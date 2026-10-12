@@ -164,6 +164,15 @@ make install
 两者都调用同一个脚本 `ci/build-emacs.sh`（可用 `PREFIX`、`NATIVE`、`JOBS`
 环境变量控制）。触发方式：推送到 `main`、提交 PR、打 `v*` 标签，或在页面手动运行。
 
+### 自动打 tag 与发布
+
+产物名固定为 `emacs-cn-linux-x86_64.tar.zst`，发布规则：
+
+- **推送到 `main`**：构建成功后，读取仓库根目录的 `VERSION` 文件，
+  自动创建 `v<VERSION>` 标签（若已存在则跳过）与同名 Release，并附上产物。
+- **推送 `v*` 标签**：为该标签创建 Release 并附上产物。
+- **发布新版本**：修改 `VERSION`（如 `31.1.50-cn1` → `31.1.50-cn2`）后推送到 `main` 即可。
+
 使用产物：
 
 ```sh

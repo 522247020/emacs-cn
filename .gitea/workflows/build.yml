@@ -92,25 +92,48 @@ jobs:
           set -eu
           sh ci/build-emacs.sh
 
-      - name: 发布 Release（Gitea API，仅打 tag 时）
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: 发布（main 自动打 tag / tag 推送）
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
         working-directory: repo
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eu
-          TAG="${GITHUB_REF_NAME}"
           API="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
           AUTH="Authorization: token ${TOKEN}"
+
+          case "${GITHUB_REF:-}" in
+            refs/tags/*)
+              TAG="${GITHUB_REF_NAME}"
+              ;;
+            refs/heads/main)
+              if [ ! -f VERSION ]; then echo "缺少 VERSION 文件"; exit 1; fi
+              TAG="v$(cat VERSION)"
+              if curl -sf -H "$AUTH" "$API/tags/$TAG" >/dev/null 2>&1; then
+                echo "tag $TAG 已存在（如需发新版本，请修改 VERSION 后重推）"
+                exit 0
+              fi
+              echo "创建 tag: $TAG -> ${GITHUB_SHA}"
+              curl -sf -X POST "$API/tags" -H "$AUTH" -H "Content-Type: application/json" \
+                -d "{\"tag_name\":\"$TAG\",\"target\":\"${GITHUB_SHA}\"}"
+              ;;
+            *)
+              echo "非 main/tag，跳过发布"
+              exit 0
+              ;;
+          esac
+
           echo "创建 Release: $TAG"
           curl -sf -X POST "$API/releases" -H "$AUTH" -H "Content-Type: application/json" \
             -d "{\"tag_name\":\"$TAG\",\"name\":\"$TAG\"}" > release.json || true
           cat release.json || true
-          RID=$(grep -o '"id":[0-9]*' release.json | head -1 | cut -d: -f2 || true)
+          RID=$(curl -sf -H "$AUTH" "$API/releases/tags/$TAG" \
+                | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2 || true)
           if [ -n "${RID:-}" ]; then
             curl -sf -X POST "$API/releases/$RID/assets?name=emacs-cn-linux-x86_64.tar.zst" \
               -H "$AUTH" -F "attachment=@emacs-cn-linux-x86_64.tar.zst"
-            echo "已上传附件"
+            echo "已上传附件到 Release $TAG"
           else
-            echo "未能创建 Release（可能已存在），跳过附件上传"
+            echo "未能获取 Release id（可能权限不足）"
+            exit 1
           fi
