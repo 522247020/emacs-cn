@@ -1,7 +1,15 @@
 name: build
 
-# Gitea Actions 语法与 GitHub Actions 基本兼容。
-# 需要先在 Gitea 站点注册 act_runner，并带有标签 ubuntu-latest；否则改下面的 runs-on。
+# Gitea Actions 工作流：不依赖任何外部 action（github.com 被墙/离线也能跑）。
+#
+# 前置：
+#   * 已注册 act_runner，标签为 ubuntu-latest（不是的话改下面的 runs-on）
+#   * runner 容器能访问你的 Gitea 服务器（用其 IP/域名）
+#   * 能访问 apt 源（国内可给容器配镜像源）
+#
+# 说明：本工作流用 `git clone` + `curl` 调 Gitea API 代替
+# actions/checkout 与 actions/upload-artifact，避免从 github.com 拉取 action。
+
 on:
   push:
     branches: [main]
@@ -15,21 +23,37 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 240
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Install build dependencies
+      - name: Checkout（git clone，不走外部 action）
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # act_runner 默认以 root 运行；两者都兼容
+          set -eu
+          echo "server=$GITHUB_SERVER_URL repo=$GITHUB_REPOSITORY ref=$GITHUB_REF"
+          HOST=$(printf '%s' "$GITHUB_SERVER_URL" | sed -E 's#^https?://##')
+          git config --global --add safe.directory '*'
+          rm -rf repo
+          git clone --depth 1 \
+            "http://oauth2:${TOKEN}@${HOST}/${GITHUB_REPOSITORY}.git" repo
+          cd repo
+          # 打 tag 时检出该 tag 的提交
+          if [ -n "${GITHUB_REF_NAME:-}" ] \
+             && git ls-remote --tags origin "refs/tags/${GITHUB_REF_NAME}" | grep -q .; then
+            git fetch --depth 1 origin "refs/tags/${GITHUB_REF_NAME}"
+            git checkout -q FETCH_HEAD
+          fi
+          git log --oneline -1
+
+      - name: 安装构建依赖
+        working-directory: repo
+        run: |
+          set -eu
           SUDO=""
           [ "$(id -u)" -ne 0 ] && SUDO="sudo"
           $SUDO apt-get update
           $SUDO apt-get install -y --no-install-recommends \
-            build-essential autoconf automake texinfo pkg-config zstd curl \
+            build-essential autoconf automake texinfo pkg-config zstd curl ca-certificates \
             libgnutls28-dev libxml2-dev libjansson-dev libgmp-dev \
             libgtk-3-dev libharfbuzz-dev libncurses-dev zlib1g-dev \
             libjpeg-dev libpng-dev libgif-dev libtiff-dev librsvg2-dev libxpm-dev
@@ -38,41 +62,35 @@ jobs:
             || $SUDO apt-get install -y libgccjit-12-dev \
             || echo "警告：未找到 libgccjit，将关闭原生编译"
 
-      - name: Build and package
+      - name: 构建并打包
+        working-directory: repo
         env:
           PREFIX: /opt/emacs-cn
           NATIVE: yes
         run: |
-          if ! ldconfig -p | grep -q libgccjit; then
-            export NATIVE=no
-          fi
+          set -eu
+          if ! ldconfig -p | grep -q libgccjit; then export NATIVE=no; fi
           sh ci/build-emacs.sh
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: emacs-cn-linux-x86_64
-          path: emacs-cn-linux-x86_64.tar.zst
-          if-no-files-found: error
-
-      - name: Publish Release (Gitea API)
+      - name: 发布 Release（Gitea API，仅打 tag 时）
         if: startsWith(github.ref, 'refs/tags/')
+        working-directory: repo
         env:
-          # Gitea 会提供 GITHUB_TOKEN；若你的实例没有，可在仓库设置里添加名为 GITEA_TOKEN 的 secret
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eu
           TAG="${GITHUB_REF_NAME}"
           API="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
-          curl -sf -X POST "$API/releases" \
-            -H "Authorization: token $TOKEN" \
-            -H "Content-Type: application/json" \
+          AUTH="Authorization: token ${TOKEN}"
+          echo "创建 Release: $TAG"
+          curl -sf -X POST "$API/releases" -H "$AUTH" -H "Content-Type: application/json" \
             -d "{\"tag_name\":\"$TAG\",\"name\":\"$TAG\"}" > release.json || true
+          cat release.json || true
           RID=$(grep -o '"id":[0-9]*' release.json | head -1 | cut -d: -f2 || true)
           if [ -n "${RID:-}" ]; then
             curl -sf -X POST "$API/releases/$RID/assets?name=emacs-cn-linux-x86_64.tar.zst" \
-              -H "Authorization: token $TOKEN" \
-              -F "attachment=@emacs-cn-linux-x86_64.tar.zst"
+              -H "$AUTH" -F "attachment=@emacs-cn-linux-x86_64.tar.zst"
+            echo "已上传附件"
           else
-            echo "未能创建 Release（可能已存在），跳过上传附件"
+            echo "未能创建 Release（可能已存在），跳过附件上传"
           fi

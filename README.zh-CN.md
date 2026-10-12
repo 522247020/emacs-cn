@@ -146,7 +146,20 @@ make install
 | 平台 | 工作流文件 | 说明 |
 | --- | --- | --- |
 | GitHub | `.github/workflows/build.yml` | 用 GitHub 托管 runner，打 tag 时自动创建 Release |
-| Gitea | `.gitea/workflows/build.yml` | 用自建 `act_runner`，打 tag 时通过 Gitea API 建 Release |
+| Gitea | `.gitea/workflows/build.yml` | 用自建 `act_runner`；**不依赖外部 action**（`git clone` + Gitea API），打 tag 时自动建 Release |
+
+> **Gitea 版为何不用 `actions/checkout` / `actions/upload-artifact`**：
+> 这些 action 默认从 `github.com` 拉取。若 runner 无法访问 github.com
+> （国内网络常见，报 `lookup github.com ... server misbehaving`），工作流会直接失败。
+> 所以 Gitea 版改为：用 `git clone`（走你自己的 Gitea 服务器）取代码，
+> 用 `curl` 调 Gitea API 发 Release，全程不需要外网 action。
+>
+> 也可在 Gitea 的 `app.ini` 里把 action 源指向可访问的镜像：
+> ```ini
+> [actions]
+> DEFAULT_ACTIONS_URL = https://gitea.com
+> ```
+> 前提是 runner 能访问 `gitea.com`。
 
 两者都调用同一个脚本 `ci/build-emacs.sh`（可用 `PREFIX`、`NATIVE`、`JOBS`
 环境变量控制）。触发方式：推送到 `main`、提交 PR、打 `v*` 标签，或在页面手动运行。
