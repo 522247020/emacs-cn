@@ -202,6 +202,76 @@ sudo tar --zstd -xf emacs-cn-linux-x86_64.tar.zst -C /
 **Action 的拉取来源** 与 **发布/制品存储**。Gitea 上也能跑，但需要先部署
 `act_runner`，制品/Release 走 Gitea 自己的接口。
 
+## 更新 Emacs / Doom
+
+### 更新 Emacs 源码
+
+汉化由三部分组成，便于跟着上游更新：
+
+| 组成 | 位置 | 说明 |
+| --- | --- | --- |
+| 代码补丁 | `patches/emacs-cn.patch` | 对上游约 10 个文件的小改动 + 新增 `chinese-l10n.el` |
+| 翻译词表 | `src/lisp/international/chinese-l10n-data.el` | 约 6.5 万条，与版本无关 |
+| 脚本 | `ci/apply-l10n.sh`、`ci/update-emacs.sh` | 套补丁 / 拉取上游并更新 |
+
+跟进上游（以 `emacs-31` 为例）：
+
+```sh
+# 1) 拉取上游新源码、套用汉化；旧源码移到 src.old
+sh ci/update-emacs.sh emacs-31
+
+# 2) 查看变化并构建验证
+cd src && ./autogen.sh
+./configure --prefix=/home/mhwy/Code/emacs/install31 \
+            --with-x-toolkit=gtk3 --with-native-compilation --without-tree-sitter
+make -j"$(nproc)"
+
+# 3) 没问题后删除 src.old 并提交
+cd .. && rm -rf src.old && git add -A && git commit -m "upgrade emacs"
+```
+
+如果上游改动导致补丁冲突，`patch` 会生成 `.rej` 文件，按提示手工合并即可。
+改动集中在：
+
+- C：`src/xdisp.c`、`src/editfns.c`、`src/print.c`、`src/lisp.h`
+- Lisp：`lisp/loadup.el`、`lisp/startup.el`、`lisp/subr.el`、`lisp/help.el`、`lisp/help-fns.el`
+- 新增：`lisp/international/chinese-l10n.el`、`chinese-l10n-data.el`
+
+只改汉化、不动上游时，直接改 `src/` 里的文件，再重新导出补丁（对照一份
+纯净上游源码）：
+
+```sh
+# /tmp/emacs-base 为对应版本的上游源码
+cd /home/mhwy/Code/emacs
+git ls-files src/ | while IFS= read -r f; do
+  rel=${f#src/}
+  [ "$rel" = lisp/international/chinese-l10n-data.el ] && continue
+  base=/tmp/emacs-base/$rel
+  if [ -f "$base" ]; then cmp -s "$base" "$f" || diff -u --label "a/$rel" --label "b/$rel" "$base" "$f"
+  else diff -u --label /dev/null --label "b/$rel" /dev/null "$f"; fi
+done > patches/emacs-cn.patch
+```
+
+### 更新 Doom
+
+Doom 的状态是按 Emacs **主/次版本**存的，更新时注意：
+
+1. **Doom 自身更新**：
+   ```sh
+   ~/.config/emacs/bin/doom upgrade    # 或 git -C ~/.config/emacs pull
+   ~/.config/emacs/bin/doom sync
+   ```
+2. **Emacs 更新后必须用同一份 Emacs 跑 `doom sync`**：会重新生成
+   `init.<major>.<minor>.el` 与 `straight/build-<major>.<minor>`：
+   ```sh
+   EMACS=/home/mhwy/Code/emacs/install31/bin/emacs \
+     ~/.config/emacs/bin/doom sync
+   ```
+3. **版本要对上**：Doom 的 `build-31.1` / `init.31.1.el` 对应 Emacs 31.1；
+   升到 31.2 就需要重新 `doom sync` 生成 `build-31.2`。
+4. 若更新后 which-key / marginalia 汉化失效，确认 `loadup.el` 里仍有
+   `(load "international/chinese-l10n")`。
+
 ## 运行
 
 ```sh

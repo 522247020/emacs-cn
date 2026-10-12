@@ -1,0 +1,1325 @@
+--- a/lisp/help-fns.el
++++ b/lisp/help-fns.el
+@@ -324,7 +324,7 @@
+           (prin1 function))
+         ;; Use " is " instead of a colon so that
+         ;; it is easier to get out the function name using forward-sexp.
+-        (princ " is ")
++        (princ (chinese-l10n-translate " is "))
+         (describe-function-1 function)
+         (with-current-buffer standard-output
+           (help-fns--setup-xref-backend)
+@@ -595,13 +595,13 @@
+           (if (and (eq function 'self-insert-command)
+                    (vectorp (car-safe keys))
+                    (consp (aref (car keys) 0)))
+-              (princ "It is bound to many ordinary text characters.\n")
++              (princ (chinese-l10n-translate "It is bound to many ordinary text characters.\n"))
+             ;; Which non-control non-meta keys run this command?
+             (dolist (key keys)
+               (if (member (event-modifiers (aref key 0)) '(nil (shift)))
+                   (push key non-modified-keys)))
+             (when remapped
+-              (princ "Its keys are remapped to ")
++              (princ (chinese-l10n-translate "Its keys are remapped to "))
+               (princ (if (symbolp remapped)
+                          (format-message "`%s'" remapped)
+ 		       "an anonymous command"))
+@@ -609,8 +609,8 @@
+ 
+             (when keys
+               (princ (if remapped
+-                         "Without this remapping, it would be bound to "
+-                       "It is bound to "))
++                         (chinese-l10n-translate "Without this remapping, it would be bound to ")
++                       (chinese-l10n-translate "It is bound to ")))
+               ;; If lots of ordinary text characters run this command,
+               ;; don't mention them one by one.
+               (if (< (length non-modified-keys) 10)
+@@ -621,8 +621,8 @@
+                 (if keys
+                     (with-current-buffer standard-output
+                       (help-fns--insert-bindings keys)
+-                      (insert ", and many ordinary text characters"))
+-                  (princ "many ordinary text characters."))))
++                      (insert (chinese-l10n-translate ", and many ordinary text characters")))
++                  (princ (chinese-l10n-translate "many ordinary text characters.")))))
+             (when (or remapped keys non-modified-keys)
+               (princ ".")
+               (terpri)))
+@@ -635,14 +635,15 @@
+               (let ((start (point)))
+                 (help-fns--insert-menu-bindings
+                  menus
+-                 (concat "It " (if remapped "could " "can ") (and keys "also ")
+-                         "be invoked from the menu: "))
++                 (concat (chinese-l10n-translate "It ") (if remapped (chinese-l10n-translate "could ") (chinese-l10n-translate "can "))
++                         (and keys (chinese-l10n-translate "also "))
++                         (chinese-l10n-translate "be invoked from the menu: ")))
+                 (when remapped
+-                  (princ ", but that was remapped to ")
++                  (princ (chinese-l10n-translate ", but that was remapped to "))
+                   (princ (if (symbolp remapped)
+                              (format-message "`%s'" remapped)
+ 		           "an anonymous command"))
+-                  (princ "as well.\n"))
++                  (princ (chinese-l10n-translate "as well.\n")))
+                 ;; The (= (point) start) condition tests whether
+                 ;; 'help-fns--insert-menu-bindings' inserted anything;
+                 ;; if it didn't, we already have a period from the
+@@ -789,7 +790,7 @@
+                       (type-spec (car res))
+                       (kind (cdr res)))
+             (insert (if (eq kind 'inferred)
+-                        "\nInferred type:\n  "
++                        (chinese-l10n-translate "\nInferred type:\n  ")
+                       "\nDeclared type:\n  "))
+             (with-demoted-errors "%S"
+               (let ((beg (point)))
+@@ -1135,33 +1136,33 @@
+                              (stringp file-name)
+                              (help-fns--autoloaded-p function))
+                         (concat
+-                         "an autoloaded " (if (commandp def)
+-                                              "interactive "))
+-                      (if (commandp def) "an interactive " "a ")))
++                         (chinese-l10n-translate "an autoloaded ") (if (commandp def)
++                                              (chinese-l10n-translate "interactive ")))
++                      (if (commandp def) (chinese-l10n-translate "an interactive ") (chinese-l10n-translate "a "))))
+                ;; Print what kind of function-like object FUNCTION is.
+                (description
+ 		(cond ((or (stringp def) (vectorp def))
+-		  "a keyboard macro")
++		  (chinese-l10n-translate "a keyboard macro"))
+ 		 ((and (symbolp function)
+                        (get function 'reader-construct))
+-                  "a reader construct")
++                  (chinese-l10n-translate "a reader construct"))
+ 		 ;; Aliases are Lisp functions, so we need to check
+ 		 ;; aliases before functions.
+ 		 (aliased
+-		  (format-message "an alias for `%s'" real-def))
++		  (format-message (chinese-l10n-translate "an alias for `%s'") real-def))
+ 		 ((autoloadp def)
+-		  (format "an autoloaded %s"
++		  (format (chinese-l10n-translate "an autoloaded %s")
+                           (cond
+-			   ((commandp def) "interactive Lisp function")
+-			   ((eq (nth 4 def) 'keymap) "keymap")
+-			   ((nth 4 def) "Lisp macro")
+-                           (t "Lisp function"))))
++			   ((commandp def) (chinese-l10n-translate "interactive Lisp function"))
++			   ((eq (nth 4 def) 'keymap) (chinese-l10n-translate "keymap"))
++			   ((nth 4 def) (chinese-l10n-translate "Lisp macro"))
++                           (t (chinese-l10n-translate "Lisp function")))))
+ 		 ((or (eq (car-safe def) 'macro)
+ 		      ;; For advised macros, def is a lambda
+ 		      ;; expression or a compiled-function-p, so we
+ 		      ;; need to check macros before functions.
+ 		      (macrop function))
+-		  (concat beg "Lisp macro"))
++		  (concat beg (chinese-l10n-translate "Lisp macro")))
+ 		 ((keymapp def)
+ 		  (let ((is-full nil)
+ 			(elts (cdr-safe def)))
+@@ -1170,7 +1171,7 @@
+ 			  (setq is-full t
+ 				elts nil))
+ 		      (setq elts (cdr-safe elts)))
+-		    (concat beg (if is-full "keymap" "sparse keymap"))))
++		    (concat beg (if is-full (chinese-l10n-translate "keymap") (chinese-l10n-translate "sparse keymap")))))
+ 		 (t
+                   (let* ((type (or (oclosure-type def) (cl-type-of def)))
+                          (typ-str
+@@ -1193,7 +1194,7 @@
+       (insert description))
+ 
+     (if (and aliased (not (fboundp real-def)))
+-	(princ ",\nwhich is not defined.")
++	(princ (chinese-l10n-translate ",\nwhich is not defined."))
+       (with-current-buffer standard-output
+ 	(save-excursion
+ 	  (save-match-data
+@@ -1207,7 +1208,7 @@
+             (setq help-mode--current-data (list :symbol function)))
+ 	;; We used to add .el to the file name,
+ 	;; but that's completely wrong when the user used load-file.
+-	(princ (format-message " in `%s'"
++	(princ (format-message (chinese-l10n-translate " in `%s'")
+                                (if (eq file-name 'C-source)
+                                    "C source code"
+                                  (help-fns-short-filename file-name))))
+@@ -1330,11 +1331,11 @@
+ (defun describe-variable-custom-version-info (variable &optional type)
+   (let ((custom-version (get variable 'custom-version))
+ 	(cpv (get variable 'custom-package-version))
+-        (type (or type "variable"))
++        (type (chinese-l10n-translate (or type "variable")))
+ 	(output nil))
+     (if custom-version
+ 	(setq output
+-	      (format "  This %s was introduced, or its default value was changed, in\n  version %s of Emacs.\n"
++	      (format (chinese-l10n-translate "  This %s was introduced, or its default value was changed, in\n  version %s of Emacs.\n")
+                       type custom-version))
+       (when cpv
+ 	(let* ((package (car-safe cpv))
+@@ -1345,10 +1346,10 @@
+ 	       (emacsv (cdr (assoc version pkg-versions))))
+ 	  (if (and package version)
+ 	      (setq output
+-		    (format (concat "  This %s was introduced, or its default value was changed, in\n  version %s of the %s package"
++		    (format (chinese-l10n-translate (concat "  This %s was introduced, or its default value was changed, in\n  version %s of the %s package"
+ 				    (if emacsv
+ 					(format " that is part of Emacs %s" emacsv))
+-				    ".\n")
++				    ".\n"))
+ 			    type version package))))))
+     output))
+ 
+@@ -1404,7 +1405,7 @@
+ 	      (princ (if file-name
+ 		         (progn
+ 		           (princ (format-message
+-                                   " is a variable defined in `%s'.\n\n"
++                                   (chinese-l10n-translate " is a variable defined in `%s'.\n\n")
+                                    (if (eq file-name 'C-source)
+                                        "C source code"
+                                      (help-fns-short-filename file-name))))
+@@ -1421,8 +1422,8 @@
+ 			       (help-xref-button 1 'help-variable-def
+ 					         variable file-name)))
+ 		           (if valvoid
+-			       "It is void as a variable."
+-                             "Its "))
++			       (chinese-l10n-translate "It is void as a variable.")
++                             (chinese-l10n-translate "Its ")))
+ 	               (with-current-buffer standard-output
+                          (setq help-mode--current-data (list :symbol variable
+                                                              :type 'variable)))
+@@ -1432,7 +1433,7 @@
+ 	    (unless valvoid
+ 	      (with-current-buffer standard-output
+ 		(setq val-start-pos (point))
+-		(princ "value is")
++		(princ (chinese-l10n-translate "value is"))
+ 		(let ((line-beg (line-beginning-position))
+ 		      (print-rep
+ 		       (let ((rep
+@@ -1477,7 +1478,7 @@
+ 		    (when (and (consp sv)
+                                (not (equal origval val))
+                                (not (equal origval :help-eval-error)))
+-		      (princ "\nOriginal value was \n")
++		      (princ (chinese-l10n-translate "\nOriginal value was \n"))
+ 		      (setq from (point))
+ 		      (if (and (symbolp origval) (not (booleanp origval)))
+ 			  (let* ((rep (cl-prin1-to-string origval))
+@@ -1498,16 +1499,16 @@
+                 (princ (format "Local in buffer %s; "
+                                (buffer-name buffer))))
+                ((terminal-live-p locus)
+-                (princ "It is a terminal-local variable; "))
++                (princ (chinese-l10n-translate "It is a terminal-local variable; ")))
+                (t
+                 (princ (format "It is local to %S" locus))))
+ 	      (if (not (default-boundp variable))
+-		  (princ "globally void")
++		  (princ (chinese-l10n-translate "globally void"))
+ 		(let ((global-val (default-value variable)))
+ 		  (with-current-buffer standard-output
+-		    (princ "global value is ")
++		    (princ (chinese-l10n-translate "global value is "))
+ 		    (if (eq val global-val)
+-			(princ "the same.")
++			(princ (chinese-l10n-translate "the same."))
+ 		      (terpri)
+ 		      ;; Fixme: pp can take an age if you happen to
+ 		      ;; ask for a very large expression.  We should
+@@ -1532,10 +1533,10 @@
+ 		(goto-char val-start-pos)
+ 		(when (looking-at "value is") (replace-match ""))
+ 		(save-excursion
+-		  (insert "\n\nValue:")
++		  (insert (chinese-l10n-translate "\n\nValue:"))
+                   (setq-local help-button-cache (point-marker)))
+-		(insert "value is shown ")
+-		(insert-button "below"
++		(insert (chinese-l10n-translate "value is shown "))
++		(insert-button (chinese-l10n-translate "below")
+ 			       'action help-button-cache
+ 			       'follow-link t
+ 			       'help-echo "mouse-2, RET: show value")
+@@ -1640,7 +1641,10 @@
+           (custom-set (get variable 'custom-set))
+           (opoint (with-current-buffer standard-output
+                     (point))))
+-      (princ (concat "  You can " customize-label (or text " this variable.")))
++      (princ (concat (chinese-l10n-translate "  You can ")
++                     (chinese-l10n-translate customize-label)
++                     (or (and text (chinese-l10n-translate text))
++                         (chinese-l10n-translate " this variable."))))
+       (when (and custom-set
+                  ;; Don't override manually written documentation.
+                  (not (string-match (rx word-start "setopt" word-end)
+@@ -2195,7 +2199,7 @@
+                   (setq help-mode--current-data (list :symbol keymap))
+                   (princ ".\n\n"))
+               (princ (format-message
+-                      " defined in `%s'.\n\n"
++                      (chinese-l10n-translate " defined in `%s'.\n\n")
+                       (if (eq file-name 'C-source)
+                           "C source code"
+                         (help-fns-short-filename file-name))))
+@@ -2261,10 +2265,10 @@
+           (when describe-mode-outline
+             (goto-char (point-min))
+             (put-text-property
+-             (point) (progn (insert (format "Major mode %S" major)) (point))
++             (point) (progn (insert (format (chinese-l10n-translate "Major mode %S") major)) (point))
+              'outline-level 1)
+             (insert "\n\n"))
+-          (insert "The major mode is "
++          (insert (chinese-l10n-translate "The major mode is ")
+                   (buttonize
+                    (propertize (format-mode-line
+                                 (buffer-local-value 'mode-name buffer)
+@@ -2272,9 +2276,9 @@
+                                'face 'bold)
+                    (lambda (_)
+                      (describe-function major))))
+-          (insert " mode")
++          (insert (chinese-l10n-translate " mode"))
+           (when-let* ((file-name (find-lisp-object-file-name major nil)))
+-	    (insert (format " defined in %s"
++	    (insert (format (chinese-l10n-translate " defined in %s")
+                             (buttonize
+                              (help-fns-short-filename file-name)
+                              (lambda (_)
+--- a/lisp/help.el
++++ b/lisp/help.el
+@@ -1010,8 +1010,8 @@
+      ;; Now describe the key, perhaps as changed.
+      (let ((key-desc (help-key-description key untranslated)))
+        (if (help--binding-undefined-p defn)
+-           (format "%s%s is undefined" key-desc mouse-msg)
+-         (format "%s%s runs the command %s" key-desc mouse-msg
++           (format (chinese-l10n-translate "%s%s is undefined") key-desc mouse-msg)
++         (format (chinese-l10n-translate "%s%s runs the command %s") key-desc mouse-msg
+                  (if (symbolp defn) (prin1-to-string defn)
+                    (help-fns-function-name defn)))))
+      defn event mouse-msg)))
+@@ -1274,8 +1274,8 @@
+ 
+             (insert brief-desc)
+             (when locus
+-              (insert (format " (found in %s)" locus)))
+-            (insert ", which is ")
++              (insert (format (chinese-l10n-translate " (found in %s)") locus)))
++            (insert (chinese-l10n-translate ", which is "))
+ 	    (describe-function-1 defn)))))))
+ 
+ (defun search-forward-help-for-help ()
+@@ -1592,7 +1592,7 @@
+                             (substitute-quotes "`")
+                             (symbol-name name)
+                             (substitute-quotes "'")
+-                            ", which is not currently defined.\n")
++                            (chinese-l10n-translate ", which is not currently defined.\n"))
+                     (unless generate-summary
+                       (setq keymap nil)))
+                    ((not generate-summary)
+@@ -1725,7 +1725,7 @@
+                           (concat " Starting With "
+                                   (help--key-description-fontified prefix)))
+                       ":\n"))
+-          "\nKey             Binding\n"
++          (chinese-l10n-translate "\nKey             Binding\n")
+           (make-separator-line)))))))
+ 
+ (defun help--shadow-lookup (keymap key accept-default remap)
+@@ -1904,7 +1904,7 @@
+             (when (or shadowed remapped)
+               (goto-char (max (1- (point)) (point-min)))
+               (when shadowed
+-                (insert "\n  (this binding is currently shadowed)"))
++                (insert (chinese-l10n-translate "\n  (this binding is currently shadowed)")))
+               (when remapped
+                 (insert (format
+                          "\n  (Remapped via %s)"
+@@ -2209,7 +2209,7 @@
+ 	(help-window-display-message
+ 	 (cond
+ 	  ((eq help-setup 'window)
+-	   "Type \\[delete-other-windows] to delete the help window")
++	   (chinese-l10n-translate "Type \\[delete-other-windows] to delete the help window"))
+ 	  ((eq help-setup 'other)
+            "Type \\<help-map>\\[help-quit] in help window to restore its previous buffer"))
+ 	 window 'other))
+--- /dev/null
++++ b/lisp/international/chinese-l10n.el
+@@ -0,0 +1,530 @@
++;;; chinese-l10n.el --- Chinese localization of the Emacs user interface  -*- lexical-binding: t; coding: utf-8; -*-
++
++;; Copyright (C) 2026 Free Software Foundation, Inc.
++
++;; This file is part of GNU Emacs.
++
++;; GNU Emacs is free software: you can redistribute it and/or modify
++;; it under the terms of the GNU General Public License as published by
++;; the Free Software Foundation, either version 3 of the License, or
++;; (at your option) any later version.
++
++;; GNU Emacs is distributed in the hope that it will be useful,
++;; but WITHOUT ANY WARRANTY; without even the implied warranty of
++;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++;; GNU General Public License for more details.
++
++;; You should have received a copy of the GNU General Public License
++;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
++
++;;; Commentary:
++
++;; This library turns the visible part of the Emacs user interface
++;; into Simplified Chinese.  It translates:
++;;
++;;   * echo-area messages and error messages (via the `chinese-l10n-table'
++;;     variable, which is consulted by the C implementation of `message',
++;;     `format-message' and error signalling);
++;;   * minibuffer prompts;
++;;   * menu-bar, tool-bar and pop-up menu items, together with their
++;;     `:help' tool tips.
++;;
++;; Function and command names, key bindings and Lisp symbols are left
++;; untouched on purpose: only human-readable text is translated.
++;;
++;; The actual translation data live in `chinese-l10n-data.el', a large
++;; vector of alternating English and Chinese strings.  Users may extend
++;; or override translations with `chinese-l10n-add-translations'.
++
++;;; Code:
++
++(defgroup chinese-l10n nil
++  "Chinese localization of the Emacs user interface."
++  :group 'environment
++  :version "31.1")
++
++(defcustom chinese-l10n-enable t
++  "Whether to translate the Emacs user interface into Chinese.
++When nil, the interface stays in English even though the translation
++table is still loaded."
++  :type 'boolean
++  :group 'chinese-l10n)
++
++(defvar chinese-l10n-table nil
++  "Hash table mapping English user-interface strings to Chinese.
++This variable is consulted directly by the C implementation of
++`message', `format-message' and error signalling, as well as by the
++Lisp code in this file.  It is normally built from `chinese-l10n-data'
++by `chinese-l10n-build-table'.")
++
++(defvar chinese-l10n-data nil
++  "Vector of alternating English and Chinese UI strings.
++Even-numbered elements are English keys, odd-numbered elements their
++Chinese translations.")
++
++(defun chinese-l10n-build-table (&optional data)
++  "Populate `chinese-l10n-table' from DATA.
++DATA defaults to `chinese-l10n-data' and must be a vector of
++alternating English and Chinese strings."
++  (let* ((data (or data chinese-l10n-data))
++         (n (and data (length data)))
++         (table (make-hash-table :test #'equal :size (or n 100))))
++    (let ((i 0))
++      (while (and n (< i n))
++        (let ((en (aref data i))
++              (zh (aref data (1+ i))))
++          (when (and (stringp en) (stringp zh) (not (equal en zh)))
++            (puthash en zh table))
++          (setq i (+ i 2)))))
++    (setq chinese-l10n-table table)
++    table))
++
++(defun chinese-l10n-translate (string)
++  "Return the Chinese translation of STRING, or STRING itself.
++STRING may be any object; non-strings are returned unchanged."
++  (if (and chinese-l10n-enable
++           (stringp string)
++           (hash-table-p chinese-l10n-table))
++      (or (gethash string chinese-l10n-table) string)
++    string))
++
++(defun chinese-l10n-add-translations (alist)
++  "Add translations from ALIST, a list of (ENGLISH . CHINESE) pairs.
++Existing entries are overridden."
++  (unless (hash-table-p chinese-l10n-table)
++    (chinese-l10n-build-table))
++  (dolist (cell alist)
++    (when (and (consp cell) (stringp (car cell)) (stringp (cdr cell)))
++      (puthash (car cell) (cdr cell) chinese-l10n-table)))
++  chinese-l10n-table)
++
++;;; Minibuffer prompts
++
++(defconst chinese-l10n-prompt-functions
++  '(read-from-minibuffer
++    read-string
++    read-buffer
++    read-file-name
++    read-directory-name
++    read-number
++    read-regexp
++    read-command
++    read-shell-command
++    read-color
++    completing-read
++    format-prompt)
++  "Functions whose first argument is a prompt to translate.")
++
++(defun chinese-l10n--translate-prompt-args (args)
++  "Translate the prompt (first element) in ARGS."
++  (if (and args (stringp (car args)))
++      (cons (chinese-l10n-translate (car args)) (cdr args))
++    args))
++
++(defun chinese-l10n--setup-prompts ()
++  (dolist (fun chinese-l10n-prompt-functions)
++    (when (fboundp fun)
++      (advice-add fun :filter-args #'chinese-l10n--translate-prompt-args))))
++
++;;; Menus
++
++(defun chinese-l10n--translate-menu-item (item)
++  "Translate the label and :help of the `menu-item' list ITEM in place."
++  (when (and (consp item) (eq (car item) 'menu-item))
++    ;; (menu-item LABEL BINDING . PLIST)
++    (let ((label (nth 1 item)))
++      (when (stringp label)
++        (setcar (cdr item) (chinese-l10n-translate label))))
++    (let ((plist (nthcdr 3 item)))
++      (while (and (consp plist) (cdr plist))
++        (when (eq (car plist) :help)
++          (when (stringp (cadr plist))
++            (setcar (cdr plist) (chinese-l10n-translate (cadr plist)))))
++        (setq plist (cddr plist))))))
++
++(defun chinese-l10n--translate-keymap (keymap seen)
++  "Translate menu items in KEYMAP recursively.  SEEN avoids cycles."
++  (when (and (keymapp keymap) (not (gethash keymap seen)))
++    (puthash keymap t seen)
++    (condition-case nil
++        (map-keymap
++         (lambda (_event def)
++           (cond
++            ;; Top-level menu bar entries: ("File" . KEYMAP)
++            ((and (consp def) (stringp (car def)))
++             (setcar def (chinese-l10n-translate (car def)))
++             (when (keymapp (cdr def))
++               (chinese-l10n--translate-keymap (cdr def) seen)))
++            ((and (consp def) (eq (car def) 'menu-item))
++             (chinese-l10n--translate-menu-item def)
++             ;; Recurse into a submenu keymap stored as the binding.
++             (let ((binding (nth 2 def)))
++               (cond
++                ((keymapp binding)
++                 (chinese-l10n--translate-keymap binding seen))
++                ((and (consp binding) (keymapp (cdr binding)))
++                 (chinese-l10n--translate-keymap (cdr binding) seen)))))
++            ((keymapp def)
++             (chinese-l10n--translate-keymap def seen))))
++         keymap)
++      (error nil))))
++
++(defun chinese-l10n-translate-all-menus ()
++  "Translate every menu item in the currently defined keymaps."
++  (let ((seen (make-hash-table :test #'eq)))
++    (chinese-l10n--translate-keymap (current-global-map) seen)
++    (chinese-l10n--translate-keymap (current-local-map) seen)
++    (dolist (sym '(menu-bar tool-bar-map tab-bar-map))
++      (when (and (boundp sym) (keymapp (symbol-value sym)))
++        (chinese-l10n--translate-keymap (symbol-value sym) seen)))
++    (mapatoms
++     (lambda (sym)
++       (when (and (boundp sym) (keymapp (symbol-value sym)))
++         (chinese-l10n--translate-keymap (symbol-value sym) seen))))))
++
++(defvar chinese-l10n--menu-timer nil)
++
++(defun chinese-l10n--schedule-menus (&rest _ignore)
++  "Arrange to translate menus on the next idle moment."
++  (unless (and (timerp chinese-l10n--menu-timer)
++               (memq chinese-l10n--menu-timer timer-list))
++    (setq chinese-l10n--menu-timer
++          (run-with-idle-timer 0.3 nil #'chinese-l10n-translate-all-menus))))
++
++(defun chinese-l10n--setup-menus ()
++  (add-hook 'after-load-functions #'chinese-l10n--schedule-menus)
++  (chinese-l10n-translate-all-menus))
++
++;;; Error-message symbols
++
++(defun chinese-l10n--translate-error-symbols ()
++  "Translate the `error-message' property of defined error symbols."
++  (mapatoms
++   (lambda (sym)
++     (let ((msg (get sym 'error-message)))
++       (when (and (stringp msg)
++                  (not (get sym 'chinese-l10n-translated)))
++         (let ((zh (chinese-l10n-translate msg)))
++           (when (not (equal zh msg))
++             (put sym 'error-message zh)
++             (put sym 'chinese-l10n-translated t))))))))
++
++;;; Splash screen
++
++(defun chinese-l10n--translate-splash-list (lst)
++  "Translate strings inside the splash-screen list LST.
++Function values (lambdas) are left untouched."
++  (mapcar
++   (lambda (x)
++     (cond
++      ((stringp x) (chinese-l10n-translate x))
++      ((and (consp x) (not (functionp x)))
++       (chinese-l10n--translate-splash-list x))
++      (t x)))
++   lst))
++
++(defun chinese-l10n--translate-splash ()
++  "Translate the text of the startup and about screens."
++  (dolist (sym '(fancy-startup-text fancy-about-text))
++    (when (boundp sym)
++      (set-default sym (chinese-l10n--translate-splash-list (symbol-value sym))))))
++
++;;; Widgets and buttons
++
++(defun chinese-l10n--translate-widget-args (args)
++  "Translate string values that follow a :tag keyword in widget ARGS."
++  (let ((out nil) (rest args) (translate-next nil))
++    (while rest
++      (let ((x (pop rest)))
++        (if translate-next
++            (progn (push (chinese-l10n-translate x) out)
++                   (setq translate-next nil))
++          (push x out)
++          (when (eq x :tag) (setq translate-next t)))))
++    (nreverse out)))
++
++(defun chinese-l10n--translate-first-arg (args)
++  "Translate the first string argument in ARGS (a button label)."
++  (if (and args (stringp (car args)))
++      (cons (chinese-l10n-translate (car args)) (cdr args))
++    args))
++
++(defun chinese-l10n--setup-widgets ()
++  (when (fboundp 'widget-create)
++    (advice-add 'widget-create :filter-args
++                #'chinese-l10n--translate-widget-args))
++  (dolist (fun '(insert-button insert-text-button make-text-button))
++    (when (fboundp fun)
++      (advice-add fun :filter-args #'chinese-l10n--translate-first-arg))))
++
++;;; Completion annotations (M-x / which-key)
++
++(defun chinese-l10n--translate-wk-desc (args)
++  "Translate the description argument of `which-key--propertize-description'."
++  (if (and args (stringp (car args)))
++      (let* ((desc (car args))
++             (prefix (if (string-prefix-p "group:" desc) "group:" ""))
++             (body (substring desc (length prefix)))
++             (zh (chinese-l10n-translate body)))
++        (cons (concat prefix zh) (cdr args)))
++    args))
++
++(defun chinese-l10n--wk-propertize (text source)
++  "Propertize TEXT with the face of SOURCE, if any."
++  (if (and (stringp source) (> (length source) 0)
++           (get-text-property 0 'face source))
++      (propertize text 'face (get-text-property 0 'face source))
++    text))
++
++(defun chinese-l10n--wk-maybe-add-docstring (current original)
++  "Chinese version of `which-key--maybe-add-docstring'.
++For a command that has no custom description, show the first line of
++its (already translated) docstring instead of its English name."
++  (let* ((orig-sym (and (stringp original) (intern-soft original)))
++         (doc (and orig-sym (commandp orig-sym)
++                   (ignore-errors (documentation orig-sym))))
++         (first (and (stringp doc) (car (split-string doc "\n"))))
++         (zh-first (if (stringp first)
++                       (or (and (hash-table-p chinese-l10n-table)
++                                (gethash first chinese-l10n-table))
++                           first)
++                     first))
++         (custom (and (stringp current) orig-sym
++                      (not (equal current (symbol-name orig-sym)))
++                      t)))
++    (cond
++     ((eq which-key-show-docstrings 'docstring-only)
++      (or (and zh-first (chinese-l10n--wk-propertize zh-first current))
++          current ""))
++     (which-key-show-docstrings
++      (cond ((and current zh-first)
++             (format "%s %s" current
++                     (chinese-l10n--wk-propertize zh-first current)))
++            (zh-first (chinese-l10n--wk-propertize zh-first current))
++            (t (or current ""))))
++     (custom (or current ""))
++     ((and zh-first (not (equal zh-first (symbol-name orig-sym))))
++      (chinese-l10n--wk-propertize zh-first current))
++     (t (or current "")))))
++
++(defconst chinese-l10n--which-key-prefixes
++  '(("C-x 4" . "其他窗口")
++    ("C-x 5" . "框架")
++    ("C-x 6" . "两列")
++    ("C-x 8" . "Unicode")
++    ("C-x RET" . "编码/输入")
++    ("C-x C-k" . "键盘宏")
++    ("C-x C-k C-r" . "宏环")
++    ("C-x C-k C-q" . "宏计数器")
++    ("C-x a" . "缩写")
++    ("C-x n" . "缩窄")
++    ("C-x r" . "寄存器/矩形/书签")
++    ("C-x t" . "标签页")
++    ("C-x v" . "版本控制")
++    ("C-x w" . "高亮")
++    ("C-x x" . "缓冲区")
++    ("C-x p" . "项目")
++    ("C-x @" . "事件")
++    ("C-x C-v" . "访问文件")
++    ("C-x =" . "比较")
++    ("C-h 4" . "其他窗口帮助")
++    ("M-s h" . "高亮匹配")
++    ("M-g" . "跳转")
++    ("M-s" . "搜索")
++    ("C-c ^" . "排序"))
++  "Chinese names for common key prefix maps shown by which-key.")
++
++(defun chinese-l10n--setup-which-key-prefixes ()
++  (dolist (cell chinese-l10n--which-key-prefixes)
++    (ignore-errors
++      (which-key-add-key-based-replacements (car cell) (cdr cell)))))
++
++(defun chinese-l10n--translate-column (col)
++  "Translate the name of a `tabulated-list-format' column COL."
++  (cond
++   ((vectorp col)
++    (if (and (> (length col) 0) (stringp (aref col 0)))
++        (let ((copy (copy-sequence col)))
++          (aset copy 0 (chinese-l10n-translate (aref col 0)))
++          copy)
++      col))
++   ((consp col)
++    (if (stringp (car col))
++        (cons (chinese-l10n-translate (car col)) (cdr col))
++      col))
++   (t col)))
++
++(defun chinese-l10n--tabulated-list-format (fmt)
++  "Return FMT with translated column names."
++  (cond
++   ((vectorp fmt)
++    (apply #'vector
++           (mapcar #'chinese-l10n--translate-column (append fmt nil))))
++   ((consp fmt)
++    (mapcar #'chinese-l10n--translate-column fmt))
++   (t fmt)))
++
++(defun chinese-l10n--tabulated-list-around (orig)
++  "Translate `tabulated-list-format' around ORIG."
++  (let ((tabulated-list-format
++         (chinese-l10n--tabulated-list-format tabulated-list-format)))
++    (funcall orig)))
++
++(defun chinese-l10n--translate-doc (doc)
++  "Translate a documentation string DOC if a translation exists."
++  (if (and (stringp doc) (hash-table-p chinese-l10n-table))
++      (or (gethash doc chinese-l10n-table) doc)
++    doc))
++
++(defun chinese-l10n--doc-lookup (rawdoc res raw)
++  "Translate RAWDOC, substituting keys unless RAW.
++RES is the already-substituted original, used as a fallback key."
++  (if (not (hash-table-p chinese-l10n-table))
++      res
++    (let* ((sub (and (stringp rawdoc) (not (equal rawdoc res))
++                     (ignore-errors (substitute-command-keys rawdoc))))
++           (zh (or (gethash res chinese-l10n-table)
++                   (and (stringp rawdoc) (gethash rawdoc chinese-l10n-table))
++                   (and sub (gethash sub chinese-l10n-table)))))
++      (cond
++       ((not zh) res)
++       (raw zh)
++       (t (or (ignore-errors (substitute-command-keys zh)) zh))))))
++
++(defun chinese-l10n--documentation-around (orig sym &optional raw)
++  "Translate `documentation' output, handling raw and substituted forms."
++  (let ((res (funcall orig sym raw)))
++    (if (not (stringp res))
++        res
++      (chinese-l10n--doc-lookup (ignore-errors (funcall orig sym t)) res raw))))
++
++(defun chinese-l10n--documentation-property-around (orig sym prop &optional raw)
++  "Translate `documentation-property' output."
++  (let ((res (funcall orig sym prop raw)))
++    (if (not (stringp res))
++        res
++      (chinese-l10n--doc-lookup (ignore-errors (funcall orig sym prop t))
++                                res raw))))
++
++(defun chinese-l10n--translate-map-title (title)
++  "Translate a binding-help section TITLE."
++  (if (not (stringp title))
++      title
++    (let ((zh (and (hash-table-p chinese-l10n-table)
++                   (gethash title chinese-l10n-table))))
++      (cond
++       (zh zh)
++       ((string-match " Minor Mode Bindings\\'" title)
++        (concat (substring title 0 (match-beginning 0)) " 次模式绑定"))
++       ((string-match " Major Mode Bindings\\'" title)
++        (concat (substring title 0 (match-beginning 0)) " 主模式绑定"))
++       ((string-match "Property Bindings\\'" title)
++        (concat (substring title 0 (match-beginning 0)) "属性绑定"))
++       (t title)))))
++
++(defun chinese-l10n--describe-map-tree-args (args)
++  "Translate the TITLE argument of `help--describe-map-tree'."
++  (let ((args (copy-sequence args)))
++    (when (and (> (length args) 4) (stringp (nth 4 args)))
++      (setcar (nthcdr 4 args) (chinese-l10n--translate-map-title (nth 4 args))))
++    args))
++
++(defun chinese-l10n--setup-documentation ()
++  "Translate the output of `documentation' and `documentation-property'.
++This makes `C-h f', `C-h v', `C-h k', `C-h m', eldoc and help
++tooltips show Chinese documentation."
++  (advice-add 'documentation :around #'chinese-l10n--documentation-around)
++  (advice-add 'documentation-property :around
++              #'chinese-l10n--documentation-property-around)
++  (advice-add 'help--describe-map-tree :filter-args
++              #'chinese-l10n--describe-map-tree-args))
++
++(defun chinese-l10n--translate-doc-first-line (doc)
++  "Translate the first line of DOC, a documentation string."
++  (if (stringp doc)
++      (let* ((nl (string-match "\n" doc))
++             (first (if nl (substring doc 0 nl) doc))
++             (zh (chinese-l10n-translate first)))
++        (if (equal zh first)
++            doc
++          (concat zh (if nl (substring doc nl) ""))))
++    doc))
++
++(defun chinese-l10n--setup-completion ()
++  ;; which-key and marginalia are usually loaded lazily, so register the
++  ;; advice for both the already-loaded and the not-yet-loaded cases.
++  (with-eval-after-load 'which-key
++    (advice-add 'which-key--propertize-description :filter-args
++                #'chinese-l10n--translate-wk-desc)
++    (advice-add 'which-key--maybe-add-docstring :override
++                #'chinese-l10n--wk-maybe-add-docstring)
++    (chinese-l10n--setup-which-key-prefixes))
++  (with-eval-after-load 'marginalia
++    (advice-add 'marginalia--function-doc :filter-return
++                #'chinese-l10n--translate-doc-first-line))
++  (with-eval-after-load 'tabulated-list
++    (advice-add 'tabulated-list-init-header :around
++                #'chinese-l10n--tabulated-list-around))
++  (when (fboundp 'which-key--propertize-description)
++    (unless (advice-member-p #'chinese-l10n--translate-wk-desc
++                             'which-key--propertize-description)
++      (advice-add 'which-key--propertize-description :filter-args
++                  #'chinese-l10n--translate-wk-desc)))
++  (when (fboundp 'which-key--maybe-add-docstring)
++    (unless (advice-member-p #'chinese-l10n--wk-maybe-add-docstring
++                             'which-key--maybe-add-docstring)
++      (advice-add 'which-key--maybe-add-docstring :override
++                  #'chinese-l10n--wk-maybe-add-docstring)))
++  (when (fboundp 'marginalia--function-doc)
++    (unless (advice-member-p #'chinese-l10n--translate-doc-first-line
++                             'marginalia--function-doc)
++      (advice-add 'marginalia--function-doc :filter-return
++                  #'chinese-l10n--translate-doc-first-line))))
++
++;;; Mode names
++
++(defun chinese-l10n--translate-mode-name ()
++  "Translate the `mode-name' of the current buffer."
++  (cond
++   ((stringp mode-name)
++    (let ((zh (chinese-l10n-translate mode-name)))
++      (unless (equal zh mode-name)
++        (setq-local mode-name zh))))
++   ((consp mode-name)
++    (let ((zh (mapcar (lambda (x)
++                        (if (stringp x) (chinese-l10n-translate x) x))
++                      mode-name)))
++      (unless (equal zh mode-name)
++        (setq-local mode-name zh))))))
++
++;;; Setup
++
++(defun chinese-l10n-setup ()
++  "Enable Chinese localization of the user interface."
++  (unless (hash-table-p chinese-l10n-table)
++    (chinese-l10n-build-table))
++  (when (and chinese-l10n-enable (not noninteractive))
++    (when (boundp 'minibuffer-default-prompt-format)
++      (setq minibuffer-default-prompt-format "\uff08\u9ed8\u8ba4 %s\uff09"))
++    (when (boundp 'yes-or-no-prompt)
++      (setq yes-or-no-prompt "\uff08\u662f\u6216\u5426\uff09 "))
++    (chinese-l10n--setup-prompts)
++    (chinese-l10n--setup-widgets)
++    (chinese-l10n--setup-completion)
++    (chinese-l10n--setup-documentation)
++    (chinese-l10n--translate-error-symbols)
++    (chinese-l10n--setup-menus)
++    (add-hook 'after-change-major-mode-hook #'chinese-l10n--translate-mode-name)
++    (chinese-l10n--translate-mode-name)))
++
++(load "international/chinese-l10n-data" t t)
++
++;; The table must exist before the dump so that the C code and already
++;; loaded Lisp see it; menus are translated once the real frame exists.
++(chinese-l10n-build-table)
++(chinese-l10n--translate-error-symbols)
++(chinese-l10n--translate-splash)
++(add-hook 'after-init-hook #'chinese-l10n-setup)
++
++(provide 'chinese-l10n)
++;;; chinese-l10n.el ends here
+--- a/lisp/loadup.el
++++ b/lisp/loadup.el
+@@ -394,6 +394,7 @@
+   (load "cus-start")) ;Late to reduce customize-rogue (needs loaddefs.el anyway)
+ (load "tooltip")
+ (load "international/iso-transl") ; Binds Alt-[ and friends.
++(load "international/chinese-l10n") ;Chinese localization of the UI.
+ 
+ ;; Used by `kill-buffer', for instance.
+ (load "emacs-lisp/rmc")
+--- a/lisp/startup.el
++++ b/lisp/startup.el
+@@ -1905,7 +1905,7 @@
+ 	    "Browse https://www.gnu.org/software/emacs/tour/")
+      "\tOverview of Emacs features at gnu.org\n"
+      :link ("View Emacs Manual" ,(lambda (_button) (info-emacs-manual)))
+-     "\tView the Emacs manual using Info\n"
++     "\t使用 Info 查看 Emacs 手册\n"
+      :link ("Absence of Warranty" ,(lambda (_button) (describe-no-warranty)))
+      "\tGNU Emacs comes with "
+      :face (variable-pitch (:slant oblique))
+@@ -1977,7 +1977,7 @@
+      :link ("Getting New Versions" ,(lambda (_button) (describe-distribution)))
+      "\tHow to obtain the latest version of Emacs\n"
+      :link ("Ordering Manuals" ,(lambda (_button) (view-order-manuals)))
+-     "\tBuying printed manuals from the FSF\n"
++     "\t从 FSF 购买印刷版手册\n"
+      "\n"
+      :link ("Emacs Tutorial" ,(lambda (_button) (help-with-tutorial)))
+      "\tLearn basic Emacs keystroke commands"
+@@ -2379,11 +2379,11 @@
+       ;; The convention for this piece of code is that
+       ;; each piece of output starts with one or two newlines
+       ;; and does not end with any newlines.
+-      (insert (if startup "Welcome to GNU Emacs" "This is GNU Emacs"))
++      (insert (if startup "\u6b22\u8fce\u4f7f\u7528 GNU Emacs" "\u8fd9\u662f GNU Emacs"))
+       (insert
+        (if (eq system-type 'gnu/linux)
+-	   ", one component of the GNU/Linux operating system.\n"
+-	 ", a part of the GNU operating system.\n"))
++	   "，它是 GNU/Linux 操作系统的一个组件。\n"
++	 "，它是 GNU 操作系统的一部分。\n"))
+ 
+       (if startup
+ 	  (if (display-mouse-p)
+@@ -2414,9 +2414,9 @@
+ 		    (regexp-quote (file-name-nondirectory
+ 				   auto-save-list-file-prefix)))
+ 	    t)
+-	   (insert "\n\nIf an Emacs session crashed recently, "
+-		   "type M-x recover-session RET\nto recover"
+-		   " the files you were editing.\n"))
++	   (insert "\n\n如果最近有 Emacs 会话崩溃，"
++		   "请输入 M-x recover-session RET\n以恢复"
++		   "您正在编辑的文件。\n"))
+       (use-local-map splash-screen-keymap)
+ 
+       ;; Display the input that we set up in the buffer.
+@@ -2458,22 +2458,22 @@
+   ;; The user can use the mouse to activate menus
+   ;; so give help in terms of menu items.
+   (insert "\
+-To follow a link, click Mouse-1 on it, or move to it and type RET.
+-To quit a partially entered command, type Control-g.\n")
++要访问链接，请用鼠标左键单击它，或移到其上并按 RET。
++要中止输入到一半的命令，请按 Control-g。\n")
+ 
+-  (insert "\nImportant Help menu items:\n")
+-  (insert-button "Emacs Tutorial"
++  (insert "\n重要帮助菜单项：\n")
++  (insert-button "Emacs 教程"
+ 		 'action (lambda (_button) (help-with-tutorial))
+ 		 'follow-link t)
+-  (insert "\t\tLearn basic Emacs keystroke commands\n")
++  (insert "\t\t学习基本的 Emacs 按键命令\n")
+   (insert-button "Read the Emacs Manual"
+ 		 'action (lambda (_button) (info-emacs-manual))
+ 		 'follow-link t)
+-  (insert "\tView the Emacs manual using Info\n")
+-  (insert-button "(Non)Warranty"
++  (insert "\t使用 Info 查看 Emacs 手册\n")
++  (insert-button "（无）担保"
+ 		 'action (lambda (_button) (describe-no-warranty))
+ 		 'follow-link t)
+-  (insert "\t\tGNU Emacs comes with ABSOLUTELY NO WARRANTY\n")
++  (insert "\t\tGNU Emacs 绝对无担保\n")
+   (insert-button "Copying Conditions"
+ 		 'action (lambda (_button) (describe-copying))
+ 		 'follow-link t)
+@@ -2481,22 +2481,22 @@
+   (insert-button "More Manuals / Ordering Manuals"
+ 		 'action (lambda (_button) (view-order-manuals))
+ 		 'follow-link t)
+-  (insert "  How to order printed manuals from the FSF\n")
++  (insert "  如何从 FSF 订购印刷版手册\n")
+ 
+-  (insert "\nUseful tasks:\n")
++  (insert "\n实用任务：\n")
+   (insert-button "Visit New File"
+ 		 'action (lambda (_button) (call-interactively 'find-file))
+ 		 'follow-link t)
+   (insert (substitute-command-keys
+-	   "\t\tSpecify a new file's name, to edit the file\n"))
+-  (insert-button "Open Home Directory"
++	   "\t\t指定新文件的名称以编辑该文件\n"))
++  (insert-button "打开主目录"
+ 		 'action (lambda (_button) (dired "~"))
+ 		 'follow-link t)
+-  (insert "\tOpen your home directory, to operate on its files\n")
+-  (insert-button "Customize Startup"
++  (insert "\t打开您的主目录，对其文件进行操作\n")
++  (insert-button "自定义启动"
+ 		 'action (lambda (_button) (customize-group 'initialization))
+ 		 'follow-link t)
+-  (insert "\tChange initialization settings including this screen\n")
++  (insert "\t更改初始化设置（包括此启动画面）\n")
+ 
+   (startup-insert-newcomers-theme)
+ 
+@@ -2522,35 +2522,35 @@
+                         map))
+                 minor-mode-overriding-map-alist)))
+ 
+-    (insert (format "\nGet help\t   %s\n"
++    (insert (format "\n获取帮助\t   %s\n"
+                     (let ((where (where-is-internal 'help-command nil t)))
+                       (cond
+                        ((equal where [?\C-h])
+-                        "C-h  (Hold down CTRL and press h)")
++                        "C-h  （按住 CTRL 并按下 h）")
+                        (where (key-description where))
+                        (t "M-x help")))))
+-    (insert-button "Emacs manual"
++    (insert-button "Emacs 手册"
+                    'action (lambda (_button) (info-emacs-manual))
+                    'follow-link t)
+     (insert (substitute-command-keys"\t   \\[info-emacs-manual]\t"))
+-    (insert-button "Browse manuals"
++    (insert-button "浏览手册"
+                    'action (lambda (_button) (Info-directory))
+                    'follow-link t)
+     (insert (substitute-command-keys "\t   \\[info]\n"))
+-    (insert-button "Emacs tutorial"
++    (insert-button "Emacs 教程"
+                    'action (lambda (_button) (help-with-tutorial))
+                    'follow-link t)
+     (insert (substitute-command-keys
+-             "\t   \\[help-with-tutorial]\tUndo changes\t   \\[undo]\n"))
+-    (insert-button "Buy manuals"
++             "\t   \\[help-with-tutorial]\t撤销更改\t   \\[undo]\n"))
++    (insert-button "购买手册"
+                    'action (lambda (_button) (view-order-manuals))
+                    'follow-link t)
+     (insert (substitute-command-keys
+-             "\t   \\[view-order-manuals]\tExit Emacs\t   \\[save-buffers-kill-terminal]")))
++             "\t   \\[view-order-manuals]\t退出 Emacs\t   \\[save-buffers-kill-terminal]")))
+ 
+   ;; Say how to use the menu bar with the keyboard.
+   (insert "\n")
+-  (insert-button "Activate menubar"
++  (insert-button "激活菜单栏"
+ 		 'action (lambda (_button) (tmm-menubar))
+ 		 'follow-link t)
+   (if (and (eq (key-binding "\M-`") 'tmm-menubar)
+@@ -2560,26 +2560,26 @@
+ 
+   ;; Many users seem to have problems with these.
+   (insert (substitute-command-keys "
+-\(`C-' means use the CTRL key.  `M-' means use the Meta (or Alt) key.
+-If you have no Meta key, you may instead type ESC followed by the character.)"))
++（`C-' 表示使用 CTRL 键。`M-' 表示使用 Meta（或 Alt）键。
++如果您没有 Meta 键，可以改为先按 ESC 再按该字符。）"))
+ 
+   ;; Insert links to useful tasks
+-  (insert "\nUseful tasks:\n")
++  (insert "\n实用任务：\n")
+ 
+   (insert-button "Visit New File"
+ 		 'action (lambda (_button) (call-interactively 'find-file))
+ 		 'follow-link t)
+   (insert "\t\t\t")
+-  (insert-button "Open Home Directory"
++  (insert-button "打开主目录"
+ 		 'action (lambda (_button) (dired "~"))
+ 		 'follow-link t)
+   (insert "\n")
+ 
+-  (insert-button "Customize Startup"
++  (insert-button "自定义启动"
+ 		 'action (lambda (_button) (customize-group 'initialization))
+ 		 'follow-link t)
+   (insert "\t\t")
+-  (insert-button "Open *scratch* buffer"
++  (insert-button "打开 *scratch* 缓冲区"
+ 		 'action (lambda (_button) (switch-to-buffer
+                                        (get-scratch-buffer-create)))
+ 		 'follow-link t)
+@@ -2596,19 +2596,19 @@
+   (insert emacs-copyright "\n")
+   (insert (substitute-command-keys
+ 	   "
+-GNU Emacs comes with ABSOLUTELY NO WARRANTY; type \\[describe-no-warranty] for "))
+-  (insert-button "full details"
++GNU Emacs 绝对无担保；输入 \\[describe-no-warranty] 查看 "))
++  (insert-button "完整细节"
+ 		 'action (lambda (_button) (describe-no-warranty))
+ 		 'follow-link t)
+-  (insert (substitute-command-keys ".
+-Emacs is Free Software--Free as in Freedom--so you can redistribute copies
+-of Emacs and modify it; type \\[describe-copying] to see "))
+-  (insert-button "the conditions"
++  (insert (substitute-command-keys "。
++Emacs 是自由软件——自由如自由——因此您可以重新分发
++和修改 Emacs；输入 \\[describe-copying] 查看 "))
++  (insert-button "相关条件"
+ 		 'action (lambda (_button) (describe-copying))
+ 		 'follow-link t)
+-  (insert (substitute-command-keys".
+-Type \\[describe-distribution] for information on "))
+-  (insert-button "getting the latest version"
++  (insert (substitute-command-keys"。
++输入 \\[describe-distribution] 了解 "))
++  (insert-button "获取最新版本"
+ 		 'action (lambda (_button) (describe-distribution))
+ 		 'follow-link t)
+   (insert "."))
+@@ -2616,7 +2616,7 @@
+ (defun normal-about-screen ()
+   (insert "\n" (emacs-version) "\n" emacs-copyright "\n\n")
+ 
+-  (insert "To follow a link, click Mouse-1 on it, or move to it and type RET.\n\n")
++  (insert "要访问链接，请用鼠标左键单击它，或移到其上并按 RET。\n\n")
+ 
+   (insert-button "Authors"
+ 		 'action
+@@ -2624,20 +2624,20 @@
+ 		   (view-file (expand-file-name "AUTHORS" data-directory))
+ 		   (goto-char (point-min)))
+ 		 'follow-link t)
+-  (insert "\t\tMany people have contributed code included in GNU Emacs\n")
++  (insert "\t\t许多人贡献了 GNU Emacs 中的代码\n")
+ 
+   (insert-button "Contributing"
+ 		 'action
+ 		 (lambda (_button) (info "(emacs)Contributing"))
+ 		 'follow-link t)
+-  (insert "\tHow to report bugs and contribute improvements to Emacs\n\n")
++  (insert "\t如何报告缺陷并为 Emacs 贡献改进\n\n")
+ 
+   (insert-button "GNU and Freedom"
+ 		 'action (lambda (_button)
+                            (let ((browse-url-browser-function 'eww-browse-url))
+                              (describe-gnu-project)))
+ 		 'follow-link t)
+-  (insert "\t\tWhy we developed GNU Emacs and the GNU system\n")
++  (insert "\t\t我们为何开发 GNU Emacs 和 GNU 系统\n")
+ 
+   (insert-button "Absence of Warranty"
+ 		 'action (lambda (_button) (describe-no-warranty))
+@@ -2652,19 +2652,19 @@
+   (insert-button "Getting New Versions"
+ 		 'action (lambda (_button) (describe-distribution))
+ 		 'follow-link t)
+-  (insert "\tHow to get the latest version of GNU Emacs\n")
++  (insert "\t如何获取最新版本的 GNU Emacs\n")
+ 
+   (insert-button "More Manuals / Ordering Manuals"
+ 		 'action (lambda (_button) (view-order-manuals))
+ 		 'follow-link t)
+-  (insert "\tBuying printed manuals from the FSF\n"))
++  (insert "\t从 FSF 购买印刷版手册\n"))
+ 
+ (defun startup-echo-area-message ()
+   (if (daemonp)
+-      "Starting Emacs daemon."
++      "正在启动 Emacs 守护进程。"
+     (substitute-command-keys
+-     "For information about GNU Emacs and the GNU system, type \
+-\\[about-emacs].")))
++     "要了解 GNU Emacs 和 GNU 系统的信息，请输入 \
++\\[about-emacs]。")))
+ 
+ (defun display-startup-echo-area-message ()
+   (let ((resize-mini-windows t))
+--- a/lisp/subr.el
++++ b/lisp/subr.el
+@@ -4109,7 +4109,7 @@
+     (delete-minibuffer-contents)
+     (ding)
+     (discard-input)
+-    (minibuffer-message "Please answer y or n")
++    (minibuffer-message "请回答 y 或 n")
+     (sit-for 2)))
+ 
+ (defvar y-or-n-p-use-read-key nil
+@@ -4193,10 +4193,10 @@
+                               (save-match-data
+                                 (substitute-command-keys
+                                  (if help-form
+-                                     (format "(\\`y', \\`n' or \\`%s') "
++                                     (format "(\\`y'、\\`n' 或 \\`%s') "
+                                              (key-description
+                                               (vector help-char)))
+-                                   "(\\`y' or \\`n') "))))))))
++                                   "(\\`y' 或 \\`n') "))))))))
+         ;; Preserve the actual command that eventually called
+         ;; `y-or-n-p' (otherwise `repeat' will be repeating
+         ;; `exit-minibuffer').
+@@ -4210,11 +4210,11 @@
+ 	    (cond ((member str '("y" "Y")) (setq answer 'act))
+ 		  ((member str '("n" "N")) (setq answer 'skip))
+ 		  ((and (member str '("h" "H")) help-form) (print help-form))
+-		  (t (setq temp-prompt (concat "Please answer y or n.  "
++		  (t (setq temp-prompt (concat "请回答 y 或 n。  "
+ 					       prompt))))))))
+      ((use-dialog-box-p)
+       (setq prompt (funcall padded prompt t)
+-	    answer (x-popup-dialog t `(,prompt ("Yes" . act) ("No" . skip)))))
++	    answer (x-popup-dialog t `(,prompt ("是" . act) ("否" . skip)))))
+      (y-or-n-p-use-read-key
+       ;; ¡Beware! when I tried to edebug this code, Emacs got into a weird state
+       ;; where all the keys were unbound (i.e. it somehow got triggered
+@@ -4229,7 +4229,7 @@
+                       (raise-frame (window-frame (minibuffer-window))))
+                     (read-key (propertize (if (memq answer scroll-actions)
+                                               prompt
+-                                            (concat "Please answer y or n.  "
++                                            (concat "请回答 y 或 n。  "
+                                                     prompt))
+                                           'face 'minibuffer-prompt)))))
+             (setq answer (lookup-key query-replace-map (vector key) t))
+--- a/src/editfns.c
++++ b/src/editfns.c
+@@ -3429,6 +3429,8 @@
+ usage: (format-message STRING &rest OBJECTS)  */)
+   (ptrdiff_t nargs, Lisp_Object *args)
+ {
++  if (STRINGP (args[0]))
++    args[0] = translate_message_string (args[0]);
+   return styled_format (nargs, args, true);
+ }
+ 
+--- a/src/lisp.h
++++ b/src/lisp.h
+@@ -4391,6 +4391,7 @@
+ extern void message1_nolog (const char *);
+ extern void message3 (Lisp_Object);
+ extern void message3_nolog (Lisp_Object);
++extern Lisp_Object translate_message_string (Lisp_Object);
+ extern void message3_frame (Lisp_Object, struct frame *);
+ extern void message3_frame_nolog (Lisp_Object, struct frame *);
+ extern void message_dolog (const char *, ptrdiff_t, bool, bool);
+--- a/src/print.c
++++ b/src/print.c
+@@ -1141,6 +1141,8 @@
+   if (!NILP (file_error) && CONSP (tail))
+     errmsg = XCAR (tail), tail = XCDR (tail);
+ 
++  errmsg = translate_message_string (errmsg);
++
+   {
+     const char *sep = ": ";
+ 
+--- a/src/xdisp.c
++++ b/src/xdisp.c
+@@ -12566,9 +12566,30 @@
+ 
+    This function cancels echoing.  */
+ 
++/* Hash table mapping English user-interface strings to Chinese
++   translations; nil disables translation.  Set from Lisp by
++   `chinese-l10n.el', which see.  The storage itself lives in the
++   `globals' struct, as for every DEFVAR_LISP variable.  */
++
++/* Return the Chinese translation of STR if Vchinese_l10n_table has
++   one, otherwise return STR unchanged.  STR need not be a string.  */
++Lisp_Object
++translate_message_string (Lisp_Object str)
++{
++  if (STRINGP (str) && HASH_TABLE_P (Vchinese_l10n_table))
++    {
++      Lisp_Object res = Fgethash (str, Vchinese_l10n_table, Qnil);
++      if (STRINGP (res))
++	return res;
++    }
++  return str;
++}
++
+ void
+ message3 (Lisp_Object m)
+ {
++  if (STRINGP (m))
++    m = translate_message_string (m);
+   log_message (m);
+   if (! inhibit_message)
+     message3_nolog (m);
+@@ -12580,6 +12601,8 @@
+ void
+ message3_frame (Lisp_Object m, struct frame *f)
+ {
++  if (STRINGP (m))
++    m = translate_message_string (m);
+   log_message (m);
+   if (! inhibit_message)
+     message3_frame_nolog (m, f);
+@@ -12779,6 +12802,13 @@
+ static void ATTRIBUTE_FORMAT_PRINTF (1, 0)
+ vmessage (const char *m, va_list ap)
+ {
++  if (m && HASH_TABLE_P (Vchinese_l10n_table))
++    {
++      Lisp_Object tr = Fgethash (build_string (m), Vchinese_l10n_table, Qnil);
++      if (STRINGP (tr))
++	m = SSDATA (tr);
++    }
++
+   if (noninteractive)
+     {
+       if (m)
+@@ -38697,6 +38727,15 @@
+ the buffer when it becomes large.  */);
+   Vmessage_log_max = make_fixnum (1000);
+ 
++  DEFVAR_LISP ("chinese-l10n-table", Vchinese_l10n_table,
++    doc: /* Hash table mapping English UI strings to Chinese translations.
++
++When this is a hash table, Emacs looks up user-interface strings
++(messages, prompts and menu labels) in it and displays the
++corresponding Chinese translation when one is found.  The table is
++set up by `chinese-l10n.el'.  A value of nil disables translation.  */);
++  Vchinese_l10n_table = Qnil;
++
+   DEFVAR_LISP ("window-scroll-functions", Vwindow_scroll_functions,
+     doc: /* List of functions to call before redisplaying a window with scrolling.
+ Each function is called with two arguments, the window and its new
