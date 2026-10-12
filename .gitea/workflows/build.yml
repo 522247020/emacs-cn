@@ -70,10 +70,18 @@ jobs:
             libgnutls28-dev libxml2-dev libjansson-dev libgmp-dev \
             libgtk-3-dev libharfbuzz-dev libncurses-dev zlib1g-dev \
             libjpeg-dev libpng-dev libgif-dev libtiff-dev librsvg2-dev libxpm-dev
-          $SUDO apt-get install -y libgccjit-14-dev \
-            || $SUDO apt-get install -y libgccjit-13-dev \
-            || $SUDO apt-get install -y libgccjit-12-dev \
-            || echo "警告：未找到 libgccjit，将关闭原生编译"
+          # libgccjit 的 dev 包在 universe 里，先确保启用
+          $SUDO apt-get install -y software-properties-common >/dev/null 2>&1 || true
+          $SUDO add-apt-repository -y universe >/dev/null 2>&1 || true
+          $SUDO apt-get update -qq || true
+          # 依次尝试常见版本（仅 -dev 包才有 -lgccjit）
+          for v in 15 14 13 12 11 10; do
+            if $SUDO apt-get install -y "libgccjit-${v}-dev"; then
+              echo "已安装 libgccjit-${v}-dev"
+              break
+            fi
+          done
+          # 安装成功与否都不致命：构建脚本会自动回退到无原生编译
 
       - name: 构建并打包
         working-directory: repo
@@ -82,7 +90,6 @@ jobs:
           NATIVE: yes
         run: |
           set -eu
-          if ! ldconfig -p | grep -q libgccjit; then export NATIVE=no; fi
           sh ci/build-emacs.sh
 
       - name: 发布 Release（Gitea API，仅打 tag 时）

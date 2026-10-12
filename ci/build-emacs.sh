@@ -19,6 +19,7 @@ JOBS=${JOBS:-$(nproc 2>/dev/null || echo 2)}
 case "$NATIVE" in
   yes|true|1) NATIVE_OPT=--with-native-compilation ;;
   *)          NATIVE_OPT=--without-native-compilation ;;
+
 esac
 
 echo "==> 源码目录: $ROOT/src"
@@ -27,12 +28,26 @@ cd "$ROOT/src"
 echo "==> autogen"
 ./autogen.sh
 
+configure_with() {
+  ./configure \
+    --prefix="$PREFIX" \
+    --with-x-toolkit=gtk3 \
+    "$1" \
+    --without-tree-sitter
+}
+
 echo "==> configure (prefix=$PREFIX, native=$NATIVE)"
-./configure \
-  --prefix="$PREFIX" \
-  --with-x-toolkit=gtk3 \
-  "$NATIVE_OPT" \
-  --without-tree-sitter
+if [ "$NATIVE_OPT" = --with-native-compilation ]; then
+  # 尝试原生编译；libgccjit 不可用时自动回退
+  if configure_with --with-native-compilation; then
+    echo "==> 已启用原生编译"
+  else
+    echo "==> 原生编译不可用（缺少 libgccjit），回退到 --without-native-compilation"
+    configure_with --without-native-compilation
+  fi
+else
+  configure_with --without-native-compilation
+fi
 
 echo "==> make -j$JOBS"
 make -j"$JOBS"
