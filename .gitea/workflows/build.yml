@@ -1,0 +1,78 @@
+name: build
+
+# Gitea Actions 语法与 GitHub Actions 基本兼容。
+# 需要先在 Gitea 站点注册 act_runner，并带有标签 ubuntu-latest；否则改下面的 runs-on。
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install build dependencies
+        run: |
+          # act_runner 默认以 root 运行；两者都兼容
+          SUDO=""
+          [ "$(id -u)" -ne 0 ] && SUDO="sudo"
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends \
+            build-essential autoconf automake texinfo pkg-config zstd curl \
+            libgnutls28-dev libxml2-dev libjansson-dev libgmp-dev \
+            libgtk-3-dev libharfbuzz-dev libncurses-dev zlib1g-dev \
+            libjpeg-dev libpng-dev libgif-dev libtiff-dev librsvg2-dev libxpm-dev
+          $SUDO apt-get install -y libgccjit-14-dev \
+            || $SUDO apt-get install -y libgccjit-13-dev \
+            || $SUDO apt-get install -y libgccjit-12-dev \
+            || echo "警告：未找到 libgccjit，将关闭原生编译"
+
+      - name: Build and package
+        env:
+          PREFIX: /opt/emacs-cn
+          NATIVE: yes
+        run: |
+          if ! ldconfig -p | grep -q libgccjit; then
+            export NATIVE=no
+          fi
+          sh ci/build-emacs.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: emacs-cn-linux-x86_64
+          path: emacs-cn-linux-x86_64.tar.zst
+          if-no-files-found: error
+
+      - name: Publish Release (Gitea API)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          # Gitea 会提供 GITHUB_TOKEN；若你的实例没有，可在仓库设置里添加名为 GITEA_TOKEN 的 secret
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          TAG="${GITHUB_REF_NAME}"
+          API="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
+          curl -sf -X POST "$API/releases" \
+            -H "Authorization: token $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"tag_name\":\"$TAG\",\"name\":\"$TAG\"}" > release.json || true
+          RID=$(grep -o '"id":[0-9]*' release.json | head -1 | cut -d: -f2 || true)
+          if [ -n "${RID:-}" ]; then
+            curl -sf -X POST "$API/releases/$RID/assets?name=emacs-cn-linux-x86_64.tar.zst" \
+              -H "Authorization: token $TOKEN" \
+              -F "attachment=@emacs-cn-linux-x86_64.tar.zst"
+          else
+            echo "未能创建 Release（可能已存在），跳过上传附件"
+          fi

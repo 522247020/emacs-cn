@@ -1,0 +1,62 @@
+name: build
+
+# 触发：推送到 main、打 tag、PR、手动
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+# 打 tag 时创建 Release 需要写权限
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake texinfo pkg-config zstd \
+            libgnutls28-dev libxml2-dev libjansson-dev libgmp-dev \
+            libgtk-3-dev libharfbuzz-dev libncurses-dev zlib1g-dev \
+            libjpeg-dev libpng-dev libgif-dev libtiff-dev librsvg2-dev libxpm-dev
+          # libgccjit（原生编译）版本随 Ubuntu 而变化，逐个尝试
+          sudo apt-get install -y libgccjit-14-dev \
+            || sudo apt-get install -y libgccjit-13-dev \
+            || sudo apt-get install -y libgccjit-12-dev \
+            || echo "警告：未找到 libgccjit，将关闭原生编译"
+
+      - name: Build and package
+        env:
+          PREFIX: /opt/emacs-cn
+          NATIVE: yes
+        run: |
+          if ! ldconfig -p | grep -q libgccjit; then
+            export NATIVE=no
+          fi
+          sh ci/build-emacs.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: emacs-cn-linux-x86_64
+          path: emacs-cn-linux-x86_64.tar.zst
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Publish Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: emacs-cn-linux-x86_64.tar.zst
+          generate_release_notes: true

@@ -138,6 +138,48 @@ make -j16
 make install
 ```
 
+## 自动构建（GitHub / Gitea）
+
+仓库已内置 CI，构建产物为可移植压缩包
+`emacs-cn-linux-x86_64.tar.zst`（内含 `/opt/emacs-cn` 目录树）：
+
+| 平台 | 工作流文件 | 说明 |
+| --- | --- | --- |
+| GitHub | `.github/workflows/build.yml` | 用 GitHub 托管 runner，打 tag 时自动创建 Release |
+| Gitea | `.gitea/workflows/build.yml` | 用自建 `act_runner`，打 tag 时通过 Gitea API 建 Release |
+
+两者都调用同一个脚本 `ci/build-emacs.sh`（可用 `PREFIX`、`NATIVE`、`JOBS`
+环境变量控制）。触发方式：推送到 `main`、提交 PR、打 `v*` 标签，或在页面手动运行。
+
+使用产物：
+
+```sh
+# 解包（需要写入 /opt）
+sudo tar --zstd -xf emacs-cn-linux-x86_64.tar.zst -C /
+/opt/emacs-cn/bin/emacs -nw
+```
+
+> 注意：产物里的 Emacs 把安装前缀 `/opt/emacs-cn` 编译进了路径，必须解到该位置。
+> 想换路径就修改 `ci/build-emacs.sh` 里的 `PREFIX` 后重新构建。
+
+### GitHub 与 Gitea 的主要差异
+
+| 方面 | GitHub Actions | Gitea Actions |
+| --- | --- | --- |
+| Runner | 官方托管 `ubuntu-latest`，无需自备 | 需自建 `act_runner`，`runs-on` 必须匹配 runner 标签（默认 `ubuntu-latest`） |
+| 工作流目录 | `.github/workflows/` | `.gitea/workflows/`（也可配置读取 `.github/workflows/`） |
+| Action 来源 | GitHub Marketplace | 默认从 `gitea.com` 镜像拉取；`actions/checkout`、`actions/upload-artifact` 可用，部分 GitHub 专属 action 不可用 |
+| 自动 token | `secrets.GITHUB_TOKEN` | 提供 `GITHUB_TOKEN`（兼容）；不同版本可能要另配 secret |
+| Artifact | 内置，`upload-artifact`，默认保留 90 天 | 需服务端开启并配置 artifact 存储 |
+| Release | `softprops/action-gh-release` 或 `gh` | Gitea REST API 或 `release-action` |
+| 容器镜像 | GHCR（`ghcr.io`） | Gitea 容器仓库 |
+| Pages | 内置 GitHub Pages | 无内置 Pages，需另配 |
+| 资源/计费 | 免费额度，超出计费 | 用你自己的 runner |
+
+**结论**：构建逻辑完全一样（同一脚本），主要差别在 **runner 来源**、
+**Action 的拉取来源** 与 **发布/制品存储**。Gitea 上也能跑，但需要先部署
+`act_runner`，制品/Release 走 Gitea 自己的接口。
+
 ## 运行
 
 ```sh
