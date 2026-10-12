@@ -6,7 +6,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 TARGETS = [
     os.path.join(ROOT, 'src', 'lisp', 'international', 'chinese-l10n-data.el'),
-    os.path.join(ROOT, 'src31', 'lisp', 'international', 'chinese-l10n-data.el'),
 ]
 
 # Fixes applied to every translation, to normalise recurring machine
