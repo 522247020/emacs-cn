@@ -31,11 +31,12 @@ jobs:
         run: |
           set -eu
           echo "server=$GITHUB_SERVER_URL repo=$GITHUB_REPOSITORY ref=$GITHUB_REF"
-          HOST=$(printf '%s' "$GITHUB_SERVER_URL" | sed -E 's#^https?://##')
+          SCHEME=$(printf '%s' "$GITHUB_SERVER_URL" | sed -E 's#^(https?)://.*#\1#')
+          HOST=${GITHUB_SERVER_URL#*://}
           git config --global --add safe.directory '*'
           rm -rf repo
           git clone --depth 1 \
-            "http://oauth2:${TOKEN}@${HOST}/${GITHUB_REPOSITORY}.git" repo
+            "${SCHEME}://oauth2:${TOKEN}@${HOST}/${GITHUB_REPOSITORY}.git" repo
           cd repo
           # 打 tag 时检出该 tag 的提交
           if [ -n "${GITHUB_REF_NAME:-}" ] \
@@ -51,7 +52,19 @@ jobs:
           set -eu
           SUDO=""
           [ "$(id -u)" -ne 0 ] && SUDO="sudo"
-          $SUDO apt-get update
+          # 默认 apt 源不可用时，尝试切换为清华镜像
+          if ! $SUDO apt-get update -qq; then
+            echo "==> 默认 apt 源不可用，切换到清华镜像"
+            for f in /etc/apt/sources.list /etc/apt/sources.list.d/*; do
+              [ -f "$f" ] || continue
+              $SUDO sed -i \
+                -e 's|https\?://archive.ubuntu.com/ubuntu|https://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' \
+                -e 's|https\?://security.ubuntu.com/ubuntu|https://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' \
+                -e 's|https\?://ports.ubuntu.com/ubuntu-ports|https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|g' \
+                "$f" 2>/dev/null || true
+            done
+            $SUDO apt-get update -qq
+          fi
           $SUDO apt-get install -y --no-install-recommends \
             build-essential autoconf automake texinfo pkg-config zstd curl ca-certificates \
             libgnutls28-dev libxml2-dev libjansson-dev libgmp-dev \
