@@ -1,0 +1,707 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 2004--2026 Free Software Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@c
+@c This file is included either in emacs-xtra.texi (when producing the
+@c printed version) or in the main Emacs manual (for the on-line version).
+
+@c Moved here from the Emacs Lisp Reference Manual, 2005-03-26.
+@node Advanced Calendar/Diary Usage
+@section 日历和日记的更多高级功能
+
+本节介绍日历和日记的一些更高级/专业的功能。  首先，您可以通过多种方式自定义日历和日记，以满足您的个人品味。
+
+@menu
+* Calendar Customizing::    日历布局和挂钩。
+* Holiday Customizing::     定义您自己的假期。
+* Mayan Calendar::          移动到玛雅日历中指定的日期。
+* Date Display Format::     更改格式。
+* Time Display Format::     更改格式。
+* Diary Customizing::       您可以设置默认值。
+* Non-Gregorian Diary::     基于其他日历的日记条目。
+* Diary Display::           可选择显示日记的方式。
+* Fancy Diary Display::     使用包含的日记文件对日记条目进行排序。
+* Sexp Diary Entries::      更灵活的日记条目。
+@end menu
+
+@node Calendar Customizing
+@subsection 自定义日历
+
+@vindex calendar-intermonth-text
+@cindex calendar layout
+@cindex calendar week numbers
+遗憾的是，日历显示从三个月开始就无法更改，但您可以通过设置变量来自定义使用的空白：@code{calendar-left-margin}、@code{calendar-day-header-width}、@code{calendar-day-digit-width}、@code{calendar-column-width} 和 @code{calendar-intermonth-spacing}。要显示文本 @emph{between} 月份（例如周数），请按照其文档中的说明自定义变量 @code{calendar-intermonth-header} 和 @code{calendar-intermonth-text}。
+
+@vindex calendar-month-header
+@vindex calendar-day-header-array
+变量 @code{calendar-month-header} 控制日历中每个月上方显示的文本。  默认情况下，它显示月份和年份。  变量 @code{calendar-day-header-array} 控制每个月中每天列上方显示的文本。默认情况下，它显示每天名称的前两个字母。
+
+@vindex calendar-holiday-marker
+@vindex diary-entry-marker
+@vindex calendar-today-marker
+变量 @code{calendar-holiday-marker} 指定如何标记假日日期。  它的值可以是插入日期旁边的单字符字符串，也可以是用于显示日期的面孔名称。同样，变量 @code{diary-entry-marker} 指定如何标记具有日记条目的日期。  函数 @code{calendar-mark-today} 使用 @code{calendar-today-marker} 来标记今天的日期。  默认情况下，日历使用名为 @code{holiday}、@code{diary} 和 @code{calendar-today} 的面来实现这些目的。
+
+@vindex calendar-initial-window-hook
+启动日历会运行正常的钩子@code{calendar-initial-window-hook}。  日历显示的重新计算不会运行此挂钩。  但是，如果您使用 @kbd{q} 命令离开日历并重新输入它，则挂钩会再次运行。
+
+@vindex calendar-today-visible-hook
+@findex calendar-star-date
+当当前日期在窗口中可见时，变量 @code{calendar-today-visible-hook} 是在日历缓冲区准备好日历后运行的正常挂钩。  这个钩子的用途之一是标记今天的日期；为此，请使用函数 @code{calendar-mark-today} 或 @code{calendar-star-date} 之一：
+
+@findex calendar-mark-today
+@smallexample
+(add-hook 'calendar-today-visible-hook 'calendar-mark-today)
+@end smallexample
+
+@vindex calendar-today-invisible-hook
+@noindent
+如果当前日期在窗口中可见 @emph{not} ，则运行类似的普通挂钩 @code{calendar-today-invisible-hook} 。
+
+@vindex calendar-move-hook
+每个日历光标移动命令在移动光标后都会运行钩子 @code{calendar-move-hook}。
+
+@node Holiday Customizing
+@subsection 定制假期
+
+@vindex calendar-holidays
+@vindex holiday-oriental-holidays
+@vindex holiday-solar-holidays
+有几个变量列出了 Emacs 知道的默认假期。  它们是：@code{holiday-general-holidays}、@code{holiday-local-holidays}、@code{holiday-solar-holidays}、@code{holiday-bahai-holidays}、@code{holiday-christian-holidays}、@code{holiday-hebrew-holidays}、@code{holiday-islamic-holidays}、@code{holiday-oriental-holidays} 和 @code{holiday-other-holidays}。名称应该是不言自明的；例如，@code{holiday-solar-holidays} 列出与太阳和月亮相关的假期。
+
+您可以根据自己的需要自定义这些假期列表，删除或添加假期，如下所述。  将它们中的任何一个设置为@code{nil}以不显示相关的假期。
+
+@vindex holiday-general-holidays
+@vindex holiday-local-holidays
+@vindex holiday-other-holidays
+默认情况下，公众假期是美国各地的公共假期。  相反，@code{holiday-local-holidays}和@code{holiday-other-holidays}默认都是空的。  这些分别用于系统范围的设置和您的个人使用。
+
+@vindex holiday-bahai-holidays
+@vindex holiday-christian-holidays
+@vindex holiday-hebrew-holidays
+@vindex holiday-islamic-holidays
+@vindex calendar-bahai-all-holidays-flag
+@vindex calendar-christian-all-holidays-flag
+@vindex calendar-hebrew-all-holidays-flag
+@vindex calendar-islamic-all-holidays-flag
+默认情况下，Emacs 不包括它所知道的所有宗教节日，仅包括世俗日历中常见的节日。  对于更广泛的宗教节日集合，您可以将任意（或全部）变量 @code{calendar-bahai-all-holidays-flag}、@code{calendar-christian-all-holidays-flag}、@code{calendar-hebrew-all-holidays-flag} 或 @code{calendar-islamic-all-holidays-flag} 设置为 @code{t}。
+
+@cindex holiday forms
+每个假期变量都是 @dfn{holiday forms} 的列表，每种形式描述一个假期（或者有时是一个假期列表）。  这是可能的假期形式的表格。  天数和月数从 1 开始计数，但 @dfn{dayname} 数字将星期日计为 0。参数 @var{string} 始终是假期的描述，作为字符串。
+
+@table @code
+@item (holiday-fixed @var{month} @var{day} @var{string})
+公历上的固定日期。
+
+@item (holiday-float @var{month} @var{dayname} @var{k} @var{string}
+&可选@var{day}) 公历日期@var{month}、@var{day}之后或之前的第@var{k}第@var{dayname}（@var{dayname}=0 表示星期日，依此类推）。  负@var{k}表示从月底开始倒数。  如果 @var{k} 为正，可选 @var{day} 默认为 1，否则为 @var{month} 的最后一天。
+
+@item (holiday-chinese @var{month} @var{day} @var{string})
+中国日历上的固定日期。
+
+@item (holiday-hebrew @var{month} @var{day} @var{string})
+希伯来历上的固定日期。
+
+@item (holiday-islamic @var{month} @var{day} @var{string})
+伊斯兰历上的固定日期。
+
+@item (holiday-julian @var{month} @var{day} @var{string})
+儒略历上的固定日期。
+
+@item (holiday-sexp @var{sexp} @var{string})
+由 Lisp 表达式 @var{sexp} 计算的日期。  该表达式应使用变量 @code{year} 来计算并以列表 @code{(@var{month} @var{day} @var{year})} 的形式返回假期日期，如果今年没有假期，则返回 @code{nil} 。
+
+@item (if @var{condition} @var{holiday-form})
+仅当@var{condition}为真时才会发生假期。
+
+@item (@var{function} @r{[}@var{args}@r{]})
+由函数 @var{function} 计算的日期列表，使用参数 @var{args} 调用。
+@end table
+
+例如，假设您要添加 7 月 14 日（即七月十四日）在法国庆祝的巴士底日。  您可以按如下方式执行此操作：
+
+@smallexample
+(setq holiday-other-holidays '((holiday-fixed 7 14 "Bastille Day")))
+@end smallexample
+
+许多假期发生在一周中的特定一天、每月的特定时间。  以下是描述飓风祈求日的节日表格，该日在维尔京群岛于七月的第四个星期一庆祝：
+
+@smallexample
+(holiday-float 7 1 4 "Hurricane Supplication Day")
+@end smallexample
+
+@noindent
+这里，7 指定七月，1 指定星期一（星期日为 0，星期二为 2，依此类推），4 指定该月中的第四次出现（1 指定第一次出现，2 指定第二次出现，@minus{}1 最后一次出现，@minus{}2 倒数第二次出现，依此类推）。
+
+您还可以指定巴@'a'@'i、中国历、希伯来历、伊斯兰教历和儒略历的固定日期发生的假期。  例如，
+
+@smallexample
+(setq holiday-other-holidays
+      '((holiday-hebrew 10 2 "Last day of Hanukkah")
+        (holiday-islamic 3 12 "Mohammed's Birthday")
+        (holiday-julian 4 2 "Jefferson's Birthday")))
+@end smallexample
+
+@noindent
+添加光明节的最后一天（因为希伯来月份从尼散月开始编号）、庆祝穆罕默德生日的伊斯兰节日（因为伊斯兰月份从穆哈拉姆开始编号）以及托马斯·杰斐逊的生日（儒略历 1743 年 4 月 2 日）。
+
+要有条件地包含假日，请使用 Emacs Lisp 的 @code{if} 或 @code{holiday-sexp} 形式。  例如，美国总统选举发生在可被 4 整除的年份中 11 月第一个星期一之后的第一个星期二：
+
+@smallexample
+(holiday-sexp '(if (zerop (% year 4))
+                   (calendar-gregorian-from-absolute
+                    (1+ (calendar-dayname-on-or-before
+                          1 (+ 6 (calendar-absolute-from-gregorian
+                                  (list 11 1 year)))))))
+              "US Presidential Election")
+@end smallexample
+
+@noindent
+或者
+
+@smallexample
+(if (zerop (% displayed-year 4))
+    (holiday-fixed 11
+           (calendar-extract-day
+             (calendar-gregorian-from-absolute
+               (1+ (calendar-dayname-on-or-before
+                     1 (+ 6 (calendar-absolute-from-gregorian
+                              (list 11 1 displayed-year)))))))
+           "US Presidential Election"))
+@end smallexample
+
+有些假期不适合任何这些形式，因为它们的确定涉及特殊的计算。  在这种情况下，您必须编写一个 Lisp 函数来进行计算。  例如，要包含日食，请将 @code{(eclipses)} 添加到 @code{holiday-other-holidays} 并编写一个 Emacs Lisp 函数 @code{eclipses}，该函数返回日历窗口中可见范围内的相关公历日期（可能为空）列表，并带有描述性字符串，如下所示：
+
+@smallexample
+(((6 4 2012) "Lunar Eclipse") ((11 13 2012) "Solar Eclipse") ... )
+@end smallexample
+
+@node Mayan Calendar
+@subsection 从玛雅历法转换
+@cindex Mayan calendar
+
+以下是根据玛雅日历选择日期的命令：
+
+@table @kbd
+@item g m l
+移至长计数日历 (@code{calendar-mayan-goto-long-count-date}) 指定的日期。
+@item g m n t
+移至 tzolkin 日历中下一个出现的地点 (@code{calendar-mayan-next-tzolkin-date})。
+@item g m p t
+移至 tzolkin 日历中上一个出现的地点 (@code{calendar-mayan-previous-tzolkin-date})。
+@item g m n h
+移至 haab 日历中下一个出现的地点 (@code{calendar-mayan-next-haab-date})。
+@item g m p h
+移至 haab 日历中上一个出现的地点 (@code{calendar-mayan-previous-haab-date})。
+@item g m n c
+移至日历轮中下一个出现的位置 (@code{calendar-mayan-next-calendar-round-date})。
+@item g m p c
+移至日历轮中上一个出现的位置 (@code{calendar-mayan-previous-calendar-round-date})。
+@end table
+
+@cindex Mayan long count
+要理解这些命令，您需要了解玛雅历法。 @dfn{long count} 是使用以下单位的天数计数：
+
+@display
+1 kin = 1 天@ @ @ 1 uinal = 20 kin@ @ @ 1 tun = 18 uinal 1 katun = 20 tun@ @ @ 1 baktun = 20 katun
+@end display
+
+@kindex g m @r{(Calendar mode)}
+@findex calendar-mayan-goto-long-count-date
+@noindent
+因此，长计数日期 12.16.11.16.6 意味着 12 baktun、16 katun、11 tun、16 uinal 和 6 kin。  Emacs 日历可以处理早于 7.17.18.13.3 的玛雅长计数日期，但不能处理更早的日期。  使用 @kbd{g m l} 命令时，请键入玛雅长计数日期，其中 baktun、katun、tun、uinal 和 kin 以句点分隔。
+
+@findex calendar-mayan-previous-tzolkin-date
+@findex calendar-mayan-next-tzolkin-date
+@cindex Mayan tzolkin calendar
+玛雅卓尔金历是一个260天的周期，由一对独立的13天和20天周期组成。  由于这个循环无限重复，Emacs 提供了命令来向后和向前移动到循环中的上一个或下一个点。  输入 @kbd{g m p t} 转到上一个 tzolkin 日期； Emacs 要求您提供 tzolkin 日期，并将指向该日期的上一个出现位置。  同样，输入 @kbd{g m n t} 转到下一个出现的 tzolkin 日期。
+
+@findex calendar-mayan-previous-haab-date
+@findex calendar-mayan-next-haab-date
+@cindex Mayan haab calendar
+玛雅哈布历以 365 天为一个周期，分为 18 个月，每月 20 天，随后是 5 天的无月期。  与 tzolkin 循环一样，此循环无限重复，并且有命令向后和向前移动到循环中的上一个或下一个点。  输入 @kbd{g m p h} 转到上一个 haab 日期； Emacs 要求您输入 haab 日期并将指针移至该日期的上一个出现位置。同样，输入 @kbd{g m n h} 转到下一个出现的 haab 日期。
+
+@c This is omitted because it is too long for smallbook format.
+@c @findex calendar-mayan-previous-calendar-round-date
+@findex calendar-mayan-next-calendar-round-date
+@cindex Mayan calendar round
+玛雅人还使用了卓尔金日期和哈布日期的组合。  这个组合大约52年为一个周期，称为@emph{calendar round}。  如果您输入 @kbd{g m p c}，Emacs 会要求您输入 haab 和 tzolkin 日期，然后将指针移动到该组合的上一个出现位置。  使用 @kbd{g m n c} 将点移动到下一个出现的组合。  如果您输入的 haab/tzolkin 日期组合不可能，这些命令会发出错误信号。
+
+Emacs 使用严格补全
+@iftex
+(@pxref{Completion Exit,,, emacs, the Emacs Manual})
+@end iftex
+@ifnottex
+(@pxref{Completion Exit})
+@end ifnottex
+每当它要求您输入玛雅名字时，您就不必担心拼写问题。
+
+@node Date Display Format
+@subsection 日期显示格式
+@vindex calendar-date-display-form
+
+您可以通过设置 @code{calendar-date-display-form} 自定义日期在日记、模式行和消息中的显示方式。该变量保存一个表达式列表，其中可能涉及变量@code{month}、@code{day}和@code{year}（它们都是字符串形式的数字）以及@code{monthname}和@code{dayname}（它们都是字母字符串）。  在美式风格中，该列表的默认值如下：
+
+@smallexample
+((if dayname (concat dayname ", ")) monthname " " day ", " year)
+@end smallexample
+
+@noindent
+而在欧洲风格中，该值是默认值：
+
+@smallexample
+((if dayname (concat dayname ", ")) day " " monthname " " year)
+@end smallexample
+
+@noindent
+默认 ISO 日期表示形式为：
+
+@smallexample
+((format "%s-%.2d-%.2d" year (string-to-number month)
+         (string-to-number day)))
+@end smallexample
+
+@noindent
+另一种典型的美式格式是：
+
+@smallexample
+(month "/" day "/" (substring year -2))
+@end smallexample
+
+@node Time Display Format
+@subsection 时间显示格式
+@vindex calendar-time-display-form
+
+日历和日记默认以传统美式风格显示一天中的时间，包括从 1 到 12 的小时、分钟以及 @samp{am} 或 @samp{pm}。  如果您更喜欢欧洲风格（在美国也称为军事风格，即时间从 00 点到 23 点），您可以更改变量 @code{calendar-time-display-form}。  该变量是一个表达式列表，可以涉及变量@code{12-hours}、@code{24-hours}和@code{minutes}（它们都是字符串形式的数字）以及@code{am-pm}和@code{time-zone}（它们都是字母字符串）。  默认值为：
+
+@smallexample
+(12-hours ":" minutes am-pm
+          (if time-zone " (") time-zone (if time-zone ")"))
+@end smallexample
+
+@noindent
+这是提供欧洲风格时间的值：
+
+@smallexample
+(24-hours ":" minutes
+          (if time-zone " (") time-zone (if time-zone ")"))
+@end smallexample
+
+请注意，很少有日历函数返回一天中的时间（目前，只有太阳函数）。
+
+@node Diary Customizing
+@subsection 定制日记
+
+@vindex diary-show-holidays-flag
+通常，日记窗口会在模式行或缓冲区本身中指示日记条目日期的任何假期。检查假期的过程可能会很慢，具体取决于定义的假期。  在这种情况下，将 @code{diary-show-holidays-flag} 设置为 @code{nil} 将加快日记显示速度。
+
+@vindex diary-number-of-entries
+变量@code{diary-number-of-entries}控制一次显示日记条目的天数。  它影响@code{calendar-view-diary-initially-flag}为@code{t}时的初始显示，以及命令@kbd{M-x diary}。  例如，值 1（默认值）仅显示当天的日记条目，而值 2 还将显示第二天的条目。  该值也可以是七个整数的向量：例如，如果值为@code{[0 2 2 2 2 4 1]}，则周日不出现日记条目，周一到周四出现当前日期和第二天的日记条目，周五到周一的条目出现在周五，而周六仅出现当天的条目。
+
+@vindex diary-date-forms
+您可以通过设置变量@code{diary-date-forms}来自定义日记文件中的日期形式。  该变量是用于识别日期的模式列表。  每个日期模式都是一个列表，其元素可以是正则表达式 (@pxref{Regular Expressions,,, elisp, the Emacs Lisp Reference Manual}) 或符号 @code{month}、@code{day}、@code{year}、@code{monthname} 和 @code{dayname}。  所有这些元素都充当与日记文件中某些类型的文本相匹配的模式。为了使日期模式作为一个整体匹配，其所有元素必须连续匹配。
+
+日期模式中的正则表达式以通常的方式进行匹配，使用更改后的标准语法表，使 @samp{*} 成为单词组成部分。
+
+符号 @code{month}、@code{day}、@code{year}、@code{monthname} 和 @code{dayname} 与所考虑日期的月数、日数、年数、月份名称和日期名称相匹配。  与数字匹配的符号允许前导零；那些与名称匹配的允许大写和缩写（如@code{calendar-month-abbrev-array}和@code{calendar-day-abbrev-array}指定）。  所有符号都可以匹配@samp{*}；由于日记条目中的 @samp{*} 表示“任何一天”、“任何月份”等，因此无论考虑哪个日期，它都应该匹配。
+
+美式风格中@code{diary-date-forms}的默认值由@code{diary-american-date-forms}提供：
+
+@example
+((month "/" day "[^/0-9]")
+ (month "/" day "/" year "[^0-9]")
+ (monthname " *" day "[^,0-9]")
+ (monthname " *" day ", *" year "[^0-9]")
+ (dayname "\\W"))
+@end example
+
+@noindent
+变量@code{diary-european-date-forms}和@code{diary-iso-date-forms}提供其他默认样式。
+
+列表中的日期模式必须为 @emph{mutually exclusive} 并且不得与日记条目本身的任何部分匹配，只能匹配日期和一个空格字符。  如果为了互斥，该模式必须匹配日记条目文本的一部分（超出日期结束的空白），则日期模式的第一个元素 @emph{must} 为 @code{backup}。  这会导致日期识别器在完成匹配后备份到日记条目当前单词的开头。  即使您使用@code{backup}，日期模式也绝对不能匹配日记条目第一个单词的一部分。  例如，@code{diary-european-date-forms}的默认值为：
+
+@c backup line is a fraction too wide in PDF, but it looks ok.
+@example
+((day "/" month "[^/0-9]")
+ (day "/" month "/" year "[^0-9]")
+ (backup day " *" monthname "\\W+\\<\\([^*0-9]\\|\\([0-9]+[:aApP]\\)\\)")
+ (day " *" monthname " *" year "[^0-9]")
+ (dayname "\\W"))
+@end example
+
+@noindent
+请注意在第三个模式中使用 @code{backup}，因为它需要匹配日期本身之外的单词部分，以将其与第四个模式区分开。
+
+@node Non-Gregorian Diary
+@subsection 使用非公历的日记条目
+
+除了基于标准公历的条目外，您的日记还可以包含基于 Bah@'a'@'i、中国、希伯来语或伊斯兰日期的条目。然而，识别此类条目可能非常耗时，并且由于大多数人不使用它们，因此您必须明确启用它们的使用。  例如，如果您希望日记能够识别希伯来语日期的日记条目，则必须执行以下操作：
+
+@vindex diary-nongregorian-listing-hook
+@vindex diary-nongregorian-marking-hook
+@findex diary-hebrew-list-entries
+@findex diary-hebrew-mark-entries
+@findex diary-islamic-list-entries
+@findex diary-islamic-mark-entries
+@findex diary-bahai-list-entries
+@findex diary-bahai-mark-entries
+@findex diary-chinese-list-entries
+@findex diary-chinese-mark-entries
+@smallexample
+(add-hook 'diary-nongregorian-listing-hook 'diary-hebrew-list-entries)
+(add-hook 'diary-nongregorian-marking-hook 'diary-hebrew-mark-entries)
+@end smallexample
+
+@noindent
+同样，对于伊斯兰教、Bah@'a'@'i 和中文条目，添加 @code{diary-islamic-list-entries} 和 @code{diary-islamic-mark-entries}、@code{diary-bahai-list-entries} 和 @code{diary-bahai-mark-entries}、或 @code{diary-chinese-list-entries} 和 @code{diary-chinese-mark-entries}。
+
+@vindex diary-bahai-entry-symbol
+@vindex diary-chinese-entry-symbol
+@vindex diary-hebrew-entry-symbol
+@vindex diary-islamic-entry-symbol
+这些日记条目与公历日期日记条目具有相同的格式；除了 @code{diary-bahai-entry-symbol}（默认 @samp{B}）必须先于 Bah@'a'@'i 日期、@code{diary-chinese-entry-symbol}（默认 @samp{C}）中国日期、@code{diary-hebrew-entry-symbol}（默认 @samp{H}）希伯来日期和 @code{diary-islamic-entry-symbol}（默认 @samp{I}）伊斯兰日期。  此外，非公历月份名称可能不会缩写（因为前三个字母通常不是唯一的）。 （另请注意，如果您想要普通希伯来年份的 Adar，则必须使用“Adar I”。）例如，希伯来日期 Heshvan 25 的日记条目可能如下所示：
+
+@smallexample
+HHeshvan 25 Happy Hebrew birthday!
+@end smallexample
+
+@noindent
+并且会出现在日记中与希伯来历 Heshvan 25 相对应的任何日期。  这是与 Dhu al-Qada 25 相匹配的伊斯兰日期日记条目：
+
+@smallexample
+IDhu al-Qada 25 Happy Islamic birthday!
+@end smallexample
+
+与公历日期日记条目一样，如果前面带有 @code{diary-nonmarking-symbol}（默认为 @samp{&}），则非公历日期条目是无标记的。
+
+以下是日历中使用的命令表，用于创建与所选日期以及 Bah@'a'@'i、中国、希伯来语或伊斯兰日历中类似的其他日期相匹配的日记条目：
+
+@table @kbd
+@item i h d
+@code{diary-hebrew-insert-entry}
+@item i h m
+@code{diary-hebrew-insert-monthly-entry}
+@item i h y
+@code{diary-hebrew-insert-yearly-entry}
+@item i i d
+@code{diary-islamic-insert-entry}
+@item i i m
+@code{diary-islamic-insert-monthly-entry}
+@item i i y
+@code{diary-islamic-insert-yearly-entry}
+@item i B d
+@code{diary-bahai-insert-entry}
+@item i B m
+@code{diary-bahai-insert-monthly-entry}
+@item i B y
+@code{diary-bahai-insert-yearly-entry}
+@item i C d
+@code{diary-chinese-insert-entry}
+@item i C m
+@code{diary-chinese-insert-monthly-entry}
+@item i C y
+@code{diary-chinese-insert-yearly-entry}
+@item i C a
+@code{diary-chinese-insert-anniversary-entry}
+@end table
+
+@findex diary-hebrew-insert-entry
+@findex diary-hebrew-insert-monthly-entry
+@findex diary-hebrew-insert-yearly-entry
+@findex diary-islamic-insert-entry
+@findex diary-islamic-insert-monthly-entry
+@findex diary-islamic-insert-yearly-entry
+@findex diary-bahai-insert-entry
+@findex diary-bahai-insert-monthly-entry
+@findex diary-bahai-insert-yearly-entry
+@findex diary-chinese-insert-entry
+@findex diary-chinese-insert-monthly-entry
+@findex diary-chinese-insert-yearly-entry
+@findex diary-chinese-insert-anniversary-entry
+
+这些命令的工作方式与普通日记条目的相应命令非常相似：它们适用于日历窗口中该点所在的日期，并且它们所做的只是将日记条目的日期部分插入日记文件的末尾。  然后您必须插入日记条目的其余部分。  基本命令添加特定非公历日期的条目，@samp{monthly} 命令为每个月中给定的非公历月内日期添加条目，以及 @samp{yearly} 命令为每年给定的非公历日期和月份添加条目。
+
+@node Diary Display
+@subsection 日记展示
+@vindex diary-display-function
+@findex diary-simple-display
+@findex diary-fancy-display
+@cindex diary buffer
+
+日记显示的工作原理是准备日记条目列表，然后运行变量@code{diary-display-function}指定的函数。  默认值 @code{diary-fancy-display} 通过将日记条目和假期复制到仅为显示目的而存在的特殊缓冲区中来显示它们。  将日记条目复制到单独的缓冲区提供了更改显示文本以使其更漂亮的机会，例如，按条目适用的日期对条目进行排序。
+
+@vindex diary-list-include-blanks
+通常，精美的日记缓冲区不会显示没有日记条目的日子，即使那天是假期。  如果您希望这些日子显示在精美日记缓冲区中，请将变量 @code{diary-list-include-blanks} 设置为 @code{t}。
+
+精美的日记缓冲区启用查看模式
+@iftex
+(@pxref{View Mode,,, emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{View Mode}).
+@end ifnottex
+
+另一种显示方法 @code{diary-simple-display} 显示实际的日记缓冲区，并使用不可见文本隐藏不适用的条目。  假期显示在模式行中。  这种方法的优点是您可以编辑缓冲区并将更改直接保存到日记文件中。  然而，这种方法不像花哨的方法那么灵活。  例如，它无法对条目进行排序。  另一个缺点是不可见的文本可能会令人困惑。  例如，如果您复制文本区域以便将其粘贴到其他位置，则可能会包含不可见文本。同样，由于您所看到的日记缓冲区是一种幻觉，因此仅打印缓冲区可能无法打印您在屏幕上看到的内容。
+
+@vindex diary-print-entries-hook
+@findex diary-print-entries
+为此，有一个特殊的命令来打印日记缓冲区的硬拷贝@emph{as it appears}；这个命令是@kbd{M-x diary-print-entries}。  它适用于任何一种显示方法，尽管使用精美的显示，您也可以像其他任何方法一样打印缓冲区。  要打印一周的每日日记的硬拷贝，请将点定位在一周的第一天，键入@kbd{7 d}，然后执行@kbd{M-x diary-print-entries}。  与往常一样，包含假期会稍微减慢显示速度；您可以通过将变量 @code{diary-show-holidays-flag} 设置为 @code{nil} 来加快速度。
+
+此命令准备一个临时缓冲区，其中仅包含日记缓冲区中当前可见的日记条目。  与简单的显示不同，其他不相关的条目实际上不存在，而不仅仅是隐藏。  准备好缓冲区后，它运行钩子@code{diary-print-entries-hook}。  该钩子的默认值使用命令@code{lpr-buffer}将数据直接发送到打印机
+@iftex
+(@pxref{Printing,,, emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{Printing}).
+@end ifnottex
+如果您想使用不同的命令进行打印，只需更改此挂钩的值即可。  其他用途可能包括，例如，按日期和时间重新排列线路。
+
+您可以编辑出现在简单日记窗口中的日记条目，但请务必记住，显示的缓冲区包含 @emph{entire} 日记文件，其中部分内容隐藏在视图之外。  例如，这意味着 @kbd{C-f} (@code{forward-char}) 命令可以将点放置在看似线的末端，但实际上是某些隐藏线的中间。
+
+@emph{Be careful when editing the diary entries in the simple display!} 在可见行中间插入附加行或添加/删除字符不会导致问题，但在行尾进行编辑可能不会达到您的预期。  删除一行可能会删除该行后面的其他不可见条目。  在编辑简单日记缓冲区之前，最好使用@kbd{s} (@code{diary-show-all-entries}) 显示整个文件。
+
+@node Fancy Diary Display
+@subsection 精美日记展示
+
+以下功能仅适用于精美的日记显示。
+
+@cindex sorting diary entries
+您可以使用普通的钩子 @code{diary-list-entries-hook} 来按一天中的时间对每天的日记条目进行排序。  方法如下：
+
+@findex diary-sort-entries
+@example
+(add-hook 'diary-list-entries-hook 'diary-sort-entries t)
+@end example
+
+@noindent
+对于每一天，这都会根据时间对以一天中可识别时间开头的日记条目进行排序。  没有时间的日记条目在每天中排在第一位。  请注意排序命令如何放置在挂钩列表的末尾，以防列表中较早的成员更改日记条目的顺序或添加项目。
+
+@vindex diary-comment-start
+您可以通过将变量 @code{diary-comment-start} 和 @code{diary-comment-end} 设置为分隔注释的字符串，在日记条目中写入 @samp{comments}。  精美的显示不打印注释。  您可能想要放置元数据以供其他包使用（例如，约会包，
+@iftex
+@pxref{Appointments,,,emacs, the Emacs Manual})
+@end iftex
+@ifnottex
+@pxref{Appointments})
+@end ifnottex
+里面的评论。
+
+@vindex diary-include-string
+您的主日记文件可以包含其他文件。  这允许一群人共享适用于他们所有人的事件的日记文件。日记文件中以 @code{diary-include-string} 开头的行：
+
+@smallexample
+#include "@var{filename}"
+@end smallexample
+
+@noindent
+将文件 @var{filename} 中的日记条目包含在精美日记缓冲区中。  包含机制是递归的，因此包含的文件可以包含其他文件，依此类推（当然，必须注意不要出现循环包含）。  以下是启用包含功能的方法：
+
+@vindex diary-list-entries-hook
+@vindex diary-mark-entries-hook
+@findex diary-include-other-diary-files
+@findex diary-mark-included-diary-files
+@smallexample
+(add-hook 'diary-list-entries-hook 'diary-include-other-diary-files)
+(add-hook 'diary-mark-entries-hook 'diary-mark-included-diary-files)
+@end smallexample
+
+包含机制仅适用于精美的日记显示，因为简单的日记显示直接显示日记文件中的条目。
+
+@node Sexp Diary Entries
+@subsection 性爱条目和精美的日记显示
+@cindex sexp diary entries
+
+@vindex diary-sexp-entry-symbol
+性爱日记条目允许您做的不仅仅是日记条目适用的复杂条件。  在日记文件中，性别条目前面应带有 @code{diary-sexp-entry-symbol}（默认为 @samp{%%}）。  通过精美的日记显示，sexp 条目可以根据日期本身生成条目的文本。
+
+例如，周年纪念日记条目可以将自周年纪念日起的年数插入日记条目的文本中。  因此，这篇日记中的@samp{%d}：
+
+@findex diary-anniversary@r{, and sexp diary entries}
+@smallexample
+%%(diary-anniversary 10 31 1948) Arthur's birthday (%d years old)
+@end smallexample
+
+@noindent
+被年龄取代，因此 1990 年 10 月 31 日，该条目出现在精美日记缓冲区中，如下所示：
+
+@smallexample
+Arthur's birthday (42 years old)
+@end smallexample
+
+@noindent
+如果日记文件包含此条目：
+
+@smallexample
+%%(diary-anniversary 10 31 1948) Arthur's %d%s birthday
+@end smallexample
+
+@noindent
+1990 年 10 月 31 日的精美日记缓冲区中的条目如下所示：
+
+@smallexample
+Arthur's 42nd birthday
+@end smallexample
+
+类似地，循环日记条目可以插入已发生的重复次数：
+
+@findex diary-cyclic@r{, and sexp diary entries}
+@smallexample
+%%(diary-cyclic 50 1 1 2012) Renew medication (%d%s time)
+@end smallexample
+
+@noindent
+看起来像这样：
+
+@smallexample
+Renew medication (5th time)
+@end smallexample
+
+@noindent
+2012年9月7日的精美日记展示中。
+
+有一个早期提醒日记 sexp，它不仅在日记中包含发生日期的条目，还包含更早日期的条目。例如，如果您想在周年纪念日前一周收到提醒，您可以使用
+
+@findex diary-remind
+@smallexample
+%%(diary-remind '(diary-anniversary 12 22 1968) 7) Ed's anniversary
+@end smallexample
+
+@noindent
+花式日记将在 12 月 15 日和 12 月 22 日显示@samp{Ed's anniversary}。
+
+@findex diary-date
+函数@code{diary-date}适用于由月、日、年组合描述的日期，每个日期可以是整数、整数列表或@code{t}（表示所有值）。  例如，
+
+@smallexample
+%%(diary-date '(10 11 12) 22 t) Rake leaves
+@end smallexample
+
+@noindent
+导致精美日记显示
+
+@smallexample
+Rake leaves
+@end smallexample
+
+@noindent
+每年10月22日、11月22日、12月22日。
+
+@findex diary-float@r{, and sexp diary entries}
+函数 @code{diary-float} 允许您描述适用于 11 月的第三个星期五或 4 月的最后一个星期二等日期的日记条目。  参数是 @var{month}、@var{dayname} 和索引 @var{n}。  该条目出现在 @var{month} 第一天之后的第 @var{n}5⁣，其中 @var{dayname}=0 表示星期日，1 表示星期一，依此类推。  如果@var{n}为负数，则从@var{month}末尾开始倒数。  @var{month} 的值可以是月份列表、单个月份，也可以是 @code{t} 来指定所有月份。  您还可以使用可选参数@var{day}指定@var{month}的@var{day}之上或之后/之前的第@var{n}第@var{dayname}；如果 18⁣ 为正，则 17⁣ 的值默认为 1；如果 20⁣ 为负，则为 19⁣ 的最后一天。  例如，
+
+@smallexample
+%%(diary-float t 1 -1) Pay rent
+@end smallexample
+
+@noindent
+导致精美日记显示
+
+@smallexample
+Pay rent
+@end smallexample
+
+@noindent
+每个月的最后一个星期一。
+
+sexp 日记条目的通用性使您可以指定可以通过算法描述的任何日记条目。  sexp 日记条目包含一个表达式，用于计算该条目是否适用于任何给定日期。  如果其值为非@code{nil}，则该条目适用于该日期；否则，它不会。  表达式可以使用变量 @code{date} 来查找所考虑的日期；它的值是一个引用公历的列表 (@var{month} @var{day} @var{year})。
+
+sexp 日记条目适用于表达式的值为非@code{nil} 的日期，但某些值具有更具体的含义。  如果该值是字符串，则该字符串是对该日期发生的事件的描述。  该值也可以采用 @code{(@var{mark} . @var{string})} 的形式；那么@var{mark}指定如何在日历中标记日期，@var{string}是事件的描述。  如果 @var{mark} 是单字符字符串，则该字符出现在日历中日期的旁边。  如果@var{mark}是面名称，则日期显示在该面中。  如果 @var{mark} 是 @code{nil}，则不指定日期的特定突出显示。
+
+假设您在该月的 21 号（如果是工作日）收到付款，如果 21 号是周末，则在之前的星期五收到付款。  以下是如何编写与这些日期匹配的 sexp 日记条目：
+
+@smallexample
+&%%(let ((dayname (calendar-day-of-week date))
+         (day (cadr date)))
+      (or (and (= day 21) (memq dayname '(1 2 3 4 5)))
+          (and (memq day '(19 20)) (= dayname 5)))
+         ) Pay check deposited
+@end smallexample
+
+以下 sexp 日记条目利用（在精美日记显示中）的能力来编造日记条目，其文本根据日期而变化：
+
+@findex diary-sunrise-sunset
+@findex diary-lunar-phases
+@findex diary-day-of-year
+@findex diary-iso-date
+@findex diary-julian-date
+@findex diary-astro-day-number
+@findex diary-bahai-date
+@findex diary-chinese-date
+@findex diary-coptic-date
+@findex diary-ethiopic-date
+@findex diary-hebrew-date
+@findex diary-islamic-date
+@findex diary-french-date
+@findex diary-mayan-date
+@findex diary-persian-date
+@table @code
+@item %%(diary-sunrise-sunset)
+在日记中记录今天当地的日出和日落时间。
+@item %%(diary-lunar-phases)
+为月相（四分之一）写一篇日记。
+@item %%(diary-day-of-year)
+用当年今天的天数和当年剩余的天数记下日记。
+@item %%(diary-iso-date)
+用今天等效的 ISO 商业日期记入日记。
+@item %%(diary-julian-date)
+用今天对应的儒略历日期记录日记。
+@item %%(diary-astro-day-number)
+用今天的天文（儒略）日数记录日记。
+@item %%(diary-bahai-date)
+用今天的相应 Bah@'a'@'i 日历日期记录日记。
+@item %%(diary-chinese-date)
+用今天的相应农历日期写日记。
+@item %%(diary-coptic-date)
+在日记中记录今天的相应科普特日历日期。
+@item %%(diary-ethiopic-date)
+用今天对应的埃塞俄比亚日历日期记录日记。
+@item %%(diary-french-date)
+在日记中记录下法国大革命日历上今天的相应日期。
+@item %%(diary-hebrew-date)
+用今天对应的希伯来历日期记录日记。
+@item %%(diary-islamic-date)
+在日记中记下今天的相应伊斯兰历日期。
+@item %%(diary-mayan-date)
+用今天对应的玛雅日历日期记下日记。
+@item %%(diary-persian-date)
+用今天的波斯日历日期记下日记。
+@end table
+
+@noindent
+例如，包括日记条目
+
+@smallexample
+&%%(diary-hebrew-date)
+@end smallexample
+
+@noindent
+如果您使用精美的日记显示，则使每天的日记显示包含希伯来日历上的等效日期。  （通过简单的日记显示，文字行 @samp{&%%(diary-hebrew-date)} 出现在任何日期的日记中。）
+
+此函数已用于构造某些标准希伯来语 sexp 日记条目：
+
+@cindex rosh hodesh
+@findex diary-hebrew-rosh-hodesh
+@cindex parasha, weekly
+@findex diary-hebrew-parasha
+@cindex candle lighting times
+@findex diary-hebrew-sabbath-candles
+@cindex omer count
+@findex diary-hebrew-omer
+@cindex yahrzeits, and sexp diary entries
+@findex diary-hebrew-yahrzeit
+@findex diary-hebrew-birthday
+@table @code
+@item %%(diary-hebrew-rosh-hodesh)
+写一篇日记，记录每个新希伯来月份的发生和仪式公告。
+@item %%(diary-hebrew-parasha)
+写一篇周六日记，讲述每周犹太教堂的经文阅读。
+@item %%(diary-hebrew-sabbath-candles)
+写一篇周五日记，记录安息日蜡烛点燃的@emph{local time}。
+@item %%(diary-hebrew-omer)
+在适当的时候，记下日记，注明奥玛数。
+@item %%(diary-hebrew-yahrzeit @var{month} @var{day} @var{year}) @var{name}
+写一篇日记来纪念死亡日期。  该日期是@emph{Gregorian}（民事）死亡日期。  日记条目出现在正确的希伯来历周年纪念日和前一天。  （参数的顺序根据日历日期样式而变化；例如，在欧洲样式中为@var{day}、@var{month}、@var{year}。）
+@item %%(diary-hebrew-birthday @var{month} @var{day} @var{year})
+在日记中记录希伯来日历上的生日。
+@end table
+
+上面记录的所有函数都带有一个可选参数@var{mark}，它指定如何在日历显示中标记日期。如果这些函数之一决定它适用于特定日期，它将返回一个包含 @var{mark} 的值，如上所述。

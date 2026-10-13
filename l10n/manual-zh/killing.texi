@@ -1,0 +1,544 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+
+@node Killing
+@chapter 删除和移动文本
+
+在 Emacs 中，@dfn{killing} 表示擦除文本并将其复制到 @dfn{kill ring} 中。  @dfn{Yanking} 表示将文本从终止环带回缓冲区。  （某些应用程序使用术语“剪切”和“粘贴”来进行类似的操作。） Kill Ring 之所以如此命名，是因为它可以被可视化为一组排列在环中的文本块，您可以按循环顺序访问它们。  @xref{Kill Ring}。
+
+Killing 和 yanking 是在 Emacs 中移动或复制文本的最常见方法。  它非常通用，因为有一些命令可以杀死许多不同类型的语法单元。
+
+@menu
+* Deletion and Killing::  删除文本的命令。
+* Yanking::               插入文本的命令。
+* Cut and Paste::         图形显示上的剪贴板和选择。
+* Accumulating Text::     将文本添加到缓冲区的其他方法。
+* Rectangles::            对矩形区域中的文本进行操作。
+* CUA Bindings::          使用 @kbd{C-x}/@kbd{C-c}/@kbd{C-v} 进行杀死和猛拉。
+@end menu
+
+@node Deletion and Killing
+@section 删除和杀掉
+
+@cindex killing text
+@cindex cutting text
+@cindex deletion
+大多数从缓冲区中删除文本的命令都会将其保存在终止环 (@pxref{Kill Ring}) 中。  这些被称为 @dfn{kill} 命令，它们的名称通常包含单词 @samp{kill}（例如 @code{kill-line}）。  杀戮环存储最近的几次杀戮，而不仅仅是最后一次杀戮，因此杀戮是一项非常安全的操作：您不必太担心丢失之前杀戮的文本。  终止环由所有缓冲区共享，因此可以将一个缓冲区中终止的文本拉入另一个缓冲区。
+
+当您使用 @kbd{C-/} (@code{undo}) 撤消终止命令 (@pxref{Undo}) 时，会将终止的文本带回缓冲区，但不会将其从终止环中删除。
+
+在图形显示上，删除文本还会将其复制到系统剪贴板。  @xref{Cut and Paste}。
+
+删除文本但不将其保存在 Kill Ring 中的命令称为 @dfn{delete} 命令；他们的名字通常包含单词@samp{delete}。  其中包括 @kbd{C-d} (@code{delete-char}) 和 @key{DEL} (@code{delete-backward-char})，它们一次仅删除一个字符，以及那些仅删除空格或换行符的命令。  可以擦除大量重要数据的命令通常会执行终止操作。
+
+您还可以使用鼠标进行杀死和猛拉。  @xref{Cut and Paste}。
+
+@menu
+* Deletion::             用于删除少量文本和空白区域的命令。
+* Killing by Lines::     如何一次删除整行文本。
+* Other Kill Commands::  用于删除大片文本区域和句法单元（例如单词和句子）的命令。
+* Kill Options::         影响杀戮的选项。
+@end menu
+
+@node Deletion
+@subsection 删除
+@findex delete-backward-char
+@findex delete-char
+
+删除意味着删除文本而不将其保存在 Kill Ring 中。  在大多数情况下，删除文本的 Emacs 命令是那些仅删除一个字符或仅删除空格的命令。
+
+@table @kbd
+@item @key{DEL}
+@itemx @key{BACKSPACE}
+删除前一个字符，或区域中的文本（如果处于活动状态）(@code{delete-backward-char})。
+
+@item @key{Delete}
+删除下一个字符，或者区域中的文本（如果处于活动状态）(@code{delete-forward-char})。
+
+@item C-d
+删除下一个字符 (@code{delete-char})。
+
+@item M-\
+删除点 (@code{delete-horizontal-space}) 周围的空格和制表符。
+@item M-x just-one-space
+删除点周围的空格和制表符，留下一个空格。
+@item M-@key{SPC}
+灵活地删除点周围的空格和制表符（@code{cycle-spacing}）。
+@item C-x C-o
+删除当前行周围的空白行 (@code{delete-blank-lines})。
+@item M-^
+通过删除中间的换行符及其后面的任何缩进来连接两行 (@code{delete-indentation})。
+@end table
+
+我们已经描述了基本删除命令 @key{DEL} (@code{delete-backward-char})、@key{delete} (@code{delete-forward-char}) 和 @kbd{C-d} (@code{delete-char})。 @xref{Erasing}。  使用数字参数，它们删除指定数量的字符。  如果省略数字参数或为 1，@key{DEL} 和 @key{delete} 会删除该区域中的所有文本（如果该区域处于活动状态）(@pxref{Using Region})。
+
+@kindex M-\
+@findex delete-horizontal-space
+其他删除命令仅删除空白字符：空格、制表符和换行符。  @kbd{M-\} (@code{delete-horizontal-space}) 删除点前后的所有空格和制表符。  使用前缀参数，只会删除点之前的空格和制表符。
+
+@findex just-one-space
+@kbd{M-x just-one-space} 删除 point 周围的制表符和空格，但在 point 之前留下一个空格，无论之前存在多少个空格（即使之前没有空格）。  对于数字参数 @var{n}，如果 @var{n} 为正，则在 point 之前留下 @var{n} 空格；如果@var{n}为负数，除了空格和制表符之外，它还会删除换行符，在点之前留下@minus{}@var{n}空格。
+
+@kindex M-SPC
+@findex cycle-spacing
+@vindex cycle-spacing-actions
+命令 @code{cycle-spacing} (@kbd{M-@key{SPC}}) 的作用类似于 @code{just-one-space} 的更灵活版本。  如果连续重复调用它，它会以循环方式执行 @code{cycle-spacing-actions} 定义的不同空间清理操作。  默认情况下，第一次调用与@code{just-one-space}相同，第二次调用删除点周围的所有空白字符，如@code{delete-horizontal-space}，第三次调用恢复原始空白字符；然后循环。  如果使用前缀参数调用，则每个操作都会被赋予该参数的值。  用户选项@code{cycle-spacing-actions}可以包含其他成员；有关详细信息，请参阅该选项的文档字符串。
+
+@kbd{C-x C-o} (@code{delete-blank-lines}) 删除当前行之后的所有空白行。  如果当前行为空，它也会删除当前行之前的所有空行（留下一个空行，即当前行）。  在单独的空行上，它会删除该行。
+
+@kbd{M-^} (@code{delete-indentation}) 通过删除换行符和所有周围的空格（通常留下一个空格）来连接当前行和上一行。  @xref{Indentation,M-^}。
+
+@c Not really sure where to put this...
+@findex delete-duplicate-lines
+命令 @code{delete-duplicate-lines} 在该区域中搜索相同的行，并删除每行中的所有行，只留下一个副本。  通常它保留每个重复行的第一个实例，但使用 @kbd{C-u} 前缀参数它保留最后一个实例。  使用 @kbd{C-u C-u} 前缀参数，它仅搜索相邻的相同行。  这是一种更有效的操作模式，当行已经排序时很有用。  使用 @kbd{C-u C-u C-u} 前缀参数，它保留重复的空行。
+
+@node Killing by Lines
+@subsection 线杀
+
+@table @kbd
+@item C-k
+杀死其余行或一行或多行 (@code{kill-line})。
+@item C-S-backspace
+一次杀死整行 (@code{kill-whole-line})
+@end table
+
+@kindex C-k
+@findex kill-line
+最简单的终止命令是@kbd{C-k} (@code{kill-line})。  如果在行末尾使用，它会杀死行结束换行符，将下一行合并到当前行中（因此，空白行被完全删除）。  否则，@kbd{C-k} 会删除从点到行尾的所有文本；如果点最初位于行的开头，则该行会留空。
+
+在决定应用哪种情况时，行尾的空格和制表符将被忽略。  只要 point 位于行中最后一个非空白字符之后，就可以确定 @kbd{C-k} 将杀死换行符。  要删除整个非空行，请转到开头并输入 @kbd{C-k} 两次。
+
+在这种情况下，“行”表示逻辑文本行，而不是屏幕行 (@pxref{Continuation Lines})。
+
+当给 @kbd{C-k} 一个正参数 @var{n} 时，它会杀死 @var{n} 行以及它们后面的换行符（不会杀死当前行上 point 之前的文本）。  使用负参数@minus{}@var{n}，它会杀死当前行之前的@var{n}行，以及当前行上点之前的文本。  参数为零的 @kbd{C-k} 会删除当前行上 point 之前的文本。
+
+@vindex kill-whole-line
+如果变量 @code{kill-whole-line} 不是 @code{nil}，则行首的 @kbd{C-k} 将杀死整行，包括后面的换行符。  该变量通常为@code{nil}。
+
+@kindex C-S-backspace
+@findex kill-whole-line
+@kbd{C-S-backspace} (@code{kill-whole-line}) 杀死整行，包括换行符，无论点在行内的位置如何。  请注意，许多文本终端会阻止您键入按键序列@kbd{C-S-backspace}。
+
+@node Other Kill Commands
+@subsection 其他杀死命令
+
+@table @kbd
+@item C-w
+杀死该区域 (@code{kill-region})。
+@item M-w
+将该区域复制到终止环 (@code{kill-ring-save})。
+@item M-d
+删除下一个单词 (@code{kill-word})。  @xref{Words}。
+@item M-@key{DEL}
+倒着杀一个字（@code{backward-kill-word}）。
+@item C-x @key{DEL}
+杀回句子开头 (@code{backward-kill-sentence})。 @xref{Sentences}。
+@item M-k
+杀死到句子结尾（@code{kill-sentence}）。
+@item C-M-k
+杀死下面的平衡表达式 (@code{kill-sexp})。  @xref{Expressions}。
+@item M-z @var{char}
+杀死下一次出现的 @var{char} (@code{zap-to-char})。
+@item M-x zap-up-to-char @var{char}
+杀死直到但不包括下一次出现的@var{char}。
+@end table
+
+@kindex C-w
+@findex kill-region
+@kindex M-w
+@findex kill-ring-save
+常用的终止命令之一是 @kbd{C-w} (@code{kill-region})，它会终止区域 (@pxref{Mark}) 中的文本。  类似地，@kbd{M-w} (@code{kill-ring-save}) 将区域中的文本复制到 Kill Ring 中，而不将其从缓冲区中删除。  如果在您键入 @kbd{C-w} 或 @kbd{M-w} 时该标记处于非活动状态，则该命令将作用于点与您上次设置标记的位置 (@pxref{Using Region}) 之间的文本。
+
+Emacs 还提供了杀死特定语法单元的命令：单词，带有 @kbd{M-@key{DEL}} 和 @kbd{M-d} (@pxref{Words})；平衡表达式，有 @kbd{C-M-k} (@pxref{Expressions})；和句子，带有 @kbd{C-x @key{DEL}} 和 @kbd{M-k} (@pxref{Sentences})。
+
+@kindex M-z
+@findex zap-to-char
+命令 @kbd{M-z} (@code{zap-to-char}) 将查杀与搜索结合起来：它读取一个字符并从该点开始查杀（并包括）缓冲区中该字符的下一次出现。  数字参数充当重复计数；否定参数意味着向后搜索并删除点之前的文本。  以前使用过的字符的历史记录会被保留，并且可以通过 @kbd{M-p}/@kbd{M-n} 按键访问。  如果必须通过复杂的输入法输入要使用的字符，这主要有用。
+@findex zap-up-to-char
+类似的命令 @code{zap-up-to-char} 杀死从点到点，但不包括字符的下一次出现，数字参数充当重复计数。
+
+@node Kill Options
+@subsection 杀戮选项
+
+@vindex kill-read-only-ok
+@cindex read-only text, killing
+一些专用缓冲区包含@dfn{read-only text}，它无法修改，因此无法被杀死。  Kill 命令专门在只读缓冲区中工作：它们移动文本并将其复制到 Kill Ring，而不实际从缓冲区中删除它。通常，发生这种情况时，它们还会发出蜂鸣声并显示错误消息。  但是，如果您将变量 @code{kill-read-only-ok} 设置为非 @code{nil} 值，它们只会在回显区域中打印一条消息来解释为什么文本未被删除。
+
+@vindex kill-transform-function
+在将 Kill 保存到 Kill Ring 之前，您可以使用 @code{kill-transform-function} 转换字符串。  它是用要杀死的字符串调用的，它应该返回您想要保存的字符串。  它还可以返回 @code{nil}，在这种情况下，字符串不会被保存到 Kill Ring 中。  例如，如果您不想将纯空白字符串保存到终止环，您可以说：
+
+@lisp
+(setq kill-transform-function
+      (lambda (string)
+        (and (not (string-blank-p string))
+             string)))
+@end lisp
+
+@vindex kill-do-not-save-duplicates
+如果将变量 @code{kill-do-not-save-duplicates} 更改为非 @code{nil} 值，则相同的后续杀死会产生单个杀死环条目，而不会重复。
+
+@findex kill-ring-deindent-mode
+如果启用次要模式@code{kill-ring-deindent-mode}，保存到kill-ring的文本的缩进量将减少第一个保存行的缩进量。  也就是说，如果已保存文本的第一行缩进了 @var{n} 列，则此模式将从每个已保存行的缩进中删除该列数。
+
+@node Yanking
+@section 扬金
+@cindex moving text
+@cindex copying text
+@cindex kill ring
+@cindex yanking
+@cindex pasting
+
+@dfn{Yanking} 表示重新插入之前被删除的文本。  移动或复制文本的常用方法是删除它，然后将其拖到其他地方。
+
+@table @kbd
+@item C-y
+将最后一次杀戮拖入缓冲区中的点 (@code{yank})。
+@item M-y
+将刚刚拉出的文本替换为较早一批被删除的文本 (@code{yank-pop})，或者允许从先前被删除的文本批次列表中进行选择。  @xref{Earlier Kills}。
+@item C-M-w
+导致以下命令（如果它是一个终止命令）附加到前一个终止（@code{append-next-kill}）。  @xref{Appending Kills}。
+@end table
+
+@kindex C-y
+@findex yank
+基本的拉动命令是@kbd{C-y} (@code{yank})。  它插入最近的kill，将光标留在插入文本的末尾。  它还在插入文本的开头设置标记，但不激活该标记；如果您愿意，可以使用 @kbd{C-u C-@key{SPC}} (@pxref{Mark Ring}) 轻松跳转到该位置。
+
+使用普通前缀参数 (@kbd{C-u C-y})，该命令会将光标保留在插入文本的前面，并在末尾设置标记。  使用任何其他前缀参数指定较早的终止；例如，@kbd{C-u 4 C-y} 重新插入第四个最近的杀戮。 @xref{Earlier Kills}。
+
+在图形显示器和支持文本模式的显示器上，@kbd{C-y} 首先检查是否有其他应用程序在最近一次 Emacs 终止之前在系统剪贴板中放置了任何文本。  如果是这样，它将插入剪贴板的文本。  因此，Emacs 有效地处理在其他应用程序中执行的“剪切”或“复制”剪贴板操作，例如 Emacs 杀戮，只不过它们不记录在杀戮环中。 @xref{Cut and Paste}，了解详情。
+
+@menu
+* Kill Ring::            存储被删除文本的位置。
+* Earlier Kills::        猛拉前段时间杀死的东西。
+* Appending Kills::      连续几次杀戮都猛烈地连在一起。
+@end menu
+
+@node Kill Ring
+@subsection 杀戮戒指
+
+@dfn{kill ring} 是之前被删除的文本块的列表。  只有一个终止环，由所有缓冲区共享，因此您可以终止一个缓冲区中的文本并将其拉入另一个缓冲区中。  这是将文本从一个缓冲区移动到另一个缓冲区的常用方法。  （还有其他几种方法：例如，您可以将文本存储在寄存器中；请参阅@ref{Registers}.@xref{Accumulating Text}，了解移动文本的其他一些方法。）
+
+@vindex kill-ring-max
+Kill Ring 中的最大条目数由变量@code{kill-ring-max} 控制。  默认值为 120。如果在达到此限制时进行新的终止，Emacs 会通过删除终止环中最旧的条目来腾出空间。
+
+@vindex kill-ring
+Kill Ring 的实际内容存储在名为 @code{kill-ring} 的变量中；您可以使用@kbd{C-h v kill-ring}查看杀戮环的全部内容。
+
+@node Earlier Kills
+@subsection 猛拉早期击杀
+@cindex yanking previous kills
+
+如 @ref{Yanking} 中所述，您可以使用 @kbd{C-y} 的数字参数来提取不再是最近删除的文本。  如果您记得想要哪个 Kill Ring 条目，这会很有用。  如果不这样做，您可以使用 @kbd{M-y} (@code{yank-pop}) 命令循环选择可能性或选择较早的击杀之一。
+
+@kindex M-y
+@findex yank-pop
+如果前一个命令是拉取命令，则 @kbd{M-y} 会获取拉取的文本并将其替换为先前终止的文本。因此，要恢复倒数第二个杀戮的文本，请首先使用 @kbd{C-y} 拉出最后一个杀戮，然后使用 @kbd{M-y} 将其替换为前一个杀戮。  这仅在 @kbd{C-y} 或另一个 @kbd{M-y} 之后有效。  （如果在其他命令之后调用@kbd{M-y}，则其工作方式有所不同，请参见下文。）
+
+您可以通过指向kill环中的条目的last-yank指针来理解@kbd{M-y}的这种操作模式。  每次你杀死时，最后一个拉动指针都会移动到环前面新创建的条目。  @kbd{C-y} 复制最后复制指针指向的条目。  在 @kbd{C-y} 或另一个 @kbd{M-y} 之后的 @kbd{M-y} 将最后复制指针移动到上一个条目，并且缓冲区中的文本会更改以匹配。  足够多的@kbd{M-y}命令一个接一个地可以将指针移动到环中的任何条目，因此您可以将任何条目放入缓冲区。  最终指针到达环的末端；接下来的@kbd{M-y}再次循环回到第一个条目。
+
+@kbd{M-y} 在环上移动最后一个拉动指针，但它不会改变环中条目的顺序，该顺序始终从前面最近的杀戮到仍然记得的最旧的杀戮。
+
+当在@kbd{C-y}或@kbd{M-y}之后使用时，@kbd{M-y}可以接受一个数字参数，它告诉它最后一个复制指针要前进多少个条目。  负参数将指针移向环的前面；从环的前面开始，它移动到最后一个条目，并从那里继续向前。
+
+一旦您要查找的文本被带入缓冲区，您就可以停止执行 @kbd{M-y} 命令，最后拉出的文本将保留在那里。  它只是 Kill Ring 条目的副本，因此在缓冲区中编辑它不会更改环中的内容。  只要没有完成新的kill，最后一个复制指针就会保留在kill环中的同一位置，因此重复@kbd{C-y}将复制先前相同的kill的另一个副本。
+
+当您使用数字参数调用 @kbd{C-y} 时，还会将最后复制指针设置为它复制的条目。
+
+您还可以在非 yank 命令之后调用 @kbd{M-y}。  在这种情况下，@kbd{M-y}会提示您在迷你缓冲区中进行之前的杀戮之一。  您可以使用迷你缓冲区历史命令 (@pxref{Minibuffer History}) 导航或搜索 Kill Ring 中的条目，直到找到要重新插入的条目。  或者，您可以使用完成命令 (@pxref{Completion Commands}) 来完成删除环中条目列表中的条目，或弹出 @file{*Completions*} 缓冲区，其中包含可供您选择的候选条目。  选择终止环条目后，您可以选择在迷你缓冲区中编辑它。  最后，输入@kbd{RET}退出迷你缓冲区并插入所选kill-ring条目的文本。  就像在另一个 yank 命令之后的 @kbd{M-y} 的情况一样，最后一个 yank 指针将指向您刚刚 yank 的文本，无论它是之前的删除之一还是您在插入之前编辑的删除环中的条目。  （在后一种情况下，编辑后的条目将添加到终止环的前面。）因此，在这里输入 @kbd{C-y} 也会拉出刚刚插入的文本的另一个副本。
+
+当在非复制命令之后使用普通前缀参数 (@kbd{C-u M-y}) 调用时，@kbd{M-y} 将光标保留在插入文本的前面，并在末尾设置标记，就像 @kbd{C-y} 一样。
+
+@node Appending Kills
+@subsection 追加击杀数
+
+@cindex appending kills in the ring
+通常，每个终止命令都会将一个新条目推送到终止环上。然而，连续两个或多个终止命令将它们的文本组合成一个条目，因此单个 @kbd{C-y} 将所有文本作为一个单元进行拉取，就像它被终止之前一样。
+
+因此，如果您想将文本作为一个单元进行拉取，则无需使用一个命令删除所有文本；只需使用一个命令即可将其全部删除。你可以继续一行一行地删除，或者一个字一个字地删除，直到你把它全部删除，并且你仍然可以立即将其全部恢复。
+
+从点向前删除的命令会添加到前一个被删除文本的末尾。  从点向后删除的命令将文本添加到开头。  这样，任何混合的向前和向后终止命令序列都会将所有终止的文本放入一个条目中，而无需重新排列。数字参数不会破坏附加终止的顺序。  例如，假设缓冲区包含以下文本：
+
+@example
+This is a line @point{}of sample text.
+@end example
+
+@noindent
+点由 @point{} 表示。  如果你输入@kbd{M-d M-@key{DEL} M-d M-@key{DEL}}，交替向前和向后杀死，你最终会得到@samp{a line of sample}作为kill环中的一个条目，以及@w{@samp{This is@ @ text.}}作为缓冲区中的一个条目。  （请注意 @samp{is} 和 @samp{text} 之间的双空格，您可以使用 @kbd{M-@key{SPC}} 或 @kbd{M-q} 清除。）
+
+删除相同文本的另一种方法是使用 @kbd{M-b M-b} 向后移动两个单词，然后使用 @kbd{C-u M-d} 删除所有四个单词。这在缓冲区和终止环中产生完全相同的结果。  @kbd{M-f M-f C-u M-@key{DEL}} 杀死相同的文本，全部向后；再一次，结果还是一样。  终止环条目中的文本始终与终止它之前在缓冲区中的顺序相同。
+
+@kindex C-M-w
+@findex append-next-kill
+如果一个kill命令与最后一个kill命令被其他命令（不仅仅是数字参数）分开，它会在kill环上启动一个新条目。  但是您可以通过预先输入 @kbd{C-M-w} (@code{append-next-kill}) 来强制它与最后杀死的文本结合。  @kbd{C-M-w} 告诉它的后续命令，如果它是一个终止命令，则将该终止视为先前终止序列的一部分。  与往常一样，如果命令向前终止，则终止将附加到先前终止的文本；如果命令向后终止，则终止将附加到前面。  通过这种方式，您可以删除几个单独的文本片段并将它们累积起来以拉回到一个地方。
+
+@kbd{M-w} (@code{kill-ring-save}) 之后的终止命令不会附加到@kbd{M-w} 复制到终止环中的文本。
+
+@node Cut and Paste
+@section 图形显示上的“剪切和粘贴”操作
+@cindex cut
+@cindex copy
+@cindex paste
+
+在大多数图形桌面环境中，您可以使用称为 @dfn{clipboard} 的系统工具在不同应用程序之间传输数据（通常是文本）。  在 X 上，还有另外两个类似的设施可用：主要选择和次要选择。  当 Emacs 在图形显示器上运行时，它的 Kill 和 yank 命令与这些工具集成，以便您可以轻松地在 Emacs 和其他图形应用程序之间传输文本。
+
+默认情况下，Emacs 使用 UTF-8 作为程序间文本传输的编码系统。  如果您发现粘贴的文本不是您所期望的，您可以通过键入 @kbd{C-x @key{RET} x} 或 @kbd{C-x @key{RET} X} 来指定另一个编码系统。  您还可以通过自定义 @code{x-select-request-type} 来请求不同的数据类型。 @xref{Communication Coding}。
+
+@menu
+* Clipboard::            Emacs 如何使用系统剪贴板。
+* Primary Selection::    临时选择的文本选择。
+* Secondary Selection::  切割时不改变点和标记。
+@end menu
+
+@node Clipboard
+@subsection 使用剪贴板
+@cindex clipboard
+
+@dfn{clipboard} 是大多数图形应用程序用于“剪切和粘贴”的工具。  当剪贴板存在时，Emacs 中的 Kill 和 yank 命令会使用它。
+
+当您使用 @kbd{C-w} (@code{kill-region}) 等命令删除某些文本，或使用 @kbd{M-w} (@code{kill-ring-save}) 等命令将其复制到删除环时，该文本也会放入剪贴板中。
+
+@vindex save-interprogram-paste-before-kill
+当 Emacs Kill 命令将文本放入剪贴板时，现有的剪贴板内容通常会丢失。  或者，Emacs 可以将现有的剪贴板内容保存到 Kill Ring，防止您丢失旧的剪贴板数据。  如果 @code{save-interprogram-paste-before-kill} 已设置为一个数字，则如果数据（以字符为单位）小于该数字，则数据将被复制。  如果此变量是任何其他非 1⁣ 值，则数据始终会被复制——如果数据很大，则存在高内存消耗的风险。
+
+Yank 命令，例如 @kbd{C-y} (@code{yank})，也使用剪贴板。  如果另一个应用程序“拥有”剪贴板（即，如果您在 Emacs 中剪切或复制文本的时间比您在 Emacs 中的最后一个终止命令更晚），则 Emacs 从剪贴板中提取而不是从删除环中提取。
+
+@vindex yank-pop-change-selection
+通常，使用 @kbd{M-y} (@code{yank-pop}) 旋转终止环不会更改剪贴板。  但是，如果将 @code{yank-pop-change-selection} 更改为 @code{t}，则 @kbd{M-y} 会将新的复制保存到剪贴板。
+
+@vindex select-enable-clipboard
+要防止 Kill 和 yank 命令访问剪贴板，请将变量 @code{select-enable-clipboard} 更改为 @code{nil}。
+
+@findex yank-media
+程序可以将纯文本以外的其他内容放入剪贴板。  例如，网络浏览器通常会让您在图像上选择“复制图像”，并且该图像将被放置在剪贴板上。  在有能力的平台上，Emacs 可以使用 @code{yank-media} 命令来拉取这些对象——但仅限于支持它的模式。  默认情况下，它会自动选择剪贴板中可用的首选媒体类型，但可以通过为命令提供前缀参数 (@pxref{Yanking Media,,, elisp, The Emacs Lisp Reference Manual}) 来覆盖它。
+
+@cindex clipboard manager
+@vindex x-select-enable-clipboard-manager
+许多 X 桌面环境支持称为 @dfn{clipboard manager} 的功能。  如果您在 Emacs 是剪贴板数据的当前“所有者”时退出，并且剪贴板管理器正在运行，Emacs 会将剪贴板数据传输到剪贴板管理器，以便它不会丢失。  在某些情况下，这可能会导致退出 Emacs 时出现延迟；如果您希望阻止 Emacs 将数据传输到剪贴板管理器，请将变量 @code{x-select-enable-clipboard-manager} 更改为 @code{nil}。
+
+由于包含 NUL 字节的字符串在通过剪贴板时通常会被截断，因此 Emacs 在将这些字符传输到系统剪贴板之前将其替换为“\0”。
+
+@vindex select-enable-primary
+@findex clipboard-kill-region
+@findex clipboard-kill-ring-save
+@findex clipboard-yank
+在 Emacs 24 之前，kill 和 yank 命令使用主选择 (@pxref{Primary Selection})，而不是剪贴板。  如果您喜欢这种行为，请将 @code{select-enable-clipboard} 更改为 @code{nil}，将 @code{select-enable-primary} 更改为 @code{t}，将 @code{mouse-drag-copy-region} 更改为 @code{t}。  在这种情况下，您可以使用以下命令在剪贴板上显式操作： @code{clipboard-kill-region} 杀死该区域并将其保存到剪贴板； @code{clipboard-kill-ring-save} 将区域复制到 Kill Ring 并将其保存到剪贴板；和 @code{clipboard-yank} 猛拉剪贴板中的内容。
+
+@node Primary Selection
+@subsection 使用其他窗口应用程序进行剪切和粘贴
+@cindex X cutting and pasting
+@cindex X selection
+@cindex primary selection
+@cindex selection, primary
+
+在 X Window 系统、PGTK 和 Haiku 下，存在一个 @dfn{primary selection}，其中包含在 X 应用程序中选择的最后一段文本（通常通过拖动鼠标）。  通常，可以通过 @kbd{mouse-2} 单击将该文本插入到其他 X 应用程序中。  主要选择与剪贴板分开。  其内容物较易碎；每次使用鼠标选择文本时，它们都会被覆盖，而剪贴板只会被显式剪切或复制命令覆盖。
+
+在 X 下，只要该区域处于活动状态 (@pxref{Mark})，该区域中的文本就会保存在主选择中。  无论该区域是通过拖动或单击鼠标 (@pxref{Mouse Commands}) 还是通过键盘命令（例如，通过键入 @kbd{C-@key{SPC}} 并移动点；@pxref{Setting Mark}）创建的，这都适用。
+
+@vindex select-active-regions
+如果将变量 @code{select-active-regions} 更改为 @code{only}，Emacs 只会将临时活动区域保存到主要选择中，即使用鼠标或使用 Shift 选择 (@pxref{Shift Selection}) 创建的区域。  如果将 @code{select-active-regions} 更改为 @code{nil}，Emacs 会避免将活动区域完全保存到主要选择中。
+
+要将主要选择插入 Emacs 缓冲区，请在要插入的位置单击 @kbd{mouse-2} (@code{mouse-yank-primary})。 @xref{Mouse Commands}。  如果设置了 @code{select-enable-primary} (@pxref{Clipboard})，您还可以使用普通的 Emacs 复制命令 (@kbd{C-y}) 插入此文本。
+
+@cindex lost-selection-mode
+默认情况下，即使在另一个程序中选择了文本，Emacs 也会保持该区域处于活动状态；这与典型的 X 行为相反。要使 Emacs 在另一个程序将数据放入主选择后停用该区域，请启用全局次要模式@code{lost-selection-mode}。
+
+@cindex MS-Windows, and primary selection
+MS-Windows 不提供主要选择，但 Emacs 通过在内部存储所选文本来在单个 Emacs 会话中模拟它。因此，与主要选择相关的所有功能和命令在 Windows 上的工作方式与在 X 上的工作方式相同，用于在同一会话中剪切和粘贴，但不能跨 Emacs 会话或与其他应用程序一起剪切和粘贴。
+
+@node Secondary Selection
+@subsection 二次选拔
+@cindex secondary selection
+
+除了主要选择之外，X Window 系统还提供了第二个类似的工具，称为 @dfn{secondary selection}。如今，很少有 X 应用程序使用辅助选择，但您可以使用以下 Emacs 命令访问它：
+
+@table @kbd
+@findex mouse-set-secondary
+@kindex M-Drag-mouse-1
+@cindex @code{secondary-selection} face
+@item M-Drag-mouse-1
+设置辅助选择，一端位于按下按钮的位置，另一端位于松开按钮的位置（@code{mouse-set-secondary}）。  当您拖动时，所选文本将使用 @code{secondary-selection} 面突出显示。  如果将鼠标拖离窗口顶部或底部，窗口会自动滚动，就像@code{mouse-set-region} (@pxref{Mouse Commands}) 一样。
+
+此命令不会更改终止环。
+
+@findex mouse-start-secondary
+@kindex M-mouse-1
+@item M-mouse-1
+为 @dfn{secondary selection} (@code{mouse-start-secondary}) 设置一个端点；使用@kbd{M-mouse-3}设置另一端并完成选择。  当开始新的选择时，此命令会取消任何现有的辅助选择。
+
+@findex mouse-secondary-save-then-kill
+@kindex M-mouse-3
+@item M-mouse-3
+设置辅助选择 (@code{mouse-secondary-save-then-kill})，一端位于您单击 @kbd{M-mouse-3} 的位置，另一端位于先前使用 @kbd{M-mouse-1} 指定的位置。  这也会将选定的文本放入 Kill Ring 中。  同一位置的第二个 @kbd{M-mouse-3} 将删除刚刚进行的辅助选择所选择的文本。
+
+@findex mouse-yank-secondary
+@kindex M-mouse-2
+@item M-mouse-2
+在单击的位置插入辅助选择，将点放置在拉出文本的末尾 (@code{mouse-yank-secondary})。
+@end table
+
+双击或三次单击 @kbd{M-mouse-1} 可对单词和行进行操作，与 @kbd{mouse-1} 非常相似。
+
+如果@code{mouse-yank-at-point}非@code{nil}，则@kbd{M-mouse-2}在点处拉动。  那么，您单击的具体位置，甚至单击框架的哪个窗口都无关紧要。  @xref{Mouse Commands}。此用户选项还会影响交互式搜索：如果它不是 @code{nil}，则用鼠标在框架中的任意位置拖动会将文本添加到搜索字符串中。
+
+@node Accumulating Text
+@section 累积文本
+@findex append-to-buffer
+@findex prepend-to-buffer
+@findex copy-to-buffer
+@findex append-to-file
+
+@cindex accumulating scattered text
+通常，我们通过杀死文本并拉动文本来复制或移动文本，但是还有其他方便的方法可以将一块文本复制到许多地方，或者将许多分散的文本块复制到一个地方。在这里，我们描述将分散的文本片段累积到缓冲区或文件中的命令。
+
+@table @kbd
+@item M-x append-to-buffer
+将区域附加到指定缓冲区的内容。
+@item M-x prepend-to-buffer
+将区域添加到指定缓冲区的内容之前。
+@item M-x copy-to-buffer
+将区域复制到指定的缓冲区中，删除该缓冲区的旧内容。
+@item M-x insert-buffer
+将指定缓冲区的内容插入到当前缓冲区的指定位置。
+@item M-x append-to-file
+将区域附加到指定文件的内容末尾。
+@end table
+
+要将文本累积到缓冲区中，请使用@kbd{M-x append-to-buffer}。这会读取缓冲区名称，然后将该区域的副本插入到指定的缓冲区中。  如果指定不存在的缓冲区，@code{append-to-buffer} 将创建该缓冲区。  文本将插入到该缓冲区中的任何点处。  如果您一直在使用缓冲区进行编辑，则复制的文本将进入缓冲区文本的中间，从当时所在的位置开始。
+
+该缓冲区中的点保留在复制文本的末尾，因此连续使用 @code{append-to-buffer} 会按照复制时的顺序将文本累积到指定缓冲区中。  严格来说，@code{append-to-buffer}并不总是附加到缓冲区中已有的文本——它仅在缓冲区中的点位于末尾时才附加。  但是，如果 2⁣ 是用于更改缓冲区的唯一命令，则 point 始终位于末尾。
+
+@kbd{M-x prepend-to-buffer} 与 @code{append-to-buffer} 类似，只是另一个缓冲区中的点位于复制的文本之前，因此连续使用此命令会以相反的顺序添加文本。  @kbd{M-x copy-to-buffer} 类似，只是删除了另一个缓冲区中的任何现有文本，因此该缓冲区仅包含新复制到其中的文本。
+
+命令 @kbd{C-x x i} (@code{insert-buffer}) 可用于从另一个缓冲区检索累积的文本。  这会提示输入缓冲区的名称，并将该缓冲区中所有文本的副本插入到当前缓冲区的 point 中，将 point 留在插入文本的开头。  它还将插入文本末尾的位置添加到标记环，而不激活标记。 @xref{Buffers}，有关缓冲区的背景信息。
+
+您可以使用 @kbd{M-x append-to-file} 将文本直接附加到文件中，而不是在缓冲区中累积文本。  这会提示输入文件名，并将该区域的文本添加到指定文件的末尾。  该文件立即在磁盘上更改。
+
+您应该仅对在 Emacs 中访问 @emph{not} 的文件使用 @code{append-to-file}。  在 Emacs 中编辑的文件上使用它会更改 Emacs 背后的文件，这可能会导致丢失一些编辑内容。
+
+移动文本的另一种方法是将其存储在寄存器中。 @xref{Registers}。
+
+@node Rectangles
+@section 矩形
+@cindex rectangle
+@cindex columns (and rectangles)
+@cindex killing rectangular areas of text
+
+@dfn{Rectangle} 命令对文本的矩形区域进行操作：在特定行范围内的特定对列之间的所有字符。  Emacs 具有杀死矩形、拉出杀死的矩形、清除它们、用空白或文本填充它们或删除它们的命令。  矩形命令对于多列格式的文本以及将文本更改为此类格式或将其更改为此类格式非常有用。
+
+@cindex mark rectangle
+@cindex region-rectangle
+@cindex rectangular region
+要为命令指定一个矩形，请将标记设置在一个角并指向对角。  由此指定的矩形称为 @dfn{region-rectangle}。  如果点和标记在同一列中，则区域矩形为空。  如果它们在同一行，则区域矩形为一行高。
+
+区域矩形的控制方式与区域的控制方式大致相同。  但请记住，点和标记值的给定组合可以解释为区域或矩形，具体取决于使用它们的命令。
+
+也可以使用鼠标标记矩形区域：单击 @kbd{C-M-mouse-1} 并将其从矩形的一个角拖动到另一角。
+
+@table @kbd
+@item C-x r k
+删除区域矩形的文本，将其内容保存为最后删除的矩形（@code{kill-rectangle}）。
+@item C-x r M-w
+将区域矩形的文本保存为最后一个被杀死的矩形（@code{copy-rectangle-as-kill}）。
+@item C-x r d
+删除区域矩形 (@code{delete-rectangle}) 的文本。
+@item C-x r y
+拉出最后一个被杀死的矩形，其左上角位于点 (@code{yank-rectangle})。
+@item C-x r o
+插入空白区域以填充区域矩形 (@code{open-rectangle}) 的空间。  这会将区域矩形的先前内容推到右侧。
+@item C-x r N
+沿区域矩形 (@code{rectangle-number-lines}) 的左边缘插入行号。  这会将区域矩形的先前内容推到右侧。
+@item C-x r c
+通过用空格替换其所有内容来清除区域矩形 (@code{clear-rectangle})。
+@item M-x delete-whitespace-rectangle
+从矩形的左边缘列开始，删除指定矩形上每行中的空白。
+@item C-x r t @var{string} @key{RET}
+将每行上的矩形内容替换为 @var{string} (@code{string-rectangle})。
+@item M-x string-insert-rectangle @key{RET} @var{string} @key{RET}
+在矩形的每条线上插入@var{string}。
+@item C-x @key{SPC}
+切换矩形标记模式 (@code{rectangle-mark-mode})。当此模式处于活动状态时，区域矩形会突出显示并可以缩小/增大，并且标准的终止和复制命令会对其进行操作。
+@end table
+
+矩形操作分为两类：擦除或插入矩形的命令和创建空白矩形的命令。
+
+@kindex C-x r k
+@kindex C-x r d
+@findex kill-rectangle
+@findex delete-rectangle
+有两种方法可以删除矩形中的文本：@kbd{C-x r d} (@code{delete-rectangle}) 彻底删除文本，或@kbd{C-x r k} (@code{kill-rectangle}) 删除文本并将其另存为@dfn{last killed rectangle}。  在这两种情况下，擦除区域矩形就像擦除矩形每行上的指定文本一样；如果该行有任何后续文本，它将向后移动以填补空白。
+
+杀死一个矩形并不是通常意义上的杀死；而是杀死一个矩形。该矩形并不存储在killring中，而是存储在一个特殊的地方，只记录最近被杀死的矩形。  这是因为拉动矩形与拉动线性文本非常不同，因此必须使用不同的拉动命令。  没有为矩形定义 Yank-popping。
+
+@kindex C-x r M-w
+@findex copy-rectangle-as-kill
+@kbd{C-x r M-w} (@code{copy-rectangle-as-kill}) 相当于矩形的@kbd{M-w}：它将矩形记录为最后一个被杀死的矩形，而不从缓冲区中删除文本。
+
+@kindex C-x r y
+@findex yank-rectangle
+要拉出最后一个被杀死的矩形，请输入 @kbd{C-x r y} (@code{yank-rectangle})。  矩形的第一条线插入到点处，矩形的第二条线插入到垂直下方一行的同一水平位置，依此类推。  受影响的行数由保存的矩形的高度决定。
+
+例如，您可以将两个单列列表转换为双列列表，方法是将其中一个单列列表作为矩形删除，然后将其拉到另一个列表旁边。
+
+您还可以使用 @kbd{C-x r r @var{r}} 和 @kbd{C-x r i @var{r}} 将矩形复制到寄存器中或从寄存器中复制出来。  @xref{Rectangle Registers}。
+
+@kindex C-x r o
+@findex open-rectangle
+@kindex C-x r c
+@findex clear-rectangle
+您可以使用两个命令来创建空白矩形：@kbd{C-x r c} (@code{clear-rectangle}) 空白区域矩形中的现有文本，@kbd{C-x r o} (@code{open-rectangle}) 插入空白矩形。
+
+@findex delete-whitespace-rectangle
+@kbd{M-x delete-whitespace-rectangle} 删除从特定列开始的水平空白。  这适用于矩形中的每条线，并且列由矩形的左边缘指定。  矩形的右边缘对此命令没有任何影响。
+
+@kindex C-x r N
+@findex rectangle
+命令 @kbd{C-x r N} (@code{rectangle-number-lines}) 沿区域矩形的左边缘插入行号。  通常，编号从 1 开始（矩形的第一行）。使用前缀参数，该命令会提示输入一个数字开始，并提示输入用于打印数字的格式字符串 (@pxref{Formatting Strings,,, elisp, The Emacs Lisp Reference Manual})。
+
+@kindex C-x r t
+@findex string-rectangle
+命令 @kbd{C-x r t} (@code{string-rectangle}) 将区域矩形的内容替换为每行上的字符串。  字符串的宽度不必与矩形的宽度相同。  如果字符串的宽度较小，则矩形后面的文本向左移动；如果字符串比矩形宽，则矩形后面的文本右移。
+
+@findex string-insert-rectangle
+命令@kbd{M-x string-insert-rectangle}与@code{string-rectangle}类似，但在每一行插入字符串，将原始文本向右移动。
+
+@findex rectangle-mark-mode
+命令 @kbd{C-x @key{SPC}} (@code{rectangle-mark-mode}) 切换是否突出显示区域矩形或标准区域（如果需要，首先激活该区域）。  启用此模式后，调整区域大小的命令（@kbd{C-f}、@kbd{C-n}等）@:以矩形方式执行此操作，并且在矩形上进行删除和拉动操作。  @xref{Killing}。  仅当该区域处于活动状态时，该模式才会持续存在。
+
+仅当标记处于活动状态时，区域矩形才起作用。  特别是，当瞬态标记模式关闭 (@pxref{Disabled Transient Mark}) 时，除了键入 @kbd{C-x @key{SPC}} 之外，您还需要激活标记。
+
+与标准区域不同，区域矩形的角可以延伸超过缓冲区的末尾，或者点通常无法进入的空白区域内部，例如 TAB 字符的中间。
+
+@findex rectangle-exchange-point-and-mark
+@findex exchange-point-and-mark@r{, in rectangle-mark-mode}
+@kindex C-x C-x@r{, in rectangle-mark-mode}
+当区域处于活动状态 (@pxref{Mark}) 且处于矩形标记模式时，@kbd{C-x C-x} 运行命令 @code{rectangle-exchange-point-and-mark}，该命令在区域矩形的四个角之间循环。  如果您想在对标记文本调用操作之前修改区域矩形的尺寸，这会很方便。
+
+@node CUA Bindings
+@section CUA 绑定
+@findex cua-mode
+@vindex cua-mode
+@cindex CUA key bindings
+@vindex cua-enable-cua-keys
+命令 @kbd{M-x cua-mode} 设置与许多其他应用程序中使用的通用用户访问 (CUA) 系统兼容的键绑定。
+
+启用 CUA 模式时，@kbd{C-x}、@kbd{C-c}、@kbd{C-v} 和 @kbd{C-z} 键分别调用剪切（删除）、复制、粘贴（猛拉）和撤消命令。  仅当区域处于活动状态时，@kbd{C-x} 和 @kbd{C-c} 键才执行剪切和复制。  否则，它们仍然充当前缀键，因此像@kbd{C-x C-c}这样的标准 Emacs 命令仍然有效。  请注意，这意味着变量 @code{mark-even-if-inactive} 对 @kbd{C-x} 和 @kbd{C-c} (@pxref{Using Region}) 没有影响。
+
+要在标记处于活动状态时输入 Emacs 命令（如 @kbd{C-x C-f}），请使用以下方法之一：将 @kbd{Shift} 与前缀键一起按住，例如 @kbd{S-C-x C-f}，或快速键入前缀键两次，例如 @kbd{C-x C-x C-f}。
+
+要禁用 CUA 模式覆盖标准 Emacs 绑定，同时保留下述 CUA 模式的其他功能，请将变量 @code{cua-enable-cua-keys} 设置为 @code{nil}。
+
+CUA 模式默认激活删除选择模式 (@pxref{Mouse Commands})，以便键入的文本替换活动区域。  要在没有此行为的情况下使用 CUA，请将变量 @code{cua-delete-selection} 设置为 @code{nil}。
+
+@cindex rectangle highlighting
+CUA 模式通过可见矩形突出显示提供增强的矩形支持。  使用@kbd{C-@key{RET}}开始一个矩形，使用移动命令扩展它，然后使用@kbd{C-x}或@kbd{C-c}剪切或复制它。  @key{RET} 将光标移动到矩形的下一个（顺时针）角，以便您可以轻松地向任何方向展开它。  您键入的普通文本将插入到矩形中每行的左侧或右侧（与光标位于同一侧）。
+
+您可以通过调用 @code{cua-rectangle-mark-mode} 命令来使用此矩形支持，而无需激活 CUA。  还有标准命令@code{rectangle-mark-mode}，请参阅@ref{Rectangles}。
+
+使用 CUA，您可以通过为终止、复制和复制命令提供一位数字前缀，轻松地将文本和矩形复制到寄存器中或从寄存器中复制出来，例如，@kbd{C-1 C-c} 将区域复制到寄存器 @code{1} 中，@kbd{C-2 C-v} 复制寄存器 @code{2} 的内容。
+
+@cindex global mark
+CUA 模式还具有全局标记功能，允许在缓冲区之间轻松移动和复制文本。  使用 @kbd{C-S-@key{SPC}} 打开和关闭全局标记。  当全局标记打开时，您删除或复制的所有文本都会自动插入到全局标记处，并且您键入的文本会插入到全局标记处而不是当前位置。
+
+例如，要将各个缓冲区中的单词复制到给定缓冲区中的单词列表中，请在目标缓冲区中设置全局标记，然后导航到列表中所需的每个单词，对其进行标记（例如，使用@kbd{S-M-f}），使用@kbd{C-c}或@kbd{M-w}将其复制到列表，然后按@key{RET}在目标列表中的单词后面插入换行符。

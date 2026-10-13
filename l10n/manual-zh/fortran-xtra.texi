@@ -1,0 +1,377 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 2004--2026 Free Software Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@c
+@c This file is included either in emacs-xtra.texi (when producing the
+@c printed version) or in the main Emacs manual (for the on-line version).
+@node Fortran
+@section Fortran模式
+@cindex Fortran mode
+@cindex mode, Fortran
+
+@cindex Fortran fixed form and free form
+@cindex Fortran 77 and Fortran 90, 95, 2003, 2008
+@findex f90-mode
+@findex fortran-mode
+Fortran 模式用于编辑固定形式（以及制表符格式）源代码（通常为 Fortran 77）。  要编辑更现代的自由格式源代码（Fortran 90、95、2003、2008），请使用 F90 模式 (@code{f90-mode})。  Emacs 通常对扩展名为 @samp{.f}、@samp{.F} 或 @samp{.for} 的文件使用 Fortran 模式，对扩展名为 @samp{.f90}、@samp{.f95}、@samp{.f03} 和 @samp{.f08} 的文件使用 F90 模式。自定义@code{auto-mode-alist}以添加更多扩展。  GNU Fortran 支持自由形式和固定形式。  本手册主要记录 Fortran 模式，但在相关时也会提及相应的 F90 模式功能。
+
+Fortran 模式为 Fortran 语句和子程序提供特殊的运动命令，以及了解 Fortran 嵌套、行号和连续语句约定的缩进命令。 Fortran 模式支持自动填充模式，该模式可将长行分成适当的 Fortran 连续行。  Fortran 模式还支持 Hideshow 次要模式
+@iftex
+(@pxref{Hideshow,,, emacs, the Emacs Manual}),
+@end iftex
+@ifnottex
+(@pxref{Hideshow}),
+@end ifnottex
+和伊梅努
+@iftex
+(@pxref{Imenu,,, emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{Imenu}).
+@end ifnottex
+
+由于 Fortran 注释与其他语言的注释不同，因此提供了特殊的注释命令。  当您插入 Fortran 关键字时，内置缩写可选择节省输入。
+
+使用 @kbd{M-x fortran-mode} 切换到该主要模式。  该命令运行钩子@code{fortran-mode-hook}。
+@iftex
+@xref{Hooks,,, emacs, the Emacs Manual}.
+@end iftex
+@ifnottex
+@xref{Hooks}.
+@end ifnottex
+
+@menu
+* Motion: Fortran Motion.         通过语句或子程序移动点。
+* Indent: Fortran Indent.         Fortran 的缩进命令。
+* Comments: Fortran Comments.     插入并对齐注释。
+* Autofill: Fortran Autofill.     Fortran 的自动填充支持。
+* Columns: Fortran Columns.       有效 Fortran 的测量列。
+* Abbrev: Fortran Abbrev.         Fortran 关键字的内置缩写。
+@end menu
+
+@node Fortran Motion
+@subsection 动作命令
+
+除了用于移动和操作 defun 的常规命令（Fortran 子程序——函数和子例程，以及 F90 模式的模块，使用命令 @code{fortran-end-of-subprogram} 和 @code{fortran-beginning-of-subprogram}）之外，Fortran 模式还提供了通过语句和其他程序单元移动的特殊命令。
+
+@table @kbd
+@kindex C-c C-n @r{(Fortran mode)}
+@findex fortran-next-statement
+@findex f90-next-statement
+@item C-c C-n
+移至下一条语句的开头 (@code{fortran-next-statement}/@code{f90-next-statement})。
+
+@kindex C-c C-p @r{(Fortran mode)}
+@findex fortran-previous-statement
+@findex f90-previous-statement
+@item C-c C-p
+移至上一条语句的开头 (@code{fortran-previous-statement}/@code{f90-previous-statement})。如果没有先前的语句（即，如果从缓冲区中的第一个语句调用），则移至缓冲区的开头。
+
+@kindex C-c C-e @r{(F90 mode)}
+@findex f90-next-block
+@item C-c C-e
+将点向前移动到下一个代码块的开头或当前代码块的结尾，以先到者为准 (@code{f90-next-block})。代码块是子例程、@code{if}--@code{endif} 语句等。  该命令仅适用于 F90 模式，不适用于 Fortran 模式。使用数字参数，它会向前移动许多块。
+
+@kindex C-c C-a @r{(F90 mode)}
+@findex f90-previous-block
+@item C-c C-a
+将点向后移动到前一个块 (@code{f90-previous-block})。  这类似于@code{f90-next-block}，但向后移动。
+
+@kindex C-M-n @r{(Fortran mode)}
+@findex fortran-end-of-block
+@findex f90-end-of-block
+@item C-M-n
+移至当前代码块的末尾 (@code{fortran-end-of-block}/@code{f90-end-of-block})。  使用数字参数，向前移动该数量的块。  该标记设置在移动点之前。  此命令的 F90 模式版本检查块类型和标签（如果存在）的一致性，但它不检查最外面的块，因为它可能不完整。
+
+@kindex C-M-p @r{(Fortran mode)}
+@findex fortran-beginning-of-block
+@findex f90-beginning-of-block
+@item C-M-p
+移至当前代码块的开头 (@code{fortran-beginning-of-block}/@code{f90-beginning-of-block})。  这类似于@code{fortran-end-of-block}，但向后移动。
+@end table
+
+命令@code{fortran-beginning-of-subprogram}和@code{fortran-end-of-subprogram}分别移动到当前子程序的开头或结尾。  命令@code{fortran-mark-do}和@code{fortran-mark-if}标记当前@code{do}或@code{if}块的结尾，并将点移动到开头。
+
+
+@node Fortran Indent
+@subsection Fortran 缩进
+
+缩进固定（或制表符）形式的 Fortran 代码需要特殊的命令和功能，以确保各种语法实体（行号、注释行指示符和续行标志）出现在所需的列中。
+
+@menu
+* Commands: ForIndent Commands.   Fortran 缩进和填充命令。
+* Contline: ForIndent Cont.       续行如何缩进。
+* Numbers:  ForIndent Num.        行号如何自动缩进。
+* Conv:     ForIndent Conv.       您必须遵守约定以避免麻烦。
+* Vars:     ForIndent Vars.       控制 Fortran 缩进样式的变量。
+@end menu
+
+@node ForIndent Commands
+@subsubsection Fortran 缩进和填充命令
+
+@table @kbd
+@item C-M-j
+在点处断开当前线并设置延续线 (@code{fortran-split-line})。
+
+@item M-^
+将此行连接到上一行 (@code{fortran-join-line})。
+
+@item C-M-q
+缩进该点位于 (@code{fortran-indent-subprogram}) 的子程序的所有行。
+
+@item M-q
+填写注释块或语句（使用 @code{fortran-fill-paragraph} 或 @code{fortran-fill-statement}）。
+@end table
+
+@kindex C-M-q @r{(Fortran mode)}
+@findex fortran-indent-subprogram
+键 @kbd{C-M-q} 运行 @code{fortran-indent-subprogram}，该命令用于重新缩进包含 point 的 Fortran 子程序（函数或子例程）的所有行。
+
+@kindex C-M-j @r{(Fortran mode)}
+@findex fortran-split-line
+键 @kbd{C-M-j} 运行 @code{fortran-split-line}，它以适合 Fortran 的方式分割一行。  在非注释行中，后半部分成为延续行并相应缩进。  在注释行中，两半都成为单独的注释行。
+
+@kindex M-^ @r{(Fortran mode)}
+@kindex C-c C-d @r{(Fortran mode)}
+@findex fortran-join-line
+@kbd{M-^} 或 @kbd{C-c C-d} 运行命令 @code{fortran-join-line}，该命令将续行连接回上一行，大致与 @code{fortran-split-line} 相反。  调用此命令时，该点必须位于连续线上。
+
+@kindex M-q @r{(Fortran mode)}
+Fortran 模式下的 @kbd{M-q} 填充该点所在的注释块或语句。这会删除任何多余的语句延续。
+
+@node ForIndent Cont
+@subsubsection 延续线
+@cindex Fortran continuation lines
+
+@vindex fortran-continuation-string
+大多数 Fortran 77 编译器允许两种编写连续行的方法。如果一行中的第一个非空格字符位于第 5 列，则该行是上一行的延续。  我们称之为@dfn{fixed form}。  （在 GNU Emacs 中，我们总是从 0 开始计数列；但请注意，Fortran 标准从 1 开始计数。您可以自定义变量 @code{column-number-indicator-zero-based} 来使列显示
+@iftex
+Fortran-like; @pxref{Optional Mode Line,,, emacs, the Emacs Manual}.)
+@end iftex
+@ifnottex
+Fortran-like; @pxref{Optional Mode Line}.)
+@end ifnottex
+变量 @code{fortran-continuation-string} 指定在第 5 列中放置什么字符。以制表符开头，后跟除 @samp{0} 之外的任何数字的行也是延续行。  我们将这种延续方式称为@dfn{tab format}。  （Fortran 90 引入了自由形式的连续线。）
+
+@vindex indent-tabs-mode @r{(Fortran mode)}
+@vindex fortran-analyze-depth
+@vindex fortran-tab-mode-default
+Fortran 模式可以使用任一样式的续行。  当您进入 Fortran 模式时，它会尝试从缓冲区内容自动推断出正确的延续样式。  它通过从缓冲区开头扫描最多 @code{fortran-analyze-depth}（默认 100）行来实现此目的。  以制表符或六个空格开头的第一行决定了选择。  如果扫描失败（例如，如果缓冲区是新的，因此为空），则使用 @code{fortran-tab-mode-default} 的值（@code{nil} 表示固定格式，非 @code{nil} 表示制表符格式）。  模式行中的@samp{/t} (@code{fortran-tab-mode-string}) 表示已选择制表符格式。  Fortran 模式相应地设置 @code{indent-tabs-mode} 的值。
+
+如果行上的文本以 Fortran 连续标记 @samp{$} 开头，或者以第 5 列中的任何非空白字符开头，则 Fortran 模式会将其视为连续行。  当您使用 @kbd{@key{TAB}} 缩进连续行时，它将将该行转换为当前的连续样式。  当您使用 @kbd{C-M-j} 拆分 Fortran 语句时，将根据延续样式创建换行符上的延续标记。
+
+延续样式的设置会影响 Fortran 模式下编辑的其他几个方面。  在固定格式模式下，语句主体的最小列号为 6。Fortran 块内缩进到较大列号的行必须仅使用空格字符作为空白。  在制表符格式模式下，语句体的最小列数为8，并且第8列之前的空格必须由1个制表符组成。
+
+@node ForIndent Num
+@subsubsection 行号
+
+如果数字是行中的第一个非空格，Fortran 缩进会假定它是行号，并将其移动到第 0 到第 4 列。（在 Emacs 中，列始终从 0 开始计数，但将 @code{column-number-indicator-zero-based} 设置为 @code{nil} 可以更改这一点，
+@iftex
+@pxref{Optional Mode Line,,, emacs, the Emacs Manual}.)
+@end iftex
+@ifnottex
+@pxref{Optional Mode Line}.)
+@end ifnottex
+
+@vindex fortran-line-number-indent
+四位或更少的行号通常缩进一个空格。变量 @code{fortran-line-number-indent} 控制它；它指定行号可以有的最大缩进。  该变量的默认值为 1。Fortran 模式会尝试阻止行号数字超过第 4 列，并在必要时将缩进减少到指定的最大值以下。  如果 1⁣ 的值为 5，则行号右对齐以在第 4 列结束。
+
+@vindex fortran-electric-line-number
+只需插入行号就足以根据这些规则缩进它。  插入每个数字时，都会重新计算缩进。要关闭此功能，请将变量 @code{fortran-electric-line-number} 设置为 @code{nil}。
+
+
+@node ForIndent Conv
+@subsubsection 句法约定
+
+Fortran 模式假设您遵循某些约定，这些约定可以简化理解 Fortran 程序的任务，使其能够正确缩进：
+
+@itemize @bullet
+@item
+两个嵌套的 @samp{do} 循环永远不会共享 @samp{continue} 语句。
+
+@item
+Fortran 关键字（例如 @samp{if}、@samp{else}、@samp{then}、@samp{do} 等）的编写没有嵌入空格或换行符。
+
+Fortran 编译器通常会忽略字符串常量之外的空格，但 Fortran 模式不会识别这些不连续的关键字。  诸如 @samp{else if} 或 @samp{end do} 之类的结构是可以接受的，但第二个单词应该与第一个单词在同一行，而不是在续行上。
+@end itemize
+
+@noindent
+如果您不遵循这些约定，缩进命令可能会不美观地缩进某些行。  然而，即使不遵循约定，正确的 Fortran 程序在重新缩进时仍保留其含义。
+
+@node ForIndent Vars
+@subsubsection Fortran 缩进变量
+
+@vindex fortran-do-indent
+@vindex fortran-if-indent
+@vindex fortran-structure-indent
+@vindex fortran-continuation-indent
+@vindex fortran-check-all-num@dots{}
+@vindex fortran-minimum-statement-indent@dots{}
+几个附加变量控制 Fortran 缩进的工作方式：
+
+@table @code
+@item fortran-do-indent
+@samp{do} 语句每个级别内的额外缩进（默认 3）。
+
+@item fortran-if-indent
+@samp{if}、@samp{select case} 或 @samp{where} 语句的每个级别内的额外缩进（默认为 3）。
+
+@item fortran-structure-indent
+@samp{structure}、@samp{union}、@samp{map} 或 @samp{interface} 语句的每个级别内的额外缩进（默认为 3）。
+
+@item fortran-continuation-indent
+连续行主体的额外缩进（默认 5）。
+
+@item fortran-check-all-num-for-matching-do
+在 Fortran 77 中，编号的 @samp{do} 语句由任何具有匹配行号的语句终止。  为此目的，通常（但不是强制）使用 @samp{continue} 语句。  如果此变量具有非 @code{nil} 值，则缩进任何编号语句必须检查是否有 @samp{do} 结束。  如果您总是以 @samp{continue} 行结束 @samp{do} 语句（或者如果您使用更现代的 @samp{enddo}），那么您可以通过将此变量设置为 @code{nil} （默认值）来加快缩进速度。
+
+@item fortran-blink-matching-if
+如果这是 @code{t}，则缩进 @samp{endif}（或 @samp{enddo}）语句会将光标暂时移动到匹配的 @samp{if}（或 @samp{do}）语句以显示它所在的位置。  默认值为@code{nil}。
+
+@item fortran-minimum-statement-indent-fixed
+使用固定形式连续行样式时 Fortran 语句的最小缩进。  声明体的缩进永远不会小于这个值。  默认值为 6。
+
+@item fortran-minimum-statement-indent-tab
+制表符格式延续行样式的 Fortran 语句的最小缩进。  声明体的缩进永远不会小于这个值。  默认值为 8。
+@end table
+
+以下部分描述了控制注释缩进的变量。
+
+@node Fortran Comments
+@subsection Fortran 注释
+
+通常的 Emacs 注释命令假定注释可以跟在一行代码后面。  在 Fortran 77 中，标准注释语法要求整行只是注释。  因此，Fortran模式取代了标准的Emacs注释命令并定义了一些新的变量。
+
+@vindex fortran-comment-line-start
+Fortran 模式还可以处理 Fortran 90 注释语法，其中注释以 @samp{!} 开头，并且可以跟随其他文本。  因为只有某些 Fortran 77 编译器接受此语法，所以 Fortran 模式不会插入此类注释，除非您事先说过这样做。  为此，请将变量 @code{fortran-comment-line-start} 设置为 @samp{"!"}。如果您使用不寻常的值，则可能需要更改@code{fortran-comment-line-start-skip}。
+
+
+@table @kbd
+@item M-;
+对齐注释或插入新注释 (@code{comment-dwim})。
+
+@item C-x ;
+仅适用于非标准 @samp{!} 注释 (@code{comment-set-column})。
+
+@item C-c ;
+将区域中的所有行转换为注释，或者（带参数）将它们转换回真实代码 (@code{fortran-comment-region})。
+@end table
+
+Fortran 模式下的@kbd{M-;} 运行标准@code{comment-dwim}。它可以识别任何类型的现有评论并适当地对齐其文本；如果没有现有注释，则插入并对齐注释。  Fortran 模式下插入和对齐注释与其他模式下不同。
+
+当必须插入新注释时，如果当前行为空，则插入整行注释。  如果您表示要使用它们，则会在非空行上插入非标准 @samp{!} 注释。  否则，将在当前行之前的新行中插入整行注释。
+
+非标准 @samp{!} 注释与其他语言中的注释一样对齐，但全行注释不同。  在标准的全行注释中，注释分隔符本身必须始终出现在零列中。可以对齐的是注释中的文本。  您可以通过将变量 @code{fortran-comment-indent-style} 设置为以下值之一来选择三种对齐方式：
+
+@vindex fortran-comment-indent-style
+@vindex fortran-comment-line-extra-indent
+@table @code
+@item fixed
+将文本对齐固定列，该列是 0⁣ 与最小语句缩进之和。  这是默认设置。
+
+对于制表符格式连续线样式，最小缩进为 @code{fortran-minimum-statement-indent-tab}；对于固定表单样式，最小缩进为 @code{fortran-minimum-statement-indent-fixed}。
+
+@item relative
+将文本对齐，就像一行代码一样，但带有额外的 @code{fortran-comment-line-extra-indent} 缩进列。
+
+@item nil
+不要自动移动全行注释中的文本。
+@end table
+
+@vindex fortran-comment-indent-char
+此外，您可以通过将变量 @code{fortran-comment-indent-char} 设置为您要使用的单字符字符串来指定用于在全行注释中缩进的字符。
+
+@vindex fortran-directive-re
+编译器指令行或预处理器行与注释行的外观非常相似。  但重要的是，无论 @code{fortran-comment-indent-style} 的值是多少，这些行都不能缩进。  变量 @code{fortran-directive-re} 是一个正则表达式，指定哪些行是指令。  匹配行从不缩进，并接受独特的字体锁定。
+
+普通 Emacs 注释命令 @kbd{C-x ;} (@code{comment-set-column}) 尚未重新定义。  如果您使用 @samp{!} 注释，则此命令可以与它们一起使用。  否则，在Fortran模式下是没有用的。
+
+@kindex C-c ; @r{(Fortran mode)}
+@findex fortran-comment-region
+@vindex fortran-comment-region
+命令 @kbd{C-c ;} (@code{fortran-comment-region}) 通过在每行前面插入字符串 @samp{c$$$} 将该区域的所有行都转换为注释。  使用数字参数，它通过从其中每行的前面删除 @samp{c$$$} 将区域恢复为实时代码。  用于这些注释的字符串可以通过设置变量@code{fortran-comment-region}来控制。  请注意，这里有一个命令和同名变量的示例；该名称的这两种用法从不冲突，因为在 Lisp 和 Emacs 中，从上下文中总是可以清楚地看出哪一个的含义。
+
+@node Fortran Autofill
+@subsection Fortran 模式下的自动填充
+
+Fortran 模式专门支持自动填充模式，这是一种次要模式，当您插入语句时，当语句变得太宽时，它会自动分割语句。  拆分语句涉及使用 @code{fortran-continuation-string} (@pxref{ForIndent Cont}) 制作连续行。  当您键入 @kbd{@key{SPC}}、@kbd{@key{RET}} 或 @kbd{@key{TAB}} 以及 Fortran 缩进命令时，会发生这种分割。  您可以按照正常方式在 Fortran 模式下激活自动填充。
+@iftex
+@xref{Auto Fill,,, emacs, the Emacs Manual}.
+@end iftex
+@ifnottex
+@xref{Auto Fill}.
+@end ifnottex
+
+@vindex fortran-break-before-delimiters
+当行长超过所需宽度（@code{fill-column} 的值）时，自动填充会在空格或分隔符处断行。  自动填充可以中断的分隔符（除了空格）为 @samp{+}、@samp{-}、@samp{/}、@samp{*}、@samp{=}、@samp{<}、@samp{>} 和 @samp{,}。  如果变量 @code{fortran-break-before-delimiters} 是 @code{nil}，则换行符位于分隔符之后。否则（默认情况下），分隔符位于分隔符之前。
+
+要在所有 Fortran 缓冲区中启用自动填充，请将 @code{auto-fill-mode} 添加到 @code{fortran-mode-hook}。
+@iftex
+@xref{Hooks,,, emacs, the Emacs Manual}.
+@end iftex
+@ifnottex
+@xref{Hooks}.
+@end ifnottex
+
+@node Fortran Columns
+@subsection 检查 Fortran 中的列
+
+@vindex fortran-line-length
+在标准 Fortran 77 中，第 72 列之外的任何内容都将被忽略。大多数编译器提供了一个选项来更改此设置（例如，gfortran 中的@samp{-ffixed-line-length-N}）。  自定义变量 @code{fortran-line-length} 以更改 Fortran 模式下的行长度。超出这一点的任何内容都将作为注释被字体锁定。  （除非它在字符串内部：超出 @code{fortran-line-length} 的字符串将会混淆字体锁定。）
+
+@table @kbd
+@item C-c C-r
+在当前行上方暂时显示列标尺 (@code{fortran-column-ruler})。
+
+@item C-c C-w
+暂时水平分割当前窗口，使其宽度为 @code{fortran-line-length} 列 (@code{fortran-window-create-momentarily})。  这可以帮助您避免使行的长度超过 Fortran 编译器施加的限制。
+
+@item C-u C-c C-w
+水平分割当前窗口，使其宽度为 @code{fortran-line-length} 列 (@code{fortran-window-create})。然后您可以继续编辑。
+
+@item M-x fortran-strip-sequence-nos
+删除第 @code{fortran-line-length} 列及以后的所有文本。
+@end table
+
+@kindex C-c C-r @r{(Fortran mode)}
+@findex fortran-column-ruler
+命令 @kbd{C-c C-r} (@code{fortran-column-ruler}) 在当前行上方暂时显示一个列标尺。  注释标尺是两行文本，显示 Fortran 程序中具有特殊意义的列的位置。  方括号显示行号的列限制，大括号显示语句主体的列限制。  列号显示在其上方。
+
+请注意，列号从零开始计数，就像 GNU Emacs 中一样（但自定义 @code{column-number-indicator-zero-based} 可以更改列显示以匹配 Fortran 的显示；
+@iftex
+@pxref{Optional Mode Line,,, emacs, the Emacs Manual}.)
+@end iftex
+@ifnottex
+@pxref{Optional Mode Line}.)
+@end ifnottex
+因此，这些数字可能会比你熟悉的数字少一个；但它们在行中指示的位置是 Fortran 的标准位置。
+
+@vindex fortran-column-ruler-fixed
+@vindex fortran-column-ruler-tabs
+用于显示列标尺的文本取决于变量 @code{indent-tabs-mode} 的值。  如果 @code{indent-tabs-mode} 为 @code{nil}，则变量 @code{fortran-column-ruler-fixed} 的值将用作列标尺。否则，显示变量 @code{fortran-column-ruler-tab} 的值。  通过更改这些变量，您可以更改列标尺的显示。
+
+@kindex C-c C-w @r{(Fortran mode)}
+@findex fortran-window-create-momentarily
+@kbd{C-c C-w} (@code{fortran-window-create-momentarily}) 暂时水平分割当前窗口，使窗口宽为 @code{fortran-line-length} 列，这样您就可以看到任何太长的行。  键入一个空格以恢复正常宽度。
+
+@kindex C-u C-c C-w @r{(Fortran mode)}
+@findex fortran-window-create
+您还可以水平分割窗口并在分割到位的情况下继续编辑。  为此，请使用 @kbd{C-u C-c C-w} (@code{M-x fortran-window-create})。  通过在此窗口中进行编辑，您可以立即看到何时使一行太宽而无法正确显示 Fortran。
+
+@findex fortran-strip-sequence-nos
+命令@kbd{M-x fortran-strip-sequence-nos}删除当前缓冲区中所有行上第@code{fortran-line-length}列及之后的所有文本。  这是摆脱旧序列号的最简单方法。
+
+@node Fortran Abbrev
+@subsection Fortran 关键字缩写
+
+Fortran 模式为常见关键字和声明提供了许多内置缩写。  这些缩写与您可以自己定义的缩写相同。  要使用它们，您必须打开缩写模式。
+@iftex
+@xref{Abbrevs,,, emacs, the Emacs Manual}.
+@end iftex
+@ifnottex
+@xref{Abbrevs}.
+@end ifnottex
+
+内置缩写在一方面是不寻常的：它们都以分号开头。  例如，一个内置的 Fortran 缩写是 @samp{;c} 代表 @samp{continue}。  如果插入 @samp{;c}，然后插入标点符号（例如空格或换行符），则 @samp{;c} 会自动扩展为 @samp{continue}（前提是启用了缩写模式）。
+
+输入 @samp{;?} 或 @samp{;C-h} 显示所有内置 Fortran 缩写及其含义的列表。

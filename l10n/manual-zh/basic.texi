@@ -1,0 +1,542 @@
+@c -*- coding: utf-8 -*-
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Basic
+@chapter 基本编辑命令
+
+@kindex C-h t
+@findex help-with-tutorial
+在这里，我们解释如何输入文本、进行更正以及将文本保存在文件中的基础知识。  如果您对本材料不熟悉，我们建议您首先通过输入 @kbd{C-h t} (@code{help-with-tutorial}) 来运行 Emacs 边做边学教程。
+
+@menu
+
+* Inserting Text::       只需键入即可插入文本。
+* Moving Point::         将光标移动到要更改内容的位置。
+* Erasing::              删除和删除文本。
+* Basic Undo::           撤消文本中最近的更改。
+* Files: Basic Files.    访问、创建和保存文件。
+* Help: Basic Help.      询问角色做什么。
+* Blank Lines::          创建和删除空行。
+* Continuation Lines::   Emacs 如何显示对于屏幕来说太宽的行。
+* Position Info::        点位于哪条线、行或列上？
+* Arguments::            用于重复命令 N 次的数字参数。
+* Repeating::            快速重复上一个命令。
+@end menu
+
+@node Inserting Text
+@section 插入文本
+
+@cindex insertion
+@cindex graphic characters
+您可以通过键入相关键来插入普通的 @dfn{graphic character}（例如 @samp{a}、@samp{B}、@samp{3} 和 @samp{=}）。  这会将字符添加到缓冲区中的点。  插入将点向前移动，以便该点保留在插入的文本后面。 @xref{Point}。
+
+@kindex RET
+@kindex C-j
+@cindex newline
+@c @findex electric-indent-just-newline
+要结束一行并开始新一行，请输入 @key{RET} (@code{newline})。 （@key{RET}键可能标记为@key{Return}或@key{Enter}，或者在键盘上带有一个看起来滑稽的向左箭头，但我们在本手册中将其称为@key{RET}。）此命令将换行符插入到缓冲区中，然后根据主模式缩进（@pxref{Indentation}）。  如果 point 位于行尾，则效果是在其后创建一个新的空行并缩进新行；如果点位于一条线的中间，则该线在该位置被分割。  要关闭自动缩进，您可以禁用电动缩进模式 (@pxref{Indent Convenience}) 或键入 @kbd{C-j}，这将仅插入换行符，而不插入任何自动缩进。
+
+正如我们在本手册后面所解释的，您可以通过打开 @dfn{minor modes} 来更改 Emacs 处理文本插入的方式。  例如，称为“自动填充”模式的次要模式会在行太长时自动分割行 (@pxref{Filling})。  称为覆盖模式的次要模式会导致插入的字符替换（覆盖）现有文本，而不是将其推到右侧。  @xref{Minor Modes}。
+
+@cindex quoting
+@kindex C-q
+@findex quoted-insert
+通过键入相关键只能插入图形字符；其他键充当编辑命令并且不会自行插入。例如，@key{DEL}默认运行命令@code{delete-backward-char}（某些模式将其绑定到不同的命令）；它不会插入文字 @samp{DEL} 字符（@acronym{ASCII} 字符代码 127）。
+
+要插入非图形字符或键盘不支持的字符，请先通过键入 @kbd{C-q} (@code{quoted-insert}) 将其@dfn{quote} 插入。  有两种使用@kbd{C-q}的方法：
+
+@itemize @bullet
+@item 
+@kbd{C-q} 后跟任何非图形字符（甚至@kbd{C-g}）会插入该字符。  例如，@kbd{C-q @key{DEL}} 插入文字 @samp{DEL} 字符。
+
+@item 
+@kbd{C-q} 后跟八进制数字序列插入具有指定八进制字符代码的字符。  您可以使用任意数量的八进制数字；任何非数字都会终止序列。  如果终止字符是 @key{RET}，则 @key{RET} 仅用于终止序列。  任何其他非数字都会终止序列，然后充当正常输入 - 因此，@kbd{C-q 1 0 1 B} 插入 @samp{AB}。
+
+在普通非二进制覆盖模式下禁用八进制序列的使用，以便为您提供一种方便的方法来插入数字而不是用它进行覆盖。
+@end itemize
+
+@vindex read-quoted-char-radix
+@noindent
+要使用十进制或十六进制代替八进制，请将变量 @code{read-quoted-char-radix} 设置为 10 或 16。如果基数为 16，则字母 @kbd{a} 到 @kbd{f} 将用作字符代码的一部分，就像数字一样。  大小写被忽略。
+
+@findex insert-char
+@kindex C-x 8
+@cindex Unicode characters, inserting
+@cindex insert Unicode character
+@cindex characters, inserting by name or code-point
+@cindex curly quotes, inserting
+@cindex curved quotes, inserting
+可以通过以 @w{@kbd{C-x 8}} 开头的命令插入一些常见的 Unicode 字符。  例如，@kbd{C-x 8 [}插入@t{‘}，它是Unicode代码点U+2018@sc{left single quotation mark}，有时称为左单“弯引号”或“弯引号”。同样，@w{@kbd{C-x 8 ]}}、@kbd{C-x 8 @{} and @kbd{C-x 8 @}} 分别插入弯曲引号@t{’}、@t{“} 和@t{”}。  此外，工作的@key{Alt}键的作用类似于@kbd{C-x 8}（除非后面跟着@key{RET}）；例如，@kbd{A-[} 的作用类似于 @kbd{C-x 8 [} 并插入 @t{‘}。  要查看哪些字符具有 @kbd{C-x 8} 简写形式，请输入 @kbd{C-x 8 C-h}。
+
+或者，您可以使用命令 @kbd{C-x 8 @key{RET}} (@code{insert-char})。  这将提示使用迷你缓冲区输入字符的 Unicode 名称或代码点。  如果您输入名称，该命令会提供补全 (@pxref{Completion})。  如果您输入代码点，它应该是十六进制数字（Unicode 的约定），或具有指定基数的数字，例如 @code{#o23072}（八进制）； @xref{Integer Basics,,, elisp, The Emacs Lisp Reference Manual}。  然后该命令将相应的字符插入到缓冲区中。
+
+例如，以下都插入相同的字符：
+
+@example
+@kbd{C-x 8 @key{RET} left single quotation mark @key{RET}}
+@kbd{C-x 8 @key{RET} left sin @key{TAB} @key{RET}}
+@kbd{C-x 8 @key{RET} 2018 @key{RET}}
+@kbd{C-x 8 [}
+@kbd{A-[}  @r{(if the Alt key works)}
+@kbd{`}    @r{(in Electric Quote mode)}
+@end example
+
+@kbd{C-q} 或 @kbd{C-x 8 ...} 的数字参数指定要插入的字符副本数 (@pxref{Arguments})。
+
+作为 @kbd{C-x 8} 的替代方法，您可以通过键入 @kbd{C-u C-x \ iso-transl @key{RET}} 选择相应的瞬态输入法，然后通过键入 @kbd{C-x \ [} 临时激活该瞬态输入法，将插入相同的字符 @t{‘} (@pxref{transient input method})。
+
+此外，在某些情况下，如果您使用重音符号和撇号 @kbd{`like this'} 键入引文，即使没有 @kbd{C-x 8} 命令，它也会转换为使用单引号的形式 @t{‘like this’}。  同样，使用双重音符号和撇号输入引号 @kbd{``like this''} 会将其转换为使用双引号的形式 @t{“like this”}。  @xref{Quotation Marks}。
+
+@node Moving Point
+@section 改变点的位置
+
+@cindex arrow keys
+@cindex moving point
+@cindex movement
+@cindex cursor motion
+@cindex moving the cursor
+除了插入字符之外，您还必须知道如何移动点 (@pxref{Point})。  键盘命令@kbd{C-f}、@kbd{C-b}、@kbd{C-n}和@kbd{C-p}分别向右、向左、向下和向上移动点。  您还可以使用大多数键盘上的 @dfn{arrow keys} 来移动点：@key{RIGHT}、@key{LEFT}、@key{DOWN} 和 @key{UP}；然而，许多 Emacs 用户发现使用箭头键比使用控制键慢，因为您需要将手移到这些键所在的键盘区域。
+
+您也可以单击鼠标左键将点移动到单击的位置。  Emacs 还提供了各种附加的键盘命令，可以以更复杂的方式移动点。
+
+@table @kbd
+
+@item C-f
+@kindex C-f
+@findex forward-char
+向前移动一个字符 (@code{forward-char})。
+
+@item @key{RIGHT}
+@kindex RIGHT
+@findex right-char
+此命令 (@code{right-char}) 的行为类似于 @kbd{C-f}，除非点位于从右到左的段落 (@pxref{Bidirectional Editing}) 中。
+
+@item C-b
+@kindex C-b
+@findex backward-char
+向后移动一个字符 (@code{backward-char})。
+
+@item @key{LEFT}
+@kindex LEFT
+@findex left-char
+此命令 (@code{left-char}) 的行为类似于 @kbd{C-b}，除非当前段落是从右到左 (@pxref{Bidirectional Editing})。
+
+@item C-n
+@itemx @key{DOWN}
+@kindex C-n
+@kindex DOWN
+@findex next-line
+向下移动一行屏幕 (@code{next-line})。  此命令尝试保持水平位置不变，因此如果您从一行的中间开始，则会移动到下一行的中间。
+
+@item C-p
+@itemx @key{UP}
+@kindex C-p
+@kindex UP
+@findex previous-line
+向上移动一行屏幕 (@code{previous-line})。  该命令保留行内的位置，如@kbd{C-n}。
+
+@item C-a
+@itemx @key{Home}
+@kindex C-a
+@kindex HOME
+@findex move-beginning-of-line
+移至行首 (@code{move-beginning-of-line})。
+
+@item C-e
+@itemx @key{End}
+@kindex C-e
+@kindex END
+@findex move-end-of-line
+移至行尾 (@code{move-end-of-line})。
+
+@item M-f
+向前移动一个单词 (@code{forward-word})。  @xref{Words}。
+
+@item C-@key{RIGHT}
+@itemx M-@key{RIGHT}
+@kindex C-RIGHT
+@kindex M-RIGHT
+@findex right-word
+此命令 (@code{right-word}) 的行为类似于 @kbd{M-f}，不同之处在于，如果当前段落是从右到左，它将 @emph{backward} 移动一个单词。  @xref{Bidirectional Editing}。
+
+@item M-b
+向后移动一个单词 (@code{backward-word})。  @xref{Words}。
+
+@item C-@key{LEFT}
+@itemx M-@key{LEFT}
+@kindex C-LEFT
+@kindex M-LEFT
+@findex left-word
+此命令 (@code{left-word}) 的行为类似于 @kbd{M-b}，不同之处在于，如果当前段落是从右到左，它将 @emph{forward} 移动一个单词。  @xref{Bidirectional Editing}。
+
+@item M-r
+@kindex M-r
+@findex move-to-window-line-top-bottom
+不移动屏幕上的文本，将点重新定位在窗口最中心文本行的左边距；在随后的连续调用中，将点按循环顺序移动到最顶行、最底行等的左边距 (@code{move-to-window-line-top-bottom})。
+
+数字参数表示将点放置在哪一行屏幕上，从窗口顶部向下计数（零表示顶行）。  负参数从底部开始计算行数（@minus{}1 表示底线）。  @xref{Arguments}，有关数字参数的更多信息。
+
+@item M-<
+@kindex M-<
+@findex beginning-of-buffer
+移动到缓冲区的顶部 (@code{beginning-of-buffer})。  使用数字参数 @var{n}，从顶部移至 @var{n}/10。在图形显示上，@kbd{C-@key{HOME}} 执行相同的操作。
+
+@item M->
+@kindex M->
+@kindex C-END
+@findex end-of-buffer
+移动到缓冲区的末尾 (@code{end-of-buffer})。  在图形显示上，@kbd{C-@key{END}} 执行相同的操作。
+
+@item C-v
+@itemx @key{PageDown}
+@itemx @key{next}
+@kindex C-v
+@kindex PageDown
+@kindex next
+将显示屏向前滚动一屏，并根据需要移动屏幕上的点 (@code{scroll-up-command})。  @xref{Scrolling}。
+
+@item M-v
+@itemx @key{PageUp}
+@itemx @key{prior}
+@kindex M-v
+@kindex PageUp
+@kindex prior
+向后滚动一个屏幕，并根据需要移动屏幕上的点 (@code{scroll-down-command})。  @xref{Scrolling}。
+
+@item M-g c
+@kindex M-g c
+@findex goto-char
+读取数字@var{n}并将点移动到缓冲区位置@var{n}。位置 1 是缓冲区的开头。  如果点位于缓冲区中的数字上或紧随其后，则这是 @var{n} 的默认值。  只需在迷你缓冲区中输入@key{RET}即可使用它。  您还可以通过给 @kbd{M-g c} 一个数字前缀参数来指定 @var{n}。
+
+@item M-g M-g
+@itemx M-g g
+@kindex M-g M-g
+@kindex M-g g
+@findex goto-line
+@findex goto-line-relative
+读取数字 @var{n} 并将指针移动到行号 @var{n} (@code{goto-line}) 的开头。  第 1 行是缓冲区的开始。  如果点位于缓冲区中的数字上或紧随其后，则这是 @var{n} 的默认值。  只需在迷你缓冲区中输入 @key{RET} 即可使用它。  您还可以通过为 @kbd{M-g M-g} 提供数字前缀参数来指定 @var{n}。 @xref{Select Buffer}，当您给它一个普通的前缀参数时，@kbd{M-g M-g} 的行为。  或者，您可以使用命令 @code{goto-line-relative} 将点移动到相对于缩小缓冲区的可访问部分的行。
+
+@code{goto-line} 有自己的历史列表 (@pxref{Minibuffer History})。  通过自定义用户选项@code{goto-line-history-local}，您可以在所有缓冲区之间共享一个列表（默认），也可以为每个缓冲区创建一个单独的列表。
+
+@item M-g @key{TAB}
+@kindex M-g TAB
+@findex move-to-column
+读取数字@var{n}并移至当前行中的第@var{n}列。第 0 列是最左边的列。  如果使用前缀参数调用，则移动到参数数值指定的列号。
+
+@item C-x C-n
+@kindex C-x C-n
+@findex set-goal-column
+使用点的当前列作为当前缓冲区中的@dfn{semipermanent goal column} (@code{set-goal-column})。  当半永久目标柱生效时，@kbd{C-n}、@kbd{C-p}、@kbd{<prior>}和@kbd{<next>}在垂直移动后总是尝试移动到该柱，或尽可能靠近它。  目标栏在取消之前一直有效。
+
+@item C-u C-x C-n
+取消目标栏。  从今以后，@kbd{C-n}和@kbd{C-p}像往常一样尝试保持水平位置。
+@end table
+
+@vindex line-move-visual
+当缓冲区中的一行文本长于窗口宽度时，Emacs 通常将其显示在两个或多个 @dfn{screen lines}（也称为@: @dfn{visual lines}）上。  为了方便起见，@kbd{C-n} 和@kbd{C-p} 按屏幕线移动点，等效键@kbd{@key{down}} 和@kbd{@key{up}} 也是如此。  您可以通过将变量@code{line-move-visual}设置为@code{nil}来强制这些命令根据@dfn{logical lines}（即根据缓冲区中的文本行）移动；如果逻辑行占用多个屏幕行，则光标会跳过其他屏幕行。  详情请参见@ref{Continuation Lines}。  @xref{Variables}，了解如何设置@code{line-move-visual}等变量。
+
+与 @kbd{C-n} 和 @kbd{C-p} 不同，大多数在行上工作的 Emacs 命令都在 @emph{logical} 行上工作。  例如，@kbd{C-a}（@code{move-beginning-of-line}）和@kbd{C-e}（@code{move-end-of-line}）分别移动到逻辑行的开头和结尾。  每当我们遇到在屏幕行上工作的命令时，例如@kbd{C-n}和@kbd{C-p}，我们都会指出它们。
+
+@vindex track-eol
+当@code{line-move-visual}为@code{nil}时，您还可以将变量@code{track-eol}设置为非@code{nil}值。  然后@kbd{C-n}和@kbd{C-p}，当从逻辑行的末尾开始时，移动到下一个逻辑行的末尾。  通常，@code{track-eol}为@code{nil}。
+
+@vindex next-line-add-newlines
+当您在缓冲区的最后一行使用 @kbd{C-n} 时，它通常会停止在缓冲区的末尾。  但是，如果将变量 @code{next-line-add-newlines} 设置为非 @code{nil} 值，则缓冲区最后一行上的 @kbd{C-n} 会在末尾创建一个附加行并向下移动到其中。
+
+@node Erasing
+@section 擦除文本
+@cindex killing characters and lines
+@cindex deleting characters and lines
+@cindex erasing characters and lines
+
+@table @kbd
+@item @key{DEL}
+@itemx @key{BACKSPACE}
+删除点之前的字符，或者区域（如果其处于活动状态）(@code{delete-backward-char})。
+
+@item @key{Delete}
+删除点后的字符或字素簇，或区域（如果其处于活动状态）(@code{delete-forward-char})。
+
+@item C-d
+删除点 (@code{delete-char}) 之后的字符。
+
+@item C-k
+杀死到行尾（@code{kill-line}）。
+
+@item M-d
+向前杀死到下一个单词的末尾 (@code{kill-word})。
+
+@item M-@key{DEL}
+@itemx M-@key{BACKSPACE}
+杀回到前一个单词的开头 (@code{backward-kill-word})。
+@end table
+
+@cindex grapheme cluster
+@cindex delete part of composed sequence of characters
+@kbd{@key{DEL}} (@code{delete-backward-char}) 命令删除 point 之前的字符，向后移动光标及其后面的字符。  如果 point 位于一行的开头，则会删除前面的换行符，将该行连接到上一行。  如果 point 之前的字符与一个或多个前面的字符组成，并与它们一起显示为单个显示单元，即所谓的 @dfn{grapheme cluster} 代表整个序列，@kbd{@key{DEL}} 仅从组成的序列中删除单个字符，这在某些情况下可能会显着改变显示文本的外观。  （在编程模式中，命令@code{backward-delete-char-untabify}通常与@key{DEL}绑定，其作用与@pxref{Program Modes}相同。）这与@code{delete-char-forward}等命令相反，后者删除点后整个组成的字符序列，请参见下文。
+
+@vindex composition-break-at-point
+对于足够长的组合字符序列，使用 @kbd{@key{DEL}} 将它们一一删除可能会很不方便。  在这些情况下，您可以将选项 @code{composition-break-at-point} 自定义为非 @code{nil} 值，以使 Emacs 分别显示点周围的字符，而不是显示其组合的结果。  这允许更方便地编辑组合字符序列，因为您可以在组合序列内移动点并删除那里的字符，而不必删除（并稍后重新插入）以下字符。
+
+如果该区域处于活动状态，@kbd{@key{DEL}} 会删除该区域中的文本，而不是删除单个字符。  @xref{Mark}，用于对该区域的描述。
+
+在大多数键盘上，@key{DEL} 标记为 @key{BACKSPACE}，但在本手册中我们将其称为 @key{DEL}。  （不要将 @key{DEL} 与 @key{Delete} 键混淆；我们将立即讨论 @key{Delete}。）在某些文本终端上，Emacs 可能无法正确识别 @key{DEL} 键。  @xref{DEL Does Not Delete}，如果你遇到这个问题。
+
+@cindex composed sequence of characters, deletion
+@cindex delete entire grapheme cluster
+@key{Delete} (@code{delete-forward-char}) 命令以相反方向删除：它删除点之后的字符，即光标下的字符。  如果点位于一行的末尾，则会将下一行连接到这一行上。  与 @kbd{@key{DEL}} 类似，如果该区域处于活动状态，它会删除该区域中的文本 (@pxref{Mark})。如果点之后的字符与后续字符组成，@key{Delete} 会一次性删除整个组成的序列。  这与 @key{DEL} 相反，@key{DEL} 总是删除单个字符，即使该字符是组合的。  如果@code{composition-break-at-point}非@code{nil}，则@key{Delete}删除从point到组合序列末尾的所有组合字符，如果将point移动到序列中，则这些字符可能只是序列的一部分。
+
+@kbd{C-d} (@code{delete-char}) 删除点之后的字符，类似于@key{Delete}，但无论区域是否处于活动状态。
+
+@xref{Deletion}，有关上述删除命令的更多详细信息。
+
+@kbd{C-k} (@code{kill-line}) 一次擦除（删除）一行。  如果您在行首或中间输入 @kbd{C-k}，它会删除直到行尾的所有文本。  如果您在一行末尾键入 @kbd{C-k}，则会将该行与下一行连接起来。
+
+@xref{Killing}，有关 @kbd{C-k} 及相关命令的更多信息。
+
+@node Basic Undo
+@section 撤消更改
+
+@table @kbd
+@item C-/
+@itemx C-x u
+@itemx C-_
+撤消撤消记录的一项——通常是一个命令值 (@code{undo})。  （第一个键在文本模式显示器上可能不可用。）
+@end table
+
+Emacs 记录缓冲区文本中所做更改的列表，以便您可以撤消最近的更改。  这是使用 @code{undo} 命令完成的，该命令绑定到 @kbd{C-/}（以及 @kbd{C-x u} 和 @kbd{C-_}）。通常，此命令会撤消上次更改，将点移回更改前的位置。  撤消命令仅适用于缓冲区中的更改；您不能使用它来撤消光标移动。
+
+在所有其他键都支持 @key{Control} 修饰符的终端上，调用 @code{undo} 最简单的方法是使用 @kbd{C-/}，因为不需要 @key{Shift} 修饰符。  在只允许 ASCII 控制字符的终端上，@kbd{C-/} 不存在，但对于其中许多终端来说，@kbd{C-/} 仍然有效，因为它实际上将 @kbd{C-_} 发送到 Emacs，而许多其他终端允许您在键入 @kbd{C-_} 时省略 @key{Shift} 修饰符（实际上是按 @kbd{C--}），这使得这是调用 @code{undo} 的最便捷方法。
+
+虽然每个编辑命令通常在撤消记录中生成单独的条目，但是非常简单的命令可以组合在一起。有时，一个条目可能只涵盖复杂命令的一部分。
+
+如果重复 @kbd{C-/} （或其别名），每次重复都会撤消另一个较早的更改，回到可用撤消信息的限制。  如果所有记录的更改均已撤消，则撤消命令将显示一条错误消息并且不执行任何操作。
+
+要了解有关 @code{undo} 命令的更多信息，请参阅 @ref{Undo}。
+
+@node Basic Files
+@section 文件
+
+您插入 Emacs 缓冲区中的文本仅持续与 Emacs 会话一样长的时间。  要永久保留任何文本，您必须将其放入 @dfn{file} 中。
+
+假设您的主目录中有一个名为 @file{test.emacs} 的文件。  要开始在 Emacs 中编辑此文件，请输入
+
+@example
+C-x C-f test.emacs @key{RET}
+@end example
+
+@noindent
+这里，文件名作为命令 @kbd{C-x C-f} (@code{find-file}) 的 @dfn{argument} 给出。  该命令使用 @dfn{minibuffer} 读取参数，然后键入 @key{RET} 终止参数 (@pxref{Minibuffer})。
+
+Emacs 通过 @dfn{visiting} 文件遵循此命令：它创建一个缓冲区，将文件的内容复制到缓冲区中，然后显示缓冲区以进行编辑。  如果更改文本，您可以通过键入 @kbd{C-x C-s} (@code{save-buffer}) @dfn{save} 文件中的新文本。  这会将更改后的缓冲区内容复制回文件@file{test.emacs}，使其永久化。  在保存之前，更改的文本仅存在于 Emacs 内部，并且文件 @file{test.emacs} 保持不变。
+
+要创建文件，只需使用 @kbd{C-x C-f} 访问它，就像它已经存在一样。  这将创建一个空缓冲区，您可以在其中插入要放入文件中的文本。  Emacs 实际上是在您第一次使用 @kbd{C-x C-s} 保存此缓冲区时创建该文件。
+
+要了解有关在 Emacs 中使用文件的更多信息，请参阅@ref{Files}。
+
+@node Basic Help
+@section 帮助
+
+@cindex getting help with keys
+如果您忘记了某个键的作用，可以通过键入 @kbd{C-h k} (@code{describe-key}) 来查找，然后输入您感兴趣的键；例如，@kbd{C-h k C-n} 告诉您@kbd{C-n} 的作用。
+
+前缀键 @kbd{C-h} 代表“帮助”。  键 @key{F1} 用作 @kbd{C-h} 的别名。  除了@kbd{C-h k}之外，还有许多其他帮助命令提供不同类型的帮助。
+
+@xref{Help}，了解详情。
+
+@node Blank Lines
+@section 空行
+
+@cindex inserting blank lines
+@cindex deleting blank lines
+以下是插入和删除空行的特殊命令和技术。
+
+@table @kbd
+@item C-o
+在光标后插入一个空行 (@code{open-line})。
+@item C-x C-o
+删除许多连续空白行中的所有空白行 (@code{delete-blank-lines})。
+@end table
+
+@kindex C-o
+@kindex C-x C-o
+@cindex blank lines
+@findex open-line
+@findex delete-blank-lines
+我们已经看到了 @kbd{@key{RET}} (@code{newline}) 如何开始新的文本行。  但是，如果您首先创建一个空行，然后在其中插入所需的文本，可能会更容易看到您在做什么。使用 @kbd{C-o} (@code{open-line}) 键可以轻松完成此操作，该键在 point 之后插入换行符，但在换行符前面保留 point 。  在@kbd{C-o}之后，键入新行的文本。
+
+您可以通过多次键入 @kbd{C-o} 来创建多个空行，或者为其提供一个数字参数来指定要创建的空行数。 @xref{Arguments}，如何。  如果您有填充前缀，则 @kbd{C-o} 命令会在新行上插入填充前缀（如果在行首键入）。  @xref{Fill Prefix}。
+
+消除多余空白行的简单方法是使用命令 @kbd{C-x C-o} (@code{delete-blank-lines})。  如果点位于一系列空行内，@kbd{C-x C-o} 将删除除其中一个空行之外的所有空行。  如果点位于单个空行上，@kbd{C-x C-o} 会将其删除。  如果点位于非空行上，则 @kbd{C-x C-o} 删除所有后续空行（如果存在）。
+
+@node Continuation Lines
+@section 延续线
+
+@cindex continuation line
+@cindex wrapping
+@cindex line wrapping
+@cindex fringes, and continuation lines
+@cindex logical line
+@cindex screen line
+@cindex visual line
+有时，缓冲区中的一行文本（a @dfn{logical line}）太长，无法容纳在窗口中，Emacs 会将其显示为两个或多个 @dfn{screen lines} 或 @dfn{visual lines}。  这称为@dfn{line wrapping}或@dfn{continuation}，长逻辑线称为@dfn{continued line}。  在图形显示上，Emacs 在左右窗口边缘用小弯曲箭头指示换行。在文本终端上，Emacs 通过在右边距显示 @samp{\} 字符来指示换行。
+
+大多数作用于行的命令作用于逻辑行，而不是屏幕行。  例如，@kbd{C-k} 杀死一条逻辑线。  如前所述，@kbd{C-n} (@code{next-line}) 和@kbd{C-p} (@code{previous-line}) 是特殊例外：它们分别将点向下和向上移动一行屏幕线 (@pxref{Moving Point})。
+
+@cindex line truncation, and fringes
+Emacs 可以选择 @dfn{truncate} 长逻辑行而不是继续它们。  这意味着每个逻辑行占用一个屏幕行；如果它比窗口的宽度长，则不显示该行的其余部分。  在图形显示上，截断线由右边缘的小直箭头指示；在文本终端上，它由右侧空白处的 @samp{$} 字符表示。 @xref{Line Truncation}。
+
+默认情况下，连续的行会在窗口右边缘换行。由于换行可能发生在单词的中间，因此连续的行可能难以阅读。  通常的解决方案是在行变得太长之前通过插入换行符来中断行。  如果您愿意，可以使用自动填充模式让 Emacs 在行太长时自动插入换行符。  @xref{Filling}。
+
+@cindex continuation lines, visual wrap prefix
+@findex visual-wrap-prefix-mode
+@findex global-visual-wrap-prefix-mode
+通常，每个连续行的第一个字符位于显示它的屏幕行的开头。次要模式 @code{visual-wrap-prefix-mode} 及其全局对应模式 (@pxref{Minor Modes}) @code{global-visual-wrap-prefix-mode} 使用根据每行周围上下文自动计算的填充前缀 (@pxref{Fill Prefix}) 安排连续行在显示时缩进。  这些前缀仅用于显示功能，不会以任何方式更改缓冲区文本。
+
+有时，您可能需要编辑包含许多长逻辑行的文件，并且通过添加换行符将它们全部分解可能不切实际。  在这种情况下，您可以使用 Visual Line 模式，该模式启用 @dfn{word wrapping}：Emacs 不是在窗口右边缘精确换行长行，而是在最接近窗口右边缘的单词边界（即空格或制表符）处换行。  视觉线模式还重新定义了@kbd{C-a}、@kbd{C-n}和@kbd{C-k}等编辑命令，以在屏幕线而不是逻辑线上进行操作。  @xref{Visual Line Mode}。
+
+@node Position Info
+@section 光标位置信息
+
+以下命令用于获取有关缓冲区各部分的大小和位置的信息，以及对字数和行数进行计数。
+
+@table @kbd
+@item M-x what-line
+显示点的行号。
+@item M-x line-number-mode
+@itemx M-x column-number-mode
+切换自动显示当前行号或列号。 @xref{Optional Mode Line}。  如果您想在每行之前显示行号，请参阅@ref{Display Custom}。
+
+@item M-=
+显示该区域中存在的行数、句子数、单词数和字符数 (@code{count-words-region})。  @xref{Mark}，了解有关该地区的信息。
+
+@item M-x count-words
+显示缓冲区中存在的行数、句子数、单词数和字符数。  如果该区域处于活动状态 (@pxref{Mark})，则显示该区域的数字。
+
+@item C-x =
+显示点后字符的字符代码、点的字符位置、点的列（@code{what-cursor-position}）。
+@item M-x hl-line-mode
+启用或禁用当前行的突出显示。  @xref{Cursor Display}。
+@item M-x size-indication-mode
+切换缓冲区大小的自动显示。 @xref{Optional Mode Line}。
+@end table
+
+@findex what-line
+@cindex line number commands
+@cindex location of point
+@cindex cursor location
+@cindex point location
+@kbd{M-x what-line} 显示回显区域中的当前行号。  该命令通常是多余的，因为当前行号显示在模式行 (@pxref{Mode Line}) 中。  但是，如果缩小缓冲区，模式行将显示相对于可访问部分的行号 (@pxref{Narrowing})。  相比之下，@code{what-line}同时显示相对于缩小区域的行号和相对于整个缓冲区的行号。
+
+@kindex M-=
+@findex count-words-region
+@kbd{M-=} (@code{count-words-region}) 显示一条消息，报告该区域中的行数、句子数、单词数和字符数（@pxref{Mark}，用于解释该区域）。  使用前缀参数@kbd{C-u M-=}，该命令显示整个缓冲区的计数。
+
+@findex count-words
+命令 @kbd{M-x count-words} 执行相同的工作，但使用不同的调用约定。  如果该区域处于活动状态，则显示该区域的计数，否则显示缓冲区的计数。
+
+@kindex C-x =
+@findex what-cursor-position
+命令 @kbd{C-x =} (@code{what-cursor-position}) 显示有关当前光标位置和该位置的缓冲区内容的信息。  它在回显区域中显示一条线，如下所示：
+
+@smallexample
+Char: c (99, #o143, #x63) point=28062 of 36168 (78%) column=53
+@end smallexample
+
+在@samp{Char:}之后，这显示了缓冲区中该点的字符。括号内的文字显示相应的十进制、八进制和十六进制字符代码；有关@kbd{C-x =}如何显示字符信息的更多信息，请参阅@ref{International Chars}。  @samp{point=} 之后是点的位置作为字符计数（缓冲区中的第一个字符是位置 1，第二个字符是位置 2，依此类推）。  之后的数字是缓冲区中字符的总数，括号中的数字表示位置占总数的百分比。  @samp{column=} 之后是点的水平位置，以从窗口左边缘开始计数的列为单位。
+
+@vindex what-cursor-show-names
+如果用户选项 @code{what-cursor-show-names} 为非 @code{nil}，则还会显示由 Unicode 字符数据库定义的字符名称。  括号中的部分将变为：
+
+@smallexample
+(99, #o143, #x63, LATIN SMALL LETTER C)
+@end smallexample
+
+如果缓冲区已变窄，导致开头和结尾的某些文本暂时无法访问，@kbd{C-x =} 将显示描述当前可访问范围的附加文本。  例如，它可能会显示：
+
+@smallexample
+Char: C (67, #o103, #x43) point=252 of 889 (28%) <231-599> column=0
+@end smallexample
+
+@noindent
+其中两个额外的数字给出了该点允许采用的最小和最大字符位置。  这两个位置之间的字符是可访问的字符。  @xref{Narrowing}。
+
+相关但不同的特征是@code{display-line-numbers-mode} (@pxref{Display Custom})。
+
+@node Arguments
+@section 数字参数
+@cindex numeric arguments
+@cindex prefix arguments
+@cindex arguments to commands
+
+在数学和计算术语中，@dfn{argument} 的意思是“提供给函数或操作的数据”。  您可以为任何 Emacs 命令指定 @dfn{numeric argument}（也称为 @dfn{prefix argument}）。  某些命令将参数解释为重复计数。  例如，给 @kbd{C-f} 一个参数 10 会导致它向前移动 10 个字符而不是 1 个字符。  对于这些命令，没有参数相当于 1 的参数，负参数会导致它们向相反的方向移动或起作用。
+
+@kindex M-1
+@kindex M-@t{-}
+@findex digit-argument
+@findex negative-argument
+指定数字参数的最简单方法是在按住 @key{Meta} 键的同时键入数字和/或减号。  例如，
+
+@example
+M-5 C-n
+@end example
+
+@noindent
+向下移动五行。  键 @kbd{M-1}、@kbd{M-2} 等以及 @kbd{M--} 绑定到为下一个命令设置参数的命令（@code{digit-argument} 和 @code{negative-argument}）。  没有数字的@kbd{M--}通常表示@minus{}1。
+
+如果输入多于一位数字，则无需按住 @key{Meta} 键输入第二个及后续数字。  因此，要向下移动五十行，请输入
+
+@example
+M-5 0 C-n
+@end example
+
+@noindent
+请注意，这个@emph{does not}插入了@samp{0}的五个副本，并向下移动一行，如您所料——@samp{0}被视为前缀参数的一部分。
+
+（如果您确实想要插入 @samp{0} 的五个副本，该怎么办？输入 @kbd{M-5 C-u 0}。这里，@kbd{C-u} 终止前缀参数，以便下一次击键开始您要执行的命令。请注意，@kbd{C-u} 的含义仅适用于这种情况。对于 @kbd{C-u} 的通常作用，请参见下文。）
+
+@kindex C-u
+@findex universal-argument
+指定数字参数的另一种方法是键入 @kbd{C-u} (@code{universal-argument}) 后跟一些数字，或者（对于负参数）后跟减号，而不是键入 @kbd{M-1}、@kbd{M-2} 等。  不带数字的减号通常表示 @minus{}1。
+
+@kbd{C-u} 单独具有“四倍”的特殊含义：它将下一个命令的参数乘以四。  @kbd{C-u C-u} 将其乘以十六。  因此，@kbd{C-u C-u C-f}向前移动了十六个字符。  其他有用的组合是@kbd{C-u C-n}、@kbd{C-u C-u C-n}（向下移动屏幕的很大一部分）、@kbd{C-u C-u C-o}（生成十六个空行）和@kbd{C-u C-k}（删除四行）。
+
+您可以在自插入字符之前使用数字参数来插入它的多个副本。  当字符不是数字时，这很简单；例如，@w{@kbd{C-u 6 4 a}} 插入字符 @samp{a} 的 64 个副本。  但这不适用于插入数字； @w{@kbd{C-u 6 4 1}} 指定参数 641。您可以将参数与要插入的数字分开，用另一个 @kbd{C-u}；例如，@w{@kbd{C-u 6 4 C-u 1}} 确实插入了字符 @samp{1} 的 64 个副本。
+
+有些命令关心是否有参数，但忽略它的值。  例如，命令@kbd{M-q} (@code{fill-paragraph}) 填充文本；通过论证，它也证明了文本的合理性。 （@xref{Filling}，有关@kbd{M-q}的更多信息。）对于这些命令，用单个@kbd{C-u}指定参数就足够了。
+
+某些命令使用参数的值作为重复计数，但在没有参数时执行一些特殊操作。  例如，带有参数 @var{n} 的命令 @kbd{C-k} (@code{kill-line}) 会杀死 @var{n} 行，包括它们的终止换行符。  但是不带参数的 @kbd{C-k} 是特殊的：它会杀死直到下一个换行符的文本，或者，如果 point 位于行尾，它会杀死换行符本身。  因此，两个不带参数的 @kbd{C-k} 命令可以杀死非空行，就像参数为 1 的 @kbd{C-k} 一样。 （@xref{Killing}，有关@kbd{C-k}的更多信息。）
+
+一些命令对待普通 @kbd{C-u} 的方式与普通参数不同。  其他一些人可能会以与 @minus{}1 的参数不同的方式对待仅包含减号的参数。  这些不寻常的情况一出现就会被描述；它们的存在是为了使单个命令更加方便，并且它们记录在该命令的文档字符串中。
+
+我们使用术语 @dfn{prefix argument} 来强调您在命令中键入此类参数 @emph{before}，并将它们与迷你缓冲区参数 (@pxref{Minibuffer}) 区分开来，后者是在调用命令时输入的 @emph{after}。
+
+在图形显示上，@kbd{C-0}、@kbd{C-1} 等。@  的作用与@kbd{M-0}、@kbd{M-1} 等相同。
+
+@node Repeating
+@section 重复命令
+@cindex repeating a command
+
+许多简单的命令，例如使用单个键或使用 @w{@kbd{M-x @var{command-name} @key{RET}}} 调用的命令，可以通过使用充当重复计数 (@pxref{Arguments}) 的数字参数来调用它们来重复。  但是，如果您要重复的命令提示输入，或以其他方式使用数字参数，则该方法将不起作用。
+
+@kindex C-x z
+@findex repeat
+命令 @kbd{C-x z} (@code{repeat}) 提供了另一种多次重复 Emacs 命令的方法。  该命令重复之前的 Emacs 命令，无论它是什么。  重复命令使用之前使用过的相同参数；它不会每次都读取新的参数。
+
+要多次重复该命令，请键入附加的 @kbd{z}：每个 @kbd{z} 会再次重复该命令一次。  当您键入 @kbd{z} 以外的字符或按下鼠标按钮时，重复结束。
+
+例如，假设您键入 @kbd{C-u 2 0 C-d} 以删除 20 个字符。  您可以通过键入 @kbd{C-x z z z} 重复该命令（包括其参数）三次，总共删除 80 个字符。  第一个@kbd{C-x z}重复该命令一次，随后的每个@kbd{z}再次重复该命令。
+
+@findex repeat-mode
+@findex describe-repeat-maps
+@vindex repeat-exit-key
+@vindex repeat-exit-timeout
+您还可以激活 @code{repeat-mode}，它允许通过键入单个字符来重复绑定到两个或多个键序列的命令。  例如，输入 @w{@kbd{C-x u}} (@code{undo}, @pxref{Undo}) 撤消最近的编辑后，您可以通过键入 @w{@kbd{u u u@dots{}}} 撤消更多编辑。  同样，输入@w{@kbd{C-x o o o@dots{}}}而不是@w{@kbd{C-x o C-x o C-x o@dots{}}}可以切换到几个窗口之外的窗口。  这是通过在键入调用命令的完整按键序列后进入瞬态重复模式来实现的；单键快捷键显示在回显区域中。
+
+只有部分命令支持在 @code{repeat-mode} 中重复；输入 @w{@kbd{M-x describe-repeat-maps @key{RET}}} 查看是哪些。
+
+瞬态重复模式启用的单字符快捷键不需要相同：例如，输入 @w{@kbd{C-x @{}}, either @kbd{@{} or @kbd{@}} or @kbd{^} or @kbd{v}, or any series that mixes these characters in any order, will resize the selected window in respective ways.  Similarly, after @w{@kbd{M-g n}} or @kbd{M-g p}, typing any sequence of @kbd{n} and/or @kbd{p} in any mix will repeat @code{next-error} and @code{previous-error} to navigate in a @file{*compilation*} or @file{*grep*} buffer (@pxref{Compilation Mode}). 后
+
+键入除定义为重复上一命令之外的任何键都会退出瞬态重复模式，然后正常执行您键入的键。  您还可以定义一个将退出瞬态重复模式的键 @emph{without} 执行导致退出的键。  为此，自定义用户选项@code{repeat-exit-key}来命名一个键；一个自然值是@key{RET}。最后，可以在一定的空闲时间后自动中断重复链：自定义用户选项@code{repeat-exit-timeout}以指定空闲时间（以秒为单位），之后此瞬态重复模式将自动关闭。

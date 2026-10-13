@@ -1,0 +1,98 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 2023--2026 Free Software Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Other Input
+@section 触摸屏输入和虚拟键盘
+@cindex other input devices
+
+Emacs 最初编写时假设其用户从配备键盘和鼠标 (@pxref{Mouse Input}) 等合适的指点设备的台式计算机或计算机终端使用它。
+
+Emacs 还能够从其他输入源接收输入，即使 Emacs 安装在用此类输入源替代键盘和鼠标的常规组合的计算机上，用户也可以与其进行交互。
+
+@menu
+* Touchscreens::                 通过触摸屏与 Emacs 交互。
+* On-Screen Keyboards::          使用虚拟键盘进行文本输入。
+@end menu
+
+@node Touchscreens
+@subsection 在触摸屏上使用 Emacs
+@cindex touchscreen input
+
+触摸屏输入是通过在显示帧的监视器或计算机终端上放置和移动工具（例如手指和触笔等指点设备）来操纵帧的内容。
+
+将这些工具放置的顺序和位置这两个因素与称为 0⁣ 的预定义模式进行比较，之后与这些因素对齐的任何手势都指定要对工具下方的文本采取的一系列操作；目前识别的手势有：
+
+@itemize @bullet
+@item 
+@cindex tapping, touchscreens
+@dfn{Tapping}，从显示屏上短暂放置和抬起工具，将选择被点击的窗口，并在窗口中的该位置执行绑定到 @code{mouse-1} 的任何命令。  如果那里存在链接 (@pxref{Mouse References})，则 Emacs 将改为遵循该链接（只要此类操作与模拟 @code{mouse-1} 事件时所采取的操作不同）。
+
+@item 
+@cindex scrolling, touchscreens
+@vindex touch-screen-enable-hscroll
+@dfn{Scrolling}，即屏幕上连续的垂直或水平运动，将沿移动方向滚动工具初始位置下方的窗口内容。  用户选项 @code{touch-screen-enable-hscroll} 控制是否响应此手势执行水平滚动 (@pxref{Horizontal Scrolling})。
+
+@item 
+@cindex dragging, touchscreens
+@cindex long-press, touchscreens
+@dfn{Dragging} 执行 @dfn{long-press} 操作，方法是将工具放置在显示屏上并在将其移动到另一个位置之前将其留在那里一段时间，它将把点移动到工具的初始位置，并在工具继续运动时开始选择工具下的文本，就好像按住 @code{mouse-1} 并类似地移动鼠标一样。 @xref{Mouse Commands}。
+
+@vindex touch-screen-word-select
+@cindex word selection mode, touchscreens
+事实证明，在触摸屏显示器上准确定位工具可能具有挑战性，这会损害文本选择。  用户选项@code{touch-screen-word-select}，启用后会提示拖动以选择工具下的完整单词。  （通常，选择范围仅扩展到包含工具下方的角色。）
+
+@vindex touch-screen-extend-selection
+@cindex extending the selection, touchscreens
+同样，可能很难选择单个手势中想要的所有文本。  如果启用了用户选项@code{touch-screen-extend-selection}，则点击窗口内的点或标记的位置将开始新的“拖动”手势，其中该区域将沿任何后续移动的方向延伸。
+
+@vindex touch-screen-preview-select
+@cindex previewing the region during selection, touchscreens
+通过指示回波区域内的点的位置，可以减轻对被工具物理遮挡的光标区域进行精确调整的困难。  如果@code{touch-screen-preview-select}非@code{nil}，则在工具运动期间，点周围的线会显示在回波区域（@pxref{Echo Area}）中，其下方是另一条线，指示该点相对于第一点的位置。
+
+@item 
+@cindex pinching, touchscreens
+@dfn{Pinching}，将两个工具分开放置在屏幕上，然后调整它们的位置（例如增加或减少它们之间的距离）将与该距离的变化成比例地修改文本比例（@pxref{Text Scale}）。
+@end itemize
+
+@vindex touch-screen-delay
+当工具放置在屏幕上的时间超过 0.7 秒后，Emacs 会记录一次长按。  这个延迟可以通过自定义变量@code{touch-screen-delay}来调整。
+
+@node On-Screen Keyboards
+@subsection 将 Emacs 与虚拟键盘结合使用
+@cindex virtual keyboards
+@cindex on-screen keyboards
+
+当系统没有连接物理键盘时，其窗口系统可能会提供一个屏幕键盘，广泛称为“虚拟键盘”，其中包含多行可单击按钮，这些按钮将键盘输入发送到应用程序，就像真正的键盘一样。
+
+当焦点程序不请求文本输入时，该虚拟键盘被隐藏，因为它占据了显示上的稀缺空间，因此，一旦程序准备好接受键盘输入，就被要求显示它。  运行 X 的系统会检测何时需要虚拟键盘的存在，但在其他系统（例如 Android）上，Emacs 负责在需要时显示它，通常是对触摸屏“点击”手势 (@pxref{Touchscreens}) 或正在使用的迷你缓冲区 (@pxref{Minibuffer}) 的反应。
+
+@vindex touch-screen-set-point-commands
+当“点击”手势导致命令被执行时，Emacs 通过在列表 @code{touch-screen-set-point-commands} 中搜索该命令来检查该命令是否旨在设置该点。  如果是，并且新点下方的文本不是只读的，则激活虚拟键盘，以等待用户在那里输入。
+
+@code{touch-screen-set-point-commands} 的默认值仅包含命令 @code{mouse-set-point} (@pxref{Mouse Commands})，这是 @code{mouse-1} 的默认绑定，因此也是触摸屏点击手势的默认绑定。
+
+@vindex touch-screen-display-keyboard
+用户选项 @code{touch-screen-display-keyboard} 强制 Emacs 在所有点击手势上显示虚拟键盘，即使文本是只读的；它也可以在本地设置缓冲区，在这种情况下，Emacs 将始终显示键盘，以响应在显示其设置的缓冲区的窗口上的点击。
+
+此外，还有多种显示或隐藏屏幕键盘的功能。  欲了解更多详情，@xref{On-Screen Keyboards,,, elisp, The Emacs Lisp Reference Manual}。
+
+@cindex quitting, without a keyboard
+由于 Emacs 在执行命令时可能无法显示虚拟键盘，因此 Emacs 在通常没有物理键盘的窗口系统上实现了一项功能，通过快速单击设备上始终存在的硬件按钮两次会导致退出。  @xref{Quitting}。
+
+@vindex x-quit-keysym
+@vindex android-quit-keycode
+X 上没有启用此类按钮，但可以通过变量 @code{x-quit-keysym} 进行配置，而 Android 上的默认键是音量减小按钮，也可以通过变量 @code{android-quit-keycode} 进行配置。
+
+@cindex text conversion, keyboards
+大多数设计为与虚拟键盘配合使用的输入法编辑文本的方式与桌面输入法不同。
+
+在传统的桌面窗口系统上，输入法只会在屏幕上显示任何正在进行的字符组合的内容，并在用户确认后将反映其内容的按键事件发送到 Emacs。
+
+相比之下，虚拟键盘输入法直接对每一帧的选定窗口进行编辑；这在 X Window 系统下称为“文本转换”或“字符串转换”。
+
+只要 @code{text-conversion-style} 的缓冲区本地值非 @code{nil}（也就是说，通常在 @code{text-mode} 和 @code{prog-mode} 的导数内部），Emacs 就会启用这些输入方法。
+
+每当 Emacs 从输入法接收到执行转换的请求，并且 Emacs 当前未读取已读取一个前缀键 (@pxref{Keys}) 的键序列时，文本转换就会异步执行。  转换完成后，会发送 @code{text-conversion} 事件。  @xref{Misc Events,,, elisp, the Emacs Reference Manual}。
+
+@vindex text-conversion-face
+如果输入法需要在缓冲区的某个区域上工作，则该区域被指定为“组合区域”（或“预转换区域”）。  变量 @code{text-conversion-face} 控制是否以独特的面显示合成区域，如果是，则使用哪个面。

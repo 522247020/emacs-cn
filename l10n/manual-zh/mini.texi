@@ -1,0 +1,537 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Minibuffer
+@chapter 迷你缓冲区
+@cindex minibuffer
+
+@dfn{minibuffer} 是 Emacs 命令读取复杂参数的地方，例如文件名、缓冲区名称、Emacs 命令名称或 Lisp 表达式。  我们称其为“迷你缓冲区”，因为它是一个具有少量屏幕空间的专用缓冲区。  您可以在迷你缓冲区中使用常用的 Emacs 编辑命令来编辑参数文本。
+
+@menu
+* Basic Minibuffer::       迷你缓冲区的基本用法。
+* Minibuffer File::        使用迷你缓冲区输入文件名。
+* Minibuffer Edit::        如何在迷你缓冲区中进行编辑。
+* Completion::             迷你缓冲区输入的缩写工具。
+* Minibuffer History::     重用最近的迷你缓冲区参数。
+* Repetition::             重新执行使用迷你缓冲区的命令。
+* Passwords::              在回显区域输入密码。
+* Yes or No Prompts::      在回声区域回答“是”或“否”。
+@end menu
+
+@node Basic Minibuffer
+@section 使用迷你缓冲区
+
+@cindex prompt
+当使用迷你缓冲区时，它会出现在回显区域中，并带有光标。  迷你缓冲区以 @dfn{prompt} 开头，通常以冒号结尾。  提示说明了预期的输入类型以及如何使用它。  使用 @code{minibuffer-prompt} 面 (@pxref{Faces}) 突出显示提示。
+
+输入迷你缓冲区参数的最简单方法是键入文本，然后按 @key{RET} 提交参数并退出迷你缓冲区。或者，您可以输入 @kbd{C-g} 通过取消要求参数 (@pxref{Quitting}) 的命令来退出迷你缓冲区。
+
+@cindex default argument
+@vindex minibuffer-default-prompt-format
+有时，提示符会在冒号之前的括号内显示 @dfn{default argument}。  如果您只输入 @key{RET}，则此默认值将用作参数。  例如，读取缓冲区名称的命令通常显示缓冲区名称作为默认值；您可以输入 @key{RET} 来对该默认缓冲区进行操作。  您可以使用用户选项@code{minibuffer-default-prompt-format}自定义默认参数的显示方式。
+
+@cindex Minibuffer Electric Default mode
+@cindex mode, Minibuffer Electric Default
+@findex minibuffer-electric-default-mode
+@vindex minibuffer-eldef-shorten-default
+如果您启用 Minibuffer Electric Default 模式（一种全局次要模式），则一旦您修改了 minibuffer 的内容，Emacs 就会隐藏默认参数（因为输入 @key{RET} 将不再提交该默认值）。  如果您恢复原始的迷你缓冲区文本，提示将再次显示默认值。  要启用此次要模式，请输入@kbd{M-x minibuffer-electric-default-mode}。
+
+由于迷你缓冲区出现在​​回显区域中，因此它可能与回显区域的其他用途发生冲突。  如果在迷你缓冲区处于活动状态时发出错误消息或信息性消息，则该消息将在迷你缓冲区文本后面的括号中显示几秒钟，或者直到您键入某些内容；然后该消息消失。  当使用迷你缓冲区时，Emacs 不会回显击键。
+
+@vindex minibuffer-follows-selected-frame
+使用迷你缓冲区时，您可以切换到不同的框架，也许是为了记下需要输入的文本 (@pxref{Frame Commands})。  默认情况下，活动迷你缓冲区会移动到这个新帧。  如果将用户选项 @code{minibuffer-follows-selected-frame} 设置为 @code{nil}，则迷你缓冲区将保留在您打开它的帧中，并且您必须切换回该帧才能完成（或中止）当前命令。  如果将该选项设置为既不是 @code{nil} 也不是 @code{t} 的值，则仅在当前命令中打开递归迷你缓冲区 (@pxref{Recursive Mini,,, elisp}) 后，迷你缓冲区才会移动帧。  这个选项主要是为了（大约）保留Emacs 28.1之前的行为。  请注意，当您最终完成使用迷你缓冲区时，该命令的效果始终发生在您首次打开它的帧中。  唯一的例外是，当该帧不再存在时，操作将在当前选定的帧中发生。
+
+@node Minibuffer File
+@section 文件名的迷你缓冲区
+
+@cindex default directory
+@kbd{C-x C-f} (@code{find-file}) 等命令使用迷你缓冲区来读取文件名参数 (@pxref{Basic Files})。  当使用迷你缓冲区读取文件名时，它通常以一些以斜杠结尾的初始文本开始。  这就是@dfn{default directory}。  例如，它可能是这样开始的：
+
+@example
+Find file: /u2/emacs/src/
+@end example
+
+@noindent
+这里，@samp{Find file:@: }是提示符，@samp{/u2/emacs/src/}是默认目录。  如果您现在输入 @kbd{buffer.c} 作为输入，则指定文件 @file{/u2/emacs/src/buffer.c}。  @xref{File Names}，有关默认目录的信息。
+
+您可以通过键入 @kbd{M-n} 获得您可能需要的文件名的替代默认值，请参阅 @ref{Minibuffer History}。
+
+您可以使用@file{..}指定父目录中的文件：@file{/a/b/../foo.el}相当于@file{/a/foo.el}。或者，您可以使用 @kbd{M-@key{DEL}} 向后删除目录名称 (@pxref{Words})。
+
+要在完全不同的目录中指定文件，您可以使用 @kbd{C-a C-k} (@pxref{Minibuffer Edit}) 终止整个默认目录。或者，您可以忽略默认值，并在默认目录后输入以斜线或波形符开头的绝对文件名。例如，您可以指定 @file{/etc/termcap}，如下所示：
+
+@example
+Find file: /u2/emacs/src//etc/termcap
+@end example
+
+@noindent
+@cindex // in file name
+@cindex double slash in file name
+@cindex slashes repeated in file name
+@findex file-name-shadow-mode
+双斜杠会导致 Emacs 忽略该对中第二个斜杠之前的所有内容。  在上面的示例中，@file{/u2/emacs/src/} 被忽略，因此您提供的参数是 @file{/etc/termcap}。  如果终端允许，文件名中被忽略的部分会变暗。  （要禁用此调暗功能，请使用命令 @w{@kbd{M-x file-name-shadow-mode}} 关闭文件名阴影模式。）
+
+当完成远程文件名 (@pxref{Remote Files}) 时，双斜杠的行为略有不同：它导致 Emacs 仅忽略文件名部分，而其余部分（方法、主机和用户名等）保持不变。  连续输入三个斜杠会忽略远程文件名中的所有内容。  @xref{File name completion,,, tramp, The Tramp Manual}。
+
+@cindex home directory shorthand
+Emacs 将 @file{~/} 解释为您的主目录。  因此，@file{~/foo/bar.txt}指定了名为@file{bar.txt}的文件，位于名为@file{foo}的目录中，而该目录又位于您的主目录中。  另外，@file{~@var{user-id}/}表示登录名为@var{user-id}的用户的主目录。  @file{~} 前面的任何前导目录名称都将被忽略：因此，@file{/u2/emacs/~/foo/bar.txt} 相当于@file{~/foo/bar.txt}。
+
+在 MS-Windows 和 MS-DOS 系统上，用户并不总是有主目录，Emacs 使用多种替代方法。  对于 MS-Windows，请参阅@ref{Windows HOME}；对于 MS-DOS，请参阅
+@ifnottex
+@ref{MS-DOS File Names}.
+@end ifnottex
+@iftex
+@ref{MS-DOS File Names, HOME on MS-DOS,, emacs, the digital version of
+the Emacs Manual}.
+@end iftex
+在这些系统上，仅当前用户支持 @file{~@var{user-id}/} 构造，即仅当 @var{user-id} 是当前用户的登录名时。
+
+@vindex insert-default-directory
+为了防止 Emacs 在读取文件名时插入默认目录，请将变量 @code{insert-default-directory} 更改为 @code{nil}。  在这种情况下，迷你缓冲区一开始是空的。尽管如此，相对文件名参数仍然基于相同的默认目录进行解释。
+
+您还可以在迷你缓冲区中输入远程文件名。 @xref{Remote Files}。
+
+@node Minibuffer Edit
+@section 在迷你缓冲区中编辑
+
+迷你缓冲区是一种 Emacs 缓冲区，尽管是一种特殊的缓冲区，并且常用的 Emacs 命令可用于编辑参数文本。 （但是提示符是@dfn{read-only}，并且无法更改。）
+
+由于迷你缓冲区中的 @key{RET} 提交了参数，因此您不能使用它来插入换行符。  您可以使用 @kbd{C-q C-j} 来做到这一点，它会插入一个 @kbd{C-j} 控制字符，它在形式上相当于换行符 (@pxref{Inserting Text})。  或者，您可以使用 @kbd{C-o} (@code{open-line}) 命令 (@pxref{Blank Lines})。
+
+在迷你缓冲区内，键 @key{TAB}、@key{SPC} 和 @kbd{?} 通常绑定到 @dfn{completion commands}，这样您就可以轻松填写​​所需的文本，而无需键入全部内容。  @xref{Completion}。与 @key{RET} 一样，您可以使用 @kbd{C-q} 插入 @key{TAB}、@key{SPC} 或 @samp{?} 字符。  如果你想让@key{SPC}和@key{?}正常插入而不是开始完成，你可以将以下内容放入你的init文件中：
+
+@lisp
+(keymap-unset minibuffer-local-completion-map "SPC")
+(keymap-unset minibuffer-local-completion-map "?")
+@end lisp
+
+为了方便起见，迷你缓冲区中的 @kbd{C-a} (@code{move-beginning-of-line}) 移动指向参数文本的开头，而不是提示的开头。  例如，这允许您使用 @kbd{C-a C-k} 删除整个参数。
+
+@cindex height of minibuffer
+@cindex size of minibuffer
+@cindex growing minibuffer
+@cindex resizing minibuffer
+当迷你缓冲区处于活动状态时，回显区域的处理方式与普通 Emacs 窗口非常相似。  例如，您可以切换到另一个窗口（使用 @kbd{C-x o}），在其中编辑文本，然后返回到迷你缓冲区窗口以完成参数。  您甚至可以删除另一个窗口中的文本，返回到迷你缓冲区窗口，然后将文本拉入参数中。  但是，迷你缓冲区窗口有一些限制：例如，您不能拆分它。  @xref{Windows}。
+
+@vindex resize-mini-windows
+通常，迷你缓冲区窗口占据单个屏幕行。但是，如果您将两行或更多行的文本添加到迷你缓冲区中，它会自动扩展以容纳文本。  变量@code{resize-mini-windows}控制迷你缓冲区的大小调整。  默认值为@code{grow-only}，这意味着我们刚刚描述的行为。  如果该值为@code{t}，则当您从迷你缓冲区中删除一些文本行时，迷你缓冲区窗口也会自动缩小，至少缩小到一个屏幕行。  如果值为 @code{nil}，则迷你缓冲区窗口永远不会自动更改大小，但您可以在其上使用常用的窗口调整大小命令 (@pxref{Windows})。
+
+@vindex max-mini-window-height
+变量 @code{max-mini-window-height} 控制调整迷你缓冲区窗口大小的最大高度。  浮点数指定框架高度的一部分；一个整数指定最大行数； @code{nil} 表示不自动调整迷你缓冲区窗口的大小。  默认值为 0.25。
+
+迷你缓冲区中的 @kbd{C-M-v} 命令可滚动在另一个窗口中显示任何类型的帮助文本的命令中的帮助文本。  您还可以使用 @kbd{M-@key{PageUp}} 和 @kbd{M-@key{PageDown}}（或者等效地，@kbd{M-@key{prior}} 和 @kbd{M-@key{next}}）滚动帮助文本。  这对于可能完成的长列表特别有用。  @xref{Other Window}。
+
+@vindex enable-recursive-minibuffers
+@findex minibuffer-depth-indicate-mode
+当迷你缓冲区处于活动状态时，Emacs 通常不允许大多数使用迷你缓冲区的命令。  要在迷你缓冲区中允许此类命令，请将变量 @code{enable-recursive-minibuffers} 设置为 @code{t}。您可能还需要启用 @code{minibuffer-depth-indicate-mode} 以在递归使用迷你缓冲区时在迷你缓冲区提示中显示当前递归深度。
+
+当激活时，迷你缓冲区通常位于@code{minibuffer-mode}。这是 Emacs 的内部模式，没有任何特殊功能。
+
+@findex minibuffer-inactive-mode
+当不活动时，迷你缓冲区位于 @code{minibuffer-inactive-mode}，单击 @kbd{mouse-1} 会显示 @file{*Messages*} 缓冲区。如果您使用迷你缓冲区的专用框架，Emacs 还会识别那里的某些键，例如，@kbd{n} 创建一个新框架。
+
+@node Completion
+@section 完成
+@c This node is referenced in the tutorial.  When renaming or deleting
+@c it, the tutorial needs to be adjusted.
+@cindex completion
+
+您通常可以使用名为 @dfn{completion} 的功能来帮助输入参数。  这意味着在您输入部分参数后，Emacs 可以根据目前输入的内容填写其余部分或部分内容。
+
+@cindex completion alternative
+当完成可用时，某些键（通常是 @key{TAB}、@key{RET} 和 @key{SPC}）会在迷你缓冲区中反弹到特殊的完成命令 (@pxref{Completion Commands})。  这些命令尝试根据请求参数的命令提供的一组 @dfn{completion alternatives} 来完成迷你缓冲区中的文本。  您通常可以输入 @kbd{?} 让 Emacs 弹出一个缓冲区（名为 @samp{*Completions*}），显示相关的补全选项。  如下文更详细所述，您可以浏览此缓冲区并从中选择所需的完成。
+
+尽管完成通常是在迷你缓冲区中完成的，但该功能有时也可以在普通缓冲区中使用。  @xref{Symbol Completion}。
+
+@menu
+* Completion Example::        使用补全的示例。
+* Completion Commands::       完成命令的列表。
+* Completion Exit::           完成和迷你缓冲区文本提交。
+* Completion Styles::         如何选择完成匹配。
+* Completion Options::        完成选项。
+@end menu
+
+@node Completion Example
+@subsection 完成示例
+
+@kindex TAB @r{(completion example)}
+一个简单的例子可能会有所帮助。  @kbd{M-x} 使用迷你缓冲区来读取命令的名称，因此完成功能是通过将迷你缓冲区文本与现有 Emacs 命令的名称进行匹配来完成的。  假设您希望运行命令@code{auto-fill-mode}。  您可以通过输入 @kbd{M-x auto-fill-mode @key{RET}} 来完成此操作，但使用补全更容易。
+
+如果您输入 @kbd{M-x a u @key{TAB}}，@key{TAB} 会查找以 @samp{au} 开头的补全替代项（在本例中为命令名称）。  有几个，包括@code{auto-fill-mode}和@code{autoconf-mode}，但它们都以@code{auto}开头，因此迷你缓冲区中的@samp{au}完成到@samp{auto}。  （您的 Emacs 会话中可能会定义更多命令。例如，如果定义了名为 @code{authorize-me} 的命令，Emacs 只能完成@samp{aut}。）
+
+如果立即再次输入@kbd{@key{TAB}}，则无法确定下一个字符；它可以是 @samp{-}、@samp{a} 或 @samp{c}。  所以它不会添加任何字符；相反，@key{TAB} 在另一个窗口中显示所有可能完成的列表。
+
+接下来，输入@kbd{-f}。  迷你缓冲区现在包含@samp{auto-f}，唯一以此开头的命令名称是@code{auto-fill-mode}。如果您现在输入 @kbd{@key{TAB}}，补全会将参数 @samp{auto-fill-mode} 的其余部分填充到迷你缓冲区中。
+
+因此，只需输入 @kbd{a u @key{TAB} - f @key{TAB}} 就可以输入 @samp{auto-fill-mode}。
+
+当点不在迷你缓冲区末尾时，@key{TAB} 也可以工作。  在这种情况下，它将在迷你缓冲区的点和末尾填充文本。  如果输入@kbd{M-x autocm}，然后按@kbd{C-b}将点移动到@samp{m}之前，您可以输入@kbd{@key{TAB}}在点处插入文本@samp{onf-}，在迷你缓冲区末尾插入文本@samp{ode}，这样迷你缓冲区就包含@samp{autoconf-mode}。
+
+@node Completion Commands
+@subsection 完成命令
+
+以下是当完成可用时在迷你缓冲区或完成缓冲区中定义的完成命令的列表。
+
+@table @kbd
+@item @key{TAB}
+尽可能完整地完成迷你缓冲区中的文本；如果无法完成，则显示可能完成的列表。
+@item @key{SPC}
+在点之前完成迷你缓冲区文本中的最多一个单词。
+@item C-x @key{UP}
+使用迷你缓冲区历史记录完成迷你缓冲区中的文本。
+@item C-x @key{DOWN}
+使用迷你缓冲区默认值完成迷你缓冲区中的文本。
+@item @key{RET}
+将迷你缓冲区中的文本作为参数提交，可能首先完成。  @xref{Completion Exit}。
+@item ?
+显示完成列表和一些有用的键绑定 (@code{minibuffer-completion-help})。
+@item M-@key{DOWN}
+@itemx M-@key{UP}
+浏览完成列表。
+@item M-v
+@itemx M-g M-c
+@itemx @key{PageUp}
+@itemx @key{prior}
+在迷你缓冲区中，选择显示完成列表的窗口。
+@item @key{RET}
+在完成缓冲区中，选择完成点。
+@item mouse-1
+@itemx mouse-2
+在完成缓冲区中，单击鼠标选择完成。
+@item @key{TAB}
+@itemx n
+在补全缓冲区中，移至下一个补全候选。
+@item S-@key{TAB}
+@itemx p
+在完成缓冲区中，移至上一个完成候选。
+@item @key{RIGHT}
+@itemx @key{LEFT}
+在完成缓冲区中，按列浏览完成列表。
+@item @key{DOWN}
+@itemx @key{UP}
+在完成缓冲区中，按行浏览完成列表。
+@item q
+退出完成窗口并切换到迷你缓冲区窗口。
+@item z
+终止完成缓冲区并删除显示它的窗口。
+@end table
+
+@kindex TAB @r{(completion)}
+@findex minibuffer-complete
+@key{TAB} (@code{minibuffer-complete}) 是最基本的完成命令。  它搜索与现有迷你缓冲区文本匹配的所有可能的完成，并尝试尽可能多地完成。  @xref{Completion Styles}，了解如何选择完成替代方案。
+
+@kindex SPC @r{(completion)}
+@findex minibuffer-complete-word
+@key{SPC} (@code{minibuffer-complete-word}) 与 @key{TAB} 类似，但只到下一个连字符或空格为止。  如果你在迷你缓冲区中有@samp{auto-f}并输入@key{SPC}，它会发现补全是@samp{auto-fill-mode}，但它只插入@samp{ill-}，给出@samp{auto-fill-}。  此时另一个@key{SPC}一直完成到@samp{auto-fill-mode}。  此命令不适用于经常包含空格的参数，例如文件名。
+
+@kindex ? @r{(completion)}
+@cindex completion list
+如果 @key{TAB} 或 @key{SPC} 无法完成，它会在另一个窗口中显示匹配的完成选项列表（如果有）以及一些用于选择完成候选的有用命令。  您可以使用 @kbd{?} (@code{minibuffer-completion-help}) 显示相同的完成列表和帮助。  以下命令可与完成列表一起使用：
+
+@vindex minibuffer-completion-auto-choose
+@kindex M-DOWN
+@kindex M-UP
+@kindex M-RET
+@findex minibuffer-next-completion
+@findex minibuffer-previous-completion
+@findex minibuffer-choose-completion
+@findex minibuffer-complete-and-exit
+在迷你缓冲区或完成列表缓冲区中时，@kbd{M-@key{DOWN}} (@code{minibuffer-next-completion}) 和 @kbd{M-@key{UP}} (@code{minibuffer-previous-completion}) 导航完成缓冲区中显示的完成。  这些命令对完成列表格式敏感：当 @code{completions-format} 的值为 @code{horizontal} 时，它们按列移动点；当其值为 @code{vertical} (@pxref{Completion Options}) 时，它们按行移动点。  如果将 @code{minibuffer-completion-auto-choose} 设置为非 @code{nil}，则使用这些命令还会将当前完成候选插入到迷你缓冲区中。  您可以使用 @kbd{M-@key{RET}} (@code{minibuffer-choose-completion}) 或 @kbd{@key{RET}} (@code{minibuffer-complete-and-exit}) 来选择选定的完成候选。  默认情况下，这些命令退出迷你缓冲区，但使用前缀参数（即 @kbd{C-u M-@key{RET}} 或 @kbd{C-u @key{RET}}），它们将当前选定的候选者插入迷你缓冲区而不退出它。
+
+@findex switch-to-completions
+在迷你缓冲区中键入 @kbd{M-v}，选择显示完成列表的窗口 (@code{switch-to-completions})。  这为使用下面的命令铺平了道路。  @key{PageUp}、@key{prior} 和 @kbd{M-g M-c} 执行相同操作。  您还可以通过其他方式选择窗口 (@pxref{Windows})。
+
+@findex choose-completion
+在补全列表缓冲区中，@kbd{@key{RET}} 选择点 (@code{choose-completion}) 处的补全候选，@kbd{mouse-1} 和 @kbd{mouse-2} 选择鼠标单击时的补全。  使用前缀参数，@kbd{C-u @key{RET}}将完成插入到迷你缓冲区中，但不退出迷你缓冲区——因此，您可以改变主意并选择另一个候选者。
+
+@findex next-completion
+@findex previous-completion
+在完成列表缓冲区中，您可以使用 @kbd{@key{TAB}} 或 @kbd{n} 将点移动到下一个完成候选 (@code{next-completion})，并使用 @kbd{S-@key{TAB}} 或 @kbd{p} 将点移动到上一个完成候选 (@code{previous-completion})。与@kbd{M-@key{DOWN}}和@kbd{M-@key{UP}}一样，这些命令也对完成列表格式敏感。
+
+@findex next-column-completion
+@findex next-line-completion
+@findex previous-column-completion
+@findex previous-line-completion
+相反，@kbd{@key{RIGHT}} (@code{next-column-completion}) 和@kbd{@key{LEFT}} (@code{previous-column-completion}) 始终按列移动点，无论完成列表格式如何。  同样，@kbd{@key{DOWN}} (@code{next-line-completion}) 和@kbd{@key{UP}} (@code{previous-line-completion}) 始终按行移动点。
+
+所有这些移动命令（以及@kbd{M-@key{DOWN}}和@kbd{M-@key{UP}}）都接受数字前缀参数@var{n}，这使得点移动到第@var{n}后一个或前一个完成候选者。
+
+@findex minibuffer-complete-history
+@findex minibuffer-complete-defaults
+@kindex C-x UP @r{(completion)}
+@kindex C-x DOWN @r{(completion)}
+您还可以使用提示您的命令的迷你缓冲区输入历史记录来完成。  @kbd{C-x @key{UP}} (@code{minibuffer-complete-history}) 的工作方式与 @kbd{@key{TAB}} 类似，但使用迷你缓冲区历史记录而不是通常的完成候选来完成。  类似的命令@kbd{C-x @key{DOWN}} (@code{minibuffer-complete-defaults}) 使用提示命令提供的默认输入项完成。
+
+@findex quit-window
+@findex kill-current-buffer
+最后，@kbd{q}退出显示它的窗口并选择显示迷你缓冲区的窗口（@code{quit-window}），@kbd{z}杀死完成缓冲区并删除显示它的窗口（@code{kill-current-buffer}）。
+
+@vindex minibuffer-visible-completions
+如果变量@code{minibuffer-visible-completions}自定义为值@code{t}，它会更改绑定到箭头键的命令：它们不是在迷你缓冲区中移动，而是在完成候选之间移动，就像默认情况下元箭头键所做的那样（但请注意，就像选择显示完成列表的窗口一样，这里也一样，@kbd{@key{RIGHT}}和@kbd{@key{LEFT}}仅按列移动点，而@kbd{@key{DOWN}}和@kbd{@key{UP}} 仅按行移动点，无论完成列表格式如何）。  类似地，@kbd{@key{RET}} 选择当前候选，就像 @kbd{M-@key{RET}} 通常所做的那样。 @code{C-g} 隐藏完成窗口，但使迷你缓冲区保持活动状态，以便您可以在提示符下继续输入。  如果该变量的值为@code{up-down}，则只有@kbd{@key{UP}}和@kbd{@key{DOWN}}箭头键在完成候选之间移动点，而@kbd{@key{RIGHT}}和@kbd{@key{LEFT}}在迷你缓冲区窗口中移动点。
+
+@node Completion Exit
+@subsection 完成退出
+
+@kindex RET @r{(completion in minibuffer)}
+@findex minibuffer-complete-and-exit
+当命令使用带有完成功能的迷你缓冲区读取参数时，它还控制当您键入 @key{RET} (@code{minibuffer-complete-and-exit}) 提交参数时会发生什么。  行为有四种类型：
+
+@itemize @bullet
+@item
+@dfn{Strict completion} 仅接受完全匹配。  仅当迷你缓冲区文本完全匹配或完成为 1 时，键入 @key{RET} 才会退出迷你缓冲区。  否则，Emacs 拒绝退出迷你缓冲区；相反，它会尝试完成，如果无法完成，它会在迷你缓冲区文本后面暂时显示 @samp{[No match]}。  （您仍然可以通过键入 @kbd{C-g} 来取消命令，从而保留迷你缓冲区。）
+
+使用此行为的命令的一个示例是@kbd{M-x}，因为它接受不存在的命令名称是没有意义的。
+
+@item
+@dfn{Cautious completion} 类似于严格补全，但 @key{RET} 仅当文本已经完全匹配时才退出。  如果文本完成完全匹配，@key{RET} 执行该完成但不退出；您必须输入第二个 @key{RET} 才能退出。
+
+例如，谨慎完成用于读取必须已存在的文件的文件名。
+
+@item
+@dfn{Permissive completion} 允许任何输入；完成候选者只是建议。  输入 @key{RET} 并不会完成，它只是提交您输入的参数。
+
+@cindex minibuffer confirmation
+@cindex confirming in the minibuffer
+@item
+@dfn{Permissive completion with confirmation} 类似于允许完成，但有一个例外：如果您键入 @key{TAB} 并且这将文本完成到某种中间状态（即尚未完全匹配的状态），则随后键入 @key{RET} 不会提交参数。  相反，Emacs 通过在文本后短暂显示 @samp{[Confirm]} 来请求确认；再次输入 @key{RET} 确认并提交文本。  这遇到了一个常见的错误，即人们在意识到 @key{TAB} 未按预期完成之前键入 @key{RET}。
+
+@vindex confirm-nonexistent-file-or-buffer
+您可以通过自定义变量 @code{confirm-nonexistent-file-or-buffer} 来调整确认行为。  默认值 @code{after-completion} 给出了我们刚刚描述的行为。如果将其更改为 @code{nil}，Emacs 不会要求确认，而是依靠许可完成。  如果将其更改为任何其他非 3⁣ 值，Emacs 会要求确认前面的命令是否是 4⁣。
+
+大多数读取文件名的命令（如 @kbd{C-x C-f}）和读取缓冲区名称的命令（如 @kbd{C-x b}）都使用此行为。
+@end itemize
+
+@node Completion Styles
+@subsection 如何选择完成替代方案
+@cindex completion style
+
+完成命令的工作原理是将大量可能的完成替代项缩小为与您在迷你缓冲区中键入的内容相匹配的较小子集。  在@ref{Completion Example}中，我们给出了这种匹配的简单示例。  确定匹配的过程相当复杂。  Emacs 尝试在大多数情况下提供合理的补全。
+
+Emacs 使用一个或多个 @dfn{completion styles} 来执行补全——一组用于将迷你缓冲区文本与补全替代项进行匹配的标准。  在完成过程中，Emacs 会依次尝试每种完成样式。  如果一种样式产生一个或多个匹配项，则将其用作完成替代项的列表。  如果某个样式没有产生匹配项，Emacs 就会转而使用下一个样式。
+
+@vindex completion-styles
+列表变量@code{completion-styles}指定要使用的完成样式。  每个列表元素要么是完成样式的名称（Lisp 符号），要么是以完成样式的名称开头的列表，后跟将对该完成样式生效的 @code{let} 样式绑定列表。  @code{completion-styles} 的多个元素可以使用不同的变量绑定命名相同的完成样式。
+
+可用的样式符号存储在变量 @code{completion-styles-alist} (@pxref{Completion Variables,,, elisp, The Emacs Lisp Reference Manual}) 中。  默认完成样式为（按顺序）：
+
+@table @code
+@item basic
+@cindex @code{basic}, completion style
+匹配的补全替代项必须与点之前的迷你缓冲区中的文本具有相同的开头。  此外，如果点之后的迷你缓冲区中有任何文本，则补全替代项的其余部分必须包含该文本作为子字符串。
+
+@cindex partial completion
+@cindex @code{partial-completion}, completion style
+@item partial-completion
+这种积极的完成方式将迷你缓冲区文本划分为由连字符或空格分隔的单词，并单独完成每个单词。  （例如，当完成命令名称时，@samp{em-l-m} 会完成为 @samp{emacs-lisp-mode}。）
+
+此外，迷你缓冲区文本中的@samp{*}被视为@dfn{wildcard}——它匹配补全替代中相应位置处的任何字符串。
+
+@vindex completion-pcm-leading-wildcard
+如果 @code{completion-pcm-leading-wildcard} 设置为 @code{t}，则此样式始终表现为 @dfn{wildcard} 出现在迷你缓冲区文本中每个单词的开头，类似于 @code{substring} 样式。  例如，@samp{l-ode} 将完成到@samp{emacs-lisp-mode}。
+
+@item emacs22
+@cindex @code{emacs22}, completion style
+这种补全样式与@code{basic}类似，只不过它忽略了点后迷你缓冲区中的文本。  之所以如此命名，是因为它对应于 Emacs 22 中的完成行为。
+@end table
+
+@noindent
+还定义了以下附加完成样式，如果您愿意，您可以将它们添加到 @code{completion-styles} (@pxref{Customization})：
+
+@table @code
+@item substring
+@cindex @code{substring}, completion style
+匹配的完成替代方案必须包含点之前的迷你缓冲区中的文本以及点之后的迷你缓冲区中的文本作为子字符串（以相同的顺序）。
+
+因此，如果迷你缓冲区中的文本为 @samp{foobar}，点位于 @samp{foo} 和 @samp{bar} 之间，则匹配 @samp{@var{a}foo@var{b}bar@var{c}}，其中 @var{a}、@var{b} 和 @var{c} 可以是包括空字符串在内的任何字符串。
+
+@item flex
+@cindex @code{flex}, completion style
+这种激进的完成样式，也称为 @code{flx} 或 @code{fuzzy} 或 @code{scatter} 完成，尝试使用按顺序子字符串完成。  例如，它可以考虑 @samp{foo} 来匹配 @samp{frodo} 或 @samp{fbarbazoo}。
+
+@item initials
+@cindex @code{initials}, completion style
+这种非常激进的完成风格试图完成首字母缩略词和首字母缩写词。  例如，当完成命令名称时，它将 @samp{lch} 匹配到 @samp{list-command-history}。
+@end table
+
+@noindent
+还有一种非常简单的完成样式，称为 @code{emacs21}。在这种风格中，如果迷你缓冲区中的文本是@samp{foobar}，则仅考虑以@samp{foobar}开头的匹配。
+
+@vindex completion-category-overrides
+通过设置变量@code{completion-category-overrides}，您可以在不同情况下使用不同的完成样式。例如，默认设置表示仅使用 @code{basic} 和 @code{substring} 完成缓冲区名称。
+
+
+@node Completion Options
+@subsection 完成选项
+
+@cindex case-sensitivity and completion
+@cindex case in completion
+在完成区分大小写的参数（例如命令名称）时，大小写很重要。  例如，当完成命令名称时，@samp{AU} 不会完成为 @samp{auto-fill-mode}。  完成参数时会忽略大小写差异，此时大小写并不重要。
+
+@vindex read-file-name-completion-ignore-case
+@vindex read-buffer-completion-ignore-case
+完成文件名时，如果变量 @code{read-file-name-completion-ignore-case} 为非 @code{nil}，则忽略大小写差异。  在文件名区分大小写的系统（例如 GNU/Linux）上，默认值为 @code{nil}；在文件名不区分大小写的系统（例如 Microsoft Windows）上，它是非@code{nil}。  完成缓冲区名称时，如果变量 @code{read-buffer-completion-ignore-case} 为非 @code{nil}，则忽略大小写差异；默认值为@code{nil}。
+
+@vindex completion-ignored-extensions
+@cindex ignored file names, in completion
+在完成文件名时，Emacs 通常会忽略某些被认为不太可能被选择的替代项，这些替代项由列表变量@code{completion-ignored-extensions} 确定。  列表中的每个元素都应该是一个字符串；任何以此类字符串结尾的文件名都将被忽略作为补全替代方案。  任何以斜杠 (@file{/}) 结尾的元素都表示子目录名称。  @code{completion-ignored-extensions}的标准值有几个元素，包括@code{".o"}、@code{".elc"}和@code{"~"}。  例如，如果目录包含 @samp{foo.c} 和 @samp{foo.elc}，则 @samp{foo} 补全为 @samp{foo.c}。  但是，如果 @emph{all} 可能的补全以其他方式被忽略的字符串结束，则它们不会被忽略：在前面的示例中，@samp{foo.e} 补全为 @samp{foo.elc}。  在补全列表中显示补全选项时，Emacs 会忽略 @code{completion-ignored-extensions}。
+
+Shell 补全是文件名补全的扩展版本@pxref{Shell Options}。
+
+@vindex completion-auto-help
+如果@code{completion-auto-help}设置为@code{nil}，则完成命令从不显示完成列表缓冲区；您必须输入 @kbd{?} 才能显示列表。  如果该值为@code{lazy}，Emacs 仅在第二次尝试完成时显示完成列表缓冲区。换句话说，如果没有什么需要完成，则第一个 @key{TAB} 与 @samp{Next char not unique} 相呼应；第二个@key{TAB}显示完成列表缓冲区。  如果该值为@code{always}，则在尝试完成时始终显示完成列表缓冲区。
+
+完成列表缓冲区在第一次显示后的显示也由@code{completion-auto-help}控制。  如果值为 @code{t} 或 @code{lazy}，则当 Emacs 能够完成时，显示完成情况的窗口会弹出（如果在您输入更多文本后 Emacs 再次无法完成，则可能会再次弹出）；如果值为@code{always}，则只有退出补全时才会弹出窗口。  值@code{visible}是一个混合体：当它决定是否弹出显示完成列表缓冲区的窗口时，它的行为类似于@code{t}，而当它决定是否弹出它时，它的行为类似于@code{always}。
+
+@vindex completion-auto-select
+Emacs 在显示该窗口时可以选择显示完成情况的窗口。  要启用此行为，请将用户选项 @code{completion-auto-select} 自定义为 @code{t}，这会在 Emacs 弹出补全时更改 @key{TAB} 的行为：按 @kbd{@key{TAB}} 将切换到补全列表缓冲区，然后您可以通过光标移动命令移动到候选者并使用 @kbd{@key{RET}} 选择它。  如果@code{completion-auto-select}的值为@code{second-tab}，那么第一个@kbd{@key{TAB}}将弹出完成列表缓冲区，第二个@kbd{@key{TAB}}将切换到它。
+
+@vindex completion-cycle-threshold
+如果@code{completion-cycle-threshold}非@code{nil}，则完成命令可以循环选择完成选项。  通常，如果迷你缓冲区中的文本有多个补全替代方案，则补全命令会补全最长的公共子字符串。  如果将 @code{completion-cycle-threshold} 更改为 @code{t}，则完成命令将改为完成第一个完成选项；完成命令的每次后续调用都会以循环方式将其替换为下一个完成替代命令。  如果您给 @code{completion-cycle-threshold} 一个数值 @var{n}，则仅当有 @var{n} 或更少的替代项时，完成命令才会切换到此循环行为。
+
+@vindex completions-sort
+用户选项 @code{completions-sort} 控制完成在 @samp{*Completions*} 缓冲区中排序的顺序。  使用默认值 @code{alphabetical} 时，完成内容按字母顺序显示。  值@code{nil}禁用排序；值 @code{historical} 首先按字母顺序排序，然后根据迷你缓冲区历史记录中候选者的顺序重新排列。  该值也可以是一个函数，它将使用完成列表来调用，并且应该按所需的顺序返回列表。
+
+@vindex completions-format
+默认情况下，@samp{*Completions*}缓冲区水平列出已排序的补全（即从左到右跨列并继续到下面的下一行），使用适合窗口宽度的尽可能多的列。  您可以通过自定义用户选项@code{completions-format}来更改此设置。  如果其值为 @code{vertical}，则 @samp{*Completions*} 缓冲区垂直列出已排序的补全（即，在每列内并继续左侧的下一列），如果值为 @code{one-column}，则所有补全都显示在单个列中。@footnote{If a completion candidate is too long for more than one column to fit in the window, or it there are three or less candidates, all completions appear in a single column even if the value of @code{completions-format} is @code{horizontal} or @code{vertical}.}
+
+@vindex completion-auto-wrap
+当 point 位于最后一个补全候选者上时，键入一个键将 point 移动到下一个候选者（根据当前格式的排序顺序）默认情况下会“环绕”，即将 point 移动到补全缓冲区中的第一个候选者。  同样，当点位于第一个候选者上时，键入一个键以移动到前一个候选者会将点放置在缓冲区中的最后一个候选者上。  您可以通过将用户选项 @code{completion-auto-wrap} 自定义为 @code{nil} 来抑制这种环绕；然后在最后一个候选上键入 @kbd{@key{TAB}} 或 @kbd{n}，或在第一个候选上键入 @kbd{S-@key{TAB}} 或 @kbd{p}，不会移动点。
+
+使用箭头键时，换行行为取决于所使用的完成格式。  在水平格式中，您可以使用 @kbd{@key{RIGHT}} 和 @kbd{@key{LEFT}}，在垂直格式中 @kbd{@key{DOWN}} 和 @kbd{@key{UP}}，与用于按排序顺序在完成候选之间移动的格式敏感键完全相同，并且具有相同的换行行为。  相反，在水平格式 @kbd{@key{DOWN}} 和 @kbd{@key{UP}} 中，如果启用了换行，则仅在当前补全列内移动并换行，而在垂直格式 @kbd{@key{RIGHT}} 和 @kbd{@key{LEFT}} 中，仅在当前补全行内移动（和换行，如果启用）。@footnote{If the completions buffer contains only single column even in the horizontal or vertical format, then both the format-sensitive keys and the arrow keys move point to the next (respectively, previous) candidate, wrapping only at the last (respectively, first) candidate, if the value of @code{completion-auto-wrap} is non-@code{nil}.}
+
+@vindex completions-max-height
+当@code{completions-max-height}非@code{nil}时，它限制了完成窗口的大小。  它在行中指定，并包括模式、标题行和底部分隔线（如果有）。  要对完成窗口显示属性进行更复杂的控制，您可以使用@code{display-buffer-alist} (@pxref{Buffer Display Action Alists,,Action Alists for Buffer Display, elisp, The Emacs Lisp Reference Manual})。
+
+@vindex completions-header-format
+变量 @code{completions-header-format} 是一个格式规范字符串，用于控制候选完成列表之前显示的信息行。  如果它包含 @samp{%s} 构造，则会被完成列表缓冲区中显示的完成数量替换。  要禁止显示标题行，请将此变量自定义为@code{nil}。  作为该变量值的字符串可以具有文本属性来更改标题行的视觉外观；一些有用的属性@code{face}或@code{cursor-intangible}（@pxref{Special Properties,,Properties with Special Meanings, elisp, The Emacs Lisp Reference Manual}）。
+
+@vindex completions-highlight-face
+当 @code{completions-highlight-face} 命名一张面时，当前完成候选者（通过键入 @kbd{@key{RET}} 或单击鼠标选择的面）将使用该面突出显示。  该变量的默认值为@code{completions-highlight}；值为 @code{nil} 禁用此突出显示。  此功能使用特殊文本属性@code{cursor-face}。
+
+@node Minibuffer History
+@section 迷你缓冲区历史
+@cindex minibuffer history
+@cindex history of minibuffer input
+@cindex completion, walking through candidates
+
+您在迷你缓冲区中输入的所有内容都会保存在 @dfn{minibuffer history list} 中，以便您以后可以轻松地再次使用它。  这包括完成候选（例如文件名、缓冲区名称、命令名称等@:）和任何其他类型的迷你缓冲区输入。  您可以使用以下命令快速将较早的或替代的响应提取到迷你缓冲区中：
+
+@table @kbd
+@item M-p
+移至迷你缓冲区历史记录中的上一项，即较早的参数 (@code{previous-history-element})。
+@item M-n
+移至迷你缓冲区历史记录中的下一项 (@code{next-history-element})。
+@item @key{UP}
+@itemx @key{DOWN}
+与 @kbd{M-p} 和 @kbd{M-n} 类似，但先移至多行项目的上一行或下一行，然后再转到上一个历史记录项目（@code{previous-line-or-history-element} 和 @code{next-line-or-history-element}）。
+@item M-r @var{regexp} @key{RET}
+移至迷你缓冲区历史记录中与 @var{regexp} (@code{previous-matching-history-element}) 匹配的较早项目。
+@item M-s @var{regexp} @key{RET}
+移至迷你缓冲区历史记录中与 @var{regexp} (@code{next-matching-history-element}) 匹配的后续项目。
+@end table
+
+@kindex M-p @r{(minibuffer history)}
+@kindex M-n @r{(minibuffer history)}
+@findex next-history-element
+@findex previous-history-element
+在迷你缓冲区中时，@kbd{M-p} (@code{previous-history-element}) 在迷你缓冲区历史列表中移动，一次一项。  每个@kbd{M-p}从历史列表中提取较早的项目到迷你缓冲区中，替换其现有内容。  键入 @kbd{M-n} (@code{next-history-element}) 以相反方向移动迷你缓冲区历史记录列表，将后面的条目提取到迷你缓冲区中。
+
+@cindex future history
+如果您在迷你缓冲区历史记录中没有后续条目时在迷你缓冲区中键入 @kbd{M-n}（例如，如果您之前没有键入过 @kbd{M-p}），Emacs 会尝试从默认参数列表中获取：您可能会输入的值。  您可以将其视为穿过 @dfn{future history}。  向前搜索迷你缓冲区历史 (@pxref{Isearch Minibuffer}) 也包括“未来历史”。
+
+@cindex minibuffer defaults for file names
+@vindex file-name-at-point-functions
+文件名的“未来历史记录”包括您可能会发现有用的几种可能的替代方案，例如当前缓冲区中的文件名或 URL。  在这种情况下，放入“未来历史”的默认值由选项 @code{file-name-at-point-functions} 的值中提到的函数控制。  默认情况下，它的值会调用 @code{ffap} 包 (@pxref{FFAP})，它尝试从点周围的文本猜测默认文件或 URL。  要禁用这种猜测，请将该选项自定义为 @code{nil} 值，然后文件名的“未来历史记录”将仅包括当前缓冲区访问的文件（如果有）和默认目录。
+
+@findex previous-line-or-history-element
+@findex next-line-or-history-element
+@kindex UP @r{(minibuffer history)}
+@kindex DOWN @r{(minibuffer history)}
+箭头键 @kbd{@key{UP}} 和 @kbd{@key{DOWN}} 的工作方式类似于 @kbd{M-p} 和 @kbd{M-n}，但如果当前历史记录项长于一行，它们允许您在转到上一个或下一个历史记录项之前移动到当前历史记录项的上一行或下一行。
+
+如果您编辑由 @kbd{M-p} 或 @kbd{M-n} 迷你缓冲区历史命令插入的文本，这不会更改其在历史列表中的条目。  但是，当您提交时，已编辑的参数确实会出现在历史列表的末尾。
+
+@findex previous-matching-history-element
+@findex next-matching-history-element
+@kindex M-r @r{(minibuffer history)}
+@kindex M-s @r{(minibuffer history)}
+您可以使用 @kbd{M-r} (@code{previous-matching-history-element}) 搜索历史列表中较旧的元素，使用 @kbd{M-s} (@code{next-matching-history-element}) 搜索较新的条目。  这些命令中的每一个都要求 @dfn{regular expression} 作为参数，并将第一个匹配的条目提取到迷你缓冲区中。  @xref{Regexps}，关于正则表达式的解释。  数字前缀参数 @var{n} 表示获取第 @var{n} 个匹配条目。  这些命令很不寻常，因为它们使用迷你缓冲区来读取正则表达式参数，即使它们是从迷你缓冲区调用的。  正则表达式中的大写字母使搜索区分大小写 (@pxref{Lax Search})。
+
+您还可以使用增量搜索（@kbd{C-s} 和 @kbd{C-r}）来搜索迷你缓冲区历史记录。  @xref{Isearch Minibuffer}。
+
+Emacs 为几种不同类型的参数保留单独的历史列表。  例如，有一个文件名列表，由所有读取文件名的命令使用。  其他历史列表包括缓冲区名称、命令名称（由@kbd{M-x}使用）和命令参数（由@code{query-replace}等命令使用）。
+
+@vindex history-length
+变量@code{history-length}指定迷你缓冲区历史列表的最大长度；如果列表太长，添加新元素会删除最旧的元素。  如果值为@code{t}，则没有最大长度。
+
+@vindex history-delete-duplicates
+变量@code{history-delete-duplicates}指定是否删除历史记录中的重复项。  如果它是非@code{nil}，则添加新元素将从列表中删除与其相等的所有其他元素。默认值为@code{nil}。
+
+@node Repetition
+@section 重复迷你缓冲区命令
+@cindex command history
+@cindex history of commands
+
+每个使用迷你缓冲区一次的命令都会记录在一个特殊的历史列表 @dfn{command history} 中，及其参数的值，以便您可以重复整个命令。  特别是，@kbd{M-x}的每次使用都会记录在那里，因为@kbd{M-x}使用迷你缓冲区来读取命令名称。
+
+@findex list-command-history
+@table @kbd
+@item C-x @key{ESC} @key{ESC}
+重新执行命令历史记录中最近的迷你缓冲区命令 (@code{repeat-complex-command})。
+@item M-x list-command-history
+显示整个命令历史记录，显示所有可以重复的命令 @kbd{C-x @key{ESC} @key{ESC}}，最近的命令在前。
+@end table
+
+@kindex C-x ESC ESC
+@findex repeat-complex-command
+@kbd{C-x @key{ESC} @key{ESC}} 重新执行最近使用迷你缓冲区的命令。  如果没有参数，它会重复最后一个这样的命令。数字参数指定要重复的命令； 1 表示最后一篇，2 表示上一篇，以此类推。
+
+@kbd{C-x @key{ESC} @key{ESC}} 的工作原理是将前一个命令转换为 Lisp 表达式，然后输入一个用该表达式的文本初始化的迷你缓冲区。  即使您不懂 Lisp，也可能会很明显显示哪个命令用于重复。  如果您只输入 @key{RET}，则会重复该命令而不改变。  您还可以在执行命令之前通过编辑 Lisp 表达式来更改命令。  执行的命令将添加到命令历史记录的前面，除非它与最近的项目相同。
+
+一旦进入 @kbd{C-x @key{ESC} @key{ESC}} 的迷你缓冲区，您就可以使用常用的迷你缓冲区历史命令 (@pxref{Minibuffer History}) 在历史列表中移动。  找到所需的上一个命令后，您可以照常编辑其表达式，然后通过键入 @key{RET} 执行它。
+
+@vindex isearch-resume-in-command-history
+严格来说，增量搜索不使用迷你缓冲区。因此，尽管它的行为类似于复杂命令，但它通常不会出现在 @w{@kbd{C-x @key{ESC} @key{ESC}}} 的历史列表中。您可以通过将 @code{isearch-resume-in-command-history} 设置为非 @code{nil} 值来使增量搜索命令出现在历史记录中。  @xref{Incremental Search}。
+
+@vindex command-history
+之前使用迷你缓冲区的命令列表作为 Lisp 列表存储在变量 @code{command-history} 中。  每个元素都是一个 Lisp 表达式，描述一个命令及其参数。  Lisp 程序可以通过使用 @code{command-history} 元素调用 @code{eval} 来重新执行命令。
+
+@node Passwords
+@section 输入密码
+@cindex entering passwords
+
+有时，您可能需要在 Emacs 中输入密码。  例如，当您告诉 Emacs 通过 FTP 等网络协议访问另一台计算机上的文件时，您通常需要提供密码才能访问该计算机 (@pxref{Remote Files})。
+
+输入密码与使用迷你缓冲区类似。  Emacs 在回显区域显示提示（如@samp{Password: }）；输入所需密码后，按@key{RET}提交。  为了防止其他人看到您的密码，您输入的每个字符都显示为星号 (@samp{*})，而不是通常的形式。
+
+输入密码时会使用与迷你缓冲区 @emph{cannot} 相关的大多数功能和命令。  没有历史记录或完成情况，并且在提交密码之前您无法更改窗口或使用 Emacs 执行任何其他操作。
+
+输入密码时，您可以按 @key{DEL} 向后删除，删除最后输入的字符。  @kbd{C-u} 删除您迄今为止输入的所有内容。  @kbd{C-g} 退出密码提示 (@pxref{Quitting})。  @kbd{C-y} 将当前的kill 插入到密码中（@pxref{Killing}）。  @key{TAB} 切换密码的可见性。  您可以输入@key{RET}或@key{ESC}来提交密码。  任何其他自插入字符键都会将关联的字符插入到密码中，并忽略所有其他输入。
+
+模式行中还有一个图标指示密码可见性。  单击 @kbd{mouse-1} 也会切换密码可见性。
+
+@node Yes or No Prompts
+@section 是或否提示
+
+Emacs 命令可能要求您在执行过程中回答是或否问题。  此类查询主要有两种类型。
+
+@cindex y or n prompt
+对于第一种是或否查询，提示以@w{@samp{(y or n)}} 结尾。  您可以通过键入一个键（@samp{y}或@samp{n}）来回答查询，该键会立即退出迷你缓冲区并传递响应。  例如，如果您键入 @kbd{C-x C-w} (@kbd{write-file}) 来保存缓冲区，并输入现有文件的名称，Emacs 会发出如下提示：
+
+@smallexample
+File `foo.el' exists; overwrite? (y or n)
+@end smallexample
+
+@cindex yes or no prompt
+@vindex yes-or-no-prompt
+如果给出错误答案会产生严重后果，通常会使用第二种是或否查询；因此，它具有较长的提示符，以 @samp{(yes or no)} 结尾（或 @code{yes-or-no-prompt} 的值，如果您已自定义）。  例如，如果您在未保存更改的文件访问缓冲区上调用 @kbd{C-x k} (@code{kill-buffer})，Emacs 将激活迷你缓冲区，并显示如下提示：
+
+@smallexample
+Buffer foo.el modified; kill anyway? (yes or no)
+@end smallexample
+
+@noindent
+要回答，您必须在迷你缓冲区中输入 @samp{yes} 或 @samp{no}，然后输入 @key{RET}。
+
+对于两种类型的是或否查询，迷你缓冲区的行为如前面部分所述；您可以使用 @kbd{C-l} 使所选窗口居中，滚动该窗口（@kbd{C-v} 或 @kbd{PageDown} 向前滚动，@kbd{M-v} 或 @kbd{PageUp} 向后滚动），使用 @kbd{C-x o} 切换到另一个窗口，使用历史命令 @kbd{M-p} 和 @kbd{M-n} 等。键入 @kbd{C-g} 取消查询，然后退出迷你缓冲区和查询命令 (@pxref{Quitting})。

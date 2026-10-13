@@ -1,0 +1,839 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Emacs Invocation
+@appendix Emacs 调用的命令行参数
+@cindex command line arguments
+@cindex arguments (command line)
+@cindex options (command line)
+@cindex switches (command line)
+@cindex startup (command line arguments)
+@cindex invocation (command line arguments)
+@c FIXME: Document '--smid'?  --xfq
+
+Emacs 支持命令行参数来在调用 Emacs 时请求各种操作。  这些是为了与其他编辑器兼容并用于复杂的活动。  我们不建议将它们用于普通编辑（@xref{Emacs Server}，一种从命令行访问现有 Emacs 作业的方法）。
+
+以 @samp{-} 开头的参数是 @dfn{options}，@samp{+@var{linenum}} 也是如此。  所有其他参数指定要访问的文件。 Emacs 在启动时会访问指定的文件。  命令行上指定的最后一个文件成为当前缓冲区；其他文件也在其他缓冲区中被访问。  与大多数程序一样，特殊参数 @samp{--} 表示所有后续参数都是文件名，而不是选项，即使它们以 @samp{-} 开头。
+
+Emacs 命令选项可以指定很多内容，例如 Emacs 使用的 X 窗口的大小和位置、其颜色等等。  一些选项支持高级用法，例如以批处理模式在文件上运行 Lisp 函数。  本章各部分描述了可用的选项，并根据其用途进行了排列。
+
+选项有两种书写方式：以单个 @samp{-} 开头的短格式和以 @samp{--} 开头的长格式。  例如，@samp{-d} 是缩写形式，@samp{--display} 是相应的长形式。
+
+带 @samp{--} 的长形式更容易记住，但打字时间更长。  但是，您不必拼写出整个选项名称；任何明确的缩写就足够了。  当长选项需要参数时，可以使用空格或等号来分隔选项名称和参数。  因此，对于选项 @samp{--display}，您可以写 @samp{--display sugar-bombs:0.0} 或 @samp{--display=sugar-bombs:0.0}。  我们建议使用等号，因为它使关系更清晰，并且下表始终显示等号。
+
+@cindex initial options (command line)
+@cindex action options (command line)
+@vindex command-line-args
+大多数选项指定如何初始化 Emacs，或设置 Emacs 会话的参数。  我们称它们为@dfn{initial options}。  有几个选项指定要执行的操作，例如加载库或调用 Lisp 函数。  这些被称为@dfn{action options}。  这些和文件名一起称为@dfn{action arguments}。  操作参数作为字符串列表存储在变量 @code{command-line-args} 中。  （实际上，当 Emacs 启动时，@code{command-line-args} 包含从命令行传递的所有参数；在初始化期间，初始参数在处理时会从该列表中删除，只留下操作参数。）
+
+@menu
+* Action Arguments::     访问文件、加载库和调用函数的参数。
+* Initial Options::      启动 Emacs 时生效的参数。
+* Command Example::      使用命令行参数的示例。
+* Environment::          Emacs 使用的环境变量。
+* Display X::            更改默认显示并使用远程登录。
+* Font X::               在 X 下选择文本字体。
+* Colors X::             选择显示颜色。
+* Window Size X::        启动窗口大小，位于 X 下方。
+* Borders X::            内部和外部边界，位于 X 下方。
+* Title X::              指定初始帧的标题。
+* Icons X::              在 X 下选择要使用的图标类型。
+* Misc X::               其他显示选项。
+@end menu
+
+@node Action Arguments
+@appendixsec 行动论点
+
+这是一个动作参数表：
+
+@table @samp
+@item @var{file}
+@opindex --file
+@itemx --file=@var{file}
+@opindex --find-file
+@itemx --find-file=@var{file}
+@opindex --visit
+@itemx --visit=@var{file}
+@cindex visiting files, command-line argument
+@vindex inhibit-startup-buffer-menu
+访问指定的@var{file}。  @xref{Visiting}。
+
+当 Emacs 启动时，它会在一个窗口中显示启动缓冲区，并在另一个窗口中显示访问 @var{file} 的缓冲区 (@pxref{Windows})。  如果您提供多个文件参数，则显示的文件是命令行中指定的最后一个文件；访问其他文件但不显示它们的缓冲区。
+
+如果启动缓冲区被禁用 (@pxref{Entering Emacs})，则使用一个文件参数启动 Emacs 会在单个窗口中显示访问 @var{file} 的缓冲区。  通过两个文件参数，Emacs 在两个不同的窗口中显示文件。  如果有两个以上的文件参数，Emacs 将显示一个窗口中指定的最后一个文件，以及另一个带有缓冲区菜单的窗口，其中显示所有其他文件 (@pxref{Several Buffers})。  要禁止使用缓冲区菜单来实现此目的，请将变量 @code{inhibit-startup-buffer-menu} 更改为 @code{t}。
+
+@item +@var{linenum} @var{file}
+@opindex +@var{linenum}
+访问指定的@var{file}，然后转到其中的行号@var{linenum}。
+
+@item +@var{linenum}:@var{columnnum} @var{file}
+访问指定的@var{file}，然后转到行号@var{linenum}并将点放置在列号@var{columnnum}。
+
+@item -l @var{file}
+@opindex -l
+@itemx --load=@var{file}
+@opindex --load
+@cindex loading Lisp libraries, command-line argument
+使用函数 @code{load} 加载名为 @var{file} 的 Lisp 库。如果 @var{file} 不是绝对文件名，Emacs 首先在当前目录中查找它，然后在 @code{load-path} (@pxref{Lisp Libraries}) 中列出的目录中查找。
+
+@strong{Warning:} 如果前面的命令行参数访问过文件，则当前目录是最后访问的文件的目录。
+
+@item -L @var{dir}
+@opindex -L
+@itemx --directory=@var{dir}
+@opindex --directory
+将目录 @var{dir} 添加到变量 @code{load-path} 之前。如果指定多个 @samp{-L} 选项，Emacs 会保留相对顺序；即，使用 @samp{-L /foo -L /bar} 会产生 @code{("/foo" "/bar" @dots{})} 形式的 @code{load-path}。如果 @var{dir} 以 @samp{:} 开头，Emacs 会删除 @samp{:} 并将余数附加（而不是前置）到 @code{load-path}。 （在 MS Windows 上，使用 @samp{;} 而不是 @samp{:}；即使用 @code{path-separator} 的值。）
+
+请注意，使用此选项对 @code{load-path} 的更改确实会 @emph{not} 影响 Emacs 查找站点启动文件以及用户的早期初始化和 init 文件加载的 Lisp 包的目录 (@pxref{Init File})，因为 @code{load-path} 是由 @samp{-L} 选项@emph{after} 更改的，这些文件被加载和解释。
+
+@item -f @var{function}
+@opindex -f
+@itemx --funcall=@var{function}
+@opindex --funcall
+@cindex call Lisp functions, command-line argument
+调用 Lisp 函数@var{function}。  如果它是交互式函数（命令），它将以交互方式读取参数，就像您使用按键序列调用相同的函数一样。  否则，它将调用不带参数的函数。
+
+@item --eval=@var{expression}
+@opindex --eval
+@itemx --execute=@var{expression}
+@opindex --execute
+@cindex evaluate expression, command-line argument
+计算 Lisp 表达式 @var{expression}。
+
+@item --insert=@var{file}
+@opindex --insert
+@cindex insert file contents, command-line argument
+将 @var{file} 的内容插入到处理此命令行参数时的当前缓冲区中。  通常，这是 @file{*scratch*} 缓冲区 (@pxref{Lisp Interaction})，但如果命令行中较早的参数访问文件或切换缓冲区，则可能是不同的缓冲区。  此命令行参数的效果类似于 @kbd{M-x insert-file} 的作用 (@pxref{Misc File Ops})。
+
+@item --kill
+@opindex --kill
+退出 Emacs 而不要求确认。
+
+@item --help
+@opindex --help
+打印一条使用消息，列出所有可用选项，然后成功退出。
+
+@item --version
+@opindex --version
+打印Emacs版本，然后成功退出。
+
+@item --fingerprint
+@opindex --fingerprint
+打印 Emacs“指纹”，用于唯一标识 Emacs 的编译版本。
+@end table
+
+@node Initial Options
+@appendixsec 初始选项
+
+初始选项指定 Emacs 会话的参数。  本节描述更一般的初始选项；一些与 X Window 系统特别相关的其他选项出现在以下部分中。
+
+一些初始选项会影响初始化文件的加载。通常，Emacs 首先加载 @file{site-start.el}（如果存在），然后加载您自己的初始化文件（如果存在），最后加载默认初始化文件 @file{default.el}（如果存在）(@pxref{Init File})。  某些选项会阻止加载其中某些文件或用其他文件替换它们。
+
+@table @samp
+@item -chdir @var{directory}
+@opindex -chdir
+@itemx --chdir=@var{directory}
+@opindex --chdir
+@cindex change Emacs directory
+在执行其他操作之前更改为 @var{directory}。  这主要用于 X 中的会话管理，以便 Emacs 在其停止时的同一目录中启动。  这使得桌面保存和恢复变得更加容易。
+
+@item -t @var{device}
+@opindex -t
+@itemx --terminal=@var{device}
+@opindex --terminal
+@cindex device for Emacs terminal I/O
+使用@var{device}作为端子输入输出设备。  该选项意味着@samp{--no-window-system}。
+
+@item -d @var{display}
+@opindex -d
+@itemx --display=@var{display}
+@opindex --display
+@cindex display for Emacs frame
+使用 X Window 系统并使用名为 @var{display} 的显示来打开初始 Emacs 框架。  @xref{Display X}，了解更多详情。
+
+@item -nw
+@opindex -nw
+@itemx --no-window-system
+@opindex --no-window-system
+@cindex disable window system
+不要直接与窗口系统通信，忽略 @env{DISPLAY} 环境变量，即使它已设置。  这意味着 Emacs 使用启动它的终端来进行所有显示和输入。
+
+@cindex batch mode
+@item -batch
+@opindex --batch
+@itemx --batch
+在 @dfn{batch mode} 中运行 Emacs。  批处理模式用于运行通过 shell 脚本、makefile 等用 Emacs Lisp 编写的程序。  要调用 Lisp 程序，请将 @samp{-batch} 选项与 @samp{-l}、@samp{-f} 或 @samp{--eval} (@pxref{Action Arguments}) 中的一个或多个结合使用。  以@xref{Command Example}为例。
+
+@vindex kill-emacs-on-sigint
+在批处理模式下，Emacs 不会显示正在编辑的文本，并且标准终端中断字符（例如 @kbd{C-z} 和 @kbd{C-c}）具有其通常的效果：对于 @kbd{C-c}，该效果是退出 Emacs 或向 @code{quit} 发出信号，具体取决于变量 @code{kill-emacs-on-sigint}。
+
+通常在回显区域打印消息的 Emacs 函数将打印到标准输出流 (@code{stdout}) 或标准错误流 (@code{stderr})。  （准确地说，像@code{prin1}、@code{princ}和@code{print}这样的函数打印到@code{stdout}，而@code{message}和@code{error}打印到@code{stderr}。）通常从迷你缓冲区读取键盘输入的函数则从终端的标准输入流（@code{stdin}）获取输入。
+
+@samp{--batch} 暗示@samp{-q}（不加载初始化文件），但@file{site-start.el} 仍然被加载。  它还会导致 Emacs 在处理完所有命令选项后退出。  此外，它会禁用自动保存，除非在明确请求自动保存的缓冲区中，并且在保存文件时，除非另有要求，否则它会忽略 @code{fsync} 系统调用。
+
+@vindex backtrace-on-error-noninteractive
+运行 @samp{--batch} Emacs 时发生的错误将导致打印 Emacs Lisp 回溯。  要禁用此行为，请将 @code{backtrace-on-error-noninteractive} 设置为 @code{nil}。
+
+@item --script @var{file}
+@opindex --script
+@cindex script mode
+以批处理模式运行 Emacs，如@samp{--batch}，然后读取并执行@var{file}中的 Lisp 代码。
+
+此选项的正常使用是在运行 Emacs 的可执行脚本文件中。  他们可以从第一行的这段文字开始
+
+@example
+#!/usr/bin/emacs --script
+@end example
+
+@noindent
+它将使用 @samp{--script} 调用 Emacs 并将脚本文件的名称提供为 @var{file}。  然后，Emacs Lisp 将第一行上的 @samp{#!} 视为注释分隔符。
+
+@item -x
+@opindex -x
+该选项只能在可执行脚本文件中使用，并且应该像这样调用：
+
+@example
+#!/usr/bin/emacs -x
+@end example
+
+这类似于@samp{--script}，但禁止加载初始化文件（如@code{--quick}），并且不能在普通命令行上使用（因为它没有指定要加载的脚本）。  此外，当到达脚本末尾时，它退出 Emacs 并使用最终形式的值作为脚本的退出值（如果最终值是数字）。  否则，它将始终以零值退出。请注意，在这种情况下，当 Emacs 读取 Lisp 代码时，它会忽略第一行和文件末尾附近的局部变量部分中的任何文件局部变量 (@pxref{Specifying File Variables})。
+
+@item --no-build-details
+@opindex --no-build-details
+@cindex build details
+@cindex deterministic build
+省略 Emacs 可执行文件中的系统名称和构建时间等详细信息，以便构建更具确定性。  此开关不适用于常规（或交互式）使用，因为它使诸如 @code{system-name} 返回 @code{nil} 之类的命令。
+
+@item -q
+@opindex -q
+@itemx --no-init-file
+@opindex --no-init-file
+@cindex bypassing init and @file{default.el} file
+@cindex init file, not loading
+@cindex @file{default.el} file, not loading
+不要加载任何初始化文件 (@pxref{Init File})。  当使用此选项调用 Emacs 时，自定义工具不允许保存选项 (@pxref{Easy Customization})。  此选项不会禁用加载@file{site-start.el}。
+
+@item --no-site-file
+@opindex --no-site-file
+@itemx -nsl
+@opindex -nsl
+@cindex @file{site-start.el} file, not loading
+不要加载 @file{site-start.el} (@pxref{Init File})。  @samp{-Q} 选项也可以执行此操作，但其他选项（如 @samp{-q}）则不会。
+
+@item --no-site-lisp
+@opindex --no-site-lisp
+@cindex @file{site-lisp} files, not loading
+不要将 @file{site-lisp} 目录包含在 @code{load-path} (@pxref{Init File}) 中。  @samp{-Q} 选项也可以执行此操作。
+
+@item --init-directory
+@opindex --init-directory
+指定查找 Emacs 初始化文件时要使用的目录。请注意，这只是覆盖 @file{user-emacs-directory} 的值，Emacs 通常将目录确定为搜索 init 文件 (@pxref{Find Init}) 的副作用，但不会更改对 @file{~/.emacs} init 文件的搜索。  特别是，如果此选项指定的目录中没有 @file{init.el} 文件，Emacs 将查找并使用没有此选项时会使用的 @file{init.el} （但会在此选项指定的目录中搜索其他每用户 Emacs 文件）。  如果您想强制 Emacs 使用此目录中的 @file{init.el} 文件，请在使用此选项启动 Emacs 之前确保该文件存在。
+
+@item --no-splash
+@opindex --no-splash
+@cindex splash screen
+@cindex startup message
+不显示启动屏幕。  您还可以通过在初始化文件 (@pxref{Entering Emacs}) 中将变量 @code{inhibit-startup-screen} 设置为非 @code{nil} 来实现此效果。
+
+@item --no-x-resources
+@opindex --no-x-resources
+@cindex X resources, not loading
+不加载 X 资源。  您还可以通过在初始化文件 (@pxref{Resources}) 中将变量 @code{inhibit-x-resources} 设置为 @code{t} 来实现此效果。
+
+@item -Q
+@opindex -Q
+@itemx --quick
+@opindex --quick
+以最少的自定义启动 Emacs。  这类似于同时使用 @samp{-q}、@samp{--no-site-file}、@samp{--no-site-lisp}、@samp{--no-x-resources} 和 @samp{--no-splash}。
+
+@item -daemon
+@opindex -daemon
+@itemx --daemon[=@var{name}]
+@opindex --daemon
+@itemx --bg-daemon[=@var{name}]
+@itemx --fg-daemon[=@var{name}]
+作为守护进程启动 Emacs：Emacs 启动后，它会启动 Emacs 服务器而不打开任何框架。  然后您可以使用 @command{emacsclient} 命令连接到 Emacs 进行编辑。 （或者，您可以为服务器指定显式 @var{name}；如果这样做，您需要在调用 @command{emacsclient} 时通过其 @option{--socket-name} 选项指定相同的 @var{name}，请参阅 @ref{emacsclient Options}。） @xref{Emacs Server}，了解有关使用 Emacs 作为守护进程的信息。  “后台”守护进程与终端断开连接并在后台运行（@samp{--daemon} 是 @samp{--bg-daemon} 的别名）。
+
+@vindex server-after-make-frame-hook
+@cindex customizations don't work in daemon sessions
+如果您的 init 文件 (@pxref{Init File}) 中的自定义项需要仅在图形显示上可用的各种功能，或者激活需要此类功能的可选功能（如颜色、鼠标、字体等），那么当您将 Emacs 作为守护进程启动时，此类自定义项可能不起作用，因为守护进程无法访问支持显示的功能。  相反，定义一个执行所有这些自定义的 Lisp 函数，然后使用 @code{add-hook} 将该函数添加到钩子 @code{server-after-make-frame-hook} (@pxref{Init Examples})。  然后，当您调用 @command{emacsclient} 时，Emacs 创建框架后将运行这些自定义设置。  （您可能需要安排这些自定义仅在第一次创建客户端框架时运行一次。）
+
+@item --no-desktop
+@opindex --no-desktop
+不要重新加载任何已保存的桌面。  @xref{Saving Emacs Sessions}。
+
+@item -u @var{user}
+@opindex -u
+@itemx --user=@var{user}
+@opindex --user
+@cindex load init file of another user
+加载@var{user}的初始化文件而不是您自己的@footnote{This option has no effect on MS-Windows.}。
+
+@item --debug-init
+@opindex --debug-init
+@cindex errors in init file
+启用 Emacs Lisp 调试器以检查 init 文件中的错误。 @xref{Error Debugging,, Entering the Debugger on an Error, elisp, The GNU Emacs Lisp Reference Manual}。
+
+@item --module-assertions
+@opindex --module-assertions
+@cindex module verification
+在处理动态可加载模块时启用昂贵的正确性检查。  这适用于希望验证其模块是否符合模块 API 要求的模块作者。  如果触发了与模块相关的断言，该选项会使 Emacs 中止。 @xref{Writing Dynamic Modules,, Writing Dynamically-Loaded Modules, elisp, The GNU Emacs Lisp Reference Manual}。
+
+@item --dump-file=@var{file}
+@opindex --dump-file
+@cindex specify dump file
+从命名的 @var{file} 加载转储的 Emacs 状态。  默认情况下，已安装的 Emacs 将在 Emacs 安装放置架构相关文件的目录中名为 1⁣ 的文件中查找其转储状态；变量 @code{exec-directory} 保存该目录的名称。  @var{emacs} 是 Emacs 可执行文件的名称，通常只是 @file{emacs}。 （当您从构建它的 @file{src} 目录调用 Emacs 而不安装它时，它将在可执行文件的目录中查找转储文件。）如果您重命名转储文件或将转储文件移动到其他位置，则可以使用此选项告诉 Emacs 在哪里找到该文件。
+@end table
+
+@node Command Example
+@appendixsec 命令参数示例
+
+下面是使用带参数和选项的 Emacs 的示例。  它假设您有一个名为 @file{hack-c.el} 的 Lisp 程序文件，该文件在加载时会对当前缓冲区执行一些有用的操作，预计是一个 C 程序。
+
+@example
+emacs --batch foo.c -l hack-c -f save-buffer >& log
+@end example
+
+@noindent
+这表示访问@file{foo.c}，加载@file{hack-c.el}（这会在访问的文件中进行更改），保存@file{foo.c}（请注意，@code{save-buffer}是@kbd{C-x C-s}绑定的函数），然后退出回到shell（因为@samp{--batch}）。  @samp{--batch} 还保证将输出重定向到 @file{log} 不会出现问题，因为 Emacs 不会假设它有一个可以使用的显示终端。
+
+@node Environment
+@appendixsec 环境变量
+@cindex environment variables
+
+@dfn{environment} 是操作系统的一项功能；它由具有名称和值的变量集合组成。  每个变量称为 @dfn{environment variable}；环境变量名称区分大小写，通常只使用大写字母。  这些值都是文本字符串。
+
+该环境的有用之处在于子进程自动从其父进程继承环境。  这意味着您可以在登录 shell 中设置一个环境变量，并且您运行的所有程序（包括 Emacs）都会自动看到它。 Emacs 的子进程（例如 shell、编译器和版本控制程序）也继承了 Emacs 的环境。
+
+@findex setenv
+@findex getenv
+@vindex initial-environment
+在 Emacs 中，命令 @kbd{M-x getenv} 读取环境变量的名称，并在回显区域中打印其值。  @kbd{M-x setenv} 在 Emacs 环境中设置变量，@kbd{C-u M-x setenv} 删除变量。  （使用 @samp{$} 进行环境变量替换，就像在文件名中一样；请参阅 @ref{File Names with $}。）变量 @code{initial-environment} 存储 Emacs 继承的初始环境。
+
+在 Emacs 之外设置环境变量的方法取决于操作系统，尤其是您所使用的 shell。  例如，以下是如何使用 Bash 将环境变量 @env{ORGANIZATION} 设置为 @samp{not very much}：
+
+@example
+export ORGANIZATION="not very much"
+@end example
+
+@noindent
+以下是在 csh 或 tcsh 中执行此操作的方法：
+
+@example
+setenv ORGANIZATION "not very much"
+@end example
+
+当 Emacs 使用 X Window 系统时，控制 X 的各种环境变量也适用于 Emacs。  请参阅 X 文档以获取更多信息。
+
+@menu
+* General Variables::    所有版本的 Emacs 使用的环境变量。
+* Misc Variables::       某些特定于系统的变量。
+* MS-Windows Registry::  MS-Windows 环境的替代方案。
+@end menu
+
+@node General Variables
+@appendixsubsec 一般变量
+
+以下是按字母顺序排列的环境变量列表，这些变量在 Emacs 中具有特殊含义。  大多数这些变量也被其他一些程序使用。  Emacs 不需要设置任何这些环境变量，但如果设置了它们，它就会使用它们的值。
+
+@c This used to be @vtable, but that enters the variables alone into
+@c the Variable Index, which in some cases, like HOME, might be
+@c confused with keys by that name, and other cases, like NAME,
+@c might be confused with general-purpose phrases.
+@table @env
+@item CDPATH
+@vindex CDPATH@r{, environment variable}
+当您指定相对目录时，由 @code{cd} 命令用来搜索指定的目录。
+@item COLORTERM
+@vindex COLORTERM@r{, environment variable}
+如果此变量设置为值@samp{truecolor}，它会告诉 Emacs 在文本模式显示上使用 24 位真彩色，即使未安装 terminfo 数据库也是如此。  Emacs 将使用内置命令通过 RGB 值请求真实颜色，而不是缺少 terminfo 信息。
+@item DBUS_SESSION_BUS_ADDRESS
+@vindex DBUS_SESSION_BUS_ADDRESS@r{, environment variable}
+当 Emacs 与 D-Bus 一起编译时，由 D-Bus 使用。  通常，无需更改它。  将其设置为虚拟地址（例如@samp{unix:path=/dev/null}）会抑制与 D-Bus 会话总线的连接，并在尚未运行时自动启动 D-Bus 会话总线。
+@item EMACSDATA
+@vindex EMACSDATA@r{, environment variable}
+Emacs 附带的与体系结构无关的文件的目录。这用于初始化变量@code{data-directory}。
+@item EMACSDOC
+@vindex EMACSDOC@r{, environment variable}
+文档字符串文件的目录，用于初始化 Lisp 变量@code{doc-directory}。
+@item EMACSLOADPATH
+@vindex EMACSLOADPATH@r{, environment variable}
+以冒号分隔的目录列表@footnote{Here and below, whenever we say ``colon-separated list of directories'', it pertains to Unix and GNU/Linux systems.  On MS-DOS and MS-Windows, the directories are separated by semi-colons instead, since DOS/Windows file names might include a colon after a drive letter.}，用于搜索 Emacs Lisp 文件。  如果设置，它将替换 @code{load-path} 变量 (@pxref{Lisp Libraries}) 的通常初始值。  空元素代表@code{load-path}的默认值；例如，使用 @samp{EMACSLOADPATH="/tmp:"} 将 @file{/tmp} 添加到默认 @code{load-path} 的前面。  要在列表中间指定空元素，请连续使用 2 个冒号，如 @samp{EMACSLOADPATH="/tmp::/foo"} 所示。
+@item EMACSPATH
+@vindex EMACSPATH@r{, environment variable}
+用于搜索可执行文件的以冒号分隔的目录列表。如果设置，Emacs 在初始化变量 @code{exec-path} (@pxref{Shell}) 时除了 @env{PATH}（见下文）之外还会使用它。
+@item EMAIL
+@vindex EMAIL@r{, environment variable}
+@vindex user-mail-address@r{, initialization}
+您的电子邮件地址;用于初始化 Lisp 变量 @code{user-mail-address}，Emacs 邮件接口将其放入传出消息 (@pxref{Mail Headers}) 的 @samp{From} 标头中。
+@item ESHELL
+@vindex ESHELL@r{, environment variable}
+用于 shell 模式覆盖 @env{SHELL} 环境变量 (@pxref{Interactive Shell})。
+@item HISTFILE
+@vindex HISTFILE@r{, environment variable}
+shell 命令在两次登录之间保存的文件的名称。如果您使用 Bash，则此变量默认为 @file{~/.bash_history}；如果您使用 ksh，则默认为 @file{~/.sh_history}；否则默认为 @file{~/.history}。
+@item HOME
+@vindex HOME@r{, environment variable}
+文件在目录树中的位置；用于扩展以波形符 (@file{~}) 开头的文件名。  如果设置，则应设置为绝对文件名。  （如果设置为相对文件名，Emacs 会相对于 Emacs 启动的目录来解释它，但我们不建议使用此功能。）如果未设置，@env{HOME} 通常默认为 @env{LOGNAME}、@env{USER} 或您的用户 ID 指定的用户主目录，如果其他方法都失败，则默认为 @file{/}。  在 MS-DOS 上，它默认为启动 Emacs 的目录，如果存在则从末尾删除 @samp{/bin}。  在 Windows 上，@env{HOME} 的默认值是用户配置文件目录的 @file{Application Data} 子目录（通常是 @file{C:/Documents and Settings/@var{username}/Application Data}，其中 @var{username} 是您的用户名），但为了向后兼容，如果在那里找到 @file{.emacs} 文件，将使用 @file{C:/} 代替。
+@item HOSTNAME
+@vindex HOSTNAME@r{, environment variable}
+运行 Emacs 的计算机的名称。
+@item INFOPATH
+@vindex INFOPATH@r{, environment variable}
+以冒号分隔的目录列表，在其中搜索信息文件。
+@item LC_ALL
+@vindex LC_ALL@r{, environment variable}
+@itemx LC_COLLATE
+@vindex LC_COLLATE@r{, environment variable}
+@itemx LC_CTYPE
+@vindex LC_CTYPE@r{, environment variable}
+@itemx LC_MESSAGES
+@vindex LC_MESSAGES@r{, environment variable}
+@itemx LC_MONETARY
+@vindex LC_MONETARY@r{, environment variable}
+@itemx LC_NUMERIC
+@vindex LC_NUMERIC@r{, environment variable}
+@itemx LC_TIME
+@vindex LC_TIME@r{, environment variable}
+@itemx LANG
+@vindex LANG@r{, environment variable}
+用户的首选区域设置。  区域设置有六个类别，由环境变量指定：@env{LC_COLLATE}（用于排序）、@env{LC_CTYPE}（用于字符编码）、@env{LC_MESSAGES}（用于系统消息）、@env{LC_MONETARY}（用于货币格式）、@env{LC_NUMERIC}（用于数字）以及@env{LC_TIME}（用于日期和时间）。  如果未设置这些变量之一，则类别默认为 @env{LANG} 环境变量的值；如果未设置 @env{LANG}，则默认为默认 @samp{C} 区域设置。  但如果指定 @env{LC_ALL}，它将覆盖所有其他语言环境变量的设置。
+
+在 MS-Windows 和 macOS 上，如果环境中尚未设置 @env{LANG}，Emacs 将根据系统范围的默认值进行设置。  您可以在某些版本的 MS-Windows 上的“区域设置”控制面板中以及 macOS 上的“语言和区域”系统偏好设置中进行设置。
+
+在 Android 上运行 GUI 会话时，@env{LANG} 设置为固定值，但语言和区域设置环境源自系统的“语言和输入”首选项。  @xref{Android Environment}。
+
+@env{LC_CTYPE} 类别的值与 @code{locale-language-names}、@code{locale-charset-language-names} 和 @code{locale-preferred-coding-systems} 中的条目进行匹配，以选择默认语言环境和编码系统。  @xref{Language Environments}。
+@item LOGNAME
+@vindex LOGNAME@r{, environment variable}
+用户的登录名。  另请参见@env{USER}。
+@item MAIL
+@vindex MAIL@r{, environment variable}
+您的系统邮件收件箱的名称。
+@ifnottex
+@item MH
+@vindex MH@r{, environment variable}
+Name of setup file for the mh system.  @xref{Top,,MH-E,mh-e, The Emacs
+Interface to MH}.
+@end ifnottex
+@item NAME
+@vindex NAME@r{, environment variable}
+你真实世界的名字。  这用于初始化变量@code{user-full-name} (@pxref{Mail Headers})。
+@item NNTPSERVER
+@vindex NNTPSERVER@r{, environment variable}
+新闻服务器的名称。  由 mh 和 Gnus 软件包使用。
+@item ORGANIZATION
+@vindex ORGANIZATION@r{, environment variable}
+您所属组织的名称。  用于在 Gnus 包的帖子中设置 @samp{Organization:} 标题。
+@item PATH
+@vindex PATH@r{, environment variable}
+以冒号分隔的包含可执行文件的目录列表。这用于初始化变量@code{exec-path} (@pxref{Shell})。如果未设置或为空，则使用依赖于实现的默认值。
+@item PWD
+@vindex PWD@r{, environment variable}
+如果设置，这应该是 Emacs 启动时的默认目录。
+@item REPLYTO
+@vindex REPLYTO@r{, environment variable}
+如果设置，则指定变量 @code{mail-default-reply-to} (@pxref{Mail Headers}) 的初始值。
+@item SAVEDIR
+@vindex SAVEDIR@r{, environment variable}
+默认保存新闻文章的目录名称。由 Gnus 包使用。
+@item SHELL
+@vindex SHELL@r{, environment variable}
+用于解析和执行 Emacs 内部运行的程序的解释器的名称。  这用于初始化变量@code{shell-file-name} (@pxref{Single Shell})。
+@item SMTPSERVER
+@vindex SMTPSERVER@r{, environment variable}
+发送邮件服务器的名称。  这用于初始化变量@code{smtpmail-smtp-server} (@pxref{Mail Sending})。
+@cindex background mode, on @command{xterm}
+@item TERM
+@vindex TERM@r{, environment variable}
+Emacs 正在使用的终端的类型。  除非 Emacs 以批处理模式运行，否则必须设置此变量。  在 MS-DOS 上，它默认为 @samp{internal}，它指定处理机器自身显示的内置终端仿真。
+@item TERMCAP
+@vindex TERMCAP@r{, environment variable}
+termcap 库文件的名称，描述如何对 @env{TERM} 指定的终端进行编程。  默认为@file{/etc/termcap}。
+@item TMPDIR
+@vindex TMPDIR@r{, environment variable}
+@itemx TMP
+@vindex TMP@r{, environment variable}
+@itemx TEMP
+@vindex TEMP@r{, environment variable}
+这些环境变量用于初始化变量@code{temporary-file-directory}，该变量指定放置临时文件的目录（@pxref{Backup}）。  Emacs 首先尝试使用 @env{TMPDIR}。  如果未设置，Emacs 通常会回退到 @file{/tmp}，但在 MS-Windows 和 MS-DOS 上，它会回退到 @env{TMP}，然后是 @env{TEMP}，最后是 @file{c:/temp}。
+@item TZ
+@vindex TZ@r{, environment variable}
+这指定了默认时区，还可能指定夏令时信息。  @xref{Time Zone Rules,,, elisp, The GNU Emacs Lisp Reference Manual}。  在 MS-DOS 上，如果在 Emacs 启动时未在环境中设置 @env{TZ}，Emacs 会定义一个适合 DOS@. 返回的国家/地区代码的默认值。在 MS-Windows 上，Emacs 根本不使用 @env{TZ}。
+@item USER
+@vindex USER@r{, environment variable}
+用户的登录名。  另请参见@env{LOGNAME}。  在 MS-DOS 上，默认为 @samp{root}。
+@item VERSION_CONTROL
+@vindex VERSION_CONTROL@r{, environment variable}
+用于初始化 @code{version-control} 变量 (@pxref{Backup Names})。
+@end table
+
+@node Misc Variables
+@appendixsubsec 杂项变量
+
+这些变量仅用于特定配置：
+
+@vtable @env
+@item COMSPEC
+在 MS-DOS 和 MS-Windows 上，调用 shell 内部的批处理文件和命令时使用的命令解释器的名称。  在 MS-DOS 上，这也用于为 @env{SHELL} 环境变量设置默认值。
+
+@item NAME
+在 MS-DOS 上，此变量默认为 @env{USER} 变量的值。
+
+@item EMACSTEST
+在 MS-DOS 上，这指定一个用于记录内部终端仿真器操作的文件。  此功能对于提交错误报告非常有用。
+
+@item EMACSCOLORS
+在 MS-DOS 上，这指定屏幕颜色。  以这种方式设置它们很有用，否则 Emacs 在启动时会立即显示默认颜色。
+
+该变量的值应该是默认脸部的前景（第一个字符）和背景（第二个字符）颜色的双字符编码。  每个字符都应该是标准 PC 文本模式显示器上所需颜色的十六进制代码。  例如，要在浅灰色背景上获取蓝色文本，请指定 @samp{EMACSCOLORS=17}，因为 1 是蓝色的代码，7 是浅灰色的代码。
+
+PC 显示器通常仅支持八种背景颜色。  然而，Emacs 将 DOS 显示切换到所有 16 种颜色都可以用作背景的模式，因此背景颜色的所有四位实际上都被使用。
+
+@item PRELOAD_WINSOCK
+在 MS-Windows 上，如果设置此变量，Emacs 将在启动时加载并初始化网络库，而不是等到第一次需要时才加载和初始化。
+
+@item WAYLAND_DISPLAY
+Pgtk Emacs（使用 @option{--with-pgtk} 构建）可以在 Wayland 上原生运行。 @env{WAYLAND_DISPLAY} 指定与合成器的连接。
+
+@item emacs_dir
+在 MS-Windows 上，@env{emacs_dir} 是一个特殊的环境变量，它表示 Emacs 安装目录的完整路径。如果 Emacs 安装在标准目录结构中，它会自动计算该值。  除非您的安装是非标准的，否则您自己设置此变量并没有多大用处，因为与其他环境变量不同，它会在启动时被 Emacs 覆盖。  当设置其他环境变量（例如 @env{EMACSLOADPATH}）时，您可能会发现使用 @env{emacs_dir} 比硬编码绝对路径更有用。  这允许 Emacs 的多个版本共享相同的环境变量设置，并且允许您移动 Emacs 安装目录，而无需更改任何环境或注册表设置。
+@end vtable
+
+@node MS-Windows Registry
+@appendixsubsec MS-Windows 系统注册表
+@pindex addpm, MS-Windows installation program
+@cindex registry, setting environment variables (MS-Windows)
+
+在 MS-Windows 上，还可以在 @file{HKEY_CURRENT_USER} 或系统注册表的@file{HKEY_LOCAL_MACHINE}部分，位于@file{/Software/GNU/Emacs}键下。  当 Emacs 启动时，除了检查环境之外，它还会检查系统注册表中的这些变量。
+
+为了确定这些变量的值，Emacs 执行以下过程。  首先，它检查环境。  如果在那里找不到该变量，Emacs 将通过 @file{/Software/GNU/Emacs} 下的变量名称查找注册表项；首先在注册表的 @file{HKEY_CURRENT_USER} 部分，如果没有找到，则在 @file{HKEY_LOCAL_MACHINE} 部分。  最后，如果 Emacs 仍然无法确定这些值，它将使用编译后的默认值。
+
+请注意，注册表设置具有全局系统范围的影响：它们将影响系统上运行的所有 Emacs 会话。  因此，如果您运行不同的 Emacs 版本，或者同时使用已安装和未安装的 Emacs 可执行文件，或者构建较新版本的 Emacs，注册表中的设置将导致它们全部使用相同的目录，这可能不是您想要的。  因此，@emph{we recommend against setting these variables in the registry}。  如果您的注册表中有此类设置，我们建议您将其删除。
+
+如果您运行 Emacs MS-Windows 安装程序 @command{addpm.exe}，它将更新 @env{emacs_dir}、@env{EMACSLOADPATH}、@env{EMACSDATA}、@env{EMACSPATH}、@env{EMACSDOC}、@env{SHELL} 和 @env{TERM} 变量的任何现有注册表设置，以具有适合已安装的 Emacs 版本（@command{addpm.exe}）的值。来了。  请注意， @command{addpm.exe} 将 @emph{not} 创建任何不存在的注册表设置，它只会更新现有设置，这些设置很可能是从旧的 Emacs 安装继承的，以便它们与新安装的 Emacs 版本兼容。  安装最新版本的 Emacs 时不再需要运行 @command{addpm.exe}，因此我们仅建议您在从旧版本升级并且由于某种原因无法从注册表中删除这些设置时才执行此操作。
+
+除了上面的环境变量之外，您还可以向 @file{/Software/GNU/Emacs} 注册表项添加设置以指定 X 资源 (@pxref{X Resources})。  您可以在 @file{.Xdefaults} 文件中指定的大多数设置都可以通过该注册表项进行设置。
+
+@node Display X
+@appendixsec 指定显示名称
+@cindex display name (X Window System)
+@cindex @env{DISPLAY} environment variable
+
+环境变量 @env{DISPLAY} 告诉所有 X 客户端（包括 Emacs）在哪里显示其窗口。  在一般情况下，当您启动 X 服务器并在本地运行作业时，它的值是默认设置的。  您可以自己指定显示；这样做的一个原因是如果您想登录到另一个系统并在那里运行 Emacs，并在本地终端上显示该窗口。
+
+@env{DISPLAY} 的语法为 @samp{@var{host}:@var{display}.@var{screen}}，其中 @var{host} 是 X Window 系统服务器计算机的主机名，@var{display} 是任意分配的编号，用于将您的服务器（X 终端）与同一计算机上的其他服务器区分开来，@var{screen} 是允许 X 服务器控制多个终端屏幕的字段。周期和 5⁣ 字段是可选的。  如果包含的话，@var{screen} 通常为零。
+
+例如，如果您的主机名为 @samp{glasperle} 并且您的服务器是配置中列出的第一个（或者可能是唯一）服务器，则您的 @env{DISPLAY} 是 @samp{glasperle:0.0}。
+
+您可以在运行 Emacs 时显式指定显示名称，方法是更改​​ @env{DISPLAY} 变量，或者使用选项 @samp{-d @var{display}} 或 @samp{--display=@var{display}}。  这是一个例子：
+
+@smallexample
+emacs --display=glasperle:0 &
+@end smallexample
+
+您可以使用 @samp{-nw} 选项禁止使用 X 窗口系统。  然后 Emacs 使用其控制文本终端进行显示。 @xref{Initial Options}。
+
+有时，安全措施会阻止远程系统上的程序在本地系统上显示。  在这种情况下，尝试运行 Emacs 会产生如下消息：
+
+@smallexample
+Xlib:  connection to "glasperle:0.0" refused by server
+@end smallexample
+
+@noindent
+您可以通过在本地系统上使用 @command{xhost} 命令授予远程计算机的访问权限来克服此问题。
+
+@node Font X
+@appendixsec 字体规格选项
+@cindex font name (X Window System)
+
+您可以使用命令行选项 @samp{-fn @var{font}} （或 @samp{--font}，它是 @samp{-fn} 的别名）来指定默认字体：
+
+@table @samp
+@item -fn @var{font}
+@opindex -fn
+@itemx --font=@var{font}
+@opindex --font
+@cindex specify default font from the command line
+使用 @var{font} 作为默认字体。
+@end table
+
+在命令行上将字体名称传递给 Emacs 时，如果它包含 shell 特殊处理的字符（例如空格），则可能需要将其用引号引起来。  例如：
+
+@smallexample
+emacs -fn "DejaVu Sans Mono-12"
+@end smallexample
+
+@xref{Fonts}，有关字体名称和指定默认字体的其他方法的详细信息。
+
+@node Colors X
+@appendixsec 窗口颜色选项
+@cindex color of window, from command line
+@cindex text colors, from command line
+
+您可以使用以下命令行选项来指定 Emacs 显示的各个部分使用的颜色。  颜色可以使用颜色名称或 RGB 三元组 (@pxref{Colors}) 来指定。
+
+@table @samp
+@item -fg @var{color}
+@opindex -fg
+@itemx --foreground-color=@var{color}
+@opindex --foreground-color
+@cindex foreground color, command-line argument
+指定前景色，覆盖 @code{default} 面 (@pxref{Faces}) 指定的颜色。
+@item -bg @var{color}
+@opindex -bg
+@itemx --background-color=@var{color}
+@opindex --background-color
+@cindex background color, command-line argument
+指定背景颜色，覆盖 @code{default} 面指定的颜色。
+@item -bd @var{color}
+@opindex -bd
+@itemx --border-color=@var{color}
+@opindex --border-color
+@cindex border color, command-line argument
+指定 X 窗口边框的颜色。  如果 Emacs 是使用 GTK+ 支持编译的，则这不会产生任何影响。
+@item -cr @var{color}
+@opindex -cr
+@itemx --cursor-color=@var{color}
+@opindex --cursor-color
+@cindex cursor color, command-line argument
+指定 Emacs 光标的颜色，指示点所在的位置。
+@item -ms @var{color}
+@opindex -ms
+@itemx --mouse-color=@var{color}
+@opindex --mouse-color
+@cindex mouse pointer color, command-line argument
+指定鼠标位于 Emacs 窗口中时鼠标光标的颜色。
+@item -r
+@opindex -r
+@itemx -rv
+@opindex -rv
+@itemx --reverse-video
+@opindex --reverse-video
+@cindex reverse video, command-line argument
+反转视频：交换前景色和背景色。
+@item --color=@var{mode}
+@opindex --color
+@cindex standard colors on a character terminal
+@cindex override character terminal color support
+当 Emacs 在文本终端上运行时设置 @dfn{color support mode}。此选项会覆盖字符终端在其 @code{termcap} 或 @code{terminfo} 数据库中通告的支持颜色数量。  参数@var{mode}可以是以下之一：
+@table @samp
+@item never
+@itemx no
+即使终端的功能指定颜色支持，也不要使用颜色。
+@item default
+@itemx auto
+与根本不使用 @option{--color} 时相同：Emacs 在启动时检测终端是否支持颜色，如果支持，则打开彩色显示。
+@item always
+@itemx yes
+@itemx ansi8
+无条件打开颜色支持，并对 8 种标准颜色使用 ANSI 转义序列指定的颜色命令。
+@item 8bit
+打开对 8 位（256 色）显示的支持（如果可用）。目前此选项仅在 MS-Windows (10+) 上有效。在其他系统上，会自动启用最大颜色支持。
+@item 24bit
+打开对 24 位（真彩色）显示的支持（如果可用）。目前此选项仅在 MS-Windows (10+) 上有效。在其他系统上，如果支持，则会自动启用 24 位颜色。
+@item @var{num}
+对 @var{num} 颜色使用颜色模式。  如果@var{num}为@minus{}1，则关闭颜色支持（相当于@samp{never}）；如果为0，则使用该终端的默认颜色支持（相当于@samp{auto}）；否则，请为 @var{num} 颜色使用适当的标准模式。根据您终端的功能，Emacs 可能能够打开 8、16、88、256 或 16777216 的颜色模式作为 @var{num} 的值。如果没有支持 @var{num} 颜色的模式，Emacs 的行为就好像 @var{num} 为 0，即，它使用终端的默认颜色支持模式。
+@end table
+
+此选项对 MS-DOS 和 Windows 10 之前的 MS-Windows 没有影响。
+
+@cindex colors on character terminal, changing during session
+@cindex character terminal, change color mode
+@vindex tty-color-mode@r{, frame parameter}
+如果省略@var{mode}，则默认为@var{ansi8}。
+
+颜色模式可以在运行的 Emacs 会话期间动态更改：当前模式可通过 @code{tty-color-mode} 框架参数获得，并且可以通过修改该框架参数来更改。@footnote{ This does not work on MS-Windows and MS-DOS text-mode terminals. } 这意味着您还可以通过 @code{default-frame-alist} 而不是命令行选项指定初始值。
+@end table
+
+例如，要使用珊瑚色鼠标光标和石板蓝色文本光标，请输入：
+
+@example
+emacs -ms coral -cr 'slate blue' &
+@end example
+
+您可以通过 @samp{-rv} 选项或使用 X 资源 @samp{reverseVideo} 反转前景色和背景色。
+
+@samp{-fg}、@samp{-bg} 和 @samp{-rv} 选项在文本终端和图形显示器上起作用。
+
+@node Window Size X
+@appendixsec 窗口大小和位置选项
+@cindex geometry of Emacs window
+@cindex position and size of Emacs frame
+@cindex width and height of Emacs frame
+@cindex specifying fullscreen for Emacs frame
+
+以下是用于指定初始 Emacs 框架的大小和位置的命令行选项列表：
+
+@table @samp
+@item -g @var{width}x@var{height}@r{[@{}+-@r{@}}@var{xoffset}@r{@{}+-@r{@}}@var{yoffset}@r{]]}
+@opindex -g
+@itemx --geometry=@var{width}x@var{height}@r{[@{}+-@r{@}}@var{xoffset}@r{@{}+-@r{@}}@var{yoffset}@r{]]}
+@opindex --geometry
+@cindex geometry, command-line argument
+指定尺寸 @var{width} 和 @var{height}（以字符列和行为单位测量）以及位置 @var{xoffset} 和 @var{yoffset}（以像素为单位测量）。  @var{width} 和 @var{height} 参数适用于所有帧，而 @var{xoffset} 和 @var{yoffset} 仅适用于初始帧。
+
+@item -fs
+@opindex -fs
+@itemx --fullscreen
+@opindex --fullscreen
+@cindex fullscreen, command-line argument
+指定宽度和高度应该是屏幕的宽度和高度。  通常不显示窗口管理器装饰。  （启动 Emacs 后，您可以使用 @key{F11}、@code{toggle-frame-fullscreen} 切换此状态。）
+
+@item -mm
+@opindex -mm
+@itemx --maximized
+@opindex --maximized
+@cindex maximized, command-line argument
+指定 Emacs 框架应最大化。  这通常意味着框架具有窗口管理器装饰。 （启动 Emacs 后，您可以使用 @kbd{M-F10}、@code{toggle-frame-maximized} 切换此状态。）
+
+@item -fh
+@opindex -fh
+@itemx --fullheight
+@opindex --fullheight
+@cindex fullheight, command-line argument
+指定高度应该是屏幕的高度。
+
+@item -fw
+@opindex -fw
+@itemx --fullwidth
+@opindex --fullwidth
+@cindex fullwidth, command-line argument
+指定宽度应该是屏幕的宽度。
+@end table
+
+@noindent
+在 @samp{--geometry} 选项中，@code{@r{@{}+-@r{@}}} 表示加号或减号。  @var{xoffset}前面的加号表示距离屏幕左侧的距离；减号表示从右侧开始计数。  @var{yoffset}前面的加号表示距屏幕顶部的距离，减号表示距屏幕底部的距离。值 @var{xoffset} 和 @var{yoffset} 本身可能是正数或负数，但这不会改变它们的含义，只会改变它们的方向。
+
+Emacs 使用与 @command{xterm} 相同的单位来解释几何。 @var{width} 和 @var{height} 以字符为单位进行测量，因此大字体会比小字体创建更大的框架。  （如果指定比例字体，Emacs 将使用其最大边界宽度作为宽度单位。） @var{xoffset} 和 @var{yoffset} 以像素为单位进行测量。
+
+您不必指定几何规范中的所有字段。  如果您同时省略 @var{xoffset} 和 @var{yoffset}，则窗口管理器会决定将 Emacs 框架放置在何处，可能是通过让您使用鼠标来放置它。  例如， @samp{164x55} 指定窗口宽 164 列，足以容纳两个并排的普通宽度窗口，高 55 行。
+
+默认框架宽度为 80 个字符，默认高度为 35 到 40 行，具体取决于操作系统和窗口管理器。您可以省略宽度或高度，或两者都省略。  如果您以整数开始几何图形，Emacs 会将其解释为宽度。  如果以 @samp{x} 开头，后跟一个整数，Emacs 会将其解释为高度。  因此，@samp{81}仅指定宽度； @samp{x45} 仅指定高度。
+
+如果您使用 @samp{+} 或 @samp{-} 开始几何图形，则会引入偏移，这意味着两个尺寸都会被忽略。  因此，@samp{-3} 仅指定@var{xoffset}。  （如果只给出一个偏移量，则始终为 @var{xoffset}。）@samp{+3-3} 指定 @var{xoffset} 和 @var{yoffset}，将框架放置在屏幕左下角附近。
+
+您可以为 X 资源文件 (@pxref{Resources}) 中的任何或所有字段指定默认值，然后使用 @samp{--geometry} 选项覆盖选定的字段。
+
+由于模式线和回波区域占据帧的最后 2 行，因此初始文本窗口的高度比几何中指定的高度小 2。  在 Emacs 的非 X-toolkit 版本中，菜单栏也占据指定编号的一行。  但在 X 工具包版本中，菜单栏是附加的，并且不计入指定的高度。  工具栏（如果有）也是附加的。
+
+启用或禁用菜单栏或工具栏会改变普通文本的可用空间量。  因此，如果 Emacs 启动时有一个工具栏（这是默认的），并假设有一个工具栏来处理几何规范，然后你的初始化文件禁用了工具栏，那么你最终会得到一个与你要求的不同的框架几何形状。  要获得没有工具栏的预期大小，请使用 X 资源指定“无工具栏”(@pxref{Table of Resources})；那么 Emacs 在处理指定的几何图形时就已经知道没有工具栏了。
+
+当使用 @samp{--fullscreen}、@samp{--maximized}、@samp{--fullwidth} 或 @samp{--fullheight} 之一时，某些窗口管理器要求您将变量 @code{frame-resize-pixelwise} 设置为非 @code{nil} 值，以使框架真正最大化或全屏显示。
+
+某些窗口管理器具有可以使它们忽略程序指定的位置和用户指定的位置的选项。  如果设置了这些，Emacs 将无法正确定位窗口。
+
+@node Borders X
+@appendixsec 内部和外部边框
+@cindex borders (X Window System)
+
+Emacs 框架有一个内部边框和一个外部边框。  内部边框是框架文本部分周围背景颜色的额外条带。  Emacs 自己绘制内部边框。  外边框由 X 在框架的工具栏和菜单栏之外绘制。还有一个由窗口管理器绘制的外部边框。外部边框的大小无法在 Emacs 内设置。
+
+@table @samp
+@item -ib @var{width}
+@opindex -ib
+@itemx --internal-border=@var{width}
+@opindex --internal-border
+@cindex internal border width, command-line argument
+将 @var{width} 指定为内部边框（框架文本区域周围）的宽度，以像素为单位。
+
+@item -bw @var{width}
+@opindex -bw
+@itemx --border-width=@var{width}
+@opindex --border-width
+@cindex main border width, command-line argument
+@cindex outer border width, command-line argument
+将 @var{width} 指定为外边框的宽度（以像素为单位）。
+@end table
+
+当您指定框架的大小时，不会计算边框。  框架的位置是从外部边框的外边缘开始测量的。
+
+使用 @samp{-ib @var{n}} 选项指定内部边框 @var{n} 像素宽。  默认值为 1。使用 @samp{-bw @var{n}} 指定外边框的宽度（尽管窗口管理器可能不会注意您指定的内容）。  外边框的默认宽度为 2。
+
+@node Title X
+@appendixsec 框架标题
+
+每个 Emacs 框架始终有一个标题，它作为框架的名称出现在窗口装饰和图标中。  默认标题的形式为@samp{@var{invocation-name}@@@var{machine}}（如果只有一帧）或显示所选窗口的缓冲区名称（如果有多个帧）。
+
+您可以使用命令行选项为初始 Emacs 框架指定非默认标题：
+
+@table @samp
+@item -T @var{title}
+@opindex -T
+@itemx --title=@var{title}
+@opindex --title
+@cindex frame title, command-line argument
+指定 @var{title} 作为初始 Emacs 框架的标题。
+@end table
+
+@samp{--name} 选项 (@pxref{Resources}) 还指定初始 Emacs 框架的标题。
+
+@node Icons X
+@appendixsec 图标
+@cindex icons (X Window System)
+@cindex minimizing a frame at startup
+
+@table @samp
+@item -iconic
+@opindex --iconic
+@itemx --iconic
+@cindex start iconified, command-line argument
+以图标化状态启动 Emacs。
+
+@item -nbi
+@opindex -nbi
+@itemx --no-bitmap-icon
+@opindex --no-bitmap-icon
+@cindex Emacs icon, a gnu
+禁用 Emacs 图标的使用。
+@end table
+
+大多数窗口管理器允许您图标化（或“最小化”）Emacs 框架，将其隐藏起来。  一些窗口管理器用小图标替换图标化窗口，而另一些窗口管理器则将它们完全从视线中删除。  @samp{-iconic} 选项告诉 Emacs 以图标化状态开始运行，而不是立即显示框架。文本框架不会出现，直到您取消图标化（或“取消最小化”）它。
+
+默认情况下，Emacs 使用包含 Emacs 徽标的图标。  在 Gnome 等桌面环境中，此图标也会在其他上下文中显示，例如，当切换到 Emacs 框架时。  @samp{-nbi} 或 @samp{--no-bitmap-icon} 选项告诉 Emacs 让窗口管理器选择要使用的图标类型——通常只是一个包含框架标题的小矩形。
+
+@node Misc X
+@appendixsec 其他显示选项
+
+@table @samp
+@c @item -hb
+@c @opindex -hb
+@c @itemx --horizontal-scroll-bars
+@c @opindex --horizontal-scroll-bars
+@c @c @cindex horizontal scroll bars, command-line argument
+@c Enable horizontal scroll bars.  Since horizontal scroll bars
+@c are not yet implemented, this actually does nothing.
+
+@item --parent-id @var{id}
+通过 XEmbed 协议将 Emacs 作为客户端 X 窗口打开，其中 @var{id} 作为父 X 窗口 id。  目前，此选项主要对开发人员有用。
+
+@item -vb
+@opindex -vb
+@itemx --vertical-scroll-bars
+@opindex --vertical-scroll-bars
+@cindex vertical scroll bars, command-line argument
+启用垂直滚动条。
+
+@item -lsp @var{pixels}
+@opindex -lsp
+@itemx --line-spacing=@var{pixels}
+@opindex --line-spacing
+@cindex line spacing, command-line argument
+指定 @var{pixels} 作为行之间放置的附加空间（以像素为单位）。
+
+@item -nbc
+@opindex -nbc
+@itemx --no-blinking-cursor
+@opindex --no-blinking-cursor
+@cindex blinking cursor disable, command-line argument
+禁用图形显示上闪烁的光标。
+
+@item -D
+@opindex -D
+@itemx --basic-display
+@opindex --basic-display
+禁用菜单栏、工具栏、滚动条、工具提示，并关闭字体锁定模式和闪烁光标。  这对于制作简化显示问题调试的测试用例很有用。
+@end table
+
+@samp{--xrm} 选项 (@pxref{Resources}) 指定额外的 X 资源值。

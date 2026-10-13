@@ -1,0 +1,136 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Screen
+@chapter 屏幕的组织
+@cindex screen
+@cindex frame
+
+在图形显示上，例如在使用 X Window 系统的 GNU/Linux 上，Emacs 占据一个图形窗口。  在文本终端上，Emacs 占据整个终端屏幕。  我们将使用术语 @dfn{frame} 来表示 Emacs 占用的图形窗口或终端屏幕。  Emacs 在两种框架上的行为非常相似。  通常一开始只有一帧，但如果您愿意，您可以创建其他帧 (@pxref{Frames})。
+
+每个帧由几个不同的区域组成。  框架顶部有一个 @dfn{menu bar}，它允许您通过一系列菜单访问命令。  在图形显示器上，菜单栏正下方是一个 @dfn{tool bar}，这是一行图标，单击它们即可执行编辑命令。  框架的最底部是一个 @dfn{echo area}，其中显示信息性消息，您可以在 Emacs 要求时输入信息。
+
+框架的主要区域位于工具栏（如果存在）下方和回波区域上方，称为 @dfn{the window}。  今后在本手册中，我们将在这个意义上使用“窗口”一词。  图形显示系统通常使用具有不同含义的“窗口”一词。但是，如上所述，我们将这些图形窗口称为“框架”。
+
+Emacs 窗口显示 @dfn{buffer}（您正在编辑或查看的文本或其他图形）。  在图形显示上，窗口的一侧有一个 @dfn{scroll bar}，可用于滚动缓冲区。  窗口的最后一行是@dfn{mode line}。  这会显示有关缓冲区中发生的情况的各种信息，例如是否有未保存的更改、正在使用的编辑模式、当前行号等等。
+
+当您启动 Emacs 时，框架中通常只有一个窗口。  但是，您可以水平或垂直细分该窗口以创建多个窗口，每个窗口可以独立显示一个缓冲区（@pxref{Windows}）。
+
+在任何时候，一个窗口都是@dfn{selected window}。  在图形显示上，选定的窗口显示更突出的光标（通常稳定并闪烁）；其他窗口显示不太突出的光标（通常是一个空心框）。  在文本终端上，只有一个光标，显示在所选窗口中。  所选窗口中显示的缓冲区称为@dfn{current buffer}，它是编辑发生的地方。  大多数 Emacs 命令隐式应用于当前缓冲区；未选择的窗口中显示的文本大部分可见以供参考。  如果在图形显示上使用多个框架，则选择特定框架将选择该框架中的窗口。
+
+@menu
+* Point::              文本中编辑命令运行的位置。
+* Echo Area::          短消息出现在屏幕底部。
+* Mode Line::          解释模式行。
+* Menu Bar::           如何使用菜单栏。
+@end menu
+
+@node Point
+@section 观点
+@cindex point
+@cindex cursor
+
+所选窗口中的光标显示大多数编辑命令生效的位置，称为@dfn{point}@footnote{The term ``point'' comes from the character @samp{.}, which was the command in TECO (the language in which the original Emacs was written) for accessing the editing position.}。  许多 Emacs 命令将指针移动到缓冲区中的不同位置；例如，您可以通过单击鼠标按钮 1（通常是左键）在所需位置放置点。
+
+默认情况下，所选窗口中的光标绘制为实心块，并且显示为 @emph{on} 一个字符，但您应该将 point 视为 @emph{between} 两个字符；它位于 @emph{before} 光标下的字符。  例如，如果您的文本看起来像 @samp{frob}，且光标位于 @samp{b} 上，则该点位于 @samp{o} 和 @samp{b} 之间。  如果在该位置插入字符 @samp{!}，结果为 @samp{fro!b}，点位于 @samp{!} 和 @samp{b} 之间。  因此，光标像以前一样保留在 @samp{b} 上。
+
+如果您在 Emacs 中编辑多个文件，每个文件都在自己的缓冲区中，每个缓冲区都有自己的 point 值。  如果您稍后再次显示当前未显示的缓冲区，它会记住其点值。  此外，如果缓冲区显示在多个窗口中，则每个窗口都有自己的点值。
+
+@xref{Cursor Display}，用于控制 Emacs 如何显示光标的选项。
+
+@node Echo Area
+@section 回声区
+@cindex echo area
+
+框架最底部的线是@dfn{echo area}。  它用于出于各种目的显示少量文本。
+
+@cindex echoing
+回显区域之所以如此命名，是因为它的用途之一是@dfn{echoing}，这意味着在您键入时显示多字符命令的字符。  单字符命令不会被回显。  如果您在命令中间暂停超过一秒，则会回显多字符命令 (@pxref{Keys})。  然后，Emacs 会回显到目前为止命令的所有字符，以提示您执行其余操作。  一旦开始回显，命令的其余部分将在您键入时立即回显。  此行为旨在为自信的用户提供快速响应，同时为犹豫的用户提供最大的反馈。
+
+@cindex error message
+@cindex echo area message
+当命令无法完成其工作时，回显区域还用于显示 @dfn{error message}。  错误消息可能会伴随蜂鸣声或屏幕闪烁。
+
+某些命令会在回显区域中显示信息性消息，告诉您该命令执行了哪些操作，或者为您提供一些特定信息。  与错误消息不同，这些 @dfn{informative} 消息不会伴随蜂鸣声或闪烁。  例如，@kbd{C-x =}（按住@key{Ctrl}并键入@kbd{x}，然后松开@key{Ctrl}并键入@kbd{=}）会显示一条消息，描述该字符所在位置、其在缓冲区中的位置以及其在窗口中的当前列。需要很长时间的命令在运行时通常会显示以 @samp{...} 结尾的消息（有时还指示已取得的进度，以百分比形式），并在完成时添加 @samp{done}。
+
+@cindex @file{*Messages*} buffer
+@cindex saved echo area messages
+@cindex messages saved from echo area
+@vindex message-log-max
+信息性回显区域消息保存在名为 @file{*Messages*} 的特殊缓冲区中。  （我们还没有解释缓冲区；有关它们的更多信息，请参阅@ref{Buffers}。）如果您错过了屏幕上短暂出现的消息，您可以切换到@file{*Messages*}缓冲区再次查看它。  @file{*Messages*} 缓冲区仅限于一定数量的行，由变量 @code{message-log-max} 指定。  （我们也没有解释变量；有关它们的更多信息，请参阅@ref{Variables}。）超出此限制，每当在末尾添加新消息行时，就会从开头删除一行。
+
+@xref{Display Custom}，用于控制 Emacs 如何使用回显区域的选项。
+
+回显区域还用于显示 @dfn{minibuffer}，这是一个特殊窗口，您可以在其中输入命令参数，例如要编辑的文件的名称。  当使用迷你缓冲区时，回显区域中显示的文本以 @dfn{prompt string} 开头，并且活动光标出现在迷你缓冲区内，该缓冲区暂时被视为所选窗口。  您始终可以通过输入 @kbd{C-g} 退出迷你缓冲区。  @xref{Minibuffer}。
+
+@node Mode Line
+@section 模式系列
+@cindex mode line
+@cindex top level
+
+每个窗口的底部都有一个@dfn{mode line}，它描述了当前缓冲区中发生的情况。  当只有一个窗口时，模式线出现在回波区域的正上方；它是帧中的倒数第二行。  在图形显示上，模式线以 3D 框外观绘制。  Emacs 通常还会使用与未选定窗口不同的颜色来绘制选定窗口的模式线，以使其脱颖而出。
+
+模式行中显示的文本具有以下格式：
+
+@example
+ @var{cs}:@var{ch}-@var{d}@var{fr}  @var{buf}      @var{pos} @var{line}   (@var{major} @var{minor})
+@end example
+
+@noindent
+在文本终端上，该文本后跟一系列延伸到窗口右边缘的破折号。  这些破折号在图形显示上被省略。
+
+@var{cs} 字符串及其后面的冒号字符描述了当前缓冲区使用的字符集和换行符约定。通常，Emacs 会自动为您处理这些设置，但有时拥有此信息很有用。
+
+@var{cs} 描述缓冲区中文本的字符集 (@pxref{Coding Systems})。  如果它是破折号 (@samp{-})，则表示没有特殊的字符集处理（行尾约定可能是例外，如下一段所述）。  @samp{=} 表示不进行任何转换，通常用于包含非文本数据的文件。  其他字符代表各种@dfn{coding systems}——例如，@samp{1}代表ISO Latin-1。
+
+在文本终端上，@var{cs} 前面有两个附加字符，用于描述键盘输入和终端输出的编码系统。  此外，如果您使用输入法，@var{cs} 前面会有一个标识输入法的字符串 (@pxref{Input Methods})。
+
+@cindex end-of-line convention, mode-line indication
+@var{cs} 之后的字符通常是冒号。  如果显示不同的字符串，则表明对文件进行编码的重要行结束约定。  通常，文件中的文本行由 @dfn{newline characters} 分隔，但有时会使用其他两种约定。  MS-DOS 约定使用回车符后跟换行符；编辑此类文件时，冒号会更改为反斜杠 (@samp{\}) 或@samp{(DOS)}，具体取决于操作系统。  较旧的 Macintosh 系统采用的另一种约定是使用回车符而不是换行符。编辑此类文件时，冒号会更改为正斜杠 (@samp{/}) 或@samp{(Mac)}。  在某些系统上，对于使用换行符作为行分隔符的文件，Emacs 显示 @samp{(Unix)} 而不是冒号。
+
+在为@command{emacsclient} (@pxref{Invoking emacsclient}) 创建的帧上，下一个字符是@samp{@@}。  此指示对于作为守护进程运行的 Emacs 进程的框架来说是典型的 (@pxref{Emacs Server})。
+
+模式行上的下一个元素是由 @var{ch} 指示的字符串。  如果窗口中显示的缓冲区与磁盘上相应文件的内容相同，则显示两个破折号（@samp{--}）；即，如果缓冲区未修改。  如果缓冲区被修改，它会显示两颗星 (@samp{**})。  对于只读缓冲区，如果缓冲区被修改，则显示 @samp{%*}，否则显示 @samp{%%}。
+
+@var{ch} 之后的字符通常是破折号 (@samp{-})。但是，如果当前缓冲区的 @code{default-directory} (@pxref{File Names}) 位于远程计算机上，则显示 @samp{@@}。
+
+如果窗口专用于其当前缓冲区，则会出现 @var{d}。它显示为 @samp{D} 表示强烈的奉献精神，@samp{d} 表示其他形式的奉献精神。  如果该窗口不是专用的，则不会出现@var{d}。  @xref{Dedicated Windows,,, elisp, The Emacs Lisp Reference Manual}。
+
+@var{fr} 给出所选框架名称 (@pxref{Frames})。  它仅出现在文本终端上。  初始帧的名称是@samp{F1}。
+
+@var{buf} 是窗口中显示的缓冲区的名称。通常，这与您正在编辑的文件的名称相同。 @xref{Buffers}。
+
+@var{pos} 告诉您窗口顶部上方或底部下方是否有其他文本。  如果您的缓冲区很小并且所有缓冲区都在窗口中可见，则@var{pos} 是@samp{All}。  否则，如果您查看缓冲区的开头，则为 @samp{Top}；如果您查看缓冲区的末尾，则为 @samp{Bot}；或者 @samp{@var{nn}%}，其中 @var{nn} 是窗口顶部之上的缓冲区的百分比。  使用大小指示模式，您还可以显示缓冲区的大小。  @xref{Optional Mode Line}。
+
+@var{line} 是字符 @samp{L} 后跟该点的行号。  （您也可以通过打开“列号”模式来显示当前列号。@xref{Optional Mode Line}。）
+
+@var{major} 是缓冲区中使用的@dfn{major mode} 的名称。主模式是缓冲区的主要编辑模式，例如Text模式、Lisp模式、C模式等。  @xref{Major Modes}。  某些主要模式会在主要模式名称后显示附加信息。例如，编译缓冲区和外壳缓冲区显示子进程的状态。
+
+@var{minor} 是一些已启用的 @dfn{minor modes} 的列表，它们是可选的编辑模式，在主要模式之上提供附加功能。  @xref{Minor Modes}。
+
+有些功能在打开时会与次要模式一起列出，即使它们并不是真正的次要模式。 @samp{Narrow} 表示正在显示的缓冲区的编辑仅限于其文本的一部分 (@pxref{Narrowing})。 @samp{Def} 表示当前正在定义键盘宏 (@pxref{Keyboard Macros})。
+
+此外，如果 Emacs 位于递归编辑级别内，模式周围的括号周围会出现方括号 (@samp{[@dots{}]})。  如果 Emacs 处于另一个递归编辑级别中，则会出现双方括号，依此类推。  由于递归编辑级别会全局影响 Emacs，因此每个窗口的模式行中都会出现这样的方括号。  @xref{Recursive Edit}。
+
+您可以更改模式行的外观及其内容的格式。  @xref{Optional Mode Line}。  另外，模式线是鼠标敏感的；单击模式行的不同部分会执行各种命令。  @xref{Mode Line Mouse}。  此外，将鼠标指针悬停在模式行的鼠标敏感部分上方会显示工具提示 (@pxref{Tooltips})，其中包含有关可通过单击模式行调用的命令的信息。
+
+@node Menu Bar
+@section 菜单栏
+@cindex menu bar
+
+每个 Emacs 框架的顶部通常都有一个 @dfn{menu bar}，您可以使用它来执行常见操作。  没有必要在这里列出它们，因为您自己可以更轻松地看到它们。
+
+在支持鼠标的显示器上，您可以使用鼠标从菜单栏中选择命令。  菜单项右边缘的箭头表示它指向子菜单，或@dfn{submenu}。  菜单项末尾的 @samp{...} 表示该命令将在实际执行任何操作之前提示您进一步输入。
+
+菜单栏中的一些命令也有普通的按键绑定；如果是这样，则在该项目本身之后会显示一个键绑定。  要查看菜单项的完整命令名称和文档，请键入 @kbd{C-h k}，然后以通常的方式用鼠标选择菜单栏 (@pxref{Key Help})。
+
+@kindex F10
+@findex menu-bar-open
+@cindex menu bar access using keyboard
+除了使用鼠标之外，您还可以通过按 @key{F10}（运行命令 @code{menu-bar-open}）来调用第一个菜单栏项。然后，您可以使用箭头键或使用 @kbd{C-b}、@kbd{C-f}（左/右）、@kbd{C-p} 和 @kbd{C-n}（上/下）浏览菜单。  要激活选定的菜单项，请按@key{RET}；要取消菜单导航，请按 @kbd{C-g} 或 @kbd{@key{ESC} @key{ESC} @key{ESC}}。 （但是，请注意，当使用 GUI 工具包构建 Emacs 时，菜单是由工具包绘制和控制的，取消菜单导航的按键序列可能与上述描述不同。）
+
+@kindex M-`
+@findex tmm-menubar
+@vindex tty-menu-open-use-tmm
+在文本终端上，您可以选择访问回显区域中的菜单栏菜单。  为此，将变量 @code{tty-menu-open-use-tmm} 自定义为非 @code{nil} 值。  然后输入 @key{F10} 将运行命令 @code{tmm-menubar} 而不是下拉菜单。  （您还可以键入 @kbd{M-`}，它总是调用 @code{tmm-menubar}。）@code{tmm-menubar} 允许您使用键盘选择菜单项。  临时选择出现在回显区域中。您可以使用向上和向下箭头键在菜单中移动到不同的项目，然后可以键入 @key{RET} 选择该项目。每个菜单项也由字母或数字指定（通常是项目名称中某个单词的首字母）。  该字母或数字与项目名称之间用 @samp{==>} 分隔。  您可以输入项目的字母或数字来选择项目。

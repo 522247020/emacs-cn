@@ -1,0 +1,193 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 2004--2026 Free Software Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@c
+@c This file is included either in emacs-xtra.texi (when producing the
+@c printed version) or in the main Emacs manual (for the on-line version).
+@node Picture Mode
+@section 编辑图片
+@cindex pictures
+@cindex making pictures out of text characters
+@findex picture-mode
+
+要编辑由文本字符组成的图片（例如，将寄存器划分为字段的图片，作为程序中的注释），请使用命令 @kbd{M-x picture-mode} 进入图片模式。
+
+在图片模式下，编辑基于文本的 @dfn{quarter-plane} 模型，根据该模型，文本字符镶嵌在向右和向下无限延伸的区域上。  该模型中不存在行尾的概念；您最多可以说的是找到该行最后一个非空白字符的位置。
+
+当然，Emacs 实际上总是将文本视为字符序列，并且行确实有结尾。  但图片模式用模拟文本四分之一平面模型的变体取代了最常用的命令。  他们通过插入空格或将制表符转换为空格来实现这一点。
+
+Emacs 的大多数基本编辑命令都由图片模式重新定义，以执行基本相同的操作，但以四分之一平面的方式进行。  此外，图片模式定义了以@kbd{C-c}前缀开头的各种按键来运行特殊的图片编辑命令。
+
+其中一个键 @kbd{C-c C-c} 特别重要。  通常，图片是较大文件的一部分，该文件通常在其他一些主要模式下进行编辑。  图像模式会记录上一个主要模式的名称，以便您稍后可以使用 @kbd{C-c C-c} 命令 (@code{picture-mode-exit}) 返回到该模式。  @kbd{C-c C-c} 还会删除行尾的空格，除非给出数字参数。
+
+图片模式的特殊命令在其他模式下都可以工作（前提是加载了@file{picture}库），但除了图片模式外，不与按键绑定。  下面的描述讨论了移动“一列”等，但所有图片模式命令都像正常的等效命令一样处理数字参数。
+
+@vindex picture-mode-hook
+打开图片模式会运行钩子@code{picture-mode-hook}。图片模式的其他扩展可以在@file{artist.el}中找到。
+
+@menu
+* Basic Picture::          图片模式的基本概念和简单命令。
+* Insert in Picture::      自插入字符后控制光标移动方向。
+* Tabs in Picture::        制表位和缩进的各种功能。
+* Rectangles in Picture::  清除并叠加矩形。
+@end menu
+
+@node Basic Picture
+@subsection 图片模式下的基本编辑
+
+@findex picture-forward-column
+@findex picture-backward-column
+@findex picture-move-down
+@findex picture-move-up
+@cindex editing in Picture mode
+
+大多数键在图片模式下执行与通常相同的操作，但以四分之一平面样式执行。  例如，@kbd{C-f} 会反弹运行 @code{picture-forward-column}，该命令将点向右移动一列，必要时插入一个空格，以便行的实际结尾没有区别。  @kbd{C-b} 反弹运行 @code{picture-backward-column}，它总是将点向左移动一列，如有必要，将制表符转换为多个空格。  @kbd{C-n}和@kbd{C-p}反弹运行@code{picture-move-down}和@code{picture-move-up}，它们可以根据需要插入空格或转换制表符，以确保该点保持在完全相同的列中。 @kbd{C-e} 运行 @code{picture-end-of-line}，它移动到该行最后一个非空白字符之后。  @kbd{C-a} 运行@code{picture-beginning-of-line}。  （屏幕模型的选择不会影响行的开头；此命令所做的唯一额外的事情是将当前图片列更新为 0。）
+
+@findex picture-newline
+通过使用覆盖模式，文本插入适应四分之一平面屏幕模型
+@iftex
+(@pxref{Minor Modes,,, emacs, the Emacs Manual}.)
+@end iftex
+@ifnottex
+(@pxref{Minor Modes}.)
+@end ifnottex
+自插入字符逐列替换现有文本，而不是将现有文本推到右侧。  @key{RET} 运行 @code{picture-newline}，它仅移动到下一行的开头，以便新文本将替换该行。
+
+@findex picture-backward-clear-column
+@findex picture-clear-column
+@findex picture-clear-line
+在图片模式下，通常删除或终止文本的命令，而是擦除文本（用空格替换）。  @key{DEL} (@code{picture-backward-clear-column}) 用空格替换前面的字符而不是删除它；这个移动点向后。  @kbd{C-d} (@code{picture-clear-column}) 用空格替换下一个或多个字符，但不移动点。  （如果您想将字符清除到空格并向前移动，请使用@key{SPC}。）@kbd{C-k}（@code{picture-clear-line}）确实会杀死行的内容，但不会从缓冲区中删除换行符。
+
+@findex picture-open-line
+要进行实际插入，您必须使用特殊命令。  @kbd{C-o} (@code{picture-open-line}) 在当前行之后创建一个空行；它永远不会分割线。  @kbd{C-M-o} (@code{split-line}) 在图片模式下有意义，因此不会改变。  @kbd{C-j} (@code{picture-duplicate-line}) 在当前行下方插入另一行内容相同的行。
+
+@kindex C-c C-d @r{(Picture mode)}
+要在图片模式下进行实际删除，请使用 @kbd{C-w}、@kbd{C-c C-d}（定义为 @code{delete-char}，就像 @kbd{C-d} 在其他模式下一样）或图片矩形命令之一 (@pxref{Rectangles in Picture})。
+
+@node Insert in Picture
+@subsection 插入后控制运动
+
+@findex picture-movement-up
+@findex picture-movement-down
+@findex picture-movement-left
+@findex picture-movement-right
+@findex picture-movement-nw
+@findex picture-movement-ne
+@findex picture-movement-sw
+@findex picture-movement-se
+@kindex C-c < @r{(Picture mode)}
+@kindex C-c LEFT @r{(Picture mode)}
+@kindex C-c > @r{(Picture mode)}
+@kindex C-c RIGHT @r{(Picture mode)}
+@kindex C-c ^ @r{(Picture mode)}
+@kindex C-c UP @r{(Picture mode)}
+@kindex C-c . @r{(Picture mode)}
+@kindex C-c DOWN @r{(Picture mode)}
+@kindex C-c ` @r{(Picture mode)}
+@kindex C-c Home @r{(Picture mode)}
+@kindex C-c ' @r{(Picture mode)}
+@kindex C-c PageUp @r{(Picture mode)}
+@kindex C-c prior @r{(Picture mode)}
+@kindex C-c / @r{(Picture mode)}
+@kindex C-c End @r{(Picture mode)}
+@kindex C-c \ @r{(Picture mode)}
+@kindex C-c PageDown @r{(Picture mode)}
+@kindex C-c next @r{(Picture mode)}
+由于图片模式下的自插入字符会覆盖并移动点，因此对于如何移动点没有本质限制。通常点向右移动，但您可以指定自插入字符后运动的八个正交或对角线方向中的任何一个。  这对于在缓冲区中绘制线条很有用。
+
+@table @kbd
+@item C-c <
+@itemx C-c @key{LEFT}
+插入后向左移动 (@code{picture-movement-left})。
+@item C-c >
+@itemx C-c @key{RIGHT}
+插入后向右移动 (@code{picture-movement-right})。
+@item C-c ^
+@itemx C-c @key{UP}
+插入后向上移动 (@code{picture-movement-up})。
+@item C-c .
+@itemx C-c @key{DOWN}
+插入后向下移动 (@code{picture-movement-down})。
+@item C-c `
+@itemx C-c @key{Home}
+插入 (@code{picture-movement-nw}) 后向上和向左移动 (``西北'')。
+@item C-c '
+@itemx C-c @key{PageUp}
+@itemx C-c @key{prior}
+插入后向上向右移动（``东北''）（@code{picture-movement-ne}）。
+@item C-c /
+@itemx C-c @key{End}
+插入@*(@code{picture-movement-sw})后向下和向左移动（“西南”）。
+@item C-c \
+@itemx C-c @key{PageDown}
+@itemx C-c @key{next}
+插入@*(@code{picture-movement-se})后向下向右移动（``东南''）。
+@end table
+
+@kindex C-c C-f @r{(Picture mode)}
+@kindex C-c C-b @r{(Picture mode)}
+@findex picture-motion
+@findex picture-motion-reverse
+两个运动命令根据当前图片插入方向移动。  命令 @kbd{C-c C-f} (@code{picture-motion}) 与当前插入后的运动方向相同，而 @kbd{C-c C-b} (@code{picture-motion-reverse}) 则相反。
+
+@node Tabs in Picture
+@subsection 图像模式选项卡
+
+@kindex M-TAB @r{(Picture mode)}
+@findex picture-tab-search
+@vindex picture-tab-chars
+图片模式下提供了两种类似选项卡的操作。  使用 @kbd{M-@key{TAB}} (@code{picture-tab-search}) 进行基于上下文的选项卡。如果没有参数，它会移动到下一个“有趣”字符下方的点，该字符位于上一个非空行中的空白之后。  这里的“下一个”意思是“出现在比起始点更大的水平位置”。  使用前缀参数（如@kbd{C-u M-@key{TAB}}），此命令将移动到当前行中的下一个这样有趣的字符。  @kbd{M-@key{TAB}} 不改变文本；它只移动点。  “有趣的”字符由变量 @code{picture-tab-chars} 定义，它应该定义一组字符。  该变量的语法类似于正则表达式中@samp{[@dots{}]}内部使用的语法——但没有@samp{[}和@samp{]}。  它的默认值为@code{"!-~"}。
+
+@findex picture-tab
+@key{TAB}本身运行@code{picture-tab}，它根据当前制表位设置进行操作；它相当于 @code{tab-to-tab-stop} 的图片模式。  通常它只是移动点，但使用数字参数时它会清除它移动的文本。
+
+@kindex C-c TAB @r{(Picture mode)}
+@findex picture-set-tab-stops
+基于上下文和基于制表位的制表符形式由命令 @kbd{C-c @key{TAB}} (@code{picture-set-tab-stops}) 组合在一起。此命令将制表位设置为 @kbd{M-@key{TAB}} 认为在当前行中重要的位置。  该命令与 @key{TAB} 一起使用，可以获得基于上下文的 Tab 键切换效果。  但在足够的情况下@kbd{M-@key{TAB}}更方便。
+
+防止在图片中使用实际制表符可能会很方便。  例如，这可以防止 @kbd{C-x @key{TAB}} 弄乱图片。  您可以通过将变量 @code{indent-tabs-mode} 设置为 @code{nil} 来完成此操作。
+
+@node Rectangles in Picture
+@subsection 图像模式矩形命令
+@cindex rectangles and Picture mode
+@cindex Picture mode and rectangles
+
+图片模式定义了以适合四分之一平面模型的方式处理矩形文本片段的命令。  标准矩形命令也可能有用。
+@iftex
+@xref{Rectangles,,, emacs, the Emacs Manual}.
+@end iftex
+@ifnottex
+@xref{Rectangles}.
+@end ifnottex
+
+@table @kbd
+@item C-c C-k
+清除带有空格的区域矩形 (@code{picture-clear-rectangle})。  使用前缀参数，删除文本。
+@item C-c C-w @var{r}
+类似，但首先将矩形内容保存在寄存器@var{r}（@code{picture-clear-rectangle-to-register}）中。
+@iftex
+@xref{Registers,,, emacs, the Emacs Manual}.
+@end iftex
+@ifnottex
+@xref{Registers}.
+@end ifnottex
+
+@item C-c C-y
+通过覆盖将最后一个被杀死的矩形复制到缓冲区中，左上角位于点（@code{picture-yank-rectangle}）。  如果有参数，则插入。
+@item C-c C-x @var{r}
+类似，但使用寄存器 @var{r} (@code{picture-yank-rectangle-from-register}) 中的矩形。
+@end table
+
+@kindex C-c C-k @r{(Picture mode)}
+@kindex C-c C-w @r{(Picture mode)}
+@findex picture-clear-rectangle
+@findex picture-clear-rectangle-to-register
+图片矩形命令@kbd{C-c C-k} (@code{picture-clear-rectangle}) 和@kbd{C-c C-w} (@code{picture-clear-rectangle-to-register}) 与标准矩形命令的不同之处在于它们通常清除矩形而不是删除它；这与在图片模式下更改@kbd{C-d}的方式类似。
+
+但是，删除矩形在图片模式下可能很有用，因此如果给定数字参数，这些命令将删除矩形。 @kbd{C-c C-k} 无论带或不带数字参数都会保存@kbd{C-c C-y} 的矩形。
+
+@kindex C-c C-y @r{(Picture mode)}
+@kindex C-c C-x @r{(Picture mode)}
+@findex picture-yank-rectangle
+@findex picture-yank-rectangle-from-register
+用于拉动矩形的图片模式命令与标准命令的不同之处在于它们是覆盖而不是插入。  这与其他文本的图片模式插入与其他模式的不同之处相同。  @kbd{C-c C-y} (@code{picture-yank-rectangle}) 插入（通过覆盖）最近被杀死的矩形，而 @kbd{C-c C-x} (@code{picture-yank-rectangle-from-register}) 对在指定寄存器中找到的矩形执行同样的操作。

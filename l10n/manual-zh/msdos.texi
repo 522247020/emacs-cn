@@ -1,0 +1,721 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Microsoft Windows
+@appendix Emacs 和 Microsoft Windows/MS-DOS
+@cindex Microsoft Windows
+@cindex MS-Windows, Emacs peculiarities
+
+本节描述在 Microsoft Windows 上使用 Emacs 的特性。  其中一些特性也与 Microsoft 较旧的 MS-DOS 操作系统相关。然而，与 MS-DOS 相关的 @emph{only} 的 Emacs 功能在单独的章节中进行了描述。
+@iftex
+manual (@pxref{MS-DOS,,, emacs-xtra, Specialized Emacs Features}).
+@end iftex
+@ifnottex
+section (@pxref{MS-DOS}).
+@end ifnottex
+
+MS-Windows 是一个非自由操作系统；这意味着它剥夺了用户每个计算机用户应得的自由。  这是不公平的。  为了您的自由，我们强烈建议您切换到免费操作系统。
+
+我们在专有操作系统上支持 GNU Emacs，因为我们希望这种自由的味道能够激励用户摆脱它们。
+
+MS-Windows 上 Emacs 的行为与手册其余部分中记录的行为相当相似，包括对长文件名、多框架、滚动条、鼠标菜单和子进程的支持。但是，需要注意一些特殊注意事项，此处对其进行了描述。
+
+@menu
+* Windows Startup::      如何在 Windows 上启动 Emacs。
+* Text and Binary::      文本文件使用 CRLF 来终止行。
+* Windows Files::        Windows 上的文件名约定。
+* ls in Lisp::           Dired 的 @code{ls} 模拟。
+* Windows HOME::         Emacs 在哪里查找 @file{.emacs} 以及它的启动位置。
+* Windows Keyboard::     Windows 特定的键盘功能。
+* Windows Mouse::        Windows 特定的鼠标功能。
+* Windows Processes::    在 Windows 上运行子进程。
+* Windows Printing::     如何在 MS-Windows 上指定打印机。
+* Windows Fonts::        指定 MS-Windows 上的字体。
+* Windows Misc::         各种 Windows 功能。
+@ifnottex
+* MS-DOS::              Using Emacs on MS-DOS.
+@end ifnottex
+@end menu
+
+@node Windows Startup
+@section 如何在 MS-Windows 上启动 Emacs
+@cindex starting Emacs on MS-Windows
+
+在 MS-Windows 上启动 Emacs 有多种方法：
+
+@enumerate
+@item 
+@pindex runemacs.exe
+@cindex desktop shortcut, MS-Windows
+@cindex start directory, MS-Windows
+@cindex directory where Emacs starts on MS-Windows
+从桌面快捷方式图标：双击图标上的鼠标左键，或单击一次，然后按 @key{RET}。  桌面快捷方式应将 @file{runemacs.exe}、@emph{not} 和 @file{emacs.exe} 的完整绝对文件名指定为其“目标”（在快捷方式的“属性”中）。  这是因为如果快捷方式的目标是 5⁣（就 Windows 而言，这是一个控制台程序），@file{runemacs.exe} 会隐藏本应创建的控制台窗口。  如果使用此方法，Emacs 将在快捷方式指定的目录中启动。  要控制其位置，请右键单击快捷方式，选择“属性”，然后在“快捷方式”选项卡中根据您的喜好修改“开始于”字段。
+
+@item 
+@cindex pinning Emacs to Windows task bar
+从任务栏快捷方式图标中，单击鼠标左键。自 Vista 以来的 Windows 版本允许您通过 @dfn{pinning} 出现在任务栏中的正在运行的程序的图标来创建此类快捷方式。  您可以使用 Emacs 执行此操作，但之后您必须更改固定快捷方式的属性才能运行 @file{runemacs.exe}、@emph{not} 或 @file{emacs.exe}。  您还可以通过在“开始”菜单中的 Emacs 图标上单击鼠标右键，然后选择 @samp{Pin to taskbar}，将 Emacs 固定到任务栏。  再次确保指定 @file{runemacs.exe} 作为要运行的程序。  您可以通过设置快捷方式属性的“开始于”字段来控制 Emacs 的启动位置。
+
+@item 
+在命令提示符窗口中，在提示符下键入 @kbd{emacs @key{RET}}。  在 Emacs 退出之前，您执行此操作的命令提示符窗口将无法用于调用其他命令。  在这种情况下，Emacs 将在 Windows shell 的当前目录中启动。
+
+@item 
+在命令提示符窗口中，在提示符下键入 @kbd{runemacs @key{RET}}。  您执行此操作的命令提示符窗口将立即可用于调用其他命令。  在这种情况下，Emacs 将在 Windows shell 的当前目录中启动。
+
+@item 
+从 Windows @code{Run} 对话框（通常通过单击 @code{Start} 按钮访问）。  在对话框中输入 @kbd{runemacs @key{RET}} 将在 Windows 的父目录（相当于用户的 @code{HOME} 目录）中启动 Emacs，请参阅 @ref{Windows HOME}。
+
+@item 
+@cindex invoking Emacs from Windows Explorer
+@pindex emacsclient.exe
+@pindex emacsclientw.exe
+通过 @file{emacsclient.exe} 或 @file{emacsclientw.exe}，允许您从其他程序调用 Emacs，并重用正在运行的 Emacs 进程来服务其他程序所需的编辑作业。 @xref{Emacs Server}。  @file{emacsclient.exe}和@file{emacsclientw.exe}的区别在于前者是控制台程序，而后者是Windows GUI程序。  这两个程序都会等待 Emacs 发出编辑作业完成的信号，然后退出并将控制权返回给调用它们的程序。  在每种情况下使用哪一种取决于需要编辑服务的程序的期望。  如果该程序本身是控制台（文本模式）程序，则应使用@file{emacsclient.exe}，以便其任何消息和提示出现在与调用程序相同的命令窗口中。  相比之下，如果调用程序是 GUI 程序，则最好使用@file{emacsclientw.exe}，因为从 GUI 程序调用@file{emacsclient.exe} 会弹出一个命令窗口。  您需要 @file{emacsclientw.exe} 的一个值得注意的情况是，当您右键单击 Windows 资源管理器中的文件并从弹出菜单中选择“打开方式”时。  如果调用 @command{emacsclient} 时 Emacs 可能未运行（或未作为服务器运行），请使用 @samp{--alternate-editor=} 或 @samp{-a} 选项 — 这将始终为您提供一个编辑器。  当通过 @command{emacsclient} 调用时，Emacs 将在调用 @command{emacsclient} 的程序的当前目录中启动。
+@end enumerate
+
+@cindex @command{emacsclient}, on MS-Windows
+请注意，由于 MS-Windows 的限制，Emacs 无法在同一会话中同时拥有 GUI 和文本模式框架。  它还无法在多个 @dfn{Command Prompt} 窗口上打开文本模式框架，因为每个 Windows 程序在任何给定时间只能有一个控制台。  由于这些原因，如果您使用 @option{-c} 选项调用 @command{emacsclient}，并且 Emacs 服务器在文本模式会话中运行，Emacs 将始终在启动它的同一个 @dfn{Command Prompt} 窗口中创建一个新的文本模式框架；仅当服务器在 GUI 会话中运行时才会创建 GUI 框架。  同样，如果您使用 @option{-t} 选项调用 @command{emacsclient}，如果服务器在 GUI 会话中运行，Emacs 将创建一个 GUI 框架，或者当会话在 @dfn{Command Prompt} 窗口中以文本模式运行时，Emacs 将创建文本模式框架。  @xref{emacsclient Options}。
+
+@node Text and Binary
+@section 文本文件和二进制文件
+@cindex text and binary files on MS-DOS/MS-Windows
+
+GNU Emacs 使用换行符来分隔文本行。  这是 GNU、Unix 和其他 POSIX 兼容系统上使用的约定。
+
+@cindex end-of-line conversion on MS-DOS/MS-Windows
+相比之下，MS-DOS 和 MS-Windows 通常使用回车符和换行符（两个字符序列）来分隔文本行。  （换行符与换行符相同。）因此，为了使用 Emacs 方便地编辑典型文件，需要转换这些行尾 (EOL) 序列。  这就是 Emacs 通常所做的：读取文件时将回车换行转换为换行符，写入文件时将换行符转换为回车换行。  处理国际字符代码转换的相同机制也可以进行此转换 (@pxref{Coding Systems})。
+
+@cindex cursor location, on MS-DOS
+@cindex point location, on MS-DOS
+大多数文件的这种特殊格式转换的一个后果是 Emacs (@pxref{Position Info}) 报告的字符位置与操作系统已知的文件大小信息不一致。
+
+此外，如果 Emacs 从文件内容中识别出它使用换行符而不是回车符后跟换行符作为其行分隔符，则在读取或写入该文件时，它不会执行 EOL 转换。  因此，您可以在 MS-DOS 上读取和编辑来自 GNU 和 Unix 系统的文件，而无需付出特别的努力，并且在您编辑它们后，它们将保留其 Unix 风格的行尾约定。
+
+模式行指示当前缓冲区是否使用行尾转换。  如果缓冲区使用 MS-DOS 行尾转换，则 Emacs 的 MS-Windows 版本会在模式行开头 (@pxref{Mode Line}) 附近的编码系统助记符后面显示反斜杠 @samp{\}。  如果未执行 EOL 转换，则会显示字符串 @samp{(Unix)} 而不是反斜杠，以提醒您文件的 EOL 格式不是通常的回车符后跟换行符。
+
+@cindex DOS-to-Unix conversion of files
+要访问文件并指定它是使用 DOS 样式还是 Unix 样式行尾，请指定编码系统 (@pxref{Text Coding})。  例如，@kbd{C-x @key{RET} c unix @key{RET} C-x C-f foobar.txt}访问文件@file{foobar.txt}而不转换EOL；如果某行以回车符后跟换行符对结尾，Emacs 将在该行末尾显示 @samp{^M}。  同样，您可以使用 @kbd{C-x @key{RET} f} 命令指示 Emacs 以指定的 EOL 格式保存缓冲区。  例如，要以 Unix EOL 格式保存缓冲区，请键入 @kbd{C-x @key{RET} f unix @key{RET} C-x C-s}。  如果您访问带有 DOS EOL 转换的文件，则将其保存为 Unix EOL 格式，这样可以有效地将文件转换为 Unix EOL 样式，如 @code{dos2unix} 程序。
+
+@cindex untranslated file system
+@findex w32-add-untranslated-filesystem
+当您使用 NFS、Samba 或其他类似方法访问驻留在使用 GNU 或 Unix 系统的计算机上的文件系统时，Emacs 不应对这些文件系统中的任何文件执行行尾转换 — 即使您创建新文件时也不应如此。  要请求此操作，请通过调用函数 @code{w32-add-untranslated-filesystem} 将这些文件系统指定为 @dfn{untranslated} 文件系统。  它需要一个参数：文件系统名称，包括驱动器号和可选的目录。  例如，
+
+@example
+(w32-add-untranslated-filesystem "Z:")
+@end example
+
+@noindent
+将驱动器 Z 指定为未翻译的文件系统，并且
+
+@example
+(w32-add-untranslated-filesystem "Z:\\foo")
+@end example
+
+@noindent
+将驱动器 Z 上的目录@file{\foo}指定为未翻译的文件系统。
+
+大多数情况下，您会在 @file{.emacs} 或 @file{init.el} 初始化文件或 @file{site-start.el} 中使用 @code{w32-add-untranslated-filesystem}，以便站点上的所有用户都能从中受益。
+
+@findex w32-remove-untranslated-filesystem
+要抵消 @code{w32-add-untranslated-filesystem} 的影响，请使用函数 @code{w32-remove-untranslated-filesystem}。  该函数接受一个参数，该参数应该是一个字符串，就像之前在 @code{w32-add-untranslated-filesystem} 中使用的字符串一样。
+
+将文件系统指定为未翻译不会影响字符集转换，只会影响行尾转换。  本质上，它指示 Emacs 默认使用在行尾使用换行符的 Unix 风格约定创建新文件。  @xref{Coding Systems}。
+
+@node Windows Files
+@section MS-Windows 上的文件名
+@cindex file names on MS-Windows
+
+MS-Windows 和 MS-DOS 通常使用反斜杠 @samp{\} 来分隔文件名中的名称单元，而不是其他系统上使用的斜杠。  MS-DOS/MS-Windows 上的 Emacs 允许使用斜杠或反斜杠，并且还知道文件名中的驱动器号。
+
+@cindex file-name completion, on MS-Windows
+在 MS-DOS/MS-Windows 上，文件名不区分大小写，因此 Emacs 默认情况下会在完成过程中忽略文件名中的字母大小写。  为此，在 MS-DOS/MS-Windows 上 @code{read-file-name-completion-ignore-case} 的默认值为非 @code{nil}。  @xref{Completion Options}。
+
+@vindex w32-get-true-file-attributes
+变量 @code{w32-get-true-file-attributes} 控制 Emacs 是否应该发出额外的系统调用，以更准确地确定 @code{file-attributes} 和 @code{directory-files-and-attributes} 等原语中的文件属性。  需要这些额外的调用来报告特殊文件（例如管道）的正确文件所有权、链接计数和文件类型。  如果没有这些系统调用，文件所有权将归属于当前用户，链接计数将始终报告为 1，特殊文件将报告为常规文件。
+
+如果此变量的值为@code{local}（默认值），Emacs 将仅对本地固定驱动器上的文件发出这些附加系统调用。  任何其他非 1⁣ 值意味着即使对于可移动卷和远程卷也会执行此操作，这可能会减慢 Dired 和其他相关功能的速度。  @code{nil} 的值意味着永远不会发出这些系统调用。  非@code{nil}值在支持硬链接和文件安全的 NTFS 卷上比在 FAT、FAT32 和 exFAT 卷上更有用。
+
+@cindex file names, invalid characters on MS-Windows
+与 Unix 不同，MS-Windows 文件系统限制文件名中可以​​使用的字符集。  不允许使用以下字符：
+
+@itemize @bullet
+@item 
+shell 重定向符号 @samp{<}、@samp{>} 和 @samp{|}。
+
+@item 
+冒号 @samp{:}（驱动器号后面除外）。
+
+@item 
+正斜杠@samp{/}和反斜杠@samp{\}（作为目录分隔符除外）。
+
+@item 
+通配符 @samp{*} 和 @samp{?}。
+
+@item 
+代码点为十进制 1 到 31 的控制字符。  特别是，文件名中不允许出现换行符。
+
+@item 
+空字符，其代码点为零（Unix 文件系统上也存在此限制）。
+@end itemize
+
+@noindent
+此外，引用名称与 DOS 字符设备匹配的任何文件（例如 @file{NUL} 或 @file{LPT1} 或 @file{PRN} 或 @file{CON}），无论有或没有任何文件扩展名，都将始终解析为任何目录中的这些字符设备。  因此，只有当您想使用相应的字符设备时才使用此类文件名。
+
+@node ls in Lisp
+@section 在 MS-Windows 上模拟 @code{ls}
+@cindex Dired, and MS-Windows/MS-DOS
+@cindex @code{ls} emulation
+
+Dired 通常使用外部程序@code{ls} 生成显示在 Dired 缓冲区 (@pxref{Dired}) 中的目录列表。  然而，MS-Windows 和 MS-DOS 系统没有附带这样的程序，尽管 @sc{gnu} @code{ls} 的多个端口可用。  因此，在 Lisp 中的那些系统 @emph{emulates} @code{ls} 上的 Emacs，通过使用 @file{ls-lisp.el} 包。  虽然@file{ls-lisp.el}提供了对@code{ls}相当完整的模拟，但该模拟还有一些特有的选项和功能；
+@iftex
+for more details, see the documentation of the variables whose names
+begin with @code{ls-lisp}.
+@end iftex
+@ifnottex
+they are described in this section.
+
+  The @code{ls} emulation supports many of the @code{ls} switches, but
+it doesn't support all of them.  Here's the list of the switches it
+does support: @option{-A}, @option{-a}, @option{-B}, @option{-C},
+@option{-c}, @option{-G}, @option{-g}, @option{-h}, @option{-i}, @option{-n},
+@option{-R}, @option{-r}, @option{-S}, @option{-s}, @option{-t}, @option{-U},
+@option{-u}, @option{-v}, and @option{-X}.  The @option{-F} switch is
+partially supported (it appends the character that classifies the
+file, but does not prevent symlink following).
+
+@vindex ls-lisp-use-insert-directory-program
+  On MS-Windows and MS-DOS, @file{ls-lisp.el} is preloaded when Emacs
+is built, so the Lisp emulation of @code{ls} is always used on those
+platforms.  If you have a ported @code{ls}, setting
+@code{ls-lisp-use-insert-directory-program} to a non-@code{nil} value
+will revert to using an external program named by the variable
+@code{insert-directory-program}.
+
+@cindex Dired sorting order, on MS-Windows/MS-DOS
+  The order in which @file{ls-lisp.el} sorts files depends on several
+customizable options described below.
+
+@vindex ls-lisp-use-string-collate
+  The default sorting order follows locale-specific rules derived from
+your system locale.  You can make the order locale-independent by
+customizing @code{ls-lisp-use-string-collate} to a @code{nil} value.
+
+@cindex Unicode Collation Algorithm (UCA), and @file{ls-lisp.el}
+@vindex ls-lisp-UCA-like-collation
+  On GNU and Unix systems, when the locale's encoding is UTF-8, the
+collation order follows the Unicode Collation Algorithm
+(@acronym{UCA}).  To have a similar effect on MS-Windows, the variable
+@code{ls-lisp-UCA-like-collation} should have a non-@code{nil} value
+(this is the default).  The resulting sorting order ignores
+punctuation, symbol characters, and whitespace characters, so
+@file{.foobar}, @file{foobar} and @w{@file{foo bar}} will appear
+together rather than far apart.
+
+@vindex ls-lisp-ignore-case
+  By default, @file{ls-lisp.el} uses a case-sensitive sort order for
+the directory listing it produces; this is so the listing looks the
+same as on other platforms.  If you wish that the files be sorted in
+case-insensitive order, set the variable @code{ls-lisp-ignore-case} to
+a non-@code{nil} value.
+
+@vindex ls-lisp-dirs-first
+  By default, files and subdirectories are sorted together, to emulate
+the behavior of @code{ls}.  However, native MS-Windows/MS-DOS file
+managers list the directories before the files; if you want that
+behavior, customize the option @code{ls-lisp-dirs-first} to a
+non-@code{nil} value.
+
+@vindex ls-lisp-verbosity
+  The variable @code{ls-lisp-verbosity} controls the file attributes
+that @file{ls-lisp.el} displays.  The value should be either
+@code{nil} or a list that contains one or more of the symbols
+@code{links}, @code{uid}, and @code{gid}.  @code{links} means display
+the count of different file names that are associated with (a.k.a.@:
+@dfn{links to}) the file's data; this is only useful on NTFS volumes.
+@code{uid} means display the numerical identifier of the user who owns
+the file.  @code{gid} means display the numerical identifier of the
+file owner's group.  The default value is @code{(links uid gid)} i.e.,
+all the 3 optional attributes are displayed.  The value @code{nil}
+means not to display any of these attributes.
+
+@vindex ls-lisp-emulation
+  The variable @code{ls-lisp-emulation} controls the flavor of the
+@code{ls} emulation by setting the defaults for the 3 options
+described above: @code{ls-lisp-ignore-case},
+@code{ls-lisp-dirs-first}, and @code{ls-lisp-verbosity}.  The value of
+this option can be one of the following symbols:
+
+@table @code
+@item GNU
+@itemx nil
+Emulate @sc{gnu} systems; this is the default.  This sets
+@code{ls-lisp-ignore-case} and @code{ls-lisp-dirs-first} to
+@code{nil}, and @code{ls-lisp-verbosity} to @code{(links uid gid modes)}.
+@item UNIX
+Emulate Unix systems.  Like @code{GNU}, but sets
+@code{ls-lisp-verbosity} to @code{(links uid modes)}.
+@item MacOS
+Emulate macOS@.  Sets @code{ls-lisp-ignore-case} to @code{t}, and
+@code{ls-lisp-dirs-first} and @code{ls-lisp-verbosity} to @code{nil}.
+@item MS-Windows
+Emulate MS-Windows.  Sets @code{ls-lisp-ignore-case} and
+@code{ls-lisp-dirs-first} to @code{t}, and @code{ls-lisp-verbosity} to
+@code{nil} on Windows 9X and to @code{t} on modern versions of
+Windows.  Note that the default emulation is @emph{not}
+@code{MS-Windows}, even on Windows, since many users of Emacs on those
+platforms prefer the @sc{gnu} defaults.
+@end table
+
+@noindent
+Any other value of @code{ls-lisp-emulation} means the same as @code{GNU}.
+Customizing this option calls the function @code{ls-lisp-set-options} to
+update the 3 dependent options as needed.  If you change the value of
+this variable without using customize after @file{ls-lisp.el} is loaded
+(note that it is preloaded on MS-Windows and MS-DOS), you can call that
+function manually for the same result.
+
+@vindex ls-lisp-support-shell-wildcards
+  The variable @code{ls-lisp-support-shell-wildcards} controls how
+file-name patterns are supported: if it is non-@code{nil} (the
+default), they are treated as shell-style wildcards; otherwise they
+are treated as Emacs regular expressions.
+
+@vindex ls-lisp-format-time-list
+  The variable @code{ls-lisp-format-time-list} defines how to format
+the date and time of files.  @emph{The value of this variable is
+ignored}, unless Emacs cannot determine the current locale.  (However,
+if the value of @code{ls-lisp-use-localized-time-format} is
+non-@code{nil}, Emacs obeys @code{ls-lisp-format-time-list} even if
+the current locale is available; see below.)
+
+The value of @code{ls-lisp-format-time-list} is a list of 2 strings.
+The first string is used if the file was modified within the current
+year, while the second string is used for older files.  In each of
+these two strings you can use @samp{%}-sequences to substitute parts
+of the time.  For example:
+@lisp
+("%b %e %H:%M" "%b %e  %Y")
+@end lisp
+
+@noindent
+Note that the strings substituted for these @samp{%}-sequences depend
+on the current locale.  @xref{Time Parsing,,, elisp, The Emacs Lisp
+Reference Manual}, for more about format time specs.
+
+@vindex ls-lisp-use-localized-time-format
+  Normally, Emacs formats the file time stamps in either traditional
+or ISO-style time format.  However, if the value of the variable
+@code{ls-lisp-use-localized-time-format} is non-@code{nil}, Emacs
+formats file time stamps according to what
+@code{ls-lisp-format-time-list} specifies.  The @samp{%}-sequences in
+@code{ls-lisp-format-time-list} produce locale-dependent month and day
+names, which might cause misalignment of columns in Dired display.
+The default value of @code{ls-lisp-use-localized-time-format} is
+@code{nil}.
+@end ifnottex
+
+@node Windows HOME
+@section MS-Windows 上的主目录和启动目录
+@cindex HOME directory on MS-Windows
+
+Windows 中 @code{HOME} 的等效项是 @dfn{user-specific application data directory}。  实际位置取决于Windows版本； Windows 2000 至 XP 上的典型值为 @file{C:\Documents and Settings\@var{username}\Application Data}，Windows Vista 及更高版本上的为 @file{C:\Users\@var{username}\AppData\Roaming}，Windows 9X/ME 上的@file{C:\WINDOWS\Application Data} 或 @file{C:\WINDOWS\Profiles\@var{username}\Application Data}@. 如果此目录不存在或无法访问，Emacs 将回退到 @file{C:\} 作为默认值 @code{HOME}。
+
+您可以通过显式设置环境变量 @env{HOME} 来覆盖 @code{HOME} 的默认值，使其指向系统上的任何目录。  @env{HOME} 可以从命令 shell 提示符或从 @samp{My Computer} 的 @samp{Properties} 对话框进行设置。 @code{HOME} 也可以在系统注册表中设置，@pxref{MS-Windows Registry}。
+
+为了与旧版本的 Emacs@footnote{ Older versions of Emacs didn't check the application data directory. } 兼容，如果驱动器 @file{C:} 的根目录 @file{C:\} 中有一个名为 @file{.emacs} 的文件，并且既没有在环境中也没有在注册表中设置 @env{HOME}，则 Emacs 会将 @file{C:\} 视为默认的 @code{HOME} 位置，并且不会在应用程序数据目录中查找，即使它存在。  请注意，在 @file{C:\} 中仅查找 @file{.emacs}；旧名称@file{_emacs}（见下文）不是。  不推荐使用 @file{C:\.emacs} 来定义 @code{HOME}； Emacs 将在启动期间显示有关其使用的警告。
+
+无论最终位置是什么，Emacs 都会设置 @env{HOME} 环境变量的内部值来指向它，并且它将使用该位置来查找它通常在主目录中查找或创建的其他文件和目录。
+
+您始终可以通过输入 @kbd{C-x d ~/ @key{RET}} 来了解 Emacs 认为您的主目录的位置。  这应该显示主目录中的文件列表，并在第一行显示其全名。  同样，要访问您的初始化文件，请输入@kbd{C-x C-f ~/.emacs @key{RET}}（假设文件名是@file{.emacs}）。
+
+@cindex init file @file{.emacs} on MS-Windows
+您的初始化文件可以具有@ref{Init File}中提到的任何名称。
+
+@cindex @file{_emacs} init file, MS-Windows
+由于 MS-DOS 不允许文件名带有前导点，并且较旧的 Windows 系统很难创建具有此类名称的文件，因此 Emacs 的 Windows 端口支持 init 文件名 @file{_emacs}（如果主目录中存在这样的文件而 @file{.emacs} 不存在）。该名称已被视为已过时，因此如果使用该名称，Emacs 将显示警告。
+
+@node Windows Keyboard
+@section MS-Windows 上的键盘使用
+@cindex keyboard, MS-Windows
+
+本节介绍与 Emacs 中键盘输入相关的 Windows 特定功能。
+
+@cindex MS-Windows keyboard shortcuts
+许多在 MS-Windows 程序中常规使用的组合键（称为“键盘快捷键”）与传统的 Emacs 键绑定相冲突。  （这些 Emacs 键绑定是在 Microsoft 成立前几年建立的。）冲突的示例包括 @kbd{C-c}、@kbd{C-x}、@kbd{C-z} 和 @kbd{C-a}。您可以通过启用 CUA 模式 (@pxref{CUA Bindings}) 来重新定义其中一些，使其含义更像 MS-Windows 含义。  另一个可选功能是删除选择模式 (@pxref{Using Region})，它将使 Emacs 的行为像其他 Windows 应用程序一样。
+
+@ifnottex
+@vindex w32-alt-is-meta
+@cindex @code{Alt} key (MS-Windows)
+  By default, the key labeled @key{Alt} is mapped as the @key{Meta}
+key.  If you wish it to produce the @code{Alt} modifier instead, set
+the variable @code{w32-alt-is-meta} to a @code{nil} value.
+
+@findex w32-register-hot-key
+@findex w32-unregister-hot-key
+  MS-Windows reserves certain key combinations, such as
+@kbd{@key{Alt}-@key{TAB}} and a number of Windows key combinations,
+for its own use.  These key combinations are intercepted by the system
+before Emacs can see them.  Also, on Windows 10, all Windows key
+combinations are reserved by the system in such a way that they are
+never propagated to applications, even if the system does not
+currently define a hotkey on the specific combination.  You can use
+the @code{w32-register-hot-key} function to allow a key sequence to be
+seen by Emacs instead of being grabbed by Windows.  When registered as
+a hot key, the key combination is pulled out of the system's input
+queue before it is handled by Windows, effectively overriding the
+special meaning of that key sequence for Windows.  The override is
+only effective when Emacs is active; with other applications on the
+foreground the keys behave normally.
+
+  The argument to @code{w32-register-hot-key} must be a single key with a
+single modifier, in vector form that would be acceptable to
+@code{define-key}.  The control and shift modifiers have no effect on the
+argument.  The meta modifier is interpreted as the @key{Alt} key if
+@code{w32-alt-is-meta} is @code{t} (the default), and the super and hyper
+modifiers are interpreted according to the bindings of
+@code{w32-lwindow-modifier} and @code{w32-rwindow-modifier}.  Additionally, a
+modifier with the trailing dash but with no key indicates that all
+Windows defined hotkeys for that modifier are to be overridden in the
+favor of Emacs.
+
+@kindex M-TAB@r{, (MS-Windows)}
+@cindex @kbd{M-@key{TAB}} vs @kbd{@key{Alt}-@key{TAB}} (MS-Windows)
+@cindex @kbd{@key{Alt}-@key{TAB}} vs @kbd{M-@key{TAB}} (MS-Windows)
+  For example, @code{(w32-register-hot-key [M-tab])} lets you use
+@kbd{M-@key{TAB}} normally in Emacs; for instance, to complete the
+word or symbol at point at top level, or to complete the current
+search string against previously sought strings during incremental
+search.  @code{(w32-register-hot-key [s-])} with
+@code{w32-lwindow-modifier} bound to @code{super} disables all the
+Windows' own Windows key based shortcuts.@footnote{There is one known
+exception: The combination @kbd{@key{Windows}-L} that locks the
+workstation is handled by the system on a lower level.  For this
+reason, @code{w32-register-hot-key} cannot override this key
+combination - it always locks the computer.}
+
+  Note that @code{w32-register-hot-key} checks the
+@code{w32-[lr]window-modifier} values at the time of the function
+call.  Thus, you can set @code{w32-lwindow-modifier} as @code{super},
+then call @code{(w32-register-hot-key [s-r])}, and finally set
+@code{w32-rwindow-modifier} as @code{super} as well.  The result is
+that the left Windows key together with @kbd{R} invokes whichever
+function you have bound for the combination in Emacs, and the right
+Windows key and @kbd{R} opens the Windows @code{Run} dialog.
+
+  The hotkey registrations always also include all the shift and
+control modifier combinations for the given hotkey; that is,
+registering @kbd{s-a} as a hotkey gives you @kbd{S-s-a},
+@kbd{C-s-a} and @kbd{C-S-s-a} as well.
+
+  On Windows 98 and ME, the hotkey registration is more restricted.
+The desired hotkey must always be fully specified, and
+@code{w32-phantom-key-code} can be customized to achieve desired
+results.
+
+  The function @code{w32-unregister-hot-key} reverses the effect of
+@code{w32-register-hot-key} for its argument key sequence.
+
+@vindex w32-capslock-is-shiftlock
+  By default, the @key{CapsLock} key only affects normal character
+keys (it converts lower-case characters to their upper-case
+variants).  However, if you set the variable
+@code{w32-capslock-is-shiftlock} to a non-@code{nil} value, the
+@key{CapsLock} key will affect non-character keys as well, as if you
+pressed the @key{SHIFT} key while typing the non-character key.
+
+@vindex w32-enable-caps-lock
+  If the variable @code{w32-enable-caps-lock} is set to a @code{nil}
+value, the @key{CapsLock} key produces the symbol @code{capslock}
+instead of the shifted version of typed keys.  The default value is
+@code{t}.
+
+@vindex w32-enable-num-lock
+@cindex keypad keys (MS-Windows)
+  Similarly, if @code{w32-enable-num-lock} is @code{nil}, the
+@key{NumLock} key will produce the symbol @code{kp-numlock}.  The
+default is @code{t}, which causes @key{NumLock} to work as expected:
+toggle the meaning of the keys on the numeric keypad.
+@end ifnottex
+
+@vindex w32-apps-modifier
+变量 @code{w32-apps-modifier} 控制 @key{Apps} 键的效果（通常位于右 @key{Alt} 和右 @key{Ctrl} 键之间）。  它的值可以是相应修饰符的符号 @code{hyper}、@code{super}、@code{meta}、@code{alt}、@code{control} 或 @code{shift} 之一，或者@code{nil} 显示为键 @code{apps}。  默认值为@code{nil}。
+
+@vindex w32-lwindow-modifier
+@vindex w32-rwindow-modifier
+@vindex w32-scroll-lock-modifier
+变量 @code{w32-lwindow-modifier} 决定左 Windows 键的效果（通常标有 @key{start} 和 Windows 徽标）。  如果其值为@code{nil}（默认值），则该键将产生符号@code{lwindow}。  将其设置为符号 @code{hyper}、@code{super}、@code{meta}、@code{alt}、@code{control} 或 @code{shift} 之一将产生相应的修饰符。  类似的变量 @code{w32-rwindow-modifier} 控制右 Windows 键的效果，@code{w32-scroll-lock-modifier} 对 @key{ScrLock} 键执行相同的操作。  如果这些变量设置为 @code{nil}，则右 Windows 键会生成符号 @code{rwindow}，@key{ScrLock} 会生成符号 @code{scroll}。  如果您希望 @key{ScrLock} 产生与其他应用程序中相同的效果，即 @: 切换键盘上的 Scroll Lock @acronym{LED} 指示，请将 @code{w32-scroll-lock-modifier} 设置为 @code{t} 或除上述修饰符号之外的任何非 @code{nil} 值。
+
+@vindex w32-pass-alt-to-system
+@cindex Windows system menu
+@cindex @code{Alt} key invokes menu (Windows)
+编译为本机 Windows 应用程序的 Emacs 通常会关闭按 @key{Alt} 键调用 Windows 菜单的 Windows 功能。  原因是 @key{Alt} 在 Emacs 中充当 @key{Meta} 的作用。在使用 Emacs 时，用户经常会暂时按下 @key{Meta} 键，然后又改变主意；如果这具有调出 Windows 菜单的效果，则会改变后续命令的含义。  许多用户对此感到沮丧。
+
+您可以通过将 @code{w32-pass-alt-to-system} 设置为非 @code{nil} 值来重新启用 Windows 对点击 @key{Alt} 键的默认处理。
+
+@ifnottex
+@vindex w32-pass-lwindow-to-system
+@vindex w32-pass-rwindow-to-system
+  The variables @code{w32-pass-lwindow-to-system} and
+@code{w32-pass-rwindow-to-system} determine whether the respective
+keys are passed to Windows or swallowed by Emacs.  If the value is
+@code{nil}, the respective key is silently swallowed by Emacs,
+otherwise it is passed to Windows.  The default is @code{t} for both
+of these variables.  Passing each of these keys to Windows produces
+its normal effect: for example, @kbd{@key{Lwindow}} opens the
+@code{Start} menu, etc.
+
+@vindex w32-recognize-altgr
+@kindex AltGr @r{(MS-Windows)}
+@cindex @key{AltGr} key (MS-Windows)
+  The variable @code{w32-recognize-altgr} controls whether the
+@key{AltGr} key (if it exists on your keyboard), or its equivalent,
+the combination of the right @key{Alt} and left @key{Ctrl} keys
+pressed together, is recognized as the @key{AltGr} key.  The default
+is @code{t}, which means these keys produce @code{AltGr}; setting it
+to @code{nil} causes @key{AltGr} or the equivalent key combination to
+be interpreted as the combination of @key{Ctrl} and @key{Meta}
+modifiers.
+
+@cindex IME, MS-Windows
+@findex w32-set-ime-open-status
+  Some versions of MS-Windows, typically East Asian localized Windows,
+enable the Input Method Manager (@acronym{IMM}) that allows
+applications to communicate with the Input Method Editor
+(@acronym{IME}), the native Windows input method service.  Emacs uses
+the @acronym{IME} when available to allow users to input East Asian
+non-@acronym{ASCII} characters, similarly to Emacs's built-in input
+methods (@pxref{Input Methods}).  However, in some situations the
+@acronym{IME} can get in the way if it interprets simple
+@acronym{ASCII} keys you input as part of a key sequence that
+designates a non-@acronym{ASCII} character.  The @acronym{IME} can be
+temporarily turned off and then on again by using the
+@code{w32-set-ime-open-status} function.
+@end ifnottex
+
+@node Windows Mouse
+@section MS-Windows 上的鼠标使用
+@cindex mouse, and MS-Windows
+
+本节介绍与鼠标相关的 Windows 特定变量。
+
+@vindex w32-mouse-button-tolerance
+@cindex simulation of middle mouse button
+变量 @code{w32-mouse-button-tolerance} 指定在两键鼠标上假装按下鼠标中键的时间间隔（以毫秒为单位）。  如果在此时间间隔内按下两个鼠标按钮，Emacs 会生成鼠标中键单击事​​件，而不是双击其中一个按钮。
+
+@vindex w32-pass-extra-mouse-buttons-to-system
+如果变量 @code{w32-pass-extra-mouse-buttons-to-system} 为非 @code{nil}，Emacs 将第四个和第五个鼠标按钮传递给 Windows。
+
+@vindex w32-swap-mouse-buttons
+变量 @code{w32-swap-mouse-buttons} 控制 3 个鼠标按钮中的哪一个生成 @kbd{mouse-2} 事件。  当为@code{nil}（默认）时，中间按钮生成@kbd{mouse-2}，右侧按钮生成@kbd{mouse-3}事件。  如果该变量为非@code{nil}，则这两个按钮的作用相反。
+
+@node Windows Processes
+@section Windows 9X/ME 和 Windows NT/2K/XP/Vista/7/8/10 上的子进程
+@cindex subprocesses on MS-Windows
+
+@cindex DOS applications, running from Emacs
+编译为本机 Windows 应用程序（而不是 DOS 版本）的 Emacs 完全支持异步子进程。  在 Windows 版本中，只要您仅运行 32 位或 64 位 Windows 应用程序，同步和异步子进程就可以在所有版本的 MS-Windows 上正常工作。  然而，当您在子进程中运行DOS应用程序时，您可能会遇到问题或根本无法运行该应用程序；如果您在两个子进程中同时运行两个 DOS 应用程序，则可能需要重新启动系统。
+
+由于 Windows 9X 上的标准命令解释器（以及大多数命令行实用程序）是 DOS 应用程序，因此在使用该系统时这些问题很重要。  但我们对此无能为力；只有微软可以修复它们。
+
+如果您只运行一个 DOS 应用程序子进程，则只要子进程“行为良好”并且不执行直接屏幕访问或其他异常操作，它就应该按预期工作。  如果您有 CPU 监视器应用程序，即使 DOS 应用程序空闲，您的计算机也会显示为 100% 繁忙，但这只是 CPU 监视器测量处理器负载的方式的产物。
+
+在启动不同子进程中的任何其他 DOS 应用程序之前，必须终止该 DOS 应用程序。  Emacs 无法中断或终止 DOS 子进程。  终止此类子进程的唯一方法是给它一个命令，告诉其程序退出。
+
+如果您尝试在单独的子进程中同时运行两个 DOS 应用程序，则启动的第二个应用程序将挂起，直到第一个应用程序完成，即使其中一个或两个是异步的。
+
+@cindex kill DOS application
+如果您可以转到第一个子进程并告诉它退出，则第二个子进程应该正常继续。  但是，如果第二个子进程是同步的，则 Emacs 本身将挂起，直到第一个子进程完成。  如果在没有用户输入的情况下它无法完成，那么如果您在 Windows 9X@. 上运行，您别无选择，只能重新启动。如果您在 Windows NT 及更高版本上运行，则可以使用进程查看器应用程序来终止 NTVDM 的相应实例（这将终止两个 DOS 子进程）。
+
+如果在这种情况下必须重新启动 Windows 9X，请不要使用 @code{Start} 菜单上的 @code{Shutdown} 命令；通常会挂起系统。  相反，请输入 @kbd{@key{Ctrl}-@key{Alt}-@key{DEL}}，然后选择 @code{Shutdown}。  这通常是有效的，尽管可能需要几分钟才能完成工作。
+
+@vindex w32-quote-process-args
+变量 @code{w32-quote-process-args} 控制 Emacs 如何引用进程参数。  非 @code{nil} 表示带有 @code{"} 字符的引号。  如果该值是一个字符，Emacs 使用该字符来转义出现的任何引号字符；否则它会根据程序的类型选择合适的转义字符。
+
+@vindex w32-pipe-buffer-size
+当 Emacs 创建与子进程通信的管道时，变量 @code{w32-pipe-buffer-size} 控制 Emacs 向系统请求的缓冲区大小。  默认值为零，这让操作系统选择大小。  任何有效的正值都将请求该大小的缓冲区（以字节为单位）。  这可用于定制与子进程的通信，以适应在缓冲管道 I/O 方面表现出异常行为的程序。
+
+@ifnottex
+@vindex w32-pipe-read-delay
+  If you need to invoke MS-DOS programs as Emacs subprocesses, you may
+see low rate of reading data from such programs.  Setting the variable
+@code{w32-pipe-read-delay} to a non-zero value may improve throughput
+in these cases; we suggest the value of 50 for such situations.  The
+default is zero.
+
+@findex w32-shell-execute
+  The function @code{w32-shell-execute} can be useful for writing
+customized commands that run MS-Windows applications registered to
+handle a certain standard Windows operation for a specific type of
+document or file.  This function is a wrapper around the Windows
+@code{ShellExecute} API@.  See the MS-Windows API documentation for
+more details.
+@end ifnottex
+
+@node Windows Printing
+@section 打印和 MS-Windows
+
+如果 POSIX 样式 @code{lpr} 程序不可用，则打印命令（例如 @code{lpr-buffer} (@pxref{Printing}) 和 @code{ps-print-buffer} (@pxref{PostScript})）可以在 MS-DOS 和 MS-Windows 中工作，将输出发送到打印机端口之一。  相同的 Emacs 变量控制所有系统上的打印，但在某些情况下，它们在 MS-DOS 和 MS-Windows 上具有不同的默认值。
+
+MS Windows 上的 Emacs 尝试自动确定默认打印机（使用函数 @code{default-printer-name}）。但在极少数情况下，这可能会失败，或者您可能希望在 Emacs 中使用不同的打印机。  本节的其余部分解释如何告诉 Emacs 使用哪台打印机。
+
+@vindex printer-name@r{, (MS-DOS/MS-Windows)}
+如果您想使用本地打印机，请将 Lisp 变量 @code{lpr-command} 设置为 @code{""}（Windows 上的默认值），并将 @code{printer-name} 设置为打印机端口的名称，例如，@code{"PRN"}（通常的本地打印机端口），或者@code{"LPT2"} 或@code{"COM1"}（对于串行打印机）。  您还可以将 @code{printer-name} 设置为文件名，在这种情况下，“打印”输出实际上会附加到该文件中。  如果将 @code{printer-name} 设置为 @code{"NUL"}，打印输出将被静默丢弃（发送到系统空设备）。
+
+您还可以通过将 @code{printer-name} 设置为该打印机的 UNC 共享名称（例如 @code{"//joes_pc/hp4si"}）来使用另一台计算机共享的打印机。  （此处使用正斜杠还是反斜杠并不重要。）要查找共享打印机的名称，请从命令提示符运行命令 @samp{net view} 以获取服务器列表，然后运行 ​​@samp{net view @var{server-name}} 查看该服务器共享的打印机（和目录）的名称。或者，单击桌面上的 @samp{Network Neighborhood} 图标，然后查找通过网络共享打印机的计算机。
+
+@cindex @samp{net use}, and printing on MS-Windows
+@cindex networked printers (MS-Windows)
+如果打印机未出现在 @samp{net view} 的输出中，或者将 @code{printer-name} 设置为 UNC 共享名不会在该打印机上生成硬拷贝，则可以使用 @samp{net use} 命令将本地打印端口（例如 @code{"LPT2"}）连接到网络打印机。  例如，键入 @kbd{net use LPT2: \\joes_pc\hp4si}@footnote{ Note that the @samp{net use} command requires the UNC share name to be typed with the Windows-style backslashes, while the value of @code{printer-name} can be set with either forward- or backslashes.} 会使 Windows @dfn{capture} @code{LPT2} 端口并将打印材料重定向到连接到机器 @code{joes_pc} 的打印机。执行此命令后，将 @code{printer-name} 设置为 @code{"LPT2"} 应在联网打印机上生成硬拷贝。
+
+使用某些类型的 Windows 网络软件，您可以指示 Windows 捕获特定的打印机端口（例如 @code{"LPT2"}），并通过 @w{@code{Control Panel->Printers}} 小程序（而不是 @samp{net use}）将其重定向到网络打印机。
+
+如果将 @code{printer-name} 设置为文件名，最好使用绝对文件名。  Emacs 根据当前缓冲区的默认目录更改工作目录，因此如果 @code{printer-name} 中的文件名是相对的，您最终将得到多个这样的文件，每个文件都位于完成打印的缓冲区的目录中。
+
+如果 @code{printer-name} 的值正确，但在您的打印机上打印时未生成硬拷贝，则您的打印机可能不支持打印纯文本（某些廉价打印机忽略此功能）。  在这种情况下，请尝试如下所述的 PostScript 打印命令。
+
+@findex print-buffer @r{(MS-DOS)}
+@findex print-region @r{(MS-DOS)}
+@vindex lpr-headers-switches @r{(MS-DOS)}
+命令@code{print-buffer}和@code{print-region}调用@code{pr}程序，或使用@code{lpr}程序的特殊开关，在每个打印页面上生成页眉。  MS-DOS 和 MS-Windows 通常没有这些程序，因此默认情况下，设置变量 @code{lpr-headers-switches} 以便打印页眉的请求被静默忽略。  因此，@code{print-buffer}和@code{print-region}分别产生与@code{lpr-buffer}和@code{lpr-region}相同的输出。  如果您确实有合适的 @code{pr} 程序（例如，来自 GNU Coreutils），请将 @code{lpr-headers-switches} 设置为 @code{nil}；然后，Emacs 将调用 @code{pr} 来生成页眉，并按照 @code{printer-name} 的指定打印结果输出。
+
+@vindex print-region-function @r{(MS-DOS)}
+@cindex lpr usage under MS-DOS
+@vindex lpr-command @r{(MS-DOS)}
+@vindex lpr-switches @r{(MS-DOS)}
+最后，如果您确实有类似的 @code{lpr} 工作，则可以将变量 @code{lpr-command} 设置为 @code{"lpr"}。  然后 Emacs 将使用 @code{lpr} 进行打印，就像在其他系统上一样。  （如果程序名称不是 @code{lpr}，请将 @code{lpr-command} 设置为适当的值。）当 @code{lpr-command} 不是 @code{""} 时，变量 @code{lpr-switches} 具有其标准含义。  如果变量 @code{printer-name} 具有字符串值，则它将用作 @code{lpr} 的 @code{-P} 选项的值，就像在 Unix 上一样。
+
+@findex ps-print-buffer @r{(MS-DOS)}
+@findex ps-spool-buffer @r{(MS-DOS)}
+@vindex ps-printer-name @r{(MS-DOS)}
+@vindex ps-lpr-command @r{(MS-DOS)}
+@vindex ps-lpr-switches @r{(MS-DOS)}
+一组并行变量 @code{ps-lpr-command}、@code{ps-lpr-switches} 和 @code{ps-printer-name} (@pxref{PostScript Variables}) 定义了 PostScript 文件的打印方式。  这些变量的使用方式与上述非 PostScript 打印的相应变量的使用方式相同。  因此，@code{ps-printer-name} 的值用作 PostScript 输出发送到的设备（或文件）的名称，就像 @code{printer-name} 用于非 PostScript 打印一样。  （如果您有两台打印机连接到两个不同的端口，并且其中只有一台是 PostScript 打印机，则有两组不同的变量。）
+
+@cindex Ghostscript, use for PostScript printing
+变量@code{ps-lpr-command}的默认值为@code{""}，这会导致PostScript输出被发送到@code{ps-printer-name}指定的打印机端口；但@code{ps-lpr-command}也可以设置为接受PostScript文件的程序的名称。  因此，如果您有非 PostScript 打印机，则可以将此变量设置为 PostScript 解释程序的名称（例如 Ghostscript）。  任何需要传递给解释器程序的开关都使用@code{ps-lpr-switches}指定。  （如果 @code{ps-printer-name} 的值是字符串，它将作为 @code{-P} 选项的值添加到开关列表中。这可能仅在您使用 @code{lpr} 时才有用，因此在使用解释器时，通常会将 @code{ps-printer-name} 设置为字符串以外的其他内容，因此它会被忽略。）
+
+例如，要使用 Ghostscript 在系统默认打印机上进行打印，请将其放入您的 @file{.emacs} 文件中：
+
+@example
+(setq ps-printer-name t)
+(setq ps-lpr-command "D:/gs6.01/bin/gswin32c.exe")
+(setq ps-lpr-switches '("-q" "-dNOPAUSE" "-dBATCH"
+                        "-sDEVICE=mswinpr2"
+                        "-sPAPERSIZE=a4"))
+@end example
+
+@noindent
+（这假设 Ghostscript 安装在 @file{D:/gs6.01} 目录中。）
+
+@node Windows Fonts
+@section 在 MS-Windows 上指定字体
+@cindex font specification (MS Windows)
+
+字体由其名称、大小和可选属性指定。指定字体的格式来自现代免费桌面中使用的 fontconfig 库：
+
+@example
+  [Family[-PointSize]][:Option1=Value1[:Option2=Value2[...]]]
+@end example
+
+还支持基于旧 XLFD 的格式以实现向后兼容性。
+
+@cindex font backend selection (MS-Windows)
+MS-Windows 上的 Emacs 支持多种字体后端。  目前，@code{gdi}、@code{uniscribe} 和 @code{harfbuzz} 后端可用。  @code{gdi} 字体后端可在所有版本的 Windows 上使用，并支持 Windows 本机支持的所有字体。  @code{uniscribe} 字体后端可在 Windows 2000 及更高版本上使用，并支持 TrueType 和 OpenType 字体。  如果 Emacs 是使用 HarfBuzz 支持构建的，并且您的系统上安装了 HarfBuzz DLL，则 @code{harfbuzz} 字体后端可用；与 @code{uniscribe} 一样，该后端仅支持 TrueType 和 OpenType 字体。  某些需要复杂布局的语言只能由 Uniscribe 或 HarfBuzz 后端正确支持。  默认情况下，每个帧启用两个后端：@code{gdi} 和 @code{harfbuzz} 或 @code{uniscribe}，具体取决于哪一个可用（如果两者都可用，则默认情况下仅启用 @code{harfbuzz}）。  当 Emacs 寻找合适的字体时，@code{harfbuzz} 和 @code{uniscribe} 后端优先于 @code{gdi}。  要覆盖它并使用 GDI 后端（即使 Uniscribe 可用），请使用 @kbd{-xrm Emacs.fontBackend:gdi} 命令行参数调用 Emacs，或者在注册表中的 @samp{HKEY_CURRENT_USER\SOFTWARE\GNU\Emacs} 或 @samp{HKEY_LOCAL_MACHINE\SOFTWARE\GNU\Emacs} 键 (@pxref{Resources}) 下添加值为 @code{gdi} 的 @code{Emacs.fontBackend} 资源。同样，即使 HarfBuzz 可用，也要使用 Uniscribe 后端，请在调用 Emacs 的命令行上使用 @kbd{-xrm Emacs.fontBackend:uniscribe}。  您还可以通过 @code{font-backend} 帧参数请求所有 3 个后端，但请注意，在这种情况下，字体搜索系统上没有可用字体的字符将花费更长的时间。
+
+或者，您可以使用 @code{modify-frame-parameters} (@pxref{Parameter Access,,, elisp, The Emacs Lisp Reference Manual}) 通过 @code{font-backend} 框架参数指定框架的字体后端。  您还可以通过 @code{default-frame-alist} 和 @code{initial-frame-alist} (@pxref{Frame Parameters}) 为所有框架请求特定的字体后端。  请注意，@code{font-backend}参数的值应该是符号列表，如@code{(uniscribe)}或@w{@code{(harfbuzz uniscribe gdi)}}中所示。
+
+@cindex font properties (MS Windows)
+@noindent
+MS-Windows 支持的可选字体属性有：
+
+@table @code
+
+@vindex font-weight-table @r{(MS-Windows)}
+@item weight
+指定字体的粗细。  特殊值 @code{light}、@code{medium}、@code{demibold}、@code{bold} 和 @code{black} 可以在不使用 @code{weight=} 的情况下指定（例如，@kbd{Courier New-12:bold}）。  否则，权重应该是 100 到 900 之间的数值，或者 @code{font-weight-table} 中指定的权重之一。  如果未指定，则假定为常规字体。
+
+@vindex font-slant-table @r{(MS-Windows)}
+@item slant
+指定字体是否为斜体。  特殊值 @code{roman}、@code{italic} 和 @code{oblique} 可以在没有 @code{slant=} 的情况下指定（例如，@kbd{Courier New-12:italic}）。否则，倾斜应该是一个数值，或者@code{font-slant-table}中指定的倾斜之一。  在 Windows 上，任何高于 150 的倾斜都被视为斜体，低于 150 的任何倾斜都被视为罗马字体。
+
+@item family
+指定字体系列，但通常会在字体名称的开头指定。
+
+@item pixelsize
+指定字体大小（以像素为单位）。  这可以用来代替姓氏后面指定的磅值。
+
+@item adstyle
+指定字体的附加样式信息。在 MS-Windows 上，可识别值 @code{mono}、@code{sans}、@code{serif}、@code{script} 和 @code{decorative}。  这些作为未指定字体系列的后备是最有用的。
+
+@vindex w32-charset-info-alist
+@item registry
+指定字体预期覆盖的字符集注册表。  大多数 TrueType 和 OpenType 字体都是涵盖多个国家字符集的 Unicode 字体，但您可以使用@code{w32-charset-info-alist} 此处的特定注册表将字体选择范围缩小到支持特定字符集的字体。
+
+@item spacing
+指定字体的间距。  @code{p} 间距指定比例字体，@code{m} 或 @code{c} 指定等宽字体。
+
+@item foundry
+不在 Windows 上使用，但用于提供信息并防止希望设置它的代码出现问题，在内部将位图字体设置为 @code{raster}，将可缩放字体设置为 @code{outline}，如果无法将类型确定为其中之一，则将其设置为 @code{unknown}。
+
+@cindex font scripts (MS Windows)
+@cindex font Unicode subranges (MS Windows)
+@item script
+指定字体应支持的 Unicode 子范围。
+
+Emacs 已知的所有脚本（通常意味着最新 Unicode 标准定义的所有脚本）都可以在 MS-Windows 上识别。但是，@code{GDI}字体仅支持已知脚本的子集：@code{greek}、@code{hangul}、@code{kana}、@code{kanbun}、@code{bopomofo}、@code{tibetan}、@code{yi}、@code{mongolian}、@code{hebrew}、@code{arabic} 和@code{thai}。
+
+@cindex font antialiasing (MS Windows)
+@cindex Cleartype
+@item antialias
+指定抗锯齿方法。  值 @code{none} 表示无抗锯齿，@code{standard} 表示使用标准抗锯齿，@code{subpixel} 表示使用子像素抗锯齿（在 Windows 上称为 @dfn{Cleartype}），@code{natural} 表示使用子像素抗锯齿并调整字母之间的间距。  如果未指定，字体将使用系统默认的抗锯齿功能。
+@end table
+
+@cindex font lookup, MS-Windows
+@findex w32-find-non-USB-fonts
+MS-Windows 上的 Emacs 用于查找适合显示给定非 0⁣ 字符的字体的方法对于某些罕见的脚本可能会失败，特别是 Unicode 最近添加的脚本，即使您的系统上安装了支持这些脚本的字体。这是因为这些脚本在 MS-Windows 上的 Emacs 用于查找字体的信息中没有为其定义 Unicode 子范围位 (USB)。  您可以使用 @code{w32-find-non-USB-fonts} 函数来克服这些问题。  它需要在 Emacs 会话开始时运行一次，如果安装新字体则需要再次运行。您可以将以下行添加到 init 文件中，以便在每次启动 Emacs 时运行此函数：
+
+@lisp
+(w32-find-non-USB-fonts)
+@end lisp
+
+@noindent
+@vindex w32-non-USB-fonts
+或者，您可以随时通过 @kbd{M-:} (@pxref{Lisp Eval}) 手动运行此函数。  在安装了许多字体的系统上，运行 @code{w32-find-non-USB-fonts} 可能需要几秒钟；如果您认为在启动过程中运行时间太长，并且很少安装新字体，请通过 @kbd{M-:} 运行此函数一次，然后将其返回的值（如果非 @code{nil}）分配给 init 文件中的变量 @code{w32-non-USB-fonts}。  （如果该函数返回@code{nil}，则表明您没有安装可以显示需要此功能的脚本中的字符的字体。）
+
+@vindex w32-use-w32-font-dialog
+@vindex w32-fixed-font-alist
+变量 @code{w32-use-w32-font-dialog} 控制通过 @kbd{S-mouse-1} (@code{mouse-appearance-menu}) 选择字体的方式。  如果值为 @code{t}（默认值），Emacs 将使用标准 Windows 字体选择对话框。  如果值为 @code{nil}，Emacs 会弹出一组固定字体的菜单。  菜单中显示的字体由@code{w32-fixed-font-alist}决定。
+
+@node Windows Misc
+@section 其他特定于 Windows 的功能
+
+本节介绍了 Windows 特定的功能，这些功能不适用于其他任何地方。
+
+@vindex w32-use-visible-system-caret
+@cindex screen reader software, MS-Windows
+变量@code{w32-use-visible-system-caret}是一个标志，用于确定是否使系统插入符可见。  不使用屏幕阅读器软件时的默认值是@code{nil}，这意味着 Emacs 绘制自己的光标来指示点的位置。  非 2⁣ 值意味着 Emacs 将使用系统插入符指示点位置；这有利于屏幕阅读器软件的使用，并且是运行 Emacs 时检测到此类软件时的默认设置。当该变量为非@code{nil}时，影响光标显示的其他变量不起作用。
+
+@ifnottex
+@vindex w32-grab-focus-on-raise
+@cindex frame focus policy, MS-Windows
+  The variable @code{w32-grab-focus-on-raise}, if set to a
+non-@code{nil} value causes a frame to grab focus when it is raised.
+The default is @code{t}, which fits well with the Windows default
+click-to-focus policy.
+@end ifnottex
+
+在 Windows 10（版本 1809 及更高版本）和 Windows 11 上，Emacs 标题栏和滚动条默认遵循系统的浅色或深色模式，类似于资源管理器和命令提示符等其他程序。要更改颜色模式，请从 @w{@code{Windows Settings}} 选择 @code{Personalization}，然后选择 @w{@code{Colors->Choose your color}}（或 @w{@code{Choose your default app mode}} 或 @w{@code{Choose your mode}}）；然后重新启动 Emacs。  在 Windows 11 上，您可以为 Windows 和应用程序选择单独的默认模式。
+
+@vindex w32-follow-system-dark-mode
+如果您不希望 Emacs 遵循系统的深色模式设置，请将变量 @code{w32-follow-system-dark-mode} 自定义为 @code{nil} 值；那么无论系统范围的设置如何，Emacs 都会使用默认的 Light 模式。  更改此变量的值仅影响更改后创建的 Emacs 框架，因此您应该直接或通过 @kbd{M-x customize-variable} 在初始化文件 (@pxref{Init File}) 中设置其值，这可以让您保存自定义值，请参阅@ref{Saving Customizations}。
+
+@findex w32-use-virtual-terminal
+@cindex Windows Terminal, Windows Console, MS-Windows
+Windows 控制台显示功能的实现与其他终端仿真器的实现不同，因为从历史上看，Windows 需要使用特殊的 API。该 API 将 Emacs 的 Windows 控制台显示限制为 16 种基本颜色。随着 Windows Terminal 的推出，Microsoft 实现了对 ANSI 控制序列（以 VT100 和 Xterm 为模型）以及 24 位 RBG 彩色显示的支持。
+
+函数 @code{w32-use-virtual-terminal} 和 @code{w32-use-virtual-terminal-p} 可用于（分别）设置和检查内部变量，该变量确定是使用较新的机制还是较旧的机制进行显示。  内部变量是根据终端启动时的功能自动设置的。默认情况下，将使用 24 位 RGB 颜色，但可以通过传递 @code{--color} 命令行参数或设置 @code{tty-color-mode} 帧参数的值来使用其他（8、16、256）颜色空间。
+
+当且仅当内部变量具有非零数值时，@code{(w32-use-virtual-terminal-p)}计算为@code{t}，否则计算为@code{nil}。  如果其计算结果为@code{t}，则将 ANSI 转义序列用于颜色，否则，将使用旧的机制。  可以通过计算@code{(w32-use-virtual-terminal x)}来设置内部变量，其中@code{x}是@code{t}或@code{nil}：如果@code{x}是@code{t}并且您的终端支持该功能，则会启用该功能。  否则，该功能将被禁用。
+
+@ifnottex
+@include msdos-xtra.texi
+@end ifnottex

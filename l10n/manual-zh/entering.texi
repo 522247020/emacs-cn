@@ -1,0 +1,89 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@iftex
+@chapter Entering and Exiting Emacs
+
+  This chapter explains how to enter Emacs, and how to exit it.
+@end iftex
+
+@ifnottex
+@raisesections
+@end ifnottex
+
+@node Entering Emacs
+@section 进入Emacs
+@cindex entering Emacs
+@cindex starting Emacs
+
+调用 Emacs 的常用方法是使用 shell 命令@command{emacs}。  在 GUI 终端上运行 Unix shell 的终端窗口中，您可以使用 @kbd{emacs &}; 在后台运行 Emacs；这样，Emacs 就不会占用终端窗口，因此您可以使用它来运行其他 shell 命令。  （有关在 MS-Windows 上启动 Emacs 的类似方法，请参阅@ref{Windows Startup}。）
+
+@cindex startup screen
+当 Emacs 启动时，初始帧显示一个名为 @samp{*GNU Emacs*} 的特殊缓冲区。  此 @dfn{startup screen} 包含有关 Emacs 的信息，以及 @dfn{links} 的常见任务信息，对初学者很有用。  例如，激活 @samp{Emacs Tutorial} 链接将打开 Emacs 教程；这与命令 @kbd{C-h t} (@code{help-with-tutorial}) 执行相同的操作。  要激活链接，请将点移到其上并输入 @kbd{@key{RET}}，或者使用 @kbd{mouse-1}（鼠标左键）单击它。
+
+使用命令行参数，您可以告诉 Emacs 在启动时立即访问一个或多个文件。  例如，@command{emacs foo.txt} 启动 Emacs，并在缓冲区中显示文件 @samp{foo.txt} 的内容。  此功能的存在主要是为了与其他编辑器兼容，这些编辑器旨在从 shell 启动以进行简短的编辑会话。  如果您以这种方式调用 Emacs，初始框架将分为两个窗口 — 一个显示指定的文件，另一个显示启动屏幕。  @xref{Windows}。
+
+一般来说，每次编辑文件时都重新启动 Emacs 是不必要的，也是浪费的。  使用 Emacs 的推荐方法是在登录后仅启动一次，并在同一个 Emacs 会话中进行所有编辑。  @xref{Files}，有关访问多个文件的信息。  如果您以这种方式使用 Emacs，Emacs 会话会积累有价值的上下文，例如终止环、寄存器、撤消历史记录和标记环数据，这些一起使编辑更加方便。  这些功能将在手册后面进行描述。
+
+要在 Emacs 运行时从另一个程序编辑文件，可以使用 @command{emacsclient} 帮助程序在现有 Emacs 会话中打开文件。  @xref{Emacs Server}。
+
+Emacs 接受其他命令行参数，告诉它加载某些 Lisp 文件、在哪里放置初始框架等等。 @xref{Emacs Invocation}。
+
+@vindex inhibit-startup-screen
+如果变量 @code{inhibit-startup-screen} 为非 @code{nil}，Emacs 不会显示启动屏幕。  在这种情况下，如果在命令行上指定了一个或多个文件，Emacs 只会显示这些文件；否则，它会显示一个名为 @file{*scratch*} 的缓冲区，该缓冲区可用于交互式地计算 Emacs Lisp 表达式。 @xref{Lisp Interaction}。  您可以使用自定义工具 (@pxref{Easy Customization}) 或通过编辑初始化文件 (@pxref{Init File}) 来设置变量@code{inhibit-startup-screen}。@footnote{Setting @code{inhibit-startup-screen} in @file{site-start.el} doesn't work, because the startup screen is set up before reading @file{site-start.el}.  @xref{Init File}, for information about @file{site-start.el}.}
+
+您还可以通过将变量 @code{initial-buffer-choice} 设置为命名该文件或目录的字符串来强制 Emacs 在启动时显示文件或目录。  @code{initial-buffer-choice} 的值也可以是一个函数（无参数），它应该返回一个随后显示的缓冲区。
+@ignore
+@c I do not think this should be mentioned.  AFAICS it is just a dodge
+@c around inhibit-startup-screen not being settable on a site-wide basis.
+@code{initial-buffer-choice} may also be @code{t} in which case the
+@file{*scratch*} buffer will be shown.
+@end ignore
+如果 @code{initial-buffer-choice} 是非 @code{nil}，那么如果您在命令行上指定任何文件，Emacs 仍然会访问它们，但最初不会显示它们。
+
+@node Exiting
+@section 退出 Emacs
+@cindex exiting
+@cindex killing Emacs
+@cindex leaving Emacs
+@cindex quitting Emacs
+
+@table @kbd
+@item C-x C-c
+杀死 Emacs (@code{save-buffers-kill-terminal})。
+@item C-z
+在文本终端上，暂停 Emacs；在图形显示上，图标化（或“最小化”）所选帧（@code{suspend-frame}）。
+@end table
+
+@kindex C-x C-c
+@findex save-buffers-kill-terminal
+@dfn{Killing} Emacs 表示终止Emacs 程序。  为此，请输入 @kbd{C-x C-c} (@code{save-buffers-kill-terminal})。  使用两个字符的按键序列可防止意外键入。  如果在您键入 @kbd{C-x C-c} 时有任何修改的文件访问缓冲区，Emacs 首先会提议保存这些缓冲区。  如果您不全部保存，则会要求再次确认，因为未保存的更改将丢失。  Emacs 还会要求确认是否有任何子进程仍在运行，因为终止 Emacs 也会终止子进程 (@pxref{Shell})。
+
+如果您使用 Emacs 作为服务器，@kbd{C-x C-c} 的行为会特别明显。如果您从客户端框架键入它，它将关闭客户端连接。  @xref{Emacs Server}。
+
+Emacs 可以选择在您终止它时记录某些会话信息，例如您当时正在访问的文件。  下次启动 Emacs 时即可使用该信息。 @xref{Saving Emacs Sessions}。
+
+@vindex confirm-kill-emacs
+如果变量 @code{confirm-kill-emacs} 的值不是 @code{nil}，则 @kbd{C-x C-c} 假定其值是谓词函数，并调用该函数。  如果函数调用的结果为非@code{nil}，则会话被终止，否则 Emacs 继续运行。  用作 @code{confirm-kill-emacs} 值的一个方便函数是函数 @code{yes-or-no-p}。  @code{confirm-kill-emacs} 的默认值为 @code{nil}。
+
+@vindex confirm-kill-processes
+如果变量 @code{confirm-kill-processes} 的值为 @code{nil}，则 @kbd{C-x C-c} 在终止由 Emacs 启动的子进程之前不会要求确认。  默认值为@code{t}。
+
+要进一步自定义 Emacs 退出时发生的情况，请参阅@ref{Killing Emacs,,, elisp, The GNU Emacs Lisp Reference Manual}。
+
+@findex kill-emacs
+要终止 Emacs 而不提示保存，请输入 @kbd{M-x kill-emacs}。
+
+@kindex C-z
+@findex suspend-frame
+@cindex minimizing
+@cindex iconifying
+@cindex suspending
+@kbd{C-z} 运行命令@code{suspend-frame}。  在图形显示上，此命令@dfn{minimizes}（或@dfn{iconifies}）选定的 Emacs 框架，以某种方式隐藏它，以便您稍后将其恢复（这种隐藏的具体方式取决于窗口系统）。在文本终端上，@kbd{C-z}命令@dfn{suspends} Emacs，暂时停止程序并将控制权返回给父进程（通常是 shell）；在大多数 shell 中，您可以使用 shell 命令 @command{%emacs} 暂停 Emacs 后恢复它。
+
+文本终端通常侦听某些特殊字符，其含义是终止或挂起正在运行的程序。  @b{This terminal feature is turned off while you are in Emacs.} Emacs 中@kbd{C-z}和@kbd{C-x C-c}作为键的含义受到了在多个操作系统上使用@kbd{C-z}和@kbd{C-c}作为停止或终止程序的字符的启发，但这是它们与操作系统的唯一关系。  您可以自定义这些键来运行您选择的任何命令 (@pxref{Keymaps})。
+
+@ifnottex
+@lowersections
+@end ifnottex

@@ -1,0 +1,1273 @@
+@c -*- coding: utf-8 -*-
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2026 Free Software
+@c Foundation, Inc.
+
+@c See file emacs.texi for copying conditions.
+@node Display
+@chapter 控制显示
+
+由于窗口中只能容纳大缓冲区的一部分，因此 Emacs 只能显示其中的一部分。  本章介绍的命令和变量可让您指定要查看文本的哪一部分以及文本的显示方式。
+
+@menu
+* Scrolling::               在窗口中上下移动文本的命令。
+* Recentering::             将当前行居中的滚动命令。
+* Auto Scrolling::          需要时自动重新显示滚动文本。
+* Horizontal Scrolling::    在窗口中左右移动文本。
+* Narrowing::               将显示和编辑限制为缓冲区的一部分。
+* View Mode::               查看只读缓冲区。
+* Follow Mode::             跟随模式可以让两个窗口作为一个窗口滚动。
+* Faces::                   如何使用面孔更改显示样式。
+* Colors::                  指定面的颜色。
+* Standard Faces::          主要的预定义面。
+* Icons::                   如何更改图标的外观。
+* Text Scale::              增加或减少缓冲区中的文本大小。
+* Font Lock::               使用面孔进行语法突出显示的次要模式。
+* Highlight Interactively::  告诉 Emacs 要突出显示哪些文本。
+* Fringes::                 启用或禁用窗口边缘。
+* Displaying Boundaries::   显示缓冲区的顶部和底部。
+* Useless Whitespace::      显示可能是虚假的尾随空格。
+* Selective Display::       隐藏带有大量缩进的线。
+* Optional Mode Line::      可选模式行显示功能。
+* Text Display::            文本字符通常如何显示。
+* Cursor Display::          显示光标的功能。
+* Line Truncation::         截断行以适应屏幕宽度，而不是将它们延续到多个屏幕行。
+* Visual Line Mode::        自动换行和基于屏幕行的编辑。
+* Display Custom::          有关用于自定义显示的变量的信息。
+@end menu
+
+@node Scrolling
+@section 滚动
+@cindex scrolling
+
+如果窗口太小而无法显示其缓冲区中的所有文本，则它仅显示其中的一部分。  @dfn{Scrolling} 命令更改显示缓冲区的哪一部分。
+
+向前或向上滚动可前进窗口中显示的缓冲区部分；同样，它相对于窗口向上移动缓冲区文本。  向后或向下滚动会显示缓冲区的较早部分，并相对于窗口向下移动文本。
+
+在 Emacs 中，向上或向下滚动是指文本在窗口中移动的方向，@emph{not} 窗口相对于文本移动的方向。  在“向上滚动”和“向下滚动”的现代含义广泛传播之前，Emacs 就采用了这个术语。  因此，在 Emacs 意义上，@key{PageDown}向上滚动的奇怪结果。
+
+窗口中显示的缓冲区部分始终包含点。如果将点移过窗口底部或顶部，则会自动滚动以将其带回屏幕上 (@pxref{Auto Scrolling})。  您还可以使用以下命令显式滚动：
+
+@table @kbd
+@item C-v
+@itemx @key{PageDown}
+@itemx @key{next}
+向前滚动几乎整个窗口 (@code{scroll-up-command})。
+@item M-v
+@itemx @key{PageUp}
+@itemx @key{prior}
+向后滚动 (@code{scroll-down-command})。
+@end table
+
+@kindex C-v
+@kindex M-v
+@kindex PageDown
+@kindex PageUp
+@kindex next
+@kindex prior
+@findex scroll-up-command
+@findex scroll-down-command
+@kbd{C-v} (@code{scroll-up-command}) 向前滚动几乎整个窗口高度。  效果是把窗口底部的两条线放在顶部，后面是以前不可见的线。  如果点位于从顶部滚动的文本中，则它最终会出现在窗口新的最上面一行。  @key{PageDown}（或@key{next}）键相当于@kbd{C-v}。
+
+@kbd{M-v} (@code{scroll-down-command}) 以类似的方式向后滚动。  @key{PageUp}（或@key{prior}）键相当于@kbd{M-v}。
+
+@vindex next-screen-context-lines
+这些滚动命令留下的重叠行数由变量 @code{next-screen-context-lines} 控制，其默认值为 2。您可以为命令提供数字前缀参数 @var{n}，以滚动 @var{n} 行； Emacs 尝试保持点不变，以便文本和点一起向上或向下移动。带有负参数的@kbd{C-v}类似于@kbd{M-v}，反之亦然。
+
+@vindex scroll-error-top-bottom
+默认情况下，如果由于窗口已到达缓冲区的开头或结尾而无法再滚动，则这些命令会发出错误信号（通过发出蜂鸣声或闪烁屏幕）。  如果将变量 @code{scroll-error-top-bottom} 更改为 @code{t}，这些命令会将点移动到尽可能远的位置。  如果点已经存在，则命令发出错误信号。
+
+@vindex scroll-preserve-screen-position
+@cindex @code{scroll-command} property
+一些用户喜欢滚动命令将指针保持在同一屏幕位置，以便滚动回同一屏幕可以方便地将指针返回到其原始位置。  您可以通过变量 @code{scroll-preserve-screen-position} 启用此行为。  如果值为 @code{t}，每当滚动命令将光标移出窗口时，Emacs 都会调整 point 以将光标保持在同一屏幕位置，而不是将其移动到最上面或最下面的行。  对于任何其他非 2⁣ 值，即使滚动命令在窗口中留下 point，Emacs 也会以这种方式调整 point。  该变量影响本节中记录的所有滚动命令，以及使用鼠标滚轮滚动 (@pxref{Mouse Commands})；一般来说，它会影响任何具有非 @code{nil} @code{scroll-command} 属性的命令。 @xref{Property Lists,,, elisp, The Emacs Lisp Reference Manual}。  当调用这些命令之一且 @code{isearch-allow-scroll} 为非 @code{nil} (@pxref{Not Exiting Isearch}) 时，相同的属性还会导致 Emacs 不退出增量搜索。
+
+@vindex fast-but-imprecise-scrolling
+有时，特别是当您按住 @kbd{C-v} 和 @kbd{M-v} 等键激活键盘自动重复时，Emacs 无法跟上所请求的快速滚动速度；显示不会更新，并且 Emacs 可能会在相当长的时间内对输入没有响应。  您可以通过将变量 @code{fast-but-imprecise-scrolling} 设置为非 @code{nil} 值来应对这种迟缓现象。  这指示滚动命令不要对它们滚动的任何未字体化的文本进行字体化（@pxref{Font Lock}），而是假设它具有默认的外观。  当使用的面大小不一样时，这可能会导致 Emacs 滚动到有些错误的缓冲区位置，即使是单个（即没有自动重复）滚动操作也是如此。
+
+@vindex jit-lock-defer-time
+作为设置 @code{fast-but-imprecise-scrolling} 的替代方案，您可能更喜欢启用 jit-lock 延迟字体化 (@pxref{Font Lock})。  为此，请将 @code{jit-lock-defer-time} 自定义为一个较小的正数，例如 0.25，如果您打字速度很快，甚至可以自定义为 0.1。  当您按住 @kbd{C-v} 时，这可以减少滚动的不稳定，但是在滚动到缓冲区的新部分的任何操作之后，窗口内容将暂时变为非字体。
+
+@vindex redisplay-skip-fontification-on-input
+最后，这些变量的第三个替代方案是@code{redisplay-skip-fontification-on-input}。  如果此变量为非@code{nil}，则在有待输入的情况下跳过一些字体。这通常不会影响显示，因为如果输入待处理，重新显示无论如何都会被完全跳过，但它可以通过避免不必要的字体来使滚动更平滑。
+
+@vindex scroll-up
+@vindex scroll-down
+@findex scroll-up-line
+@findex scroll-down-line
+命令@kbd{M-x scroll-up}和@kbd{M-x scroll-down}的行为与@code{scroll-up-command}和@code{scroll-down-command}类似，只是它们不服从@code{scroll-error-top-bottom}。  在 Emacs 24 之前，这些是向上和向下滚动的默认命令。命令 @kbd{M-x scroll-up-line} 和 @kbd{M-x scroll-down-line} 一次滚动当前窗口一行。  如果您打算使用这些命令中的任何一个，您可能需要为它们提供键绑定 (@pxref{Init Rebinding})。
+
+在图形显示上，您还可以使用滚动条滚动窗口； @pxref{Scroll Bars}。
+
+@node Recentering
+@section 重心调整
+
+@table @kbd
+@item C-l
+滚动选定的窗口，使当前行成为最中心的文本行；在随后的连续调用中，使当前行成为顶行、底行，依此类推。  也可能重新显示屏幕 (@code{recenter-top-bottom})。
+
+@item C-M-S-l
+滚动另一个窗口；这相当于 @kbd{C-l} 作用于另一个窗口。
+
+@item M-x recenter
+滚动选定的窗口，使当前行成为最中心的文本行。  也可能重新显示屏幕。
+
+@item C-M-l
+启发式滚动将有用的信息显示到屏幕上 (@code{reposition-window})。
+@end table
+
+@kindex C-l
+@findex recenter-top-bottom
+@kbd{C-l} (@code{recenter-top-bottom}) 命令 @dfn{recenters} 滚动所选窗口，使当前屏幕行恰好位于窗口的中心，或尽可能靠近中心。
+
+连续键入 @kbd{C-l} 两次 (@kbd{C-l C-l}) 会滚动窗口，使该点位于最上面的屏幕行。  输入第三个 @kbd{C-l} 会滚动窗口，使该点位于最底部的屏幕行。每个连续的 @kbd{C-l} 都会在这三个位置之间循环。
+
+@vindex recenter-positions
+您可以通过自定义列表变量@code{recenter-positions}来更改循环顺序。  每个列表元素应该是符号@code{top}、@code{middle}或@code{bottom}，或数字；整数表示将该行移动到指定的屏幕行，而 0.0 到 1.0 之间的浮点数则指定距窗口顶部的屏幕空间的百分比。  默认值 @code{(middle top bottom)} 是上述循环顺序。此外，如果将变量 @code{scroll-margin} 更改为非零值 @var{n}，则 @kbd{C-l} 始终在点与窗口顶部或底部 (@pxref{Auto Scrolling}) 之间留下至少 @var{n} 屏幕线。
+
+您还可以给 @kbd{C-l} 一个前缀参数。  一个简单的前缀参数 @kbd{C-u C-l} 只是将显示点的线居中。  正参数 @var{n} 会将显示点 @var{n} 的线从窗口顶部向下移动。  零参数将点的线移动到窗口的顶部。  负参数 @minus{}@var{n} 会将点的线从窗口底部移动 @var{n} 线。  当给定参数时，@kbd{C-l}不会清除屏幕或循环显示不同的屏幕位置。
+
+@vindex recenter-redisplay
+如果变量@code{recenter-redisplay}具有非@code{nil}值，则每次调用@kbd{C-l}也会清除并重新显示屏幕；特殊值 @code{tty} （默认值）表示仅在文本终端框架上执行此操作。  如果屏幕因任何原因出现乱码，重新显示非常有用 (@pxref{Screen Garbled})。
+
+@findex recenter
+更原始的命令 @kbd{M-x recenter} 的行为类似于 @code{recenter-top-bottom}，但不会在屏幕位置之间循环。
+
+@kindex C-M-l
+@findex reposition-window
+@kbd{C-M-l} (@code{reposition-window}) 以一种旨在将有用信息显示到屏幕上的方式试探性地滚动当前窗口。  例如，在 Lisp 文件中，如果可能，此命令会尝试将整个当前 defun 显示到屏幕上。
+
+@node Auto Scrolling
+@section 自动滚动
+
+@cindex automatic scrolling
+当点移出文本的可见部分时，Emacs 执行@dfn{automatic scrolling}。  通常，自动滚动中心垂直指向窗口，但有多种方法可以改变这种行为。
+
+@vindex scroll-conservatively
+@vindex scroll-minibuffer-conservatively
+如果将 @code{scroll-conservatively} 设置为较小的数字 @var{n}，则将 point 稍微移离屏幕（不超过 @var{n} 行）会导致 Emacs 滚动到足以将 point 重新带回到屏幕上；如果这样做无法使点可见，Emacs 会滚动到窗口中心点。  如果将 @code{scroll-conservatively} 设置为较大的数字（大于 100），则无论点移动多远，自动滚动都不会以点为中心； Emacs 总是滚动文本，使其足以使点进入视图，根据滚动方向，在窗口的顶部或底部。  默认情况下，@code{scroll-conservatively}为@tie{}0，这意味着始终以窗口为中心。也就是说，在迷你缓冲区窗口中，默认情况下滚动始终是保守的，因为 @code{scroll-minibuffer-conservatively} 是非 @code{nil}，它优先于 @code{scroll-conservatively}。
+
+@vindex scroll-step
+另一种控制自动滚动的方法是自定义变量@code{scroll-step}。  它的值决定了当点移出屏幕时自动滚动的行数。  如果滚动该行数无法使点重新回到视图中，则点会居中。  默认值为零，这（默认情况下）导致滚动后点始终居中。
+
+@cindex aggressive scrolling
+@vindex scroll-up-aggressively
+@vindex scroll-down-aggressively
+控制自动滚动的第三种方法是自定义变量@code{scroll-up-aggressively}和@code{scroll-down-aggressively}，它们直接指定滚动后点的垂直位置。  @code{scroll-up-aggressively} 的值应该是 @code{nil} （默认值），或者是介于 0 和 1 之间的浮点数 @var{f}。后者意味着当 point 低于窗口底部边缘时（即向前滚动），Emacs 会滚动窗口，使得 point 距离窗口底部边缘为窗口高度的 @var{f} 部分。  因此，较大的 @var{f} 意味着更积极的滚动：更多新文本进入视野。  默认值 @code{nil} 相当于 0.5。
+
+同样，当点位于窗口顶部边缘上方（即向后滚动）时，使用@code{scroll-down-aggressively}。  该值指定滚动后点距离窗口上边距的距离。  因此，与 1⁣ 一样，值越大越激进。
+
+请注意，变量 @code{scroll-conservatively}、@code{scroll-step} 和 @code{scroll-up-aggressively} / @code{scroll-down-aggressively} 以矛盾的方式控制自动滚动。  因此，您应该选择最多其中一种方法来自定义自动滚动。  如果您自定义多个变量，优先级顺序为：@code{scroll-conservatively}，然后@code{scroll-step}，最后@code{scroll-up-aggressively} / @code{scroll-down-aggressively}。
+
+@vindex scroll-margin
+@vindex maximum-scroll-margin
+变量 @code{scroll-margin} 限制点距离窗口顶部或底部的距离（即使激进滚动指定的分数 @var{f} 大于顶部和底部边距之间的窗口部分）。  其值为屏幕行数；如果点位于窗口顶部或底部的那么多行内，Emacs 会执行自动滚动。  默认情况下，@code{scroll-margin} 为 0。默认情况下，有效边距大小限制为窗口高度的四分之一，但可以通过自定义 @code{maximum-scroll-margin}将此限制增加到一半（或减少到零）。
+
+@node Horizontal Scrolling
+@section 水平滚动
+@cindex horizontal scrolling
+
+@vindex auto-hscroll-mode
+@dfn{Horizontal scrolling} 表示将窗口内的所有行向侧面移动，以便不显示左边距附近的一些文本。  当窗口中的文本水平滚动时，文本行会被截断而不是连续 (@pxref{Line Truncation})。如果窗口显示截断的行，只要点移出屏幕的左边缘或右边缘，Emacs 就会执行自动水平滚动。  默认情况下，窗口中的所有行都会一起水平滚动，但如果将变量@code{auto-hscroll-mode}设置为特殊值@code{current-line}，则只有显示光标的行才会滚动。  要完全禁用自动水平滚动，请将变量 @code{auto-hscroll-mode} 设置为 @code{nil}。  请注意，当自动水平滚动关闭时，如果点移出屏幕边缘，光标会消失以表明这一点。  （在文本终端上，光标留在边缘。）
+
+@vindex hscroll-margin
+变量 @code{hscroll-margin} 控制在自动滚动发生之前点距离窗口左边缘和右边缘的距离。  它以列为单位进行测量。  例如，如果值为 5，则在边缘的 5 列内移动点会导致远离该边缘的水平滚动。
+
+@vindex hscroll-step
+变量 @code{hscroll-step} 确定当点太靠近边缘时要滚动窗口的列数。  零（默认值）意味着在窗口内水平居中。正整数值指定要滚动的列数。浮点数（其值应介于 0 和 1 之间）指定要滚动的窗口宽度的分数。
+
+您还可以使用以下命令执行显式水平滚动：
+
+@table @kbd
+@item C-x <
+将当前窗口中的文本向左滚动 (@code{scroll-left})。
+@item C-x >
+向右滚动 (@code{scroll-right})。
+@end table
+
+@kindex C-x <
+@kindex C-x >
+@findex scroll-left
+@findex scroll-right
+@kbd{C-x <} (@code{scroll-left}) 将所选窗口中的文本向左滚动窗口的整个宽度，减去两列。  （换句话说，窗口中的文本相对于窗口向左移动。）使用数字参数 @var{n}，它会滚动 @var{n} 列。
+
+如果文本向左滚动，并且 point 移出窗口的左边缘，则光标将冻结在窗口的左边缘，直到 point 移回到文本的显示部分。这与 @code{auto-hscroll-mode} 的当前设置无关，对于向左滚动的文本，仅影响窗口右边缘的行为。
+
+@kbd{C-x >} (@code{scroll-right}) 类似地向右滚动。窗口正常显示后就不能再向右滚动，每一行都从窗口的左边距开始；尝试这样做没有效果。  这意味着您不必精确计算 @w{@kbd{C-x >}} 的参数；任何足够大的参数都会恢复正常显示。
+
+如果您使用这些命令水平滚动窗口，则会设置自动水平滚动的下限。  自动滚动将继续滚动窗口，但向右滚动的距离永远不会超过您之前通过 @code{scroll-left} 设置的量。  当@code{auto-hscroll-mode}设置为@code{current-line}时，除了显示光标的行之外的所有行都将滚动该最小量。
+
+在图形显示器上，如果您打开可选的 @code{horizontal-scroll-bar-mode};，则可以使用水平滚动条水平滚动窗口。 @pxref{Scroll Bars}。
+
+@node Narrowing
+@section 缩小范围
+@cindex widening
+@cindex restriction
+@cindex narrowing
+@cindex accessible portion
+
+@dfn{Narrowing} 表示专注于缓冲区的某些部分，使其余部分暂时无法访问。  您仍然可以到达的部分称为 @dfn{accessible portion}。  取消缩小，使整个缓冲区再次可访问，称为@dfn{widening}。  缓冲区中有效的缩小范围称为缓冲区的@dfn{restriction}。
+
+通过消除混乱，缩小范围可以更容易地集中在单个子例程或段落上。  它还可用于限制替换命令或重复键盘宏的操作范围。
+
+@table @kbd
+@item C-x n n
+缩小到点和标记之间 (@code{narrow-to-region})。
+@item C-x n w
+加宽以使整个缓冲区再次可访问 (@code{widen})。
+@item C-x n p
+缩小到当前页面 (@code{narrow-to-page})。
+@item C-x n d
+缩小到当前的 defun (@code{narrow-to-defun})。
+@end table
+
+当您缩小到缓冲区的一部分时，该部分似乎就是全部。  您看不到其余部分，无法进入其中（动作命令不会超出可访问部分），也无法以任何方式更改它。  但是，它并没有消失，如果您保存文件，所有无法访问的文本都将被保存。  每当缩小生效时，单词 @samp{Narrow} 就会出现在模式行中。
+
+@kindex C-x n n
+@findex narrow-to-region
+主要缩小命令是@kbd{C-x n n} (@code{narrow-to-region})。它设置当前缓冲区的限制，以便当前区域中的文本仍然可访问，但该区域之前或之后的所有文本都不可访问。  点和标记不变。
+
+@kindex C-x n p
+@findex narrow-to-page
+@kindex C-x n d
+@findex narrow-to-defun
+或者，使用 @kbd{C-x n p} (@code{narrow-to-page}) 缩小到当前页面。  @xref{Pages}，用于页面的定义。 @kbd{C-x n d} (@code{narrow-to-defun}) 缩小到 defun 包含点 (@pxref{Defuns})。
+
+@kindex C-x n w
+@findex widen
+取消缩小的方法是用 @kbd{C-x n w} (@code{widen}) 扩大。  这使得缓冲区中的所有文本都可以再次访问。
+
+您可以使用 @kbd{C-x =} 命令获取有关缓冲区缩小到哪一部分的信息。  @xref{Position Info}。
+
+因为缩小很容易让不理解的用户感到困惑，所以 @code{narrow-to-region} 通常是一个禁用命令。  尝试使用此命令会要求确认并为您提供启用它的选项；如果启用该命令，则不再需要确认。  @xref{Disabling}。
+
+@node View Mode
+@section 查看模式
+@cindex View mode
+@cindex mode, View
+
+@kindex s @r{(View mode)}
+@kindex SPC @r{(View mode)}
+@kindex DEL @r{(View mode)}
+查看模式是一种次要模式，可让您按顺序整屏扫描缓冲区。  它提供了方便地滚动缓冲区的命令，但不提供更改缓冲区的命令。  除了常用的 Emacs 光标移动命令之外，您还可以键入 @key{SPC} 向前滚动一窗口，键入 @kbd{S-@key{SPC}} 或 @key{DEL} 向后滚动，以及 @kbd{s} 开始增量搜索。
+
+@kindex q @r{(View mode)}
+@kindex e @r{(View mode)}
+@findex View-quit
+@findex View-exit
+键入 @kbd{q} (@code{View-quit}) 会禁用查看模式，并切换回启用查看模式之前的缓冲区和位置。  键入 @kbd{e} (@code{View-exit}) 会禁用视图模式，保留当前缓冲区和位置。
+
+@findex view-buffer
+@findex view-file
+@kbd{M-x view-buffer} 提示现有的 Emacs 缓冲区，切换到它，并启用查看模式。  @kbd{M-x view-file} 提示输入文件并在启用查看模式的情况下访问它。
+
+@node Follow Mode
+@section 跟随模式
+@cindex Follow mode
+@cindex mode, Follow
+@findex follow-mode
+@cindex windows, synchronizing
+@cindex synchronizing windows
+
+@dfn{Follow mode} 是一种次要模式，使两个显示相同缓冲区的窗口作为单个高虚拟窗口滚动。要使用“跟随”模式，请转到只有一个窗口的框架，使用 @kbd{C-x 3} 将其分成两个并排的窗口，然后键入 @kbd{M-x follow-mode}。  从那时起，您可以在两个窗口之一中编辑缓冲区，或滚动其中一个；另一个窗口紧随其后。
+
+在“跟随”模式下，如果将点移出一个窗口中可见的部分并移入另一个窗口中可见的部分，则会选择另一个窗口——再次将这两个窗口视为一个大窗口的一部分。
+
+要关闭跟随模式，请再次输入 @kbd{M-x follow-mode}。
+
+@node Faces
+@section 文字面孔
+@cindex faces
+
+Emacs 可以用几种不同的样式显示文本，称为 @dfn{faces}。  每个面都可以指定各种@dfn{face attributes}，例如字体、高度、粗细、倾斜、前景色和背景色以及下划线或上划线。  大多数主要模式通过字体锁定模式自动将面孔分配给文本。  @xref{Font Lock}，了解有关如何分配这些面的更多信息。
+
+@findex list-faces-display
+要查看当前定义的面及其外观，请输入 @kbd{M-x list-faces-display}。  使用前缀参数时，会提示输入正则表达式，并仅显示名称与该正则表达式 (@pxref{Regexps}) 匹配的面孔。
+
+@vindex frame-background-mode
+一张特定的脸在不同的框架中看起来可能会有所不同。  例如，某些文本终端不支持所有面部属性，特别是字体、高度和宽度，并且某些文本终端支持有限的颜色范围。  此外，出于易读性的原因，大多数 Emacs 面孔都被定义为它们的属性在浅色和深色框架背景上有所不同。  默认情况下，Emacs 根据帧的当前背景颜色自动选择在每个帧上显示哪组面部属性。  但是，您可以通过为变量 @code{frame-background-mode} 指定一个非 @code{nil} 值来覆盖此设置。  值 @code{dark} 使 Emacs 将所有帧视为具有深色背景，而值 @code{light} 使其将所有帧视为具有浅色背景。
+
+@cindex background color
+@cindex @code{default face}
+您可以自定义面孔以更改其属性，并保存这些自定义以供将来的 Emacs 会话使用。  @xref{Face Customization}，了解详情。
+
+@code{default} 面是显示文本的默认面，并且其所有属性均已指定。  它的背景颜色也用作框架的背景颜色。  @xref{Colors}。
+
+@cindex @code{cursor} face
+另一个特殊的面是@code{cursor}面。  在图形显示上，该面的背景颜色用于绘制文本光标。  这张脸的其他属性都没有任何效果；光标下文本的前景色取自底层文本的背景色。  在文本终端上，文本光标的外观由终端决定，而不是由 @code{cursor} 面决定。
+
+您还可以使用 X 资源来指定任何特定面的属性。  @xref{Resources}。
+
+Emacs 可以显示可变宽度字体，但某些 Emacs 命令，特别是缩进命令，不考虑可变字符显示宽度。  因此，我们建议不要对大多数字体使用可变宽度字体，特别是那些由字体锁定模式指定的字体。
+
+@node Colors
+@section 脸部颜色
+
+面孔可以有各种前景色和背景色。  当您指定面的颜色时——例如，自定义面 (@pxref{Face Customization}) 时——您可以使用 @dfn{color name} 或 @dfn{RGB triplet}。
+
+@subsection 颜色名称
+@cindex color name
+@findex list-colors-display
+@vindex list-colors-sort
+颜色名称是预定义的名称，例如 @samp{dark orange} 或 @samp{medium sea green}。  要查看颜色名称列表，请输入 @kbd{M-x list-colors-display}。  要控制颜色的显示顺序，请自定义@code{list-colors-sort}。  如果您在图形显示器上运行此命令，它将显示 Emacs 已知的全部颜色名称（这些是标准 X11 颜色名称，在 X 的 @file{rgb.txt} 文件中定义）。  如果您在文本终端上运行该命令，它只会显示可以在此类终端上安全显示的一小部分颜色。  然而，即使在文本终端上，Emacs 也能理解 X11 颜色名称；如果一个面被赋予由 X11 颜色名称指定的颜色，则它会使用最接近匹配的终端颜色显示。
+
+@subsection RGB 三元组
+@cindex RGB triplet
+RGB 三元组是@samp{#RRGGBB} 形式的字符串。  每个原色分量均由 1⁣（强度 0）和 @samp{FF}（最大强度）之间的十六进制数表示。每个分量也可以使用一位、三位或四位十六进制数字，因此 @samp{red} 可以表示为 @samp{#F00}、@samp{#fff000000} 或 @samp{#ffff00000000}。  组件的位数必须相同。  对于十六进制值 A 到 F，大写或小写均可。
+
+@kbd{M-x list-colors-display} 命令还显示每个命名颜色的等效 RGB 三元组。  例如，@samp{medium sea green}相当于@samp{#3CB371}。
+
+@cindex face colors, setting
+@findex set-face-foreground
+@findex set-face-background
+您可以使用 @kbd{M-x set-face-foreground} 和 @kbd{M-x set-face-background} 更改脸部的前景色和背景色。这些命令在迷你缓冲区中提示输入面名称和颜色并完成，然后将该面设置为使用指定的颜色。它们会影响所有帧上的面部颜色，但与使用自定义缓冲区或 X 资源不同，它们的效果不会在未来的 Emacs 会话中持续存在。  您还可以使用框架参数来设置特定框架的前景色和背景色； @xref{Frame Parameters}。
+
+@node Standard Faces
+@section 标准面
+@cindex standard faces
+
+以下是用于指定文本外观的标准面。  当您想要它们产生的效果时，可以将它们应用到特定文本。
+
+@table @code
+@item default
+该面用于不指定任何面的普通文本。它的背景颜色用作框架的背景颜色。
+
+@item bold
+该字体使用默认字体的粗体变体。
+
+@item italic
+该字体使用默认字体的斜体变体。
+
+@item bold-italic
+该字体使用默认字体的粗体斜体变体。
+
+@item underline
+这张脸强调了文字。
+
+@item fixed-pitch
+该字体强制使用固定宽度字体。  如果您愿意，可以自定义此字体以使用不同的固定宽度字体，但不应将其设为可变宽度字体。
+
+@item fixed-pitch-serif
+这个字体类似于@code{fixed-pitch}，只不过字体有衬线，看起来更像传统打字。
+
+@cindex @code{variable-pitch} face
+@item variable-pitch
+该字体强制使用可变宽度（即比例）字体。为此面选择的字体大小与为默认（通常是固定宽度）字体选择的字体相匹配。
+
+@item variable-pitch-text
+这类似于 @code{variable-pitch} 面（它继承自该面），但稍大一些。  与等宽字体高度相同的比例字体通常在视觉上显得较小，因此更难以阅读。  当显示较长的文本时，与（稍小）@code{variable-pitch} 面相比，此面可能是一个不错的选择。
+
+@cindex @code{shadow} face
+@item shadow
+该面用于使文本比周围的普通文本不那么引人注目。  通常，这可以通过使用与黑色或白色默认前景色形成对比的灰色阴影来实现。
+@end table
+
+这是一个不完整的面孔列表，用于出于特定目的临时突出显示部分文本。  （许多其他模式为此目的定义了自己的面孔。）
+
+@table @code
+@item highlight
+该面用于在各种上下文中突出显示文本，例如当鼠标光标移动到超链接上时。
+@item isearch
+该面用于突出显示当前 Isearch 匹配 (@pxref{Incremental Search})。
+@item query-replace
+该面用于突出显示当前查询替换匹配 (@pxref{Replace})。
+@item lazy-highlight
+该面用于突出显示 Isearch 和 Query Replace 的惰性匹配（当前匹配以外的匹配）。
+@item region
+该面用于显示活动区域 (@pxref{Mark})。当 Emacs 构建为支持 GTK+ 时，其颜色取自当前的 GTK+ 主题。
+@item secondary-selection
+该面用于显示辅助 X 选择 (@pxref{Secondary Selection})。
+@item trailing-whitespace
+当 @code{show-trailing-whitespace} 为非 @code{nil} (@pxref{Useless Whitespace}) 时，用于突出显示行尾多余空格和制表符的面。
+@item escape-glyph
+用于显示控制字符和转义序列的面 (@pxref{Text Display})。
+@item homoglyph
+用于显示相似字符的面孔，即看起来像但不是所表示的字符的字符 (@pxref{Text Display})。
+@item nobreak-space
+用于显示不间断空格字符 (@pxref{Text Display}) 的面。
+@item nobreak-hyphen
+用于显示不间断连字符 (@pxref{Text Display}) 的面。
+@end table
+
+以下面控制 Emacs 框架各部分的外观：
+
+@table @code
+@cindex @code{mode-line} face
+@item mode-line
+当不使用工具包菜单时，这是用于模式线、标题线和菜单栏的基面。  默认情况下，它使用阴影绘制，以在图形显示上产生凸起效果，并在文本终端上绘制为默认面的反面。
+
+@code{mode-line-active} 和 @code{mode-line-inactive} 面（模式线上使用的面）继承自该面。
+
+@cindex faces for mode lines
+@item mode-line-active
+与@code{mode-line}类似，但用于当前选定窗口的模式线。  该面继承自@code{mode-line}，因此该面的更改会影响所有窗口中的模式线。
+
+@cindex @code{mode-line-inactive} face
+@item mode-line-inactive
+与 @code{mode-line} 类似，但用于除所选窗口之外的窗口的模式线（如果 @code{mode-line-in-non-selected-windows} 为非 @code{nil}）。  该面继承自@code{mode-line}，因此该面的更改会影响所有窗口中的模式线。
+
+@cindex @code{mode-line-highlight} face
+@item mode-line-highlight
+与 @code{highlight} 类似，但用于模式行上文本的鼠标敏感部分。  当鼠标指针悬停在文本的此类部分上方时，通常会弹出工具提示 (@pxref{Tooltips})。
+
+@cindex @code{mode-line-buffer-id} face
+@item mode-line-buffer-id
+该面用于模式行中的缓冲区识别部分。
+
+@cindex @code{header-line} face
+@item header-line
+类似于窗口标题行的@code{mode-line}，它出现在窗口的顶部，就像模式行出现在底部一样。大多数窗口没有标题行——只有一些特殊模式（例如信息模式）才会创建标题行。
+
+@code{header-line-active} 和 @code{header-line-inactive} 面（它们是标题行上实际使用的面）继承自该面。
+
+@cindex faces for header lines
+@item header-line-active
+与@code{header-line}类似，但用于当前选定窗口的标题行。  该面继承自@code{header-line}，因此该面的更改会影响所有窗口中的标题行。
+
+@cindex @code{header-line-inactive} face
+@item header-line-inactive
+与@code{header-line}类似，但用于除所选窗口之外的窗口的标题行（如果这些窗口有标题行）。  该面继承自@code{header-line}，因此该面的更改会影响所有窗口中的标题行。
+
+@cindex @code{header-line-highlight} face
+@item header-line-highlight
+与 @code{highlight} 和 @code{mode-line-highlight} 类似，但用于标题行上文本的鼠标敏感部分。  这是一个单独的面，因为 @code{header-line} 面的自定义方式可能无法与 @code{highlight} 很好地交互。
+
+@cindex @code{tab-line} face
+@item tab-line
+与窗口的选项卡行的 @code{mode-line} 类似，它出现在窗口的顶部，其中选项卡代表窗口缓冲区。 @xref{Tab Line}。
+
+@code{tab-line-active} 和 @code{tab-line-inactive} 面（它们是制表线上实际使用的面）继承自该面。
+
+@cindex faces for tab lines
+@item tab-line-active
+与 @code{tab-line} 类似，但用于当前所选窗口的制表符行。  该面继承自@code{tab-line}，因此该面的更改会影响所有窗口中的制表符行。
+
+@cindex @code{tab-line-inactive} face
+@item tab-line-inactive
+与 @code{tab-line} 类似，但用于除所选窗口之外的窗口的制表符行（如果这些窗口有制表符行）。  该面继承自@code{tab-line}，因此该面的更改会影响所有窗口中的制表符行。
+
+@cindex @code{vertical-border} face
+@item vertical-border
+该面用于文本终端上窗口之间的垂直分隔线。
+
+@cindex @code{minibuffer-prompt} face
+@vindex minibuffer-prompt-properties
+@item minibuffer-prompt
+该面用于迷你缓冲区中显示的提示字符串。默认情况下，Emacs 会自动将此面添加到 @code{minibuffer-prompt-properties} 的值中，@code{minibuffer-prompt-properties} 是用于显示提示文本的文本属性 (@pxref{Text Properties,,, elisp, the Emacs Lisp Reference Manual}) 列表。  （该变量在进入迷你缓冲区时生效。）
+
+@cindex @code{fringe} face
+@item fringe
+图形显示器上窗口左侧和右侧边缘的面。  （边缘是 Emacs 框架中文本区域与窗口左右边框之间的狭窄部分。） @xref{Fringes}。
+
+@item cursor
+该面的 @code{:background} 属性指定文本光标的颜色。  @xref{Cursor Display}。
+
+@item tooltip
+该面用于工具提示文本。  默认情况下，如果 Emacs 是使用 GTK+ 支持构建的，则工具提示是通过 GTK+ 绘制的，并且该面没有任何效果。  @xref{Tooltips}。
+
+@item mouse
+该面决定鼠标指针的颜色。
+@end table
+
+以下面同样控制 Emacs 框架部分的外观，但仅限于文本终端，或者当 Emacs 构建在 X 上且没有工具包支持时。  （对于所有其他情况，各个框架元素的外观由系统范围的设置决定。）
+
+@table @code
+@item scroll-bar
+该面决定了滚动条的视觉外观。 @xref{Scroll Bars}。
+@item tool-bar
+该面决定工具栏图标的颜色。  @xref{Tool Bars}。
+@item tab-bar
+该面决定选项卡栏图标的颜色。  @xref{Tab Bars}。
+@cindex menu bar appearance
+@cindex @code{menu} face, no effect if customized
+@cindex customization of @code{menu} face
+@item menu
+该面决定了 Emacs 菜单的颜色和字体。  @xref{Menu Bars}。
+@cindex faces for text-mode menus
+@cindex TTY menu faces
+@item tty-menu-enabled-face
+该面用于显示文本模式终端上启用的菜单项。
+@item tty-menu-disabled-face
+该面用于显示文本模式终端上禁用的菜单项。
+@item tty-menu-selected-face
+该面用于在文本模式终端上显示单击鼠标或按 @key{RET} 将选择的菜单项。
+@end table
+
+@node Icons
+@section 图标
+@cindex icons, on clickable buttons
+
+Emacs 有时会显示可单击的按钮（或其他信息丰富的图标），您可以自定义这些按钮的显示方式。
+
+@vindex icon-preference
+这里的主要自定义点是 @code{icon-preference} 用户选项。  通过使用它，您可以告诉 Emacs 您对图标的总体偏好。  这是图标类型的列表，将使用第一个支持的图标类型。  支持的类型有：
+
+@table @code
+@item image
+使用图像作为图标。
+
+@item emoji
+使用彩色表情符号作为图标。
+
+@item symbol
+使用单色符号作为图标。
+
+@item text
+使用简单的文本作为图标。
+@end table
+
+此外，每个单独的图标都可以使用 @kbd{M-x customize-icon} 进行自定义，主题可以进一步改变图标的​​外观。
+
+要获取图标的快速描述，请使用 @kbd{M-x describe-icon} 命令。
+
+@node Text Scale
+@section 文字比例
+
+@cindex adjust buffer font size
+@cindex font size of @code{default} face, increase or decrease
+@findex text-scale-adjust
+@kindex C-x C-+
+@kindex C-x C--
+@kindex C-x C-=
+@kindex C-x C-0
+@kindex C-wheel-down
+@kindex C-wheel-up
+要增加当前缓冲区中 @code{default} 面的字体大小，请键入 @kbd{C-x C-+} 或 @kbd{C-x C-=}。  要减少它，请输入 @kbd{C-x C--}。  要恢复默认（全局）字体大小，请键入 @kbd{C-x C-0}。  这些键都绑定到同一个命令 @code{text-scale-adjust}，该命令会查看最后键入的键来确定要执行的操作，并通过更改默认字体的高度来相应地调整字体大小。
+
+大多数面没有 @code{:height} 属性的显式设置，因此继承了 @code{default} 面的高度。这些面也通过上述命令进行缩放。
+
+除 0⁣ 之外，具有显式设置 @code{:height} 属性的面不受这些字体大小更改的影响。 @code{header-line} 面是一个例外：即使它具有 @code{:height} 属性的显式设置，它也会被缩放。
+
+同样，当鼠标指针位于缓冲区文本上方时，按下 @kbd{Ctrl} 修饰符滚动鼠标滚轮，将增大或减小受影响面的字体大小，具体取决于滚动方向。
+
+这些命令的最后一个键可以在没有前导 @kbd{C-x} 且没有修饰符的情况下重复。  例如，@w{@kbd{C-x C-= C-= C-=}}和@w{@kbd{C-x C-= = =}}将面部高度增加三级。  每一步都会将文本高度缩放 ​​1.2 倍；要更改此因子，请自定义变量@code{text-scale-mode-step}。  @code{text-scale-adjust} 命令的数字参数 0 可恢复默认高度，与键入 @kbd{C-x C-0} 相同。
+
+@cindex adjust global font size
+@findex global-text-scale-adjust
+@vindex global-text-scale-adjust-resizes-frames
+@kindex C-x C-M-+
+@kindex C-x C-M-=
+@kindex C-x C-M--
+@kindex C-x C-M-0
+@kindex C-M-wheel-down
+@kindex C-M-wheel-up
+同样，要全局更改字体大小，请键入 @kbd{C-x C-M-+}、@kbd{C-x C-M-=}、@kbd{C-x C-M--} 或 @kbd{C-x C-M-0}，或者在按下 @kbd{Ctrl} 和 @kbd{Meta} 修饰键的同时滚动鼠标滚轮。  要在全局更改字体大小时启用框架大小调整，请自定义变量@code{global-text-scale-adjust-resizes-frames} (@pxref{Easy Customization})。
+
+@cindex increase buffer font size
+@findex text-scale-increase
+@cindex decrease buffer font size
+@findex text-scale-decrease
+命令 @code{text-scale-increase} 和 @code{text-scale-decrease} 增大或减小当前缓冲区中的字体大小，就像分别与 @kbd{C-x C-+} 和 @kbd{C-x C--} 一样。  您可能会发现绑定到这些命令比 @code{text-scale-adjust} 更方便。
+
+@cindex set buffer font size
+@findex text-scale-set
+命令 @code{text-scale-set} 将当前缓冲区中的字体大小缩放到由其前缀参数指定的绝对级别。
+
+@findex text-scale-mode
+如果当前字体缩放比例不是 1，上述命令会自动启用次要模式@code{text-scale-mode}，否则禁用它。
+
+@cindex pinch to scale
+@findex text-scale-pinch
+当通过将两根手指放在触摸板上并将它们移向或远离彼此来执行捏合手势时，命令@code{text-scale-pinch}根据触摸板上手指之间的距离来增大或减小文本比例。  这仅适用于某些具有受支持硬件的系统。
+
+@findex mouse-wheel-text-scale
+命令 @code{mouse-wheel-text-scale} 还可以更改文本比例。  通常，当您在移动鼠标滚轮时按 @key{Ctrl} 时会运行它。  当滚轮向下移动时，文本比例增大，当滚轮向上移动时，文本比例减小。
+
+@node Font Lock
+@section 字体锁定模式
+@cindex Font Lock mode
+@cindex mode, Font Lock
+@cindex syntax highlighting and coloring
+
+字体锁定模式是一种次要模式，始终位于特定缓冲区的本地，它将面分配给（或@dfn{fontifies}）缓冲区中的文本。每个缓冲区的主要模式告诉字体锁定模式要字体化的文本；例如，编程语言模式将语法相关的结构（如注释、字符串和函数名称）字体化。
+
+@findex font-lock-mode
+在支持字体锁定模式的主要模式中默认启用该模式。要在当前缓冲区中切换它，请输入 @kbd{M-x font-lock-mode}。  正数参数无条件启用字体锁定模式，负数或零参数则禁用它。
+
+@findex global-font-lock-mode
+@vindex global-font-lock-mode
+输入 @kbd{M-x global-font-lock-mode} 可在所有缓冲区中切换字体锁定模式。  要为将来的 Emacs 会话强加此设置，请自定义变量 @code{global-font-lock-mode} (@pxref{Easy Customization})，或将以下行添加到您的 init 文件中：
+
+@example
+(global-font-lock-mode 0)
+@end example
+
+@noindent
+如果您已禁用全局字体锁定模式，您仍然可以通过将函数 @code{font-lock-mode} 添加到模式挂钩 (@pxref{Hooks}) 来启用特定主要模式的字体锁定。  例如，要启用字体锁定模式来编辑 C 文件，您可以执行以下操作：
+
+@example
+(add-hook 'c-mode-hook 'font-lock-mode)
+@end example
+
+字体锁定模式使用几个专门命名的面来完成其工作，包括 @code{font-lock-string-face}、@code{font-lock-comment-face} 等。  找到它们的最简单方法是使用@kbd{M-x customize-group @key{RET} font-lock-faces @key{RET}}。  然后，您可以使用该自定义缓冲区来自定义这些面的外观。  @xref{Face Customization}。
+
+@cindex just-in-time (JIT) font-lock
+@cindex background syntax highlighting
+字体化非常大的缓冲区可能需要很长时间。  为了避免访问文件时出现较大延迟，Emacs 最初仅对缓冲区的可见部分进行字体设置。  当您滚动缓冲区时，每个变得可见的部分在显示时都会被字体化；这种类型的字体锁定称为@dfn{Just-In-Time}（或@dfn{JIT}）锁定。  您可以通过自定义自定义组@samp{jit-lock}中的变量来控制 JIT Lock 的行为方式，包括告诉它在空闲时执行字体化。  @xref{Specific Customization}。
+
+主要模式用于确定缓冲文本的哪些部分要字体化以及要使用哪些外观的信息可以基于分析文本的几种不同方式：
+
+@itemize @bullet
+@item
+基于正则表达式 (@pxref{Regexp Search,, Regular Expression Search}) 搜索关键字和其他文本模式。
+
+@item
+根据内置语法表 (@pxref{Syntax Tables,,, elisp, The Emacs Lisp Reference Manual}) 查找文本中语法不同的部分。
+
+@item
+使用由成熟的解析器通过专用库（例如树托管库（@pxref{Parsing Program Source,,, elisp, The Emacs Lisp Reference Manual}））或外部程序生成的语法树。
+@end itemize
+
+@menu
+* Traditional Font Lock::   基于正则表达式和语法表的字体锁定。
+* Parser-based Font Lock::  基于外部解析器的字体锁定。
+* Semantic Font Lock::      基于语义分析的字体锁定。
+@end menu
+
+@node Traditional Font Lock
+@subsection 传统字体锁定
+@cindex traditional font-lock
+
+提供字体锁定信息的“传统”方法基于正则表达式搜索和使用 Emacs 内置语法表进行语法分析。  本小节描述了使用这些传统方法的主要模式的字体锁定的使用和定制。
+
+@vindex font-lock-maximum-decoration
+对于支持此功能的主要模式，您可以通过自定义变量 @code{font-lock-maximum-decoration} 来控制字体锁定模式应用的字体量。  该变量的值应该是一个数字（1 代表最小的字体量；某些模式支持级别高达 3）；或@code{t}，意思是“尽可能高”（默认值）。  为了对给定的文件缓冲区有效，应该在访问文件时完成 @code{font-lock-maximum-decoration} 的定制；如果您在自定义此变量时已经在缓冲区中访问了该文件，请在自定义后终止该缓冲区并再次访问该文件。
+
+您还可以为特定的主要模式指定不同的数字；例如，要对 C/C++ 模式使用级别 1，否则使用默认级别，请使用值
+
+@example
+'((c-mode . 1) (c++-mode . 1)))
+@end example
+
+@cindex incorrect fontification
+@cindex parenthesis in column zero and fontification
+@cindex brace in column zero and fontification
+注释和字符串字体化（或“句法”字体化）依赖于对缓冲区文本的句法结构的分析。  为了速度，某些模式（包括 Lisp 模式）依赖于一种特殊的约定：最左边一列中的左括号或左大括号始终定义 defun 的开头，因此始终位于任何字符串或注释之外。  因此，如果左括号或左大括号位于字符串或注释内，则应避免在最左列中放置左括号或左大括号。  @xref{Left Margin Paren}，了解详情。
+
+@findex font-lock-add-keywords
+大多数模式都已存在字体锁定突出显示模式，但您可能想要字体化其他模式。  您可以使用函数 @code{font-lock-add-keywords} 为特定模式添加您自己的突出显示模式。  例如，要突出显示 C 注释中的 @samp{FIXME:} 单词，请使用以下命令：
+
+@example
+(add-hook 'c-mode-hook
+          (lambda ()
+           (font-lock-add-keywords nil
+            '(("\\<\\(FIXME\\):" 1
+               font-lock-warning-face t)))))
+@end example
+
+@findex font-lock-remove-keywords
+@vindex font-lock-ignore
+@noindent
+要从字体锁定突出显示模式中删除关键字，请使用函数@code{font-lock-remove-keywords}。  @xref{Search-based Fontification,,, elisp, The Emacs Lisp Reference Manual}。或者，您可以通过自定义 @code{font-lock-ignore} 选项 @pxref{Customizing Keywords,,, elisp, The Emacs Lisp Reference Manual} 有选择地禁用某些关键字的突出显示。
+
+@node Parser-based Font Lock
+@subsection 基于解析器的字体锁定
+@cindex font-lock via tree-sitter
+@cindex parser-based font-lock
+如果您的 Emacs 是使用 tree-sitter 库构建的，则它可以使用该库解析缓冲区文本的结果来实现字体化。  这通常比上一小节中描述的“传统”方法更快、更准确，因为 tree-sitter 库为编程语言和它支持的其他类型的格式化文本提供了成熟的解析器。  使用tree-sitter库的主要模式被命名为@code{@var{foo}-ts-mode}，其中@samp{-ts-}部分表示该库的使用。  本小节记录了基于 tree-sitter 库的字体锁定支持。
+
+@vindex treesit-font-lock-level
+您可以通过自定义变量@code{treesit-font-lock-level}来控制基于树守护者的主要模式的字体锁定模式应用的字体量。  它的值是 1 到 4 之间的数字：
+
+@table @asis
+@item 1级
+此级别通常仅对函数定义中的注释和函数名称进行字体显示。
+@item 2级
+此级别添加关键字、字符串和数据类型的字体化。
+@item 3级
+这是默认级别；它添加了作业、数字等的字体。
+@item 4级
+此级别添加了所有其他可以字体化的内容：运算符、分隔符、括号、其他标点符号、函数调用中的函数名称、属性查找、变量等。
+@end table
+
+@vindex treesit-font-lock-feature-list
+@noindent
+上述每个语法类别的具体构成取决于主要模式和树守护者针对主要模式语言使用的解析器语法。  然而，一般来说，类别遵循编程语言的约定或主要模式支持的文件格式。  变量@code{treesit-font-lock-feature-list}的缓冲区本地值保存基于树坐骑的主要模式支持的字体化特征，其中每个子列表显示相应字体化级别提供的特征。
+
+一旦您通过 @w{@kbd{M-x customize-variable}} (@pxref{Specific Customization}) 更改 @code{treesit-font-lock-level} 的值，它将立即在所有现有缓冲区以及您将来在同一会话中访问的文件中生效。
+
+@node Semantic Font Lock
+@subsection 语义字体锁定
+@cindex semantic highlighting
+
+@dfn{Semantic highlighting} 是一种功能，编辑器使用某种语义分析来理解程序的源代码，并根据不同标记在程序中的特定角色突出显示这些标记，从而向用户传达有关不同标记含义的有用信息。
+
+语义突出显示比传统的“语法突出显示”更复杂，传统的“语法突出显示”只考虑标记的语法角色，即它如何影响代码的@emph{parsing}，而不像语义分析考虑标记对程序的@emph{execution}的影响。  例如，语义突出显示实现可能能够区分局部变量和全局变量，并为每个类别提供不同的突出显示，即使该语言的 @emph{syntax} 没有做出这样的区分。  语义突出显示对于语法结构根据其出现的上下文可能意味着完全不同的事物的语言尤其有用，例如 Lisp 和 Prolog。  在此类语言中，仅进行句法分析就错过了程序员推理其程序所需的许多重要信息。
+
+一些语言服务器提供语义突出显示信息，Emacs 可以通过其 LSP 客户端 Eglot 利用这些信息。  @xref{Eglot Features,,, eglot, Eglot: The Emacs LSP Client}。
+
+@vindex elisp-fontify-semantically
+此外，Emacs 还为 Emacs Lisp 实现了语义突出显示，作为 @code{emacs-lisp-mode} (@pxref{Executing Lisp}) 的可选功能。要启用它，请将选项 @code{elisp-fontify-semantically} 自定义为非 @code{nil} 值。  本小节的其余部分描述了 Emacs Lisp 特定的语义突出显示支持的使用。
+
+当 @code{elisp-fontify-semantically} 启用时，@code{emacs-lisp-mode} 分析您的代码并根据符号的语义角色突出显示符号，作为该模式通常的字体锁定突出显示 (@pxref{Font Lock}) 的一部分。  它不影响字符串、注释和其他语法元素（如括号）的突出显示； @code{elisp-fontify-semantically} 仅影响符号的突出显示。
+
+@cindex symbol role, in semantic analysis
+语义分析为每个符号分配一个@dfn{symbol role}，例如“函数”、“局部变量”、“面名称”等。每个符号角色都有一个关联的面属性，该属性在语义突出显示期间应用于具有该角色的符号。  默认情况下，这些面中的大多数都继承自适当的 @code{font-lock-*} 面。  例如，局部绑定变量得到 @code{elisp-bound-variable} 面，它继承自 @code{font-lock-variable-use-face}。
+
+@vindex elisp-add-help-echo
+语义分析可以区分 50 多个此类符号角色，但您无需记住这么多面孔的外观即可利用语义突出显示：您可以将鼠标悬停在突出显示的符号上，以查看工具提示，其中包含 Emacs 为该符号推断出的确切角色 (@pxref{Tooltips})。  如果您想禁用此额外信息，请将 @code{elisp-add-help-echo} 自定义为 @code{nil} 值。
+
+使用@code{elisp-fontify-semantically}时还应记住以下几点：
+
+@itemize @bullet
+@item 
+语法错误会破坏语义分析，因此为了获得最佳结果，您可能需要启用 @code{electric-pair-mode} 以在编辑代码时保持代码语法正确。  @xref{Matching}。
+
+@cindex trusted buffers, and semantic highlighting
+@vindex elisp-scope-safe-macros
+@item 
+在某些情况下，分析会使用宏扩展，但默认情况下，它仅在受信任的缓冲区中执行此操作 (@pxref{Host Security})。  在 @emph{untrusted} 缓冲区中，某些宏参数可能不会突出显示。  有关 Emacs 认为可以安全扩展以进行分析的宏的更多信息，请参阅 @code{elisp-scope-safe-macro-p} 的文档字符串。  用户选项 @code{elisp-scope-safe-macros} 控制在不可信缓冲区中分析期间可以安全扩展哪些宏。
+
+@item 
+分析是根据当前 Emacs 会话中的定义进行的，因此使用已卸载库的代码可能会错过一些突出显示。
+
+@item 
+该分析假设词汇绑定有效 (@pxref{Selecting Lisp Dialect,,, elisp, the Emacs Lisp Reference Manual})。
+
+@item 
+语义突出显示需要比传统字体锁定进行额外的处理——在编辑非常大的 defun 时，当前的实现可能会很慢。
+@end itemize
+
+
+@node Highlight Interactively
+@section 交互式突出显示
+@cindex highlighting by matching
+@cindex interactive highlighting
+@cindex Highlight Changes mode
+
+@findex highlight-changes-mode
+突出显示更改模式是一种次要模式，通过为文本提供不同的外观，@dfn{highlights} 缓冲区中最近更改的部分。  要启用或禁用突出显示更改模式，请使用@kbd{M-x highlight-changes-mode}。
+
+@cindex Hi Lock mode
+@findex hi-lock-mode
+Hi Lock 模式是一种次要模式，可突出显示与您指定的正则表达式匹配的文本。  例如，您可以使用它来突出显示程序源文件中对某个变量的所有引用，突出显示某个程序的大量输出中的某些部分，或者突出显示文章中的某些名称。  要启用或禁用 Hi Lock 模式，请使用命令@kbd{M-x hi-lock-mode}。  要为所有缓冲区启用 Hi Lock 模式，请使用 @kbd{M-x global-hi-lock-mode} 或将 @code{(global-hi-lock-mode 1)} 放入 @file{.emacs} 文件中。
+
+Hi Lock 模式的工作方式类似于 Font Lock 模式 (@pxref{Font Lock})，只不过您明确指定要突出显示的正则表达式。  您可以使用以下命令来控制它们。  （下面以 @kbd{C-x w} 开头的键绑定已被弃用，取而代之的是全局 @kbd{M-s h} 绑定，并将在未来的某些 Emacs 版本中删除。）
+
+@table @kbd
+@item M-s h r @var{regexp} @key{RET} @var{face} @key{RET}
+@itemx C-x w h @var{regexp} @key{RET} @var{face} @key{RET}
+@kindex M-s h r
+@kindex C-x w h
+@findex highlight-regexp
+使用面 @var{face} (@code{highlight-regexp}) 突出显示与 @var{regexp} 匹配的文本。  只要缓冲区被加载，突出显示就会保持不变。  例如，要使用默认外观（黄色背景）突出显示所有出现的单词“whim”，请输入@kbd{M-s h r whim @key{RET} @key{RET}}。  任何面都可以用于突出显示，Hi Lock 提供了几个自己的面，并且这些面已预先加载到默认值列表中。  当提示输入面孔时，使用 @kbd{M-n} 和 @kbd{M-p} 循环浏览它们。  前缀数字参数将突出显示限制为相应的子表达式。
+
+@vindex hi-lock-auto-select-face
+将选项 @code{hi-lock-auto-select-face} 设置为非 @code{nil} 值会导致此命令（以及读取面孔的其他 Hi Lock 命令）自动从默认列表中选择下一张面孔，而无需提示。
+
+您可以多次使用此命令，指定各种正则表达式以不同的方式突出显示。
+
+@item M-s h u @var{regexp} @key{RET}
+@itemx C-x w r @var{regexp} @key{RET}
+@kindex M-s h u
+@kindex C-x w r
+@findex unhighlight-regexp
+取消突出显示 @var{regexp} (@code{unhighlight-regexp})。  如果从菜单中调用它，则可以从列表中选择要取消突出显示的表达式。  如果从键盘调用它，则使用迷你缓冲区。它将显示最近添加的正则表达式；使用 @kbd{M-n} 显示下一个较旧的表达式，使用 @kbd{M-p} 选择下一个较新的表达式。  （您也可以手动键入表达式并完成。）当您要取消突出显示的表达式出现在迷你缓冲区中时，按 @kbd{@key{RET}} 退出迷你缓冲区并取消突出显示它。
+
+@item M-s h l @var{regexp} @key{RET} @var{face} @key{RET}
+@itemx C-x w l @var{regexp} @key{RET} @var{face} @key{RET}
+@kindex M-s h l
+@kindex C-x w l
+@findex highlight-lines-matching-regexp
+@cindex lines, highlighting
+@cindex highlighting lines of text
+使用面@var{face} (@code{highlight-lines-matching-regexp}) 突出显示包含@var{regexp} 匹配项的整行。
+
+@item M-s h p @var{phrase} @key{RET} @var{face} @key{RET}
+@itemx C-x w p @var{phrase} @key{RET} @var{face} @key{RET}
+@kindex M-s h p
+@kindex C-x w p
+@findex highlight-phrase
+@cindex phrase, highlighting
+@cindex highlighting phrase
+使用面 @var{face} (@code{highlight-phrase}) 高亮显示 @var{phrase} 的匹配项。  @var{phrase} 可以是任何正则表达式，但空格将被替换为空格匹配，并且首字母小写字母将变得不区分大小写。
+
+@item M-s h .
+@itemx C-x w .
+@kindex M-s h .
+@kindex C-x w .
+@findex highlight-symbol-at-point
+@cindex symbol, highlighting
+@cindex highlighting symbol at point
+使用下一个可用面 (@code{highlight-symbol-at-point}) 突出显示在点​​附近找到的符号。
+
+@item M-s h w
+@itemx C-x w b
+@kindex M-s h w
+@kindex C-x w b
+@findex hi-lock-write-interactive-patterns
+将所有当前突出显示的 regexp/face 对插入到缓冲区中，并使用注释分隔符以防止它们更改您的程序。  （此键绑定运行 @code{hi-lock-write-interactive-patterns} 命令。）
+
+如果适当的话，如果您调用@kbd{M-x hi-lock-find-patterns}，或者如果您在启用高锁定模式时访问文件（因为运行@code{hi-lock-find-patterns}），这些模式将从注释中提取。
+
+@item M-s h f
+@itemx C-x w i
+@kindex M-s h f
+@kindex C-x w i
+@findex hi-lock-find-patterns
+从当前缓冲区中的注释中提取正则表达式/人脸对 (@code{hi-lock-find-patterns})。  因此，您可以使用@code{highlight-regexp}交互地输入模式，使用@code{hi-lock-write-interactive-patterns}将它们存储到文件中，编辑它们（可能包括匹配的不同括号部分的不同面孔），最后使用此命令（@code{hi-lock-find-patterns}）让Hi Lock突出显示编辑的模式。
+
+@vindex hi-lock-file-patterns-policy
+变量 @code{hi-lock-file-patterns-policy} 控制 Hi Lock 模式是否应在访问文件时自动提取并突出显示文件中找到的模式。  它的值可以是@code{nil}（从不突出显示）、@code{ask}（查询用户）或函数。  如果它是一个函数，则@code{hi-lock-find-patterns}以模式作为参数调用它；如果函数返回非@code{nil}，则使用这些模式。  默认值为@code{ask}。  请注意，如果直接调用 @code{hi-lock-find-patterns}，无论该变量的值是什么，模式都会突出显示。
+
+@vindex hi-lock-exclude-modes
+此外，如果当前主模式的符号是列表 @code{hi-lock-exclude-modes} 的成员，则 @code{hi-lock-find-patterns} 不执行任何操作。
+@end table
+
+@node Fringes
+@section 窗花边
+@cindex fringes
+
+@findex set-fringe-style
+@findex fringe-mode
+@vindex fringe-mode @r{(variable)}
+在图形显示上，每个 Emacs 窗口的左右边缘通常都有窄的 @dfn{fringes}。  边缘用于显示提供有关窗口中文本的信息的符号。您可以输入 @kbd{M-x fringe-mode} 来切换条纹的显示或修改其宽度。  该命令影响所有帧中的条纹；要仅修改所选帧上的条纹，请使用 @kbd{M-x set-fringe-style}。  您可以通过自定义变量 @code{fringe-mode} 使对条纹的更改永久化。
+
+条纹最常见的用途是指示连续线 (@pxref{Continuation Lines})。  当一行文本被分割成多条屏幕线时，除了第一条屏幕线之外，左边缘会显示每个屏幕线的弯曲箭头，表明这不是真正的开始。  右边缘显示除最后一行之外的每条屏幕线的弯曲箭头，表明这不是真正的结束。  如果线的方向是从右到左 (@pxref{Bidirectional Editing})，则边缘中弯曲箭头的含义会交换。
+
+边缘表示带有短水平箭头的行截断 (@pxref{Line Truncation})，这意味着该行上有更多文本，这些文本水平滚动到视图之外。  单击其中一个箭头可沿箭头方向水平滚动显示。
+
+边缘还可以指示其他内容，例如缓冲区边界 (@pxref{Displaying Boundaries})、窗口末尾附近未使用的行 (@pxref{indicate-empty-lines}) 以及正在调试的程序正在执行的位置 (@pxref{Debuggers})。
+
+@vindex overflow-newline-into-fringe
+如果当前行与窗口完全一样宽并且点位于行的末尾，则边缘还用于绘制光标。要禁用此功能，请将变量 @code{overflow-newline-into-fringe} 更改为 @code{nil}；这会导致 Emacs 继续或截断与窗口宽度完全相同的行。
+
+如果您自定义 @code{fringe-mode} 以删除窗口显示一侧或两侧的边缘，则显示在边缘上的功能将不可用。  行连续和截断的指示符是一个例外：当边缘不可用时，Emacs 使用最左边和最右边的字符单元来用特殊 ASCII 字符来指示连续和截断，请参阅@ref{Continuation Lines}和@ref{Line Truncation}。  这会减少每行上可用于显示文本的宽度，因为用于截断和连续指示符的字符单元是为此目的而保留的。  由于缓冲区文本可以包含双向文本，因此可以包含从左到右和从右到左的段落 (@pxref{Bidirectional Editing})，因此仅删除一个边缘仍然会保留两个字符单元（窗口的每一侧各一个），用于截断和继续指示符，因为这些指示符在从右到左的段落中显示在窗口的相对两侧。
+
+@node Displaying Boundaries
+@section 显示边界
+
+@cindex mode, display-fill-column-indicator
+@findex display-fill-column-indicator-mode
+@findex global-display-fill-column-indicator-mode
+Emacs 可以显示 @code{fill-column} 位置 (@pxref{Fill Commands}) 的指示。  填充列指示器是一个有用的功能，特别是在 @code{prog-mode} 及其后代 (@pxref{Major Modes}) 中，用于指示特定列的位置，该特定列对于格式化程序源代码具有一些特殊含义。  这假设缓冲区使用固定间距字体，其中所有字符（双宽字符可能除外）在显示时具有相同的宽度。  如果缓冲区使用可变间距字体，则不同行上的填充列指示器可能会显示不对齐。
+
+要激活填充列指示显示，请使用次要模式 @code{display-fill-@-column-indicator-mode} 和 @code{global-display-fill-column-indicator-mode}，分别在本地或全局启用指示器。
+
+或者，您可以设置两个缓冲区局部变量@code{display-fill-column-indicator}和@code{display-fill-column-indicator-character}来激活指示器并控制用于指示的字符。  请注意，两个变量都必须为非 2⁣ 才能显示指示。  （打开次要模式会设置这两个变量。）
+
+有 2 个缓冲区局部变量和一个面孔来自定义此模式：
+
+@table @code
+@item display-fill-column-indicator-column
+@vindex display-fill-column-indicator-column
+指定应设置指示器的列号。  该列可以采用正数值，或者特殊值 @code{t}，这意味着将使用变量 @code{fill-column} 的值。
+
+任何其他值都会禁用该指示器。  默认值为@code{t}。
+
+@item display-fill-column-indicator-character
+@vindex display-fill-column-indicator-character
+指定用于指示符的字符。  该字符可以是任何有效字符，包括 Unicode 字符（如果字体支持）。值@code{nil}禁用指示器。  当通过函数@code{display-fill-column-indicator-mode}或@code{global-display-fill-column-indicator-mode}启用该模式时，如果它是非@code{nil}，它们将使用该变量指定的字符；否则，Emacs 将使用字符 U+2502 @sc{box drawings light vertical}，如果 U+2502 无法显示，则回退到 @samp{|}。
+
+@item fill-column-indicator
+@vindex fill-column-indicator
+指定用于显示指示器的面。  它从面 @code{shadow} 继承默认值，但没有背景颜色。  要更改指示器颜色，只需设置该面的前景色即可。
+@end table
+
+@vindex indicate-buffer-boundaries
+在图形显示上，Emacs 可以在边缘指示缓冲区边界。  如果启用此功能，第一行和最后一行将在条纹中标记有角度图像。  这可以与向上和向下箭头图像组合，指示是否可以滚动窗口。
+
+缓冲区局部变量 @code{indicate-buffer-boundaries} 控制如何在边缘中指示缓冲区边界和窗口滚动。  如果值为 @code{left} 或 @code{right}，则角度位图和箭头位图分别显示在左边缘或右边缘。
+
+如果 value 是一个列表 (@pxref{Association Lists,,, elisp, the Emacs Lisp Reference Manual})，则每个元素 @code{(@var{indicator} . @var{position})} 指定其中一个指示器的位置。  @var{indicator} 必须是 @code{top}、@code{bottom}、@code{up}、@code{down} 或 @code{t} 之一，指定列表中不存在的指标的默认位置。  @var{position} 是 @code{left}、@code{right} 或 @code{nil} 之一，指定不显示此指示器。
+
+例如，@code{((top . left) (t . right))} 将顶角位图放置在左边缘，将底角位图放置在右边缘，并将两个箭头位图放置在右边缘。  要仅显示左边缘的角度位图，而不显示箭头位图，请使用@code{((top .  left) (bottom . left))}。
+
+@node Useless Whitespace
+@section 无用的空白
+
+@cindex trailing whitespace
+@cindex whitespace, trailing
+@vindex show-trailing-whitespace
+很容易在行尾留下不必要的空格，或在缓冲区末尾留下空行，而自己却没有意识到。  在大多数情况下，这个@dfn{trailing whitespace}没有任何作用，但有时它可能会很麻烦。
+
+@cindex @code{trailing-whitespace} face
+您可以通过将缓冲区局部变量 @code{show-trailing-whitespace} 设置为 @code{t} 来使行尾的尾随空白可见。  然后 Emacs 使用面 @code{trailing-whitespace} 显示尾随空白。
+
+当点位于包含空格的行的末尾时，此功能不适用。  严格来说，这仍然是尾随空白，但在这种情况下特别显示它在您输入新文本时看起来很难看。  在这种特殊情况下，点的位置足以表明空间存在。
+
+@findex delete-trailing-whitespace
+@vindex delete-trailing-lines
+@findex delete-trailing-whitespace-mode
+输入 @kbd{M-x delete-trailing-whitespace} 删除所有尾随空格。  该命令删除缓冲区中每行末尾的所有多余空格以及缓冲区末尾的所有空行；要忽略后者，请将变量 @code{delete-trailing-lines} 更改为 @code{nil}。  如果该区域处于活动状态，则该命令会删除该区域中每行末尾的多余空格。  如果启用缓冲区本地模式 @code{delete-trailing-whitespace-mode}，每次保存缓冲区时，Emacs 都会自动调用 @code{delete-trailing-whitespace}。
+
+@vindex indicate-empty-lines
+@cindex unused lines
+@cindex fringes, and unused line indication
+@anchor{indicate-empty-lines}
+在图形显示上，Emacs 可以用左边缘的小图像 (@pxref{Fringes}) 来指示窗口末尾未使用的行。该图像出现的屏幕行与任何缓冲区文本都不对应，因此缓冲区末尾的空白行会很突出，因为它们缺少该图像。  要启用此功能，请将缓冲区局部变量 @code{indicate-empty-lines} 设置为非 @code{nil} 值。  您可以通过设置此变量的默认值（例如 @code{(setq-default indicate-empty-lines t)}）来为所有新缓冲区启用或禁用此功能。
+
+@cindex Whitespace mode
+@cindex mode, Whitespace
+@findex whitespace-mode
+@vindex whitespace-style
+@findex whitespace-toggle-options
+空白模式是一种缓冲区本地次要模式，可让您通过用特殊的面绘制空白字符或将它们显示为特殊的字形来可视化缓冲区中的多种空白。  要切换此模式，请输入 @kbd{M-x whitespace-mode}。  可视化的空白类型由列表变量@code{whitespace-style}决定。  通过键入 @w{@kbd{M-x whitespace-toggle-options}} 可以在当前缓冲区中打开或关闭该列表中的各个元素。  以下是可能元素的部分列表（有关完整列表，请参阅变量的文档）：
+
+@table @code
+@item face
+启用所有使用特殊面孔的可视化。  该元素具有特殊含义：如果列表中不存在该元素，则除了 @code{space-mark}、@code{tab-mark} 和 @code{newline-mark} 之外，其他可视化效果都不会生效。
+
+@item trailing
+突出显示尾随空白。
+
+@item tabs
+突出显示制表符。
+
+@item spaces
+突出显示空格和不间断空格字符。
+
+@item lines
+@vindex whitespace-line-column
+突出显示长度超过 80 列的行。  要更改列限制，请自定义变量@code{whitespace-line-column}。
+
+@item newline
+突出显示换行符。
+
+@item missing-newline-at-eof
+如果缓冲区不以换行符结尾，则突出显示最后一个字符。
+
+@item empty
+突出显示缓冲区开头和/或结尾处的空行。
+
+@item big-indent
+@vindex whitespace-big-indent-regexp
+突出显示太深的缩进。  默认情况下，任何至少 4 个连续制表符或 32 个连续空格字符的序列都会突出显示。  要改变这一点，请自定义正则表达式@code{whitespace-big-indent-regexp}。
+
+@item space-mark
+使用特殊的字形绘制空格和不间断字符。
+
+@item tab-mark
+用特殊的字形绘制制表符。
+
+@item newline-mark
+用特殊的字形绘制换行符。
+@end table
+
+@findex global-whitespace-toggle-options
+@findex global-whitespace-mode
+全局空白模式是一种全局次要模式，可让您可视化所有缓冲区中的空白。  要切换各个功能，请使用@kbd{M-x global-whitespace-toggle-options}。
+
+@node Selective Display
+@section 选择性显示
+@cindex selective display
+@findex set-selective-display
+@kindex C-x $
+
+Emacs 能够隐藏缩进超过给定列数的行。  您可以使用它来概述程序的一部分。
+
+要隐藏当前缓冲区中的行，请键入 @kbd{C-x $} (@code{set-selective-display}) 和数字参数 @var{n}。  然后，具有至少 @var{n} 列缩进的线条就会从屏幕上消失。  它们存在的唯一迹象是每条可见线的末尾出现三个点 (@samp{@dots{}})，后面跟着一个或多个隐藏点。
+
+命令 @kbd{C-n} 和 @kbd{C-p} 穿过隐藏线，就好像它们不存在一样。
+
+隐藏线仍然存在于缓冲区中，并且大多数编辑命令照常看到它们，因此您可能会在隐藏文本的中间找到点。  发生这种情况时，光标出现在上一行末尾的三个点之后。  如果点位于可见行的末尾，在结束它的换行符之前，光标将出现在三个点之前。
+
+要使所有行再次可见，请键入不带参数的@kbd{C-x $}。
+
+@vindex selective-display-ellipses
+如果将变量 @code{selective-display-ellipses} 设置为 @code{nil}，则三个点不会出现在隐藏线之前的行的末尾。  那么就没有隐藏线的可见指示。  该变量设置后自动成为本地变量。
+
+另请参阅@ref{Outline Mode}了解隐藏缓冲区中部分文本的另一种方法。
+
+@node Optional Mode Line
+@section 可选模式系列特性
+
+@cindex buffer size display
+@cindex display of buffer size
+@findex size-indication-mode
+缓冲区百分比@var{pos}表示窗口顶部上方缓冲区的百分比。  您还可以通过键入 @kbd{M-x size-indication-mode} 打开大小指示模式来显示缓冲区的大小。  大小将立即显示在缓冲区百分比之后，如下所示：
+
+@example
+@var{pos} of @var{size}
+@end example
+
+@noindent
+这里@var{size}是人类可读的缓冲区中字符数的表示，这意味着@samp{k}代表10^3，@samp{M}代表10^6，@samp{G}代表10^9等，用于缩写。
+
+@cindex line number display
+@cindex display of current line number
+@findex line-number-mode
+当启用行号模式时，点的当前行号出现在模式行中。  使用命令@kbd{M-x line-number-mode}打开和关闭该模式；通常它是打开的。  行号出现在缓冲区百分比 @var{pos} 之后，并用字母 @samp{L} 表示它是什么。
+
+@cindex Column Number mode
+@cindex mode, Column Number
+@findex column-number-mode
+同样，您可以通过使用 @kbd{M-x column-number-mode} 打开列号模式来显示当前列号。  列号由字母 @samp{C} 表示。  但是，当这两种模式均启用时，行号和列号将显示在括号中，行号在前，而不是使用 @samp{L} 和 @samp{C}。  例如：@samp{(561,2)}。  @xref{Minor Modes}，有关次要模式以及如何使用这些命令的更多信息。
+
+@vindex column-number-indicator-zero-based
+在列号模式下，显示的列号从窗口的左边距开始从零开始计数。  如果您希望显示的列号从 1 开始计数，您可以将 @code{column-number-indicator-zero-based} 设置为 @code{nil}。
+
+@cindex narrowing, and line number display
+如果您缩小了缓冲区 (@pxref{Narrowing})，则显示的行号是相对于缓冲区的可访问部分的。因此，它不适合作为 @code{goto-line} 的参数。  （命令@code{what-line}显示相对于整个文件的行号。）您可以使用@code{goto-line-relative}命令将点移动到相对于缩小的缓冲区的可访问部分的行。
+
+@vindex line-number-display-limit
+如果缓冲区非常大（大于 @code{line-number-display-limit} 的值），Emacs 将不会计算行号，因为那样会太慢；因此，行号不会出现在模式行上。  要消除此限制，请将 @code{line-number-display-limit} 设置为 @code{nil}。
+
+@vindex line-number-display-limit-width
+如果缓冲区中的行太长，行号计算也会很慢。  因此，如果点附近行的平均宽度（以字符为单位）大于 @code{line-number-display-limit-width} 的值，Emacs 不会显示行号。  默认值为 200 个字符。
+
+@findex display-time
+@cindex time (on mode line)
+Emacs 可以选择在所有模式行中显示时间和系统负载。  要启用此功能，请键入 @kbd{M-x display-time} 或自定义选项 @code{display-time-mode}。  添加到模式行的信息如下所示：
+
+@example
+@var{hh}:@var{mm}PM @var{l.ll}
+@end example
+
+@noindent
+@vindex display-time-24hr-format
+这里@var{hh}和@var{mm}是小时和分钟，后面总是跟着@samp{AM}或@samp{PM}。  @var{l.ll} 是最后几分钟收集的整个系统中正在运行或准备运行（即正在等待可用处理器）的进程的平均数量。  （如果您的操作系统不支持，某些字段可能会丢失。）如果您喜欢以 24 小时格式显示时间，请将变量 @code{display-time-24hr-format} 设置为 @code{t}。
+
+@cindex mail (on mode line)
+@vindex display-time-use-mail-icon
+@vindex display-time-mail-face
+@vindex display-time-mail-file
+@vindex display-time-mail-directory
+如果有您尚未阅读的邮件，则负载级别后面会出现 @samp{Mail} 字样。  在图形显示上，您可以通过自定义 @code{display-time-use-mail-icon} 使用图标代替 @samp{Mail}；这可能会节省模式行上的一些空间。  您可以自定义 @code{display-time-mail-face} 以使邮件指示器突出。  使用@code{display-time-mail-file}指定要检查的邮件文件，或设置@code{display-time-mail-directory}指定要检查传入邮件的目录（目录中任何非空的常规文件都被视为新到达的邮件）。
+
+@cindex battery status (on mode line)
+@findex display-battery-mode
+@vindex display-battery-mode
+@vindex battery-mode-line-format
+在笔记本电脑上运行 Emacs 时，您可以使用命令 @code{display-battery-mode} 或自定义变量 @code{display-battery-mode} 在模式行上显示电池电量。  变量@code{battery-mode-line-format}决定电池电量的显示方式；确切的模式行消息取决于操作系统，它通常显示当前电池电量占总电量的百分比。  @code{battery-update-functions} 中的函数在更新模式行后运行，可用于根据电池状态触发操作。
+
+@cindex mode line, 3D appearance
+@cindex attributes of mode line, changing
+@cindex non-integral number of lines in a window
+在图形显示上，模式线被绘制为 3D 框。  如果您不喜欢此效果，可以通过自定义 @code{mode-line} 面并将其 @code{box} 属性设置为 @code{nil} 来禁用它。  @xref{Face Customization}。
+
+@cindex non-selected windows, mode line appearance
+默认情况下，未选定窗口的模式线显示在不同的面上，称为@code{mode-line-inactive}。  仅选定的窗口显示在 @code{mode-line} 面上。  这有助于显示选择了哪个窗口。  当选择迷你缓冲区时，由于它没有模式行，因此您激活迷你缓冲区的窗口将使用 @code{mode-line} 显示其模式行；因此，对迷你缓冲区的普通输入不会更改任何模式行。
+
+@vindex mode-line-in-non-selected-windows
+您可以通过将变量@code{mode-line-in-non-selected-windows}设置为@code{nil}来禁用@code{mode-line-inactive}；那么所有模式线都显示在 @code{mode-line} 面上。
+
+@vindex eol-mnemonic-unix
+@vindex eol-mnemonic-dos
+@vindex eol-mnemonic-mac
+@vindex eol-mnemonic-undecided
+您可以通过将每个变量 @code{eol-mnemonic-unix}、@code{eol-mnemonic-dos}、@code{eol-mnemonic-mac} 和 @code{eol-mnemonic-undecided} 设置为您喜欢的字符串来自定义每种行尾格式的模式行显示。
+
+@vindex mode-line-compact
+@vindex mode-line-collapse-minor-modes
+某些模式在模式行中放置大量数据，将模式行末尾的元素推到右侧。  如果 @code{mode-line-compact} 变量不是 @code{nil}，Emacs 可以通过将空格延伸为单个空格来“压缩”模式行。  如果此变量为@code{long}，则仅当模式线比当前选定的窗口宽时才会执行此操作。  （此计算是近似的，基于字符数，而不是其显示的宽度。）此变量可以是缓冲区本地的，仅压缩某些缓冲区中的模式行。  为了进一步“压缩”模式行，您可以将 @code{mode-line-collapse-minor-modes} 选项自定义为非 @code{nil} 值，Emacs 将通过将模式行上的一些次要模式指示器折叠成单个可单击按钮来隐藏它们。
+
+@findex mode-line-invisible-mode
+默认情况下，大多数缓冲区都会显示模式行，但如果模式行在缓冲区中没有用处，可以使用命令@w{@kbd{M-x mode-line-invisible-mode}}隐藏当前缓冲区中的模式行，模式行将保持隐藏状态，直到再次调用该命令。  要在进入主模式时始终隐藏模式行，请将 @code{mode-line-invisible-mode} 添加到挂钩 (@pxref{Hooks})。
+
+@node Text Display
+@section 文本如何显示
+@cindex characters (in text)
+@cindex printing character
+
+大多数字符都是@dfn{printing characters}：当它们出现在缓冲区中时，它们会按字面显示在屏幕上。  打印字符包括 @acronym{ASCII} 数字、字母和标点符号，以及许多非 @acronym{ASCII} 字符。
+
+@vindex tab-width
+@cindex control characters on display
+@acronym{ASCII} 字符集包含非打印@dfn{control characters}。  其中两个是特别显示的：换行符（Unicode 代码点 U+000A）通过开始新行来显示，而制表符（U+0009）显示为延伸到下一个制表位列（通常每 8 列）的空格。  每个制表符的空格数由缓冲区局部变量 @code{tab-width} 控制，该变量必须具有 1 到 1000 之间的整数值（含 1 和 1000）。  请注意，缓冲区中制表符的显示方式与 @key{TAB} 作为命令的定义无关。
+
+其他 @acronym{ASCII} 控制字符，其代码低于 U+0020（八进制 40，十进制 32），显示为插入符号 (@samp{^})，后跟字符的非控制版本，具有 @code{escape-glyph} 面。  例如，@samp{control-A} 字符 U+0001 显示为 @samp{^A}。
+
+@cindex octal escapes
+@vindex ctl-arrow
+代码为 U+0080（八进制 200）到 U+009F（八进制 237）的原始字节显示为 @dfn{octal escape sequences}，并带有 @code{escape-glyph} 面。  例如，字符代码 U+0098（八进制 230）显示为@samp{\230}。如果将缓冲区局部变量 @code{ctl-arrow} 更改为 @code{nil}，@acronym{ASCII} 控制字符也会显示为八进制转义序列，而不是脱字符转义序列。  （您还可以请求以十六进制显示原始字节，@pxref{Display Custom, display-raw-bytes-as-hex}。）
+
+@vindex nobreak-char-display
+@cindex non-breaking space
+@cindex non-breaking hyphen
+@cindex soft hyphen
+@cindex @code{escape-glyph} face
+@cindex @code{nobreak-space} face
+一些非 @acronym{ASCII} 字符与 @acronym{ASCII} 空格或连字符（减号）具有相同的外观。  如果这些字符在您没有意识到的情况下被输入到缓冲区中，例如通过猛拉，它们可能会导致问题；例如，源代码编译器通常不会将非 2⁣ 空格视为空白字符。  为了解决这个问题，Emacs 专门显示了这样的字符：它用 @code{nobreak-space} 面显示 U+00A0 @sc{no-break space} 和 Unicode 水平空间类中的其他字符，并用 @code{nobreak-hyphen} 面显示 U+00AD @sc{soft hyphen}、U+2010 @sc{hyphen} 和 U+2011 @sc{non-breaking hyphen}。  要禁用此功能，请将变量 @code{nobreak-char-display} 更改为 @code{nil}。  如果您为该变量指定非 @code{nil} 和非 @code{t} 值，Emacs 会显示突出显示的反斜杠，后跟空格或连字符。
+
+您可以通过显示表自定义任何特定字符代码的显示方式。  @xref{Display Tables,, Display Tables, elisp, The Emacs Lisp Reference Manual}。
+
+@cindex glyphless characters
+@cindex characters with no font glyphs
+@cindex @code{glyphless-char} face
+在图形显示上，某些字符在 Emacs 可用的任何字体中可能没有字形。  这些@dfn{glyphless characters}通常显示为包含十六进制字符代码的框。类似地，在文本终端上，无法使用终端编码 (@pxref{Terminal Coding}) 显示的字符通常显示为问号。  您可以通过自定义变量@code{glyphless-char-display-control}来控制显示方式。  您还可以自定义 @code{glyphless-char} 脸部，使这些字符在显示时更加突出。  @xref{Glyphless Chars,, Glyphless Character Display, elisp, The Emacs Lisp Reference Manual}，了解详情。
+
+@findex glyphless-display-mode
+@code{glyphless-display-mode} 次要模式可用于切换当前缓冲区中无字形字符的显示。  无字形字符将显示为框，其中包含其名称的首字母缩略词。
+
+@cindex curly quotes, and terminal capabilities
+@cindex curved quotes, and terminal capabilities
+@cindex @code{homoglyph} face
+
+Emacs 尝试确定弯曲引号 @t{‘} 和 @t{’} 是否可以显示在当前显示器上。  默认情况下，如果情况确实如此，那么当 @acronym{ASCII} 引号 @w{(@samp{`} and @samp{'})} 出现在消息和帮助文本中时，Emacs 会将它们转换为这些弯曲的引号。  您可以通过自定义用户选项 @code{text-quoting-style} (@pxref{Keys in Documentation,,, elisp, The Emacs Lisp Reference Manual}) 来影响或抑制此翻译。
+
+如果已知弯曲引号 @t{‘}、@t{’}、@t{“} 和 @t{”} 看起来就像 @acronym{ASCII} 字符，则它们会显示为 @code{homoglyph} 面。  已知不可显示的弯曲引号显示为具有 @code{homoglyph} 面的 @acronym{ASCII} 近似值 @samp{`}、@samp{'} 和 @samp{"}。
+
+@node Cursor Display
+@section 显示光标
+@cindex text cursor
+
+@vindex visible-cursor
+在文本终端上，光标的外观由终端控制，很大程度上不受 Emacs 的控制。  某些终端提供两种不同的光标：可见的静态光标和非常明显的闪烁光标。  默认情况下，Emacs 使用非常明显的光标，并在启动或恢复 Emacs 时切换到它。  如果 Emacs 启动或恢复时变量 @code{visible-cursor} 为 @code{nil}，则它使用普通光标。
+
+@vindex cursor-type
+在图形显示器和许多 Xterm 兼容的文本终端上，可以更改文本光标的颜色和形状。  要自定义其颜色，请更改名为 @code{cursor} (@pxref{Face Customization}) 的面的 @code{:background} 属性。  （该面的其他属性没有影响；光标下显示的文本是使用框架的背景颜色绘制的。）要更改其形状，请自定义缓冲区局部变量@code{cursor-type}；可能的值为 @code{box}（默认值）、@code{(box . @var{size})}（框光标在任一维度都大于 @var{size} 像素的蒙版图像下成为空心框）、@code{hollow}（空心框）、@code{bar}（垂直条）、@code{(bar . @var{n})}（垂直条 @var{n} 像素宽）、@code{hbar}（水平条）条）、@code{(hbar . @var{n})}（水平条@var{n}像素高）或@code{nil}（根本没有光标）。
+
+@vindex xterm-update-cursor
+在 Xterm 兼容的文本终端上，光标自定义由用户选项 @code{xterm-update-cursor} 控制。  有效值为 @code{t} 更新光标的颜色和形状，@code{type} 只更新光标的形状，@code{color} 只更新光标的颜色，@code{nil} 不更新光标的外观。  文本终端无法显示空心框，而是使用实心框。  同样，所有文本终端都会忽略 @code{bar} 和 @code{hbar} 的像素大小。
+
+@findex hl-line-mode
+@findex global-hl-line-mode
+@cindex highlight current line
+为了使光标更加明显，您可以使用 HL 线模式，这是一种突出显示包含点的线的次要模式。  使用 @kbd{M-x hl-line-mode} 在当前缓冲区中启用或禁用它。  @kbd{M-x global-hl-line-mode} 全局启用或禁用相同模式。
+
+其余控件仅适用于图形显示，其中 Emacs 可以完全控制光标的显示方式。
+
+@findex blink-cursor-mode
+@cindex cursor, blinking
+@cindex blinking cursor
+@vindex blink-cursor-mode
+@vindex blink-cursor-blinks
+@vindex blink-cursor-alist
+默认情况下，如果 Emacs 在此期间没有收到任何输入，光标将在闪烁 10 次后停止闪烁；任何输入事件都会重新开始计数。  您可以自定义变量 @code{blink-cursor-blinks} 来控制：它的值表示在停止之前在没有输入的情况下闪烁多少次。  将该变量设置为零或负值将使光标永远闪烁。  要完全禁用光标闪烁，请将变量 @code{blink-cursor-mode} 更改为 @code{nil} (@pxref{Easy Customization})，或添加以下行
+
+@lisp
+  (blink-cursor-mode 0)
+@end lisp
+
+@noindent
+到你的初始化文件。  或者，您可以通过自定义列表变量 @code{blink-cursor-alist} 来更改光标闪烁时的外观。  列表中的每个元素应具有 @code{(@var{on-type} . @var{off-type})} 的形式；这意味着，如果光标在闪烁时显示为 @var{on-type}（其中 @var{on-type} 是上述光标类型之一），则在闪烁时显示为 @var{off-type}。
+
+@vindex x-stretch-cursor
+@cindex wide block cursor
+某些字符（例如制表符）非常宽。  当光标位于此类字符上时，通常会使用默认字符宽度绘制该字符。  您可以通过将变量 @code{x-stretch-cursor} 更改为非 @code{nil} 值来使光标伸展以覆盖宽字符。
+
+@cindex cursor in non-selected windows
+@vindex cursor-in-non-selected-windows
+光标通常在未选定的窗口中显示为不闪烁的空心框。  （对于条形光标，它显示为较细的条形。）要关闭未选定窗口中的光标，请将变量 @code{cursor-in-non-selected-windows} 更改为 @code{nil}。
+
+@node Line Truncation
+@section 行截断
+
+@cindex truncation
+@cindex line truncation
+作为延续 (@pxref{Continuation Lines}) 的替代方案，Emacs 可以通过 @dfn{truncation} 显示长行。  这意味着所有不适合屏幕或窗口宽度的字符根本不会出现。  在图形显示上，边缘中的小直箭头表示线两端的截断。  在文本终端上，这用最右和/或最左列中的 @samp{$} 符号表示。
+
+@kindex C-x x t
+@vindex truncate-lines
+@findex toggle-truncate-lines
+水平滚动会自动导致行截断 (@pxref{Horizontal Scrolling})。  您可以使用命令 @kbd{C-x x t} (@code{toggle-truncate-lines}) 显式启用特定缓冲区的行截断。  这是通过本地更改变量 @code{truncate-lines} 来实现的。  如果该变量是非@code{nil}，则长行将被截断；如果是@code{nil}，则它们会继续到多个屏幕行。  以任何方式设置变量 @code{truncate-lines} 都会使其成为当前缓冲区的本地变量；在此之前，默认值（通常为 @code{nil}）一直有效。
+
+由于行截断和自动换行（在下一节中描述）是矛盾的，因此 @code{toggle-truncate-lines} 在打开行截断时会禁用自动换行。
+
+如果分割窗口变得太窄，Emacs 可能会自动启用行截断。  @xref{Split Window}，对于控制它的变量@code{truncate-partial-width-windows}。
+
+@node Visual Line Mode
+@section 视线模式
+
+@cindex word wrap
+普通行延续 (@pxref{Continuation Lines}) 的另一种替代方法是使用 @dfn{word wrap}。  这里，每条长逻辑行被分成两条或更多条屏幕线，或“视觉线”，就像普通的行延续一样。  然而，Emacs 尝试在靠近窗口右边缘的字边界处换行。  （如果该行的方向是从右到左，则它会在左窗口边缘换行。）这使文本更易于阅读，因为换行不会发生在单词中间。
+
+@cindex mode, Visual Line
+@cindex Visual Line mode
+@findex visual-line-mode
+@findex global-visual-line-mode
+自动换行由 Visual Line 模式（一种可选的次要模式）启用。要在当前缓冲区中打开可视线模式，请输入 @kbd{M-x visual-line-mode};重复此命令会将其关闭。  您还可以使用菜单栏打开可视线模式：在“选项”菜单中，选择 @samp{Line Wrapping in this Buffer} 子菜单，然后选择 @samp{Word Wrap (Visual Line mode)} 菜单项。  启用可视线模式后，模式线会在模式显示屏中显示字符串 @samp{wrap}。  命令 @kbd{M-x global-visual-line-mode} 切换所有缓冲区中的可视线模式。
+
+由于自动换行和行截断（在上一节中描述）是矛盾的，因此打开 @code{visual-line-mode} 会禁用行截断。
+
+@findex beginning-of-visual-line
+@findex end-of-visual-line
+@findex next-logical-line
+@findex previous-logical-line
+在可视行模式下，某些编辑命令适用于屏幕行而不是逻辑行：@kbd{C-a} (@code{beginning-of-visual-line}) 移动到屏幕行的开头，@kbd{C-e} (@code{end-of-visual-line}) 移动到屏幕行的末尾，@kbd{C-k} (@code{kill-visual-line}) 删除文本到屏幕行的末尾。
+
+要按逻辑线移动，请使用命令 @kbd{M-x next-logical-line} 和 @kbd{M-x previous-logical-line}。  无论是否启用视觉线模式，这些移动分别指向下一个逻辑线和上一个逻辑线。  如果您经常使用这些命令，则为它们分配键绑定可能会很方便。  @xref{Init Rebinding}。
+
+默认情况下，自动换行不显示边缘指示符。视觉行模式通常用于编辑包含许多长逻辑行的文件，因此为每个换行行设置边缘指示器会在视觉上分散注意力。  您可以通过自定义变量 @code{visual-line-fringe-indicators} 来更改此设置。
+
+@vindex word-wrap-whitespace-mode
+默认情况下，Emacs 仅在 @key{SPC} 和 @key{TAB} 等空白字符后换行，但在 @key{EN QUAD} 等空白字符后不换行。  Emacs 提供了一个名为 @code{word-wrap-whitespace-mode} 的次要模式，它可以在当前模式下打开自动换行，并根据 @code{word-wrap-whitespace-characters} 用户选项设置换行的字符。  该模式还有一个全球化版本，称为 @code{global-word-wrap-whitespace-mode}。
+
+@vindex word-wrap-by-category
+@findex modify-category-entry
+@findex char-category-set
+@findex category-set-mnemonics
+当 CJK 和拉丁文本混合在一起时，只有在空格字符后进行中断才会产生不正确的结果（因为 CJK 字符不使用空格来分隔单词）。  您可以自定义选项 @code{word-wrap-by-category} 以允许 Emacs 在具有 @samp{|} 类别 (@pxref{Categories,,, elisp, the Emacs Lisp Reference Manual}) 的任何字符之后换行，这为 CJK 字符提供了更好的支持。  此外，如果使用“自定义”设置此变量，Emacs 会自动加载@file{kinsoku.el}。当 @file{kinsoku.el} 加载时，Emacs 在换行时遵循避头尾规则。  这意味着具有 @samp{>} 类别的字符不会出现在行首（例如，U+FF0C @sc{fullwidth comma}），并且具有 @samp{<} 类别的字符不会出现在行尾（例如，U+300A @sc{left double angle bracket}）。  您可以使用命令 @code{char-category-set} 和 @code{category-set-mnemonics} 查看角色的类别集，或者通过在角色上键入 @kbd{C-u C-x =} 并查看报告中的“类别”部分。  您可以使用命令@code{modify-category-entry}为角色添加类别。
+
+@node Display Custom
+@section 显示定制
+
+本节介绍控制 Emacs 屏幕外观的各个方面的变量。  初级用户可以跳过它。
+
+@vindex display-line-numbers
+@cindex number lines in a buffer
+@cindex display line numbers
+如果您想让 Emacs 显示缓冲区中每一行的行号，请自定义缓冲区局部变量 @code{display-line-numbers}；默认为@code{nil}。  该变量可以有多个不同的值以支持各种行号显示模式：
+
+@table @asis
+@item @code{t}
+在显示缓冲区文本的每个非连续屏幕行之前显示（绝对）行号。  如果该行是连续行，或者整个屏幕行显示显示或覆盖字符串，则不会对该行进行编号。
+
+@item @code{relative}
+在显示缓冲区文本的非连续行之前显示相对行号。  行号是相对于显示点的行而言的，因此随着行距当前行越来越远，行号会上下增长。
+
+@item @code{visual}
+该值使 Emacs 直观地对行进行计数：仅对显示屏上实际显示的行进行计数（忽略文本不可见部分中的任何行），并且换行以消耗多个屏幕行的行将被计​​数多次。  显示的数字是相对的，如上面的 @code{relative} 值。  这在折叠文本的模式下非常方便，例如大纲模式 (@pxref{Outline Mode})，以及当您需要移动精确的屏幕行数时。
+
+@item 还要别的吗
+任何其他非@code{nil}值都被视为@code{t}。
+@end table
+
+@findex display-line-numbers-mode
+@findex global-display-line-numbers-mode
+@vindex display-line-numbers-type
+命令@kbd{M-x display-line-numbers-mode}提供了一种打开行号显示的便捷方法。  该模式有一个全球化变体@code{global-display-line-numbers-mode}。  用户选项 @code{display-line-numbers-type} 控制这些模式将激活如上所述的行号显示的子模式。
+
+@noindent
+请注意，即使您全局打开 @code{display-line-numbers-mode}，行号也不会显示在迷你缓冲区和工具提示中。
+
+@vindex display-line-numbers-current-absolute
+当 Emacs 显示相对行号时，可以控制当前行之前显示的数字，该行显示点。  默认情况下，Emacs 显示当前行的绝对编号，即使所有其他行号都是相对的。  如果将变量 @code{display-line-numbers-current-absolute} 自定义为 @code{nil} 值，则当前行显示的数字将为零。  如果您不关心当前行数，并且希望在大缓冲区中为文本留出更多水平空间，那么这会很方便。
+
+@vindex display-line-numbers-widen
+在缩小的缓冲区 (@pxref{Narrowing}) 中，行通常从缩小的开始处开始编号。  但是，如果将变量 @code{display-line-numbers-widen} 自定义为非 @code{nil} 值，则行号将忽略任何缩小，并从缓冲区的第一个字符开始。
+
+@vindex display-line-numbers-offset
+如果 0⁣ 的值非零，则将其添加到每个绝对行号，并且从缓冲区的开头开始对行进行计数，就好像 1⁣ 是非 2⁣ 一样。  当设置为零或行号不是绝对时，它不起作用。
+
+@vindex display-line-numbers-width-start
+@vindex display-line-numbers-grow-only
+@vindex display-line-numbers-width
+在选择性显示模式 (@pxref{Selective Display}) 和其他隐藏多行显示的模式（例如 Outline 和 Org 模式）下，您可能希望自定义变量 @code{display-line-numbers-width-start} 和 @code{display-line-numbers-grow-only}，或将 @code{display-line-numbers-width} 设置为足够大的值，以避免偶尔错误计算为行号保留的空间。
+
+@cindex @code{line-number} face
+行号显示在特殊的面@code{line-number}中。当前行号以不同的面显示，@code{line-number-current-line}，因此可以使当前行号具有明显的外观，这将有助于定位显示点的行。  附加面 @code{line-number-major-tick} 和 @code{line-number-minor-tick} 可用于突出显示为某些数字的倍数的行的行号。  分别自定义@code{display-line-numbers-major-tick}和@code{display-line-numbers-minor-tick}来设置这些数字。
+
+@vindex line-spacing
+变量 @code{line-spacing} 控制行之间的垂直间距。  它可以设置为整数（指定像素）或浮点数（指定相对于默认框架字体高度的间距）。  您还可以将此变量设置为整数或浮点数的 cons 单元格，例如 @code{(@var{top} . @var{bottom})}。  当设置为 cons 单元格时，间距分布在行的上方和下方，允许文本在行高内垂直居中。另请参见@ref{Line Height,,, elisp, The Emacs Lisp Reference Manual}。
+
+@vindex visible-bell
+如果变量 @code{visible-bell} 不是 @code{nil}，Emacs 会尝试让整个屏幕闪烁，而它通常会发出可听见的铃声。  如果您的终端无法使屏幕闪烁，则此变量无效。
+
+@vindex echo-keystrokes
+变量@code{echo-keystrokes}控制多字符按键的回显；它的值是导致回显开始所需的暂停秒数，或者为零，意味着根本不回显。  当有东西需要回显时，该值就会生效。  @xref{Echo Area}。
+
+@vindex echo-keystrokes-help
+如果变量 @code{echo-keystrokes-help} 为非 @code{nil}（默认值），则根据 @code{echo-keystrokes} 显示的多字符按键序列回显将包含有关按键的简短帮助文本，该文本将调用 @code{describe-prefix-bindings} (@pxref{Misc Help}) 以显示您已键入的前缀的命令列表。  有关相关帮助工具，请参阅@ref{which-key}。
+
+@cindex mouse pointer
+@cindex hourglass pointer display
+@vindex display-hourglass
+@vindex hourglass-delay
+在图形显示上，如果 Emacs 繁忙，Emacs 将鼠标指针显示为沙漏。  要禁用此功能，请将变量 @code{display-hourglass} 设置为 @code{nil}。  变量@code{hourglass-delay}决定沙漏显示之前繁忙时间的秒数；默认值为 1。
+
+@vindex make-pointer-invisible
+如果鼠标指针位于 Emacs 框架内，则每次键入字符插入文本时，Emacs 都会使其不可见，以防止其遮挡文本。  （准确地说，当您键入自插入字符时会发生隐藏。@xref{Inserting Text}。）移动鼠标指针使其再次可见。  要禁用此功能，请将变量 @code{make-pointer-invisible} 设置为 @code{nil}。
+
+@vindex underline-minimum-offset
+@vindex x-underline-at-descent-line
+在图形显示上，变量 @code{underline-minimum-offset} 确定带下划线的文本的基线和下划线之间的最小距离（以像素为单位）。  默认值为1；增加它可能会提高某些字体的下划线文本的可读性。 （但是，Emacs 永远不会在当前行区域下方绘制下划线。）变量 @code{x-underline-at-descent-line} 决定如何绘制带下划线的文本。  默认为@code{nil}，表示在字体的基线水平上绘制；如果将其更改为 @code{t}，Emacs 会在与字体下降线相同的高度绘制下划线。  （如果为带下划线的文本指定了非默认行间距，请参阅@ref{Line Height,,, elisp, The Emacs Lisp Reference Manual}，Emacs 会在附加间距下方绘制下划线。）
+
+@vindex overline-margin
+变量 @code{overline-margin} 指定文本上方上划线的垂直位置，包括上划线本身的高度（以像素为单位）；默认值为 2。
+
+@findex tty-suppress-bold-inverse-default-colors
+在某些文本终端上，粗体和反色视频一起导致文本难以阅读。  在这种情况下，使用非 @code{nil} 参数调用函数 @code{tty-suppress-bold-inverse-default-colors} 可以抑制粗体效果。
+
+@vindex display-raw-bytes-as-hex
+原始字节默认以八进制格式显示，例如十进制值为 128 的字节显示为@code{\200}。  要将显示更改为 @code{\x80} 的十六进制格式，请将变量 @code{display-raw-bytes-as-hex} 设置为 @code{t}。当从包含 Emacs 会话的终端复制文本时，或者当终端的 @code{escape-glyph} 面看起来像默认面时，解释原始字节时可能需要小心。  例如，默认情况下，Emacs 显示四个字符 @samp{\}、@samp{2}、@samp{0}、@samp{0}，其字符与显示十进制值 128 的字节相同。使用十六进制显示时，问题可能会更严重，其中原始字节 128 后跟字符 @samp{7} 显示为 @code{\x807}，Emacs Lisp 将其读取为单个字符U+0807 撒玛利亚字母；这种混淆不会发生在相应的八进制显示@code{\2007} 中，因为八进制转义符最多包含三位数字。

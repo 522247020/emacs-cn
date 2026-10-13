@@ -1,0 +1,56 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node M-x
+@chapter 按名称运行命令
+
+每个 Emacs 命令都有一个可用于运行它的名称。  为了方便起见，许多命令还具有键绑定。  您可以通过键入按键来运行这些命令，也可以按名称运行它们。  大多数 Emacs 命令没有键绑定，因此运行它们的唯一方法是通过名称。 （@xref{Key Bindings}，了解如何设置按键绑定。）
+
+按照惯例，命令名称由一个或多个单词组成，并用连字符分隔；例如，@code{auto-fill-mode} 或 @code{manual-entry}。  命令名称大多使用完整的英文单词，以便于记忆。
+
+@kindex M-x
+要按名称运行命令，请以 @kbd{M-x} 开始，键入命令名称，然后以 @key{RET} 终止。  @kbd{M-x} 使用迷你缓冲区来读取命令名称。  字符串 @samp{M-x} 作为 @dfn{prompt} 出现在迷你缓冲区的开头，以提醒您输入要运行的命令名称。  @key{RET} 退出迷你缓冲区并运行命令。  @xref{Minibuffer}，有关迷你缓冲区的更多信息。
+
+您可以使用补全来输入命令名称。  例如，要调用命令 @code{forward-char}，您可以键入
+
+@example
+M-x forward-char @key{RET}
+@end example
+
+@noindent
+或者
+
+@example
+M-x forw @key{TAB} c @key{RET}
+@end example
+
+@noindent
+请注意，@code{forward-char} 与您使用键 @kbd{C-f} 调用的命令相同。  键绑定的存在不会阻止您按名称运行命令。
+
+@cindex obsolete command
+当 @kbd{M-x} 完成命令时，它会忽略在任何以前的 Emacs 主要版本中声明 @dfn{obsolete} 的命令；对于这些，您必须输入他们的全名。  列出了在当前版本的 Emacs 中标记为过时的命令。  （过时的命令是那些存在更新、更好的替代命令的命令，并且计划在未来的某些 Emacs 版本中删除这些命令。）
+
+@vindex read-extended-command-predicate
+此外，@kbd{M-x}补全可以排除与当前缓冲区的主要模式（@pxref{Major Modes}）和次要模式（@pxref{Minor Modes}）不相关且通常无法使用的命令。  默认情况下，不排除任何命令，但您可以自定义选项@code{read-extended-command-predicate}以从完成结果中排除那些不相关的命令。
+
+@kindex M-S-x
+@kindex M-X
+相反，Emacs 可以排除除那些与当前缓冲区特别相关的命令之外的所有命令。  @kbd{M-S-x}（即“meta shift x”）命令的工作方式与 @kbd{M-x} 类似，但它不会列出 Emacs 知道的所有（或大多数）命令，它只会列出已标记为“属于”当前主要模式或任何启用的次要模式的命令。
+
+要取消 @kbd{M-x} 且不运行命令，请键入 @kbd{C-g} 而不是输入命令名称。  这将带您回到命令级别。
+
+要将数字参数传递给使用 @kbd{M-x} 调用的命令，请在 @kbd{M-x} 之前指定数字参数。  当读取命令名称时，参数值出现在提示中，最后 @kbd{M-x} 将参数传递给该命令。  例如，要将数字参数 42 传递给命令 @code{forward-char}，您可以键入 @kbd{C-u 42 M-x forward-char @key{RET}}。
+
+@vindex suggest-key-bindings
+当您使用 @kbd{M-x} 运行的命令具有键绑定时，Emacs 会在运行该命令后在回显区域中提及这一点。  例如，如果您键入 @kbd{M-x forward-word}，则消息表明您可以通过键入 @kbd{M-f} 运行相同的命令。  您可以通过将变量 @code{suggest-key-bindings} 设置为 @code{nil} 来关闭这些消息。  @code{suggest-key-bindings} 的值也可以是一个数字，在这种情况下，Emacs 会在将绑定从显示中删除之前显示该绑定几秒。  默认行为是显示绑定 2 秒。
+
+此外，当 @code{suggest-key-bindings} 为非 @code{nil} 时，@kbd{M-x} 的完成列表会显示所有具有这些键绑定的命令的等效键绑定。
+
+@vindex extended-command-suggest-shorter
+没有键绑定的命令，在 @samp{M-x} 提示符下键入少于其全名后仍然可以调用。  如果 Emacs 比完整命令名称短得多，并且 @code{extended-command-suggest-shorter} 不是 @code{nil}，则 Emacs 会在回显区域中提及此类简写。  @code{suggest-key-bindings} 的设置也会影响这些提示。
+
+在本手册中，当我们谈到按名称运行命令时，我们经常省略终止名称的@key{RET}。  因此我们可以说 @kbd{M-x auto-fill-mode} 而不是 @w{@kbd{M-x auto-fill-mode @key{RET}}}。  我们提及 @key{RET} 只是为了强调，例如当命令后面跟着参数时。
+
+@findex execute-extended-command
+@kbd{M-x} 通过运行命令@code{execute-extended-command} 来工作，该命令负责读取另一个命令的名称并调用它。

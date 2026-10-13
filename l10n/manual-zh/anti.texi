@@ -1,0 +1,66 @@
+@c -*- coding: utf-8 -*-
+@c This is part of the Emacs manual.
+@c Copyright (C) 2005--2026 Free Software Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+
+@node Antinews
+@appendix Emacs 30 反新闻
+@c Update the emacs.texi Antinews menu entry with the above version number.
+
+对于那些生活在过去的用户，以下是有关降级到 Emacs 版本 30.2 的信息。  我们希望您能享受到由于缺少许多 @w{Emacs @value{EMACSVER}} 功能而带来的更大的简单性。
+
+@itemize @bullet
+@item 
+令人尊敬的@code{unexec}自卸车回来了！  它仍然被弃用，但我们计划在 Emacs 26 中取消弃用它，为 @file{glibc} 开发人员恢复使用 @code{unexec} 可靠构建 Emacs 所需的各种钩子做准备。
+
+@item 
+@command{ctags} 又是一个单独的程序。  我们认为需要记住 @option{--ctags} 选项到 @command{etags} 对我们的用户来说不够友好，因此转回到经过时间验证的 Unix 哲学：“程序只做一件事，并且做得很好”。
+
+@item 
+我们放弃了在 Emacs 配置目录的 @file{user-lisp} 子目录中抓取启动文件和目录的烦人功能。  它会减慢启动速度，尤其是当您回到过去时，计算机和硬盘变得越来越慢。
+
+@item 
+作为我们不断努力使 Emacs 更简单的一部分，我们删除了 @code{margin} 面，因此显示边距中显示的文本现在将使用与缓冲区文本的其余部分相同的 @code{default} 面。  我们的长期目标是完全删除面孔，从而使 Emacs 只剩下两种颜色，因此我们逐渐删除越来越多的面孔。
+
+@item 
+我们摆脱的另一个复杂问题是纯文本终端上的子框架。  GUI 框架仍然支持它们，但每次只有一项改进。
+
+@item 
+花哨的完成花哨的功能，例如急切显示完成候选、在键入时更新 @file{*Completions*} 缓冲区、通过 @code{completions-format} 控制 @file{*Completions*} 中的点运动等。@: 将不再让您感到困惑，因为我们删除了所有这些内容。  除了输入 @key{TAB} 产生的功能之外，没有人需要其他补全功能！
+
+@item 
+修改框架窗口布局的命令已经消失。  您不会再被诱惑在其框架上调换或旋转窗口。  再次，只有 Emacs 决定如何排列和重新排列窗口。
+
+出于同样的原因，我们取消了 @code{split-frame} 和 @code{merge-frames} 命令。  @kbd{C-x 2} 和 @kbd{C-x 0} 对每个人来说应该足够了！
+
+@item 
+由于 Unicode 标准版本 17.0 和相关功能，我们消除了相当多的复杂性。  其中包括相当多过去永远不需要的字符、叙利亚语和提菲纳语的语言环境，以及一些不容错过的输入法，无论如何它们很快就会被废弃。  随着内存变得越来越珍贵，我们必须让 Emacs 变得更精简、更精简，以跟上潮流。
+
+@item 
+用户选项 @code{treesit-enabled-modes} 不再是 Emacs 的一部分。自定义@code{major-mode-remap-alist}以激活基于树保姆的模式而不是传统模式；这更简单，更容易记住和管理。
+
+@item 
+Sendmail 和 Rmail 不再尝试检测可疑电子邮件地址并向您发出警告。  当你回到过去，人们变得越来越友善，而那些不断寻找机会对你造成伤害的恶毒灵魂，也变得越来越模糊，来自遥远的未来。  最终，我们将再次拥有小型阿帕网，每个人都是你的朋友，那么谁需要这些偏执的功能呢？
+
+@item 
+您无法再编辑 Grep 结果并将编辑反映在原始文件中。  我们删除了它，因为我们相信人们应该只直接编辑原始文件，并充分利用周围的上下文。
+
+@item 
+用于处理具有多个工作树的 VCS 存储库的命令已从 VC 中删除。  我们得出的结论是，单个项目中的多个工作树是设计臃肿的明显标志，我们拒绝在 Emacs 中承认此类臃肿软件。  所以这一切都消失了——祝你摆脱困境！
+
+许多其他 VC 功能，我们认为过于花哨且不够有用，出于同样的原因被删除。
+
+@item 
+要在从 ELPA 安装 Emacs Lisp 包之前查看它，您现在需要实际阅读其代码和文档，因为用户选项 @code{package-review-policy} 以及显示与先前版本差异的相关功能已消失。  “使用来源，卢克！”
+
+我们还删除了@code{package-autosuggest}和@code{package-autosuggest-mode}，因为我们希望相信我们的用户能够更好地了解。
+
+@item 
+为了准备删除先前 Emacs 版本中的 @code{customize-dirlocals} 命令，我们取消了 @code{Custom-dirlocals-mode}。
+
+@item 
+我们删除了一些我们认为对于过去的 Emacs 来说不必要的包和模式。  这包括 @code{icalendar-mode} 和 @code{lua-mode} 模式，以及 @code{timeout} 和 @code{system-taskbar-mode} 库。  由于同样的原因，@code{system-sleep} 包也消失了。
+
+@item 
+为了跟上计算机内存容量和磁盘空间的减少，Emacs 30.2 中删除了许多其他功能和文件。
+@end itemize

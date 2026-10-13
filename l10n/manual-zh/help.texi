@@ -1,0 +1,523 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Help
+@chapter 帮助
+@cindex help
+@cindex self-documentation
+@findex help-command
+@kindex C-h
+@kindex F1
+
+@kindex C-h C-h
+@findex help-for-help
+Emacs 提供了各种各样的帮助命令，所有命令都可以通过前缀键 @kbd{C-h}（或者等效的功能键 @key{F1}）访问。  以下各节介绍了这些帮助命令。  您还可以输入 @kbd{C-h C-h} 查看帮助命令列表 (@code{help-for-help})。  您可以使用 @key{SPC} 和 @key{DEL} 滚动列表，然后键入所需的帮助命令。  要取消，请输入@kbd{C-g}。
+
+@cindex help buffer
+许多帮助命令以特殊的 @dfn{help buffer} 形式显示其信息。  在此缓冲区中，您可以键入 @key{SPC} 和 @key{DEL} 进行滚动，并键入 @key{RET} 跟随超链接。  @xref{Help Mode}。
+
+@vindex help-window-select
+默认情况下，帮助命令在单独的窗口中显示帮助缓冲区，而无需选择该窗口。  变量@code{help-window-select}控制它：它的默认值为@code{nil}；如果自定义为值@code{t}，则帮助命令无条件选择帮助窗口，如果其值为@code{other}，则仅当所选帧上有两个以上窗口时才选择帮助窗口。
+
+@vindex help-window-keep-selected
+相反，@samp{*Help*}缓冲区中的许多命令会弹出一个新窗口来显示结果。  例如，单击链接显示源代码，或使用 @key{i} 命令显示手动条目，将（默认情况下）弹出一个新窗口。  如果@code{help-window-keep-selected}更改为非@code{nil}，则显示@samp{*Help*}缓冲区的窗口将被重新使用。
+
+@cindex searching documentation efficiently
+@cindex looking for a subject in documentation
+如果您正在寻找某个功能，但不知道它的名称或在哪里查找，我们推荐三种方法。  首先，尝试 apropos 命令，然后尝试搜索手册索引，然后查看常见问题解答和包关键字，最后尝试列出外部包。
+
+@table @kbd
+@item C-h a @var{topics} @key{RET}
+这会搜索名称与参数@var{topics}匹配的命令。  参数可以是关键字、由空格分隔的关键字列表或正则表达式 (@pxref{Regexps})。 @xref{Apropos}。
+
+@item C-h d @var{topics} @key{RET}
+类似，但搜索文档字符串的 @emph{text} 而不是命令和函数的名称。
+
+@item C-h r i @var{topic} @key{RET}
+这会在 Emacs 信息手册的索引中搜索 @var{topic}，显示找到的第一个匹配项。  按 @kbd{,} 查看后续比赛。  您可以使用正则表达式作为@var{topic}。
+
+@item C-h r s @var{topic} @key{RET}
+类似，但搜索手册的 @emph{text} 而不是索引。
+
+@item C-h C-f
+这将使用 Info 显示 Emacs 常见问题解答。
+
+@item C-h p
+这会根据关键字显示可用的 Emacs 软件包。 @xref{Package Keywords}。
+
+@item M-x list-packages
+这将显示外部包的列表。  @xref{Packages}。
+@end table
+
+@kbd{C-h} 或 @key{F1} 在各种其他上下文中也表示“帮助”。  例如，您可以在前缀键后键入它们，以查看可以跟随该前缀键的键的列表。  （您也可以在这种情况下使用@kbd{?}。一些前缀键不支持@kbd{C-h}或@kbd{?}，因为它们为这些输入定义了其他含义，但它们都支持@key{F1}。）
+
+@menu
+* Help Summary::         所有帮助命令的简要列表。
+* Key Help::             询问 Emacs 中某个键的作用。
+* Name Help::            询问命令、变量或函数名称。
+* Apropos::              询问与给定主题相关的内容。
+* Help Mode::            帮助模式和帮助缓冲区的特殊功能。
+* Package Keywords::     通过关键字（主题）查找 Lisp 库。
+* Language Help::        有关国际语言支持的帮助。
+* Misc Help::            其他帮助命令。
+* Help Files::           显示辅助帮助文件的命令。
+* Help Echo::            有关活动文本和工具提示的帮助（“气球帮助”）。
+@end menu
+
+@iftex
+@node Help Summary
+@end iftex
+@ifnottex
+@node Help Summary
+@section Help Summary
+@end ifnottex
+
+以下是用于访问内置文档的帮助命令的摘要。  其中大部分内容将在以下各节中进行更详细的描述。
+
+@table @kbd
+@item C-h a @var{topics} @key{RET}
+显示名称与 @var{topics} (@code{apropos-command}) 匹配的命令列表。  @xref{Apropos}。
+@item C-h b
+显示所有活动的键绑定；首先是次要模式绑定，然后是主要模式绑定，最后是全局绑定 (@code{describe-bindings})。 @xref{Misc Help}。
+@item C-h C-q
+切换显示常用命令及其键绑定的窗口。  @xref{Misc Help}。
+@item C-h c @var{key}
+显示按键序列 @var{key} 绑定到 (@code{describe-key-briefly}) 的命令的名称。  这里@kbd{c}代表“字符”。  有关 @var{key} 的更多详细信息，请使用 @kbd{C-h k}。  @xref{Key Help}。
+@item C-h d @var{topics} @key{RET}
+显示文档与 @var{topics} (@code{apropos-documentation}) 匹配的命令和变量。  @xref{Apropos}。
+@item C-h e
+显示 @file{*Messages*} 缓冲区 (@code{view-echo-area-messages})。  @xref{Misc Help}。
+@item C-h f @var{function} @key{RET}
+显示名为 @var{function} (@code{describe-function}) 的 Lisp 函数的文档。  由于命令是 Lisp 函数，因此这也适用于命令，但您也可以使用@code{C-h x}。  @xref{Name Help}。
+@item C-h h
+显示 @file{HELLO} 文件，其中显示了各种字符集的示例。
+@item C-h i
+运行 Info，GNU 文档浏览器 (@code{info})。  Emacs 手册可在 Info.plist 中找到。  @xref{Misc Help}。
+@item C-h k @var{key}
+显示 @var{key} 运行的命令的名称和文档 (@code{describe-key})。  @xref{Key Help}。
+@item C-h l
+显示最近 300 次击键的描述 (@code{view-lossage})。  @xref{Misc Help}。
+@item C-h m
+显示当前主要模式和次要模式的文档 (@code{describe-mode})。  @xref{Misc Help}。
+@item C-h n
+显示最近 Emacs 更改的新闻 (@code{view-emacs-news})。 @xref{Help Files}。
+@item C-h o @var{symbol}
+显示名为 @var{symbol} (@code{describe-symbol}) 的 Lisp 符号的文档。  这将显示各种符号的文档：函数、变量和面。  @xref{Name Help}。
+@item C-h p
+按主题关键字 (@code{finder-by-keyword}) 查找包。 @xref{Package Keywords}。  这列出了使用包菜单缓冲区的包。  @xref{Packages}。
+@item C-h P @var{package} @key{RET}
+显示有关指定包 (@code{describe-package}) 的文档。  @xref{Package Keywords}。
+@item C-h r
+在 Info (@code{info-emacs-manual}) 中显示 Emacs 手册。
+@item C-h s
+显示当前@dfn{syntax table} (@code{describe-syntax}) 的内容。  @xref{Misc Help}。  语法表说明哪些字符是开始分隔符，哪些是单词的一部分，等等。  @xref{Syntax Tables,, Syntax Tables, elisp, The Emacs Lisp Reference Manual}，了解详情。
+@item C-h t
+进入Emacs交互教程(@code{help-with-tutorial})。
+@item C-h v @var{var} @key{RET}
+显示 Lisp 变量 @var{var} (@code{describe-variable}) 的文档。  @xref{Name Help}。
+@item C-h w @var{command} @key{RET}
+显示哪些键运行名为 @var{command} (@code{where-is}) 的命令。 @xref{Key Help}。
+@item C-h x @var{command} @key{RET}
+显示有关指定 @var{command} (@code{describe-command}) 的文档。  @xref{Name Help}。
+@item C-h C @var{coding} @key{RET}
+描述编码系统@var{coding} (@code{describe-coding-system})。  @xref{Coding Systems}。
+@item C-h C @key{RET}
+描述当前使用的编码系统。
+@item C-h F @var{command} @key{RET}
+输入 Info 并转到记录 Emacs 命令@var{command} (@code{Info-goto-emacs-command-node}) 的节点。  @xref{Name Help}。
+@item C-h I @var{method} @key{RET}
+描述输入法@var{method} (@code{describe-input-method})。 @xref{Select Input Method}。
+@item C-h K @var{key}
+输入 Info 并转到记录按键序列@var{key} (@code{Info-goto-emacs-key-command-node}) 的节点。  @xref{Key Help}。
+@item C-h L @var{language-env} @key{RET}
+显示有关语言环境@var{language-env} (@code{describe-language-environment}) 中使用的字符集、编码系统和输入法的信息。  @xref{Language Environments}。
+@item C-h S @var{symbol} @key{RET}
+根据您正在编辑的编程语言 (@code{info-lookup-symbol}) 显示符号 @var{symbol} 上的信息文档。 @xref{Misc Help}。
+@item C-h .
+如果点位于一 (@code{display-local-help}) 中，则显示特殊文本区域的帮助消息。  （例如，这些包括@file{*Help*}缓冲区中的链接。）@xref{Help Echo}。  如果您使用前缀参数 @kbd{C-u C-h .} 调用此命令，并且点位于按钮或小部件上，则此命令将弹出一个描述该按钮/小部件的新缓冲区。
+@end table
+
+@node Key Help
+@section 密钥的文档
+
+@findex describe-key-briefly
+@findex describe-key
+用于获取有关按键序列信息的帮助命令是@kbd{C-h c} (@code{describe-key-briefly}) 和@kbd{C-h k} (@code{describe-key})。
+
+@kindex C-h c
+@kbd{C-h c @var{key}} 在回显区域中显示@var{key} 绑定到的命令的名称。  例如，@kbd{C-h c C-f} 显示@samp{forward-char}。
+
+@cindex documentation string
+@kindex C-h k
+@kbd{C-h k @var{key}} 类似，但提供更多信息：它显示包含命令的 @dfn{documentation string} 的帮助缓冲区，它准确地描述了命令的作用。
+
+@kindex C-h K
+@findex Info-goto-emacs-key-command-node
+@kbd{C-h K @var{key}} 显示 Emacs 手册中描述与 @var{key} 相对应的命令的部分。
+
+@kbd{C-h c}、@kbd{C-h k} 和 @kbd{C-h K} 适用于任何类型的按键序列，包括功能键、菜单和鼠标事件（@kbd{C-h c} 忽略鼠标移动事件）。  例如，在@kbd{C-h k}之后，您可以从菜单栏中选择一个菜单项，以查看其运行的命令的文档字符串。
+
+@kindex C-h w
+@findex where-is
+@kbd{C-h w @var{command} @key{RET}} 列出了绑定到 @var{command} 的键。  它在回显区域中显示列表。  如果它说该命令不在任何键上，则意味着您必须使用 @kbd{M-x} 来运行它。  @kbd{C-h w} 运行命令@code{where-is}。
+
+@findex button-describe
+@findex widget-describe
+Emacs 中的某些模式使用各种按钮 (@pxref{Buttons,,,elisp, The Emacs Lisp Reference Manual}) 和小部件 (@pxref{Introduction,,,widget, Emacs Widgets})，单击它们可以执行某些操作。  为了找出这些按钮最终调用的功能，Emacs 提供了 @code{button-describe} 和 @code{widget-describe} 命令，应将鼠标指针悬停在按钮上来运行这些命令。
+
+@anchor{which-key}
+@kbd{M-x which-key} 是一种全局次要模式，有助于发现键盘映射。  它会在弹出窗口中显示当前输入的不完整命令（前缀）之后的键绑定。
+
+@node Name Help
+@section 通过命令或变量名称提供帮助
+
+@kindex C-h x
+@findex describe-command
+@kbd{C-h x @var{command} @key{RET}} (@code{describe-command}) 在窗口中显示名为 @var{command} 的文档。  例如，
+
+@example
+C-h x auto-fill-mode @key{RET}
+@end example
+
+@noindent
+显示@code{auto-fill-mode}的文档。  这是您获取未绑定到任何键的命令文档的方式（通常使用 @kbd{M-x} 运行该命令）。
+
+@kindex C-h f
+@findex describe-function
+@kbd{C-h f @var{function} @key{RET}} (@code{describe-function}) 显示 Lisp @var{function} 的文档。  此命令适用于您在 Lisp 程序中使用的 Lisp 函数。  例如，如果您刚刚编写了表达式 @code{(make-vector len)} 并且想要检查您是否正确使用了 @code{make-vector}，请输入 @w{@kbd{C-h f make-vector @key{RET}}}。此外，由于所有命令都是 Lisp 函数，因此您还可以使用此命令查看任何命令的文档。
+
+如果您输入 @kbd{C-h f @key{RET}}，它描述了点周围缓冲区中最里面的 Lisp 表达式所调用的函数，@emph{provided} 该函数名称是一个有效的、已定义的 Lisp 函数。 （当您输入参数时，该名称将显示为默认名称。）例如，如果 point 位于文本 @samp{(make-vector (car x)} 之后，则包含 point 的最内层列表是以 @samp{(make-vector} 开头的列表，因此 @w{@kbd{C-h f @key{RET}}} 描述函数 @code{make-vector}。
+
+@kbd{C-h f} 对于验证函数名称拼写是否正确也很有用。  如果 @kbd{C-h f} 的迷你缓冲区提示默认显示缓冲区中的函数名称，则意味着该名称被定义为 Lisp 函数。  如果您不想查看文档，请输入 @kbd{C-g} 取消 @kbd{C-h f} 命令。
+
+@code{describe-function} 显示的函数文档不仅仅包括文档字符串和函数签名。  它还显示辅助信息，例如其类型、定义它的文件、是否已被声明为过时，并且通常可以通过在文本的强调部分单击或键入 @key{RET} 来获取更多信息。
+
+@cindex function type specifier
+@cindex declared type of a function
+@cindex inferred type of a function
+函数类型（如果已知）用 @dfn{function type specifier} (@pxref{Type Specifiers,,,elisp, The Emacs Lisp Reference Manual}) 表示，如果该类型是由 Lisp 程序手动声明的或由编译器推断的，则会指定该类型。  请注意，函数类型推断仅在启用本机编译时才有效 (@pxref{native compilation,,, elisp, The Emacs Lisp Reference Manual})。
+
+@vindex help-enable-symbol-autoload
+如果您请求自动加载函数的帮助，而该函数的 @code{autoload} 形式 (@pxref{Autoload,,, elisp, The Emacs Lisp Reference Manual}) 不提供文档字符串，则 @file{*Help*} 缓冲区将不会显示任何文档字符串。  在这种情况下，如果@code{help-enable-symbol-autoload}不是@code{nil}，Emacs将尝试加载定义该函数的文件以查看那里是否有文档字符串。
+
+@findex shortdoc
+您可以使用 @kbd{M-x shortdoc} 命令获取与特定主题相关的功能的概述。  这将提示您输入感兴趣的区域，例如 @code{string}，并将您弹出到一个缓冲区，其中列出了许多与处理字符串相关的函数。
+
+您还可以请求由 @kbd{C-h f} 弹出的 @file{*Help*} 缓冲区中显示的函数和命令的文档包括其使用示例。  为此，请将以下内容添加到初始化文件中 (@pxref{Init File})：
+
+@example
+(add-hook 'help-fns-describe-function-functions
+          #'shortdoc-help-fns-examples-function)
+@end example
+
+@kindex C-h v
+@findex describe-variable
+@kbd{C-h v} (@code{describe-variable}) 与 @kbd{C-h f} 类似，但描述的是 Lisp 变量而不是 Lisp 函数。  它的默认值是点周围或之前的 Lisp 符号（如果这是已定义的 Lisp 变量的名称）。  @xref{Variables}。
+
+如果您安装了源文件 (@pxref{Hyperlinking})，则描述 Emacs 变量和函数的帮助缓冲区通常具有指向相应源代码的超链接。
+
+@kindex C-h F
+@findex Info-goto-emacs-command-node
+要在手册中查找命令的文档，请使用 @kbd{C-h F} (@code{Info-goto-emacs-command-node})。  它了解各种手册，而不仅仅是 Emacs 手册，并找到合适的手册。
+
+@kindex C-h o
+@findex describe-symbol
+@kbd{C-h o} (@code{describe-symbol}) 类似于 @kbd{C-h f} 和 @kbd{C-h v}，但它描述任何符号，无论是函数、变量还是面。  如果符号有多个定义，例如它同时具有函数定义和变量定义，则此命令将依次显示所有这些定义的文档。
+
+@kindex C-h 4 s
+@findex help-find-source
+@kbd{C-h 4 s} (@code{help-find-source}) 切换到缓冲区，访问帮助缓冲区中所描述内容的源定义。
+
+@vindex completions-detailed
+如果 @code{completions-detailed} 用户选项为非 @code{nil}，某些命令会在显示完成时提供有关可能值的详细信息。  例如，@kbd{C-h o TAB} 将包含文档字符串的第一行，并且还会说明每个符号是函数还是变量（等等）。  包含哪些详细信息取决于所使用的命令。
+
+@node Apropos
+@section 恰如其分
+@cindex apropos
+
+@cindex apropos pattern
+@cindex apropos commands, list of keywords
+@dfn{apropos} 命令回答诸如“处理文件的命令是什么？”之类的问题。更准确地说，您将查询指定为 @dfn{apropos pattern}，它可以是一个单词、由空格分隔的单词列表或正则表达式。
+
+以下每个 apropos 命令读取迷你缓冲区中的 apropos 模式，搜索与该模式匹配的项目，并在不同的窗口中显示结果。
+
+@table @kbd
+@item C-h a
+@kindex C-h a
+@findex apropos-command
+搜索命令 (@code{apropos-command})。  使用前缀参数，也可以搜索非交互式函数。
+
+@item M-x apropos
+@findex apropos
+搜索函数和变量。  交互功能（命令）和非交互功能都可以通过此找到。
+
+@kindex C-h u
+@findex apropos-user-option
+@item C-h u
+搜索用户可自定义的变量。  使用前缀参数，也可以搜索不可自定义的变量。
+
+@item M-x apropos-variable
+@findex apropos-variable
+搜索变量。  使用前缀参数，仅搜索可自定义变量。
+
+@item M-x apropos-local-variable
+@findex apropos-local-variable
+搜索缓冲区局部变量。
+
+@item M-x apropos-value
+@findex apropos-value
+搜索其值与指定模式匹配的变量。  使用前缀参数，还可以搜索定义与模式匹配的函数，以及属性与模式匹配的 Lisp 符号。
+
+@item M-x apropos-local-value
+@findex apropos-local-value
+搜索其值与指定模式匹配的缓冲区局部变量。
+
+@item C-h d
+@kindex C-h d
+@findex apropos-documentation
+搜索文档字符串与指定模式 (@code{apropos-documentation}) 匹配的函数和变量。
+@end table
+
+最简单的一种恰当模式是一个单词。  任何包含该单词的内容都与该模式匹配。  因此，要查找适用于文件的命令，请键入 @kbd{C-h a file @key{RET}}。  这将显示包含 @samp{file} 的所有命令名称的列表，包括 @code{copy-file}、@code{find-file} 等。  每个命令名称都带有简短的描述和当前可以用来调用它的键列表。  在我们的示例中，它会说您可以通过键入 @kbd{C-x C-f} 来调用 @code{find-file}。
+
+@vindex help-window-select@r{, and apropos commands}
+默认情况下，显示带有查询结果的 apropos 缓冲区的窗口未被选中，但您可以通过将变量 @code{help-window-select} 自定义为任何非 @code{nil} 值来选择它。
+
+有关 apropos 缓冲区中列出的函数定义、变量或符号属性的更多信息，您可以使用 @kbd{mouse-1} 或 @kbd{mouse-2} 单击它，或者移动到那里并键入 @key{RET}。
+
+当您在 apropos 模式中指定多个单词时，名称必须至少包含其中两个单词才能匹配。  因此，如果您正在寻找命令来删除点之前的一大块文本，您可以尝试@kbd{C-h a kill back backward behind before @key{RET}}。  真实的命令名称 @code{kill-backward} 将与之匹配；如果有命令@code{kill-text-before}，它也会匹配，因为它包含两个指定的单词。
+
+为了获得更大的灵活性，您可以指定正则表达式 (@pxref{Regexps})。  如果 apropos 模式包含任何正则表达式特殊字符 @samp{^$*+?.\[}，则它会被解释为正则表达式。
+
+遵循命名 Emacs 命令的约定，以下是您会发现在 apropos 模式中有用的一些单词。  通过在 @kbd{C-h a} 中使用它们，您还将感受到命名约定。
+
+@quotation
+字符、行、单词、句子、段落、区域、页面、sexp、列表、defun、矩形、缓冲区、框架、窗口、面、文件、目录、寄存器、模式、开始、结束、向前、向后、下一个、上一个、向上、向下、搜索、转到、删除、删除、标记、插入、复制、填充、缩进、大小写、更改、设置、内容、列表、查找、查看、描述、默认。
+@end quotation
+
+@vindex apropos-do-all
+如果变量 @code{apropos-do-all} 不是 @code{nil}，大多数 apropos 命令的行为就好像它们被赋予了前缀参数一样。有一个例外：不带前缀参数的@code{apropos-variable}将始终搜索所有变量，无论@code{apropos-do-all}的值是什么。
+
+@vindex apropos-sort-by-scores
+@cindex apropos search results, order by score
+@vindex apropos-documentation-sort-by-scores
+默认情况下，除 0⁣ 之外的所有 apropos 命令均按字母顺序列出其结果。  如果变量 @code{apropos-sort-by-scores} 不是 @code{nil}，这些命令会尝试猜测每个结果的相关性，并首先显示最相关的结果。  @code{apropos-documentation} 命令默认按相关性顺序列出其结果；要按字母顺序列出它们，请将变量 @code{apropos-documentation-sort-by-scores} 更改为 @code{nil}。
+
+@node Help Mode
+@section 帮助模式命令
+@findex help-mode
+@cindex help mode
+
+帮助缓冲区将帮助模式作为其主要模式。  帮助模式提供与查看模式相同的命令 (@pxref{View Mode})；例如，@key{SPC}向前滚动，@key{DEL}或@kbd{S-@key{SPC}}向后滚动。  它还提供了一些特殊的命令：
+
+@table @kbd
+@item @key{RET}
+遵循点 (@code{help-follow}) 处的交叉引用。
+@item @key{TAB}
+将点向前移动到下一个超链接 (@code{forward-button})。
+@item S-@key{TAB}
+将点移回到上一个超链接 (@code{backward-button})。
+@item mouse-1
+@itemx mouse-2
+按照您单击的超链接进行操作。
+@item n
+@itemx p
+在帮助缓冲区中的页面之间前后移动。
+@item C-c C-c
+显示有关点 (@code{help-follow-symbol}) 处符号的所有文档。
+@item C-c C-f
+@itemx r
+在帮助命令历史中前进 (@code{help-go-forward})。
+@item C-c C-b
+@itemx l
+返回帮助命令的历史记录 (@code{help-go-back})。
+@item s
+查看当前帮助主题的来源（如果有）(@code{help-view-source})。
+@item i
+在手册中查找当前主题 (@code{help-goto-info})。
+@item I
+在 Emacs Lisp 手册中查找当前主题 (@code{help-goto-lispref-info})。
+@item c
+自定义变量或面 (@code{help-customize})。
+@end table
+
+@cindex hyperlink
+@findex help-follow
+@findex help-go-back
+@findex help-go-forward
+@kindex RET @r{(Help mode)}
+@kindex C-c C-b @r{(Help mode)}
+@kindex l @r{(Help mode)}
+@kindex C-c C-f @r{(Help mode)}
+@kindex r @r{(Help mode)}
+当函数名称、变量名称或面名称 (@pxref{Faces}) 出现在帮助缓冲区的文档中时，它通常是带下划线的@dfn{hyperlink}。  要查看相关文档，请将点移至此处并输入 @key{RET} (@code{help-follow})，或单击包含 @kbd{mouse-1} 或 @kbd{mouse-2} 的超链接。  这样做会替换帮助缓冲区的内容；要回溯您的步骤，请输入 @kbd{C-c C-b} 或 @kbd{l} (@code{help-go-back})。  在原路返回时，您可以使用 @kbd{C-c C-f} 或 @kbd{r} (@code{help-go-forward}) 前进。
+
+@kindex TAB @r{(Help mode)}
+@findex forward-button
+@kindex S-TAB @r{(Help mode)}
+@findex backward-button
+要在帮助缓冲区中的超链接之间移动，请使用 @key{TAB} (@code{forward-button}) 向前移动到下一个超链接，使用 @kbd{S-@key{TAB}} (@code{backward-button}) 移动到上一个超链接。  这些命令循环执行；例如，在最后一个超链接处键入 @key{TAB} 会返回到第一个超链接。
+
+@vindex help-clean-buttons
+默认情况下，帮助缓冲区中的许多链接都显示在引号字符中。  如果@code{help-clean-buttons}用户选项是非@code{nil}，这些引号字符将从缓冲区中删除。
+
+@kindex n @r{(Help mode)}
+@kindex p @r{(Help mode)}
+@findex help-goto-next-page
+@findex help-goto-previous-page
+由某些帮助命令（如 @kbd{C-h b}，显示一长串按键绑定）生成的帮助缓冲区由 @samp{^L} 字符划分为多个页面。  在此类缓冲区中，@kbd{n} (@code{help-goto-next-page}) 命令将带您到下一个页面开头，而 @kbd{p} (@code{help-goto-previous-page}) 命令将带您到上一个页面开头。  这样您就可以在帮助缓冲区中的不同类型文档之间快速导航。
+
+@cindex URL, viewing in help
+@cindex help, viewing web pages
+@cindex viewing web pages in help
+@cindex web pages, viewing in help
+帮助缓冲区还可以包含信息手册、源代码定义和 URL（网页）的超链接。  前两个在 Emacs 中打开，第三个使用网络浏览器通过 @code{browse-url} 命令 (@pxref{Browse-URL}) 打开。
+
+要查看文本中有关任何符号的所有文档，请将点移至该符号并输入 @kbd{C-c C-c} (@code{help-follow-symbol})。这显示了该符号的所有含义的文档——作为变量、作为函数和/或作为面孔。
+
+@node Package Keywords
+@section 包的关键字搜索
+@cindex finder
+
+Emacs 中的大多数可选功能都分为 @dfn{packages}。 Emacs 包含数百个内置软件包，并且可以通过网络安装更多软件包 (@pxref{Packages})。
+
+@kindex C-h p
+@findex finder-by-keyword
+为了更容易地找到与某个主题相关的包，大多数包根据其用途与一个或多个 @dfn{keywords} 相关联。输入 @kbd{C-h p} (@code{finder-by-keyword}) 以显示软件包关键字列表，以及关键字含义的描述。  要查看给定关键字的包列表，请在该行键入 @key{RET}；这将显示包菜单缓冲区中的包列表 (@pxref{Package Menu})。
+
+@findex describe-package
+@kindex C-h P
+@kbd{C-h P} (@code{describe-package}) 提示输入包的名称 (@pxref{Packages})，并显示帮助缓冲区，描述包的属性及其实现的功能。  缓冲区以按钮的形式列出与包相关的关键字。  单击带有 @kbd{mouse-1} 或 @kbd{mouse-2} 的按钮可查看与该关键字相关的其他软件包的列表。
+
+@node Language Help
+@section 国际语言支持帮助
+
+有关特定语言环境 (@pxref{Language Environments}) 的信息，请键入 @kbd{C-h L} (@code{describe-language-environment})。  这将显示一个帮助缓冲区，描述该语言环境支持的语言，并列出关联的字符集、编码系统和输入方法，以及该语言环境的一些示例文本。
+
+命令@kbd{C-h h} (@code{view-hello-file}) 显示文件@file{etc/HELLO}，该文件通过展示如何用多种语言说“hello”来演示各种字符集。
+
+命令@kbd{C-h I} (@code{describe-input-method}) 描述了一种输入法——可以是指定的输入法，也可以是默认当前使用的输入法。  @xref{Input Methods}。
+
+命令@kbd{C-h C} (@code{describe-coding-system}) 描述编码系统——指定的编码系统或当前使用的编码系统。  @xref{Coding Systems}。
+
+@node Misc Help
+@section 其他帮助命令
+
+@kindex C-h i
+@kindex C-h 4 i
+@findex info
+@findex info-other-window
+@cindex Info
+@cindex manuals, included
+@kbd{C-h i} (@code{info}) 运行 Info 程序，该程序浏览结构化文档文件。  @kbd{C-h 4 i} (@code{info-other-window}) 执行相同操作，但在另一个窗口中显示信息缓冲区。  整个 Emacs 手册以及 GNU 系统的许多其他手册都可以在 Info 中找到。  输入 Info 后键入 @kbd{h} 以运行有关使用 Info 的教程。
+
+@cindex find Info manual by its file name
+使用数字参数@var{n}，@kbd{C-h i} 选择信息缓冲区@samp{*info*<@var{n}>}。  如果您想同时浏览多个信息手册，这非常有用。  如果您仅指定 @kbd{C-u} 作为前缀参数，@kbd{C-h i} 会提示输入文档文件的名称，以便您可以浏览顶级信息菜单中没有条目的文件。
+
+如上所述，帮助命令 @kbd{C-h F @var{function} @key{RET}} 和 @kbd{C-h K @var{key}} 输入 Info 并直接转到 @var{function} 或 @var{key} 的文档。
+
+@kindex C-h S
+@findex info-lookup-symbol
+编辑程序时，如果您有该编程语言手册的信息版本，则可以使用 @kbd{C-h S} (@code{info-lookup-symbol}) 在适当的手册中查找符号（关键字、函数或变量）的条目。  该命令如何工作的详细信息取决于主要模式。
+
+@kindex C-h l
+@findex view-lossage
+@findex lossage-size
+如果发生令人惊讶的事情，并且您不确定输入的内容，请使用 @kbd{C-h l} (@code{view-lossage})。  @kbd{C-h l} 显示您最后一次输入的击键及其调用的命令。  默认情况下，Emacs 会存储最近 300 次击键；如果您愿意，可以使用命令 @code{lossage-size} 更改此数字。如果您看到不熟悉的命令，请使用 @kbd{C-h k}，或按 @kbd{RET} 或单击它们以了解它们的用途。
+
+@vindex view-lossage-auto-refresh
+默认情况下，一旦显示丢失缓冲区，它就不会显示显示后要键入的击键和命令。  但是，如果您将变量@code{view-lossage-auto-refresh}设置为值@code{t}，则当您键入更多命令时，丢失缓冲区将不断刷新。  或者，您可以使用前缀参数调用@code{view-lossage}，如@kbd{C-u C-h l}所示，以显示丢失缓冲区并随后自动刷新。
+
+@kindex C-h e
+@findex view-echo-area-messages
+要查看最近的回波区域消息，请使用 @kbd{C-h e} (@code{view-echo-area-messages})。  这将显示缓冲区@file{*Messages*}，其中保存了这些消息。
+
+@kindex C-h m
+@findex describe-mode
+每个 Emacs 主要模式通常都会重新定义一些键，并对编辑的工作方式进行其他更改。  @kbd{C-h m} (@code{describe-mode}) 显示有关当前主要模式的文档，该文档通常描述在此模式下更改的命令和功能及其键绑定。
+
+@kindex C-h b
+@findex describe-bindings
+@kindex C-h s
+@findex describe-syntax
+@kbd{C-h b} (@code{describe-bindings}) 和 @kbd{C-h s} (@code{describe-syntax}) 显示有关 Emacs 中当前环境的其他信息。  @kbd{C-h b} 显示现在有效的所有键绑定的列表：首先是当前次要模式的本地绑定，然后是当前主模式定义的本地绑定，最后是全局绑定 (@pxref{Key Bindings})。  @kbd{C-h s} 显示语法表的内容，以及每个字符语法的说明 (@pxref{Syntax Tables,, Syntax Tables, elisp, The Emacs Lisp Reference Manual})。
+
+@kindex C-h C-q
+@findex help-quick-toggle
+@findex help-quick
+@cindex cheat sheet of popular Emacs commands
+@kbd{C-h C-q} (@code{help-quick-toggle}) 打开和关闭缓冲区的显示，显示最流行的 Emacs 命令及其各自的键绑定（又名@:“备忘单”）。  该缓冲区的内容由命令 @code{help-quick} 创建。  此缓冲区中显示的每个键绑定都是一个按钮：使用 @kbd{mouse-1} 或 @kbd{mouse-2} 单击它可显示绑定到该键序列的命令的文档。
+
+@findex describe-prefix-bindings
+您可以通过在前缀键后键入 @kbd{C-h}、@kbd{?} 或 @key{F1} (@code{describe-prefix-bindings}) 来获取特定前缀键的子命令列表。  （有一些前缀键并非所有这些键都适用 - 那些为该键提供自己的绑定的前缀键。这些前缀键之一是 @key{ESC}，因为 @kbd{@key{ESC} C-h} 和 @kbd{@key{ESC} ?} 实际上分别是 @kbd{C-M-h} (@code{mark-defun}) 和 @kbd{M-?} (@code{xref-find-references})。但是，@w{@kbd{@key{ESC} @key{F1}}} 工作得很好。）
+
+@findex describe-keymap
+最后，@kbd{M-x describe-keymap} 提示输入键盘映射的名称并完成，并显示该键盘映射中所有键绑定的列表。
+
+@node Help Files
+@section 帮助文件
+
+除了内置文档和手册之外，Emacs 还包含其他几个描述主题的文件，例如复制条件、发行说明、调试和报告错误的说明等。您可以使用以下命令来查看这些文件。  除了@kbd{C-h g}之外，它们都具有@kbd{C-h C-@var{char}}的形式。
+
+@kindex C-h C-c
+@findex describe-copying
+@kindex C-h C-d
+@findex view-emacs-debugging
+@kindex C-h C-e
+@findex view-external-packages
+@kindex C-h C-f
+@findex view-emacs-FAQ
+@kindex C-h g
+@findex describe-gnu-project
+@kindex C-h C-m
+@findex view-order-manuals
+@kindex C-h C-n
+@findex view-emacs-news
+@kindex C-h C-o
+@findex describe-distribution
+@kindex C-h C-p
+@findex view-emacs-problems
+@kindex C-h C-t
+@findex view-emacs-todo
+@kindex C-h C-w
+@findex describe-no-warranty
+
+@table @kbd
+@item C-h C-c
+显示您可以复制和重新分发 Emacs 的规则 (@code{describe-copying})。
+@item C-h C-d
+显示调试 Emacs 的帮助 (@code{view-emacs-debugging})。
+@item C-h C-e
+显示有关从哪里获取外部包的信息 (@code{view-external-packages})。
+@item C-h C-f
+显示 Emacs 常见问题解答列表 (@code{view-emacs-FAQ})。
+@item C-h g
+访问 @uref{https://www.gnu.org, page}，了解有关 GNU 项目 (@code{describe-gnu-project}) 的信息。
+@item C-h C-m
+显示有关订购 Emacs 手册印刷版的信息 (@code{view-order-manuals})。
+@item C-h C-n
+显示新闻，其中列出了此版本 Emacs 中的新功能 (@code{view-emacs-news})。
+@item C-h C-o
+显示如何订购或下载最新版本的 Emacs 和其他 GNU 软件 (@code{describe-distribution})。
+@item C-h C-p
+显示已知 Emacs 问题的列表，有时还提供建议的解决方法 (@code{view-emacs-problems})。
+@item C-h C-t
+显示 Emacs 待办事项列表 (@code{view-emacs-todo})。
+@item C-h C-w
+显示 GNU Emacs 完全没有保修的完整详细信息 (@code{describe-no-warranty})。
+@end table
+
+@node Help Echo
+@section 有关活动文本和工具提示的帮助
+
+@cindex tooltip help
+@cindex balloon help
+@cindex active text
+在 Emacs 中，@dfn{active text}（响应鼠标单击或 @key{RET} 执行某些特殊操作的文本）通常具有关联的帮助文本。  这包括 Emacs 缓冲区中的超链接以及部分模式行。  在图形显示器以及一些支持鼠标跟踪的文本终端上，将鼠标移动到活动文本上会将帮助文本显示为@dfn{tooltip}。 @xref{Tooltips}。
+
+@kindex C-h .
+@findex display-local-help
+@vindex help-at-pt-display-when-idle
+@vindex eldoc-help-at-pt
+在不支持鼠标跟踪的终端上，您可以通过键入 @kbd{C-h .} (@code{display-local-help}) 显示当前活动缓冲区文本的帮助文本。  这会在回显区域显示帮助文本。  要在可用时自动显示帮助文本，请将变量 @code{help-at-pt-display-when-idle} 设置为 @code{t}。  如果您使用 Eldoc，请将变量 @code{eldoc-help-at-pt} 设置为 @code{t}。

@@ -1,0 +1,718 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1987, 1993--1995, 1997, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node X Resources
+@appendix X 选项和资源
+
+您可以使用 X 资源自定义 Emacs 行为的一些与 X 相关的方面，就像使用 X 的程序一样。
+
+当使用 GTK+ 支持编译 Emacs 时，各种图形小部件（例如菜单栏、滚动条和对话框）的外观由下式确定：
+@ifnottex
+GTK+ resources, which we will also describe.
+@end ifnottex
+@iftex
+GTK+ resources.
+@end iftex
+当 Emacs 在没有 GTK+ 支持的情况下构建时，这些小部件的外观由额外的 X 资源决定。
+
+在 MS-Windows 上，您可以使用系统注册表 (@pxref{MS-Windows Registry}) 自定义一些相同的方面。
+
+@menu
+* Resources::            在 Emacs 中使用 X 资源（一般情况）。
+* Table of Resources::   影响 Emacs 的特定 X 资源表。
+* Lucid Resources::      Lucid 菜单的 X 资源。
+* Motif Resources::      Motif 和 LessTif 菜单的 X 资源。
+* GTK resources::        GTK+ 小部件的资源。
+@end menu
+
+@node Resources
+@appendixsec X资源
+@cindex resources
+@cindex X resources
+@cindex @file{~/.Xdefaults} file
+@cindex @file{~/.Xresources} file
+
+在 X Window 系统下运行的程序在类和资源的层次结构下组织其用户选项。  您可以在 @dfn{X resource file} 中指定这些选项的默认值，通常命名为 ⁣​​1⁣ 或 @file{~/.Xresources}。  该文件中的更改不会立即生效，因为 X 服务器存储自己的资源列表；要更新它，请使用命令@command{xrdb}——例如，@samp{xrdb ~/.Xdefaults}。
+
+通过 X 资源指定的设置通常会覆盖 Emacs 初始化文件 (@pxref{Init File}) 中的等效设置，特别是初始框架的参数 (@pxref{Frame Parameters})。
+
+@cindex registry, setting resources (MS-Windows)
+（MS-Windows 系统不支持 X 资源文件；在此类系统上，Emacs 在 Windows 注册表中查找 X 资源，首先在键 @samp{HKEY_CURRENT_USER\SOFTWARE\GNU\Emacs} 下查找，这仅影响当前用户并覆盖系统范围的设置，然后在键 @samp{HKEY_LOCAL_MACHINE\SOFTWARE\GNU\Emacs} 下查找，这会影响系统的所有用户。菜单和滚动条是 MS-Windows 上的本机小部件，因此它们只能通过显示控制面板中的系统范围设置进行自定义。您还可以使用@samp{-xrm} 命令行选项，如下所述。）
+
+X 资源文件中的每一行指定一个选项或一组相关选项的值。  行在文件中出现的顺序并不重要。  每个资源规范由@dfn{program name}和@dfn{resource name}组成。  每个名称的大小写区别都很重要。  这是一个例子：
+
+@example
+emacs.cursorColor: dark green
+@end example
+
+程序名称是资源应用到的可执行文件的名称。  对于 Emacs，这通常是 @samp{emacs}。  要指定适用于所有 Emacs 实例的定义，无论 Emacs 可执行文件的名称如何，请使用 @samp{Emacs}。
+
+资源名称是程序设置的名称。  例如，Emacs 识别控制文本光标颜色的 @samp{cursorColor} 资源。
+
+资源被分组为命名的类。  例如，@samp{Foreground}类包含@samp{cursorColor}、@samp{foreground}和@samp{pointerColor}资源(@pxref{Table of Resources})。  您可以使用类名来指定该类中所有资源的默认值，而不是使用资源名称，如下所示：
+
+@example
+emacs.Foreground: dark green
+@end example
+
+如果您将变量 @code{inhibit-x-resources} 设置为非 @code{nil} 值，Emacs 根本不会处理 X 资源。  如果您使用 @samp{-Q}（或 @samp{--quick}）命令行选项调用 Emacs，@code{inhibit-x-resources} 将自动设置为 @code{t} (@pxref{Initial Options})。
+
+@ifnottex
+  In addition, you can use the following command-line options to
+override the X resources file:
+
+@table @samp
+@item -name @var{name}
+@opindex --name
+@itemx --name=@var{name}
+@cindex resource name, command-line argument
+This option sets the program name of the initial Emacs frame to
+@var{name}.  It also sets the title of the initial frame to
+@var{name}.  This option does not affect subsequent frames.
+
+If you don't specify this option, the default is to use the Emacs
+executable's name as the program name.
+
+For consistency, @samp{-name} also specifies the name to use for other
+resource values that do not belong to any particular frame.
+
+The resources that name Emacs invocations also belong to a class,
+named @samp{Emacs}.  If you write @samp{Emacs} instead of
+@samp{emacs}, the resource applies to all frames in all Emacs jobs,
+regardless of frame titles and regardless of the name of the
+executable file.
+
+@item -xrm @var{resource-value}
+@opindex --xrm
+@itemx --xrm=@var{resource-value}
+@cindex resource values, command-line argument
+This option specifies X resource values for the present Emacs job.
+
+@var{resource-value} should have the same format that you would use
+inside a file of X resources.  Several @samp{-xrm} options are
+possible to include multiple resource specifications.  You can also
+use @samp{#include "@var{filename}"} as @var{resource-value} to
+include a file full of resource specifications.  Resource values
+specified with @samp{-xrm} take precedence over all other resource
+specifications.
+@end table
+@end ifnottex
+
+@node Table of Resources
+@appendixsec Emacs 的 X 资源表
+
+下表列出了 Emacs 识别的 X 资源名称。请注意，某些资源在使用各种 X 工具包（GTK+、Lucid 等）编译的 Emacs 中不起作用——我们会在下面指出这种情况。
+
+@table @asis
+@item @code{alpha}（类@code{Alpha}）
+设置 @samp{alpha} 帧参数，确定帧透明度 (@pxref{Frame Parameters,,, elisp, The Emacs Lisp Reference Manual})。
+
+@item @code{alphaBackground}（类@code{AlphaBackground}）
+设置 @samp{alpha-background} 帧参数，确定背景透明度 (@pxref{Frame Parameters,,, elisp, The Emacs Lisp Reference Manual})。
+
+@item @code{background}（类@code{Background}）
+背景颜色 (@pxref{Colors})。
+
+@item @code{bitmapIcon}（类@code{BitmapIcon}）
+告诉窗口管理器显示 Emacs 图标 if @samp{on};如果 @samp{off} 则不要这样做。  @xref{Icons X}，有关图标的说明。
+
+@ifnottex
+@item @code{borderColor} (class @code{BorderColor})
+Color of the frame's external border.  This has no effect if Emacs is
+compiled with GTK+ support.
+
+@item @code{borderWidth} (class @code{BorderWidth})
+Width of the frame's external border, in pixels.  This has no effect
+if Emacs is compiled with GTK+ support.
+@end ifnottex
+
+@item @code{cursorBlink}（类@code{CursorBlink}）
+如果启动时此资源的值为 @samp{off} 或 @samp{false} 或 @samp{0}，Emacs 将禁用闪烁光标模式 (@pxref{Cursor Display})。
+
+@item @code{cursorColor}（类@code{Foreground}）
+文本光标颜色。  如果在 Emacs 启动时指定了该资源，Emacs 会将其值设置为 @code{cursor} 面 (@pxref{Faces}) 的背景颜色。
+
+@item @code{font}（类@code{Font}）
+@code{default} 面 (@pxref{Fonts}) 的字体名称。  您还可以指定字体集名称 (@pxref{Fontsets})。
+
+@item @code{fontBackend}（类@code{FontBackend}）
+用于绘制字体的后端的逗号分隔列表（按优先顺序排列）。  例如，值 @samp{x,xft} 告诉 Emacs 使用 X 核心字体驱动程序绘制字体，如果失败则返回到 Xft 字体驱动程序。  通常，您应该保留此资源未设置，在这种情况下，Emacs 会尝试使用所有可用的字体后端。
+
+@item @code{foreground}（类@code{Foreground}）
+文本的默认前景色。
+
+@item @code{fullscreen}（类@code{Fullscreen}）
+所需的全屏尺寸。  该值可以是 @code{fullboth}、@code{maximized}、@code{fullwidth} 或 @code{fullheight} 之一，对应于命令行选项 @samp{-fs}、@samp{-mm}、@samp{-fw} 和 @samp{-fh} (@pxref{Window Size X})。  请注意，这仅适用于初始帧。
+
+@item @code{geometry}（类@code{Geometry}）
+窗口大小和位置。  该值应该是大小和位置规范，其形式与 @samp{-g} 或 @samp{--geometry} 命令行选项 (@pxref{Window Size X}) 中的形式相同。
+
+该大小适用于 Emacs 会话中的所有框架，但该位置仅适用于初始 Emacs 框架（或者，对于特定框架名称的资源，仅适用于该框架）。
+
+请注意不要将此资源指定为 @samp{emacs*geometry}，因为这可能会影响各个菜单以及主 Emacs 框架。
+
+@ifnottex
+@item @code{horizontalScrollBars} (class @code{ScrollBars})
+If the value of this resource is @samp{off} or @samp{false} or
+@samp{0}, Emacs disables Horizontal Scroll Bar mode at startup
+(@pxref{Scroll Bars}).
+
+@item @code{iconName} (class @code{Title})
+Name to display in the icon.
+
+@item @code{internalBorder} (class @code{BorderWidth})
+Width of the internal frame border, in pixels.
+@end ifnottex
+
+@item @code{lineSpacing}（类@code{LineSpacing}）
+@cindex line spacing (X resource)
+行之间的额外空间（以像素为单位）。
+
+@ifnottex
+@item @code{menuBackground} (class @code{Background})
+@cindex background for menus (X resource)
+The background color of the menus in non-toolkit versions of Emacs.
+(For toolkit versions, see @ref{Lucid Resources}, also see @ref{Motif
+Resources}, and see @ref{GTK resources}.)
+@end ifnottex
+
+@item @code{menuBar}（类@code{MenuBar}）
+@cindex menu bar (X resource)
+如果此资源的值为 @samp{off} 或 @samp{false} 或 @samp{0}，Emacs 将在启动时禁用菜单栏模式 (@pxref{Menu Bars})。
+
+@ifnottex
+@item @code{minibuffer} (class @code{Minibuffer})
+If @samp{none}, Emacs will not make a minibuffer in this frame; it
+will use a separate minibuffer frame instead.
+
+@item @code{paneFont} (class @code{Font})
+@cindex font for menus (X resource)
+Font name for menu pane titles, in non-toolkit versions of Emacs.
+(For toolkit versions, see @ref{Lucid Resources}, also see @ref{Motif
+Resources}, and see @ref{GTK resources}.)
+
+@item @code{paneForeground} (class @code{Foreground})
+@cindex foreground for menus (X resource)
+Foreground color for menu pane titles, in non-toolkit versions of
+Emacs.  (For toolkit versions, see @ref{Lucid Resources}, also see
+@ref{Motif Resources}, and see @ref{GTK resources}.)
+@end ifnottex
+
+@item @code{pointerColor}（类@code{Foreground}）
+鼠标光标的颜色。  这在许多图形桌面环境中没有效果，因为它们不允许 Emacs 以这种方式更改鼠标光标。
+
+@ifnottex
+@item @code{privateColormap} (class @code{PrivateColormap})
+If @samp{on}, use a private color map, in the case where the default
+visual of class PseudoColor and Emacs is using it.
+
+@item @code{reverseVideo} (class @code{ReverseVideo})
+Switch foreground and background default colors if @samp{on}, use colors as
+specified if @samp{off}.
+
+@item @code{screenGamma} (class @code{ScreenGamma})
+@cindex gamma correction (X resource)
+Gamma correction for colors, equivalent to the frame parameter
+@code{screen-gamma}.
+
+@item @code{scrollBar} (class @code{ScrollBar})
+@cindex scroll bar (X resource)
+If the value of this resource is @samp{off} or @samp{false} or
+@samp{0}, Emacs disables Scroll Bar mode at startup (@pxref{Scroll Bars}).
+
+@item @code{scrollBarWidth} (class @code{ScrollBarWidth})
+@cindex scrollbar width (X resource)
+The scroll bar width in pixels, equivalent to the frame parameter
+@code{scroll-bar-width}.  Do not set this resource if Emacs is
+compiled with GTK+ support.
+@end ifnottex
+
+@ifnottex
+@item @code{selectionFont} (class @code{SelectionFont})
+Font name for pop-up menu items, in non-toolkit versions of Emacs.  (For
+toolkit versions, see @ref{Lucid Resources}, also see @ref{Motif
+Resources}, and see @ref{GTK resources}.)
+
+@item @code{selectionForeground} (class @code{SelectionForeground})
+Foreground color for pop-up menu items, in non-toolkit versions of
+Emacs.  (For toolkit versions, see @ref{Lucid Resources}, also see
+@ref{Motif Resources}, and see @ref{GTK resources}.)
+
+@item @code{selectionTimeout} (class @code{SelectionTimeout})
+Number of milliseconds to wait for a selection reply.
+If the selection owner doesn't reply in this time, we give up.
+A value of 0 means wait as long as necessary.
+
+@item @code{synchronous} (class @code{Synchronous})
+@cindex debugging X problems
+@cindex synchronous X mode
+Run Emacs in synchronous mode if @samp{on}.  Synchronous mode is
+useful for debugging X problems.
+@end ifnottex
+
+@item @code{title}（类@code{Title}）
+显示在初始 Emacs 框架的标题栏中的名称。
+
+@item @code{toolBar}（类@code{ToolBar}）
+@cindex tool bar (X resource)
+如果此资源的值为 @samp{off} 或 @samp{false} 或 @samp{0}，Emacs 将在启动时禁用工具栏模式 (@pxref{Tool Bars})。
+
+@item @code{tabBar}（类@code{TabBar}）
+@cindex tab bar (X resource)
+如果此资源的值为 @samp{on} 或 @samp{yes} 或 @samp{1}，Emacs 将在启动时启用选项卡栏模式 (@pxref{Tab Bars})。
+
+@item @code{useXIM}（类@code{UseXIM}）
+@cindex XIM (X resource)
+@cindex X input methods (X resource)
+@cindex input methods, X
+如果 @samp{false} 或 @samp{off}，则禁用 X 输入法 (XIM)。仅当您的 Emacs 是使用 XIM 支持构建的时，这才有意义。  在缓慢的 X 客户端/服务器链接上关闭 XIM 可能很有用。
+
+@item @code{inputStyle}（类@code{InputStyle}）
+@cindex inputStyle (X resource)
+@cindex input method style, X
+此资源控制如何显示 X 输入法生成的预览文本。  它的值可以是以下之一：
+
+@table @samp
+@item callback
+显示当前缓冲区中预览文本的内容。
+
+@item offthespot
+在 Emacs 提供的显示的单独区域内显示预览文本。
+
+@item overthespot
+在当前窗口中的点位置的弹出窗口内显示预览文本。
+
+@item none
+让输入法决定如何显示自己。  这通常相当于 @samp{overthespot}，但它可能适用于更多输入法。
+
+@item native
+使用工具包处理输入法。  目前仅在 GTK 上实现。
+
+@item root
+使用特定于输入法的显示器上的某个位置来显示预览文本。
+@end table
+
+@item @code{synchronizeResize} (class @code{SynchronizeResize})
+如果为 @samp{off} 或 @samp{false}，Emacs 将不会尝试告诉窗口管理器何时完成了响应框架大小调整的重绘显示。  否则，窗口管理器将推迟绘制刚刚调整大小的框架，直到更新其内容，这会阻止显示尚未绘制的框架的空白区域。  如果设置为@samp{extended}，它将启用替代帧同步协议，某些不支持 Emacs 默认使用的协议的合成窗口管理器可能支持该协议，并导致 Emacs 在使用兼容的合成窗口管理器时将显示与显示器刷新率同步。
+
+@item @code{verticalScrollBars} (class @code{ScrollBars})
+如果@samp{left}，则在左侧赋予框架滚动条；如果@samp{right}，则在右侧赋予框架滚动条；如果 @samp{off} (@pxref{Scroll Bars})，则没有滚动条。
+
+@ifnottex
+@item @code{visualClass} (class @code{VisualClass})
+The @dfn{visual class} for X color display.  If specified, the value
+should start with one of @samp{TrueColor}, @samp{PseudoColor},
+@samp{DirectColor}, @samp{StaticColor}, @samp{GrayScale}, and
+@samp{StaticGray}, followed by @samp{-@var{depth}}, where @var{depth}
+is the number of color planes.
+@end ifnottex
+@end table
+
+您还可以使用 X 资源来自定义各个 Emacs 界面 (@pxref{Faces})。  例如，设置资源@samp{@var{face}.attributeForeground}相当于自定义面@var{face}的@samp{foreground}属性。  但是，我们建议在 Emacs 中自定义面孔，而不是使用 X 资源。  @xref{Face Customization}。
+
+@ifnottex
+@node Lucid Resources
+@appendixsec Lucid Menu And Dialog X Resources
+@cindex Menu X Resources (Lucid widgets)
+@cindex Dialog X Resources (Lucid widgets)
+@cindex Lucid Widget X Resources
+
+  If Emacs is compiled with the X toolkit support using Lucid widgets,
+you can use X resources to customize the appearance of the menu bar
+(@pxref{Menu Bar}), pop-up menus, and dialog boxes (@pxref{Dialog
+Boxes}).  The resources for the menu bar fall in the
+@samp{pane.menubar} class (following, as always, either the name of
+the Emacs executable or @samp{Emacs} for all Emacs invocations).  The
+resources for the pop-up menu are in the @samp{menu*} class.  The
+resources for dialog boxes are in the @samp{dialog*} class.
+
+  For example, to display menu bar entries with the @samp{Courier-12}
+font (@pxref{Fonts}), write this:
+
+@example
+Emacs.pane.menubar.font: Courier-12
+@end example
+
+@noindent
+Lucid widgets can display multilingual text in your locale.  To enable
+this, specify a @code{fontSet} resource instead of a @code{font}
+resource.  @xref{Fontsets}.  If both @code{font} and @code{fontSet}
+resources are specified, the @code{fontSet} resource is used.
+
+Here is a list of resources for menu bars, pop-up menus, and dialogs:
+
+@table @code
+@item font
+Font for menu item text.
+@item fontSet
+Fontset for menu item text.
+@item background
+Background color.
+@item buttonForeground
+Foreground color for a selected item.
+@item foreground
+Foreground color.
+@item disabledForeground
+Foreground color for a disabled menu item.
+@item highlightForeground
+Foreground color for a menu item highlighted by the mouse or key
+navigation.
+@item highlightBackground
+Background color for a menu item highlighted by the mouse or key
+navigation.
+@ifnottex
+@item horizontalSpacing
+Horizontal spacing in pixels between items.  Default is 3.
+@item verticalSpacing
+Vertical spacing in pixels between items.  Default is 2.
+@item arrowSpacing
+Horizontal spacing between the arrow (which indicates a submenu) and
+the associated text.  Default is 10.
+@item shadowThickness
+Thickness of shadow lines for 3D buttons, arrows, and other graphical
+elements.  Default is 1.
+@item borderThickness
+Thickness of the external borders of the menu bars and pop-up menus.
+Default is 1.
+@item cursor
+Name of the cursor to use in the menu bars and pop-up menus.  Default
+is @code{"right_ptr"}.
+@end ifnottex
+@item margin
+菜单栏的边距（以字符为单位）。  默认值为 1。
+@end table
+
+@node Motif Resources
+@appendixsec 主题菜单 X 资源
+@cindex Menu X Resources (Motif widgets)
+@cindex Motif Widget X Resources
+
+如果 Emacs 是使用 Motif 或 LessTif 小部件使用 X 工具包支持进行编译的，则可以使用 X 资源来自定义菜单栏 (@pxref{Menu Bar})、弹出菜单和对话框 (@pxref{Dialog Boxes}) 的外观。  然而，资源的组织方式与 Lucid 小部件不同。
+
+菜单栏的资源名称位于 @samp{pane.menubar} 类中，必须按以下形式指定：
+
+@smallexample
+Emacs.pane.menubar.@var{subwidget}.@var{resource}: @var{value}
+@end smallexample
+
+@noindent
+对于弹出菜单，资源位于 @samp{menu*} 类中，而不是 @samp{pane.menubar} 中。  对于对话框，它们位于 @samp{dialog} 中。在每种情况下，每个单独的菜单字符串都是一个子小部件；子窗口小部件的名称与菜单项字符串相同。  例如，菜单栏中的@samp{File}菜单是一个名为@samp{emacs.pane.menubar.File}的子窗口小部件。
+
+通常，您希望为整个菜单栏指定相同的资源。  为此，请使用 @samp{*} 而不是特定的子小部件名称。例如，要为所有菜单栏项（包括子菜单）指定字体 @samp{8x16}，请编写以下内容：
+
+@smallexample
+Emacs.pane.menubar.*.fontList: 8x16
+@end smallexample
+
+子菜单中的每个项目也有自己的 X 资源名称；例如，@samp{File}子菜单有一个名为@samp{Save (current buffer)}的项目。  子菜单项的资源规范如下所示：
+
+@smallexample
+Emacs.pane.menubar.popup_*.@var{menu}.@var{item}.@var{resource}: @var{value}
+@end smallexample
+
+@noindent
+例如，以下是如何指定 @samp{Save (current buffer)} 项的字体：
+
+@smallexample
+Emacs.pane.menubar.popup_*.File.Save (current buffer).fontList: 8x16
+@end smallexample
+
+@noindent
+对于二级子菜单中的项目，例如@samp{Tools}下@samp{Spell Checking}下的@samp{Complete Word}，资源适合此模板：
+
+@smallexample
+Emacs.pane.menubar.popup_*.popup_*.@var{menu}.@var{resource}: @var{value}
+@end smallexample
+
+@noindent
+例如，
+
+@smallexample
+Emacs.pane.menubar.popup_*.popup_*.Spell Checking.Complete Word: @var{value}
+@end smallexample
+
+@noindent
+（这应该是一根很长的线。）
+
+如果您希望子菜单项看起来与菜单栏本身不同，则必须首先为所有子菜单项指定资源，然后单独覆盖子菜单的值。  这是一个例子：
+
+@smallexample
+Emacs.pane.menubar.*.fontList: 9x18
+Emacs.pane.menubar.popup_*.fontList: 8x16
+@end smallexample
+
+要为 LessTif 文件选择框指定资源，请使用 @samp{fsb*}，如下所示：
+
+@example
+Emacs.fsb*.fontList: 8x16
+@end example
+
+以下是 LessTif 菜单栏和弹出菜单的资源列表：
+
+@table @code
+@item armColor
+武装按钮中显示的颜色。
+@item fontList
+要使用的字体。
+@item marginBottom
+@itemx marginHeight
+@itemx marginLeft
+@itemx marginRight
+@itemx marginTop
+@itemx marginWidth
+边框内项目周围留出的空间量。
+@item borderWidth
+菜单项四周边框的宽度。
+@item shadowThickness
+边框阴影的宽度。
+@item bottomShadowColor
+底部和右侧边框阴影的颜色。
+@item topShadowColor
+顶部和左侧边框阴影的颜色。
+@end table
+@end ifnottex
+
+@node GTK resources
+@appendixsec GTK+ 资源
+@cindex GTK+ resources
+@cindex resource files for GTK+
+@cindex @file{~/.gtkrc-2.0} file
+@cindex @file{~/.emacs.d/gtkrc} file
+
+如果 Emacs 是使用 GTK+ 工具包支持编译的，则自定义其 GTK+ 小部件（例如菜单、对话框、工具栏和滚动条）的最简单方法是选择适当的 GTK+ 主题，例如使用 GNOME 主题选择器。
+
+在 GTK+ 版本 2 中，您还可以使用 @dfn{GTK+ resources} 自定义 Emacs 使用的 GTK+ 小部件的外观。  这些资源在文件 @file{~/.emacs.d/gtkrc}（对于 Emacs 特定的 GTK+ 资源）或 @file{~/.gtkrc-2.0}（对于通用 GTK+ 资源）中指定。  我们建议使用 @file{~/.emacs.d/gtkrc}，因为当使用 GNOME@. 运行 GConf 时，GTK+ 似乎会忽略 @file{~/.gtkrc-2.0}，但请注意，某些 GTK+ 主题可能会覆盖 @file{~/.emacs.d/gtkrc} 中的自定义设置；我们对此无能为力。  GTK+ 资源不会影响与 GTK+ 小部件无关的 Emacs 方面，例如主 Emacs 窗口中的字体和颜色；这些由普通 X 资源 (@pxref{Resources}) 控制。
+
+以下部分描述如何为 Emacs 定制 GTK+ 资源。  有关 GTK+ 资源的详细信息，请参阅 GTK+ API 文档@uref{https://developer-old.gnome.org/gtk2/stable/gtk2-Resource-Files.html}。
+
+在 GTK+ 版本 3 中，GTK+ 资源已被完全不同的系统所取代。  GTK+ 小部件的外观现在由类似 CSS 的样式文件确定：GTK+ 安装目录中的@file{gtk-3.0/gtk.css}，以及本地样式设置的@file{~/.themes/@var{theme}/gtk-3.0/gtk.css}（其中@var{theme} 是当前 GTK+ 主题的名称）。  因此，本节中对 GTK+ 资源的描述不适用于 GTK+ 3。有关 GTK+ 3 样式系统的详细信息，请参见@uref{https://developer-old.gnome.org/gtk3/3.0/GtkCssProvider.html}。
+
+@menu
+* GTK Resource Basics::    GTK+资源的基本使用。
+* GTK Widget Names::       GTK+ 小部件的命名方式。
+* GTK Names in Emacs::     Emacs 使用的 GTK+ 小部件。
+* GTK styles::             GTK+ 小部件中可以自定义哪些内容。
+@end menu
+
+@node GTK Resource Basics
+@appendixsubsec GTK+ 资源基础知识
+
+在 GTK+ 2 资源文件（通常为@file{~/.emacs.d/gtkrc}）中，最简单的资源设置只是将值分配给变量。  例如，将以下行放入资源文件中会将所有 GTK+ 小部件上的字体更改为 @samp{courier-12}：
+
+@smallexample
+gtk-font-name = "courier 12"
+@end smallexample
+
+@noindent
+请注意，在这种情况下，字体名称必须作为 GTK 字体模式（也称为 @dfn{Pango font name}）提供，而不是作为 Fontconfig 样式字体名称或 XLFD@. @xref{Fonts}。
+
+要自定义小部件，您首先需要定义 @dfn{style}，然后将该样式应用于小部件。  这是设置菜单字体的示例（@samp{#}字符表示注释）：
+
+@smallexample
+# @r{Define the style @samp{my_style}.}
+style "my_style"
+@{
+  font_name = "helvetica bold 14"
+@}
+
+# @r{Specify that widget type @samp{*emacs-menuitem*} uses @samp{my_style}.}
+widget "*emacs-menuitem*" style "my_style"
+@end smallexample
+
+@noindent
+此示例中的小部件名称包含通配符，因此该样式将应用于所有匹配 @samp{*emacs-menuitem*} 的小部件。  小部件根据它们的包含方式来命名，从外部小部件到内部小部件。  这是另一个将 @samp{my_style} 专门应用于 Emacs 菜单栏的示例：
+
+@smallexample
+widget "Emacs.pane.menubar.*" style "my_style"
+@end smallexample
+
+这是一个更详细的示例，展示了如何更改滚动条的各个部分：
+
+@smallexample
+style "scroll"
+@{
+  fg[NORMAL] = "red"@ @ @ @ @ # @r{Arrow color.}
+  bg[NORMAL] = "yellow"@ @ # @r{Thumb and background around arrow.}
+  bg[ACTIVE] = "blue"@ @ @ @ # @r{Trough color.}
+  bg[PRELIGHT] = "white"@ # @r{Thumb color when the mouse is over it.}
+@}
+
+widget "*verticalScrollBar*" style "scroll"
+@end smallexample
+
+@node GTK Widget Names
+@appendixsubsec GTK+ 小部件名称
+@cindex GTK+ widget names
+
+GTK+ 小部件由 @dfn{widget name} 和 @dfn{widget class} 指定。  小部件名称指的是特定的小部件（例如，@samp{emacs-menuitem}），而小部件类指的是类似小部件的集合（例如，@samp{GtkMenuItem}）。  小部件总是有一个类，但不需要有名称。
+
+@dfn{Absolute names} 是小部件名称或小部件类的序列，对应于嵌入其他小部件中的小部件的层次结构。  例如，如果名为 @code{top} 的 @code{GtkWindow} 包含名为 @code{box} 的 @code{GtkVBox}，后者又包含名为 @code{menubar} 的 @code{GtkMenuBar}，则菜单栏小部件的绝对类名称为 @code{GtkWindow.GtkVBox.GtkMenuBar}，其绝对小部件名称为 @code{top.box.menubar}。
+
+GTK+ 资源文件可以包含两种类型的用于指定小部件外观的命令：
+
+@table @code
+@item widget
+根据类名或仅根据类指定小部件的样式。
+
+@item widget_class
+根据类名指定小部件的样式。
+@end table
+
+@noindent
+有关使用 @code{widget} 命令的示例，请参阅上一小节； @code{widget_class} 命令的使用方式类似。  请注意，小部件名称/类和样式必须用双引号引起来，并且这些命令必须位于 GTK+ 资源文件的顶层。
+
+如前所述，您可以使用 shell 通配符语法指定小部件名称或类：@samp{*} 匹配零个或多个字符，@samp{?} 匹配一个字符。  此示例为所有小部件分配样式：
+
+@smallexample
+widget "*" style "my_style"
+@end smallexample
+
+@node GTK Names in Emacs
+@appendixsubsec Emacs 中的 GTK+ 小部件名称
+@cindex GTK+ widget names in Emacs
+@cindex GTK+ widget classes
+
+下面列出了 Emacs 框架使用的 GTK+ 小部件：
+
+@table @asis
+@item @code{Emacs}（类@code{GtkWindow}）
+@table @asis
+@item @code{pane}（类@code{GtkVBox}）
+@table @asis
+@item @code{menubar}（类@code{GtkMenuBar}）
+@table @asis
+@item [菜单项小部件]
+@end table
+@item [未命名小部件]（类@code{GtkHandleBox}）
+@table @asis
+@item @code{emacs-toolbar}（类@code{GtkToolbar}）
+@table @asis
+@item [工具栏项目小部件]
+@end table
+@end table
+@item @code{emacs}（类@code{GtkFixed}）
+@table @asis
+@item @code{verticalScrollBar}（类@code{GtkVScrollbar}）
+@end table
+@end table
+@end table
+@end table
+
+@noindent
+Emacs 窗口的内容在 @code{emacs} 小部件中绘制。请注意，即使有多个 Emacs 窗口，每个滚动条小部件也被命名为 ⁣​​1⁣。
+
+例如，以下是设置菜单栏样式的两种不同方法：
+
+@smallexample
+widget "Emacs.pane.menubar.*" style "my_style"
+widget_class "GtkWindow.GtkVBox.GtkMenuBar.*" style "my_style"
+@end smallexample
+
+对于 GTK+ 对话框，Emacs 使用名为 @code{emacs-dialog} 的类 @code{GtkDialog} 小部件。  对于文件选择，Emacs 使用名为 @code{emacs-filedialog}、属于 @code{GtkFileSelection} 类的小部件。
+
+由于弹出菜单和对话框的小部件是独立窗口，并且不包含在 @code{Emacs} 小部件中，因此它们的 GTK+ 绝对名称不以 @samp{Emacs} 开头。  要自定义这些小部件，请使用如下通配符：
+
+@smallexample
+widget "*emacs-dialog*" style "my_dialog_style"
+widget "*emacs-filedialog* style "my_file_style"
+widget "*emacs-menuitem* style "my_menu_style"
+@end smallexample
+
+如果您想将样式应用于 Emacs 中的所有菜单，请使用以下命令：
+
+@smallexample
+widget_class "*Menu*" style "my_menu_style"
+@end smallexample
+
+@node GTK styles
+@appendixsubsec GTK+ 风格
+@cindex GTK+ styles
+
+以下是两个 GTK+ 样式声明的示例：
+
+@smallexample
+pixmap_path "/usr/share/pixmaps:/usr/include/X11/pixmaps"
+
+style "default"
+@{
+  font_name = "helvetica 12"
+
+  bg[NORMAL] = @{ 0.83, 0.80, 0.73 @}
+  bg[SELECTED] = @{ 0.0, 0.55, 0.55 @}
+  bg[INSENSITIVE] = @{ 0.77, 0.77, 0.66 @}
+  bg[ACTIVE] = @{ 0.0, 0.55, 0.55 @}
+  bg[PRELIGHT] = @{ 0.0, 0.55, 0.55 @}
+
+  fg[NORMAL] = "black"
+  fg[SELECTED] = @{ 0.9, 0.9, 0.9 @}
+  fg[ACTIVE] = "black"
+  fg[PRELIGHT] = @{ 0.9, 0.9, 0.9 @}
+
+  base[INSENSITIVE] = "#777766"
+  text[INSENSITIVE] = @{ 0.60, 0.65, 0.57 @}
+
+  bg_pixmap[NORMAL] = "background.xpm"
+  bg_pixmap[INSENSITIVE] = "background.xpm"
+  bg_pixmap[ACTIVE] = "background.xpm"
+  bg_pixmap[PRELIGHT] = "<none>"
+
+@}
+
+style "ruler" = "default"
+@{
+  font_name = "helvetica 8"
+@}
+
+@end smallexample
+
+样式@samp{ruler}继承自@samp{default}。  这样您就可以在现有样式的基础上进行构建。  字体和颜色的语法如下所述。
+
+如本示例所示，可以根据小部件的 @dfn{state} 指定前景和背景的多个值。  可能的状态有：
+
+@table @code
+@item NORMAL
+这是小部件的默认状态。
+
+@item ACTIVE
+这是准备做某事的小部件的状态。  它也适用于滚动条的槽，即 @code{bg[ACTIVE] = "red"} 将滚动条槽设置为红色。  已布防的按钮（按下但尚未释放）处于此状态。
+
+@item PRELIGHT
+这是当鼠标指针位于小部件上方时可进行操作的状态 - 例如，当鼠标位于滚动条中的滑块上方或菜单项上方时。  当鼠标悬停在未按下的按钮上时，该按钮处于此状态。
+
+@item SELECTED
+这是用户已选择的数据的状态。  它可以是选定的文本或列表中选定的项目。  Emacs 中不使用此状态。
+
+@item INSENSITIVE
+这是可见的小部件的状态，但无法以通常的方式操作它们，例如，无法按下的按钮和禁用的菜单项。  要将禁用的菜单项显示为黄色，请使用 @code{fg[INSENSITIVE] = "yellow"}。
+@end table
+
+以下是样式声明中可以包含的内容：
+
+@table @code
+@item bg[@var{state}] = @var{color}
+这指定了小部件的背景颜色。  请注意，可编辑文本不使用 @code{bg}；它使用 @code{base} 代替。
+
+@item base[@var{state}] = @var{color}
+这指定可编辑文本的背景颜色。  在 Emacs 中，此颜色用于文件对话框中文本字段的背景。
+
+@item bg_pixmap[@var{state}] = "@var{pixmap}"
+这指定图像背景（而不是背景颜色）。 @var{pixmap} 应该是图像文件名。  GTK+ 可以使用多种图像文件格式，包括 XPM、XBM、GIF、JPEG 和 PNG@. 如果您希望小部件使用与其父级相同的图像，请使用 @samp{<parent>}。  如果您不需要任何图像，请使用@samp{<none>}。 @samp{<none>} 是取消从父样式继承的背景图像的方法。
+
+您不能通过绝对文件名来指定文件。  GTK+ 在@code{pixmap_path}指定的目录中查找像素图文件。 @code{pixmap_path} 是双引号内以冒号分隔的目录列表，在 @file{gtkrc} 文件的顶层指定（即不在样式定义内；请参阅上面的示例）：
+
+@smallexample
+pixmap_path "/usr/share/pixmaps:/usr/include/X11/pixmaps"
+@end smallexample
+
+@item fg[@var{state}] = @var{color}
+这指定了小部件要使用的前景色。  它是菜单和按钮中文本的颜色以及滚动条中箭头的颜色。  对于可编辑文本，请使用 @code{text}。
+
+@item text[@var{state}] = @var{color}
+这是可编辑文本的颜色。  在 Emacs 中，此颜色用于文件对话框中的文本字段。
+
+@item font_name = "@var{font}"
+这指定小部件中文本的字体。  @var{font} 是 GTK 样式（或 Pango）字体名称，如 @samp{Sans Italic 10}。 @xref{Fonts}。  名称不区分大小写。
+@end table
+
+有三种方法可以指定颜色：颜色名称、RGB 三元组或 GTK 样式 RGB 三元组。  @xref{Colors}，用于颜色名称和 RGB 三元组的描述。  颜色名称应用双引号引起来，例如 @samp{"red"}。  RGB 三元组应不带双引号，例如 @samp{#ff0000}。  GTK 样式 RGB 三元组的形式为 @w{@code{@{ @var{r}, @var{g}, @var{b} @}}}，其中 @var{r}、@var{g} 和 @var{b} 要么是 0--65535 范围内的整数，要么是 0.0--1.0 范围内的浮点数。

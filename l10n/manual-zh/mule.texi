@@ -1,0 +1,1077 @@
+@c -*- coding: utf-8 -*-
+@c This is part of the Emacs manual.
+@c Copyright (C) 1997, 1999--2026 Free Software Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node International
+@chapter 国际字符集支持
+@c This node is referenced in the tutorial.  When renaming or deleting
+@c it, the tutorial needs to be adjusted.  (TUTORIAL.de)
+@cindex international scripts
+@cindex multibyte characters
+@cindex encoding of characters
+
+@cindex Han
+@cindex Hindi
+@cindex Hangul
+Emacs 支持多种国际字符集，包括拉丁字母表的欧洲和越南语变体，以及阿拉伯文字、婆罗米文字（用于孟加拉语、印地语和泰语等语言）、西里尔文、埃塞俄比亚语、格鲁吉亚语、希腊语、汉字（用于中文和日语）、朝鲜文（用于韩语）、希伯来语和 IPA@. Emacs 还支持其他国际化软件（例如文字处理程序和邮件程序）使用的这些字符的各种编码。
+
+Emacs 通过支持所有相关活动，允许使用国际字符编辑文本：
+
+@itemize @bullet
+@item 
+您可以访问包含非 @acronym{ASCII} 字符的文件，保存非 @acronym{ASCII} 文本，并在 Emacs 和它调用的程序（例如编译器、拼写检查器和邮件程序）之间传递非 @acronym{ASCII} 文本。  设置语言环境 (@pxref{Language Environments}) 负责为特定语言或文化设置编码系统和其他选项。或者，您可以指定 Emacs 如何对每个命令的文本进行编码或解码；参见@ref{Text Coding}。
+
+@item 
+您可以显示由各种脚本编码的非@acronym{ASCII}字符。  这是通过在图形显示上使用适当的字体 (@pxref{Defining Fontsets}) 以及将特殊代码发送到文本显示 (@pxref{Terminal Coding}) 来实现的。  如果某些字符显示不正确，请参阅@ref{Undisplayable Characters}，其中描述了可能出现的问题并解释了如何解决这些问题。
+
+@item 
+文本自然顺序为从右到左的脚本中的字符将重新排序以进行显示 (@pxref{Bidirectional Editing})。这些文字包括阿拉伯语、希伯来语、叙利亚语、塔纳语和其他一些文字。
+
+@item 
+您可以插入非 @acronym{ASCII} 字符或搜索它们。  为此，您可以指定适合您的语言的 Emacs 输入法 (@pxref{Select Input Method})，或使用选择语言环境时设置的默认输入法。  如果您的键盘可以产生非 @acronym{ASCII} 字符，您可以选择适当的键盘编码系统 (@pxref{Terminal Coding})，Emacs 将接受这些字符。  在图形显示上，现代系统通常提供其本机输入法，也可以使用 @kbd{C-x 8} 前缀输入 Latin-1 字符，请参阅 @ref{Unibyte Mode}。
+
+对于 X Window 系统，您的区域设置应设置为适当的值，以确保 Emacs 正确解释键盘输入；参见@ref{Language Environments, locales}和@ref{X Coding}。
+@end itemize
+
+本章的其余部分详细描述了这些问题。
+
+@menu
+* International Chars::      多字节字符的基本概念。
+* Language Environments::    根据您使用的语言进行设置。
+* Input Methods::            输入不在键盘上的文本字符。
+* Select Input Method::      指定您选择的输入法。
+* Coding Systems::           读写文件时的字符集转换等等。
+* Recognize Coding::         Emacs 如何确定要使用哪种转换。
+* Specify Coding::           明确指定文件的编码系统。
+* Output Coding::            选择输出的编码系统。
+* Text Coding::              选择用于文件文本的转换。
+* Communication Coding::     用于进程间通信的编码系统。
+* File Name Coding::         文件@emph{names}的编码系统。
+* X Coding::                 X 输入法的编码系统。
+* Terminal Coding::          指定用于转换终端输入和输出的编码系统。
+* Fontsets::                 字体集是涵盖整个字符范围的字体集合。
+* Defining Fontsets::        定义新的字体集。
+* Modifying Fontsets::       修改现有字体集。
+* Undisplayable Characters::  当字符不显示时。
+* Unibyte Mode::             您可以选择一种欧洲字符集来使用，而不使用多字节字符。
+* Charsets::                 Emacs 如何对其内部字符代码进行分组。
+* Bidirectional Editing::    支持从右到左的脚本。
+@end menu
+
+@node International Chars
+@section 国际字符集简介
+
+国际字符集和脚本的用户已经建立了许多或多或少的标准编码系统来存储文件。  这些编码系统通常是 @dfn{multibyte}，这意味着两个或更多字节的序列用于表示单个非 @acronym{ASCII} 字符。
+
+@cindex Unicode
+在内部，Emacs 使用自己的多字节字符编码，它是 @dfn{Unicode} 标准的超集。  这种内部编码允许几乎所有已知脚本中的字符混合在单个缓冲区或字符串中。  当读写文件以及与子进程交换数据时，Emacs 在多字节字符编码和各种其他编码系统之间进行转换。
+
+@kindex C-h h
+@findex view-hello-file
+@cindex undisplayable characters
+@cindex @samp{?} in display
+命令@kbd{C-h h} (@code{view-hello-file}) 显示文件@file{etc/HELLO}，该文件通过展示如何用多种语言说“你好”来说明各种脚本。  如果某些字符无法在您的终端上显示，它们将显示为 @samp{?} 或空心框 (@pxref{Undisplayable Characters})。
+
+即使在使用这些字符集的国家/地区，键盘通常也没有适用于其中所有字符的按键。  您可以使用 @kbd{C-x 8 @key{RET}} (@code{insert-char}) 插入键盘不支持的字符。  @xref{Inserting Text}。一些常用字符有简写；例如，您可以通过键入 @kbd{C-x 8 [} 插入左单引号 @t{‘}，或者在电子报价模式下，通常只需键入 @kbd{`}。 @xref{Quotation Marks}。  Emacs 还支持各种 @dfn{input methods}，通常每种脚本或语言对应一个，这使得在脚本中键入字符变得更容易。 @xref{Input Methods}。
+
+@kindex C-x RET
+前缀键 @kbd{C-x @key{RET}} 用于与多字节字符、编码系统和输入法相关的命令。
+
+@kindex C-x =@r{, and international characters}
+@findex what-cursor-position@r{, and international characters}
+命令@kbd{C-x =} (@code{what-cursor-position}) 显示有关该点的字符的信息。  除了@ref{Position Info}中描述的字符位置之外，该命令还显示字符的编码方式。  例如，它在字符 @samp{c} 的回显区域中显示以下行：
+
+@smallexample
+Char: c (99, #o143, #x63) point=28062 of 36168 (78%) column=53
+@end smallexample
+
+@samp{Char:} 之后的四个值描述了 point 之后的字符，首先显示它，然后给出其十进制、八进制和十六进制的字符代码。  对于非 1⁣ 多字节字符，如果该编码系统使用单字节 (@pxref{Coding Systems}) 安全地对字符进行编码，则后面跟着 @samp{file} 以及缓冲区编码系统中字符的十六进制表示形式。  如果字符的编码长于一个字节，Emacs 将显示@samp{file ...}。
+
+@cindex eight-bit character set
+@cindex raw bytes
+在极少数情况下，Emacs 会遇到 @dfn{raw bytes}：值在 128（八进制 0200）到 255（八进制 0377）范围内的单字节，Emacs 无法将其解释为某些非 ASCII 字符的已知编码的一部分。  这些原始字节被视为属于特殊字符集@code{eight-bit}； Emacs 将它们显示为转义八进制代码（可以自定义；@pxref{Display Custom}）。  在这种情况下，@kbd{C-x =} 显示@samp{raw-byte} 而不是@samp{file}。  此外，@kbd{C-x =} 显示原始字节的字符代码，就好像它们在 @code{#x3FFF80..#x3FFFFF} 范围内一样，这是 Emacs 映射它们的地方，以将它们与范围 @code{#x0080..#x00FF} 中的 Unicode 字符区分开来。
+
+@cindex character set of character at point
+@cindex font of character at point
+@cindex text properties at point
+@cindex face at point
+@findex describe-char
+通过前缀参数 (@kbd{C-u C-x =})，此命令另外调用命令 @code{describe-char}，该命令显示角色的详细描述：
+
+@itemize @bullet
+@item 
+字符集名称以及标识该字符集中字符的代码； @acronym{ASCII} 字符被识别为属于 @code{ascii} 字符集。
+
+@item 
+角色的脚本、语法和类别。
+
+@item 
+在当前输入法（如果支持该字符）下按什么键输入该字符。
+
+@item 
+字符的编码，既在缓冲区内部，又在外部（如果要将缓冲区保存到文件中）。
+
+@item 
+如果您在图形显示器上运行 Emacs，则该字符的字体名称和字形代码。  如果您在文本终端上运行 Emacs，则代码会发送到终端。
+
+@item 
+如果该字符在显示器上与任何后续字符组合以形成一个或多个字素簇，则组合信息：如果该帧在图形显示器上则字体字形，以及所组合的字符。
+
+@item 
+角色的文本属性 (@pxref{Text Properties,,, elisp, the Emacs Lisp Reference Manual})，包括用于显示角色的任何非默认面以及包含该角色的任何覆盖层 (@pxref{Overlays,,, elisp, the same manual})。
+@end itemize
+
+这是一个示例，其中一些行被折叠以适合本手册：
+
+@smallexample
+             position: 1 of 1 (0%), column: 0
+            character: ê (displayed as ê) (codepoint 234, #o352, #xea)
+    preferred charset: unicode (Unicode (ISO10646))
+code point in charset: 0xEA
+               script: latin
+               syntax: w        which means: word
+             category: .:Base, L:Left-to-right (strong), c:Chinese,
+                       j:Japanese, l:Latin, v:Viet
+             to input: type "C-x 8 RET ea" or
+                       "C-x 8 RET LATIN SMALL LETTER E WITH CIRCUMFLEX"
+          buffer code: #xC3 #xAA
+            file code: #xC3 #xAA (encoded by coding system utf-8-unix)
+              display: by this font (glyph code)
+    xft:-PfEd-DejaVu Sans Mono-normal-normal-
+        normal-*-15-*-*-*-m-0-iso10646-1 (#xAC)
+
+Character code properties: customize what to show
+  name: LATIN SMALL LETTER E WITH CIRCUMFLEX
+  old-name: LATIN SMALL LETTER E CIRCUMFLEX
+  general-category: Ll (Letter, Lowercase)
+  decomposition: (101 770) ('e' '^')
+@end smallexample
+
+@node Language Environments
+@section 语言环境
+@cindex language environments
+
+只要启用多字节字符，Emacs 缓冲区就支持所有支持的字符集；无需选择特定语言即可显示其字符。但是，选择 @dfn{language environment} 以便设置各种默认值非常重要。  粗略地说，语言环境代表的是首选脚本的选择，而不是语言的选择。
+
+语言环境控制在阅读文本时识别哪些编码系统 (@pxref{Recognize Coding})。  这适用于文件、传入邮件以及您在 Emacs 中读入的任何其他文本。  它还可以指定创建文件时要使用的默认编码系统。  每种语言环境还指定一种默认输入法。
+
+@findex set-language-environment
+@vindex current-language-environment
+要选择语言环境，请自定义 @code{current-language-environment} 或使用命令 @kbd{M-x set-language-environment}。  使用此命令时，哪个缓冲区是当前缓冲区都没有区别，因为其效果全局适用于 Emacs 会话。  请参阅变量 @code{language-info-alist} 了解支持的语言环境列表，并使用命令 @kbd{C-h L @var{lang-env} @key{RET}} (@code{describe-language-environment}) 了解有关语言环境 @var{lang-env} 的更多信息。支持的语言环境包括：
+
+@c @cindex entries below are split between portions of the list to
+@c make them more accurate, i.e., land on the line that mentions the
+@c language.  However, makeinfo 4.x doesn't fill inside @quotation
+@c lines that follow a @cindex entry and whose text has no whitespace.
+@c To work around, we group the language environments together, so
+@c that the blank that separates them triggers refill.
+@quotation
+@cindex ASCII (language environment)
+@cindex Arabic
+ASCII、阿拉伯语、
+@cindex Belarusian
+@cindex Bengali
+白俄罗斯语、孟加拉语、
+@cindex Brazilian Portuguese
+@cindex Bulgarian
+巴西葡萄牙语、保加利亚语、
+@cindex Burmese
+@cindex Cham
+缅甸、占族、
+@cindex Chinese
+中文-BIG5、中文-CNS、中文-EUC-TW、中文-GB、中文-GB18030、中文-GBK、
+@cindex Croatian
+@cindex Cyrillic
+克罗地亚语、西里尔字母-ALT、西里尔字母-ISO、西里尔字母-KOI8、
+@cindex Czech
+@cindex Devanagari
+捷克语、梵文、
+@cindex Dutch
+@cindex English
+荷兰语、英语、
+@cindex Esperanto
+@cindex Ethiopic
+世界语、埃塞俄比亚语、
+@cindex French
+@cindex Georgian
+法语、格鲁吉亚语、
+@cindex German
+@cindex Greek
+@cindex Gujarati
+德语、希腊语、古吉拉特语、
+@cindex Hebrew
+@cindex IPA
+希伯来语、国际音标、
+@cindex Italian
+意大利语,
+@cindex Japanese
+@cindex Kannada
+日语、卡纳达语、
+@cindex Khmer
+@cindex Korean
+@cindex Lao
+高棉语、韩语、老挝语、
+@cindex Latin
+拉丁语 1、拉丁语 2、拉丁语 3、拉丁语 4、拉丁语 5、拉丁语 6、拉丁语 7、拉丁语 8、拉丁语 9、
+@cindex Latvian
+@cindex Lithuanian
+拉脱维亚语、立陶宛语、
+@cindex Malayalam
+@cindex Oriya
+马拉雅拉姆语、奥里亚语、
+@cindex Persian
+@cindex Polish
+波斯语、波兰语、
+@cindex Punjabi
+@cindex Romanian
+旁遮普语、罗马尼亚语、
+@cindex Russian
+@cindex Sinhala
+俄语、僧伽罗语、
+@cindex Slovak
+@cindex Slovenian
+@cindex Spanish
+斯洛伐克语、斯洛文尼亚语、西班牙语、
+@cindex Swedish
+@cindex TaiViet
+瑞典语、TaiViet、
+@cindex Tajik
+@cindex Tamil
+塔吉克语、泰米尔语、
+@cindex Telugu
+@cindex Thai
+泰卢固语、泰语、
+@cindex Tibetan
+@cindex Turkish
+藏语、土耳其语、
+@cindex UTF-8
+@cindex Ukrainian
+UTF-8、乌克兰语、
+@cindex Vietnamese
+@cindex Welsh
+越南语、威尔士语、
+@cindex Windows-1255
+和Windows-1255。
+@end quotation
+
+要在图形显示器上显示您的语言环境使用的脚本，您需要有合适的字体。 @xref{Fontsets}，了解有关设置字体的更多详细信息。
+
+@findex set-locale-environment
+@vindex locale-language-names
+@vindex locale-charset-language-names
+@cindex locales
+某些操作系统允许您通过设置区域设置环境变量 @env{LC_ALL}、@env{LC_CTYPE} 或 @env{LANG} 来指定所使用的字符集区域设置。  （如果设置了多个，则第一个非空的指定用于此目的的语言环境。）在启动期间，Emacs 在系统语言环境别名表中查找字符集语言环境的名称，将其规范名称与变量 @code{locale-charset-language-names} 和 @code{locale-language-names} 的值中的条目进行匹配（前者覆盖后者），如果找到匹配，则选择相应的语言环境。它还会调整显示表和终端编码系统、区域设置编码系统、区域设置所需的首选编码系统，以及最后但并非最不重要的 Emacs 解码键盘发送的非 5⁣ 字符的方式。
+
+@c This seems unlikely, doesn't it?
+如果您在运行 Emacs 时修改 @env{LC_ALL}、@env{LC_CTYPE} 或 @env{LANG} 环境变量（通过使用 @kbd{M-x setenv}），您可能需要随后调用 @code{set-locale-environment} 命令来从新的语言环境重新调整语言环境。
+
+@vindex locale-preferred-coding-systems
+@code{set-locale-environment}函数通常使用语言环境建立的首选编码系统来解码系统消息。  但是，如果您的语言环境与变量 @code{locale-preferred-coding-systems} 中的条目匹配，Emacs 就会使用相应的编码系统。  例如，如果语言环境 @samp{ja_JP.PCK} 与 @code{locale-preferred-coding-systems} 中的 @code{japanese-shift-jis} 匹配，则 Emacs 会使用该编码，即使它通常可能使用 @code{utf-8}。
+
+您可以通过显式使用命令 @code{set-language-environment} 或在初始化文件中自定义 @code{current-language-environment} 来覆盖启动时选择的语言环境。
+
+@kindex C-h L
+@findex describe-language-environment
+要显示有关特定语言环境@var{lang-env}效果的信息，请使用命令@kbd{C-h L @var{lang-env} @key{RET}} (@code{describe-language-environment})。  这会告诉您该语言环境适用于哪些语言，并列出了与其配套的字符集、编码系统和输入法。  它还显示了一些示例文本来说明此语言环境中使用的脚本。  如果您为 @var{lang-env} 提供空输入，则此命令描述所选的语言环境。
+
+@vindex set-language-environment-hook
+您可以使用普通钩子@code{set-language-environment-hook}自定义任何语言环境。  设置新语言环境后，命令 @code{set-language-environment} 运行该挂钩。  钩子函数可以通过检查变量@code{current-language-environment}来测试特定的语言环境。  您应该在该钩子中放置特定语言环境的非默认设置，例如键盘输入和终端输出的编码系统、默认输入法等。
+
+@vindex exit-language-environment-hook
+在开始设置新的语言环境之前，@code{set-language-environment} 首先运行钩子@code{exit-language-environment-hook}。  此挂钩对于撤消使用 @code{set-language-environment-hook} 进行的自定义非常有用。例如，如果您使用 @code{set-language-environment-hook} 在特定语言环境中设置特殊键绑定，则应设置 @code{exit-language-environment-hook} 来恢复该键的正常绑定。
+
+@node Input Methods
+@section 输入法
+
+@cindex input methods
+@dfn{input method} 是一种专门为交互式输入设计的字符转换。  本节介绍 Emacs 自带的输入法；对于底层操作系统提供的本机输入法，@pxref{Unibyte Mode}。
+
+在 Emacs 中，通常每种语言都有自己的输入法；有时，使用相同字符的多种语言可以共享一种输入法。  一些语言支持多种输入法。
+
+最简单的输入法是将 @acronym{ASCII} 字母映射到另一个字母表中；这允许您使用其他字母而不是 @acronym{ASCII}。  希腊语和俄语输入法就是这样工作的。
+
+一种更强大的技术是组合：将字符序列转换为一个字母。  许多欧洲输入法使用组合来从由字母后跟重音字符组成的序列中生成单个非@acronym{ASCII}字母（反之亦然）。  例如，某些方法将序列 @kbd{o ^} 转换为单个重音字母。这些输入法没有自己的特殊命令；他们所做的只是组成打印字符序列。
+
+音节文字的输入方法通常使用先映射后组合的方式。  泰语和韩语的输入法就是这样工作的。首先，字母被映射成特定声音或音调标记的符号；然后，将构成整个音节的这些序列映射为一个音节符号。
+
+@kindex C-f@r{, when using input methods}
+@kindex C-b@r{, when using input methods}
+@kindex C-n@r{, when using input methods}
+@kindex C-p@r{, when using input methods}
+中文和日文需要更复杂的方法。  在中文输入法中，首先输入中文单词的拼音（在输入法@code{chinese-py}等中），或字符的一系列部分（在输入法@code{chinese-4corner}和@code{chinese-sw}等中）。  一个输入序列通常对应于许多可能的汉字。  您可以使用@kbd{C-f}、@kbd{C-b}、@kbd{C-n}、@kbd{C-p}（或箭头键）和数字等键和数字来选择您想要的选项，这些键在这种情况下具有特殊含义。
+
+可能的字符在概念上排列成几行，每行最多可容纳 10 个选项。  通常，Emacs 在回显区域一次只显示一行； @code{(@var{i}/@var{j})} 出现在开头，表示这是总共 @var{j} 行中的第 @var{i} 行。  输入 @kbd{C-n} 或 @kbd{C-p} 显示下一行或上一行。
+
+输入 @kbd{C-f} 和 @kbd{C-b} 可在当前行的选项中向前和向后移动。  当您执行此操作时，Emacs 使用特殊颜色突出显示当前的替代方案；输入 @kbd{C-@key{SPC}} 选择当前替代项并将其用作输入。  该行中的备选方案也已编号；该数字出现在替代项之前。  键入数字会选择当前行的关联替代项并将其用作输入。
+
+@kindex TAB@r{, when using Chinese input methods}
+@key{TAB} 在这些中文输入法中显示一个缓冲区，同时显示所有可能的字符；然后单击其中一个上的 @kbd{mouse-2} 选择该替代方案。  键 @kbd{C-f}、@kbd{C-b}、@kbd{C-n}、@kbd{C-p} 和数字继续照常工作，但它们在显示可能字符的缓冲区中突出显示，而不是在回显区域中突出显示。
+
+要按照 @dfn{p@=iny@=in} 音译方法输入字符，请使用 @code{chinese-sisheng} 输入法。  这是一种基于组合的方法，例如，@kbd{pi1} 结果为 @samp{p@=i}。
+
+在日语输入法中，首先使用拼音输入整个单词；然后，当该单词进入缓冲区后，Emacs 使用一个大字典将其转换为一个或多个字符。  一种拼音对应于许多不同的日语单词；要选择其中之一，请使用 @kbd{C-n} 和 @kbd{C-p} 循环选择选项。
+
+有时，切断输入法处理很有用，这样您刚刚输入的字符就不会与后续字符组合。  例如，在输入法@code{latin-1-postfix}中，序列@kbd{o ^}组合起来形成带有重音符号的@samp{o}。  如果您想将它们作为单独的字符输入怎么办？
+
+一种方法是输入重音符号两次；这是输入单独字母和重音符号的特殊功能。  例如，@kbd{o ^ ^} 为您提供两个字符@samp{o^}。  另一种方法是在 @kbd{o} 之后键入另一个字母（不会与该字母组合的内容）并立即将其删除。  例如，您可以输入 @kbd{o o @key{DEL} ^} 来获取单独的 @samp{o} 和 @samp{^}。  另一种更通用但不太容易输入的方法是在两个字符之间使用 @kbd{C-\ C-\} 来阻止它们组合。  这是命令 @kbd{C-\} (@code{toggle-input-method}) 使用了两次。
+@ifnottex
+@xref{Select Input Method}.
+@end ifnottex
+
+@cindex incremental search, input method interference
+@kbd{C-\ C-\} 在增量搜索中特别有用，因为它停止等待更多字符组合，并开始搜索您已经输入的内容。
+
+要了解如何使用当前输入法输入点后的字符，请输入@kbd{C-u C-x =}。  @xref{Position Info}。
+
+@c TODO: document complex-only/default/t of
+@c @code{input-method-verbose-flag}
+@vindex input-method-verbose-flag
+@vindex input-method-highlight-flag
+变量@code{input-method-highlight-flag}和@code{input-method-verbose-flag}控制输入法如何解释正在发生的事情。  如果@code{input-method-highlight-flag}非@code{nil}，则部分序列在缓冲区中突出显示（对于大多数输入法——有些输入法禁用此功能）。  如果@code{input-method-verbose-flag}不是@code{nil}，则接下来可能要键入的字符列表将显示在回显区域中（但当您位于迷你缓冲区中时不会显示）。
+
+@vindex quail-activate-hook
+@findex quail-translation-keymap
+您可以通过在添加到钩子变量 @code{quail-activate-hook} 的函数中进行更改来修改输入法的工作方式。 @xref{Hooks}。  例如，您可以通过使用 @code{keymap-set} 在函数 @code{quail-translation-keymap} 返回的键映射中定义键绑定来重新定义输入法的某些键。 @xref{Init Rebinding}。
+
+当缓冲区中的文本由于某种原因为只读时，输入法将被禁止。  因此，即使输入法处于活动状态，单字符键绑定也可以在使缓冲区文本或其部分只读的模式下工作，例如 @code{read-only-mode} 和 @code{image-mode}。
+
+@kindex C-x 8 @key{RET}
+@cindex insert character by name or code-point
+键入不在键盘上的字符的另一种方法是使用 @kbd{C-x 8 @key{RET}} (@code{insert-char}) 根据其 Unicode 名称或代码点插入单个字符；见@ref{Inserting Text}。
+
+@cindex emoji input
+@cindex inserting Emoji
+@kindex C-x 8 e
+@findex emoji-insert
+@findex emoji-list
+@findex emoji-search
+有用于插入表情符号的专门命令，可以在 @kbd{C-x 8 e} 键盘映射上找到这些命令。  @kbd{C-x 8 e e} (@code{emoji-insert}) 可让您浏览不同的表情符号类别，然后选择一个。  @kbd{C-x 8 e l} (@code{emoji-list}) 将弹出一个新的缓冲区并列出所有 Emoji；单击（或使用@kbd{RET}）表情符号字符会将其插入当前缓冲区中。最后，@kbd{C-x 8 e s} (@code{emoji-search}) 将允许您根据表情符号的名称搜索它们。
+
+@findex emoji-describe
+@code{describe-char} 显示有关点下的字符/字形的大量信息（包括表情符号）。  有时获得名称的快速描述很有用，您可以使用 @kbd{C-x 8 e d} (@code{emoji-describe}) 命令来执行此操作。  它的主要目的是帮助区分不同的表情符号变体（它们看起来非常相似），但它也会告诉您非表情符号字符的名称。
+
+@node Select Input Method
+@section 选择输入法
+
+@table @kbd
+@item C-\
+启用或禁用所选输入法 (@code{toggle-input-method})。
+
+@item C-x @key{RET} C-\ @var{method} @key{RET}
+为当前缓冲区选择新的输入法 (@code{set-input-method})。
+
+@item C-x \ @var{method} @key{RET}
+暂时启用所选瞬态输入方式；插入单个字符后它将自动禁用（@code{activate-transient-input-method}）。
+
+@item C-h I @var{method} @key{RET}
+@itemx C-h C-\ @var{method} @key{RET}
+@findex describe-input-method
+@kindex C-h I
+@kindex C-h C-\
+描述输入法@var{method} (@code{describe-input-method})。默认情况下，它描述当前的输入法（如果有）。  此说明应为您提供如何使用任何特定输入法的完整详细信息。
+
+@item M-x list-input-methods
+显示所有支持的输入法的列表。
+@end table
+
+@findex set-input-method
+@vindex current-input-method
+@kindex C-x RET C-\
+要为当前缓冲区选择输入方法，请使用@kbd{C-x @key{RET} C-\} (@code{set-input-method})。  该命令从minibuffer中读取输入法名称；该名称通常以其要使用的语言环境开头。  变量@code{current-input-method}记录选择的输入法。
+
+@findex toggle-input-method
+@kindex C-\
+输入法使用各种 @acronym{ASCII} 字符序列来代表非 @acronym{ASCII} 字符。  有时暂时关闭输入法很有用。  为此，请输入 @kbd{C-\} (@code{toggle-input-method})。  要重新启用输入法，请再次输入@kbd{C-\}。
+
+如果您键入 @kbd{C-\} 并且尚未选择输入法，则会提示您指定一种输入法。  这与使用 @kbd{C-x @key{RET} C-\} 指定输入法具有相同的效果。
+
+当使用数字参数调用时，如 @kbd{C-u C-\} 所示，@code{toggle-input-method} 始终提示您输入输入法，建议将最近选择的输入法作为默认值。
+
+@vindex default-input-method
+选择语言环境指定在各种缓冲区中使用的默认输入方法。  当您有默认输入法时，可以通过键入 @kbd{C-\} 在当前缓冲区中选择它。  变量@code{default-input-method}指定默认输入法（@code{nil}表示没有）。
+
+在某些支持多种不同输入法的语言环境中，您可能希望使用与 @code{set-language-environment} 选择的默认输入法不同的输入法。  如果您愿意，您可以使用 @code{set-language-environment-hook} (@pxref{Language Environments, set-language-environment-hook}) 指示 Emacs 为特定语言环境选择不同的默认输入法。  例如：
+
+@lisp
+(defun my-chinese-setup ()
+  "Set up my private Chinese environment."
+  (if (equal current-language-environment "Chinese-GB")
+      (setq default-input-method "chinese-tonepy")))
+(add-hook 'set-language-environment-hook 'my-chinese-setup)
+@end lisp
+
+@noindent
+每当您选择 Chinese-GB 语言环境时，这会将默认输入法设置为 @code{chinese-tonepy}。
+
+您可以指示 Emacs 自动激活某种输入法。  例如：
+
+@lisp
+(add-hook 'text-mode-hook
+  (lambda () (set-input-method "german-prefix")))
+@end lisp
+
+@noindent
+这会在文本模式下自动激活输入法@code{german-prefix}。
+
+@findex quail-set-keyboard-layout
+字母脚本的某些输入方法通过（实际上）重新映射键盘来模拟这些脚本常用的各种键盘布局。  如何正确执行此重新映射取决于您的实际键盘布局。  要指定键盘的布局，请使用命令@kbd{M-x quail-set-keyboard-layout}。
+
+@findex quail-show-key
+您可以使用命令 @kbd{M-x quail-show-key} 显示要键入哪个键（或键序列），以便使用所选的键盘布局输入点后面的字符。  除了有关角色的其他信息之外，命令 @kbd{C-u C-x =} 还显示该信息。
+
+@findex list-input-methods
+@kbd{M-x list-input-methods} 显示所有支持的输入法的列表。  该列表提供了有关每种输入法的信息，包括模式行中代表该输入法的字符串。
+
+@findex activate-transient-input-method
+@kindex C-x \
+@anchor{transient input method}
+有时启用输入法 @dfn{transiently} 可以方便地仅插入单个字符。  键入@kbd{C-x \} (@code{activate-transient-input-method}) 将暂时启用输入法，让您使用输入法规则插入单个字符，然后自动禁用输入法。  如果尚未选择瞬态输入法，@kbd{C-x \} 将提示您选择输入法；后续调用此命令将启用所选的瞬态输入法。  要选择不同的瞬态输入方法，请键入 @kbd{C-u C-x \}。  您可以选择与使用 @kbd{C-u C-\} 选择的输入方法不同的瞬态方法。
+
+@node Coding Systems
+@section 编码系统
+@cindex coding systems
+
+各种语言的用户已经建立了许多或多或少的标准编码系统来表示它们。  Emacs 内部不使用这些编码系统；相反，它在读取数据时从各种编码系统转换为自己的编码系统，在写入数据时将内部编码系统转换为其他编码系统。  可以在读取或写入文件、从终端发送或接收文件以及与子进程交换数据时进行转换。
+
+Emacs 为每个编码系统分配一个名称。  大多数编码系统用于一种语言，编码系统的名称以语言名称开头。  有些编码系统可用于多种语言；他们的名字通常以@samp{iso}开头。  还有一些特殊的编码系统，例如 @code{no-conversion}、@code{raw-text} 和 @code{emacs-internal}。
+
+@cindex international files from DOS/Windows systems
+一类特殊的编码系统，统称为@dfn{codepages}，旨在支持 MS-Windows 和 MS-DOS 软件编码的文本。  这些编码系统的名称为 @code{cp@var{nnnn}}，其中 @var{nnnn} 是代码页的 3 位或 4 位数字。  您可以像任何其他编码系统一样使用这些编码；例如，要访问以代码页 850 编码的文件，请输入 @kbd{C-x @key{RET} c cp850 @key{RET} C-x C-f @var{filename} @key{RET}}。
+
+除了转换非 0⁣ 字符的各种表示形式之外，编码系统还可以执行行尾转换。  Emacs 处理如何在文件中分隔行的三种不同约定：换行符 (Unix)、回车符后换行符 (DOS) 以及仅回车符 (Mac)。
+
+@table @kbd
+@item C-h C @var{coding} @key{RET}
+描述编码系统@var{coding} (@code{describe-coding-system})。
+
+@item C-h C @key{RET}
+描述当前使用的编码系统 (@code{describe-coding-system})。
+
+@item M-x list-coding-systems
+显示所有支持的编码系统的列表。
+@end table
+
+@kindex C-h C
+@findex describe-coding-system
+命令 @kbd{C-h C} (@code{describe-coding-system}) 显示有关特定编码系统的信息，包括这些编码系统指定的行尾转换。  您可以指定编码系统名称作为参数；或者，使用空参数时，它描述当前为各种目的选择的编码系统（在当前缓冲区中和默认值），以及用于识别编码系统的优先级列表（@pxref{Recognize Coding}）。
+
+@findex list-coding-systems
+要显示所有支持的编码系统的列表，请键入 @kbd{M-x list-coding-systems}。  该列表提供了有关每个编码系统的信息，包括模式行中代表该系统的字母 (@pxref{Mode Line})。
+
+@cindex end-of-line conversion
+@cindex line endings
+@cindex MS-DOS end-of-line conversion
+@cindex Macintosh end-of-line conversion
+此列表中出现的每个编码系统（@code{no-conversion} 除外，这意味着不进行任何类型的转换）指定如何以及是否转换打印字符，但行尾转换的选择则根据每个文件的内容来决定。例如，如果文件似乎使用顺序回车和换行来分隔行，则将使用 DOS 行尾转换。
+
+列出的每个编码系统都有三个变体，它们准确地指定了行尾转换的操作：
+
+@table @code
+@item @dots{}-unix
+不进行任何行尾转换；假设文件使用换行符来分隔行。  （这是 Unix 和 GNU 系统以及 macOS 上通常使用的约定。）
+
+@item @dots{}-dos
+假设文件使用回车符和换行符来分隔行，并进行适当的转换。  （这是 Microsoft 系统上通常使用的约定。@footnote{It is also specified for MIME @samp{text/*} bodies and in other network transport contexts.  It is different from the SGML reference syntax record-start/record-end format, which Emacs doesn't support directly.}）
+
+@item @dots{}-mac
+假设文件使用回车符分隔行，并进行适当的转换。  （这是经典 Mac 操作系统中使用的约定，但现在在旧版软件之外很少见。）
+@end table
+
+为了简洁起见，这些变体编码系统从 @code{list-coding-systems} 显示中省略，因为它们是完全可预测的。  例如，编码系统@code{iso-latin-1}有变体@code{iso-latin-1-unix}、@code{iso-latin-1-dos}和@code{iso-latin-1-mac}。
+
+@cindex @code{undecided}, coding system
+编码系统@code{unix}、@code{dos}和@code{mac}分别是@code{undecided-unix}、@code{undecided-dos}和@code{undecided-mac}的别名。  这些编码系统仅指定行尾转换，并让字符代码转换从文本本身推断出来。
+
+@cindex @code{raw-text}, coding system
+编码系统 @code{raw-text} 适用于主要是 @acronym{ASCII} 文本的文件，但可能包含大于 127 的字节值，这些字节值不打算对非 @acronym{ASCII} 字符进行编码。  使用 @code{raw-text}，Emacs 会原封不动地复制这些字节值，并在当前缓冲区中将 @code{enable-multibyte-characters} 设置为 @code{nil}，以便正确解释它们。  @code{raw-text} 根据遇到的数据以通常的方式处理行尾转换，并具有通常的三种变体来指定要使用的行尾转换类型。
+
+@cindex @code{no-conversion}, coding system
+相反，编码系统 @code{no-conversion} 根本不指定任何字符代码转换——对于非 @acronym{ASCII} 字节值不进行转换，对于行尾也不进行转换。  这对于读取或写入二进制文件、tar 文件和其他必须逐字检查的文件非常有用。  它也将 @code{enable-multibyte-characters} 设置为 @code{nil}。
+
+编辑文件而不进行任何类型转换的最简单方法是使用 @kbd{M-x find-file-literally} 命令。  这使用了@code{no-conversion}，并且还抑制了其他 Emacs 功能，这些功能可能会在您看到文件内容之前对其进行转换。  @xref{Visiting}。
+
+@cindex @code{emacs-internal}, coding system
+编码系统 @code{emacs-internal} （或 @code{utf-8-emacs}，等效的）意味着文件包含使用内部 Emacs 编码存储的非 @acronym{ASCII} 字符。  该编码系统根据遇到的数据处理行尾转换，并具有通常的三种变体来指定行尾转换的类型。
+
+@node Recognize Coding
+@section 识别编码系统
+
+每当 Emacs 读取给定的文本片段时，它都会尝试识别要使用的编码系统。  这适用于正在读取的文件、子进程的输出、X 选择的文本等。大多数情况下，Emacs 可以自动选择正确的编码系统 — 一旦您指定了您的首选项。
+
+一些编码系统可以通过数据中出现的字节序列来识别或区分。  然而，有些编码系统无法区分，甚至无法区分。  例如，没有办法区分Latin-1和Latin-2；它们使用具有不同含义的相同字节值。
+
+Emacs 通过编码系统优先级列表来处理这种情况。  每当 Emacs 读取文件时，如果您没有指定要使用的编码系统，Emacs 就会根据每个编码系统检查数据，从优先级最高的第一个系统开始，沿着列表向下查找，直到找到适合该数据的编码系统。  然后它会转换文件内容，假设它们在此编码系统中表示。
+
+编码系统的优先级列表取决于所选的语言环境 (@pxref{Language Environments})。  例如，如果您使用法语，您可能希望 Emacs 更喜欢 Latin-1 而不是 Latin-2；如果您使用捷克语，您可能希望首选 Latin-2。  这是指定语言环境的原因之一。
+
+@findex prefer-coding-system
+但是，您可以使用命令 @kbd{M-x prefer-coding-system} 详细更改编码系统优先级列表。  该命令从迷你缓冲区中读取编码系统的名称，并将其添加到优先级列表的前面，以便它优先于所有其他系统。  如果多次使用此命令，则每次使用都会在优先级列表的前面添加一个元素。
+
+如果您使用指定行尾转换类型的编码系统，例如 @code{iso-8859-1-dos}，这意味着 Emacs 应尝试优先识别 @code{iso-8859-1}，并且在识别 @code{iso-8859-1} 时应使用 DOS 行尾转换。
+
+@vindex file-coding-system-alist
+有时，文件名指示该文件使用哪种编码系统。  变量@code{file-coding-system-alist}指定了这种对应关系。  有一个特殊的函数 @code{modify-coding-system-alist} 用于向此列表添加元素。  例如，要使用编码系统 @code{chinese-iso-8bit} 读写所有 @samp{.txt} 文件，您可以执行以下 Lisp 表达式：
+
+@smallexample
+(modify-coding-system-alist 'file "\\.txt\\'" 'chinese-iso-8bit)
+@end smallexample
+
+@noindent
+第一个参数应该是 @code{file}，第二个参数应该是一个正则表达式，用于确定该文件适用于哪些文件，第三个参数表示这些文件要使用哪种编码系统。
+
+@vindex inhibit-eol-conversion
+@cindex DOS-style end-of-line display
+Emacs 根据文件的内容识别要使用哪种行尾转换：如果它只看到回车符，或者只看到回车符后跟换行序列，那么它会相应地选择行尾转换。  您可以通过将变量 @code{inhibit-eol-conversion} 设置为非 @code{nil} 来禁止自动使用行尾转换。  如果这样做，DOS 风格的文件将显示在缓冲区中可见的 @samp{^M} 字符；有些人更喜欢这种方式，而不是模式线左边缘附近更微妙的 @samp{(DOS)} 行尾类型指示 (@pxref{Mode Line, eol-mnemonic})。
+
+@vindex inhibit-iso-escape-detection
+@cindex escape sequences in files
+默认情况下，编码系统的自动检测对转义序列敏感。  如果 Emacs 看到以转义字符开头的字符序列，并且该序列作为 ISO-2022 代码有效，则会告诉 Emacs 使用其中一种 ISO-2022 编码来解码文件。
+
+但是，在某些情况下，您可能希望按原样读取文件中的转义序列。  在这种情况下，您可以将变量 @code{inhibit-iso-escape-detection} 设置为非 @code{nil}。  然后，代码检测会忽略任何转义序列，并且从不使用 ISO-2022 编码。  结果是所有转义序列在缓冲区中都变得可见。
+
+@code{inhibit-iso-escape-detection} 的默认值为@code{nil}。  我们建议您不要永久更改它，仅针对一项特定操作进行更改。  这是因为 Emacs 发行版中的某些 Emacs Lisp 源文件包含以编码系统 @code{iso-2022-7bit} 编码的非 @acronym{ASCII} 字符，如果您抑制转义序列检测，当您访问这些文件时，它们将无法正确解码。
+@c I count a grand total of 3 such files, so is the above really true?
+
+@vindex auto-coding-alist
+@vindex auto-coding-regexp-alist
+变量 @code{auto-coding-alist} 和 @code{auto-coding-regexp-alist} 是分别为某些文件名模式或包含某些模式的文件指定编码系统的最强方法。这些变量甚至覆盖文件本身中的 @samp{-*-coding:-*-} 标签 (@pxref{Specify Coding})。  例如，Emacs 对 tar 和归档文件使用 @code{auto-coding-alist}，以防止它被归档成员中的 @samp{-*-coding:-*-} 标签混淆，并认为它适用于整个归档文件。
+@ignore
+@c This describes old-style BABYL files, which are no longer relevant.
+Likewise, Emacs uses @code{auto-coding-regexp-alist} to ensure that
+RMAIL files, whose names in general don't match any particular
+pattern, are decoded correctly.
+@end ignore
+
+@vindex auto-coding-functions
+指定编码系统的另一种方法是使用变量@code{auto-coding-functions}。  例如，内置 @code{auto-coding-functions} 之一会检测 XML 文件的编码。与前两个不同，此变量不会覆盖任何 @samp{-*-coding:-*-} 标签。
+
+@node Specify Coding
+@section 指定文件的编码系统
+
+如果 Emacs 错误地识别文件的编码，您可以使用正确的编码系统通过 @kbd{C-x @key{RET} r} (@code{revert-buffer-with-coding-system}) 重新读取该文件。  该命令提示输入要使用的编码系统。  要查看 Emacs 实际使用什么编码系统来解码文件，请查看模式行左边缘附近的编码系统助记符字母 (@pxref{Mode Line})，或输入 @kbd{C-h C} (@code{describe-coding-system})。
+
+@vindex coding
+您可以在文件本身中指定特定文件的编码系统，在开头使用 @w{@samp{-*-@dots{}-*-}} 结构，或在末尾使用局部变量列表 (@pxref{File Variables})。  您可以通过为名为 @code{coding} 的“变量”定义一个值来实现此目的。 Emacs 实际上并没有变量 @code{coding}；这不是设置变量，而是使用文件的指定编码系统。  例如，@w{@samp{-*-mode: C; coding: latin-1; -*-}}指定使用Latin-1编码系统以及C模式。  当您在文件中显式指定编码时，它将覆盖 @code{file-coding-system-alist}。
+
+@node Output Coding
+@section 选择输出编码系统
+
+@vindex buffer-file-coding-system
+一旦 Emacs 为缓冲区选择了编码系统，它就会将该编码系统存储在 @code{buffer-file-coding-system} 中。  这使得它成为从此缓冲区写入文件的操作的默认值，例如@code{save-buffer}和@code{write-region}。  您可以使用 @code{set-buffer-file-coding-system} (@pxref{Text Coding}) 为缓冲区的进一步文件输出指定不同的编码系统。
+
+您可以将 Emacs 支持的任何字符插入到任何 Emacs 缓冲区中，但大多数编码系统只能处理这些字符的子集。因此，您插入的字符可能无法使用用于保存缓冲区的编码系统进行编码。例如，您可以访问一个用 @code{iso-8859-2} 编码的波兰语文本文件，并向其中添加一些俄语单词。  当您保存该缓冲区时，Emacs 无法使用 @code{buffer-file-coding-system} 的当前值，因为您添加的字符无法由该编码系统进行编码。
+
+当发生这种情况时，Emacs 会尝试最喜欢的编码系统（由 @kbd{M-x prefer-coding-system} 或 @kbd{M-x set-language-environment} 设置）。  如果该编码系统可以安全地对缓冲区中的所有字符进行编码，Emacs 就会使用它，并将其值存储在 @code{buffer-file-coding-system} 中。  否则，Emacs 将显示适合对缓冲区内容进行编码的编码系统列表，并要求您选择其中一种编码系统。
+
+如果您在邮件消息中插入不合适的字符，Emacs 的行为会略有不同。  它还检查是否
+@c What determines this?
+建议在 MIME 消息中使用最优选的编码系统；如果没有，它会通知您这一事实并提示您使用另一个编码系统。  这样您就不会无意中发送以收件人的邮件软件难以解码的方式编码的消息。  （如果您在提示符下输入其名称，您仍然可以使用不合适的编码系统。）
+
+@c It seems that select-message-coding-system does this.
+@c Both sendmail.el and smptmail.el call it; i.e., smtpmail.el still
+@c obeys sendmail-coding-system.
+@vindex sendmail-coding-system
+当您发送邮件消息 (@pxref{Sending Mail}) 时，Emacs 有四种不同的方法来确定用于对消息文本进行编码的编码系统。  它首先尝试缓冲区自身的 @code{buffer-file-coding-system} 值（如果该值不是 @code{nil}）。否则，它使用 @code{sendmail-coding-system} 的值（如果它不是 @code{nil}）。  第三，它使用@code{default-sendmail-coding-system}的值。如果这三个值全部为 @code{nil}，Emacs 将使用新文件的默认编码系统（即默认值 @code{buffer-file-coding-system}）对外发邮件进行编码，这由您选择的语言环境控制。
+
+@node Text Coding
+@section 指定文件文本的编码系统
+
+如果 Emacs 不会自动为文件内容选择正确的编码系统，您可以使用以下命令来指定一个：
+
+@table @kbd
+@item C-x @key{RET} f @var{coding} @key{RET}
+使用编码系统 @var{coding} 保存或重新访问当前缓冲区 (@code{set-buffer-file-coding-system}) 中的文件。
+
+@item C-x @key{RET} c @var{coding} @key{RET}
+为紧随其后的命令 (@code{universal-coding-system-argument}) 指定编码系统@var{coding}。
+
+@item C-x @key{RET} r @var{coding} @key{RET}
+使用编码系统@var{coding} (@code{revert-buffer-with-coding-system}) 重新访问当前文件。
+
+@item M-x recode-region @key{RET} @var{right} @key{RET} @var{wrong} @key{RET}
+转换使用编码系统@var{wrong}解码的区域，并使用编码系统@var{right}对其进行解码。
+@end table
+
+@kindex C-x RET f
+@findex set-buffer-file-coding-system
+命令@kbd{C-x @key{RET} f} (@code{set-buffer-file-coding-system}) 设置当前缓冲区的文件编码系统（即保存或恢复文件时使用的编码系统）。  您可以指定使用迷你缓冲区的编码系统。  您还可以通过单击模式行 (@pxref{Mode Line}) 中编码系统指示器上的 @kbd{mouse-3} 来调用此命令。
+
+如果您指定的编码系统无法处理缓冲区中的所有字符，则当您尝试保存缓冲区时，Emacs 会警告您有关麻烦字符的信息，并要求您选择其他编码系统 (@pxref{Output Coding})。
+
+@cindex specify end-of-line conversion
+您还可以使用此命令指定行尾转换 (@pxref{Coding Systems, end-of-line conversion}) 来编码当前缓冲区。  例如，@kbd{C-x @key{RET} f dos @key{RET}} 将导致 Emacs 使用 DOS 风格的回车符和换行符来保存当前缓冲区的文本。
+
+@kindex C-x RET c
+@findex universal-coding-system-argument
+指定文件编码系统的另一种方法是在访问该文件时。  首先使用命令@kbd{C-x @key{RET} c}(@code{universal-coding-system-argument})；该命令使用迷你缓冲区来读取编码系统名称。  退出迷你缓冲区后，指定的编码系统将用于 @emph{the immediately following command}。
+
+因此，例如，如果紧随其后的命令是 @kbd{C-x C-f}，它将使用该编码系统读取文件（并记录稍后保存文件时的编码系统）。  或者，如果紧随其后的命令是@kbd{C-x C-w}，它将使用该编码系统写入文件。当您以这种方式指定保存的编码系统而不是使用@kbd{C-x @key{RET} f}时，如果缓冲区包含编码系统无法处理的字符，则不会发出警告。
+
+受指定编码系统影响的其他文件命令包括@kbd{C-x i}和@kbd{C-x C-v}，以及@kbd{C-x C-f}的其他窗口变体。  @kbd{C-x @key{RET} c} 还会影响启动子进程的命令，包括 @kbd{M-x shell} (@pxref{Shell})。  如果紧随其后的命令不使用编码系统，则 @kbd{C-x @key{RET} c} 最终无效。
+
+无需转换即可访问文件的简单方法是使用 @kbd{M-x find-file-literally} 命令。  @xref{Visiting}。
+
+变量 @code{buffer-file-coding-system} 的默认值指定创建新文件时要使用的编码系统的选择。当您找到新文件以及创建缓冲区然后将其保存在文件中时，它适用。  选择语言环境通常会将此变量设置为该语言环境的默认编码系统的良好选择。
+
+@kindex C-x RET r
+@findex revert-buffer-with-coding-system
+如果您访问的文件具有错误的编码系统，您可以使用 @kbd{C-x @key{RET} r} (@code{revert-buffer-with-coding-system}) 进行更正。这将使用您指定的编码系统再次访问当前文件。
+
+@findex recode-region
+如果一段文本已经使用错误的编码系统插入到缓冲区中，您可以使用 @kbd{M-x recode-region} 重新对其进行解码。  这会提示您输入正确的编码系统，然后提示您输入实际使用的错误编码系统，并进行转换。  它首先使用错误的编码系统对该区域进行编码，然后使用正确的编码系统再次对其进行解码。
+
+@node Communication Coding
+@section 进程间通信的编码系统
+
+本节说明如何指定用于与其他进程通信的编码系统。
+
+@table @kbd
+@item C-x @key{RET} x @var{coding} @key{RET}
+使用编码系统 @var{coding} 在其他图形应用程序之间传输选择 (@code{set-selection-coding-system})。
+
+@item C-x @key{RET} X @var{coding} @key{RET}
+使用编码系统 @var{coding} 将 @emph{one} 选择（下一个）传输到另一个图形应用程序 (@code{set-next-selection-coding-system}) 或从另一个图形应用程序 (@code{set-next-selection-coding-system}) 传输。
+
+@item C-x @key{RET} p @var{input-coding} @key{RET} @var{output-coding} @key{RET}
+使用编码系统 @var{input-coding} 和 @var{output-coding} 进行当前缓冲区 (@code{set-buffer-process-coding-system}) 中的子进程输入和输出。
+@end table
+
+@kindex C-x RET x
+@kindex C-x RET X
+@findex set-selection-coding-system
+@findex set-next-selection-coding-system
+命令 @kbd{C-x @key{RET} x} (@code{set-selection-coding-system}) 指定用于将所选文本发送到其他窗口应用程序以及用于接收在其他应用程序中所做选择的文本的编码系统。  此命令适用于所有后续选择，直到您再次使用该命令覆盖它。  命令 @kbd{C-x @key{RET} X} (@code{set-next-selection-coding-system}) 指定在 Emacs 中进行的下一个选择或由 Emacs 读取的编码系统。
+
+@vindex x-select-request-type
+变量 @code{x-select-request-type} 指定从 X Window 系统请求的数据类型，以接收来自其他应用程序的文本选择。  如果值为 @code{nil}（默认值），Emacs 按此顺序尝试 @code{UTF8_STRING} 和 @code{COMPOUND_TEXT}，并使用各种启发式方法选择两个结果中更合适的一个；如果这些都不成功，Emacs 就会求助于@code{STRING}。如果 5⁣ 的值是符号 @code{COMPOUND_TEXT}、@code{UTF8_STRING}、@code{STRING} 或 @code{TEXT} 之一，则 Emacs 仅使用该请求类型。  如果该值是其中一些符号的列表，则 Emacs 仅按顺序尝试列表中的请求类型，直到其中之一成功，或者直到列表耗尽。
+
+@kindex C-x RET p
+@findex set-buffer-process-coding-system
+命令 @kbd{C-x @key{RET} p} (@code{set-buffer-process-coding-system}) 指定子进程输入和输出的编码系统。  该命令适用于当前缓冲区；通常，每个子进程都有自己的缓冲区，因此您可以通过在相应的缓冲区中给出命令来使用此命令来指定与特定子进程之间的转换。
+
+您还可以在运行或启动子进程的命令之前使用 @kbd{C-x @key{RET} c} (@code{universal-coding-system-argument}) 来指定与该子进程通信的编码系统。  @xref{Text Coding}。
+
+进程输入和输出的默认翻译取决于当前的语言环境。
+
+@vindex locale-coding-system
+@cindex decoding non-@acronym{ASCII} keyboard input on X
+变量 @code{locale-coding-system} 指定在编码和解码系统字符串（例如系统错误消息和 @code{format-time-string} 格式和时间戳）时使用的编码系统。  该编码系统还可以用于解码 X Window 系统上的非 2⁣ 键盘输入，并且还将用于以批处理模式对发送到标准输出和错误流的文本进行编码。  您应该选择与底层系统的文本表示兼容的编码系统，通常由环境变量 @env{LC_ALL}、@env{LC_CTYPE} 和 @env{LANG} 之一指定。  （按照上面指定的顺序，第一个值非空的值决定文本表示形式。）
+
+@node File Name Coding
+@section 文件名编码系统
+
+@table @kbd
+@item C-x @key{RET} F @var{coding} @key{RET}
+使用编码系统 @var{coding} 来编码和解码文件名 (@code{set-file-name-coding-system})。
+@end table
+
+@findex set-file-name-coding-system
+@kindex C-x RET F
+@cindex file names with non-@acronym{ASCII} characters
+命令 @kbd{C-x @key{RET} F} (@code{set-file-name-coding-system}) 指定用于编码文件 @emph{names} 的编码系统。  对读写@emph{contents}文件没有影响。
+
+@vindex file-name-coding-system
+事实上，这个命令所做的只是设置变量@code{file-name-coding-system}的值。  如果将变量设置为编码系统名称（作为 Lisp 符号或字符串），Emacs 会使用该编码系统对所有文件操作的文件名进行编码。  这使得在文件名中使用非 1⁣ 字符成为可能，或者至少使用指定编码系统可以编码的非 2⁣ 字符。
+
+如果 @code{file-name-coding-system} 为 @code{nil}，Emacs 使用由所选语言环境确定的默认编码系统，并存储在 @code{default-file-name-coding-system} 变量中（通常为 UTF-8）。
+
+@cindex file-name encoding, MS-Windows
+@vindex w32-unicode-filenames
+当 Emacs 在 NT 系列后代的 MS-Windows 版本（Windows 2000、XP 和所有更高版本）上运行时，@code{file-name-coding-system} 的值在很大程度上被忽略，因为 Emacs 默认情况下使用允许直接传递 Unicode 文件名的 API。  相比之下，在 Windows 9X 上，文件名使用 @code{file-name-coding-system} 进行编码，应将其设置为与当前系统区域设置相关的代码页 (@pxref{Coding Systems, codepage})。  变量 @code{w32-unicode-filenames} 的值控制 Emacs 在调用接受文件名的操作系统函数时是否使用 Unicode API。  该变量在 Windows 9X 上由启动代码设置为 @code{nil}，在较新版本的 MS-Windows 上设置为 @code{t}。
+
+@strong{Warning:} 如果您在 Emacs 会话中更改 @code{file-name-coding-system}（或语言环境），并且您已经访问过其名称使用早期编码系统进行编码且无法在新编码系统下进行编码（或以不同方式编码）的文件，则可能会出现问题。  如果您尝试以访问的文件名保存这些缓冲区之一，则保存可能会使用错误的文件名，或者可能会遇到错误。  如果发生此类问题，请使用 @kbd{C-x C-w} 为该缓冲区指定新文件名。
+
+@findex recode-file-name
+如果在编码文件名时出现错误，请使用命令@kbd{M-x recode-file-name}更改文件名的编码系统。  这会提示输入现有文件名、其旧编码系统以及您希望转换到的编码系统。
+
+@node X Coding
+@section X 键盘输入的编码系统
+@cindex X input method coding systems
+X Window 系统下的输入方法指定了必须用于解码键盘输入的自己的编码系统。  默认情况下，Emacs 在与输入法服务器建立连接时自动确定每种输入法使用的编码系统，并使用该特定编码系统对键盘输入进行解码。  然而，这种决定有时可能会失败。在这种情况下，将使用区域设置编码系统 (@pxref{Communication Coding})。
+
+@cindex X input method coding systems, overriding
+@vindex x-input-coding-system
+如果输入法未正确声明其用于对文本进行编码的编码系统，则必须手动指定 Emacs 用于从输入法解码文本的编码系统。  当变量@code{x-input-coding-system}的值设置为符号时，无条件地用作用于解码来自输入法的键盘输入的编码系统。
+
+@node Terminal Coding
+@section 终端 I/O 编码系统
+
+@table @kbd
+@item C-x @key{RET} t @var{coding} @key{RET}
+使用编码系统 @var{coding} 进行终端输出 (@code{set-terminal-coding-system})。
+
+@item C-x @key{RET} k @var{coding} @key{RET}
+使用编码系统 @var{coding} 进行键盘输入 (@code{set-keyboard-coding-system})。
+@end table
+
+@kindex C-x RET t
+@findex set-terminal-coding-system
+命令@kbd{C-x @key{RET} t} (@code{set-terminal-coding-system}) 指定终端输出的编码系统。  如果为终端输出指定字符代码，则输出到终端的所有字符都将转换为该编码系统。
+
+此功能对于某些为支持特定语言或字符集而构建的纯字符终端非常有用，例如，支持 ISO 拉丁字符集之一的欧洲终端。  使用多字节文本时需要指定终端编码系统，以便 Emacs 知道终端实际可以处理哪些字符。
+
+默认情况下，终端的输出根本不会被翻译，除非 Emacs 可以根据您的终端类型或区域设置规范 (@pxref{Language Environments}) 推断出正确的编码系统。
+
+@kindex C-x RET k
+@findex set-keyboard-coding-system
+@vindex keyboard-coding-system
+命令@kbd{C-x @key{RET} k}（@code{set-keyboard-coding-system}）或变量@code{keyboard-coding-system}指定键盘输入的编码系统。  键盘输入的字符代码转换对于带有发送非 @acronym{ASCII} 图形字符的按键的终端非常有用，例如，一些为 ISO Latin-1 或其子集设计的终端。
+
+默认情况下，键盘输入根据您的系统区域设置进行翻译。  如果您的终端并不真正支持您的语言环境隐含的编码（例如，如果您发现在键入 @kbd{M-i} 时它会插入非 @acronym{ASCII} 字符），则需要将 @code{keyboard-coding-system} 设置为 @code{nil} 来关闭编码。你可以通过放置来做到这一点
+
+@lisp
+(set-keyboard-coding-system nil)
+@end lisp
+
+@noindent
+在你的初始化文件中。
+
+@findex w32-set-console-codepage
+设置 @code{keyboard-coding-system} 对 MS-Windows 没有影响，旧的 Windows 9X 系统除外，在这种情况下，编码必须与 MS-Windows 控制台的当前代码页匹配，可以通过调用 @code{w32-set-console-codepage} 进行更改。
+
+使用编码系统翻译进行键盘输入与使用输入法之间存在相似之处：两者都定义翻译为单个字符的键盘输入序列。  然而，输入法被设计为方便人类交互使用，并且翻译的序列通常是@acronym{ASCII}打印字符的序列。  编码系统通常翻译非图形字符序列。
+
+@node Fontsets
+@section 字体集
+@cindex fontsets
+
+字体通常定义单个字母或脚本的形状。因此，显示 Emacs 支持的整个脚本范围需要许多字体的集合。  在 Emacs 中，这样的集合称为 @dfn{fontset}。  字体集由一系列字体规范定义，每个字体规范被分配来处理一定范围的字符代码，并且可以依靠另一个字体集来处理其指定的字体未涵盖的字符。
+
+@cindex fonts for various scripts
+@cindex Intlfonts package, installation
+每个字体集都有一个名称，就像字体一样。  然而，虽然字体存储在系统中并且可用的字体名称由系统定义，但字体集是在 Emacs 本身内定义的。  一旦定义了字体集，您就可以在 Emacs 中通过指定其名称来使用它，无论您可以在任何可以使用单一字体的地方。  当然，Emacs 字体集只能使用您的系统支持的字体。  如果某些字符在屏幕上显示为空框或十六进制代码，则意味着它们使用的字体集没有适合这些字符的字体。  在这种情况下，或者如果显示了字符，但效果不如您所愿，您可能需要安装额外的字体或修改字体集以使用系统上已安装的特定字体（见下文）。  您的操作系统可能有可供安装的可选字体；或者您可以安装 GNU Intlfonts 软件包，其中包括大多数受支持脚本的字体。@footnote{If you run Emacs on X, you may need to inform the X server about the location of the newly installed fonts with commands such as:
+@c FIXME?  I feel like this may be out of date.
+@c E.g., the intlfonts tarfile is ~ 10 years old.
+
+@example
+ xset fp+ /usr/local/share/emacs/fonts
+ xset fp rehash
+@end example
+}
+
+Emacs 自动创建三个字体集： @dfn{standard fontset}、@dfn{startup fontset} 和 @dfn{default fontset}。
+@c FIXME?  The doc of *standard*-fontset-spec says:
+@c "You have the biggest chance to display international characters
+@c with correct glyphs by using the *standard* fontset." (my emphasis)
+@c See https://lists.gnu.org/r/emacs-devel/2012-04/msg00430.html
+默认字体集很可能具有各种非 @acronym{ASCII} 字符的字体，并且是其他两个字体集的默认后备，如果您设置默认字体而不是字体集。但是，它没有指定字体系列名称，因此如果直接使用它，结果可能会有些随机。  您可以通过使用 @samp{-fn} 选项启动 Emacs 来指定特定的字体集。  例如，
+
+@example
+emacs -fn fontset-standard
+@end example
+
+@noindent
+您还可以使用 @samp{Font} 资源 (@pxref{X Resources}) 指定字体集。
+
+如果没有指定使用的字体集，则 Emacs 使用 @acronym{ASCII} 字体，并使用 @samp{fontset-default} 作为字体未覆盖的字符的后备。  标准字体集仅在明确请求时才使用，无论其名称如何。
+
+@findex describe-fontset
+要显示有关特定字体集的信息，请使用 @w{@kbd{M-x describe-fontset}} 命令。  它提示输入字体集名称，默认为当前帧使用的字体集名称，然后显示该字体集中所有字符的子范围以及分配给它们的字体。  要查看 Emacs 在没有特定字体集的情况下启动的会话中使用哪些字体（这是正常情况），请在提示符下键入 @kbd{fontset-default @key{RET}}，或者仅键入 @kbd{@key{RET}} 来描述当前框架使用的字体集。
+
+字体集不一定为每个字符代码指定字体。  如果字体集没有为某个字符指定字体，或者指定的字体在您的系统上不存在，则无法正确显示该字符。  它将将该字符显示为十六进制代码或薄空格或空框。  （@xref{Text Display, , glyphless characters}，了解详细信息。）或者字体集可能为某些字符范围指定字体，但您可能不喜欢它们的视觉外观。  如果发生这种情况，您可能希望修改您的字体集；请参阅@ref{Modifying Fontsets}，了解如何做到这一点。
+
+@node Defining Fontsets
+@section 定义字体集
+
+@vindex standard-fontset-spec
+@vindex w32-standard-fontset-spec
+@vindex ns-standard-fontset-spec
+@cindex standard fontset
+当在 X 上运行时，Emacs 根据 @code{standard-fontset-spec} 的值自动创建标准字体集。  这个字体集的名字是
+
+@example
+-*-fixed-medium-r-normal-*-16-*-*-*-*-*-fontset-standard
+@end example
+
+@noindent
+或者简称 @samp{fontset-standard}。
+
+在 GNUstep 和 macOS 上，标准字体集是使用 @code{ns-standard-fontset-spec} 的值创建的，在 MS Windows 上，它是使用 @code{w32-standard-fontset-spec} 的值创建的。
+
+@c FIXME?  How does one access these, or do anything with them?
+@c Does it matter?
+标准字体集的粗体、斜体和粗斜体变体是自动创建的。  他们的名字用 @samp{bold} 代替 @samp{medium}，或用 @samp{i} 代替 @samp{r}，或两者兼而有之。
+
+@cindex startup fontset
+Emacs 根据您使用 @samp{Font} 资源或 @samp{-fn} 参数指定的任何默认 @acronym{ASCII} 字体，或者 Emacs 启动时找到的默认字体，自动生成字体集。  这是@dfn{startup fontset}，它的名字是@code{fontset-startup}。  Emacs 通过将 @var{charset_registry} 字段替换为 @samp{fontset}，将 @var{charset_encoding} 字段替换为 @samp{startup} 来生成此字体集，然后使用生成的字符串指定字体集。
+
+例如，如果您使用这种形式的字体启动 Emacs，
+
+@c FIXME?  I think this is a little misleading, because you cannot (?)
+@c actually specify a font with wildcards, it has to be a complete spec.
+@c Also, an X font specification of this form hasn't (?) been
+@c mentioned before now, and is somewhat obsolete these days.
+@c People are more likely to use a form like
+@c emacs -fn "DejaVu Sans Mono-12"
+@c How does any of this apply in that case?
+@example
+emacs -fn "*courier-medium-r-normal--14-140-*-iso8859-1"
+@end example
+
+@noindent
+Emacs 生成以下字体集并将其用于初始 X 窗口框架：
+
+@example
+-*-courier-medium-r-normal-*-14-140-*-*-*-*-fontset-startup
+@end example
+
+启动字体集将使用您指定的字体，或具有不同注册表和编码的变体，用于该字体支持的所有字符，并回退到 @samp{fontset-default} 对于其他字符。
+
+使用 X 资源@samp{Emacs.Font}，您可以指定字体集名称，就像实际的字体名称一样。  但要小心，不要在像 @samp{Emacs*Font} 这样的通配符资源中指定字体集名称——该通配符规范与各种其他资源相匹配，例如菜单，以及
+@c FIXME is this still true?
+菜单无法处理字体集。  @xref{X Resources}。
+
+您可以使用名为 @samp{Fontset-@var{n}} 的 X 资源指定其他字体集，其中 @var{n} 是从 0 开始的整数。资源值应具有以下形式：
+
+@smallexample
+@var{fontpattern}, @r{[}@var{charset}:@var{font}@r{]@dots{}}
+@end smallexample
+
+@noindent
+其中 @var{fontpattern} 应采用标准 X 字体名称的形式（请参阅前面的 fontset-startup 示例），最后两个字段除外。  它们的形式应该是@samp{fontset-@var{alias}}。
+
+每个字体集都有两个名称，一长一短。  长名称是@var{fontpattern}。  短名称是 @samp{fontset-@var{alias}}，长名称的最后 2 个字段（例如，@samp{fontset-startup} 表示启动时自动创建的字体集）。  您可以通过任一名称引用字体集。
+
+构造 @samp{@var{charset}:@var{font}} 指定对于一个特定字符集使用哪种字体（在此字体集中）。  这里，@var{charset}是字符集的名称，@var{font}是用于该字符集的字体。  您可以在定义一种字体集时多次使用此构造。
+
+对于其他字符集，Emacs 根据 @var{fontpattern} 选择字体。  它将 @samp{fontset-@var{alias}} 替换为描述字符集的值。  对于 @acronym{ASCII} 字符字体，@samp{fontset-@var{alias}} 替换为 @samp{ISO8859-1}。
+
+此外，当多个连续字段为通配符时，Emacs 会将它们折叠为单个通配符。  这是为了防止使用自动缩放字体。  缩放较大字体制作的字体无法用于编辑，缩放较小的字体也没有用，因为最好使用较小的字体本身的大小，这就是 Emacs 的做法。
+
+因此，如果@var{fontpattern}是这样的，
+
+@example
+-*-fixed-medium-r-normal-*-24-*-*-*-*-*-fontset-24
+@end example
+
+@noindent
+@acronym{ASCII} 字符的字体规范如下：
+
+@example
+-*-fixed-medium-r-normal-*-24-*-ISO8859-1
+@end example
+
+@noindent
+中文 GB2312 字符的字体规范如下：
+
+@example
+-*-fixed-medium-r-normal-*-24-*-gb2312*-*
+@end example
+
+您可能没有符合上述字体规格的中文字体。  大多数 X 发行版仅包含在 @var{family} 字段中具有 @samp{song ti} 或 @samp{fangsong ti} 的中文字体。  在这种情况下，@samp{Fontset-@var{n}}可以指定为：
+
+@smallexample
+Emacs.Fontset-0: -*-fixed-medium-r-normal-*-24-*-*-*-*-*-fontset-24,\
+        chinese-gb2312:-*-*-medium-r-normal-*-24-*-gb2312*-*
+@end smallexample
+
+@noindent
+然后，除中文 GB2312 字符外的所有字体规范在 @var{family} 字段中都具有 @samp{fixed}，而中文 GB2312 字符的字体规范在 @var{family} 字段中具有通配符 @samp{*}。
+
+@findex create-fontset-from-fontset-spec
+处理字体集资源值以创建字体集的函数称为@code{create-fontset-from-fontset-spec}。  您还可以显式调用此函数来创建字体集。
+
+@xref{Fonts}，有关字体命名的更多信息。
+
+@node Modifying Fontsets
+@section 修改字体集
+@cindex fontsets, modifying
+@findex set-fontset-font
+
+字体集并不总是需要从头开始创建。  如果只需要进行较小的更改，则修改现有字体集可能会更容易，通常是@samp{fontset-default}。  修改 @samp{fontset-default} 还会影响使用它作为后备的其他字体集，因此可以是解决 Emacs 为特定脚本选择的字体问题的有效方法。
+
+可以使用函数@code{set-fontset-font}修改字体集，指定要修改字体的字符、字符集、脚本或字符范围，以及要使用的字体的字体规范。  一些例子是：
+
+@example
+;; Prefer a big5 font for han characters.
+(set-fontset-font "fontset-default"
+                  'han (font-spec :registry "big5")
+                  nil 'prepend)
+
+@cindex emoji font
+;; Use "Noto Color Emoji" for the emoji script (this is the default).
+(set-fontset-font "fontset-default" 'emoji
+                  '("Noto Color Emoji" . "iso10646-1")
+                  nil 'prepend)
+
+;; Display the "heart" character using a color font.
+(set-fontset-font "fontset-default"
+                  #x2764 "Noto Color Emoji")
+
+;; Use MyPrivateFont for the Unicode private use area.
+(set-fontset-font "fontset-default"  '(#xe000 . #xf8ff)
+                  "MyPrivateFont")
+
+;; Use Liberation Mono for latin-3 charset.
+(set-fontset-font "fontset-default" 'iso-8859-3
+                  "Liberation Mono")
+
+;; Use DejaVu Sans Mono as a fallback in fontset-startup
+;; before resorting to fontset-default.
+(set-fontset-font "fontset-startup" nil "DejaVu Sans Mono"
+                  nil 'append)
+@end example
+
+@vindex use-default-font-for-symbols
+当修改@code{symbol}脚本的字体集时，@code{use-default-font-for-symbols}的值将影响该字体集是否实际使用。
+
+@noindent
+@xref{Fontsets, , , elisp, GNU Emacs Lisp Reference Manual}，了解有关使用 @code{set-fontset-font} 函数的更多详细信息。
+
+@cindex script of a character
+@cindex codepoint of a character
+如果您不知道该字符的代码点或其所属的脚本，您可以询问 Emacs。  将鼠标指向该字符，输入 @w{@kbd{C-u C-x =}} (@code{what-cursor-position})，该信息以及更多信息将显示在 Emacs 弹出的 @file{*Help*} 缓冲区中。  @xref{Position Info}。  例如，日语字符属于 @samp{kana} 脚本，但日语文本也将它们与中文字符混合，因此以下使用 @samp{han} 脚本将 Emacs 设置为日语文本使用 @samp{Kochi Gothic} 字体：
+
+@example
+(set-fontset-font "fontset-default" 'han "Kochi Gothic")
+@end example
+
+@noindent
+@cindex CKJ characters
+（为了方便起见，Emacs 中的 @samp{han} 脚本设置为支持所有中文、日文和韩文，即@: @acronym{CJK} 字符，而不仅仅是中文字符。）
+
+@vindex script-representative-chars
+有关已知脚本的列表，请参阅变量@code{script-representative-chars}。
+
+如上所述的字体集设置只会影响默认字体不支持的字符，因此如果 @samp{Kochi Gothic} 字体涵盖拉丁字符，它将不会用于显示拉丁脚本，因为 Emacs 使用的默认字体通常涵盖基本拉丁语。
+
+@cindex ignore font
+@cindex fonts, how to ignore
+@vindex face-ignored-fonts
+系统上安装的某些字体可能会损坏，或者对使用它们的字符产生令人不快的结果，并且您可能希望指示 Emacs 在搜索显示字符所需的合适字体时完全忽略它们。  您可以通过将有问题的字体添加到变量 @code{face-ignored-fonts} 的值（一个列表）来做到这一点。  这是一个放入 @file{~/.emacs} 的示例：
+
+@example
+(add-to-list 'face-ignored-fonts "Some Bad Font")
+@end example
+
+@node Undisplayable Characters
+@section 无法显示的字符
+
+您的终端可能无法显示一些非 @acronym{ASCII} 字符。  大多数文本终端仅支持单个字符集（使用变量 @code{default-terminal-coding-system} 告诉 Emacs 是哪一个，@ref{Terminal Coding}）；无法在该编码系统中编码的字符默认显示为 @samp{?}。
+
+图形显示器可以显示更广泛的字符，但您可能没有为所有这些字符安装字体；没有字体的字符显示为空心框。
+
+如果您使用 Latin-1 字符，但您的终端无法显示 Latin-1，您可以安排显示助记符 @acronym{ASCII} 序列，例如 @samp{"o} 表示 o-umlaut。  加载库 @file{iso-ascii} 来执行此操作。
+
+@vindex latin1-display
+如果您的终端可以显示 Latin-1，您可以使用等效的 Latin-1 字符和 @acronym{ASCII} 助记符的混合来显示其他欧洲字符集中的字符。  自定义变量 @code{latin1-display} 来启用此功能。  助记符@acronym{ASCII}序列大多与前缀输入法的助记符序列相对应。
+
+@node Unibyte Mode
+@section 单字节编辑模式
+
+@cindex European character sets
+@cindex accented characters
+@cindex ISO Latin character sets
+@cindex Unibyte operation
+ISO 8859 Latin-@var{n} 字符集定义了八进制 0240 到 0377（十进制 160 到 255）范围内的字符代码，以处理各种欧洲语言（以及一些非欧洲语言）所需的重音字母和标点符号。  请注意，即使在单字节缓冲区中（即，如果您禁用多字节字符），Emacs 也会将具有此范围内的代码的字节视为原始字节，而不是字符。  然而，Emacs 仍然可以处理这些字符代码，就好像它们一次属于单字节字符集 @emph{one} 一样。  要指定要使用的这些代码中的@emph{which}，请调用@kbd{M-x set-language-environment}并指定合适的语言环境，例如@samp{Latin-@var{n}}。 @xref{Disabling Multibyte, , Disabling Multibyte Characters, elisp, GNU Emacs Lisp Reference Manual}。
+
+@vindex unibyte-display-via-language-environment
+Emacs 还可以将 160 到 255 范围内的字节显示为可读字符，前提是所使用的终端或字体支持它们。  这会自动进行。  在图形显示上，Emacs 还可以通过字体集显示单字节字符，实际上是根据当前语言环境显示等效的多字节字符。  要请求此操作，请将变量 @code{unibyte-display-via-language-environment} 设置为非 @code{nil} 值。  请注意，设置此项仅影响这些字节的显示方式，但不会改变 Emacs 将它们视为原始字节而不是字符的基本事实。
+
+@cindex @code{iso-ascii} library
+如果您的终端不支持显示 Latin-1 字符集，Emacs 可以将这些字符显示为 @acronym{ASCII} 序列，这至少可以让您清楚地了解这些字符是什么。  为此，请加载库@code{iso-ascii}。  可以实现其他拉丁语@var{n}字符集的类似库，但到目前为止尚未实现。
+
+@findex standard-display-8bit
+@cindex 8-bit display
+通常非 ISO-8859 字符（128 到 159 之间的十进制代码）显示为八进制转义符。  您可以使用 @code{disp-table} 库中的函数 @code{standard-display-8bit} 更改 ISO-8859 字符集的非标准扩展版本。
+
+输入单字节非@acronym{ASCII}字符有两种方法：
+
+@itemize @bullet
+@cindex 8-bit input
+@item
+您可以使用适合所选语言环境的输入法。 @xref{Input Methods}。  当您在单字节缓冲区中使用输入法时，您用它指定的非 1⁣ 字符将转换为单字节。
+
+@item
+如果您的键盘可以生成 128（十进制）及以上的字符代码（代表非 0⁣ 字符），您可以直接键入这些字符代码。
+
+在图形显示上，您不需要执行任何特殊操作即可使用这些键；他们应该只是工作。  在文本终端上，您应该使用命令 @kbd{M-x set-keyboard-coding-system} 或自定义变量 @code{keyboard-coding-system} 来指定键盘使用的编码系统 (@pxref{Terminal Coding})。  启用此功能可能需要您使用 @key{ESC} 来输入元字符；但是，在控制台终端或终端模拟器（例如 @code{xterm}）上，您可以安排将 Meta 转换为 @key{ESC}，并且仍然能够直接在键盘上或使用 @key{Compose} 或 @key{AltGr} 键键入 8 位字符。  @xref{User Input}。
+
+@cindex input methods, native
+@cindex XIM, X Input Methods
+@cindex GTK input methods
+许多现代系统为许多没有为其字符分配键盘按键的语言提供 @dfn{native input methods}。如果 Emacs 是在支持这些本机输入法的情况下构建的，则您可以激活此类输入法并键入它们支持的字符。  如何激活和使用这些输入法取决于系统和输入法，这里不再赘述；请参阅您的系统文档。  这里我们描述一些 Emacs 工具来控制本机输入法的使用。
+
+@vindex x-gtk-use-native-input
+在使用 GTK 工具包构建的 Emacs 中，变量 @code{x-gtk-use-native-input} 控制 Emacs 是否应该接收 GTK 输入法生成的字符。  如果值为 @code{nil}，则默认情况下，Emacs 使用 X 输入法 (@acronym{XIM})，否则使用 GTK 输入法。  @code{useXIM} X 资源控制是否使用@acronym{XIM}，@code{inputStyle} X 资源控制原生输入法生成的预览文本在X 上的显示； @pxref{Table of Resources}。
+
+在 MS-Windows 上，Emacs 支持由输入法管理器@acronym{IMM} 提供的本机输入法，但如果需要可以将其关闭； @pxref{Windows Keyboard}。
+
+@cindex @code{iso-transl} library
+@cindex compose character
+@cindex dead character
+@item
+您可以使用键 @kbd{C-x 8} 作为输入非 @acronym{ASCII} Latin-1 和其他打印字符的组合字符前缀。  @kbd{C-x 8} 适合插入（在迷你缓冲区以及其他缓冲区中）、搜索以及允许键序列的任何其他上下文。
+
+@kbd{C-x 8} 通过加载 @code{iso-transl} 库来工作。  加载该库后，@key{Alt} 修饰键（如果键盘有）与 @kbd{C-x 8} 具有相同的用途：将 @key{Alt} 与重音字符一起使用来修改以下字母。  此外，如果键盘上有 Latin-1 死重音字符的键，一旦加载 @code{iso-transl} ，它们也被定义为与以下字符组合。
+
+使用 @kbd{C-x 8 C-h} 列出所有可用的 @kbd{C-x 8} 翻译。
+
+可用的翻译集可以使用 @kbd{M-x iso-transl-set-language} 命令用某些特定于语言的字符进行扩展。  当前支持的语言有：@samp{French}、@samp{German}、@samp{Portuguese}、@samp{Spanish} 和 @samp{Esperanto}。  详情请参见@code{iso-transl-language-alist}。
+@end itemize
+
+@node Charsets
+@section 字符集
+@cindex charsets
+
+在 Emacs 中，@dfn{charset} 是“字符集”的缩写。  Emacs 支持大多数流行的字符集（例如 @code{ascii}、@code{iso-8859-1}、@code{cp1250}、@code{big5} 和 @code{unicode}），以及它自己的一些字符集（例如 @code{emacs}、@code{unicode-bmp} 和 @code{eight-bit}）。  所有受支持的字符都属于一个或多个字符集。
+
+Emacs 通常会针对字符集执行正确的操作，因此您不必担心它们。  然而，了解一些有关字符集的基本细节有时会很有帮助。
+
+一个例子是字体选择 (@pxref{Fonts})。  每个语言环境 (@pxref{Language Environments}) 都定义了各种字符集的优先级列表。  当搜索字体时，Emacs 首先尝试查找可以显示最高优先级字符集的字体。  例如，在日语环境中，字符集@code{japanese-jisx0208}具有最高优先级，因此Emacs尝试使用@code{registry}属性为@samp{JISX0208.1983-0}的字体。
+
+@findex list-charset-chars
+@cindex characters in a certain charset
+@findex describe-character-set
+有两个命令可用于获取有关字符集的信息。  命令 @kbd{M-x list-charset-chars} 提示输入字符集名称，并显示该字符集中的所有字符。命令 @kbd{M-x describe-character-set} 提示输入字符集名称，并显示有关该字符集的信息，包括其在 Emacs 中的内部表示形式。
+
+@findex list-character-sets
+@kbd{M-x list-character-sets} 显示所有支持的字符集的列表。  该列表给出了字符集的名称以及用于标识每个字符集的附加信息；有关更多详细信息，请参阅 @url{https://www.itscj.ipsj.or.jp/itscj_english/, Information Processing Society of Japan/Information Technology Standards Commission of Japan (IPSJ/ITSCJ)} 维护的 @url{https://www.itscj.ipsj.or.jp/itscj_english/iso-ir/ISO-IR.pdf, ISO International Register of Coded Character Sets to be Used with Escape Sequences (ISO-IR)}。  在此列表中，字符集分为两类：首先列出 @dfn{normal charsets}，然后列出 @dfn{supplementary charsets}。  补充字符集用于定义另一个字符集（作为父字符集或子集），或为较旧的 Emacs 版本提供向后兼容性。
+
+要找出缓冲区中的字符属于哪个字符集，请在其前面放置点并输入 @kbd{C-u C-x =} (@pxref{International Chars})。
+
+@node Bidirectional Editing
+@section 双向编辑
+@cindex bidirectional editing
+@cindex right-to-left text
+
+Emacs 支持编辑用脚本编写的文本，例如阿拉伯语、波斯语和希伯来语，其水平文本的自然显示顺序是从右到左。  但是，这些脚本中嵌入的数字和拉丁文本仍然从左到右显示。  在拉丁文文档中嵌入一小部分阿拉伯语或希伯来语文本的情况也并不罕见。例如，作为程序源文件中的注释和字符串。  由于这些原因，使用这些脚本的文本实际上是 @dfn{bidirectional}：从左到右和从右到左字符的混合。
+
+本节介绍 Emacs 提供的用于编辑双向文本的工具和选项。
+
+@cindex logical order
+@cindex visual order
+Emacs 以所谓的 @dfn{logical}（或 @dfn{reading}）顺序存储从右到左的双向文本：您读取的第一个字符的缓冲区或字符串位置先于下一个字符。在显示时将双向文本重新排序为 @dfn{visual} 顺序。  因此，字符位置不再随其显示位置单调增加。  Emacs 实现 @uref{https://unicode.org/reports/tr9/, Unicode Standard Annex #9} 中描述的 Unicode 双向算法 (UBA)，用于对双向文本进行重新排序以供显示。它与 UBA 的区别仅在于当文本方向与基本段落方向相反时（例如，当从右到左的段落中出现一长行英文文本时）如何显示续行。
+
+@vindex bidi-display-reordering
+缓冲区局部变量 @code{bidi-display-reordering} 控制缓冲区中的文本是否重新排序以供显示。  如果其值为非 @code{nil}，Emacs 会在显示时对具有从右到左方向性的字符重新排序。  默认值为@code{t}。
+
+@cindex base direction of paragraphs
+@cindex paragraph, base direction
+@vindex bidi-paragraph-start-re
+@vindex bidi-paragraph-separate-re
+双向文本的每个段落都可以有自己的 @dfn{base direction}，从右到左或从左到右。  从左到右段落中的文本从屏幕上窗口的左边距开始，并在到达右边距时被截断或继续。  相比之下，从右到左的段落中的文本从右侧边距开始显示，并在左侧边距处继续或截断。  默认情况下，段落边界是空行，即完全由空白字符组成的行。  要改变这一点，您可以自定义两个变量@code{bidi-paragraph-start-re}和@code{bidi-paragraph-separate-re}，其值应该是正则表达式（字符串）；例如，要使用单个换行符开始一个新段落，请将这两个变量设置为 @code{"^"}。  这两个变量是缓冲区局部变量 (@pxref{Locals})。
+
+@vindex bidi-paragraph-direction
+Emacs 根据段落开头的文本动态确定每个段落的基本方向。  但是，有时缓冲区可能需要为其段落强制指定某个基本方向。  变量@code{bidi-paragraph-direction}，如果非@code{nil}，则禁用基本方向的动态确定，而是强制缓冲区中的所有段落具有由其缓冲区本地值指定的方向。  该值可以是 @code{right-to-left} 或 @code{left-to-right}。  任何其他值都被解释为 @code{nil}。
+
+@cindex LRM
+@cindex RLM
+或者，您可以通过在段落前面插入特殊格式字符来控制段落的基本方向。特殊字符 @code{RIGHT-TO-LEFT MARK} 或 @sc{rlm} 强制下一段从右到左方向，而 @code{LEFT-TO-RIGHT MARK} 或 @sc{lrm} 强制从左到右方向。  （您可以使用 @kbd{C-x 8 @key{RET}} 插入这些字符。）在 GUI 会话中，@sc{lrm} 和 @sc{rlm} 字符显示为非常细的空白字符；在文本终端上它们显示为空白。
+
+由于字符会重新排序以供显示，因此按逻辑顺序或在缓冲区位置上运行的 Emacs 命令可能会产生不寻常的效果。  例如，命令@kbd{C-f}和@kbd{C-b}按逻辑顺序移动point，因此当point遍历重新排序的双向文本时，光标有时会跳转。类似地，如果覆盖连续范围的字符位置的突出显示区域跨越重新排序的文本，则该区域可能看起来不连续。  这是正常现象，与支持双向文本的其他程序的行为类似。
+
+@kindex RIGHT@r{, and bidirectional text}
+@kindex LEFT@r{, and bidirectional text}
+@findex right-char@r{, and bidirectional text}
+@findex left-char@r{, and bidirectional text}
+绑定到箭头键的光标移动命令（例如 @key{LEFT} 和 @kbd{C-@key{RIGHT}}）对当前段落的基本方向敏感。  在从左到右的段落中，无论有或没有修饰符绑定到 @key{RIGHT} 的命令都会在缓冲区文本中移动 @emph{forward}，但在从右到左的段落中，它们会移动 @emph{backward}。  这反映了这样的事实：在从右到左的段落中，当向左移动时，缓冲区位置主要增加。
+
+当您移出段落时，如果前一个或后一个段落的基本方向与您移出的段落不同，则箭头键的含义可能会发生变化。发生这种情况时，您需要将按下的箭头键调整到新的基本方向。
+
+@vindex visual-order-cursor-movement
+@cindex cursor, visual-order motion
+默认情况下，@key{LEFT}和@key{RIGHT}按逻辑顺序移动，但如果@code{visual-order-cursor-movement}不是@code{nil}，这些命令相应地移动到当前屏幕位置左侧或右侧的字符，并根据需要移动到下一个或上一个屏幕行。  请注意，这可能会将点移开许多缓冲区位置，具体取决于周围的双向上下文。
+
+@cindex bidi formatting control characters
+双向文本有时使用特殊格式字符来影响显示文本的重新排序。  上面提到的@sc{lrm}和@sc{rlm}字符就是两个这样的字符，但是还有更多。  默认情况下，它们在 GUI 框架上显示为细空格字形，在文本模式框架上显示为简单空格。  如果您想了解这些特殊控制字符，以便它们的显示效果不会令人意外，您可以打开 @code{glyphless-display-mode} (@pxref{Text Display})。  此次要模式将使这些格式字符在小框中显示为首字母缩略词，以便它们在显示时脱颖而出，并使它们的效果更容易理解。

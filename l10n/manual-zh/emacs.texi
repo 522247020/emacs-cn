@@ -1,0 +1,1593 @@
+\输入texinfo
+
+@setfilename ../../info/emacs.info
+@settitle GNU Emacs 手册
+@documentlanguage en
+@include docstyle.texi
+@include emacsver.texi
+
+@c When printing, define EDITION to be the printed edition number, in
+@c the preferred style for ordinal edition numbers.  E.g., run the
+@c shell command "texi2any -D 'EDITION Nineteenth'" for the 19th
+@c printed edition where the edition number is spelled out in English.
+@c This relates mainly to the published book sold by the FSF.
+
+@copying
+@ifset EDITION
+这是@cite{GNU Emacs Manual}、@*的@value{EDITION}版本
+@end ifset
+@ifclear EDITION
+这是@cite{GNU Emacs Manual}，
+@end ifclear
+更新了 Emacs 版本@value{EMACSVER}。
+
+版权所有 @copyright{} 1985--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；不变部分为“GNU 宣言”、“分发”和“GNU 通用公共许可证”，封面文本为“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。  从 FSF 购买副本支持其开发 GNU 和促进软件自由。”
+@end quotation
+@end copying
+
+@dircategory Emacs
+@direntry
+* Emacs: (emacs).                可扩展的自文档文本编辑器。
+@end direntry
+
+@c in general, keep the following line commented out, unless doing a
+@c copy of this manual that will be published.  The manual should go
+@c onto the distribution in the full, 8.5 x 11" size.
+@c @set smallbook
+
+@ifset smallbook
+@smallbook
+@end ifset
+
+@c per rms and peterb, use 10pt fonts for the main text, mostly to
+@c save on paper cost.
+@c Do this inside @tex for now, so current makeinfo does not complain.
+@tex
+@ifset smallbook
+@fonttextsize 10
+@end ifset
+\global\hbadness=6666 % don't worry about not-too-underfull boxes
+@end tex
+
+@defcodeindex op
+@synindex pg cp
+
+@iftex
+@kbdinputstyle code
+
+@shorttitlepage GNU Emacs Manual
+@end iftex
+
+@titlepage
+@sp 6
+@center @titlefont{GNU Emacs Manual}
+@sp 4
+@ifset EDITION
+@center @value{EDITION} Edition, Updated for Emacs Version @value{EMACSVER}.
+@end ifset
+@ifclear EDITION
+@center Updated for Emacs Version @value{EMACSVER}
+@end ifclear
+@sp 5
+@center Richard Stallman et al.
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+
+@sp 2
+由自由软件基金会出版 @* 31 Milk Street, # 960789 @* Boston, MA 02196 @* ISBN 978-0-9831592-8-5
+
+@sp 2
+封面艺术由艾蒂安·苏瓦萨 (Etienne Suvasa) 创作；封面由FSF工作人员设计。
+
+@end titlepage
+
+@headings double
+
+@summarycontents
+@contents
+
+
+@ifnottex
+@node Top
+@top The Emacs Editor
+
+Emacs is the advanced, extensible, customizable, self-documenting
+editor.  This manual describes how to edit with Emacs and some of the
+ways to customize it; it corresponds to GNU Emacs version @value{EMACSVER}.
+
+@c See 'manual-html-mono' and 'manual-html-node' in admin/admin.el.
+@ifset WWW_GNU_ORG
+@html
+The GNU Emacs website is at
+<a href="/software/emacs/">https://www.gnu.org/software/emacs/</a>.<br>
+To view this manual in other formats, click
+<a href="/software/emacs/manual/emacs.html">here</a>.<br>
+You can also purchase a printed copy from the
+<a href="https://shop.fsf.org/product/emacs-manual/">FSF store</a>.
+@end html
+@end ifset
+
+@ifinfo
+If you are reading this in Emacs, type @kbd{h} to read a basic
+introduction to the Info documentation system.
+@end ifinfo
+
+For information on extending Emacs, see @ref{Top, Emacs Lisp,, elisp, The
+Emacs Lisp Reference Manual}.
+
+@insertcopying
+@end ifnottex
+
+@c Note that the TeX version generates its own TOC, so the ifnottex's
+@c here are not really necessary.
+@menu
+* Distrib::              如何获取最新的 Emacs 发行版。
+* Intro::                Emacs 概念简介。
+
+重要的一般概念
+* Screen::               如何解释您在屏幕上看到的内容。
+* User Input::           输入事件的种类（字符、按钮、功能键）。
+* Keys::                 按键序列：您键入的内容以请求一项编辑操作。
+* Mouse Input::          使用鼠标和键盘。
+* Commands::             命名函数通过按键序列运行来进行编辑。
+* Other Input::          除了鼠标、键盘和小键盘之外的输入。
+* Entering Emacs::       从 shell 启动 Emacs。
+* Exiting::              停止或终止 Emacs。
+
+基本编辑命令
+* Basic::                最基本的编辑命令。
+* Minibuffer::           输入提示的参数。
+* M-x::                  通过名称调用命令。
+* Help::                 用于向 Emacs 询问其命令的命令。
+
+重要的文本更改命令
+* Mark::                 标记：如何界定文本区域。
+* Killing::              删除（剪切）和拉取（粘贴）文本。
+* Registers::            保存文本字符串或缓冲区中的位置。
+* Display::              控制显示的文本。
+* Search::               查找或替换出现的字符串。
+* Fixit::                对于修复拼写错误特别有用的命令。
+* Keyboard Macros::      记录要重播的击键序列。
+
+Emacs的主要结构
+* Files::                所有关于处理文件。
+* Buffers::              多个缓冲区；一次编辑多个文件。
+* Windows::              在一帧中查看多段文本。
+* Frames::               在显示器上使用多个窗口。
+* International::        使用非@acronym{ASCII}字符集。
+
+高级功能
+* Modes::                主要模式和次要模式改变 Emacs 的基本行为。
+* Indentation::          编辑行首的空白。
+* Text::                 用于编辑人类语言的命令和模式。
+* Programs::             用于编辑程序的命令和模式。
+* Building::             编译、运行和调试程序。
+* Maintaining::          用于维护大型程序的功能。
+* Abbrevs::              定义文本缩写以减少打字。
+* Dired::                目录和文件管理器。
+* Calendar/Diary::       日历和日记设施。
+* Sending Mail::         在 Emacs 中发送邮件。
+* Rmail::                在 Emacs 中阅读邮件。
+* Gnus::                 灵活的邮件和新闻阅读器。
+* Host Security::        单台计算机上的安全问题。
+* Network Security::     管理网络安全。
+* Document View::        查看 PDF、PS 和 DVI 文件。
+* Shell::                从 Emacs 执行 shell 命令。
+* Emacs Server::         使用 Emacs 作为编辑服务器。
+* Printing::             打印缓冲区或区域的硬拷贝。
+* Sorting::              在 Emacs 中对行、段落或页面进行排序。
+@ifnottex
+* Picture Mode::        Editing pictures made up of text characters.
+@end ifnottex
+* Editing Binary Files::   使用 Hexl 模式编辑二进制文件。
+* Saving Emacs Sessions::  将 Emacs 状态从一个会话保存到下一个会话。
+* Recursive Edit::       在另一个命令中执行编辑。
+* Hyperlinking::         跟踪缓冲区中的链接。
+* Amusements::           各种游戏和黑客。
+* Packages::             安装附加功能。
+* Customization::        修改 Emacs 的行为。
+
+从问题中恢复
+* Quitting::             退出并中止。
+* Lossage::              如果 Emacs 挂起或出现故障该怎么办。
+* Bugs::                 如何以及何时报告错误。
+* Contributing::         如何为 Emacs 做出贡献。
+* Service::              如何获取满足您自己的 Emacs 需求的帮助。
+
+附录
+* Copying::              GNU 通用公共许可证允许您按照某些条款重新分发 GNU Emacs；它还解释说没有保修。
+* GNU Free Documentation License::  本文档的许可证。
+* Emacs Invocation::     毛茸茸的启动选项。
+* X Resources::          用于自定义 Emacs 的 X 资源。
+* Antinews::             有关 Emacs 版本 30 的信息。
+* Mac OS / GNUstep::      在 macOS 和 GNUstep 下使用 Emacs。
+* Haiku::                在 Haiku 上使用 Emacs。
+* Android::              在 Android 上使用 Emacs。
+* Microsoft Windows::    在 Microsoft Windows 和 MS-DOS 上使用 Emacs。
+* Manifesto::            什么是 GNU？  Gnu 不是 Unix！
+
+* Glossary::             本手册中使用的术语。
+@ifnottex
+* Acknowledgments::     Major contributors to GNU Emacs.
+@end ifnottex
+
+索引（每个索引包含一个大菜单）
+* Key Index::            每个标准 Emacs 键序列都有一个项目。
+* Option Index::         每个命令行选项都有一个项目。
+* Command Index::        每个标准命令名称都有一个项目。
+* Variable Index::       本手册中记录的每个变量都有一个项目。
+* Concept Index::        概念和其他一般主题的项目。
+
+@c Do NOT modify the following 3 lines!  They must have this form to
+@c be correctly identified by 'texinfo-multiple-files-update'.  In
+@c particular, the detailed menu header line MUST be identical to the
+@c value of 'texinfo-master-menu-header'.  See texnfo-upd.el.
+
+@detailmenu
+--- 详细节点列表 --- ---------------------------------
+
+以下是一些其他节点，它们实际上是已列出的节点的子节点，请在此处提及，以便您可以一步访问它们：
+
+屏幕的组织
+
+* Point::                文本中编辑命令运行的位置。
+* Echo Area::            短消息出现在屏幕底部。
+* Mode Line::            解释模式行。
+* Menu Bar::             如何使用菜单栏。
+
+触摸屏输入和虚拟键盘
+* Touchscreens::         通过触摸屏与 Emacs 交互。
+* On-Screen Keyboards::  使用虚拟键盘进行文本输入。
+
+基本编辑命令
+
+* Inserting Text::       只需键入即可插入文本。
+* Moving Point::         将光标移动到要更改内容的位置。
+* Erasing::              删除和删除文本。
+* Basic Undo::           撤消文本中最近的更改。
+* Basic Files::          访问、创建和保存文件。
+* Basic Help::           询问角色做什么。
+* Blank Lines::          创建和删除空行。
+* Continuation Lines::   Emacs 如何显示对于屏幕来说太宽的行。
+* Position Info::        点位于哪条线、行或列上？
+* Arguments::            用于重复命令 N 次的数字参数。
+* Repeating::            快速重复上一个命令。
+
+迷你缓冲区
+
+* Basic Minibuffer::       迷你缓冲区的基本用法。
+* Minibuffer File::      使用迷你缓冲区输入文件名。
+* Minibuffer Edit::      如何在迷你缓冲区中进行编辑。
+* Completion::           迷你缓冲区输入的缩写工具。
+* Minibuffer History::   重用最近的迷你缓冲区参数。
+* Repetition::           重新执行使用迷你缓冲区的命令。
+* Passwords::            在回显区域输入密码。
+* Yes or No Prompts::    在回声区域回答“是”或“否”。
+
+完成
+
+* Completion Example::   使用补全的示例。
+* Completion Commands::  完成命令的列表。
+* Completion Exit::      完成和迷你缓冲区文本提交。
+* Completion Styles::    如何选择完成匹配。
+* Completion Options::   完成选项。
+
+帮助
+
+* Help Summary::         所有帮助命令的简要列表。
+* Key Help::             询问 Emacs 中某个键的作用。
+* Name Help::            询问命令、变量或函数名称。
+* Apropos::              询问与给定主题相关的内容。
+* Help Mode::            帮助模式和帮助缓冲区的特殊功能。
+* Package Keywords::     通过关键字（主题）查找 Lisp 库。
+* Language Help::        有关国际语言支持的帮助。
+* Misc Help::            其他帮助命令。
+* Help Files::           显示辅助帮助文件的命令。
+* Help Echo::            有关活动文本和工具提示的帮助。
+
+马克和地区
+
+* Setting Mark::         设置标记的命令。
+* Marking Objects::      在文本单元周围放置区域的命令。
+* Using Region::         对区域内容进行操作的方法摘要。
+* Mark Ring::            先前的标记位置已保存，以便您可以返回那里。
+* Global Mark Ring::     各个缓冲区中先前的标记位置。
+* Shift Selection::      使用移动光标运动键。
+* Disabled Transient Mark::  默认情况下不突出显示区域。
+
+删除和移动文本
+
+* Deletion and Killing::  删除文本的命令。
+* Yanking::              插入文本的命令。
+* Cut and Paste::        图形显示上的剪贴板和选择。
+* Accumulating Text::    将文本添加到缓冲区的其他方法。
+* Rectangles::           对矩形区域中的文本进行操作。
+* CUA Bindings::         使用 @kbd{C-x}/@kbd{C-c}/@kbd{C-v} 进行杀死和猛拉。
+
+删除和杀掉
+
+* Deletion::             用于删除少量文本和空白区域的命令。
+* Killing by Lines::     如何一次删除整行文本。
+* Other Kill Commands::  用于删除大片文本区域和句法单元（例如单词和句子）的命令。
+* Kill Options::         影响杀戮的选项。
+
+扬金
+
+* Kill Ring::            存储被删除文本的位置。
+* Earlier Kills::        猛拉前段时间杀死的东西。
+* Appending Kills::      连续几次杀戮都猛烈地连在一起。
+
+图形显示上的剪切和粘贴操作
+
+* Clipboard::            Emacs 如何使用系统剪贴板。
+* Primary Selection::    临时选择的文本选择。
+* Secondary Selection::  切割时不改变点和标记。
+
+寄存器
+
+* Position Registers::         在寄存器中保存位置。
+* Text Registers::             将文本保存在寄存器中。
+* Rectangle Registers::        将矩形保存在寄存器中。
+* Configuration Registers::    将窗口/框架配置保存在寄存器中。
+* Number Registers::           寄存器中的数字。
+* File and Buffer Registers::  寄存器中的文件和缓冲区名称。
+* Keyboard Macro Registers::   寄存器中的键盘宏。
+* Bookmarks::                  书签就像寄存器一样，但是是持久的。
+
+控制显示
+
+* Scrolling::               在窗口中上下移动文本的命令。
+* Recentering::             将当前行居中的滚动命令。
+* Auto Scrolling::          需要时自动重新显示滚动文本。
+* Horizontal Scrolling::    在窗口中左右移动文本。
+* Narrowing::               将显示和编辑限制为缓冲区的一部分。
+* View Mode::               查看只读缓冲区。
+* Follow Mode::             跟随模式可以让两个窗口作为一个窗口滚动。
+* Faces::                   如何使用面孔更改显示样式。
+* Colors::                  指定面的颜色。
+* Standard Faces::          主要的预定义面。
+* Text Scale::              增加或减少缓冲区中的文本大小。
+* Font Lock::               使用面孔进行语法突出显示的次要模式。
+* Highlight Interactively::  告诉 Emacs 要突出显示哪些文本。
+* Fringes::                 启用或禁用窗口边缘。
+* Displaying Boundaries::   显示缓冲区的顶部和底部。
+* Useless Whitespace::      显示可能是虚假的尾随空格。
+* Selective Display::       隐藏带有大量缩进的线。
+* Optional Mode Line::      可选模式行显示功能。
+* Text Display::            文本字符通常如何显示。
+* Cursor Display::          显示光标的功能。
+* Line Truncation::         截断行以适应屏幕宽度，而不是将它们延续到多个屏幕行。
+* Visual Line Mode::        自动换行和基于屏幕行的编辑。
+* Display Custom::          有关用于自定义显示的变量的信息。
+
+字体锁定
+* Traditional Font Lock::   基于正则表达式和语法表的字体锁定。
+* Parser-based Font Lock::  基于外部解析器的字体锁定。
+* Semantic Font Lock::      基于语义分析的字体锁定。
+
+查找与替换
+
+* Incremental Search::      当您键入字符串时，就会进行搜索。
+* Nonincremental Search::   指定整个字符串然后搜索。
+* Word Search::             搜索单词序列。
+* Symbol Search::           搜索源代码符号。
+* Regexp Search::           搜索正则表达式的匹配项。
+* Regexps::                 正则表达式的语法。
+* Regexp Backslash::        正则表达式构造以“\”开头。
+* Regexp Example::          解释了一个复杂的正则表达式。
+* Lax Search::                 搜索会忽略相似字符之间的一些区别，例如字母大小写。
+* Replace::                 搜索并替换部分或全部匹配项。
+* Other Repeating Search::  对某些正则表达式的所有匹配项进行操作。
+* Search Customizations::   各种搜索定制。
+
+增量搜索
+
+* Basic Isearch::         基本增量搜索命令。
+* Repeat Isearch::        再次搜索相同的字符串。
+* Isearch Yank::          将文本抓取到搜索字符串或编辑搜索字符串的命令。
+* Error in Isearch::      当找不到你的字符串时。
+* Special Isearch::       增量搜索中的特殊输入。
+* Not Exiting Isearch::   前缀参数和滚动命令。
+* Isearch Minibuffer::    增量搜索迷你缓冲区历史记录。
+
+替换命令
+
+* Unconditional Replace::   替换字符串的所有匹配项。
+* Regexp Replace::          替换正则表达式的所有匹配项。
+* Replacement and Lax Matches:: 搜索要替换的文本不严格。
+* Query Replace::           如何使用查询。
+
+用于修复拼写错误的命令
+
+* Undo::                 撤消命令。
+* Transpose::            交换两个字符、单词、行、列表......
+* Fixing Case::          更正输入的最后一个单词的大小写。
+* Spelling::             将拼写检查器应用于单词或整个文件。
+
+键盘宏
+
+* Basic Keyboard Macro::      定义和运行键盘宏。
+* Keyboard Macro Ring::       以前的键盘宏的保存位置。
+* Keyboard Macro Counter::    在宏中插入递增数字。
+* Keyboard Macro Query::      让键盘宏每次执行不同的操作。
+* Save Keyboard Macro::       给键盘宏命名；将它们保存在文件中。
+* Edit Keyboard Macro::       编辑键盘宏。
+* Keyboard Macro Step-Edit::  交互式执行和编辑键盘宏。
+
+文件处理
+
+* File Names::           如何键入和编辑文件名参数。
+* Visiting::             访问文件使 Emacs 准备编辑该文件。
+* Saving::               保存使您的更改永久化。
+* Reverting::            恢复会取消所有未保存的更改。
+* Auto Revert::          自动保持缓冲区最新。
+* Auto Save::            自动保存会定期防止数据丢失。
+* File Aliases::         处理一个文件的多个名称。
+* Directories::          创建、删除和列出文件目录。
+* Comparing Files::      查找两个文件的不同之处。
+* Diff Mode::            编辑文件差异的模式。
+* Copying and Naming::   复制、命名和重命名文件。
+* Misc File Ops::        您可以对文件执行的其他操作。
+* Compressed Files::     访问压缩文件。
+* File Archives::        操作 tar、zip、jar 等@: 存档文件。
+* Remote Files::         访问其他机器上的文件。
+* Quoted File Names::    在文件名中引用特殊字符。
+* File Name Cache::      根据您经常使用的文件列表完成。
+* File Conveniences::    查找文件的便捷功能。
+* Image Mode::           查看图像文件。
+* Filesets::             处理文件集。
+
+保存文件
+
+* Save Commands::        用于保存文件的命令。
+* Backup::               Emacs 如何保存文件的旧版本。
+* Customize Save::       自定义文件的保存。
+* Interlocking::         Emacs 如何防止两个用户同时编辑一个文件。
+* File Shadowing::       自动将文件复制到影子。
+* Time Stamps::          Emacs 可以在保存文件时更新时间戳文本。
+
+备份文件
+
+* Backup Names::         备份文件的命名方式。
+* Backup Deletion::      Emacs 删除多余编号的备份。
+* Backup Copying::       可以通过复制或重命名来进行备份。
+
+自动更新时间戳
+
+* Time Stamp Customization::    如何使用时间戳模式进行自定义。
+* Time Stamps for One File::    确保特定文件的自动时间戳。
+
+@ifnottex
+Auto Reverting Non-File Buffers
+
+* Auto Reverting the Buffer Menu:: Auto Revert of the Buffer Menu.
+* Auto Reverting Dired::           Auto Revert of Dired buffers.
+@end ifnottex
+
+自动保存：防灾
+
+* Auto Save Files::      在您保存文件之前，实际上会在其中进行自动保存更改的文件。
+* Auto Save Control::    控制自动保存的时间和频率。
+* Recover::              从自动保存文件中恢复文本。
+
+使用多个缓冲区
+
+* Select Buffer::        创建一个新的缓冲区或重新选择一个旧的缓冲区。
+* List Buffers::         获取存在的缓冲区列表。
+* Misc Buffer::          重命名；更改只读状态；复制文本。
+* Kill Buffer::          杀死不再需要的缓冲区。
+* Several Buffers::      如何遍历所有缓冲区的列表并对其中的几个进行不同的操作。
+* Indirect Buffers::     间接缓冲区共享另一个缓冲区的文本。
+* Buffer Convenience::   缓冲区处理的便利和定制功能。
+
+缓冲区处理的便利功能和定制
+
+* Uniquify::             使缓冲区名称与目录部分唯一。
+* Icomplete::            快速迷你缓冲区选择。
+* Buffer Menus::         可配置的缓冲区菜单。
+
+多个窗口
+
+* Basic Window::         Emacs 窗口简介。
+* Split Window::         新窗口是通过分割现有窗口创建的。
+* Other Window::         移动到另一个窗口或对其执行某些操作。
+* Pop Up Window::        在另一个窗口中查找文件或缓冲区。
+* Change Window::        删除窗口并更改其大小。
+* Displaying Buffers::   Emacs 如何选择一个窗口来显示缓冲区。
+* Temporary Displays::   显示不可编辑的缓冲区。
+* Window Convenience::   窗口处理的便捷功能。
+* Tab Line::             窗口选项卡线。
+* Window Tool Bar::      附加到窗口的工具栏。
+
+在窗口中显示缓冲区
+
+* Window Choice::        @code{display-buffer} 如何工作。
+
+框架和图形显示
+
+* Mouse Commands::       使用鼠标移动、剪切和粘贴。
+* Word and Line Mouse::  用于选择整个单词或行的鼠标命令。
+* Mouse References::     使用鼠标从列表中选择一个项目。
+* Menu Mouse Clicks::    单击鼠标即可调出菜单。
+* Mode Line Mouse::      鼠标单击模式线。
+* Creating Frames::      创建具有各种内容的附加 Emacs 框架。
+* Frame Commands::       图标化、删除和切换框架。
+* Fonts::                更改框架字体。
+* Speedbar::             如何制作和使用速度栏框架。
+* Multiple Displays::    一个 Emacs 实例如何与多个显示器通信。
+* Frame Parameters::     更改框架的颜色和其他模式。
+* Scroll Bars::          如何启用和禁用滚动条；如何使用它们。
+* Window Dividers::      可以用鼠标拖动的窗口分隔符。
+* Drag and Drop::        使用拖放打开文件并插入文本。
+* Menu Bars::            启用和禁用菜单栏。
+* Tool Bars::            启用和禁用工具栏。
+* Tab Bars::             启用和禁用选项卡栏。
+* Dialog Boxes::         控制对话框的使用。
+* Tooltips::             显示当前鼠标位置的信息。
+* Mouse Avoidance::      防止鼠标指针遮挡文本。
+* Text Terminals::       终端上的多个框架仅显示一个。
+* Text-Only Mouse::      在文本终端中使用鼠标。
+
+国际字符集支持
+
+* International Chars::      多字节字符的基本概念。
+* Language Environments::    根据您使用的语言进行设置。
+* Input Methods::            输入不在键盘上的文本字符。
+* Select Input Method::      指定您选择的输入法。
+* Coding Systems::           读写文件时的字符集转换等等。
+* Recognize Coding::         Emacs 如何确定要使用哪种转换。
+* Specify Coding::           明确指定文件的编码系统。
+* Output Coding::            选择输出的编码系统。
+* Text Coding::              选择用于文件文本的转换。
+* Communication Coding::     用于进程间通信的编码系统。
+* File Name Coding::         文件@emph{names}的编码系统。
+* Terminal Coding::          指定用于转换终端输入和输出的编码系统。
+* Fontsets::                 字体集是涵盖整个字符范围的字体集合。
+* Defining Fontsets::        定义新的字体集。
+* Modifying Fontsets::       修改现有字体集。
+* Undisplayable Characters:: 当字符不显示时。
+* Unibyte Mode::             您可以选择一种欧洲字符集来使用，而不使用多字节字符。
+* Charsets::                 Emacs 如何对其内部字符代码进行分组。
+* Bidirectional Editing::    支持从右到左的脚本。
+
+主要和次要模式
+
+* Major Modes::          文本模式 vs.@: Lisp 模式 vs.@: C 模式...
+* Minor Modes::          每个次要模式都是您可以独立于其他任何模式打开的功能。
+* Choosing Modes::       访问文件时如何选择模式。
+
+缩进
+
+* Indentation Commands::   用于执行缩进的更多命令。
+* Tab Stops::              文本模式下缩进的停止点。
+* Just Spaces::            仅使用空格字符进行缩进。
+* Indent Convenience::     可选的缩进功能。
+* Code Alignment::         使行的公共部分从同一列开始。
+
+人类语言的命令
+
+* Words::                移过去，杀言。
+* Sentences::            移过去杀刑。
+* Paragraphs::           移动段落。
+* Pages::                翻页。
+* Quotation Marks::      插入引号。
+* Filling::              填充或调整文本。
+* Case::                 更改文本的大小写。
+* Text Mode::            编辑文本文件的主要模式。
+* Outline Mode::         编辑轮廓。
+* Org Mode::             Emacs 组织者。
+* TeX Mode::             编辑 TeX 和 LaTeX 文件。
+* HTML Mode::            编辑 HTML 和 SGML 文件。
+* Nroff Mode::           编辑 nroff 格式化程序的输入。
+* Enriched Text::        编辑包含字体、颜色等的文本。
+* Text Based Tables::    用于编辑基于文本的表格的命令。
+* Two-Column::           将文本列拆分为单独的窗口。
+
+填充文字
+
+* Auto Fill::            自动填充模式会自动断开长行。
+* Fill Commands::        重新填充段落和中心线的命令。
+* Fill Prefix::          填写缩进的段落或注释等。
+* Adaptive Fill::        Emacs 如何自动确定填充前缀。
+
+轮廓模式
+
+* Outline Format::       大纲的文本是什么样的。
+* Outline Motion::       用于在轮廓中移动的特殊命令。
+* Outline Visibility::   控制可见内容的命令。
+* Outline Views::        轮廓和多个视图。
+* Foldout::              折叠意味着放大轮廓。
+
+组织模式
+
+* Org Organizer::        管理 TODO 列表和议程。
+* Org Authoring::        将 Org 缓冲区导出为各种格式。
+
+@TeX{} Mode
+
+* TeX Editing::          用于在 TeX 模式下进行编辑的特殊命令。
+* LaTeX Editing::        LaTeX 输入文件的附加命令。
+* TeX Print::            使用 TeX 打印文件的一部分的命令。
+* TeX Misc::             TeX 模式的定制以及相关功能。
+
+丰富的文本
+
+* Enriched Mode::            进入和退出丰富模式。
+* Hard and Soft Newlines::   有两种不同类型的换行符。
+* Editing Format Info::      如何编辑文本属性。
+* Enriched Faces::           粗体、斜体、下划线等。
+* Enriched Indentation::     更改左右边距。
+* Enriched Justification::   居中、设置文本与左边距或右边距齐平等。
+* Enriched Properties::      “特殊文本属性”子菜单。
+
+@c The automatic texinfo menu update inserts some duplicate items here
+@c (faces, colors, indentation, justification, properties), because
+@c they are listed in two menus.  But we already have them above, no
+@c need to list them twice.
+
+编辑基于文本的表格
+
+* Table Definition::     什么是基于文本的表格。
+* Table Creation::       如何创建表格。
+* Table Recognition::    如何激活和停用表。
+* Cell Commands::        表中面向单元格的命令。
+* Cell Justification::   证明单元格内容合理。
+* Table Rows and Columns::  插入和删除行和列。
+* Table Conversion::     纯文本和表格之间的转换。
+* Table Misc::           表杂项。
+
+编辑节目
+
+* Program Modes::        编辑程序的主要模式。
+* Defuns::               对程序的主要顶层部分进行操作的命令。
+* Program Indent::       调整缩进以显示嵌套。
+* Parentheses::          对括号进行操作的命令。
+* Comments::             插入、删除和对齐注释。
+* Documentation::        获取您计划调用的函数的文档。
+* Hideshow::             有选择地显示块。
+* Symbol Completion::    完成程序或语言的符号名称。
+* MixedCase Words::      像这样处理标识符。
+* Semantic::             基于源代码解析的编辑工具套件。
+* Misc for Programs::    其他对于编辑程序有用的 Emacs 功能。
+* C Modes::              C、C++、Objective-C、Java、IDL、Pike 和 AWK 模式的特殊命令。
+* Asm Mode::             Asm 模式及其特殊功能。
+@ifnottex
+* Fortran::             Fortran mode and its special features.
+@end ifnottex
+
+顶级定义或 Defuns
+
+* Left Margin Paren::    如果左括号或类似的左分隔符位于左边距，则它会启动 defun。
+* Moving by Defuns::     用于移动或标记主要定义的命令。
+* Imenu::                将缓冲区索引制作为菜单。
+* Which Function::       哪个功能模式显示您处于哪个功能。
+
+程序缩进
+
+* Basic Indent::         缩进一行。
+* Multi-line Indent::    一次重新缩进多行的命令。
+* Lisp Indent::          指定每个 Lisp 函数应如何缩进。
+* C Indent::             用于缩进 C 和相关模式的额外功能。
+* Custom C Indent::      控制 C 和相关模式的缩进样式。
+
+带括号的编辑命令
+
+* Expressions::          带有平衡括号的表达式。
+* Moving by Parens::     在括号结构中向上、向下和横向移动的命令。
+* Matching::             插入结束分隔符会闪烁匹配打开分隔符。
+
+操纵评论
+
+* Comment Commands::     插入、删除和对齐注释。
+* Multi-Line Comments::  用于添加和编辑多行注释的命令。
+* Options for Comments:: 自定义评论功能。
+
+文档查找
+
+* Info Lookup::         在信息文件中查找库函数和命令。
+* Man Page::            查找库函数和命令的手册页。
+* Programming Language Doc::  查找程序函数、变量等。
+
+C 及相关模式
+
+* Motion in C::          通过 C 语句等移动的命令
+* Electric C::           冒号和其他字符可以自动重新缩进。
+* Hungry Delete::        更强大的 DEL 命令。
+* Other C Commands::     填充注释、查看宏扩展以及其他简洁的功能。
+
+@ifnottex
+Fortran Mode
+
+* Fortran Motion::      Moving point by statements or subprograms.
+* Fortran Indent::      Indentation commands for Fortran.
+* Fortran Comments::    Inserting and aligning comments.
+* Fortran Autofill::    Auto fill support for Fortran.
+* Fortran Columns::     Measuring columns for valid Fortran.
+* Fortran Abbrev::      Built-in abbrevs for Fortran keywords.
+
+Fortran Indentation
+
+* ForIndent Commands::  Commands for indenting and filling Fortran.
+* ForIndent Cont::      How continuation lines indent.
+* ForIndent Num::       How line numbers auto-indent.
+* ForIndent Conv::      Conventions you must obey to avoid trouble.
+* ForIndent Vars::      Variables controlling Fortran indent style.
+@end ifnottex
+
+编译和测试程序
+
+* Compilation::          用 Lisp 以外的语言（C、Pascal 等）编译程序。
+* Compilation Mode::     访问编译器错误的模式。
+* Compilation Shell::    正确定制您的 shell 以在编译缓冲区中使用。
+* Grep Searching::       用 grep 搜索。
+* Flymake::              即时查找语法错误。
+* Debuggers::            为非 Lisp 程序运行符号调试器。
+* Executing Lisp::       编辑 Lisp 程序的多种模式，以及运行 Lisp 程序的不同设施。
+* Lisp Libraries::       Lisp 程序如何加载到 Emacs 中。
+* Lisp Eval::            在 Emacs 中执行单个 Lisp 表达式。
+* Lisp Interaction::     在 Emacs 缓冲区中执行 Lisp。
+* External Lisp::        通过 Emacs 与单独的 Lisp 进行通信。
+
+在 Emacs 下运行调试器
+
+* Starting GUD::         如何启动调试器子进程。
+* Debugger Operation::   调试器和源缓冲区之间的连接。
+* Commands of GUD::      常用命令的键绑定。
+* GUD Customization::    为 GUD 定义您自己的命令。
+* GDB Graphical Interface::   一种使用GDB功能实现图形调试环境的增强模式。
+
+GDB图形界面
+
+* GDB User Interface Layout::    控制显示缓冲区的数量。
+* Source Buffers::               使用边缘/边缘的鼠标来控制您的程序。
+* Breakpoints Buffer::           断点控制面板。
+* Threads Buffer::               显示您的线程。
+* Stack Buffer::                 从调用堆栈中选择一个帧。
+* Other GDB Buffers::            其他用于控制 GDB 状态的缓冲区。
+* Watch Expressions::            监视速度栏中的变量值。
+* Multithreaded Debugging::      调试具有多个线程的程序。
+
+维护大型程序
+
+* Version Control::      使用版本控制系统。
+* Projects::             用于处理项目中的源文件的命令。
+* Change Log::           维护程序的更改历史记录。
+* Xref::                 查找程序中任何函数、方法、结构、宏、@dots{} 的定义和引用。
+* EDE::                  用于管理编程项目的替代工具。
+@ifnottex
+* Emerge::              A convenient way of merging two versions of a program.
+@end ifnottex
+* Bug Reference::        突出显示对错误报告的引用并在问题跟踪器中浏览它们。
+
+版本控制
+
+* Introduction to VC::   版本控制的一般工作原理。
+* VC Mode Line::         模式行如何显示版本控制状态。
+* Basic VC Editing::     如何在版本控制下编辑文件。
+* Log Buffer::           日志条目缓冲区中可用的功能。
+* Registering::          将文件置于版本控制之下。
+* Old Revisions::        检查和比较旧版本。
+* VC Change Log::        查看 VC 更改日志。
+* VC Undo::              在提交之前或之后取消更改。
+* VC Ignore::            忽略版本控制系统下的文件。
+* VC Directory Mode::    列出由版本控制管理的文件。
+* Branches::             多线发展。
+@ifnottex
+* Miscellaneous VC::    Various other commands and features of VC.
+* Customizing VC::      Variables that change VC's behavior.
+@end ifnottex
+
+版本控制简介
+
+* Why Version Control?::     了解它解决的问题。
+* Version Control Systems::  支持版本控制后端系统。
+* VCS Concepts::             与版本控制相关的词语和概念。
+* VCS Merging::              如何处理文件冲突。
+* VCS Changesets::           如何对更改进行分组。
+* VCS Repositories::         存储版本控制存储库的位置。
+* Types of Log File::        VCS 日志与 ChangeLog 不同。
+
+版本控制下的基本编辑
+
+* VC With A Merging VCS::   不加锁：CVS 的默认模式。
+* VC With A Locking VCS::   默认模式下的 RCS、SCCS 和可选的 CVS。
+* Advanced C-x v v::        通过前缀参数可以使用高级功能。
+
+VC目录模式
+
+* VC Directory Buffer::    缓冲区的外观和含义。
+* VC Directory Commands::  在 VC 目录缓冲区中使用的命令。
+
+版本控制分支
+
+* Switching Branches::        如何前往另一个现有分行。
+* Pulling / Pushing::         从其他地方接收/发送更改。
+* Merging::                   在分支之间转移更改。
+* Creating Branches::         如何开始一个新的分支。
+* Copying Between Branches::  复制修订版所做的更改。
+
+@ifnottex
+Miscellaneous Commands and Features of VC
+
+* Change Logs and VC::    Generating a change log file from log entries.
+* VC Delete/Rename::      Deleting and renaming version-controlled files.
+* Revision Tags::         Symbolic names for revisions.
+* Merge Bases::           The most recent revision existing on both branches.
+* Unintegrated Changes::  Diffs including all unintegrated changes on a branch.
+* Other Working Trees::   Multiple sets of workfiles.
+* Version Headers::       Inserting version control headers into working files.
+* Editing VC Commands::   Editing the VC shell commands that Emacs will run.
+* Preparing Patches::     Preparing and composing patches from within VC.
+* VC Auto-Reverting::     Updating buffer contents after VCS operations.
+* Rewinding Branches::    Commands to delete revisions from ends of branches.
+
+Customizing VC
+
+* General VC Options::    Options that apply to multiple back ends.
+* RCS and SCCS::          Options for RCS and SCCS.
+* CVS Options::           Options for CVS.
+@end ifnottex
+
+项目
+
+* Project File Commands::    用于处理项目文件的命令。
+* Project Buffer Commands::  用于处理项目缓冲区的命令。
+* Switching Projects::       在项目之间切换。
+* Managing Projects::        管理项目列表文件。
+* VC-Aware Project Backend::  默认项目后端。
+
+变更日志
+
+* Change Log Commands::  用于编辑更改日志文件的命令。
+* Format of ChangeLog::  更改日志文件是什么样子的。
+
+外部参照
+
+* Find Identifiers::     用于查找定义或引用标识符的位置、列出标识符等的命令。
+* Tags Tables::          Tags表记录了哪个文件定义了一个符号。
+* Select Tags Table::    如何访问特定的标签表。
+
+查找标识符
+
+* Looking Up Identifiers::  用于查找特定标记的定义的命令。
+* Xref Commands::           @file{*xref*} 缓冲区中的命令。
+* Identifier Search::       搜索和替换标识符。
+* List Identifiers::        列出标识符并完成它们。
+
+标签 表格
+
+* Tag Syntax::           各种类型的代码和文本文件的标记语法。
+* Create Tags Table::    使用 @command{etags} 创建标签表。
+* Etags Regexps::        使用正则表达式创建任意标签。
+
+@ifnottex
+Merging Files with Emerge
+
+* Overview of Emerge::  How to start Emerge.  Basic concepts.
+* Submodes of Emerge::  Fast mode vs.@: Edit mode.
+                          Skip Prefers mode and Auto Advance mode.
+* State of Difference:: You do the merge by specifying state A or B
+                          for each difference.
+* Merge Commands::      Commands for selecting a difference,
+                          changing states of differences, etc.
+* Exiting Emerge::      What to do when you've finished the merge.
+* Combining in Emerge::     How to keep both alternatives for a difference.
+* Fine Points of Emerge::   Miscellaneous issues.
+@end ifnottex
+
+缩写
+
+* Abbrev Concepts::      定义缩写的基础知识。
+* Defining Abbrevs::     定义缩写，以便在键入时它会扩展。
+* Expanding Abbrevs::    控制扩展：前缀、取消扩展。
+* Abbrevs Suggestions::  获取有关已定义缩写的自动建议。
+* Editing Abbrevs::      查看或编辑已定义缩写的整个列表。
+* Saving Abbrevs::       保存整个缩写列表以供另一个会话使用。
+* Dynamic Abbrevs::      缓冲区中已有单词的缩写。
+* Dabbrev Customization::  什么是单词，动态缩写。  办案。
+
+@ifnottex
+Editing Pictures
+
+* Basic Picture::         Basic concepts and simple commands of Picture Mode.
+* Insert in Picture::     Controlling direction of cursor motion
+                            after self-inserting characters.
+* Tabs in Picture::       Various features for tab stops and indentation.
+* Rectangles in Picture:: Clearing and superimposing rectangles.
+@end ifnottex
+
+Dired，目录编辑器
+
+* Dired Enter::               如何调用 Dired.
+* Dired Navigation::          Dired 缓冲区中的特殊运动命令。
+* Dired Deletion::            使用 Dired 删除文件。
+* Flagging Many Files::       根据文件名称标记文件。
+* Dired Visiting::            其他文件操作通过 Dired 进行。
+* Marks vs Flags::            删除标记与标记。
+* Operating on Files::        如何复制、重命名、打印、压缩等一个或多个文件。
+* Shell Commands in Dired::   对标记的文件运行 shell 命令。
+* Transforming File Names::   使用模式重命名多个文件。
+* Comparison in Dired::       通过 Dired 运行 @code{diff}。
+* Subdirectories in Dired::   将子目录添加到 Dired 缓冲区。
+@ifnottex
+* Subdir Switches::          Subdirectory switches in Dired.
+@end ifnottex
+* Subdirectory Motion::       跨子目录、上下移动。
+* Hiding Subdirectories::     使子目录可见或不可见。
+* Dired Updating::            丢弃不感兴趣的文件的行。
+* Dired and Find::            使用 @code{find} 选择 Dired 的文件。
+* Wdired::                    通过编辑 Dired 缓冲区来操作文件。
+* Image-Dired::               在 Dired 中查看图像缩略图。
+* Misc Dired Features::       各种其他功能。
+
+日历和日记
+
+* Calendar Motion::      浏览日历；选择日期。
+* Scroll Calendar::      将提前或推迟的几个月搬上银幕。
+* Counting Days::        两个日期之间有多少天？
+* General Calendar::     退出或重新计算日历。
+* Writing Calendar Files::  将日历写入各种格式的文件。
+* Holidays::             显示假期日期。
+* Sunrise/Sunset::       显示当地时间的日出和日落时间。
+* Lunar Phases::         显示月相。
+* Other Calendars::      将日期转换为其他日历系统。
+* Diary::                显示您日记中的事件。
+* Daylight Saving::      如何指定夏令时何时有效。
+* Time Intervals::       跟踪时间间隔。
+@ifnottex
+* Advanced Calendar/Diary Usage:: Advanced Calendar/Diary customization.
+@end ifnottex
+
+日历中的运动
+
+* Calendar Unit Motion::       按天、按周、按月、按年移动。
+* Move to Beginning or End::   移动到周、月和年的开始/结束。
+* Specified Dates::            移至当前日期或另一个特定日期。
+
+与其他日历的转换
+
+* Calendar Systems::        Emacs 能够理解的日历（公历除外）。
+* To Other Calendar::       将选定的日期转换为各种日历。
+* From Other Calendar::     移至另一个日历中指定的日期。
+
+日记
+
+* Format of Diary File::    在日记中输入事件。
+* Displaying the Diary::    查看日记条目和关联的日历日期。
+* Date Formats::            您可以通过多种方式指定日期。
+* Adding to Diary::         创建日记条目的命令。
+* Special Diary Entries::   周年纪念日、日期块、循环条目等。
+* Appointments::            提醒您何时该做某事。
+* Diary Conversion::        将日记事件与其他格式相互转换。
+
+日记转换
+
+* Diary iCalendar Import::       将 iCalendar 数据导入日记。
+* Diary iCalendar Display::      显示 iCalendar 数据而不导入。
+* Diary iCalendar Export::       将日记条目导出到 iCalendar。
+* Diary Outlook Import::         将 Outlook 约会导入日记。
+
+@ifnottex
+More advanced features of the Calendar and Diary
+
+* Calendar Customizing::   Calendar layout and hooks.
+* Holiday Customizing::    Defining your own holidays.
+* Mayan Calendar::         Moving to a date specified in a Mayan calendar.
+* Date Display Format::    Changing the format.
+* Time Display Format::    Changing the format.
+* Diary Customizing::      Defaults you can set.
+* Non-Gregorian Diary::    Diary entries based on other calendars.
+* Diary Display::          A choice of ways to display the diary.
+* Fancy Diary Display::    Sorting diary entries, using included diary files.
+* Sexp Diary Entries::     More flexible diary entries.
+@end ifnottex
+
+发送邮件
+
+* Mail Format::          邮件消息的格式。
+* Mail Headers::         一些标准邮件标头字段的详细信息。
+* Mail Aliases::         邮件地址的缩写和分组。
+* Mail Commands::        用于编辑正在撰写的邮件的特殊命令。
+* Mail Signature::       为每条消息添加签名。
+* Mail Amusements::      分散国家安全局的注意力；添加幸运消息。
+* Mail Methods::         使用替代邮件撰写方法。
+
+邮件命令
+
+* Mail Sending::         发送消息的命令。
+* Header Editing::       用于移动到标题字段并编辑它们的命令。
+* Citing Mail::          引用您正在回复的消息。
+* Mail Misc::            附件、拼写检查等
+
+使用 Rmail 读取邮件
+
+* Rmail Basics::         Rmail的基本概念，以及简单的使用。
+* Rmail Scrolling::      滚动浏览消息。
+* Rmail Motion::         转到另一封邮件。
+* Rmail Deletion::       删除和清除消息。
+* Rmail Inbox::          邮件如何进入 Rmail 文件。
+* Rmail Files::          使用多个 Rmail 文件。
+* Rmail Output::         将消息复制到文件中。
+* Rmail Labels::         通过标记消息对消息进行分类。
+* Rmail Attributes::     某些标准标签，称为属性。
+* Rmail Reply::          发送对您正在查看的消息的回复。
+* Rmail Summary::        摘要显示许多消息的简要信息。
+* Rmail Sorting::        在 Rmail 中对邮件进行排序。
+* Rmail Display::        Rmail 如何显示消息；定制。
+* Rmail Coding::         Rmail 如何处理解码字符集。
+* Rmail Editing::        在 Rmail 中编辑消息文本和标题。
+* Rmail Digest::         从摘要消息中提取消息。
+* Rmail Rot13::          读取 rot13 代码中编码的消息。
+* Movemail::             有关获取新邮件的更多详细信息。
+* Remote Mailboxes::     从远程邮箱检索邮件。
+* Other Mailbox Formats::  从本地邮箱中检索各种格式的邮件。
+
+Rmail 摘要
+
+* Rmail Make Summary::   进行各种总结。
+* Rmail Summary Edit::   操作摘要中的消息。
+
+牛羚
+
+* Buffers of Gnus::      组、摘要和文章缓冲区。
+* Gnus Startup::         关于启动 Gnus 您应该了解的内容。
+* Gnus Group Buffer::    Gnus 组命令的简短描述。
+* Gnus Summary Buffer::  Gnus 摘要命令的简短描述。
+
+文档查看
+
+* DocView Navigation::   导航 DocView 缓冲区。
+* DocView Searching::    搜索内部文档。
+* DocView Slicing::      指定显示页面的哪一部分。
+* DocView Conversion::   影响并触发转化。
+
+从 Emacs 运行 Shell 命令
+
+* Single Shell::         如何运行一个 shell 命令并返回。
+* Interactive Shell::    永久 shell 通过 Emacs 获取输入。
+* Shell Mode::           与永久 shell 一起使用的特殊 Emacs 命令。
+* Shell Prompts::        识别 shell 提示符的两种方法。
+* Shell History::        在 shell 缓冲区中重复先前的命令。
+* Directory Tracking::   跟踪子 shell 何时更改目录。
+* Shell Options::        用于自定义 Shell 模式的选项。
+* Terminal emulator::    作为终端模拟器的 Emacs 窗口。
+* Term Mode::            Term 模式下使用的特殊 Emacs 命令。
+* Remote Host::          连接到另一台计算机。
+* Serial Terminal::      连接到串行端口。
+
+Shell 命令历史记录
+
+* Shell Ring::            从历史列表中获取命令。
+* Shell History Copying:: 移动到命令，然后复制它。
+* History References::    扩展@samp{!}风格的历史参考。
+
+使用 Emacs 作为服务器
+
+* TCP Emacs server::      监听 TCP 套接字。
+* Invoking emacsclient::  连接到 Emacs 服务器。
+* emacsclient Options::   Emacs 客户端启动选项。
+
+打印硬拷贝
+
+* PostScript::            将缓冲区或区域打印为 PostScript。
+* PostScript Variables::  自定义 PostScript 打印命令。
+* Printing Package::      可选的高级打印接口。
+
+超链接和导航功能
+
+* EWW::                  Emacs 中的网络浏览器。
+* Embedded WebKit Widgets::  在 Emacs 缓冲区中嵌入浏览器小部件。
+* Browse-URL::           以下网址。
+* Goto Address mode::    激活 URL。
+* FFAP::                 在该点查找文件等@:。
+
+Emacs Lisp 包
+
+* Package Menu::          用于查看和管理包的缓冲区。
+* Package Statuses::      包可以具有哪些状态。
+* Package Installation::  软件包安装选项。
+* Package Files::         安装软件包的地方。
+
+定制化
+
+* Easy Customization::   浏览和更改设置的便捷方式。
+* Variables::            许多 Emacs 命令会检查 Emacs 变量来决定要做什么；通过设置变量，您可以控制它们的功能。
+* Key Bindings::         键映射说明了每个键运行的命令。通过更改它们，您可以重新定义键。
+* Init File::            如何在初始化文件中编写常见的自定义内容。
+* Authentication::       保留持久的身份验证信息。
+
+轻松定制界面
+
+* Customization Groups::      设置如何分类。
+* Browsing Custom::           浏览并搜索设置。
+* Changing a Variable::       如何编辑选项的值并设置选项。
+* Saving Customizations::     保存自定义以供将来的 Emacs 会话使用。
+* Face Customization::        如何编辑脸部的属性。
+* Specific Customization::    自定义特定设置或组。
+* Custom Themes::             自定义设置的集合。
+* Creating Custom Themes::    如何创建新的自定义主题。
+
+变量
+
+* Examining::            检查或设置一个变量的值。
+* Hooks::                挂钩变量让您可以指定 Emacs 的某些部分在特定场合运行的程序。
+* Locals::               变量的每个缓冲区值。
+* File Variables::       文件如何指定变量值。
+* Directory Variables::  如何通过目录指定变量值。
+* Connection Variables::  对具有远程默认目录的缓冲区有效的变量。
+
+文件中的局部变量
+
+* Specifying File Variables::  指定文件局部变量。
+* Safe File Variables::        确保文件局部变量是安全的。
+
+目录中的局部变量
+
+* EditorConfig support::   通过 EditorConfig 的每个目录变量
+
+自定义按键绑定
+
+* Keymaps::              一般性。  全局键盘映射。
+* Prefix Keymaps::       前缀键的键盘映射。
+* Local Keymaps::        主要模式和次要模式都有自己的键盘映射。
+* Minibuffer Maps::      迷你缓冲区使用自己的本地键盘映射。
+* Rebinding::            如何方便地重新定义一个按键的含义。
+* Init Rebinding::       使用初始化文件重新绑定密钥。
+* Modifier Keys::        在键绑定中使用修饰键。
+* Function Keys::        重新绑定终端功能键。
+* Named ASCII Chars::    区分 @key{TAB} 和 @kbd{C-i}，依此类推。
+* Mouse Buttons::        在 Emacs 中重新绑定鼠标按钮。
+* Disabling::            禁用命令意味着在执行之前需要确认。  这样做是为了防止初学者感到意外。
+
+Emacs 初始化文件
+
+* Init Syntax::          Emacs Lisp 中常量的语法。
+* Init Examples::        如何使用 init 文件做一些事情。
+* Terminal Init::        每种终端类型都可以有一个 init 文件。
+* Find Init::            Emacs 如何找到 init 文件。
+* Init Non-ASCII::       在初始化文件中使用非@acronym{ASCII}字符。
+* Early Init File::      另一个初始化文件，早期会被读取。
+
+处理 Emacs 问题
+
+* Stuck Recursive::      括号周围的模式行中的“[...]”。
+* Screen Garbled::       屏幕上有垃圾。
+* Text Garbled::         文中垃圾。
+* Memory Full::          当内存不足时如何应对。
+* Crashing::             Emacs 崩溃时会做什么。
+* After a Crash::        恢复崩溃的 Emacs 会话中的编辑。
+* Emergency Escape::     如果 Emacs 停止响应该怎么办。
+* DEL Does Not Delete::  如果@key{DEL}不删除怎么办。
+
+报告错误
+
+* Known Problems::       如何阅读已知问题和错误。
+* Bug Criteria::         你真的发现bug了吗？
+* Understanding Bug Reporting::  如何有效地报告错误。
+* Checklist::            良好的错误报告应遵循的步骤。
+* Sending Patches::      如何发送 GNU Emacs 补丁。
+
+为 Emacs 开发做出贡献
+
+* Coding Standards::      GNU Emacs 编码标准。
+* Copyright Assignment::  将版权分配给 FSF。
+
+Emacs 调用的命令行参数
+
+* Action Arguments::     访问文件、加载库和调用函数的参数。
+* Initial Options::      启动 Emacs 时生效的参数。
+* Command Example::      使用命令行参数的示例。
+* Environment::          Emacs 使用的环境变量。
+* Display X::            更改默认显示并使用远程登录。
+* Font X::               在 X 下选择文本字体。
+* Colors X::             选择显示颜色。
+* Window Size X::        启动窗口大小，位于 X 下方。
+* Borders X::            内部和外部边界，位于 X 下方。
+* Title X::              指定初始帧的标题。
+* Icons X::              在 X 下选择要使用的图标类型。
+* Misc X::               其他显示选项。
+
+环境变量
+
+* General Variables::    所有版本的 Emacs 使用的环境变量。
+* Misc Variables::       某些特定于系统的变量。
+* MS-Windows Registry::  MS-Windows 环境的替代方案。
+
+X 选项和资源
+
+* Resources::            在 Emacs 中使用 X 资源（一般情况）。
+* Table of Resources::   影响 Emacs 的特定 X 资源表。
+* Lucid Resources::      Lucid 菜单的 X 资源。
+* Motif Resources::      Motif 和 LessTif 菜单的 X 资源。
+* GTK resources::        GTK 小部件的资源。
+
+GTK资源
+
+* GTK Resource Basics::    GTK+资源的基本使用。
+* GTK Widget Names::       GTK+ 小部件的命名方式。
+* GTK Names in Emacs::     Emacs 使用的 GTK+ 小部件。
+* GTK styles::             GTK+ 小部件中可以自定义哪些内容。
+
+Emacs 和 macOS / GNUstep
+
+* Mac / GNUstep Basics::         GNUstep 或 macOS 下的基本 Emacs 使用。
+* Mac / GNUstep Customization::  GNUstep 或 macOS 下的自定义。
+* Mac / GNUstep Events::         如何处理窗口系统事件。
+* GNUstep Support::              有关 GNUstep 支持状态的详细信息。
+
+Emacs 和俳句
+
+* Haiku Basics::         Haiku 下的 Emacs 基本使用和安装。
+* Haiku Fonts::          在 Haiku 上显示字体的各种选项。
+
+Emacs 和 Android
+
+* What is Android?::             前言。
+* Android Startup::              在 Android 上启动 Emacs。
+* Android File System::          Android 文件系统。
+* Android Document Providers::   从其他程序访问文件。
+* Android Environment::          在 Android 下运行 Emacs。
+* Android Windowing::            Android 窗口系统。
+* Android Fonts::                Android下的字体选择。
+* Android Troubleshooting::      处理问题。
+* Android Software::             获取额外的软件。
+
+Emacs 和 Microsoft Windows/MS-DOS
+
+* Windows Startup::      如何在 Windows 上启动 Emacs。
+* Text and Binary::      文本文件使用 CRLF 来终止行。
+* Windows Files::        Windows 上的文件名约定。
+* ls in Lisp::           Dired 的 @code{ls} 模拟。
+* Windows HOME::         Emacs 在哪里查找 @file{.emacs} 以及它的启动位置。
+* Windows Keyboard::     Windows 特定的键盘功能。
+* Windows Mouse::        Windows 特定的鼠标功能。
+* Windows Processes::    在 Windows 上运行子进程。
+* Windows Printing::     如何在 MS-Windows 上指定打印机。
+* Windows Fonts::        指定 MS-Windows 上的字体。
+* Windows Misc::         各种 Windows 功能。
+@ifnottex
+* MS-DOS::              Using Emacs on MS-DOS.
+
+Emacs and MS-DOS
+
+* MS-DOS Keyboard::     Keyboard conventions on MS-DOS.
+* MS-DOS Mouse::        Mouse conventions on MS-DOS.
+* MS-DOS Display::      Fonts, frames and display size on MS-DOS.
+* MS-DOS File Names::   File name conventions on MS-DOS.
+* MS-DOS Printing::     Printing specifics on MS-DOS.
+* MS-DOS and MULE::     Support for internationalization on MS-DOS.
+* MS-DOS Processes::    Running subprocesses on MS-DOS.
+@end ifnottex
+
+@end detailmenu
+@end menu
+
+@iftex
+@unnumbered Preface
+
+  This manual documents the use and simple customization of the Emacs
+editor.  Simple Emacs customizations do not require you to be a
+programmer, but if you are not interested in customizing, you can
+ignore the customization hints.
+
+  This is primarily a reference manual, but can also be used as a
+primer.  If you are new to Emacs, we recommend you start with the
+integrated, learn-by-doing tutorial, before reading the manual.  To
+run the tutorial, start Emacs and type @kbd{C-h t} (which is ``control
+h and then t'').  The tutorial describes commands, tells you when to
+try them, and explains the results.  The tutorial is available in
+several languages.
+
+  On first reading, just skim chapters 1 and 2, which describe the
+notational conventions of the manual and the general appearance of the
+Emacs display screen.  Note which questions are answered in these
+chapters, so you can refer back later.  After reading chapter 4, you
+should practice the commands shown there.  The next few chapters
+describe fundamental techniques and concepts that are used constantly.
+You need to understand them thoroughly, so experiment with them
+until you are fluent.
+
+  Chapters 14 through 19 describe intermediate-level features that are
+useful for many kinds of editing.  Chapter 20 and following chapters
+describe optional but useful features; read those chapters when you
+need them.
+
+  Read the Common Problems chapter if Emacs does not seem to be
+working properly.  It explains how to cope with several common
+problems (@pxref{Lossage,, Dealing with Emacs Trouble}), as well as
+when and how to report Emacs bugs (@pxref{Bugs}).
+
+  To find the documentation of a particular command, look in the index.
+Keys (character commands) and command names have separate indexes.
+There is also a glossary, with a cross-reference for each term.
+
+  This manual is available as a printed book and also as an Info file.
+The Info file is for reading from Emacs itself, or with the Info program.
+Info is the principal format for documentation in the GNU system.
+The Info file and the printed book contain substantially the same text
+and are generated from the same source files, which are also
+distributed with GNU Emacs.
+
+  GNU Emacs is a member of the Emacs editor family.  There are many
+Emacs editors, all sharing common principles of organization.  For
+information on the underlying philosophy of Emacs and the lessons
+learned from its development, see @cite{Emacs, the Extensible,
+Customizable Self-Documenting Display Editor}, available from
+@url{https://dspace.mit.edu/handle/1721.1/5736}.
+
+This version of the manual is mainly intended for use with GNU Emacs
+installed on GNU and Unix systems.  GNU Emacs can also be used on
+MS-DOS, Microsoft Windows, and Macintosh systems.  The Info file
+version of this manual contains some more information about using
+Emacs on those systems.  Those systems use different file name syntax;
+in addition MS-DOS does not support all GNU Emacs features.
+@xref{Microsoft Windows}, for information about using Emacs on
+Windows.  @xref{Mac OS / GNUstep}, for information about using Emacs
+on Macintosh (and GNUstep).
+@end iftex
+
+@node Distrib
+@unnumbered 分配
+
+GNU Emacs 是@dfn{free software}；这意味着每个人都可以自由使用它，并在某些条件下自由重新分发它。  GNU Emacs 不属于公共领域；它受版权保护，并且对其分发有限制，但这些限制旨在允许良好合作的公民想做的一切。不允许的是试图阻止其他人进一步共享他们可能从您那里获得的任何版本的 GNU Emacs。  确切的条件可以在 Emacs 附带的 GNU 通用公共许可证中找到，并且也出现在本手册@footnote{This manual is itself covered by the GNU Free Documentation License.  This license is similar in spirit to the General Public License, but is more suitable for documentation.  @xref{GNU Free Documentation License}.}中。 @xref{Copying}。
+
+获取 GNU Emacs 副本的一种方法是从拥有它的其他人那里获得。您无需征求我们的许可即可这样做，也无需告诉其他任何人；只需复制它即可。  如果您可以访问互联网，您可以通过匿名 FTP 获取 GNU Emacs 的最新发行版；请参阅我们网站上的@url{https://www.gnu.org/software/emacs}了解更多信息。
+
+当您购买计算机时，您还可能会收到 GNU Emacs。  计算机制造商可以按照适用于其他所有人的相同条款自由分发副本。  这些条款要求他们向您提供完整的源代码，包括他们可能所做的任何更改，并允许您根据通用公共许可证的通常条款重新分发从他们那里收到的 GNU Emacs。  换句话说，当您获得该程序时，该程序必须对您免费，而不仅仅是对制造商免费。
+
+如果您发现 GNU Emacs 有用，请@strong{send a donation} 到自由软件基金会来支持我们的工作。  向自由软件基金会捐款在美国可以免税@. 如果您在工作场所使用 GNU Emacs，请建议公司捐款。要捐赠，请参阅@url{https://my.fsf.org/donate/}。有关您可以提供帮助的其他方式，请参阅@url{https://www.gnu.org/help/help.html}。
+
+@c The command view-order-manuals uses this anchor.
+@anchor{Printed Books}
+我们还出售本手册的硬拷贝版本以及 Robert J. Chassell 撰写的 @cite{An Introduction to Programming in Emacs Lisp}。您可以访问我们的在线商店：@url{https://shop.fsf.org/}。销售收入将用于支持基金会的宗旨：开发新的自由软件以及改进包括 GNU Emacs 在内的现有程序。
+
+如果您需要联系自由软件基金会，请参阅@url{https://www.fsf.org/about/contact/}，或写信至
+
+@display
+自由软件基金会 31 Milk Street, # 960789 Boston, MA 02196 USA
+@end display
+
+@iftex
+@node Acknowledgments
+@unnumberedsec Acknowledgments
+
+@c Nowadays we add names to this list only while simultaneously adding
+@c them to ack.texi.  There remain lots of names here that aren't in
+@c ack.texi for historical reasons.
+@c It's hard to update this fairly.
+@c I wonder if it would be better to drop it in favor of AUTHORS?
+Contributors to GNU Emacs include Jari Aalto, Eric Abrahamsen, Per
+Abrahamsen, Tomas Abrahamsson, Jay K. Adams, Alon Albert, Michael
+Albinus, Nagy Andras, Benjamin Andresen, Ralf Angeli, Dmitry Antipov,
+Aur@'elien Aptel, Joe Arceneaux, Emil @AA{}str@"om, Miles Bader, David
+Bakhash, Juanma Barranquero, Eli Barzilay, Thomas Baumann, Steven
+L. Baur, Jay Belanger, Alexander L. Belikoff, Thomas Bellman, Scott
+Bender, Boaz Ben-Zvi, Sergey Berezin, Stephen Berman, Jonas Bernoulli,
+Karl Berry, Anna M. Bigatti, Ray Blaak, David Blacka, Martin Blais, Jim
+Blandy, Johan Bockg@aa{}rd, Jan B@"ocker, Joel Boehland, Lennart
+Borgman, Per Bothner, Terrence Brannon, Frank Bresz, Peter Breton,
+Emmanuel Briot, Kevin Broadey, Vincent Broman, Michael Brouwer, David
+M. Brown, Ken Brown, Stefan Bruda, Georges Brun-Cottan, Joe Buehler,
+Scott Byer, W@l{}odek Bzyl, Tino Calancha, Bill Carpenter, Damien
+Cassou, Per Cederqvist, Hans Chalupsky, Chris Chase, Bob Chassell,
+Jihyun Cho, Andrew Choi, Chong Yidong, Sacha Chua, Stewart Clamen, James
+Clark, Mike Clarkson, Glynn Clements, Andrea Corallo, Andrew Cohen,
+Daniel Colascione, Christoph Conrad, Ludovic Court@`es, Andrew Csillag,
+Toby Cubitt, Baoqiu Cui, Doug Cutting, Mathias Dahl, Yue Daian, Julien
+Danjou, Satyaki Das, Vivek Dasmohapatra, Dan Davison, Michael DeCorte,
+Gary Delp, Nachum Dershowitz, Dave Detlefs, Matthieu Devin, Christophe
+de Dinechin, Eric Ding, Jan Dj@"arv, Lawrence R. Dodd, Carsten Dominik,
+Scott Draves, Benjamin Drieu, Viktor Dukhovni, Jacques Duthen, Dmitry
+Dzhus, John Eaton, Rolf Ebert, Carl Edman, David Edmondson, Paul Eggert,
+Stephen Eglen, Christian Egli, Torbj@"orn Einarsson, Helmut Eller,
+Tsugutomo Enami, David Engster, Hans Henrik Eriksen, Michael Ernst, Ata
+Etemadi, Frederick Farnbach, Oscar Figueiredo, Jared Finder, Fred Fish,
+Steve Fisk, Thomas Fitzsimmons, Karl Fogel, Gary Foster, Eric S. Fraga,
+Romain Francoise, Noah Friedman, Andreas Fuchs, Shigeru Fukaya, Xue
+Fuqiao, Hallvard Furuseth, Keith Gabryelski, Peter S. Galbraith, Kevin
+Gallagher, Fabi@'an E. Gallina, Kevin Gallo, Juan Le@'en Lahoz Garc@'ia,
+Howard Gayle, Daniel German, Stephen Gildea, Julien Gilles, David
+Gillespie, Bob Glickstein, Nicolas Goaziou, Deepak Goel, David De La
+Harpe Golden, Boris Goldowsky, David Goodger, Jacob Gore, Chris Gray,
+Kevin Greiner, Michelangelo Grigni, Odd Gripenstam, Kai Gro@ss{}johann,
+Michael Gschwind, Bastien Guerry, Henry Guillaume, Dmitry Gutov, Doug
+Gwyn, Bruno Haible, Ken'ichi Handa, Lars Hansen, Chris Hanson, Jesper
+Harder, Alexandru Harsanyi, K. Shane Hartman, John Heidemann, Jon
+K. Hellan, Magnus Henoch, Markus Heritsch, Dirk Herrmann, Karl Heuer,
+Manabu Higashida, Joe Hildebrand, Konrad Hinsen, Torsten Hilbrich,
+Juergen Hoetzel, Anders Holst, Jeffrey C. Honig, J@"urgen H@"otzel,
+Tassilo Horn, Kurt Hornik, Khaled Hosny, Tom Houlder, Joakim Hove, Denis
+Howe, Lars Ingebrigtsen, Andrew Innes, Seiichiro Inoue, Philip Jackson,
+Martyn Jago, Pavel Janik, Paul Jarc, Ulf Jasper, Thorsten Jolitz,
+Michael K. Johnson, Kyle Jones, Terry Jones, Simon Josefsson, Alexandre
+Julliard, Rahul Martim Juliato, Arne J@o{}rgensen, Jambunathan K, Tomoji
+Kagatani, Brewster Kahle, Tokuya Kameshima, Lute Kamstra, Stefan Kangas,
+Ivan Kanis, David Kastrup, David Kaufman, Henry Kautz, Taichi Kawabata,
+Taro Kawagishi, Howard Kaye, Michael Kifer, Richard King, Wilhelm
+Kirschbaum, Peter Kleiweg, Karel Kl@'i@v{c}, Shuhei Kobayashi, Pavel
+Kobyakov, Larry K. Kolodney, David Howard Kaye, Michael Kifer, Richard
+King, Peter Kleiweg, M. Koppelman, Koseki Yoshinori, Robert Krawitz,
+Sebastian Kremer, Ryszard Kubiak, Tak Kunihiro, Igor Kuzmin, David
+K@aa{}gedal, Daniel LaLiberte, Karl Landstrom, Mario Lang, Aaron Larson,
+James R. Larus, Gemini Lasswell, Vinicius Jose Latorre, Richard
+Lawrence, Werner Lemberg, Frederic Lepied, Peter Liljenberg, Christian
+Limpach, Lars Lindberg, Chris Lindblad, Anders Lindgren, Thomas Link,
+Juri Linkov, Francis Litterio, Sergey Litvinov, Leo Liu, Emilio
+C. Lopes, Martin Lorentzson, Dave Love, Eric Ludlam, K@'aroly
+L@H{o}rentey, Sascha L@"udecke, Greg McGary, Roland McGrath, Michael
+McNamara, Alan Mackenzie, Christopher J. Madsen, Neil M. Mager, Arni
+Magnusson, Artur Malabarba, Ken Manheimer, Bill Mann, Brian Marick,
+St@'ephane Marks, Simon Marshall, Bengt Martensson, Charlie Martin,
+Yukihiro Matsumoto, Tomohiro Matsuyama, David Maus, Thomas May, Will
+Mengarini, David Megginson, Jimmy Aguilar Mena, Stefan Merten, Ben
+A. Mesander, Wayne Mesard, Brad Miller, Lawrence Mitchell, Richard
+Mlynarik, Gerd M@"ollmann, Bret Mogilefsky, Dani Moncayo, Stefan
+Monnier, David Moore, Keith Moore, Jan Moringen, Morioka Tomohiko, Glenn
+Morris, Don Morrison, John Muhl, Diane Murray, Riccardo Murri, Sen
+Nagata, Erik Naggum, Gergely Nagy, Nobuyoshi Nakada, Thomas Neumann,
+Mike Newton, Thien-Thi Nguyen, Jurgen Nickelsen, Dan Nicolaescu, Hrvoje
+Nik@v{s}i@'c, Jeff Norden, Andrew Norman, Theresa O'Connor, Kentaro
+Ohkouchi, Christian Ohler, Kenichi Okada, Alexandre Oliva, Bob Olson,
+Michael Olson, Takaaki Ota, Mark Oteiza, Pieter E. J. Pareit, Ross
+Patterson, David Pearson, Juan Pechiar, Jeff Peck, Damon Anton Permezel,
+Tom Perrine, William M. Perry, Per Persson, Jens Petersen, Nicolas
+Petton, Daniel Pfeiffer, Justus Piater, Richard L. Pieri, Fred
+Pierresteguy, Fran@,{c}ois Pinard, Daniel Pittman, Christian Plaunt,
+Alexander Pohoyda, David Ponce, Noam Postavsky, Francesco A. Potort@`i,
+Michael D. Prange, Mukesh Prasad, Steve Purcell, Vincenzo Pupillo, Jim
+Radford, Ken Raeburn, Marko Rahamaa, Ashwin Ram, Eric S. Raymond, Paul
+Reilly, Edward M. Reingold, David Reitter, Alex Rezinsky, Rob Riepel,
+Lara Rios, Adrian Robert, Nick Roberts, Roland B. Roberts, John
+Robinson, Denis B. Roegel, Danny Roozendaal, Sebastian Rose, William
+Rosenblatt, Markus Rost, Guillermo J. Rozas, Martin Rudalics, Ivar
+Rummelhoff, Jason Rumney, Wolfgang Rupprecht, Benjamin Rutt, Kevin Ryde,
+Phil Sainty, James B. Salem, Masahiko Sato, Timo Savola, Jorgen
+Sch@"afer, Holger Schauer, William Schelter, Ralph Schleicher, Gregor
+Schmid, Michael Schmidt, Ronald S. Schnell, Philippe Schnoebelen, Jan
+Schormann, Alex Schroeder, Stefan Schoef, Rainer Sch@"opf, Raymond
+Scholz, Eric Schulte, Andreas Schwab, Randal Schwartz, Oliver Seidel,
+Daniel Semyonov, Manuel Serrano, Paul Sexton, Hovav Shacham, Stanislav
+Shalunov, Marc Shapiro, Richard Sharman, Olin Shivers, Tibor @v{S}imko,
+Espen Skoglund, Rick Sladkey, Lynn Slater, Chris Smith, David Smith, JD
+Smith, Paul D. Smith, Wilson Snyder, William Sommerfeld, Simon South,
+Andre Spiegel, Michael Staats, Richard M. Stallman, Thomas Steffen, Ulf
+Stegemann, Reiner Steib, Sam Steingold, Ake Stenhoff, Philipp Stephani,
+Peter Stephenson, Ken Stevens, Andy Stewart, Jonathan Stigelman, Martin
+Stjernholm, Kim F.  Storm, Steve Strassmann, Christopher Suckling, Olaf
+Sylvester, Naoto Takahashi, Steven Tamm, Jan Tatarik, Jo@~ao T@'avora,
+Luc Teirlinck, Jean-Philippe Theberge, Jens T.@: Berger Thielemann,
+Reuben Thomas, Spencer Thomas, Jim Thompson, Theodor Thornhill, Toru
+Tomabechi, Andy Oram, David O'Toole, Markus Triska, Tom Tromey, Eli
+Tziperman, Daiki Ueno, Masanobu Umeda, Rajesh Vaidheeswarran, Neil
+W. Van Dyke, Didier Verna, Joakim Verona, Ulrik Vieth, Christian Vogler,
+Geoffrey Voelker, Johan Vromans, Inge Wallin, John Paul Wallington,
+Colin Walters, Barry Warsaw, Christoph Wedler, Ilja Weis, Zhang Weize,
+Morten Welinder, Joseph Brian Wells, Rodney Whitby, Sean Whitton, John
+Wiegley, Sascha Wilde, Ed Wilkinson, Mike Williams, Roland Winkler, Bill
+Wohler, Steven A. Wood, Dale R. Worley, Francis J. Wright, Felix
+S. T. Wu, Tom Wurgler, Yamamoto Mitsuharu, Po Lu, Katsumi Yamaoka,
+Masatake Yamato, Eshel Yaron, Jonathan Yavner, Ryan Yeske, Ilya
+Zakharevich, Milan Zamazal, Victor Zandy, Eli Zaretskii, Jamie Zawinski,
+Andrew Zhilin, Shenghuo Zhu, Piotr Zieli@'nski, Ian T. Zimmermann, Reto
+Zimmermann, Neal Ziring, Teodor Zlatanov, and Detlev Zundel.
+@end iftex
+
+@node Intro
+@unnumbered 介绍
+
+您正在阅读有关 GNU Emacs 的内容，它是高级、自记录、可定制、可扩展编辑器 Emacs 的 GNU 化身。 （中的@samp{G}
+@c Workaround makeinfo 4 bug.
+@c https://lists.gnu.org/r/bug-texinfo/2004-08/msg00009.html
+@iftex
+@acronym{GNU, @acronym{GNU}'s Not Unix}
+@end iftex
+@ifnottex
+@acronym{GNU, GNU's Not Unix}
+@end ifnottex
+并不沉默。）
+
+我们称 Emacs @dfn{advanced} 是因为它能做的不仅仅是简单的插入和删除文本。  它可以控制子进程、自动缩进程序、一次显示多个文件、像编辑本地文件一样编辑远程文件等等。  Emacs 编辑命令以字符、单词、行、句子、段落和页面以及各种编程语言中的表达式和注释进行操作。
+
+@dfn{Self-documenting} 表示您可以随时使用特殊命令（称为 @dfn{help commands}）来查找您的选项是什么，或者查找任何命令的作用，或者查找与给定主题相关的所有命令。  @xref{Help}。
+
+@dfn{Customizable} 意味着您可以通过简单的方式轻松更改 Emacs 命令的行为。  例如，如果您使用的编程语言的注释以 @samp{<**} 开头并以 @samp{**>} 结尾，您可以告诉 Emacs 注释操作命令使用这些字符串 (@pxref{Comments})。  再举一个例子，您可以将基本光标移动命令（上、下、左、右）重新绑定到键盘上您觉得舒服的任何键。 @xref{Customization}。
+
+@dfn{Extensible} 意味着您可以超越简单的自定义并创建全新的命令。  新命令只是用 Lisp 语言编写的程序，由 Emacs 自己的 Lisp 解释器运行。  甚至可以在编辑会话中重新定义现有命令，而无需重新启动 Emacs。  Emacs 中的大部分编辑命令都是用 Lisp 编写的；少数异常本来可以用 Lisp 编写，但为了提高效率而使用 C。编写扩展就是编程，但非程序员也可以在之后使用它。  @xref{Top, Emacs Lisp Intro, Preface, eintr, An Introduction to Programming in Emacs Lisp}，如果你想学习 Emacs Lisp 编程。
+
+@include screen.texi
+@include commands.texi
+@include entering.texi
+@include basic.texi
+@include mini.texi
+@include m-x.texi
+@include help.texi
+@include mark.texi
+@include killing.texi
+@include regs.texi
+@include display.texi
+@include search.texi
+@include fixit.texi
+@include kmacro.texi
+@c Includes arevert-xtra.
+@include files.texi
+@include buffers.texi
+@include windows.texi
+@include frames.texi
+@include mule.texi
+@include modes.texi
+@include indent.texi
+@include text.texi
+@c Includes fortran-xtra.
+@include programs.texi
+@include building.texi
+@c Includes vc1-xtra, emerge-xtra.
+@include maintaining.texi
+@include abbrevs.texi
+@c Includes dired-xtra.
+@include dired.texi
+@c Includes cal-xtra.
+@include calendar.texi
+@include sending.texi
+@include rmail.texi
+@c Includes picture-xtra.texi
+@include misc.texi
+@include package.texi
+@include custom.texi
+@include trouble.texi
+
+@node Copying
+@appendix GNU 通用公共许可证
+@include gpl.texi
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@include cmdargs.texi
+@include xresources.texi
+
+@include anti.texi
+@include macos.texi
+@include haiku.texi
+@include android.texi
+@c Includes msdos-xtra.
+@include msdos.texi
+@include gnu.texi
+@include glossary.texi
+@ifnottex
+@include ack.texi
+@end ifnottex
+
+@c The Option Index is produced only in the on-line version,
+@c because the index entries related to command-line options
+@c tend to point to the same pages and all begin with a dash.
+
+@node Key Index
+@unnumbered 关键（字符）索引
+@printindex ky
+
+@ifnottex
+@node Option Index
+@unnumbered Command-Line Options Index
+@printindex op
+@end ifnottex
+
+@node Command Index
+@unnumbered 命令和功能索引
+@printindex fn
+
+@node Variable Index
+@unnumbered 变量索引
+@printindex vr
+
+@node Concept Index
+@unnumbered 概念索引
+@printindex cp
+
+@bye

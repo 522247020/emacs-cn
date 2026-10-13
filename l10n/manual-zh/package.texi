@@ -1,0 +1,414 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Packages
+@chapter Emacs Lisp 包
+@cindex Package
+@cindex Package archive
+
+Emacs 通过在 @dfn{packages} 中实现附加功能进行扩展，这些功能是 Emacs Lisp 库。  这些可以由您编写或由其他人提供。  如果您想安装这样的包以便在将来的 Emacs 会话中可用，您需要编译它并将其放在 Emacs 查找 Lisp 库的目录中。  @xref{Lisp Libraries}，有关此手动安装方法的更多详细信息。  许多软件包在 Lisp 文件开头附近的大量注释中提供了安装和使用说明；您可以使用这些说明来安装和微调您对该软件包的使用。
+
+@cindex Emacs Lisp package archive
+包也可以由 @dfn{package archives} 提供，它是 Emacs Lisp 包的大集合。  每个包都是一个单独的 Emacs Lisp 程序，有时还包括其他组件，例如信息手册@footnote{Note that if your system sets the @env{INFOPATH} environmental variable, without a trailing path separator, then this shadows the manuals that Emacs registers during startup, @xref{Other Info Directories,,,texinfo, Texinfo}.}。  Emacs 包含一个功能，可以让您轻松地从此类档案中下载和安装软件包。  本章的其余部分将介绍此功能。
+
+要从软件包档案中列出可安装的软件包，请输入 @w{@kbd{M-x list-packages @key{RET}}}。  它会打开一个名为 @file{*Packages*} 的缓冲区，其中包含所有包的列表。  您可以通过此缓冲区安装或卸载软件包。  @xref{Package Menu}。
+
+命令 @kbd{C-h P} (@code{describe-package}) 提示输入包的名称，并显示帮助缓冲区，描述包的属性及其实现的功能。
+
+默认情况下，Emacs 从两个存档下载包：@url{https://elpa.gnu.org/, GNU ELPA} 和 @url{https://elpa.nongnu.org/, NonGNU ELPA}。  这些由 Emacs 开发人员维护并由 GNU 项目托管。  或者，您还可以从第三方档案下载软件包。  @xref{Package Installation}。
+
+有关将 Emacs Lisp 程序转换为可安装包的信息，@xref{Packaging,,,elisp, The Emacs Lisp Reference Manual}。
+
+@menu
+* Package Menu::          用于查看和管理包的缓冲区。
+* Package Statuses::      包可以具有哪些状态。
+* Package Installation::  软件包安装选项。
+* Package Files::         安装软件包的地方。
+* Fetching Package Sources::   直接从源管理包。
+@end menu
+
+@node Package Menu
+@section 包菜单缓冲区
+@cindex package menu
+@cindex built-in package
+@findex list-packages
+
+命令@kbd{M-x list-packages}调出@dfn{package menu}。这是一个缓冲区，列出了 Emacs 知道的所有包，每行一个，并包含以下信息：
+
+@itemize @bullet
+@item 
+包名称（例如，@samp{auctex}）。
+
+@item 
+包的版本号（例如，@samp{11.86}）。
+
+@item 
+软件包的状态——通常为@samp{available}（可以从软件包档案中下载）、@samp{installed}、
+@c @samp{unsigned} (installed, but not signed; @pxref{Package Signing}),
+或 @samp{built-in} （默认包含在 Emacs 中）。 @xref{Package Statuses}。
+
+@item 
+如果您启用了多个包存档，则该包来自哪个包存档。
+
+@item 
+包的简短描述。
+@end itemize
+
+@noindent
+@code{list-packages} 命令访问网络，从包存档服务器检索可用包的列表。  如果网络不可用，它将退回到最近检索的列表。
+
+在包列表缓冲区中使用的主要命令是 @key{x} 命令。  如果尚未安装点下的软件包，此命令将安装它。  如果点下的软件包已经安装，此命令将删除它。
+
+包菜单中提供了以下命令：
+
+@table @kbd
+@item h
+@kindex h @r{(Package Menu)}
+@findex package-menu-quick-help
+打印一条简短消息，总结如何使用包菜单 (@code{package-menu-quick-help})。
+
+@item ?
+@itemx @key{RET}
+@kindex ? @r{(Package Menu)}
+@kindex RET @r{(Package Menu)}
+@findex package-menu-describe-package
+在当前行 (@code{package-menu-describe-package}) 显示包的帮助缓冲区，类似于 @kbd{C-h P} 命令 (@pxref{Packages}) 显示的帮助窗口。
+
+@item i
+@kindex i @r{(Package Menu)}
+@findex package-menu-mark-install
+将当前行上的软件包标记为安装 (@code{package-menu-mark-install})。  如果包状态为 @samp{available}，则会在行首添加一个 @samp{I} 字符；输入@kbd{x}（见下文）将下载并安装该软件包。
+
+@item d
+@kindex d @r{(Package Menu)}
+@findex package-menu-mark-delete
+将当前行上的包标记为删除 (@code{package-menu-mark-delete})。  如果包状态为 @samp{installed}，则会在行首添加一个 @samp{D} 字符；输入@kbd{x}（见下文）将删除该包。 @xref{Package Files}，有关删除包所需的信息。
+
+@item w
+@kindex w @r{(Package Menu)}
+@findex package-browse-url
+在浏览器中打开当前行的包网站 (@code{package-browse-url})。  @code{browse-url} 用于打开浏览器。
+
+@item ~
+@kindex ~ @r{(Package Menu)}
+@findex package-menu-mark-obsolete-for-deletion
+将所有过时的包标记为删除 (@code{package-menu-mark-obsolete-for-deletion})。  这标记为删除所有状态为 @samp{obsolete} 的包。
+
+@item u
+@itemx @key{DEL}
+@kindex u @r{(Package Menu)}
+@findex package-menu-mark-unmark
+删除先前通过 @kbd{i} 或 @kbd{d} 命令 (@code{package-menu-mark-unmark}) 添加到当前行的任何安装或删除标记。
+
+@item U
+@kindex U @r{(Package Menu)}
+@findex package-menu-mark-upgrades
+将所有软件包标记为更新的可用版本以进行升级 (@code{package-menu-mark-upgrades})。  这会在新的可用版本上放置一个安装标记，并在旧的安装版本上放置一个删除标记（标记为状态@samp{obsolete}）。  默认情况下，这不会标记有新版本可用的内置包，但自定义 @code{package-install-upgrade-built-in} 可以改变这一点。  @xref{Package Installation}。  如果将 @code{package-install-upgrade-built-in} 自定义为非 @code{nil} 值，请务必检查 @kbd{U} 命令标记的所有内置包，以避免更新您不想覆盖的内置包。
+
+@item x
+@kindex x @r{(Package Menu)}
+@vindex package-menu-async
+@findex package-menu-execute
+下载并安装所有标有@kbd{i}的软件包及其依赖项；另外，删除所有标有 @kbd{d} (@code{package-menu-execute}) 的包。  这也消除了标记。  如果没有标记任何软件包，此命令将安装 point 下的软件包（如果尚未安装），或删除 point 下的软件包（如果已安装）。
+
+@item g
+@item r
+@kindex g @r{(Package Menu)}
+@kindex r @r{(Package Menu)}
+刷新包列表 (@code{revert-buffer})。  这会再次从包存档中获取可用包的列表，并重新显示包列表。
+
+@item H
+@kindex H @r{(Package Menu)}
+@findex package-menu-hide-package
+隐藏名称与正则表达式 (@code{package-menu-hide-package}) 匹配的包。  这会提示输入正则表达式，然后隐藏具有匹配名称的包。  正则表达式的默认值将仅隐藏其名称所在的包，因此只需在提示符处按 @key{RET} 即可隐藏当前包。
+
+@item (
+@kindex ( @r{(Package Menu)}
+@findex package-menu-toggle-hiding
+切换旧版本包以及低优先级存档版本的可见性 (@code{package-menu-toggle-hiding})。
+
+@item / a
+@kindex / a @r{(Package Menu)}
+@findex package-menu-filter-by-archive
+按存档过滤包列表 (@code{package-menu-filter-by-archive})。这会提示输入包存档（例如，@samp{gnu}），然后仅显示该存档中的包。  您可以通过键入以逗号分隔的名称来指定多个存档。
+
+@item / d
+@kindex / d @r{(Package Menu)}
+@findex package-menu-filter-by-description
+按描述过滤包列表 (@code{package-menu-filter-by-description})。  这会提示输入正则表达式，然后仅显示其描述与该正则表达式匹配的包。
+
+@item / k
+@kindex / k @r{(Package Menu)}
+@findex package-menu-filter-by-keyword
+按关键字 (@code{package-menu-filter-by-keyword}) 过滤包列表。这会提示输入关键字（例如，@samp{games}），然后仅显示带有该关键字的包。  您可以通过键入以逗号分隔的方式指定多个关键字。
+
+@item / N
+@kindex / N @r{(Package Menu)}
+@findex package-menu-filter-by-name-or-description
+按名称或描述过滤包列表 (@code{package-menu-filter-by-name-or-description})。  这会提示输入正则表达式，然后仅显示名称或描述与该正则表达式匹配的包。
+
+@item / n
+@kindex / n @r{(Package Menu)}
+@findex package-menu-filter-by-name
+按名称过滤包列表 (@code{package-menu-filter-by-name})。这会提示输入正则表达式，然后仅显示名称与该正则表达式匹配的包。
+
+@item / s
+@kindex / s @r{(Package Menu)}
+@findex package-menu-filter-by-status
+按状态过滤包裹列表 (@code{package-menu-filter-by-status})。这会提示一个或多个状态（例如，@samp{available}、@pxref{Package Statuses}），然后仅显示具有匹配状态的包。  您可以通过键入以逗号分隔的状态值来指定多个状态值。
+
+@item / v
+@kindex / v @r{(Package Menu)}
+@findex package-menu-filter-by-version
+按版本过滤软件包列表 (@code{package-menu-filter-by-version})。这首先提示输入比较符号 @samp{<}、@samp{>} 或 @samp{=} 之一以及版本字符串，然后显示其版本相应低于、等于或高于您键入的版本的软件包。
+
+@item / m
+@kindex / m @r{(Package Menu)}
+@findex package-menu-filter-marked
+通过非空标记 (@code{package-menu-filter-marked}) 过滤包列表。这仅显示已标记为要安装或删除的软件包。
+
+@item / u
+@kindex / u @r{(Package Menu)}
+@findex package-menu-filter-upgradable
+过滤软件包列表以仅显示有可用升级的软件包 (@code{package-menu-filter-upgradable})。  默认情况下，此过滤器排除有较新版本可用的内置软件包，但自定义 @code{package-install-upgrade-built-in} 可以更改这一点。 @xref{Package Installation}。
+
+@item / /
+@kindex / / @r{(Package Menu)}
+@findex package-menu-filter-clear
+清除当前应用于包列表的过滤器 (@code{package-menu-filter-clear})。
+@end table
+
+@noindent
+例如，您可以通过在列出该软件包的行上键入 @kbd{i}，然后键入 @kbd{x} 来安装该软件包。
+
+@node Package Statuses
+@section 包裹状态
+@cindex package status
+
+包可以具有以下状态之一：
+
+@table @samp
+@item available
+该软件包尚未安装，但可以从软件包存档中下载并安装。
+
+@item avail-obso
+该软件包可供安装，但也提供更新版本。  默认情况下，具有此状态的包是隐藏的。
+
+@cindex built-in package
+@item built-in
+该包默认包含在 Emacs 中。  无法通过包菜单删除，默认情况下不考虑升级（但可以通过自定义@code{package-install-upgrade-built-in}、@pxref{Package Installation}进行更改）。
+
+@item dependency
+该软件包是自动安装的，以满足另一个软件包的依赖关系。
+
+@item disabled
+该包已使用 @code{package-load-list} 变量禁用。
+
+@item external
+该包不是内置的，也不是来自 @code{package-user-dir} (@pxref{Package Files}) 指定的目录。  外部包的处理方式与 @samp{built-in} 包非常相似，并且无法删除。
+
+@item held
+包裹被保留，@xref{Package Installation}。
+
+@item incompat
+由于某种原因无法安装该软件包，例如因为它依赖于可卸载的软件包。
+
+@item installed
+该软件包已安装。
+
+@item new
+与 @samp{available} 等效，只不过该包自上次调用 @w{@kbd{M-x list-packages}} 以来已添加到包存档中。
+
+@item obsolete
+该软件包是过时的安装版本；除了此版本的软件包外，还安装了较新的版本。
+
+@c @samp{unsigned} (installed, but not signed; @pxref{Package Signing}),
+@end table
+
+@node Package Installation
+@section 包安装
+
+@findex package-install
+@findex package-upgrade
+@findex package-upgrade-all
+@vindex package-retention-policy
+使用包菜单 (@pxref{Package Menu}) 最方便地安装包，但您也可以使用命令 @kbd{M-x package-install}。  这会提示输入状态为 @samp{available} 的软件包的名称，然后下载并安装它。  同样，如果要升级某个包，可以使用@kbd{M-x package-upgrade}命令，如果要升级所有包，可以使用@kbd{M-x package-upgrade-all}命令。  默认情况下，这些命令将删除旧安装，但您可以通过自定义变量 @code{package-retention-policy} 来调整该行为。
+
+请注意，@code{package-install} 不会建议安装已安装的软件包。  同样，@code{package-upgrade}只会建议升级有新版本可用的软件包。
+
+@vindex package-install-upgrade-built-in
+默认情况下，@code{package-install} 不考虑可从档案中获取新版本的内置软件包。  （如果包包含在 Emacs 发行版中，则该包是内置的。）特别是，当您在提示符下键入时，它不会在补全候选列表中显示内置包。  但是，如果您使用前缀参数调用@code{package-install}，它也会考虑可以升级的内置包。  您可以通过自定义变量 @code{package-install-upgrade-built-in} 将此行为设置为默认行为：如果其值非 @code{nil}，则即使在没有前缀参数的情况下调用，@code{package-install} 也会考虑内置包。  请注意，包菜单命令 (@pxref{Package Menu}) 也受 @code{package-install-upgrade-built-in} 影响。
+
+相比之下，@code{package-upgrade}和@code{package-upgrade-all}从不考虑内置包。  如果您想使用这些命令升级某些内置软件包，则需要通过 @kbd{C-u M-x package-install @key{RET}} 或将 @code{package-install-upgrade-built-in} 自定义为非 @code{nil} 值来升级每个软件包一次，然后通过软件包菜单或 @code{package-install} 升级软件包一次。
+
+如果您将 @code{package-install-upgrade-built-in} 自定义为非 @code{nil} 值，则在使用一次更新多个软件包的命令时要非常小心，例如软件包菜单中的 @code{package-upgrade-all} 和 @kbd{U}：这些命令可能会覆盖您不打算用存档中的较新版本替换的内置软件包。  如果您只想更新少量内置软件包，请不要使用这些批量命令。
+
+@cindex package requirements
+一个软件包可以@dfn{require}安装某些其他软件包，因为它依赖于它们提供的功能。  当 Emacs 安装此类软件包时，它还会自动下载并安装任何尚未安装的所需软件包。  （如果所需的软件包因​​某种原因不可用，Emacs 会发出错误信号并停止安装。）软件包的要求列表显示在其帮助缓冲区中。
+
+@cindex review
+@vindex package-review-policy
+如果您在从软​​件包档案安装和升级软件包时很谨慎，您可以配置 @code{package-review-policy} 以便您有机会在安装软件包之前检查软件包。  通过将用户选项设置为@code{t}，您可以查看所有包（包括依赖项），在此期间您可以浏览源代码、检查下载的包与之前安装之间的差异或阅读更改日志。  您还可以配置 @code{package-review-policy} 来选择性地信任或不信任特定的包或存档。
+
+@cindex GNU ELPA
+@cindex NonGNU ELPA
+默认情况下，Emacs 从两个存档下载包：@url{https://elpa.gnu.org/, GNU ELPA} 和 @url{https://elpa.nongnu.org/, NonGNU ELPA}。  这些由 Emacs 开发人员维护并由 GNU 项目托管。  @dfn{GNU ELPA} 包含我们认为是 GNU Emacs 一部分的 GNU 软件包，但与核心 Emacs 分开分发。  @dfn{NonGNU ELPA} 包含其版权尚未分配给自由软件基金会的第三方软件包。@footnote{For more information about copyright assignments, see @url{https://www.gnu.org/licenses/why-assign.html, Why the FSF Gets Copyright Assignments from Contributors}.}
+
+@noindent
+这是由变量 @code{package-archives} 控制的，其值是 Emacs 已知的包存档列表。  每个列表元素必须采用 @code{(@var{id} . @var{location})} 形式，其中 @var{id} 是包存档的名称，@var{location} 是 @acronym{URL} 或包存档目录的名称。  如果您希望使用第三方软件包档案，您可以更改此列表 - 但这样做需要您自担风险，并且仅使用您认为可以信任的第三方！
+
+@cindex base location, package archive
+@defopt package-archives
+该变量的值是 Emacs 包管理器识别的包档案列表。
+
+每个 alist 元素对应一个存档，并且应采用 @code{(@var{id} . @var{location})} 形式，其中 @var{id} 是存档的名称（字符串），@var{location} 是其 ⁣​​3⁣（字符串）。
+
+如果基本位置以 @samp{http:} 或 @samp{https:} 开头，则将其视为 HTTP(S) URL，并且通过 HTTP(S) 从该存档下载包（与默认 GNU 存档的情况一样）。
+
+否则，基本位置应该是目录名称。  在这种情况下，Emacs 通过普通文件访问从该存档中检索包。  此类本地档案主要用于测试。
+@end defopt
+
+@cindex automatic suggestions for installing Emacs packages
+@cindex packages, automatic suggestions for installing
+@findex package-autosuggest
+@findex package-autosuggest-mode
+@vindex package-autosuggest-style
+当您访问某些类型的文件时，Emacs 可以建议安装软件包。  当您访问没有可用特定模式的文件时，可以使用 @code{package-autosuggest} 命令查找并安装为此文件类型推荐的附加 ELPA 包。  如果您启用@code{package-autosuggest-mode}，Emacs 将自动通知您是否有针对缓冲区访问的文件的建议附加包。  默认情况下，这些通知会在缓冲区窗口的模式行中显示一个按钮，建议您通过安装附加包来升级主要模式，但您可以通过自定义 @code{package-autosuggest-style} 用户选项来控制 Emacs 如何呈现这些通知。
+
+@anchor{Package Signing}
+@cindex package security
+@cindex package signing
+软件包档案的维护者可以通过 @dfn{signing} 他们来增加您对其软件包的信任。  他们生成一对私钥/公钥对，并使用私钥为每个包创建一个 @dfn{signature file}。  有了公钥，您就可以使用签名文件来验证包的创建者并确保包没有被篡改。  签名验证通过 EasyPG 接口 (@pxref{Top,, EasyPG, epa, Emacs EasyPG Assistant Manual}) 使用@uref{https://www.gnupg.org/, the GnuPG package}。有效签名并不能保证包不是恶意的，因此您仍应谨慎行事。  软件包档案应提供有关如何获取其公钥的说明。  一种方法是从服务器（例如 @url{https://pgp.mit.edu/}）下载密钥。使用 @kbd{M-x package-import-keyring} 将密钥导入到 Emacs 中。 Emacs 将包密钥存储在变量 @code{package-gnupghome-dir} 指定的目录中，默认情况下存储在 @code{package-user-dir} 的 @file{gnupg} 子目录中，这会导致 Emacs 在验证签名时使用选项 @samp{--homedir} 调用 GnuPG。如果@code{package-gnupghome-dir}是@code{nil}，GnuPG的选项@samp{--homedir}被忽略。 GNU 软件包存档的公钥随 Emacs 一起分发，位于 @file{etc/package-keyring.gpg}.  Emacs 自动使用它。
+
+@vindex package-check-signature
+@vindex package-unsigned-archives
+如果用户选项 @code{package-check-signature} 不是 @code{nil}，Emacs 将在您安装软件包时尝试验证签名。  如果该选项的值为@code{allow-unsigned}，并且找到可用的 OpenPGP 配置，则会检查签名的软件包，但您仍然可以安装未签名的软件包。  如果您使用一些未对其包进行签名的存档，您可以将它们添加到列表@code{package-unsigned-archives}。  （如果值为 @code{allow-unsigned} 并且未找到可用的 OpenPGP，则该选项被视为其值为 @code{nil}。）如果值为 @code{t}，则至少有一个签​​名必须有效；如果值为@code{all}，则所有这些都必须有效。
+
+有关加密密钥和签名的更多信息，@pxref{Top,, GnuPG, gnupg, The GNU Privacy Guard Manual}。 Emacs 附带了一个 GNU Privacy Guard 接口，@pxref{Top,, EasyPG, epa, Emacs EasyPG Assistant Manual}。
+
+@vindex package-pinned-packages
+如果您启用了多个软件包存档，并且其中一些提供同一软件包的不同版本，您可能会发现选项 @code{package-pinned-packages} 很有用。  您可以将包/存档对添加到此列表，以确保仅从指定的存档下载指定的包。
+
+@vindex package-archive-priorities
+@vindex package-menu-hide-low-priority
+当您启用多个包存档时，另一个有用的选项是@code{package-archive-priorities}。  它指定每个存档的优先级（数字越大指定优先级越高的存档）。  默认情况下，存档的优先级为零，除非此选项的值另有指定。  如果来自较高优先级存档的相同包可用，则来自较低优先级存档的包将不会显示在菜单中。  （这由@code{package-menu-hide-low-priority}的值控制。）
+
+一旦包被下载、字节编译并安装，它就可供当前的 Emacs 会话使用。  使包可用会将其目录添加到 @code{load-path} 并加载其自动加载。  包自动加载的效果因包而异。  大多数软件包只是提供一些新命令，而其他命令则对 Emacs 会话产生更广泛的影响。  有关此类信息，请参阅软件包的帮助缓冲区。
+
+Emacs 在所有后续会话中自动提供已安装的软件包。  这种情况发生在启动时，在处理 init 文件之前但在处理早期 init 文件之后 (@pxref{Early Init File})。  作为例外，如果使用 @samp{-q} 或 @samp{--no-init-file} 选项 (@pxref{Initial Options}) 调用，Emacs 不会在启动时提供可用的包。
+
+@vindex package-enable-at-startup
+要防止 Emacs 在启动时自动提供包，请将变量 @code{package-enable-at-startup} 更改为 @code{nil}。  您必须在早期的初始化文件中执行此操作，因为在加载常规初始化文件之前会读取变量。  因此，如果您通过“自定义”自定义此变量，则应将自定义设置保存到早期的初始化文件中。  为此，请在保存自定义值 @code{package-enable-at-startup} 之前设置或更改变量 @code{custom-file} (@pxref{Saving Customizations}) 的值以指向早期初始化文件。
+
+@findex package-quickstart-refresh
+@vindex package-quickstart
+如果安装了许多软件包，可以通过将用户选项 @code{package-quickstart} 设置为 @code{t} 来缩短启动时间。设置此选项将使 Emacs 预先计算许多东西，而不是在每次 Emacs 启动时重新计算它们。  但是，如果您这样做，则当需要更改激活时（例如更改 3⁣ 的值时），您必须手动运行命令 @code{package-quickstart-refresh}。
+
+@findex package-activate-all
+如果您将 @code{package-enable-at-startup} 设置为 @code{nil}，您仍然可以在启动期间或启动后使软件包可用。  要使已安装的软件包在启动期间可用，请在初始化文件中调用函数@code{package-activate-all}。  要使已安装的软件包在启动后可用，请调用命令@kbd{M-: (package-activate-all) RET}。
+
+@vindex package-load-list
+为了更好地控制启动时哪些包可用，您可以使用变量 @code{package-load-list}。  它的值应该是一个列表。  @w{@code{(@var{name} @var{version})}} 形式的列表元素告诉 Emacs 提供名为 @var{name} 的包的可用版本 @var{version}。  这里，@var{version}应该是一个版本字符串（对应于包的特定版本），或者@code{t}（这意味着使任何已安装的版本可用），或者@code{nil}（这意味着没有版本；这会禁用该包，从而阻止它可用）。  列表元素也可以是符号@code{all}，这意味着提供未由其他列表元素命名的任何软件包的最新安装版本。默认值只是@code{'(all)}。
+
+例如，如果将 @code{package-load-list} 设置为 @w{@code{'((muse "3.20") all)}}，则 Emacs 仅提供 @samp{muse} 软件包的 3.20 版本以及除 @samp{muse} 之外的任何已安装版本的软件包。  恰好安装的任何其他版本的 @samp{muse} 将被忽略。  @samp{muse} 软件包将在软件包菜单中列出，状态为 @samp{held}。
+
+@findex package-recompile
+@findex package-recompile-all
+Emacs 字节代码相当稳定，但字节代码可能会过时，或者编译的文件依赖于新版本 Emacs 中已更改的宏。  您可以使用命令 @w{@kbd{M-x package-recompile}} 重新编译特定包，或使用 @w{@kbd{M-x package-recompile-all}} 重新编译所有包。  （如果您安装了许多软件包，后一个命令可能需要相当长的时间才能运行。）
+
+@node Package Files
+@section 包文件和目录布局
+@cindex package directory
+
+@cindex package file
+@findex package-install-file
+每个包都以单个 @dfn{package file} 的形式从包存档中下载 — 要么是一个 Emacs Lisp 源文件，要么是包含多个 Emacs Lisp 源和其他文件的 tar 文件。  包文件由安装包的 Emacs 命令自动检索、处理和处置。  通常，您不需要直接处理它们，除非您正在制作一个包（@pxref{Packaging,,,elisp, The Emacs Lisp Reference Manual}）。  如果您需要直接从包文件安装包，请使用命令@kbd{M-x package-install-file}。
+
+@vindex package-user-dir
+安装后，包的内容将放置在 @file{~/.emacs.d/elpa/} 的子目录中（您可以通过自定义变量 @code{package-user-dir} 更改该目录的名称）。  包子目录名为 @file{@var{name}-@var{version}}，其中 @var{name} 是包名称，@var{version} 是其版本字符串。
+
+@cindex system-wide packages
+@vindex package-directory-list
+除了@code{package-user-dir}之外，Emacs 还会在@code{package-directory-list}中列出的目录中查找已安装的软件包。这些目录旨在供系统管理员使 Emacs 软件包在系统范围内可用； Emacs 本身从不在那里安装软件包。  @code{package-directory-list} 的包子目录的布局方式与 @code{package-user-dir} 中相同。
+
+删除包 (@pxref{Package Menu}) 涉及删除相应的包子目录。  这只适用于安装在@code{package-user-dir}中的软件包；如果被告知对系统范围的包目录中的包进行操作，则删除命令会发出错误信号。
+
+@node Fetching Package Sources
+@section 获取包源
+@cindex package development source
+@cindex upstream source, for packages
+@cindex git source of package @c "git" is not technically correct
+
+默认情况下，@code{package-install} 从软件包存档中下载 Tarball 并安装其文件。  如果您希望破解软件包源并与其他人共享您的更改，这可能是不够的。  在这种情况下，您可能更愿意直接获取并处理上游源。  这通常使得开发补丁和报告错误变得更加容易。
+
+@findex package-vc-install
+@findex package-vc-checkout
+一种方法是使用 @code{package-vc-install} 直接从源代码中获取包的源代码。  该命令还将自动确保所有文件都经过字节编译并自动加载，就像常规包一样。  以这种方式安装的软件包的行为就像任何其他软件包一样。  您可以使用@code{package-upgrade}或@code{package-upgrade-all}升级它们，并使用@code{package-delete}再次删除它们。  它们甚至显示在常规包装清单中。  如果您只想克隆包的源代码，而不将其添加到包列表中，请使用@code{package-vc-checkout}。
+
+请注意，目前无法使用 @code{package-vc-install} 升级内置软件包。
+
+@findex package-report-bug
+@findex package-vc-prepare-patch
+通过源代码检查，您可能希望针对当前开发头重现错误或实现新功能来解决问题。  如果包元数据指示如何联系维护者，您可以使用命令@code{package-report-bug}通过电子邮件报告错误。  该报告将包括您自定义的所有用户选项。  如果您进行了更改并希望与维护者共享，请首先提交您的更改，然后使用命令 @code{package-vc-prepare-patch} 来共享它。
+@iftex
+@xref{Preparing Patches,,,emacs-xtra, Specialized Emacs Features}.
+@end iftex
+@ifnottex
+@xref{Preparing Patches}.
+@end ifnottex
+
+@subsection 指定包源
+@cindex package specification
+@cindex specification, for source packages
+
+要从源安装包，Emacs 必须知道从哪里获取包的源代码（例如代码存储库）以及有关代码结构的基本信息（例如多文件包中的主文件）。  A @dfn{package specification} 描述了这些属性。
+
+当包存档 (@pxref{Package Archives,,,elisp, The Emacs Lisp Reference Manual}) 支持时，Emacs 可以自动从所述存档下载包的规范。如果传递给 @code{package-vc-install} 的第一个参数是命名包的符号，那么 Emacs 将使用该包的存档提供的规范。
+
+@example
+@group
+;; Emacs will download BBDB's specification from GNU ELPA:
+(package-vc-install 'bbdb)
+@end group
+@end example
+
+@code{package-vc-install} 的第一个参数也可以是包规范。  这允许您从用户选项@code{package-archives}中列出的已知存档之外的位置安装源包。  包规范是 @code{(@var{name} . @var{spec})} 形式的列表，其中 @var{spec} 应该是使用下表中任何键的属性列表。
+
+有关使用代码存储库和版本控制系统的基本术语的定义，请参阅@ref{VCS Concepts,,,emacs, The GNU Emacs Manual}。
+
+@table @code
+@item :url
+提供 URL 的字符串，该 URL 指定从中获取包源代码的存储库。
+
+@item :branch
+提供要安装的代码修订版本的字符串。  不要将其与包的版本号混淆。
+
+@item :lisp-dir
+一个字符串，提供用于加载 Lisp 源代码的目录的存储库相对名称，默认为存储库的根目录。
+
+@item :main-file
+提供项目主文件的字符串，从中收集包元数据。  如果未给出，则默认为附加“.el”的包名称。
+
+@item :doc
+一个字符串，提供用于构建信息文件的文档文件的存储库相对名称。  这可以是 Texinfo 文件或 Org 文件。
+
+@item :make
+提供存储库 Makefile 中定义的目标的字符串或字符串列表，应在构建 Info 文件之前运行。仅当@code{package-vc-allow-build-commands}为非@code{nil}时才生效。
+
+@item :shell-command
+提供在构建 Info 文件之前运行的 shell 命令的字符串。  仅当@code{package-vc-allow-build-commands}为非@code{nil}时才生效。
+
+@item :vc-backend
+命名 VC 后端的符号，用于下载包存储库的副本 (@pxref{Version Control Systems,,,emacs, The GNU Emacs Manual})。  如果省略，Emacs 将尝试根据提供的 URL 进行猜测，否则，该过程将回退到 1⁣ 的值。
+@end table
+
+@example
+@group
+;; Specifying information manually:
+(package-vc-install
+  '(bbdb :url "https://git.savannah.nongnu.org/git/bbdb.git"
+         :lisp-dir "lisp"
+         :doc "doc/bbdb.texi"))
+@end group
+@end example

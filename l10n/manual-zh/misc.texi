@@ -1,0 +1,1938 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--2026 Free Software Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@iftex
+@chapter Miscellaneous Commands
+
+  This chapter contains several brief topics that do not fit anywhere
+else: reading Usenet news, host and network security,
+viewing PDFs and other such documents, web
+browsing, running shell commands and shell subprocesses, using a
+single shared Emacs for utilities that expect to run an editor as a
+subprocess, printing, sorting text, editing binary files, saving an
+Emacs session for later resumption, recursive editing level, following
+hyperlinks, and various diversions and amusements.
+
+@end iftex
+
+@ifnottex
+@raisesections
+@end ifnottex
+
+@node Gnus
+@section 使用 Gnus 发送电子邮件和新闻组新闻
+@cindex Gnus
+@cindex Usenet news
+@cindex newsreader
+
+Gnus 是一个 Emacs 软件包，主要设计用于阅读和发布 Usenet 新闻。  它还可用于读取和响应来自许多其他来源的消息——电子邮件、远程目录、摘要等。  这里我们介绍一下Gnus并描述几个基本特性。
+@ifnottex
+For full details, see @ref{Top, Gnus,, gnus, The Gnus Manual}.
+@end ifnottex
+@iftex
+For full details on Gnus, type @kbd{C-h i} and then select the Gnus
+manual.
+@end iftex
+
+@menu
+* Buffers of Gnus::      组、摘要和文章缓冲区。
+* Gnus Startup::         关于启动 Gnus 您应该了解的内容。
+* Gnus Group Buffer::    Gnus 组命令的简短描述。
+* Gnus Summary Buffer::  Gnus 摘要命令的简短描述。
+@end menu
+
+@node Buffers of Gnus
+@subsection Gnus 缓冲区
+
+Gnus 使用多个缓冲区来显示信息和接收命令。  三个最常用的 Gnus 缓冲区是 @dfn{group buffer}、@dfn{summary buffer} 和 @dfn{article buffer}。
+
+@dfn{group buffer} 包含文章源列表（例如新闻组和电子邮件收件箱），统称为 @dfn{groups}。  这是 Gnus 启动时显示的第一个缓冲区。  它通常仅显示您订阅的且包含未读文章的组。  从此缓冲区中，您可以选择要读取的组。
+
+@dfn{summary buffer} 列出单个组中的文章，每行显示一篇文章。  默认情况下，它显示每篇文章的作者、主题和行
+@iftex
+number.
+@end iftex
+@ifnottex
+number, but this is customizable; @xref{Summary Buffer Format,,, gnus,
+The Gnus Manual}.
+@end ifnottex
+摘要缓冲区在您在组缓冲区中选择一个组时创建，并在您退出该组时终止。
+
+从摘要缓冲区中，您可以选择要查看的文章。  文章显示在@dfn{article buffer}中。  在正常的 Gnus 使用中，您可以查看该缓冲区，但不选择它——所有有用的 Gnus 命令都可以从摘要缓冲区中调用。  但如果您愿意，您可以选择文章缓冲区，并从中执行 Gnus 命令。
+
+@node Gnus Startup
+@subsection 当 Gnus 启动时
+
+@findex gnus
+@cindex @file{.newsrc} file
+如果您的系统已设置为阅读 Usenet 新闻，那么开始使用 Gnus 就很容易 — 只需键入 @kbd{M-x gnus}。
+
+启动时，Gnus 会读取您的 @dfn{news initialization file}：主目录中名为 @file{.newsrc} 的文件，其中列出了 Usenet 新闻组和订阅（该文件并非 Gnus 所独有；许多其他新闻阅读器程序都使用它）。  然后，它尝试联系系统的默认新闻服务器，该服务器通常由 @env{NNTPSERVER} 环境变量指定。
+
+如果您的系统没有默认的新闻服务器，或者您希望使用 Gnus 阅读电子邮件，那么在调用 @kbd{M-x gnus} 之前，您需要告诉 Gnus 从哪里获取新闻和/或邮件。  为此，请自定义变量 @code{gnus-select-method} 和/或 @code{gnus-secondary-select-methods}。
+@iftex
+See the Gnus manual for details.
+@end iftex
+@ifnottex
+@xref{Finding the News,,, gnus, The Gnus Manual}.
+@end ifnottex
+
+一旦 Gnus 启动，它就会显示组缓冲区。  默认情况下，组缓冲区仅显示少量的@dfn{subscribed groups}。具有其他状态的组——@dfn{unsubscribed}、@dfn{killed}或@dfn{zombie}——被隐藏。  第一次启动 Gnus 时，任何您未订阅的组都会被设为终止组；随后出现在新闻服务器上的任何组都会成为僵尸组。
+
+要继续，您必须在组缓冲区中选择一个组以打开该组的摘要缓冲区；然后，选择摘要缓冲区中的一篇文章以在单独的窗口中查看其文章缓冲区。  以下各节说明如何使用组缓冲区和摘要缓冲区来执行此操作。
+
+要退出 Gnus，请在组缓冲区中输入 @kbd{q}。  这会自动将您的组状态记录在文件@file{.newsrc}和@file{.newsrc.eld}中，以便它们在后续的 Gnus 会话中生效。
+
+@node Gnus Group Buffer
+@subsection 使用 Gnus 组缓冲区
+
+Gnus 组缓冲区中提供以下命令：
+
+@table @kbd
+@kindex SPC @r{(Gnus Group mode)}
+@findex gnus-group-read-group
+@item @key{SPC}
+切换到当前行 (@code{gnus-group-read-group}) 上的组的摘要缓冲区。
+
+@kindex l @r{(Gnus Group mode)}
+@kindex A s @r{(Gnus Group mode)}
+@findex gnus-group-list-groups
+@item l
+@itemx A s
+在组缓冲区中，仅列出您订阅的且包含未读文章的组（@code{gnus-group-list-groups}；这是默认列表）。
+
+@kindex L @r{(Gnus Group mode)}
+@kindex A u @r{(Gnus Group mode)}
+@findex gnus-group-list-all-groups
+@item L
+@itemx A u
+列出所有订阅和取消订阅的组，但不包括已杀死或僵尸组 (@code{gnus-group-list-all-groups})。
+
+@kindex A k @r{(Gnus Group mode)}
+@findex gnus-group-list-killed
+@item A k
+列出被杀死的群体 (@code{gnus-group-list-killed})。
+
+@kindex A z @r{(Gnus Group mode)}
+@findex gnus-group-list-zombies
+@item A z
+列出僵尸组 (@code{gnus-group-list-zombies})。
+
+@kindex u @r{(Gnus Group mode)}
+@findex gnus-group-toggle-subscription-at-point
+@cindex subscribe groups
+@cindex unsubscribe groups
+@item u
+切换当前行群组 (@code{gnus-group-toggle-subscription-at-point}) 的订阅状态。对已死亡或僵尸组调用此命令会将其变成取消订阅的组。
+
+@kindex C-k @r{(Gnus Group mode)}
+@findex gnus-group-kill-group
+@item C-k
+杀死当前行上的组 (@code{gnus-group-kill-group})。被杀死的群体不会记录在 @file{.newsrc} 文件中，也不会显示在 @kbd{l} 或 @kbd{L} 列表中。
+
+@kindex DEL @r{(Gnus Group mode)}
+@item @key{DEL}
+将点移至包含未读文章的上一组 (@code{gnus-group-prev-unread-group})。
+
+@kindex n @r{(Gnus Group mode)}
+@findex gnus-group-next-unread-group
+@item n
+将点移动到下一个未读组 (@code{gnus-group-next-unread-group})。
+
+@kindex p @r{(Gnus Group mode)}
+@findex gnus-group-prev-unread-group
+@item p
+将点移至上一个未读组 (@code{gnus-group-prev-unread-group})。
+
+@kindex q @r{(Gnus Group mode)}
+@findex gnus-group-exit
+@item q
+更新您的 Gnus 设置，然后退出 Gnus (@code{gnus-group-exit})。
+@end table
+
+@node Gnus Summary Buffer
+@subsection 使用 Gnus 摘要缓冲区
+
+Gnus 摘要缓冲区中提供了以下命令：
+
+@table @kbd
+@kindex SPC @r{(Gnus Summary mode)}
+@findex gnus-summary-next-page
+@item @key{SPC}
+如果没有选择文章，则选择当前行的文章并显示其文章缓冲区。  否则，尝试在其窗口中滚动选定的文章缓冲区；到达缓冲区末尾时，选择下一篇未读文章 (@code{gnus-summary-next-page})。
+
+因此，您可以通过重复输入@key{SPC}来阅读所有文章。
+
+@kindex DEL @r{(Gnus Summary mode)}
+@findex gnus-summary-prev-page
+@item @key{DEL}
+向后滚动文章文本 (@code{gnus-summary-prev-page})。
+
+@kindex n @r{(Gnus Summary mode)}
+@findex gnus-summary-next-unread-article
+@item n
+选择下一篇未读文章 (@code{gnus-summary-next-unread-article})。
+
+@kindex p @r{(Gnus Summary mode)}
+@findex gnus-summary-prev-unread-article
+@item p
+选择上一篇未读文章 (@code{gnus-summary-prev-unread-article})。
+
+@kindex s @r{(Gnus Summary mode)}
+@findex gnus-summary-isearch-article
+@item s
+对选定的文章缓冲区 (@code{gnus-summary-isearch-article}) 进行增量搜索，就像切换到缓冲区并键入 @kbd{C-s} (@pxref{Incremental Search}) 一样。
+
+@kindex M-s M-s @r{(Gnus Summary mode)}
+@findex gnus-summary-search-article-forward
+@item M-s M-s @var{regexp} @key{RET}
+向前搜索包含 @var{regexp} (@code{gnus-summary-search-article-forward}) 匹配的文章。
+
+@kindex M-s M-r @r{(Gnus Summary mode)}
+@findex gnus-summary-search-article-backward
+@item M-r @var{regexp} @key{RET}
+向后搜索包含 @var{regexp} (@code{gnus-summary-search-article-backward}) 匹配的文章。
+
+@kindex q @r{(Gnus Summary mode)}
+@item q
+退出摘要缓冲区并返回到组缓冲区 (@code{gnus-summary-exit})。
+@end table
+
+@node Host Security
+@section 主机安全
+@cindex security
+
+Emacs 在 GNU/Linux 等操作系统内部运行，并依赖操作系统来检查文件访问等安全约束。  Emacs 的默认设置是为典型用途而设计的；它们可能需要在安全性比平时更受关注或更少关注的环境中进行一些调整。  例如，文件局部变量可能存在风险，您可以将变量 @code{enable-local-variables} 设置为 @code{:safe} 或（甚至更保守地）设置为 @code{nil}；相反，如果您的文件都是可信的，并且对这些变量的默认检查很烦人，您可以将 @code{enable-local-variables} 设置为 @code{:all}。  @xref{Safe File Variables}。
+
+@cindex trusted files and directories
+使用 @code{load-file} 或 @code{load-library} (@pxref{Lisp Libraries}) 加载 Emacs Lisp 代码文件可以执行正在加载的文件中的某些 Lisp 代码，因此您应该只加载您信任的源的 Lisp 文件。  然而，某些 Emacs 功能在某些情况下可以执行 Lisp 代码，即使没有您明确的命令或请求。  例如，Flymake，Emacs 的动态语法检查器 (@pxref{Top,,, flymake, GNU Flymake})，如果启用，可以自动执行您访问的 Lisp 文件中的一些代码，作为其语法检查工作的一部分。  类似地，访问 Lisp 文件的缓冲区中的某些完成命令 (@pxref{Completion}) 有时需要扩展 Lisp 宏以获得最佳结果。  在这些情况下，只需访问 Lisp 文件并在其中执行一些编辑就可以触发 Lisp 代码的执行。  如果访问的文件来自不受信任的来源，则它可能包含 Emacs 在这些情况下执行的危险甚至恶意代码。
+
+为了防止这种情况，Emacs 禁用 Flymake、补全和其他一些功能执行 Lisp 代码，除非访问的文件是 @dfn{trusted}。  您可以通过自定义用户选项 @code{trusted-content} 来指定系统上的哪些文件应受信任。
+
+@defopt trusted-content
+该选项的默认值是@code{nil}，这意味着没有文件是可信的。  您可以将该变量自定义为一个或多个受信任文件和目录名称的列表。  以斜杠 @file{/} 结尾的文件名被解释为目录，这意味着它的所有文件和子目录也是受信任的。  特殊值 @code{:all} 意味着 @emph{all} 系统上的文件和目录应该是可信的； @strong{this is not recommended}，因为它打开了一个巨大的安全漏洞。
+@end defopt
+
+@xref{Security Considerations,,, elisp, The Emacs Lisp Reference Manual}，有关使用 Emacs 作为大型应用程序的一部分时的安全注意事项的更多信息。
+
+@node Network Security
+@section 网络安全
+@cindex network security manager
+@cindex NSM
+@cindex encryption
+@cindex SSL
+@cindex TLS
+@cindex Transport Layer Security
+@cindex STARTTLS
+
+每当 Emacs 建立任何网络连接时，它都会将已建立的连接传递给@dfn{Network Security Manager} (@acronym{NSM})。  @acronym{NSM} 负责在您的控制下实施网络安全。  目前，这是通过使用传输层安全 (@acronym{TLS}) 功能来实现的。
+
+@vindex network-security-level
+@code{network-security-level} 变量确定 @acronym{NSM} 强制执行的安全级别。  如果其值为@code{low}，则不执行安全检查。  不建议这样做，这基本上意味着您的网络连接不可信。但是，该设置在有限的情况下很有用，例如测试网络问题时。
+
+如果这个变量是@code{medium}（这是默认值），将会执行一些检查。  如果结果 @acronym{NSM} 确定网络连接可能不可信，它会让您意识到这一点，并询问您如何处理网络连接。
+
+您可以决定为未经验证的连接注册永久安全异常、临时异常或完全拒绝连接。
+
+@vindex network-security-protocol-checks
+除了基本的证书正确性检查之外，还可以使用多种 @acronym{TLS} 算法检查。  一些以前被认为是安全的加密技术已证明自己很脆弱，因此 Emacs（默认情况下）会警告您其中一些问题。
+
+协议网络检查是通过 @code{network-security-protocol-checks} 变量控制的。
+
+它是一个列表，其中每个关联的第一个元素是检查的名称，第二个元素是应使用检查的安全级别。
+
+像@code{(rc4 medium)}这样的元素将导致函数@code{nsm-protocol-check--rc4}被调用，如下所示：@w{@code{(nsm-protocol-check--rc4 host port status settings)}}。如果连接应该继续，该函数应返回非@code{nil}，否则返回@code{nil}。
+
+下面是在默认 @code{medium} 级别上完成的检查列表。
+
+@table @asis
+
+@item 无法验证 @acronym{TLS} 证书
+如果连接是 @acronym{TLS}、@acronym{SSL} 或 @acronym{STARTTLS} 连接，@acronym{NSM} 将检查用于建立我们要连接的服务器身份的证书是否可以验证。
+
+虽然无效的证书通常会引起关注（中间人可能会劫持您的网络连接并窃取您的密码），但无论如何仍可能有充分的理由继续连接。  例如，服务器可能正在使用自签名证书，或者证书可能已过期。  由您决定是否可以继续连接。
+
+@item 自签名证书已更改
+如果您之前接受了自签名证书，但现在它已更改，这可能意味着服务器刚刚更改了证书，但也可能意味着网络连接已被劫持。
+
+@item 以前加密的连接现在未加密
+如果连接未加密，但在之前的会话中已加密，这可能意味着您和服务器之间存在代理，该代理会删除 @acronym{STARTTLS} 公告，从而使连接保持未加密状态。  这通常是非常可疑的。
+
+@item 发送密码时与未加密的服务通信
+当连接到 @acronym{IMAP} 或 @acronym{POP3} 服务器时，通常应该对这些服务器进行加密，因为通过这些连接发送密码是很常见的。  同样，如果您通过 @acronym{SMTP} 发送需要密码的电子邮件，您通常希望对该连接进行加密。  如果连接未加密，@acronym{NSM} 会警告您。
+
+@item Diffie-Hellman 低素数位
+在进行公钥交换时，素数位的数量应该足够高，以确保通道不会被第三方窃听。  如果这个数字太低，Emacs 会警告你。  （这是@code{diffie-hellman-prime-bits}签入@code{network-security-protocol-checks}）。
+
+@item @acronym{RC4}流密码
+@acronym{RC4} 流密码被认为质量较低，可能会被第三方窃听。  （这是@code{rc4}签入@code{network-security-protocol-checks}）。
+
+@item @acronym{SHA1} 在主机证书或中间证书中
+据信，如果中间证书使用 @acronym{SHA1} 哈希算法，则第三方可以假装是该颁发实例来颁发证书。  因此，这些连接很容易受到中间人攻击。 （这些是@code{network-security-protocol-checks}中的@code{signature-sha1}和@code{intermediate-sha1}检查）。
+
+@item @acronym{SSL1}、@acronym{SSL2} 和 @acronym{SSL3}
+早于 @acronym{TLS1.0} 的协议被认为容易受到各种攻击，如果您正在做的事情需要更高的安全性，您可能希望避免使用这些协议。  （这是@code{version}签入@code{network-security-protocol-checks}）。
+
+@item 三重 DES（或 @acronym{3DES}）密码
+@acronym{3DES}流密码最多提供112位的有效安全性，其中的一个重大安全漏洞于2016年被披露（CVE-2016-2183）。  从 2023 年底开始，NIST 在所有应用程序中都已弃用它。  （这是@code{3des-cipher}签入@code{network-security-protocol-checks}）。
+@end table
+
+如果 @code{network-security-level} 是 @code{high}，除了上述检查之外，还会进行以下检查：
+
+@table @asis
+@item 经过验证的证书会更改公钥
+服务器偶尔会更改密钥，这通常无需担心。  但是，如果您担心您的网络连接被有权访问为第三方服务颁发新证书的灵活证书颁发机构的机构劫持，您可能需要跟踪这些更改。
+
+@end table
+
+最后，如果 @code{network-security-level} 是 @code{paranoid}，当 @acronym{NSM} 第一次看到任何新证书时，您也会收到通知。  这将允许您检查 Emacs 建立的所有连接的所有证书。
+
+以下附加变量可用于控制 @acronym{NSM} 操作的细节：
+
+@table @code
+@item nsm-settings-file
+@vindex nsm-settings-file
+这是 @acronym{NSM} 存储有关连接的详细信息的文件。默认为@file{~/.emacs.d/network-security.data}。
+
+@item nsm-save-host-names
+@vindex nsm-save-host-names
+默认情况下，不会保存非 @code{STARTTLS} 连接的主机名。  相反，主机/端口哈希用于识别连接。这意味着人们无法随意读取设置文件来查看用户连接到了哪些服务器。  如果这个变量是@code{t}，@acronym{NSM}也会将主机名保存在@code{nsm-settings-file}中。
+
+@end table
+
+
+@node Document View
+@section 文档查看
+@cindex DVI file
+@cindex PDF file
+@cindex PS file
+@cindex PostScript file
+@cindex OpenDocument file
+@cindex Microsoft Office file
+@cindex EPUB file
+@cindex CBZ file
+@cindex FB2 file
+@cindex XPS file
+@cindex OXPS file
+@cindex DocView mode
+@cindex mode, DocView
+@cindex document viewer (DocView)
+@findex doc-view-mode
+
+DocView 模式是查看 DVI、PostScript (PS)、PDF、OpenDocument、Microsoft Office、EPUB、CBZ、FB2、XPS 和 OXPS 文档的主要模式。  它提供了切片、缩放和搜索文档内部等功能。  它的工作原理是使用 @command{gs} (GhostScript) 或 @command{pdfdraw}/@command{mutool draw} (MuPDF) 命令和其他外部工具将文档转换为一组图像，然后显示这些转换后的图像。
+
+@findex doc-view-toggle-display
+@findex doc-view-minor-mode
+当您访问可以使用 DocView 模式显示的文档文件时，Emacs 会自动使用该模式@footnote{The needed external tools for the document type must be available, and Emacs must be running in a graphical frame and have PNG image support.  If these requirements is not fulfilled, Emacs falls back to another major mode.}。  例外的是，当您访问 PostScript 文件时，Emacs 会切换到 PS 模式，这是一种将 PostScript 文件编辑为文本的主要模式；但是，它还启用了 DocView 次要模式，因此您可以键入 @kbd{C-c C-c} 使用 DocView 查看文档。  在 DocView 模式或 DocView 次要模式下，重复 @kbd{C-c C-c} (@code{doc-view-toggle-display}) 可在 DocView 和底层文件内容之间切换。
+
+@findex doc-view-open-text
+当您访问通常由 DocView 模式处理的文件但不满足某些要求时（例如，您在终端框架中操作或 Emacs 不支持 PNG），Emacs 会询问您是否要以纯文本形式查看文档内容。  如果您回答“是”，Emacs 将在缓冲区中打开文本模式并激活 DocView 次要模式。  因此，通过输入 @kbd{C-c C-c}，您可以切换到此后备模式。  再按一次@kbd{C-c C-c}，您将返回到 DocView 模式。  通过在 DocView 模式下键入 @kbd{C-c C-t} (@code{doc-view-open-text})，纯文本内容也可以显示在一个单独的缓冲区中，该缓冲区的名称类似于原始文档缓冲区，后缀为 @code{/text}。
+
+您可以使用命令 @kbd{M-x doc-view-mode} 显式启用 DocView 模式。  您可以使用 @kbd{M-x doc-view-minor-mode} 切换 DocView 次要模式。
+
+当 DocView 模式启动时，它会显示欢迎屏幕并开始逐页格式化文件。  格式化后，它会显示第一页。
+
+要终止 DocView 缓冲区，请输入 @kbd{k} (@code{doc-view-kill-proc-and-buffer})。  要隐藏它，请输入 @kbd{q} (@code{quit-window})。
+
+@menu
+* Navigation: DocView Navigation.   导航 DocView 缓冲区。
+* Searching: DocView Searching.     搜索内部文档。
+* Slicing: DocView Slicing.         指定显示页面的哪一部分。
+* Conversion: DocView Conversion.   影响并触发转化。
+@end menu
+
+@node DocView Navigation
+@subsection 文档视图导航
+
+在 DocView 模式下，您可以使用常用的 Emacs 移动键滚动当前页面：@kbd{C-p}、@kbd{C-n}、@kbd{C-b}、@kbd{C-f} 和箭头键。
+
+@vindex doc-view-continuous
+默认情况下，直线运动键@kbd{C-p}和@kbd{C-n}分别在当前页面的开头和结尾处停止滚动。但是，如果将变量 @code{doc-view-continuous} 更改为非 @code{nil} 值，则如果您已位于当前页面的开头，则 @kbd{C-p} 将显示上一页；如果您位于当前页面的末尾，则 @kbd{C-n} 将显示下一页。
+
+@findex doc-view-next-page
+@findex doc-view-previous-page
+@kindex n @r{(DocView mode)}
+@kindex p @r{(DocView mode)}
+@kindex PageDown @r{(DocView mode)}
+@kindex PageUp @r{(DocView mode)}
+@kindex next @r{(DocView mode)}
+@kindex prior @r{(DocView mode)}
+@kindex C-x ] @r{(DocView mode)}
+@kindex C-x [ @r{(DocView mode)}
+您还可以通过键入 @kbd{n}、@key{PageDown}、@key{next} 或 @kbd{C-x ]} (@code{doc-view-next-page}) 显示下一页。要显示上一页，请输入 @kbd{p}、@key{PageUp}、@key{prior} 或 @kbd{C-x [} (@code{doc-view-previous-page})。
+
+@findex doc-view-scroll-up-or-next-page
+@findex doc-view-scroll-down-or-previous-page
+@kindex SPC @r{(DocView mode)}
+@kindex DEL @r{(DocView mode)}
+@key{SPC} (@code{doc-view-scroll-up-or-next-page}) 是浏览文档的便捷方式。  它在当前页面内滚动或前进到下一页。  @key{DEL} 以类似的方式向后移动 (@code{doc-view-scroll-down-or-previous-page})。
+
+@findex doc-view-first-page
+@findex doc-view-last-page
+@findex doc-view-goto-page
+@kindex M-< @r{(DocView mode)}
+@kindex M-> @r{(DocView mode)}
+要转到第一页，请输入 @kbd{M-<} (@code{doc-view-first-page});要转到最后一个，请输入 @kbd{M->} (@code{doc-view-last-page})。  要按页码跳转到页面，请输入 @kbd{M-g M-g} 或 @kbd{M-g g} (@code{doc-view-goto-page})。
+
+@findex doc-view-enlarge
+@findex doc-view-shrink
+@vindex doc-view-resolution
+@vindex doc-view-scale-internally
+@kindex + @r{(DocView mode)}
+@kindex - @r{(DocView mode)}
+您可以使用 @kbd{+} (@code{doc-view-enlarge}) 和 @kbd{-} (@code{doc-view-shrink}) 放大或缩小文档。  默认情况下，这些命令只是重新缩放已渲染的图像。  如果您希望图像以新尺寸重新渲染，请将 @code{doc-view-scale-internally} 设置为 @code{nil}。  要指定 DocView 的默认大小，请自定义变量@code{doc-view-resolution}。
+
+@vindex doc-view-imenu-flatten
+@vindex doc-view-imenu-format
+@vindex doc-view-djvused-program
+DocView 可以分别使用 @command{mutool} 和 @command{djvused} 程序（如果可用）为 PDF 和 DjVu 文档生成大纲菜单。  OpenOffice 和 LibreOffice 使用的开放文档格式文件的大纲也是在转换为 PDF 后使用 @command{mutool} 生成的。  这使用了@code{imenu}设施（@pxref{Imenu}）。  您可以使用变量 @code{doc-view-imenu-format} 和 @code{doc-view-imenu-flatten} 自定义此大纲的 @code{imenu} 项目的格式和显示方式。  可以通过更改 9⁣ 用户选项来自定义 @command{djvused} 程序的文件名。
+
+@cindex registers, in DocView mode
+@findex doc-view-page-to-register
+@findex doc-view-jump-to-register
+@kindex m @r{(DocView mode)}
+@kindex ' @r{(DocView mode)}
+您可以使用 @kbd{m} (@code{doc-view-page-to-register}) (@pxref{Registers}) 将当前页面保存到寄存器。  但是，这些寄存器不跨缓冲区共享，并且保留在 DocView 缓冲区本地。  您稍后可以使用 @kbd{'} (@code{doc-view-jump-to-register}) 跳转到保存的页面。
+
+@node DocView Searching
+@subsection 文档视图搜索
+
+在 DocView 模式下，您可以在文件文本中搜索正则表达式 (@pxref{Regexps})。  搜索界面的灵感来自于@code{isearch} (@pxref{Incremental Search})。
+
+@findex doc-view-search
+@findex doc-view-search-backward
+@findex doc-view-show-tooltip
+要开始搜索，请输入 @kbd{C-s} (@code{doc-view-search}) 或 @kbd{C-r} (@code{doc-view-search-backward})。  这使用迷你缓冲区读取正则表达式，然后回显在文档中找到的匹配项的数量。  您可以通过键入 @kbd{C-s} 和 @kbd{C-r} 在比赛中前进和后退。  DocView模式无法显示页面图像内的匹配；相反，它会显示一个工具提示（在鼠标位置），列出当前页面中的所有匹配行。要强制显示此工具提示，请输入 @kbd{C-t} (@code{doc-view-show-tooltip})。
+
+要开始新的搜索，请使用带有前缀参数的搜索命令；即 @kbd{C-u C-s} 表示向前搜索，或 @kbd{C-u C-r} 表示向后搜索。
+
+@node DocView Slicing
+@subsection 文档视图切片
+
+文档通常具有较宽的打印边距。  在阅读屏幕上的文档时，它们很烦人，因为它们会占用屏幕空间并导致滚动不方便。
+
+@findex doc-view-set-slice
+@findex doc-view-set-slice-using-mouse
+使用 DocView，您可以通过选择要显示的 @dfn{slice} 页面来隐藏这些边距。  切片是页面区域内的一个矩形；一旦您在 DocView 中指定了一个切片，它就会应用于您查看的任何页面。
+
+要以数字方式指定切片，请输入 @kbd{c s} (@code{doc-view-set-slice});然后输入左上角像素位置以及切片的宽度和高度。
+@c ??? how does this work?
+
+指定切片的更方便的图形方式是使用 @kbd{c m} (@code{doc-view-set-slice-using-mouse})，您可以使用鼠标选择切片。  只需在要切片的区域的左上角按住鼠标左键，然后将鼠标指针移动到右下角并释放按钮即可。
+
+最方便的方法是通过输入 @kbd{c b} (@code{doc-view-set-slice-from-bounding-box}) 使用从文档自动确定的 BoundingBox 信息来设置最佳切片。
+
+@findex doc-view-reset-slice
+要取消选定的切片，请输入 @kbd{c r} (@code{doc-view-reset-slice})。  然后 DocView 显示整个页面，包括其整个边距。
+
+@node DocView Conversion
+@subsection 文档视图转换
+
+@vindex doc-view-cache-directory
+@findex doc-view-clear-cache
+为了提高效率，DocView 缓存 @command{gs} 生成的图像。缓存图像的目录名称由变量@code{doc-view-cache-directory}给出。  您可以通过输入@kbd{M-x doc-view-clear-cache}清除缓存目录。
+
+@findex doc-view-kill-proc
+@findex doc-view-kill-proc-and-buffer
+要强制重新转换当前查看的文档，请键入 @kbd{r} 或 @kbd{g} (@code{revert-buffer})。  要终止与当前缓冲区关联的转换器进程，请输入 @kbd{K} (@code{doc-view-kill-proc})。  命令 @kbd{k} (@code{doc-view-kill-proc-and-buffer}) 终止转换器进程和 DocView 缓冲区。
+
+@node Shell
+@section 从 Emacs 运行 Shell 命令
+@cindex subshell
+@cindex shell commands
+
+Emacs 具有用于将单个命令行传递到 shell 子进程、用于通过 Emacs 缓冲区的输入和输出交互运行 shell 以及用于在终端仿真器窗口中运行 shell 的命令。
+
+@table @kbd
+@item M-! @var{cmd} @key{RET}
+运行 shell 命令@var{cmd}并显示输出 (@code{shell-command})。
+@item M-| @var{cmd} @key{RET}
+以区域内容作为输入运行 shell 命令@var{cmd}；可以选择用输出 (@code{shell-command-on-region}) 替换该区域。
+@item M-& @var{cmd} @key{RET}
+异步运行 shell 命令@var{cmd}，并显示输出 (@code{async-shell-command})。
+@item M-x shell
+通过 Emacs 缓冲区运行具有输入和输出的子 shell。  然后您可以交互式地发出命令。
+@item M-x term
+通过 Emacs 缓冲区运行具有输入和输出的子 shell。  然后您可以交互式地发出命令。  可以使用完整的终端仿真。
+@end table
+
+@vindex exec-path
+每当您为可执行程序指定相对文件名时（无论是在上述命令之一的 @var{cmd} 参数中，还是在其他上下文中），Emacs 都会在变量 @code{exec-path} 指定的目录中搜索该程序。  该变量的值必须是目录列表；默认值取决于 Emacs 启动时的环境变量 @env{PATH} (@pxref{General Variables})。
+
+@kbd{M-x eshell} 调用完全在 Emacs 中实现的 shell。  它记录在其自己的手册中。
+@ifnottex
+@xref{Top,Eshell,Eshell, eshell, Eshell: The Emacs Shell}.
+@end ifnottex
+@iftex
+See the Eshell Info manual, which is distributed with Emacs.
+@end iftex
+
+@menu
+* Single Shell::            如何运行一个 shell 命令并返回。
+* Interactive Shell::       永久 shell 通过 Emacs 获取输入。
+* Shell Mode::              与永久 shell 一起使用的特殊 Emacs 命令。
+* Shell Prompts::           识别 shell 提示符的两种方法。
+* History: Shell History.   在 shell 缓冲区中重复先前的命令。
+* Directory Tracking::      跟踪子 shell 何时更改目录。
+* Shell Bookmarks::         保存和恢复本地和远程 shell 缓冲区。
+* Options: Shell Options.   用于自定义 Shell 模式的选项。
+* Terminal emulator::       作为终端模拟器的 Emacs 窗口。
+* Term Mode::               Term 模式下使用的特殊 Emacs 命令。
+* Remote Host::             连接到另一台计算机。
+* Serial Terminal::         连接到串行端口。
+@end menu
+
+@node Single Shell
+@subsection 单 shell 命令
+
+@kindex M-!
+@findex shell-command
+@vindex shell-command-buffer-name
+@kbd{M-!} (@code{shell-command}) 使用迷你缓冲区读取一行文本，并将其作为 shell 命令在专门为该命令创建的子 shell 中执行。  命令的标准输入来自空设备。  如果 shell 命令产生任何输出，则输出将出现在回显区域（如果输出很短）或 @samp{"*Shell Command Output*"} (@code{shell-command-buffer-name}) 缓冲区（如果输出很长）。  变量 @code{resize-mini-windows} 和 @code{max-mini-window-height} (@pxref{Minibuffer Edit}) 控制 Emacs 何时应考虑输出对于回声区域来说太长。请注意，自定义@code{shell-command-dont-erase-buffer}（如下所述）可能会影响回声区域中显示的内容。
+
+例如，解压缩名为 @file{foo.gz} 的文件的一种方法是键入 @kbd{M-! gunzip foo.gz @key{RET}}。  该 shell 命令通常会创建文件 @file{foo} 并且不产生终端输出。
+
+@code{shell-command} 的数字参数（例如 @kbd{M-1 M-!}）会导致它将终端输出插入到当前缓冲区而不是单独的缓冲区中。  默认情况下，它在输出之前放置点，并在输出之后设置标记（但非默认值 @code{shell-command-dont-erase-buffer} 可以更改这一点，请参见下文）。例如，@kbd{M-1 M-! gunzip < foo.gz @key{RET}}会将文件@file{foo.gz}的未压缩形式插入到当前缓冲区中。
+
+如果指定的 shell 命令不是以 @samp{&} 结尾，它将运行 @dfn{synchronously}，您必须等待它退出才能继续使用 Emacs。  要停止等待，请输入 @kbd{C-g} 退出；这会发送一个 @code{SIGINT} 信号来终止 shell 命令（这与 @kbd{C-c} 通常在 shell 中生成的信号相同）。然后，Emacs 会等待，直到命令实际终止。  如果 shell 命令没有停止（因为它忽略了 @code{SIGINT} 信号），请再次输入 @kbd{C-g}；这会向命令发送一个无法忽略的@code{SIGKILL}信号。
+
+@kindex M-&
+@findex async-shell-command
+@vindex shell-command-buffer-name-async
+以 @samp{&} 结尾的 shell 命令将被执行 @dfn{asynchronously}，并且您可以在 Emacs 运行时继续使用它。您还可以输入 @kbd{M-&} (@code{async-shell-command}) 来异步执行 shell 命令；这与使用尾随 @samp{&} 调用 @kbd{M-!} 完全相同，只是您不需要 @samp{&}。默认情况下，异步 shell 命令的输出进入 @samp{"*Async Shell Command*"} 缓冲区 (@code{shell-command-buffer-name-async})。  Emacs 在输出进入时将其插入到该缓冲区中，无论该缓冲区在窗口中是否可见。
+
+@vindex async-shell-command-buffer
+如果您想同时运行多个异步 shell 命令，它们最终可能会竞争输出缓冲区。  选项@code{async-shell-command-buffer}指定对此采取的措施；例如，是否重命名预先存在的输出缓冲区，或者为新命令使用不同的缓冲区。  有关更多可能性，请参阅变量的文档。
+
+@vindex async-shell-command-display-buffer
+如果您希望异步 shell 命令的输出缓冲区仅在命令生成输出时显示，请将 @code{async-shell-command-display-buffer} 设置为 @code{nil}。
+
+@vindex async-shell-command-width
+选项 @code{async-shell-command-width} 定义可用于异步 shell 命令输出的显示列数。正整数告诉 shell 使用该列数进行命令输出。  默认值是 @code{nil} ，这意味着使用 shell 提供的相同数量的列。
+
+@vindex shell-command-prompt-show-cwd
+要使上述命令在提示中显示当前目录，请将变量 @code{shell-command-prompt-show-cwd} 自定义为非 @code{nil} 值。
+
+@kindex M-|
+@findex shell-command-on-region
+@kbd{M-|} (@code{shell-command-on-region}) 类似于 @kbd{M-!}，但将区域内容作为标准输入传递给 shell 命令，而不是不输入。  使用数字参数，它会删除旧区域并将其替换为 shell 命令的输出。
+
+例如，您可以将 @kbd{M-|} 与 @command{gpg} 程序一起使用来查看缓冲区中有哪些键。  如果缓冲区包含 GnuPG 键，请输入 @kbd{C-x h M-| gpg @key{RET}} 将整个缓冲区内容提供给 @command{gpg}。  这会将键列表输出到名称为@code{shell-command-buffer-name}值的缓冲区。
+
+@vindex shell-file-name
+@cindex @env{SHELL} environment variable
+上述命令使用变量@code{shell-file-name}指定的 shell。  它的默认值由 Emacs 启动时的 @env{SHELL} 环境变量决定。  如果文件名是相对的，Emacs 会搜索@code{exec-path} (@pxref{Shell}) 中列出的目录。
+
+如果默认目录是远程 (@pxref{Remote Files})，则默认值为 @file{/bin/sh}。  这可以通过声明 @code{shell-file-name} 连接本地 (@pxref{Connection Variables}) 来更改。
+
+要指定 @kbd{M-!} 或 @kbd{M-|} 的编码系统，请预先使用命令 @kbd{C-x @key{RET} c}。  @xref{Communication Coding}。
+
+@vindex shell-command-default-error-buffer
+默认情况下，错误输出与输出缓冲区中的常规输出混合。  但是，如果将变量 @code{shell-command-default-error-buffer} 的值更改为字符串，错误输出将插入到该名称的缓冲区中。
+
+@vindex shell-command-dont-erase-buffer
+默认情况下，输出缓冲区在 shell 命令之间被擦除，除非输出进入当前缓冲区。  如果将选项 @code{shell-command-dont-erase-buffer} 的值更改为 @code{erase}，则输出缓冲区始终会被擦除。  其他非 2⁣ 值可防止擦除输出缓冲区，并且（如果输出缓冲区不是当前缓冲区）还可以控制在插入 shell 命令的输出后将点放置在何处：
+
+@table @code
+@item beg-last-out
+将点放在最后一个 shell 命令输出的开头。
+@item end-last-out
+将 point 放在最后一个 shell 命令输出的末尾，即 @: 放在输出缓冲区的末尾。
+@item save-point
+将点的位置恢复为插入 shell 命令输出之前的位置。
+@end table
+
+请注意，如果此选项为非@code{nil}，则回显区域中显示的输出可能不仅仅来自最后一个命令，因为回显区域仅显示输出缓冲区的一部分。
+
+如果输出缓冲区不是当前缓冲区，则 shell 命令输出将附加到该缓冲区的末尾。
+
+@node Interactive Shell
+@subsection 交互式子shell
+
+@findex shell
+要以交互方式运行子 shell，请输入 @kbd{M-x shell}。  这将创建（或重用）一个名为 @file{*shell*} 的缓冲区，并运行一个 shell 子进程，输入来自该缓冲区，输出进入该缓冲区。  也就是说，子 shell 的任何终端输出都会进入缓冲区，前进点，子 shell 的任何终端输入都来自缓冲区中的文本。  要向子 shell 提供输入，请转到缓冲区末尾并键入输入，以 @key{RET} 结尾。
+
+默认情况下，当交互调用子 shell 时，@file{*shell*} 缓冲区将显示在新窗口中，除非当前窗口已显示 @file{*shell*} 缓冲区。  此行为可以通过 @code{display-buffer-alist} (@pxref{Window Choice}) 进行自定义。
+
+当子 shell 等待或运行命令时，您可以切换窗口或缓冲区并在 Emacs 中执行其他编辑。  只要 Emacs 有时间处理（例如，在等待键盘输入时），Emacs 就会将子 shell 的输出插入到 Shell 缓冲区中。
+
+@cindex @code{comint-highlight-input} face
+@cindex @code{comint-highlight-prompt} face
+在 Shell 缓冲区中，提示用面 @code{comint-highlight-prompt} 显示，提交的输入行用面 @code{comint-highlight-input} 显示。  这使得区分输入行和 shell 输出变得更加容易。 @xref{Faces}。
+
+要创建多个子 shell，请使用前缀参数调用 @kbd{M-x shell}（例如 @kbd{C-u M-x shell}）。  然后该命令将读取缓冲区名称，并在该缓冲区中创建（或重用）一个子 shell。  您还可以使用 @kbd{M-x rename-uniquely} 重命名 @file{*shell*} 缓冲区，然后使用普通 @kbd{M-x shell} 创建新的 @file{*shell*} 缓冲区。不同缓冲区中的子shell独立且并行运行。
+
+Emacs 尝试通过查看您输入的命令、查找 @samp{cd} 命令等来跟踪当前目录是什么。  这是一个容易出错的解决方案，因为有很多方法可以更改当前目录，因此 Emacs 还会查找特殊的 @acronym{OSC}（操作系统命令）转义码，这些转义码旨在以更可靠的方式传达此信息。  您应该安排 shell 在每个提示符下打印适当的转义序列，例如使用以下命令：
+
+@example
+printf "\e]7;file://%s%s\e\\" "$HOSTNAME" "$PWD"
+@end example
+
+@noindent
+然后告诉 Emacs 处理转义码：
+
+@lisp
+(add-hook 'comint-output-filter-functions #'comint-osc-process-output)
+@end lisp
+
+@vindex explicit-shell-file-name
+@cindex environment variables for subshells
+@cindex @env{ESHELL} environment variable
+要指定 @kbd{M-x shell} 使用的 shell 文件名，请自定义变量 @code{explicit-shell-file-name}。  如果这是 @code{nil} （默认值），Emacs 将使用环境变量 @env{ESHELL}（如果存在）。  否则，通常使用变量 @code{shell-file-name} (@pxref{Single Shell})；但如果默认目录是远程 (@pxref{Remote Files})，它会提示您输入 shell 文件名。  @xref{Minibuffer File}，了解如何有效键入远程文件名的提示。
+
+Emacs 向新 shell 发送文件 @file{~/.emacs_@var{shellname}} 的内容作为输入（如果存在），其中 @var{shellname} 是从中加载 shell 的文件的名称。  例如，如果您使用 bash，则发送给它的文件是@file{~/.emacs_bash}。  如果找不到该文件，Emacs 会尝试使用@file{~/.emacs.d/init_@var{shellname}.sh}。
+
+您可以通过将变量 @code{comint-terminfo-terminal} 自定义为值 @samp{"dumb-emacs-ansi"} (@pxref{Shell Options}) 来为许多命令启用彩色输出。
+
+要指定 shell 的编码系统，您可以在 @kbd{M-x shell} 之前使用命令 @kbd{C-x @key{RET} c}。  您还可以通过在 shell 缓冲区中键入 @kbd{C-x @key{RET} p} 来更改正在运行的子 shell 的编码系统。  @xref{Communication Coding}。
+
+@cindex @env{INSIDE_EMACS} environment variable
+Emacs 将子 shell 中的环境变量 @env{INSIDE_EMACS} 设置为 @samp{@var{version},comint}，其中 @var{version} 是 Emacs 版本（例如 @samp{28.1}）。  程序可以检查此变量以确定它们是否在 Emacs 子 shell 内运行。
+
+@node Shell Mode
+@subsection 外壳模式
+@cindex Shell mode
+@cindex mode, Shell
+
+Shell 缓冲区的主要模式是 Shell 模式。  它的许多特殊命令都绑定到 @kbd{C-c} 前缀，并且类似于普通 shell 中常见的编辑和作业控制字符，只是您必须先键入 @kbd{C-c}。  以下是 Shell 模式命令的列表：
+
+@table @kbd
+@item @key{RET}
+@kindex RET @r{(Shell mode)}
+@findex comint-send-input
+将当前行作为输入发送到子 shell (@code{comint-send-input})。  省略行开头的任何 shell 提示符 (@pxref{Shell Prompts})。  如果点位于缓冲区的末尾，则这就像在普通交互式 shell 中提交命令行一样。  但是，您也可以在 shell 缓冲区中的其他位置调用 @key{RET} 将当前行作为输入提交。
+
+@item @key{TAB}
+@kindex TAB @r{(Shell mode)}
+@findex completion-at-point@r{, in Shell Mode}
+@cindex shell completion
+在 shell 缓冲区中的点之前完成命令名或文件名 (@code{completion-at-point})。  这使用通常的 Emacs 完成规则 (@pxref{Completion})，完成替代项是文件名、环境变量名称、shell 命令历史记录和历史引用 (@pxref{History References})。对于控制完成的选项，@pxref{Shell Options}。
+
+@item M-?
+@kindex M-? @r{(Shell mode)}
+@findex comint-dynamic-list-filename@dots{}
+临时显示点 (@code{comint-dynamic-list-filename-completions}) 之前文件名的可能补全列表。
+
+@item C-d
+@kindex C-d @r{(Shell mode)}
+@findex comint-delchar-or-maybe-eof
+删除一个字符或发送 @acronym{EOF} (@code{comint-delchar-or-maybe-eof})。  在 shell 缓冲区的末尾键入，这会将 @acronym{EOF} 发送到子 shell。  在缓冲区中的任何其他位置键入，这都会像往常一样删除一个字符。
+
+@item C-c C-a
+@kindex C-c C-a @r{(Shell mode)}
+@findex comint-bol-or-process-mark
+移动到行首，但在提示之后（如果有的话）（@code{comint-bol-or-process-mark}）。  如果您连续重复此命令两次，第二次它会移回到进程标记，这是您尚未发送到子 shell 的输入的开头。 （通常这是同一位置——该行提示符的末尾——但是在 @kbd{C-c @key{SPC}} 之后，进程标记可能位于上一行。）
+
+@item C-c @key{SPC}
+累积多行输入，然后将它们一起发送 (@code{comint-accumulate})。  该命令在 point 之前插入换行符，但不会将前面的文本作为输入发送到子 shell——至少现在还没有。  当您键入 @key{RET} 时，这两行（换行符之前的一行和之后的一行）将一起发送（以及分隔它们的换行符）。
+
+@item C-c C-u
+@kindex C-c C-u @r{(Shell mode)}
+@findex comint-kill-input
+终止缓冲区末尾待处理的所有文本以作为输入发送 (@code{comint-kill-input})。  如果 point 不在缓冲区末尾，则只会删除该文本中 point 之前的部分。
+
+@item C-c C-w
+@kindex C-c C-w @r{(Shell mode)}
+在点 (@code{backward-kill-word}) 之前删除一个单词。
+
+@item C-c C-c
+@kindex C-c C-c @r{(Shell mode)}
+@findex comint-interrupt-subjob
+中断 shell 或其当前子作业（如果有）(@code{comint-interrupt-subjob})。  此命令还会终止 shell 缓冲区中待处理且尚未发送的任何 shell 输入。
+
+@item C-c C-z
+@kindex C-c C-z @r{(Shell mode)}
+@findex comint-stop-subjob
+停止 shell 或其当前子作业（如果有）(@code{comint-stop-subjob})。此命令还会终止 shell 缓冲区中待处理且尚未发送的任何 shell 输入。
+
+@item C-c C-\
+@findex comint-quit-subjob
+@kindex C-c C-\ @r{(Shell mode)}
+向 shell 或其当前子作业（如果有）发送退出信号 (@code{comint-quit-subjob})。  此命令还会终止 shell 缓冲区中待处理且尚未发送的任何 shell 输入。
+
+@item C-c C-o
+@kindex C-c C-o @r{(Shell mode)}
+@findex comint-delete-output
+删除 shell 命令的最后一批输出 (@code{comint-delete-output})。  如果 shell 命令输出大量阻碍的输出，这非常有用。  使用前缀参数，此命令将删除的文本保存在 @code{kill-ring} (@pxref{Kill Ring}) 中，以便您稍后可以将其 (@pxref{Yanking}) 拉到其他地方。
+
+@item C-c C-s
+@kindex C-c C-s @r{(Shell mode)}
+@findex comint-write-output
+将 shell 命令的最后一批输出写入文件 (@code{comint-write-output})。  使用前缀参数，文件将被附加到。  输出末尾的任何提示都不会写入。
+
+@item C-c C-r
+@itemx C-M-l
+@kindex C-c C-r @r{(Shell mode)}
+@kindex C-M-l @r{(Shell mode)}
+@findex comint-show-output
+滚动以在窗口顶部显示最后一批输出的开头；也将光标移动到那里 (@code{comint-show-output})。
+
+@item C-c C-e
+@kindex C-c C-e @r{(Shell mode)}
+@findex comint-show-maximum-output
+滚动将缓冲区的最后一行放在窗口底部 (@code{comint-show-maximum-output})。
+
+@item C-c C-f
+@kindex C-c C-f @r{(Shell mode)}
+@findex shell-forward-command
+@vindex shell-command-regexp
+向前移动一个 shell 命令，但不要超出当前行 (@code{shell-forward-command})。  变量@code{shell-command-regexp}指定如何识别命令的结束。
+
+@item C-c C-b
+@kindex C-c C-b @r{(Shell mode)}
+@findex shell-backward-command
+向后移动一个 shell 命令，但不要超出当前行 (@code{shell-backward-command})。
+
+@item M-x dirs
+向 shell 询问其工作目录，并更新 Shell 缓冲区的默认目录。  @xref{Directory Tracking}。
+
+@item M-x comint-send-invisible @key{RET} @var{text} @key{RET}
+@findex comint-send-invisible
+读取后，将 @var{text} 作为输入发送到 shell，而不进行回显。  当 shell 命令运行要求输入密码的程序时，这非常有用。
+
+请注意，Emacs 默认情况下不会回显密码。  如果您确实希望它们得到回显，请计算 (@pxref{Lisp Eval}) 以下 Lisp 表达式：
+
+@example
+(remove-hook 'comint-output-filter-functions
+             'comint-watch-for-password-prompt)
+@end example
+
+@item M-x comint-continue-subjob
+@findex comint-continue-subjob
+继续外壳过程。  如果您不小心挂起 shell 进程，这很有用。@footnote{You should not suspend the shell process. Suspending a subjob of the shell is a completely different matter---that is normal practice, but you must use the shell to continue the subjob; this command won't do it.}
+
+@item M-x comint-strip-ctrl-m
+@findex comint-strip-ctrl-m
+丢弃当前 shell 输出组中的所有 control-M 字符。使用此命令最方便的方法是当您从子 shell 获取输出时使其自动运行。  为此，请计算此 Lisp 表达式：
+
+@example
+(add-hook 'comint-output-filter-functions
+          'comint-strip-ctrl-m)
+@end example
+
+@item M-x comint-truncate-buffer
+@findex comint-truncate-buffer
+此命令将 shell 缓冲区截断为某个最大行数，由变量 @code{comint-buffer-maximum-size} 指定。以下是每次从子 shell 获取输出时自动执行此操作的方法：
+
+@example
+(add-hook 'comint-output-filter-functions
+          'comint-truncate-buffer)
+@end example
+@end table
+
+默认情况下，Shell 模式处理常见的 @acronym{ANSI} 转义码（例如，用于更改文本的颜色）。  如果您将以下内容放入 init 文件中，Emacs 还可以选择支持一些扩展转义代码，例如某些 @acronym{OSC}（操作系统代码）：
+
+@lisp
+(add-hook 'comint-output-filter-functions #'comint-osc-process-output)
+@end lisp
+
+启用此功能后，例如 @code{ls --hyperlink} 的输出将被制作为 Shell 模式缓冲区中的可点击按钮。
+
+@cindex Comint mode
+@cindex mode, Comint
+Shell 模式是 Comint 模式的衍生模式，Comint 模式是一种与交互式子进程通信的通用模式。  Shell模式的大部分功能实际上都来自Comint模式，从上面列出的命令名称可以看出。  Shell 模式的特殊功能包括目录跟踪功能和一些用户命令。
+
+使用 Comint 模式变体的其他 Emacs 功能包括 GUD (@pxref{Debuggers}) 和 @kbd{M-x run-lisp} (@pxref{External Lisp})。
+
+@findex comint-run
+您可以使用 @kbd{M-x comint-run} 在子进程中使用未修改的 Comint 模式执行您选择的任何程序——无需 Shell 模式的专门化。  要将参数传递给程序，请使用@kbd{C-u M-x comint-run}。
+
+@node Shell Prompts
+@subsection 外壳提示符
+
+@cindex prompt, shell
+提示是程序输出的文本，表明它已准备好接受新的用户输入。  通常，Comint 模式（以及 Shell 模式）会根据子进程的输出自动找出缓冲区的哪一部分是提示符。  （具体来说，它假设任何接收到的不以换行符结尾的输出行都是提示。）
+
+Comint 模式将缓冲区分为两种类型的 @dfn{fields}：输入字段（用户输入的位置）和输出字段（其他位置）。  提示是输出字段的一部分。  大多数 Emacs 运动命令不会跨越字段边界，除非它们在多行上移动。  例如，当 point 位于 shell 命令行上的输入字段中时，@kbd{C-a} 将 point 放在输入字段的开头、提示符之后。  在内部，这些字段是使用 @code{field} 文本属性 (@pxref{Text Properties,,, elisp, the Emacs Lisp Reference Manual}) 实现的。
+
+@vindex comint-use-prompt-regexp
+@vindex shell-prompt-pattern
+如果将变量 @code{comint-use-prompt-regexp} 更改为非 @code{nil} 值，则 Comint 模式将使用正则表达式 (@pxref{Regexps}) 识别提示。  在Shell模式下，正则表达式由变量@code{shell-prompt-pattern}指定。 @code{comint-use-prompt-regexp}的默认值为@code{nil}，因为这种识别提示的方法并不可靠，但在特殊情况下您可能希望将其设置为非@code{nil}值。  在这种情况下，Emacs 不会将 Comint 缓冲区划分为字段，因此一般运动命令的行为与在没有特殊文本属性的缓冲区中通常的行为相同。  但是，您可以使用段落运动命令方便地导航缓冲区 (@pxref{Paragraphs})；在 Shell 模式下，Emacs 使用 @code{shell-prompt-pattern} 作为段落边界。
+
+@node Shell History
+@subsection Shell 命令历史记录
+
+Shell 缓冲区支持三种重复早期命令的方式。  您可以使用类似于迷你缓冲区历史记录的键；它们的工作方式与迷你缓冲区中的操作非常相似，从先前的命令插入文本，而点始终保留在缓冲区的末尾。  您可以在缓冲区中移动到先前输入的原始位置，然后重新提交它们或将它们复制到末尾。  或者您可以使用 @samp{!} 样式的历史参考。
+
+@menu
+* Ring: Shell Ring.              从历史列表中获取命令。
+* Copy: Shell History Copying.   移动到命令，然后复制它。
+* History References::           扩展@samp{!}风格的历史参考。
+@end menu
+
+@node Shell Ring
+@subsubsection 壳牌历史环
+
+@table @kbd
+@findex comint-previous-input
+@kindex M-p @r{(Shell mode)}
+@item M-p
+@itemx C-@key{UP}
+获取下一个较早的旧 shell 命令 (@code{comint-previous-input})。
+
+@findex comint-complete-input-ring
+@kindex C-x @key{UP} @r{(Shell mode)}
+@item C-x @key{UP}
+使用 shell 命令历史记录 (@code{comint-complete-input-ring}) 完成当前输入。
+
+@kindex M-n @r{(Shell mode)}
+@findex comint-next-input
+@item M-n
+@itemx C-@key{DOWN}
+获取下一个较晚的旧 shell 命令 (@code{comint-next-input})。
+
+@kindex M-r @r{(Shell mode)}
+@findex comint-history-isearch-backward-regexp
+@item M-r
+开始对旧 shell 命令进行增量正则表达式搜索 (@code{comint-history-isearch-backward-regexp})。
+
+@item C-c C-x
+@kindex C-c C-x @r{(Shell mode)}
+@findex comint-get-next-from-history
+从历史记录中获取下一个后续命令 (@code{comint-get-next-from-history})。
+
+@item C-c .
+@kindex C-c . @r{(Shell mode)}
+@findex comint-insert-previous-argument
+从旧的 shell 命令中获取一个参数 (@code{comint-input-previous-argument})。
+
+@item C-c C-l
+@kindex C-c C-l @r{(Shell mode)}
+@findex comint-dynamic-list-input-ring
+在另一个窗口中显示缓冲区的 shell 命令历史记录 (@code{comint-dynamic-list-input-ring})。
+@end table
+
+Shell 缓冲区提供先前输入的 shell 命令的历史记录。  要重用历史记录中的 shell 命令，请使用编辑命令 @kbd{M-p}、@kbd{M-n} 和 @kbd{M-r}。  它们的工作方式与迷你缓冲区历史命令 (@pxref{Minibuffer History}) 类似，只不过它们在 Shell 缓冲区而不是迷你缓冲区内操作，并且 Shell 缓冲区中的@code{M-r} 通过 shell 命令历史记录调用增量搜索。
+
+@kbd{M-p} 将较早的 shell 命令提取到 shell 缓冲区的末尾。  连续使用 @kbd{M-p} 会连续获取较早的 shell 命令，每个命令都会替换已经作为潜在 shell 输入存在的任何文本。  @kbd{M-n} 做同样的事情，只是它从缓冲区中连续找到更新的 shell 命令。 @kbd{C-@key{UP}} 的工作方式类似于 @kbd{M-p}，@kbd{C-@key{DOWN}} 的工作方式类似于 @kbd{M-n}。
+
+@kbd{C-x @key{UP}} 尝试根据旧 shell 命令的历史记录完成 (@pxref{Completion}) 您当前的输入。  因此，举例来说，您可以键入之前执行的又长又复杂的 shell 命令的前几个单词，然后调用此命令让 Emacs 填写其余部分。
+
+历史搜索命令 @kbd{M-r} 开始对以前的 shell 命令进行增量正则表达式搜索。  输入@kbd{M-r}后，开始输入所需的字符串或正则表达式；最后匹配的 shell 命令将显示在当前行中。增量搜索命令有其通常的效果——例如，@kbd{C-s}和@kbd{C-r}向前和向后搜索下一个匹配项（@pxref{Incremental Search}）。  当找到所需的输入时，输入 @key{RET} 终止搜索。  这会将输入放入命令行中。  当您转到历史记录环的开头或结尾时，您在导航历史列表之前编写的任何部分输入都会恢复。
+
+通常，重新执行先前按顺序执行的多个连续 shell 命令很有用。  为此，首先查找并重新执行序列的第一个命令。  然后输入@kbd{C-c C-x};这将获取以下命令——您刚刚重复的命令后面的命令。  然后输入@key{RET}重新执行该命令。  您可以通过反复键入 @kbd{C-c C-x @key{RET}} 来重新执行多个连续命令。
+
+命令 @kbd{C-c .}@: (@code{comint-insert-previous-argument}) 从前一个命令复制单个参数，如 Bash 中的 @kbd{@key{ESC} .}@: 和 @command{zsh}。  最简单的用法是复制上一个 shell 命令的最后一个参数。  使用前缀参数 @var{n}，它会复制第 @var{n} 个参数。重复 @kbd{C-c .} 复制早期的 shell 命令，始终使用相同的 @var{n} 值（重复 @kbd{C-c .} 命令时不要给出前缀参数）。
+
+@vindex comint-insert-previous-argument-from-end
+如果将 @code{comint-insert-previous-argument-from-end} 设置为非 @code{nil} 值，@kbd{C-c .}@: 将复制从最后一个参数算起的第 @var{n} 参数；这模拟了@command{zsh}中的@kbd{@key{ESC} .}@:。
+
+这些命令从特殊的历史列表中获取先前 shell 命令的文本，而不是从 shell 缓冲区本身。  因此，编辑 shell 缓冲区，甚至删除其中的大部分，不会影响这些命令访问的历史记录。
+
+@vindex comint-input-ring-file-name
+@vindex shell-history-file-name
+@cindex @env{HISTFILE} environment variable
+某些 shell 将其命令历史记录存储在文件中，以便您可以引用以前的 shell 会话中的命令。  Emacs 读取您选择的 shell 的命令历史记录文件，以初始化其自己的命令历史记录。  历史文件名是@code{shell-history-file-name}中指定的字符串。  如果该用户选项为@code{t}，则不会读取命令历史记录。  如果值为@code{nil}，则从环境变量@env{HISTFILE}指定的文件中读取命令历史记录，或者从@file{~/.bash_history}（对于bash）、@file{~/.sh_history}（对于ksh）、@file{~/.zsh_history"}（对于zsh）或@file{~/.history}（对于其他shell）读取。
+
+@node Shell History Copying
+@subsubsection Shell 历史记录复制
+
+@table @kbd
+@kindex C-c C-p @r{(Shell mode)}
+@findex comint-previous-prompt
+@item C-c C-p
+将点移至上一个提示 (@code{comint-previous-prompt})。
+
+@kindex C-c C-n @r{(Shell mode)}
+@findex comint-next-prompt
+@item C-c C-n
+将点移动到以下提示 (@code{comint-next-prompt})。
+
+@kindex C-c RET @r{(Shell mode)}
+@findex comint-copy-old-input
+@item C-c @key{RET}
+复制该点的输入命令，并将副本插入缓冲区的末尾 (@code{comint-copy-old-input})。  如果您将点移回到上一个命令，这非常有用。  复制命令后，您可以使用 @key{RET} 提交副本作为输入。  如果您愿意，您可以在重新提交之前对其进行编辑。  如果在输出行上使用此命令，则会将该行复制到缓冲区的末尾。
+
+@item mouse-2
+如果 @code{comint-use-prompt-regexp} 为 @code{nil}（默认值），则复制您单击的旧输入命令，并将副本插入到缓冲区末尾 (@code{comint-insert-input})。  如果 @code{comint-use-prompt-regexp} 不是 @code{nil}，或者点击不是在旧输入上，则像往常一样猛拉即可。
+@end table
+
+移动到前一个输入，然后使用 @kbd{C-c @key{RET}} 或 @kbd{mouse-2} 复制它会产生相同的结果（相同的缓冲区内容），您可以通过使用 @kbd{M-p} 足够多次从历史列表中获取前一个输入来获得。  但是，@kbd{C-c @key{RET}} 会从缓冲区复制文本，如果您在发送后编辑缓冲区中的输入文本，则该文本可能与历史列表中的内容不同。
+
+@node History References
+@subsubsection 壳牌历史参考
+@cindex history reference
+
+各种 shell，包括 csh 和 bash，支持以 @samp{!} 和 @samp{^} 开头的 @dfn{history references}。  Shell 模式可以识别这些结构，并且可以为您执行历史替换。
+
+如果插入历史引用并输入@key{TAB}，则会在输入历史中搜索匹配的命令，如有必要，执行替换，并将结果放置在缓冲区中代替历史引用。  例如，您可以获取以 @samp{mv} 和 @kbd{! m v @key{TAB}} 开头的最新命令。  如果需要，您可以编辑该命令，然后通过键入 @key{RET} 将命令重新提交到 shell。
+
+@vindex comint-input-autoexpand
+@findex comint-magic-space
+当您将历史引用发送到 shell 时，Shell 模式可以选择扩展缓冲区中的历史引用。  要请求此操作，请将变量 @code{comint-input-autoexpand} 设置为 @code{input}。  您可以通过将@key{SPC}绑定到命令@code{comint-magic-space}来使@key{SPC}执行历史扩展。  @xref{Rebinding}。
+
+Shell 模式会在遵循提示时识别历史引用。 @xref{Shell Prompts}，了解 Shell 模式如何识别提示。
+
+@node Directory Tracking
+@subsection 目录追踪
+@cindex directory tracking
+
+@vindex shell-pushd-regexp
+@vindex shell-popd-regexp
+@vindex shell-cd-regexp
+Shell 模式会跟踪给子 shell 的 @samp{cd}、@samp{pushd} 和 @samp{popd} 命令，以便保持 Shell 缓冲区的默认目录 (@pxref{File Names}) 与 shell 的工作目录相同。  它通过检查您发送的输入行来识别这些命令。
+
+如果您对这些命令使用别名，则可以通过将变量 @code{shell-pushd-regexp}、@code{shell-popd-regexp} 和 @code{shell-cd-regexp} 设置为适当的正则表达式 (@pxref{Regexps}) 来告诉 Emacs 也识别它们。  例如，如果 4⁣ 匹配 shell 命令行的开头，则该行被视为 5⁣ 命令。  这些命令仅在 shell 命令行的开头被识别。
+
+@findex dirs
+如果 Emacs 对子 shell 工作目录中的更改感到困惑，请输入 @kbd{M-x dirs}。  此命令向 shell 询问其工作目录并相应地更新默认目录。  它适用于支持最常见命令语法的 shell，但可能不适用于不常见的 shell。
+
+@findex dirtrack-mode
+@cindex Dirtrack mode
+@cindex mode, Dirtrack
+@vindex dirtrack-list
+您还可以使用 Dirtrack 模式，这是一种本地缓冲区次要模式，它实现了跟踪 shell 工作目录的替代方法。  要使用此方法，您的 shell 提示符必须始终包含工作目录，并且您必须提供正则表达式来识别提示符的哪一部分包含工作目录；有关详细信息，请参阅变量 @code{dirtrack-list} 的文档。  要使用 Dirtrack 模式，请在 Shell 缓冲区中键入 @kbd{M-x dirtrack-mode}，或将 @code{dirtrack-mode} 添加到 @code{shell-mode-hook} (@pxref{Hooks})。
+
+@node Shell Bookmarks
+@subsection 外壳书签
+@cindex shell bookmarks
+
+Shell 模式缓冲区可以添加书签，并且支持本地和远程 (@pxref{Remote Files}) shell 缓冲区。  @xref{Bookmarks}。
+
+打开或“跳转”到带有书签的 shell 会恢复其缓冲区名称、当前目录，并根据需要使用用于创建远程缓冲区的 shell 命令创建远程连接。
+
+@vindex shell-bookmark-name-function
+@findex shell-bookmark-name-from-default-directory
+@findex shell-bookmark-name-from-buffer-name
+选项 @code{shell-bookmark-name-function} 可以根据您的喜好进行定制。  它默认为函数@code{shell-bookmark-name-from-default-directory}，它使用缓冲区的@code{default-directory}的最终组件。  替代函数 @code{shell-bookmark-name-from-buffer-name} 使用缓冲区名称，并去掉其 @code{rename-uniquely} 后缀括号“<>”。  您可以将此选项绑定到您自己的函数。
+
+当您打开远程 shell 书签时，您可以禁止远程连接。  当您使用 @code{desktop-load} 或通过另一个会话管理包恢复会话时，这非常有用，以避免建立连接的时间延迟。  您可以使用命令 @kbd{C-x C-v} (@code{find-alternate-file}) 在未连接的远程缓冲区上建立连接。  要以交互方式禁止连接，请在调用打开/跳转书签菜单项或调用命令 @code{bookmark-jump} 之前给出前缀参数。  @footnote{To inhibit a connection programmatically, refer to the documentation for the variable @code{shell-bookmark-jump-non-essential}.}@footnote{To properly handle multi-hop remote connections, refer to the documentation for the function @code{shell-bookmark-jump}.}
+
+注意：在创建临时多跳远程连接之前，请自定义一个或两个：@code{tramp-save-ad-hoc-proxies} 到非@code{nil} 以保留代理路由。 @code{tramp-show-ad-hoc-proxies} 到非 @code{nil} 以确保连接完全合格。  如果您在多个主机上使用相同的持久书签文件，这会很有帮助。
+
+@xref{Ad-hoc multi-hops,,, tramp, The Tramp Manual}.
+
+@node Shell Options
+@subsection Shell 模式选项
+
+@vindex comint-scroll-to-bottom-on-input
+如果变量 @code{comint-scroll-to-bottom-on-input} 不是 @code{nil}，则插入和复制命令会在插入之前将所选窗口滚动到底部。  默认值为@code{nil}。
+
+@vindex comint-scroll-show-maximum-output
+如果@code{comint-scroll-show-maximum-output}非@code{nil}，则当点位于末尾时输出到达会尝试将最后一行文本滚动到窗口的底行，显示尽可能多的有用文本。  （这模仿了大多数终端的滚动行为。）默认值为@code{t}。
+
+@vindex comint-move-point-for-output
+通过设置@code{comint-move-point-for-output}，您可以选择在输出到达时让点跳转到缓冲区的末尾——无论缓冲区点之前位于何处。  如果值为@code{this}，则点在选定的窗口中跳转。  如果值为@code{all}，则在显示 Comint 缓冲区的每个窗口中进行点跳转。  如果值为@code{other}，则在显示当前缓冲区的所有未选定窗口中进行点跳转。  默认值为@code{nil}，表示点不跳转到末尾。
+
+@vindex comint-prompt-read-only
+如果设置@code{comint-prompt-read-only}，Comint 缓冲区中的提示是只读的。
+
+@vindex comint-input-ignoredups
+变量@code{comint-input-ignoredups}控制是否将连续的相同输入存储在输入历史记录中。  非 1⁣ 值意味着省略与先前输入相同的输入。默认值是@code{nil}，这意味着存储每个输入，即使它等于前一个输入。
+
+@vindex comint-completion-addsuffix
+@vindex comint-completion-recexact
+@vindex comint-completion-autolist
+三个变量自定义文件名完成。  变量 @code{comint-completion-addsuffix} 控制完成是否插入空格或斜杠来指示完全完成的文件或目录名（非 @code{nil} 表示插入空格或斜杠）。 @code{comint-completion-recexact}，如果非@code{nil}，如果通常的 Emacs 补全算法甚至无法添加单个字符，则指示 @key{TAB} 选择最短的可能补全。 @code{comint-completion-autolist}，如果非@code{nil}，表示只要完成不准确，就列出所有可能的完成。
+
+@vindex shell-completion-execonly
+命令完成通常只考虑可执行文件。如果将 @code{shell-completion-execonly} 设置为 @code{nil}，它也会考虑非可执行文件。
+
+@vindex shell-completion-fignore
+@vindex comint-completion-fignore
+变量 @code{shell-completion-fignore} 指定在 Shell 模式完成中要忽略的文件扩展名列表。  默认设置为 @code{nil}，但有些用户更喜欢 @code{("~" "#" "%")} 来忽略以 @samp{~}、@samp{#} 或 @samp{%} 结尾的文件名。  其他相关的 Comint 模式使用变量 @code{comint-completion-fignore} 代替。
+
+@findex shell-dynamic-complete-command
+shell 命令完成的一些实现细节也可以在 @code{shell-dynamic-complete-command} 函数的 Lisp 文档中找到。
+
+@findex shell-pushd-tohome
+@findex shell-pushd-dextract
+@findex shell-pushd-dunique
+您可以配置 @samp{pushd} 的行为。  变量控制在没有给出参数的情况下 @samp{pushd} 的行为是否与 @samp{cd} 类似 (@code{shell-pushd-tohome})，使用数字参数弹出而不是旋转 (@code{shell-pushd-dextract})，并且仅将目录添加到目录堆栈中（如果目录尚不存在的话） (@code{shell-pushd-dunique})。  当然，您选择的值应该与底层 shell 匹配。
+
+@vindex comint-terminfo-terminal
+@vindex system-uses-terminfo
+@vindex TERM@r{, environment variable, in sub-shell}
+Comint 模式将 @env{TERM} 环境变量设置为安全的默认值，但这会禁用一些有用的功能。  例如，在使用 @env{TERM} 确定是否支持颜色的应用程序中禁用彩色输出。  如果您系统上的 terminfo 数据库包含 @samp{"dumb-emacs-ansi"} 终端类型的定义（正如所有最新版本的 terminfo 所做的那样），您可以通过自定义选项 @code{comint-terminfo-terminal} 到 @samp{"dumb-emacs-ansi"} 来启用高级终端功能，包括颜色。  只要 @code{system-uses-terminfo} 不是 @code{nil}，Emacs 就会使用 @code{comint-terminfo-terminal} 作为 @env{TERM} 的值。
+
+@code{comint-terminfo-terminal} 和 @code{system-uses-terminfo} 都可以声明为连接局部变量，以调整这些选项以匹配远程系统的期望 (@pxref{Connection Variables})。
+
+@node Terminal emulator
+@subsection Emacs 终端模拟器
+@findex term
+
+要在文本终端模拟器中运行子 shell，请使用 @kbd{M-x term}。这将创建（或重用）名为 @file{*terminal*} 的缓冲区，并使用来自键盘的输入运行子 shell，并将输出发送到该缓冲区。
+
+@cindex line mode @r{(terminal emulator)}
+@cindex char mode @r{(terminal emulator)}
+终端仿真器使用Term模式，有两种输入模式。  在 @dfn{line mode} 中，Term 的行为基本上类似于 Shell 模式 (@pxref{Shell Mode})。  在@dfn{char mode}中，每个字符都直接发送到子shell，作为终端输入；唯一的例外是终端转义字符，默认情况下为 @kbd{C-c} (@pxref{Term Mode})。  您的输入的任何回显都是子 shell 的责任；子 shell 的任何终端输出都会进入缓冲区，前进点。
+
+某些程序（例如 Emacs 本身）需要详细控制终端屏幕的外观。  他们通过发出特殊的控制代码来做到这一点。  术语模式可识别并处理 ANSI 标准 VT100 样式的转义序列，大多数现代终端都接受这些序列，包括 @command{xterm}。  （因此，您实际上可以在 Emacs Term 窗口中运行 Emacs。）
+
+@code{term} 面指定终端模拟器中文本的默认外观（默认外观与 @code{default} 面相同）。  当终端控制代码用于更改文本的外观时，它们在终端模拟器中由面 @code{term-color-black}、@code{term-color-red}、@code{term-color-green}、@code{term-color-yellow} @code{term-color-blue}、@code{term-color-magenta}、@code{term-color-cyan}、@code{term-color-white}、@code{term-color-underline} 和 @code{term-color-bold} 表示。 @xref{Faces}。
+
+您还可以使用 Term 模式与连接到串行端口的设备进行通信。  @xref{Serial Terminal}。
+
+用于加载子 shell 的文件名的确定方式与 Shell 模式相同。  要创建多个终端模拟器，请使用 @kbd{M-x rename-uniquely} 将缓冲区 @file{*terminal*} 重命名为不同的名称，就像 Shell 模式一样。
+
+与 Shell 模式不同，Term 模式不会通过检查您的输入来跟踪当前目录。  但有些 shell 可以告诉 Term 当前目录是什么。  这是由 @code{bash} 版本 1.15 及更高版本自动完成的。
+
+@node Term Mode
+@subsection 期限模式
+@cindex Term mode
+@cindex mode, Term
+
+要在术语模式下在行模式和字符模式之间切换，请使用以下命令：
+
+@table @kbd
+@kindex C-c C-j @r{(Term mode)}
+@findex term-line-mode
+@item C-c C-j
+切换到线路模式 (@code{term-line-mode})。  如果已处于线路模式，则不执行任何操作。
+
+@kindex C-c C-k @r{(Term mode)}
+@findex term-char-mode
+@item C-c C-k
+切换到字符模式 (@code{term-char-mode})。  如果已处于字符模式，则不执行任何操作。
+@end table
+
+以下命令仅在字符模式下可用：
+
+@table @kbd
+@item C-c C-c
+将文字 @kbd{C-c} 发送到子 shell (@code{term-interrupt-subjob})。
+
+@item C-c @var{char}
+这相当于普通 Emacs 中的 @kbd{C-x @var{char}}。  例如，@kbd{C-c o}调用@kbd{C-x o}的全局绑定，通常是@samp{other-window}。
+@end table
+
+@cindex paging in Term mode
+术语模式具有一次一页的功能。  启用后，它会使输出在每个屏幕结束时暂停：
+
+@table @kbd
+@kindex C-c C-q @r{(Term mode)}
+@findex term-pager-toggle
+@item C-c C-q
+切换一次一页功能 (@code{term-pager-toggle})。  该命令适用于行模式和字符模式。  启用该功能后，模式行会显示单词 @samp{page}，每次 Term 收到超过一屏的输出时，它都会暂停并在模式行中显示 @samp{**MORE**}。  输入 @key{SPC} 显示下一屏输出，或输入 @kbd{?} 查看其他选项。  该界面类似于@code{more}程序。
+@end table
+
+@node Remote Host
+@subsection 远程主机外壳
+@cindex remote host
+@cindex connecting to remote host
+@cindex Telnet
+@cindex SSH
+
+您可以使用常规终端中的任何命令（例如 @command{ssh} 命令）从术语窗口登录到远程计算机。
+
+要求您输入密码的程序通常会抑制密码的回显，因此密码不会显示在缓冲区中。  如果缓冲区处于字符模式，就会像使用真实终端一样发生这种情况。  如果处于线路模式，密码暂时可见，但当您按回车键时密码将被删除。  （这是自动发生的；没有特殊的密码处理。）
+
+当您登录到不同的计算机时，您需要通过在远程登录命令的环境中设置 @env{TERM} 环境变量来指定所使用的终端类型。  （如果您使用 bash，则可以通过在远程登录命令之前编写变量赋值来实现，无需使用逗号分隔。）终端类型 @samp{ansi} 或 @samp{vt100} 适用于大多数系统。
+
+@node Serial Terminal
+@subsection 串口终端
+@cindex terminal, serial
+@findex serial-term
+
+如果您有设备连接到计算机的串行端口，则可以通过键入 @kbd{M-x serial-term} 与其通信。  此命令询问串行端口名称和速度，并切换到新的术语模式缓冲区。  Emacs 通过此缓冲区与串行设备进行通信，就像在普通 Term 模式下与终端进行通信一样。
+
+串行端口的速度以每秒位数来衡量。  最常见的速度是每秒 9600 位。  您可以通过单击模式线以交互方式更改速度。
+
+通过单击模式行中的@samp{8N1}，可以对串行端口进行更多配置。  默认情况下，串口配置为@samp{8N1}，即每个字节由 8 个数据位、无奇偶校验位和 1 个停止位组成。
+
+如果速度或配置错误，您将无法与设备通信，并且可能只会在窗口中看到垃圾输出。
+
+@node Emacs Server
+@section 使用 Emacs 作为服务器
+@pindex emacsclient
+@cindex Emacs as a server
+@cindex server, using Emacs as
+@cindex @env{EDITOR} environment variable
+
+各种程序可以调用您选择的编辑器来编辑特定的文本片段。  例如，版本控制程序调用编辑器来输入版本控制日志 (@pxref{Version Control})，而 Unix @command{mail} 实用程序调用编辑器来输入要发送的消息。  按照惯例，您选择的编辑器由环境变量 @env{EDITOR} 指定。  如果将 @env{EDITOR} 设置为 @samp{emacs}，Emacs 将会被调用，但是以一种不方便的方式——通过启动一个新的 Emacs 进程。  这很不方便，因为新的 Emacs 进程不与任何现有的 Emacs 进程共享缓冲区、命令历史记录或其他类型的信息。
+
+您可以通过将 Emacs 设置为 @dfn{edit server} 来解决此问题，以便它“监听”外部编辑请求并采取相应的操作。  有多种方法可以启动 Emacs 服务器：
+
+@itemize
+@findex server-start
+@item
+在现有 Emacs 进程中运行命令 @code{server-start}：输入 @kbd{M-x server-start}，或将表达式 @code{(server-start)} 放入 init 文件 (@pxref{Init File})。  现有的Emacs进程是服务器；当您退出 Emacs 时，服务器会随着 Emacs 进程一起终止。
+
+@cindex daemon, Emacs
+@item
+使用 @samp{--daemon} 命令行选项之一以 @dfn{daemon} 方式运行 Emacs。  @xref{Initial Options}。  当 Emacs 以这种方式启动时，它会在初始化后调用 @code{server-start} 并且不会打开初始框架。  然后它等待来自客户端的编辑请求。
+
+@item
+使用 @samp{--alternate-editor=""} 命令行选项运行命令 @code{emacsclient}。  仅当没有 Emacs 守护进程正在运行时，这才会启动 Emacs 守护进程。
+
+@cindex systemd unit file
+@item
+如果您的操作系统使用 @command{systemd} 来管理启动，则当您使用提供的 @dfn{systemd unit file} 登录时，可以自动以守护程序模式启动 Emacs。  要激活此功能：
+@example
+systemctl --user enable emacs
+@end example
+（如果您的 Emacs 安装在非标准位置，您可能需要将 @file{emacs.service} 文件复制到标准目录，例如 @file{~/.config/systemd/user/}。）
+
+@cindex socket activation, systemd, Emacs
+@item
+当指定套接字上发生连接事件时，外部进程可以调用 Emacs 服务器，并将该套接字传递给新的 Emacs 服务器进程。  @command{systemd} 的套接字功能就是一个例子：@command{systemd} 服务创建一个套接字并侦听其上的连接；当@command{emacsclient}第一次连接到它时，@command{systemd}可以启动Emacs服务器并将套接字移交给它来为@command{emacsclient}连接提供服务。  使用此功能的设置可以是：
+
+@file{~/.config/systemd/user/emacs.socket}:
+@example
+[Socket]
+ListenStream=/path/to/.emacs.socket
+DirectoryMode=0700
+
+[Install]
+WantedBy=sockets.target
+@end example
+
+（还必须安装上述 @file{emacs.service} 文件。）
+
+@code{ListenStream} 路径将是 Emacs 侦听来自 @command{emacsclient} 的连接的路径；这是您选择的文件。
+@end itemize
+
+@cindex @env{TEXEDIT} environment variable
+一旦 Emacs 服务器启动，您可以使用名为 @command{emacsclient} 的 shell 命令连接到 Emacs 进程并告诉它访问文件。  然后您可以将@env{EDITOR}环境变量设置为@samp{emacsclient}，以便外部程序将使用现有的Emacs进程进行编辑。@footnote{Some programs use a different environment variable; for example, to make
+@TeX{} use @samp{emacsclient}, set the @env{TEXEDIT} environment
+变量为@samp{emacsclient +%d %s}。}
+
+@vindex server-name
+您可以在同一台计算机上运行多个 Emacs 服务器，方法是使用变量 @code{server-name} 为每个服务器赋予唯一的 @dfn{server name}。  例如，@kbd{M-x set-variable @key{RET} server-name @key{RET} "foo" @key{RET}} 将服务器名称设置为@samp{foo}。  @code{emacsclient} 程序可以使用 @samp{-s} 或 @samp{-f} 选项 (@pxref{emacsclient Options}) 按名称指定服务器，具体取决于服务器是否使用 TCP 套接字 (@pxref{TCP Emacs server})。
+
+如果您想运行多个 Emacs 守护进程 (@pxref{Initial Options})，您可以为每个守护进程指定自己的服务器名称，如下所示：
+
+@example
+  emacs --daemon=foo
+@end example
+
+@vindex server-stop-automatically
+当满足某些条件时，可以选择自动停止 Emacs 服务器。  为此，请将选项 @code{server-stop-automatically} 设置为以下值之一：
+
+@table @code
+@item empty
+当服务器没有客户端、没有未保存的文件访问缓冲区并且不再有正在运行的进程时，该值会导致服务器停止。
+
+@item delete-frame
+该值意味着当最后一个客户端框架关闭时，系统会询问是否必须保存每个未保存的文件访问缓冲区并停止每个未完成的进程，如果是，则停止服务器。
+
+@item kill-terminal
+该值意味着当使用@kbd{C-x C-c}（@code{save-buffers-kill-terminal}）关闭最后一个客户端框架时，系统会询问您是否必须保存每个未保存的文件访问缓冲区，并且是否可以停止每个未完成的进程，如果是，则停止服务器。
+@end table
+
+@findex server-eval-at
+如果您通过唯一的服务器名称定义了服务器，则可以使用 @code{server-eval-at} 函数从另一个 Emacs 实例连接到该服务器并计算服务器上的 Lisp 表达式。例如，@code{(server-eval-at "foo" '(+ 1 2))} 在 @samp{foo} 服务器上计算表达式 @code{(+ 1 2)}，并返回 @code{3}。  （如果没有具有该名称的服务器，则会发出错误信号。）目前，此功能主要对开发人员有用。
+
+如果您的操作系统的桌面环境是 @url{https://www.freedesktop.org/wiki/Specifications/,,freedesktop.org-compatible}（大多数 GNU/Linux 和其他最新的类 Unix GUI 都是如此），您可以使用 @samp{Emacs (Client)} 菜单项通过 @command{emacsclient} 连接到 Emacs 服务器。  如果守护进程尚未运行，则该守护进程将启动。
+
+@menu
+* TCP Emacs server::      监听 TCP 套接字。
+* Invoking emacsclient::  连接到 Emacs 服务器。
+* emacsclient Options::   Emacs 客户端启动选项。
+@end menu
+
+@node TCP Emacs server
+@subsection TCP Emacs 服务器
+@cindex TCP Emacs server
+
+@vindex server-use-tcp
+Emacs 服务器通常侦听本地 Unix 域套接字上的连接。  有些操作系统，例如MS-Windows，不支持本地套接字；在这种情况下，服务器将改用 TCP 套接字。  在某些情况下，即使支持本地套接字，让服务器侦听 TCP 套接字也是有用的，例如，如果您需要从远程计算机联系 Emacs 服务器。  您可以将 @code{server-use-tcp} 设置为非 @code{nil} 以使 Emacs 侦听 TCP 套接字而不是本地套接字。  如果您的操作系统不支持本地套接字，则这是默认设置。
+
+@vindex server-host
+@vindex server-port
+如果 Emacs 服务器设置为使用 TCP，则默认情况下它将侦听 localhost 接口上的随机端口。  可以使用变量 @code{server-host} 和 @code{server-port} 将其更改为另一个接口和/或固定端口。
+
+@vindex server-auth-key
+TCP 套接字不受文件系统权限的约束。  为了保留对哪些用户可以通过 TCP 套接字与 Emacs 服务器通信的控制，@command{emacsclient} 程序必须向服务器发送授权密钥。  该密钥通常由 Emacs 服务器随机生成。  这是推荐的操作模式。
+
+@findex server-generate-key
+如果需要，您可以通过设置 @code{server-auth-key} 变量将授权密钥设置为静态值。  密钥必须包含 64 个 ASCII 可打印字符（空格除外）（这意味着从 @samp{!} 到 @samp{~} 的字符，或从十进制代码 33 到 126）。  您可以使用 @kbd{M-x server-generate-key} 来获取随机密钥。
+
+@vindex server-auth-dir
+@cindex server file
+当您启动 TCP Emacs 服务器时，Emacs 会创建一个 @dfn{server file}，其中包含 @command{emacsclient} 用于连接到服务器的 TCP 信息。  变量@code{server-auth-dir}指定包含服务器文件的默认目录；默认情况下，这是 @file{~/.emacs.d/server/}。  在没有具有文件权限的本地套接字的情况下，此目录的权限决定哪些用户可以让其 @command{emacsclient} 进程与 Emacs 服务器通信。  如果 5⁣ 是绝对文件名，则在该文件名指定的位置创建服务器文件。
+
+@vindex EMACS_SERVER_FILE@r{, environment variable}
+要告诉 @command{emacsclient} 使用特定服务器文件通过 TCP 连接到服务器，请使用 @samp{-f} 或 @samp{--server-file} 选项，或设置 @env{EMACS_SERVER_FILE} 环境变量 (@pxref{emacsclient Options})。  如果@code{server-auth-dir}设置为非标准值，或者如果@code{server-name}设置为绝对文件名，则@command{emacsclient}需要服务器文件的绝对文件名，因为默认的@code{server-auth-dir}被硬编码在@command{emacsclient}中用作解析相对文件名的目录。
+
+@node Invoking emacsclient
+@subsection 调用@command{emacsclient}
+@cindex @command{emacsclient} invocation
+
+使用 @command{emacsclient} 程序的最简单方法是运行 shell 命令 @samp{emacsclient @var{file}}，其中 @var{file} 是文件名。  它连接到 Emacs 服务器，并告诉 Emacs 进程访问其现有框架之一中的@var{file}——可以是图形框架，也可以是文本终端中的框架 (@pxref{Frames})。  然后您可以选择该帧开始编辑。
+
+如果没有 Emacs 服务器，@command{emacsclient} 程序将停止并显示错误消息（您可以通过使用 @command{emacsclient}、@pxref{emacsclient Options} 的 @samp{--alternate-editor=""} 选项来防止这种情况发生）。  如果 Emacs 进程没有现有框架（如果它作为守护进程启动 (@pxref{Emacs Server})，则可能会发生这种情况），则 Emacs 会在您调用 @command{emacsclient} 的终端上打开一个框架。
+
+您还可以使用 @samp{-c} 选项强制 @command{emacsclient} 在图形显示上打开新框架，或使用 @samp{-t} 选项在文本终端上打开新框架。  @xref{emacsclient Options}。  如果您使用 @samp{-c} 使用 X 转发打开多个框架，您可能希望禁用单键盘模式。  @xref{Multiple Displays}。
+
+如果您在单个文本终端上运行，则可以使用以下两种方法之一在 @command{emacsclient} 的 shell 和 Emacs 服务器之间切换： (i) 在不同的虚拟终端上运行 Emacs 服务器和 @command{emacsclient}，并在调用 @command{emacsclient} 后切换到 Emacs 服务器的虚拟终端； (ii) 使用 Shell 模式 (@pxref{Interactive Shell}) 或 Term 模式 (@pxref{Term Mode}) 从 Emacs 服务器本身调用 @command{emacsclient}； @command{emacsclient} 仅阻止 Emacs 下的子 shell，您仍然可以使用 Emacs 编辑文件。
+
+@kindex C-x #
+@findex server-edit
+在 Emacs 服务器中完成编辑 @var{file} 后，在其缓冲区中输入 @kbd{C-x #} (@code{server-edit})。  这将保存文件并向@command{emacsclient}程序发送一条消息，告诉它退出。  使用@env{EDITOR}的程序通常会等待编辑器（在本例中为@command{emacsclient}）退出，然后再执行其他操作。
+
+@findex server-edit-abort
+如果您想放弃编辑，请使用 @w{@kbd{M-x server-edit-abort}} 命令。  这会将消息发送回 @command{emacsclient} 程序，告诉它以异常退出状态退出，并且不保存任何缓冲区。
+
+您还可以使用多个文件名参数调用 @command{emacsclient}：@samp{emacsclient @var{file1} @var{file2} ...} 告诉 Emacs 服务器访问 @var{file1}、@var{file2} 等。  Emacs 选择访问 @var{file1} 的缓冲区，并将其他缓冲区埋入缓冲区列表的底部 (@pxref{Buffers})。  一旦所有指定的文件完成（即，一旦您在每个服务器缓冲区中键入 @kbd{C-x #}），@command{emacsclient} 程序就会退出。
+
+@vindex server-kill-new-buffers
+@vindex server-temp-file-regexp
+完成服务器缓冲区也会杀死该缓冲区，除非在要求服务器创建它之前它已经存在于 Emacs 会话中。  但是，如果将 @code{server-kill-new-buffers} 设置为 @code{nil}，则会使用不同的标准：如果文件名与正则表达式 @code{server-temp-file-regexp} 匹配，则使用服务器缓冲区完成将杀死它。  这是为了区分某些临时文件而设置的。
+
+每个 @kbd{C-x #} 检查其他待处理的外部请求以编辑各种文件，并选择下一个此类文件。  如果您愿意，您可以手动切换到服务器缓冲区；你不必用@kbd{C-x #}来达到它。  但是 @kbd{C-x #} 是告诉 @command{emacsclient} 你已经完成的方法。
+
+@vindex server-window
+如果将变量 @code{server-window} 的值设置为窗口或框架，则 @kbd{C-x #} 始终在该窗口或该框架中显示下一个服务器缓冲区。
+
+@vindex server-client-instructions
+当@command{emacsclient}连接时，服务器通常会输出一条消息，说明如何退出客户端框架。  如果@code{server-client-instructions}设置为@code{nil}，则该消息被禁止。
+
+@node emacsclient Options
+@subsection @code{emacsclient} 选项
+@cindex @code{emacsclient} options
+
+您可以向 @command{emacsclient} 程序传递一些可选参数，例如：
+
+@example
+emacsclient -c +12 @var{file1} +4:3 @var{file2}
+@end example
+
+@noindent
+@samp{+@var{line}} 或 @samp{+@var{line}:@var{column}} 参数指定下一个文件参数的行号或行号和列号。  它们的行为类似于 Emacs 本身的命令行参数。  @xref{Action Arguments}。
+
+下面列出了 @command{emacsclient} 识别的其他可选参数：
+
+@table @samp
+@item -a @var{command}
+@itemx --alternate-editor=@var{command}
+指定当 @command{emacsclient} 无法联系 Emacs 时要运行的 shell 命令。  当在脚本中运行 @code{emacsclient} 时，这很有用。  该命令可以包含参数，这些参数可以“像这样”引用。  目前，不支持转义引号。
+
+作为一个特殊的例外，如果 @var{command} 是空字符串，则 @command{emacsclient} 以守护进程模式启动 Emacs（如 @samp{emacs --daemon}），然后再次尝试连接。
+
+@cindex @env{ALTERNATE_EDITOR} environment variable
+环境变量 @env{ALTERNATE_EDITOR} 与 @samp{-a} 选项具有相同的效果。  如果两者都存在，则后者优先。
+
+@cindex client frame
+@item -c
+@itemx --create-frame
+创建一个新的图形@dfn{client frame}，而不是使用现有的 Emacs 框架。  请参阅下文了解 @kbd{C-x C-c} 在客户端框架中的特殊行为。  如果 Emacs 无法创建新的图形框架（例如，如果它无法连接到 X 服务器），它会尝试创建一个文本终端客户端框架，就像您提供了 @samp{-t} 选项一样。
+
+在 MS-Windows 上，单个 Emacs 会话无法在图​​形和文本终端上显示框架，也不能在多个文本终端上显示框架。  因此，如果 Emacs 服务器在文本终端上运行，则 @samp{-c} 选项与 @samp{-t} 选项一样，会在服务器当前的文本终端中创建一个新框架。  @xref{Windows Startup}。
+
+如果在提供 @samp{-c} 选项时省略文件名参数，则新框架默认显示 @file{*scratch*} 缓冲区。  您可以使用变量 @code{initial-buffer-choice} (@pxref{Entering Emacs}) 自定义此行为。
+
+@item -r
+@itemx --reuse-frame
+如果不存在，则创建一个新的图形客户端框架，否则使用现有的 Emacs 框架。
+
+@item -F @var{alist}
+@itemx --frame-parameters=@var{alist}
+为新创建的图形框架设置参数 (@pxref{Frame Parameters})。
+
+@item -d @var{display}
+@itemx --display=@var{display}
+告诉 Emacs 在 X 显示器@var{display} 上打开给定的文件（假设有多个 X 显示器可用）。
+
+@item -e
+@itemx --eval
+告诉 Emacs 评估一些 Emacs Lisp 代码，而不是访问一些文件。  当给出此选项时，@command{emacsclient} 的参数被解释为要计算的表达式列表，@emph{not} 被解释为要访问的文件列表。
+
+@vindex server-eval-args-left
+通过 @option{--eval} 命令行选项传递复杂的 Lisp 表达式有时需要对 shell 特有的字符进行精心转义。  为了避免这种情况，您可以将参数传递给表达式中的 Lisp 函数，作为 @command{emacsclient} 的附加单独参数，并在表达式中使用 @var{server-eval-args-left} 来访问这些参数。  如果空字符串参数传递给 @command{emacsclient}，这些参数也会被包含在内。  无论您的代码是否成功，都要小心让您的表达式从 @var{server-eval-args-left} 中删除已处理的参数，例如使用 @code{pop}，否则 Emacs 将尝试将这些参数作为单独的 Lisp 表达式进行计算。
+
+@item -f @var{server-file}
+@itemx --server-file=@var{server-file}
+指定一个服务器文件 (@pxref{TCP Emacs server}) 以通过 TCP@. 连接到 Emacs 服务器。或者，您可以设置 @env{EMACS_SERVER_FILE} 环境变量以指向服务器文件。  （命令行选项覆盖环境变量。）
+
+Emacs 服务器通常使用本地套接字来侦听连接，但也支持通过 TCP@. 连接要连接到 TCP Emacs 服务器，@command{emacsclient} 需要读取包含 Emacs 服务器连接详细信息的 @dfn{server file}。  该文件的名称通过此选项指定，可以是相对于 @file{~/.emacs.d/server} 的文件名，也可以是绝对文件名。 @xref{TCP Emacs server}。
+
+@item -n
+@itemx --no-wait
+让@command{emacsclient}立即退出，而不是等到所有服务器缓冲区都完成。  只要您愿意，您可以在 Emacs 中编辑服务器缓冲区，当您在其中输入 @kbd{C-x #} 时，它们就会被 @emph{not} 杀死。
+
+@item -w
+@itemx --timeout=@var{N}
+等待 Emacs 响应 @var{N} 秒，然后放弃。如果在此时间内没有响应，@command{emacsclient} 将显示警告并退出。  默认为@samp{0}，表示永远等待。
+
+@item --parent-id=@var{id}
+通过 XEmbed 协议，在 id 为 @var{id} 的父 X 窗口中打开一个 @command{emacsclient} 框架作为客户端框架。  目前，此选项主要对开发人员有用。
+
+@item -q
+@itemx --quiet
+不要让 @command{emacsclient} 显示有关等待 Emacs 或连接到远程服务器套接字的消息。
+
+@item -u
+@itemx --suppress-output
+不要让@command{emacsclient}显示服务器返回的结果。  当执行的评估是针对副作用而不是结果时，与 @samp{-e} 结合使用最有用。
+
+@item -s @var{server-name}
+@itemx --socket-name=@var{server-name}
+连接到名为 @var{server-name} 的 Emacs 服务器。  （MS-Windows 不支持此选项。）服务器名称由 Emacs 服务器上的变量 @code{server-name} 给出。  如果省略此选项，@command{emacsclient} 连接到默认套接字。如果将 Emacs 服务器的 @code{server-name} 设置为绝对文件名，请为此选项指定与 @var{server-name} 相同的绝对文件名，以指示 @command{emacsclient} 连接到该服务器。如果您将 Emacs 作为守护进程 (@pxref{Initial Options}) 启动并指定了守护进程启动的服务器的名称，则需要使用此选项。
+
+或者，您可以设置 @env{EMACS_SOCKET_NAME} 环境变量以指向服务器套接字。  （命令行选项覆盖环境变量。）
+
+@item -t
+@itemx --tty
+@itemx -nw
+@itemx --no-window-system
+在当前文本终端上创建新的客户端框架，而不是使用现有的 Emacs 框架。  其行为就像上面描述的 @samp{-c} 选项一样，除了它创建一个文本终端框架 (@pxref{Text Terminals})。
+
+在 MS-Windows 上，如果 Emacs 服务器使用图形显示，@samp{-t} 的行为与 @samp{-c} 类似，但如果 Emacs 服务器在文本终端上运行，它将在当前文本终端中创建一个新框架。
+
+@item -T @var{tramp-prefix}
+@itemx --tramp=@var{tramp-prefix}
+设置要添加到文件名的前缀，以便 Emacs 使用 TRAMP (@pxref{Top, The Tramp Manual,, tramp, The Tramp Manual}) 查找远程计算机 (@pxref{Remote Files}) 上的文件。  这在与从远程主机使用 Emacs 服务器结合使用时非常有用。  通过 ssh 转发侦听套接字，或 ssh 转发侦听端口 @pxref{TCP Emacs server} 并使 @var{server-file} 在远程计算机上可用，远程计算机上的程序可以使用 @command{emacsclient} 作为 @env{EDITOR} 和类似环境变量的值，但不是与远程计算机上的 Emacs 服务器通信，而是使用 TRAMP 在本地 Emacs 会话中访问这些文件。
+
+@vindex EMACSCLIENT_TRAMP@r{, environment variable}
+设置环境变量 @env{EMACSCLIENT_TRAMP} 与使用 @samp{-T} 选项具有相同的效果。  如果两者都指定，则命令行选项优先。
+
+例如，假设有两个主机：@samp{local} 和@samp{remote}。
+
+@example
+local$ ssh -R "/home/%r/.emacs.socket":"$@{XDG_RUNTIME_DIR:-$@{TMPDIR:-/tmp@}/emacs%i@}$@{XDG_RUNTIME_DIR:+/emacs@}/server" remote
+remote$ export EMACS_SOCKET_NAME=$HOME/.emacs.socket
+remote$ export EMACSCLIENT_TRAMP=/ssh:remote:
+remote$ export EDITOR=emacsclient
+remote$ $EDITOR /tmp/foo.txt #Should open in local emacs.
+@end example
+
+如果您使用的平台 @command{emacsclient} 不使用 Unix 域套接字（即 MS-Windows），或者您的 SSH 实现无法转发它们（例如，版本 6.7 之前的 OpenSSH），您可以转发 TCP 端口。  在此示例中，假设本地 Emacs 侦听 tcp 端口 12345。进一步假设 @file{/home} 位于共享文件系统上，以便服务器文件 @file{~/.emacs.d/server/server} 在两台主机上都可读。
+
+@example
+local$ ssh -R12345:localhost:12345 remote
+remote$ export EMACS_SERVER_FILE=server
+remote$ export EMACSCLIENT_TRAMP=/ssh:remote:
+remote$ export EDITOR=emacsclient
+remote$ $EDITOR /tmp/foo.txt #Should open in local emacs.
+@end example
+
+@item -V
+@itemx --version
+打印版本信息并退出。
+
+@item -H
+@itemx --help
+打印使用信息消息并退出。
+
+@end table
+
+由@samp{-c}或@samp{-t}选项创建的新图形或文本终端框架被视为@dfn{client frames}。  您从客户端框架创建的任何新框架也被视为客户端框架。  如果您在客户端框架中键入 @kbd{C-x C-c} (@code{save-buffers-kill-terminal})，该命令不会像通常那样终止 Emacs 会话 (@pxref{Exiting})。  相反，Emacs 会删除客户端框架；此外，如果客户端框架有一个 @command{emacsclient} 等待重新获得控制（即，如果您没有提供 @samp{-n} 选项），Emacs 会删除同一客户端的所有其他框架，并将客户端的服务器缓冲区标记为已完成，就像您在所有这些缓冲区中键入 @kbd{C-x #} 一样。  如果删除客户端框架后没有剩余框架，则 Emacs 会话将退出。
+
+作为例外，当 Emacs 作为守护进程启动时，所有帧都被视为客户端帧，并且 @kbd{C-x C-c} 永远不会终止 Emacs。  要终止守护进程会话，请输入 @kbd{M-x kill-emacs}。
+
+请注意，@samp{-t}和@samp{-n}选项是矛盾的：@samp{-t}表示控制当前文本终端以创建新的客户端框架，而@samp{-n}表示不控制文本终端。  如果您提供这两个选项，Emacs 会访问现有框架中的指定文件而不是新的客户端框架，从而抵消 @samp{-t} 的效果。
+
+@node Printing
+@section 打印硬拷贝
+@cindex hardcopy
+@cindex printing
+
+Emacs 提供了打印整个缓冲区或部分缓冲区硬拷贝的命令。  您可以直接调用打印命令，如下所述，或使用菜单栏上的 @samp{File} 菜单。
+
+@findex htmlfontify-buffer
+除了本节中描述的命令之外，您还可以打印 Dired (@pxref{Operating on Files}) 和日记 (@pxref{Displaying the Diary}) 的硬拷贝。  您还可以使用命令 @kbd{M-x htmlfontify-buffer} 将 Emacs 缓冲区“打印”为 HTML，该命令将当前缓冲区转换为 HTML 文件，用基于 CSS 的标记替换 Emacs 界面。  此外，Org 模式允许您将 Org 文件打印为多种格式，例如 PDF (@pxref{Org Mode})。
+
+@table @kbd
+@item M-x print-buffer
+打印当前缓冲区的硬拷贝，其中页面标题包含文件名和页码。
+@item M-x lpr-buffer
+打印当前缓冲区的硬拷贝，不带页面标题。
+@item M-x print-region
+与 @code{print-buffer} 类似，但仅打印当前区域。
+@item M-x lpr-region
+与 @code{lpr-buffer} 类似，但仅打印当前区域。
+@end table
+
+@findex print-buffer
+@findex print-region
+@findex lpr-buffer
+@findex lpr-region
+@vindex lpr-switches
+@vindex lpr-commands
+在大多数操作系统上，上述硬拷贝命令通过调用 @command{lpr} 程序提交文件进行打印。  要更改打印机程序，请自定义变量@code{lpr-command}。  要指定额外的开关给打印机程序，请自定义列表变量@code{lpr-switches}。  它的值应该是一个选项字符串列表，每个选项字符串都应以@samp{-}开头（例如，选项字符串@code{"-w80"}指定80列的行宽）。  默认为空列表，@code{nil}。
+
+@vindex printer-name
+@vindex lpr-printer-switch
+要指定要使用的打印机，请设置变量@code{printer-name}。默认值 @code{nil} 指定默认打印机。  如果将其设置为打印机名称（字符串），则该名称将通过 @samp{-P} 开关传递到 @command{lpr}；如果您不使用 @command{lpr}，则应使用 @code{lpr-printer-switch} 指定开关。
+
+@vindex lpr-headers-switches
+@vindex lpr-add-switches
+变量 @code{lpr-headers-switches} 类似地指定用于制作页眉的额外开关。  变量@code{lpr-add-switches}控制是否向打印机程序提供@samp{-T}和@samp{-J}选项（适用于@command{lpr}）：@code{nil}表示不添加它们（如果您的打印机程序与@command{lpr}不兼容，这应该是该值）。
+
+@menu
+* PostScript::            将缓冲区或区域打印为 PostScript。
+* PostScript Variables::  自定义 PostScript 打印命令。
+* Printing Package::      可选的高级打印接口。
+@end menu
+
+@node PostScript
+@subsection PostScript 硬拷贝
+
+这些命令将缓冲区内容转换为 PostScript，打印它或将其保留在另一个 Emacs 缓冲区中。
+
+@table @kbd
+@item M-x ps-print-buffer
+以 PostScript 形式打印当前缓冲区的硬拷贝。
+@item M-x ps-print-region
+以 PostScript 形式打印当前区域的硬拷贝。
+@item M-x ps-print-buffer-with-faces
+以 PostScript 形式打印当前缓冲区的硬拷贝，通过 PostScript 功能显示文本中使用的面。
+@item M-x ps-print-region-with-faces
+以 PostScript 形式打印当前区域的硬拷贝，显示文本中使用的面孔。
+@item M-x ps-spool-buffer
+为当前缓冲区文本生成并后台打印 PostScript 图像。
+@item M-x ps-spool-region
+为当前区域生成并假脱机打印 PostScript 图像。
+@item M-x ps-spool-buffer-with-faces
+为当前缓冲区生成并假脱机打印 PostScript 图像，显示所使用的面。
+@item M-x ps-spool-region-with-faces
+生成并假脱机当前区域的 PostScript 图像，显示所使用的面孔。
+@item M-x ps-despool
+将假脱机的 PostScript 发送到打印机。
+@item M-x handwrite
+为当前缓冲区生成/打印 PostScript，就像手写一样。
+@end table
+
+@findex ps-print-region
+@findex ps-print-buffer
+@findex ps-print-region-with-faces
+@findex ps-print-buffer-with-faces
+@code{ps-print-buffer} 和 @code{ps-print-region} 命令以 PostScript 形式打印缓冲区内容。  一个命令打印整个缓冲区；另一个，只是地区。  命令 @code{ps-print-buffer-with-faces} 和 @code{ps-print-region-with-faces} 的行为类似，但使用 PostScript 功能来显示缓冲区文本的外观（字体和颜色）。
+
+交互地，当您使用前缀参数 (@kbd{C-u}) 时，这些命令会提示用户输入文件名，并将 PostScript 图像保存在该文件中，而不是将其发送到打印机。
+
+@findex ps-spool-region
+@findex ps-spool-buffer
+@findex ps-spool-region-with-faces
+@findex ps-spool-buffer-with-faces
+名称为 @samp{spool} 而不是 @samp{print} 的命令会在 Emacs 缓冲区中生成 PostScript 输出，而不是将其发送到打印机。
+
+@findex ps-despool
+使用命令 @code{ps-despool} 将假脱机图像发送到打印机。  该命令将 @samp{-spool-} 命令（参见上面的命令）生成的 PostScript 发送到打印机。  使用前缀参数 (@kbd{C-u})，它会提示输入文件名，并将假脱机的 PostScript 图像保存在该文件中，而不是将其发送到打印机。
+
+@findex handwrite
+@cindex handwriting
+@kbd{M-x handwrite} 更无聊。  它生成当前缓冲区的 PostScript 再现作为草书手写文档。  可以在@code{handwrite}组中定制。  此函数仅支持 ISO 8859-1 字符。
+
+@node PostScript Variables
+@subsection PostScript 硬拷贝的变量
+
+@vindex ps-lpr-command
+@vindex ps-lpr-switches
+@vindex ps-printer-name
+所有 PostScript 硬拷贝命令都使用变量 @code{ps-lpr-command} 和 @code{ps-lpr-switches} 来指定如何打印输出。  @code{ps-lpr-command} 指定要运行的命令名称，@code{ps-lpr-switches} 指定要使用的命令行选项，@code{ps-printer-name} 指定打印机。  如果您不自己设置前两个变量，它们将从 @code{lpr-command} 和 @code{lpr-switches} 获取初始值。  如果@code{ps-printer-name}是@code{nil}，则使用@code{printer-name}。
+
+@vindex ps-print-header
+变量 @code{ps-print-header} 控制这些命令是否向每个页面添加标题行——将其设置为 @code{nil} 以关闭标题。
+
+@cindex color emulation on black-and-white printers
+@vindex ps-print-color-p
+如果您的打印机不支持颜色，则应通过将 @code{ps-print-color-p} 设置为 @code{nil} 来关闭颜色处理。  默认情况下，如果显示器支持颜色，Emacs 会生成带有颜色信息的硬拷贝输出；在黑白打印机上，颜色是用灰色阴影来模拟的。  即使您的屏幕颜色仅使用灰色阴影，这也可能会产生难以阅读甚至难以辨认的输出。
+
+@vindex ps-black-white-faces
+或者，您可以将 @code{ps-print-color-p} 设置为 @code{black-white} 以使颜色在黑白打印机上显示得更好。  这是通过使用 @code{ps-black-white-faces} 中的信息通过可定制的灰色阴影列表来表达颜色，并通过粗体和斜体面属性进行增强来实现的。
+
+@vindex ps-use-face-background
+默认情况下，PostScript 打印会忽略面的背景颜色，除非变量 @code{ps-use-face-background} 为非 @code{nil}。  这是为了避免对斑马条纹和背景图像/文本产生不必要的干扰。
+
+@vindex ps-paper-type
+@vindex ps-page-dimensions-database
+变量 @code{ps-paper-type} 指定要格式化的纸张尺寸；合法值包括 @code{a4}、@code{a3}、@code{a4small}、@code{b4}、@code{b5}、@code{executive}、@code{ledger}、@code{legal}、@code{letter}、@code{letter-small}、@code{statement}、@code{tabloid}。  默认值为@code{letter}。  您可以通过更改变量 @code{ps-page-dimensions-database} 来定义其他纸张尺寸。
+
+@vindex ps-landscape-mode
+变量@code{ps-landscape-mode}指定页面上的打印方向。  默认为@code{nil}，代表纵向模式。  任何非 2⁣ 值都指定横向模式。
+
+@vindex ps-number-of-columns
+变量@code{ps-number-of-columns}指定列数；它在横向和纵向模式下均有效。  默认值为 1。
+
+@vindex ps-font-family
+@vindex ps-font-size
+@vindex ps-font-info-database
+变量 @code{ps-font-family} 指定用于打印普通文本的字体系列。  合法值包括 @code{Courier}、@code{Helvetica}、@code{NewCenturySchlbk}、@code{Palatino} 和 @code{Times}。  变量 @code{ps-font-size} 指定普通文本的字体大小，默认为 8.5 磅。  @code{ps-font-size} 的值也可能是 2 个浮点数的缺点：一个用于横向模式，另一个用于纵向模式。
+
+@vindex ps-multibyte-buffer
+@cindex Intlfonts for PostScript printing
+@cindex fonts for PostScript printing
+Emacs 比典型的 PostScript 打印机支持更多的脚本和字符。  因此，缓冲区中的某些字符可能无法使用打印机内置的字体进行打印。  您可以使用 GNU Intlfonts 包中的字体来扩充随打印机提供的字体，也可以指示 Emacs 专门使用 Intlfonts。  变量 @code{ps-multibyte-buffer} 控制这一点：默认值 @code{nil} 适用于打印 @acronym{ASCII} 和 Latin-1 字符；值 3⁣ 适用于内置有 @acronym{ASCII}、Latin-1、日语和韩语字符字体的打印机。  值 @code{bdf-font} 安排 Intlfonts 包中的 BDF 字体用于 @emph{all} 字符。  最后，值 @code{bdf-font-except-latin} 指示打印机对 @acronym{ASCII} 和 Latin-1 字符使用内置字体，并对其余字符使用 Intlfonts BDF 字体。
+
+@vindex bdf-directory-list
+为了能够使用 BDF 字体，Emacs 需要知道在哪里可以找到它们。  变量 @code{bdf-directory-list} 保存 Emacs 应该在其中查找字体的目录列表；默认值包括单个目录@file{/usr/local/share/emacs/fonts/bdf}。
+
+这些命令的许多其他自定义变量在 Lisp 文件@file{ps-print.el} 和 @file{ps-mule.el} 中定义和描述。
+
+@node Printing Package
+@subsection 印刷包装
+@cindex Printing package
+
+用于打印硬拷贝的基本 Emacs 功能可以使用 Printing 包进行扩展。  这提供了一个易于使用的界面，用于选择打印内容、在打印前预览 PostScript 文件以及设置各种打印选项，例如打印标题、横向或纵向模式、双面模式等。  在 GNU/Linux 或 Unix 系统上，打印包依赖于 @file{gs} 和 @file{gv} 实用程序，它们作为 GhostScript 程序的一部分分发。  在 MS-Windows 上，可以使用 Ghostscript 的 @file{gstools} 端口。
+
+@findex pr-interface
+要使用打印包，请将 @code{(require 'printing)} 添加到您的初始化文件 (@pxref{Init File})，然后添加 @code{(pr-update-menus)}。此功能用包含各种打印选项的 @samp{Printing} 子菜单替换了菜单栏中的常用打印命令。您还可以输入@kbd{M-x pr-interface @key{RET}}；这将创建一个 @file{*Printing Interface*} 缓冲区，类似于自定义缓冲区，您可以在其中设置打印选项。  选择打印内容和方式后，使用 @samp{Print} 按钮启动打印作业（单击其上的 @kbd{mouse-2}，或将指针移到其上并键入 @key{RET}）。  有关各种选项的更多信息，请使用 @samp{Interface Help} 按钮。
+
+@node Sorting
+@section 文本排序
+@cindex sorting
+
+Emacs 提供了几个用于对缓冲区中的文本进行排序的命令。  所有操作都针对该区域的内容。他们将该区域的文本划分为许多@dfn{sort records}，为每个记录标识一个@dfn{sort key}，然后将记录重新排序为排序键确定的顺序。  对记录进行排序，使其键按字母顺序排列，或者对于数字排序，按数字顺序排列。  在字母排序中，根据 5⁣ 字符序列，所有大写字母 @samp{A} 到 @samp{Z} 都排在小写字母 @samp{a} 之前（但下面描述的 @code{sort-fold-case} 可以改变这一点）。
+
+各种排序命令的不同之处在于它们如何将文本划分为排序记录以及每个记录的哪一部分用作排序键。  大多数命令使每一行成为单独的排序记录，但某些命令使用段落或页面作为排序记录。  大多数排序命令使用每个完整的排序记录作为其自己的排序键，但有些排序命令仅使用记录的一部分作为排序键。
+
+@findex sort-lines
+@findex sort-paragraphs
+@findex sort-pages
+@findex sort-fields
+@findex sort-numeric-fields
+@vindex sort-numeric-base
+@table @kbd
+@item M-x sort-lines
+将区域划分为行，并通过比较一行的整个文本来排序。  数字参数表示按降序排序。
+
+@item M-x sort-paragraphs
+将区域划分为段落，并通过比较段落的整个文本（前导空白行除外）进行排序。  数字参数意味着按降序排序。
+
+@item M-x sort-pages
+将区域划分为多个页面，并通过比较页面的整个文本（前导空白行除外）进行排序。  数字参数表示按降序排序。
+
+@item M-x sort-fields
+将区域分为几行，并通过比较每行中一个字段的内容来排序。  字段被定义为由空格分隔，因此一行中连续的非空格字符的第一个运行构成字段 1，第二个这样的运行构成字段 2，依此类推。
+
+使用数字参数指定要按哪个字段排序：1 按字段 1 排序，等等；默认值为 1。负参数表示从右侧而不是从左侧开始计数字段；因此，负 1 表示按最后一个字段排序。  如果多行在要排序的字段中具有相同的内容，它们将保持与原始缓冲区中相同的相对顺序。
+
+@item M-x sort-numeric-fields
+与@kbd{M-x sort-fields}类似，不同之处在于每行将指定字段转换为整数，并对数字进行比较。  当被视为文本时，@samp{10}位于@samp{2}之前，但当被视为数字时，@samp{10}位于@samp{2}之后。  默认情况下，数字根据 @code{sort-numeric-base} 进行解释，但以 @samp{0x} 或 @samp{0} 开头的数字分别解释为十六进制和八进制。
+
+@item M-x sort-columns
+与 0⁣ 类似，只不过用于比较的每行中的文本来自固定范围的列。  使用前缀参数，按相反顺序排序。  有关此命令的更多详细信息，请参阅下文。
+
+@findex reverse-region
+@item M-x reverse-region
+反转该区域中的线的顺序。  这对于按字段降序排序非常有用，因为这些排序命令没有执行此操作的功能。
+@end table
+
+例如，如果缓冲区包含以下内容：
+
+@smallexample
+On systems where clash detection (locking of files being edited) is
+implemented, Emacs also checks the first time you modify a buffer
+whether the file has changed on disk since it was last visited or
+saved.  If it has, you are asked to confirm that you want to change
+the buffer.
+@end smallexample
+
+@noindent
+将 @kbd{M-x sort-lines} 应用于整个缓冲区会产生以下结果：
+
+@smallexample
+On systems where clash detection (locking of files being edited) is
+implemented, Emacs also checks the first time you modify a buffer
+saved.  If it has, you are asked to confirm that you want to change
+the buffer.
+whether the file has changed on disk since it was last visited or
+@end smallexample
+
+@noindent
+其中大写 @samp{O} 排序在所有小写字母之前。  如果你使用 @kbd{C-u 2 M-x sort-fields} 代替，你会得到这样的结果：
+
+@smallexample
+implemented, Emacs also checks the first time you modify a buffer
+saved.  If it has, you are asked to confirm that you want to change
+the buffer.
+On systems where clash detection (locking of files being edited) is
+whether the file has changed on disk since it was last visited or
+@end smallexample
+
+@noindent
+其中排序键为 @samp{Emacs}、@samp{If}、@samp{buffer}、@samp{systems} 和 @samp{the}。
+
+@findex sort-columns
+@kbd{M-x sort-columns} 需要更多解释。  您可以通过在其中一列上放置点并在另一列上放置标记来指定列。  因为这意味着您不能将点或标记放在要排序的文本的第一行的开头，所以此命令使用“区域”的不寻常定义：所有线点所在的行都被视为区域的一部分，标记所在的所有行以及其间的所有行也被视为区域的一部分。
+
+例如，要按第 10 至 15 列中的信息对表格进行排序，您可以将标记放在表格第一行的第 10 列上，并指向表格最后一行的第 15 列，然后运行 ​​@code{sort-columns}。  同样，您可以使用第一行第 15 列上的标记和最后一行第 10 列上的点来运行它。
+
+这可以被认为是对由点和标记指定的矩形进行排序，只不过矩形左侧或右侧每行上的文本与矩形内部的文本一起移动。 @xref{Rectangles}。
+
+@vindex sort-fold-case
+如果 @code{sort-fold-case} 不是 @code{nil}，许多排序命令在比较时会忽略大小写差异。
+
+@c Picture Mode documentation
+@ifnottex
+@include picture-xtra.texi
+@end ifnottex
+
+
+@node Editing Binary Files
+@section 编辑二进制文件
+
+@cindex Hexl mode
+@cindex mode, Hexl
+@cindex editing binary files
+@cindex hex editing
+有一种特殊的主要模式用于编辑二进制文件：Hexl 模式。  要使用它，请使用 @kbd{M-x hexl-find-file} 而不是 @kbd{C-x C-f} 来访问文件。  此命令将文件的内容转换为十六进制并允许您编辑翻译。  保存文件时，它会自动转换回二进制文件。
+
+您还可以使用 @kbd{M-x hexl-mode} 将现有缓冲区转换为十六进制。  如果您正常访问文件然后发现它是二进制文件，这非常有用。
+
+在 Hexl 模式下插入文本始终会覆盖。  这是为了降低意外破坏文件中数据对齐的风险。普通文本字符会插入自身（即用自身覆盖）。  有些命令可以通过代码插入特殊字符。  大多数光标移动键以及 @kbd{C-x C-s} 在 Hexl 模式下绑定到产生相同效果的命令。  以下是 Hexl 模式特有的其他重要命令的列表：
+
+@c I don't think individual index entries for these commands are useful--RMS.
+@table @kbd
+@item C-M-d
+插入一个带有十进制代码的字节。
+
+@item C-M-o
+插入一个带有八进制代码的字节。
+
+@item C-M-x
+插入一个带有十六进制代码的字节。
+
+@item C-M-a
+移至 512 字节页面的开头。
+
+@item C-M-e
+移至 512 字节页面的末尾。
+
+@item C-x [
+移至 1k 字节页面的开头。
+
+@item C-x ]
+移至 1k 字节页面的末尾。
+
+@item M-g
+移动到十六进制指定的地址。
+
+@item M-j
+移动到以十进制指定的地址。
+
+@item C-c C-c
+离开 Hexl 模式，返回到调用 @code{hexl-mode} 之前该缓冲区所具有的主要模式。
+@end table
+
+@noindent
+其他 Hexl 命令可让您插入二进制字节的字符串（序列），移动 @code{short}s 或 @code{int}s 等；输入 @kbd{C-h a hexl- @key{TAB}} 了解详细信息。
+
+Hexl 模式也可用于编辑文本文件。  如果文本文件包含异常字符或使用异常编码 (@pxref{Coding Systems})，这可能会派上用场。  为此，插入字节的 Hexl 命令还可以插入 @acronym{ASCII} 和非 @acronym{ASCII} 字符，包括多字节字符。  要使用 Hexl 编辑文本文件，请照常访问该文件，然后键入 @w{@kbd{M-x hexl-mode @key{RET}}} 切换到 Hexl 模式。  您现在可以通过键入文本字符来插入它们。  但是，插入多字节字符需要特别小心，以避免创建无效多字节序列的危险：您应该在 point 位于文件中多字节序列的第一个字节上时开始键入此类字符。
+
+@node Saving Emacs Sessions
+@section 保存 Emacs 会话
+@cindex saving sessions
+@cindex restore session
+@cindex remember editing session
+@cindex reload files
+
+@cindex desktop configuration
+您可以使用桌面库将 Emacs 的状态从一个会话保存到另一个会话。  保存的 Emacs @dfn{desktop configuration} 包括缓冲区、它们的文件名、主要模式、缓冲区位置、窗口和框架配置以及一些重要的全局变量。
+
+@vindex desktop-save-mode
+@findex desktop-save-mode
+要启用此功能，请使用自定义缓冲区 (@pxref{Easy Customization}) 将 @code{desktop-save-mode} 设置为 @code{t} 以供将来会话使用，或在初始化文件 (@pxref{Init File}) 中添加以下行：
+
+@example
+(desktop-save-mode 1)
+@end example
+
+@vindex desktop-path
+@vindex desktop-auto-save-timeout
+如果您在 init 文件中打开 @code{desktop-save-mode}，那么当 Emacs 启动时，它会在 @code{desktop-path} 中查找已保存的桌面（默认为 @code{user-emacs-directory}，然后是您的主目录）并使用它找到的第一个桌面。  虽然 Emacs 在打开 @code{desktop-save-mode} 的情况下运行，但默认情况下，每当桌面配置发生任何更改时，它都会自动保存桌面。  变量 @code{desktop-auto-save-timeout} 决定 Emacs 检查桌面修改的频率。  当您退出 Emacs 时，桌面也会被保存。
+
+@cindex disable restoring of desktop configuration
+当您不希望 Emacs 重新加载任何已保存的桌面配置时，请在 Emacs 命令行上指定选项 @samp{--no-desktop}。这将关闭当前会话的@code{desktop-save-mode}。使用 @samp{--no-init-file} 选项启动 Emacs 也会禁用桌面重新加载，因为它绕过了通常打开 @code{desktop-save-mode} 的 init 文件。
+
+@findex desktop-change-dir
+@findex desktop-revert
+您可以在不同的目录中单独保存桌面配置；从保存桌面配置的目录启动 Emacs 将恢复该配置，前提是您自定义 @code{desktop-path} 以将 @file{.} （当前目录）添加到其他目录中。  您可以保存当前桌面并通过键入@kbd{M-x desktop-change-dir}重新加载保存在另一目录中的桌面。  键入 @kbd{M-x desktop-revert} 将恢复到之前重新加载的桌面。
+
+@vindex desktop-load-locked-desktop
+Emacs 保存桌面的文件在会话运行时被锁定，以避免无意中从另一个 Emacs 会话覆盖它。  当 Emacs 退出时，该锁通常会被删除，但如果 Emacs 或您的系统崩溃，锁会保留下来，并且当您重新启动 Emacs 时，它会默认询问您是否使用锁定的桌面文件。  您可以通过将变量 @code{desktop-load-locked-desktop} 自定义为 @code{nil}（这意味着在这种情况下永远不会加载桌面）或 @code{t}（这意味着在不询问的情况下加载桌面）来避免出现此问题。  您还可以将该变量自定义为特殊值@code{check-pid}，这意味着如果锁定桌面的 Emacs 进程未在本地计算机上运行，​​则加载该文件。  不应在锁定 Emacs 可能仍在另一台计算机上运行的情况下使用此方法，这可能是在使用 NFS 或类似工具远程安装主目录的多用户环境中的情况。
+
+@cindex desktop restore in daemon mode
+当Emacs以守护进程模式启动时，它不能问你任何问题，因此如果它发现桌面文件被锁定，它不会加载它，除非@code{desktop-load-locked-desktop}是@code{t}。  请注意，由于其他原因，在守护程序模式下恢复桌面有些问题：例如，守护程序无法使用 GUI 功能，因此无法恢复框架位置、大小和装饰等参数。  因此，您可能希望延迟在守护程序模式下恢复桌面，直到第一个客户端连接为止，方法是在添加到 @code{server-after-make-frame-hook} (@pxref{Creating Frames,,, elisp, The Emacs Lisp Reference Manual}) 的挂钩函数中调用@code{desktop-read}（见下文）。
+
+@findex desktop-save
+@findex desktop-read
+无论何时，您都可以使用命令 @kbd{M-x desktop-save} 强制立即保存当前桌面。  如果您不想使用自动桌面恢复，因此不打开 @code{desktop-save-mode}，或者当您对桌面进行了重大更改，并且希望确保配置在 Emacs 或系统崩溃时不会丢失，这非常有用。  如果当前 Emacs 会话尚未加载任何桌面，您可以使用 @kbd{M-x desktop-read} 恢复之前保存的桌面。
+
+@vindex desktop-restore-frames
+默认情况下，桌面会尝试保存和恢复框架和窗口配置。@footnote{ Except on Android, where this option defaults to @code{nil} because the window manager (@pxref{Android Windowing}) is too prohibitive, and doesn't allow restoring frame configurations.} 要禁用或启用此功能，请将 @code{desktop-restore-frames} 分别设置为 @code{nil} 或任何非 @code{nil} 值。  （请参阅该变量的文档，了解一些相关选项，您可以自定义这些选项来微调此行为。）
+
+@vindex frameset-filter-alist
+当桌面恢复框架和窗口配置时，它使用记录的框架参数值，忽略初始化文件中这些参数的任何设置 (@pxref{Init File})。  这意味着恢复框架的字体和外观等框架参数将来自桌面文件，它们是在您退出之前的 Emacs 会话时保存的。初始化文件中这些参数的任何设置都将被忽略。  要禁用此功能，请自定义@code{frameset-filter-alist}的值以过滤掉您不想恢复的帧参数；然后，它们将根据您在 init 文件中的自定义设置进行设置。
+
+@vindex desktop-files-not-to-save
+@vindex remote-file-name-access-timeout@r{, and desktop restoring}
+默认情况下，不保存有关访问远程文件的缓冲区的信息。  自定义变量 @code{desktop-files-not-to-save} 来更改此设置。  在这种情况下，您还可以考虑自定义 @code{remote-file-name-access-timeout}，它是停止远程文件的缓冲区恢复之前的秒数。  这可以防止 Emacs 在恢复访问远程文件的会话时被阻止。
+
+@vindex desktop-restore-eager
+默认情况下，桌面上的所有缓冲区都会一次性恢复。但是，如果桌面中有大量缓冲区，这可能会很慢。  您可以使用变量@code{desktop-restore-eager}指定要立即恢复的缓冲区的最大数量；当 Emacs 空闲时，剩余的缓冲区会延迟恢复。
+
+@findex desktop-clear
+@vindex desktop-globals-to-clear
+@vindex desktop-clear-preserve-buffers-regexp
+输入 @kbd{M-x desktop-clear} 清空 Emacs 桌面；例如，如果您想通过调用 @kbd{M-x desktop-read} next 切换到另一个桌面，这可能很有用。  @code{desktop-clear}命令杀死除内部缓冲区之外的所有缓冲区，并清除@code{desktop-globals-to-clear}中列出的全局变量。  如果您希望它保留某些缓冲区，请自定义变量@code{desktop-clear-preserve-buffers}，其值是与不杀死的缓冲区名称相匹配的正则表达式列表。
+
+@vindex desktop-globals-to-save
+如果要将迷你缓冲区历史记录从一个会话保存到另一个会话，请使用 @code{savehist} 库。  如果将选定的迷你缓冲区历史变量添加到 @code{desktop-globals-to-save} 的值，您还可以将这些变量保存为 @code{desktop-save-mode} 的一部分。
+
+@node Recursive Edit
+@section 递归编辑级别
+@cindex recursive editing level
+@cindex editing level, recursive
+
+@dfn{recursive edit} 是指您使用 Emacs 命令在另一个 Emacs 命令中间执行任意编辑的情况。  例如，当您在 @code{query-replace} 内键入 @kbd{C-r} 时，您将进入递归编辑，您可以在其中更改当前缓冲区。  退出递归编辑后，您将返回到@code{query-replace}。  @xref{Query Replace}。
+
+@kindex C-M-c
+@findex exit-recursive-edit
+@cindex exiting recursive edit
+@dfn{Exiting} 递归编辑意味着返回到未完成的命令，继续执行。  退出的命令是@kbd{C-M-c} (@code{exit-recursive-edit})。
+
+您还可以 @dfn{abort} 递归编辑。  这就像退出一样，也是立即退出未完成的命令。  使用命令 @kbd{C-]} (@code{abort-recursive-edit}) 来执行此操作。  @xref{Quitting}。
+
+模式行通过在始终围绕主要和次要模式名称的括号周围显示方括号来显示您何时处于递归编辑中。  每个窗口的模式行都以相同的方式显示这一点，因为 Emacs 作为一个整体而不是任何特定的窗口或缓冲区都处于递归编辑状态。
+
+可以在递归编辑中进行递归编辑。  例如，在 @code{query-replace} 中键入 @kbd{C-r} 后，您可以键入进入调试器的命令。  这将在 @kbd{C-r} 的递归编辑级别内开始调试器的递归编辑级别。模式行为当前正在进行的每个递归编辑级别显示一对方括号。
+
+退出内部递归编辑（例如使用调试器@kbd{c}命令）将恢复在下一个级别运行的命令。  该命令完成后，您可以使用 @kbd{C-M-c} 退出另一个递归编辑级别，依此类推。  退出仅适用于最内层。中止也只退出一级递归编辑；它立即返回到上一个递归编辑的命令级别。  如果您愿意，您可以中止下一个递归编辑级别。
+
+或者，命令 @kbd{M-x top-level} 中止所有级别的递归编辑，立即返回到顶级命令读取器。  如果迷你缓冲区处于活动状态，它也会退出。
+
+在递归编辑中编辑的文本不必与您在顶层编辑的文本相同。  这取决于递归编辑的目的。  如果调用递归编辑的命令首先选择不同的缓冲区，那就是您将递归编辑的缓冲区。  在任何情况下，您都可以以正常方式在递归编辑中切换缓冲区（只要缓冲区切换键没有被反弹）。  您可能可以在递归编辑中完成所有其余的编辑，访问文件等。  但这有时可能会产生令人惊讶的影响（例如堆栈溢出）。  因此，当您不再需要递归编辑时，请记住退出或中止它。
+
+递归编辑通常启用单键盘模式。  @xref{Multiple Displays}。
+
+一般来说，我们会尽量减少 GNU Emacs 中递归编辑级别的使用。  这是因为它们限制您按照特定的顺序返回——从最内层到顶层。  如果可能，我们会在单独的缓冲区中呈现不同的活动，以便您可以根据需要在它们之间切换。  某些命令会切换到新的主要模式，该模式提供了切换回来的命令。  这些方法使您能够更灵活地按照您选择的顺序返回未完成的任务。
+
+
+@node Hyperlinking
+@section 超链接和网页导航功能
+
+以下小节描述了处理 Emacs 缓冲区文本中出现的 URL 和其他类型链接的便利功能。
+
+@menu
+* EWW::                          Emacs 中的网络浏览器。
+* Embedded WebKit Widgets::      在 Emacs 缓冲区中嵌入浏览器小部件。
+* Browse-URL::                   以下网址。
+* Goto Address mode::            激活 URL。
+* FFAP::                         在该点查找文件等@:。
+@end menu
+
+@node EWW
+@subsection 使用 EWW 浏览网页
+
+@findex eww
+@findex eww-open-file
+@dfn{EWW}，Emacs Web Wowser，是 Emacs 的 Web 浏览器包。它允许浏览 Emacs 缓冲区内的 URL。  命令 @kbd{M-x eww} 将打开 URL 或搜索网络。  您可以使用命令@kbd{M-x eww-open-file} 打开文件。  您可以使用 EWW 作为 @code{browse-url}、@pxref{Browse-URL} 的 Web 浏览器。  有关完整详细信息，@pxref{Top, EWW,, eww, The Emacs Web Wowser Manual}。
+
+@node Embedded WebKit Widgets
+@subsection 嵌入式 WebKit 小部件
+@cindex xwidget
+@cindex webkit widgets
+@cindex embedded widgets
+
+@findex xwidget-webkit-browse-url
+@findex xwidget-webkit-mode
+@cindex Xwidget-WebKit mode
+如果 Emacs 是使用适当的支持包编译的，它就能够在其缓冲区中显示浏览器小部件。  命令 @kbd{M-x xwidget-webkit-browse-url} 请求在浏览器小部件中显示的 URL。  URL 通常默认为点处或之前的 URL，但如果存在活动区域​​ (@pxref{Mark})，则默认 URL 在删除其中的任何空格后来自该区域。  然后，该命令使用嵌入式浏览器创建一个新的缓冲区，显示指定的 URL@. 该缓冲区被置于 Xwidget-WebKit 模式（类似于图像模式，@pxref{Image Mode}），该模式提供用于滚动小部件、更改其大小和重新加载小部件的一键命令。  在该缓冲区中输入 @w{@kbd{C-h b}} 以查看键绑定。
+
+@findex xwidget-webkit-edit-mode
+@cindex xwidget-webkit-edit-mode
+默认情况下，在 xwidget webkit 缓冲区中输入自插入字符不会执行任何操作，或者会触发某些特殊操作。  要使这些字符和其他常见编辑键在按下时自动插入，您可以启用 @code{xwidget-webkit-edit-mode}，这会重新定义它们以传递到 WebKit xwidget。
+
+您还可以通过在 xwidget webkit 缓冲区中输入 @kbd{e} 来启用 @code{xwidget-webkit-edit-mode}。
+
+@findex xwidget-webkit-isearch-mode
+@cindex searching in webkit buffers
+@code{xwidget-webkit-isearch-mode} 是一种次要模式，其行为与增量搜索 (@pxref{Incremental Search}) 类似，但对 WebKit 小部件的内容而不是当前缓冲区进行操作。  它绑定到 xwidget-webkit 缓冲区内的 @kbd{C-s} 和 @kbd{C-r}。  当@kbd{C-r}调用时，初始搜索将以相反方向执行。
+
+输入任何自插入字符都会导致该字符被插入到当前搜索查询中。  键入 @kbd{C-s} 将导致 WebKit 小部件显示下一个搜索结果，而键入 @kbd{C-r} 将使其显示上一个搜索结果。
+
+要退出增量搜索，您可以输入 @kbd{C-g}。
+
+@findex xwidget-webkit-browse-history
+@cindex history of webkit buffers
+命令 @code{xwidget-webkit-browse-history} 显示一个缓冲区，其中包含当前 WebKit 缓冲区先前加载的页面列表，并允许您通过点击 @kbd{RET} 导航到这些页面。
+
+它绑定到@kbd{H}。
+
+@vindex xwidget-webkit-disable-javascript
+@cindex disabling javascript in webkit buffers
+默认情况下，JavaScript 在 WebKit 缓冲区内启用，这可能是不可取的，因为网站经常使用它来跟踪您的在线活动。您可以通过将变量 @code{xwidget-webkit-disable-javascript} 自定义为非 @code{nil} 值来禁用 WebKit 缓冲区中的 JavaScript。更改后，您必须终止所有 WebKit 缓冲区才能使此设置生效。
+
+@node Browse-URL
+@subsection 以下网址
+@cindex World Wide Web
+@cindex Web
+@findex browse-url
+@findex browse-url-at-point
+@findex browse-url-at-mouse
+@cindex Browse-URL
+@cindex URLs
+
+@table @kbd
+@item M-x browse-url @key{RET} @var{url} @key{RET}
+将 URL 加载到 Web 浏览器中。
+@end table
+
+Browse-URL 包允许您轻松地从 Emacs 中跟踪 URL。  大多数 URL 后面都会调用 Web 浏览器； @samp{mailto:} URL 后调用 @code{compose-mail} Emacs 命令将邮件发送到指定地址 (@pxref{Sending Mail})。
+
+命令 @kbd{M-x browse-url} 提示输入 URL，并跟随它。如果点位于合理的 URL 附近，则该 URL 将作为默认值提供。  Browse-URL 包还提供了您可能希望绑定到键的其他命令，例如 @code{browse-url-at-point} 和 @code{browse-url-at-mouse}。
+
+@vindex browse-url-mailto-function
+@vindex browse-url-browser-function
+您可以通过 @code{browse-url} 自定义组中的各种选项自定义 Browse-URL 的行为。  特别是，选项 @code{browse-url-mailto-function} 允许您定义如何关注 @samp{mailto:} URL，而 @code{browse-url-browser-function} 则指定您的默认浏览器。
+
+@vindex browse-url-handlers
+您可以通过自定义 @code{browse-url-handlers}（与浏览匹配 URL 的函数配对的正则表达式或谓词的列表）来定义使用其他函数来浏览某些 URL。
+
+有关更多信息，请输入 @kbd{C-h P browse-url @key{RET}} 查看包注释。
+
+@findex url-handler-mode
+Emacs 还有一个次要模式，支持将 @acronym{URL} 当作文件来处理。  @code{url-handler-mode} 是一个全局次要模式，影响大多数处理文件名的 Emacs 命令和原语。  打开此模式后，您可以说 @kbd{C-x C-f https://www.gnu.org/ RET} 来查看该网页的 @acronym{HTML}，然后您可以对其进行编辑并将其保存到本地文件等。
+
+@node Goto Address mode
+@subsection 激活 URL
+@findex goto-address-mode
+@cindex mode, Goto Address
+@cindex Goto Address mode
+@cindex URLs, activating
+
+@table @kbd
+@item M-x goto-address-mode
+激活当前缓冲区中的 URL 和电子邮件地址。
+
+@item M-x global-goto-address-mode
+激活所有缓冲区中的@code{goto-address-mode}。
+@end table
+
+@kindex C-c RET @r{(Goto Address mode)}
+@findex goto-address-at-point
+您可以通过输入 @kbd{M-x goto-address-mode} 让 Emacs 在当前缓冲区中专门标记 URL。  当启用此缓冲区本地次要模式时，它会查找缓冲区中的所有 URL，突出显示它们，并将它们转换为可单击的按钮。  当点位于其文本上时，您可以通过键入 @kbd{C-c @key{RET}} (@code{goto-address-at-point}) 来跟踪 URL；或者通过单击 @kbd{mouse-2}，或快速单击 @kbd{mouse-1} (@pxref{Mouse References})。  跟踪 URL 是通过调用 @code{browse-url} 作为子例程 (@pxref{Browse-URL}) 来完成的。
+
+将 @code{goto-address-mode} 添加到模式挂钩和用于显示传入消息的挂钩（例如，@code{rmail-show-message-hook} 用于 Rmail）非常有用。  Gnus 或 MH-E 不需要这样做，它们有类似的功能。
+
+@node FFAP
+@subsection 在点查找文件和 URL
+@findex find-file-at-point
+@findex ffap
+@findex dired-at-point
+@findex ffap-next
+@findex ffap-menu
+@cindex finding file at point
+
+FFAP 包用提供更合理默认值的命令替换了用于查找文件的某些键绑定，例如 @kbd{C-x C-f}。  当给定前缀参数时，这些命令的行为与普通命令类似。  否则，他们会从点周围的文本中获取默认文件名或 URL。  如果在缓冲区中找到的内容采用 URL 形式而不是文件名形式，则命令使用 @code{browse-url} 来查看它 (@pxref{Browse-URL})。
+
+此功能对于跟踪邮件或新闻缓冲区、@file{README} 文件、@file{MANIFEST} 文件等中的引用非常有用。  有关更多信息，请输入 @kbd{C-h P ffap @key{RET}} 查看包注释。
+
+@cindex FFAP minor mode
+@findex ffap-mode
+要启用 FFAP，请输入 @kbd{M-x ffap-bindings}。  这将进行以下键绑定，并在 Rmail、Gnus 和 VM 文章缓冲区中安装附加 FFAP 功能的挂钩。
+
+@table @kbd
+@item C-x C-f @var{filename} @key{RET}
+@kindex C-x C-f @r{(FFAP)}
+找到 @var{filename}，从点 (@code{find-file-at-point}) 周围的文本猜测默认值。
+@item C-x C-r @var{filename} @key{RET}
+@kindex C-x C-r @r{(FFAP)}
+@code{ffap-read-only}，类似于@code{find-file-read-only}。
+@item C-x C-v @var{filename} @key{RET}
+@kindex C-x C-v @r{(FFAP)}
+@code{ffap-alternate-file}，类似于@code{find-alternate-file}。
+@item C-x d @var{directory} @key{RET}
+@kindex C-x d @r{(FFAP)}
+在 @var{directory} 上启动 Dired，默认为点 (@code{dired-at-point}) 处的目录。
+@item C-x C-d @var{directory} @key{RET}
+@code{ffap-list-directory}，类似于@code{list-directory}。
+@item C-x 4 f @var{filename} @key{RET}
+@kindex C-x 4 f @r{(FFAP)}
+@code{ffap-other-window}，类似于@code{find-file-other-window}。
+@item C-x 4 r @var{filename} @key{RET}
+@code{ffap-read-only-other-window}，类似于@code{find-file-read-only-other-window}。
+@item C-x 4 d @var{directory} @key{RET}
+@code{ffap-dired-other-window}，如@code{dired-other-window}。
+@item C-x 5 f @var{filename} @key{RET}
+@kindex C-x 5 f @r{(FFAP)}
+@code{ffap-other-frame}，类似于@code{find-file-other-frame}。
+@item C-x 5 r @var{filename} @key{RET}
+@code{ffap-read-only-other-frame}，类似于@code{find-file-read-only-other-frame}。
+@item C-x 5 d @var{directory} @key{RET}
+@code{ffap-dired-other-frame}，类似于@code{dired-other-frame}。
+@kindex C-x t C-f @r{(FFAP)}
+@item C-x t C-f @var{filename} @key{return}
+@code{ffap-other-tab}，类似于@code{find-file-other-tab}。
+@item C-x t C-r @var{filename} @key{return}
+@code{ffap-read-only-other-tab}，类似于@code{find-file-read-only-other-tab}。
+@item M-x ffap-next
+在缓冲区中搜索下一个文件名或 URL，然后找到该文件或 URL。
+@item S-mouse-3
+@kindex S-mouse-3 @r{(FFAP)}
+@code{ffap-at-mouse} 查找从鼠标单击位置周围的文本猜测的文件。
+@item C-S-mouse-3
+@kindex C-S-mouse-3 @r{(FFAP)}
+显示当前缓冲区中提到的文件和 URL 的菜单，然后找到您选择的文件和 URL (@code{ffap-menu})。
+@end table
+
+@node Amusements
+@section 游戏和其他娱乐
+@cindex boredom
+@cindex games
+
+@findex animate-birthday-present
+@cindex animate
+@code{animate} 包使文本跳舞（例如，@kbd{M-x animate-birthday-present}）。
+
+@findex blackbox
+@findex mpuz
+@findex 5x5
+@cindex puzzles
+@kbd{M-x blackbox}、@kbd{M-x mpuz} 和 @kbd{M-x 5x5} 是谜题。 @code{blackbox} 挑战您通过断层扫描确定盒子内物体的位置。  @code{mpuz} 显示一个乘法谜题，其中的字母代表您必须猜测的代码中的数字——要猜测一个值，请键入一个字母，然后输入您认为它代表的数字。  @code{5x5} 的目标是填满所有的方格。
+
+@findex bubbles
+@cindex bubbles
+@kbd{M-x bubbles} 是一款游戏，其目标是以最少的步数消除尽可能多的气泡。
+
+@findex decipher
+@cindex ciphers
+@cindex cryptanalysis
+@kbd{M-x decipher} 帮助您对用简单的单字母替换密码加密的缓冲区进行密码分析。
+
+@findex dissociated-press
+@kbd{M-x dissociated-press} 将当前 Emacs 缓冲区中的文本逐字或逐字符地打乱，将其输出写入名为 @file{*Dissociation*} 的缓冲区。  正参数告诉它逐个字符地操作，并指定重叠字符的数量。  负参数告诉它逐字操作，并指定重叠字的数量。  分离新闻产生的结果与马尔可夫链的结果非常相似，但它是一项独立的、无知的发明；它在随机跳转之间巧妙地从样本文本中复制几个连续的字符，这与在每个单词或字符之后随机跳转的马尔可夫链不同。  如果您希望文档易于使用且正确，请不要在文档中使用分离词。
+
+@findex dunnet
+@cindex dunnet
+@kbd{M-x dunnet} 运行基于文本的冒险游戏。
+
+@findex gomoku
+@cindex Go Moku
+如果您想要更多的个人参与，请尝试@kbd{M-x gomoku}，它会和您一起玩Go Moku 游戏。
+
+@cindex tower of Hanoi
+@findex hanoi
+如果你有点无聊，可以尝试@kbd{M-x hanoi}。  如果您相当无聊，请给它一个数字参数。  如果你非常非常无聊，可以尝试争论 9。坐下来观看。
+
+@findex life
+@cindex Life
+@kbd{M-x life} 运行康威生命游戏元胞自动机。
+
+@findex morse-region
+@findex unmorse-region
+@findex nato-region
+@cindex Morse code
+@cindex --/---/.-./.../.
+@kbd{M-x morse-region} 将区域内的文本转换为摩尔斯电码； @kbd{M-x unmorse-region} 将其转换回来。  @kbd{M-x nato-region} 将区域内的文本转换为北约拼音字母； @kbd{M-x denato-region} 将其转换回来。
+
+@findex pong
+@cindex Pong game
+@findex tetris
+@cindex Tetris
+@findex snake
+@cindex Snake
+@kbd{M-x pong}、@kbd{M-x snake} 和 @kbd{M-x tetris} 是著名的 Pong、Snake 和 Tetris 游戏的实现。
+
+@findex solitaire
+@cindex solitaire
+@kbd{M-x solitaire} 玩纸牌游戏，您可以将木钉跳到其他木钉上。
+
+@findex zone
+@cindex zone
+当 Emacs 空闲时，命令 @kbd{M-x zone} 在显示屏上玩游戏。
+
+@findex butterfly
+@cindex butterfly
+“真正的程序员”部署@kbd{M-x butterfly}，它使用蝴蝶在驱动器盘片上翻转一点，请参阅@uref{https://xkcd.com/378}。
+
+@findex doctor
+@cindex Eliza
+最后，如果您发现自己感到沮丧，请尝试向著名心理治疗师伊丽莎描述您的问题。  只需执行@kbd{M-x doctor}即可。  通过键入 @key{RET} 两次来结束每个输入。
+
+@ifnottex
+@lowersections
+@end ifnottex

@@ -1,0 +1,1280 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Calendar/Diary
+@chapter 日历和日记
+@cindex calendar
+@findex calendar
+
+Emacs 提供了台历的功能，包括计划的或过去的事件的日记。  它还具有管理约会的功能，并跟踪您在某些项目上花费的时间。
+
+要输入日历，请输入 @kbd{M-x calendar}。  这将显示以当前月份为中心、点位于当前日期的三个月日历。  使用数字参数（如@kbd{C-u M-x calendar}），它会提示您将月份和年份作为三个月日历的中心。  日历使用自己的缓冲区，其主要模式是日历模式。
+
+日历中的@kbd{mouse-3}调出特定日期的操作菜单； @kbd{mouse-2} 显示常用日历功能的菜单，这些功能与任何特定日期无关。  要退出日历，请输入 @kbd{q}。
+
+@iftex
+  This chapter describes the basic calendar features.
+For more advanced topics,
+@pxref{Advanced Calendar/Diary Usage,,, emacs-xtra, Specialized Emacs Features}.
+@end iftex
+
+@menu
+* Calendar Motion::      浏览日历；选择日期。
+* Scroll Calendar::      将提前或推迟的几个月搬上银幕。
+* Counting Days::        两个日期之间有多少天？
+* General Calendar::     退出或重新计算日历。
+* Writing Calendar Files::  将日历写入各种格式的文件。
+* Holidays::             显示假期日期。
+* Sunrise/Sunset::       显示当地时间的日出和日落时间。
+* Lunar Phases::         显示月相。
+* Other Calendars::      将日期转换为其他日历系统。
+* Diary::                显示您日记中的事件。
+* Daylight Saving::      如何指定夏令时何时有效。
+* Time Intervals::       跟踪时间间隔。
+@ifnottex
+* Advanced Calendar/Diary Usage:: Advanced Calendar/Diary customization.
+@end ifnottex
+@end menu
+
+@node Calendar Motion
+@section 日历中的运动
+
+@cindex moving inside the calendar
+日历模式提供了以逻辑时间单位（例如天、周、月和年）浏览日历的命令。  如果您移动到最初显示的月份之外，日历显示会自动滚动时间以使所选日期可见。移动到某个日期可以让您查看其假期或日记条目，或将其转换为其他日历；只需滚动日历即可移动较长的时间段。
+
+@menu
+* Calendar Unit Motion::       按天、按周、按月、按年移动。
+* Move to Beginning or End::   移动到周、月和年的开始/结束。
+* Specified Dates::            移至当前日期或另一个特定日期。
+@end menu
+
+@node Calendar Unit Motion
+@subsection 标准时间长度的运动
+
+日历缓冲区中的移动命令与文本中的移动命令并行。  您可以向前或向后移动几天、几周、几个月和几年。
+
+@table @kbd
+@item C-f
+将点向前移动一天 (@code{calendar-forward-day})。
+@item C-b
+将点向后移动一天 (@code{calendar-backward-day})。
+@item C-n
+将点向前移动一周 (@code{calendar-forward-week})。
+@item C-p
+将点向后移动一周 (@code{calendar-backward-week})。
+@item M-@}
+@itemx @}
+将点向前移动一个月 (@code{calendar-forward-month})。
+@item M-@{
+@itemx @{
+将点向后移动一个月 (@code{calendar-backward-month})。
+@item C-x ]
+@itemx ]
+将点向前移动一年 (@code{calendar-forward-year})。
+@item C-x [
+@itemx [
+将点向后移动一年 (@code{calendar-backward-year})。
+@end table
+
+@kindex C-f @r{(Calendar mode)}
+@findex calendar-forward-day
+@kindex C-b @r{(Calendar mode)}
+@findex calendar-backward-day
+@kindex C-n @r{(Calendar mode)}
+@findex calendar-forward-week
+@kindex C-p @r{(Calendar mode)}
+@findex calendar-backward-week
+日和周命令与常用的按字符和按行移动的 Emacs 命令自然类似。  正如 @kbd{C-n} 通常移动到下一行中的同一列一样，在日历模式下，它绑定到 @code{calendar-forward-week}，后者移动到下一周的同一天。  @kbd{C-p} (@code{calendar-backward-week}) 移至上周的同一天。  @kbd{C-f} (@code{calendar-forward-day}) 和 @kbd{C-b} (@code{calendar-backward-day}) 向前和向后移动几天。
+
+箭头键相当于 @kbd{C-f}、@kbd{C-b}、@kbd{C-n} 和 @kbd{C-p}，就像它们通常在其他模式下一样。
+
+@kindex M-@} @r{(Calendar mode)}
+@kindex @} @r{(Calendar mode)}
+@findex calendar-forward-month
+@kindex M-@{ @r{(Calendar mode)}
+@kindex @{ @r{(Calendar mode)}
+@findex calendar-backward-month
+@kindex C-x ] @r{(Calendar mode)}
+@kindex ] @r{(Calendar mode)}
+@findex calendar-forward-year
+@kindex C-x [ @r{(Calendar mode)}
+@kindex [ @r{(Calendar mode)}
+@findex calendar-backward-year
+数月和数年的运动命令与数周的运动命令类似，但移动的距离更大。  月份命令 @kbd{M-@}} (@code{calendar-forward-month}) 和 @kbd{M-@{} (@code{calendar-backward-month}) move forward or backward by an entire month.  The year commands @w{@kbd{C-x ]}} (@code{calendar-forward-year}) and @w{@kbd{C-x [}} (@code{calendar-backward-year}) move forward or backward a whole year.
+
+记住这些命令的最简单方法是分别考虑类似于文本段落和页面的月份和年份。  但日历移动命令本身与通过文本移动的命令不太相似：普通的 Emacs 段落命令移动到段落的开头或结尾，而这些月份和年份命令移动整个月或整年，在月份或年份内保持相同的日期。
+
+您还可以使用更简单的按键 @kbd{@}} 和 @kbd{@{} to navigate by month, and @kbd{]} and @kbd{[} to navigate by year.
+
+所有这些命令都接受数字参数作为重复计数。为了方便起见，即使没有 Meta 修饰符，数字键和减号也可以在日历模式下指定数字参数。  例如，@kbd{100 C-f} 将点从当前位置向前移动 100 天。
+
+@node Move to Beginning or End
+@subsection 周、月或年的开始或结束
+
+一周（或月或年）不仅仅是天数；它还包括天数。我们认为几周（几个月，几年）是从特定日期开始的。  因此，日历模式提供了移动到一周、一个月或一年的开始或结束的命令：
+
+@table @kbd
+@kindex C-a @r{(Calendar mode)}
+@findex calendar-beginning-of-week
+@item C-a
+将点移动到一周的开始 (@code{calendar-beginning-of-week})。
+@kindex C-e @r{(Calendar mode)}
+@findex calendar-end-of-week
+@item C-e
+将点移至周末 (@code{calendar-end-of-week})。
+@kindex M-a @r{(Calendar mode)}
+@findex calendar-beginning-of-month
+@item M-a
+将点移至月初 (@code{calendar-beginning-of-month})。
+@kindex M-e @r{(Calendar mode)}
+@findex calendar-end-of-month
+@item M-e
+将点移至月末 (@code{calendar-end-of-month})。
+@kindex M-< @r{(Calendar mode)}
+@findex calendar-beginning-of-year
+@item M-<
+将点移至年初 (@code{calendar-beginning-of-year})。
+@kindex M-> @r{(Calendar mode)}
+@findex calendar-end-of-year
+@item M->
+将点移至年底 (@code{calendar-end-of-year})。
+@end table
+
+这些命令还采用数字参数作为重复计数，重复计数指示向后或向前移动多少周、几个月或几年。
+
+@vindex calendar-week-start-day
+@vindex calendar-weekend-days
+@cindex weeks, which day they start on
+@cindex calendar, first day of week
+默认情况下，每周从星期日开始。  要使它们从星期一开始，请将变量 @code{calendar-week-start-day} 设置为 1。要更改突出显示为周末的日期标题，请设置变量 @code{calendar-weekend-days}。
+
+@node Specified Dates
+@subsection 指定日期
+
+日历模式提供了用于移动到以各种方式指定的特定日期的命令。
+
+@table @kbd
+@item g d
+将点移动到指定日期 (@code{calendar-goto-date})。
+@item g D
+将点移动到一年中的指定日期 (@code{calendar-goto-day-of-year})。
+@item g w
+将点移动到一年中的指定周 (@code{calendar-iso-goto-week})。
+@item o
+以指定月份为中心的日历 (@code{calendar-other-month})。
+@item .
+将点移至今天的日期 (@code{calendar-goto-today})。
+@end table
+
+@kindex g d @r{(Calendar mode)}
+@findex calendar-goto-date
+@kbd{g d} (@code{calendar-goto-date}) 提示输入年、月和该月的某一天，然后移至该日期。  由于日历包含从当前纪元开始的所有日期，因此您必须完整键入年份；也就是说，输入 @samp{2010}，而不是 @samp{10}。
+
+@kindex g D @r{(Calendar mode)}
+@findex calendar-goto-day-of-year
+@kindex g w @r{(Calendar mode)}
+@findex calendar-iso-goto-week
+@kbd{g D} (@code{calendar-goto-day-of-year}) 提示输入年日数字，并移至该日期。  负日数从年底开始倒数。  @kbd{g w} (@code{calendar-iso-goto-week}) 提示输入年份和周数，并移至该周。
+
+@kindex o @r{(Calendar mode)}
+@findex calendar-other-month
+@kbd{o} (@code{calendar-other-month}) 提示输入月份和年份，然后将三个月日历以该月为中心。
+
+@kindex . @r{(Calendar mode)}
+@findex calendar-goto-today
+您可以使用 @kbd{.}@: (@code{calendar-goto-today}) 返回到今天的日期。
+
+@node Scroll Calendar
+@section 在日历中滚动
+
+@cindex scrolling in the calendar
+当您移出可见部分时，日历显示会自动滚动时间。  您也可以手动滚动它。想象一下日历窗口包含一条长纸条，上面有月份。  滚动日历意味着水平移动条带，以便新的月份在窗口中可见。
+
+@table @kbd
+@item >
+将日历向前滚动一个月 (@code{calendar-scroll-left})。
+@item <
+将日历向后滚动一个月 (@code{calendar-scroll-right})。
+@item C-v
+@itemx @key{PageDown}
+@itemx @key{next}
+向前滚动日历 (@code{calendar-scroll-calendar-left})。
+@item M-v
+@itemx @key{PageUp}
+@itemx @key{prior}
+向后滚动日历 (@code{calendar-scroll-calendar-right})。
+@item C-l
+将日期居中到该点。
+@end table
+
+@kindex > @r{(Calendar mode)}
+@findex calendar-scroll-left
+@kindex < @r{(Calendar mode)}
+@findex calendar-scroll-right
+最基本的日历滚动命令一次滚动一个月。 @kbd{>} (@code{calendar-scroll-left}) 将日历内容向前滚动一个月。  @kbd{<} (@code{calendar-scroll-right}) 将内容向后滚动一个月。
+
+@kindex C-v @r{(Calendar mode)}
+@kindex PageDown @r{(Calendar mode)}
+@kindex next @r{(Calendar mode)}
+@findex calendar-scroll-calendar-left
+@kindex M-v @r{(Calendar mode)}
+@kindex PageUp @r{(Calendar mode)}
+@kindex prior @r{(Calendar mode)}
+@findex calendar-scroll-calendar-right
+命令@kbd{C-v} (@code{calendar-scroll-calendar-left}) 和@kbd{M-v} (@code{calendar-scroll-calendar-right}) 在整个屏幕上滚动日历——与这些命令的通常含义类似。  @kbd{C-v} 使较晚的日期可见，@kbd{M-v} 使较早的日期可见。  这些命令采用数字参数作为重复计数。
+
+功能键@key{PageDown}（或@key{next}）和@key{PageUp}（或@key{prior}）相当于@kbd{C-v}和@kbd{M-v}，就像在其他模式下一样。
+
+@kindex C-l @r{(Calendar mode)}
+@findex calendar-recenter
+命令@kbd{C-l} (@code{calendar-recenter}) 滚动显示的日历，使该日期的月份水平居中。  下次调用此命令时会将该月份放在最左边的位置，而另一次调用则会将该月份放在最右边的位置。  后续调用以循环方式重用相同的顺序。
+
+@node Counting Days
+@section 计算天数
+
+@table @kbd
+@item M-=
+显示当前区域的天数 (@code{calendar-count-days-region})。
+@end table
+
+@kindex M-= @r{(Calendar mode)}
+@findex calendar-count-days-region
+要确定某个范围内的天数，请使用 @kbd{C-@key{SPC}} 在一个日期上设置标记，将点移至另一日期，然后键入 @kbd{M-=} (@code{calendar-count-days-region})。  显示的天数为 @emph{inclusive}；也就是说，它包括标记和点指定的日期。
+
+@node General Calendar
+@section 杂项日历命令
+
+@table @kbd
+@item p d
+显示一年中的某天 (@code{calendar-print-day-of-year})。
+@item C-c C-l
+重新生成日历窗口 (@code{calendar-redraw})。
+@item @key{SPC}
+向上滚动下一个窗口 (@code{scroll-other-window})。
+@item @key{DEL}
+@itemx S-@key{SPC}
+向下滚动下一个窗口 (@code{scroll-other-window-down})。
+@item q
+退出日历 (@code{calendar-exit})。
+@item M-x calendar-show-more-months
+显示更多月份。
+@item M-x calendar-show-fewer-months
+显示更少的月份。
+@end table
+
+@kindex p d @r{(Calendar mode)}
+@cindex day of year
+@findex calendar-print-day-of-year
+要显示自年初以来经过的天数或该年剩余的天数，请键入 @kbd{p d} 命令 (@code{calendar-print-day-of-year})。  这将在回显区域中显示这两个数字。  已过去的天数包括所选日期。  剩余天数不包括该日期。
+
+@kindex C-c C-l @r{(Calendar mode)}
+@findex calendar-redraw
+如果日历窗口文本损坏，请输入 @kbd{C-c C-l} (@code{calendar-redraw}) 重新绘制它。  （只有当您使用非日历模式编辑命令时才会发生这种情况。）
+
+@kindex SPC @r{(Calendar mode)}
+在日历模式下，您可以使用 @key{SPC} (@code{scroll-other-window}) 和 @key{DEL} (@code{scroll-other-window-down}) 分别向上或向下滚动另一个窗口（如果有）。  当您在另一个窗口中显示假期列表或日记条目时，这非常方便。
+
+@kindex q @r{(Calendar mode)}
+@findex exit-calendar
+@vindex calendar-remove-frame-by-deleting
+要退出日历，请输入 @kbd{q} (@code{calendar-exit})。  这会隐藏与日历相关的所有缓冲区，并选择其他缓冲区。 （如果框架包含专用日历窗口，则退出日历会根据 @code{calendar-remove-frame-by-deleting} 的值删除或图标化该框架。）
+
+@findex calendar-show-more-months
+@findex calendar-show-fewer-months
+命令 @kbd{M-x calendar-show-more-months} 在日历右侧显示更多月份。  只要有足够的空间，日历最多可以显示12个月。  命令 @kbd{M-x calendar-show-fewer-months} 显示更少的月份。  日历始终显示至少 3 个月。
+
+@c FIXME this mentions holidays and diary entries, albeit briefly, so
+@c should it be moved after those sections?  Or at least xref them.
+@node Writing Calendar Files
+@section 写入日历文件
+
+您可以将日历和日记条目写入 HTML 和 @LaTeX{} 文件。
+
+@cindex calendar and HTML
+@vindex cal-html-directory
+@vindex cal-html-holidays
+日历 HTML 命令生成包含日历、假日和日记条目的 HTML 代码文件。  每个文件适用于一个月，名称格式为 @file{@var{yyyy}-@var{mm}.html}，其中 @var{yyyy} 和 @var{mm} 分别是四位数的年份和两位数的月份。  变量@code{cal-html-directory}指定 HTML 文件的默认输出目录。  要防止显示假期，请自定义@code{cal-html-holidays}。
+
+@vindex cal-html-css-default
+由 @code{<} 和 @code{>} 括起来的日记条目被解释为 HTML 标签（例如：这是一个带有 <font color=''red''>一些红色文本</font> 的日记条目）。  您可以通过包含 HTML 文件的目录中的样式表 @file{cal.css} 更改显示的 HTML 页面的整体外观（例如，各种页面元素的颜色、标题样式）（有关相关样式设置，请参阅变量 @code{cal-html-css-default} 的值）。
+
+@kindex H @r{(Calendar mode)}
+@table @kbd
+@item H m
+生成一个月的日历 (@code{cal-html-cursor-month})。
+@item H y
+生成一年中每个月的日历文件以及索引页 (@code{cal-html-cursor-year})。  默认情况下，此命令将文件写入 @var{year} 子目录，其中 @var{year} 是光标处的年份——如果更改此设置，年份之间的某些超链接将不起作用。
+@end table
+
+@vindex cal-html-print-day-number-flag
+@vindex cal-html-year-index-cols
+如果变量@code{cal-html-print-day-number-flag}非@code{nil}，则月历显示一年中的第几天数字。  变量@code{cal-html-year-index-cols}指定年度索引页中的列数。
+
+@cindex calendar and @LaTeX{}
+Calendar @LaTeX{} 命令生成一个 @LaTeX{} 代码缓冲区，打印为日历。  根据您使用的命令，打印的日历涵盖该点所在的日、周、月或年。
+
+@kindex t @r{(Calendar mode)}
+@table @kbd
+@item t m
+生成一个月的日历 (@code{cal-tex-cursor-month})。
+@item t M
+生成横向打印的一个月日历 (@code{cal-tex-cursor-month-landscape})。
+@item t d
+生成一日日历 (@code{cal-tex-cursor-day})。
+@item t w 1
+生成一周的一页日历，包含小时 (@code{cal-tex-cursor-week})。
+@item t w 2
+生成一周的两页日历，包含小时 (@code{cal-tex-cursor-week2})。
+@item t w 3
+生成一周的 ISO 样式日历，没有时间 (@code{cal-tex-cursor-week-iso})。
+@item t w 4
+生成一个从星期一开始的一周的日历，包含小时 (@code{cal-tex-cursor-week-monday})。
+@item t w W
+生成一周的两页日历，没有时间 (@code{cal-tex-cursor-week2-summary})。
+@item t f w
+生成 Filofax 风格的两周一目了然的日历 (@code{cal-tex-cursor-filofax-2week})。
+@item t f W
+生成 Filofax 风格的一周一览日历 (@code{cal-tex-cursor-filofax-week})。
+@item t y
+生成一年的日历 (@code{cal-tex-cursor-year})。
+@item t Y
+生成一年的横向打印日历 (@code{cal-tex-cursor-year-landscape})。
+@item t f y
+生成一年的 filofax 样式日历 (@code{cal-tex-cursor-filofax-year})。
+@end table
+
+其中一些命令横向打印日历（在横向模式下），因此它的宽度可以大于长度。  其中一些使用 Filofax 纸张尺寸（3.75 英寸 x 6.75 英寸）。  所有这些命令都接受一个前缀参数，该参数指定要打印的天数、周数、月数或年数（始终从选定的日期开始）。
+
+@vindex cal-tex-holidays
+@vindex cal-tex-diary
+@vindex cal-tex-rules
+如果变量 @code{cal-tex-holidays} 不是 @code{nil}（默认值），则打印的日历将显示 @code{calendar-holidays} 中的假期。如果变量@code{cal-tex-diary}不是@code{nil}（默认为@code{nil}），则还包括日记条目（仅在月历、Filofax 和 iso-week 日历中）。  如果变量@code{cal-tex-rules}不是@code{nil}（默认为@code{nil}），日历会以有足够空间的样式显示规则页面。  请查阅各个 cal-tex 函数的文档，了解哪些日历支持哪些功能。
+
+@vindex cal-tex-preamble-extra
+您可以使用变量@code{cal-tex-preamble-extra}插入额外的
+@LaTeX{} commands in the preamble of the generated document if you need
+到。
+
+@node Holidays
+@section 假期
+@cindex holidays
+
+Emacs 日历知道许多主要和次要假期，并且可以显示它们。  您可以将自己的假期添加到默认列表中。
+
+@table @kbd
+@item mouse-3 Holidays
+@itemx h
+显示所选日期的假期 (@code{calendar-cursor-holidays})。
+@item x
+在日历窗口中标记假期 (@code{calendar-mark-holidays})。
+@item u
+取消标记日历窗口 (@code{calendar-unmark})。
+@item a
+在另一个窗口中列出显示月份的所有假期 (@code{calendar-list-holidays})。
+@item M-x holidays
+在另一个窗口中列出今天日期前后三个月内的所有假期。
+@item M-x list-holidays
+在另一个窗口中列出指定年份范围的假期。
+@end table
+
+@kindex h @r{(Calendar mode)}
+@findex calendar-cursor-holidays
+要查看给定日期是否有假期，请将点定位在日历窗口中的该日期上并使用 @kbd{h} (@code{calendar-cursor-holidays}) 命令。  或者，使用 @kbd{mouse-3} 单击该日期，然后从出现的菜单中选择 @kbd{Holidays}。  无论哪种方式，这都会在回显区域中显示该日期的假期（如果适合），否则在单独的窗口中显示。
+
+@kindex x @r{(Calendar mode)}
+@findex calendar-mark-holidays
+@kindex u @r{(Calendar mode)}
+@findex calendar-unmark
+@vindex calendar-mark-holidays-flag
+要查看日历中显示的所有日期的假期分布，请使用 @kbd{x} (@code{calendar-mark-holidays}) 命令。这会以不同的方式显示假期日期。
+@iftex
+@xref{Calendar Customizing,,, emacs-xtra, Specialized Emacs Features}.
+@end iftex
+@ifnottex
+@xref{Calendar Customizing, calendar-holiday-marker}.
+@end ifnottex
+该命令既适用于当前可见的月份，也适用于随后通过滚动可见的其他月份。  要关闭标记并删除当前标记，请输入 @kbd{u} (@code{calendar-unmark})，这也会删除所有日记标记 (@pxref{Diary})。  如果变量 @code{calendar-mark-holidays-flag} 为非 @code{nil}，则创建或更新日历会自动标记假期。
+
+@kindex a @r{(Calendar mode)}
+@findex calendar-list-holidays
+要获取更详细的信息，请使用 @kbd{a} (@code{calendar-list-holidays}) 命令，该命令显示一个单独的缓冲区，其中包含当前日历范围内所有假期的列表。  您可以在日历窗口中使用 @key{SPC} 和 @key{DEL} 分别向上和向下滚动该列表。
+
+@findex holidays
+@vindex calendar-view-holidays-initially-flag
+命令@kbd{M-x holidays}显示当月和前后月份的假期列表；即使您没有日历窗口，这也有效。  如果变量 @code{calendar-view-holidays-initially-flag} 为非 @code{nil}，则创建日历会以这种方式显示假期。  如果您希望假期列表以不同月份为中心，请使用 @kbd{C-u M-x holidays}，它会提示输入月份和年份。
+
+Emacs 已知的节日包括美国节日和主要的 Bah@'a'@'i、中国、基督教、伊斯兰教和犹太节日；还有至日和春分。
+
+@findex list-holidays
+@findex holiday-list
+命令 @kbd{M-x holiday-list} 显示一系列年份的假期列表。  此功能会询问您的起始年份和终止年份，并允许您选择所有假期或几类假期之一。  即使您没有日历窗口，也可以使用此命令。
+
+Emacs 使用的假期日期基于 @emph{current practice}，而不是历史事实。  例如，退伍军人节始于 1919 年，但显示时间较早。
+
+@node Sunrise/Sunset
+@section 日出和日落的时间
+@cindex sunrise and sunset
+
+特殊的日历命令可以在一两分钟内告诉您任何日期的日出和日落时间。
+
+@table @kbd
+@item mouse-3 Sunrise/sunset
+@itemx S
+显示所选日期 (@code{calendar-sunrise-sunset}) 的日出和日落时间。
+@item M-x sunrise-sunset
+显示今天日期的日出和日落时间。
+@item C-u M-x sunrise-sunset
+显示指定日期的日出和日落时间。
+@item M-x calendar-sunrise-sunset-month
+显示所选月份的日出和日落时间。
+@end table
+
+@kindex S @r{(Calendar mode)}
+@findex calendar-sunrise-sunset
+@findex sunrise-sunset
+在日历中，要在回波区域显示日出和日落的 @emph{local times}，请将光标移至所需日期，然后输入 @kbd{S} (@code{calendar-sunrise-sunset})。  或者，单击日期上的@kbd{mouse-3}，然后从出现的菜单中选择@samp{Sunrise/sunset}。  命令 @kbd{M-x sunrise-sunset} 可在日历外部使用，以显示今天日期或指定日期的信息。  要指定今天以外的日期，请使用@kbd{C-u M-x sunrise-sunset}，它会提示输入年、月和日。
+
+您可以使用 @kbd{C-u C-u M-x sunrise-sunset} 显示任何地点和任何日期的日出和日落时间。  这会要求您提供经度、纬度、与协调世界时的分钟差和日期，然后告诉您该日期该地点的日出和日落时间。
+
+@vindex calendar-location-name
+@vindex calendar-longitude
+@vindex calendar-latitude
+由于日出和日落的时间取决于地球上的位置，因此在使用这些命令之前，您需要告诉 Emacs 您的纬度、经度和位置名称。  以下是设置内容的示例：
+
+@example
+(setq calendar-latitude 40.1)
+(setq calendar-longitude -88.2)
+(setq calendar-location-name "Urbana, IL")
+@end example
+
+@noindent
+@code{calendar-latitude} 和 @code{calendar-longitude} 的值使用一位小数。
+
+@vindex calendar-time-zone
+@vindex calendar-standard-time-zone-name
+@vindex calendar-daylight-time-zone-name
+您的时区也会影响当地时间的日出和日落时间。 Emacs 通常从操作系统获取时区信息，但如果这些值不是您想要的（或者操作系统不提供它们），您必须自己设置它们。  这是一个例子：
+
+@example
+(setq calendar-time-zone -360)
+(setq calendar-standard-time-zone-name "CST")
+(setq calendar-daylight-time-zone-name "CDT")
+@end example
+
+@noindent
+@code{calendar-time-zone} 的值是当地标准时间与协调世界时间（也称为@:“格林威治时间”）之间的差异分钟数。  @code{calendar-standard-time-zone-name} 和 @code{calendar-daylight-time-zone-name} 的值是您所在时区使用的缩写。  Emacs 显示日出和日落的时间@emph{corrected for daylight saving time}。  @xref{Daylight Saving}，了解如何确定夏令时。
+
+@vindex calendar-time-zone-style
+如果您想显示数字时区（如 @samp{"+0100"}）而不是符号时区（如 @samp{"CET"}），请将变量 @code{calendar-time-zone-style} 设置为 @code{numeric}。
+
+作为用户，您可能会发现在 @file{.emacs} 文件中为您通常的物理位置设置日历位置变量很方便。如果您是系统管理员，您可能需要在 @file{default.el} 文件中为所有用户设置这些变量。  @xref{Init File}。
+
+@node Lunar Phases
+@section 月相
+@cindex phases of the moon
+@cindex moon, phases of
+
+本节中描述的日历命令显示月相的日期和时间（新月、上弦月、满月、下弦月）。  此功能对于调试取决于月相的问题非常有用。
+
+@table @kbd
+@item M
+显示所示可见期间 (@code{calendar-lunar-phases}) 的所有四分之一月亮的日期和时间。
+@item M-x lunar-phases
+显示当前日期周围三个月的四分之一月的日期和时间。
+@end table
+
+@kindex M @r{(Calendar mode)}
+@findex calendar-lunar-phases
+在日历中，使用 @kbd{M} (@code{calendar-lunar-phases}) 命令显示当前可见范围内月相的单独缓冲区。  列出的日期和时间精确到几分钟之内。
+
+@findex lunar-phases
+在日历之外，使用命令 @kbd{M-x lunar-phases} 显示当前月份以及前后月份的月相列表。  有关不同月份的信息，请使用 @kbd{C-u M-x lunar-phases}，它会提示输入月份和年份。
+
+月相的日期和时间均以当地时间给出（根据夏令时进行了适当修正）。请参阅上一节中的讨论 (@pxref{Sunrise/Sunset})。
+
+@node Other Calendars
+@section 与其他日历的转换
+
+@cindex Gregorian calendar
+@cindex New Style calendar
+显示的 Emacs 日历是 @emph{always} @dfn{Gregorian calendar}，有时称为 @dfn{New Style calendar}，当今世界大部分地区都在使用。  然而，这种历法在十六世纪之前并不存在，并且在十八世纪之前也没有被广泛使用；直到二十世纪初，它才完全取代儒略历并获得普遍接受。  Emacs 日历可以显示自当前纪元第一年 1 月以来的任何月份，但显示的日历始终是公历，即使对于公历不存在的日期也是如此。
+
+虽然 Emacs 无法显示其他日历，但它可以在多个其他日历之间进行日期转换。
+
+@menu
+* Calendar Systems::        Emacs 能够理解的日历（公历除外）。
+* To Other Calendar::       将选定的日期转换为各种日历。
+* From Other Calendar::     移至另一个日历中指定的日期。
+@end menu
+
+@c FIXME perhaps most of the details should be moved to cal-xtra.
+@c Just list the major supported systems here?
+@node Calendar Systems
+@subsection 支持的日历系统
+
+@cindex ISO commercial calendar
+ISO商业日历在商业中经常使用。
+
+@cindex Julian calendar
+儒略历以尤利乌斯·凯撒命名，是整个中世纪欧洲以及十九世纪之前许多国家使用的历法。
+
+@cindex Julian day numbers
+@cindex astronomical day numbers
+天文学家使用儒略历来简单计算自公元前 4713 年 1 月 1 日星期一中午以来经过的天数。  从那时起经过的天数称为 @dfn{Julian day number} 或 @dfn{Astronomical day number}。
+
+@cindex Hebrew calendar
+犹太教传统上使用希伯来历。  Emacs 日历程序使用希伯来历来确定犹太节日的日期。  希伯来历日期从日落开始和结束。
+
+@cindex Islamic calendar
+许多以伊斯兰为主的国家都使用伊斯兰历。 Emacs 使用它来确定伊斯兰节日的日期。  伊斯兰世界对于历法没有统一的看法。 Emacs 使用广泛接受的版本，但伊斯兰节日的确切日期通常取决于宗教当局的宣布，而不是计算。  因此，实际的纪念日期可能与 Emacs 计算的日期略有不同。  伊斯兰历日期从日落开始和结束。
+
+@cindex French Revolutionary calendar
+法国大革命历法是由雅各宾派在 1789 年革命后创建的，旨在代表一种更加世俗和基于自然的年度周期观点，并以类似于公制的合理化措施设置每周 10 天。  1805年底，法国政府正式放弃了这个历法。
+
+@cindex Mayan calendars
+@cindex long count calendar system
+@cindex tzolkin calendar system
+@cindex haab calendar system
+@cindex Goodman-Martinez-Thompson correlation
+中美洲的玛雅人使用三种独立的、重叠的历法系统：@emph{long count}、@emph{tzolkin}和@emph{haab}。 Emacs 了解所有这三个日历。  专家们对玛雅历法和我们的历法之间的确切关联存在争议； Emacs 在计算中使用 Goodman-Martinez-Thompson 相关性。
+
+@cindex Coptic calendar
+@cindex Ethiopic calendar
+科普特人使用基于古埃及太阳历的日历。他们的日历由 12 个 30 天的月份组成，后面还有一个额外的 5 天的周期。  每四年一次，他们会在这个额外的时期中添加一个闰日，使其达到六天。  埃塞俄比亚历法结构相同，但年份数字和月份名称不同。
+
+@cindex Persian calendar
+@cindex Birashk
+波斯人使用基于奥马尔·海亚姆设计的太阳历。他们的日历由十二个月组成，其中前六个月有31天，接下来的五个月有30天，最后一个平年有29天，闰年有30天。  闰年以复杂的模式每四到五年出现一次。这里实现的历法是 Birashk 倡导的算术波斯历，以 2,820 年为一个周期。  它与基于天文事件的天文波斯历不同。  截至撰写本文时，首次未来差异预计将在 2025 年 3 月 20 日发生。目前尚不清楚届时伊朗的官方日历是什么。
+@c FIXME not so far in the future now.
+
+@cindex Chinese calendar
+中国历法是一个复杂的系统，将阴历月份排列成太阳年。  年以六十为一个周期，每年包含十二个月的平年或十三个月的闰年；每个月有 29 天或 30 天。  年、普通月和日的命名是通过将十个@dfn{celestial stems}之一与十二个@dfn{terrestrial branches}之一组合起来，总共六十个名称，以六十个循环重复。
+
+@cindex Bah@'a'@'i calendar
+Bah@'a'@'i 日历系统基于 19 个月、每个 19 天的太阳周期。  剩余的闰日（称为 Ayy@'am-i-H@'a）位于第 18 个月和第 19 个月之间。  继2014年世界正义院对日历进行改革后，Naw-R@'uz（新年）的日期现在由德黑兰观测到的春分确定，而双圣生日（B@'ab的诞生和Bah@'a'u'll@'ah的诞生）的日期是从之后的第八个新月开始计算的。 Naw-R@'uz。  对于公元 172 年（公元 2015 年）之前的日期，日历遵循改革前的固定计算。
+
+@node To Other Calendar
+@subsection 转换为其他日历
+
+以下命令描述了各种其他日历系统中的选定日期（此时的日期）：
+
+@table @kbd
+@kindex p @r{(Calendar mode)}
+@findex calendar-print-other-dates
+@item mouse-3  Other calendars
+@itemx p o
+在各种其他日历中显示所选日期。 (@code{calendar-print-other-dates})。
+@findex calendar-iso-print-date
+@item p c
+显示所选日期 (@code{calendar-iso-print-date}) 的 ISO 商业日历等效值。
+@findex calendar-julian-print-date
+@item p j
+显示所选日期的儒略日期 (@code{calendar-julian-print-date})。
+@findex calendar-astro-print-day-number
+@item p a
+显示所选日期的天文（儒略）日数 (@code{calendar-astro-print-day-number})。
+@findex calendar-hebrew-print-date
+@item p h
+显示所选日期的希伯来语日期 (@code{calendar-hebrew-print-date})。
+@findex calendar-islamic-print-date
+@item p i
+显示所选日期的伊斯兰日期 (@code{calendar-islamic-print-date})。
+@findex calendar-french-print-date
+@item p f
+显示所选日期的法国大革命日期 (@code{calendar-french-print-date})。
+@findex calendar-bahai-print-date
+@item p b
+显示所选日期 (@code{calendar-bahai-print-date}) 的 Bah@'a'@'i 日期。
+@findex calendar-chinese-print-date
+@item p C
+显示所选日期的中文日期 (@code{calendar-chinese-print-date})。
+@findex calendar-coptic-print-date
+@item p k
+显示所选日期的科普特日期 (@code{calendar-coptic-print-date})。
+@findex calendar-ethiopic-print-date
+@item p e
+显示所选日期的埃塞俄比亚日期 (@code{calendar-ethiopic-print-date})。
+@findex calendar-persian-print-date
+@item p p
+显示所选日期的波斯日期 (@code{calendar-persian-print-date})。
+@findex calendar-mayan-print-date
+@item p m
+显示所选日期的玛雅日期 (@code{calendar-mayan-print-date})。
+@end table
+
+否则，将指针移至要转换的日期，然后键入上表中以 @kbd{p} 开头的相应命令。  前缀 @kbd{p} 是“print”的助记符，因为 Emacs 在回显区域“打印”等效日期。  @kbd{p o} (@code{calendar-print-other-dates}) 以 Emacs 已知的所有形式显示日期。  您还可以使用 @kbd{mouse-3}，然后从出现的菜单中选择 @kbd{Other calendars}。  这会以菜单的形式显示 Emacs 理解的所有日历中日期的等效形式。  （从此菜单中选择替代项实际上不会执行任何操作 - 该菜单仅用于显示。）
+
+@node From Other Calendar
+@subsection 从其他日历转换
+
+您可以使用其他支持的日历来指定要移至的日期。  本节介绍使用 Mayan 以外的日历执行此操作的命令；对于玛雅历法，请参阅以下部分。
+
+@kindex g @var{char} @r{(Calendar mode)}
+@findex calendar-iso-goto-date
+@findex calendar-julian-goto-date
+@findex calendar-astro-goto-day-number
+@findex calendar-bahai-goto-date
+@findex calendar-hebrew-goto-date
+@findex calendar-islamic-goto-date
+@findex calendar-french-goto-date
+@findex calendar-chinese-goto-date
+@findex calendar-persian-goto-date
+@findex calendar-coptic-goto-date
+@findex calendar-ethiopic-goto-date
+@table @kbd
+@item g c
+移至 ISO 商业日历 (@code{calendar-iso-goto-date}) 中指定的日期。
+@item g w
+移至 ISO 商业日历 (@code{calendar-iso-goto-week}) 中指定的一周。
+@item g j
+移至儒略历 (@code{calendar-julian-goto-date}) 中指定的日期。
+@item g a
+移至用天文（儒略）日数 (@code{calendar-astro-goto-day-number}) 指定的日期。
+@item g b
+移至 Bah@'a'@'i 日历 (@code{calendar-bahai-goto-date}) 中指定的日期。
+@item g h
+移至希伯来历 (@code{calendar-hebrew-goto-date}) 中指定的日期。
+@item g i
+移至伊斯兰历 (@code{calendar-islamic-goto-date}) 中指定的日期。
+@item g f
+移至法国大革命日历 (@code{calendar-french-goto-date}) 中指定的日期。
+@item g C
+移动到农历中指定的日期 (@code{calendar-chinese-goto-date})。
+@item g p
+移至波斯历 (@code{calendar-persian-goto-date}) 中指定的日期。
+@item g k
+移至科普特日历 (@code{calendar-coptic-goto-date}) 中指定的日期。
+@item g e
+移至埃塞俄比亚历 (@code{calendar-ethiopic-goto-date}) 中指定的日期。
+@end table
+
+这些命令要求您输入其他日历上的日期，将指针移动到与该日期等效的公历日期，并在回显区域中显示其他日历的日期。  每当 Emacs 要求您输入月份名称时，它都会使用严格的完成 (@pxref{Completion Exit})，因此您不必担心希伯来语、伊斯兰教或法语名称的拼写。
+
+@c FIXME move?
+@findex calendar-hebrew-list-yahrzeits
+@cindex yahrzeits
+关于希伯来历的一个常见问题是死亡日期周年纪念日的计算，称为“0”。  Emacs 日历包含用于此类计算的工具。  如果您在日历中，命令 @kbd{M-x calendar-hebrew-list-yahrzeits} 会询问您的年份范围，然后显示这些年份的 yahrzeit 日期列表，这些年份对应于 point 给出的日期。  如果您不在日历中，此命令首先会询问您的死亡日期和年份范围，然后显示耶尔泽特日期列表。
+
+@node Diary
+@section 日记
+@cindex diary
+
+Emacs 日记结合日历每天跟踪约会或其他事件。  要使用日记功能，您必须首先创建一个包含事件及其日期列表的日记文件。  然后，Emacs 可以自动挑选并显示今天、不久的将来或任何指定日期的事件。
+
+尽管您可能会首先手动创建日记，但 Emacs 提供了许多命令来让您查看、添加和更改日记条目。
+
+@menu
+* Format of Diary File::    在日记中输入事件。
+* Displaying the Diary::    查看日记条目和关联的日历日期。
+* Date Formats::            您可以通过多种方式指定日期。
+* Adding to Diary::         创建日记条目的命令。
+* Special Diary Entries::   周年纪念日、日期块、循环条目等。
+* Appointments::            提醒您何时该做某事。
+* Diary Conversion::        将日记事件与其他格式相互转换。
+@end menu
+
+@node Format of Diary File
+@subsection 日记档案
+@cindex diary file
+
+@vindex diary-file
+您的 @dfn{diary file} 是一个记录与特定日期相关的事件的文件。  日记文件的名称由变量@code{diary-file}指定。  默认值为 @file{~/.emacs.d/diary}，但为了与旧版本兼容，Emacs 将使用 @file{~/diary}（如果存在）。
+@ignore
+@c I don't think this is relevant any more.  The utility doesn't seem
+@c to be part of the default install on GNU/Linux machines these days.
+@c When I tried it with my basic diary file, it just died with an error.
+The @code{calendar} utility program supports a subset of the format
+allowed by the Emacs diary facilities, so you can use that utility to
+view the diary file, with reasonable results aside from the entries it
+cannot understand.
+@end ignore
+
+日记文件中的每个条目描述一个事件并由一行或多行组成。  条目始终以左侧空白处的日期规范开始。  条目的其余部分只是描述事件的文本。  如果条目有多于一行，则第一行之后的行必须以空格开头，以指示它们继续上一个条目。  不以有效日期开头且不继续前面条目的行将被忽略。  这是一个例子：
+
+@example
+12/22/2015  Twentieth wedding anniversary!
+10/22       Ruth's birthday.
+* 21, *:    Payday
+Tuesday--weekly meeting with grad students at 10am
+         Supowit, Shen, Bitner, and Kapoor to attend.
+1/13/89     Friday the thirteenth!!
+thu 4pm     squash game with Lloyd.
+mar 16      Dad's birthday
+April 15, 2016 Income tax due.
+* 15        time cards due.
+@end example
+
+@noindent
+此示例使用额外的空格来对齐大多数条目的事件描述。  这种格式纯粹是一个品味问题。
+
+您还可以使用日记条目的第一行仅包含日期或日期名称（后面没有空格或标点符号）的格式。  例如：
+
+@example
+02/11/2012
+      Bill B. visits Princeton today
+      2pm Cognitive Studies Committee meeting
+      2:30-5:30 Liz at Lawrenceville
+      4:00pm Dentist appt
+      7:30pm Dinner at George's
+      8:00-10:00pm concert
+@end example
+
+@noindent
+如果您使用简单的日记显示，此条目将具有不同的外观
+@iftex
+(@pxref{Diary Display,,, emacs-xtra, Specialized Emacs Features}).
+@end iftex
+@ifnottex
+(@pxref{Diary Display}).
+@end ifnottex
+简单的日记显示省略了开头的日期线；仅出现续行。  当您仅显示一天的条目时，这种条目样式看起来更整洁，但如果您要求多于一天的条目，则可能会造成混乱。
+
+@node Displaying the Diary
+@subsection 显示日记
+
+创建日记文件后，您可以使用日历来查看它。  您还可以在日历模式之外查看今天的事件。  在下文中，键绑定指的是日历缓冲区。
+
+@table @kbd
+@item mouse-3 Diary
+@itemx d
+显示所选日期 (@code{diary-view-entries}) 的所有日记条目。
+@item s
+显示整个日记文件 (@code{diary-show-all-entries})。
+@item m
+标记所有有日记条目的可见日期 (@code{diary-mark-entries})。
+@item u
+取消标记日历窗口 (@code{calendar-unmark})。
+@item M-x diary-print-entries
+打印日记显示的硬拷贝。
+@item M-x diary
+显示今天的所有日记条目。
+@item M-x diary-mail-entries
+向自己发送有关即将到来的日记条目的电子邮件提醒。
+@end table
+
+@kindex d @r{(Calendar mode)}
+@findex diary-view-entries
+@vindex calendar-view-diary-initially-flag
+使用 @kbd{d} (@code{diary-view-entries}) 显示日记条目会在单独的缓冲区中显示日历中所选日期的日记条目。  新缓冲区的模式行显示日记条目的日期。  假期显示在缓冲区或模式行中，具体取决于您选择的显示方法
+@iftex
+(@pxref{Diary Display,,, emacs-xtra, Specialized Emacs Features}).
+@end iftex
+@ifnottex
+(@pxref{Diary Display}).
+@end ifnottex
+如果您使用 @kbd{d} 指定数字参数，它将显示连续多天的所有日记条目。  因此，@kbd{2 d} 显示所选日期和第二天的所有条目。
+
+显示日期日记条目的另一种方法是单击该日期上的 @kbd{mouse-3}，然后从出现的菜单中选择 @kbd{Diary entries}。  如果变量 @code{calendar-view-diary-initially-flag} 为非 @code{nil}，则创建日历会列出当前日期的日记条目（前提是当前日期可见）。
+
+@kindex m @r{(Calendar mode)}
+@findex diary-mark-entries
+@vindex calendar-mark-diary-entries-flag
+要更广泛地了解日记中提到的日期，请使用 @kbd{m} (@code{diary-mark-entries}) 命令。  这标志着日记条目以不同面貌出现的日期。
+@iftex
+@xref{Calendar Customizing,,, emacs-xtra, Specialized Emacs Features}.
+@end iftex
+@ifnottex
+@xref{Calendar Customizing, diary-entry-marker}.
+@end ifnottex
+
+此命令既适用于当前可见的月份，也适用于滚动后随后变得可见的月份。  要关闭标记并删除当前标记，请键入 @kbd{u} (@code{calendar-unmark})，这也会关闭假日标记 (@pxref{Holidays})。  如果变量 @code{calendar-mark-diary-entries-flag} 不是 @code{nil}，则创建或更新日历会自动标记日记日期。
+
+@vindex diary-nonmarking-symbol
+要防止在日历中标记单个日记条目，请在条目开头的日期之前插入 @code{diary-nonmarking-symbol} 指定的字符串（默认为 @samp{&}）。  这对日记缓冲区中条目的显示没有影响；它只影响日历中日期的标记。非标记条目对于否则会标记许多不同日期的通用条目很有用。
+
+@kindex s @r{(Calendar mode)}
+@findex diary-show-all-entries
+要查看完整的日记文件，而不仅仅是某些条目，请使用 @kbd{s} (@code{diary-show-all-entries}) 命令。
+
+@findex diary
+@vindex diary-number-of-entries
+命令@kbd{M-x diary}显示当前日期的日记条目，与日历显示无关，也可以选择显示接下来几天的日记条目；变量 @code{diary-number-of-entries} 指定要包含的天数。
+@iftex
+@xref{Diary Customizing,,, emacs-xtra, Specialized Emacs Features}.
+@end iftex
+@ifnottex
+@xref{Diary Customizing, diary-number-of-entries}.
+@end ifnottex
+
+如果您将 @code{(diary)} 放入 @file{.emacs} 文件中，则当您启动 Emacs 时，会自动显示一个窗口，其中包含当天的日记条目。
+
+@findex diary-mail-entries
+@vindex diary-mail-days
+有些人喜欢接收日记中事件的电子邮件通知。  要向自己发送此类邮件，请使用命令@kbd{M-x diary-mail-entries}。  前缀参数指定要检查的天数（从今天开始）；否则，变量 @code{diary-mail-days} 表示多少天。
+
+@node Date Formats
+@subsection 日期格式
+
+以下是一些示例日记条目，说明了格式化日期的不同方法。  这些示例均以美国顺序（月、日、年）显示日期，但日历模式支持欧洲顺序（日、月、年）和 ISO 顺序（年、月、日）作为选项。
+
+@example
+4/20/12  Switch-over to new tabulation system
+apr. 25  Start tabulating annual results
+4/30  Results for April are due
+*/25  Monthly cycle finishes
+Friday  Don't leave without backing up files
+@end example
+
+第一个条目仅在 2012 年 4 月 20 日出现一次。第二个和第三个条目每年在指定日期出现，第四个条目使用通配符（星号）表示月份，因此它出现在每个月的 25 日。  最终条目每周周五出现。
+
+您可以仅使用数字来表示日期，如 @samp{@var{month}/@var{day}} 或 @samp{@var{month}/@var{day}/@var{year}}。后面必须跟一个非数字。  在日期本身中，@var{month}和@var{day}是一位或两位数的数字。  可选的@var{year}也是一个数字，可以缩写为最后两位数字；也就是说，您可以使用 @samp{11/12/2012} 或 @samp{11/12/12}。
+
+@vindex calendar-abbrev-length
+@vindex calendar-month-abbrev-array
+@vindex calendar-day-abbrev-array
+日期还可以采用 @samp{@var{monthname} @var{day}} 或 @samp{@var{monthname} @var{day}, @var{year}} 的形式，其中月份名称可以拼写为全称或缩写（带或不带句点）。  月份和日期名称的首选缩写可以使用变量 @code{calendar-abbrev-length}、@code{calendar-month-abbrev-array} 和 @code{calendar-day-abbrev-array} 设置。  默认情况下使用名称的前三个字母作为其缩写。  案例并不重要。
+
+日期可以是@dfn{generic}；也就是说，部分未指定。  然后该条目适用于与规范匹配的所有日期。  如果日期不包含年份，则它是通用的并且适用于任何年份。或者，@var{month}、@var{day}或@var{year}可以是@samp{*}；这分别匹配任何月、日或年。  因此，日记条目 @samp{3/*/*} 匹配任何一年三月的任何一天； @samp{march *}也是如此。
+
+@vindex calendar-date-style
+@findex calendar-set-date-style
+如果您更喜欢欧洲日期书写风格（其中日期在月份之前）或 ISO 风格（其中顺序为年、月、日），请在日历中键入 @kbd{M-x calendar-set-date-style}，或自定义变量 @code{calendar-date-style}。  这会影响日记日期的解释方式、日期显示以及某些命令期望给出参数的顺序。
+
+您可以使用一周中某一天的名称作为通用日期，该日期适用于一周中这一天的任何日期。  您可以如上所述缩写星期几，或完整拼写；案例并不重大。
+
+@node Adding to Diary
+@subsection 添加到日记的命令
+@cindex create diary entries
+
+在日历中，有几个用于创建日记条目的命令。  这里列出了基本命令；更复杂的命令在下一节中 (@pxref{Special Diary Entries})。条目也可以基于非公历。
+@iftex
+@xref{Non-Gregorian Diary,,, emacs-xtra, Specialized Emacs Features}.
+@end iftex
+@ifnottex
+@xref{Non-Gregorian Diary}.
+@end ifnottex
+
+@table @kbd
+@item i d
+添加所选日期 (@code{diary-insert-entry}) 的日记条目。
+@item i w
+添加一周中选定日期的日记条目 (@code{diary-insert-weekly-entry})。
+@item i m
+添加每月选定日期 (@code{diary-insert-monthly-entry}) 的日记条目。
+@item i y
+添加一年中选定日期 (@code{diary-insert-yearly-entry}) 的日记条目。
+@end table
+
+@kindex i d @r{(Calendar mode)}
+@findex diary-insert-entry
+您可以通过在日历窗口中选择该日期并键入 @kbd{i d} (@code{diary-insert-entry}) 命令来为特定日期创建日记条目。  此命令在另一个窗口中显示日记文件的末尾并插入日期；然后您可以输入日记条目的其余部分。
+
+@kindex i w @r{(Calendar mode)}
+@findex diary-insert-weekly-entry
+@kindex i m @r{(Calendar mode)}
+@findex diary-insert-monthly-entry
+@kindex i y @r{(Calendar mode)}
+@findex diary-insert-yearly-entry
+如果您想创建适用于一周中特定一天的日记条目，请选择一周中的那一天（任何出现的情况都可以）并输入 @kbd{i w} (@code{diary-insert-weekly-entry})。  这将插入星期几作为通用日期；然后您可以输入日记条目的其余部分。  您可以用相同的方式创建每月日记条目：选择该月的某一天，使用 @kbd{i m} (@code{diary-insert-monthly-entry}) 命令，然后键入条目的其余部分。  同样，您可以使用 @kbd{i y} (@code{diary-insert-yearly-entry}) 命令插入年度日记条目。
+
+所有上述命令默认都会标记日记条目。  要创建非标记日记条目，请为命令提供前缀参数。例如，@kbd{C-u i w} 会创建一个无标记的每周日记条目。
+
+当您修改日记文件时，请务必在退出 Emacs 之前保存该文件。  使用上述任何插入命令后保存日记文件将自动更新日历窗口中的日记标记（如果适用）。  您可以随时使用命令@code{calendar-redraw}强制更新。
+
+@node Special Diary Entries
+@subsection 特别日记条目
+
+@cindex sexp entries, in diary
+除了基于日历日期的条目之外，日记文件还可以包含 @dfn{sexp entries} 来表示常规事件，例如周年纪念日。这些条目基于 Emacs 在扫描日记文件时计算的 Lisp 表达式 (sexp)。  sexp 条目包含 @samp{%%} ，而不是日期，后跟 Lisp 表达式，该表达式必须以括号开头和结尾。  Lisp 表达式确定条目适用于哪些日期。
+
+日历模式提供了插入某些常用 sexp 条目的命令：
+
+@table @kbd
+@item i a
+添加所选日期 (@code{diary-insert-anniversary-entry}) 的周年纪念日记条目。
+@item i b
+为当前区域添加块日记条目 (@code{diary-insert-block-entry})。
+@item i c
+添加从日期 (@code{diary-insert-cyclic-entry}) 开始的循环日记条目。
+@end table
+
+@kindex i a @r{(Calendar mode)}
+@findex diary-insert-anniversary-entry
+如果您想要创建适用于特定日期周年纪念日的日记条目，请将点移至该日期并使用 @kbd{i a} (@code{diary-insert-anniversary-entry}) 命令。  这将在另一个窗口中显示日记文件的末尾并插入周年纪念日描述；然后您可以输入日记条目的其余部分。  该条目看起来像这样：
+
+@findex diary-anniversary
+@example
+%%(diary-anniversary 10 31 1988) Arthur's birthday
+@end example
+
+@noindent
+此条目适用于 1988 年之后任何一年的 10 月 31 日； @samp{10 31 1988} 指定日期。  （如果您使用欧洲或 ISO 日历样式，月、日、年的输入顺序会有所不同。）此表达式需要起始年份的原因是高级日记函数可以使用它来计算经过的年数。
+
+@cindex block diary entry
+@dfn{block} 日记条目适用于指定的连续日期范围。  以下是适用于 2012 年 6 月 24 日至 2012 年 7 月 10 日期间所有日期的块日记条目：
+
+@findex diary-block
+@example
+%%(diary-block 6 24 2012 7 10 2012) Vacation
+@end example
+
+@noindent
+@samp{6 24 2012} 表示开始日期，@samp{7 10 2012} 表示结束日期。  （同样，如果您使用欧洲或 ISO 日历样式，月、日、年的输入顺序是不同的。）
+
+@kindex i b @r{(Calendar mode)}
+@findex diary-insert-block-entry
+要插入块条目，请将点和标记放置在范围开始和结束的两个日期上，然后键入 @kbd{i b} (@code{diary-insert-block-entry})。  此命令在另一个窗口中显示日记文件的末尾并插入块描述；然后您可以输入日记条目。
+
+@kindex i c @r{(Calendar mode)}
+@findex diary-insert-cyclic-entry
+@cindex cyclic diary entry
+@dfn{Cyclic} 日记条目会在固定的天数间隔后重复。要创建一个，请选择开始日期并使用 @kbd{i c} (@code{diary-insert-cyclic-entry}) 命令。  该命令提示输入间隔长度，然后插入条目，如下所示：
+
+@findex diary-cyclic
+@example
+%%(diary-cyclic 50 3 1 2012) Renew medication
+@end example
+
+@noindent
+此条目适用于 2012 年 3 月 1 日及之后的每 50 天； @samp{3 1 2012} 指定开始日期。  （如果您使用欧洲或ISO日历样式，月、日、年的输入顺序会有所不同。）
+
+所有这三个命令都会标记日记条目。  要插入非标记条目，请为命令提供前缀参数。  例如，@kbd{C-u i a} 会创建一个无标记的周年纪念日记条目。
+
+在日历中标记 sexp 日记条目可能非常耗时，因为必须单独检查日历窗口中可见的每个日期。  因此，如果可能的话，最好将 sexp 日记条目设置为非标记（使用 @samp{&}）。
+
+@cindex floating diary entry
+另一种复杂的 sexp 条目是 @dfn{floating} 日记条目，它通过以天、周和月为单位指定的偏移量来指定定期发生的事件。  它类似于由 @code{cron} 实用程序解释的 crontab 条目。  这是一个无标记的浮动日记条目，适用于 11 月的第四个星期四：
+
+@findex diary-float
+@example
+&%%(diary-float 11 4 4) American Thanksgiving
+@end example
+
+@noindent
+11 指定十一月（第十一个月），4 指定星期四（一周的第四天，其中星期日编号为零），第二个 4 指定第四个星期四（1 表示“第一个”，2 表示“第二个”，@minus{}2 表示“倒数第二个”，依此类推）。该月份可以是单个月份或月份列表。  因此，您可以将上面的 11 更改为@samp{'(1 2 3)}，并将该条目应用于一月、二月和三月的最后一个星期四。  如果月份为@code{t}，则该条目适用于一年中的所有月份。
+
+@findex diary-offset
+@example
+%%(diary-offset '(diary-float t 3 4) 2) Monthly committee meeting
+@end example
+
+@noindent
+此条目适用于每月第三个星期四之后的星期六。  2 指定 sexp @w{@code{'(diary-float t 3 4)}} 计算为 @code{t} 后的天数。  例如，当您的组织在第三个星期四举行的每月会议两天后召开委员会会议，或者您想参加安排在不同时区的虚拟会议导致日期不同时，这非常有用。
+
+每个标准 sexp 日记条目都采用一个可选参数，指定在日历中标记条目时要使用的面孔名称或单字符字符串。  最一般地，sexp 日记条目可以执行任意计算以确定它们何时应用。
+@iftex
+@xref{Sexp Diary Entries,,, emacs-xtra, Specialized Emacs Features}.
+@end iftex
+@ifnottex
+@xref{Sexp Diary Entries}.
+@end ifnottex
+
+@node Appointments
+@subsection 预约
+@cindex appointment notification
+
+@vindex appt-display-format
+@vindex appt-audible
+@vindex appt-display-mode-line
+如果您有约会的日记条目，并且该日记条目以一天中可识别的时间开始，则 Emacs 可以提前警告您约会正在等待处理。  Emacs 通过以您选择的格式（由变量 @code{appt-display-format} 指定）显示消息来提醒您约会。  如果@code{appt-audible}的值不是@code{nil}，则警告包括声音提醒。  此外，如果 @code{appt-display-mode-line} 不是 @code{nil}，Emacs 会在模式行上显示距离约会的分钟数。
+
+@vindex appt-display-duration
+@vindex appt-disp-window-function
+@vindex appt-delete-window-function
+如果@code{appt-display-format}的值为@code{window}，则变量@code{appt-display-duration}控制提醒窗口可见的时间长度；变量@code{appt-disp-window-function}和@code{appt-delete-window-function}分别给出用于创建和销毁窗口的函数的名称。
+
+@findex appt-activate
+要启用预约通知，请输入 @kbd{M-x appt-activate}。有了积极的论点，它就可以发出通知；如果参数为负，则禁用通知；没有参数，它会切换。启用通知还会从日记文件中设置今天的约会列表，提供在一天中可识别时间找到的所有日记条目，并在每个条目之前提醒您。
+
+例如，假设日记文件包含以下几行：
+
+@example
+Monday
+  9:30am Coffee break
+ 12:00pm Lunch
+@end example
+
+@vindex appt-message-warning-time
+@vindex appt-warning-time-regexp
+@noindent
+然后在周一，系统会在上午 9:20 左右提醒您休息时间，并在上午 11:50 左右提醒您午餐时间。  变量 @code{appt-message-warning-time} 指定提前多少分钟（默认 12）向您发出警告。  这是默认警告时间。  每个约会都可以通过添加匹配 @code{appt-warning-time-regexp} 的片段来指定不同的警告时间（有关详细信息，请参阅该变量的文档）。
+
+您可以用 am/pm 风格（@samp{12:00am} 代表午夜，@samp{12:00pm} 代表中午）或 24 小时欧洲/军用风格来书写时间。  你不需要保持一致；您的日记文件可以混合使用两种样式。  如果日记要被识别，时间必须位于日记的开头。
+
+@vindex appt-display-diary
+Emacs 会在午夜过后自动更新日记文件中的约会列表。  您可以随时通过重新启用预约通知来强制更新。  这两个操作也会显示当天的日记缓冲区，除非您将 @code{appt-display-diary} 设置为 @code{nil}。  每当日记文件（或其包含的文件；请参阅
+@iftex
+@ref{Fancy Diary Display,,, emacs-xtra, Specialized Emacs Features})
+@end iftex
+@ifnottex
+@ref{Fancy Diary Display})
+@end ifnottex
+已保存。  如果您使用组织模式并在组织议程文件中保留约会，则可以使用 @code{org-agenda-to-appt} 命令将这些约会添加到列表中。  @xref{Weekly/daily agenda, Appointment reminders,,org, The Org Manual}，了解有关该命令的更多信息。
+
+@findex appt-add
+@findex appt-delete
+@cindex alarm clock
+您还可以使用闹钟等预约通知功能。  命令 @kbd{M-x appt-add} 将条目添加到约会列表中，而不影响您的日记文件。  您可以使用 @kbd{M-x appt-delete} 从约会列表中删除条目。
+
+@node Diary Conversion
+@subsection 导入和导出日记条目
+@cindex diary import
+@cindex diary export
+
+您可以在 Emacs 日记文件和其他格式之间传输日记条目。
+
+@menu
+* Diary iCalendar Import::       将 iCalendar 数据导入日记。
+* Diary iCalendar Display::      显示 iCalendar 数据而不导入。
+* Diary iCalendar Export::       将日记条目导出到 iCalendar。
+* Diary Outlook Import::         将 Outlook 约会导入日记。
+@end menu
+
+@node Diary iCalendar Import
+@subsubsection 将 iCalendar 数据导入为日记条目
+@cindex import iCalendar to diary
+
+@cindex iCalendar support in diary
+@dfn{iCalendar} 是用于交换日历数据的互联网标准格式。  许多日历应用程序都可以导出和导入 iCalendar 格式的数据。  iCalendar 数据也经常作为电子邮件附件发送。  iCalendar 数据通常使用 @file{.ics} 文件扩展名，并以“text/calendar”@acronym{MIME} 类型在电子邮件中发送。  （@xref{Mail Misc}，有关@acronym{MIME} 和电子邮件附件的更多信息。）
+
+@code{diary-icalendar} 包允许您将 iCalendar 数据与 Emacs 日记结合使用。  您可以在 iCalendar 格式和 Emacs 日记文件之间导入和导出数据，还可以直接在日记中显示 iCalendar 数据。
+
+以下命令会将 iCalendar 数据导入到您的日记文件中：
+
+@ftable @code
+@item diary-icalendar-import-file
+将 iCalendar 文件导入 Emacs 日记文件。
+
+@item diary-icalendar-import-buffer
+将 iCalendar 数据从当前缓冲区导入到 Emacs 日记文件中。
+@end ftable
+
+@code{diary-icalendar-import-buffer} 还适合从电子邮件附件导入 iCalendar 数据。  例如，使用 Rmail 邮件客户端，您可以使用：
+
+@example
+(add-hook 'rmail-show-message-hook #'diary-icalendar-import-buffer)
+@end example
+
+日记导入取决于许多用户可自定义的变量，这些变量位于 @code{diary-icalendar-import} 自定义组中。  您可以使用 @kbd{M-x customize-group} 查看和自定义这些变量。 @xref{Customization Groups}。
+
+iCalendar 数据分为 @dfn{components}，代表日历事件（VEVENT 组件）、任务 (VTODO) 和其他文本数据 (VJOURNAL)。  由于这些组件包含不同类型的数据，因此它们由不同的函数导入，由以下变量决定：
+
+@vtable @code
+@item diary-icalendar-vevent-format-function
+用于格式化日记的 VEVENT 组件的函数。
+
+@item diary-icalendar-vjournal-format-function
+用于格式化日记的 VJOURNAL 组件的函数。
+
+@item diary-icalendar-vtodo-format-function
+为日记格式化 VTODO 组件的函数。
+@end vtable
+
+您可以通过编写自己的格式化函数来自定义导入日记条目的格式。  将此类函数表示为称为 @dfn{skeletons} 的模板很方便（但不是必需）。
+@ifinfo
+@xref{Top, Autotyping, The Autotype Manual, autotype}，了解有关骨骼的更多信息。
+@end ifinfo
+
+例如，假设您只想导入每个日历事件的日期、时间、摘要和位置，并将它们写在一行上，如下所示：
+
+@example
+2025/11/11 Summary @@ Some Location
+@end example
+
+@noindent
+然后，您可以将导入格式化函数编写为骨架，并将其设置为 @code{diary-icalendar-vevent-format-function} 的值，如下所示：
+
+@lisp
+@group
+(require 'skeleton)
+
+(defun simple-vevent (_)
+  "Format a VEVENT summary and location on a single line"
+  (skeleton-insert
+    '(nil
+      ical-start-to-end & " " & ical-summary & " "
+      (when ical-location "@@ ") & ical-location "\n")))
+
+(setopt diary-icalendar-vevent-format-function #'simple-vevent)
+@end group
+@end lisp
+
+本例中的变量 @code{ical-start-to-end}、@code{ical-summary} 和 @code{ical-location} 在调用骨架时动态绑定到适当的值。  有关更多信息，请参阅 @code{diary-icalendar-vevent-format-function} 的文档字符串。
+
+导入过程中遇到的任何错误都将报告在名为 @file{*icalendar-errors*} 的缓冲区中。  您可以使用 @code{next-error} 命令查看这些错误。  @xref{Compilation Mode}。  如果您经常需要导入格式错误的 iCalendar 数据，有几个钩子可用于此目的；请参阅 @code{icalendar-parser} 自定义组。
+
+@node Diary iCalendar Display
+@subsubsection 在日记中显示 iCalendar 条目
+@cindex display iCalendar in diary
+
+如果您主要将日历数据存储在 Emacs 之外，但仍希望在 Emacs 日历和日记中查看它，则可以通过包含日记文件中的 iCalendar 文件来实现。
+
+例如，假设您将日历从外部服务器下载到名为 @file{Appointments.ics}.txt 的文件中。  然后你可以通过写这样的行来将该文件包含在你的日记中
+
+@example
+#include "path/to/Appointments.ics"
+@end example
+
+@noindent
+在你的日记档案中。  您还必须设置一些挂钩来将该文件中的数据显示为日记条目并在日历中标记它们：
+
+@lisp
+@group
+(add-hook 'diary-mark-entries-hook
+          #'diary-mark-included-diary-files)
+(add-hook 'diary-nongregorian-marking-hook
+          #'diary-icalendar-mark-entries)
+(add-hook 'diary-list-entries-hook
+          #'diary-include-other-diary-files)
+(add-hook 'diary-nongregorian-listing-hook
+          #'diary-icalendar-display-entries)
+@end group
+@end lisp
+
+@noindent
+当您从日历中显示日记时，@file{Appointments.ics} 中的事件、任务和日记条目将在适当的日期显示。 @xref{Displaying the Diary}。
+
+这样做的好处是您不需要同步日历服务器和日记文件之间的数据。  这比定期在日记和 iCalendar 格式之间导入和导出更简单、更可靠。
+
+@findex diary-icalendar-mailcap-viewer
+您还可以使用函数 @code{diary-icalendar-mailcap-viewer} 在电子邮件中显示 iCalendar 附件，而无需将其导入日记文件。  例如，您可以将此函数添加到变量 @code{mailcap-user-mime-data};请参阅其文档字符串以获取更多信息。
+
+显示 iCalendar 条目使用与导入它们相同的基础结构，因此自定义导入格式也会更改显示条目的格式。  @xref{Diary iCalendar Import}。
+
+@node Diary iCalendar Export
+@subsubsection 将日记条目导出到 iCalendar
+@cindex export diary to iCalendar
+
+以下命令将以 iCalendar 格式导出日记条目：
+
+@ftable @code
+@item diary-icalendar-export-file
+将日记文件导出为 iCalendar 格式。
+
+@item diary-icalendar-export-region
+将日记文本区域导出为 iCalendar 格式。
+@end ftable
+
+iCalendar 导出取决于许多用户可自定义的变量，这些变量位于 @code{diary-icalendar-export} 自定义组中。  您可以使用 @kbd{M-x customize-group} 查看和自定义这些变量。 @xref{Customization Groups}。
+
+将日记条目导出到 iCalendar 要求您遵守日记中的某些约定，以便可以从日记条目中解析 iCalendar 属性。
+
+默认情况下，导出器将使用条目的第一行（在日期和时间之后）作为 iCalendar 摘要，并将条目的其余部分作为其 iCalendar 描述。  其他 iCalendar 属性也可以在单独行的条目中进行编码，如下所示：
+
+@example
+@group
+2025/11/11 Bender's birthday bash
+  Location: Robot House
+  Attendees:
+    Fry <philip.fry@@mars.edu>
+    Günter <guenter@@mars.edu>
+@end group
+@end example
+
+@noindent
+此格式与默认导入功能生成的格式匹配。
+
+@vindex diary-icalendar-address-regexp
+@vindex diary-icalendar-class-regexp
+@vindex diary-icalendar-description-regexp
+@vindex diary-icalendar-location-regexp
+@vindex diary-icalendar-organizer-regexp
+@vindex diary-icalendar-status-regexp
+@vindex diary-icalendar-summary-regexp
+@vindex diary-icalendar-todo-regexp
+@vindex diary-icalendar-uid-regexp
+@vindex diary-icalendar-url-regexp
+如果您自定义导入格式，或者想要以不同的格式导出日记条目，则需要自定义导出变量以检测日记条目的格式。  最常见的 iCalendar 属性是使用正则表达式从日记条目中解析出来的。  请参阅 @code{diary-icalendar-export} 自定义组中名为 @code{diary-icalendar-*-regexp} 的变量来修改这些属性的解析方式。
+
+@vindex diary-icalendar-other-properties-parser
+如果您需要导出其他 iCalendar 属性，或者进行更复杂的解析，您可以定义一个函数来执行此操作并将其设置为变量 @code{diary-icalendar-other-properties-parser} 的值；有关详细信息，请参阅其文档字符串。
+
+@vindex diary-icalendar-export-linewise
+默认情况下，导出器假定每个日记条目代表一个 iCalendar 事件。  如果您希望以每天一个条目的格式保存日记，并在同一条目内的连续行上包含不同的事件，您仍然可以将此类条目导出为不同的 iCalendar 事件。  为此，请将变量 @code{diary-icalendar-export-linewise} 设置为非零值。
+
+例如，设置此变量后，会出现如下条目：
+
+@example
+@group
+2025-05-03
+  9AM Lab meeting
+    Günter to present on new assay
+  Start experiment A
+  12:30-1:30PM Lunch with Phil
+  16:00 Experiment A finishes; move to freezer
+@end group
+@end example
+
+@noindent
+将导出为四个事件，每个事件在同一天进行，但开始时间不同（第二个事件“开始实验 A”除外，它没有开始时间）。  有关更多信息，请参阅 @code{diary-icalendar-export-linewise} 的文档字符串。
+
+@node Diary Outlook Import
+@subsubsection 将 Outlook 约会导入为日记条目
+@cindex diary outlook import
+
+@vindex diary-outlook-formats
+@vindex diary-from-outlook-function
+您还可以从 Outlook 生成的约会消息导入日记条目。  在 Rmail 或 Gnus 中查看此类消息时，请执行 @kbd{M-x diary-from-outlook} 导入该条目。  您可以通过自定义变量 @code{diary-outlook-formats} 使此命令识别其他约会消息格式。  其他邮件客户端可以将 @code{diary-from-outlook-function} 设置为适当的值。
+
+
+@node Daylight Saving
+@section 夏令时
+@cindex daylight saving time
+
+Emacs 了解标准时间和夏令时之间的区别——日出、日落、至日、春分和月相的时间都考虑到了这一点。  夏令时的规则因地而异，而且每年也有不同的历史。  为了正确完成这项工作，Emacs 需要知道要使用哪些规则。
+
+@vindex calendar-daylight-savings-starts
+@vindex calendar-daylight-savings-ends
+有些操作系统会记录适用于您所在位置的规则；在这些系统上，Emacs 自动从系统获取所需的信息。  如果部分或全部信息丢失，Emacs 会使用马萨诸塞州剑桥当前使用的规则来填补空白。  如果生成的规则不是您想要的，您可以通过设置某些变量来告诉 Emacs 要使用的规则：@code{calendar-daylight-savings-starts} 和 @code{calendar-daylight-savings-ends}。
+
+这些值应该是引用变量 @code{year} 的 Lisp 表达式，并以列表 @code{(@var{month} @var{day} @var{year})} 的形式计算夏令时开始或（分别）结束的公历日期。  如果您所在的地区不使用夏令时，则该值应为 @code{nil}。
+
+Emacs 使用这些表达式来确定假日列表的夏令时的开始日期以及校正太阳和月亮计算中的时间。
+
+马萨诸塞州剑桥的值如下：
+
+@example
+(calendar-nth-named-day 2 0 3 year)
+(calendar-nth-named-day 1 0 11 year)
+@end example
+
+@noindent
+即，@code{year}指定年份的第三个月（三月）的第二个第 0 天（星期日），以及该年第十一个月（十一月）的第一个星期日。  如果夏令时更改为从 10 月 1 日开始，您可以将 @code{calendar-daylight-savings-starts} 设置为：
+
+@example
+(list 10 1 year)
+@end example
+
+如果您所在的位置没有夏令时，或者您希望所有时间均为标准时间，请将 @code{calendar-daylight-savings-starts} 和 @code{calendar-daylight-savings-ends} 设置为 @code{nil}。
+
+@vindex calendar-daylight-time-offset
+变量@code{calendar-daylight-time-offset}指定夏令时和标准时间之间的差异，以分钟为单位。  马萨诸塞州剑桥的值为 60。
+
+@c @vindex calendar-daylight-savings-starts-time  too long!
+@vindex calendar-daylight-savings-ends-time
+最后，两个变量 @code{calendar-daylight-savings-starts-time} 和 @code{calendar-daylight-savings-ends-time} 指定当地时间午夜之后应发生夏令时转换的分钟数。  对于马萨诸塞州剑桥，两个变量的值为 120。
+
+@node Time Intervals
+@section 时间间隔求和
+@cindex time intervals, summing
+@cindex summing time intervals
+@cindex timeclock
+@cindex clocking time
+
+timeclock 包添加了时间间隔，因此您可以（例如）跟踪您在特定项目上花费的时间。  （更高级的替代方案是使用组织模式的工具来计时，@pxref{Clocking Work Time,,,org, The Org Manual}）。
+
+@findex timeclock-in
+@findex timeclock-out
+@findex timeclock-change
+@findex timeclock-workday-remaining
+@findex timeclock-when-to-leave
+开始处理项目时使用 @kbd{M-x timeclock-in} 命令，完成后使用 @kbd{M-x timeclock-out} 命令。  每次执行此操作时，都会在项目记录中添加一个时间间隔。  您可以使用 @kbd{M-x timeclock-change} 更改为处理不同的项目。
+
+一旦您收集了多个时间间隔的数据，您就可以使用 @kbd{M-x timeclock-workday-remaining} 查看今天还剩多少时间工作（假设通常平均每天工作 8 小时），并使用 @kbd{M-x timeclock-when-to-leave} 计算您的工作时间。
+
+@vindex timeclock-mode-line-display
+@findex timeclock-mode-line-display
+如果您希望 Emacs 在模式行中显示工作日的剩余时间，可以自定义 @code{timeclock-mode-line-display} 变量并将其值设置为 @code{t}，或者调用 @kbd{M-x timeclock-mode-line-display} 命令。
+
+@vindex timeclock-ask-before-exiting
+终止当前的 Emacs 会话可能意味着也可能不意味着您已停止处理该项目，默认情况下，Emacs 会询问您。  但是，您可以将变量 @code{timeclock-ask-before-exiting} 的值自定义为 @code{nil} 以避免出现此问题；那么，只有显式的 @kbd{M-x timeclock-out} 或 @kbd{M-x timeclock-change} 才会告诉 Emacs 当前间隔已经结束。
+
+@cindex @file{timelog} file
+@vindex timeclock-file
+@findex timeclock-reread-log
+时钟函数通过将数据累积到名为 @file{~/.emacs.d/timelog} 的文件中来工作。  您可以通过自定义变量 @code{timeclock-file} 来为此文件指定不同的名称。  如果您手动编辑 timeclock 文件，或者更改 timeclock 的任何可自定义变量的值，则应运行命令 @kbd{M-x timeclock-reread-log} 来更新文件中 Emacs 中的数据。
+
+@ifnottex
+@include cal-xtra.texi
+@end ifnottex

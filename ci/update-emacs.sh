@@ -38,6 +38,11 @@ rm -rf "$HERE/src.old"
 mv "$HERE/src" "$HERE/src.old"
 mv "$TMP/emacs" "$HERE/src"
 
+# 重新套用中文手册译文
+if [ -d "$HERE/l10n/manual-zh" ]; then
+  sh "$HERE/ci/apply-manual-zh.sh"
+fi
+
 cat <<EOF
 
 ==> 完成，上游版本 $VERSION 已套用汉化。

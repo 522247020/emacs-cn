@@ -1,0 +1,52 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 2004--2026 Free Software Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@c
+@c This file is included either in emacs-xtra.texi (when producing the
+@c printed version) or in the main Emacs manual (for the on-line version).
+
+@node Non-File Buffers
+@subsection 自动恢复非文件缓冲区
+
+全局自动恢复模式通常仅恢复文件缓冲区。  有两种方法可以自动恢复某些非文件缓冲区： 在这些缓冲区中启用自动恢复模式（使用 @kbd{M-x auto-revert-mode}）；并将 1⁣ 设置为非 2⁣ 值。  后者为实现它的所有类型的缓冲区启用自动恢复（在下面的菜单中列出）。
+
+与文件缓冲区一样，非文件缓冲区通常不应在您处理它们时或它们包含恢复后可能丢失的信息时恢复。  因此，如果它们被修改，它们不会恢复。  这可能会很棘手，因为决定何时应将非文件缓冲区标记为已修改通常比文件缓冲区更困难。
+
+另一个棘手的细节是，出于效率原因，自动恢复通常不会尝试检测缓冲区中所有可能的更改，而只会检测主要或易于检测的更改。  因此，为非文件缓冲区启用自动恢复并不总是保证缓冲区中的所有信息都是最新的，并且不一定使手动恢复毫无用处。
+
+在另一个极端，某些缓冲区每@code{auto-revert-interval}秒自动恢复一次。  （这当前仅适用于缓冲区菜单。）在这种情况下，自动恢复在恢复时不会打印任何消息，即使 @code{auto-revert-verbose} 为非 @code{nil} 时也是如此。
+
+@vindex buffer-auto-revert-by-notification
+一些非文件缓冲区可以通过其默认目录上的文件通知可靠地更新； Dired 缓冲区就是一个例子。  主模式可以通过将缓冲区中的 @code{buffer-auto-revert-by-notification} 设置为非 @code{nil} 值来指示这一点，从而允许自动恢复以避免定期轮询。  此类通知不包括对该目录中的文件的更改，仅包括对该目录本身的更改。
+
+详细信息取决于缓冲区的特定类型，并在相应部分中进行了解释。
+
+@menu
+* Auto Reverting the Buffer Menu::  自动恢复缓冲区菜单。
+* Auto Reverting Dired::            自动恢复 Dired 缓冲区。
+@end menu
+
+@node Auto Reverting the Buffer Menu
+@subsubsection 自动恢复缓冲区菜单
+
+如果启用了非文件缓冲区的自动恢复，则缓冲区菜单
+@iftex
+(@pxref{Several Buffers,,, emacs, the Emacs Manual})
+@end iftex
+@ifnottex
+(@pxref{Several Buffers})
+@end ifnottex
+每 @code{auto-revert-interval} 秒自动恢复一次，无论是否需要。  （检查是否需要比实际恢复可能需要更长的时间。）
+
+如果缓冲区菜单被不恰当地标记为修改，只需使用 @kbd{g} 手动恢复它，自动恢复就会恢复。  但是，如果您将某些缓冲区标记为要删除或要显示，则必须小心，因为恢复会删除所有标记。  添加标记会设置缓冲区的修改标志，这一事实会阻止“自动恢复”自动删除标记。
+
+@node Auto Reverting Dired
+@subsubsection 自动恢复 Dired 缓冲区
+
+Dired 缓冲区仅在缓冲区主目录的文件列表更改时（例如，添加或删除新文件时）自动恢复。  当有关特定文件的信息发生变化（例如，当大小发生变化时）或插入的子目录发生变化时，它们不会自动恢复。为了确保 @emph{all} 列出的信息是最新的，如果 Dired 缓冲区中启用了自动恢复，则必须使用 @kbd{g}、@emph{even} 手动恢复。  有时，您可能会觉得修改或保存主目录中列出的文件实际上确实会导致自动恢复。  这是因为对文件进行更改或保存文件通常会导致目录本身发生更改；例如，通过备份文件或自动保存文件。  然而，这并不能得到保证。
+
+如果 Dired 缓冲区被标记为已修改，并且没有您想要保护的更改，那么大多数时候您可以通过使用 @kbd{g} 手动恢复缓冲区来恢复自动恢复。  有一个例外。  如果您标记或标记文件，则可以安全地恢复缓冲区。  这不会删除标志或标记（当然，除非标记的文件已被删除）。  但是，即使在恢复之后，缓冲区仍将保持修改状态，并且自动恢复将不会恢复。这是因为，如果您标记或标记文件，您可能正在处理缓冲区，并且您可能不希望缓冲区在没有警告的情况下发生更改。如果您希望在存在标记和标志的情况下恢复自动恢复，请使用 @kbd{M-~} 将缓冲区标记为未修改。  但是，添加、删除或更改标记或标志将再次标记其已修改。
+
+远程 Dired 缓冲区当前无法自动恢复。  您使用 shell 通配符或文件参数仅列出部分文件的 Dired 缓冲区也不是。  @file{*Find*} 和 @file{*Locate*} 缓冲区也不会自动恢复。
+
+请注意，自动恢复 Dired 缓冲区在某些系统上可能无法令人满意地工作。

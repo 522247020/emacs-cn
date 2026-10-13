@@ -1,0 +1,74 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 2021--2026 Free Software Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Haiku
+@appendix Emacs 和俳句
+@cindex Haiku
+
+Haiku 是一个类 Unix 操作系统，最初是操作系统 BeOS 的重新实现。
+
+本附录描述了使用由 Application Kit（Haiku 固有的窗口系统）构建的 Emacs 的特性。  此处说明的特性不适用于在没有窗口支持的情况下构建的 Haiku 上的 Emacs，或使用 X11 配置的 Emacs。
+
+@menu
+* Haiku Basics::         Haiku 下的 Emacs 基本使用和安装。
+* Haiku Fonts::          在 Haiku 上显示字体的各种选项。
+@end menu
+
+@node Haiku Basics
+@section Haiku 安装和启动
+@cindex haiku application
+@cindex haiku installation
+
+当 Emacs 安装在 Haiku 下时，两个可执行文件会被复制到二进制目录，这两个可执行文件对于某些标识文件系统元数据的保存是相同的。  第一个是普通的 Emacs 可执行文件，@file{emacs}，而第二个，@file{Emacs}，包含一个图标和一个应用程序“签名”，该“签名”帮助系统将文件类型和打开框架归因于它，从而使其能够接收文件类型分配，从而直接从跟踪器打开文件。
+
+@file{Emacs} 中设置了多个文件属性，提示系统在任何给定时间仅允许运行单个副本。  这一不变量在显示连接建立时进行验证，并通过终止任何试图创建显示连接（当显示连接已存在）的 Emacs 进程来强制执行。
+
+由于这个原因和其他原因，@file{Emacs}适合启动 Emacs 的 GUI 会话，而 @file{emacs} 应该用于其他类型的 Emacs 会话。
+
+@cindex modifier keys and system keymap (Haiku)
+Emacs 无法接收不寻常的修饰键，例如俳句下的 @kbd{Hyper}，或接收由系统超级键映射生成的重音字符。
+
+默认情况下，按下操作系统定义的 Option 键时会报告 @key{Super} 修饰符。  类似地，@key{Meta}修饰符被分配给Command键，当然@key{Control}被分配给系统Control键，@key{Shift}被分配给系统Shift键。  在标准 PC 键盘上，Haiku 应该将这些键映射到使用 GNU 系统的用户熟悉的位置，但这可能需要对系统配置进行一些调整才能工作。
+
+您可以通过以下变量自定义系统已知的修饰键与 Emacs 已知的修饰键之间的关系。
+
+@cindex modifier key customization (Haiku)
+@table @code
+@vindex haiku-meta-keysym
+@item haiku-meta-keysym
+Emacs 将被视为 Meta 键的系统修饰键。默认为@code{command}。
+
+@vindex haiku-control-keysym
+@item haiku-control-keysym
+Emacs 将将其视为 Control 键的系统修饰键。  默认为@code{control}。
+
+@vindex haiku-super-keysym
+@item haiku-super-keysym
+Emacs 将将其视为超级键的系统修饰键。  默认为@code{option}。
+
+@vindex haiku-shift-keysym
+@item haiku-shift-keysym
+Emacs 将将其视为 Shift 键的系统修饰键。  默认为@code{shift}。
+@end table
+
+每个变量的值可以是符号 @code{command}、@code{control}、@code{option}、@code{shift} 或 @code{nil} 之一。 @code{nil} 或任何其他值将导致使用默认值。
+
+@cindex tooltips (haiku)
+@cindex haiku tooltips
+在 Haiku 上，Emacs 默认使用系统工具提示机制。由此生成的工具提示有时响应速度更快，但无法显示文本属性或面孔。  如果您需要这些功能，请将变量 @code{use-system-tooltips} 自定义为 @code{nil} 值，这样 Emacs 将使用自己的工具提示实现。
+
+@cindex X resources on Haiku
+与 X 窗口系统不同，Haiku 不提供系统范围的资源数据库。  由于许多重要选项是通过 X 资源 (@pxref{X Resources}) 指定的，因此提供了一种模拟：启动时，Emacs 将在用户配置目录（通常为 @file{/boot/home/config/settings}）内加载名为 @file{GNU Emacs} 的文件，该文件应该是扁平化的系统消息，其中键和值都是字符串，并分别对应于属性及其值。  这样的文件可以使用 @command{xmlbmessage} 工具创建。
+
+@cindex crashes, Haiku
+@cindex haiku debugger
+@vindex haiku-debug-on-fatal-error
+如果变量 @code{haiku-debug-on-fatal-error} 不是 @code{nil}，Emacs 将在收到致命信号时启动系统调试器。  默认为@code{t}。  如果您的系统无法使用GDB，请在报告错误时附上系统调试器生成的报告。
+
+@node Haiku Fonts
+@section Haiku 下的字体后端和选择
+@cindex font backend selection (Haiku)
+
+当使用 Haiku 窗口支持构建时，Emacs 支持多种不同的字体后端，但支持的子集取决于配置 Emacs 时存在和启用的依赖项列表。  您可以通过在用于调用 Emacs 的命令行上提供 @w{@code{-xrm Emacs.fontBackend:@var{backend}}} 来指定要使用的字体后端，其中 @var{backend} 是下面列出的后端之一，或者通过更改 @code{font-backend} 帧参数以每帧为基础。
+
+其中两个后端 @code{ftcr} 和 @code{ftcrhb} 与 X Window 系统上的对应后端相同。  还有一个名为@code{haiku}的俳句专用后端，它使用应用服务器来绘制字体，但目前无法显示彩色字体或表情符号。

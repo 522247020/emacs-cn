@@ -1,0 +1,27 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 2004--2026 Free Software Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@c
+@c This file is included either in emacs-xtra.texi (when producing the
+@c printed version) or in the main Emacs manual (for the on-line version).
+@node Subdir Switches
+@section Dired 中的子目录开关
+
+您可以使用 @kbd{C-u i} 在 Dired 缓冲区中插入具有指定 @command{ls} 开关的子目录。  您可以使用 @kbd{C-u l} 更改已插入子目录的 @command{ls} 开关。
+
+如果您恢复缓冲区，Dired 会保留开关。  删除子目录会忘记它的开关。
+
+使用@code{dired-undo}
+@iftex
+(@pxref{Marks vs Flags,,, emacs, the Emacs Manual})
+@end iftex
+@ifnottex
+(@pxref{Marks vs Flags})
+@end ifnottex
+重新插入或删除使用显式开关插入的子目录可以绕过 Dired 的记住（或忘记）开关的机制。  使用 @code{dired-undo} 删除子目录不会忘记它的开关。当稍后使用 @kbd{i} 重新插入时，将使用旧开关重新插入。  使用 @code{dired-undo} 重新插入使用常规 Dired 命令（不是 @code{dired-undo}）删除的子目录最初将使用旧的开关插入它。  但是，恢复缓冲区将使用缓冲区的默认开关重新列出它。如果其中任何一个产生问题，您可以使用 @kbd{C-u i} 或 @kbd{C-u l} 轻松纠正这种情况。
+
+Dired 不记得 @code{R} 开关。  使用包含 @code{R} 开关的开关插入子目录相当于使用所有剩余开关插入其每个子目录。例如，更新或终止使用 @code{R} 开关插入的子目录不会更新或终止其子目录。
+
+缓冲区的默认开关不会影响使用显式指定的开关插入的子目录。  特别是，诸如 0⁣ 之类的更改缓冲区开关的命令不会影响此类子目录。  （但是，它们确实会影响没有显式分配开关的子目录。）
+
+您可以使 Dired 忘记所有子目录开关，并使用 @kbd{M-x dired-reset-subdir-switches} 重新列出具有缓冲区默认开关的所有子目录。  这也会恢复 Dired 缓冲区。

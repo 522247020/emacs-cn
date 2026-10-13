@@ -1,0 +1,502 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Buffers
+@chapter 使用多个缓冲区
+
+@cindex buffers
+您在 Emacs 中编辑的文本位于一个名为 @dfn{buffer} 的对象中。  每次访问文件时，都会使用缓冲区来保存文件的文本。  每次调用 Dired 时，都会使用一个缓冲区来保存目录列表。  如果您使用 @kbd{C-x m} 发送消息，则会使用缓冲区来保存消息的文本。  当您请求命令的文档时，该文档会出现在名为 @file{*Help*} 的缓冲区中。
+
+缓冲区只要在使用中就存在，并且在不再需要时被您 (@pxref{Kill Buffer}) 或 Emacs 删除（“杀死”）（例如，当您退出 Emacs 时，@pxref{Exiting}）。
+
+每个缓冲区都有一个唯一的名称，该名称可以是任意长度。  当缓冲区显示在窗口中时，其名称显示在模式行 (@pxref{Mode Line}) 中。  缓冲区名称中大小写的区别很重要。  大多数缓冲区是通过访问文件创建的，并且它们的名称源自文件的名称；但是，您也可以使用任何您想要的名称创建一个空缓冲区。  新启动的 Emacs 有多个缓冲区，其中一个名为 1⁣，可用于计算 Lisp 表达式，并且不与任何文件关联 (@pxref{Lisp Interaction})。
+
+@cindex selected buffer
+@cindex current buffer
+在任何时刻，只有一个缓冲区为@dfn{selected}；我们称之为@dfn{current buffer}。  我们有时会说命令在“缓冲区”上运行；这实际上意味着它在当前缓冲区上运行。  当只有一个 Emacs 窗口时，该窗口中显示的缓冲区是当前的。  当有多个窗口时，@dfn{selected window}中显示的缓冲区是当前的。  @xref{Windows}。
+
+@cindex buffer contents
+@cindex contents of a buffer
+缓冲区的 @dfn{contents} 由一系列字符组成，每个字符可选地携带一组文本属性 (@pxref{International Chars, Text properties})，可以指定有关该字符的更多信息。
+
+除了文本内容之外，每个缓冲区还记录几条信息，例如正在访问哪个文件（如果有）、是否被修改以及有效的主要模式和次要模式（@pxref{Modes}）。  这些存储在 @dfn{buffer-local variables} 变量中，每个缓冲区中可以有不同的值。 @xref{Locals}。
+
+@cindex buffer size, maximum
+缓冲区的大小不能大于某个最大值，该最大值由 @dfn{Emacs integers} 表示的最大缓冲区位置定义。这是因为 Emacs 使用该数据类型跟踪缓冲区位置。对于典型的 64 位机器，此最大缓冲区大小为 @math{2^{61} - 2} 字节，或约 2 EiB@. 对于典型的 32 位机器，最大值通常为 @math{2^{29} - 2} 字节，或约 512 MiB@. 缓冲区大小还受到系统内存量的限制。
+
+@menu
+* Select Buffer::        创建一个新的缓冲区或重新选择一个旧的缓冲区。
+* List Buffers::         获取存在的缓冲区列表。
+* Misc Buffer::          重命名；更改只读状态；复制文本。
+* Kill Buffer::          杀死不再需要的缓冲区。
+* Several Buffers::      如何遍历所有缓冲区的列表并对其中的几个进行不同的操作。
+* Indirect Buffers::     间接缓冲区共享另一个缓冲区的文本。
+* Buffer Convenience::   缓冲区处理的便利和定制功能。
+@end menu
+
+@node Select Buffer
+@section 创建和选择缓冲区
+@cindex change buffers
+@cindex switch buffers
+
+@table @kbd
+@item C-x b @var{buffer} @key{RET}
+选择或创建一个名为 @var{buffer} (@code{switch-to-buffer}) 的缓冲区。
+@item C-x 4 b @var{buffer} @key{RET}
+类似，但在另一个窗口中选择 @var{buffer} (@code{switch-to-buffer-other-window})。
+@item C-x 5 b @var{buffer} @key{RET}
+类似，但在单独的框架中选择 @var{buffer} (@code{switch-to-buffer-other-frame})。
+@item C-x @key{LEFT}
+选择缓冲区列表中的前一个缓冲区 (@code{previous-buffer})。
+@item C-x @key{RIGHT}
+选择缓冲区列表中的下一个缓冲区 (@code{next-buffer})。
+@item C-u M-g M-g
+@itemx C-u M-g g
+读取数字 @var{n} 并移至另一个窗口中除当前缓冲区之外最近选择的缓冲区中的第 @var{n} 行。
+@end table
+
+@kindex C-x b
+@findex switch-to-buffer
+@kbd{C-x b} (@code{switch-to-buffer}) 命令使用迷你缓冲区读取缓冲区名称。  然后它使该缓冲区成为当前缓冲区，并将其显示在当前选定的窗口中。  空输入指定当前未在任何窗口中显示的缓冲区中最近的缓冲区。
+
+输入缓冲区名称时，您可以使用常用的完成和历史命令 (@pxref{Minibuffer})。  请注意，@kbd{C-x b} 和相关命令使用 @dfn{permissive completion with confirmation} 进行迷你缓冲区补全：如果在迷你缓冲区文本命名不存在的缓冲区时键入 @key{RET}，Emacs 会打印 @samp{[Confirm]} 并且您必须键入第二个 @key{RET} 才能提交该缓冲区名称。 @xref{Completion Exit}，了解详情。  有关其他完成选项和功能，请参阅@ref{Completion Options}。
+
+如果指定的缓冲区不存在，@kbd{C-x b} 将创建一个不访问任何文件的新的空缓冲区，并选择它进行编辑。  变量@code{major-mode}的默认值决定了新缓冲区的主要模式；默认值为基本模式。  @xref{Major Modes}。  创建新缓冲区的原因之一是用它来制作临时笔记。  如果您尝试保存它，Emacs 会询问要使用的文件名，并且会在考虑该文件名的情况下重新建立缓冲区的主模式 (@pxref{Choosing Modes})。
+
+@kindex C-x LEFT
+@kindex C-x RIGHT
+@findex next-buffer
+@findex previous-buffer
+为了方便地在几个缓冲区之间切换，请使用命令@kbd{C-x @key{LEFT}}和@kbd{C-x @key{RIGHT}}。  @kbd{C-x @key{LEFT}} (@code{previous-buffer}) 选择前一个缓冲区（按照当前帧中最近选择的顺序），而@kbd{C-x @key{RIGHT}} (@code{next-buffer}) 以相反方向移动穿过缓冲区。  这两个命令都支持用作重复计数的数字前缀参数。
+
+@kindex C-x 4 b
+@findex switch-to-buffer-other-window
+要在当前窗口 (@pxref{Windows}) 之外的窗口中选择缓冲区，请键入 @kbd{C-x 4 b} (@code{switch-to-buffer-other-window})。  这会提示使用迷你缓冲区输入缓冲区名称，在另一个窗口中显示该缓冲区，然后选择该窗口。
+
+@kindex C-x 5 b
+@findex switch-to-buffer-other-frame
+同样，@kbd{C-x 5 b} (@code{switch-to-buffer-other-frame}) 提示输入缓冲区名称，在另一个帧 (@pxref{Frames}) 中显示该缓冲区，然后选择该帧。  如果缓冲区已显示在另一个框架上的窗口中，则 Emacs 会选择该窗口和框架，而不是创建新框架。
+
+@xref{Displaying Buffers}，了解 @kbd{C-x 4 b} 和 @kbd{C-x 5 b} 命令如何获取要显示的窗口和/或框架。
+
+此外，@kbd{C-x C-f}以及任何其他用于访问文件的命令也可用于切换到现有的文件访问缓冲区。 @xref{Visiting}。
+
+@findex goto-line@r{, with an argument}
+@kbd{C-u M-g M-g}，即带有普通前缀参数的@code{goto-line}，使用迷你缓冲区读取数字@var{n}，选择另一个窗口中除当前缓冲区之外的最近选择的缓冲区，然后将指针移动到该缓冲区中行号@var{n}的开头。  这在引用另一个缓冲区中的行号的缓冲区中主要有用：如果点位于数字上或紧随数字之后，@code{goto-line} 使用该数字作为 @var{n} 的默认值。  请注意，除 6⁣ 之外的前缀参数的行为有所不同。 @kbd{C-u 4 M-g M-g} 转到 @emph{current} 缓冲区中的第 4 行，而不从迷你缓冲区中读取数字。  （请记住，不带前缀参数的@kbd{M-g M-g}读取数字@var{n}，然后移动到当前缓冲区中的行号@var{n}。@xref{Moving Point}。）
+
+Emacs 使用以空格开头的缓冲区名称用于内部目的。它以较小的方式特殊对待这些缓冲区——例如，默认情况下它们不记录撤消信息。  最好避免自己使用此类缓冲区名称。
+
+@node List Buffers
+@section 列出现有缓冲区
+
+@table @kbd
+@item C-x C-b
+列出现有缓冲区 (@code{list-buffers})。
+@end table
+
+@cindex listing current buffers
+@kindex C-x C-b
+@findex list-buffers
+要显示现有缓冲区的列表，请输入 @kbd{C-x C-b}。  这会在名为@file{*Buffer List*}的缓冲区中弹出一个缓冲区菜单。  列表中的每一行显示一个缓冲区的名称、大小、主要模式和访问的文件。缓冲区按照当前的顺序列出；最近的缓冲区排在第一位。  本节描述缓冲区列表如何显示以及如何解释列表中的各种指示；请参阅 @ref{Several Buffers}，了解 @file{*Buffer List*} 缓冲区中的特殊模式及其可用命令的描述。
+
+行的第一个字段中的@samp{.}表示缓冲区是当前的。  @samp{%} 表示只读缓冲区。  @samp{*} 表示缓冲区被修改。  如果修改了多个缓冲区，则可能需要使用 @kbd{C-x s} (@pxref{Save Commands}) 保存一些缓冲区。这是缓冲区列表的示例：
+
+@smallexample
+CRM Buffer                Size  Mode              File
+. * .emacs                3294  Elisp/l           ~/.emacs
+ %  *Help*                 101  Help
+    search.c             86055  C                 ~/cvs/emacs/src/search.c
+ %  src                  20959  Dired by name     ~/cvs/emacs/src/
+  * *mail*                  42  Mail
+ %  HELLO                 1607  Fundamental       ~/cvs/emacs/etc/HELLO
+ %  NEWS                481184  Outline           ~/cvs/emacs/etc/NEWS
+    *scratch*              191  Lisp Interaction
+  * *Messages*            1554  Messages
+@end smallexample
+
+@noindent
+缓冲区@file{*Help*}是由帮助请求（@pxref{Help}）创建的；它没有访问任何文件。  缓冲区@code{src}是由Dired在目录@file{~/cvs/emacs/src/}上创建的。  您可以通过为命令提供前缀参数来仅列出正在访问文件的缓冲区，如@kbd{C-u C-x C-b}中所示。
+
+默认情况下，@code{list-buffers} 会忽略名称以空格开头的缓冲区，除非它们访问文件：此类缓冲区由 Emacs 内部使用（但 @kbd{I} 命令反驳了这一点，@pxref{Several Buffers}）。
+
+@node Misc Buffer
+@section 杂项缓冲区操作
+
+@table @kbd
+@item C-x C-q
+切换缓冲区的只读状态 (@code{read-only-mode})。
+@item C-x x r @key{RET} @var{buffer} @key{RET}
+更改当前缓冲区的名称。
+@item C-x x u
+通过在末尾添加 @samp{<@var{number}>} 来重命名当前缓冲区。
+@item M-x view-buffer @key{RET} @var{buffer} @key{RET}
+滚动浏览缓冲区@var{buffer}。  @xref{View Mode}。
+@end table
+
+@kindex C-x C-q
+@vindex buffer-read-only
+@cindex read-only buffer
+缓冲区可以是@dfn{read-only}，这意味着不允许插入或删除其文本的命令。  （但是，其他命令，如@kbd{C-x @key{RET} f}，仍然可以将其标记为已修改，@pxref{Text Coding}）。  模式行表示只读缓冲区，左边距附近有 @samp{%%} 或 @samp{%*}。  @xref{Mode Line}。  只读缓冲区通常由 Dired 和 Rmail 等子系统创建，这些子系统具有对文本进行操作的特殊命令。  访问访问控制表明您无法写入的文件也会使缓冲区变为只读。
+
+@findex read-only-mode
+@vindex view-read-only
+命令 @kbd{C-x C-q} (@code{read-only-mode}) 使只读缓冲区可写，并使可写缓冲区只读。  这是通过设置变量 @code{buffer-read-only} 来实现的，该变量在每个缓冲区中都有一个本地值，并且如果其值为非 @code{nil} 则使缓冲区只读。  如果将选项 @code{view-read-only} 更改为非 @code{nil} 值，则使用 @kbd{C-x C-q} 将缓冲区设置为只读也会启用缓冲区中的查看模式 (@pxref{View Mode})。
+
+@kindex C-x x r
+@findex rename-buffer
+@kbd{C-x x r} (@code{rename-buffer} 更改当前缓冲区的名称。您将新名称指定为迷你缓冲区参数；没有默认值。如果您指定的名称已用于其他缓冲区，则会发生错误并且不会进行重命名。
+
+@kindex C-x x u
+@findex rename-uniquely
+@kbd{C-x x u} (@code{rename-uniquely}) 将当前缓冲区重命名为类似的名称，并添加数字后缀以使其既不同又唯一。  该命令不需要参数。  它对于创建多个 shell 缓冲区很有用：如果重命名 @file{*shell*} 缓冲区，然后再次执行 @kbd{M-x shell}，它会创建一个名为 @file{*shell*} 的新 shell 缓冲区；同时，旧的 shell 缓冲区继续以新名称存在。  此方法也适用于邮件缓冲区、编译缓冲区和大多数使用特定名称创建特殊缓冲区的 Emacs 功能。  （对于其中一些功能，例如@kbd{M-x compile}、@kbd{M-x grep}，您需要在再次使用该命令之前切换到其他缓冲区，否则尽管名称更改，它仍将重用当前缓冲区。）
+
+@kindex C-x x i
+命令 @kbd{M-x append-to-buffer} 和 @kbd{C-x x i} (@code{insert-buffer}) 也可用于将文本从一个缓冲区复制到另一个缓冲区。  @xref{Accumulating Text}。
+
+@node Kill Buffer
+@section 杀死缓冲区
+
+@cindex killing buffers
+@cindex close buffer
+@cindex close file
+如果您继续 Emacs 会话一段时间，可能会积累大量缓冲区。  然后您可能会发现它可以方便地 @dfn{kill} 您不再需要的缓冲区。  （其他一些编辑器将此操作称为 @dfn{close}，并谈论“关闭缓冲区”或“关闭缓冲区中访问的文件”。）在大多数操作系统上，终止缓冲区会将用于缓冲区的内存 Emacs 释放回操作系统，以便其他程序可以使用它。  以下是一些用于终止缓冲区的命令：
+
+@table @kbd
+@item C-x k @var{buffer} @key{RET}
+终止缓冲区@var{buffer} (@code{kill-buffer})。
+@item M-x kill-some-buffers
+提议一个一个地杀死每个缓冲区。
+@item M-x kill-matching-buffers
+提议杀死与正则表达式匹配的所有缓冲区。
+@item M-x kill-matching-buffers-no-ask
+类似于 @code{kill-matching-buffers}，但不要求确认。
+@end table
+
+@findex kill-buffer
+@kindex C-x k
+@cindex killing unsaved buffers
+@cindex unsaved buffers, killing
+@kbd{C-x k} (@code{kill-buffer}) 杀死一个缓冲区，其名称是您在迷你缓冲区中指定的。  如果您在迷你缓冲区中仅键入 @key{RET}，则使用默认值来终止当前缓冲区。  如果您终止当前缓冲区，则另一个缓冲区将成为当前缓冲区：最近一段时间是当前缓冲区，但现在不再显示在任何窗口中。  如果您要求终止已修改的文件访问缓冲区，则必须在终止缓冲区之前使用 @kbd{yes} 进行确认。
+
+@findex kill-some-buffers
+命令 @kbd{M-x kill-some-buffers} 逐一询问每个缓冲区。  答案 1⁣ 意味着杀死缓冲区，就像 2⁣ 一样。  此命令忽略名称以空格开头的缓冲区，这些缓冲区由 Emacs 内部使用。
+
+@findex kill-matching-buffers
+@findex kill-matching-buffers-no-ask
+命令 @kbd{M-x kill-matching-buffers} 提示输入正则表达式并杀死名称与该表达式匹配的所有缓冲区。 @xref{Regexps}。  与@code{kill-some-buffers}一样，它在每次击杀前都会要求确认。  该命令通常会忽略名称以空格开头的缓冲区，这些缓冲区由 Emacs 内部使用。  要同时终止内部缓冲区，请使用前缀参数调用 @code{kill-matching-buffers}。  命令 @w{@kbd{M-x kill-matching-buffers-no-ask}} 的工作方式与 @code{kill-matching-buffers} 类似，但在杀死每个匹配的缓冲区之前不要求确认。
+
+缓冲区菜单功能也可以方便地杀死各种缓冲区。  @xref{Several Buffers}。
+
+@vindex kill-buffer-hook
+如果你想在每次杀死缓冲区时执行一些特殊操作，可以将钩子函数添加到钩子@code{kill-buffer-hook} (@pxref{Hooks})。
+
+@findex clean-buffer-list
+如果您像许多人一样运行一个 Emacs 会话一段时间，它可能会填满您几天前使用过的缓冲区。  命令@kbd{M-x clean-buffer-list}是清除它们的便捷方法；它会杀死您很长时间没有使用的所有未修改的缓冲区。  一个普通的缓冲区如果三天没有显示就会被杀死；但是，您可以指定某些缓冲区永远不应该被自动终止，而其他缓冲区如果仅一个小时未使用则应被终止。  这些默认值以及该命令行为的其他方面可以通过自定义 @code{clean-buffer-list} 的文档字符串中描述的几个选项来控制。
+
+@cindex Midnight mode
+@vindex midnight-mode
+@vindex midnight-hook
+您还可以通过启用午夜模式，每天一次为您完成缓冲区清除。  午夜模式每天午夜运行；那时，它会运行 @code{clean-buffer-list}，或者您放置在普通钩子 @code{midnight-hook} (@pxref{Hooks}) 中的任何函数。  要启用午夜模式，请使用自定义缓冲区将变量 @code{midnight-mode} 设置为 @code{t}。  @xref{Easy Customization}。
+
+@node Several Buffers
+@section 对多个缓冲区进行操作
+@cindex Buffer Menu
+
+@table @kbd
+@item M-x buffer-menu
+开始编辑列出所有 Emacs 缓冲区的缓冲区。
+@item M-x buffer-menu-other-window
+类似，但在另一个窗口中执行。
+@end table
+
+由@kbd{C-x C-b}（@pxref{List Buffers}）打开的@dfn{Buffer Menu}不仅仅列出缓冲区。  它还允许您通过类似于 Dired (@pxref{Dired}) 的接口对缓冲区执行各种操作。  您可以保存缓冲区、杀死它们（这里称为 @dfn{deleting} 它们，以与 Dired 保持一致）或显示它们。
+
+@findex buffer-menu
+@findex buffer-menu-other-window
+要使用缓冲区菜单，请键入 @kbd{C-x C-b} 并切换到显示 @file{*Buffer List*} 缓冲区的窗口。  您还可以输入 @kbd{M-x buffer-menu} 在所选窗口中打开缓冲区菜单。或者，命令 @kbd{M-x buffer-menu-other-window} 在另一个窗口中打开缓冲区菜单，并选择该窗口。
+
+缓冲区菜单是只读缓冲区，只能通过本节中描述的特殊命令进行更改。  可以在此缓冲区中使用常用的光标移动命令。  以下命令适用于当前行描述的缓冲区：
+
+@table @kbd
+@findex Buffer-menu-delete
+@kindex d @r{(Buffer Menu)}
+@item d
+将缓冲区标记为删除（终止），然后将指针移动到下一行 (@code{Buffer-menu-delete})。  删除标志由缓冲区名称之前的行上的字符 @samp{D} 表示。  仅当您键入 @kbd{x} 命令时才会发生删除（见下文）。
+
+@findex Buffer-menu-delete-backwards
+@kindex C-d @r{(Buffer Menu)}
+@item C-d
+与 @kbd{d} 类似，但将点向上移动而不是向下 (@code{Buffer-menu-delete-backwards})。
+
+@findex Buffer-menu-save
+@kindex s @r{(Buffer Menu)}
+@item s
+标记缓冲区以进行保存 (@code{Buffer-menu-save})。  保存标志由缓冲区名称之前的行上的字符 @samp{S} 表示。  仅当您键入 @kbd{x} 时才会进行保存。  您可以请求对同一缓冲区进行保存和删除。
+
+@findex Buffer-menu-execute
+@kindex x @r{(Buffer Menu)}
+@item x
+执行所有标记的删除并保存 (@code{Buffer-menu-execute})。
+
+@findex Buffer-menu-unmark
+@kindex u @r{(Buffer Menu)}
+@item u
+删除当前行中的所有标志，然后向下移动 (@code{Buffer-menu-unmark})。  使用前缀参数，在删除标志后向上移动。
+
+@findex Buffer-menu-backup-unmark
+@kindex DEL @r{(Buffer Menu)}
+@item @key{DEL}
+移至上一行并删除该行上的所有标志 (@code{Buffer-menu-backup-unmark})。
+
+@findex Buffer-menu-unmark-all-buffers
+@kindex M-DEL @r{(Buffer Menu)}
+@item M-@key{DEL}
+从所有行中删除特定标志 (@code{Buffer-menu-unmark-all-buffers})。  这要求单个字符，并取消标记用该字符标记的缓冲区；输入 @key{RET} 将删除所有标记。
+
+@findex Buffer-menu-unmark-all
+@kindex U @r{(Buffer Menu)}
+@item U
+删除所有行中的所有标志 (@code{Buffer-menu-unmark-all})。
+@end table
+
+@noindent
+用于删除标志的命令@kbd{d}和@kbd{C-d}接受数字参数作为重复计数。
+
+以下命令立即对当前行列出的缓冲区进行操作。  它们还接受数字参数作为重复计数。
+
+@table @kbd
+@findex Buffer-menu-not-modified
+@kindex ~ @r{(Buffer Menu)}
+@item ~
+将缓冲区标记为未修改 (@code{Buffer-menu-not-modified})。 @xref{Save Commands}。
+
+@findex Buffer-menu-toggle-read-only
+@kindex % @r{(Buffer Menu)}
+@item %
+切换缓冲区的只读状态 (@code{Buffer-menu-toggle-read-only})。  @xref{Misc Buffer}。
+
+@findex Buffer-menu-visit-tags-table
+@kindex t @r{(Buffer Menu)}
+@item t
+访问作为标签表的缓冲区 (@code{Buffer-menu-visit-tags-table})。  @xref{Select Tags Table}。
+@end table
+
+以下命令用于选择另一个或多个缓冲区：
+
+@table @kbd
+@findex quit-window
+@kindex q @r{(Buffer Menu)}
+@item q
+退出缓冲区菜单 (@code{quit-window})。  最近的以前可见的缓冲区将显示在其位置。
+
+@findex Buffer-menu-this-window
+@kindex f @r{(Buffer Menu)}
+@kindex RET @r{(Buffer Menu)}
+@item @key{RET}
+@itemx f
+选择该行的缓冲区，替换其窗口 (@code{Buffer-menu-this-window}) 中的 @file{*Buffer List*} 缓冲区。
+
+@findex Buffer-menu-other-window
+@kindex o @r{(Buffer Menu)}
+@item o
+在另一个窗口中选择该行的缓冲区，就像通过 @kbd{C-x 4 b} 一样，使 @file{*Buffer List*} 可见 (@code{Buffer-menu-other-window})。
+
+@findex Buffer-menu-switch-other-window
+@kindex C-o @r{(Buffer Menu)}
+@item C-o
+在另一个窗口中显示该行的缓冲区，而不选择它 (@code{Buffer-menu-switch-other-window})。
+
+@findex Buffer-menu-1-window
+@kindex 1 @r{(Buffer Menu)}
+@item 1
+在全帧窗口中选择该行的缓冲区 (@code{Buffer-menu-1-window})。
+
+@findex Buffer-menu-2-window
+@kindex 2 @r{(Buffer Menu)}
+@item 2
+在当前帧上设置两个窗口，在一个窗口中选择该行的缓冲区，在另一个窗口中选择先前的当前缓冲区（@file{*Buffer List*} 除外）(@code{Buffer-menu-2-window})。
+
+@findex Buffer-menu-bury
+@kindex b @r{(Buffer Menu)}
+@item b
+隐藏该行的缓冲区 (@code{Buffer-menu-bury})（即，将其移动到缓冲区列表的末尾）。
+
+@findex Buffer-menu-mark
+@kindex m @r{(Buffer Menu)}
+@item m
+如果使用 @kbd{v} 命令 (@code{Buffer-menu-mark}) 退出，则将此行的缓冲区标记为显示在另一个窗口中。  显示标志由行首的字符 @samp{>} 表示。 （单个缓冲区可能无法同时具有删除和显示标志。）
+
+@findex Buffer-menu-select
+@kindex v @r{(Buffer Menu)}
+@item v
+选择该行的缓冲区，并在其他窗口中显示使用 @kbd{m} 命令 (@code{Buffer-menu-select}) 标记的任何缓冲区。如果您没有标记任何缓冲区，则此命令相当于@kbd{1}。
+@end table
+
+以下命令影响整个缓冲区列表：
+
+@table @kbd
+@findex tabulated-list-sort
+@kindex S @r{(Buffer Menu)}
+@item S
+根据当前列中的值对缓冲区菜单条目进行排序。  使用数字前缀参数 @var{n}，根据第 @var{n} 列 (@code{tabulated-list-sort}) 进行排序。
+
+@kindex @} @r{(Buffer Menu)}
+@findex tabulated-list-widen-current-column
+@item @}
+将当前列宽度加宽 @var{n}（前缀数字参数）字符。
+
+@kindex @{ @r{(Buffer Menu)}
+@findex tabulated-list-narrow-current-column
+@item @{
+将当前列宽缩小 @var{n}（前缀数字参数）个字符。
+
+@findex Buffer-menu-toggle-files-only
+@kindex T @r{(Buffer Menu)}
+@item T
+删除或重新插入非文件缓冲区的行 (@code{Buffer-menu-toggle-files-only})。  此命令切换缓冲区列表中此类缓冲区的包含情况。
+
+@findex Buffer-menu-toggle-internal
+@kindex I @r{(Buffer Menu)}
+@item I
+切换内部缓冲区的显示，其名称以空格开头。
+@end table
+
+通常，当创建和终止缓冲区时，缓冲区@file{*Buffer List*}不会自动更新；它的内容只是文本。  如果您已创建、删除或重命名缓冲区，则更新 @file{*Buffer List*} 以显示您所做的操作的方法是键入 @kbd{g} (@code{revert-buffer})。  如果您在此缓冲区中启用自动恢复模式，则可以每隔 4⁣ 秒定期执行此操作，只要它未标记为已修改。  仅当 6⁣ 为非 7⁣ 时，全局自动恢复模式才适用于 @file{*Buffer List*} 缓冲区。
+@ifnottex
+@xref{Auto Reverting the Buffer Menu, global-auto-revert-non-file-buffers}, for details.
+@end ifnottex
+
+@node Indirect Buffers
+@section 间接缓冲区
+@cindex indirect buffer
+@cindex base buffer
+
+@dfn{indirect buffer} 共享某个其他缓冲区的文本，称为间接缓冲区的 @dfn{base buffer}。  在某些方面，它是文件之间符号链接的缓冲区类似物。
+
+@table @kbd
+@findex make-indirect-buffer
+@item M-x make-indirect-buffer @key{RET} @var{base-buffer} @key{RET} @var{indirect-name} @key{RET}
+使用基本缓冲区 @var{base-buffer} 创建一个名为 @var{indirect-name} 的间接缓冲区。
+@findex clone-indirect-buffer
+@item M-x clone-indirect-buffer @key{RET}
+创建一个间接缓冲区，它是当前缓冲区的孪生副本。
+@item C-x 4 c
+@kindex C-x 4 c
+@findex clone-indirect-buffer-other-window
+创建一个间接缓冲区，它是当前缓冲区的孪生副本，并在另一个窗口中选择它 (@code{clone-indirect-buffer-other-window})。
+@end table
+
+间接缓冲区的文本始终与其基本缓冲区的文本相同；通过编辑其中之一所做的更改会立即在另一个中可见。  这里的“文本”包括字符及其文本属性。  但在所有其他方面，间接缓冲区与其基础缓冲区是完全分开的。  它们可以有不同的名称、不同的点值、不同的缩小范围、不同的标记、不同的覆盖、不同的主要模式和不同的局部变量。
+
+间接缓冲区无法访问文件，但其基本缓冲区可以。  如果您尝试保存间接缓冲区，实际上是通过保存基本缓冲区来实现的。  杀死基本缓冲区会有效地杀死间接缓冲区，但杀死间接缓冲区对其基本缓冲区没有影响。
+
+使用间接缓冲区的一种方法是显示轮廓的多个视图。  @xref{Outline Views}。
+
+创建间接缓冲区的一种快速方便的方法是使用命令 @kbd{C-x 4 c} (@code{clone-indirect-buffer-other-window})。  它创建并选择一个间接缓冲区，其基本缓冲区是当前缓冲区。  使用数字参数时，它会提示输入间接缓冲区的名称；否则它使用当前缓冲区的名称，并添加 @samp{<@var{n}>} 后缀。
+
+创建间接缓冲区的更通用方法是使用命令 @kbd{M-x make-indirect-buffer}。  它从缓冲区 @var{base-buffer} 创建一个名为 @var{indirect-name} 的间接缓冲区，提示两者都使用迷你缓冲区。
+
+@vindex clone-indirect-buffer-hook
+创建间接缓冲区的函数在创建间接缓冲区后运行钩子@code{clone-indirect-buffer-hook}。当这个钩子运行时，新创建的间接缓冲区是当前缓冲区。
+
+注意：当对缓冲区的文本进行修改时，修改挂钩仅在基本缓冲区中运行，因为这些挂钩上的大多数函数尚未准备好在间接缓冲区中正常工作。  因此，如果您需要在间接缓冲区中修改钩子函数，则需要手动将该函数添加到钩子@emph{in the base buffer}，然后使该函数在所需的间接缓冲区中运行。
+
+@node Buffer Convenience
+@section 缓冲区处理的便利功能和定制
+
+本节介绍了几种可以更方便地在缓冲区之间切换的模式和功能。
+
+@menu
+* Uniquify::                使缓冲区名称与目录部分唯一。
+* Icomplete::               快速迷你缓冲区选择。
+* Buffer Menus::            可配置的缓冲区菜单。
+@end menu
+
+@node Uniquify
+@subsection 使缓冲区名称唯一
+
+@cindex unique buffer names
+@cindex directories in buffer names
+当多个缓冲区访问同名文件时，Emacs 必须为缓冲区指定不同的名称。  默认方法根据包含文件的目录名称添加后缀。  例如，如果您同时访问文件@file{/foo/bar/mumble/name}和@file{/baz/quux/mumble/name}，它们的缓冲区将分别命名为@samp{name<bar/mumble>}和@samp{name<quux/mumble>}。 Emacs 添加所需数量的目录部分以形成唯一的名称。
+
+@vindex uniquify-buffer-name-style
+您可以通过自定义选项 @code{uniquify-buffer-name-style} 从多种不同的样式中进行选择来构造唯一的缓冲区名称。
+
+@code{forward} 命名方法在缓冲区名称的开头包含文件目录名称的一部分；使用此方法，访问文件@file{/u/rms/tmp/Makefile}和@file{/usr/projects/zaphod/Makefile}的缓冲区将被命名为@samp{tmp/Makefile}和@samp{zaphod/Makefile}。
+
+相反，@code{post-forward}命名方法将调用缓冲区@samp{Makefile|tmp}和@samp{Makefile|zaphod}。  默认方法 @code{post-forward-angle-brackets} 类似于 @code{post-forward}，只不过它将唯一路径括在尖括号中。  @code{reverse}命名方法将它们称为@samp{Makefile\tmp}和@samp{Makefile\zaphod}。  当仅一个目录名不足以区分两个文件时，@code{post-forward} 和 @code{reverse} 之间就会出现显着差异；然后 @code{reverse} 将目录名称按倒序排列，使 @file{/top/middle/file} 变为 @samp{file\middle\top}，而 @code{post-forward} 将它们按正序排列在文件名之后，如 @samp{file|top/middle} 所示。  如果 @code{uniquify-buffer-name-style} 设置为 @code{nil}，则缓冲区名称只需附加 @samp{<2>}、@samp{<3>} 等@:。
+
+@code{uniquify-buffer-name-style} 的值可以设置为具有两个参数 @var{base} 和 @var{extra-strings} 的自定义函数，其中 @var{base} 是字符串，@var{extra-strings} 是字符串列表。  例如 @code{post-forward-angle-brackets} 的当前实现可以是：
+
+@example
+(defun my-post-forward-angle-brackets (base extra-string)
+  (concat base \"<\" (mapconcat #'identity extra-string \"/\") \">\"))
+@end example
+
+如果您要在键入缓冲区名称之前按 @emph{look} ，那么遵循哪条规则将目录名称放入缓冲区名称中并不是很重要。  但作为一个有经验的用户，如果你知道规则，你就不必看。  然后您可能会发现一条或另一条规则更容易让您记住并快速应用。
+
+@node Icomplete
+@subsection 快速迷你缓冲区选择
+
+@findex icomplete-mode
+@cindex Icomplete mode
+
+Icomplete 模式提供了一种方便的方法来在迷你缓冲区中可能的补全中快速选择一个元素。  启用后，在迷你缓冲区中键入内容会连续显示与您键入的字符串匹配的可能完成列表。
+
+您可以随时键入 @kbd{C-j} 选择列表中的第一个补全。  因此，选择特定完成的方法是将其置于列表中的第一个。  有两种方法可以做到这一点。  您可以输入更多的补全名称，从而缩小列表范围，排除所需补全之上不需要的补全。  或者，您可以使用 @kbd{C-.} 和 @kbd{C-,} 旋转列表，直到所需的缓冲区位于第一个。
+
+@kbd{M-@key{TAB}} 将选择列表中的第一个完成，与 @kbd{C-j} 类似，但不退出迷你缓冲区，因此您可以进一步编辑它。  这通常在输入文件名时使用，其中 @kbd{M-@key{TAB}} 可以使用几次以在目录层次结构中下降。
+
+要启用迷你缓冲区的 Icomplete 模式，请键入 @kbd{M-x icomplete-mode}，或将变量 @code{icomplete-mode} 自定义为 @code{t} (@pxref{Easy Customization})。
+
+您还可以通过将变量 @code{icomplete-in-buffer} 自定义为 @code{t} 来另外启用 @kbd{C-M-i}（命令 @code{completion-at-point}）的 Icomplete 模式。  对于缓冲区内完成，@code{completion-auto-help} 变量控制 Icomplete 模式何时显示可能的完成。  @code{t} 的默认值意味着当您第一次输入 @kbd{C-M-i} 时，会显示可能的补全。
+
+默认情况下，当您按 @kbd{C-M-i} 时，Icomplete 模式的可能完成的缓冲区内显示和 @file{*Completions*} 缓冲区都会出现。  如果您使用 @code{icomplete-in-buffer}，那么您可能希望抑制 @file{*Completions*} 缓冲区的出现。  为此，请将以下内容添加到初始化文件中 (@pxref{Init File})：
+
+@example
+(advice-add 'completion-at-point :after #'minibuffer-hide-completions)
+@end example
+
+@findex fido-mode
+@cindex fido mode
+
+Icomplete 模式的替代方案是 Fido 模式。  这与 Icomplete 模式非常相似，但保留了名为 Ido 模式的流行扩展的一些功能（实际上该名称源自“Fake Ido”）。  除此之外，在 Fido 模式下，@kbd{C-s} 和 @kbd{C-r} 还用于旋转完成列表，@kbd{C-k} 可用于删除文件并杀死列表中的缓冲区。  另一个值得注意的方面是 @code{flex} 用作默认完成样式 (@pxref{Completion Styles})。  要更改此设置，请将以下内容添加到初始化文件中 (@pxref{Init File})：
+
+@example
+(defun my-icomplete-styles ()
+  (setq-local completion-styles '(initials flex)))
+(add-hook 'icomplete-minibuffer-setup-hook 'my-icomplete-styles)
+@end example
+
+要启用 Fido 模式，请输入 @kbd{M-x fido-mode}，或将变量 @code{fido-mode} 自定义为 @code{t} (@pxref{Easy Customization})。
+
+@findex icomplete-vertical-mode
+@cindex Icomplete vertical mode
+
+默认情况下，Icomplete 模式和 Fido 模式将可能的补全显示在与提示相同的行上。  要在提示下垂直显示补全候选项，请键入 @kbd{M-x icomplete-vertical-mode}，或将变量 @code{icomplete-vertical-mode} 自定义为 @code{t} (@pxref{Easy Customization})。
+
+@node Buffer Menus
+@subsection 自定义缓冲区菜单
+
+@findex bs-show
+@cindex buffer list, customizable
+@table @kbd
+@item M-x bs-show
+创建与 @kbd{M-x list-buffers} 类似但可自定义的缓冲区列表。
+@item M-x ibuffer
+制作一个缓冲区列表并以类似于 Dired 的方式对其进行操作。
+@end table
+
+@findex bs-customize
+@kbd{M-x bs-show} 弹出一个缓冲区列表，类似于 @kbd{C-x C-b} 通常显示的缓冲区列表，但您可以以更灵活的方式自定义其显示。  例如，您可以指定要显示的缓冲区属性列表、缓冲区名称列的最小和最大宽度、永远不会显示和始终显示的缓冲区名称的正则表达式等。如果您更喜欢这个而不是通常的缓冲区列表，您可以将此命令绑定到@kbd{C-x C-b}。  要自定义此缓冲区列表，请使用 @code{bs} 自定义组 (@pxref{Easy Customization})，或调用 @kbd{bs-customize}。
+
+@findex msb-mode
+@cindex mode, MSB
+@cindex MSB mode
+@findex mouse-buffer-menu
+@kindex C-Down-mouse-1
+MSB 全局次要模式（“MSB”代表“鼠标选择缓冲区”）提供了您可能喜欢的不同且可自定义的鼠标缓冲区菜单。  它用自己的命令替换了通常绑定到 1⁣ 和 2⁣ 的 @code{mouse-buffer-menu} 命令，并且还修改了菜单栏缓冲区菜单。  您可以在 @code{msb} 自定义组中自定义菜单。
+
+@findex ibuffer
+IBuffer 是查看缓冲区列表并以类似于 Dired (@pxref{Dired}) 的方式对其进行操作的主要模式，包括以各种方式进行过滤、标记、排序以及对缓冲区进行操作。

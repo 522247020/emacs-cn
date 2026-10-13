@@ -1,0 +1,1474 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 1999--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Files
+@chapter 文件处理
+@cindex files
+
+操作系统将数据永久存储在名为@dfn{files}的文件中，因此您使用 Emacs 编辑的大部分文本都来自文件，并且最终存储在文件中。
+
+要编辑文件，您必须告诉 Emacs 读取该文件并准备一个包含文件文本副本的缓冲区。  这称为 @dfn{visiting} 文件。  编辑命令直接应用于缓冲区中的文本；也就是复制到Emacs内部。  仅当您 @dfn{save} 将缓冲区放回到文件中时，您的更改才会出现在文件本身中。
+
+除了访问和保存文件之外，Emacs 还可以删除、复制、重命名和追加文件、保留文件的多个版本以及对文件目录进行操作。
+
+@menu
+* File Names::           如何键入和编辑文件名参数。
+* Visiting::             访问文件使 Emacs 准备编辑该文件。
+* Saving::               保存使您的更改永久化。
+* Reverting::            恢复会取消所有未保存的更改。
+* Auto Revert::          自动保持缓冲区最新。
+* Auto Save::            自动保存会定期防止数据丢失。
+* File Aliases::         处理一个文件的多个名称。
+* Directories::          创建、删除和列出文件目录。
+* Comparing Files::      查找两个文件的不同之处。
+* Diff Mode::            编辑文件差异的模式。
+* Copying and Naming::   复制、命名和重命名文件。
+* Misc File Ops::        您可以对文件执行的其他操作。
+* Compressed Files::     访问压缩文件。
+* File Archives::        操作 tar、zip、jar 等@: 存档文件。
+* Remote Files::         访问其他机器上的文件。
+* Quoted File Names::    在文件名中引用特殊字符。
+* File Name Cache::      根据您经常使用的文件列表完成。
+* File Conveniences::    查找文件的便捷功能。
+* Image Mode::           查看图像文件。
+* Filesets::             处理文件集。
+@end menu
+
+@node File Names
+@section 文件名
+@cindex file names
+
+@cindex default file name
+许多对文件进行操作的 Emacs 命令要求您使用迷你缓冲区 (@pxref{Minibuffer File}) 指定文件名。
+
+在迷你缓冲区中时，您可以使用常用的完成和历史命令 (@pxref{Minibuffer})。  请注意，文件名补全会忽略扩展名出现在变量 @code{completion-ignored-extensions} (@pxref{Completion Options}) 中的文件名。另请注意，大多数命令使用允许完成并确认读取文件名：允许您提交不存在的文件名，但如果您在完成不存在的文件名后立即键入 @key{RET}，Emacs 会打印 @samp{[Confirm]} 并且您必须键入第二个 @key{RET} 进行确认。 @xref{Completion Exit}，了解详情。
+
+迷你缓冲区历史命令提供了一些读取文件名的特殊功能，请参阅@ref{Minibuffer History}。
+
+@cindex default directory, of a buffer
+@vindex default-directory
+每个缓冲区都有一个@dfn{default directory}，存储在缓冲区局部变量@code{default-directory}中。  每当 Emacs 使用迷你缓冲区读取文件名时，它通常会将默认目录插入到迷你缓冲区中作为初始内容。  您可以通过将变量 @code{insert-default-directory} 更改为 @code{nil} (@pxref{Minibuffer File}) 来禁止此插入。  无论如何，Emacs 始终假定任何相对文件名都是相对于默认目录的，例如，输入不带目录的文件名指定默认目录中的文件。
+
+@findex cd
+@findex pwd
+当你访问一个文件时，Emacs 将访问缓冲区中的 @code{default-directory} 设置为其文件的目录。  当您通过像 @kbd{C-x b} 这样的命令创建一个不访问文件的新缓冲区时，通常会从当时当前的缓冲区 (@pxref{Select Buffer}) 复制其默认目录。  您可以使用命令@kbd{M-x pwd}查看当前缓冲区中@code{default-directory}的值。  命令 @kbd{M-x cd} 提示输入目录名称，并将缓冲区的 @code{default-directory} 设置为该目录（这样做不会更改缓冲区的文件名（如果有））。
+
+例如，当您访问文件 @file{/u/rms/gnu/gnu.tasks} 时，默认目录设置为 @file{/u/rms/gnu/}。  如果您调用读取文件名的命令，只需在迷你缓冲区中输入@samp{foo}（省略目录）即可指定文件@file{/u/rms/gnu/foo}；输入@samp{../.login}指定@file{/u/rms/.login}；输入@samp{new/foo}指定@file{/u/rms/gnu/new/foo}。
+
+在迷你缓冲区中输入文件名时，您可以使用几个快捷方式：双斜杠会忽略第二个斜杠之前的所有内容，@samp{~/} 是您的主目录。 @xref{Minibuffer File}。
+
+@cindex environment variables in file names
+@cindex expansion of environment variables
+@cindex @code{$} in file names
+  @anchor{File Names with $}The character @samp{$} is used to
+将环境变量替换为文件名。  环境变量的名称由@samp{$}之后的所有字母数字字符组成；或者，可以将其括在 @samp{$} 之后的大括号中。  例如，如果您使用 shell 命令 @command{export FOO=rms/hacks} 设置名为 @env{FOO} 的环境变量，则 @file{/u/$FOO/test.c} 和 @file{/u/$@{FOO@}/test.c} 都是 @file{/u/rms/hacks/test.c} 的缩写。  如果未定义环境变量，则不会发生替换，因此字符 @samp{$} 代表其自身。  请注意，在 Emacs 外部设置的环境变量只有在 Emacs 启动之前应用时才会影响 Emacs。
+
+要访问名称中包含 @samp{$} 的文件，如果 @samp{$} 导致扩展，请键入 @samp{$$}。  在对单个 @samp{$} 执行变量替换的同时，该对转换为单个 @samp{$}。  或者，使用 @samp{/:} (@pxref{Quoted File Names}) 引用整个文件名。  以文字 @samp{~} 开头的文件名应使用 @samp{/:./} 引起来。
+
+您可以在文件名中包含非 @acronym{ASCII} 字符。 @xref{File Name Coding}。
+
+@node Visiting
+@section 访问文件
+@cindex visiting files
+@cindex open file
+
+@table @kbd
+@item C-x C-f
+访问文件 (@code{find-file})。
+@item C-x C-r
+访问文件进行查看，但不允许对其进行更改 (@code{find-file-read-only})。
+@item C-x C-v
+访问不同的文件而不是上次访问的文件 (@code{find-alternate-file})。
+@item C-x 4 f
+在另一个窗口中访问文件 (@code{find-file-other-window})。  不要更改所选窗口中显示的内容。
+@item C-x 5 f
+在新框架中访问文件 (@code{find-file-other-frame})。  不要更改所选框架中显示的内容。
+@item M-x find-file-literally
+访问不转换内容的文件。
+@end table
+
+@cindex files, visiting and saving
+@cindex saving files
+@dfn{Visiting} 文件意味着将其内容读入 Emacs 缓冲区，以便您可以编辑它们。  Emacs 为您访问的每个文件创建一个新的缓冲区。
+
+@kindex C-x C-f
+@findex find-file
+要访问文件，请键入 @kbd{C-x C-f} (@code{find-file}) 并使用迷你缓冲区输入所需文件的名称。  在迷你缓冲区中时，您可以通过键入 @kbd{C-g} 中止命令。  @xref{File Names}，有关将文件名输入迷你缓冲区的详细信息。
+
+如果指定的文件存在，但系统不允许您读取它，则会在回显区域中显示一条错误消息（在 GNU 和 Unix 系统上，您可以使用 @samp{su} 或 @samp{sudo} 方法；@pxref{Remote Files} 访问此类文件）。  否则，您可以通过屏幕上出现新文本以及模式行 (@pxref{Mode Line}) 中显示的缓冲区名称来判断 @kbd{C-x C-f} 已成功完成。  Emacs 通常根据文件名构造缓冲区名称，省略目录名。  例如，在名为 @samp{emacs.tex} 的缓冲区中访问名为 @file{/usr/rms/emacs.tex} 的文件。  如果已经存在具有该名称的缓冲区，Emacs 会构造一个唯一的名称；通常的方法是根据目录名称添加后缀（例如@samp{<rms>}、@samp{<tmp>} 等），但您也可以选择其他方法。  @xref{Uniquify}。
+
+@cindex creating files
+要创建新文件，只需使用相同的命令@kbd{C-x C-f}访问它即可。  Emacs 在回显区域中显示 @samp{(New file)}，但在其他方面，其行为就像您访问了现有的空文件一样。
+
+@cindex modified (buffer)
+访问文件后，您使用编辑命令所做的更改将在 Emacs 缓冲区中进行。  它们不会在访问的文件中生效，直到您 @dfn{save} 缓冲区 (@pxref{Saving})。  如果缓冲区包含尚未保存的更改，我们称该缓冲区为@dfn{modified}。  这意味着如果不保存缓冲区，一些更改将会丢失。  模式行在左边距附近显示两颗星，表示缓冲区已修改。
+
+如果您访问 Emacs 中已有的文件，@kbd{C-x C-f} 会切换到现有缓冲区，而不是制作另一个副本。  在此之前，它会检查该文件自您上次访问或保存以来是否已更改。  如果文件已更改，Emacs 会重新读取它。
+
+@vindex large-file-warning-threshold
+@cindex file, warning when size is large
+@cindex size of file, warning when visiting
+@cindex maximum buffer size exceeded, error message
+如果您尝试访问大于 @code{large-file-warning-threshold} 的文件（默认为 10000000，大约 10 MB），Emacs 会首先要求您确认。  您可以回答 @kbd{y} 继续访问该文件，或回答 @kbd{l} 按字面意思访问该文件（见下文）。  访问大文件确实可以加快此类文件的导航和编辑速度，因为各种可能昂贵的功能都被关闭。  但请注意，Emacs 无法访问大于最大 Emacs 缓冲区大小的文件，该大小受到 Emacs 可以分配的内存量以及 Emacs 可以表示的整数 (@pxref{Buffers}) 的限制。  如果您尝试，Emacs 会显示一条错误消息，指出已超出最大缓冲区大小。
+
+@vindex treesit-max-buffer-size
+如果您尝试访问主模式 (@pxref{Major Modes}) 使用 tree-sitter 解析库的文件，如果文件大小（以字节为单位）大于变量 @code{treesit-max-buffer-size} 的值，Emacs 将显示警告。  64 位 Emacs 的默认值为 40 MB，32 位 Emacs 的默认值为 15 MB。  这样可以防止在如此大的缓冲区中激活基于树驻留者的主要模式，从而避免 Emacs 耗尽内存的危险，因为典型的树驻留者解析器需要的内存大约是它解析的文本的 10 倍。
+
+@cindex wildcard characters in file names
+@vindex find-file-wildcards
+如果您指定的文件名包含 shell 样式的通配符，Emacs 会访问与其匹配的所有文件。  （在不区分大小写的文件系统上，Emacs 匹配通配符时不考虑字母大小写。）通配符包括 @samp{?}、@samp{*} 和 @samp{[@dots{}]} 序列。  要在迷你缓冲区的文件名中输入通配符 @samp{?}，您需要键入 @kbd{C-q ?}。  @xref{Quoted File Names}，有关如何访问名称实际上包含通配符的文件的信息。  您可以通过自定义@code{find-file-wildcards}来禁用通配符功能。
+
+@vindex query-about-changed-file
+如果您要求访问缓冲区中已访问过的文件，但该文件已在外部发生更改，Emacs 通常会询问您是否要从磁盘重新读取该文件。  但是，如果您将 @code{query-about-changed-file} 设置为 @code{nil}，Emacs 不会查询您，而只会显示更改之前的缓冲区内容，并显示一条回显区域消息，告诉您如何从文件恢复缓冲区。
+
+@kindex C-x C-v
+@findex find-alternate-file
+如果您由于输入错误的名称而无意中访问了错误的文件，请输入 @kbd{C-x C-v} (@code{find-alternate-file}) 来访问您真正想要的文件。  @kbd{C-x C-v} 与 @kbd{C-x C-f} 类似，但它会杀死当前缓冲区（在第一次提出如果修改则保存它之后）。  当@kbd{C-x C-v}读取要访问的文件名时，会将整个默认文件名插入到缓冲区中，在目录部分后面加上点；如果您在输入姓名时犯了轻微错误，这会很方便。
+
+@vindex find-file-run-dired
+如果您访问的文件实际上是一个目录，Emacs 会调用 Dired，即 Emacs 目录浏览器。  @xref{Dired}。  您可以通过将变量 @code{find-file-run-dired} 设置为 @code{nil} 来禁用此行为；在这种情况下，尝试访问目录是错误的。
+
+实际上是其他文件集合的文件或@dfn{file archives}，以特殊模式访问，该模式调用类似 Dired 的环境以允许对存档成员进行操作。  @xref{File Archives}，了解有关这些功能的更多信息。
+
+如果您访问操作系统不允许修改的文件，或者标记为只读的文件，Emacs 也会将缓冲区设置为只读，这样您就不会继续进行更改，而以后保存时会遇到麻烦。  您可以使用 @kbd{C-x C-q} (@code{read-only-mode}) 使缓冲区可写。  @xref{Misc Buffer}。
+
+@kindex C-x C-r
+@findex find-file-read-only
+如果您想以只读方式访问文件以防止意外输入更改，请使用命令 @kbd{C-x C-r} (@code{find-file-read-only}) 而不是 @kbd{C-x C-f} 来访问它。
+
+@kindex C-x 4 f
+@findex find-file-other-window
+@kbd{C-x 4 f} (@code{find-file-other-window}) 与@kbd{C-x C-f} 类似，只是在另一个窗口中选择包含指定文件的缓冲区。  在 @kbd{C-x 4 f} 之前选择的窗口继续显示它已经显示的相同缓冲区。  如果仅显示一个窗口时使用此命令，则该窗口将分为两部分 (@pxref{Window Choice})，一个窗口显示与之前相同的缓冲区，另一个窗口显示新请求的文件。 @xref{Windows}。
+
+@kindex C-x 5 f
+@findex find-file-other-frame
+@kbd{C-x 5 f} (@code{find-file-other-frame}) 类似，但打开一个新框架，或选择显示指定文件的任何现有框架。 @xref{Frames}。
+
+@cindex file selection dialog
+在图形显示上，还有两种访问文件的附加方法。  首先，当使用合适的 GUI 工具包构建 Emacs 时，用鼠标调用的命令（通过单击菜单栏或工具栏）使用工具包的标准文件选择对话框，而不是提示输入迷你缓冲区中的文件名。  在 GNU/Linux 和 Unix 平台上，Emacs 在使用 GTK+、LessTif 和 Motif 工具包构建时可以做到这一点；在 MS-Windows 和 Mac 上，GUI 版本默认执行此操作。有关如何自定义此内容的信息，请参阅@ref{Dialog Boxes}。
+
+其次，Emacs 支持拖放：将文件拖放到普通的 Emacs 窗口中可以使用该窗口访问该文件。  作为例外，将文件拖放到显示 Dired 缓冲区的窗口中会将文件移动或复制到显示的目录中。  详情请参见@ref{Drag and Drop}和@ref{Misc Dired Features}。
+
+在文本模式终端和图形显示器上，当 Emacs 是在没有 GUI 工具包的情况下构建时，您可以通过菜单栏 @samp{File} 菜单访问文件，其中包含 @samp{Visit New File} 和 @samp{Open File} 项。
+
+每次访问文件时，Emacs 都会自动扫描其内容以检测它使用的字符编码和行结束约定，并将它们转换为缓冲区内 Emacs 的内部编码和行结束约定。  当您保存缓冲区时，Emacs 会执行逆转换，将文件以其原始编码和行尾约定写入磁盘。  @xref{Coding Systems}。
+
+@findex find-file-literally
+如果您希望将文件编辑为 @acronym{ASCII} 字符序列而无需特殊编码或转换，请使用 @kbd{M-x find-file-literally} 命令。  它访问一个文件，如@kbd{C-x C-f}，但不会进行格式转换（@pxref{Format Conversion,, Format Conversion, elisp, the Emacs Lisp Reference Manual}）、字符代码转换（@pxref{Coding Systems}）或自动解压缩（@pxref{Compressed Files}），并且不会因为@code{require-final-newline}（@pxref{Customize Save}）而添加最终换行符。  如果您已经以通常（非字面）方式访问过同一文件，则此命令会询问您是否按字面访问它。
+
+@findex find-sibling-file
+@vindex find-sibling-rules
+文件有时（松散地）与其他文件绑定，您可以将这些文件称为 @dfn{sibling files}。  例如，在编辑 C 文件时，如果您有一个名为 @samp{"foo.c"} 的文件，则通常还会有一个名为 @samp{"foo.h"} 的文件，并且该文件可能是其同级文件。  或者您可能有不同版本的文件，例如 @samp{"src/emacs/emacs-27/lisp/allout.el"} 和 @samp{"src/emacs/emacs-28/lisp/allout.el"} 可能被视为同级文件。  Emacs 提供 @code{find-sibling-file} 命令在同级文件之间跳转，但不可能猜测用户可能希望将哪些文件视为同级文件，因此 Emacs 允许您通过更改 @code{find-sibling-rules} 用户选项来自由配置。这是匹配/扩展元素的列表。
+
+例如，要进行 @samp{".c"} 到 @samp{".h"} 映射，您可以说：
+
+@lisp
+(setq find-sibling-rules
+      '(("\\([^/]+\\)\\.c\\'" "\\1.h")))
+@end lisp
+
+（@code{ff-find-related-file} 提供类似的功能，特别适合 C 文件，@pxref{Other C Commands}。）
+
+或者，如果您想将 @samp{"src/emacs/DIR/file-name"} 下的所有文件视为其他 @var{dir} 的兄弟文件，您可以说：
+
+@lisp
+(setq find-sibling-rules
+      '(("src/emacs/[^/]+/\\(.*\\)\\'" "src/emacs/.*/\\1")))
+@end lisp
+
+正如您所看到的，这是一个 @w{@code{(@var{MATCH} @var{EXPANSION}...)}} 元素的列表。  @var{match} 是匹配访问文件名的正则表达式，每个@var{expansion} 可以通过使用@samp{\\1} 等引用匹配组。  然后将生成的扩展字符串应用于文件系统，以查看是否有任何文件与此扩展匹配（解释为正则表达式）。
+
+@vindex find-file-hook
+@vindex find-file-not-found-functions
+两个特殊的钩子变量允许扩展修改访问文件的操作。  访问不存在的文件会运行@code{find-file-not-found-functions}中的函数；该变量保存一个函数列表，这些函数被一个接一个地调用（不带参数），直到其中一个返回非 1 为止。  这不是一个普通的钩子，名称以 @samp{-functions} 结尾，而不是 @samp{-hook} 来表明这一事实。
+
+成功访问任何文件，无论是否存在，都会调用@code{find-file-hook}中的函数，不带任何参数。  这个变量是一个普通的钩子。  如果文件不存在，则首先运行@code{find-file-not-found-functions}。  @xref{Hooks}。
+
+有多种方法可以自动指定编辑文件的主要模式 (@pxref{Choosing Modes})，以及指定为该文件定义的局部变量 (@pxref{File Variables})。
+
+@node Saving
+@section 保存文件
+
+@dfn{Saving} Emacs 中的缓冲区意味着将其内容写回到缓冲区中访问过的文件中。
+
+@menu
+* Save Commands::        用于保存文件的命令。
+* Backup::               Emacs 如何保存文件的旧版本。
+* Customize Save::       自定义文件的保存。
+* Interlocking::         Emacs 如何防止两个用户同时编辑一个文件。
+* Shadowing: File Shadowing.   自动将文件复制到“shadows”。
+* Time Stamps::          Emacs 可以在保存文件时更新时间戳文本。
+@end menu
+
+@node Save Commands
+@subsection 保存文件的命令
+
+这些是与保存和写入文件相关的命令。
+
+@table @kbd
+@item C-x C-s
+将当前缓冲区保存到其文件中 (@code{save-buffer})。
+@item C-x s
+将任何或所有缓冲区保存到其文件中 (@code{save-some-buffers})。
+@item M-~
+忘记当前缓冲区已更改 (@code{not-modified})。使用前缀参数 (@kbd{C-u})，将当前缓冲区标记为已更改。
+@item C-x C-w
+使用指定的文件名 (@code{write-file}) 保存当前缓冲区。
+@item M-x set-visited-file-name
+更改保存当前缓冲区的文件名。
+@item M-x rename-visited-file
+与@kbd{M-x set-visited-file-name}相同，但也重命名缓冲区正在访问的文件（如果有）。
+@end table
+
+@kindex C-x C-s
+@findex save-buffer
+当您希望保存文件并使更改永久生效时，请输入 @kbd{C-x C-s} (@code{save-buffer})。  保存完成后，@kbd{C-x C-s} 显示如下消息：
+
+@example
+Wrote /u/rms/gnu/gnu.tasks
+@end example
+
+@noindent
+如果当前缓冲区未被修改（自缓冲区创建或上次保存以来未对其进行任何更改），则保存并未真正完成，因为它不会产生任何效果。  相反，@kbd{C-x C-s} 在回显区域显示如下消息：
+
+@example
+(No changes need to be saved)
+@end example
+
+通过前缀参数 @kbd{C-u C-x C-s}，Emacs 还会标记下一次保存完成时要备份的缓冲区。  @xref{Backup}。
+
+@kindex C-x s
+@findex save-some-buffers
+命令 @kbd{C-x s} (@code{save-some-buffers}) 可以保存任何或所有修改的缓冲区。  它询问您如何处理每个缓冲区。  可能的响应类似于 @code{query-replace} 的响应：
+
+@table @kbd
+@item y
+@item @key{SPC}
+保存该缓冲区并询问其余缓冲区的情况。
+@item n
+@item @key{DEL}
+不要保存此缓冲区，但询问其余缓冲区。
+@item !
+保存此缓冲区和所有其余内容，不再有任何问题。
+@item q
+@c following generates acceptable underfull hbox
+@item @key{RET}
+终止@code{save-some-buffers}，不再保存。
+@item .
+保存此缓冲区，然后退出@code{save-some-buffers}，甚至不询问其他缓冲区。
+@item M-~
+不要保存此缓冲区，并将其标记为未修改。这类似于 @code{not-modified} 命令 (@pxref{Save Commands})。
+@item C-r
+查看当前询问您的缓冲区。  当您退出查看模式时，您将返回到@code{save-some-buffers}，它会再次询问该问题。
+@item C-f
+退出 @code{save-some-buffers} 并访问当前询问您的缓冲区。
+@item d
+将缓冲区与其相应的文件进行比较，以便您可以看到要保存的更改。  这调用命令 @code{diff-buffer-with-file} (@pxref{Comparing Files})。
+@item C-h
+显示有关这些选项的帮助消息。
+@end table
+
+@noindent
+@vindex save-some-buffers-default-predicate
+您可以自定义 @code{save-some-buffers-default-predicate} 的值来控制 Emacs 将询问哪些缓冲区。
+
+@kbd{C-x C-c}，退出 Emacs 的按键序列，调用 @code{save-some-buffers}，因此会提出相同的问题。
+
+@kindex M-~
+@findex not-modified
+如果您更改了缓冲区但不希望保存更改，则应该采取一些措施来阻止它。  否则，每次使用@kbd{C-x s}或@kbd{C-x C-c}时，您都可能会错误地保存此缓冲区。  您可以做的一件事是键入 @kbd{M-~} (@code{not-modified})，这会清除缓冲区已修改的指示。  如果这样做，则所有保存命令都不会认为需要保存缓冲区。  （@samp{~} 通常用作“not”的数学符号；因此 @kbd{M-~} 是“not”，metafied。）或者，您可以通过再次读取文件中的文本来取消自访问或保存文件以来所做的所有更改。  这称为@dfn{reverting}。  @xref{Reverting}。  （您也可以通过重复撤消命令 @kbd{C-x u} 来撤消所有更改，直到撤消所有更改；但恢复更容易。）
+
+@findex set-visited-file-name
+@kbd{M-x set-visited-file-name} 更改当前缓冲区正在访问的文件的名称。  它使用迷你缓冲区读取新文件名。  然后它将缓冲区标记为访问该文件名，并相应地更改缓冲区名称。  @code{set-visited-file-name} 不在新访问的文件中保存缓冲区；它只是更改 Emacs 内的记录，以防您稍后保存。  它还将缓冲区标记为已修改，以便该缓冲区中的@kbd{C-x C-s}保存@emph{will}。
+
+@kindex C-x C-w
+@findex write-file
+如果您希望将缓冲区标记为访问不同的文件并立即保存，请使用 @kbd{C-x C-w} (@code{write-file})。  这相当于 @code{set-visited-file-name} 后接 @kbd{C-x C-s}，只不过 @kbd{C-x C-w} 要求确认文件是否存在。 @kbd{C-x C-s}用在不访问文件的缓冲区上与@kbd{C-x C-w}具有相同的效果；也就是说，它读取文件名，将缓冲区标记为访问该文件，并将其保存在那里。  未访问文件的缓冲区中的默认文件名是通过将缓冲区名称与缓冲区的默认目录 (@pxref{File Names}) 组合而成的。
+
+如果新文件名暗示主模式，则在大多数情况下 @kbd{C-x C-w} 会切换到该主模式。  命令 @code{set-visited-file-name} 也可以执行此操作。  @xref{Choosing Modes}。
+
+如果您希望将当前缓冲区保存到另一个文件而不访问该文件，请使用@code{mark-whole-buffer} (@kbd{C-x h})，然后使用@w{@kbd{M-x write-region}} (@pxref{Misc File Ops})。
+
+如果 Emacs 即将保存文件并发现磁盘上最新版本的日期与 Emacs 最后读取或写入的日期不匹配，Emacs 会通知您这一事实，因为这可能表明存在由同时编辑引起的问题，需要您立即注意。 @xref{Interlocking,, Simultaneous Editing}。
+
+@node Backup
+@subsection 备份文件
+@cindex backup file
+@vindex make-backup-files
+
+在大多数操作系统上，重写文件会自动销毁该文件曾经包含的所有记录。  因此，从 Emacs 保存文件会丢弃文件的旧内容，或者说会丢弃，除非 Emacs 在实际保存之前小心地将旧内容复制到另一个文件（称为 @dfn{backup} 文件）。
+
+Emacs 仅在第一次从访问该文件的缓冲区保存文件时才对文件进行备份。  无论您随后保存该文件多少次，其备份都保持不变。  但是，如果您终止缓冲区然后再次访问该文件，则会创建一个新的备份文件。
+
+对于大多数文件，变量@code{make-backup-files}决定是否制作备份文件。  在大多数操作系统上，其默认值为@code{t}，因此 Emacs 会写入备份文件。
+
+对于版本控制系统（@pxref{Version Control}）管理的文件，变量@code{vc-make-backup-files}决定是否制作备份文件。  默认情况下它是@code{nil}，因为当您将所有以前的版本存储在版本控制系统中时，备份文件是多余的。
+@iftex
+@xref{General VC Options,,,emacs-xtra, Specialized Emacs Features}.
+@end iftex
+@ifnottex
+@xref{General VC Options}.
+@end ifnottex
+
+根据您的选择，Emacs 可以为每个文件保留一个备份，也可以为您编辑的每个文件创建一系列编号的备份文件。 @xref{Backup Names}。
+
+@vindex backup-enable-predicate
+@vindex temporary-file-directory
+@vindex small-temporary-file-directory
+@code{backup-enable-predicate}变量的默认值防止为由@code{temporary-file-directory}或@code{small-temporary-file-directory}指定的临时文件目录中的文件写入备份文件。
+
+您可以明确地告诉 Emacs 从缓冲区创建另一个备份文件，即使该缓冲区之前已保存过。  如果使用@kbd{C-u C-x C-s}保存缓冲区，则再次保存缓冲区时，保存的版本将成为备份文件。  @kbd{C-u C-u C-x C-s} 保存缓冲区，但首先将以前的文件内容放入新的备份文件中。  @kbd{C-u C-u C-u C-x C-s} 会做两件事：它会根据以前的内容进行备份，并在您再次保存时安排从新保存的内容进行另一个备份。
+
+@vindex backup-directory-alist
+您可以自定义变量 @code{backup-directory-alist} 来指定匹配特定模式的文件应备份到特定目录中。  典型的用途是添加一个元素 @code{("." . @var{dir})} 来使目录中的所有备份都具有绝对名称 @var{dir}。  Emacs 修改备份文件名以避免不同目录中的同名文件之间发生冲突。  或者，添加 @code{("." . ".~")} 会在原始文件目录的不可见子目录 @file{.~} 中进行备份。  如果需要，Emacs 会创建目录来进行备份。
+
+@menu
+* Names: Backup Names.           备份文件的命名方式。
+* Deletion: Backup Deletion.     Emacs 删除多余编号的备份。
+* Copying: Backup Copying.       可以通过复制或重命名来进行备份。
+@end menu
+
+@node Backup Names
+@subsubsection 单个或编号备份
+@cindex backup file names
+@cindex names of backup files
+
+@cindex @file{~}, in names of backup files
+@cindex tilde (@file{~}) at end of backup file name
+当 Emacs 制作备份文件时，其名称通常是在正在编辑的文件名后添加 @samp{~} 来构成；因此，@file{eval.c}的备份文件将是@file{eval.c~}。
+
+@cindex @file{~/.emacs.d/%backup%~}
+如果访问控制阻止 Emacs 以常用名称写入备份文件，它会将备份文件写入为 @file{~/.emacs.d/%backup%~}。此类文件只能存在一个，因此只有最近制作的此类备份可用。
+
+Emacs 也可以生成@dfn{numbered backup files}。  编号的备份文件名包含 @samp{.~}、数字以及原始文件名后的另一个 @samp{~}。  因此，@file{eval.c} 的备份文件将被称为@file{eval.c.~1~}、@file{eval.c.~2~} 等，一直到@file{eval.c.~259~} 等名称。
+
+@vindex version-control
+变量@code{version-control}决定是制作单个备份文件还是多个编号的备份文件。  其可能的值为：
+
+@table @code
+@item nil
+对已编号备份的文件进行编号备份。否则，进行单个备份。  这是默认设置。
+@item t
+进行编号备份。
+@item never
+切勿进行编号备份；始终进行单个备份。
+@end table
+
+@noindent
+设置此变量的常用方法是通过初始化文件或自定义缓冲区进行全局设置。  但是，您可以在单个缓冲区中本地设置 @code{version-control} 来控制该缓冲区文件的备份 (@pxref{Locals})。  某些模式（例如 Rmail 模式）会设置此变量。  每当您访问给定文件时，您还可以在本地设置 Emacs @code{version-control} (@pxref{File Variables})。
+
+@cindex @env{VERSION_CONTROL} environment variable
+如果您设置环境变量 @env{VERSION_CONTROL} 来告诉各种 GNU 实用程序如何处理备份文件，Emacs 也会通过在启动时相应地设置 Lisp 变量 @code{version-control} 来遵守环境变量。  如果环境变量的值为@samp{t}或@samp{numbered}，则@code{version-control}变为@code{t}；如果值为@samp{nil}或@samp{existing}，则@code{version-control}变为@code{nil}；如果是@samp{never}或@samp{simple}，那么@code{version-control}就变成@code{never}。
+
+@vindex make-backup-file-name-function
+如果将变量 @code{make-backup-file-name-function} 设置为合适的 Lisp 函数，则可以覆盖 Emacs 构建备份文件名的常用方式。
+
+@node Backup Deletion
+@subsubsection 自动删除备份
+
+为了防止过度消耗磁盘空间，Emacs 可以自动删除编号的备份版本。  通常，Emacs 会保留前几个备份和最新的几个备份，并删除中间的任何备份。  每次进行新备份时都会发生这种情况。
+
+@vindex kept-old-versions
+@vindex kept-new-versions
+两个变量@code{kept-old-versions}和@code{kept-new-versions}控制此删除。  它们的值分别是每次进行新备份时要保留的最旧（编号最小）备份的数量和要保留的最新（编号最大）备份的数量。  中间的备份（不包括最旧和最新的）是多余的中间版本——这些备份将被删除。  当需要删除多余的版本时，即在创建新的备份版本之后，将使用这些变量的值；新制作的备份包含在 @code{kept-new-versions} 的计数中。  默认情况下，两个变量均为 2。
+
+@vindex delete-old-versions
+如果 @code{delete-old-versions} 为 @code{t}，Emacs 会静默删除多余的备份文件。  如果是 @code{nil}（默认值），Emacs 会询问您是否应该删除多余的备份版本。  如果它有任何其他值，那么 Emacs 永远不会自动删除备份。
+
+Dired 的 @kbd{.}（句号）命令也可用于删除旧版本。 @xref{Flagging Many Files}。
+
+@node Backup Copying
+@subsubsection 复制与@:重命名
+
+备份文件可以通过复制旧文件或重命名来制作。当旧文件有多个名称（硬链接）时，这会产生影响。  如果旧文件被重命名为备份文件，则备用名称将成为备份文件的名称。  如果复制旧文件，则备用名称仍然是您正在编辑的文件的名称，并且通过这些名称访问的内容将是新内容。
+
+制作备份文件的方法也可能会影响文件的所有者和组。  如果使用复制，这些不会改变。  如果使用重命名，您将成为文件的所有者，并且文件的组将成为默认组（不同的操作系统有不同的默认组）。
+
+@vindex backup-by-copying
+@vindex backup-by-copying-when-linked
+@vindex backup-by-copying-when-mismatch
+@vindex backup-by-copying-when-privileged-mismatch
+@cindex file ownership, and backup
+@cindex backup, and user-id
+重命名或复制的选择如下：
+
+@itemize
+@item
+如果变量@code{backup-by-copying}非@code{nil}（默认为@code{nil}），则使用复制。
+
+@item
+否则，如果变量@code{backup-by-copying-when-linked}非@code{nil}（默认为@code{nil}），并且文件有多个名称，请使用复制。
+
+@item
+否则，如果变量 @code{backup-by-copying-when-mismatch} 不是 @code{nil}（默认为 @code{t}），并且重命名会更改文件的所有者或组，请使用复制。
+
+如果将 @code{backup-by-copying-when-mismatch} 更改为 @code{nil}，Emacs 将检查文件所有者的数字用户 ID 和文件组的数字组 ID。  如果其中任何一个不大于@code{backup-by-copying-when-privileged-mismatch}，那么它的行为就像@code{backup-by-copying-when-mismatch} 无论如何都是非@code{nil}一样。
+
+@item
+否则，重命名是默认选择。
+@end itemize
+
+当使用版本控制系统 (@pxref{Version Control}) 管理文件时，Emacs 通常不会以通常的方式对该文件进行备份。  但是 @dfn{committing}（又名@: @dfn{checking in}、@pxref{VCS Concepts}）文件的新版本在某些方面与备份类似。  一个不幸的相似之处是，这些操作通常会破坏硬链接，从而断开您访问的文件名与同一文件的任何备用名称的连接。  这与 Emacs 无关——是版本控制系统做的。
+
+某些文件存储服务支持@dfn{file versioning}：它们记录文件先前版本的历史记录，并允许恢复到先前版本。  如果您希望在使用 Emacs 编辑这些服务托管的文件时能够执行此操作，请将 @code{backup-by-copying} 自定义为非 @code{nil} 值。
+
+@vindex file-precious-flag
+在编辑珍贵文件时，复制旧文件进行备份也很有用，因为它可以确保在备份和保存编辑之间出现故障时旧文件保留其名称。  或者，您可以将 @code{file-precious-flag} 自定义为非 @code{nil} 值，这意味着通过复制进行备份，并在保存编辑时防止 I/O 错误。
+
+@node Customize Save
+@subsection 自定义文件保存
+
+@vindex require-final-newline
+如果变量 @code{require-final-newline} 的值为 @code{t}，则静默保存或写入文件会在末尾添加换行符（如果那里还没有换行符）。  如果值为 @code{visit}，Emacs 会在任何没有换行符的文件末尾添加一个换行符，就在它访问该文件之后。  （这将缓冲区标记为已修改，您可以撤消它。）如果值为 @code{visit-save}，Emacs 在访问和保存时都会添加此类换行符。  如果值为@code{nil}，Emacs 将保持文件末尾不变；任何其他非 5⁣ 值都意味着 Emacs 询问您是否添加换行符。  默认值为@code{nil}。
+
+@vindex mode-require-final-newline
+一些主要模式是为特定类型的文件设计的，这些文件总是以换行符结尾。  这些主要模式将变量@code{require-final-newline}设置为@code{mode-require-final-newline}的值，默认为@code{t}。  通过设置后一个变量，您可以控制这些模式如何处理最终换行符。
+
+@vindex file-preserve-symlinks-on-save
+如果此选项为非 @code{nil} 并且您通过符号链接访问文件，则 Emacs 将在保存缓冲区时中断符号链接，并将缓冲区写入与符号链接同名的文件中，如果 @code{file-precious-flag} 的值为非 @code{nil} (@pxref{Saving Buffers, file-precious-flag,, elisp, The Emacs Lisp Reference Manual})。  如果您希望 Emacs 在这些情况下将缓冲区保存到符号链接指向的文件（从而保留链接），请将变量 @code{file-preserve-symlinks-on-save} 自定义为 @code{t}。
+
+@vindex write-region-inhibit-fsync
+通常，当程序写入文件时，操作系统会在将数据提交到辅助存储之前将文件的数据短暂缓存在主内存中。  虽然这可以极大地提高性能，但如果系统在提交缓存之前断电，则存在数据丢失的风险，并且在某些平台上，其他进程可能不会立即注意到文件的更改。
+
+为了降低这种风险，Emacs 可以在保存文件后调用 @code{fsync} 系统调用。  使用@code{fsync}并不能消除数据丢失或通知缓慢的风险，部分原因是许多系统不正确支持@code{fsync}，部分原因是Emacs的文件保存过程通常还依赖于目录更新，即使@code{fsync}正常工作，目录更新也可能无法幸存。
+
+@code{write-region-inhibit-fsync} 变量控制 Emacs 在保存文件后是否调用 @code{fsync}。  该变量的默认值为@code{t}。
+
+Emacs 在编写自动保存文件时从不使用 @code{fsync}，因为这些文件无论如何都可能会丢失数据。
+
+@node Interlocking
+@subsection 防止同时编辑
+
+@cindex file dates
+@cindex simultaneous editing
+当两个用户访问同一个文件，都进行更改，然后都保存它们时，就会发生同时编辑。  如果没有人知道发生了这种情况，则无论哪个用户先保存，稍后都会发现他们的更改丢失了。
+
+在某些系统上，当第二个用户开始更改文件时，Emacs 会立即注意到，并立即发出警告。  在所有系统上，Emacs 都会在您保存文件时进行检查，并在您要覆盖其他用户的更改时发出警告。  您可以通过采取适当的纠正措施而不是保存文件来防止丢失其他用户的工作。
+
+@findex ask-user-about-lock
+@cindex locking files
+@cindex .#, lock file names
+@cindex file locking
+当您在访问文件的 Emacs 缓冲区中进行第一次修改时，Emacs 会记录该文件是您的@dfn{locked}。 （它通过在同一目录中创建一个具有特殊内容的特殊命名的符号链接@footnote{If your file system does not support symbolic links, a regular file is used.}来实现此目的。@xref{File Locks,,, elisp}，了解更多详细信息。）保存更改时，Emacs 会删除锁定。  这个想法是，只要访问该文件的 Emacs 缓冲区有未保存的更改，该文件就会被锁定。
+
+@vindex create-lockfiles
+您可以通过将变量 @code{create-lockfiles} 设置为 @code{nil} 来防止创建锁定文件。  @strong{Caution:} 这样做您将失去此功能提供的好处。  您还可以使用 @code{lock-file-name-transforms} 变量控制锁定文件的写入位置。
+
+@cindex collision
+如果您在访问的文件被其他人锁定时开始修改缓冲区，则会构成@dfn{collision}。  当 Emacs 检测到碰撞时，它会通过调用 Lisp 函数@code{ask-user-about-lock} 来询问您要做什么。  您可以重新定义此函数以进行定制。  该函数的标准定义会问您一个问题并接受三个可能的答案：
+
+@table @kbd
+@item s
+偷锁。  已经更改文件的人将失去锁定，而您将获得锁定。
+@item p
+继续。  尽管该文件已被其他人锁定，但仍可以继续编辑该文件。
+@item q
+辞职。  这会导致错误 (@code{file-locked})，并且缓冲区内容保持不变——您尝试进行的修改实际上并未发生。
+@end table
+
+如果 Emacs 或操作系统崩溃，这可能会留下过时的锁定文件，因此您可能偶尔会收到有关虚假冲突的警告。  当您确定碰撞是虚假的时，只需使用 @kbd{p} 告诉 Emacs 无论如何都要继续。
+
+请注意，锁定是基于文件名进行的；如果一个文件有多个名称，Emacs 不会阻止两个用户以不同的名称同时编辑该文件。
+
+在某些情况下，锁定文件无法写入，例如，如果 Emacs 缺乏系统权限或由于某些其他原因无法创建锁定文件。  在这些情况下，当您尝试保存文件时，Emacs 仍然可以通过检查文件的上次修改日期来检测冲突。  如果文件自上次 Emacs 访问或保存以来已发生更改，则意味着已通过其他方式进行了更改，并且如果 Emacs 继续保存，这些更改将会丢失。  然后，Emacs 会显示一条警告消息，并要求在保存之前进行确认；回答@kbd{yes}保存，@kbd{no}或@kbd{C-g}取消保存。
+
+如果通知您已进行同时编辑，将缓冲区与其文件进行比较的一种方法是使用 @kbd{M-x diff-buffer-with-file} 命令。  @xref{Comparing Files}。
+
+@vindex remote-file-name-inhibit-locks
+您可以通过将变量 @code{remote-file-name-inhibit-locks} 设置为 @code{t} 来防止创建远程锁定文件。
+
+@cindex lock-file-mode
+次要模式@code{lock-file-mode}，以交互方式调用，切换当前缓冲区中@code{create-lockfiles}的本地值。
+
+@node File Shadowing
+@subsection 隐藏文件
+@cindex shadow files
+@cindex file shadows
+@findex shadow-initialize
+
+您可以安排将某些文件的相同 @dfn{shadow} 副本保留在多个位置 — 可能在不同的计算机上。  为此，首先您必须设置一个@dfn{shadow file group}，它是在站点列表之间共享的一组同名文件。  该文件组是永久性的，适用于以后的 Emacs 会话以及当前的 Emacs 会话。  一旦组设置完毕，每次退出 Emacs 时，它都会将您编辑的文件复制到该组中的其他文件中。  您还可以在不退出 Emacs 的情况下通过输入 @w{@kbd{M-x shadow-copy-files}} 进行复制。
+
+@cindex shadow cluster
+@dfn{shadow cluster} 是一组共享目录的主机，因此向其中一个主机复制或从其中一个主机复制足以更新所有主机上的文件。  每个影子集群都有一个名称，并指定主主机（我们将文件复制到的主机）的网络地址，以及与集群中所有其他主机的主机名匹配的正则表达式。  您可以使用 @w{@kbd{M-x shadow-define-cluster}} 定义影子簇。
+
+@table @kbd
+@item M-x shadow-initialize
+设置文件阴影。
+@item M-x shadow-define-literal-group
+声明要在站点之间共享的单个文件。
+@item M-x shadow-define-regexp-group
+使与一组文件中的每一个文件匹配的所有文件在主机之间共享。
+@item M-x shadow-define-cluster @key{RET} @var{name} @key{RET}
+定义影子文件簇@var{name}。
+@item M-x shadow-copy-files
+复制所有挂起的影子文件。
+@item M-x shadow-cancel
+取消隐藏某些文件的指令。
+@end table
+
+要设置影子文件组，请使用@w{@kbd{M-x shadow-define-literal-group}}或@w{@kbd{M-x shadow-define-regexp-group}}。  请参阅他们的文档字符串以获取更多信息。
+
+在将文件复制到其影子之前，Emacs 会要求确认。这次您可以回答“否”来绕过该文件的复制。  如果您想永久取消某个文件的影子，请使用@w{@kbd{M-x shadow-cancel}}消除或更改影子文件组。
+
+文件隐藏在 MS Windows 上不可用。
+
+@node Time Stamps
+@subsection 自动更新时间戳
+@cindex time stamps, automatic file timestamps
+@cindex modification dates
+@cindex last modified time
+
+在文件文本中添加时间戳可以确保即使文件被复制或转换而丢失了文件系统的修改时间，也能保留写入文件的时间。时间戳也可以称为日期戳或上次修改时间。您可以安排在每次保存文件时自动更新文件中的时间戳。
+
+设置自动时间戳有两个步骤。首先，该文件需要一个时间戳模板。默认情况下，模板出现在前八行的某个位置，如下所示：
+
+@example
+Time-stamp: <>
+@end example
+
+@noindent
+或（您的选择）像这样：
+
+@example
+Time-stamp: " "
+@end example
+
+@findex time-stamp
+使用该模板后，您可以使用命令 @kbd{M-x time-stamp} 立即更新当前缓冲区的时间戳。 Emacs 编辑器将检查模板；如果找到模板，Emacs 将在尖括号或引号之间写入当前日期、时间、作者和/或其他信息。在第一个时间戳之后，该行可能如下所示：
+
+@example
+Time-stamp: <1993-07-06 11:05:14 terryg>
+@end example
+
+其次，通过将 @code{time-stamp} 添加到 @code{before-save-hook} (@pxref{Hooks})，将 Emacs 配置为在保存文件时运行 @code{time-stamp}。有两种方法可以执行此步骤：您可以
+
+@itemize
+@item
+使用 @kbd{M-x customize-option} (@pxref{Specific Customization}) 自定义选项 @code{before-save-hook}，或者
+
+@item
+编辑初始化文件 (@pxref{Init File})，添加以下行：
+@example
+(add-hook 'before-save-hook 'time-stamp)
+@end example
+@end itemize
+
+现在，每次保存文件时，Emacs 都会查找时间戳。如果缓冲区没有模板，@code{time-stamp}不执行任何操作；任何有时间戳的文件都会自动保持最新。
+
+@menu
+* Time Stamp Customization::    如何使用时间戳模式进行自定义。
+* Time Stamps for One File::    确保特定文件的自动时间戳。
+@end menu
+
+@node Time Stamp Customization
+@subsubsection 自定义时间戳
+
+@vindex time-stamp-pattern
+要自定义特定文件中的时间戳，请在该文件的局部变量列表 (@pxref{Specifying File Variables}) 中设置变量 @code{time-stamp-pattern}。您可以更改 @code{time-stamp} 将匹配的模式来识别模板，以及使用 @code{time-stamp-pattern} 在文件中的位置查找模式；有关详细信息，请参阅变量的内置文档（使用 @kbd{C-h v}、@pxref{Name Help}）。
+
+举一个简单的例子，假设您想要一份手稿注明出版年份和城市。您希望在进行修订时更新年份。您可以将这一行放在文件顶部附近：
+
+@example
+publishing_year_and_city = "Published nnnn in Boston, Mass.";
+@end example
+
+@noindent
+以及同一文件末尾的以下注释，告诉 @code{time-stamp} 如何识别和更新该自定义模板：
+
+@example
+@group
+// Local variables:
+// time-stamp-pattern: "Published %Y in Boston"
+// End:
+@end group
+@end example
+
+该模式表示时间戳开始之前的文本是“Published”，结束之后的文本是“in Boston”。如果 @code{time-stamp} 在前八行之一中找到开头和结尾，则中间的内容将按照格式（本例中为 @code{%Y}）指定的方式进行更新。  由于 @code{%Y} 请求年份，结果可能如下所示：
+
+@example
+publishing_year_and_city = "Published 2025 in Boston, Mass.";
+@end example
+
+通过指定 @code{%Y} 的格式，我们可以准确地得到替换的年份；默认格式的其他部分（日期、时间和作者）不是此示例模式的一部分，因此不会出现在结果中。
+
+更改 @code{time-stamp-pattern}（或任何文件局部变量）的值后，输入 @kbd{M-x normal-mode} 以便 Emacs 注意到。
+
+这是另一个示例，将时间戳插入 HTML 文档的最后一段。由于此模板位于文档的末尾，而不是前八行，因此 @code{time-stamp-pattern} 以 @code{-10/} 开头，告诉 @code{time-stamp} 查看最后 10 行。 @code{%%} 要求默认格式（由 @code{time-stamp-format} 指定）。
+
+@example
+@r{@dots{}}
+<p>Last modified: </p>
+</body>
+</html>
+<!--
+Local variables:
+time-stamp-pattern: "-10/Last modified: %%</p>$"
+End:
+-->
+@end example
+
+默认情况下，时间戳根据您的区域设置 (@pxref{Environment}) 和时区 (@pxref{Time of Day,,, elisp, The Emacs Lisp Reference Manual}) 进行格式化。
+@vindex time-stamp-time-zone
+设置 @code{time-stamp-time-zone} 以覆盖所使用的时区。
+@vindex time-stamp-format
+有关格式和影响它的其他变量的详细信息，请参阅变量 @code{time-stamp-format} 的内置文档。
+
+@node Time Stamps for One File
+@subsubsection 强制为一个文件添加时间戳
+
+如果您正在处理具有多个作者的文件，并且无法确定其他作者是否已在其 Emacs 初始化文件中全局启用时间戳，则可以通过将 @code{time-stamp} 添加到该文件的局部变量列表中该缓冲区的 @code{before-save-hook} 来强制为特定文件启用时间戳。扩展前面的示例之一：
+
+@example
+@group
+// Local variables:
+// eval: (add-hook 'before-save-hook 'time-stamp nil t)
+// time-stamp-pattern: "Published %Y in Boston"
+// End:
+@end group
+@end example
+
+尽管此示例显示它们都设置在一起，但如果您喜欢默认模式，则可以使用 @code{eval} 而无需设置 @code{time-stamp-pattern}。
+
+此处使用的 @code{add-hook} 的额外参数 @code{nil} 和 @code{t} 是使添加的钩子仅影响此缓冲区所必需的。
+
+@node Reverting
+@section 恢复缓冲区
+@findex revert-buffer
+@findex revert-buffer-with-fine-grain
+@cindex drastic changes
+@cindex reread a file
+
+如果您对文件访问缓冲区进行了大量更改，然后又改变了主意，则可以 @dfn{revert} 更改并返回到文件的保存版本。  为此，请输入 @kbd{C-x x g}。  由于无意中恢复可能会丢失大量工作，因此如果缓冲区被修改，Emacs 会首先要求确认。
+
+@code{revert-buffer} 命令尝试以这样的方式定位点：如果文件仅被轻微编辑，您将处于与之前大致相同的文本部分。  但如果您进行了重大更改，点可能会出现在完全不同的位置。
+
+恢复将缓冲区标记为未修改。  但是，它将恢复的更改作为单个修改添加到缓冲区的撤消历史记录中 (@pxref{Undo})。  因此，在恢复后，如果您碰巧改变主意，可以输入 @kbd{C-/} 或其别名来恢复恢复的更改。
+
+@vindex revert-buffer-with-fine-grain-max-seconds
+要更保守地恢复缓冲区，可以使用命令 @code{revert-buffer-with-fine-grain}。  该命令的作用类似于@code{revert-buffer}，但它尝试尽可能非破坏性，努力保留缓冲区中的所有标记、属性和覆盖。  由于当您进行大量更改时，以这种方式恢复可能会非常慢，因此您可以修改变量 @code{revert-buffer-with-fine-grain-max-seconds} 来指定以这种方式替换缓冲区内容所需的最大秒数。  请注意，不能确保 @code{revert-buffer-with-fine-grain} 的整个执行时间不会比这更长。
+
+某些与文件无关的缓冲区（例如 Dired 缓冲区）也可以恢复。  对他们来说，恢复意味着重新计算其内容。  使用 @kbd{C-x b} 显式创建的缓冲区无法恢复；如果您尝试，@code{revert-buffer} 会报告错误。
+
+@vindex revert-without-query
+当您编辑一个自动且频繁更改的文件时（例如，持续运行的进程的输出日志），Emacs 无需询问您即可恢复该文件可能会很有用。  要请求此行为，请将变量 @code{revert-without-query} 设置为正则表达式列表。  当文件名与这些正则表达式之一匹配时，@code{find-file}和@code{revert-buffer}将自动恢复它（如果它已更改）——前提是缓冲区本身没有被修改。  （如果您编辑了文本，则放弃所做的更改是错误的。）
+
+@kindex C-x x g
+@vindex revert-buffer-quick-short-answers
+@findex revert-buffer-quick
+@kbd{C-x x g} 键击绑定到 @code{revert-buffer-quick} 命令。  这类似于 2⁣ 命令，但提示较少。  与@code{revert-buffer}不同，当前缓冲区是否访问文件不会提示，并且缓冲区没有被修改。  它还尊重 @code{revert-buffer-quick-short-answers} 用户选项。  如果此选项不是@code{nil}，请使用较短的@kbd{y/n}查询而不是较长的@kbd{yes/no}查询。
+
+您还可以告诉 Emacs 当其访问的文件在磁盘上发生更改时自动恢复缓冲区； @pxref{Auto Revert}。
+
+@vindex major-mode-remap-alist@r{, and reverting a buffer}
+请注意，恢复缓冲区会打开适合访问缓冲区文件的主模式，如@ref{Choosing Modes}中所述。  因此，恢复缓冲区的结果实际上打开的主要模式取决于模式重新映射，并且如果您在中间自定义了@code{major-mode-remap-alist}，则可能与原始模式不同。
+
+@cindex reverting with superuser permissions
+@cindex reverting with root permissions
+@findex tramp-revert-buffer-with-sudo
+@kindex C-x x @@
+@kbd{C-x x @@} 键击绑定到 @code{tramp-revert-buffer-with-sudo} 命令。  这将再次访问该文件，但具有超级用户或 root 权限。  如果使用 @kbd{C-u} 前缀参数调用，它会提示使用默认的 @option{sudo} 之外的另一个 TRAMP 方法。  @xref{Ad-hoc multi-hops, Tramp,, tramp, The Tramp Manual}。
+
+@node Auto Revert
+@section 自动恢复：自动保持缓冲区最新
+@cindex Global Auto Revert mode
+@cindex mode, Global Auto Revert
+@cindex Auto Revert mode
+@cindex mode, Auto Revert
+@findex global-auto-revert-mode
+@findex auto-revert-mode
+@findex auto-revert-tail-mode
+
+如果该文件被另一个程序更改，则缓冲区可能会与磁盘上其访问的文件不同步。  要使其保持最新，您可以通过键入 @kbd{M-x auto-revert-mode} 启用自动恢复模式。当磁盘上访问的文件发生更改时，这会自动恢复缓冲区。  要对所有文件缓冲区执行相同的操作，请键入 @kbd{M-x global-auto-revert-mode} 以启用全局自动恢复模式。
+
+如果缓冲区有未保存的更改，或者磁盘上的文件被删除或重命名，“自动恢复”将不会恢复缓冲区。
+
+自动恢复模式的一种用途是“尾随”文件（例如系统日志），以便连续显示其他程序对该文件所做的更改。  为此，只需将点移动到缓冲区的末尾，当文件内容发生变化时它将保留在那里。但是，如果您确定文件只会在最后增长而更改，请改用“自动恢复尾部”模式 (@code{auto-revert-tail-mode})。  这样做效率更高。自动恢复尾部模式也适用于远程文件。
+
+@vindex auto-revert-verbose
+当缓冲区自动恢复时，会生成一条消息。  这可以通过将@code{auto-revert-verbose}设置为@code{nil}来抑制。
+
+@vindex auto-revert-remote-files
+自动恢复模式不会检查或恢复远程文件，因为这通常太慢。  可以通过将变量 @code{auto-revert-remote-files} 设置为非 @code{nil} 来更改此行为。
+
+@cindex file notifications
+@vindex auto-revert-use-notify
+@vindex auto-revert-interval
+默认情况下，自动恢复模式使用 @dfn{file notifications} 工作，其中文件系统中的更改由 OS@. 报告给 Emacs。您可以通过将变量 @code{auto-revert-use-notify} 自定义为 @code{nil} 值来禁用文件通知，然后 Emacs 将通过每五秒轮询一次来检查文件更改。  您可以通过变量@code{auto-revert-interval}更改轮询间隔。
+
+并非所有系统都支持文件通知；如果不支持，@code{auto-revert-use-notify} 默认为 @code{nil}。
+
+@vindex auto-revert-avoid-polling
+@vindex auto-revert-notify-exclude-dir-regexp
+默认情况下，即使使用文件通知，自动恢复模式也会定期轮询文件是否发生更改。  在许多情况下轮询是不必要的，关闭轮询可能仅依靠通知来节省电量。  为此，请将变量 @code{auto-revert-avoid-polling} 设置为非 @code{nil}。  然而，通知在某些文件系统上无效；主要是类 Unix 机器上的网络文件系统，可以从其他机器上更改文件。  对于这样的文件系统，轮询可能是必要的。要在 @code{auto-revert-avoid-polling} 为非 @code{nil} 时强制轮询，请将 @code{auto-revert-notify-exclude-dir-regexp} 设置为匹配应排除在使用通知之外的文件。
+
+在 Dired 缓冲区 (@pxref{Dired}) 中，当在缓冲区目录中创建或删除文件时，自动恢复模式会刷新缓冲区。
+
+@xref{VC Undo}，用于在版本控制下恢复到文件的早期版本的命令。  @xref{VC Mode Line}，用于访问版本控制下的文件时的自动恢复特性。
+
+@ifnottex
+@menu
+* Non-File Buffers::    Auto Reverting Non-File Buffers.
+@end menu
+@include arevert-xtra.texi
+@end ifnottex
+
+@node Auto Save
+@section 自动保存：防灾
+@cindex Auto Save mode
+@cindex mode, Auto Save
+@cindex crashes
+
+有时，Emacs 会自动将每个访问过的文件保存在单独的文件中，而不更改您实际使用的文件。  这称为@dfn{auto-saving}。  如果系统崩溃，它可以防止您丢失超过有限数量的工作。
+
+@vindex auto-save-no-message
+当 Emacs 确定到了自动保存的时间时，它会考虑每个缓冲区，如果启用了自动保存并且自上次自动保存以来它已被更改，则每个缓冲区都会自动保存。  当@code{auto-save-no-message}变量设置为@code{nil}（默认）时，如果确实有文件自动保存，则在自动保存期间，在回显区域中会显示消息@samp{Auto-saving...}；要禁用这些消息，请将变量自定义为非 @code{nil} 值。  自动保存期间发生的错误会被捕获，这样它们就不会干扰您正在输入的命令的执行。
+
+@menu
+* Files: Auto Save Files.        在您保存文件之前，实际上会在其中进行自动保存更改的文件。
+* Control: Auto Save Control.    控制自动保存的时间和频率。
+* Recover::                      从自动保存文件中恢复文本。
+@end menu
+
+@node Auto Save Files
+@subsection 自动保存文件
+
+自动保存通常不会保存在您访问过的文件中，因为保存您不想永久保存的更改可能是非常不希望的。  相反，自动保存是在名为 @dfn{auto-save file} 的不同文件中完成的，并且仅当您明确请求保存时（例如使用 @kbd{C-x C-s}），访问的文件才会更改。
+
+@cindex @file{#}, in auto-save file names
+通常，自动保存的文件名是在访问的文件名的前面和后面附加@samp{#}。  因此，访问文件@file{foo.c}的缓冲区会自动保存在文件@file{#foo.c#}中。  大多数不访问文件的缓冲区只有在您明确请求时才会自动保存；自动保存时，自动保存文件名是在缓冲区名称的前后添加@samp{#}，然后在末尾添加数字和字母以确保唯一性。  例如，您在其中撰写要发送的消息的 @file{*mail*} 缓冲区可能会自动保存在名为 @file{#*mail*#704juu} 的文件中。  自动保存文件名就是以这种方式生成的，除非您对 Emacs 的某些部分进行重新编程以执行不同的操作（函数@code{make-auto-save-file-name} 和 @code{auto-save-file-name-p}）。  当在该缓冲区中打开自动保存时，将计算用于在缓冲区中自动保存的文件名。
+
+@cindex auto-save for remote files
+@vindex auto-save-file-name-transforms
+变量 @code{auto-save-file-name-transforms} 允许对自动保存文件名进行一定程度的控制。  它允许您指定一系列正则表达式和替换来转换自动保存文件名。  默认值将远程文件 (@pxref{Remote Files}) 的自动保存文件放入本地计算机上的临时文件目录中。
+
+当您删除大缓冲区中的大部分文本时，自动保存会在该缓冲区中暂时关闭。  这是因为，如果您无意中删除了文本，您可能会发现自动保存文件包含已删除的文本会更有用。  要在发生这种情况后重新启用自动保存，请使用 @kbd{C-x C-s} 保存缓冲区，或使用 @kbd{C-u 1 M-x auto-save-mode}。
+
+@vindex auto-save-visited-mode
+如果您希望在访问的文件中而不是在单独的自动保存文件中完成自动保存，请启用全局次要模式@code{auto-save-visited-mode}。  在此模式下，自动保存与显式保存相同。  注意，该模式与上述@code{auto-save}模式正交；您可以同时启用两者。  但是，如果 @code{auto-save} 模式在某些缓冲区中处于活动状态，并且过时的 @code{auto-save-visited-file-name} 变量设置为非 @code{nil} 值，则该缓冲区将不会受到 @code{auto-save-visited-mode} 的影响。
+
+您可以使用变量@code{auto-save-visited-interval}自定义@code{auto-save-visited-mode}中自动保存操作之间的间隔；默认为五秒。 @code{auto-save-interval}和@code{auto-save-timeout}对@code{auto-save-visited-mode}没有影响。  @xref{Auto Save Control}，有关这些变量的详细信息。
+
+@vindex delete-auto-save-files
+当您将缓冲区保存在其访问的文件中时，缓冲区的自动保存文件将被删除。  （您可以通过将变量@code{delete-auto-save-files}设置为@code{nil}来禁止这种情况。）使用@kbd{C-x C-w}或@code{set-visited-file-name}更改访问的文件名会重命名任何自动保存文件以使用新的访问名称。
+
+@vindex kill-buffer-delete-auto-save-files
+默认情况下，终止缓冲区不会删除缓冲区的自动保存文件。  如果@code{kill-buffer-delete-auto-save-files}非@code{nil}，则杀死具有自动保存文件的缓冲区将使Emacs提示用户是否应删除自动保存文件。  （如果@code{delete-auto-save-files}是@code{nil}，这会被抑制。）
+
+@node Auto Save Control
+@subsection 控制自动保存
+
+@vindex auto-save-default
+@findex auto-save-mode
+每次访问文件时，如果变量 @code{auto-save-default} 为非 @code{nil}（但不在批处理模式下；@pxref{Initial Options}），则会打开该文件缓冲区的自动保存功能。  该变量的默认值是@code{t}，因此自动保存是文件访问缓冲区的常见做法。  要在当前缓冲区中切换自动保存，请输入 @kbd{M-x auto-save-mode}。  自动保存模式充当缓冲区本地次要模式 (@pxref{Minor Modes})。
+
+@vindex auto-save-interval
+Emacs 会根据自上次自动保存以来您输入的字符数定期自动保存。  变量@code{auto-save-interval}指定自动保存之间有多少个字符。  默认情况下，它是 300。Emacs 不接受太小的值：如果您将 @code{auto-save-interval} 自定义为小于 20 的值，Emacs 的行为将如同该值是 20 一样。
+
+@vindex auto-save-timeout
+当您停止打字一段时间时，也会自动保存。  默认情况下，它会在空闲 30 秒后执行此操作（此时，Emacs 也可能执行垃圾收集；@pxref{Garbage Collection,,, elisp, The Emacs Lisp Reference Manual}）。  要更改此间隔，请自定义变量@code{auto-save-timeout}。  如果当前缓冲区较长，则实际时间周期较长；这是一种启发式方法，旨在在您编辑长缓冲区时避免妨碍您，因为自动保存会花费相当多的时间。空闲期间自动保存可以完成两件事：首先，如果您离开终端一段时间，它可以确保保存您的所有工作；其次，它可以避免在您实际打字时进行一些自动保存。
+
+@vindex auto-save-visited-interval
+当 @code{auto-save-visited-mode} 启用时，Emacs 将在五秒空闲时间后自动保存文件访问缓冲区。  您可以自定义变量@code{auto-save-visited-interval}来更改空闲时间间隔。
+
+当 Emacs 遇到致命错误时，它也会自动保存。  这包括使用 @samp{kill %emacs} 等 shell 命令终止 Emacs 作业，或断开电话线或网络连接。
+
+@findex do-auto-save
+您可以使用命令 @kbd{M-x do-auto-save} 显式执行自动保存。
+
+@node Recover
+@subsection 从自动保存中恢复数据
+
+@findex recover-file
+您可以使用命令 @kbd{M-x recover-file @key{RET} @var{file} @key{RET}} 使用自动保存文件的内容来恢复丢失的数据。  这将访问@var{file}，然后（在您确认后）从其自动保存文件@file{#@var{file}#}恢复内容。然后，您可以使用@kbd{C-x C-s}保存，将恢复的文本放入@var{file}本身。  例如，要从自动保存文件 @file{#foo.c#} 恢复文件 @file{foo.c}，请执行以下操作：
+
+@example
+M-x recover-file @key{RET} foo.c @key{RET}
+yes @key{RET}
+C-x C-s
+@end example
+
+在要求确认之前，@kbd{M-x recover-file} 显示描述指定文件和自动保存文件的目录列表，以便您可以比较它们的大小和日期。  如果自动保存文件较旧，@kbd{M-x recover-file} 不会提供读取它。
+
+当@kbd{M-x recover-file}要求确认时，如果您回答@kbd{diff}或@kbd{=}，它会显示@var{file}与其自动保存文件@file{#@var{file}#}之间的差异，并重新提示您确认。
+
+@findex recover-session
+如果 Emacs 或计算机崩溃，您可以使用命令 @kbd{M-x recover-session} 从自动保存文件中恢复您正在编辑的所有文件。  这首先向您显示记录的中断会话的列表。  将光标移至您选择的位置，然后输入 @kbd{C-c C-c}。
+
+然后 @code{recover-session} 询问该会话期间正在编辑的每个文件，询问是否恢复该文件。如果您回答 @kbd{y}，它会调用 @code{recover-file}，这会按正常方式工作。  它显示原始文件及其自动保存文件的日期，并再次询问是否恢复该文件。
+
+@code{recover-session} 完成后，您选择恢复的文件将出现在 Emacs 缓冲区中。  然后你应该保存它们。  只有这样——保存它们——才能更新文件本身。
+
+@vindex auto-save-list-file-prefix
+Emacs 将有关中断会话的信息记录在目录 @file{~/.emacs.d/auto-save-list/} 中名为 @file{.saves-@var{pid}-@var{hostname}~} 的文件中。  该目录由变量@code{auto-save-list-file-prefix}确定。  如果您将 @code{auto-save-list-file-prefix} 设置为 @code{nil}，则不会记录会话以进行恢复。
+
+@node File Aliases
+@section 文件名别名
+@cindex symbolic links (visiting)
+@cindex hard links (visiting)
+
+符号链接和硬链接都使得多个文件名可以引用同一个文件。  硬链接是直接引用文件的备用名称；所有名字都同等有效，没有一个是优先的。  相比之下，符号链接是一种定义的别名：当@file{foo}是到@file{bar}的符号链接时，您可以使用任一名称来引用文件，但@file{bar}是真实名称，而@file{foo}只是一个别名。  当符号链接指向目录时，会出现更复杂的情况。
+
+@vindex find-file-existing-other-name
+@vindex find-file-suppress-same-file-warnings
+通常，如果您访问 Emacs 已经以不同名称访问的文件，Emacs 会在回显区域中显示一条消息，并使用访问该文件的现有缓冲区。  在支持硬链接或符号链接的系统上，或者在截断长文件名的系统上或在不区分大小写的文件系统上使用长文件名时，可能会发生这种情况。  您可以通过将变量 @code{find-file-suppress-same-file-warnings} 设置为非 @code{nil} 值来抑制该消息。  您可以通过将变量 @code{find-file-existing-other-name} 设置为 @code{nil} 来完全禁用此功能：然后，如果您以两个不同的名称访问同一文件，则会为每个文件名获得一个单独的缓冲区。
+
+@vindex find-file-visit-truename
+@cindex truenames of files
+@cindex file truenames
+如果变量 @code{find-file-visit-truename} 为非 @code{nil}，则为缓冲区记录的文件名是文件的 @dfn{truename} （通过将所有符号链接替换为其目标名称而创建），而不是您指定的名称。  设置@code{find-file-visit-truename}也意味着@code{find-file-existing-other-name}的效果。
+
+@cindex directory name abbreviation
+@vindex directory-abbrev-alist
+有时，目录通常是通过符号链接访问的，您可能希望 Emacs 优先显示其链接名称。  为此，请自定义@code{directory-abbrev-alist}。  此列表中的每个元素应采用 @code{(@var{from} . @var{to})} 形式，这意味着只要 @var{from} 出现在目录名称中，就用 @var{to} 替换 @var{from}。  @var{from} 字符串是正则表达式 (@pxref{Regexps})。  它与锚定在第一个字符的目录名称相匹配，并且应该以 @samp{\`} 开头（以支持嵌入换行符的目录名称，这会击败 @samp{^}）。  @var{to} 字符串应该是指向同一目录的普通绝对目录名称。  不要使用 @samp{~} 代表 @var{to} 字符串中的主目录； Emacs 单独执行这些替换。  下面是一个示例，该系统中的 @file{/home/fsf} 通常通过名为 @file{/fsf} 的符号链接访问：
+
+@example
+(("\\`/home/fsf" . "/fsf"))
+@end example
+
+@node Directories
+@section 文件目录
+
+@cindex file directory
+@cindex directory listing
+文件系统将文件分组为@dfn{directories}。  @dfn{directory listing} 是目录中所有文件的列表。  Emacs 提供了创建和删除目录的命令，以及以简短格式（仅文件名）和详细格式（包括大小、日期和其他属性）制作目录列表的命令。  Emacs 还包括一个名为 Dired 的目录浏览器功能，您可以使用 @kbd{C-x d} 调用它；参见@ref{Dired}。
+
+@table @kbd
+@item C-x C-d @var{dir-or-pattern} @key{RET}
+显示简短的目录列表 (@code{list-directory})。
+@item C-u C-x C-d @var{dir-or-pattern} @key{RET}
+显示详细的目录列表。
+@item M-x make-directory @key{RET} @var{dirname} @key{RET}
+创建一个名为@var{dirname}的新目录。
+@item M-x delete-directory @key{RET} @var{dirname} @key{RET}
+删除名为@var{dirname}的目录。  如果不为空，系统会询问您是否要递归删除它。
+@end table
+
+@findex list-directory
+@kindex C-x C-d
+显示目录列表的命令是@kbd{C-x C-d} (@code{list-directory})。  它使用迷你缓冲区读取文件名，该文件名可以是要列出的目录，也可以是要列出的文件的包含通配符的模式。  例如，
+
+@example
+C-x C-d /u2/emacs/etc @key{RET}
+@end example
+
+@noindent
+列出目录@file{/u2/emacs/etc}中的所有文件。  以下是指定文件名模式的示例：
+
+@example
+C-x C-d /u2/emacs/src/*.c @key{RET}
+@end example
+
+通常，@kbd{C-x C-d} 显示仅包含文件名的简短目录列表。  数字参数（无论值如何）告诉它创建一个详细的列表，包括大小、日期和所有者（如@samp{ls -l}）。
+
+@vindex list-directory-brief-switches
+@vindex list-directory-verbose-switches
+目录列表的文本主要是通过在较差的进程中运行 @code{ls} 来获取的。  两个 Emacs 变量控制传递给 @code{ls} 的开关：@code{list-directory-brief-switches} 是一个字符串，给出在简短列表中使用的开关（默认为 @code{"-CF"}），@code{list-directory-verbose-switches} 是一个字符串，给出在详细列表中使用的开关（默认为 @code{"-l"}）。
+
+在详细目录列表中，Emacs 添加有关包含该目录的磁盘上的可用空间量的信息。
+
+命令 @kbd{M-x delete-directory} 提示使用迷你缓冲区输入目录名称，如果目录为空则删除该目录。  如果目录不为空，系统会询问您是否要递归删除它。  在具有“垃圾箱”（或“回收站”）功能的系统上，您可以通过将变量 @code{delete-by-moving-to-trash} 更改为 @code{t} 使此命令将指定目录移动到垃圾箱，而不是直接删除它。  @xref{Misc File Ops}，了解有关使用垃圾箱的更多信息。
+
+@node Comparing Files
+@section 比较文件
+@cindex comparing files
+
+@findex diff
+@vindex diff-switches
+命令 @kbd{M-x diff} 提示使用迷你缓冲区输入两个文件名，并在名为 @file{*diff*} 的缓冲区中显示两个文件之间的差异。  这是通过运行 @command{diff} 程序，使用从变量 @code{diff-switches} 中获取的选项来实现的。 @code{diff-switches} 的值应该是一个字符串；默认值为 @code{"-u"} 来指定统一的上下文差异。
+@c Note that the actual name of the info file is diffutils.info,
+@c but it adds a dir entry for diff too.
+@c On older systems, only "info diff" works, not "info diffutils".
+@xref{Top,, Diff, diffutils, Comparing and Merging Files}，了解有关 @command{diff} 计划的更多信息。
+
+@code{diff} 命令的输出使用称为 Diff 模式的主要模式显示。  @xref{Diff Mode}。
+
+一个（更复杂的）替代方案是 @kbd{M-x ediff} (@pxref{Top, Ediff, Ediff, ediff, The Ediff Manual})。
+
+@findex diff-backup
+命令 @kbd{M-x diff-backup} 将指定文件与其最近的备份进行比较。  如果指定备份文件的名称，@code{diff-backup} 会将其与作为备份的源文件进行比较。  在所有其他方面，这与 @kbd{M-x diff} 类似。
+
+@findex diff-buffer-with-file
+命令@kbd{M-x diff-buffer-with-file}将指定的缓冲区与其相应的文件进行比较。  这显示了如果保存缓冲区将对文件进行哪些更改。
+
+@findex diff-buffers
+命令@kbd{M-x diff-buffers}比较两个指定缓冲区的内容。
+
+@findex compare-windows
+命令 @kbd{M-x compare-windows} 将当前窗口中的文本与选择当前窗口之前所选窗口中的文本进行比较。  （有关 Emacs 中窗口的更多信息，@pxref{Windows}。）在将标记环 (@pxref{Mark Ring}) 上的每个初始点值推入其各自的缓冲区后，比较从每个窗口中的点开始。  然后它在每个窗口中向前移动点，一次一个字符，直到到达不匹配的字符。  然后命令退出。
+
+如果命令启动时两个窗口中的 point 后面跟着不匹配的文本，则 @kbd{M-x compare-windows} 会试探性地尝试前进到两个窗口中的匹配文本，然后退出。  因此，如果您重复使用 @kbd{M-x compare-windows} (@pxref{Repeating})，每次它都会跳过一个匹配范围或找到另一个匹配范围的开头。
+
+@vindex compare-ignore-case
+@vindex compare-ignore-whitespace
+使用数字参数时，@code{compare-windows} 会忽略空格的变化。  如果变量 @code{compare-ignore-case} 不是 @code{nil}，则比较也会忽略大小写差异。如果变量 @code{compare-ignore-whitespace} 是非 @code{nil}，则 @code{compare-windows} 默认情况下会忽略空格中的更改，但前缀参数会在该命令的单次调用中关闭该更改。
+
+@cindex Smerge mode
+@findex smerge-mode
+@cindex failed merges
+@cindex merges, failed
+@cindex comparing 3 files (@code{diff3})
+您可以使用 @kbd{M-x smerge-mode} 打开 Smerge 模式，这是一种用于编辑 @command{diff3} 程序输出的次要模式。  这通常是由于文件更改冲突而导致 VC 外部版本控制系统更新合并失败的结果。  Smerge 模式提供了通过选择特定更改来解决冲突的命令。
+
+@iftex
+@xref{Emerge,,, emacs-xtra, Specialized Emacs Features},
+@end iftex
+@ifnottex
+@xref{Emerge},
+@end ifnottex
+用于 Emerge 工具，它提供了用于合并文件的强大界面。
+
+@node Diff Mode
+@section 差异模式
+@cindex Diff mode
+@findex diff-mode
+@cindex patches, editing
+
+Diff 模式是用于输出 @kbd{M-x diff} 和其他类似命令的主要模式。  这种输出称为 @dfn{patch}，因为它可以传递给 @command{patch} 命令以自动应用指定的更改。  要手动选择 Diff 模式，请输入 @kbd{M-x diff-mode}。
+
+@cindex hunk, diff
+补丁中指定的更改被分组为 @dfn{hunks}，它们是包含一个或多个更改行的连续文本块。 Hunks 通常还包含未更改的行来为更改提供上下文。  每个块前面都有一个@dfn{hunk header}，它指定块发生更改的旧行号和新行号。 Diff 模式突出显示每个块标头，以将其与块的实际内容区分开。
+
+补丁中的第一个块前面是文件头，其中显示文件的新旧版本的名称及其时间戳。  如果补丁显示多个文件的更改，则每个文件在该文件的第一个更改之前都有这样的标头。
+
+@vindex diff-update-on-the-fly
+您可以像编辑任何其他缓冲区一样编辑 Diff 模式缓冲区。  （如果它是只读的，您需要先将其设置为可写；请参阅@ref{Misc Buffer}。）每当您编辑块时，Diff 模式都会尝试自动更正块标头中的行号，以确保补丁保持正确，并且仍然可以由 @command{patch} 应用。  要禁用自动行号校正，请将变量 @code{diff-update-on-the-fly} 更改为 @code{nil}。
+
+Diff 模式安排 @kbd{M-g M-n} 和其他处理错误消息的命令 (@pxref{Compilation Mode}) 将块视为编译器错误消息。  因此，您可以使用编译模式命令来访问相应的源位置。
+
+此外，Diff 模式提供以下命令来导航、操作和应用补丁的各个部分：
+
+@table @kbd
+@findex diff-hunk-next
+@item M-n
+移动到下一个大块开始 (@code{diff-hunk-next})。  使用前缀参数@var{n}，向前移动到下一个@var{n}块。
+
+@vindex diff-refine
+默认情况下，Diff 模式会在 Emacs 显示它们时自动 @dfn{refines} 块，以更好的粒度突出显示它们的更改。或者，如果您将 @code{diff-refine} 设置为符号 @code{navigation}，则 Diff 模式仅细化您使用此命令或使用 @code{diff-hunk-prev} 移动到的块。  最后，您可以将 @code{diff-refine} 设置为 @code{nil} 并使用 @kbd{C-c C-b} (@code{diff-refine-hunk}) 手动优化块，如下所述。
+
+@cindex shadow cursor (Diff mode)
+@vindex smerge-refine-shadow-cursor
+默认情况下，以任何方式精炼块都会在精炼区域的两个边缘之一显示 @dfn{shadow cursor}，以更好地显示精炼区域的开始或结束位置。  这可以通过自定义变量 @code{smerge-refine-shadow-cursor} 来控制。
+
+@findex diff-hunk-prev
+@item M-p
+移至上一个块开始 (@code{diff-hunk-prev})。  使用前缀参数@var{n}，移回到前一个@var{n}块。  与 @kbd{M-n} 一样，如果您将 @code{diff-refine} 设置为符号 @code{navigation}，则此命令会优化您移动到的块。
+
+@findex diff-file-next
+@item M-@}
+移至多文件补丁中的下一个文件开头 (@code{diff-file-next})。  使用前缀参数@var{n}，向前移动到第 @var{n} 个下一个文件的开头。
+
+@findex diff-file-prev
+@item M-@{
+移动到多文件补丁中的上一个文件开头 (@code{diff-file-prev})。  使用前缀参数 @var{n}，移回到前一个文件 @var{n} 的开头。
+
+@findex diff-hunk-kill
+@item M-k
+在点 (@code{diff-hunk-kill}) 杀死大块头。  如果该区域处于活动状态，则杀死该区域重叠的所有大块头。
+
+@findex diff-file-kill
+@item M-K
+在多文件补丁中，杀死当前文件部分。 (@code{diff-file-kill})。
+
+@findex diff-apply-hunk
+@cindex patches, applying
+@cindex reverse-apply diffs
+@item C-c C-a
+将此块应用到其目标文件 (@code{diff-apply-hunk})。  使用 @kbd{C-u} 的前缀参数，恢复该块，即 @: 应用该块的相反内容，将“新”版本更改为“旧”版本。  如果@code{diff-jump-to-old-file}不是@code{nil}，则将块应用到文件的“旧”版本。
+
+@code{diff-apply-hunk} 提示您确认删除文件并将块应用到备份文件，并且它提供反向应用已应用的块。  但是，如果该区域处于活动状态，它将应用该区域重叠的所有块，而不进行任何提示。  在此模式下，如果任何块没有完全应用，并且不确认删除或将块应用到备份文件，它就会失败。
+
+@findex diff-revert-and-kill-hunk
+@item C-c M-u
+恢复该块，然后从差异中删除该块 (@code{diff-revert-and-kill-hunk})。  保存访问目标文件的缓冲区。  当该区域处于活动状态时，该命令会反向应用并杀死该区域重叠的块。
+
+该命令在 @w{@kbd{C-x v =}} 和 @w{@kbd{C-x v D}} (@pxref{Old Revisions}) 生成的缓冲区中很有用。  这些缓冲区为您提供了所做更改的视图，并且您可以使用此命令撤消您不打算执行或不再需要的更改。
+
+这是一个破坏性操作，因此默认情况下，此命令会要求您确认是否确实要恢复并杀死该块。  您可以自定义 @code{diff-ask-before-revert-and-kill-hunk} 来控制它。
+
+@findex diff-apply-buffer
+@item C-c @key{RET} a
+应用缓冲区中的所有块 (@code{diff-apply-buffer})。  如果该区域处于活动状态，则应用该区域重叠的所有块；否则，适用所有帅哥。  使用前缀参数，反向应用帅哥。如果成功应用差异，请保存更改的缓冲区。
+
+@findex diff-delete-other-hunks
+@item C-c @key{RET} n
+删除当前帅哥以外的帅哥。  如果该区域处于活动状态，则此命令会删除该区域重叠的块；否则它会删除除当前块之外的所有块。  此命令在缩小的缓冲区中不起作用，因为安全删除块需要访问缓冲区中指定块文件名的部分。
+
+@findex diff-refine-hunk
+@item C-c C-b
+以更细的粒度 (@code{diff-refine-hunk}) 突出显示该点的块的变化。  这使您可以准确查看每条更改行的哪些部分实际上已更改。  默认情况下，精炼块会在精炼区域的两个边缘之一显示“阴影光标”。
+
+@vindex diff-refine
+默认情况下，Diff 模式会在 Emacs 显示块时对其进行细化，因此如果您将 @code{diff-refine} 自定义为非默认值，您可能会发现此命令很有用。
+
+@findex diff-goto-source
+@vindex diff-jump-to-old-file
+@item C-c C-c
+转到与该块对应的源文件和行 (@code{diff-goto-source})。  默认情况下，这会跳转到文件的“新”版本，即文件头中第一个显示的版本。使用前缀参数，跳转到“旧”版本。  如果@code{diff-jump-to-old-file}非@code{nil}，则此命令默认跳转到“旧”文件，并且前缀参数的含义相反。  如果前缀参数是大于 8 的数字（例如，如果您键入 @kbd{C-u C-u C-c C-c}），则此命令还会为下一次调用设置 @code{diff-jump-to-old-file}。
+
+如果源文件受版本控制（@pxref{Version Control}），则默认跳转到工作文件。  使用前缀参数，跳转到与 diff 的旧版本或新版本之一对应的源代码，如下所示：
+@itemize @minus
+@item
+如果点位于旧的更改行上（即@:已删除的行），则以@kbd{C-x v ~}（@code{vc-revision-other-window};@pxref{Old Revisions}）的方式跳转到旧的源文件；
+@item
+否则，通过访问工作文件或@kbd{C-x v ~}的方式跳转到新的源文件。
+@end itemize
+
+@findex diff-ediff-patch
+@item C-c C-e
+使用补丁 (@code{diff-ediff-patch}) 启动 Ediff 会话。 @xref{Top, Ediff, Ediff, ediff, The Ediff Manual}。
+
+@findex diff-restrict-view
+@item C-c C-n
+将视图限制为当前块 (@code{diff-restrict-view})。 @xref{Narrowing}。  使用前缀参数，将视图限制为多文件补丁的当前文件。  要再次加宽，请使用 @kbd{C-x n w} (@code{widen})。
+
+@findex diff-reverse-direction
+@item C-c C-r
+反转整个缓冲区的比较方向 (@code{diff-reverse-direction})。  使用前缀参数，仅在当前区域 (@pxref{Mark}) 内反转方向。  反转方向意味着更改块和文件开始标头以生成一个补丁，将“新”版本更改为“旧”版本。
+
+@findex diff-split-hunk
+@item C-c C-s
+将点 (@code{diff-split-hunk}) 处的块分成两个单独的块。  这会插入一个块头并修改当前块的头。  此命令对于手动编辑补丁很有用，并且仅适用于由 @command{diff} 程序的 @option{-u} 或 @option{--unified} 选项生成的 @dfn{unified diff format}。  如果您需要将 @option{-c} 或 @option{--context} 选项生成的 @dfn{context diff format} 中的块拆分为 @command{diff}，请首先使用 @kbd{C-c C-u} 将缓冲区转换为统一 diff 格式。
+
+@findex diff-unified->context
+@item C-c C-d
+将整个缓冲区转换为 @dfn{context diff format} (@code{diff-unified->context})。  使用前缀参数，仅转换该区域内的块。
+
+@findex diff-context->unified
+@item C-c C-u
+将整个缓冲区转换为统一 diff 格式 (@code{diff-context->unified})。  使用前缀参数，将统一格式转换为上下文格式。  当标记处于活动状态时，仅转换该区域内的帅哥。
+
+@findex diff-refresh-hunk
+@item C-c C-l
+重新生成当前块 (@code{diff-refresh-hunk})。
+
+@vindex diff-ignore-whitespace-switches
+@findex diff-ignore-whitespace-hunk
+@item C-c C-w
+重新生成当前块，忽略空白的变化。使用非@code{nil}前缀arg，重新生成所有的帅哥（@code{diff-ignore-whitespace-hunk}）。  这会使用 @code{diff-ignore-whitespace-switches} 调用 @code{diff-command}，默认为 @samp{-b}，这意味着仅忽略空白中的更改。
+
+@findex diff-add-change-log-entries-other-window
+@findex add-change-log-entry-other-window@r{, in Diff mode}
+@item C-x 4 A
+为每个块 (@code{diff-add-change-log-entries-other-window}) 生成一个变更日志条目，就像 @kbd{C-x 4 a} 所做的那样 (@pxref{Change Log})。  这将创建更改日志的框架，您稍后可以用更改的实际描述来填充该框架。  @kbd{C-x 4 a} 本身在 Diff 模式下代表当前块的文件进行操作，但从补丁本身获取函数名称。  这对于为补丁删除的函数创建日志条目非常有用。
+@end table
+
+@c Trailing whitespace is NOT shown by default.
+@c Emacs's dir-locals file enables this (for some reason).
+@cindex trailing whitespace, in patches
+@findex diff-delete-trailing-whitespace
+补丁有时会在修改的行上包含尾随空格，这是一种无意且不需要的更改。  有两种方法可以解决这个问题。  首先，如果您在 Diff 缓冲区 (@pxref{Useless Whitespace}) 中启用空白模式，它会自动突出显示修改行中的尾随空白。  其次，您可以使用命令 @kbd{M-x diff-delete-trailing-whitespace}，该命令在修补程序修改的行中搜索尾随空格，并删除修补程序和修补后的源文件中的该空格。该命令不会保存所做的修改，因此您可以决定是否保存更改（修改的文件列表显示在回显区域中）。  使用前缀参数，它尝试修改原始（“旧”）源文件而不是修补后的（“新”）源文件。
+
+@vindex diff-font-lock-syntax
+如果@code{diff-font-lock-syntax}非@code{nil}，则 hunk 中的源片段将根据适当的主要模式突出显示。
+
+@node Copying and Naming
+@section 复制、命名和重命名文件
+
+Emacs 有多个用于复制、命名和重命名文件的命令。它们都使用迷你缓冲区读取两个文件名，@var{old}（或@var{target}）和@var{new}，然后相应地复制或调整文件名；他们不接受通配符文件名。
+
+在所有这些命令中，如果参数 @var{new} 只是目录名称 (@pxref{Directory Names,,, elisp, the Emacs Lisp Reference Manual})，则真正的新名称位于该目录中，具有与 @var{old} 相同的非目录组件。  例如，命令 @w{@kbd{M-x rename-file @key{RET} ~/foo @key{RET} /tmp/ @key{RET}}} 将 @file{~/foo} 重命名为 ⁣​​5⁣。  在 GNU 和其他类似 POSIX 的系统上，目录名称以 @samp{/} 结尾。
+
+当新文件名已经存在时，所有这些命令都要求确认。
+
+@findex copy-file
+@cindex copying files
+@kbd{M-x copy-file} 将文件 @var{old} 的内容复制到文件 @var{new}。
+
+@vindex copy-directory-create-symlink
+@findex copy-directory
+@kbd{M-x copy-directory} 复制目录，类似于 @command{cp -r} shell 命令。  如果 2⁣ 是目录名称，则会创建 3⁣ 目录的副本并将其放入 @var{new} 中。否则，它将 @var{old} 的所有内容复制到名为 @var{new} 的新目录中。  如果@code{copy-directory-create-symlink}不是@code{nil}并且@var{old}是符号链接，则此命令将复制符号链接。  如果@code{nil}，此命令将跟随链接并复制内容。  （这是默认设置。）
+
+@cindex renaming files
+@findex rename-file
+@kbd{M-x rename-file} 将文件 @var{old} 重命名为 ⁣​​2⁣。  如果文件名@var{new}已经存在，必须用@kbd{yes}确认，否则重命名不会完成；这是因为重命名会导致 @var{new} 这个名称的旧含义丢失。  如果@var{old}和@var{new}位于不同的文件系统上，则文件@var{old}将被复制并删除。
+
+@ifnottex
+  If a file is under version control (@pxref{Version Control}), you
+should rename it using @w{@kbd{C-x v R}} instead of
+@w{@kbd{M-x rename-file}}.  @xref{VC Delete/Rename}.
+@end ifnottex
+
+@findex add-name-to-file
+@cindex hard links (creation)
+@kbd{M-x add-name-to-file} 向现有文件添加附加名称，而不删除旧名称。  新名称被创建为现有文件的硬链接。  新名称必须属于该文件所在的同一文件系统。  在 MS-Windows 上，仅当文件驻留在 NTFS 文件系统中时此命令才有效。  在 MS-DOS 和某些远程系统类型上，它通过复制文件来工作。
+
+@findex make-symbolic-link
+@cindex symbolic links (creation)
+@kbd{M-x make-symbolic-link} 创建一个名为 @var{new} 的符号链接，它指向 @var{target}。  其效果是，将来尝试打开文件 @var{new} 将引用打开完成时名为 @var{target} 的任何文件，或者如果当时名称 @var{target} 不存在，则会出现错误。  该命令不会扩展参数@var{target}，因此它允许您指定相对名称作为链接的目标。  但是，此命令会扩展 @var{target} 中的前导 @samp{~}，以便您可以轻松指定主目录，并删除前导 @samp{/:}，以便您可以指定以文字 @samp{~} 或 @samp{/:} 开头的相对名称。 @xref{Quoted File Names}。  在 MS-Windows 上，此命令仅适用于 MS Windows Vista 及更高版本。  当@var{new}为远程时，它的工作方式取决于系统类型。
+
+@node Misc File Ops
+@section 杂项文件操作
+
+Emacs 具有用于对文件执行许多其他操作的命令。全部操作在一个文件上；他们不接受通配符文件名。
+
+@findex delete-file
+@cindex deletion (of files)
+@kbd{M-x delete-file} 提示输入文件并将其删除。  如果要删除一个目录中的多个文件，使用 Dired 可能比使用 @code{delete-file} 更方便。  @xref{Dired Deletion}。
+
+@cindex trash
+@cindex recycle bin
+@findex move-file-to-trash
+@kbd{M-x move-file-to-trash} 将文件移动到系统@dfn{Trash}（或@dfn{Recycle Bin}）。  大多数操作系统都可以使用此功能；如果您改变主意，移入废纸篓的文件可以稍后取回。  （恢复已删除文件的方式取决于系统。）
+
+@vindex delete-by-moving-to-trash
+默认情况下，Emacs 删除命令 @emph{not} 使用废纸篓。  要使用垃圾箱（如果可用）执行常见删除命令，请将变量 @code{delete-by-moving-to-trash} 更改为 @code{t}。这会影响命令 @kbd{M-x delete-file} 和 @kbd{M-x delete-directory} (@pxref{Directories})，以及 Dired 中的删除命令 (@pxref{Dired Deletion})。  为 @kbd{M-x delete-file} 或 @kbd{M-x delete-directory} 提供前缀参数会使它们直接删除，而不是使用垃圾箱，无论 @code{delete-by-moving-to-trash} 如何。
+
+如果您设置了 @code{delete-by-moving-to-trash}，并且想要在 Emacs 中从 Trash 目录中手动删除文件，那么使用 @kbd{D} (@code{dired-do-delete}) 之类的命令在 Trash 目录中效果不佳（它只会为文件提供一个新名称，但不会删除任何内容）。  如果您希望能够执行此操作，您应该在 Trash 目录中创建一个包含类似以下内容的 @code{.dir-locals.el} 文件：
+
+@example
+((dired-mode . ((delete-by-moving-to-trash . nil))))
+@end example
+
+但请注意，如果您使用系统“清空垃圾箱”命令，它也可能会删除此 @code{.dir-locals.el} 文件，因此只有在手动从“垃圾箱”目录中删除文件时才应执行此操作。
+
+@vindex remote-file-name-inhibit-delete-by-moving-to-trash
+如果变量 @code{remote-file-name-inhibit-delete-by-moving-to-trash} 为非 @code{nil}，则远程文件永远不会移至垃圾箱。  相反，它们会被删除。
+
+@ifnottex
+  If a file is under version control (@pxref{Version Control}), you
+should delete it using @kbd{M-x vc-delete-file} instead of @kbd{M-x
+delete-file}.  @xref{VC Delete/Rename}.
+@end ifnottex
+
+@kindex C-x i
+@findex insert-file
+@kbd{M-x insert-file}（也称为@kbd{C-x i}）将指定文件内容的副本插入到当前缓冲区的 point 中，使内容之前的 point 保持不变。  插入内容之后的位置将添加到标记环中，而不激活标记 (@pxref{Mark Ring})。
+
+@findex insert-file-literally
+@kbd{M-x insert-file-literally} 类似于 @kbd{M-x insert-file}，只不过文件是按字面插入的：它被视为 @acronym{ASCII} 字符的序列，没有特殊编码或转换，类似于 @kbd{M-x find-file-literally} 命令 (@pxref{Visiting})。
+
+@findex write-region
+@kbd{M-x write-region}是@kbd{M-x insert-file}的倒数；它将区域的内容复制到指定的文件中。  @kbd{M-x append-to-file} 将区域文本添加到指定文件的末尾。  @xref{Accumulating Text}。  变量@code{write-region-inhibit-fsync}适用于这些命令以及保存文件；参见@ref{Customize Save}。
+
+@findex set-file-modes
+@cindex file modes
+@cindex file permissions
+@kbd{M-x set-file-modes} 读取后跟 @dfn{file mode} 的文件名，并将该文件模式应用于指定文件。  文件模式，也称为@dfn{file permissions}，决定文件是否可以读取、写入或执行，以及由谁读取、写入或执行。  该命令使用 @command{chmod} 命令接受的相同符号或八进制格式读取文件模式；例如@samp{u+x}表示为拥有该文件的用户添加执行权限。  它对不支持文件模式的操作系统没有影响。  @code{chmod} 是该函数的方便别名。
+
+@node Compressed Files
+@section 访问压缩文件
+@cindex compression
+@cindex uncompression
+@cindex Auto Compression mode
+@cindex mode, Auto Compression
+@pindex gzip
+
+当您访问压缩文件时，Emacs 会自动解压缩它们；如果您更改并保存它们，Emacs 也会自动重新压缩它们。  Emacs 通过文件名来识别压缩文件。  以@samp{.gz}结尾的文件名表示使用@code{gzip}压缩的文件。  其他结尾表示其他压缩程序。
+
+自动解压缩和压缩适用于 Emacs 使用文件内容的所有操作。  这包括访问它、保存它、将其内容插入缓冲区、加载它以及字节编译它。
+
+@findex auto-compression-mode
+@vindex auto-compression-mode
+要禁用此功能，请键入命令@kbd{M-x auto-compression-mode}。  您可以通过自定义变量@code{auto-compression-mode}来永久禁用它。
+
+@node File Archives
+@section 文件档案
+@cindex mode, tar
+@cindex Tar mode
+@cindex file archives
+
+名称以 @samp{.tar} 结尾的文件通常是由 @code{tar} 程序创建的 @dfn{archive}。  Emacs 以一种称为 Tar 模式的特殊模式查看这些文件，该模式提供类似 Dired 的内容列表 (@pxref{Dired})。  您可以像在 Dired 中一样浏览列表，并访问存档中包含的子文件。但是，并非所有 Dired 命令都在 Tar 模式下可用。
+
+如果启用自动压缩模式 (@pxref{Compressed Files})，则 Tar 模式也用于压缩存档 — 扩展名为 @samp{.tgz}、@code{.tar.Z} 和 @code{.tar.gz} 的文件。
+
+键 @kbd{e}、@kbd{f} 和 @key{RET} 都将组件文件提取到自己的缓冲区中。  您可以在那里编辑它，如果保存缓冲区，编辑后的版本将替换 Tar 缓冲区中的版本。用鼠标单击 Tar 缓冲区中的文件名也会产生同样的效果。  @kbd{v} 在查看模式下将文件提取到缓冲区中 (@pxref{View Mode})。  @kbd{o} 提取文件并将其显示在另一个窗口中，以便您可以同时编辑文件和操作存档。
+
+@kbd{I} 键将新的（常规）文件添加到存档中。  该文件最初是空的，但可以使用上面的命令轻松编辑。  该命令将新文件插入到当前文件之前，因此在 Tar 缓冲区的最上面一行使用它会使新文件成为存档中的第一个文件，在缓冲区末尾使用它会使其成为最后一个文件。
+
+当您稍后使用 @kbd{x} 时，@kbd{d} 标记要删除的文件，@kbd{u} 取消标记文件，如 Dired 中。  @kbd{C} 将文件从存档复制到磁盘，@kbd{R} 重命名存档中的文件。 @kbd{g} 从磁盘上的存档恢复缓冲区。  键 @kbd{M}、@kbd{G} 和 @kbd{O} 分别更改文件的权限位、组和所有者。
+
+保存 Tar 缓冲区会将新版本的存档以及您对组件所做的更改写入磁盘。
+
+使用 Tar 模式不需要 @code{tar} 程序——Emacs 直接读取档案。  但是，访问压缩档案需要适当的解压缩程序。
+
+@cindex Archive mode
+@cindex mode, archive
+@pindex arc
+@pindex jar
+@pindex zip
+@pindex rar
+@pindex lzh
+@pindex zoo
+@pindex 7z
+@cindex Java class archives
+@cindex unzip archives
+单独但类似的存档模式用于 @code{arc}、@code{jar}、@code{lzh}、@code{zip}、@code{rar}、@code{7z} 和 @code{zoo} 存档以及自解压可执行文件的 @code{exe} 文件。
+
+Archive 模式的按键绑定与 Tar 模式类似，增加了 @kbd{m} 键用于标记后续操作的文件，以及 @kbd{M-@key{DEL}} 取消标记所有标记的文件。此外，@kbd{a} 键可切换详细文件信息的显示，对于那些无法在一行中容纳的存档类型。  仅某些存档格式支持重命名子文件或更改其模式或所有者等操作。
+
+与 Tar 模式不同，Archive 模式运行存档程序来解压和重新打包存档。  但是，您不需要这些程序来查看存档目录，只需提取或操作存档中的子文件即可。  程序名称及其选项的详细信息可以在 @samp{Archive} 自定义组 (@pxref{Customization Groups}) 中设置。
+
+@node Remote Files
+@section 远程文件
+
+@cindex Tramp
+@cindex FTP
+@cindex remote file access
+您可以使用特殊的文件名语法引用其他计算机上的文件：
+
+@example
+@group
+/@var{method}:@var{host}:@var{filename}
+/@var{method}:@var{user}@@@var{host}:@var{filename}
+/@var{method}:@var{user}@@@var{host}#@var{port}:@var{filename}
+@end group
+@end example
+
+@noindent
+为了执行此请求，Emacs 使用远程登录程序，例如 @command{ssh}。您必须始终在文件名中指定要使用的方法，例如，@file{/ssh:@var{user}@@@var{host}:@var{filename}} 使用@command{ssh}。  当您在文件名中指定伪方法 @samp{-} 时，Emacs 将选择该方法，如下所示：
+
+@enumerate
+@item
+如果主机名以 @samp{ftp.} （带点）开头，Emacs 使用 FTP。
+@item
+如果用户名是 @samp{ftp} 或 @samp{anonymous}，Emacs 使用 FTP。
+@item
+如果变量 @code{tramp-default-method} 设置为 @samp{ftp}，Emacs 使用 FTP。
+@item
+如果 @command{ssh-agent} 正在运行，Emacs 将使用 @command{scp}。
+@item
+否则，Emacs 使用 @command{ssh}。
+@end enumerate
+
+@cindex disabling remote files
+@cindex inhibit-remote-files
+@noindent
+您可以通过运行@kbd{M-x inhibit-remote-files}来完全关闭远程文件名功能。  在个别情况下，您可以通过用 @samp{/:} (@pxref{Quoted File Names}) 引用文件名来关闭该功能。
+
+@cindex @code{ange-ftp}
+通过 FTP 的远程文件访问由 Ange-FTP 包处理，如下所述。  通过其他方法进行的远程文件访问由 Tramp 包处理，该包有自己的手册。 @xref{Top, The Tramp Manual,, tramp, The Tramp Manual}。
+
+@vindex ange-ftp-default-user
+@cindex user name for remote file access
+当使用 Ange-FTP 包时，Emacs 使用名称 @var{user} 通过 FTP 登录（如果远程文件名中指定了该名称）。  如果未指定 @var{user}，Emacs 将使用您在本地系统上的用户名登录；但如果将变量 @code{ange-ftp-default-user} 设置为字符串，则会使用该字符串。  登录时，Emacs 也可能会要求输入密码。
+
+@cindex backups for remote files
+@vindex ange-ftp-make-backup-files
+出于性能原因，Emacs 默认情况下不会为通过 FTP 访问的文件创建备份文件。  为此，请将变量 @code{ange-ftp-make-backup-files} 更改为非 @code{nil} 值。
+
+默认情况下，远程文件的自动保存文件是在本地计算机上的临时文件目录中创建的，由变量@code{auto-save-file-name-transforms}指定。  @xref{Auto Save Files}。
+
+@cindex anonymous FTP
+@vindex ange-ftp-generate-anonymous-password
+要访问可通过匿名 FTP 访问的文件，您可以使用特殊用户名 @samp{anonymous} 或 @samp{ftp}。  这些用户名的密码经过特殊处理。  变量 @code{ange-ftp-generate-anonymous-password} 控制发生的情况：如果该变量的值是字符串，则该字符串用作密码；如果非 @code{nil} （默认值），则使用 @code{user-mail-address} 的值；如果 @code{nil}，则 Emacs 会照常提示您输入密码 (@pxref{Passwords})。
+
+@cindex firewall, and accessing remote files
+@cindex gateway, and remote file access with @code{ange-ftp}
+@vindex ange-ftp-smart-gateway
+@vindex ange-ftp-gateway-host
+有时您可能无法访问远程计算机上的文件，因为出于安全原因，中间的 @dfn{firewall} 会阻止连接。  如果您可以登录可访问目标文件 @emph{are} 的 @dfn{gateway} 计算机，并且其 FTP 服务器支持网关功能，则您仍然可以使用远程文件名；您所要做的就是通过设置变量 @code{ange-ftp-gateway-host} 来指定网关计算机的名称，并将 @code{ange-ftp-smart-gateway} 设置为 @code{t}。  否则，您也许可以使远程文件名起作用，但过程很复杂。  您可以通过输入 @kbd{M-x finder-commentary @key{RET} ange-ftp @key{RET}} 来阅读说明。
+
+@node Quoted File Names
+@section 引用的文件名
+
+@cindex quoting file names
+@cindex file names, quote special characters
+您可以 @dfn{quote} 绝对文件名，以防止其中的特殊字符和语法产生特殊效果。方法是在开头添加@samp{/:}。
+
+例如，您可以引用看似远程的本地文件名，以防止将其视为远程文件名。  因此，如果您有一个名为 @file{/foo:} 的目录和一个名为 @file{bar} 的文件，则可以在 Emacs 中将该文件引用为 @samp{/:/foo:/bar}。
+
+如果您只想引用远程文件名本地部分中的特殊字符，则可以仅引用本地部分。 @samp{/ssh:baz:/:/foo:/bar}指主机@file{baz}上目录@file{/foo:}的文件@file{bar}。
+
+@samp{/:} 还可以防止 @samp{~} 被视为用户主目录的特殊字符。  例如，@file{/:/tmp/~hack}指目录@file{/tmp}中名称为@file{~hack}的文件。如果 @samp{~} 位于文件名的开头，则必须用 @samp{/:./} 引起来，如 @samp{/:./~foo/bar} 所示。
+
+用 @samp{/:} 引用也是在迷你缓冲区中输入包含 @samp{$} 的文件名的一种方法。  为了使其工作，@samp{/:} 必须位于迷你缓冲区内容的开头。  （您也可以将每个@samp{$}加倍；请参阅@ref{File Names with $}。）
+
+您还可以使用 @samp{/:} 引用通配符，以进行访问。例如，@file{/:/tmp/foo*bar}访问文件@file{/tmp/foo*bar}。
+
+获得相同结果的另一种方法是输入 @file{/tmp/foo[*]bar}，这是仅匹配 @file{/tmp/foo*bar} 的通配符规范。  然而，在许多情况下，不需要引用通配符，因为即使不加引号，它们也会给出正确的结果。  例如，如果 @file{/tmp} 中唯一以 @samp{foo} 开头并以 @samp{bar} 结尾的文件名是 @file{foo*bar}，则指定 @file{/tmp/foo*bar} 将仅访问 @file{/tmp/foo*bar}。
+
+@node File Name Cache
+@section 文件名缓存
+
+@cindex file name caching
+@cindex cache of file names
+@pindex find
+@kindex C-TAB
+@findex file-cache-minibuffer-complete
+您可以使用 @dfn{file name cache} 轻松按名称查找文件，而无需准确记住它所在的位置。当在迷你缓冲区中输入文件名时，@kbd{C-@key{TAB}} (@code{file-cache-minibuffer-complete}) 使用文件名缓存来完成它。  如果重复@kbd{C-@key{TAB}}，则会循环显示您最初键入的内容的可能补全。  （但是，请注意，@kbd{C-@key{TAB}} 字符无法在大多数文本终端上键入。）
+
+文件名缓存不会自动填满。  相反，您可以使用以下命令将文件名加载到缓存中：
+
+@findex file-cache-add-directory
+@table @kbd
+@item M-x file-cache-add-directory @key{RET} @var{directory} @key{RET}
+将 @var{directory} 中的每个文件名添加到文件名缓存中。
+@item M-x file-cache-add-directory-using-find @key{RET} @var{directory} @key{RET}
+将 @var{directory} 中的每个文件名及其所有嵌套子目录添加到文件名缓存中。
+@item M-x file-cache-add-directory-using-locate @key{RET} @var{directory} @key{RET}
+将 @var{directory} 中的每个文件名及其所有嵌套子目录添加到文件名缓存中，使用 @command{locate} 查找所有文件。
+@item M-x file-cache-add-directory-list @key{RET} @var{variable} @key{RET}
+将 @var{variable} 中列出的每个目录中的每个文件名添加到文件名缓存中。  @var{variable} 应该是一个 Lisp 变量，其值是目录列表，如 @code{load-path}。
+@item M-x file-cache-clear-cache @key{RET}
+清除缓存；也就是说，从中删除所有文件名。
+@end table
+
+文件名缓存不是持久性的：它仅在 Emacs 会话期间保留和维护。  您可以使用@code{file-cache-display}命令查看缓存的内容。
+
+@node File Conveniences
+@section 查找文件的便捷功能
+
+在本节中，我们介绍一些方便的工具，用于查找最近打开的文件，从缓冲区读取文件名。
+
+@findex recentf-mode
+@vindex recentf-mode
+@findex recentf-open
+@findex recentf-save-list
+@findex recentf-edit-list
+如果使用@kbd{M-x recentf-mode}启用Recentf模式，Emacs将维护最近打开的文件的列表。  要从此列表中打开文件，请使用 @kbd{M-x recentf-open} 命令。  启用此模式后，@samp{File} 菜单将包含一个子菜单，您可以使用该子菜单访问这些文件之一。  @kbd{M-x recentf-save-list} 将当前的 @code{recentf-list} 保存到文件中，@kbd{M-x recentf-edit-list} 对其进行编辑。
+
+@vindex remote-file-name-access-timeout
+如果您使用远程文件，您还可以考虑自定义@code{remote-file-name-access-timeout}，这是停止检查是否应在Recentf中使用远程文件之前的秒数。  这可以防止 Emacs 被阻止。
+
+@c FIXME partial-completion-mode (complete.el) is obsolete.
+@kbd{M-x ffap} 命令使用更强大的启发式默认值 (@pxref{FFAP}) 概括 @code{find-file}，通常基于该点的文本。  部分完成模式提供了扩展 @code{find-file} 的其他功能，可与 @code{ffap} 一起使用。 @xref{Completion Options}。
+
+@node Image Mode
+@section 查看图像文件
+
+@findex image-mode
+@findex image-toggle-display
+@cindex images, viewing
+访问图像文件会自动选择图像模式。  在此主要模式下，您可以键入 @kbd{C-c C-c} (@code{image-toggle-display}) 在 Emacs 缓冲区中将文件显示为图像和显示其底层文本（或原始字节）表示形式之间切换。此外，您还可以输入 @kbd{C-c C-x} (@code{image-toggle-hex-display}) 在 Emacs 缓冲区中将文件显示为图像和以十六进制表示形式显示之间进行切换。  仅当 Emacs 编译为支持显示此类图像时，才能将文件显示为图像。
+
+@vindex image-auto-resize
+@vindex image-auto-resize-on-window-resize
+如果显示的图像比显示图像的窗口更宽或更高，则通常的点动键（@kbd{C-f}、@kbd{C-p} 等）会导致显示图像的不同部分。但是，默认情况下，图像会自动调整大小以适合窗口，因此仅当您使用选项 @code{image-auto-resize} 和 @code{image-auto-resize-on-window-resize} 自定义默认行为时才需要这样做。
+
+@findex image-transform-fit-to-window
+@kindex s w (Image mode)
+@findex image-transform-set-percent
+@kindex s p (Image mode)
+@findex image-transform-set-scale
+@kindex s s (Image mode)
+@findex image-transform-reset-to-initial
+@kindex s 0 (Image mode)
+@findex image-transform-reset-to-original
+@kindex s o (Image mode)
+要手动调整图像大小，您可以使用绑定到 @kbd{s w} 的命令 @code{image-transform-fit-to-window} 使图像适合窗口高度和宽度。  要将图像缩放到其原始大小的百分比，请使用绑定到 @kbd{s p} 的命令 @code{image-transform-set-percent}。  要缩放指定比例因子的图像，请使用绑定到 @kbd{s s} 的命令 @code{image-transform-set-scale}。  要将所有变换重置为初始状态，请使用绑定到 7⁣ 的 @code{image-transform-reset-to-initial} 或绑定到 @kbd{s o} 的 @code{image-transform-reset-to-original}。
+
+@findex image-next-file
+@findex image-previous-file
+您可以按@kbd{n}（@code{image-next-file}）和@kbd{p}（@code{image-previous-file}）分别访问同一目录中的下一个图像文件和上一个图像文件。  这些命令将查询“父”缓冲区以确定下一个/上一个图像文件是什么。  当从存档文件（如 zip 或 tar 文件）打开文件时，这些命令也有效，然后将查询存档模式缓冲区。  如果找不到存档或 dired“父”缓冲区，则会打开 dired 缓冲区。
+
+@findex image-mode-mark-file
+@findex image-mode-unmark-file
+@findex image-mode-copy-file-name-as-kill
+查看图像时，有时能够方便地标记文件以供以后处理（例如，如果您想选择一组图像复制到其他地方）。  @kbd{m} (@code{image-mode-mark-file}) 命令将在显示当前文件目录的任何 Dired 缓冲区中标记当前文件。  如果没有打开这样的缓冲区，则在新缓冲区中打开该目录。  要取消标记文件，请使用 @kbd{u} (@code{image-mode-unmark-file}) 命令。最后，如果您只想将当前缓冲区文件名复制到killring，则可以使用@kbd{w}（@code{image-mode-copy-file-name-as-kill}）命令。
+
+@findex image-toggle-animation
+@findex image-next-frame
+@findex image-previous-frame
+@findex image-goto-frame
+@findex image-increase-speed
+@findex image-decrease-speed
+@findex image-reset-speed
+@findex image-reverse-speed
+@vindex image-animate-loop
+@cindex image animation
+@cindex animated images
+如果图像可以动画化，则命令 @key{RET} (@code{image-toggle-animation}) 启动或停止动画。动画播放一次，除非选项 @code{image-animate-loop} 为非 @code{nil}。  使用 @kbd{f} (@code{image-next-frame}) 和 @kbd{b} (@code{image-previous-frame}) 您可以单步执行各个帧。  这两个命令都接受数字前缀来一次单步执行多个帧。  您可以使用 @kbd{F} (@code{image-goto-frame}) 转到特定帧。  帧的索引从 1 开始。输入 @kbd{a +} (@code{image-increase-speed}) 会增加动画速度，输入 @kbd{a -} (@code{image-decrease-speed}) 会降低动画速度，而输入 @kbd{a r} (@code{image-reverse-speed}) 会反转动画速度。  命令@kbd{a 0} (@code{image-reset-speed}) 将速度重置为原始值。
+
+除了上述特定于图像模式的键绑定之外，当点位于图像处或图像内部时，任何 Emacs 缓冲区中显示的图像都具有特殊的键绑定：
+
+@table @kbd
+@cindex resize images
+@cindex image resize
+@findex image-increase-size
+@kindex i + (Image mode)
+@item i +
+将图像尺寸 (@code{image-increase-size}) 增加 20%。  前缀数字参数控制增量； @var{n}的值意味着将大小乘以@w{@code{1 + @var{n} / 10}}的因子，因此@w{@kbd{C-u 5 i +}}意味着将大小增加50%。
+
+@findex image-decrease-size
+@kindex i - (Image mode)
+@item i -
+将图像尺寸 (@code{image-decrease-size}) 减小 20%。  前缀数字参数控制减量； @var{n}的值意味着将尺寸乘以因子@w{@code{1 - @var{n} / 10}}，因此@w{@kbd{C-u 3 i -}}意味着将尺寸减小30%。
+
+@cindex rotating images
+@cindex image rotation
+@findex image-rotate
+@kindex i r (Image mode)
+@item i r
+将图像顺时针旋转 90 度 (@code{image-rotate})。使用前缀参数，改为逆时针旋转 90 度。请注意，此命令不适用于切片图像。
+
+@findex image-flip-horizontally
+@kindex i h (Image mode)
+@item i h
+水平翻转图像 (@code{image-flip-horizontally})。  这呈现的图像就像在垂直镜子中反射一样。请注意，此命令不适用于切片图像。
+
+@findex image-flip-vertically
+@kindex i v (Image mode)
+@item i v
+垂直翻转图像 (@code{image-flip-vertically})。  这呈现的图像就像在水平镜子中反射一样。请注意，此命令不适用于切片图像。
+
+@findex image-save
+@kindex i o (Image mode)
+@item i o
+将图像保存到文件 (@code{image-save})。  此命令提示您输入用于保存图像的文件名。
+
+@cindex cropping images
+@vindex image-crop-crop-command
+@findex image-crop
+@kindex i c (Image mode)
+@item i c
+裁剪图像 (@code{image-crop})。  仅当您的系统安装了可用于裁剪和剪切图像的外部程序时，此命令才可用；用户选项 @code{image-crop-crop-command} 决定使用哪个程序，默认为 ImageMagick 的 @command{convert} 程序。  该命令显示图像上叠加了一个矩形框，并允许您使用鼠标移动该框并调整该框的大小。  输入 @kbd{m} 使鼠标移动来移动框架而不是调整其大小；输入 @kbd{s} 来移动方框。  当您对裁剪框的位置和大小感到满意时，输入@kbd{@key{RET}}实际裁剪框下的部分；或输入 @kbd{q} 退出而不裁剪。  然后，您可以使用 @w{@kbd{i o}} 或 @w{@kbd{M-x image-save}} 保存裁剪后的图像。
+
+@findex image-cut
+@kindex i x (Image mode)
+@vindex image-cut-color
+@vindex image-crop-cut-command
+@item i x
+从图像中剪切一个矩形 (@code{image-cut})。  这与 @code{image-crop} 的工作方式相同（并且还需要由变量 @code{image-crop-cut-command} 定义的外部程序来执行图像剪切），但它不是裁剪图像，而是删除框架内的部分并使用 @code{image-cut-color} 指定的颜色填充该部分。  使用前缀参数，该命令会提示要使用的颜色。
+@end table
+
+大小和旋转命令是“重复”的，这意味着您可以继续调整图像，而无需使用 @kbd{i} 前缀。
+
+@cindex ImageMagick support
+@vindex imagemagick-enabled-types
+@vindex imagemagick-types-inhibit
+如果 Emacs 是在支持 ImageMagick 库的情况下编译的，则它可以使用 ImageMagick 渲染各种图像。  变量 @code{imagemagick-enabled-types} 列出了 Emacs 可以使用 ImageMagick 渲染的图像类型；列表中的每个元素都应该是图像类型的内部 ImageMagick 名称，作为符号或等效字符串（例如，@code{BMP} 表示 @file{.bmp} 图像）。  要为所有可能的图像类型启用 ImageMagick，请将 @code{imagemagick-enabled-types} 更改为 @code{t}。  变量 @code{imagemagick-types-inhibit} 列出了永远不应该使用 ImageMagick 渲染的图像类型，无论 @code{imagemagick-enabled-types} 的值如何（默认列表包括 @code{C} 和 @code{HTML} 等类型，ImageMagick 可以将其渲染为图像，但 Emacs 不应该）。  要完全禁用 ImageMagick，请将 @code{imagemagick-types-inhibit} 更改为 @code{t}。
+
+@vindex image-use-external-converter
+如果 Emacs 没有对相关图像格式的本机支持，并且 @code{image-use-external-converter} 不是 @code{nil}，则 Emacs 将在显示之前尝试确定是否存在可用于将相关图像转换为 @acronym{PNG} 的外部实用程序。  目前支持 GraphicsMagick、ImageMagick 和 @command{ffmpeg} 进行图像转换。
+
+@findex image-converter-add-handler
+此外，您可能希望为某些图像格式添加特殊处理程序。  这些可以使用 @code{image-converter-add-handler} 函数添加。  例如，要允许将 Krita 文件作为简单图像查看，您可以这样说：
+
+@lisp
+(image-converter-add-handler
+ "kra"
+ (lambda (file data-p)
+   (if data-p
+       (error "Can't decode non-files")
+     (call-process "unzip" nil t nil
+                   "-qq" "-c" "-x" file "mergedimage.png"))))
+@end lisp
+
+该函数有两个参数，第一个是文件名后缀，第二个是执行“转换”的函数。  该函数有两个参数，第一个是文件名或带有数据的字符串，第二个表示第一个参数是否是数据，并且应该在当前缓冲区中输出 @code{image-convert-to-format} 格式的图像。
+
+@findex thumbs-mode
+@cindex mode, Thumbs
+Image-Dired 包还可用于以缩略图形式查看图像。  @xref{Image-Dired}。
+
+@node Filesets
+@section 文件集
+@cindex filesets
+@cindex sets of files
+
+@findex filesets-init
+如果您经常编辑某组文件，则可以将它们定义为@dfn{fileset}。  这允许您同时对所有文件执行某些操作，例如访问、@code{query-replace} 和 shell 命令。  要使用文件集，您必须首先将表达式 @code{(filesets-init)} 添加到您的初始化文件 (@pxref{Init File})。  这会将 @samp{Filesets} 子菜单添加到菜单栏的 @samp{File} 菜单中。
+
+@findex filesets-add-buffer
+@findex filesets-remove-buffer
+定义文件集的最简单方法是一次向其中添加一个文件。  要将文件添加到文件集 @var{name}，请访问该文件并输入 @kbd{M-x filesets-add-buffer @key{RET} @var{name} @key{RET}}。  如果没有文件集@var{name}，则会创建一个新文件集，该文件集最初仅包含当前文件。  命令 @kbd{M-x filesets-remove-buffer} 从文件集中删除当前文件。
+
+您还可以使用 @kbd{M-x filesets-edit}（或从 @samp{Filesets} 菜单中选择 @samp{Edit Filesets}）直接编辑文件集列表。  编辑是在自定义缓冲区 (@pxref{Easy Customization}) 中执行的。  通常，文件集是简单的文件列表，但您也可以将文件集定义为匹配文件名的正则表达式。  自定义缓冲区中显示了这些更复杂的文件集的一些示例。  如果您想在以后的 Emacs 会话中使用相同的文件集，请记住选择@samp{Save for future sessions}。
+
+@findex filesets-open
+@findex filesets-close
+@findex filesets-run-cmd
+@vindex filesets-commands
+您可以使用命令 @kbd{M-x filesets-open} 访问文件集中的所有文件，并使用 @kbd{M-x filesets-close} 关闭它们。  使用 @kbd{M-x filesets-run-cmd} 对文件集中的所有文件运行命令（例如 @code{multi-isearch-files} 或 @command{grep}）。  这些命令在@code{filesets-commands}中指定，也可以从@samp{Filesets}菜单中使用，其中每个现有文件集都由一个子菜单表示。
+
+@xref{Version Control}，用于文件集的不同概念：捆绑在一起进行版本控制操作的文件组。该类型的文件集是未命名的，并且不会在 Emacs 会话中持续存在。

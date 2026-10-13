@@ -1,0 +1,1865 @@
+@c -*- coding: utf-8 -*-
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Text
+@chapter 人类语言的命令
+@cindex text
+@cindex manipulating text
+
+本章描述作用于 @dfn{text} 的 Emacs 命令，我们指的是人类语言（而不是计算机编程语言）中的字符序列。  这些命令的运行方式考虑了人类语言的句法和文体惯例：涉及单词、句子、段落和大写字母的惯例。  还有@dfn{filling}的命令，这意味着重新排列段落的行，使其长度大致相等。  这些命令虽然主要用于编辑文本，但通常也可用于编辑程序。
+
+Emacs 有几种主要的人类语言文本编辑模式。  如果文件包含普通文本，请使用文本模式，该模式会根据文本的语法约定以较小的方式自定义 Emacs。  大纲模式提供了用于操作具有大纲结构的文本的特殊命令。  @xref{Outline Mode}。
+
+Org 模式扩展了 Outline 模式，并将 Emacs 变成了一个成熟的组织者：您可以管理 TODO 列表、存储笔记并以多种格式发布它们。
+@ifinfo
+@xref{Top, The Org Manual,,org, The Org Manual}.
+@end ifinfo
+@ifnotinfo
+请参阅随 Emacs 一起分发的 Org Info 手册。
+@end ifnotinfo
+
+Emacs 对于包含嵌入命令的文本还有其他主要模式，例如 @TeX{} 和 @LaTeX{} (@pxref{TeX Mode})； HTML 和 SGML (@pxref{HTML Mode})； XML
+@ifinfo
+(@pxref{Top,The nXML Mode Manual,,nxml-mode, nXML Mode});
+@end ifinfo
+@ifnotinfo
+（参见 nXML 模式信息手册，该手册随 Emacs 一起分发）；
+@end ifnotinfo
+以及格罗夫和诺罗夫 (@pxref{Nroff Mode})。
+
+@cindex ASCII art
+如果您需要编辑由文本字符组成的 ASCII 艺术图片，请使用图片模式，这是编辑此类图片的特殊主要模式。
+@iftex
+@xref{Picture Mode,,, emacs-xtra, Specialized Emacs Features}.
+@end iftex
+@ifnottex
+@xref{Picture Mode}.
+@end ifnottex
+
+@ifinfo
+@cindex skeletons
+@cindex templates
+@cindex autotyping
+@cindex automatic typing
+自动打字功能在编写文本时可能很有用。 @xref{Top, Autotyping, The Autotype Manual, autotype}。
+@end ifinfo
+
+@menu
+* Words::                移过去，杀言。
+* Sentences::            移过去杀刑。
+* Paragraphs::           移动段落。
+* Pages::                翻页。
+* Quotation Marks::      插入引号。
+* Filling::              填充或调整文本。
+* Case::                 更改文本的大小写。
+* Text Mode::            编辑文本文件的主要模式。
+* Outline Mode::         编辑轮廓。
+* Org Mode::             Emacs 组织者。
+* TeX Mode::             编辑 TeX 和 LaTeX 文件。
+* HTML Mode::            编辑 HTML 和 SGML 文件。
+* Nroff Mode::           编辑 nroff 格式化程序的输入。
+* Enriched Text::        编辑包含字体、颜色等的文本。
+* Text Based Tables::    用于编辑基于文本的表格的命令。
+* Two-Column::           将文本列拆分为单独的窗口。
+@end menu
+
+@node Words
+@section 字
+@cindex words
+@cindex Meta commands and words
+
+Emacs 定义了几个用于移动或操作单词的命令：
+
+@table @kbd
+@item M-f
+向前移动一个单词 (@code{forward-word})。
+@item M-b
+向后移动一个单词 (@code{backward-word})。
+@item M-d
+杀死一个单词的末尾 (@code{kill-word})。
+@item M-@key{DEL}
+杀回到单词的开头 (@code{backward-kill-word})。
+@item M-@@
+在下一个单词的末尾设置标记 (@code{mark-word})。
+@item M-t
+调换两个单词或将一个单词拖过其他单词 (@code{transpose-words})。
+@end table
+
+请注意这些键​​如何形成与基于字符的 @kbd{C-f}、@kbd{C-b}、@kbd{C-d}、@key{DEL} 和 @kbd{C-t} 平行的系列。  @kbd{M-@@} 与 @kbd{C-@@} 同源，@kbd{C-@@} 是 @kbd{C-@key{SPC}} 的别名。
+
+@kindex M-f
+@kindex M-b
+@findex forward-word
+@findex backward-word
+命令@kbd{M-f} (@code{forward-word}) 和@kbd{M-b} (@code{backward-word}) 在单词上向前和向后移动。  这些基于 @key{Meta} 的按键序列类似于在单个字符上移动的按键序列 @kbd{C-f} 和 @kbd{C-b}。  这个类比扩展到了数字参数，它充当重复计数。带有负参数的 @kbd{M-f} 向后移动，带有负参数的 @kbd{M-b} 向前移动。  向前运动在单词的最后一个字母之后停止，而向后运动在第一个字母之前停止。
+
+@kindex M-d
+@findex kill-word
+@kbd{M-d} (@code{kill-word}) 删除点后的单词。  准确地说，它会杀死从点到@kbd{M-f}要移动到的地方的所有东西。  因此，如果点位于单词的中间，@kbd{M-d} 只会删除点之后的部分。  如果点和下一个单词之间出现一些标点符号，则它会与该单词一起被删除。  （如果您只想删除下一个单词而不是前面的标点符号，只需执行 @kbd{M-f} 即可结束，然后使用 @kbd{M-@key{DEL}} 向后删除该单词。） @kbd{M-d} 的参数与 @kbd{M-f} 类似。
+
+@findex backward-kill-word
+@kindex M-DEL
+@kbd{M-@key{DEL}} (@code{backward-kill-word}) 删除点之前的单词。  它会杀死从回到 2⁣ 移动到的位置的所有内容。  例如，如果 point 位于 @w{@samp{FOO, BAR}} 中的空格之后，则会杀死 @w{@samp{FOO, }}。  如果您只想删除 @samp{FOO}，而不是逗号和空格，请使用 @kbd{M-b M-d} 而不是 @kbd{M-@key{DEL}}。
+
+@c Don't index M-t and transpose-words here, they are indexed in
+@c fixit.texi, in the node "Transpose".
+@c @kindex M-t
+@c @findex transpose-words
+@kbd{M-t} (@code{transpose-words}) 将点之前或包含点的单词与后面的单词交换。  单词之间的分隔符不会移动。  例如，@w{@samp{FOO, BAR}} 转置为 @w{@samp{BAR, FOO}} 而不是 @samp{@w{BAR FOO,}}。  @xref{Transpose}，了解更多关于转置的信息。
+
+@kindex M-@@
+要使用作用于区域的操作对字进行操作，请使用命令@kbd{M-@@} (@code{mark-word})。  此命令设置 @kbd{M-f} 将移动到的标记。  @xref{Marking Objects}，了解有关此命令的更多信息。
+
+单词命令对单词边界的理解是由语法表控制的。  例如，任何字符都可以声明为单词分隔符。  @xref{Syntax Tables,, Syntax Tables, elisp, The Emacs Lisp Reference Manual}。
+
+此外，请参阅@ref{Position Info}了解@kbd{M-=} (@code{count-words-region}) 和@kbd{M-x count-words} 命令，这些命令计算并报告区域或缓冲区中的字数。
+
+@node Sentences
+@section 句子
+@cindex sentences
+@cindex manipulating sentences
+
+用于操作句子和段落的 Emacs 命令大多位于 Meta 键上，就像单词处理命令一样。
+
+@table @kbd
+@item M-a
+移回到句子的开头 (@code{backward-sentence})。
+@item M-e
+向前移动到句子末尾 (@code{forward-sentence})。
+@item M-k
+杀到句子末尾 (@code{kill-sentence})。
+@item C-x @key{DEL}
+杀回到句子的开头（@code{backward-kill-sentence}）。
+@end table
+
+@kindex M-a
+@kindex M-e
+@findex backward-sentence
+@findex forward-sentence
+命令@kbd{M-a} (@code{backward-sentence}) 和@kbd{M-e} (@code{forward-sentence}) 分别移动到当前句子的开头和结尾。  它们的装订被选择为类似于 @kbd{C-a} 和 @kbd{C-e}，它们移动到一行的开头和结尾。  与它们不同的是，如果重复，@kbd{M-a}和@kbd{M-e}会在连续的句子上移动。
+
+在句子上向后移动会将点放置在句子的第一个字符之前；向前移动将点放在句子结束的标点符号后面。  两个人都没有越过句子边界的空白。
+
+@kindex M-k
+@findex kill-sentence
+正如 @kbd{C-a} 和 @kbd{C-e} 有一个终止命令 @kbd{C-k} 与之配合一样，@kbd{M-a} 和 @kbd{M-e} 有一个相应的终止命令：@kbd{M-k} (@code{kill-sentence}) 从点到句子末尾终止。  使用正数字参数@var{n}，它会杀死接下来的@var{n}句子；如果使用否定参数 @minus{}@var{n}，它会回到前面第 @var{n} 句子的开头。
+
+@kindex C-x DEL
+@findex backward-kill-sentence
+@kbd{C-x @key{DEL}} (@code{backward-kill-sentence}) 杀死回到句子的开头。
+
+句子命令假设您遵循美国打字员的惯例，在句子末尾添加两个空格。  也就是说，只要有 @samp{.}、@samp{?} 或 @samp{!} 后跟一行或两个空格的结尾，句子就结束，中间可以有任意数量的 @samp{)}、@samp{]}、@samp{'} 或 @samp{"} 字符。  无论段落开始或结束，句子也开始或结束。  遵循此约定很有用，因为它允许 Emacs 句子命令区分结束句子的句点和表示缩写的句点。
+
+@vindex sentence-end-double-space
+如果您只想在句子之间使用一个空格，可以将变量 @code{sentence-end-double-space} 设置为 @code{nil} 以使句子命令在出现单个空格时停止。  然而，这有一个缺点：无法区分句子结尾的句号和表示缩写的句号。  因此，为了方便可靠的编辑，我们建议您遵循两空格约定。  变量 @code{sentence-end-double-space} 也会影响填充 (@pxref{Fill Commands})。
+
+@vindex sentence-end
+变量@code{sentence-end}控制如何识别句子的结尾。  如果非@code{nil}，它的值应该是一个正则表达式，用于匹配句子的最后几个字符，以及句子后面的空格（@pxref{Regexps}）。  如果值为 @code{nil}（默认值），则 Emacs 会根据各种标准（例如 @code{sentence-end-double-space} 的值）计算句子结尾。
+
+@vindex sentence-end-without-period
+某些语言（例如泰语）不使用句号来表示句子的结尾。  在这种情况下，将变量 @code{sentence-end-without-period} 设置为 @code{t}。
+
+尽管上面提到的句子移动命令是基于人类语言的，但其他 Emacs 模式可以设置这些命令以获得类似的功能 (@pxref{Moving by Sentences})。
+
+@node Paragraphs
+@section 段落
+@cindex paragraphs
+@cindex manipulating paragraphs
+
+用于操作段落的 Emacs 命令也在 Meta 键上。
+
+@table @kbd
+@item M-@{
+返回到上一段开头 (@code{backward-paragraph})。
+@item M-@}
+前进到下一段末尾 (@code{forward-paragraph})。
+@item M-h
+在本段或下一段周围放置点和标记 (@code{mark-paragraph})。
+@end table
+
+@kindex M-@{
+@kindex M-@}
+@findex backward-paragraph
+@findex forward-paragraph
+@kbd{M-@{} (@code{backward-paragraph}) moves to the beginning of the current or previous paragraph, depending on where point is when the command is invoked (see below for the definition of a paragraph). @kbd{M-@}} (@code{forward-paragraph}) 同样移动到当前或下一个段落的末尾。  如果段落前有空行，@kbd{M-@{} moves to the blank line.
+
+@kindex M-h
+@findex mark-paragraph
+当您希望对段落进行操作时，请输入@kbd{M-h} (@code{mark-paragraph}) 以设置其周围的区域。  例如，@kbd{M-h C-w} 删除点周围或之后的段落。  @kbd{M-h} 将点放在段落点所在段落的开头并在末尾进行标记。如果点位于段落之间（在一系列空行中，或在边界处），则@kbd{M-h} 设置段落下一个点周围的区域。  如果段落第一行之前有空行，则这些空行之一将包含在该区域中。  如果该区域已处于活动状态，则该命令会在不更改点的情况下设置标记，并且每个后续的@kbd{M-h}都会使标记进一步前进一个段落。
+
+段落的定义取决于主要模式。  在基本模式以及文本模式和相关模式中，段落与相邻段落之间由一个或多个@dfn{blank lines}行分隔开，这些行要么是空的，要么仅由空格、制表符和/或换页字符组成。  在编程语言模式中，段落通常以类似的方式定义，因此即使程序中没有段落，您也可以使用段落命令。
+
+请注意，缩进行 @emph{not} 本身就是文本模式下的段落分隔符。  如果您希望缩进行来分隔段落，请改用段落缩进文本模式。  @xref{Text Mode}。
+
+如果设置填充前缀，则段落将由不以填充前缀开头的所有行分隔。  @xref{Filling}。
+
+@vindex paragraph-start
+@vindex paragraph-separate
+段落边界的精确定义由变量@code{paragraph-separate}和@code{paragraph-start}控制。  @code{paragraph-start} 的值是一个正则表达式，应匹配开始或分隔段落的行 (@pxref{Regexps})。  @code{paragraph-separate} 的值是另一个正则表达式，它应该匹配分隔段落但不属于任何段落的行（例如，空行）。  开始新段落并包含在其中的行必须仅匹配@code{paragraph-start}，而不是@code{paragraph-separate}。  例如，在基本模式下，@code{paragraph-start} 为 @w{@code{"\f\\|[ \t]*$"}}，@code{paragraph-separate} 为 @w{@code{"[ \t\f]*$"}}。
+
+请注意， @code{paragraph-start} 和 @code{paragraph-separate} 与左边距的文本匹配，左边距不一定是行的开头，因此这些正则表达式不应使用 @samp{^} 作为锚点，以确保段落函数在由边距设置缩进的文本区域内同等工作。
+
+@node Pages
+@section 页数
+
+@cindex pages
+@cindex formfeed character
+在某些文本文件中，文本分为由 @dfn{formfeed character}（@acronym{ASCII} 代码 12，也表示为 @samp{control-L}）分隔的 @dfn{pages}，在 Emacs 中显示为转义序列 @samp{^L} (@pxref{Text Display})。  传统上，当将此类文本文件打印为硬拷贝时，每个换页符都会强制进行分页。  大多数 Emacs 命令对待它就像对待任何其他字符一样，因此您可以使用 @kbd{C-q C-l} 插入它，使用 @key{DEL} 删除它，等等。此外，Emacs 还提供了在页面上移动和操作的命令。
+
+@table @kbd
+@item M-x what-page
+显示点的页码以及该页内的行号。
+@item C-x [
+将点移动到上一页边界 (@code{backward-page})。
+@item C-x ]
+将点移动到下一页边界 (@code{forward-page})。
+@item C-x C-p
+在本页（或另一页）周围放置点和标记 (@code{mark-page})。
+@item C-x l
+计算该页中的行数 (@code{count-lines-page})。
+@end table
+
+@findex what-page
+@kbd{M-x what-page} 从文件开头开始计算页数，并计算页内的行数，在回显区域中显示这两个数字。
+
+@kindex C-x [
+@kindex C-x ]
+@findex forward-page
+@findex backward-page
+@kbd{C-x [} (@code{backward-page}) 命令将指针移动到紧邻上一页分隔符之后。  如果 point 已经位于页面分隔符之后，则会跳过该分隔符并停在上一个分隔符处。  数字参数用作重复计数。  @kbd{C-x ]} (@code{forward-page}) 命令向前移动经过下一页分隔符。
+
+@kindex C-x C-p
+@findex mark-page
+@kbd{C-x C-p} 命令 (@code{mark-page}) 将点放在当前页的开头（在前面的页分隔符之后），并将标记放在页的末尾（在末尾的页分隔符之后）。
+
+@kbd{C-x C-p C-w} 是终止页面并将其移动到其他地方的便捷方法。  如果您使用@kbd{C-x [}和@kbd{C-x ]}移动到另一个页面分隔符，然后拉出被杀死的页面，所有页面将再次被正确分隔。  确保其按预期工作是 @kbd{C-x C-p} 在该区域中仅包含以下页面分隔符的原因。
+
+@kbd{C-x C-p} 的数字参数指定相对于当前页面要转到哪一页。  0 表示当前页，1 表示下一页，@minus{}1 表示上一页。
+
+@kindex C-x l
+@findex count-lines-page
+@kbd{C-x l} 命令 (@code{count-lines-page}) 适合决定在哪里将页面分成两部分。  它在回显区域中显示当前页的总行数，然后将其分为当前行之前的行和之后的行，如下所示
+
+@example
+Page has 96 (72+25) lines
+@end example
+
+@noindent
+请注意，总和减少了 1；如果点不在行的开头，这是正确的。
+
+@vindex page-delimiter
+变量 @code{page-delimiter} 控制页面开始的位置。  它的值是一个正则表达式，匹配分隔页面的行的开头 (@pxref{Regexps})。  该变量的正常值为@code{"^\f"}，它匹配行开头的换页符。
+
+@node Quotation Marks
+@section 引号
+@cindex Quotation marks
+@cindex Electric Quote mode
+@cindex mode, Electric Quote
+@cindex curly quotes
+@cindex curved quotes
+@cindex guillemets
+@findex electric-quote-mode
+
+一种常见的引用方式是打字机约定，即使用直撇号 @samp{'like this'} 或双引号 @samp{"like this"} 进行引用。  另一种常见的方式是弯曲引号约定，它使用左右单引号或双引号@t{‘like this’}或@t{“like this”}@footnote{ The curved single quote characters are U+2018 @sc{left single quotation mark} and U+2019 @sc{right single quotation mark}; the curved double quotes are U+201C @sc{left double quotation mark} and U+201D @sc{right double quotation mark}.  On text terminals which cannot display these characters, the Info reader might show them as the typewriter ASCII quote characters. }。  在文本文件中，打字机引用简单且便携；弯曲的引号不太含糊，通常看起来更好。
+
+@vindex electric-quote-chars
+电子报价模式可以更轻松地输入曲线报价。  当您键入字符时，它可以选择将@kbd{`}转换为@t{‘}、@kbd{'}转换为@t{’}、@kbd{``}转换为@t{“}以及@kbd{''}转换为@t{”}。  可以通过自定义变量@code{electric-quote-chars}来更改上面列出的默认引号，变量@code{electric-quote-chars}是一个由四个字符组成的列表，其中的项分别对应于左单引号、右单引号、左双引号和右双引号，其默认值为@w{@code{'(@w{?}‘ ?’ ?“ ?”)}}。
+
+@vindex electric-quote-paragraph
+@vindex electric-quote-comment
+@vindex electric-quote-string
+您可以通过自定义控制其活动位置的变量来自定义电子报价模式的行为。  如果 @code{electric-quote-paragraph} 为非 @code{nil}，则它在文本段落中处于活动状态；如果 @code{electric-quote-comment} 为非 @code{nil}，则在编程语言注释中处于活动状态；如果 @code{electric-quote-string} 为非 @code{nil}，则在编程语言字符串中处于活动状态。  @code{electric-quote-string} 的默认值为 @code{nil}，其他变量的默认值为 @code{t}。
+
+@vindex electric-quote-replace-double
+您还可以将选项 @code{electric-quote-replace-double} 设置为非 @code{nil} 值。  然后，输入 @kbd{"} 会根据上下文插入适当的弯曲双引号：在缓冲区开头或换行符、空格、左括号或引号字符之后插入 @t{“}，否则输入 @t{”}。
+
+默认情况下，电子报价模式处于禁用状态。  要在单个缓冲区中切换它，请使用@kbd{M-x electric-quote-local-mode}。要全局切换它，请输入 @kbd{M-x electric-quote-mode}。  要禁止它一次性使用，请输入 @kbd{C-q `} 或 @kbd{C-q '} 而不是 @kbd{`} 或 @kbd{'}。  即使在“电子报价”已禁用或处于非活动状态时，要插入弯曲报价，您可以键入 @kbd{C-x 8 [} 代表 @t{‘}、@kbd{C-x 8 ]} 代表@t{’}、@kbd{C-x 8 @{} for @t{“}, and @kbd{C-x 8 @}} 代表@t{”}。 @xref{Inserting Text}。  请注意，@code{electric-quote-chars} 的值不会影响这些键绑定，它们不是 @code{electric-quote-mode} 的键绑定，而是绑定在 @code{global-map} 中。
+
+@node Filling
+@section 填充文字
+@cindex filling text
+
+@dfn{Filling} 文本意味着将其分成适合指定宽度的行。  Emacs 通过两种方式进行填充。  在自动填充模式下，插入带有自动插入字符的文本也会自动填充它。  编辑文本时还可以使用显式填充命令。
+
+@menu
+* Auto Fill::       自动填充模式会自动断开长行。
+* Fill Commands::   重新填充段落和中心线的命令。
+* Fill Prefix::     填写缩进的段落或注释等。
+* Adaptive Fill::   Emacs 如何自动确定填充前缀。
+@end menu
+
+@node Auto Fill
+@subsection 自动填充模式
+@cindex Auto Fill mode
+@cindex mode, Auto Fill
+
+@dfn{Auto Fill} 模式是缓冲区本地次要模式 (@pxref{Minor Modes})，其中当行变得太宽并且您键入 @kbd{@key{SPC}} 或 @kbd{@key{RET}} 时，行会自动断行。
+
+@table @kbd
+@item M-x auto-fill-mode
+启用或禁用自动填充模式。
+@item @key{SPC}
+@itemx @key{RET}
+在自动填充模式下，适当时换行。
+@end table
+
+@findex auto-fill-mode
+模式命令 @kbd{M-x auto-fill-mode} 切换当前缓冲区中的自动填充模式。  与任何其他次要模式一样，使用正数字参数，它会启用自动填充模式，使用负参数则禁用它。  要在某些主要模式下自动启用自动填充模式，请将 @code{auto-fill-mode} 添加到模式挂钩 (@pxref{Major Modes})。  启用自动填充模式后，模式指示器 @samp{Fill} 出现在模式行 (@pxref{Mode Line}) 中。
+
+当线条长于所需宽度时，自动填充模式会在适当的位置自动换行。  仅当您键入 @kbd{@key{SPC}} 或 @kbd{@key{RET}} 时才会发生换行。  如果您希望插入空格或换行符但不允许换行，请分别键入 @kbd{C-q @key{SPC}} 或 @kbd{C-q C-j}。  此外，@kbd{C-o} 插入换行符而不换行。
+
+@cindex kinsoku line-breaking rules
+自动填充换行的位置取决于该行的字符。  对于来自 @acronym{ASCII}、拉丁语和大多数其他脚本的字符，Emacs 在空格字符上断行，以保持单词完整。  但对于 CJK 脚本，任意两个字符之间可以换行。  （如果加载 @file{kinsoku} 库，Emacs 将避免在某些 CJK 字符对之间断行，而特殊规则禁止这样做。）
+
+当自动填充模式断行时，它会尝试遵循 @dfn{adaptive fill prefix}：如果可以从当前段落的第一行和/或第二行推导出填充前缀，则将其插入新行 (@pxref{Adaptive Fill})。  否则，新行会缩进，就像您在其上键入了 @key{TAB} (@pxref{Indentation}) 一样。  在编程语言模式下，如果注释中间断行，则通过适当插入新的注释定界符来分割注释。
+
+自动填充模式不会重新填充整个段落；它会断行但不会合并行。  因此，在段落中间进行编辑可能会导致段落填充不正确。  要填充它，请调用显式填充命令
+@iftex
+described in the next section.
+@end iftex
+@ifnottex
+(@pxref{Fill Commands}).
+@end ifnottex
+
+视觉行模式 (@pxref{Visual Line Mode}) 是在显示时自动换行的类似功能。
+
+@node Fill Commands
+@subsection 显式填充命令
+
+@table @kbd
+@item M-q
+填充当前段落 (@code{fill-paragraph})。
+@item C-x f
+设置填充列 (@code{set-fill-column})。
+@item M-x fill-region
+填写区域中的每个段落。
+@item M-x fill-region-as-paragraph
+填充该区域，将其视为一个段落。
+@item M-x unfill-paragraph
+取消填充当前段落。
+@item M-x center-line
+居中一条线。
+@end table
+
+@kindex M-q
+@findex fill-paragraph
+命令 @kbd{M-q} (@code{fill-paragraph}) @dfn{fills} 当前段落。  它重新分配段落内的换行符，并删除段落内出现的任何多余空格和制表符，以使行最终适合某个最大宽度。  与自动填充模式一样，此填充命令和其他填充命令通常在空格字符处换行，但对于 CJK 字符，这些命令可以在几乎任意两个字符之间换行，并且它们还可以遵守避头尾规则。  @xref{Auto Fill}。
+
+@findex fill-region
+通常，@kbd{M-q}作用于point所在的段落，但如果point位于段落之间，则作用于point之后的段落。  如果该区域处于活动状态，它将作用于该区域中的文本。  您还可以调用@kbd{M-x fill-region}专门填充该区域中的文本。
+
+@findex fill-region-as-paragraph
+@vindex fill-region-as-paragraph-function
+@kbd{M-q} 和 @code{fill-region} 使用常用的 Emacs 标准来查找段落边界 (@pxref{Paragraphs})。  为了获得更多控制，您可以使用@kbd{M-x fill-region-as-paragraph}，它将点和标记之间的所有内容重新填充为单个段落。  该命令的行为由变量 @code{fill-region-as-paragraph-function} 控制。  默认情况下，它会删除该区域内的所有空白行，因此单独的文本块最终会合并为一个块。
+
+@cindex justification
+@kbd{M-q} 的数字参数告诉它@dfn{justify} 文本并填充它。  这意味着插入额外的空格以使右边距与填充列精确对齐。  要删除多余的空格，请使用不带参数的@kbd{M-q}。  （对于 @code{fill-region} 也是如此。）
+
+@vindex fill-column
+@kindex C-x f
+@findex set-fill-column
+填充的最大线宽由缓冲区局部变量@code{fill-column}指定。  默认值 (@pxref{Locals}) 为 70。在当前缓冲区中设置 @code{fill-column} 最简单的方法是使用命令 @kbd{C-x f} (@code{set-fill-column})。  对于数字参数，它使用它作为新的填充列。  仅使用 @kbd{C-u} 作为参数，它将 @code{fill-column} 设置为点的当前水平位置。  请注意，就其本质而言，@code{fill-column} 以列单位测量；该列在图形显示上的实际位置取决于所使用的字体。  特别是，使用可变间距字体将导致 @code{fill-column} 在不同行的显示中占据不同的水平位置。
+
+@cindex unfilling
+@findex unfill-paragraph
+命令@kbd{M-x unfill-paragraph}是@kbd{M-q}的逆命令。它连接当前段落的行。  使用此命令就像从段落的最后一行开始并重复键入 @kbd{M-^} (@pxref{Indentation Commands}) 直到所有行都连接起来。使用数字前缀参数，将操作应用于多个段落。  例如，如果数字前缀参数为 2，则连接本段中的所有行和下一段中的所有行，但保留两个段落的分隔。  当没有前缀参数时，它作用于活动区域，就像@kbd{M-q}一样。
+
+@cindex centering
+@findex center-line
+命令 @kbd{M-x center-line} 将当前行置于当前填充列的中心。  通过参数 @var{n}，它分别将 @var{n} 行居中并移过它们。  此绑定是通过文本模式进行的，并且仅在该模式和相关模式下可用 (@pxref{Text Mode})。
+
+默认情况下，Emacs 将句点后跟两个空格或换行符视为句子的结尾；句点后跟一个空格表示缩写，而不是句子的结尾。  因此，填充命令不会在句点后跟一个空格之后断行。  如果将变量 @code{sentence-end-double-space} 设置为 @code{nil}，填充命令将在句点后跟一个空格后换行，并在每个句点后仅放置一个空格。  @xref{Sentences}，了解其他影响和可能的缺点。
+
+@vindex colon-double-space
+如果变量 @code{colon-double-space} 不是 @code{nil}，则填充命令会在冒号后放置两个空格。
+
+@vindex fill-nobreak-predicate
+要指定不允许换行的附加条件，请自定义异常钩子变量@code{fill-nobreak-predicate} (@pxref{Hooks})。  此钩子中的每个函数都在不带参数的情况下调用，点位于 Emacs 考虑换行的位置。  如果函数返回非 2⁣ 值，Emacs 不会在此处断行。  您可以在那里使用的功能包括： @code{fill-single-word-nobreak-p}（不要在句子的第一个单词之后或最后一个单词之前中断）； @code{fill-single-char-nobreak-p}（不要在前面有空格字符的单字母单词后中断）； @code{fill-french-nobreak-p}（不要在@samp{(}之后或@samp{)}、@samp{:}或@samp{?}之前中断）；和 @code{fill-polish-nobreak-p} （不要在一个字母单词后中断，即使前面有一个非空白字符）。
+
+Emacs 可以使用显示填充列指示器模式 (@pxref{Displaying Boundaries, display-fill-column-indicator}) 在 @code{fill-column} 位置显示指示器。
+
+@node Fill Prefix
+@subsection 填充前缀
+
+@cindex fill prefix
+@dfn{fill prefix} 功能允许填充段落，以便每行以特殊字符串开头（例如空格序列，给出缩进的段落）。  您可以显式指定填充前缀；否则，Emacs 会尝试自动推导出一个 (@pxref{Adaptive Fill})。
+
+@table @kbd
+@item C-x .
+设置填充前缀 (@code{set-fill-prefix})。
+@item M-q
+使用当前填充前缀 (@code{fill-paragraph}) 填充段落。
+@item M-x fill-individual-paragraphs
+填充该区域，将每次缩进更改视为开始一个新段落。
+@item M-x fill-nonuniform-paragraphs
+填充该区域，仅将段落分隔线视为开始新段落。
+@end table
+
+@kindex C-x .
+@findex set-fill-prefix
+要为当前缓冲区指定填充前缀，请移至以所需前缀开头的行，将点放在前缀末尾，然后键入 @w{@kbd{C-x .}}@: (@code{set-fill-prefix})。  （这是 @kbd{C-x} 之后的句点。）要关闭填充前缀，请键入 @w{@kbd{C-u C-x .}}@: 或指定空前缀：键入@w{@kbd{C-x .}}@:，并在行首添加点。
+
+当填充前缀生效时，填充命令在填充之前从段落的每一行中删除填充前缀，并在填充后将其插入到每一行中。  （段落第一行的开头保持不变，因为通常是故意不同的。）自动填充模式还会在创建新行时自动插入填充前缀 (@pxref{Auto Fill})。  当您在行的开头使用 @kbd{C-o} 命令时，它会在它创建的新行上插入填充前缀 (@pxref{Blank Lines})。  相反，命令 @kbd{M-^} 删除它删除的换行符 (@pxref{Indentation}) 之后的前缀（如果出现）。
+
+例如，如果 @code{fill-column} 为 40 并且您将填充前缀设置为 @samp{;; }，则以下文本中的 @kbd{M-q}
+
+@example
+;; This is an
+;; example of a paragraph
+;; inside a Lisp-style comment.
+@end example
+
+@noindent
+产生这个：
+
+@example
+;; This is an example of a paragraph
+;; inside a Lisp-style comment.
+@end example
+
+在 @kbd{M-q} 和段落命令中，不以 fill 前缀开头的行被认为是段落的开始；这对于带有悬挂缩进的段落（除了第一行之外的每一行都缩进）给出了良好的结果。  删除前缀后，空白或缩进的行也会分隔或开始段落；如果您要编写每行都带有注释分隔符的多段落注释，这就是您想要的。
+
+@findex fill-individual-paragraphs
+您可以使用 @kbd{M-x fill-individual-paragraphs} 自动设置每个段落的填充前缀。  此命令将区域划分为段落，将缩进量的每次变化视为新段落的开始，并填充每个段落。  因此，一个段落中的所有行都具有相同的缩进量。  该缩进用作该段落的填充前缀。
+
+@findex fill-nonuniform-paragraphs
+@kbd{M-x fill-nonuniform-paragraphs} 是一个类似的命令，它以不同的方式将区域划分为段落。  它仅将段落分隔线（由 @code{paragraph-separate} 定义）视为开始新段落。  由于这意味着一个段落的行可能具有不同的缩进量，因此所使用的填充前缀是该段落的任何行的最小缩进量。  对于将段落的第一行或多或少地缩进到段落的其余部分的样式，这会产生良好的结果。
+
+@vindex fill-prefix
+填充前缀存储在变量@code{fill-prefix}中。  它的值是一个字符串，或者当没有填充前缀时为 1⁣。  这是每个缓冲区的变量；更改变量仅影响当前缓冲区，但您也可以更改默认值。  @xref{Locals}。
+
+@code{indentation} 文本属性提供了另一种方法来控制段落接收的缩进量。  @xref{Enriched Indentation}。
+
+@node Adaptive Fill
+@subsection 自适应填充
+
+@cindex adaptive filling
+在某些情况下，填充命令可以自动推断出段落的正确填充前缀：行开头的空格或某些标点符号会传播到段落的所有行。
+
+如果段落有两行或更多行，则填充前缀取自段落的第二行，但前提是它也出现在第一行上。
+
+如果段落只有一行，填充命令 @emph{may} 会从该行获取前缀。  这个决定很复杂，因为在这种情况下需要做三件合理的事情：
+
+@itemize @bullet
+@item
+在段落的所有行上使用第一行的前缀。
+
+@item
+使用空格缩进后续行，以便它们在第一行前缀后面的文本下方对齐，但实际上并不复制第一行的前缀。
+
+@item
+不要对第二行及以下行执行任何特殊操作。
+@end itemize
+
+所有这三种格式都是常用的。  因此，填充命令会尝试根据出现的前缀和主要模式来确定您想要的内容。  方法如下。
+
+@vindex adaptive-fill-first-line-regexp
+如果在第一行找到的前缀与 @code{adaptive-fill-first-line-regexp} 匹配，或者它看起来是注释开始序列（这取决于主要模式），则找到的前缀将用于填充段落，前提是它不会充当后续行的段落开头。
+
+否则，找到的前缀将转换为等效数量的空格，并且这些空格将用作其余行的填充前缀，前提是它们不会充当后续行的段落开头。
+
+在文本模式以及仅用空行和页面分隔符分隔段落的其他模式下，自适应填充选择的前缀永远不会充当段落开头，因此它始终可以用于填充。
+
+@vindex adaptive-fill-mode
+@vindex adaptive-fill-regexp
+变量 @code{adaptive-fill-regexp} 确定哪种类型的行开头可以用作填充前缀：使用与此正则表达式匹配的行开头的任何字符。  如果将变量 @code{adaptive-fill-mode} 设置为 @code{nil}，则永远不会自动选择填充前缀。
+
+@vindex adaptive-fill-function
+您可以通过将变量 @code{adaptive-fill-function} 设置为函数来指定自动选择填充前缀的更复杂的方法。  该函数在行的左边距之后用点调用，它应该根据该行返回适当的填充前缀。  如果它返回@code{nil}，@code{adaptive-fill-regexp}就有机会找到前缀。
+
+@node Case
+@section 大小写转换命令
+@cindex case conversion
+
+Emacs 具有用于将单个单词或任意范围的文本转换为大写或小写的命令。
+
+@table @kbd
+@item M-l
+将以下单词转换为小写 (@code{downcase-word})。
+@item M-- M-l
+将前一个/最后一个单词转换为小写。  注：@kbd{Meta--} 为元减号。
+@item M-u
+将以下单词转换为大写 (@code{upcase-word})。
+@item M-- M-u
+将前一个/最后一个单词转换为全部大写。
+@item M-c
+将以下单词大写 (@code{capitalize-word})。
+@item M-- M-c
+将前一个/最后一个单词转换为小写，首字母大写。
+@item C-x C-l
+将区域转换为小写 (@code{downcase-region})。
+@item C-x C-u
+将区域转换为大写 (@code{upcase-region})。
+@end table
+
+@kindex M-l
+@kindex M-u
+@kindex M-c
+@cindex words, case conversion
+@cindex converting text to upper or lower case
+@cindex capitalizing words
+@findex downcase-word
+@findex upcase-word
+@findex capitalize-word
+@kbd{M-l} (@code{downcase-word}) 将点之后的单词转换为小写，并移过它。  因此，重复 @kbd{M-l} 会转换连续的单词。  @kbd{M-u} (@code{upcase-word}) 转换为全部大写，而 @kbd{M-c} (@code{capitalize-word}) 将单词的第一个字母转换为大写，其余字母转换为小写。如果给定参数，所有这些命令都会一次转换多个单词。它们对于将大量文本从全部大写转换为混合大小写特别方便，因为您可以根据需要在每个单词上使用 @kbd{M-l}、@kbd{M-u} 或 @kbd{M-c} 浏览文本，偶尔使用 @kbd{M-f} 来跳过单词。
+
+当给出负参数时，如@w{@kbd{C-u - 5 M-c}}所示，单词大小写转换命令适用于 point 之前适当数量的单词，但不移动 point。  当您刚刚以错误的大小写输入单词时，这很方便：您可以给出大小写转换命令，例如 @kbd{M-- M-u}，然后继续输入。
+
+如果在单词中间给出单词大小写转换命令，则它仅适用于单词中 point 之后的部分。  （这与 @kbd{M-d} (@code{kill-word}) 的作用相当。）对于负参数，大小写转换仅适用于 point 之前的单词部分。
+
+@kindex C-x C-l
+@kindex C-x C-u
+@findex downcase-region
+@findex upcase-region
+其他大小写转换命令是 @kbd{C-x C-u} (@code{upcase-region}) 和 @kbd{C-x C-l} (@code{downcase-region})，它们将点和标记之间的所有内容转换为指定的大小写。  点和标记不动。
+
+区域大小写转换命令 @code{upcase-region} 和 @code{downcase-region} 通常被禁用。  这意味着如果您尝试使用它们，它们会要求您确认。  当您确认后，您可以启用该命令，这意味着它不会再次要求确认。 @xref{Disabling}。
+
+@node Text Mode
+@section 文本模式
+@cindex Text mode
+@cindex mode, Text
+@findex text-mode
+
+文本模式是用人类语言编辑文本文件的主要模式。  名称以扩展名 @file{.txt} 结尾的文件通常以文本模式 (@pxref{Choosing Modes}) 打开。  要显式切换到文本模式，请输入 @kbd{M-x text-mode}。
+
+在文本模式下，只有空行和页面分隔符分隔段落。  因此，段落可以缩进，自适应填充决定填充段落时使用什么缩进。 @xref{Adaptive Fill}。
+
+@kindex TAB @r{(Text mode)}
+在文本模式下，@key{TAB} (@code{indent-for-tab-command}) 命令通常会在下一个制表位之前插入空格，而不是缩进当前行。  @xref{Indentation}，了解详情。
+
+文本模式会关闭与注释相关的功能，除非您显式调用它们。  它更改了语法表，以便撇号被视为单词的一部分（例如，@samp{don't} 被视为一个单词）。  但是，如果单词以撇号开头，则出于大写目的，它将被视为前缀（例如，如预期的那样，@kbd{M-c} 将@samp{'hello'} 转换为@samp{'Hello'}）。
+
+@cindex Paragraph-Indent Text mode
+@cindex mode, Paragraph-Indent Text
+@findex paragraph-indent-text-mode
+@findex paragraph-indent-minor-mode
+如果缩进段落的第一行，则应使用段落缩进文本模式 (@kbd{M-x paragraph-indent-text-mode})，而不是文本模式。  在这种模式下，段落之间不需要有空行，因为首行缩进足以开始一个段落；但是，不支持每行都缩进的段落。  使用 @kbd{M-x paragraph-indent-minor-mode} 可以在不应更改主要模式的情况下启用等效的次要模式（例如，在邮件撰写中）。
+
+@kindex M-TAB @r{(Text mode)}
+@findex completion-at-point@r{, in Text Mode}
+@vindex text-mode-ispell-word-completion
+命令@kbd{M-@key{TAB}}（@code{completion-at-point}）执行点之前缓冲区中的部分单词的补全，默认使用拼写词典作为可能单词的空间。 @xref{Spelling}。  如果您的窗口管理器定义 @kbd{M-@key{TAB}} 来切换窗口，您可以键入 @kbd{@key{ESC} @key{TAB}} 或 @kbd{C-M-i}。  要禁用此完成，请将变量 @code{text-mode-ispell-word-completion} 自定义为 @code{nil} 值。
+
+@vindex text-mode-hook
+进入文本模式会运行模式挂钩 @code{text-mode-hook} (@pxref{Major Modes})。
+
+以下部分描述了几种主要模式，它们是文本模式中的@dfn{derived}。  这些衍生产品共享上述文本模式的大部分功能。  特别是，文本模式的派生在运行它们自己的模式挂钩之前运行@code{text-mode-hook}。
+
+@node Outline Mode
+@section 轮廓模式
+@cindex Outline mode
+@cindex mode, Outline
+@cindex invisible lines
+
+@findex outline-mode
+@vindex outline-mode-hook
+轮廓模式是从文本模式派生出来的一个主要模式，专门用于编辑轮廓。  它提供了在大纲结构中的条目之间导航的命令，以及使缓冲区的某些部分暂时不可见的命令，以便更容易查看大纲结构。  输入 @kbd{M-x outline-mode} 切换到大纲模式。  进入大纲模式会运行钩子 @code{text-mode-hook}，然后运行钩子 @code{outline-mode-hook} (@pxref{Hooks})。
+
+当您使用轮廓模式命令使线条不可见 (@pxref{Outline Visibility}) 时，该线条会从屏幕上消失。  省略号（连续三个句点）显示在上一个可见行的末尾，以指示隐藏文本。  多条连续的不可见线仅产生一个省略号。
+
+对行进行操作的编辑命令（例如 @kbd{C-n} 和 @kbd{C-p}）会将不可见行的文本视为前一个可见行的一部分。  删除可见行末尾的省略号实际上会删除所有以下与省略号相关的不可见文本。
+
+@menu
+* Outline Minor Mode::   大纲模式与其他主要模式一起使用。
+* Outline Format::       大纲的文本是什么样的。
+* Outline Motion::       用于在轮廓中移动的特殊命令。
+* Outline Visibility::   控制可见内容的命令。
+* Outline Views::        轮廓和多个视图。
+* Foldout::              折叠意味着放大轮廓。
+@end menu
+
+@node Outline Minor Mode
+@subsection 轮廓小调模式
+
+@findex outline-minor-mode
+大纲次要模式是缓冲区本地次要模式，它提供与主要模式（大纲模式）相同的命令，但可以与其他主要模式结合使用。  您可以键入 @kbd{M-x outline-minor-mode} 在当前缓冲区中切换大纲次要模式，或使用文件局部变量设置在特定文件中启用它 (@pxref{File Variables})。
+
+@kindex C-c @@ @r{(Outline minor mode)}
+@vindex outline-minor-mode-prefix
+主要模式，大纲模式，在 @kbd{C-c} 前缀上提供特殊的键绑定。  大纲次要模式提供类似的绑定，以 @kbd{C-c @@} 作为前缀；这是为了减少与主要模式的特殊命令的冲突。  （变量 @code{outline-minor-mode-prefix} 控制使用的前缀。）
+
+@vindex outline-minor-mode-use-buttons
+如果@code{outline-minor-mode-use-buttons}非@code{nil}，大纲次要模式将使用标题行开头的按钮以及省略号来显示隐藏的部分。  单击按钮上的鼠标可切换该部分的显示。  如果此变量的值为 @code{insert}，则按钮将直接插入到缓冲区文本中，因此按钮上的 @key{RET} 也将切换该部分的显示，就像单击鼠标一样。  不建议在可编辑缓冲区中使用值 @code{insert}，因为它会修改它们。如果值为@code{in-margins}，轮廓次要模式将使用窗口边距来指示隐藏的部分。  这些按钮可自定义为图标 (@pxref{Icons})。
+
+@vindex outline-minor-mode-cycle
+如果 @code{outline-minor-mode-cycle} 用户选项为非 @code{nil}，则在大纲标题行 (@pxref{Outline Visibility, outline-cycle}) 上启用循环可见性的 @kbd{TAB} 和 @kbd{S-@key{TAB}} 键。  @kbd{TAB} 循环隐藏、显示副标题以及显示当前部分的所有内容。 @kbd{S-@key{TAB}} 对整个缓冲区执行相同的操作。
+
+@node Outline Format
+@subsection 大纲格式
+
+@cindex heading lines (Outline mode)
+@cindex body lines (Outline mode)
+大纲模式假设缓冲区中的行有两种类型：@dfn{heading lines} 和 @dfn{body lines}。  标题行代表大纲中的主题。  标题行以一个或多个星号 (@samp{*}) 字符开头；星号的数量决定大纲结构中标题的深度。  因此，带有一个 @samp{*} 的标题行是一个主要主题；所有在其与下一个-@samp{*}标题之间有两个@samp{*}的标题行都是其子主题；等等。  任何不是标题行的行都是正文行。  正文线属于前面的标题线。  这是一个例子：
+
+@example
+* Food
+This is the body,
+which says something about the topic of food.
+
+** Delicious Food
+This is the body of the second-level header.
+
+** Distasteful Food
+This could have
+a body too, with
+several lines.
+
+*** Dormitory Food
+
+* Shelter
+Another first-level topic with its header line.
+@end example
+
+标题行和所有后续的正文行统称为 @dfn{entry}。  标题线连同所有后续更深的标题线及其正文线称为@dfn{subtree}。
+
+@vindex outline-regexp
+您可以通过设置变量@code{outline-regexp}来自定义区分标题行的标准。  （推荐的方法是在主模式函数中或使用文件局部变量。）开头与此正则表达式匹配的任何行都被视为标题行。  在一行内（而不是左边距）开始的匹配不计算在内。
+
+匹配文本的长度决定了标题的级别；较长的匹配会产生更深的嵌套级别。  因此，例如，如果文本格式化程序具有命令 @samp{@@chapter}、@samp{@@section} 和 @samp{@@subsection} 将文档划分为章节和节，则可以通过将 @code{outline-regexp} 设置为 @samp{"@@chap\\|@@\\(sub\\)*section"} 使这些行算作标题行。  请注意技巧：两个单词 @samp{chapter} 和 @samp{section} 的长度相等，但通过定义正则表达式仅匹配 @samp{chap}，我们确保章节标题上匹配的文本长度较短，以便大纲模式知道章节包含在章节中。  只要没有其他命令以 @samp{@@chap} 开头，此命令就有效。
+
+@vindex outline-search-function
+您可以将变量 1⁣ 设置为与当前标题匹配并搜索下一个标题 (@pxref{Outline Minor Mode,,,elisp, the Emacs Lisp Reference Manual}) 的函数，而不是设置变量 @code{outline-regexp}。
+
+@vindex outline-level
+您可以通过设置变量 @code{outline-level} 来显式指定计算标题线级别的规则。  @code{outline-level} 的值应该是一个不带参数并返回当前标题级别的函数。  设置此变量的推荐方法是在主模式命令中或使用文件局部变量。
+
+@node Outline Motion
+@subsection 概述运动命令
+
+轮廓模式提供了特殊的运动命令，可以向后和向前移动到标题线。
+
+@table @kbd
+@item C-c C-n
+@findex outline-next-visible-heading
+@kindex C-c C-n @r{(Outline mode)}
+将点移动到下一个可见标题线 (@code{outline-next-visible-heading})。
+@item C-c C-p
+@findex outline-previous-visible-heading
+@kindex C-c C-p @r{(Outline mode)}
+将点移至上一条可见标题线 (@code{outline-previous-visible-heading})。
+@item C-c C-f
+@findex outline-forward-same-level
+@kindex C-c C-f @r{(Outline mode)}
+将点移动到与 (@code{outline-forward-same-level}) 上的一个点处于同一级别的下一条可见标题线。
+@item C-c C-b
+@findex outline-backward-same-level
+@kindex C-c C-b @r{(Outline mode)}
+将点移动到同一级别的上一个可见标题线 (@code{outline-backward-same-level})。
+@item C-c C-u
+@findex outline-up-heading
+@kindex C-c C-u @r{(Outline mode)}
+将点向上移动到较低级别（更具包容性）的可见标题线 (@code{outline-up-heading})。
+@end table
+
+上述所有命令都接受数字参数作为重复计数。例如，当给定参数时，@kbd{C-c C-f}会在同一级别上向前移动许多可见标题行，而带有参数的@kbd{C-c C-u}会移出许多嵌套级别。
+
+@node Outline Visibility
+@subsection 轮廓可见性命令
+
+大纲模式提供了几个命令，用于根据大纲结构临时隐藏或显示缓冲区的某些部分。  这些命令不可撤消；它们的效果根本不会被撤消机制记录，因此您可以直接撤消它们 (@pxref{Undo})。
+
+其中许多命令作用于当前标题行。  如果点位于标题线上，则该点是当前标题线；如果点位于正文行上，则当前标题行是最近的前面的标题行。
+
+@table @kbd
+@item C-c C-c
+使当前标题行的主体不可见 (@code{outline-hide-entry})。
+@item C-c C-e
+使当前标题行的主体可见 (@code{outline-show-entry})。
+@item C-c C-d
+使当前标题下的所有内容都不可见，不包括标题本身 (@code{outline-hide-subtree})。
+@item C-c C-s
+使当前标题下的所有内容都可见，包括正文、副标题及其正文 (@code{outline-show-subtree})。
+@item C-c C-l
+使当前标题行及其所有副标题的正文不可见 (@code{outline-hide-leaves})。
+@item C-c C-k
+使当前标题行的所有级别的所有副标题都可见 (@code{outline-show-branches})。
+@item C-c C-i
+使当前标题行的直接副标题（下一级）可见 (@code{outline-show-children})。
+@item C-c C-t
+使缓冲区中的所有正文线不可见 (@code{outline-hide-body})。
+@item C-c C-a
+使缓冲区中的所有行都可见 (@code{outline-show-all})。
+@item C-c C-q
+隐藏除顶部 @var{n} 级别的标题行 (@code{outline-hide-sublevels}) 之外的所有内容。
+@item C-c C-o
+隐藏除该点所在的标题或正文之外的所有内容，以及从那里到大纲顶层的标题 (@code{outline-hide-other})。
+@item C-c / h @var{regexp} @key{RET}
+隐藏与 @var{regexp} (@code{outline-hide-by-heading-regexp}) 匹配的标题正文。
+@item C-c / s @var{regexp} @key{RET}
+显示与 @var{regexp} (@code{outline-show-by-heading-regexp}) 匹配的标题正文。
+@end table
+
+@findex outline-hide-entry
+@findex outline-show-entry
+@kindex C-c C-c @r{(Outline mode)}
+@kindex C-c C-e @r{(Outline mode)}
+这些命令中最简单的是@kbd{C-c C-c} (@code{outline-hide-entry})，它隐藏紧随当前标题行的正文线，以及@kbd{C-c C-e} (@code{outline-show-entry})，它显示它们。  副标题及其正文不受影响。
+
+@findex outline-hide-subtree
+@findex outline-show-subtree
+@kindex C-c C-s @r{(Outline mode)}
+@kindex C-c C-d @r{(Outline mode)}
+@cindex subtree (Outline mode)
+命令@kbd{C-c C-d} (@code{outline-hide-subtree}) 和@kbd{C-c C-s} (@code{outline-show-subtree}) 更强大。  它们适用于当前标题行的 @dfn{subtree}：其正文、所有子标题（直接和间接）及其所有正文。
+
+@findex outline-hide-leaves
+@findex outline-show-branches
+@findex outline-show-children
+@kindex C-c C-l @r{(Outline mode)}
+@kindex C-c C-k @r{(Outline mode)}
+@kindex C-c C-i @r{(Outline mode)}
+命令@kbd{C-c C-l} (@code{outline-hide-leaves}) 隐藏当前标题行的主体及其子树中的所有主体；副标题本身是可见的。  命令 @kbd{C-c C-k} (@code{outline-show-branches}) 显示副标题，如果它们之前被隐藏（例如，通过 @kbd{C-c C-d}）。  命令 @kbd{C-c C-i} (@code{outline-show-children}) 是此命令的较弱版本；它只显示直接的副标题，即下一级的副标题。
+
+@findex outline-hide-other
+@kindex C-c C-o @r{(Outline mode)}
+命令 @kbd{C-c C-o} (@code{outline-hide-other}) 隐藏除该点所在的条目及其父级（从该条目到大纲中的顶级标题）和顶级标题之外的所有内容。  它还显示缓冲区中第一个标题之前的正文行。
+
+@findex outline-hide-by-heading-regexp
+@findex outline-show-by-heading-regexp
+@kindex C-c / h @r{(Outline mode)}
+@kindex C-c / s @r{(Outline mode)}
+命令@kbd{C-c / h} (@code{outline-hide-by-heading-regexp}) 提示输入正则表达式，并隐藏与正则表达式匹配的所有标题正文行。  命令@kbd{C-c / s}同样提示输入正则表达式，并显示匹配标题的正文。
+
+@findex outline-hide-body
+@findex outline-show-all
+@kindex C-c C-t @r{(Outline mode)}
+@kindex C-c C-a @r{(Outline mode)}
+@findex hide-sublevels
+@kindex C-c C-q @r{(Outline mode)}
+其余命令影响整个缓冲区。  @kbd{C-c C-t} (@code{outline-hide-body}) 使所有正文行不可见，以便您只看到轮廓结构（作为特殊例外，它不会隐藏文件顶部第一个标题行之前的行，即使这些行在技术上是正文行）。  @kbd{C-c C-a} (@code{outline-show-all}) 使所有线条可见。  @kbd{C-c C-q} (@code{outline-hide-sublevels}) 隐藏当前标题行级别及以上级别的除顶级标题之外的所有标题（如果点不在标题上，则默认为 1）；使用数字参数 @var{n} 时，它会隐藏除顶部 @var{n} 级别的标题行之外的所有内容。  请注意，它完全显示了第一个标题之前的所有 @var{n} 顶层和正文线。
+
+@cindex cycle visibility, in Outline mode
+@findex outline-cycle
+@findex outline-cycle-buffer
+Outline 还提供了两个方便的命令来循环每个部分和整个缓冲区的可见性。  在标题上键入 @kbd{@key{TAB}} (@code{outline-cycle}) 可在“隐藏全部”、“子标题”和“显示全部”状态之间循环当前部分。  输入 @kbd{S-@key{TAB}} (@code{outline-cycle-buffer}) 会在“仅顶级标题”、“所有标题和副标题”和“显示全部”状态之间循环整个缓冲区。
+
+@anchor{Outline Search}
+@findex reveal-mode
+@vindex search-invisible
+当增量搜索找到大纲模式隐藏的文本时，它会使缓冲区的该部分可见。  如果您在该位置退出搜索，文本仍然可见。  要切换活动增量搜索是否可以匹配隐藏文本，请输入 @kbd{M-s i}。要更改将来搜索的默认值，请自定义选项 @code{search-invisible}。  （此选项还会影响 @code{query-replace} 和相关函数处理隐藏文本 @pxref{Query Replace} 的方式。）您还可以使用“显示”模式 (@kbd{M-x reveal-mode})（一种缓冲区本地次要模式）在文本中导航时自动使文本可见。
+
+@vindex outline-default-state
+@code{outline-default-state} 变量控制打开大纲模式后哪些标题可见。  如果非@code{nil}，则最初会概述一些标题。  如果等于数字，则仅显示直至并包括相应级别的标题。  如果等于@code{outline-show-all}，则显示缓冲区的所有文本。  如果等于@code{outline-show-only-headings}，则仅显示标题，无论其级别如何。  如果等于 lambda 函数或函数名称，则该函数预计会切换标题可见性，并且在启用该模式后将在不带参数的情况下调用。
+
+@node Outline Views
+@subsection 在多个视图中查看一个轮廓
+
+@cindex multiple views of outline
+@cindex views of an outline
+@cindex outline with multiple views
+@cindex indirect buffers and outlines
+您可以在不同的窗口中同时显示单个轮廓的两个视图。  为此，您必须使用@kbd{M-x make-indirect-buffer} 创建一个间接缓冲区。  该命令的第一个参数是现有的大纲缓冲区名称，第二个参数是用于新间接缓冲区的名称。  @xref{Indirect Buffers}。
+
+一旦存在间接缓冲区，您就可以使用 @kbd{C-x 4 b} 或其他 Emacs 命令以正常方式将其显示在窗口中。  显示和隐藏部分文本的大纲模式命令独立地作用于每个缓冲区；因此，每个缓冲区都可以有自己的视图。  如果您希望同一轮廓上有两个以上的视图，请创建额外的间接缓冲区。
+
+@node Foldout
+@subsection 折叠编辑
+
+@cindex folding editing
+Foldout 包通过折叠命令扩展了轮廓模式和轮廓次要模式。  折叠的想法是放大轮廓的嵌套部分，同时在更高级别隐藏其相关部分。
+
+考虑一个大纲模式缓冲区，其中隐藏了 1 级标题下的所有文本和副标题。  要查看隐藏在这些标题之一下的内容，您可以使用 @kbd{C-c C-e} (@kbd{M-x outline-show-entry}) 来显示正文，或使用 @kbd{C-c C-i} 来显示子（2 级）标题。
+
+@kindex C-c C-z
+@findex foldout-zoom-subtree
+对于折叠，您可以使用 @kbd{C-c C-z} (@kbd{M-x foldout-zoom-subtree})。这会公开正文和子副标题，并缩小缓冲区，以便只有 @w{level-1} 标题、正文和 2 级标题可见。  现在要查看二级标题之一，请将光标置于其上并再次使用@kbd{C-c C-z}。  这会暴露 2 级正文及其 3 级子标题，并再次缩小缓冲区范围。  您可以根据需要放大连续的副标题。  模式行中的字符串显示您已经走了多深。
+
+放大标题时，要仅查看子副标题，请指定数字参数：@kbd{C-u C-c C-z}。  子标题的级别数也可以指定（比较 @kbd{M-x outline-show-children}），例如 @w{@kbd{M-2 C-c C-z}} 公开两级子标题。或者，可以使用负参数指定主体：@w{@kbd{M-- C-c C-z}}。  整个子树可以通过指定零参数来展开，类似于 @kbd{C-c C-s} (@kbd{M-x outline-show-subtree})：@w{@kbd{M-0 C-c C-z}}。
+
+放大时，您仍然可以使用轮廓模式的曝光和隐藏功能，而不会干扰折叠。  此外，由于缓冲区变窄，全局编辑操作将仅影响放大标题下的文本。  这对于限制对文档的特定章节或部分的更改很有用。
+
+@kindex C-c C-x
+@findex foldout-exit-fold
+要取消缩放（退出）折叠，请使用 @kbd{C-c C-x} (@kbd{M-x foldout-exit-fold})。这将隐藏顶级标题下的所有文本和副标题，并使您返回到缓冲区的上一个视图。  指定数字参数会退出许多级别的折叠。  指定零参数将退出所有折叠。  指定负参数（以便退出的折叠保持可见）保留点和窗口视图的位置。
+
+要取消折叠缩小而不隐藏文本和副标题，请指定负参数。  例如，@w{@kbd{M--2 C-c C-x}} 退出两个折叠并保留文本和副标题。
+
+@findex foldout-widen-to-current-fold
+在折叠内工作时，您可能希望使用 Emacs 的标准缩小命令，例如 @kbd{C-x n n} (@code{narrow-to-region}) 或 @kbd{C-x n d} (@code{narrow-to-defun})。  使用这些命令后，@code{foldout-widen-to-current-fold}) 允许您加宽回当前折叠级别，而不是整个缓冲区。  如果您当前没有处于折叠状态，则其行为类似于@code{widen}。
+
+折叠模式还提供用于进入和退出折叠以及显示和隐藏文本的鼠标命令：
+
+@table @asis
+@item @kbd{C-M-mouse-1} 放大单击的标题
+@itemize @w{}
+@item 
+单击：暴露身体。
+@item 
+双击：显示副标题。
+@item 
+三击：显示正文和副标题。
+@item 
+四次单击：暴露整个子树。
+@end itemize
+@item @kbd{C-M-mouse-2} 显示单击的标题下的文本
+@itemize @w{}
+@item 
+单击：暴露身体。
+@item 
+双击：显示副标题。
+@item 
+三击：显示正文和副标题。
+@item 
+四次单击：暴露整个子树。
+@end itemize
+@item @kbd{C-M-mouse-3} 隐藏单击的标题下的文本或退出折叠
+@itemize @w{}
+@item 
+单击：隐藏子树。
+@item 
+双击：退出折叠并隐藏文本。
+@item 
+三击：退出折叠而不隐藏文本。
+@item 
+四次单击：退出所有折叠并隐藏文本。
+@end itemize
+@end table
+
+@c FIXME not marked as a user variable
+@vindex foldout-mouse-modifiers
+您可以通过设置@code{foldout-mouse-modifiers}来指定不同的修饰键（而不是@kbd{@key{Ctrl}-@key{Meta}-}）；但如果您已经加载了 @file{foldout.el} 库，则必须重新加载它才能生效。
+
+要使用 Foldout 包，您可以输入 @kbd{M-x load-library @key{RET} foldout @key{RET}}；或者您可以通过将以下内容放入您的初始化文件中来安排自动执行此操作：
+
+@example
+(with-eval-after-load "outline"
+  (require 'foldout))
+@end example
+
+@node Org Mode
+@section 组织模式
+@cindex organizer
+@cindex planner
+@cindex Org mode
+@cindex mode, Org
+
+@findex org-mode
+Org 模式是 Outline 模式的一种变体，用于使用 Emacs 作为组织者和/或创作系统。  名称以扩展名 @file{.org} 结尾的文件在 Org 模式 (@pxref{Choosing Modes}) 下打开。要显式切换到组织模式，请输入 @kbd{M-x org-mode}。
+
+在组织模式下，与大纲模式一样，每个条目都有一个以一个或多个 @samp{*} 字符开头的标题行。  @xref{Outline Format}。此外，任何以 @samp{#} 字符开头的行都被视为注释。
+
+@kindex TAB @r{(Org Mode)}
+@findex org-cycle
+组织模式提供了用于轻松查看和操作大纲结构的命令。  这些命令中最简单的是@key{TAB} (@code{org-cycle})。  如果在标题行上调用，它将循环显示子树的不同可见性状态：(i) 仅显示该标题行，(ii) 仅显示标题行及其直接子项的标题行（如果有），以及 (iii) 显示整个子树。如果在正文行中调用，则执行 @key{TAB} 的全局绑定。
+
+@kindex S-TAB @r{(Org Mode)}
+@findex org-shifttab
+在 Org 模式缓冲区中的任何位置键入 @kbd{S-@key{TAB}} (@code{org-shifttab}) 会循环整个大纲结构的可见性，在 (i) 仅显示顶级标题行，(ii) 显示所有标题行但不显示正文行，以及 (iii) 显示所有内容之间。
+
+@kindex M-UP @r{(Org Mode)}
+@kindex M-DOWN @r{(Org Mode)}
+@kindex M-LEFT @r{(Org Mode)}
+@kindex M-RIGHT @r{(Org Mode)}
+@findex org-metaup
+@findex org-metadown
+@findex org-metaleft
+@findex org-metaright
+您可以通过在标题行上键入 @kbd{M-@key{UP}} (@code{org-metaup}) 或 @kbd{M-@key{DOWN}} (@code{org-metadown}) 在缓冲区中向上或向下移动整个条目，包括其正文行和子树（如果有）。  同样，您可以使用 @kbd{M-@key{LEFT}} (@code{org-metaleft}) 和 @kbd{M-@key{RIGHT}} (@code{org-metaright}) 提升或降级标题行。  如果在正文行上调用，这些命令将执行其全局绑定。
+
+以下小节提供了使用 Org 模式作为组织者和创作系统的基本说明。  欲知详情，@pxref{Top, The Org Mode Manual, Introduction, org, The Org Manual}。
+
+@menu
+* Org Organizer::    管理 TODO 列表和议程。
+* Org Authoring::    将 Org 缓冲区导出为各种格式。
+@end menu
+
+@node Org Organizer
+@subsection 组织作为组织者
+@cindex TODO item
+@cindex Org agenda
+
+@kindex C-c C-t @r{(Org Mode)}
+@findex org-todo
+@vindex org-todo-keywords
+您可以通过在条目中的任意位置键入 @kbd{C-c C-t} (@code{org-todo}) 将组织条目标记为 @dfn{TODO} 项目。  这会将关键字 @samp{TODO} 添加到标题行。  再次输入@kbd{C-c C-t}将关键字切换为@samp{DONE}；另一个 @kbd{C-c C-t} 完全删除关键字，依此类推。  您可以通过变量@code{org-todo-keywords}自定义@kbd{C-c C-t}使用的关键字。
+
+@kindex C-c C-s @r{(Org Mode)}
+@kindex C-c C-d @r{(Org Mode)}
+@findex org-schedule
+@findex org-deadline
+除了将条目标记为 TODO 之外，您还可以通过在条目中键入 @kbd{C-c C-s} (@code{org-schedule}) 为其附加日期。  这会弹出 Emacs 日历 (@pxref{Calendar/Diary}) 来提示输入日期，然后在标题行下方添加标签 @samp{SCHEDULED} 以及所选日期。  命令@kbd{C-c C-d} (@code{org-deadline}) 具有相同的效果，只是它使用标签@code{DEADLINE}。
+
+@kindex C-c [ @r{(Org Mode)}
+@findex org-agenda-file-to-front
+@vindex org-agenda-files
+一旦您在 Org 文件中计划了一些 TODO 项目，您可以通过键入 @kbd{C-c [} (@code{org-agenda-file-to-front}) 将该文件添加到 @dfn{agenda files} 列表中。  组织模式旨在让您轻松维护多个议程文件，例如用于组织生活的不同方面。  议程文件列表存储在变量@code{org-agenda-files}中。
+
+@findex org-agenda
+要查看来自议程文件的项目，请输入 @kbd{M-x org-agenda}。  此命令会提示您想要查看的内容：本周要做的事情列表、具有特定关键字的 TODO 项目列表等。
+@ifnottex
+@xref{Agenda Views,,,org, The Org Manual}, for details.
+@end ifnottex
+
+@node Org Authoring
+@subsection Org 作为创作系统
+@cindex Org exporting
+
+@findex org-export-dispatch
+@kindex C-c C-e @r{(Org mode)}
+您可能想要很好地格式化您的组织笔记并为导出和发布做好准备。  要导出当前缓冲区，请在 Org 缓冲区中的任意位置键入 @kbd{C-c C-e} (@code{org-export-dispatch})。  该命令提示输入导出格式；目前支持的格式包括 HTML、@LaTeX{}、Texinfo、OpenDocument (@file{.odt})、iCalendar、Markdown、手册页和 PDF@. 某些格式（例如 PDF）需要安装某些系统工具。
+
+@vindex org-publish-project-alist
+要一次将多个文件导出到本地或通过网络的特定目录，您必须通过变量 @code{org-publish-project-alist} 定义项目列表。  有关详细信息，请参阅其文档。
+
+Org 支持简单的标记方案，用于将文本格式应用于导出的文档：
+
+@example
+- This text is /emphasized/
+- This text is *in bold*
+- This text is _underlined_
+- This text uses =a teletype font=
+
+#+begin_quote
+``This is a quote.''
+#+end_quote
+
+#+begin_example
+This is an example.
+#+end_example
+@end example
+
+如需了解更多详细信息，@ref{Exporting,,,org, The Org Manual}和@ref{Publishing,,,org, The Org Manual}。
+
+@node TeX Mode
+@section @TeX{}模式
+@cindex @TeX{} mode
+@cindex @LaTeX{} mode
+@cindex Sli@TeX{} mode
+@cindex Doc@TeX{} mode
+@cindex mode, @TeX{}
+@cindex mode, @LaTeX{}
+@cindex mode, Sli@TeX{}
+@cindex mode, Doc@TeX{}
+@findex tex-mode
+@findex plain-tex-mode
+@findex latex-mode
+@findex slitex-mode
+@findex doctex-mode
+@findex bibtex-mode
+
+  @TeX{} is a powerful text formatter written by Donald Knuth; like
+GNU Emacs，它是免费软件。  @TeX{} 格式有多种变体，包括 @LaTeX{}，@TeX{} 的简化输入格式； Doc@TeX{}，一种特殊的文件格式，其中写入@LaTeX{}源代码，将源代码与文档结合起来；和 Sli@TeX{}，@LaTeX{}@footnote{ It has been replaced by the @samp{slides} document class, which comes with @LaTeX{}.} 的过时特殊形式。
+
+@vindex tex-default-mode
+Emacs 为每个变体提供了 @TeX{} 主要模式： Plain
+@TeX{} mode, @LaTeX{} mode, Doc@TeX{} mode, and Sli@TeX{} mode.  Emacs
+通过查看缓冲区的内容来选择适当的模式。 （这是通过调用 @code{tex-mode} 命令来完成的，该命令通常在您访问类似 @TeX{} 的文件时自动调用。@xref{Choosing Modes}。）如果内容不足以确定这一点，Emacs 将选择由变量 @code{tex-default-mode} 指定的模式；它的默认值为@code{latex-mode}。  如果 Emacs 没有猜对，您可以选择正确的变体
+@TeX{} mode using the commands @code{plain-tex-mode},
+@code{latex-mode}、@code{slitex-mode} 或 @code{doctex-mode}。
+
+以下部分记录了 @TeX{} 模式及其变体的功能。  还有其他几个与 @TeX{} 相关的 Emacs 软件包，本手册中未记录这些软件包：
+
+@itemize @bullet
+@item 
+Bib@TeX{}模式是Bib@TeX{}文件的主要模式，通常用于保存@LaTeX{}文档的书目参考。  有关更多信息，请参阅命令 @code{bibtex-mode} 的文档字符串。
+
+@item 
+Ref@TeX{} 包提供了一个次要模式，可以与
+@LaTeX{} mode to manage bibliographic references.
+@ifinfo
+@xref{Top,The Ref@TeX{} Manual,,reftex}.
+@end ifinfo
+@ifnotinfo
+有关更多信息，请参阅 Ref@TeX{} Info 手册，该手册随 Emacs 一起分发。
+@end ifnotinfo
+
+@item 
+AUC@TeX{} 包提供了更高级的编辑功能
+@TeX{} and its related formats, including the ability to preview
+@TeX{} equations within Emacs buffers.  Unlike Bib@TeX{} mode and the
+Ref@TeX{} 包，AUC@TeX{} 默认情况下不随 Emacs 一起分发。可以通过包菜单下载（@pxref{Packages}）；安装后，请参阅
+@ifinfo
+@ref{Top,The AUC@TeX{} Manual,,auctex}.
+@end ifinfo
+@ifnotinfo
+AUC@TeX{} 手册，包含在包装中。
+@end ifnotinfo
+@end itemize
+
+@menu
+* TeX Editing::    用于在 TeX 模式下进行编辑的特殊命令。
+* LaTeX Editing::  LaTeX 输入文件的附加命令。
+* TeX Print::      使用 TeX 打印文件的一部分的命令。
+* TeX Misc::       TeX 模式的定制以及相关功能。
+@end menu
+
+@node TeX Editing
+@subsection @TeX{} 编辑命令
+
+@table @kbd
+@item "
+根据上下文插入 @samp{``} 或 @samp{"} 或 @samp{''} (@code{tex-insert-quote})。
+@item C-j
+插入段落分隔符（两个换行符）并检查前一段是否有不平衡的大括号或美元符号 (@code{tex-terminate-paragraph})。
+@item M-x tex-validate-region
+检查该区域中的每个段落是否有不平衡的大括号或美元符号。
+@item C-c @{
+插入 @samp{@{@}} 并在它们之间定位点 (@code{tex-insert-braces})。
+@item C-c @}
+向前移动到下一个不匹配的右大括号 (@code{up-list})。
+@end table
+
+@findex tex-insert-quote
+@kindex " @r{(@TeX{} mode)}
+在@TeX{}中，通常不使用字符@samp{"}；相反，引号以 @samp{``} 开头并以 @samp{''} 结尾。  因此，@TeX{} 模式将 @kbd{"} 键绑定到 @code{tex-insert-quote} 命令。  这会在空格或左大括号之后插入 @samp{``}，在反斜杠之后插入 @samp{"}，在任何其他字符之后插入 @samp{''}。
+
+作为一个特殊的例外，如果您在 point 之前的文本为 @samp{``} 或 @samp{''} 时键入 @kbd{"}，Emacs 会将前面的文本替换为单个 @samp{"} 字符。  因此，如果需要，您可以输入 @kbd{""} 来插入 @samp{"}。  （您也可以使用 @kbd{C-q "} 插入该字符。）
+
+在 @TeX{} 模式下，@samp{$} 有一个特殊的语法代码，它试图理解 @TeX{} 数学模式分隔符匹配的方式。  当您插入要退出数学模式的 @samp{$} 时，进入数学模式的匹配 @samp{$} 的位置会显示一秒钟。  此功能与显示与插入的右大括号相匹配的左大括号相同。  然而，无法判断 @samp{$} 是进入数学模式还是离开数学模式；因此，当您插入进入数学模式的 @samp{$} 时，前一个 @samp{$} 位置会显示为匹配，即使它们实际上不相关。
+
+@findex tex-insert-braces
+@kindex C-c @{ @r{(@TeX{} mode)}
+@findex up-list
+@kindex C-c @} @r{(@TeX{} mode)}
+  @TeX{} uses braces as delimiters that must match.  Some users prefer
+始终保持牙套平衡，而不是单独插入。  使用 @kbd{C-c @{} (@code{tex-insert-braces}) to insert a pair of braces.  It leaves point between the two braces so you can insert the text that belongs inside.  Afterward, use the command @kbd{C-c @}} (@code{up-list}) 向前移动经过右大括号。  您还可以调用@kbd{C-c @{} after marking some text: then the command encloses the marked text in braces.
+
+@findex tex-validate-region
+@findex tex-terminate-paragraph
+@kindex C-j @r{(@TeX{} mode)}
+有两个命令用于检查大括号的匹配。 @kbd{C-j} (@code{tex-terminate-paragraph}) 检查 point 之前的段落，并插入两个换行符以开始一个新段落。  如果发现任何不匹配，它会在回显区域输出一条消息。  @kbd{M-x tex-validate-region} 逐段检查一个区域。  错误列在 @file{*Occur*} 缓冲区中；您可以在该缓冲区中使用常用的发生模式命令（例如@kbd{C-c C-c}）来访问特定的不匹配（@pxref{Other Repeating Search}）。
+
+请注意，Emacs 命令对方括号和圆括号进行计数
+@TeX{} mode, not just braces.  This is not strictly correct for the
+检查 @TeX{} 语法的目的。  然而，圆括号和方括号很可能在文本中用作匹配分隔符，并且对于各种运动命令和自动匹配显示来说，使用它们非常有用。
+
+@node LaTeX Editing
+@subsection @LaTeX{} 编辑命令
+
+  @LaTeX{} mode provides a few extra features not applicable to plain
+@TeX{}:
+
+@table @kbd
+@item C-c C-o
+为 @LaTeX{} 块插入 @samp{\begin} 和 @samp{\end} 并将点定位在它们之间的线上 (@code{latex-insert-block})。
+@item C-c C-e
+关闭尚未关闭的最里面的 @LaTeX{} 块 (@code{latex-close-block})。
+@end table
+
+@findex latex-insert-block
+@kindex C-c C-o @r{(@LaTeX{} mode)}
+在 @LaTeX{} 输入中，@samp{\begin} 和 @samp{\end} 标签用于对文本块进行分组。  要插入块，请输入 @kbd{C-c C-o} (@code{latex-insert-block})。  这会提示输入块类型，并插入适当的匹配 @samp{\begin} 和 @samp{\end} 标签，在两者之间留下一个空行并在那里移动点。
+
+@vindex latex-block-names
+当向 @kbd{C-c C-o} 输入块类型参数时，可以使用常用的完成命令 (@pxref{Completion})。  默认完成列表包含标准 @LaTeX{} 块类型。  如果您需要其他块类型来完成，请自定义列表变量@code{latex-block-names}。
+
+@findex latex-close-block
+@kindex C-c C-e @r{(@LaTeX{} mode)}
+@findex latex-electric-env-pair-mode
+在 @LaTeX{} 输入中，@samp{\begin} 和 @samp{\end} 标签必须平衡。您可以使用 @kbd{C-c C-e} (@code{latex-close-block}) 插入与最后一个不匹配的 @samp{\begin} 相匹配的 @samp{\end} 标签。  它还会缩进 @samp{\end} 以匹配相应的 @samp{\begin}，并在 @samp{\end} 标记后插入换行符（如果 point 位于行的开头）。  当您键入相应的标签时，次要模式 @code{latex-electric-env-pair-mode} 会自动插入 @samp{\end} 或 @samp{\begin} 标签。
+
+@node TeX Print
+@subsection @TeX{} 打印命令
+
+您可以将 @TeX{} 作为 Emacs 的子进程来调用，提供缓冲区的全部内容或仅提供其中的一部分（例如，较大文档的一章）。
+
+@table @kbd
+@item C-c C-b
+在整个当前缓冲区 (@code{tex-buffer}) 上调用 @TeX{}。
+
+@item C-c C-r
+在当前区域上调用 @TeX{} 以及缓冲区的标头 (@code{tex-region})。
+
+@item C-c C-f
+对当前文件 (@code{tex-file}) 调用 @TeX{}。
+
+@item C-c C-v
+预览最后一个 @kbd{C-c C-b}、@kbd{C-c C-r} 或 @kbd{C-c C-f} 命令 (@code{tex-view}) 的输出。
+
+@item C-c C-p
+打印最后一个 @kbd{C-c C-b}、@kbd{C-c C-r} 或 @kbd{C-c C-f} 命令 (@code{tex-print}) 的输出。
+
+@item C-c @key{TAB}
+对当前文件 (@code{tex-bibtex-file}) 调用 Bib@TeX{}。
+@item C-c C-l
+将显示 @TeX{} 输出的窗口居中，以便可以看到最后一行 (@code{tex-recenter-output-buffer})。
+@item C-c C-k
+终止 @TeX{} 子进程 (@code{tex-kill-job})。
+@item C-c C-c
+对整个当前缓冲区 (@code{tex-compile}) 调用其他一些编译命令。
+@end table
+
+@findex tex-buffer
+@kindex C-c C-b @r{(@TeX{} mode)}
+@findex tex-view
+@kindex C-c C-v @r{(@TeX{} mode)}
+@findex tex-print
+@kindex C-c C-p @r{(@TeX{} mode)}
+要通过 @TeX{} 传递当前缓冲区，请输入 @kbd{C-c C-b} (@code{tex-buffer})。  格式化的输出位于临时文件中，通常是 @file{.dvi} 文件。  然后，您可以输入 @kbd{C-c C-v} (@code{tex-view}) 启动外部程序（例如 @command{xdvi}）来查看此输出文件。  您还可以输入 @kbd{C-c C-p} (@code{tex-print}) 打印输出文件的硬拷贝。
+
+@cindex @env{TEXINPUTS} environment variable
+@vindex tex-directory
+默认情况下，@kbd{C-c C-b} 在当前目录中运行@TeX{}。  @TeX{} 的输出也会在此目录中创建。  要在不同的目录中运行@TeX{}，请将变量@code{tex-directory}更改为所需的目录。  如果您的环境变量 @env{TEXINPUTS} 包含相对名称，或者您的文件包含带有相对文件名的 @samp{\input} 命令，则 @code{tex-directory} @emph{must} 为 @code{"."} 否则您将得到错误的结果。  否则，指定其他目录是安全的，例如@code{"/tmp"}。
+
+@vindex tex-run-command
+@vindex latex-run-command
+@vindex tex-dvi-view-command
+@vindex tex-dvi-print-command
+@vindex tex-print-file-extension
+缓冲区的 @TeX{} 变体确定实际运行的 shell 命令 @kbd{C-c C-b}。  在 Plain @TeX{} 模式下，它由变量 @code{tex-run-command} 指定，默认为 @code{"tex"}。  在
+@LaTeX{} mode, it is specified by @code{latex-run-command}, which
+默认为@code{"latex"}。  @kbd{C-c C-v} 运行以查看 @file{.dvi} 输出的 shell 命令由变量 @code{tex-dvi-view-command} 确定，无论 @TeX{} 变体如何。  @kbd{C-c C-p} 运行以打印输出的 shell 命令由变量 @code{tex-dvi-print-command} 确定。  变量 @code{tex-print-file-extension} 可以设置为查看和打印 @TeX{} 编译文件所需的文件扩展名。  例如，您可以将其设置为@file{.pdf}，并相应更新@code{tex-dvi-view-command}和@code{tex-dvi-print-command}，以及@code{latex-run-command}或@code{tex-run-command}。
+
+通常，Emacs 会自动将输出文件名附加到上一段中描述的 shell 命令字符串中。  例如，如果 @code{tex-dvi-view-command} 为 @code{"xdvi"}，则 @kbd{C-c C-v} 运行 @command{xdvi @var{output-file-name}}。  然而，在某些情况下，文件名需要嵌入到命令中，例如，如果您需要将文件名作为参数提供给一个命令，而该命令的输出通过管道传输到另一个命令。  您可以在命令字符串中使用 @samp{*} 指定文件名的放置位置。  例如，
+
+@example
+(setq tex-dvi-print-command "dvips -f * | lpr")
+@end example
+
+@findex tex-kill-job
+@kindex C-c C-k @r{(@TeX{} mode)}
+@findex tex-recenter-output-buffer
+@kindex C-c C-l @r{(@TeX{} mode)}
+@TeX{} 的终端输出（包括所有错误消息）出现在名为 @file{*tex-shell*} 的缓冲区中。  如果 2⁣ 出现错误，您可以切换到此缓冲区并向其提供输入（这与 Shell 模式下的工作方式相同；@pxref{Interactive Shell}）。  无需切换到此缓冲区，您可以通过键入 @kbd{C-c C-l} 滚动它，使其最后一行可见。
+
+如果您发现 @TeX{} 进程的输出不再有用，请键入 @kbd{C-c C-k} (@code{tex-kill-job}) 来终止它。  使用@kbd{C-c C-b}或@kbd{C-c C-r}也会杀死任何仍在运行的@TeX{}进程。
+
+@findex tex-region
+@kindex C-c C-r @r{(@TeX{} mode)}
+您还可以通过输入 @kbd{C-c C-r} (@code{tex-region}) 通过 @TeX{} 传递任意区域。  然而，这很棘手，因为 @TeX{} 输入的大多数文件在开头都包含设置参数和定义宏的命令，如果没有这些命令，文件的后续部分将无法正确格式化。  为了解决这个问题，@kbd{C-c C-r}允许您指定文件的一部分包含基本命令；它作为输入的一部分包含在指定区域之前
+@TeX{}.  The designated part of the file is called the @dfn{header}.
+
+@cindex header (@TeX{} mode)
+要指示 Plain @TeX{} 模式下标头的边界，您可以在文件中插入两个特殊字符串。  在标题前插入 @samp{%**start of header}，在标题后插入 @samp{%**end of header}。  每个字符串必须完全出现在一行上，但该行之前或之后可能有其他文本。  包含两个字符串的行包含在标题中。如果 @samp{%**start of header} 没有出现在缓冲区的前 100 行内，​​则 @kbd{C-c C-r} 假定没有标题。
+
+在@LaTeX{}模式下，标头以@samp{\documentclass}或@samp{\documentstyle}开始，以@samp{\begin@{document@}}结束。  这些是 @LaTeX{} 要求您在任何情况下都使用的命令，因此不需要执行任何特殊操作来识别标头。
+
+@findex tex-file
+@kindex C-c C-f @r{(@TeX{} mode)}
+命令 (@code{tex-buffer}) 和 (@code{tex-region}) 在临时目录中完成所有工作，并且没有 @TeX{} 进行交叉引用所需的任何辅助文件；这些命令通常不适合运行最终副本，其中所有交叉引用都需要正确。
+
+当您需要辅助文件进行交叉引用时，请使用@kbd{C-c C-f} (@code{tex-file})，它会在当前缓冲区的文件目录中运行@TeX{}。  在运行@TeX{}之前，它会保存所有修改过的缓冲区。  一般来说，您需要使用 (@code{tex-file}) 两次才能获得正确的交叉引用。
+
+@vindex tex-start-options
+变量 @code{tex-start-options} 的值指定 @TeX{} 运行的选项。
+
+@vindex tex-start-commands
+变量@code{tex-start-commands}的值指定用于启动@TeX{}的@TeX{}命令。  默认值使 @TeX{} 以不间断模式运行。  要交互运行 @TeX{}，请将变量设置为 @code{""}。
+
+@vindex tex-main-file
+大型 @TeX{} 文档通常被分成几个文件——一个主文件，加上子文件。  在子文件上运行 @TeX{} 通常不起作用；你必须在主文件上运行它。  为了在编辑子文件时使@code{tex-file}有用，您可以将变量@code{tex-main-file}设置为主文件的名称。  然后 @code{tex-file} 在该文件上运行 @TeX{}。
+
+使用 @code{tex-main-file} 最方便的方法是在每个子文件的局部变量列表中指定它。  @xref{File Variables}。
+
+@findex tex-bibtex-file
+@kindex C-c TAB @r{(@TeX{} mode)}
+@vindex tex-bibtex-command
+对于@LaTeX{}文件，可以使用Bib@TeX{}来处理当前缓冲区文件的辅助文件。  Bib@TeX{} 在数据库中查找书目引文，并为书目部分准备引用的参考文献。  命令 @kbd{C-c @key{TAB}} (@code{tex-bibtex-file}) 运行 shell 命令 (@code{tex-bibtex-command}) 为当前缓冲区的文件生成 @samp{.bbl} 文件。  一般来说，您需要执行一次@kbd{C-c C-f} (@code{tex-file}) 来生成@samp{.aux} 文件，然后执行@kbd{C-c @key{TAB}} (@code{tex-bibtex-file})，然后再重复@kbd{C-c C-f} (@code{tex-file}) 两次以获得正确的交叉引用。
+
+@findex tex-compile
+@kindex C-c C-c @r{(@TeX{} mode)}
+要在当前 @TeX{} 缓冲区上调用其他编译程序，请输入 @kbd{C-c C-c} (@code{tex-compile})。  该命令知道如何将参数传递给许多常见程序，包括 @file{pdflatex}、@file{yap}、@file{xdvi} 和 @file{dvips}。  您可以使用标准完成键 (@pxref{Completion}) 选择所需的编译程序。
+
+@node TeX Misc
+@subsection @TeX{} 模式杂项
+
+@vindex tex-shell-hook
+@vindex tex-mode-hook
+@vindex doctex-mode-hook
+@vindex latex-mode-hook
+@vindex slitex-mode-hook
+@vindex plain-tex-mode-hook
+输入 @TeX{} 模式的任何变体都会运行钩子 @code{text-mode-hook} 和 @code{tex-mode-hook}。  然后它运行 @code{plain-tex-mode-hook}、@code{doctex-mode-hook}、@code{latex-mode-hook} 或 @code{slitex-mode-hook}，以合适的为准。  启动 @TeX{} shell 运行钩子 @code{tex-shell-hook}。  @xref{Hooks}。
+
+@findex iso-iso2tex
+@findex iso-tex2iso
+@findex iso-iso2gtex
+@findex iso-gtex2iso
+@cindex Latin-1 @TeX{} encoding
+@cindex @TeX{} encoding
+命令 @kbd{M-x iso-iso2tex}、@kbd{M-x iso-tex2iso}、@kbd{M-x iso-iso2gtex} 和 @kbd{M-x iso-gtex2iso} 可用于在 Latin-1 编码文件和 @TeX{} 编码文件之间进行转换。
+
+@node HTML Mode
+@section SGML 和 HTML 模式
+@cindex SGML mode
+@cindex HTML mode
+@cindex mode, SGML
+@cindex mode, HTML
+@findex sgml-mode
+@findex html-mode
+
+SGML 和 HTML 的主要模式提供缩进支持和用于操作标签的命令。
+
+HTML 由两种模式组成——一种是称为 @code{html-mode} 的基本模式，它是 SGML 模式的稍微定制的变体。  另一个默认用于 HTML 文件，称为 @code{mhtml-mode}，并尝试正确处理 @code{<script>} 元素中包含的 Javascript 和嵌入 @code{<style>} 元素中的 CSS。
+
+@table @kbd
+@item C-c C-n
+@kindex C-c C-n @r{(SGML mode)}
+@findex sgml-name-char
+以交互方式指定特殊字符并插入该字符的 SGML @samp{&} 命令 (@code{sgml-name-char})。
+
+@item C-c C-t
+@kindex C-c C-t @r{(SGML mode)}
+@findex sgml-tag
+以交互方式指定标签及其属性 (@code{sgml-tag})。此命令要求您提供标签名称和属性值，然后插入开始标签和结束标签，并在它们之间留下点。
+
+使用前缀参数 @var{n}，该命令将标记放在点后缓冲区中已存在的 @var{n} 单词周围。  每当一个区域处于活动状态时，它就会在该区域周围放置标签（当瞬态标记模式关闭时，它会在提供数字参数 @minus{}1 时执行此操作。）
+
+@item C-c C-a
+@kindex C-c C-a @r{(SGML mode)}
+@findex sgml-attributes
+以交互方式插入当前标签的属性值 (@code{sgml-attributes})。
+
+@item C-c C-f
+@kindex C-c C-f @r{(SGML mode)}
+@findex sgml-skip-tag-forward
+跳过平衡标签组（从开始标签延伸到相应的结束标签）(@code{sgml-skip-tag-forward})。数字参数充当重复计数。
+
+@item C-c C-b
+@kindex C-c C-b @r{(SGML mode)}
+@findex sgml-skip-tag-backward
+向后跳过平衡标签组（从开始标签延伸到其相应的结束标签）(@code{sgml-skip-tag-backward})。  数字参数充当重复计数。
+
+@item C-c C-d
+@kindex C-c C-d @r{(SGML mode)}
+@findex sgml-delete-tag
+删除该点或该点之后的标签，并删除匹配的标签 (@code{sgml-delete-tag})。  如果该点或该点之后的标签是开始标签，则也删除结束标签；如果它是结束标签，则也删除开始标签。
+
+@item C-c ? @var{tag} @key{RET}
+@kindex C-c ? @r{(SGML mode)}
+@findex sgml-tag-help
+显示标签 @var{tag} (@code{sgml-tag-help}) 含义的描述。  如果参数@var{tag}为空，则描述该点的标签。
+
+@item C-c /
+@kindex C-c / @r{(SGML mode)}
+@findex sgml-close-tag
+为最里面的未终止标签插入结束标签 (@code{sgml-close-tag})。  如果在标签或注释中调用，请将其关闭而不是插入关闭标签。
+
+@item C-c 8
+@kindex C-c 8 @r{(SGML mode)}
+@findex sgml-name-8bit-mode
+切换次要模式，在该模式中 Latin-1 字符插入代表它们的相应 SGML 命令，而不是字符本身 (@code{sgml-name-8bit-mode})。
+
+@item C-c C-v
+@kindex C-c C-v @r{(SGML mode)}
+@findex sgml-validate
+运行 shell 命令（必须指定）以验证当前缓冲区为 SGML (@code{sgml-validate})。  （在 HTML 模式下，此按键序列运行不同的命令。）
+
+@item C-c @key{TAB}
+@kindex C-c TAB @r{(SGML mode)}
+@findex sgml-tags-invisible
+切换缓冲区中现有标签的可见性。  这可以用作廉价预览（@code{sgml-tags-invisible}）。
+@end table
+
+@cindex nXML mode
+@cindex mode, nXML
+@cindex mode, XML
+@findex nxml-mode
+@cindex XML schema
+编辑 XML 文档的主要模式称为 nXML 模式。  这是一个强大的主要模式，可以识别许多现有的 XML 模式，并使用它们通过 @kbd{M-@key{TAB}} 提供 XML 元素的补全，以及带有错误突出显示的动态 XML 验证。  要在现有缓冲区中启用 nXML 模式，请输入 @kbd{M-x nxml-mode}，或等效的@kbd{M-x xml-mode}。  Emacs 对扩展名为 @file{.xml} 的文件使用 nXML 模式。  对于扩展名为 @file{.xhtml} 的 XHTML 文件，Emacs 默认使用 HTML 模式；您可以通过自定义变量 @code{auto-mode-alist} (@pxref{Choosing Modes}) 使其使用 nXML 模式。
+@ifinfo
+nXML 模式在其自己的手册中进行了描述：@xref{Top, nXML Mode,,nxml-mode, nXML Mode}。
+@end ifinfo
+@ifnotinfo
+nXML 模式在随 Emacs 一起发布的 Info 手册中进行了描述。
+@end ifnotinfo
+
+@vindex sgml-xml-mode
+您可以选择使用功能较弱的 SGML 模式来编辑 XML，因为 XML 是 SGML@. 的严格子集。要在现有缓冲区中启用 SGML 模式，请键入 @kbd{M-x sgml-mode}。  在启用 SGML 模式时，Emacs 检查缓冲区以确定它是否是 XML；如果是，它将变量 @code{sgml-xml-mode} 设置为非 @code{nil} 值。这会导致 SGML 模式的标签插入命令（如上所述）始终插入显式结束标签。
+
+@node Nroff Mode
+@section 诺夫模式
+
+@cindex nroff
+@findex nroff-mode
+@vindex nroff-mode-hook
+Nroff 模式是从文本模式派生的一种主要模式，专门用于编辑 nroff 文件（例如 Unix 手册页）。  输入 @kbd{M-x nroff-mode} 进入此模式。  进入 Nroff 模式运行钩子 @code{text-mode-hook}，然后运行 ​​@code{nroff-mode-hook} (@pxref{Hooks})。
+
+在 Nroff 模式下，nroff 命令行被视为段落分隔符，页面由 @samp{.bp} 命令分隔，注释以反斜杠双引号开头。  它还定义了这些命令：
+
+@findex nroff-forward-text-line
+@findex nroff-backward-text-line
+@findex nroff-count-text-lines
+@kindex M-n @r{(Nroff mode)}
+@kindex M-p @r{(Nroff mode)}
+@kindex M-? @r{(Nroff mode)}
+@table @kbd
+@item M-n
+移至不是 nroff 命令的下一行的开头 (@code{nroff-forward-text-line})。  参数是重复计数。
+@item M-p
+与 @kbd{M-n} 类似，但向上移动 (@code{nroff-backward-text-line})。
+@item M-?
+在回显区域中显示区域 (@code{nroff-count-text-lines}) 中的文本行数（不是 nroff 命令的行）。
+@end table
+
+@findex nroff-electric-mode
+Electric Nroff 模式是一种缓冲区本地次要模式，可与 Nroff 模式一起使用。  要切换此次要模式，请输入 @kbd{M-x nroff-electric-mode} (@pxref{Minor Modes})。  当该模式打开时，每次键入 @key{RET} 结束包含打开某种分组的 nroff 命令的行时，用于关闭该分组的 nroff 命令会自动插入到下一行。
+
+如果您将大纲次要模式与 Nroff 模式 (@pxref{Outline Mode}) 一起使用，则标题行是@samp{.H} 形式的行，后跟一个数字（标题级别）。
+
+@node Enriched Text
+@section 丰富的文本
+@cindex Enriched mode
+@cindex mode, Enriched
+@cindex enriched text
+@cindex WYSIWYG
+@cindex word processing
+@cindex text/enriched MIME format
+
+丰富模式是一种以 WYSIWYG（所见即所得）方式编辑格式化文本文件的次要模式。  启用丰富模式后，您可以将各种格式化属性应用于缓冲区中的文本，例如字体和颜色；保存缓冲区后，这些属性将使用 MIME @samp{text/enriched} 文件格式与文本一起保存。
+
+丰富模式通常与文本模式 (@pxref{Text Mode}) 一起使用。它与 @emph{not} 兼容字体锁定模式，许多主要模式（包括大多数编程语言模式）都使用该模式来进行语法突出显示 (@pxref{Font Lock})。  与丰富模式不同，字体锁定模式根据当前缓冲区内容自动分配文本属性；这些属性不会保存到磁盘。
+
+Emacs 的@code{data-directory} 中的文件@file{enriched.txt} 是丰富模式功能的一个示例。
+
+@menu
+* Enriched Mode::            进入和退出丰富模式。
+* Hard and Soft Newlines::   有两种不同类型的换行符。
+* Editing Format Info::      如何编辑文本属性。
+* Enriched Faces::           粗体、斜体、下划线等。
+* Enriched Indentation::     更改左右边距。
+* Enriched Justification::   居中、设置文本与左边距或右边距齐平等。
+* Enriched Properties::      “特殊文本属性”子菜单。
+@end menu
+
+@node Enriched Mode
+@subsection 丰富模式
+
+丰富模式是缓冲区局部次要模式 (@pxref{Minor Modes})。当您访问以 @samp{text/enriched} 格式保存的文件时，Emacs 会自动启用丰富模式，并将文件中的格式信息应用到缓冲区文本。  当您在启用丰富模式的情况下保存缓冲区时，它将使用 @samp{text/enriched} 格式保存，包括格式信息。
+
+@findex enriched-mode
+要创建一个新的格式化文本文件，请访问不存在的文件并输入@kbd{M-x enriched-mode}。  该命令实际上切换丰富模式。  使用前缀参数时，如果参数为正，则启用丰富模式，否则禁用丰富模式。  如果禁用 Enriched 模式，Emacs 不再使用 @samp{text/enriched} 格式保存缓冲区；已添加到缓冲区的任何格式化属性仍保留在缓冲区中，但不会保存到磁盘。
+
+@vindex enriched-translations
+丰富模式不会保存所有 Emacs 文本属性，只会保存变量 @code{enriched-translations} 中指定的属性。  其中包括字体、颜色、缩进和对齐方式的属性。
+
+@findex format-decode-buffer
+如果您访问一个文件并且 Emacs 无法识别该文件是 @samp{text/enriched} 格式，请输入 @kbd{M-x format-decode-buffer}。此命令提示输入文件格式，并以该格式重新读取文件。  指定 @samp{text/enriched} 格式会自动启用丰富模式。
+
+要以原始形式查看 @samp{text/enriched} 文件（作为带有标记标签的纯文本而不是格式化文本），请使用 @kbd{M-x find-file-literally} (@pxref{Visiting})。
+
+@xref{Format Conversion,, Format Conversion, elisp, the Emacs Lisp Reference Manual}，了解 Emacs 如何识别和转换文件格式（如 @samp{text/enriched}）的详细信息。  @xref{Text Properties,,, elisp, the Emacs Lisp Reference Manual}，有关文本属性的更多信息。
+
+@node Hard and Soft Newlines
+@subsection 硬换行符和软换行符
+@cindex hard newline
+@cindex soft newline
+@cindex newlines, hard and soft
+
+@findex use-hard-newlines
+在丰富模式下，Emacs 区分两种不同类型的换行符：@dfn{hard} 换行符和 @dfn{soft} 换行符。  您还可以通过键入 @kbd{M-x use-hard-newlines} 在其他缓冲区中启用或禁用此功能。
+
+硬换行符用于分隔段落，或任何需要换行的地方，无论文本如何填充；使用软换行符进行填充。  @key{RET} (@code{newline}) 和@kbd{C-o} (@code{open-line}) 命令插入硬换行符。  填充命令，包括自动填充 (@pxref{Auto Fill})，仅插入软换行符并仅删除软换行符，而保留硬换行符。
+
+@c FIXME: I don't see 'unfilled' in that node.  --xfq
+因此，在使用丰富模式进行编辑时，不应使用 @key{RET} 或 @kbd{C-o} 在填充段落的中间换行。  请改用自动填充模式或显式填充命令 (@pxref{Fill Commands})。  在应始终保留换行符的位置（例如在表格和列表中）使用 @key{RET} 或 @kbd{C-o}。  对于此类线条，您可能还需要将对齐方式设置为 @code{unfilled} (@pxref{Enriched Justification})。
+
+@node Editing Format Info
+@subsection 编辑格式信息
+
+更改属性的最简单方法是使用 @samp{Text Properties} 菜单。  您可以从菜单栏 (@pxref{Menu Bar}) 中的 @samp{Edit} 菜单或使用 @kbd{C-mouse-2} (@pxref{Menu Mouse Clicks}) 访问此菜单。  下面列出了 @samp{Text Properties} 菜单中的一些命令（您也可以使用 @kbd{M-x} 调用它们）：
+
+@table @code
+@findex facemenu-remove-face-props
+@item Remove Face Properties
+从区域 (@code{facemenu-remove-face-props}) 中删除面属性。
+
+@findex facemenu-remove-all
+@item Remove Text Properties
+从区域中删除所有文本属性，包括面属性 (@code{facemenu-remove-all})。
+
+@findex describe-text-properties
+@cindex text properties of characters
+@cindex overlays at character position
+@cindex widgets at buffer position
+@cindex buttons at buffer position
+@item Describe Properties
+列出有关点 (@code{describe-text-properties}) 之后的字符的所有文本属性和其他信息。
+
+@item Display Faces
+显示已定义面的列表 (@code{list-faces-display})。 @xref{Faces}。
+
+@item Display Colors
+显示已定义颜色的列表 (@code{list-colors-display})。 @xref{Colors}。
+@end table
+
+@noindent
+其他菜单项将在以下部分中描述。
+
+@node Enriched Faces
+@subsection 丰富文本中的面孔
+
+以下命令可用于添加或删除面 (@pxref{Faces})。  如果标记处于活动状态，则每个字符都适用于该区域中的文本；如果标记处于非活动状态，则每个字符都适用于下一个自插入字符。  使用前缀参数，每个命令都适用于下一个自插入字符，即使该区域处于活动状态也是如此。
+
+@table @kbd
+@kindex M-o d @r{(Enriched mode)}
+@findex facemenu-set-default
+@item M-o d
+删除所有 @code{face} 属性 (@code{facemenu-set-default})。
+
+@kindex M-o b @r{(Enriched mode)}
+@findex facemenu-set-bold
+@item M-o b
+应用 @code{bold} 面 (@code{facemenu-set-bold})。
+
+@kindex M-o i @r{(Enriched mode)}
+@findex facemenu-set-italic
+@item M-o i
+应用 @code{italic} 面 (@code{facemenu-set-italic})。
+
+@kindex M-o l @r{(Enriched mode)}
+@findex facemenu-set-bold-italic
+@item M-o l
+应用 @code{bold-italic} 面 (@code{facemenu-set-bold-italic})。
+
+@kindex M-o u @r{(Enriched mode)}
+@findex facemenu-set-underline
+@item M-o u
+应用 @code{underline} 面 (@code{facemenu-set-underline})。
+
+@kindex M-o o @r{(Enriched mode)}
+@findex facemenu-set-face
+@item M-o o @var{face} @key{RET}
+涂抹脸部@var{face} (@code{facemenu-set-face})。
+
+@findex facemenu-set-foreground
+@item M-x facemenu-set-foreground
+提示输入颜色 (@pxref{Colors})，并将其应用为前景色。
+
+@findex facemenu-set-background
+@item M-x facemenu-set-background
+提示输入颜色，并将其应用为背景颜色。
+@end table
+
+@noindent
+这些命令也可以通过“文本属性”菜单使用。
+
+自插入字符通常继承缓冲区中前一个字符的面部属性（以及大多数其他文本属性）。  如果使用上述命令之一指定下一个自插入字符的面部，该字符将不会继承前一个字符的面部属性，但仍会继承其他文本属性。
+
+丰富模式定义了两个附加面：@code{excerpt} 和 @code{fixed}。  这些对应于文本/丰富文件格式中使用的代码。  @code{excerpt} 面用于引用；默认情况下，它与 @code{italic} 相同。  @code{fixed} 面指定固定宽度文本；默认情况下，它与 @code{bold} 相同。
+
+@node Enriched Indentation
+@subsection 丰富文本中的缩进
+
+在丰富模式下，您可以为段落或段落的一部分的右边距或左边距指定不同的缩进量。这些边距也会影响填充命令，例如 @kbd{M-q} (@pxref{Filling})。
+
+文本属性的缩进子菜单提供用于指定缩进的命令：
+
+@table @code
+@kindex C-x TAB @r{(Enriched mode)}
+@findex increase-left-margin
+@item Indent More
+将区域缩进 4 列 (@code{increase-left-margin})。  在丰富模式下，该命令也可在@kbd{C-x @key{TAB}}上使用；如果您提供一个数字参数，则表示要添加到边距的列数（负参数会减少列数）。
+
+@item Indent Less
+从该区域删除 4 列缩进。
+
+@item Indent Right More
+通过在右侧边距缩进 4 列来使文本变窄。
+
+@item Indent Right Less
+从右边距删除 4 列缩进。
+@end table
+
+@vindex standard-indent
+变量 @code{standard-indent} 指定这些命令应在缩进中添加或减去多少列。  默认值为 4。像往常一样，丰富模式的默认右边距由变量 @code{fill-column} 控制。
+
+@kindex C-c [ @r{(Enriched mode)}
+@kindex C-c ] @r{(Enriched mode)}
+@findex set-left-margin
+@findex set-right-margin
+您还可以输入 @kbd{C-c [} (@code{set-left-margin}) 和 @kbd{C-c ]} (@code{set-right-margin}) 来设置左右边距。  您可以使用数字参数指定边距宽度；否则，这些命令会通过迷你缓冲区提示输入值。
+
+填充前缀（如果有）除了指定的段落缩进之外也起作用：@kbd{C-x .} 在填充前缀的新值中不包括指定缩进的空格，并且填充命令在每行的缩进之后查找填充前缀。  @xref{Fill Prefix}。
+
+@node Enriched Justification
+@subsection 丰富文本中的理由
+@cindex justification style
+
+在Enriched模式下，可以使用以下命令指定各种@dfn{justification styles}进行填充。  这些命令适用于包含点的段落，或者，如果该区域处于活动状态，则适用于与该区域重叠的所有段落。
+
+@table @kbd
+@kindex M-j l @r{(Enriched mode)}
+@findex set-justification-left
+@item M-j l
+将线条与左边距对齐 (@code{set-justification-left})。
+
+@kindex M-j r @r{(Enriched mode)}
+@findex set-justification-right
+@item M-j r
+将线条与右边距对齐 (@code{set-justification-right})。
+
+@kindex M-j b @r{(Enriched mode)}
+@findex set-justification-full
+@item M-j b
+将线条与两侧边距对齐，并在线条中间插入空格以实现此目的 (@code{set-justification-full})。
+
+@kindex M-j c @r{(Enriched mode)}
+@kindex M-S @r{(Enriched mode)}
+@findex set-justification-center
+@item M-j c
+@itemx M-S
+边距之间的中心线 (@code{set-justification-center})。
+
+@kindex M-j u @r{(Enriched mode)}
+@findex set-justification-none
+@item M-j u
+完全关闭填充 (@code{set-justification-none})。  填充命令对具有此设置的文本不执行任何操作。  但是，您仍然可以缩进左边距。
+@end table
+
+@vindex default-justification
+您还可以使用“文本属性”菜单中的“对齐方式”子菜单指定对齐方式。  默认对齐方式由每个缓冲区变量@code{default-justification}指定。它的值应该是符号 @code{left}、@code{right}、@code{full}、@code{center} 或 @code{none} 之一；它们的含义与上面的命令相对应。
+
+@node Enriched Properties
+@subsection 设置其他文本属性
+
+文本属性的特殊属性子菜单包含用于添加或删除其他四个文本属性的条目：@code{read-only}（不允许更改文本）、@code{invisible}（隐藏文本）、@code{intangible}（不允许在文本内移动点）和@code{charset}（这对于选择正确的字体来显示字符很重要）。  @samp{Remove Special} 菜单项从该区域的文本中删除所有这些特殊属性。
+
+@code{invisible} 和 @code{intangible} 属性不会保存。
+
+@vindex enriched-allow-eval-in-display-props
+@cindex security, when displaying enriched text
+丰富模式还支持保存和恢复 @code{display} 属性 (@pxref{Display Property,,,elisp, the Emacs Lisp Reference Manual})，这些属性会影响文本在屏幕上的显示方式，并且还允许显示来自缓冲区文本以外的源的图像和字符串。  @code{display} 属性还支持执行任意 Lisp 形式，作为处理显示属性的一部分，从而提供了一种根据某些只能在显示时知道的条件动态定制显示的方法。  由于任意 Lisp 的执行都会使 Emacs 面临潜在的攻击，特别是当丰富文本的来源位于 Emacs 之外甚至在您的系统之外时（例如，如果它是在电子邮件中收到的），因此默认情况下在丰富模式下禁用此类执行。  您可以通过将变量 @code{enriched-allow-eval-in-display-props} 自定义为非 @code{nil} 值来启用它。
+
+@node Text Based Tables
+@section 编辑基于文本的表格
+@cindex table mode
+@cindex text-based tables
+
+@code{table} 包提供了轻松编辑基于文本的表格的命令。  以下是此类表的示例：
+
+@smallexample
+@group
++-----------------+--------------------------------+-----------------+
+|     Command     |          Description           |   Key Binding   |
++-----------------+--------------------------------+-----------------+
+|  forward-char   |Move point right N characters   |       C-f       |
+|                 |(left if N is negative).        |                 |
+|                 |                                |                 |
++-----------------+--------------------------------+-----------------+
+|  backward-char  |Move point left N characters    |       C-b       |
+|                 |(right if N is negative).       |                 |
+|                 |                                |                 |
++-----------------+--------------------------------+-----------------+
+@end group
+@end smallexample
+
+当 Emacs 将这样一段文本识别为表格 (@pxref{Table Recognition}) 时，只要内容太大而无法容纳单元格，编辑每个表格单元格的内容就会自动调整表格的大小。  您可以使用以下部分中定义的命令来导航和编辑表布局。
+
+@findex table-fixed-width-mode
+输入 @kbd{M-x table-fixed-width-mode} 可切换自动调整表格大小功能。
+
+@menu
+* Table Definition::           什么是基于文本的表格。
+* Table Creation::             如何创建表格。
+* Table Recognition::          如何激活和停用表。
+* Cell Commands::              表中面向单元格的命令。
+* Cell Justification::         证明单元格内容合理。
+* Table Rows and Columns::     插入和删除行和列。
+* Table Conversion::           纯文本和表格之间的转换。
+* Table Misc::                 表杂项。
+@end menu
+
+@node Table Definition
+@subsection 什么是基于文本的表格？
+@cindex cells, for text-based tables
+
+@dfn{table} 由分为 @dfn{cells} 的矩形文本区域组成。  每个单元格必须至少为 1 个字符宽和 1 个字符高（不包括其边界线）。  一个单元格可以细分为更多单元格，但它们不能重叠。
+
+单元格边框线用三个特殊字符绘制，由以下变量指定：
+
+@table @code
+@vindex table-cell-vertical-char
+@item table-cell-vertical-char
+用于垂直线的字符。  默认值为@samp{|}。
+
+@vindex table-cell-horizontal-chars
+@item table-cell-horizontal-chars
+用于水平线的字符。  默认值为@samp{"-="}。
+
+@vindex table-cell-intersection-char
+@item table-cell-intersection-char
+用于水平线和垂直线相交的字符。  默认值为@samp{+}。
+@end table
+
+@noindent
+以下是 @emph{invalid} 表的示例：
+
+@example
+   +-----+       +--+    +-++--+
+   |     |       |  |    | ||  |
+   |     |       |  |    | ||  |
+   +--+  |    +--+--+    +-++--+
+   |  |  |    |  |  |    +-++--+
+   |  |  |    |  |  |    | ||  |
+   +--+--+    +--+--+    +-++--+
+      a          b          c
+@end example
+
+@noindent
+从左到右：
+
+@enumerate a
+@item
+不允许出现重叠的单元格或非矩形单元格。
+@item
+边框必须是矩形。
+@item
+单元格的最小宽度/高度必须为一个字符。
+@end enumerate
+
+@node Table Creation
+@subsection 创建表
+@cindex create a text-based table
+@cindex table creation
+
+@findex table-insert
+要从头开始创建基于文本的表格，请输入 @kbd{M-x table-insert}。  此命令提示输入表格列数、表格行数、单元格宽度和单元格高度。  单元格宽度和单元格高度不包括单元格边框；每个都可以指定为单个整数（这意味着每个单元格都具有相同的宽度/高度），也可以指定为由空格或逗号分隔的整数序列（指定各个表列/行的宽度/高度，对于表列从左到右计数，对于表行从上到下计数）。  然后将指定的表插入到该点。
+
+由 @kbd{M-x table-insert} 插入的表包含特殊的文本属性，这些属性告诉 Emacs 将其特殊地视为基于文本的表。  如果将缓冲区保存到文件并稍后再次访问它，这些属性就会丢失，并且该表在 Emacs 中显示为普通文本。  请参阅下一节，了解如何将其转换回表格。
+
+@node Table Recognition
+@subsection 表格识别
+@cindex table recognition
+
+@findex table-recognize
+@findex table-unrecognize
+缓冲区中现有的基于文本的表缺少 @kbd{M-x table-insert} 应用的特殊文本属性，不会被特殊视为表。  要应用这些文本属性，请输入 @kbd{M-x table-recognize}。  此命令扫描当前缓冲区、@dfn{recognizes} 有效表格单元格，并应用相关文本属性。  相反，键入 @kbd{M-x table-unrecognize} 到 @dfn{unrecognize} 当前缓冲区中的所有表格，删除特殊文本属性并将表格转换回纯文本。
+
+您还可以使用以下命令有选择地识别或不识别表：
+
+@table @kbd
+@findex table-recognize-region
+@item M-x table-recognize-region
+识别当前区域内的表。
+
+@findex table-unrecognize-region
+@item M-x table-unrecognize-region
+无法识别当前区域内的表。
+
+@findex table-recognize-table
+@item M-x table-recognize-table
+识别该表并激活它。
+
+@findex table-unrecognize-table
+@item M-x table-unrecognize-table
+在该点停用该表。
+
+@findex table-recognize-cell
+@item M-x table-recognize-cell
+识别该点的细胞并激活它。
+
+@findex table-unrecognize-cell
+@item M-x table-unrecognize-cell
+在该点停用单元。
+@end table
+
+@xref{Table Conversion}，另一种识别表格的方法。
+
+@node Cell Commands
+@subsection 表格单元格的命令
+
+@findex table-forward-cell
+@findex table-backward-cell
+命令@kbd{M-x table-forward-cell}和@kbd{M-x table-backward-cell}将点从当前单元格移动到相邻单元格。  该顺序是循环的：当点位于表格的最后一个单元格中时，@kbd{M-x table-forward-cell} 移动到第一个单元格。  同样，当点位于第一个单元格上时，@kbd{M-x table-backward-cell} 移动到最后一个单元格。
+
+@findex table-span-cell
+@kbd{M-x table-span-cell} 提示输入方向——右、左、上、下——并将当前单元格与该方向上的相邻单元格合并。  如果合并会导致非法的单元布局，则此命令会发出错误信号。
+
+@findex table-split-cell
+@findex table-split-cell-vertically
+@findex table-split-cell-horizontally
+@cindex text-based tables, splitting cells
+@cindex splitting table cells
+@kbd{M-x table-split-cell} 垂直或水平分割当前单元格，提示迷你缓冲区的方向。  要沿特定方向分割，请使用 @kbd{M-x table-split-cell-vertically} 和 @kbd{M-x table-split-cell-horizontally}。  垂直拆分时，旧单元格内容会自动在两个新单元格之间拆分。  水平分割时，如果单元格非空，系统会提示您如何分割单元格内容；选项有@samp{split}（在点处划分内容）、@samp{left}（将所有内容放入左侧单元格）和@samp{right}（将所有内容放入右侧单元格）。
+
+以下命令放大或缩小单元格。  默认情况下，它们按一行或一列调整大小；如果提供数字参数，则指定要调整大小的行数或列数。
+
+@table @kbd
+@findex table-heighten-cell
+@item M-x table-heighten-cell
+垂直放大当前单元格。
+
+@findex table-shorten-cell
+@item M-x table-shorten-cell
+垂直缩小当前单元格。
+
+@findex table-widen-cell
+@item M-x table-widen-cell
+水平放大当前单元格。
+
+@findex table-narrow-cell
+@item M-x table-narrow-cell
+水平缩小当前单元格。
+@end table
+
+@node Cell Justification
+@subsection 单元格对齐
+@cindex justification in text-based tables
+
+命令 @kbd{M-x table-justify} 将 @dfn{justification} 施加到基于文本的表格中的一个或多个单元格。  对齐确定单元格中的文本相对于单元格边缘的对齐方式。表格中的每个单元格都可以单独对齐。
+
+@findex table-justify
+@kbd{M-x table-justify} 首先提示要证明什么；选项为@samp{cell}（仅当前单元格）、@samp{column}（当前表格列中的所有单元格）和@samp{row}（当前表格行中的所有单元格）。  然后该命令会提示输入对齐方式；选项包括 @code{left}、@code{center}、@code{right}、@code{top}、@code{middle}、@code{bottom} 或 @code{none}（表示无垂直对齐）。
+
+水平和垂直对齐方式独立指定，两种方式可以同时生效；例如，您可以调用 @kbd{M-x table-justify} 两次，一次指定 @code{right} 对齐方式，一次指定 @code{bottom} 对齐方式，将单元格的内容与右下角对齐。
+
+@vindex table-detect-cell-alignment
+对齐样式作为文本属性存储在缓冲区中，并且当您终止缓冲区或退出 Emacs 时会丢失。  然而，表格识别命令，例如 @kbd{M-x table-recognize} (@pxref{Table Recognition})，尝试通过检查其内容来确定并重新应用每个单元格的对齐方式。  要禁用此功能，请将变量 @code{table-detect-cell-alignment} 更改为 @code{nil}。
+
+@node Table Rows and Columns
+@subsection 表格行和列
+@cindex inserting rows and columns in text-based tables
+
+@findex table-insert-row
+@kbd{M-x table-insert-row} 在当前表格行之前插入一行单元格。  当前行与点一起被向下推过新行。  要在表格底部的最后一行之后插入一行，请使用表格下方、底部边缘下方的点调用此命令。  您可以使用数字前缀参数一次插入多行。
+
+@c A numeric prefix argument specifies the number of rows to insert.
+
+@findex table-insert-column
+类似地，@kbd{M-x table-insert-column} 在当前表格列的左侧插入一列单元格。  要将列插入到最右列的右侧，请通过指向表外部最右列的右侧来调用此命令。  数字前缀参数指定要插入的列数。
+
+@cindex deleting rows and column in text-based tables
+@kbd{M-x table-delete-column} 删除当前位置的单元格列。类似地，@kbd{M-x table-delete-row} 删除位于该点的单元格行。  任一命令的数字前缀参数指定要删除的列数或行数。
+
+@node Table Conversion
+@subsection 纯文本和表格之间的转换
+@cindex text to table
+@cindex table to text
+
+@findex table-capture
+命令 @kbd{M-x table-capture} 捕获区域中的纯文本并将其转换为表格。  与@kbd{M-x table-recognize}（@pxref{Table Recognition}）不同，原文不需要有表格外观；它只需要具有类似逻辑表的结构。
+
+例如，假设我们有以下数字，它们分为三行并用逗号水平分隔：
+
+@example
+1, 2, 3, 4
+5, 6, 7, 8
+, 9, 10
+@end example
+
+@noindent
+对该文本调用 @kbd{M-x table-capture} 会生成此表：
+
+@example
++-----+-----+-----+-----+
+|1    |2    |3    |4    |
++-----+-----+-----+-----+
+|5    |6    |7    |8    |
++-----+-----+-----+-----+
+|     |9    |10   |     |
++-----+-----+-----+-----+
+@end example
+
+@findex table-release
+@kbd{M-x table-release} 则相反：它将表格转换回纯文本，并删除其单元格边框。
+
+这对命令的一个应用是编辑布局中的文本。  请看下面三段：
+
+@example
+table-capture is a powerful command.
+Here are some things it can do:
+
+Parse Cell Items   Using row and column delimiter regexps,
+                   it parses the specified text area and
+                   extracts cell items into a table.
+@end example
+
+@noindent
+将 @code{table-capture} 应用于包含上述文本的区域，并使用列和行分隔符正则表达式的空字符串，创建一个包含单个单元格的表格，如下所示。
+
+@smallexample
+@group
++----------------------------------------------------------+
+|table-capture is a powerful command.                      |
+|Here are some things it can do:                           |
+|                                                          |
+|Parse Cell Items   Using row and column delimiter regexps,|
+|                   it parses the specified text area and  |
+|                   extracts cell items into a table.      |
++----------------------------------------------------------+
+@end group
+@end smallexample
+
+@noindent
+然后我们可以使用单元格分割命令（@pxref{Cell Commands}）来细分表格，使每个段落占据一个单元格：
+
+@smallexample
++----------------------------------------------------------+
+|table-capture is a powerful command.                      |
+|Here are some things it can do:                           |
++-----------------+----------------------------------------+
+|Parse Cell Items | Using row and column delimiter regexps,|
+|                 | it parses the specified text area and  |
+|                 | extracts cell items into a table.      |
++-----------------+----------------------------------------+
+@end smallexample
+
+@noindent
+现在可以独立编辑每个单元格，而不会影响其他单元格的布局。  完成后，我们可以调用@kbd{M-x table-release}将表格转换回纯文本。
+
+@node Table Misc
+@subsection 餐桌杂项
+
+@cindex table dimensions
+@findex table-query-dimension
+命令@code{table-query-dimension}报告表格和表格单元格在该点的布局。  这是其输出的示例：
+
+@smallexample
+Cell: (21w, 6h), Table: (67w, 16h), Dim: (2c, 3r), Total Cells: 5
+@end smallexample
+
+@noindent
+这表示当前单元格宽 21 个字符，高 6 行，表格宽 67 个字符，高 16 行，2 列 3 行，总共 5 个单元格。
+
+@findex table-insert-sequence
+@kbd{M-x table-insert-sequence} 遍历表格的单元格，将一系列文本字符串插入到每个单元格中。  它要求序列的基本字符串，然后通过“递增”基本字符串来生成序列，可以是数字（如果基本字符串以数字字符结尾），也可以是 1⁣ 顺序。  除了基本字符串之外，该命令还提示输入序列中的元素数量、增量、单元格间隔以及每个单元格中文本的对齐方式。
+
+@cindex table for HTML and LaTeX
+@findex table-generate-source
+@kbd{M-x table-generate-source} 生成针对特定标记语言格式化的表格。  它要求一种语言（必须是 @code{html}、@code{latex}、@code{cals}、@code{wiki} 或 @code{mediawiki} 之一）、用于放置结果的目标缓冲区以及表格标题，然后将生成的表格插入到指定的缓冲区中。  默认目标缓冲区为 @code{table.@var{lang}}，其中 @var{lang} 是您指定的语言。
+
+@node Two-Column
+@section 两栏编辑
+@cindex two-column editing
+@cindex splitting columns
+@cindex columns, splitting
+
+两列模式可让您方便地编辑两列并排的文本。  它使用两个并排的窗口，每个窗口显示自己的缓冲区。  进入两列模式有以下三种方式：
+
+@table @asis
+@item @kbd{@key{F2} 2} 或 @kbd{C-x 6 2}
+@kindex F2 2
+@kindex C-x 6 2
+@findex 2C-two-columns
+进入两列模式，左侧是当前缓冲区，右侧是名称基于当前缓冲区名称 (@code{2C-two-columns}) 的缓冲区。  如果右侧缓冲区尚不存在，则它一开始为空；当前缓冲区的内容没有改变。
+
+当当前缓冲区为空或仅包含一列而您想要添加另一列时，此命令适用。
+
+@item @kbd{@key{F2} s} 或 @kbd{C-x 6 s}
+@kindex F2 s
+@kindex C-x 6 s
+@findex 2C-split
+将包含两列文本的当前缓冲区拆分为两个缓冲区，并并排显示它们 (@code{2C-split})。  当前缓冲区将成为左侧缓冲区，但右侧列中的文本将移至右侧缓冲区。  当前列指定分割点。  分割从当前行开始，一直持续到缓冲区的末尾。
+
+当您的缓冲区已包含两列文本并且您希望暂时分隔各列时，此命令适用。
+
+@item @kbd{@key{F2} b @var{buffer} @key{RET}}
+@itemx @kbd{C-x 6 b @var{buffer} @key{RET}}
+@kindex F2 b
+@kindex C-x 6 b
+@findex 2C-associate-buffer
+进入两列模式，使用当前缓冲区作为左侧缓冲区，并使用缓冲区 @var{buffer} 作为右侧缓冲区 (@code{2C-associate-buffer})。
+@end table
+
+@kbd{@key{F2} s} 或 @kbd{C-x 6 s} 查找列分隔符，它是出现在两列之间的每一行上的字符串。  您可以使用 @kbd{@key{F2} s} 的数字参数指定分隔符的宽度；点之前的许多字符构成分隔符字符串。  默认情况下，宽度为1，因此列分隔符是点之前的字符。
+
+当一行在正确的位置有分隔符时，@kbd{@key{F2} s} 将分隔符后面的文本放入右侧缓冲区，并删除分隔符。  在适当位置没有列分隔符的行保持不分割；它们保留在左侧缓冲区中，右侧缓冲区有一个空行来对应。  （这是在双列模式下编写跨越两列的行的方法：将其写入左侧缓冲区，并在右侧缓冲区中放置一个空行。）
+
+@kindex F2 RET
+@kindex C-x 6 RET
+@findex 2C-newline
+命令 @kbd{@key{F2} @key{RET}} 或 @kbd{C-x 6 @key{RET}} (@code{2C-newline}) 在两个缓冲区的相应位置插入换行符。  这是在分割缓冲区中编辑两列文本时向其添加新行的最简单方法。
+
+@kindex F2 1
+@kindex C-x 6 1
+@findex 2C-merge
+根据需要编辑两个缓冲区后，将它们与 @kbd{@key{F2} 1} 或 @kbd{C-x 6 1} (@code{2C-merge}) 合并。  这会将右侧缓冲区中的文本复制为另一个缓冲区中的第二列。要返回两列编辑，请使用 @kbd{@key{F2} s}。
+
+@kindex F2 d
+@kindex C-x 6 d
+@findex 2C-dissociate
+使用 @kbd{@key{F2} d} 或 @kbd{C-x 6 d} 分离两个缓冲区，使每个缓冲区保持原样 (@code{2C-dissociate})。  如果另一个缓冲区（当您键入 @kbd{@key{F2} d} 时不是当前的缓冲区）为空，则 @kbd{@key{F2} d} 会杀死它。

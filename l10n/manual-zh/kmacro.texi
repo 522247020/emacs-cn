@@ -1,0 +1,442 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Keyboard Macros
+@chapter 键盘宏
+@cindex defining keyboard macros
+@cindex keyboard macro
+
+在本章中，我们将描述如何记录一系列编辑命令，以便您以后可以方便地重复它。
+
+@dfn{keyboard macro} 是 Emacs 用户定义的命令，代表另一个按键序列。  例如，如果您发现要键入 @kbd{C-n M-d C-d} 四十次，则可以通过定义键盘宏来执行 @kbd{C-n M-d C-d} 操作，然后再执行 39 次，从而加快工作速度。
+
+您可以通过执行和记录定义键盘宏的命令来定义键盘宏。  换句话说，当您定义键盘宏时，该定义是第一次执行。  这样，您就可以看到命令的效果，这样您就不必在头脑中弄清楚它们。  当您关闭定义时，键盘宏被定义并且实际上也被执行一次。然后，您可以通过调用宏重新执行整个操作。
+
+键盘宏与普通 Emacs 命令的不同之处在于它们是用 Emacs 命令语言而不是 Lisp 编写的。  这使得新手更容易编写它们，并且使它们作为临时黑客更方便。  然而，Emacs 命令语言作为一种编程语言还不够强大，无法用于编写任何智能或通用的内容。  对于这样的事情，必须使用 Lisp。
+
+@menu
+* Basic Keyboard Macro::      定义和运行键盘宏。
+* Keyboard Macro Ring::       以前的键盘宏的保存位置。
+* Keyboard Macro Counter::    在宏中插入递增数字。
+* Keyboard Macro Query::      让键盘宏每次执行不同的操作。
+* Save Keyboard Macro::       给键盘宏命名；将它们保存在文件中。
+* Edit Keyboard Macro::       编辑键盘宏。
+* Keyboard Macro Step-Edit::  交互式执行和编辑键盘宏。
+* Kmacro Menu::               用于列出和编辑键盘宏和键盘宏环的界面。
+@end menu
+
+@node Basic Keyboard Macro
+@section 基本使用
+
+@table @kbd
+@item @key{F3}
+开始定义键盘宏 (@code{kmacro-start-macro-or-insert-counter})。
+@item @key{F4}
+如果正在定义键盘宏，则结束定义；否则，执行最近的键盘宏 (@code{kmacro-end-or-call-macro})。
+@item C-u @key{F3}
+重新执行最后一个键盘宏，然后将键附加到其定义中。
+@item C-u C-u @key{F3}
+将按键附加到最后一个键盘宏而不重新执行它。
+@item C-x C-k r
+在区域 (@code{apply-macro-to-region-lines}) 开始的每一行上运行最后一个键盘宏。
+@item C-x (
+开始定义键盘宏（旧式）(@code{kmacro-start-macro})；使用前缀参数，将键附加到最后一个宏。
+@item C-x )
+结束宏定义（旧式）(@code{kmacro-end-macro})；前缀参数用作执行宏的重复计数。
+@item C-x e
+执行最近定义的键盘宏(@code{kmacro-end-and-call-macro})；前缀参数用作重复计数。
+@end table
+
+@kindex F3
+@kindex F4
+@findex kmacro-start-macro-or-insert-counter
+@findex kmacro-end-or-call-macro
+@findex kmacro-end-and-call-macro
+要开始定义键盘宏，请输入 @key{F3}。  从那时起，你的按键继续被执行，而且也成为宏定义的一部分。  @samp{Def} 出现在模式行中以提醒您正在发生的事情。  完成后，输入 @key{F4} (@code{kmacro-end-or-call-macro}) 终止定义。  例如，
+
+@example
+@key{F3} M-f foo @key{F4}
+@end example
+
+@noindent
+定义一个宏向前移动一个单词，然后插入@samp{foo}。请注意，@key{F3} 和 @key{F4} 不会成为宏的一部分。
+
+定义宏后，可以用@key{F4}调用它。  对于上面的示例，这与再次输入 @kbd{M-f foo} 具有相同的效果。 （请注意 @key{F4} 命令的两个作用：如果您正在定义宏，则它会结束宏，否则调用最后一个宏。）您还可以为 @key{F4} 提供数字前缀参数 @samp{n}，这意味着调用宏 @samp{n} 次。  参数为零会无限期地重复宏，直到出现错误或键入 @kbd{C-g}（或者，在 MS-DOS 上，@kbd{C-@key{Break}}）。
+
+上面的示例演示了一个可以与键盘宏一起使用的便捷技巧：如果您希望在文本中规则间隔的位置重复操作，请将运动命令作为宏的一部分。  在这种情况下，重复宏会在每个连续单词后插入字符串 @samp{foo}。
+
+终止键盘宏的定义后，您可以通过键入 @kbd{C-u @key{F3}} 将更多击键附加到其定义中。  这相当于简单的 @key{F3} 然后重新输入到目前为止的整个定义。  结果，它重新执行先前定义的宏。  如果将变量 @code{kmacro-execute-before-append} 更改为 @code{nil}，则在附加到它之前不会重新执行现有宏（默认为 @code{t}）。  您还可以通过键入 @kbd{C-u C-u @key{F3}} 添加到最后一个键盘宏定义的末尾，而无需重新执行它。
+
+当命令使用迷你缓冲区读取参数时，您的迷你缓冲区输入将与命令一起成为宏的一部分。  因此，当您重播宏时，该命令将获得与输入宏时相同的参数。  例如，
+
+@example
+@key{F3} C-a C-k C-x b foo @key{RET} C-y C-x b @key{RET} @key{F4}
+@end example
+
+@noindent
+定义一个宏，它杀死当前行，将其拉入缓冲区@samp{foo}，然后返回到原始缓冲区。
+
+大多数键盘命令在键盘宏定义中照常工作，但有一些例外。  输入 @kbd{C-g} (@code{keyboard-quit}) 退出键盘宏定义。  键入 @kbd{C-M-c} (@code{exit-recursive-edit}) 可能不可靠：如果退出在宏内开始的递归编辑，它会按照您的预期工作，但如果它退出在调用键盘宏之前开始的递归编辑，它也必然会退出键盘宏。鼠标事件也是不可靠的，即使您可以在键盘宏中使用它们：当宏重播鼠标事件时，它使用该事件的原始鼠标位置，即定义宏时鼠标所处的位置。  其效果可能很难预测。
+
+@findex apply-macro-to-region-lines
+@kindex C-x C-k r
+命令 @kbd{C-x C-k r} (@code{apply-macro-to-region-lines}) 在该区域开始的每一行上重复最后定义的键盘宏。  它通过将点移动到行的开头然后执行宏来逐行执行此操作。
+
+@kindex C-x (
+@kindex C-x )
+@kindex C-x e
+@findex kmacro-start-macro
+@findex kmacro-end-macro
+除了上述 @key{F3} 和 @key{F4} 命令之外，Emacs 还支持一组较旧的键绑定来定义和执行键盘宏。  要开始宏定义，请输入 @kbd{C-x (} (@code{kmacro-start-macro});与 @key{F3} 一样，前缀参数将此定义附加到最后一个键盘宏。  要结束宏定义，请输入 @kbd{C-x )} (@code{kmacro-end-macro})。  要执行最近的宏，请输入 @kbd{C-x e} (@code{kmacro-end-and-call-macro})。  如果在定义宏时输入@kbd{C-x e}，宏将立即终止并执行。输入@kbd{C-x e}后，您可以立即重复输入@kbd{e}以立即重复宏一次或多次。  您还可以给@kbd{C-x e}一个重复参数，就像@key{F4}一样（当它用于执行宏时）。
+
+@kbd{C-x )} 可以给出重复计数作为参数。  这意味着定义宏后立即重复它。  宏定义本身算作第一次重复，因为它是按照您定义的方式执行的，因此 @kbd{C-u 4 C-x )} 会立即执行该宏 3 次。
+
+@findex kmacro-redisplay
+@kindex C-x C-k d
+在执行长时间运行的键盘宏时，触发重新显示有时会很有用（以显示我们已经走了多远）。  @kbd{C-x C-k d} 命令可用于此目的。  作为一个不太有用的示例，@kbd{C-x ( M-f C-x C-k d C-x )} 将创建一个宏，当说 @kbd{C-u 42 C-x e} 时，该宏将在每次迭代中重新显示一次。
+
+@node Keyboard Macro Ring
+@section 键盘宏环
+
+所有定义的键盘宏都记录在@dfn{keyboard macro ring}.  只有一个键盘宏环，由所有缓冲区共享。
+
+@table @kbd
+@item C-x C-k C-k
+执行环开头的键盘宏 (@code{kmacro-end-or-call-macro-repeat})。
+@item C-x C-k C-n
+将键盘宏环旋转到下一个宏（之前定义）(@code{kmacro-cycle-ring-next})。
+@item C-x C-k C-p
+将键盘宏环旋转到上一个宏（稍后定义）(@code{kmacro-cycle-ring-previous})。
+@end table
+
+在键盘宏环上运行的所有命令都使用相同的 @kbd{C-x C-k} 前缀。  这些命令中的大多数都可以立即执行和重复，而无需重复 @kbd{C-x C-k} 前缀。  例如，
+
+@example
+C-x C-k C-p C-p C-k C-k C-k C-n C-n C-k C-p C-k C-d
+@end example
+
+@noindent
+会将键盘宏环旋转到前第二个宏，执行生成的头宏三次，旋转回原始头宏，执行一次，旋转到上一个宏，执行该宏，最后将其从宏环中删除。
+
+@findex kmacro-end-or-call-macro-repeat
+@kindex C-x C-k C-k
+命令@kbd{C-x C-k C-k} (@code{kmacro-end-or-call-macro-repeat}) 执行宏环开头的键盘宏。  您可以通过键入另一个 @kbd{C-k} 立即重复宏，也可以通过键入 @kbd{C-n} 或 @kbd{C-p} 立即旋转宏环。
+
+定义键盘宏时，@kbd{C-x C-k C-k} 的行为与 @key{F4} 类似，只不过之后，您可以立即使用本节的大多数键绑定，而无需使用 @kbd{C-x C-k} 前缀。  例如，另一个@kbd{C-k}将重新执行宏。
+
+@findex kmacro-cycle-ring-next
+@kindex C-x C-k C-n
+@findex kmacro-cycle-ring-previous
+@kindex C-x C-k C-p
+命令@kbd{C-x C-k C-n} (@code{kmacro-cycle-ring-next}) 和@kbd{C-x C-k C-p} (@code{kmacro-cycle-ring-previous}) 旋转宏环，将下一个或上一个键盘宏带到宏环的头部。  新头宏的定义显示在回显区域中。  您可以通过重复@kbd{C-n}和@kbd{C-p}立即继续旋转宏环，直到所需的宏位于环的头部。  要立即执行新的宏环头，只需输入@kbd{C-k}。
+
+请注意，Emacs 将宏环的头部视为最后定义的键盘宏。  例如，@key{F4}将执行该宏，而@kbd{C-x C-k n}将为其指定名称。
+
+@vindex kmacro-ring-max
+键盘宏环中存储的宏的最大数量由可自定义变量@code{kmacro-ring-max}决定。
+
+@node Keyboard Macro Counter
+@section 键盘宏计数器
+
+每个键盘宏都有一个关联的计数器，当您开始定义宏时，该计数器被初始化为 0。  这个@dfn{current counter}允许您将一个数字插入到缓冲区中，该数字取决于宏被调用的次数。  每次将计数器的值插入缓冲区时，计数器通常都会递增。
+
+除了当前计数器之外，键盘宏还维护 @dfn{previous counter}，它记录当前计数器上次递增或设置时的值。  请注意，将当前计数器加零（例如使用 @w{@kbd{C-u 0 C-x C-k C-i}}）也会将当前计数器的值记录为先前的计数器值。
+
+@table @kbd
+@item @key{F3}
+在键盘宏定义中，将键盘宏计数器值插入缓冲区 (@code{kmacro-start-macro-or-insert-counter})。
+@item C-x C-k C-i
+将键盘宏计数器值插入缓冲区 (@code{kmacro-insert-counter})。
+@item C-x C-k C-c
+设置键盘宏计数器 (@code{kmacro-set-counter})。
+@item C-x C-k C-a
+将前缀 arg 添加到键盘宏计数器 (@code{kmacro-add-counter})。
+@item C-x C-k C-f
+指定插入键盘宏计数器的格式 (@code{kmacro-set-format})。
+@end table
+
+@findex kmacro-insert-counter
+@kindex C-x C-k C-i
+当您定义键盘宏时，命令 @key{F3} (@code{kmacro-start-macro-or-insert-counter}) 将键盘宏计数器的当前值插入到缓冲区中，并将计数器递增 1。（如果您没有定义宏，则使用 @key{F3} 开始宏定义。@xref{Basic Keyboard Macro}。）您可以使用数字前缀参数来指定不同的增量。  如果您仅指定 @kbd{C-u} 前缀，则会插入先前的计数器值，并且不会更改当前值。
+
+作为示例，让我们展示如何使用键盘宏计数器来构建编号列表。  考虑以下按键顺序：
+
+@example
+@key{F3} C-a @key{F3} . @key{SPC} @key{F4}
+@end example
+
+@noindent
+作为此键盘宏定义的一部分，字符串 @samp{0. } 被插入到当前行的开头。  如果您现在移动到缓冲区中的其他位置并输入 @key{F4} 来调用宏，则字符串 @samp{1. } 会插入到该行的开头。后续调用插入 @samp{2. }、@samp{3. } 等。
+
+命令@kbd{C-x C-k C-i} (@code{kmacro-insert-counter}) 与@key{F3} 执行相同的操作，但它可以在键盘宏定义之外使用。  当没有定义或执行键盘宏时，它会在键盘宏环的头部插入并递增宏的计数器。
+
+@findex kmacro-set-counter
+@kindex C-x C-k C-c
+命令 @kbd{C-x C-k C-c} (@code{kmacro-set-counter}) 将当前宏计数器设置为数字参数的值。  如果您在宏内部使用它，它将对宏的每次重复进行操作。  如果您在执行宏时仅指定 2⁣ 作为前缀，则会将计数器重置为宏当前重复开始时的值（撤消本次重复中迄今为止的任何增量）。
+
+@findex kmacro-add-counter
+@kindex C-x C-k C-a
+命令@kbd{C-x C-k C-a} (@code{kmacro-add-counter}) 将前缀参数添加到当前宏计数器。  仅使用 2⁣ 作为参数，它将计数器重置为任何键盘宏插入的最后一个值。  （通常，当您使用它时，最后的插入将在同一个宏中，并且它将是同一个计数器。）
+
+@findex kmacro-set-format
+@kindex C-x C-k C-f
+命令@kbd{C-x C-k C-f} (@code{kmacro-set-format}) 提示输入插入宏计数器时要使用的格式。  默认格式为@samp{%d}，表示以十进制形式插入数字，不进行任何填充。  您可以使用空迷你缓冲区退出以将格式重置为此默认值。  您可以指定 @code{format} 函数接受的任何格式字符串，并且使用单个整数额外参数 (@pxref{Formatting Strings,,, elisp, The Emacs Lisp Reference Manual}) 有意义。  将格式字符串插入迷你缓冲区时，请勿将其放在双引号内。
+
+如果在没有定义或执行键盘宏时使用此命令，则新格式会影响所有后续宏定义。现有宏继续使用定义时有效的格式。  如果您在定义键盘宏时设置格式，则会影响从该点开始定义的宏，但不会影响后续宏。  宏的执行将在每个步骤中使用在其定义期间该步骤有效的格式。  宏执行期间对宏格式的更改（与定义期间的相应更改一样）不会对后续宏产生影响。
+
+@kbd{C-x C-k C-f} 设置的格式不影响寄存器中存储的数字的插入。
+
+如果您使用寄存器作为计数器，在宏的每次重复时递增它，则可以完成与键盘宏计数器相同的操作。  @xref{Number Registers}。  对于大多数用途，使用键盘宏计数器更简单。
+
+@node Keyboard Macro Query
+@section 执行具有变化的宏
+
+在键盘宏中，您可以创建类似于 @code{query-replace} 的效果，因为宏每次都会询问您是否进行更改。
+
+@table @kbd
+@item C-x q
+当宏执行期间到达此点时，请求确认 (@code{kbd-macro-query})。
+@end table
+
+@kindex C-x q
+@findex kbd-macro-query
+定义宏时，在您希望发生查询的位置键入 @kbd{C-x q}。  在宏定义期间，@kbd{C-x q}不执行任何操作，但是当您稍后运行宏时，@kbd{C-x q}会交互式地询问您是否继续。
+
+当 @kbd{C-x q} 询问时，有效的响应是：
+
+@table @asis
+@item @key{SPC}（或@kbd{y}）
+继续执行键盘宏。
+
+@item @key{DEL}（或@kbd{n}）
+跳过宏重复的剩余部分，并立即开始下一次重复。
+
+@item @key{RET}（或@kbd{q}）
+跳过本次重复的剩余部分并取消进一步的重复。
+
+@item @kbd{C-r}
+输入递归编辑级别，您可以在其中执行不属于宏的编辑。  当您使用@kbd{C-M-c}退出递归编辑时，系统会再次询问您如何继续使用键盘宏。  如果此时输入@key{SPC}，则会执行宏定义的其余部分。  您可以将点和文本保持在某种状态，以便宏的其余部分可以执行您想要的操作。
+@end table
+
+@kbd{C-u C-x q} 是带有前缀参数的 @kbd{C-x q}，执行完全不同的功能。  当您在宏定义期间键入它时以及从宏执行它时，它都会进入递归编辑，从键盘读取输入。  在定义期间，您在递归编辑中所做的编辑不会成为宏的一部分。  在宏执行期间，递归编辑使您有机会对每次重复进行一些特定的编辑。 @xref{Recursive Edit}。
+
+@node Save Keyboard Macro
+@section 命名和保存键盘宏
+
+@table @kbd
+@item C-x C-k n
+为最近定义的键盘宏 (@code{kmacro-name-last-macro}) 提供命令名称（在 Emacs 会话期间）。
+@item C-x C-k b
+将最近定义的键盘宏绑定到按键序列（在会话期间）(@code{kmacro-bind-to-key})。
+@item M-x insert-kbd-macro
+在缓冲区中插入键盘宏的定义，作为 Lisp 代码。
+@end table
+
+@cindex saving keyboard macros
+@findex kmacro-name-last-macro
+@kindex C-x C-k n
+如果您希望保存键盘宏以供以后使用，可以使用 @kbd{C-x C-k n} (@code{kmacro-name-last-macro}) 为其命名。这使用迷你缓冲区读取名称作为参数，并定义该名称以当前形式执行最后一个键盘宏。  （如果您稍后添加到该宏的定义中，这不会改变该名称作为宏的定义。）宏名称是一个 Lisp 符号，以这种方式定义它使其成为使用 @kbd{M-x} 调用或使用 @code{keymap-global-set} (@pxref{Keymaps}) 绑定键的有效命令名称。  如果您指定的名称具有除键盘宏之外的先前定义，则会显示一条错误消息，并且不会发生任何更改。
+
+@cindex binding keyboard macros
+@findex kmacro-bind-to-key
+@kindex C-x C-k b
+您还可以将最后一个键盘宏（以其当前形式）绑定到某个键，使用 @kbd{C-x C-k b} (@code{kmacro-bind-to-key}) 后跟要绑定的键序列。  您可以绑定到全局键映射中的任何键序列，但由于大多数键序列已经有其他绑定，因此您应该仔细选择键序列。  如果您尝试使用现有绑定（在任何键盘映射中）绑定到按键序列，则此命令会要求您在替换现有绑定之前进行确认。
+
+为了避免覆盖现有绑定引起的问题，按键序列 @kbd{C-x C-k 0} 到 @kbd{C-x C-k 9} 和 @kbd{C-x C-k A} 到 @kbd{C-x C-k Z} 保留用于您自己的键盘宏绑定。  事实上，要绑定到这些按键序列之一，您只需键入数字或字母，而不是整个按键序列。例如，
+
+@example
+C-x C-k b 4
+@end example
+
+@noindent
+将把最后一个键盘宏绑定到按键序列@kbd{C-x C-k 4}。
+
+@findex insert-kbd-macro
+您可以将宏的定义保存在文件中。  然后它可以在另一个编辑会话中使用。  首先，访问要保存定义的文件。然后使用以下命令：
+
+@example
+M-x insert-kbd-macro @key{RET} @var{macroname} @key{RET}
+@end example
+
+@noindent
+这会插入一些 Lisp 代码，当稍后执行时，这些代码将使用与现在相同的定义来定义相同的宏。  （您不需要了解 Lisp 代码即可执行此操作，因为 @code{insert-kbd-macro} 会为您编写 Lisp 代码。）然后保存文件。  您可以稍后使用 @code{load-file} (@pxref{Lisp Libraries}) 加载该文件。  如果您保存的文件是初始化文件@file{~/.emacs} (@pxref{Init File})，则每次运行 Emacs 时都会定义该宏。
+
+如果你给@code{insert-kbd-macro}一个前缀参数，它会生成额外的Lisp代码来记录你绑定到@var{macroname}的键（如果有的话），这样当你加载文件时宏将被重新分配相同的键。
+
+如果你没有给@code{insert-kbd-macro}一个宏名称，它会插入Lisp代码来恢复@code{last-kdb-macro}。
+
+@node Edit Keyboard Macro
+@section 编辑键盘宏
+
+@table @kbd
+@item C-x C-k C-e
+编辑最后定义的键盘宏 (@code{kmacro-edit-macro})。
+@item C-x C-k e @var{name} @key{RET}
+编辑先前定义的键盘宏@var{name} (@code{edit-kbd-macro})。
+@item C-x C-k l
+将最后 300 个击键编辑为键盘宏 (@code{kmacro-edit-lossage})。
+@end table
+
+@findex kmacro-edit-macro
+@kindex C-x C-k C-e
+@kindex C-x C-k RET
+您可以通过键入 @kbd{C-x C-k C-e} 或 @kbd{C-x C-k @key{RET}} (@code{kmacro-edit-macro}) 来编辑最后一个键盘宏。  这会格式化缓冲区中的宏定义，并进入专门的主要模式进行编辑。  在该缓冲区中键入 @kbd{C-h m} 一次即可显示如何编辑宏的详细信息。  完成编辑后，输入@kbd{C-c C-c}。
+
+@findex edmacro-insert-key
+@findex edmacro-set-macro-to-region-lines
+@code{edmacro-mode} 是@code{kmacro-edit-macro} 使用的主要模式，提供了更轻松地编辑格式化宏的命令。  使用 @kbd{C-c C-q} (@code{edmacro-insert-key}) 以正确的格式将您键入的下一个按键序列插入到缓冲区中，类似于 @kbd{C-q} (@code{quoted-insert})。  使用 @kbd{C-c C-r} (@code{edmacro-set-macro-to-region-lines}) 将宏文本替换为区域中的文本。  如果该区域不是从行的开头开始或者不是在行的末尾结束，则该区域将扩展以包括完整的行。  如果该区域在一行的开头结束，则排除最后一行。
+
+@findex edit-kbd-macro
+@kindex C-x C-k e
+您可以通过键入 @kbd{C-x C-k e} (@code{edit-kbd-macro}) 来编辑已命名的键盘宏或绑定到某个键的宏。  接下来是用于调用宏的键盘输入——@kbd{C-x e}或@kbd{M-x @var{name}}或其他按键序列。
+
+@findex kmacro-edit-lossage
+@vindex edmacro-reverse-macro-lines
+@kindex C-x C-k l
+您可以通过键入 @kbd{C-x C-k l} (@code{kmacro-edit-lossage}) 将最后 300 个击键编辑为宏。  默认情况下，您最近的击键列在缓冲区的底部。要以相反顺序列出宏的按键序列，请将 @code{edmacro-reverse-macro-lines} 设置为 @code{t}。
+
+@node Keyboard Macro Step-Edit
+@section 逐步编辑键盘宏
+
+@findex kmacro-step-edit-macro
+@kindex C-x C-k SPC
+您可以通过键入 @kbd{C-x C-k @key{SPC}} (@code{kmacro-step-edit-macro}) 以交互方式重播和编辑最后一个键盘宏，一次一个命令。  除非您使用 @kbd{q} 或 @kbd{C-g} 退出宏，否则编辑的宏将替换宏环上的最后一个宏。
+
+此宏编辑功能显示迷你缓冲区中的最后一个宏以及要执行的第一个（或下一个）命令，并提示您执行操作。  您可以输入 @kbd{?} 来获取选项摘要。  可以执行以下操作：
+
+@itemize @bullet{}
+@item
+@key{SPC} 和 @kbd{y} 执行当前命令，并前进到键盘宏中的下一个命令。
+@item
+@kbd{n}、@kbd{d} 和 @key{DEL} 跳过并删除当前命令。
+@item
+@kbd{f} 在执行键盘宏时跳过当前命令，但不将其从宏中删除。
+@item
+@key{TAB} 执行当前命令，以及紧随当前命令之后的所有类似命令；例如，@key{TAB}可用于插入字符序列（对应于@code{self-insert-command}命令序列）。
+@item
+@kbd{c} 继续执行（无需进一步编辑）直到键盘宏结束。  如果执行正常终止，则编辑后的宏将替换原始键盘宏。
+@item
+@kbd{C-k} 跳过并删除键盘宏的其余部分，终止分步编辑，并用编辑后的宏替换原始键盘宏。
+@item
+@kbd{q}和@kbd{C-g}取消键盘宏的步进编辑；放弃对键盘宏所做的任何更改。
+@item
+@kbd{i @var{key}@dots{} C-j} 读取并执行一系列按键序列（不包括最后的 @kbd{C-j}），并将它们插入到键盘宏中的当前命令之前，而不前进到当前命令。
+@item
+@kbd{I @var{key}@dots{}} 读取一个按键序列，执行它，并将其插入到键盘宏中的当前命令之前，而不前进到当前命令。
+@item
+@kbd{r @var{key}@dots{} C-j} 读取并执行一系列按键序列（不包括最后的 @kbd{C-j}），并用它们替换键盘宏中的当前命令，并在插入的按键序列上前进。
+@item
+@kbd{R @var{key}@dots{}} 读取一个按键序列，执行它，并用该按键序列替换键盘宏中的当前命令，并在插入的按键序列上前进。
+@item
+@kbd{a @var{key}@dots{} C-j}执行当前命令，然后读取并执行一系列按键序列（不包括最后的@kbd{C-j}），并将它们插入到键盘宏中当前命令之后；然后它会前进到当前命令和插入的按键序列。
+@item
+@kbd{A @var{key}@dots{} C-j}执行键盘宏中的其余命令，然后读取并执行一系列按键序列（不包括最后的@kbd{C-j}），并将它们附加到键盘宏的末尾；然后它终止分步编辑并用编辑后的宏替换原始键盘宏。
+@end itemize
+
+@node Kmacro Menu
+@section 列出和编辑键盘宏
+@cindex Kmacro Menu
+
+@cindex listing current keyboard macros
+@kindex M-x list-keyboard-macros @key{RET}
+@findex kmacro-menu
+@findex list-keyboard-macros
+要显示现有键盘宏的列表，请键入 @kbd{M-x list-keyboard-macros @key{RET}}。  这会在名为 @file{*Keyboard Macro List*} 的缓冲区中弹出 @dfn{Kmacro Menu}。  列表中的每一行显示一个宏的位置、计数器值、计数器格式、使用该格式的计数器值以及宏键。  以下是宏列表的示例：
+
+@smallexample
+Position  Counter  Format  Formatted  Keys
+0               8  %02d    08         N : SPC <F3> RET
+1               0  %d      0          l o n g SPC p h r a s e
+@end smallexample
+
+@noindent
+宏列出时，当前宏位于顶部位置编号 0 的位置，较旧的宏则按照它们在键盘宏环 (@pxref{Keyboard Macro Ring}) 中找到的顺序排列。  使用 Kmacro 菜单，您可以更改宏的顺序并更改其计数器、计数器格式和键。  Kmacro 菜单是只读缓冲区，只能通过本节中描述的特殊命令进行更改。  运行命令后，Kmacro 菜单会显示更改以反映宏属性和宏环的新值。  您可以在此缓冲区中使用常用的光标移动命令，以及用于导航表格的特殊移动命令。  要查看特殊命令的列表，请在 Kmacro 菜单中键入 @kbd{C-h m} 或 @kbd{?} (@code{describe-mode})。
+
+您可以使用以下命令来更改宏的属性：
+
+@table @kbd
+@item #
+@findex kmacro-menu-edit-position
+@kindex # @r{(Kmacro Menu)}
+更改当前行中宏的位置 (@pxref{Keyboard Macro Ring})。
+
+@item C-x C-t
+@findex kmacro-menu-transpose
+@kindex C-x C-t @r{(Kmacro Menu)}
+将当前行上的宏移动到上面的行，如@code{transpose-lines}所示。
+
+@item c
+@findex kmacro-menu-edit-counter
+@kindex c @r{(Kmacro Menu)}
+更改当前行宏的计数器值 (@pxref{Keyboard Macro Counter})。
+
+@item f
+@findex kmacro-menu-edit-format
+@kindex f @r{(Kmacro Menu)}
+更改当前行宏的计数器格式。
+
+@item e
+@findex kmacro-menu-edit-keys
+@kindex e @r{(Kmacro Menu)}
+使用 @code{edit-kbd-macro} (@pxref{Edit Keyboard Macro}) 更改当前行宏的键。
+
+@item @key{RET}
+@findex kmacro-menu-edit-column
+@kindex @key{RET} @r{(Kmacro Menu)}
+使用上面的命令更改当前行宏当前列中的值。
+@end table
+
+以下命令删除或复制列表中的宏：
+
+@table @kbd
+@item d
+@findex kmacro-menu-flag-for-deletion
+@item d @r{(Kmacro Menu)}
+将当前行上的宏标记为删除，然后将点移动到下一行 (@code{kmacro-menu-flag-for-deletion})。  删除标志由行首的字符 @samp{D} 表示。  仅当您键入 @kbd{x} 命令时才会发生删除（见下文）。
+
+如果该区域处于活动状态，则此命令会标记该区域中的所有宏。
+
+@item x
+@findex kmacro-menu-do-flagged-delete
+@item x @r{(Kmacro Menu)}
+删除列表中已标记为删除的宏 (@code{kmacro-menu-do-flagged-delete})。
+
+@item m
+@findex kmacro-menu-mark
+@item m @r{(Kmacro Menu)}
+在当前行标记宏，然后将点移动到下一行 (@code{kmacro-menu-mark})。  标记的宏由行首的字符 @samp{*} 表示。  标记的宏可以通过 @kbd{C} 和 @kbd{D} 命令进行操作（见下文）。
+
+如果该区域处于活动状态，则此命令会标记该区域中的所有宏。
+
+@item C
+@findex kmacro-menu-do-copy
+@item C @r{(Kmacro Menu)}
+此命令通过将宏复制到列表中的当前位置 (@code{kmacro-menu-do-copy}) 来复制宏。  例如，在位置 0 处的宏上运行此命令将将该宏的副本插入到位置 1 中，并将其余宏向下移动。
+
+如果该区域处于活动状态，则此命令会复制该区域中的宏。  否则，如果存在标记的宏，则此命令将复制标记的宏。  如果没有区域也没有标记的宏，则此命令将复制当前行上的宏。  在前两种情况下，命令在复制之前会提示确认。
+
+@item D
+@findex kmacro-menu-do-delete
+@item D @r{(Kmacro Menu)}
+此命令删除宏，将其从环中删除 (@code{kmacro-menu-do-delete})。  例如，在位置号 0 的宏上运行此命令将删除当前宏，然后使宏环中的第一个宏（之前位于位置号 1）成为新的当前宏，并将其从环中弹出。
+
+如果该区域处于活动状态，此命令将删除该区域中的宏。  否则，如果存在标记的宏，则该命令将删除标记的宏。  如果没有区域，也没有标记的宏，则该命令删除当前行的宏。  在所有情况下，该命令都会在删除之前提示您确认。
+
+该命令是 @kbd{d} 和 @kbd{x} 命令的替代命令（见上文）。
+
+@item u
+@findex kmacro-menu-unmark
+@item u @r{(Kmacro Menu)}
+取消标记并取消标记当前行上的宏，然后将点向下移动到下一行 (@code{kmacro-menu-unmark})。  如果存在活动区域​​，此命令将取消标记并取消标记该区域中的所有宏。
+
+@item @key{DEL}
+@findex kmacro-menu-unmark-backward
+@item @key{DEL} @r{(Kmacro Menu)}
+与 @kbd{u} 命令类似（见上文），但当没有活动区域 (@code{kmacro-menu-unmark-backward}) 时，将点向上移动到上一行。
+
+@item U
+@findex kmacro-menu-unmark-all
+@item U @r{(Kmacro Menu)}
+取消标记和取消标记列表中的所有宏 (@code{kmacro-menu-unmark-all})。
+@end table

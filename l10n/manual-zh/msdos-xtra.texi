@@ -1,0 +1,369 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 2004--2026 Free Software Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@c
+@c This file is included either in emacs-xtra.texi (when producing the
+@c printed version) or in the main Emacs manual (for the on-line version).
+@node MS-DOS
+@section Emacs 和 MS-DOS
+@cindex MS-DOS peculiarities
+
+本节简要描述在 MS-DOS 上使用 Emacs 的特性。
+@iftex
+Information about Emacs and Microsoft's current operating system
+Windows is in the main Emacs manual
+(@pxref{Microsoft Windows,,, emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+Information about peculiarities common to MS-DOS and Microsoft's
+current operating systems Windows is in
+@ref{Microsoft Windows}.
+@end ifnottex
+
+如果您为 MS-DOS 构建 Emacs，则二进制文件也可以作为 DOS 应用程序在 Windows 3.X、Windows NT、Windows 9X/ME 或 Windows 2000/XP 上运行；如果您使用为 MS-DOS 构建的 Emacs，那么本章的所有内容都适用于所有这些系统。
+
+@iftex
+  @xref{Text and Binary,,,emacs, the Emacs Manual}, for information
+@end iftex
+@ifnottex
+  @xref{Text and Binary}, for information
+@end ifnottex
+关于 Emacs 在 MS-DOS（和 Windows）下对文本文件的特殊处理。
+
+@menu
+* Keyboard: MS-DOS Keyboard.    MS-DOS 上的键盘约定。
+* Mouse: MS-DOS Mouse.          MS-DOS 上的鼠标约定。
+* Display: MS-DOS Display.      MS-DOS 上的字体、框架和显示大小。
+* Files: MS-DOS File Names.     MS-DOS 上的文件名约定。
+* Printing: MS-DOS Printing.    MS-DOS 上的打印细节。
+* I18N: MS-DOS and MULE.        支持 MS-DOS 上的国际化。
+* Processes: MS-DOS Processes.  在 MS-DOS 上运行子进程。
+@end menu
+
+@node MS-DOS Keyboard
+@subsection MS-DOS 上的键盘使用
+
+@kindex DEL @r{(MS-DOS)}
+@kindex BS @r{(MS-DOS)}
+在 Emacs 中称为 @key{DEL} 的键（因为在大多数工作站上都​​是这样指定的）在 PC 上称为 @key{BS}（退格键）@. 这就是为什么 PC 特定的终端初始化将 @key{BS} 键重新映射为 @key{DEL}；出于同样的原因，@key{Delete} 键被重新映射为@kbd{C-d}。
+
+@kindex C-g @r{(MS-DOS)}
+@kindex C-Break @r{(MS-DOS)}
+@cindex quitting on MS-DOS
+为 MS-DOS 构建的 Emacs 将 @kbd{C-@key{Break}} 识别为退出字符，就像 @kbd{C-g} 一样。  这是因为 Emacs 无法检测到您已键入 @kbd{C-g}，直到它准备好接受更多输入。  因此，您不能使用 @kbd{C-g} 来停止正在运行的命令
+@iftex
+(@pxref{Quitting,,,emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{Quitting}).
+@end ifnottex
+相比之下，@kbd{C-@key{Break}}@emph{is}在您键入后立即被检测到（就像@kbd{C-g}在其他系统上一样），因此它可用于停止正在运行的命令和紧急逃生
+@iftex
+(@pxref{Emergency Escape,,,emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{Emergency Escape}).
+@end ifnottex
+
+@cindex Meta (under MS-DOS)
+@cindex Hyper (under MS-DOS)
+@cindex Super (under MS-DOS)
+@vindex dos-super-key
+@vindex dos-hyper-key
+PC 键盘映射使用左侧 @key{Alt} 键作为 @key{Meta} 键。您有两种选择来模拟 @key{SUPER} 和 @key{Hyper} 键：通过将变量 @code{dos-hyper-key} 和 @code{dos-super-key} 分别设置为 1 或 2，选择右 @key{Ctrl} 键或右 @key{Alt} 键。  如果 @code{dos-super-key} 和 @code{dos-hyper-key} 都不为 1，则默认情况下，右 @key{Alt} 键也映射到 @key{Meta} 键。  但是，如果安装了 MS-DOS 国际键盘支持程序 @file{KEYB.COM}，Emacs 会将 @emph{not} 映射右侧 @key{Alt} 到 @key{Meta}，因为它用于访问非美国键盘布局上的 @kbd{~} 和 @kbd{@@} 等字符；在这种情况下，您只能使用左@key{Alt}作为@key{Meta}键。
+
+@kindex C-j @r{(MS-DOS)}
+@vindex dos-keypad-mode
+变量 @code{dos-keypad-mode} 是一个标志变量，用于控制数字键盘中的按键返回哪些键代码。  您还可以通过将以下行放入 @file{_emacs} 文件中来定义键盘 @key{ENTER} 键的作用类似于 @kbd{C-j}：
+
+@smallexample
+;; @r{Make the @key{ENTER} key from the numeric keypad act as @kbd{C-j}.}
+(keymap-set function-key-map "<kp-enter>" "C-j")
+@end smallexample
+
+@node MS-DOS Mouse
+@subsection MS-DOS 上的鼠标使用
+
+@cindex mouse support under MS-DOS
+MS-DOS 上的 Emacs 支持鼠标（仅在默认终端上）。鼠标命令按记录工作，包括使用菜单和菜单栏的命令
+@iftex
+(@pxref{Menu Bar,,,emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{Menu Bar}).
+@end ifnottex
+滚动条在 MS-DOS Emacs 中不起作用。  PC 鼠标通常只有两个按钮；它们的作用相当于@kbd{mouse-1}和@kbd{mouse-2}，但如果将它们两个按在一起，就会产生@kbd{mouse-3}的效果。  如果鼠标确实有 3 个按钮，Emacs 会在启动时检测到这一点，并且所有 3 个按钮都正常工作，就像在 X 上一样。
+
+当鼠标指针在菜单项上移动时，菜单栏和弹出菜单的帮助字符串将显示在回显区域中。  鼠标敏感文本的突出显示
+@iftex
+(@pxref{Mouse References,,,emacs, the Emacs Manual})
+@end iftex
+@ifnottex
+(@pxref{Mouse References})
+@end ifnottex
+也支持。
+
+@cindex mouse, set number of buttons
+@findex msdos-set-mouse-buttons
+某些版本的鼠标驱动程序无法正确报告鼠标按钮的数量。  例如，有轮子的鼠标报告它们有 3 个按钮，但只有其中 2 个传递给 Emacs；作为中间按钮的滚轮上的点击不会被传递。  在这些情况下，您可以使用 @kbd{M-x msdos-set-mouse-buttons} 命令告诉 Emacs 需要多少个鼠标按钮。  您可以通过将此片段添加到您的 @file{_emacs} init 文件中来使这样的设置永久化：
+
+@example
+;; @r{Treat the mouse like a 2-button mouse.}
+(msdos-set-mouse-buttons 2)
+@end example
+
+@cindex Windows clipboard support
+为 MS-DOS 构建的 Emacs 在 Windows 上运行时支持剪贴板操作。  将文本放在终止环上或从环中拉出文本的命令，首先检查 Windows 剪贴板，就像 Emacs 在 X Window 系统上所做的那样
+@iftex
+(@pxref{Mouse Commands,,,emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{Mouse Commands}).
+@end ifnottex
+Windows 上的 MS-DOS Emacs 仅支持主选择和剪切缓冲区；辅助选择始终显示为空。
+
+由于 Windows 实现剪贴板访问的方式，可以放入剪贴板的文本长度受到 Emacs 可用的空闲 DOS 内存量的限制。  通常，剪贴板最多可以放入 620KB 的文本，但此限制取决于系统配置，如果将 Emacs 作为另一个程序的子进程运行，则此限制会更低。  如果被删除的文本不适合，Emacs 会输出一条消息说明这一点，并且不会将文本放入剪贴板。
+
+空字符也不能放入 Windows 剪贴板中。  如果被删除的文本包含空字符，Emacs 不会将此类文本放入剪贴板，并在回显区域中显示一条消息来说明这一点。
+
+@vindex dos-display-scancodes
+变量@code{dos-display-scancodes}，当非@code{nil}时，指示Emacs显示@acronym{ASCII}值以及每次击键的键盘扫描码；此功能可作为 @code{view-lossage} 命令的补充，用于调试。
+
+@node MS-DOS Display
+@subsection 在 MS-DOS 上显示
+@cindex faces under MS-DOS
+@cindex fonts, emulating under MS-DOS
+
+MS-DOS 上的显示不能使用字体变体，例如粗体或斜体，但它支持多个字体，每个字体都可以指定前景色和背景色。  因此，您可以通过定义相关面以使用不同的颜色来获得使用字体（例如 @code{font-lock}、丰富文本模式等）的 Emacs 包的完整功能。  使用@code{list-colors-display}命令
+@iftex
+(@pxref{Colors,,,emacs, the Emacs Manual})
+@end iftex
+@ifnottex
+(@pxref{Colors})
+@end ifnottex
+和 @code{list-faces-display} 命令
+@iftex
+(@pxref{Faces,,,emacs, the Emacs Manual})
+@end iftex
+@ifnottex
+(@pxref{Faces})
+@end ifnottex
+查看可用的颜色和面孔以及它们的外观。
+
+@xref{MS-DOS and MULE}，在本章后面，了解 Emacs 如何显示 DOS 显示中内置的本机字体不支持的字形和字符。
+
+@cindex cursor shape on MS-DOS
+当 Emacs 启动时，它将光标形状更改为实心框。  这是为了与其他系统兼容，其中框光标是 Emacs 中的默认设置。  通过在变量 @code{default-frame-alist} 中指定 @code{cursor-type} 参数，可以将此默认形状更改为条形
+@iftex
+(@pxref{Creating Frames,,,emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{Creating Frames}).
+@end ifnottex
+MS-DOS 终端不支持垂直条形光标，因此条形光标是水平的，并且 @code{@var{width}} 参数（如果由框架参数指定）实际上确定其高度。因此， @code{bar} 和 @code{hbar} 光标类型在 MS-DOS@. 上产生相同的效果 作为扩展，条形光标规范可以包括光标的起始扫描行及其宽度，如下所示：
+
+@example
+ '(cursor-type bar @var{width} . @var{start})
+@end example
+
+@noindent
+此外，如果 @var{width} 参数为负数，则光标栏从字符单元格的顶部开始。
+
+@cindex frames on MS-DOS
+MS-DOS 终端一次只能显示一帧。  Emacs 框架工具在 MS-DOS 上的工作方式与在文本终端上的工作方式非常相似
+@iftex
+(@pxref{Frames,,,emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{Frames}).
+@end ifnottex
+当您在 MS-Windows 上从 DOS 窗口运行 Emacs 时，您可以使可见框架小于全屏，但 Emacs 仍然无法一次显示多个框架。
+
+@cindex frame size under MS-DOS
+@findex dos-mode4350
+@findex dos-mode25
+@code{dos-mode4350} 命令将显示切换为 43 或 50 行，具体取决于您的硬件； @code{dos-mode25} 命令切换到默认的 80x25 屏幕尺寸。
+
+默认情况下，Emacs 只知道如何设置 80 列 x 25、28、35、40、43 或 50 行的屏幕尺寸。  但是，如果您的视频适配器具有特殊的视频模式，可以将显示切换为其他尺寸，那么您也可以让 Emacs 支持这些模式。  当您要求 Emacs 将帧切换到 @var{n} 行乘 @var{m} 列尺寸时，它会检查是否存在名为 @code{screen-dimensions-@var{n}x@var{m}} 的变量，如果存在，则使用其值（必须是整数）作为要切换到的视频模式。  （Emacs 通过使用 @code{AL} 寄存器中的 @code{screen-dimensions-@var{n}x@var{m}} 值调用 BIOS @code{Set Video Mode} 函数来切换到该视频模式。）例如，假设您的适配器在进入视频模式 85 时将切换到 66x80 尺寸。然后您可以通过将以下内容放入 @file{_emacs} 文件中来使 Emacs 支持此屏幕尺寸：
+
+@example
+(setq screen-dimensions-66x80 85)
+@end example
+
+由于 MS-DOS 上的 Emacs 只能将帧大小设置为特定支持的尺寸，因此它无法满足每个可能的帧大小调整请求。  当请求不支持的大小时，Emacs 将选择指定大小之外的下一个更大的受支持大小。  例如，如果您要求 36x80 帧，您将得到 40x80。
+
+仅当变量 @code{screen-dimensions-@var{n}x@var{m}} 完全匹配指定大小时才使用；搜索下一个更大的受支持大小时会忽略它们。  在上面的示例中，即使您的 VGA 支持 38x80 尺寸并且您定义了一个具有合适值的变量 @code{screen-dimensions-38x80}，当您请求 36x80 帧时，您仍然会得到 40x80 屏幕。  如果您想在这种情况下获得 38x80 大小，可以通过将名为 @code{screen-dimensions-36x80} 的变量设置为与 @code{screen-dimensions-38x80} 相同的视频模式值来实现。
+
+在 MS-DOS 上更改框架尺寸会将所有其他框架更改为新尺寸。
+
+@node MS-DOS File Names
+@subsection MS-DOS 上的文件名
+@cindex file names under MS-DOS
+@cindex init file, default name under MS-DOS
+
+在 MS-DOS 上，文件名不区分大小写，并且限制为八个字符，还可以选择添加一个句点和另外三个字符。  Emacs 对这些限制有足够的了解，可以处理适用于其他操作系统的文件名。  例如，文件名中的前导点@samp{.}在 MS-DOS 中无效，因此 Emacs 透明地将它们转换为下划线@samp{_}；因此你的默认初始化文件
+@iftex
+(@pxref{Init File,,,emacs, the Emacs Manual})
+@end iftex
+@ifnottex
+(@pxref{Init File})
+@end ifnottex
+在 MS-DOS 上称为 @file{_emacs}@. 句号之前或之后的多余字符通常会被 MS-DOS 本身忽略；因此，如果您访问文件 @file{LongFileName.EvenLongerExtension}，您将默默地得到 @file{longfile.eve}，但 Emacs 仍会在模式行上显示长文件名。  除此之外，您可以指定在 MS-DOS 下有效的文件名；如上所述的透明转换仅适用于 Emacs 内置的文件名。
+
+@cindex backup file names on MS-DOS
+MS-DOS 上对文件名的上述限制使得几乎不可能构造备份文件的名称
+@iftex
+(@pxref{Backup Names,,,emacs, the Emacs Manual})
+@end iftex
+@ifnottex
+(@pxref{Backup Names})
+@end ifnottex
+不会丢失一些原始文件名字符。  例如，即使使用单个备份，@file{docs.txt} 的备份文件名称也是@file{docs.tx~}。
+
+@cindex file names under Windows 95/NT
+@cindex long file names in DOS box under Windows 95/NT
+如果您在 Windows 9X、Windows ME 或 Windows 2000/XP 下将 Emacs 作为 DOS 应用程序运行，则可以打开对长文件名的支持。  如果您这样做，Emacs 不会截断文件名或将其转换为小写；而是会截断文件名。相反，它逐字使用您指定的文件名。  要启用长文件名支持，请在启动 Emacs 之前将环境变量 @env{LFN} 设置为 @samp{y}。  不幸的是，Windows NT 不允许 DOS 程序访问长文件名，因此为 MS-DOS 构建的 Emacs 只能看到它们的短 8+3 别名。
+
+@cindex HOME directory under MS-DOS
+MS-DOS 没有主目录的概念，因此 MS-DOS 上的 Emacs 假装它的安装目录是 @env{HOME} 环境变量的值。  也就是说，如果您的 Emacs 二进制文件 @file{emacs.exe} 位于目录 @file{c:/utils/emacs/bin} 中，则 Emacs 的行为就像@env{HOME} 设置为 @samp{c:/utils/emacs} 一样。  特别是，Emacs 就是在此处查找 init 文件@file{_emacs}。考虑到这一点，您可以在文件名中使用 @samp{~} 作为主目录的别名，就像在 GNU 或 Unix 上一样。  您还可以在启动 Emacs 之前在环境中设置 @env{HOME} 变量；然后它的值将覆盖上面的默认行为。
+
+MS-DOS 上的 Emacs 会专门处理名称 @file{/dev}，因为 DJGPP 模拟器库中的一项功能会假装 I/O 设备在该目录中具有名称。  我们建议您避免在任何磁盘上使用名为 @file{/dev} 的实际目录。
+
+@node MS-DOS Printing
+@subsection 打印和 MS-DOS
+
+打印命令，例如@code{lpr-buffer}
+@iftex
+(@pxref{Printing,,,emacs, the Emacs Manual}) and @code{ps-print-buffer}
+(@pxref{PostScript,,,emacs, the Emacs Manual})
+@end iftex
+@ifnottex
+(@pxref{Printing}) and @code{ps-print-buffer} (@pxref{PostScript})
+@end ifnottex
+如果 POSIX 样式 @code{lpr} 程序不可用，则可以通过将输出发送到打印机端口之一在 MS-DOS 上工作。  相同的 Emacs 变量控制所有系统上的打印，但在某些情况下，它们在 MS-DOS 上具有不同的默认值。
+
+@iftex
+@xref{Windows Printing,,,emacs, the Emacs Manual},
+@end iftex
+@ifnottex
+@xref{Windows Printing},
+@end ifnottex
+有关设置打印到网络打印机的详细信息。
+
+某些打印机期望对非 @acronym{ASCII} 文本进行 DOS 代码页编码，即使它们连接到对同一区域设置使用不同编码的 Windows 计算机也是如此。  例如，在 Latin-1 语言环境中，DOS 使用代码页 850，而 Windows 使用代码页 1252。@xref{MS-DOS and MULE}。  当您从 Windows 打印到此类打印机时，可以在 @kbd{M-x lpr-buffer} 之前使用 @kbd{C-x @key{RET} c} (@code{universal-coding-system-argument}) 命令；然后，Emacs 会将文本转换为您指定的 DOS 代码页。  例如，@kbd{C-x @key{RET} c cp850-dos @key{RET} M-x lpr-region @key{RET}} 将打印该区域，同时将其转换为代码页 850 编码。
+
+@vindex dos-printer
+@vindex dos-ps-printer
+为了向后兼容，在 MS-DOS 上，@code{dos-printer} (@code{dos-ps-printer}) 的值（如果有值）将覆盖@code{printer-name} (@code{ps-printer-name}) 的值。
+
+
+@node MS-DOS and MULE
+@subsection MS-DOS 上的国际支持
+@cindex international support (MS-DOS)
+
+MS-DOS 上的 Emacs 支持与 GNU、Unix 和其他平台上相同的国际字符集
+@iftex
+(@pxref{International,,,emacs, the Emacs Manual}),
+@end iftex
+@ifnottex
+(@pxref{International}),
+@end ifnottex
+包括用于在不同字符集之间进行转换的编码系统。  但是，由于 MS-DOS/MS-Windows 和其他系统之间不兼容，因此您应该注意此支持的几个特定于 DOS 的方面。  本节介绍这些方面。
+
+下面的描述主要针对 Emacs 的 MS-DOS 端口，特别是它谈论对 Emacs 用户的实际影响的地方。
+
+@table @kbd
+@item M-x dos-codepage-setup
+设置适合当前 DOS 代码页的 Emacs 显示和编码系统。
+@end table
+
+@cindex codepage, MS-DOS
+@cindex DOS codepages
+MS-DOS 设计为在任何给定时间都支持 256 个字符的字符集，但也提供多种字符集可供选择。  替代字符集称为 @dfn{DOS codepages}。每个代码页都包含全部 128 个 @acronym{ASCII} 字符，但其他 128 个字符（代码 128 到 255）因代码页而异。每个 DOS 代码页都由 3 位数字标识，例如 850、862 等。
+
+与允许您同时使用多种字体的 X 不同，MS-DOS 通常不允许在单个会话中使用多个代码页。  MS-DOS 被设计为在系统启动时加载单个代码页，并要求您重新启动才能更改它@footnote{Normally, one particular codepage is burnt into the display memory, while other codepages can be installed by modifying system configuration files, such as @file{CONFIG.SYS}, and rebooting. While there is third-party software that allows changing the codepage without rebooting, we describe here how a stock MS-DOS system behaves.}。  当您在其他系统（例如 MS-Windows）上运行 DOS 可执行文件时，同样的限制也适用。
+
+@vindex dos-codepage
+对于 MS-DOS 上的多字节操作，Emacs 需要知道所选的 DOS 代码页可以显示哪些字符。  因此，它在启动后不久就会查询系统以获取所选的代码页编号，并将该编号存储在变量@code{dos-codepage}中。  某些系统返回当前代码页的默认值 437，即使实际代码页不同。  （当您使用显示硬件内置的代码页时，通常会发生这种情况。）您可以通过在 init 文件中设置变量 @code{dos-codepage} 来指定 Emacs 使用的不同代码页。
+
+@cindex language environment, automatic selection on MS-DOS
+多字节 Emacs 仅支持某些 DOS 代码页：可以显示远东脚本的代码页，例如日语代码页 932，以及编码单个 ISO 8859 字符集的代码页。
+
+远东代码页可以直接显示这些国家/地区的 MULE 字符集之一，因此 Emacs 只需设置为使用代码页支持的适当终端编码系统即可。本节其余部分描述的特殊功能主要与编码 ISO 8859 字符集的代码页有关。
+
+对于与 ISO 字符集之一对应的代码页，Emacs 根据代码页编号了解字符集。  Emacs 自动创建一个编码系统来支持读写使用当前代码页的文件，并且默认使用这个编码系统。  该编码系统的名称是@code{cp@var{nnn}}，其中@var{nnn}是代码页编号。@footnote{The standard Emacs coding systems for ISO 8859 are not quite right for the purpose, because typically the DOS codepage does not match the standard ISO character codes.  For example, the letter @samp{@,{c}} (@samp{c} with cedilla) has code 231 in the standard Latin-1 character set, but the corresponding DOS codepage 850 uses code 135 for this glyph.}
+
+@cindex mode line (MS-DOS)
+所有@code{cp@var{nnn}}编码系统都使用字母@samp{D}（代表“DOS”）作为其模式行助记符。  由于终端编码系统和文件 I/O 的默认编码系统在启动时都设置为正确的 @code{cp@var{nnn}} 编码系统，因此 MS-DOS 上的模式行通常以 @samp{-DD\-} 开头。
+@iftex
+@xref{Mode Line,,,emacs, the Emacs Manual}.
+@end iftex
+@ifnottex
+@xref{Mode Line}.
+@end ifnottex
+远东 DOS 终端不使用 @code{cp@var{nnn}} 编码系统，因此它们的初始模式行看起来像 Emacs 默认值。
+
+由于代码页编号还指示您正在使用哪个脚本，因此 Emacs 会自动运行 @code{set-language-environment} 来选择该脚本的语言环境
+@iftex
+(@pxref{Language Environments,,,emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{Language Environments}).
+@end ifnottex
+
+如果缓冲区包含属于其他 ISO 8859 字符集的字符，而不是所选 DOS 代码页支持的字符集，Emacs 将使用一系列 @acronym{ASCII} 字符来显示它。  例如，如果当前代码页没有字母 @samp{@`o} 的字形（带有重音符号的小 @samp{o}），它将显示为 @samp{@{`o@}}，其中大括号作为一个视觉指示，表明这是一个单个字符。 （这对于某些非拉丁字符（例如希腊语或希伯来语字母表中的字符）来说可能看起来很尴尬，但了解该语言的人仍然可以阅读。）尽管该字符可能占据屏幕上的几列，但它实际上仍然只是一个字符，并且所有 Emacs 命令都将其视为一个字符。
+
+@cindex MS-Windows codepages
+MS-Windows 提供了自己的代码页，与相同语言环境的 DOS 代码页不同。  例如，DOS代码页850支持与Windows代码页1252相同的字符集； DOS 代码页 855 支持与 Windows 代码页 1251 等相同的字符集。MS-Windows 版本的 Emacs 在使用 @samp{-nw} 选项调用时使用当前代码页进行显示。
+
+@node MS-DOS Processes
+@subsection MS-DOS 上的子进程
+
+@cindex compilation under MS-DOS
+@cindex inferior processes under MS-DOS
+@findex compile @r{(MS-DOS)}
+@findex grep @r{(MS-DOS)}
+由于 MS-DOS 是单进程“操作系统”，因此异步子进程不可用。  特别是，Shell 模式及其变体不起作用。  大多数使用异步子进程的 Emacs 功能也不适用于 MS-DOS，包括 Shell 模式和 GUD@. 如有疑问，请尝试查看；不起作用的命令会输出一条错误消息，指出不支持异步进程。
+
+通过同步运行下级进程，可以在 Emacs 下使用 @kbd{M-x compile} 进行编译，使用 @kbd{M-x grep} 搜索文件并使用 @kbd{M-x diff} 显示文件之间的差异。  这意味着在下级进程完成之前您无法进行任何编辑。
+
+通过对 @code{ispell} 程序的同步调用的特殊支持，拼写检查也可以工作。  这比其他平台上的异步调用慢。
+
+您可以使用 @kbd{M-x eshell} 命令来代替在 MS-DOS 上不起作用的 Shell 模式。  这会调用 Eshell 包，该包完全在 Emacs Lisp 中实现类似 POSIX 的 shell。
+
+相比之下，编译为本机 Windows 应用程序的 Emacs @strong{does} 支持异步子进程。
+@iftex
+@xref{Windows Processes,,,emacs, the Emacs Manual}.
+@end iftex
+@ifnottex
+@xref{Windows Processes}.
+@end ifnottex
+
+@cindex printing under MS-DOS
+打印命令，例如@code{lpr-buffer}
+@iftex
+(@pxref{Printing,,,emacs, the Emacs Manual}) and
+@code{ps-print-buffer} (@pxref{PostScript,,,emacs, the Emacs Manual}),
+work in MS-DOS by sending the output to one of the printer ports.
+@xref{MS-DOS Printing,,,emacs, the Emacs Manual}.
+@end iftex
+@ifnottex
+(@pxref{Printing}) and @code{ps-print-buffer} (@pxref{PostScript}),
+work in MS-DOS by sending the output to one of the printer ports.
+@xref{MS-DOS Printing}.
+@end ifnottex
+
+当您在 MS-DOS 上同步运行子进程时，请确保程序终止并且不会尝试读取键盘输入。  如果程序不自行终止，您将无法终止它，因为 MS-DOS 没有提供终止进程的通用方法。在这些情况下，按 @kbd{C-c} 或 @kbd{C-@key{Break}} 有时可能会有所帮助。
+
+MS-DOS 不支持访问其他计算机上的文件@. 其他面向网络的命令（例如发送邮件、Web 浏览、远程登录等）也不起作用，除非使用某些网络重定向器将网络访问内置到 MS-DOS 中。
+
+@cindex directory listing on MS-DOS
+@vindex dired-listing-switches @r{(MS-DOS)}
+MS-DOS 上的 Dired 使用 @code{ls-lisp} 包
+@iftex
+(@pxref{ls in Lisp,,,emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{ls in Lisp}).
+@end ifnottex
+因此，MS-DOS 上的 Dired 仅支持您可以在 @code{dired-listing-switches} 变量中提及的一些可能选项。  有效的选项包括 @samp{-A}、@samp{-a}、@samp{-c}、@samp{-i}、@samp{-r}、@samp{-S}、@samp{-s}、@samp{-t} 和 @samp{-u}。

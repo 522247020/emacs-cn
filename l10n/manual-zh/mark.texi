@@ -1,0 +1,266 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Mark
+@chapter 马克和地区
+@cindex mark
+@cindex setting a mark
+@cindex region
+
+Emacs 与许多其他应用程序一样，允许您选择缓冲区文本的任意部分并调用对此类 @dfn{selected text} 进行操作的命令。  在 Emacs 中，我们将所选文本称为 @dfn{the region}；它的处理与其他程序中选定文本的处理非常相似，但也有重要的区别。
+
+@cindex active region
+@cindex activating the mark
+该区域是 @dfn{the mark} 和当前 @dfn{point} 之间的缓冲区部分。  您可以通过在某处设置标记（例如使用 @kbd{C-SPC} 命令）来定义区域，然后将点移动到您希望区域结束的位置。  （或者您可以使用鼠标定义区域。）
+
+该区域始终在点和标记之间延伸，无论它们中的哪一个出现在文本中的前面；每次移动点时，区域都会发生变化。
+
+将标记设置在文本@dfn{activates} it 中的位置。  当标记处于活动状态时，我们也说该区域处于活动状态； Emacs 通过使用 @code{region} 面 (@pxref{Face Customization}) 突出显示其中的文本来指示其范围。
+
+@cindex deactivating the mark
+在某些非运动命令（包括任何更改缓冲区中文本的命令）之后，Emacs 会自动将标记设置为 @dfn{deactivates} ；这将关闭突出显示。  您还可以随时通过键入 @kbd{C-g} (@pxref{Quitting}) 显式停用该标记。
+
+许多命令将其操作的文本限制在活动区域​​内。  例如，@kbd{M-%}命令（替换匹配文本）通常适用于缓冲区的整个可访问部分，但如果您有一个活动区域，它将仅适用于该区域。
+
+即使该标记未激活，它也是有用的。  例如，您可以使用标记环移至先前的标记位置。  @xref{Mark Ring}。  此外，某些命令甚至会对非活动区域产生影响（例如@dfn{upcase-region}）。  您还可以使用 @kbd{C-x C-x} 等命令重新激活该区域。
+
+上述行为是交互式会话中的默认行为，称为瞬态标记模式。  禁用瞬态标记模式会将 Emacs 切换到另一种行为，其中该区域通常不会突出显示。  @xref{Disabled Transient Mark}。
+
+@vindex highlight-nonselected-windows
+在一个缓冲区中设置标记不会影响其他缓冲区中的标记。  当您返回到带有活动标记的缓冲区时，该标记位于与之前相同的位置。  当多个窗口显示相同的缓冲区时，它们可以具有不同的点值，从而具有不同的区域，但它们都共享一个公共标记位置。  @xref{Windows}。通常，只有选定的窗口会突出显示其区域；但是，如果变量 @code{highlight-nonselected-windows} 不是 @code{nil}，则每个窗口都会突出显示自己的区域。
+
+还有另一种区域：矩形区域。 @xref{Rectangles}。
+
+@menu
+* Setting Mark::             设置标记的命令。
+* Marking Objects::          在文本单元周围放置区域的命令。
+* Using Region::             对区域内容进行操作的方法摘要。
+* Mark Ring::                先前的标记位置已保存，以便您可以返回那里。
+* Global Mark Ring::         各个缓冲区中先前的标记位置。
+* Shift Selection::          使用移动光标运动键。
+* Disabled Transient Mark::  默认情况下不突出显示区域。
+@end menu
+
+@node Setting Mark
+@section 设置标记
+
+以下是一些设置标记的命令：
+
+@table @kbd
+@item C-@key{SPC}
+将标记设置在点处，然后激活它 (@code{set-mark-command})。
+@item C-@@
+相同。
+@item C-x C-x
+将标记设置在该点，并激活它；然后将标记移动到原来的位置 (@code{exchange-point-and-mark})。
+@item Drag-mouse-1
+在您拖动的文本周围设置点和标记。
+@item mouse-3
+在点处设置标记，然后将点移动到单击的位置 (@code{mouse-save-then-kill})。
+@item @r{Shifted cursor motion keys}
+如果标记处于非活动状态，则将标记设置在点处，然后移动点。 @xref{Shift Selection}。
+@end table
+
+@kindex C-SPC
+@kindex C-@@
+@findex set-mark-command
+设置标记的最常见方法是使用 @kbd{C-@key{SPC}} (@code{set-mark-command})@footnote{There is no @kbd{C-@key{SPC}} character in @acronym{ASCII}; usually, typing @kbd{C-@key{SPC}} on a text terminal gives the character @kbd{C-@@}.  This key is also bound to @code{set-mark-command}, so unless you are unlucky enough to have a text terminal that behaves differently, you might as well think of @kbd{C-@@} as @kbd{C-@key{SPC}}.}。  这会在点所在的位置设置标记并激活它。  然后您可以将点移开，留下标记。  如果点所在位置已经设​​置了标记，则该命令不会设置另一个标记，而只会激活现有标记。
+
+例如，假设您希望将缓冲区的一部分转换为大写。  要完成此操作，请转到所需文本的一端，输入 @kbd{C-@key{SPC}}，然后移动点，直到突出显示所需的文本部分。  现在输入 @kbd{C-x C-u} (@code{upcase-region})。  这会将区域中的文本转换为大写，然后停用该标记。
+
+只要该标记处于活动状态，您就可以通过键入 @kbd{C-g} (@pxref{Quitting}) 来停用它。  大多数对该区域进行操作的命令也会自动停用该标记，如上例中的@kbd{C-x C-u}。
+
+您还可以使用它来记住缓冲区中的位置（通过键入 @kbd{C-@key{SPC} C-@key{SPC}}），然后跳回那里（通过键入 @kbd{C-u C-@key{SPC}}），而不是设置标记来对某个区域进行操作。  @xref{Mark Ring}，了解详情。
+
+@kindex C-x C-x
+@findex exchange-point-and-mark
+命令@kbd{C-x C-x} (@code{exchange-point-and-mark}) 交换点和标记的位置。  当您对点的位置感到满意但想要移动区域的另一端（标记所在的位置）时，@kbd{C-x C-x} 非常有用。  如有必要，再次使用 @kbd{C-x C-x} 将标记放置在新位置，同时将点放回其原始位置。  通常，如果标记处于非活动状态，此命令首先会在上次设置的位置重新激活标记，以确保该区域突出显示。  但是，如果您使用前缀参数调用它，它会使标记处于非活动状态并且该区域不会突出显示；您可以使用它以类似于@kbd{C-u C-@key{SPC}}的方式跳转到标记。
+
+您也可以用鼠标设置标记。  如果按下鼠标左键 (@kbd{down-mouse-1}) 并将鼠标拖过一段文本，则会在您第一次按下鼠标按钮的位置设置标记，并在您释放鼠标按钮的位置放置点。  或者，单击鼠标右键 (@kbd{mouse-3}) 在点处设置标记，然后将点移动到单击的位置。  @xref{Mouse Commands}，有关这些鼠标命令的更详细说明。
+
+最后，您可以通过按住 Shift 键同时键入某些光标移动命令（例如@kbd{S-@key{RIGHT}}、@kbd{S-C-f}、@kbd{S-C-n} 等）来设置标记。  这称为@dfn{shift-selection}。它在移动点之前的点设置标记，但前提是没有通过先前的 Shift 选择或鼠标命令设置活动标记。  通过鼠标命令和通过移动选择设置的标记的行为与通常的标记略有不同：任何后续未移动的光标移动命令都会自动停用它。  详情请参见@ref{Shift Selection}。
+
+许多插入文本的命令，例如 @kbd{C-y} (@code{yank})，会在插入文本的另一端设置标记，而不激活它。这可以让您轻松返回到该位置 (@pxref{Mark Ring})。  当命令在回显区域显示 @samp{Mark set} 时，您可以判断该命令执行了此操作。
+
+@cindex primary selection, when active region changes
+在 X 下，每次活动区域发生变化时，Emacs 都会将该区域中的文本保存到 @dfn{primary selection}。  这样您就可以通过 @kbd{mouse-2} 单击将该文本插入到其他 X 应用程序中。 @xref{Primary Selection}。
+
+@node Marking Objects
+@section 标记文本对象的命令
+
+@cindex marking sections of text
+以下是用于在文本对象（例如单词、列表、段落或页面）周围放置点和标记的命令：
+
+@table @kbd
+@item M-@@
+在下一个单词的末尾设置标记 (@code{mark-word})。  这不移动点。
+@item C-M-@@
+在以下平衡表达式结束后设置标记 (@code{mark-sexp})。  这不移动点。
+@item M-h
+将光标移动到当前段落的开头，并在末尾设置标记 (@code{mark-paragraph})。
+@item C-M-h
+将 point 移动到当前 defun 的开头，并在末尾设置标记 (@code{mark-defun})。
+@item C-x C-p
+将光标移动到当前页的开头，并在末尾设置标记 (@code{mark-page})。
+@item C-x h
+将指针移动到缓冲区的开头，并在末尾设置标记 (@code{mark-whole-buffer})。
+@end table
+
+@kindex M-@@
+@findex mark-word
+@kbd{M-@@} (@code{mark-word}) 在下一个单词的末尾设置标记（@pxref{Words}，有关单词的信息）。  重复调用此命令可通过每次将标记前进一个字来扩展区域。  作为例外，如果标记处于活动状态并且位于 point 之前，@kbd{M-@@} 会将标记从当前位置向后移动一个字，每次一个字。
+
+该命令还接受数字参数 @var{n}，它告诉它将标记前进 @var{n} 个字。  负参数 @minus{}@var{n} 将标记向后移动 @var{n} 个字。
+
+@kindex C-M-@@
+@findex mark-sexp
+类似地，@kbd{C-M-@@} (@code{mark-sexp}) 将标记放在下一个平衡表达式 (@pxref{Expressions}) 的末尾。  重复调用会将区域扩展到后续表达式，而正或负数字参数则将标记向前或向后移动指定数量的表达式。
+
+上面列表中的其他命令都设置了点和标记，以便在缓冲区中定界对象。  @kbd{M-h} (@code{mark-paragraph}) 标记段落 (@pxref{Paragraphs})，@kbd{C-M-h} (@code{mark-defun}) 标记顶级定义 (@pxref{Moving by Defuns})，@kbd{C-x C-p} (@code{mark-page}) 标记页面 (@pxref{Pages})。  重复调用再次发挥相同的作用，将区域扩展到连续的对象；同样，数字参数指定要移动标记的对象数量。
+
+@kindex C-x h
+@findex mark-whole-buffer
+@cindex select all
+@kbd{C-x h} (@code{mark-whole-buffer}) 将整个缓冲区设置为区域，将点放在开头，将标记放在结尾。
+
+@node Using Region
+@section 在该地区运营
+
+@cindex operations on a marked region
+一旦您拥有了一个区域，您可以通过以下一些方式对其进行操作：
+
+@itemize @bullet
+@item
+用 @kbd{C-w} (@pxref{Killing}) 杀死它。
+@item
+使用 @kbd{M-w} (@pxref{Yanking}) 将其复制到 Kill Ring。
+@item
+使用 @kbd{C-x C-l} 或 @kbd{C-x C-u} (@pxref{Case}) 转换大小写。
+@item
+使用 @kbd{C-u C-/} (@pxref{Undo}) 撤消其中的更改。
+@item
+使用 @kbd{M-%} (@pxref{Query Replace}) 替换其中的文本。
+@item
+用 @kbd{C-x @key{TAB}} 或 @kbd{C-M-\} (@pxref{Indentation}) 缩进。
+@item
+使用 @kbd{M-x fill-region} (@pxref{Filling}) 将其填充为文本。
+@item
+使用 @kbd{M-$} (@pxref{Spelling}) 检查其中单词的拼写。
+@item
+使用 @kbd{M-x eval-region} (@pxref{Lisp Eval}) 将其评估为 Lisp 代码。
+@item
+使用 @kbd{C-x r s} (@pxref{Registers}) 将其保存在寄存器中。
+@item
+将其保存在缓冲区或文件中 (@pxref{Accumulating Text})。
+@end itemize
+
+当标记处于非活动状态时，某些命令具有默认行为，但如果标记处于活动状态，则对区域进行操作。  例如，@kbd{M-$} (@code{ispell-word}) 通常会检查点处单词的拼写，但如果标记处于活动状态，则会检查该区域中的文本 (@pxref{Spelling})。  通常，如果区域为空（即，如果标记和点位于同一位置），此类命令将使用其默认行为。  如果您希望它们在空白区域上操作，请将变量 @code{use-empty-active-region} 更改为 @code{t}。
+
+@vindex delete-active-region
+如 0⁣ 中所述，@key{DEL} (@code{backward-delete-char}) 和 @key{Delete} (@code{delete-forward-char}) 命令也以这种方式起作用。  如果标记处于活动状态，他们会删除该区域中的文本。  （作为例外，如果您提供数字参数 @var{n}，其中 @var{n} 不是 1，则无论标记是否处于活动状态，这些命令都会删除 @var{n} 个字符）。  如果将变量 @code{delete-active-region} 更改为 @code{nil}，则当标记处于活动状态时，这些命令的行为不会有所不同。  如果您将该值更改为 @code{kill}，这些命令 @dfn{kill} 该区域而不是删除它 (@pxref{Killing})。
+
+@vindex mark-even-if-inactive
+其他命令始终在该区域上运行，并且没有默认行为。  此类命令的名称中通常包含单词 @code{region}，例如 @kbd{C-w} (@code{kill-region}) 和 @kbd{C-x C-u} (@code{upcase-region})。  如果标记处于非活动状态，则它们对 @dfn{inactive region} 进行操作，即对点和上次设置标记的位置 (@pxref{Mark Ring}) 之间的文本进行操作。  要禁用此行为，请将变量 @code{mark-even-if-inactive} 更改为 @code{nil}。  如果标记处于非活动状态，这些命令将发出错误信号。
+
+@cindex Delete Selection mode
+@cindex mode, Delete Selection
+@findex delete-selection-mode
+@findex delete-selection-local-mode
+@vindex delete-selection-temporary-region
+默认情况下，即使标记处于活动状态，文本插入也会正常进行 — 例如，键入 @kbd{a} 会插入字符 @samp{a}，然后停用标记。  删除选择模式是一种次要模式，它会修改此行为：如果启用该模式，则在标记处于活动状态时插入文本会导致首先删除该区域中的文本。  但是，您可以通过自定义 @code{delete-selection-temporary-region} 选项来调整此行为。  它的默认值为 @code{nil}，但您可以将其设置为 @code{t}，在这种情况下，只会替换临时活动区域：通过拖动鼠标 (@pxref{Setting Mark}) 或通过移位选择 (@pxref{Shift Selection}) 以及禁用瞬态标记模式时通过 @kbd{C-u C-x C-x} 设置的区域。  您可以通过将@code{delete-selection-temporary-region}设置为@code{selection}来进一步调整行为：然后@kbd{C-u C-x C-x}的临时区域将不会被替换，只有通过拖动鼠标或Shift键选择激活的区域才会被替换。  要打开或关闭“删除选择”模式，请输入 @kbd{M-x delete-selection-mode}。  要仅在当前缓冲区中打开或关闭“删除选择”模式，请输入 @kbd{M-x delete-selection-local-mode}。
+
+@node Mark Ring
+@section 马克戒指
+
+@cindex mark ring
+每个缓冲区都会记住标记之前的位置，即 @dfn{mark ring} 中的位置。  设置标记的命令也会将旧标记推到该环上。  标记环的用途之一是记住您可能想返回的地点。
+
+@table @kbd
+@item C-@key{SPC} C-@key{SPC}
+设置标记，将其推到标记环上，但不激活它。
+@item C-u C-@key{SPC}
+将点移动到标记所在的位置，并从先前标记的环中恢复标记。
+@end table
+
+@kindex C-SPC C-SPC
+当您想要使用标记来记住您可能希望返回的位置时，命令 @kbd{C-@key{SPC} C-@key{SPC}} 非常方便。它将当前点推到标记环上，而不激活标记（这将导致 Emacs 突出显示该区域）。  这实际上是连续两次调用@kbd{C-@key{SPC}} (@code{set-mark-command})；第一个@kbd{C-@key{SPC}} 设置标记，第二个@kbd{C-@key{SPC}} 停用它。  （当瞬态标记模式关闭时，@kbd{C-@key{SPC} C-@key{SPC}} 会暂时激活瞬态标记模式；@pxref{Disabled Transient Mark}。）
+
+@kindex C-u C-SPC
+要返回到标记位置，请使用 @code{set-mark-command} 和前缀参数：@kbd{C-u C-@key{SPC}}。  这会将点移动到标记所在的位置，如果标记处于活动状态，则将其停用。  每个后续的@kbd{C-u C-@key{SPC}}都会跳转到存储在标记环中的先前位置。  通过这种方式移动的位置不会丢失；他们走到了环的尽头。
+
+@vindex set-mark-command-repeat-pop
+如果将 @code{set-mark-command-repeat-pop} 设置为非 @code{nil}，则在键入 @kbd{C-u C-@key{SPC}} 后，您可以立即键入 @kbd{C-@key{SPC}} 而不是 @kbd{C-u C-@key{SPC}} 来循环标记环。  默认情况下，@code{set-mark-command-repeat-pop} 为 @code{nil}。
+
+每个缓冲区都有自己的标记环。  所有编辑命令都使用当前缓冲区的标记环。  特别是，@kbd{C-u C-@key{SPC}} 始终保留在同一个缓冲区中。
+
+@vindex mark-ring-max
+变量@code{mark-ring-max}指定标记环中保留的最大条目数。  默认为 16 个条目。  如果存在这么多条目并且推送了另一条目，则列表中最早的条目将被丢弃。  重复@kbd{C-u C-@key{SPC}}循环当前在环中的位置。
+
+如果你想一次又一次地回到同一个地方，标记环可能不够方便。  如果是这样，您可以将该位置记录在寄存器中以供以后检索 (@pxref{Position Registers,, Saving Positions in Registers})。
+
+@node Global Mark Ring
+@section 全球标志戒指
+@cindex global mark ring
+
+@vindex global-mark-ring-max
+除了属于每个缓冲区的普通标记环之外，Emacs 还有一个 @dfn{global mark ring}。  每次设置标记时，如果自上次标记设置后已切换缓冲区，则除了当前缓冲区自己的标记环之外，还会将其记录在全局标记环中。  因此，全局标记环记录了您曾经所在的一系列缓冲区，以及对于每个缓冲区，您设置标记的位置。  全局标记环的长度由@code{global-mark-ring-max}控制，默认为16。
+
+请注意，只有当某个命令设置了标记时，该标记才会记录在全局标记环中。  如果仅激活现有标记，就像您使用 @kbd{C-@key{SPC}} 且已设置标记 (@pxref{Setting Mark}) 时的情况一样，不会将标记推送到全局环上。
+
+@kindex C-x C-SPC
+@findex pop-global-mark
+命令@kbd{C-x C-@key{SPC}}（@code{pop-global-mark}）跳转到全局环中最新条目的缓冲区和位置。  它还会旋转环，以便连续使用 @kbd{C-x C-@key{SPC}} 将您带到较早的缓冲区并标记位置。
+
+@node Shift Selection
+@section 班次选择
+@cindex shift-selection
+
+如果在键入光标移动命令时按住 Shift 键，则会在移动点之前设置标记，以便该区域从点的原始位置延伸到新位置。  此功能称为@dfn{shift-selection}。  它与在其他编辑器中选择文本的方式类似。
+
+通过移位选择设置的标记的行为与我们上面描述的略有不同。  首先，除了停用标记的常用方法（例如更改缓冲区文本或键入 @kbd{C-g}）之外，还可以通过任何 @emph{unshifted} 光标移动命令来停用标记。  其次，任何后续的 @emph{shifted} 光标移动命令都会避免重新设置标记。  因此，一系列移动的光标运动命令将连续调整该区域。
+
+仅当移动的光标运动键尚未绑定到单独的命令 (@pxref{Customization}) 时，Shift-selection 才起作用。  例如，如果将 @kbd{S-C-f} 绑定到另一个命令，则键入 @kbd{S-C-f} 运行该命令，而不是执行 @kbd{C-f} (@code{forward-char}) 的 Shift 选择版本。
+
+通过鼠标命令设置的标记与通过移位选择 (@pxref{Setting Mark}) 设置的标记的行为相同。  例如，如果通过拖动鼠标指定区域，则可以使用移动光标运动命令继续扩展该区域。  在任何一种情况下，任何未移​​动的光标移动命令都会停用该标记。
+
+@vindex shift-select-mode
+要关闭班次选择，请将 @code{shift-select-mode} 设置为 @code{nil}。  这样做不会禁用通过鼠标命令设置标记。  如果将 @code{shift-select-mode} 设置为值 @code{permanent}，则未进行 Shift 转换的光标运动键将不会停用标记，因此，例如，可以通过 Shift-选择来扩展先前命令设置的区域，并且未移位的光标运动键将扩展通过 Shift-选择设置的区域。
+
+@node Disabled Transient Mark
+@section 禁用瞬态标记模式
+@cindex mode, Transient Mark
+@cindex Transient Mark mode
+@cindex highlighting region
+@cindex region highlighting
+@cindex Zmacs mode
+@findex transient-mark-mode
+
+标记和区域的默认行为（其中设置标记会激活它并突出显示区域）称为瞬态标记模式。  这是交互式会话中默认启用的次要模式。  可以使用 @kbd{M-x transient-mark-mode} 或 @samp{Options} 菜单中的 @samp{Highlight Active Region} 菜单项进行切换。  关闭它会将 Emacs 切换到另一种操作模式：
+
+@itemize @bullet
+@item
+使用 @kbd{C-@key{SPC}} 或 @kbd{C-x C-x} 等命令设置标记不会突出显示该区域。  因此，您无法通过查看标记的位置来判断；你必须记住。
+
+解决此问题的通常方法是设置标记，然后尽快使用它，以免您忘记它在哪里。  您还可以使用 @kbd{C-x C-x} 来检查标记的位置，它会交换点和标记的位置 (@pxref{Setting Mark})。
+
+@item
+某些命令通常在标记处于活动状态时作用于该区域，但现在不再这样做。  例如，如果标记处于活动状态，通常 @kbd{M-%} (@code{query-replace}) 在区域内执行替换。  当瞬态标记模式关闭时，它始终从缓冲区的点到末尾运行。  以这种方式运行的命令在其自己的文档中进行了标识。
+@end itemize
+
+@cindex enabling Transient Mark mode temporarily
+当瞬态标记模式关闭时，您可以使用 @kbd{C-@key{SPC} C-@key{SPC}} 或 @kbd{C-u C-x C-x} 临时激活它。
+
+@table @kbd
+@item C-@key{SPC} C-@key{SPC}
+@kindex C-SPC C-SPC@r{, enabling Transient Mark mode temporarily}
+将标记设置在点处（如普通的@kbd{C-@key{SPC}}）并仅启用一次瞬态标记模式，直到标记停用。  （这实际上并不是一个单独的命令；您使用了 @kbd{C-@key{SPC}} 命令两次。）
+
+@item C-u C-x C-x
+@kindex C-u C-x C-x
+交换点和标记，激活标记并暂时启用瞬态标记模式，直到标记下次停用。  （这是带有前缀参数的 @kbd{C-x C-x} 命令，@code{exchange-point-and-mark}。）
+@end table
+
+这些命令设置或激活标记，并仅启用瞬态标记模式，直到标记停用为止。  您可能想要使用它们的原因之一是，当瞬态标记模式关闭时，某些命令对整个缓冲区而不是区域进行操作。  立即启用瞬态标记模式可以让您在该区域上使用这些命令。
+
+当您使用鼠标 (@pxref{Setting Mark}) 或使用 Shift 选择 (@pxref{Shift Selection}) 指定区域时，这同样会暂时激活瞬态标记模式并突出显示该区域。

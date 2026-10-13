@@ -1,0 +1,111 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@iftex
+@chapter Characters, Keys and Commands
+
+  This chapter explains the character sets used by Emacs for input
+commands, and the fundamental concepts of @dfn{keys} and
+@dfn{commands}, whereby Emacs interprets your keyboard and mouse
+input.
+@end iftex
+
+@ifnottex
+@raisesections
+@end ifnottex
+
+@node User Input
+@section 用户输入的种类
+@cindex input with the keyboard
+@cindex keyboard input
+@cindex character set (keyboard)
+@cindex @acronym{ASCII}
+
+GNU Emacs 主要设计用于键盘。  虽然可以使用鼠标通过菜单栏和工具栏发出编辑命令，但这通常不如使用键盘有效。
+
+@cindex control character
+Emacs 的键盘输入基于 @acronym{ASCII} 的深度扩展版本。  简单字符，如 @samp{a}、@samp{B}、@samp{3}、@samp{=} 和空格字符（表示为 @key{SPC}），可通过键入相应的键来输入。  @dfn{Control characters}，例如 @key{RET}、@key{TAB}、@key{DEL}、@key{ESC}、@key{F1}、@key{Home} 和 @key{LEFT}，以及非英语键盘上的某些字符 (@pxref{International}) 也可以通过这种方式输入。
+
+@cindex modifier keys
+@cindex Control
+@cindex C-
+@cindex META
+@cindex M-
+@cindex Alt key, serving as Meta
+Emacs 还识别使用 @dfn{modifier keys} 输入的控制字符。  两个常用的修饰键是@key{Control}（通常标记为@key{Ctrl}）和@key{Meta}（通常标记为@key{Alt}）@footnote{We refer to @key{Alt} as @key{Meta} for historical reasons.}。  例如，按住@key{Ctrl}键的同时按@kbd{a}即可输入@kbd{Control-a}；我们将其简称为@kbd{C-a}。  同样，按住@key{Alt}键并按@kbd{a}即可输入@kbd{@key{Meta}-a}（简称为@kbd{M-a}）。  修饰键也可以应用于非字母数字字符，例如 @kbd{C-@key{F1}} 或 @kbd{M-@key{LEFT}}。
+
+@cindex @key{ESC} replacing @key{Meta} key
+您还可以使用以 @key{ESC} 开头的两个字符序列键入元字符。  因此，您可以通过输入 @kbd{@key{ESC} a} 来输入 @kbd{M-a}。  您可以通过输入@kbd{@key{ESC} C-a}来输入@kbd{C-M-a}（同时按住@key{Ctrl}和@key{Alt}，然后按@kbd{a}）。  与@key{Meta}不同，@key{ESC}作为单独的字符输入。  输入下一个字符时，您不必按住 @key{ESC}；相反，请按 @key{ESC} 并释放它，然后输入下一个字符。  此功能在 @key{Meta} 键无法可靠工作的某些文本终端上非常有用。
+
+Emacs 支持 3 个附加修饰键，请参阅@ref{Modifier Keys}。
+
+Emacs 广泛支持使用鼠标按钮、鼠标滚轮和其他指点设备（例如触摸板和触摸屏）。 @xref{Mouse Input}，了解详情。
+
+@cindex keys stolen by window manager
+@cindex window manager, keys stolen by
+在图形显示上，窗口管理器可能会阻止某些键盘输入，包括 @kbd{M-@key{TAB}}、@kbd{M-@key{SPC}}、@kbd{C-M-d} 和 @kbd{C-M-l}。  如果您遇到此问题，您可以自定义窗口管理器以不阻止这些键，或重新绑定受影响的 Emacs 命令 (@pxref{Customization})。
+
+如果一个 Emacs 框架正在执行迷你缓冲区提示，而其他 Emacs 框架似乎忽略输入，您可能希望禁用单键盘模式。  @xref{Multiple Displays}。
+
+@cindex input event
+简单字符和控制字符，以及某些非键盘输入（例如鼠标单击）统称为@dfn{input events}。  有关 Emacs 内部如何处理输入事件的详细信息，请参阅@ref{Input Events,,, elisp, The Emacs Lisp Reference Manual}。
+
+@node Keys
+@section 按键
+
+一些 Emacs 命令仅由一个输入事件调用；例如，@kbd{C-f}在缓冲区中向前移动一个字符。  其他命令需要两个或多个输入事件来调用，例如@kbd{C-x C-f}和@kbd{C-x 4 C-f}。
+
+@cindex key
+@cindex key sequence
+@cindex complete key
+@cindex prefix key
+@dfn{key sequence}（简称 @dfn{key}）是一个或多个作为一个单元有意义的输入事件的序列。  如果按键序列调用命令，我们将其称为 @dfn{complete key}；例如，@kbd{C-f}、@kbd{C-x C-f}和@kbd{C-x 4 C-f}都是完整的键。如果按键序列的长度不足以调用命令，我们将其称为@dfn{prefix key}；从前面的示例中，我们看到 @kbd{C-x} 和 @kbd{C-x 4} 是前缀键。  每个键序列要么是完整键，要么是前缀键。
+
+前缀键与后面的输入事件相结合以形成更长的键序列。  例如，@kbd{C-x} 是前缀键，因此单独键入 @kbd{C-x} 不会调用命令；相反，Emacs 会等待进一步的输入（如果您暂停超过一秒，它会回显 @kbd{C-x} 键以提示输入；@pxref{Echo Area}）。 @kbd{C-x} 与下一个输入事件组合以形成双事件键序列，其本身可以是前缀键（例如@kbd{C-x 4}），或完整键（例如@kbd{C-x C-f}）。  键序列的长度没有限制，但实际上它们很少长于三个或四个输入事件。
+
+您无法将输入事件添加到完整的按键上。  例如，因为 @kbd{C-f} 是一个完整的按键，所以双事件序列 @kbd{C-f C-k} 是两个按键序列，而不是一个。
+
+默认情况下，Emacs 中的前缀键为 @kbd{C-c}、@kbd{C-h}、@kbd{C-x}、@kbd{C-x @key{RET}}、@kbd{C-x @@}、@kbd{C-x a}、@kbd{C-x n}、@kbd{C-x r}、@kbd{C-x t}、@kbd{C-x v}、@kbd{C-x 4}、 @kbd{C-x 5}、@kbd{C-x 6}、@key{ESC} 和 @kbd{M-g}。  （@key{F1} 和 @key{F2} 是 @kbd{C-h} 和 @kbd{C-x 6} 的别名。）这个列表并不是一成不变的；如果您自定义 Emacs，则可以创建新的前缀键。您甚至可以消除一些标准的，尽管不建议大多数用户这样做；例如，如果删除 @kbd{C-x 4} 的前缀定义，则 @kbd{C-x 4 C-f} 将成为无效的按键序列。  @xref{Key Bindings}。
+
+在前缀键后键入帮助字符（@kbd{C-h} 或 @key{F1}）会显示以该前缀开头的命令列表。  此规则的唯一例外是 @key{ESC}：@kbd{@key{ESC} C-h} 相当于 @kbd{C-M-h}，它完全执行其他操作。  但是，您可以使用 @key{F1} 显示以 @key{ESC} 开头的命令列表。
+
+@node Mouse Input
+@section 鼠标输入
+@cindex mouse input
+
+默认情况下，Emacs 支持所有正常的鼠标操作，例如通过单击鼠标左键设置光标，以及通过拖动鼠标指针选择区域。  所有鼠标操作都可用于绑定命令，就像将它们绑定到键盘事件 (@pxref{Keys}) 一样。  本节提供了在 Emacs 中使用鼠标的总体概述； @pxref{Mouse Commands} 及其后面的部分，了解有关 Emacs 中鼠标命令的更多详细信息。
+
+当您单击鼠标左键时，Emacs 会收到一个 @code{mouse-1} 事件。  要查看与该事件绑定的命令，您可以键入 @kbd{C-h c}，然后按鼠标左键。  同样，鼠标中键为@code{mouse-2}，鼠标右键为@code{mouse-3}。  如果您的鼠标带有滚轮，则滚轮事件通常绑定到 @code{wheel-down} 或 @code{wheel-up}，或者 @code{mouse-4} 和 @code{mouse-5}，但这取决于操作系统配置。
+
+一般来说，传统 X 系统和终端 (@pxref{Text-Only Mouse}) 将报告 @code{mouse-4} 和 @code{mouse-5}，而所有其他系统将报告 @code{wheel-down} 和 @code{wheel-up}。
+
+有些鼠标还具有水平滚轮，触摸板通常也支持水平滚动。  这些事件在除终端和旧版 X 系统之外的所有系统上报告为 @code{wheel-left} 和 @code{wheel-right}，在这些系统中它们分别为 @code{mouse-6} 和 @code{mouse-7}。
+
+您还可以将键盘修饰符与鼠标事件结合起来，这样您就可以绑定一个特殊的命令，该命令会在您按住 Meta 键然后使用鼠标中键时触发。  在这种情况下，事件名称将为@code{M-mouse-2}。
+
+@cindex touchscreen events
+在某些系统上，您还可以绑定命令来处理触摸屏事件。  在这种情况下，事件称为 @code{touchscreen-update} 和 @code{touchscreen-end}。
+
+@node Commands
+@section 按键和命令
+
+@cindex binding
+@cindex command
+本手册充满了告诉您特定键的用途的段落。  但 Emacs 并不直接为键赋予含义。  相反，Emacs 为命名的 @dfn{commands} 赋予含义，然后通过 @dfn{binding} 为命令赋予按键含义。
+
+每个命令都有一个由程序员选择的名称。  该名称通常由几个用破折号分隔的英文单词组成；例如，@code{next-line} 或 @code{forward-word}。  在内部，每个命令都是 Lisp @dfn{function} 的一种特殊类型，与命令相关的操作是通过运行该函数来执行的。  @xref{What Is a Function,, What Is a Function, elisp, The Emacs Lisp Reference Manual}。
+
+键和命令之间的绑定记录在名为 @dfn{keymaps} 的表中。  @xref{Keymaps}。
+
+当我们说“@kbd{C-n} 垂直向下移动一行”时，我们掩盖了一种微妙的区别，这种区别在普通使用中无关紧要，但对于 Emacs 定制至关重要。  命令 @code{next-line} 垂直向下移动。  @kbd{C-n} 具有此效果 @emph{because} 它绑定到 @code{next-line}。  如果您将 @kbd{C-n} 重新绑定到命令 @code{forward-word}，@kbd{C-n} 将向前移动一个单词。
+
+在本手册中，我们经常将像 0⁣ 这样的键称为命令，尽管严格来说该键绑定到命令。通常，我们在提到运行该命令的键后，在括号中声明真正起作用的命令的名称。  例如，我们会说“命令@kbd{C-n}（@code{next-line}）垂直向下移动点”，这意味着命令@code{next-line}垂直向下移动，并且键@kbd{C-n}通常与其绑定。
+
+既然我们正在讨论定制，我们应该告诉你@dfn{variables}。  命令的描述通常会说：“要更改此设置，请设置变量@code{mumble-foo}。”变量是用于存储值的名称。  本手册中记录的大多数变量都是为了自定义：Emacs 的某些命令或其他部分会检查变量，并根据您设置的值表现出不同的行为。  您可以忽略有关变量的信息，直到您有兴趣自定义它们为止。  然后阅读变量的基本信息（@pxref{Variables}），具体变量的信息就有意义了。
+
+@include input.texi
+
+@ifnottex
+@lowersections
+@end ifnottex

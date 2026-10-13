@@ -1,0 +1,1081 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Building
+@chapter 编译和测试程序
+@cindex building programs
+@cindex program building
+@cindex running Lisp functions
+
+上一章讨论了可用于更改程序的 Emacs 命令。  本章讨论有助于编译和测试程序的命令。
+
+@menu
+* Compilation::          用 Lisp 以外的语言（C、Pascal 等）编译程序。
+* Compilation Mode::     访问编译器错误的模式。
+* Compilation Shell::    正确定制您的 shell 以在编译缓冲区中使用。
+* Grep Searching::       用 grep 搜索。
+* Flymake::              即时查找语法错误。
+* Debuggers::            为非 Lisp 程序运行符号调试器。
+* Executing Lisp::       编辑 Lisp 程序的多种模式，以及运行 Lisp 程序的不同设施。
+* Libraries: Lisp Libraries.       Lisp 程序如何加载到 Emacs 中。
+* Eval: Lisp Eval.       在 Emacs 中执行单个 Lisp 表达式。
+* Interaction: Lisp Interaction.   在 Emacs 缓冲区中执行 Lisp。
+* External Lisp::        通过 Emacs 与单独的 Lisp 进行通信。
+@end menu
+
+@node Compilation
+@section 在 Emacs 下运行编译
+@cindex inferior process
+@cindex make
+@cindex compilation errors
+@cindex error log
+
+Emacs 可以运行 C 和 Fortran 等语言的编译器，将编译日志输入 Emacs 缓冲区。  它还可以解析错误消息并显示错误发生的位置。
+
+@table @kbd
+@item M-x compile
+在 Emacs 下异步运行编译器，错误消息将发送到 @file{*compilation*} 缓冲区。
+
+@item M-x recompile
+@itemx g@r{ (Compilation mode)}
+使用与上次调用 @kbd{M-x compile} 相同的命令来调用编译器。
+
+@item M-x kill-compilation
+终止正在运行的编译子进程。
+@end table
+
+@findex compile
+要运行 @code{make} 或其他编译命令，请输入 @kbd{M-x compile}。  这使用迷你缓冲区读取 shell 命令行，然后通过将 shell 作为 Emacs 的子进程（或 2⁣）运行来执行命令。  输出被插入到名为 @file{*compilation*} 的缓冲区中。  当前缓冲区的默认目录用作执行命令的工作目录，因此默认情况下编译发生在该目录中。
+
+当使用前缀参数调用时，@file{*compilation*}缓冲区使用 Comint 模式作为其主要模式 (@pxref{Shell Mode})。  默认情况下，Comint 模式有一个很好的特性，即在其内容中查找任何凭据提示，并在发生这种情况时让 Emacs 要求输入密码。如果编译命令需要这样的凭据，这很有用。
+
+@vindex compile-command
+默认编译命令是 @samp{make -k}，对于使用 @command{make} 实用程序编译的程序通常是正确的（@samp{-k} 标志告诉 @command{make} 在出现错误后尽可能继续编译）。  @xref{Top,, Make, make, GNU Make Manual}。如果您之前已经执行过@kbd{M-x compile}，则您指定的命令会自动存储在变量@code{compile-command}中；下次输入 @kbd{M-x compile} 时，它将用作默认值。  文件还可以为 @code{compile-command} (@pxref{File Variables}) 指定文件本地值。
+
+开始编译会在另一个窗口中显示 @file{*compilation*} 缓冲区，但不会选择它。  编译运行时，单词 @samp{run} 显示在 @file{*compilation*} 缓冲区的主模式指示器中，并且单词 @samp{Compiling} 出现在所有模式行中。  在编译运行时，您不必保持 @file{*compilation*} 缓冲区可见；无论如何，它都会继续。当编译结束时，无论出于何种原因，@file{*compilation*}缓冲区的模式行都会更改为@samp{exit}（后跟退出代码：@samp{[0]}表示正常退出）或@samp{signal}（如果信号终止进程）。
+
+如果您想查看出现的编译记录，请切换到 @file{*compilation*} 缓冲区并将指针移动到缓冲区的末尾。  当 point 位于末尾时，新的编译输出将插入到 point 之上，并保留在末尾。  否则，当编译输出添加到缓冲区末尾时，点保持固定。
+
+当编译进行时，模式行显示编译器迄今为止发出的错误、警告和信息性消息的数量。
+
+@cindex compilation buffer, keeping point at end
+@vindex compilation-scroll-output
+如果将变量 @code{compilation-scroll-output} 更改为非 @code{nil} 值，则 @file{*compilation*} 缓冲区会自动滚动以跟随输出。  如果该值为@code{first-error}，则当出现第一个错误时滚动停止，并将点保留在该错误处。  对于任何其他非 4⁣ 值，滚动将继续，直到不再有输出。
+
+@findex recompile
+要使用相同的命令重新运行上次编译，请键入 @kbd{M-x recompile}。  这将重用上次调用 @kbd{M-x compile} 的编译命令。  它还重用 @file{*compilation*} 缓冲区并在其默认目录中启动编译，该目录是先前编译开始的目录。  在@file{*compilation*}缓冲区中，该命令绑定到@kbd{g}。
+
+@findex kill-compilation
+@vindex compilation-always-kill
+开始新的编译也会杀死 @file{*compilation*} 中已经运行的任何编译，因为缓冲区在任何时候只能处理一个编译。  然而，@kbd{M-x compile}和@kbd{M-x recompile}在实际终止正在运行的编译之前要求确认；要始终自动终止编译而不询问，请将变量 @code{compilation-always-kill} 更改为 @code{t}。  您还可以使用命令 @kbd{M-x kill-compilation} 终止编译进程。
+
+要同时运行两个编译，请启动第一个编译，然后重命名 @file{*compilation*} 缓冲区（可能使用 @code{rename-uniquely}; @pxref{Misc Buffer}），然后切换缓冲区并启动另一个编译。  这将创建一个新的 @file{*compilation*} 缓冲区。
+
+@vindex compilation-environment
+您可以使用变量 @code{compilation-environment} 控制传递给编译命令的环境。  它的值是环境变量设置的列表；每个元素应该是 @code{"@var{envvarname}=@var{value}"} 形式的字符串。  这些环境变量设置会覆盖通常的环境变量设置。
+
+@vindex compilation-max-output-line-length
+在编译输出中显示极长的行会降低 Emacs 的速度。  长度超过 0⁣ 的行将超过该限制的部分隐藏在按钮后面，单击该按钮即可显示隐藏部分。  将此变量设置为 @code{nil} 就不会隐藏任何内容。
+
+@node Compilation Mode
+@section 编译模式
+
+@cindex Compilation mode
+@cindex mode, Compilation
+@cindex locus
+@file{*compilation*} 缓冲区使用称为编译模式的主要模式。  编译模式将缓冲区中的每条错误信息都变成一个超链接；您可以将光标移至该位置并输入 @key{RET}，或者用鼠标单击它 (@pxref{Mouse References})，以在单独的窗口中访问错误消息的 @dfn{locus}。  轨迹是文件中发生错误的特定位置。
+
+@cindex compilation mode faces
+@vindex compilation-error
+@vindex compilation-warning
+@file{*compilation*} 缓冲区的外观可以通过自定义用于突出显示 @file{*compilation*} 缓冲区部分的面来控制，例如 @code{compilation-error} 或 @code{compilation-warning}，分别用于错误和警告消息。  请注意，由于这些面继承自 @code{error} 和 @code{warning} 面，因此也可以直接自定义父面。
+
+使用 @w{@kbd{M-x customize-group RET compilation}} 查看自定义变量和面孔的完整列表。
+
+@findex compile-goto-error
+@vindex compilation-auto-jump-to-first-error
+如果将变量 @code{compilation-auto-jump-to-first-error} 更改为非 @code{nil} 值，Emacs 会自动访问 @file{*compilation*} 缓冲区中出现的第一条错误消息的位置。  （该变量还可以具有值@code{if-location-known}和@code{first-known}，它们修改自动访问错误轨迹的条件。）
+
+@vindex compilation-search-path
+@vindex compilation-search-extra-path
+错误消息的实际位置由目录名称列表@code{compilation-search-path} 确定。  默认情况下，Emacs 会访问发生编译的目录下的错误消息中指示的文件，该文件由 @code{compilation-search-path} 默认值中的特殊目录名称 @code{nil} 表示（即 @code{(nil)}）。  要使 Emacs 尝试在不同目录下查找文件（例如，编译嵌套项目时），请自定义 @code{compilation-search-path} 以包含该目录。  对于目录本地自定义 (@pxref{Directory Variables})，最好设置@code{compilation-search-extra-path}，Emacs 除了@code{compilation-search-path} 之外还考虑它。  @code{compilation-search-extra-path} 中的条目优先于@code{compilation-search-path} 中的条目。
+
+编译模式提供以下附加命令。  这些命令也可以在 @file{*grep*} 缓冲区中使用，其中超链接是搜索匹配项而不是错误消息 (@pxref{Grep Searching})。
+
+@table @kbd
+@item M-g M-n
+@itemx M-g n
+@itemx C-x `
+访问下一条错误消息或匹配的位置 (@code{next-error})。
+@item M-g M-p
+@itemx M-g p
+访问上一个错误消息或匹配的位置 (@code{previous-error})。
+@item M-n
+将点移动到下一个错误消息或匹配，而不访问其轨迹 (@code{compilation-next-error})。
+@item M-p
+将点移动到上一个错误消息或匹配项，而不访问其轨迹 (@code{compilation-previous-error})。
+@item M-@}
+将点移动到下一个错误消息或在不同文件中发生的匹配 (@code{compilation-next-file})。
+@item M-@{
+将点移动到上一个错误消息或在不同文件中发生的匹配 (@code{compilation-previous-file})。
+@item C-c C-f
+切换下一个错误跟随次要模式，这使得编译缓冲区中的光标移动产生自动源显示。
+@item g
+重新运行最后一个命令，其输出显示在 @file{*compilation*} 缓冲区中。
+@item M-x next-error-select-buffer
+选择下次调用 @code{next-error} 和 @code{previous-error} 时要使用的缓冲区。
+@end table
+
+@kindex M-g M-n
+@kindex M-g n
+@kindex C-x `
+@findex next-error
+@vindex next-error-message-highlight
+@vindex next-error-highlight
+@vindex next-error-highlight-no-select
+要按顺序访问错误，请键入 @w{@kbd{C-x `}} (@code{next-error})，或等效的@kbd{M-g M-n} 或 @kbd{M-g n}。该命令可以从任何缓冲区调用，而不仅仅是编译模式缓冲区。  编译后第一次调用它时，它会访问第一条错误消息的位置。  随后的每个@w{@kbd{M-g M-n}}都会以类似的方式访问下一个错误。  如果您使用 @key{RET} 访问特定错误或在 @file{*compilation*} 缓冲区中单击鼠标，后续的 @w{@kbd{M-g M-n}} 命令将从此处前进。  当@w{@kbd{M-g M-n}}发现不再有错误消息可访问时，它发出错误信号。  @w{@kbd{C-u M-g M-n}} 再次从编译缓冲区的开头开始，访问第一个轨迹。
+
+@kbd{M-g M-p} 或 @kbd{M-g p} (@code{previous-error}) 以相反方向迭代错误。
+
+@vindex next-error-find-buffer-function
+@findex next-error-select-buffer
+@code{next-error} 和 @code{previous-error} 命令不仅仅作用于 @file{*compilation*} 和 @file{*grep*} 缓冲区中列出的错误或匹配项；他们还知道如何迭代其他命令生成的错误或匹配列表，例如 @kbd{M-x occur} (@pxref{Other Repeating Search})。  如果当前缓冲区包含错误消息或匹配项，这些命令将迭代它们；否则，Emacs 会在所选帧的窗口中查找包含错误消息或匹配项的缓冲区（如果变量 @code{next-error-find-buffer-function} 被自定义为值 @code{next-error-buffer-on-selected-frame}），然后查找 @code{next-error} 或 @code{previous-error} 先前使用的缓冲区，最后查找所有其他缓冲区。  这些命令循环访问的任何当前未显示在窗口中的缓冲区都将显示。  您可以使用 @command{next-error-select-buffer} 命令切换到不同的缓冲区，以供后续调用 @code{next-error} 使用。
+
+@vindex compilation-skip-threshold
+默认情况下，@code{next-error}和@code{previous-error}命令会跳过不太重要的消息。  变量 @code{compilation-skip-threshold} 控制这一点。  默认值 1 表示跳过任何比警告不太重要的内容。  值 2 表示跳过任何比错误不太重要的内容，而 0 表示不跳过任何消息。
+
+当 Emacs 访问错误消息的位置时，它会立即突出显示相关的源代码行。  该突出显示的持续时间由所选缓冲区中轨迹的变量 @code{next-error-highlight} 和非所选缓冲区中轨迹的变量 @code{next-error-highlight-no-select} 确定。  您还可以自定义变量 @code{next-error-message-highlight} ，它定义如何突出显示包含消息的缓冲区中的当前错误消息。
+
+@vindex compilation-context-lines
+如果@file{*compilation*}缓冲区显示在带有左边缘（@pxref{Fringes}）的窗口中，轨迹访问命令会在边缘放置一个箭头，指向当前的错误消息。  如果窗口没有左边缘，例如在文本终端上，这些命令会滚动窗口，使当前消息位于窗口顶部。  如果将变量 @code{compilation-context-lines} 更改为 @code{t}，则会在零列之前插入一个可见箭头。  如果将变量更改为整数值 @var{n}，这些命令会滚动窗口，以便当前错误消息距顶部 @var{n} 行，无论是否有边缘；默认值 @code{nil} 给出了上述行为。
+
+@vindex compilation-hidden-output
+编译输出有时可能非常冗长，并且其中大部分内容并不是用户特别感兴趣的。  @code{compilation-hidden-output} 用户选项应该是正则表达式或正则表达式列表，并且匹配的输出将变得不可见。例如，要隐藏递归 makefile 的详细输出，您可以这样说：
+
+@lisp
+(setq compilation-hidden-output
+      '("^make[^\n]+\n"))
+@end lisp
+
+@vindex compilation-error-regexp-alist
+@vindex grep-regexp-alist
+为了解析来自编译器的消息，编译模式使用变量 @code{compilation-error-regexp-alist}，它列出了各种错误消息格式并告诉 Emacs 如何从每种格式中提取轨迹。  类似的变量 @code{grep-regexp-alist} 告诉 Emacs 如何解析 @code{grep} 命令 (@pxref{Grep Searching}) 的输出。
+
+@vindex compilation-transform-file-match-alist
+@cindex compilation transform file
+@cindex compilation find file
+有时 @code{compilation-error-regexp-alist} 无法正确确定错误来源的文件名。  使用用户选项@code{compilation-transform-file-match-alist}进行任何必要的调整，例如添加或更改目录组件，甚至考虑某些编译器消息而不是错误消息。
+
+@findex compilation-next-error
+@findex compilation-previous-error
+@findex compilation-next-file
+@findex compilation-previous-file
+编译模式还定义了按键 @key{SPC} 和 @key{DEL} 来逐屏滚动； @kbd{M-n} (@code{compilation-next-error}) 和 @kbd{M-p} (@code{compilation-previous-error}) 移至下一条或上一条错误消息；和 @kbd{M-@{} (@code{compilation-next-file}) and @kbd{M-@}} (@code{compilation-previous-file}) 移动到不同源文件的下一个或上一个错误消息。
+
+@cindex Next Error Follow mode
+@findex next-error-follow-minor-mode
+您可以输入 @kbd{C-c C-f} 来切换下一个错误跟随模式。  在这种次要模式下，编译缓冲区中的普通光标移动会自动更新源缓冲区，即，将光标移动到错误消息上会导致显示该错误的位置。
+
+编译模式的功能在称为编译次要模式的次要模式中也可用。  这使您可以解析任何缓冲区中的错误消息，而不仅仅是普通的编译输出缓冲区。  输入 @kbd{M-x compilation-minor-mode} 启用次要模式。  例如，在 Rlogin 缓冲区 (@pxref{Remote Host}) 中，编译次要模式自动通过 FTP 访问远程源文件 (@pxref{File Names})。
+
+@node Compilation Shell
+@section 用于编译的子shell
+
+本节包括在编译缓冲区中使用 shell 及其功能的各种技术和建议。  本材料特定于本地编译，并且很可能无法在默认目录位于远程主机上的编译缓冲区中工作（或与之无关）。
+
+@kbd{M-x compile} 命令使用 shell 来运行编译命令，但指定非交互式 shell 的选项。  这尤其意味着 shell 应该在没有提示的情况下启动。  如果您发现常用的 shell 提示符在 @file{*compilation*} 缓冲区中看起来很难看，则意味着您通过无条件设置提示符在 shell 的 init 文件中犯了错误。  （此初始化文件可能被命名为 ⁣​​2⁣、@file{.profile}、@file{.cshrc}、@file{.shrc} 等，具体取决于您使用的 shell。）仅当已有提示时，shell 初始化文件才应设置提示。  在 bash 中执行此操作的方法如下：
+
+@example
+if [ "$@{PS1+set@}" = set ]
+then PS1=@dots{}
+fi
+@end example
+
+@noindent
+以下是在 csh 中执行此操作的方法：
+
+@example
+if ($?prompt) set prompt = @dots{}
+@end example
+
+@vindex TERM@r{, environment variable, in compilation mode}
+如果要自定义传递给编译子 shell 的 @env{TERM} 环境变量的值，请自定义变量 @code{comint-terminfo-terminal} (@pxref{Shell Options})。
+
+Emacs 不期望编译器进程启动异步子进程；如果是这样，并且它们在主编译器进程终止后继续运行，Emacs 可能会杀死它们，或者它们的输出可能不会到达 Emacs。  为了避免此问题，请让主编译进程等待其子进程完成。  在 shell 脚本中，您可以使用 @samp{$!} 和 @samp{wait} 来完成此操作，如下所示：
+
+@example
+(sleep 10; echo 2nd)& pid=$!  # @r{Record pid of subprocess}
+echo first message
+wait $pid                     # @r{Wait for subprocess}
+@end example
+
+@noindent
+如果后台进程没有输出到编译缓冲区，那么你只需要防止它在主编译进程终止时被杀死，这就足够了：
+
+@example
+nohup @var{command}; sleep 1
+@end example
+
+@ifnottex
+  On MS-DOS, asynchronous subprocesses are
+not supported, so @kbd{M-x compile} runs the compilation command
+synchronously (i.e., you must wait until the command finishes before
+you can do anything else in Emacs).  @xref{MS-DOS}.
+@end ifnottex
+
+@node Grep Searching
+@section Emacs 下使用 Grep 进行搜索
+
+正如您可以从 Emacs 运行编译器然后访问存在编译错误的行一样，您也可以运行 @command{grep} 然后访问找到匹配项的行。  这是通过将 @command{grep} 报告的匹配视为错误来实现的。输出缓冲区使用 Grep 模式，它是编译模式 (@pxref{Compilation Mode}) 的变体。
+
+@table @kbd
+@item M-x grep
+@itemx M-x lgrep
+在 Emacs 下异步运行 @command{grep}，列出名为 @file{*grep*} 的缓冲区中的匹配行。
+@item M-x grep-find
+@itemx M-x find-grep
+@itemx M-x rgrep
+通过@code{find}运行@command{grep}，并收集@file{*grep*}缓冲区中的输出。
+@item M-x zrgrep
+运行 @code{zgrep} 并将输出收集到 @file{*grep*} 缓冲区中。
+@item M-x kill-grep
+终止正在运行的 @command{grep} 子进程。
+@end table
+
+@findex grep
+要运行 @command{grep}，请输入 @kbd{M-x grep}，然后输入指定如何运行 @command{grep} 的命令行。  使用与正常运行时给 @command{grep} 相同的参数：@command{grep} 样式的正则表达式（通常用单引号来引用 shell 的特殊字符），后跟文件名，可以使用通配符。  如果您为 @kbd{M-x grep} 指定前缀参数，它将在 point 周围的缓冲区中查找标识符 (@pxref{Xref})，并将其放入默认的 @command{grep} 命令中。
+
+您的命令不需要简单地运行 @command{grep}；您可以使用任何以相同格式生成输出的 shell 命令。  例如，您可以链接 @command{grep} 命令，如下所示：
+
+@example
+grep -nH -e foo *.el | grep bar | grep toto
+@end example
+
+@command{grep} 的输出进入@file{*grep*} 缓冲区。  您可以使用@w{@kbd{M-g M-n}}、@key{RET}等在原始文件中找到相应的行，就像编译错误一样。 @xref{Compilation Mode}，详细描述@file{*grep*}缓冲区中可用的命令和键绑定。
+
+@vindex grep-match-regexp
+一些 grep 程序接受 @samp{--color} 选项来在匹配项周围输出特殊标记以突出显示。  您可以通过将 @code{grep-highlight-matches} 设置为 @code{t} 来使用此功能。  当在源缓冲区中显示匹配项时，将突出显示完全匹配的项，而不是整个源代码行。通过匹配 @command{grep} 发出的 @acronym{ANSI} 转义序列来提供突出显示。  序列的匹配由@code{grep-match-regexp}控制，可以定制以适应不同的@command{grep}程序。
+
+与编译命令 (@pxref{Compilation}) 一样，当 grep 命令运行时，模式行显示到目前为止找到并突出显示的匹配项的运行数量。
+
+@command{grep} 命令将在运行前保存缓冲区。  这是由 @code{grep-save-buffers} 变量控制的。可能的值是 @code{nil}（不保存）、@code{ask}（保存前询问）或用作谓词的函数（以文件名作为参数调用，如果要保存缓冲区，则应返回非 @code{nil}）。  任何其他非@code{nil}值意味着所有缓冲区都应该被保存而不询问。  默认值为@code{ask}。
+
+@vindex grep-use-headings
+@vindex grep-heading@r{ face}
+默认情况下，grep 匹配显示的每行都带有文件名前缀。  但是，如果将变量 @code{grep-use-headings} 自定义为非 @code{nil} 值，则匹配项将分为多个部分，每个具有匹配项的文件一个部分，并且文件名使用特殊的面 @code{grep-heading} 显示在节标题中。
+
+@findex grep-find
+@findex find-grep
+命令@kbd{M-x grep-find}（也可用作@kbd{M-x find-grep}）与@kbd{M-x grep}类似，但它为该命令提供了不同的初始默认值——同时运行@code{find}和@command{grep}，以便搜索目录树中的每个文件。  另请参见 @ref{Dired and Find} 中的 @code{find-grep-dired} 命令。
+
+@findex lgrep
+@findex rgrep
+@findex zrgrep
+命令@kbd{M-x lgrep}（本地grep）和@kbd{M-x rgrep}（递归grep）是@command{grep}和@code{grep-find}的更用户友好的版本，它们分别提示要匹配的正则表达式、要搜索的文件以及搜索的基目录。搜索的区分大小写由 @code{case-fold-search} 的当前值控制。  命令 @kbd{M-x zrgrep} 与 @kbd{M-x rgrep} 类似，但它调用 @command{zgrep} 而不是 @command{grep} 来搜索 gzip 压缩文件的内容。
+
+这些命令基于变量 @code{grep-template}（对于 @code{lgrep}）和@code{grep-find-template}（对于@code{rgrep}）构建 shell 命令。  要搜索的文件可以使用变量@code{grep-files-aliases}中定义的别名。
+
+@vindex grep-find-ignored-directories
+变量 @code{grep-find-ignored-directories} 中列出的目录将被 @kbd{M-x rgrep} 自动跳过。  默认值包括各种版本控制系统使用的数据目录。
+
+@vindex grep-find-abbreviate
+@findex grep-find-toggle-abbreviation
+默认情况下，为 @code{lgrep}、@code{rgrep} 和 @code{zgrep} 构建的 shell 命令会通过隐藏包含要忽略的长文件和目录列表的部分来缩写显示。  您可以通过单击代表它们的带有省略号的按钮来显示隐藏的部分。  您还可以通过键入 @kbd{M-x grep-find-toggle-abbreviation} 以交互方式切换查看隐藏部分。  要禁用 shell 命令的此缩写，请将选项 @code{grep-find-abbreviate} 自定义为 @code{nil} 值。
+
+@findex grep-change-to-grep-edit-mode
+@cindex Grep Edit mode
+@cindex mode, Grep Edit
+在 @file{*grep*} 缓冲区中键入 @kbd{e} 可使缓冲区可写并进入 Grep 编辑模式。  与发生编辑模式 (@pxref{Other Repeating Search}) 类似，您可以编辑@code{grep} 报告的匹配行，并将这些更改反映在访问原始文件的缓冲区中。  输入 @kbd{C-c C-c} 离开 Grep 编辑模式并返回到 Grep 模式。
+
+@node Flymake
+@section 即时查找语法错误
+@cindex checking syntax
+
+Flymake 模式是一种次要模式，可为许多编程和标记语言执行即时语法检查，包括 C、C++、Perl、HTML 和 @TeX{}/@LaTeX{}。  它有点类似于 Flyspell 模式，后者以类似的方式对普通人类语言执行拼写检查 (@pxref{Spelling})。  当您编辑文件时，Flymake 模式会使用缓冲区的临时副本在后台运行适当的语法检查工具。  然后它解析错误和警告消息，并突出显示缓冲区中的错误行。  使用的语法检查工具取决于语言；例如，对于 C/C++ 文件，这通常是 C 编译器。  Flymake 还可以使用 @code{make} 等构建工具来检查复杂的项目。
+
+要启用 Flymake 模式，请输入 @kbd{M-x flymake-mode}。  您可以使用 @w{@kbd{M-x flymake-goto-next-error}} 和 @w{@kbd{M-x flymake-goto-prev-error}} 跳转到它发现的错误。要显示当前缓冲区诊断的详细概述，请使用命令@w{@kbd{M-x flymake-show-buffer-diagnostics}}；要显示整个项目 (@pxref{Projects}) 的类似诊断概述，请使用 @w{@kbd{M-x flymake-show-project-diagnostics}}。
+
+有关使用 Flymake 的更多详细信息，
+@ifnottex
+see @ref{Top, Flymake, Flymake, flymake, The Flymake Manual}.
+@end ifnottex
+@iftex
+see the Flymake Info manual, which is distributed with Emacs.
+@end iftex
+
+@node Debuggers
+@section 在 Emacs 下运行调试器
+@cindex debuggers
+@cindex GUD library
+@cindex GDB
+@cindex DBX
+@cindex SDB
+@cindex XDB
+@cindex Perldb
+@cindex JDB
+@cindex PDB
+
+GUD（Grand Unified Debugger）库为各种符号调试器提供了 Emacs 接口。  它可以运行 GNU 调试器 (GDB)，以及 LLDB、DBX、SDB、XDB、Guile REPL 调试命令、Perl 调试模式、Python 调试器 PDB 和 Java 调试器 JDB。
+
+Emacs 为 GDB 提供了一个特殊的接口，它使用额外的 Emacs 窗口来显示被调试程序的状态。  @xref{GDB Graphical Interface}。
+
+Emacs 还具有用于 Emacs Lisp 程序的内置调试器。 @xref{Debugging,, The Lisp Debugger, elisp, the Emacs Lisp Reference Manual}。
+
+@menu
+* Starting GUD::         如何启动调试器子进程。
+* Debugger Operation::   调试器和源缓冲区之间的连接。
+* Commands of GUD::      常用命令的键绑定。
+* GUD Customization::    为 GUD 定义您自己的命令。
+* GDB Graphical Interface::   一种使用GDB功能实现图形调试环境的增强模式。
+@end menu
+
+@node Starting GUD
+@subsection 启动GUD
+
+有多个用于启动调试器子进程的命令，每个命令对应于一个特定的调试器程序。
+
+@table @kbd
+@item M-x gdb
+@findex gdb
+将 GDB 作为子进程运行，并通过类似 IDE 的 Emacs 界面与其交互。  @xref{GDB Graphical Interface}，了解有关此命令的更多信息。
+
+@item M-x gud-gdb
+@findex gud-gdb
+运行 GDB，使用 GUD 交互缓冲区进行 GDB 子进程的输入和输出 (@pxref{Debugger Operation})。  如果这样的缓冲区已经存在，则切换到它；否则，创建缓冲区并切换到它。
+
+对于其他调试器程序，此列表中的其他命令执行相同的操作。
+
+@item M-x lldb
+@findex lldb
+运行 LLDB 调试器。
+
+@item M-x perldb
+@findex perldb
+在调试模式下运行 Perl 解释器。
+
+@item M-x jdb
+@findex jdb
+运行 Java 调试器。
+
+@item M-x pdb
+@findex pdb
+运行 Python 调试器。
+
+@item M-x guiler
+@findex guiler
+运行 Guile REPL 来调试 Guile Scheme 程序。
+
+@item M-x dbx
+@findex dbx
+运行 DBX 调试器。
+
+@item M-x xdb
+@findex xdb
+@vindex gud-xdb-directories
+运行 XDB 调试器。
+
+@item M-x sdb
+@findex sdb
+运行 SDB 调试器。
+@end table
+
+这些命令中的每一个都使用迷你缓冲区读取命令行来调用调试器。  迷你缓冲区的初始内容包含标准可执行文件名称和调试器选项，有时还包含对要调试的可执行文件名称的猜测。对于 @code{pdb}、@code{perldb} 和 @code{guiler}，如果当前缓冲区访问文件，则在提示中按 @kbd{M-n} (@code{next-history-element}) 会建议包含该文件名的完整命令行。此命令行中不允许使用 Shell 通配符和变量。 Emacs 假定第一个不以 @samp{-} 开头的命令参数是可执行文件名。
+
+@cindex remote host, debugging on
+TRAMP 提供了远程调试的工具，调试器和被调试的程序都位于同一远程主机上。 @xref{Running a debugger on a remote host,,, tramp, The Tramp Manual}，了解详情。  这与 GDB 的远程调试功能是分开的，其中程序和调试器在不同的机器上运行 (@pxref{Remote Debugging,, Debugging Remote Programs, gdb, The GNU debugger})。
+
+@node Debugger Operation
+@subsection 调试器操作
+@cindex GUD interaction buffer
+
+@dfn{GUD interaction buffer} 是一个 Emacs 缓冲区，用于将文本命令发送到调试器子进程，并记录其输出。这是与调试器交互的基本接口，由 @kbd{M-x gud-gdb} 和中列出的其他命令使用
+@iftex
+the preceding section.
+@end iftex
+@ifnottex
+@ref{Starting GUD}.
+@end ifnottex
+@kbd{M-x gdb} 命令使用额外的专用缓冲区扩展了此接口，用于控制断点、堆栈帧和调试器状态的其他方面 (@pxref{GDB Graphical Interface})。
+
+GUD 交互缓冲区使用 Shell 模式的变体，因此 Shell 模式定义的 Emacs 命令可用 (@pxref{Shell Mode})。  大多数调试器命令 (@pxref{Completion}) 都可以完成，并且您可以使用常用的 Shell 模式历史命令来重复它们。
+@iftex
+See the next section
+@end iftex
+@ifnottex
+@xref{Commands of GUD},
+@end ifnottex
+用于可在 GUD 交互缓冲区中使用的特殊命令。
+
+当您调试程序时，Emacs 通过访问 Emacs 缓冲区中的相关源文件来显示它们，左边缘有一个箭头指示当前执行行。  （在文本终端上，箭头显示为 @samp{=>}，覆盖在前两个文本列上。）在此类缓冲区中移动点不会移动箭头。  您可以自由编辑这些源文件，但请注意，插入或删除行会偏离箭头的位置，因为 Emacs 无法确定哪个编辑的源文件行对应于调试器子进程报告的行。  要更新此信息，您通常必须重新编译并重新启动程序。
+
+@cindex GUD and hl-line-mode
+@cindex highlighting execution lines in GUD
+@vindex gud-highlight-current-line
+此外，GUD 能够以两种方式之一在窗口文本本身内直观地划分当前执行行：第一种方式在启用用户选项 @code{gud-highlight-current-line} 时生效，并在覆盖层中显示该行，其外观由面 @code{gud-highlight-current-line-face} 提供。  另一个在启用 HL 行模式 (@pxref{Cursor Display}) 时生效，并将 HL 行模式引入的覆盖短暂移动到执行行，直到后续编辑命令将其重新定位回光标下方。
+
+@cindex GUD Tooltip mode
+@cindex mode, GUD Tooltip
+@findex gud-tooltip-mode
+GUD 工具提示模式是一种全局次要模式，为 GUD@. 添加了工具提示支持。要切换此模式，请键入 @kbd{M-x gud-tooltip-mode}。  默认情况下它是禁用的。  如果启用，您可以将鼠标指针移动到变量、函数或宏（统称为 @dfn{identifiers}）上，以在工具提示中显示它们的值 (@pxref{Tooltips})。  如果仅将鼠标指针放在表达式上并不能显示您想要的表达式的值，您可以通过将鼠标拖动到表达式上，然后将鼠标留在标记区域内，更明确地告诉 Emacs 要计算哪个表达式。  GUD 工具提示模式在 GUD 交互缓冲区以及变量 @code{gud-tooltip-modes} 中列出的主要模式的所有源缓冲区中生效。  如果关闭工具提示模式，则值将显示在回显区域而不是工具提示中。
+
+当使用带有 @kbd{M-x gud-gdb} 的 GUD 工具提示模式时，在 GDB 中显示表达式的值有时会扩展宏，从而可能在调试的程序中造成副作用。  因此，在 @code{gud-gdb} 中使用工具提示被禁用。  如果使用@kbd{M-x gdb}接口，就不会出现这个问题，因为有特殊的代码来避免副作用；此外，您可以在程序未执行时显示与标识符关联的宏定义。
+
+@node Commands of GUD
+@subsection GUD命令
+
+GUD 提供用于设置和清除断点、选择堆栈帧以及单步执行程序的命令。
+
+@table @kbd
+@item C-x C-a C-b
+@kindex C-x C-a C-b
+在该点所在的源代码行上设置一个断点。
+@end table
+
+@kbd{C-x C-a C-b} (@code{gud-break}) 在源缓冲区中调用时，会在当前源代码行上设置调试器断点。  该命令仅在启动 GUD@. 后才可用，如果在不与任何调试器子进程关联的缓冲区中调用它，则会发出错误信号。
+
+@kindex C-x C-a @r{(GUD)}
+以下命令在 GUD 交互缓冲区和全局中均可用，但具有不同的键绑定。  以 @kbd{C-c} 开头的键仅在 GUD 交互缓冲区中可用，而以 @kbd{C-x C-a} 开头的键则全局可用。  其中一些命令也可以通过工具栏使用；某些调试器不支持某些。
+
+@table @kbd
+@item C-c C-l
+@kindex C-c C-l @r{(GUD)}
+@itemx C-x C-a C-l
+@findex gud-refresh
+在另一个窗口中显示 GUD 交互缓冲区 (@code{gud-refresh}) 中引用的最后一个源代码行。
+
+@item C-c C-s
+@kindex C-c C-s @r{(GUD)}
+@itemx C-x C-a C-s
+@findex gud-step
+执行下一行代码 (@code{gud-step})。  如果该行包含函数调用，则执行在进入被调用函数后停止。
+
+@item C-c C-n
+@kindex C-c C-n @r{(GUD)}
+@itemx C-x C-a C-n
+@findex gud-next
+执行下一行代码，单步执行函数调用，而不在函数内部停止 (@code{gud-next})。
+
+@item C-c C-i
+@kindex C-c C-i @r{(GUD)}
+@itemx C-x C-a C-i
+@findex gud-stepi
+执行单个机器指令 (@code{gud-stepi})。
+
+@item C-c C-p
+@kindex C-c C-p @r{(GUD)}
+@itemx C-x C-a C-p
+@findex gud-print
+计算点 (@code{gud-print}) 处的表达式。  如果 Emacs 没有打印出您想要的确切表达式，请先将其标记为区域。
+
+@need 3000
+@item C-c C-r
+@kindex C-c C-r @r{(GUD)}
+@itemx C-x C-a C-r
+@findex gud-cont
+继续执行而不指定任何停止点。  程序将一直运行，直到遇到断点、终止或收到调试器正在检查的信号 (@code{gud-cont})。
+
+@need 1000
+@item C-c C-d
+@kindex C-c C-d @r{(GUD)}
+@itemx C-x C-a C-d
+@findex gud-remove
+删除当前源代码行上的断点（如果有）(@code{gud-remove})。  如果在 GUD 交互缓冲区中使用此命令，它将应用于程序上次停止的行。
+
+@item C-c C-t
+@kindex C-c C-t @r{(GUD)}
+@itemx C-x C-a C-t
+@findex gud-tbreak
+在当前源代码行（如果有）上设置临时断点 (@code{gud-tbreak})。  如果在 GUD 交互缓冲区中使用此命令，它将应用于程序上次停止的行。
+
+@item C-c <
+@kindex C-c < @r{(GUD)}
+@itemx C-x C-a <
+@findex gud-up
+选择下一个封闭的堆栈帧 (@code{gud-up})。  这相当于 GDB 命令@samp{up}。
+
+@item C-c >
+@kindex C-c > @r{(GUD)}
+@itemx C-x C-a >
+@findex gud-down
+选择下一个内部堆栈帧 (@code{gud-down})。  这相当于 GDB 命令@samp{down}。
+
+@item C-c C-u
+@kindex C-c C-u @r{(GUD)}
+@itemx C-x C-a C-u
+@findex gud-until
+继续执行到当前行 (@code{gud-until})。  程序将一直运行，直到遇到断点、终止、获得调试器正在检查的信号或到达光标当前所在的行。
+
+@item C-c C-f
+@kindex C-c C-f @r{(GUD)}
+@itemx C-x C-a C-f
+@findex gud-finish
+运行程序，直到选定的堆栈帧返回或因其他原因停止 (@code{gud-finish})。
+@end table
+
+如果您使用 GDB，则可以使用以下附加键绑定：
+
+@table @kbd
+@item C-x C-a C-j
+@kindex C-x C-a C-j @r{(GUD)}
+@findex gud-jump
+仅在源缓冲区中有用，@code{gud-jump} 将程序的执行点转移到当前行。  换句话说，程序执行的下一行将是您发出命令的行。  如果新的执行行与前一个执行行位于不同的函数中，GDB 会提示确认，因为结果可能会很奇怪。  有关详细信息，请参阅有关 @code{jump} 的 GDB 手册条目。
+
+@item @key{TAB}
+@kindex TAB @r{(GUD)}
+@findex gud-gdb-complete-command
+使用 GDB，完成符号名称 (@code{gud-gdb-complete-command})。该键仅在 GUD 交互缓冲区中可用。
+@end table
+
+当有意义时，这些命令将数字参数解释为重复计数。
+
+因为 @key{TAB} 用作完成命令，所以您不能使用它来输入选项卡作为您正在使用 GDB@. 调试的程序的输入，而是输入 @kbd{C-q @key{TAB}} 来输入选项卡。
+
+@node GUD Customization
+@subsection GUD定制
+
+@vindex gdb-mode-hook
+@vindex dbx-mode-hook
+@vindex sdb-mode-hook
+@vindex xdb-mode-hook
+@vindex perldb-mode-hook
+@vindex pdb-mode-hook
+@vindex jdb-mode-hook
+@vindex guiler-mode-hook
+启动时，GUD 运行以下挂钩之一： @code{gdb-mode-hook}，如果您使用 GDB； @code{dbx-mode-hook}，如果您使用 DBX； @code{sdb-mode-hook}，如果您使用的是 SDB； @code{xdb-mode-hook}，如果您使用的是XDB； @code{guiler-mode-hook} 用于 Guile REPL 调试； @code{perldb-mode-hook}，用于Perl调试模式； @code{pdb-mode-hook}，对于PDB； @code{jdb-mode-hook}，对于 JDB@. @xref{Hooks}。
+
+@code{gud-def} Lisp 宏 (@pxref{Defining Macros,,, elisp, the Emacs Lisp Reference Manual}) 提供了一种方便的方法来定义 Emacs 命令，该命令将特定命令字符串发送到调试器，并在 GUD 交互缓冲区中设置键绑定：
+
+@findex gud-def
+@example
+(gud-def @var{function} @var{cmdstring} @var{binding} @var{docstring})
+@end example
+
+这定义了一个名为 @var{function} 的命令，它将 @var{cmdstring} 发送到调试器进程，并为其提供文档字符串 @var{docstring}。  然后您可以在任何缓冲区中使用命令@var{function}。  如果@var{binding}非@code{nil}，则@code{gud-def}还将命令绑定到GUD缓冲区模式中的@kbd{C-c @var{binding}}，并且通常绑定到@kbd{C-x C-a @var{binding}}。
+
+命令字符串 @var{cmdstring} 可能包含某些 @samp{%} 序列，代表调用 @var{function} 时要填充的数据：
+
+@table @samp
+@item %f
+当前源文件的名称。  如果当前缓冲区是GUD缓冲区，则当前源文件是程序停止的文件。
+
+@item %l
+当前源代码行号。  如果当前缓冲区是 GUD 缓冲区，则当前源行是程序停止的行。
+
+@item %e
+在瞬态标记模式下，区域中的文本（如果处于活动状态）。否则为点处或邻近点处的 C 左值或函数调用表达式的文本。
+
+@item %a
+点处或邻近点的十六进制地址的文本。
+
+@item %p
+被调用函数的数字参数，为十进制数。  如果使用该命令时不带数字参数，则 @samp{%p} 代表空字符串。
+
+如果您不在命令字符串中使用 @samp{%p}，您定义的命令将忽略任何数字参数。
+
+@item %d
+当前源文件的目录名称。
+
+@item %c
+从周围点的表达式派生的完全限定类名（仅限 jdb）。
+@end table
+
+@node GDB Graphical Interface
+@subsection GDB图形界面
+
+命令 @kbd{M-x gdb} 在类似 IDE 的界面中启动 GDB，并使用专门的缓冲区来控制断点、堆栈帧和调试器状态的其他方面。  它还提供了使用鼠标控制调试会话的其他方法，例如单击源缓冲区的边缘以在此处设置断点。
+
+@vindex gud-gdb-command-name
+要仅使用 GUD 交互缓冲区接口运行 GDB，而不使用这些附加功能，请使用 @kbd{M-x gud-gdb} (@pxref{Starting GUD})。
+
+在内部，@kbd{M-x gdb}通知GDB其屏幕大小是无限的；为了正确操作，在调试会话期间不得更改 GDB 的屏幕高度和宽度值。
+
+@menu
+* GDB User Interface Layout::    控制显示缓冲区的数量。
+* Source Buffers::               使用边缘/边缘的鼠标来控制您的程序。
+* Breakpoints Buffer::           断点控制面板。
+* Threads Buffer::               显示您的线程。
+* Stack Buffer::                 从调用堆栈中选择一个帧。
+* Other GDB Buffers::            其他用于控制 GDB 状态的缓冲区。
+* Watch Expressions::            监视速度栏中的变量值。
+* Multithreaded Debugging::      调试具有多个线程的程序。
+@end menu
+
+@node GDB User Interface Layout
+@subsubsection GDB 用户界面布局
+@cindex GDB User Interface layout
+
+@vindex gdb-many-windows
+@vindex gdb-show-main
+如果变量 @code{gdb-many-windows} 为 @code{nil}（默认值），@kbd{M-x gdb} 通常仅显示 GUD 交互缓冲区。但是，如果变量 @code{gdb-show-main} 也不是 @code{nil}，则它会以两个窗口开始：一个显示 GUD 交互缓冲区，另一个显示正在调试的程序的 @code{main} 函数的源代码。
+
+如果@code{gdb-many-windows}非@code{nil}，则@kbd{M-x gdb}显示以下帧布局：
+
+@smallexample
+@group
++--------------------------------+--------------------------------+
+|   GUD interaction buffer       |   Locals/Registers buffer      |
+|--------------------------------+--------------------------------+
+|   Primary Source buffer        |   I/O buffer for debugged pgm  |
+|--------------------------------+--------------------------------+
+|   Stack buffer                 |   Breakpoints/Threads buffer   |
++--------------------------------+--------------------------------+
+@end group
+@end smallexample
+
+@findex gdb-save-window-configuration
+@findex gdb-load-window-configuration
+@vindex gdb-default-window-configuration-file
+@vindex gdb-window-configuration-directory
+您可以根据上面的布局自定义窗口布局，并使用 @code{gdb-save-window-configuration} 将该布局保存到文件中。然后您可以稍后使用 @code{gdb-load-window-configuration} 加载此布局。  （在内部，Emacs 使用术语“窗口配置”而不是“窗口布局”。）您可以通过自定义 @code{gdb-default-window-configuration-file} 将自定义布局设置为 @code{gdb-many-windows} 使用的默认布局。  如果它不是绝对文件名，GDB 将在 @code{gdb-window-configuration-directory} 下查找该文件。 @code{gdb-window-configuration-directory} 默认为 @code{user-emacs-directory} (@pxref{Find Init})。
+
+
+@findex gdb-restore-windows
+@findex gdb-many-windows
+@vindex gdb-restore-window-configuration-after-quit
+如果您更改了窗口布局，可以通过键入 @kbd{M-x gdb-restore-windows} 恢复默认布局。  要在多窗口布局和仅包含 GUD 交互缓冲区和源文件的简单布局之间切换，请输入 @kbd{M-x gdb-many-windows}。
+
+如果您有一个复杂的窗口设置，并且不希望 @code{gdb-many-windows} 破坏它，最好首先在单独的框架中调用 @kbd{M-x gdb}，这样原始框架上的窗口排列就不会受到影响。  如果您在文本模式终端上工作，那么用于 GDB 会话的单独框架会特别方便，因为窗口的屏幕空间可能非常宝贵。  如果您选择在同一帧中启动 GDB，请考虑将 @code{gdb-restore-window-configuration-after-quit} 设置为非 @code{nil} 值。  GDB 退出后，您的原始布局将恢复。  使用@code{t}总是恢复；仅当@code{gdb-many-windows}非@code{nil}时才使用@code{if-gdb-many-windows}进行恢复；仅当@code{gdb-show-main}非@code{nil}时才使用@code{if-gdb-show-main}进行恢复。
+
+您还可以指定要在同一帧或不同帧中显示的其他 GDB 相关缓冲区。  通过键入 @kbd{M-x gdb-display-@var{buffertype}-buffer} 或 @kbd{M-x gdb-frame-@var{buffertype}-buffer} 选择所需的缓冲区，其中 @var{buffertype} 是相关的缓冲区类型，例如 @samp{breakpoints} 或 @samp{io}。您可以从菜单栏中使用 @samp{GUD} 菜单的 @samp{GDB-Windows} 和 @samp{GDB-Frames} 子菜单执行相同操作。
+
+@vindex gdb-max-source-window-count
+@vindex gdb-display-source-buffer-action
+默认情况下，GDB最多使用一个窗口来显示源文件。您可以通过自定义@code{gdb-max-source-window-count}使其使用更多窗口。  您还可以自定义@code{gdb-display-source-buffer-action}来控制GDB如何显示源文件。
+
+完成调试后，使用 @kbd{C-x k} 终止 GUD 交互缓冲区，这也会终止与会话关联的所有缓冲区。  但是，如果在 Emacs 中编辑并重新编译源代码后希望继续调试，则无需执行此操作。  当您重新启动执行时，GDB 会自动查找新的可执行文件。  保留 GUD 交互缓冲区的优点是可以保留 shell 历史记录以及 GDB 的断点。  您确实需要检查最近编辑的源文件中的断点是否仍然位于正确的位置。
+
+@node Source Buffers
+@subsubsection 源缓冲区
+@cindex fringes, for debugging
+
+@table @asis
+@item @kbd{mouse-1}（边缘）
+设置或清除该行上的断点 (@code{gdb-mouse-set-clear-breakpoint})。
+
+@item @kbd{C-mouse-1}（边缘）
+启用或禁用该行上的断点 (@code{gdb-mouse-toggle-breakpoint-margin})。
+
+@item @kbd{mouse-3}（边缘）
+继续执行到该行 (@code{gdb-mouse-until})。
+
+@item @kbd{C-mouse-3}（边缘）
+跳转到该行 (@code{gdb-mouse-jump})。
+@end table
+
+在图形显示上，您可以单击源缓冲区边缘的@kbd{mouse-1}，以在该行上设置断点 (@pxref{Fringes})。您单击的位置边缘会出现一个红点。  如果那里已经存在断点，则单击会将其删除。  单击 @kbd{C-mouse-1} 可启用或禁用现有断点；已禁用但未取消设置的断点由灰点表示。
+
+在文本终端上，或者当禁用边缘时，启用的断点会在窗口的左边距中用 @samp{B} 字符指示。  禁用的断点用 @samp{b} 表示。 （仅当存在断点时才显示边距。）
+
+源缓冲区左边缘的实线箭头表示调试程序停止的最内帧的行。  空心箭头表示更高层框架的当前执行线。  如果您使用 @kbd{mouse-1} 拖动边缘中的箭头，则会导致执行前进到您释放按钮的行。或者，您可以单击边缘中的@kbd{mouse-3} 前进到该行。  您可以单击边缘中的@kbd{C-mouse-3} 跳转到该行，而不执行中间行。  此命令允许您向后运行，这对于运行已执行的代码非常有用，以便更详细地检查其执行情况。
+
+@vindex gdb-mi-decode-strings
+默认情况下，正在调试的程序中的源文件名和非 ASCII 字符串使用默认编码系统进行解码。  如果您喜欢不同的解码，可能是因为正在调试的程序使用不同的字符编码，请将变量 @code{gdb-mi-decode-strings} 设置为适当的编码系统，或设置为 @code{nil} 以将非 ASCII 字符保留为未解码的八进制转义符。
+
+@node Breakpoints Buffer
+@subsubsection 断点缓冲区
+
+GDB 断点缓冲区显示调试器会话中的断点、观察点和捕获点。  @xref{Breakpoints,,, gdb, The GNU debugger}。  它提供了以下命令，主要适用于@dfn{current breakpoint}（该点所在的断点）：
+
+@table @kbd
+@item @key{SPC}
+@kindex SPC @r{(GDB Breakpoints buffer)}
+@findex gdb-toggle-breakpoint
+启用/禁用当前断点 (@code{gdb-toggle-breakpoint})。  在图形显示上，这会更改该行源缓冲区边缘中点的颜色。  当断点启用时，该点为红色；当断点禁用时，该点为灰色。
+
+@item D
+@kindex D @r{(GDB Breakpoints buffer)}
+@findex gdb-delete-breakpoint
+删除当前断点 (@code{gdb-delete-breakpoint})。
+
+@item @key{RET}
+@kindex RET @r{(GDB Breakpoints buffer)}
+@findex gdb-goto-breakpoint
+访问当前断点 (@code{gdb-goto-breakpoint}) 的源代码行。
+
+@item mouse-2
+@kindex mouse-2 @r{(GDB Breakpoints buffer)}
+访问您单击的断点 (@code{gdb-goto-breakpoint}) 的源代码行。
+@end table
+
+@vindex gdb-show-threads-by-default
+当@code{gdb-many-windows}非@code{nil}时，GDB断点缓冲区与GDB线程缓冲区共享其窗口。  要从一种切换到另一种，请单击标题行中相关按钮上的 @kbd{mouse-1}。  如果@code{gdb-show-threads-by-default}非@code{nil}，则默认显示GDB线程缓冲区。
+
+@node Threads Buffer
+@subsubsection 线程缓冲区
+
+@findex gdb-select-thread
+GDB 线程缓冲区显示被调试程序中线程的摘要。  @xref{Threads, Threads, Debugging programs with multiple threads, gdb, The GNU debugger}。  要选择线程，请将点移动到那里并按 @key{RET} (@code{gdb-select-thread})，或使用 @kbd{mouse-2} 单击它。  这还会显示关联的源缓冲区，并更新其他 GDB 缓冲区的内容。
+
+您可以自定义 @code{gdb-buffers} 组中的变量来选择 GDB 线程缓冲区中包含的字段。
+
+@table @code
+@item gdb-thread-buffer-verbose-names
+@vindex gdb-thread-buffer-verbose-names
+显示长线程名称，例如 @samp{Thread 0x4e2ab70 (LWP 1983)}。
+
+@item gdb-thread-buffer-arguments
+@vindex gdb-thread-buffer-arguments
+显示线程顶部框架的参数。
+
+@item gdb-thread-buffer-locations
+@vindex gdb-thread-buffer-locations
+显示文件信息或库名称。
+
+@item gdb-thread-buffer-addresses
+@vindex gdb-thread-buffer-addresses
+显示线程缓冲区中线程帧的地址。
+@end table
+
+要同时查看多个线程的信息，请从 GDB 线程缓冲区使用以下命令。
+
+@table @kbd
+@item d
+@kindex d @r{(GDB threads buffer)}
+@findex gdb-display-disassembly-for-thread
+显示当前行线程的反汇编缓冲区 (@code{gdb-display-disassembly-for-thread})。
+
+@item f
+@kindex f @r{(GDB threads buffer)}
+@findex gdb-display-stack-for-thread
+显示当前行 (@code{gdb-display-stack-for-thread}) 线程的 GDB 堆栈缓冲区。
+
+@item l
+@kindex l @r{(GDB threads buffer)}
+@findex gdb-display-locals-for-thread
+显示当前行 (@code{gdb-display-locals-for-thread}) 线程的 GDB 本地缓冲区。
+
+@item r
+@kindex r @r{(GDB threads buffer)}
+@findex gdb-display-registers-for-thread
+显示当前行 (@code{gdb-display-registers-for-thread}) 线程的 GDB 寄存器缓冲区。
+@end table
+
+@noindent
+它们的大写对应项@kbd{D}、@kbd{F}、@kbd{L} 和@kbd{R} 在新帧中显示相应的缓冲区。
+
+当您创建一个显示有关某个特定线程的信息的缓冲区时，它会绑定到该线程，并在您调试程序时不断显示实际信息。  每个 GDB 缓冲区的模式指示器显示该缓冲区显示其信息的线程数。  线程号也包含在每个绑定缓冲区的名称中。
+
+GDB 线程缓冲区中提供了更多命令，这些命令取决于用于控制程序执行的 GDB 模式。  @xref{Multithreaded Debugging}。
+
+@node Stack Buffer
+@subsubsection 堆栈缓冲区
+
+GDB 堆栈缓冲区显示一个 @dfn{call stack}，其中一行对应调试器会话中的每个嵌套子例程调用 (@dfn{stack frames})。  @xref{Backtrace,, Backtraces, gdb, The GNU debugger}。
+
+@findex gdb-frames-select
+在图形显示上，选定的堆栈帧由边缘中的箭头指示。  在文本终端上，或者当边缘被禁用时，选定的堆栈帧将以相反的对比度显示。  要选择堆栈帧，请移动其行中的点并输入 @key{RET} (@code{gdb-frames-select})，或单击其上的 @kbd{mouse-2}。  这样做也会更新本地缓冲区
+@ifnottex
+(@pxref{Other GDB Buffers}).
+@end ifnottex
+@iftex
+(described in the next section).
+@end iftex
+
+@vindex gdb-stack-buffer-addresses
+如果您希望在每个堆栈帧中显示帧地址，请将变量 @code{gdb-stack-buffer-addresses} 自定义为非 @code{nil} 值。
+
+@node Other GDB Buffers
+@subsubsection 其他 GDB 缓冲区
+
+@kbd{M-x gdb} 提供的其他缓冲区（您可以选择请求显示）包括：
+
+@table @asis
+@findex gdb-display-locals-buffer
+@item 当地人缓冲区
+该缓冲区显示简单数据类型 (@pxref{Frame Info, Frame Info, Information on a frame, gdb, The GNU debugger}) 的当前堆栈帧的局部变量的值。  如果要编辑该值，请按 @key{RET} 或单击该值上的 @kbd{mouse-2}。
+
+数组和结构体仅显示其类型。  使用 GDB 6.4 或更高版本，您可以通过键入 @key{RET} 或单击 @kbd{mouse-2} 检查此时局部变量的值。  对于早期版本的 GDB，在类型描述上使用 @key{RET} 或 @kbd{mouse-2}（@samp{[struct/union]} 或 @samp{[array]}）。  @xref{Watch Expressions}。
+
+要显示本地缓冲区，请输入 @kbd{M-x gdb-display-locals-buffer}。
+
+@findex gdb-display-io-buffer
+@item 输入/输出缓冲器
+如果您正在调试的程序使用标准输入和输出流与用户交互，或者向其标准输出发出大量输出，您可能希望将其 I/O 与与 GDB 的交互分开。  使用命令 @w{@kbd{M-x gdb-display-io-buffer}} 显示一个带有缓冲区的窗口，Emacs 将您正在调试的程序的输入和输出重定向到该缓冲区。然而，如果变量@code{gdb-display-io-buffer}是@code{nil}，Emacs将不会创建也不会显示单独的I/O缓冲区，而是将程序的交互重定向到GUD交互缓冲区。
+
+@findex gdb-display-registers-buffer
+@item 寄存器缓冲区
+该缓冲区显示寄存器 (@pxref{Registers,,, gdb, The GNU debugger}) 保存的值。  使用命令 @kbd{M-x gdb-display-registers-buffer} 请求显示该缓冲区。如果要编辑寄存器的值，请按寄存器上的 @key{RET} 或单击 @kbd{mouse-2}。  对于 GDB 6.4 或更高版本，最近更改的寄存器值显示为 @code{font-lock-warning-face}。
+
+@findex gdb-display-disassembly-buffer
+@item 汇编缓冲区
+汇编器缓冲区将当前帧显示为机器代码。  箭头指向当前指令，您可以像在源缓冲区中一样设置和删除断点。  断点图标也会出现在边缘或页边距中。  要请求显示此缓冲区，请使用@kbd{M-x gdb-display-disassembly-buffer}。
+
+@findex gdb-display-memory-buffer
+@item 内存缓冲区
+内存缓冲区可让您检查程序内存的各个部分 (@pxref{Memory, Memory, Examining memory, gdb, The GNU debugger})。单击标题行相应部分的@kbd{mouse-1} 可更改缓冲区显示的起始地址或数据项数量。  或者，分别使用 @kbd{S} 或 @kbd{N}。  单击标题行上的@kbd{mouse-3}可选择这些数据项的显示格式或单位大小。  使用 @w{@kbd{M-x gdb-display-memory-buffer}} 请求显示该缓冲区。
+@end table
+
+当@code{gdb-many-windows}非@code{nil}时，局部缓冲区与寄存器缓冲区共享其窗口，就像断点和线程缓冲区一样。  要从一种切换到另一种，请使用 @kbd{mouse-1} 单击标题行中的相关按钮。
+
+@node Watch Expressions
+@subsubsection 观看表情
+@cindex Watching expressions in GDB
+
+@findex gud-watch
+@kindex C-x C-a C-w @r{(GUD)}
+如果您想查看每次程序停止时变量如何变化，请将点移至变量名称中，然后单击工具栏中的监视图标 (@code{gud-watch}) 或输入 @kbd{C-x C-a C-w}。  如果指定前缀参数，则可以在微型缓冲区中输入变量名称。
+
+每个监视表达式都显示在速度栏中 (@pxref{Speedbar})。  复杂的数据类型，例如数组、结构和联合，以树格式表示。  叶和简单数据类型显示表达式的名称及其值，并且当选择速度栏框架时，将类型显示为工具提示。  较高级别显示指针的名称、类型和地址值，否则仅显示名称和类型。  根表达式还将帧地址显示为工具提示，以帮助识别定义它们的帧。
+
+要扩展或收缩复杂数据类型，请单击表达式左侧标签上的 @kbd{mouse-2} 或按 @key{SPC}。  如果表达式的直接子级数量超过变量 @code{gdb-max-children} 的值，Emacs 会在扩展​​表达式之前要求确认。
+
+@kindex D @r{(GDB speedbar)}
+@findex gdb-var-delete
+要删除复杂的监视表达式，请将点移至速度栏中的根表达式并输入 @kbd{D} (@code{gdb-var-delete})。
+
+@kindex RET @r{(GDB speedbar)}
+@findex gdb-edit-value
+要编辑具有简单数据类型的变量或复杂数据类型的简单元素，请将速度栏中的点移至此处并输入 @key{RET} (@code{gdb-edit-value})。  或者您可以单击某个值上的 @kbd{mouse-2} 进行编辑。  无论哪种方式，这都会使用迷你缓冲区读取新值。
+
+@vindex gdb-show-changed-values
+如果将变量 @code{gdb-show-changed-values} 设置为非 @code{nil}（默认值），Emacs 使用 @code{font-lock-warning-face} 突出显示最近更改的值，并使用 @code{shadow} 使超出范围的变量不那么明显。  当变量超出范围时，您无法编辑其值。
+
+@vindex gdb-delete-out-of-scope
+如果变量 @code{gdb-delete-out-of-scope} 不是 @code{nil} （默认值），Emacs 会自动删除超出范围的监视表达式。  有时，当您的程序多次重新进入同一函数时，将此值设置为 @code{nil} 可能会很有用，这样您就不需要重新创建监视表达式。
+
+@vindex gdb-use-colon-colon-notation
+如果变量 @code{gdb-use-colon-colon-notation} 不是 @code{nil}，Emacs 使用 @samp{@var{function}::@var{variable}} 格式。  这允许用户显示共享相同变量名的监视表达式。  默认值为@code{nil}。
+
+@vindex gdb-speedbar-auto-raise
+要在每次手表表达式显示更新时自动提高速度栏，请将 @code{gdb-speedbar-auto-raise} 设置为非 @code{nil}。  如果您使用全屏 Emacs 框架进行调试，这会很有用。
+
+@node Multithreaded Debugging
+@subsubsection 多线程调试
+@cindex Multithreaded debugging in GDB
+@cindex Non-stop debugging in GDB
+
+在GDB的@dfn{all-stop mode}中，每当你的程序停止时，所有执行线程都会停止。  同样，每当您重新启动程序时，所有线程都会开始执行。  @xref{All-Stop Mode, , All-Stop Mode, gdb, The GNU debugger}。  对于某些多线程目标，GDB 支持另一种操作模式，称为 @dfn{non-stop mode}，您可以在调试器中检查已停止的程序线程，而其他线程继续自由执行。  @xref{Non-Stop Mode, , Non-Stop Mode, gdb, The GNU debugger}。  7.0 之前的 GDB 版本不支持不间断模式，并且它不适用于所有目标。
+
+@vindex gdb-non-stop-setting
+变量@code{gdb-non-stop-setting}决定Emacs是否以全停模式或不间断模式运行GDB。  默认值为@code{t}，这意味着它会尝试使用不间断模式（如果可用）。  如果将该值更改为 2⁣，或者不间断模式不可用，Emacs 会以全停止模式运行 GDB。  该变量在 Emacs 开始调试会话时生效；如果更改其值，则应重新启动任何活动的调试会话。
+
+@vindex gdb-switch-when-another-stopped
+当线程以不间断模式停止时，Emacs 通常会切换到该线程。  如果您不希望 Emacs 在已选择另一个停止的线程的情况下执行此切换，请将变量 @code{gdb-switch-when-another-stopped} 更改为 @code{nil}。
+
+@vindex gdb-switch-reasons
+Emacs 可以根据导致停止的原因决定是否切换到停止的线程。  自定义变量@code{gdb-switch-reasons}来选择导致线程切换的停止原因。
+
+@vindex gdb-stopped-functions
+变量 @code{gdb-stopped-functions} 允许您在某个线程停止时执行您的函数。
+
+在不停机模式下，可以切换不同的模式来执行GUD控制命令。
+
+@vindex gdb-gud-control-all-threads
+@table @dfn
+@item 不间断/A
+
+当@code{gdb-gud-control-all-threads}为@code{t}（默认值）时，中断和继续命令适用于所有线程，因此您可以分别使用@code{gud-stop-subjob}和@code{gud-cont}通过一个命令停止或继续所有线程。  当至少一个线程停止时，工具栏上会显示 @samp{Go} 按钮，而当至少一个线程正在运行时，工具栏上会显示 @samp{Stop} 按钮。
+
+@item 直达/T
+
+当@code{gdb-gud-control-all-threads}为@code{nil}时，仅停止/继续当前线程。  GUD 工具栏上的 @samp{Go} 和 @samp{Stop} 按钮根据当前线程的状态显示。
+@end table
+
+您可以从工具栏或 @samp{GUD->GDB-MI} 菜单更改 @code{gdb-gud-control-all-threads} 的当前值。
+
+步进命令始终适用于当前线程。
+
+在不间断模式下，您可以中断/继续线程而不选择它们。  在线程缓冲区中点击@kbd{i}会中断点下的线程，@kbd{c}继续它，@kbd{s}单步执行。  将来可能会添加更多此类命令。
+
+请注意，当您中断线程时，它会因 @samp{signal received} 原因而停止。  如果该原因包含在您的 @code{gdb-switch-reasons} 中（默认情况下），Emacs 将切换到该线程。
+
+@node Executing Lisp
+@section 执行 Lisp 表达式
+
+Emacs 具有适用于多种 Lisp 变体的主要模式。  它们使用与其他编程语言模式相同的编辑命令 (@pxref{Programs})。  此外，它们还提供用于执行 Lisp 表达式的特殊命令。
+
+@table @asis
+@item Emacs Lisp 模式
+编辑 Emacs Lisp 源文件的模式。  它定义 @kbd{C-M-x} 来计算当前顶级 Lisp 表达式。  @xref{Lisp Eval}。
+
+@item Lisp交互模式
+交互式 Emacs Lisp 会话的模式。  它定义 @kbd{C-j} 来计算 point 之前的表达式并将其值插入缓冲区。  @xref{Lisp Interaction}。
+
+@item 口齿不清模式
+用于编辑在除 Emacs Lisp 之外的 Lisp 中运行的程序的源文件的模式。  它定义 @kbd{C-M-x} 来计算外部 Lisp 中的当前顶级表达式。  @xref{External Lisp}。
+
+@item 劣质 Lisp 模式
+与外部 Lisp 进行交互会话的模式，该模式作为 Emacs 的子进程（或 @dfn{inferior process}）运行。
+@ifnottex
+@xref{External Lisp}.
+@end ifnottex
+
+@item 方案模式
+与 Lisp 模式类似，但适用于Scheme 程序。
+
+@item 劣方案模式
+与 Inferior Lisp 模式类似，但针对的是 Scheme。
+@end table
+
+@node Lisp Libraries
+@section Emacs 的 Lisp 代码库
+@cindex libraries
+@cindex loading Lisp code
+
+Emacs Lisp 代码存储在名称通常以 @file{.el} 结尾的文件中。  在 Emacs Lisp 模式下会自动访问此类文件。
+
+@cindex byte code
+Emacs Lisp 代码可以编译为字节码，加载速度更快，占用空间更少，执行速度更快。  按照惯例，编译后的 Emacs Lisp 代码会放在一个名称以 @samp{.elc} 结尾的单独文件中。  例如，@file{foo.el}的编译代码放入@file{foo.elc}。  @xref{Byte Compilation,, Byte Compilation, elisp, the Emacs Lisp Reference Manual}。
+
+@cindex native compilation
+Emacs Lisp 代码也可以编译为 @dfn{native code}：与 C 或 Fortran 编译器生成的机器代码不同的机器代码。  本机代码的运行速度甚至比字节码还要快。  本机编译的 Emacs Lisp 代码存储在名称以 @samp{.eln} 结尾的文件中。  @xref{Native Compilation,, Native Compilation, elisp, the Emacs Lisp Reference Manual}。
+
+@findex load-file
+要 @dfn{load} Emacs Lisp 文件，请输入 @kbd{M-x load-file}。  此命令使用迷你缓冲区读取文件名，并将该文件的内容作为 Emacs Lisp 代码执行。  不必先访问该文件；该命令直接从磁盘读取文件，而不是从现有的 Emacs 缓冲区中读取。
+
+@findex load
+@findex load-library
+@vindex load-prefer-newer
+@cindex load path for Emacs Lisp
+如果 Emacs Lisp 文件安装在 Emacs Lisp @dfn{load path}（定义如下）中，您可以通过键入 @kbd{M-x load-library} 来加载它，而不是使用 @kbd{M-x load-file}。  @kbd{M-x load-library} 命令提示输入 @dfn{library name} 而不是文件名；它会搜索 Emacs Lisp 加载路径中的每个目录，尝试找到与该库名称匹配的文件。  如果库名称为 @samp{@var{foo}}，它会尝试查找名为 @file{@var{foo}.elc}、@file{@var{foo}.el} 和 @file{@var{foo}} 的文件。  （如果 Emacs 是在启用本机编译的情况下构建的，@code{load-library} 会查找对应于 @file{@var{foo}.el} 的 @samp{.eln} 文件并加载它，而不是@file{@var{foo}.elc}。）默认行为是加载找到的第一个文件。  此命令优先选择 @file{.eln} 文件而不是 @file{.elc} 文件，优先选择 @file{.elc} 文件而不是 @file{.el} 文件，因为编译后的文件加载和运行速度更快。  如果它发现 @file{@var{lib}.el} 比 @file{@var{lib}.elc} 新，它会发出警告，以防有人对 @file{.el} 文件进行更改并忘记重新编译它，但无论如何都会加载 @file{.elc} 文件。 （由于这种行为，您可以将未完成的编辑保存到 Emacs Lisp 源文件中，并且在您的更改准备好使用之前不会重新编译。）但是，如果您将选项 @code{load-prefer-newer} 设置为非 @code{nil} 值，则 Emacs 会加载最新版本的文件，而不是上述过程。  如果 Emacs 是原生编译的，它找不到@file{@var{lib}.el}对应的@samp{.eln}文件，它会加载一个@file{@var{lib}.elc}，并在后台开始原生编译@file{@var{lib}.el}，编译完成后加载@samp{.eln}文件。
+
+Emacs Lisp 程序通常使用 @code{load} 函数加载 Emacs Lisp 文件。  这与@code{load-library}类似，但级别较低并且接受额外的参数。  @xref{How Programs Do Loading,,, elisp, the Emacs Lisp Reference Manual}。
+
+@vindex load-path
+Emacs Lisp 加载路径由变量@code{load-path} 指定。  它的值应该是目录列表（字符串）。  这些目录由 @kbd{M-x load-library} 命令、较低级别的 @code{load} 函数以及查找 Emacs Lisp 库的其他 Emacs 函数按指定顺序搜索。 @code{load-path} 中的条目也可以具有特殊值 @code{nil}，它代表当前默认目录，但使用它几乎总是一个坏主意，因为它的含义将取决于 Emacs 使用 @code{load-path} 时当前的缓冲区。 （如果您发现自己希望 @code{nil} 出现在列表中，那么很可能您真正想要的是使用 @kbd{M-x load-file}。）
+
+@code{load-path} 的默认值是存储 Emacs 本身的 Lisp 代码的目录列表。  如果您在另一个目录中有自己的库，则可以将该目录添加到加载路径。  与本手册中描述的大多数其他变量不同，@code{load-path} 无法通过自定义界面 (@pxref{Easy Customization}) 进行更改，但您可以通过在初始化文件中添加如下行来向其添加目录 (@pxref{Init File})：
+
+@example
+(add-to-list 'load-path "/path/to/my/lisp/library")
+@end example
+
+通常将本地安装的库放在默认值 @code{load-path} 中的 @file{site-lisp} 目录中，或者放在 @file{site-lisp} 的某个子目录中。  这样，您就不需要修改@code{load-path}的默认值。
+
+@vindex native-comp-eln-load-path
+与 @code{load-path} 类似，Emacs 查找包含本机编译的 Lisp 代码的 @file{*.eln} 文件的目录列表由变量 @code{native-comp-eln-load-path} 指定。
+
+@cindex autoload
+有些命令是@dfn{autoloaded}；当您运行它们时，Emacs 首先自动加载关联的库。  例如，@kbd{M-x compile}命令（@pxref{Compilation}）是自动加载的；如果你调用它，Emacs 首先会自动加载 @code{compile} 库。相反，命令 @kbd{M-x recompile} 不会自动加载，因此在加载 @code{compile} 库之前它不可用。
+
+@vindex help-enable-autoload
+当您查找自动加载命令 (@pxref{Name Help}) 的文档时，如果该文档引用其库中的其他函数和变量，也可能会发生自动加载（加载库可以让 Emacs 在 @file{*Help*} 缓冲区中正确设置超链接）。  要禁用此功能，请将变量 @code{help-enable-autoload} 更改为 @code{nil}。
+
+@vindex help-enable-completion-autoload
+当根据完成的前缀完成 @code{describe-variable} 和 @code{describe-function} 的名称时，也会发生自动加载。  要禁用此功能，请将变量 @code{help-enable-completion-autoload} 更改为 @code{nil}。
+
+将库放入 Emacs 可以找到并加载它的目录后，您可能希望使其在启动时可用。  当库定义了应按需自动可用的功能并且手动加载库不方便时，这非常有用。  在这些情况下，请确保通过向 init 文件添加合适的形式来加载库：@code{load} 或 @code{require}（如果您始终需要在启动时加载库），或者 @code{autoload}（如果您需要 Emacs 在调用某些命令或函数时加载库）。  例如：
+
+@smalllisp
+@group
+ ;; Loads @file{my-shining-package.elc} unconditionally.
+ (require 'my-shining-package)
+@end group
+@group
+ ;; Will load @file{my-shining-package.elc} when @code{my-func} is invoked.
+ (autoload 'my-func "my-shining-package")
+@end group
+@end smalllisp
+
+请注意，使用 @code{package-install} (@pxref{Package Installation}) 安装包会负责将包的 Lisp 文件放置在 Emacs 可以找到它的目录中，并且还会根据需要扩展 @code{load-path}，使得此类包不需要上述手动自定义。
+
+@node Lisp Eval
+@section 评估 Emacs Lisp 表达式
+@cindex Emacs Lisp mode
+@cindex mode, Emacs Lisp
+@cindex evaluation, Emacs Lisp
+
+@findex emacs-lisp-mode
+Emacs Lisp 模式是编辑 Emacs Lisp 的主要模式。  它的模式命令是@kbd{M-x emacs-lisp-mode}。
+
+Emacs 提供了几个用于计算 Emacs Lisp 表达式的命令。  您可以在 Emacs Lisp 模式下使用这些命令来测试正在编写的 Emacs Lisp 代码。  例如，重写函数后，可以对函数定义进行求值，使其对后续函数调用生效。  这些命令也是全局可用的，并且可以在 Emacs Lisp 模式之外使用。
+
+@table @asis
+@item @kbd{M-:}
+读取迷你缓冲区中的单个 Emacs Lisp 表达式，对其求值，然后在回显区域 (@code{eval-expression}) 中打印该值。
+@item @kbd{C-x C-e}
+计算 point 之前的 Emacs Lisp 表达式，并在回显区域 (@code{eval-last-sexp}) 中打印该值。
+@item @kbd{C-M-x} @r{(in Emacs Lisp mode)}
+@itemx @kbd{M-x eval-defun}
+评估包含或之后的 defun 点，并在回显区域 (@code{eval-defun}) 中打印该值。
+@item @kbd{M-x eval-region}
+评估该区域中的所有 Emacs Lisp 表达式。
+@item @kbd{M-x eval-buffer}
+计算缓冲区中的所有 Emacs Lisp 表达式。
+@end table
+
+@ifinfo
+@c This uses 'colon' instead of a literal ':' because Info cannot
+@c cope with a ':' in a menu.
+@kindex M-colon
+@end ifinfo
+@ifnotinfo
+@kindex M-:
+@end ifnotinfo
+@findex eval-expression
+@kbd{M-:} (@code{eval-expression}) 使用迷你缓冲区读取表达式并对其求值。  （在计算表达式之前，当前缓冲区会切换回您键入 @kbd{M-:} 时的当前缓冲区，而不是您在其中键入表达式的迷你缓冲区。）
+
+@kindex C-x C-e
+@findex eval-last-sexp
+命令 @kbd{C-x C-e} (@code{eval-last-sexp}) 计算缓冲区中前一点的 Emacs Lisp 表达式，并在回显区域中显示该值。  当评估结果是整数时，它将与其他格式的值一起显示（八进制、十六进制和字符，如果@code{eval-expression-print-maximum-character}允许的话）。
+
+如果给 @kbd{M-:} 或 @kbd{C-x C-e} 一个前缀参数，它会将值插入当前缓冲区中的点，而不是将其显示在回显区域中。  如果前缀参数为零，则任何整数输出都将与其其他格式（八进制、十六进制和字符）的值一起插入。  这样的前缀参数还可以防止根据变量 @code{eval-expression-print-level} 和 @code{eval-expression-print-length} 进行输出缩写（见下文）。  类似地，@code{-1}的前缀参数会覆盖@code{eval-expression-print-length}的效果。
+
+@kbd{C-x C-e} (@code{eval-last-sexp}) 特别对待@code{defvar} 表达式。  通常，如果 @code{defvar} 表达式定义的变量已经有值，则对其求值不会执行任何操作。  但该命令无条件地将变量重置为@code{defvar}指定的初始值；这对于调试 Emacs Lisp 程序很方便。  @code{defcustom} 和 @code{defface} 表达式的处理方式类似。  请注意，本节中记录的其他命令（除 7⁣ 之外）没有此特殊功能。
+
+@kindex C-M-x @r{(Emacs Lisp mode)}
+@findex eval-defun
+在 Emacs Lisp 模式下，@code{eval-defun} 命令绑定到 @kbd{C-M-x}。  它计算包含或跟随点的顶级 Lisp 表达式，并在回显区域中打印该值。  在这种情况下，顶级表达式被称为“defun”，但它不必是实际的@code{defun}（函数定义）。
+
+此命令处理 @code{defvar}/@code{defcustom}/@code{defface} 形式的方式与 @code{eval-last-sexp} 相同。
+
+使用前缀参数，@kbd{C-M-x} 检测 Edebug（Emacs Lisp 调试器）的函数定义。  @xref{Instrumenting, Instrumenting for Edebug,, elisp, the Emacs Lisp Reference Manual}。
+
+@findex eval-region
+@findex eval-buffer
+命令 @kbd{M-x eval-region} 将区域文本解析为一个或多个 Lisp 表达式，并对其进行一一求值。  @kbd{M-x eval-buffer} 类似，但评估整个缓冲区。
+
+@vindex eval-expression-print-level
+@vindex eval-expression-print-length
+@vindex eval-expression-print-maximum-character
+@vindex eval-expression-debug-on-error
+选项 @code{eval-expression-print-level} 和 @code{eval-expression-print-length} 控制在缩写之前在评估命令结果中打印的列表的最大深度和长度。  向 @code{eval-expression} 或 @code{eval-last-sexp} 提供零前缀参数会导致列表被完整打印。  @code{eval-expression-debug-on-error} 控制使用这些命令时评估错误是否调用调试器；它的默认值为@code{t}。 @code{eval-expression-print-maximum-character} 防止大于它的整数显示为字符。
+
+@node Lisp Interaction
+@section Lisp 交互缓冲区
+
+@findex lisp-interaction-mode
+当 Emacs 启动时，它包含一个名为 @file{*scratch*} 的缓冲区，该缓冲区用于交互式评估 Emacs Lisp 表达式。其主要模式是Lisp交互模式。  您还可以通过输入 @kbd{M-x lisp-interaction-mode} 来启用 Lisp 交互模式。
+
+@findex scratch-buffer
+如果您终止了 @file{*scratch*} 缓冲区，则可以使用 @kbd{M-x scratch-buffer} 命令重新创建它。
+
+@findex eval-print-last-sexp
+@kindex C-j @r{(Lisp Interaction mode)}
+在@file{*scratch*}缓冲区和其他Lisp交互模式缓冲区中，@kbd{C-j}（@code{eval-print-last-sexp}）计算point之前的Lisp表达式，并在point处插入值。  因此，当您在缓冲区中键入表达式并在每个表达式后面输入 @kbd{C-j} 时，缓冲区会记录已计算表达式及其值的副本。  Lisp 交互模式中的所有其他命令与 Emacs Lisp 模式中的相同。
+
+@vindex initial-scratch-message
+启动时，@file{*scratch*}缓冲区包含一条 Lisp 注释形式的短消息，解释它的用途。  该消息由变量 @code{initial-scratch-message} 控制，该变量应该是文档字符串，或 @code{nil} （这意味着抑制该消息）。
+
+@findex ielm
+交互式评估 Emacs Lisp 表达式的另一种方法是使用 Inferior Emacs Lisp 模式，该模式提供了一个类似于 Shell 模式 (@pxref{Shell Mode}) 的接口来评估 Emacs Lisp 表达式。  输入 @kbd{M-x ielm} 创建一个使用此模式的 @file{*ielm*} 缓冲区。  有关更多信息，请参阅该命令的文档。
+
+@cindex persistent *scratch* buffer
+默认情况下，@file{*scratch*}缓冲区不与任何文件关联。  因此，当您退出 Emacs 时，缓冲区中的所有文本都会丢失。如果您愿意，可以使用 Remember 模式的注释缓冲区功能来使 Emacs 保存并重新加载 @file{*scratch*} 的内容。  将变量 @code{initial-buffer-choice} 自定义为符号 @code{remember-notes} 并将变量 @code{remember-notes-buffer-name} 自定义为字符串 @code{"*scratch*"} 来实现此目的。  另请参阅@xref{Quick Start,,, remember, the Remember mode manual}。
+
+@node External Lisp
+@section 运行外部 Lisp
+@cindex Lisp mode
+@cindex mode, Lisp
+@cindex Common Lisp
+
+Lisp 模式是编辑用通用 Lisp 方言（例如 Common Lisp）编写的程序的主要模式。  它的模式命令是@kbd{M-x lisp-mode}。  Emacs 自动对名称以 @file{.l}、@file{.lsp} 或 @file{.lisp} 结尾的文件使用 Lisp 模式。
+
+@findex run-lisp
+@vindex inferior-lisp-program
+@kindex C-x C-z
+您可以将外部 Lisp 会话作为 Emacs 的子进程或 @dfn{inferior process} 运行，并将表达式传递给它进行计算。  要开始外部 Lisp 会话，请输入 @kbd{M-x run-lisp}。  这将运行名为 @command{lisp} 的程序，并对其进行设置，以便输入和输出都通过名为 @file{*inferior-lisp*} 的 Emacs 缓冲区。  要更改 @kbd{M-x run-lisp} 运行的 Lisp 程序的名称，请更改变量 @code{inferior-lisp-program}。
+
+@file{*lisp*}缓冲区的主要模式是 Inferior Lisp 模式，它结合了 Lisp 模式和 Shell 模式（@pxref{Shell Mode}）的特点。  要将输入发送到 Lisp 会话，请转到 @file{*lisp*} 缓冲区的末尾并键入输入，然后键入 @key{RET}。  Lisp 会话的终端输出会自动插入到缓冲区中。
+
+@kindex C-M-x @r{(Lisp mode)}
+@findex lisp-eval-defun
+当您在 Lisp 模式下编辑 Lisp 程序时，您可以键入 @kbd{C-M-x} (@code{lisp-eval-defun}) 将表达式从 Lisp 模式缓冲区发送到您使用 @kbd{M-x run-lisp} 启动的 Lisp 会话。发送的表达式是在该点或该点之后的顶级 Lisp 表达式。  结果值照常进入 @file{*inferior-lisp*} 缓冲区。  请注意，Lisp 模式中@kbd{C-M-x} 的效果与 Emacs Lisp 模式 (@pxref{Lisp Eval}) 中的效果非常相似，只是表达式被发送到不同的 Lisp 环境而不是在 Emacs 中进行计算。
+
+@findex scheme-mode
+@findex run-scheme
+@cindex Scheme mode
+@cindex mode, Scheme
+@kindex C-M-x @r{(Scheme mode)}
+编辑Scheme代码和将表达式发送到Scheme子进程的工具非常相似。  方案源文件在方案模式下编辑，可以使用@kbd{M-x scheme-mode}显式启用。  您可以通过键入@kbd{M-x run-scheme}来启动Scheme会话（与Scheme交互的缓冲区名为@file{*scheme*}），并通过键入@kbd{C-M-x}向其发送表达式。

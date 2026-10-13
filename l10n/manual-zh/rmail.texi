@@ -1,0 +1,933 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Rmail
+@chapter 使用 Rmail 读取邮件
+@cindex Rmail
+@cindex reading mail
+@findex rmail
+@findex rmail-mode
+@vindex rmail-mode-hook
+
+Rmail 是一个 Emacs 子系统，用于阅读和处理您收到的邮件。  Rmail 将邮件消息存储在称为 Rmail 文件的文件中。读取 Rmail 文件中的消息是在一种特殊的主要模式（Rmail 模式）下完成的，该模式重新定义了大多数字母来运行管理邮件的命令。
+
+Emacs 还附带了一个更复杂、更灵活的邮件阅读子系统，称为 Gnus。  Gnus 是一个非常大的软件包，因此在它自己的手册中进行了描述，请参阅@ref{Top,,, gnus, The Gnus Newsreader}。
+
+@menu
+* Basic: Rmail Basics.        Rmail的基本概念，以及简单的使用。
+* Scroll: Rmail Scrolling.    滚动浏览消息。
+* Motion: Rmail Motion.       转到另一封邮件。
+* Deletion: Rmail Deletion.   删除和清除消息。
+* Inbox: Rmail Inbox.         邮件如何进入 Rmail 文件。
+* Files: Rmail Files.         使用多个 Rmail 文件。
+* Output: Rmail Output.       将消息复制到文件中。
+* Labels: Rmail Labels.       通过标记消息对消息进行分类。
+* Attrs: Rmail Attributes.    某些标准标签，称为属性。
+* Reply: Rmail Reply.         发送对您正在查看的消息的回复。
+* Summary: Rmail Summary.     摘要显示许多消息的简要信息。
+* Sort: Rmail Sorting.        在 Rmail 中对邮件进行排序。
+* Display: Rmail Display.     Rmail 如何显示消息；定制。
+* Coding: Rmail Coding.       Rmail 如何处理解码字符集。
+* Editing: Rmail Editing.     在 Rmail 中编辑消息文本和标题。
+* Digest: Rmail Digest.       从摘要消息中提取消息。
+* Rot13: Rmail Rot13.         读取 rot13 代码中编码的消息。
+* Movemail::                  有关获取新邮件的更多详细信息。
+* Remote Mailboxes::          从远程邮箱检索邮件。
+* Other Mailbox Formats::     从本地邮箱中检索各种格式的邮件。
+@end menu
+
+@node Rmail Basics
+@section Rmail 的基本概念
+
+@cindex primary Rmail file
+@vindex rmail-file-name
+以最简单的方式使用 Rmail，您将拥有一个 Rmail 文件 @file{~/RMAIL}，其中保存了所有邮件。  它被称为你的@dfn{primary Rmail file}。  命令 @kbd{M-x rmail} 读取您的主 Rmail 文件，合并收件箱中的新邮件，显示您尚未阅读的第一封邮件，然后让您开始阅读。  变量 @code{rmail-file-name} 指定主 Rmail 文件的名称。
+
+@cindex current message (Rmail)
+Rmail 一次仅显示 Rmail 文件中的一封邮件。显示的消息称为 @dfn{current message}。  Rmail 模式的特殊命令可以执行诸如删除当前邮件、将其复制到另一个文件、发送回复或移动到另一封邮件等操作。  您还可以创建多个 Rmail 文件 (@pxref{Files}) 并使用 Rmail 在它们之间移动邮件 (@pxref{Rmail Output})。
+
+@cindex message number (Rmail)
+在 Rmail 文件中，消息通常按照接收顺序依次排列；您可以指定其他方式对它们进行排序 (@pxref{Rmail Sorting})。  消息由连续的整数来标识，即它们的@dfn{message numbers}。  当前消息的数量显示在 Rmail 的模式行中，后面是文件中的消息总数。  您可以通过使用 @kbd{j} 键 (@pxref{Rmail Motion}) 指定消息编号来移动到消息。
+
+@kindex s @r{(Rmail)}
+@findex rmail-expunge-and-save
+遵循 Emacs 的常用约定，仅当您保存文件时，Rmail 文件中的更改才会永久生效。  您可以使用 @kbd{s} (@code{rmail-expunge-and-save}) 保存它，这也会首先从文件中删除已删除的消息 (@pxref{Rmail Deletion})。  要保存文件而不删除，请使用@kbd{C-x C-s}。  合并收件箱文件中的新邮件后，Rmail 会自动保存 Rmail 文件 (@pxref{Rmail Inbox})。
+
+@kindex q @r{(Rmail)}
+@findex rmail-quit
+@kindex b @r{(Rmail)}
+@findex rmail-bury
+您可以使用 @kbd{q} (@code{rmail-quit}) 退出 Rmail；这将删除并保存 Rmail 文件，然后隐藏 Rmail 缓冲区及其摘要缓冲区（如果存在）（@pxref{Rmail Summary}）。  但没有必要正式退出。  如果您从 Rmail 切换到在其他缓冲区中进行编辑，并且再也没有切换回来，那么您就已经退出了。  只需确保最终保存 Rmail 文件（就像您更改的任何其他文件一样）。  @kbd{C-x s} 是执行此操作的合适方法 (@pxref{Save Commands})。  Rmail 命令@kbd{b}、@code{rmail-bury} 会隐藏 Rmail 缓冲区及其摘要，而不删除和保存 Rmail 文件。
+
+@node Rmail Scrolling
+@section 在消息内滚动
+
+当 Rmail 显示的消息无法在屏幕上显示时，您必须滚动浏览该消息才能阅读其余内容。  您可以使用常用的滚动命令来完成此操作：@kbd{C-v}、@kbd{M-v} 和 @kbd{M-<} (@pxref{Scrolling})，但在 Rmail 中滚动非常频繁，因此应该更容易。
+
+@table @kbd
+@item @key{SPC}
+向前滚动 (@code{scroll-up-command})。
+@item @key{DEL}
+@itemx S-@key{SPC}
+向后滚动 (@code{scroll-down-command})。
+@item .
+滚动到消息开头 (@code{rmail-beginning-of-message})。
+@item /
+滚动到消息末尾 (@code{rmail-end-of-message})。
+@end table
+
+@kindex SPC @r{(Rmail)}
+@kindex DEL @r{(Rmail)}
+@kindex S-SPC @r{(Rmail)}
+由于阅读邮件时最常见的操作是整屏滚动浏览邮件，因此 Rmail 使@key{SPC}和@key{DEL}（或@kbd{S-@key{SPC}}）分别与@kbd{C-v}（@code{scroll-up-command}）和@kbd{M-v}（@code{scroll-down-command}）执行相同的操作。
+
+@kindex . @r{(Rmail)}
+@kindex / @r{(Rmail)}
+@findex rmail-beginning-of-message
+@findex rmail-end-of-message
+命令@kbd{.} (@code{rmail-beginning-of-message}) 滚动回所选消息的开头。  这与@kbd{M-<}不太一样：一方面，它没有设置标记；另一方面，它没有设置标记。另一方面，如果您更改了当前消息的缓冲区边界（例如，通过编辑@pxref{Rmail Editing}），它会重置当前消息的缓冲区边界。  类似地，命令 @kbd{/} (@code{rmail-end-of-message}) 向前滚动到所选消息的末尾。
+@c The comment about buffer boundaries is still true in mbox Rmail, if
+@c less likely to be relevant.
+
+@node Rmail Motion
+@section 在消息之间移动
+
+处理消息最基本的事情就是阅读它。  在 Rmail 中执行此操作的方法是使消息成为最新消息。  通常的做法是按顺序移动文件，因为这是接收消息的顺序。  当您输入 Rmail 时，您将位于尚未设为当前状态的第一封邮件（即第一封具有 @samp{unseen} 属性；@pxref{Rmail Attributes}）的邮件。  向前查看其他新消息；向后移动以重新检查旧消息。
+
+@table @kbd
+@item n
+移至下一条未删除的消息，跳过任何插入的已删除消息 (@code{rmail-next-undeleted-message})。
+@item p
+移至上一条未删除的消息 (@code{rmail-previous-undeleted-message})。
+@item M-n
+移至下一条消息，包括已删除的消息 (@code{rmail-next-message})。
+@item M-p
+移至上一条消息，包括已删除的消息 (@code{rmail-previous-message})。
+@item C-c C-n
+移至与当前消息主题相同的下一条消息 (@code{rmail-next-same-subject})。
+@item C-c C-p
+移至与当前邮件主题相同的上一条邮件 (@code{rmail-previous-same-subject})。
+@item j
+移至第一条消息。  使用参数@var{n}，移动到消息编号@var{n} (@code{rmail-show-message})。
+@item >
+移至最后一条消息 (@code{rmail-last-message})。
+@item <
+移至第一条消息 (@code{rmail-first-message})。
+@item M-s @var{regexp} @key{RET}
+移至包含 @var{regexp} (@code{rmail-search}) 匹配的下一条消息。
+@item - M-s @var{regexp} @key{RET}
+移至包含 @var{regexp} 匹配项的上一条消息。 （这是带有否定参数的@kbd{M-s}。）
+@end table
+
+@kindex n @r{(Rmail)}
+@kindex p @r{(Rmail)}
+@kindex M-n @r{(Rmail)}
+@kindex M-p @r{(Rmail)}
+@findex rmail-next-undeleted-message
+@findex rmail-previous-undeleted-message
+@findex rmail-next-message
+@findex rmail-previous-message
+@kbd{n} 和 @kbd{p} 是 Rmail 中消息之间移动的常用方式。  它们按顺序浏览邮件，但跳过已删除的邮件，这通常是您想要做的。  它们的命令定义被命名为@code{rmail-next-undeleted-message}和@code{rmail-previous-undeleted-message}。  如果您不想跳过已删除的消息（例如，如果您想移动到某条消息以取消删除它），请使用变体 @kbd{M-n} 和 @kbd{M-p}（@code{rmail-next-message} 和 @code{rmail-previous-message}）。  这些命令中的任何一个的数字参数都用作重复计数。
+
+在 Rmail 中，您可以通过仅键入数字来指定数字参数。  您不需要先输入 @kbd{C-u}。  您还可以通过仅键入 @kbd{-} 来指定负参数。
+
+@kindex M-s @r{(Rmail)}
+@findex rmail-search
+@cindex searching in Rmail
+@kbd{M-s} (@code{rmail-search}) 命令是 Rmail 的搜索版本。  通常的增量搜索命令 @kbd{C-s} 在 Rmail 中工作，但它仅在当前邮件内搜索。  @kbd{M-s} 的目的是搜索另一条消息。  它以非增量方式读取正则表达式 (@pxref{Regexps})，然后从以下消息的开头开始搜索匹配项。  然后它选择该消息。  如果 5⁣ 为空，则 6⁣ 重用上次使用的正则表达式。
+
+要在文件中向后搜索另一条消息，请给 @kbd{M-s} 一个负参数。  在 Rmail 中，您可以使用 @kbd{- M-s} 执行此操作。  这将从上一条消息的末尾开始搜索。
+
+还可以根据标签搜索消息。 @xref{Rmail Labels}。
+
+@kindex C-c C-n @r{(Rmail)}
+@kindex C-c C-p @r{(Rmail)}
+@findex rmail-next-same-subject
+@findex rmail-previous-same-subject
+@kbd{C-c C-n} (@code{rmail-next-same-subject}) 命令移动到与当前消息主题相同的下一条消息。  前缀参数用作重复计数。  如果参数为负，则该命令向后移动，作用类似于 @kbd{C-c C-p} (@code{rmail-previous-same-subject})。  比较主题时，这些命令会忽略通常添加到回复主题的前缀。  这些命令对于阅读与同一主题（即@: @dfn{thread}）相关的所有消息非常有用。
+
+@kindex j @r{(Rmail)}
+@kindex > @r{(Rmail)}
+@kindex < @r{(Rmail)}
+@findex rmail-show-message
+@findex rmail-last-message
+@findex rmail-first-message
+要移动到由绝对消息编号指定的消息，请使用 @kbd{j} (@code{rmail-show-message}) 并将消息编号作为参数。  如果没有参数，@kbd{j} 选择第一条消息。  @kbd{<} (@code{rmail-first-message}) 也选择第一条消息。  @kbd{>} (@code{rmail-last-message}) 选择最后一条消息。
+
+@node Rmail Deletion
+@section 删除消息
+
+@cindex deletion (Rmail)
+当您不再需要保留消息时，您可以@dfn{delete}它。  这会将其标记为可忽略，并且某些 Rmail 命令会假装它不再存在；但它仍然在 Rmail 文件中占有一席之地，并且仍然具有其邮件编号。
+
+@cindex expunging (Rmail)
+@dfn{Expunging} Rmail 文件实际上删除了已删除的邮件。剩余的消息被连续地重新编号。
+@c The following is neither true (there is also unforward, sorting,
+@c etc), nor especially interesting.
+@c Expunging is the only action that changes the message number of any
+@c message, except for undigestifying (@pxref{Rmail Digest}).
+
+@table @kbd
+@item d
+删除当前消息，并移至下一条未删除的消息 (@code{rmail-delete-forward})。
+@item C-d
+删除当前消息，并移至上一条未删除的消息 (@code{rmail-delete-backward})。
+@item u
+取消删除当前消息，或返回到上一条已删除的消息并取消删除 (@code{rmail-undelete-previous-message})。
+@item x
+删除 Rmail 文件 (@code{rmail-expunge})。
+@end table
+
+@kindex d @r{(Rmail)}
+@kindex C-d @r{(Rmail)}
+@findex rmail-delete-forward
+@findex rmail-delete-backward
+有两个 Rmail 命令用于删除邮件。  两者都删除当前消息并选择另一条消息。  @kbd{d} (@code{rmail-delete-forward}) 移动到下一条消息，跳过已删除的消息，而 @kbd{C-d} (@code{rmail-delete-backward}) 移动到上一条未删除的消息。  如果在指定方向上没有可移动到的未删除邮件，则刚刚删除的邮件将保持当前状态。  数字前缀参数用作重复计数，以允许在单个命令中删除多条消息。  否定参数颠倒了 @kbd{d} 和 @kbd{C-d} 的含义。
+
+@c mention other hooks, e.g., show message hook?
+@vindex rmail-delete-message-hook
+每当 Rmail 删除一条消息时，它都会运行钩子 @code{rmail-delete-message-hook}。  当调用钩子函数时，消息已被标记为删除，但它仍然是 Rmail 缓冲区中的当前消息。
+
+@cindex undeletion (Rmail)
+@kindex x @r{(Rmail)}
+@findex rmail-expunge
+@kindex u @r{(Rmail)}
+@findex rmail-undelete-previous-message
+要使所有已删除的邮件最终从 Rmail 文件中消失，请输入 @kbd{x} (@code{rmail-expunge})。  在执行此操作之前，您仍然可以@dfn{undelete}删除的消息。  取消删除命令 @kbd{u} (@code{rmail-undelete-previous-message}) 旨在在大多数情况下取消 @kbd{d} 命令的效果。  如果当前消息被删除，它会取消删除当前消息。  否则，它将向后移动到以前的消息，直到找到已删除的消息，并取消删除该消息。  数字前缀参数用作重复计数，以允许在单个命令中取消删除多条消息。
+
+您通常可以使用 @kbd{u} 撤消 @kbd{d}，因为 @kbd{u} 会移回并取消删除 @kbd{d} 删除的消息。  但是，当 @kbd{d} 跳过被删除消息后面的一些已删除消息时，这不起作用；然后 @kbd{u} 命令会取消删除最后一条被跳过的消息。  没有干净的方法可以避免这个问题。  但是，通过重复 @kbd{u} 命令，您最终可以返回到要取消删除的消息。  您还可以使用 @kbd{M-p} 命令选择特定已删除的消息，然后输入 @kbd{u} 将其取消删除。
+
+已删除的消息具有 @samp{deleted} 属性，因此当当前消息被删除时，@samp{deleted} 会出现在模式行中。  事实上，删除或取消删除一条消息无非就是添加或删除这个属性。  @xref{Rmail Attributes}。
+
+@node Rmail Inbox
+@section Rmail 文件和收件箱
+@cindex inbox file
+
+当您在本地接收邮件时，操作系统会将您收到的邮件放置在我们称为您的 @dfn{inbox} 的文件中。  当您启动 Rmail 时，它会运行一个名为 @command{movemail} 的 C 程序，将新邮件从收件箱复制到主 Rmail 文件中，该文件还包含从以前的 Rmail 会话保存的其他邮件。  您实际上是在这个文件中使用 Rmail 阅读邮件的。  这个操作称为@dfn{getting new mail}。  您可以随时在 Rmail 中输入 @kbd{g} 获取新邮件。
+
+@vindex rmail-primary-inbox-list
+@cindex @env{MAIL} environment variable
+变量 @code{rmail-primary-inbox-list} 包含主 Rmail 文件收件箱中的文件列表。  如果您没有显式设置此变量，Rmail 将使用 @env{MAIL} 环境变量，或者作为最后的手段，使用基于 @code{rmail-spool-directory} 的默认收件箱。  默认收件箱文件取决于您的操作系统；通常是 @file{/var/mail/@var{username}}、@file{/var/spool/mail/@var{username}} 或 @file{/usr/spool/mail/@var{username}}。
+
+您可以使用命令 @code{set-rmail-inbox-list} 为当前会话的任何 Rmail 文件指定收件箱文件；参见@ref{Rmail Files}。
+
+拥有单独的 Rmail 文件和收件箱有两个原因。
+
+@enumerate
+@item
+收件箱文件格式因操作系统和所使用的其他邮件软件而异。  Rmail 中只有一部分需要了解替代方案，并且它只需要了解如何将所有替代方案转换为 Rmail 自己的格式。
+
+@item
+访问收件箱文件而不会有丢失邮件的危险是非常麻烦的，因为需要与邮件传递联锁。此外，不同的操作系统使用不同的互锁技术。  将邮件从收件箱一次性移出到单独的 Rmail 文件中的策略避免了在 Rmail 的所有其余部分中进行互锁的需要，因为只有 Rmail 对 Rmail 文件进行操作。
+@end enumerate
+
+@cindex mbox files
+@vindex rmail-mbox-format
+Rmail 使用 Unix 和 GNU 系统为收件箱文件引入的标准 @samp{mbox} 格式作为 Rmail 文件的内部格式。 （事实上​​，mbox 格式有一些略有不同。差异并不是很重要，但是您可以设置变量 @code{rmail-mbox-format} 来告诉 Rmail 您的系统使用哪种格式。有关更多详细信息，请参阅该变量的文档。）
+
+@vindex rmail-preserve-inbox
+当收到新邮件时，Rmail首先将新邮件从收件箱文件复制到Rmail文件中；然后保存Rmail文件；然后它会清除收件箱文件。  这样，系统崩溃可能会导致收件箱和 Rmail 文件之间出现重复邮件，但不会丢失邮件。  如果@code{rmail-preserve-inbox}非@code{nil}，则Rmail收到新邮件时不会清除收件箱文件。  例如，您可能希望在旅行时用来通过 POP 检查邮件的便携式计算机上进行此项设置，以便您的邮件将保留在服务器上，并且稍后可以将其保存在主桌面工作站上。
+
+在某些情况下，Rmail 会间接从收件箱文件复制新邮件。  首先，它运行 @command{movemail} 程序，将邮件从收件箱移动到名为 @file{.newmail-@var{inboxname}} 的中间文件，与 Rmail 文件位于同一目录中。  然后 Rmail 合并该文件中的新邮件，保存 Rmail 文件，然后删除中间文件。  如果在错误的时间发生崩溃，该文件将继续存在，并且 Rmail 下次从该收件箱收到新邮件时将再次使用它。
+
+如果 Rmail 无法将 @file{.newmail-@var{inboxname}} 中的数据转换为 mbox 格式，它会将文件重命名为 ⁣​​1⁣（@var{n} 是选择的整数，以使名称唯一），以便 Rmail 不会再次遇到数据问题。  您应该查看该文件，找到任何令 Rmail 感到困惑的消息（可能包含控制下划线字符、八进制代码 037），然后将其删除。  然后您可以使用@kbd{1 g}从更正后的文件中获取新邮件。
+
+@node Rmail Files
+@section 多个 Rmail 文件
+
+Rmail 默认在您的 @dfn{primary Rmail file} 上运行，其名称为 @file{~/RMAIL}，并从系统收件箱文件接收传入的邮件。但您也可以拥有其他 Rmail 文件并使用 Rmail 对其进行编辑。  这些文件可以通过它们自己的收件箱接收邮件，或者您可以使用显式 Rmail 命令将邮件移入其中 (@pxref{Rmail Output})。
+
+@table @kbd
+@item i @var{file} @key{RET}
+将 @var{file} 读入 Emacs 并在其上运行 Rmail (@code{rmail-input})。
+@ignore
+@item M-x set-rmail-inbox-list @key{RET} @var{files} @key{RET}
+Specify inbox file names for current Rmail file to get mail from.
+@end ignore
+@item g
+合并当前 Rmail 文件收件箱中的新邮件 (@code{rmail-get-new-mail})。
+@item C-u g @var{file} @key{RET}
+合并收件箱文件中的新邮件@var{file}。
+@end table
+
+@kindex i @r{(Rmail)}
+@findex rmail-input
+要在主 Rmail 文件以外的文件上运行 Rmail，您可以在 Rmail 中使用 @kbd{i} (@code{rmail-input}) 命令。  这会以 Rmail 模式访问该文件。  即使不在 Rmail 中，您也可以使用 @kbd{M-x rmail-input}，但输入 @kbd{C-u M-x rmail} 更容易，它可以完成相同的操作。
+
+您使用 @kbd{i} 读取的文件通常应该是有效的 mbox 文件。如果不是，Rmail 会尝试将其文本转换为 mbox 格式，并访问缓冲区中转换后的文本。  如果保存缓冲区，则会转换文件。
+
+如果指定的文件名不存在，@kbd{i} 会初始化一个新缓冲区以创建新的 Rmail 文件。
+
+@vindex rmail-secondary-file-directory
+@vindex rmail-secondary-file-regexp
+您还可以从菜单中选择 Rmail 文件。  在“分类”菜单中，选择“输入 Rmail 文件”项；然后选择您想要的 Rmail 文件。变量@code{rmail-secondary-file-directory}和@code{rmail-secondary-file-regexp}指定在菜单中提供哪些文件：第一个变量表示在哪个目录中找到它们；第二个表示要提供该目录中的哪些文件（所有与正则表达式匹配的文件）。  如果没有文件匹配，则无法选择此菜单项。  这些变量也适用于选择输出文件 (@pxref{Rmail Output})。
+@c FIXME matches only checked when Rmail file first visited?
+
+@c This is commented out because we want to advertise rmail-inbox-list
+@c instead.
+@ignore
+@findex set-rmail-inbox-list
+  Each Rmail file can contain a list of inbox file names; you can specify
+this list with @kbd{M-x set-rmail-inbox-list @key{RET} @var{files}
+@key{RET}}.  The argument can contain any number of file names, separated
+by commas.  It can also be empty, which specifies that this file should
+have no inboxes.  Once you specify a list of inboxes in an Rmail file,
+the  Rmail file remembers it permanently until you specify a different list.
+@end ignore
+
+@vindex rmail-inbox-list
+要使用的收件箱文件由变量 @code{rmail-inbox-list} 指定，该变量在 Rmail 模式下是本地缓冲区。  作为一个特殊的例外，如果您没有为主 Rmail 文件指定收件箱文件，它将使用 @env{MAIL} 环境变量或您的标准系统收件箱。
+
+@kindex g @r{(Rmail)}
+@findex rmail-get-new-mail
+@kbd{g} 命令 (@code{rmail-get-new-mail}) 将邮件从收件箱合并到当前 Rmail 文件中。  如果 Rmail 文件没有收件箱，@kbd{g} 不执行任何操作。  命令 @kbd{M-x rmail} 还将新邮件合并到您的主 Rmail 文件中。
+
+@cindex merge mail from file (Rmail)
+要合并来自非常用收件箱的文件的邮件，请为 @kbd{g} 键指定一个数字参数，如 @kbd{C-u g} 所示。  然后它读取文件名并合并该文件中的邮件。  当使用带有参数的 @kbd{g} 时，收件箱文件不会被删除或以任何方式更改。  因此，这是将一个消息文件合并到另一个消息文件中的通用方法。
+
+@node Rmail Output
+@section 将消息复制到文件中
+
+这些命令将消息从 Rmail 文件复制到另一个文件中。
+
+@table @kbd
+@item o @var{file} @key{RET}
+将当前消息的完整副本附加到文件@var{file} (@code{rmail-output})。
+
+@item C-o @var{file} @key{RET}
+将显示的当前消息的副本附加到文件@var{file} (@code{rmail-output-as-seen})。
+
+@item w @var{file} @key{RET}
+仅将消息正文输出到文件 @var{file}，并使用消息 @samp{Subject} 标头中的默认文件名。
+@end table
+
+@kindex o @r{(Rmail)}
+@findex rmail-output
+@kindex C-o @r{(Rmail)}
+@findex rmail-output-as-seen
+命令@kbd{o}和@kbd{C-o}将当前消息复制到指定文件中，并将其添加到末尾。  正前缀参数用作重复计数：许多连续消息将被复制到指定文件，从当前消息开始并忽略已删除的消息。
+
+这两个命令的主要区别在于复制的数量：@kbd{o}复制完整的消息标题，即使它们并不全部可见，而@kbd{C-o}则精确复制当前显示的标题，不再复制。 @xref{Rmail Display}。  此外，如果文件是 Babyl 格式，@kbd{o} 会将消息转换为 Babyl 格式（Emacs 版本 22 及之前的 Rmail 使用）； @kbd{C-o} 根本无法输出到 Babyl 文件。
+@c FIXME remove BABYL mention in some future version?
+
+如果当前在 Emacs 缓冲区中访问输出文件，则输出命令会将消息附加到该缓冲区。  最终由您将缓冲区保存在其文件中。
+
+@kindex w @r{(Rmail)}
+@findex rmail-output-body-to-file
+有时您可能会收到一条消息，其正文包含文件的内容。  您可以使用 @kbd{w} 命令 (@code{rmail-output-body-to-file}) 将正文保存到文件（不包括消息头）。  这些消息通常在 @samp{Subject} 字段中包含预期的文件名，因此 @kbd{w} 命令使用 @samp{Subject} 字段作为输出文件名的默认值（在替换文件名中无法移植的一些字符之后）。  但是，文件名是使用迷你缓冲区读取的，因此您可以根据需要指定不同的名称。
+
+您还可以将消息输出到通过菜单选择的 Rmail 文件。在 Classify 菜单中，选择 Output Rmail File 菜单项；然后选择您想要的 Rmail 文件。  这会将当前消息输出到该文件，如 @kbd{o} 命令。  变量 @code{rmail-secondary-file-directory} 和 @code{rmail-secondary-file-regexp} 指定在菜单中提供哪些文件：第一个变量表示在哪个目录中找到它们；第二个表示要提供该目录中的哪些文件（所有与正则表达式匹配的文件）。  如果没有文件匹配，则无法选择此菜单项。
+
+使用 @kbd{o} 或 @kbd{C-o} 复制消息会为消息的原始副本提供 @samp{filed} 属性，以便当此类消息处于当前状态时，@samp{filed} 会出现在模式行中。
+
+@vindex rmail-delete-after-output
+如果您只想保留每封邮件的单个副本，请将变量 @code{rmail-delete-after-output} 设置为 @code{t}；然后@kbd{o}、@kbd{C-o}和@kbd{w}命令在复制后删除原始消息。  （如果您愿意，您可以在之后取消删除它，请参阅@ref{Rmail Deletion}。）
+
+@vindex rmail-output-reset-deleted-flag
+默认情况下，@kbd{o}将保留其输出的消息的已删除状态，就像原始消息一样；因此，在输出之前删除的消息将在输出文件中显示为已删除。将变量 @code{rmail-output-reset-deleted-flag} 设置为非 @code{nil} 值会抵消：消息的副本将重置其已删除状态，因此该消息将在输出文件中显示为未删除。  此外，当该变量为非@code{nil}时，为@kbd{o}指定正参数在查找要输出的连续消息时不会忽略已删除的消息。
+
+@vindex rmail-output-file-alist
+变量 @code{rmail-output-file-alist} 允许您根据当前消息的内容指定输出文件的智能默认值。  该值应该是一个列表，其元素具有以下形式：
+
+@example
+(@var{regexp} . @var{name-exp})
+@end example
+
+@noindent
+如果当前消息中存在@var{regexp}匹配，则输出的默认文件名是@var{name-exp}。  如果多个元素与消息匹配，则第一个匹配元素决定默认文件名。  子表达式 2⁣ 可以是给出要使用的文件名的字符串常量，或者更一般地，它可以是产生字符串形式的文件名的任何 Lisp 表达式。  @code{rmail-output-file-alist}适用于@kbd{o}和@kbd{C-o}。
+
+@vindex rmail-automatic-folder-directives
+Rmail 可以根据变量 @code{rmail-automatic-folder-directives} 的值自动将消息从主 Rmail 文件（@code{rmail-file-name} 指定的文件）保存到其他文件。该变量是一个元素列表 (@samp{directives})，用于说明将哪些消息保存在何处。  每个指令都是一个由输出文件组成的列表，后跟一对或多对标头名称和正则表达式。  如果消息的标头与指定的正则表达式匹配，则该消息将保存到给定文件中。  如果指令有多个标头条目，则所有标头条目都必须匹配。  当 Rmail 显示来自文件 @code{rmail-file-name} 的消息时，它会检查指令，并应用第一个匹配的指令（如果有）。  如果输出文件为@code{nil}，则消息将被删除，而不是保存。  例如，您可以使用此功能将来自特定地址或具有特定主题的邮件保存到专用文件中。
+
+@node Rmail Labels
+@section 标签
+@cindex label (Rmail)
+@cindex attribute (Rmail)
+
+每条消息都可以分配不同的 @dfn{labels} 作为分类手段。  每个标签都有一个名称；不同的名字是不同的标签。  任何给定的标签在特定消息上要么存在，要么不存在。  一些标签名称具有标准含义，并在适当的时候由 Rmail 自动赋予邮件；这些特殊标签称为@dfn{attributes}。
+@ifnottex
+(@xref{Rmail Attributes}.)
+@end ifnottex
+所有其他标签仅由用户分配。
+
+@table @kbd
+@item a @var{label} @key{RET}
+将标签 @var{label} 分配给当前消息 (@code{rmail-add-label})。
+@item k @var{label} @key{RET}
+从当前消息 (@code{rmail-kill-label}) 中删除标签 @var{label}。
+@item C-M-n @var{labels} @key{RET}
+移至具有标签 @var{labels} (@code{rmail-next-labeled-message}) 之一的下一条消息。
+@item C-M-p @var{labels} @key{RET}
+移至具有标签 @var{labels} (@code{rmail-previous-labeled-message}) 之一的上一条消息。
+@item l @var{labels} @key{RET}
+@itemx C-M-l @var{labels} @key{RET}
+对包含任何标签 @var{labels} (@code{rmail-summary-by-labels}) 的所有消息进行摘要。
+@end table
+
+@kindex a @r{(Rmail)}
+@kindex k @r{(Rmail)}
+@findex rmail-add-label
+@findex rmail-kill-label
+@kbd{a} (@code{rmail-add-label}) 和@kbd{k} (@code{rmail-kill-label}) 命令允许您分配或删除当前消息上的任何标签。  如果@var{label}参数为空，则表示分配或删除最近分配或删除的标签。
+
+一旦您给了邮件标签并根据需要对其进行分类，就可以通过三种方式使用这些标签：移动、摘要和排序。
+
+@kindex C-M-n @r{(Rmail)}
+@kindex C-M-p @r{(Rmail)}
+@findex rmail-next-labeled-message
+@findex rmail-previous-labeled-message
+@kbd{C-M-n @var{labels} @key{RET}} (@code{rmail-next-labeled-message}) 移动到具有标签 @var{labels} 之一的下一条消息。  参数 @var{labels} 指定一个或多个标签名称，以逗号分隔。  @kbd{C-M-p} (@code{rmail-previous-labeled-message}) 类似，但向后移动到之前的消息。  任一命令的数字参数用作重复计数。
+
+命令 @kbd{C-M-l @var{labels} @key{RET}} (@code{rmail-summary-by-labels}) 显示仅包含至少具有一组指定标签的消息的摘要。  参数 @var{labels} 是一个或多个标签名称，以逗号分隔。 @xref{Rmail Summary}，有关摘要的信息。
+
+如果 @kbd{C-M-n}、@kbd{C-M-p} 或 @kbd{C-M-l} 的 @var{labels} 参数为空，则表示使用为这些命令中的任何一个指定的最后一组标签。
+
+@xref{Rmail Sorting}，有关使用标签对消息进行排序的信息。
+
+@node Rmail Attributes
+@section Rmail 属性
+
+有些标签如@samp{deleted}和@samp{filed}具有内置含义，Rmail会在适当的时候自动将它们分配给邮件；这些标签称为 @dfn{attributes}。  以下是 Rmail 属性列表：
+
+@table @samp
+@item unseen
+意味着该消息从未是最新的。  当消息来自收件箱文件时分配给消息，并在消息成为当前消息时删除。  当您启动 Rmail 时，它首先显示具有此属性的第一条消息。
+@item deleted
+表示该消息已被删除。  由删除命令分配并由取消删除命令删除 (@pxref{Rmail Deletion})。
+@item filed
+意味着消息已被复制到其他文件中。  由 @kbd{o} 和 @kbd{C-o} 文件输出命令 (@pxref{Rmail Output}) 分配。
+@item answered
+意味着您已经邮寄了对该消息的答复。  由 @kbd{r} 命令 (@code{rmail-reply}) 分配。  @xref{Rmail Reply}。
+@item forwarded
+表示您已转发该消息。  由 @kbd{f} 命令 (@code{rmail-forward}) 分配。  @xref{Rmail Reply}。
+@item edited
+表示您已在 Rmail 中编辑了邮件文本。 @xref{Rmail Editing}。
+@item resent
+表示您已重新发送该消息。  由命令@kbd{M-x rmail-resend}分配。  @xref{Rmail Reply}。
+@item retried
+表示您已重试发送失败的消息。  由命令@kbd{M-x rmail-retry-failure}分配。  @xref{Rmail Reply}。
+@end table
+
+所有其他标签仅由用户分配或删除，并且没有标准含义。
+
+@node Rmail Reply
+@section 发送回复
+
+Rmail 有几个用于发送外发邮件的命令。  @xref{Sending Mail}，有关使用消息模式的信息，包括与 Rmail 配合使用的某些功能。  本节记录的是 Rmail 的特殊命令，用于输入用于撰写外发消息的邮件缓冲区。  请注意，用于发送邮件的常用键——@kbd{C-x m}、@kbd{C-x 4 m}和@kbd{C-x 5 m}——在 Rmail 模式下也可以正常工作。
+
+@table @kbd
+@item m
+发送消息 (@code{rmail-mail})。
+@item c
+继续编辑已开始的外发消息 (@code{rmail-continue})。
+@item r
+发送对当前 Rmail 消息的回复 (@code{rmail-reply})。
+@item f
+将当前消息转发给其他用户 (@code{rmail-forward})。
+@item C-u f
+将当前消息重新发送给其他用户 (@code{rmail-resend})。
+@item M-m
+尝试第二次发送退回的消息 (@code{rmail-retry-failure})。
+@end table
+
+@kindex r @r{(Rmail)}
+@findex rmail-reply
+@cindex reply to a message
+在 Rmail 中发送消息的最常见原因是回复您正在阅读的消息。  为此，请输入 @kbd{r} (@code{rmail-reply})。  这会在另一个窗口中显示邮件撰写缓冲区，与 @kbd{C-x 4 m} 非常相似，但会根据您要回复的消息预初始化 @samp{Subject}、@samp{To}、@samp{CC}、@samp{In-Reply-To} 和 @samp{References} 标头字段。  @samp{To} 字段以发送您收到的消息的人的地址开始，@samp{CC} 字段以该消息的所有其他收件人开始。
+
+@vindex rmail-re-abbrevs
+@vindex rmail-reply-prefix
+@vindex mail-re-regexps
+@samp{Subject}头字段可以包含@samp{Re:}的一个或多个实例或其局部变体。  如果它们匹配 @code{rmail-re-abbrevs} （从 @code{mail-re-regexps} 初始化），它们就会被删除，并且 @code{rmail-reply-prefix} 会被添加到前面。
+
+@vindex mail-dont-reply-to-names
+您可以使用变量 @code{mail-dont-reply-to-names} 排除某些收件人自动包含在回复中。  它的值应该是一个正则表达式；任何匹配的收件人都会从 @samp{CC} 字段中排除。  它们也被排除在 @samp{To} 字段之外，除非这会使该字段留空。  如果此变量是 @code{nil}，那么您第一次撰写回复时，它会被初始化为与您自己的地址匹配的默认值。
+
+要仅回复原始消息的发件人，请输入带有数字参数的回复命令：@kbd{C-u r} 或 @kbd{1 r}。对于特定回复，这完全省略了 @samp{CC} 字段。
+
+邮件撰写缓冲区初始化后，编辑和发送邮件将照常进行 (@pxref{Sending Mail})。  如果预先提供的标题字段不是您想要的，您可以对其进行编辑。  您还可以使用 @kbd{C-c C-y} 等命令，该命令会拉入您正在回复的消息 (@pxref{Mail Commands})。  您还可以切换到 Rmail 缓冲区，在那里选择不同的消息，切换回来，然后拉出新的当前消息。
+
+@kindex M-m @r{(Rmail)}
+@findex rmail-retry-failure
+@cindex retrying a failed message
+@vindex rmail-retry-ignored-headers
+有时消息无法到达目的地。  邮寄程序通常会将失败的消息发送回给您，并用 @dfn{failure message} 括起来。  Rmail 命令@kbd{M-m} (@code{rmail-retry-failure}) 准备第二次发送相同的消息：它设置一个邮件撰写缓冲区，其中包含与以前相同的文本和标题字段。  如果您立即输入 @kbd{C-c C-c}，您将再次发送与第一次完全相同的消息。  或者，您可以编辑文本或标题，然后发送。  变量 @code{rmail-retry-ignored-headers} 与 @code{rmail-ignored-headers} (@pxref{Rmail Display}) 格式相同，控制重试时从失败消息中删除哪些标头。
+
+@kindex f @r{(Rmail)}
+@findex rmail-forward
+@cindex forwarding a message
+在 Rmail 中发送邮件的另一个常见原因是将当前消息@dfn{forward}发送给其他用户。  @kbd{f} (@code{rmail-forward}) 通过使用当前消息作为文本以及 @code{[@var{from}: @var{subject}]} 形式的主题来预初始化邮件撰写缓冲区，从而使此操作变得简单，其中 @var{from} 和 @var{subject} 是原始消息的发件人和主题。  您所要做的就是填写收件人并发送。  当您转发邮件时，收件人会收到一封来自您的邮件，其中包含原始邮件的内容。
+
+@vindex rmail-enable-mime-composing
+@findex unforward-rmail-message
+Rmail 提供两种转发消息的格式。  默认使用 MIME 格式 (@pxref{Rmail Display})。  这包括作为单独部分的原始消息。  如果您愿意，可以通过将变量 @code{rmail-enable-mime-composing} 设置为 @code{nil} 来使用更简单的格式。  在这种情况下，Rmail 仅包含包含在两个分隔符行之间的原始消息。  它还通过在行的开头插入 @w{@samp{- }} 来修改以破折号开头的每一行。  当您收到这种格式的转发消息时，如果它包含普通文本之外的内容（例如程序源代码），您可能会发现撤消该转换很有用。  您可以通过选择转发的消息并输入 @kbd{M-x unforward-rmail-message} 来完成此操作。  此命令提取原始转发的消息，删除插入的 @w{@samp{- }} 字符串，并将其作为紧随当前消息的单独消息插入到 Rmail 文件中。
+
+@findex rmail-resend
+@dfn{Resending} 是类似于转发的替代方案；不同之处在于，重新发送会发送一条来自原始发件人的消息，就像它到达您时一样 — 添加了一些标头字段（@samp{Resent-From} 和 @samp{Resent-To}）以表明它是通过您发送的。  要在 Rmail 中重新发送消息，请使用@kbd{C-u f}。  （@kbd{f} 运行 @code{rmail-forward}，如果您提供数字参数，它会调用 @code{rmail-resend}。）
+
+@kindex m @r{(Rmail)}
+@findex rmail-mail
+使用 @kbd{m} (@code{rmail-mail}) 命令开始编辑非回复的外发消息。  它将标头字段留空。它与 @kbd{C-x 4 m} 的唯一区别在于，它使 @kbd{C-c C-y} 可以访问 Rmail 缓冲区，就像 @kbd{r} 一样。
+@ignore
+@c Not a good idea, because it does not include Reply-To etc.
+Thus, @kbd{m} can be used to reply to or forward a message; it can do
+anything @kbd{r} or @kbd{f} can do.
+@end ignore
+
+@kindex c @r{(Rmail)}
+@findex rmail-continue
+@kbd{c} (@code{rmail-continue}) 命令恢复编辑邮件撰写缓冲区，完成编辑您已撰写的外发邮件，或更改您已发送的邮件。
+
+@vindex rmail-mail-new-frame
+如果将变量 @code{rmail-mail-new-frame} 设置为非 @code{nil} 值，则开始发送消息的所有 Rmail 命令都会创建一个新框架来编辑该消息。当您发送消息时，该框架将被删除（但如果它是当前显示器上唯一可见的框架，或者如果它是文本模式框架，则不会删除）。  如果在发送消息时无法删除此框架，Emacs 将尝试重用它来撰写后续消息。
+@ignore
+@c FIXME does not work with Message -> Kill Message
+, or when you use the @samp{Cancel} item in the @samp{Mail} menu.
+@end ignore
+
+所有发送消息的 Rmail 命令都使用您选择的邮件撰写方法 (@pxref{Mail Methods})。
+
+@node Rmail Summary
+@section 摘要
+@cindex summary (Rmail)
+
+@dfn{summary} 是一个缓冲区，每条消息包含一行，可让您概览 Rmail 文件中的邮件。  每行显示邮件编号和日期、发件人、行数、标签和主题。  当您移动到摘要行时，在摘要缓冲区中移动点会选择消息。  几乎所有 Rmail 命令在摘要缓冲区中也有效；当在那里使用时，它们适用于摘要的当前行描述的消息。
+
+摘要缓冲区仅适用于单个 Rmail 文件；如果您正在编辑多个 Rmail 文件，每个文件都可以有自己的摘要缓冲区。摘要缓冲区名称是通过将 @samp{-summary} 附加到 Rmail 缓冲区名称来创建的。  通常一次仅显示一个摘要缓冲区。
+
+@menu
+* Rmail Make Summary::        进行各种总结。
+* Rmail Summary Edit::        操作摘要中的消息。
+@end menu
+
+@node Rmail Make Summary
+@subsection 做总结
+
+以下是为当前 Rmail 缓冲区创建摘要的命令。  一旦 Rmail 缓冲区有了摘要，Rmail 缓冲区中的更改（例如删除或清除邮件以及获取新邮件）会自动更新摘要。
+
+@table @kbd
+@item h
+@itemx C-M-h
+总结所有消息 (@code{rmail-summary})。
+@item l @var{labels} @key{RET}
+@itemx C-M-l @var{labels} @key{RET}
+汇总具有一个或多个指定标签 (@code{rmail-summary-by-labels}) 的消息。
+@item C-M-r @var{rcpts} @key{RET}
+汇总与指定收件人匹配的邮件 (@code{rmail-summary-by-recipients})。
+@item C-M-t @var{topic} @key{RET}
+汇总在其主题 (@code{rmail-summary-by-topic}) 中与指定正则表达式 @var{topic} 匹配的消息。
+@item C-M-s @var{regexp} @key{RET}
+汇总标头与指定正则表达式@var{regexp} (@code{rmail-summary-by-regexp}) 匹配的消息。
+@item C-M-f @var{senders} @key{RET}
+汇总与指定发件人匹配的邮件。 (@code{rmail-summary-by-senders})。
+@end table
+
+@kindex h @r{(Rmail)}
+@findex rmail-summary
+@kbd{h} 或 @kbd{C-M-h} (@code{rmail-summary}) 命令用缓冲区中所有消息的摘要填充当前 Rmail 缓冲区的摘要缓冲区。然后它在另一个窗口中显示并选择摘要缓冲区。
+
+@kindex l @r{(Rmail)}
+@kindex C-M-l @r{(Rmail)}
+@findex rmail-summary-by-labels
+@kbd{C-M-l @var{labels} @key{RET}} (@code{rmail-summary-by-labels}) 进行部分摘要，仅提及具有一个或多个标签 @var{labels} 的消息。  @var{labels} 应包含以逗号分隔的标签名称。
+
+@kindex C-M-r @r{(Rmail)}
+@findex rmail-summary-by-recipients
+@kbd{C-M-r @var{rcpts} @key{RET}} (@code{rmail-summary-by-recipients}) 进行部分摘要，仅提及具有一个或多个与正则表达式 @var{rcpts} 匹配的收件人的邮件。  这与 @samp{To}、@samp{From} 和 @samp{CC} 标头匹配（提供前缀参数以排除 @samp{CC} 标头）。
+
+@kindex C-M-t @r{(Rmail)}
+@findex rmail-summary-by-topic
+@kbd{C-M-t @var{topic} @key{RET}} (@code{rmail-summary-by-topic}) 进行部分摘要，仅提及其主题与正则表达式 @var{topic} 匹配的消息。  使用前缀参数，匹配的是整个消息，而不仅仅是主题。
+
+@kindex C-M-s @r{(Rmail)}
+@findex rmail-summary-by-regexp
+@kbd{C-M-s @var{regexp} @key{RET}} (@code{rmail-summary-by-regexp}) 进行部分摘要，仅提及标题（包括日期和主题行）与正则表达式 @var{regexp} 匹配的邮件。
+
+@kindex C-M-f @r{(Rmail)}
+@findex rmail-summary-by-senders
+@kbd{C-M-f @var{senders} @key{RET}} (@code{rmail-summary-by-senders}) 进行部分摘要，仅提及 @samp{From} 字段与正则表达式 @var{senders} 匹配的消息。
+
+请注意，任何 Rmail 缓冲区都只有一个摘要缓冲区；进行任何类型的摘要都会丢弃任何先前的摘要。
+
+@vindex rmail-summary-window-size
+@vindex rmail-summary-line-count-flag
+变量 @code{rmail-summary-window-size} 表示摘要窗口使用多少行。  变量 @code{rmail-summary-line-count-flag} 控制消息的摘要行是否应包括消息的行数。  将此选项设置为 @code{nil} 可能会加快摘要的生成速度。
+
+@vindex rmail-summary-sender-function
+@vindex rmail-summary-recipient-function
+Rmail 使用选项 @code{rmail-summary-sender-function} 和 @code{rmail-summary-recipient-function} 设置摘要行中发件人和收件人字段的格式。  对于发件人，可能的值包括显示地址（默认）或显示发件人姓名并回退到地址。  对于收件人，可能的值包括显示 @samp{To:} 字段第一行的地址（默认值）、显示第一个收件人姓名并回退到地址，或显示所有收件人姓名并回退到地址。这两个选项也可以设置为自定义功能。
+
+@vindex rmail-summary-address-width
+选项 @code{rmail-summary-address-width} 控制这些字段的宽度。
+
+@node Rmail Summary Edit
+@subsection 编辑摘要
+
+您可以使用 Rmail 摘要缓冲区执行几乎在 Rmail 缓冲区本身中可以执行的任何操作。  事实上，一旦有了摘要缓冲区，就无需切换回 Rmail 缓冲区。
+
+您可以从摘要缓冲区中选择并显示 Rmail 缓冲区中的各种消息，只需将摘要缓冲区中的点移动到不同的行即可。  使用什么 Emacs 命令来移动点并不重要；无论命令末尾出现哪个行点，都会在 Rmail 缓冲区中选择该消息。
+
+@vindex rmail-summary-scroll-between-messages
+几乎所有 Rmail 命令都在摘要缓冲区和 Rmail 缓冲区中工作。  因此，摘要缓冲区中的@kbd{d}删除当前消息，@kbd{u}取消删除，@kbd{x}删除。  （但是，在摘要缓冲区中，如果相关方向上不再有未删除的消息，则删除命令将转到第一条或最后一条消息，而不是停留在当前消息上。） @kbd{o} 和 @kbd{C-o} 将当前消息输出到 FILE ； @kbd{r} 开始回复；您可以使用 @key{SPC} 和 @key{DEL} 滚动当前消息，同时保留在摘要缓冲区中。  然而，在摘要缓冲区中，滚动经过带有 @key{SPC} 或 @key{DEL} 的消息的结尾或开头，分别会转到下一条或上一条未删除的消息。  将 @code{rmail-summary-scroll-between-messages} 选项自定义为 @code{nil} 以禁用滚动到下一条/上一条消息。
+
+@findex rmail-summary-undelete-many
+@kbd{M-u} (@code{rmail-summary-undelete-many}) 取消删除摘要中所有已删除的消息。  前缀参数意味着取消删除许多以前删除的消息。
+
+在消息之间移动的 Rmail 命令也可以在摘要缓冲区中工作，但有一点不同：它们在摘要中包含的消息集中移动。  它们还确保 Rmail 缓冲区出现在​​屏幕上（与光标移动命令不同，光标移动命令更新 Rmail 缓冲区的内容，但不会在窗口中显示它，除非它已经出现）。以下是这些命令的列表：
+
+@table @kbd
+@item n
+移至下一行，跳过显示“已删除”的行，然后选择其消息 (@code{rmail-summary-next-msg})。
+@item p
+移至上一行，跳过显示“已删除”的行，然后选择其消息 (@code{rmail-summary-previous-msg})。
+@item M-n
+移至下一行并选择其消息 (@code{rmail-summary-next-all})。
+@item M-p
+移至上一行并选择其消息 (@code{rmail-summary-previous-all})。
+@item >
+移至最后一行，然后选择其消息 (@code{rmail-summary-last-message})。
+@item <
+移至第一行，然后选择其消息 (@code{rmail-summary-first-message})。
+@item j
+@itemx @key{RET}
+选择当前行上的消息（确保 Rmail 缓冲区出现在​​屏幕上；@code{rmail-summary-goto-msg}）。  使用参数 @var{n}，选择消息编号 @var{n} 并移至摘要缓冲区中的相应行；如果消息未在摘要缓冲区中列出，则这会发出错误信号。
+@item M-s @var{pattern} @key{RET}
+从当前消息开始在消息中搜索@var{pattern}；选择找到的消息，并将摘要缓冲区中的点移动到该消息的行 (@code{rmail-summary-search})。  前缀参数充当重复计数；负参数意味着向后搜索（相当于@code{rmail-summary-search-backward}。）
+@item C-M-n @var{labels} @key{RET}
+移至至少具有一个指定标签 (@code{rmail-summary-next-labeled-message}) 的下一条消息。  @var{labels} 是逗号分隔的标签列表。  前缀参数充当重复计数。
+@item C-M-p @var{labels} @key{RET}
+移至至少具有一个指定标签 (@code{rmail-summary-previous-labeled-message}) 的上一条消息。
+@item C-c C-n @key{RET}
+移至与当前消息主题相同的下一条消息 (@code{rmail-summary-next-same-subject})。  前缀参数充当重复计数。
+@item C-c C-p @key{RET}
+移至与当前消息主题相同的上一条消息 (@code{rmail-summary-previous-same-subject})。
+@end table
+
+@vindex rmail-redisplay-summary
+当您在 Rmail 缓冲区中执行删除、取消删除和获取新邮件，甚至选择不同的邮件时，都会更新摘要缓冲区。  如果变量 @code{rmail-redisplay-summary} 不是 @code{nil}，这些操作也会将摘要缓冲区带回到屏幕上。
+
+@kindex Q @r{(Rmail summary)}
+@findex rmail-summary-wipe
+@kindex q @r{(Rmail summary)}
+@findex rmail-summary-quit
+@kindex b @r{(Rmail summary)}
+@findex rmail-summary-bury
+使用完摘要后，输入 @kbd{Q} (@code{rmail-summary-wipe}) 删除摘要缓冲区的窗口。  您还可以在摘要中退出 Rmail：@kbd{q} (@code{rmail-summary-quit}) 删除摘要窗口，然后通过保存 Rmail 文件并切换到另一个缓冲区来退出 Rmail。或者，@kbd{b} (@code{rmail-summary-bury}) 简单地隐藏 Rmail 摘要和缓冲区。
+
+@node Rmail Sorting
+@section 对 Rmail 文件进行排序
+@cindex sorting Rmail file
+@cindex Rmail file sorting
+
+@table @kbd
+@findex rmail-sort-by-date
+@item C-c C-s C-d
+@itemx M-x rmail-sort-by-date
+按日期对当前 Rmail 缓冲区中的邮件进行排序。
+
+@findex rmail-sort-by-subject
+@item C-c C-s C-s
+@itemx M-x rmail-sort-by-subject
+按主题对当前 Rmail 缓冲区中的邮件进行排序。
+
+@findex rmail-sort-by-author
+@item C-c C-s C-a
+@itemx M-x rmail-sort-by-author
+按作者姓名对当前 Rmail 缓冲区中的消息进行排序。
+
+@findex rmail-sort-by-recipient
+@item C-c C-s C-r
+@itemx M-x rmail-sort-by-recipient
+按收件人姓名对当前 Rmail 缓冲区中的邮件进行排序。
+
+@findex rmail-sort-by-correspondent
+@item C-c C-s C-c
+@itemx M-x rmail-sort-by-correspondent
+按对方的姓名对当前 Rmail 缓冲区中的邮件进行排序。
+
+@findex rmail-sort-by-lines
+@item C-c C-s C-l
+@itemx M-x rmail-sort-by-lines
+按行数对当前 Rmail 缓冲区中的邮件进行排序。
+
+@findex rmail-sort-by-labels
+@item C-c C-s C-k @key{RET} @var{labels} @key{RET}
+@itemx M-x rmail-sort-by-labels @key{RET} @var{labels} @key{RET}
+按标签对当前 Rmail 缓冲区中的邮件进行排序。  参数 @var{labels} 应该是以逗号分隔的标签列表。  这些标签的顺序指定了消息的顺序；带有第一个标签的消息排在第一位，带有第二个标签的消息排在第二位，依此类推。没有这些标签的消息排在最后。
+@end table
+
+Rmail 排序命令执行@emph{stable sort}：如果没有理由选择两封邮件中的任何一封，则它们的顺序保持不变。  您可以使用它来按多个标准进行排序。  例如，如果您使用@code{rmail-sort-by-date}，然后使用@code{rmail-sort-by-author}，来自同一作者的消息将按日期顺序显示。
+
+使用前缀参数，所有这些命令都会颠倒比较顺序。  这意味着它们按照从最新到最旧、从最大到最小或相反的字母顺序对消息进行排序。
+
+摘要缓冲区中的相同键运行类似的功能；例如，@kbd{C-c C-s C-l}运行@code{rmail-summary-sort-by-lines}。这些命令始终对整个 Rmail 缓冲区进行排序，即使摘要仅显示消息的子集。
+
+请注意，您无法撤消排序，因此您可能希望在排序之前保存 Rmail 缓冲区。
+
+@node Rmail Display
+@section 消息显示
+
+本节介绍 Rmail 如何显示邮件标头、@acronym{MIME} 部分和附件、URL 和加密消息。
+
+@table @kbd
+@item t
+切换完整标题的显示 (@code{rmail-toggle-header})。
+@end table
+
+@kindex t @r{(Rmail)}
+@findex rmail-toggle-header
+在第一次显示每条消息之前，Rmail 会重新格式化其标头，隐藏无用的标头字段以减少混乱。  @kbd{t} (@code{rmail-toggle-header}) 命令对此进行切换，在显示重新格式化的标头字段和显示完整的原始标头之间切换。  使用正前缀参数，该命令显示重新格式化的标头；使用零或负前缀参数，它显示完整的标头。  如有必要，再次选择该消息也会重新格式化它。
+
+@vindex rmail-ignored-headers
+@vindex rmail-displayed-headers
+@vindex rmail-nonignored-headers
+变量@code{rmail-ignored-headers}保存一个正则表达式，指定要隐藏的标头字段；任何匹配的标题行都将被隐藏。  变量 @code{rmail-nonignored-headers} 会覆盖这一点：匹配该正则表达式的任何标头字段都会显示，即使它也匹配 @code{rmail-ignored-headers} 也是如此。  变量@code{rmail-displayed-headers}是这两个变量的替代；如果非@code{nil}，这应该是一个正则表达式，指定要显示哪些标题（默认为@code{nil}）。
+
+@vindex rmail-highlighted-headers
+Rmail 突出显示某些特别有趣的标头字段 — 默认情况下为 @samp{From} 和 @samp{Subject} 字段。此突出显示使用 @code{rmail-highlight} 面。  变量@code{rmail-highlighted-headers}保存一个正则表达式，指定要突出显示的标题字段；如果它与标头字段的开头匹配，则整个字段都会突出显示。  要禁用此功能，请将 @code{rmail-highlighted-headers} 设置为 @code{nil}。
+
+@cindex MIME messages (Rmail)
+@vindex rmail-enable-mime
+如果邮件采用 @acronym{MIME}（多用途 Internet 邮件扩展）格式并包含多个部分（@acronym{MIME} 实体），Rmail 将使用 @dfn{tagline} 显示每个部分。  标语总结了该部分的索引、大小和内容类型。  根据内容类型，它还可能包含一个或多个按钮；这些执行操作，例如将零件保存到文件中。
+
+@vindex rmail-mime-save-action
+当您将 MIME 附件保存到文件时，Rmail 可以根据 @code{rmail-mime-save-action} 的值执行后续操作。  默认情况下，该值为@code{nil}，这意味着 Rmail 不执行任何操作。其他预定义值有：
+
+@table @code
+@item visit-file
+在 Emacs 中访问保存的文件。
+
+@item visit-directory
+访问 Dired 中的文件目录并将指针移至该文件。
+
+@item open-external
+使用适合其类型的外部程序打开该文件。
+@end table
+
+您还可以将 @code{rmail-mime-save-action} 设置为自定义函数。将使用已保存附件的绝对文件名作为唯一参数来调用此函数。
+
+@table @kbd
+@findex rmail-mime-toggle-hidden
+@item @key{RET}
+隐藏或显示点 (@code{rmail-mime-toggle-hidden}) 处的 @acronym{MIME} 部分。
+
+@findex rmail-mime-next-item
+@item @key{TAB}
+将点移动到下一个 @acronym{MIME} 标语按钮。 （@code{rmail-mime-next-item}）。
+
+@findex rmail-mime-previous-item
+@item S-@key{TAB}
+将点移动到前一个 @acronym{MIME} 部分 (@code{rmail-mime-previous-item})。
+
+@findex rmail-mime
+@item v
+@kindex v @r{(Rmail)}
+在 @acronym{MIME} 显示和原始消息 (@code{rmail-mime}) 之间切换。
+@end table
+
+每个纯文本 @acronym{MIME} 部分最初在其标语之后立即显示，作为 Rmail 缓冲区的一部分（除非消息有 @acronym{HTML} 部分，见下文），而其他类型的 @acronym{MIME} 部分仅由其标语表示，其实际内容被隐藏。  在任何一种情况下，您都可以通过在部件中的任意位置或其标语中的任意位置键入 @key{RET} （用于其他操作的按钮除外，如果有的话），可以在显示和隐藏状态之间切换 @acronym{MIME} 部件。  输入 @key{RET} （或用鼠标单击）激活标语按钮，然后输入 @key{TAB} 在标语按钮之间循环点。
+
+@kbd{v} (@code{rmail-mime}) 命令在上述默认 @acronym{MIME} 显示和显示未解码的 @acronym{MIME} 数据的原始显示之间切换。  使用前缀参数，此命令仅切换该点实体的显示。
+
+@vindex rmail-mime-prefer-html
+如果消息有 @acronym{HTML} @acronym{MIME} 部分，如果 Emacs 可以呈现 @acronym{HTML}@footnote{ This capability requires that Emacs be built with @file{libxml2} support or that you have the Lynx browser installed.}，Rmail 会优先显示它而不是纯文本部分。  为了防止这种情况发生，并显示纯文本部分，请将变量 @code{rmail-mime-prefer-html} 自定义为 @code{nil} 值。
+
+要防止 Rmail 处理 MIME 解码的消息，请将变量 @code{rmail-enable-mime} 更改为 @code{nil}。  在这种情况下，@kbd{v} (@code{rmail-mime}) 命令会创建一个临时缓冲区来显示当前的 @acronym{MIME} 消息。
+
+@findex rmail-epa-decrypt
+@cindex encrypted mails (reading in Rmail)
+如果当前消息是加密消息，请使用命令 @kbd{C-c C-d} (@code{rmail-epa-decrypt}) 使用 EasyPG 库 (@pxref{Top,, EasyPG, epa, EasyPG Assistant User's Manual}) 对其进行解密。
+
+您可以使用“转到地址”模式突出显示并激活 Rmail 缓冲区中的 URL：
+
+@c FIXME goto-addr.el commentary says to use goto-address instead.
+@example
+(add-hook 'rmail-show-message-hook 'goto-address-mode)
+@end example
+
+@noindent
+然后，您可以通过使用 @kbd{mouse-2}（或快速按 @kbd{mouse-1}）单击这些 URL 或移动到其中一个并键入 @kbd{C-c @key{RET}} 来浏览这些 URL。  @xref{Goto Address mode, Activating URLs, Activating URLs}。
+
+@node Rmail Coding
+@section Rmail 和编码系统
+
+@cindex decoding mail messages (Rmail)
+Rmail 自动解码包含非 0⁣ 字符的消息，就像 Emacs 对您访问的文件和子进程输出所做的那样。  Rmail 使用消息中的标准 @samp{charset=@var{charset}} 标头（如果有）来确定发件人如何对消息进行编码。  它将 @var{charset} 映射到相应的 Emacs 编码系统 (@pxref{Coding Systems})，并使用该编码系统来解码消息文本。  如果消息头没有 @samp{charset} 规范，或者 @var{charset} 无法识别，Rmail 将使用通常的 Emacs 启发式和默认值 (@pxref{Recognize Coding}) 选择编码系统。
+
+@cindex fixing incorrectly decoded mail messages
+有时，消息会被错误解码，这可能是因为 Emacs 在缺乏 @samp{charset} 规范的情况下猜测了错误的编码系统，或者是因为规范不准确。  例如，配置错误的邮件程序可能会发送带有 @samp{charset=iso-8859-1} 标头的消息，而该消息实际上是用 @code{koi8-r} 编码的。  当您看到消息文本出现乱码，或者某些字符显示为十六进制代码或空框时，可能已经发生了这种情况。
+
+@findex rmail-redecode-body
+如果您能找出或猜测哪一个是正确的，则可以通过使用正确的编码系统再次解码消息来纠正问题。  为此，请调用 @kbd{M-x rmail-redecode-body} 命令。它读取编码系统的名称，然后使用您指定的编码系统重新解码消息。  如果指定了正确的编码系统，结果应该是可读的。
+
+@vindex rmail-file-coding-system
+当您在 Rmail 中收到新邮件时，每封邮件都会根据其写入的编码系统自动进行翻译，就好像它是一个单独的文件一样。  这将使用您指定的编码系统的优先级列表。  如果 MIME 消息指定了字符集，Rmail 就会遵守该规范。  为了读取和保存 Rmail 文件本身，Emacs 使用变量 @code{rmail-file-coding-system} 指定的编码系统。  默认值为@code{nil}，这意味着 Rmail 文件不被翻译（它们以 Emacs 内部字符代码读取和写入）。
+
+@node Rmail Editing
+@section 在消息内编辑
+
+大多数常用的 Emacs 键绑定在 Rmail 模式下可用，但 Rmail 出于其他目的重新定义了一些键绑定，例如 @kbd{C-M-n} 和 @kbd{C-M-h}。  然而，Rmail 缓冲区通常是只读的，并且大多数信件被重新定义为 Rmail 命令。  如果要编辑邮件文本，则必须使用 Rmail 命令@kbd{e}。
+
+@table @kbd
+@item e
+将当前消息编辑为普通文本。
+@end table
+
+@kindex e @r{(Rmail)}
+@findex rmail-edit-current-message
+@kbd{e} 命令 (@code{rmail-edit-current-message}) 从 Rmail 模式切换到 Rmail 编辑模式，这是另一种主要模式，与文本模式几乎相同。  模式线指示了这种变化。
+
+@findex rmail-cease-edit
+@findex rmail-abort-edit
+在 Rmail 编辑模式下，信件照常插入，并且 Rmail 命令不可用。  您可以编辑消息正文和标题字段。  编辑完消息后，输入 @kbd{C-c C-c} (@code{rmail-cease-edit}) 切换回 Rmail 模式。或者，您可以返回 Rmail 模式，但通过键入 @kbd{C-c C-]} (@code{rmail-abort-edit}) 取消已完成的任何编辑。
+
+@vindex rmail-edit-mode-hook
+进入 Rmail 编辑模式运行钩子 @code{text-mode-hook}；然后它运行钩子 @code{rmail-edit-mode-hook} (@pxref{Hooks})。返回到普通 Rmail 模式会将属性 @samp{edited} 添加到消息中（如果您对其进行了任何更改）(@pxref{Rmail Attributes})。
+
+@node Rmail Digest
+@section 摘要消息
+@cindex digest message
+@cindex undigestify
+
+@dfn{digest message} 是一条消息，它的存在是为了包含并携带其他几个消息。  摘要用于某些邮件列表；在一段时间内（例如一天）到达列表的所有消息都会放入一个摘要中，然后发送给订阅者。  由于网络邮件传输中每条消息的开销，即使总大小相同，传输单个摘要所用的计算机时间也比传输单个消息要少。
+
+@findex undigestify-rmail-message
+当您收到摘要消息时，阅读它的最方便的方法是@dfn{undigestify}它：将其恢复为许多单独的消息。然后您可以根据需要阅读和删除各个消息。为此，请选择摘要消息并键入命令@kbd{M-x undigestify-rmail-message}。  这会将子消息提取为单独的 Rmail 消息，并将它们插入到摘要之后。  摘要消息本身被标记为已删除。
+
+@node Rmail Rot13
+@section 读取 Rot13 消息
+@cindex rot13 code
+
+可能会冒犯或惹恼某些读者的邮件列表消息有时会用一个名为 @dfn{rot13} 的简单代码进行编码，如此命名是因为它将字母表旋转 13 个字母。  该代码不是为了保密，因为它不提供任何信息；相反，它使那些希望避免看到消息真实文本的人能够使用。  例如，电影评论可能会使用 rot13 来隐藏重要的情节点。
+
+@findex rot13-other-window
+要查看使用 rot13 代码的缓冲区，请使用命令 @kbd{M-x rot13-other-window}。  这会在另一个窗口中显示当前缓冲区，该窗口在显示文本时应用代码。
+
+@findex rot13-region
+如果您只对某个区域感兴趣，那么命令 @kbd{M-x rot13-region} 可能更合适。  这将就地加密/解密活动区域。  如果缓冲区是只读的，它将尝试在回显区域中显示纯文本。  如果文本对于回显区域来说太长，该命令将弹出一个临时缓冲区，其中包含加密/解密的文本。
+
+@node Movemail
+@section @command{movemail}程序
+@cindex @command{movemail} program
+
+Rmail 使用 @command{movemail} 程序将邮件从收件箱移动到 Rmail 文件 (@pxref{Rmail Inbox})。  第一次加载时，Rmail 会尝试定位 @command{movemail} 程序并确定其版本。  @command{movemail} 程序有两个版本：GNU Mailutils 版本 (@pxref{movemail,,,mailutils,GNU Mailutils Manual})，以及构建和安装的 Emacs 特定版本，除非 Emacs 配置为有效 @option{--with-mailutils}。两个 @command{movemail} 版本支持相同的命令行语法和相同的基本选项子集。  然而，Mailutils 版本提供了额外的功能并且更安全。
+
+@command{movemail} 的 Emacs 版本可以从常用的 Unix 邮箱格式中检索邮件。  @strong{Warning}：虽然也可以使用POP3协议，但不建议这样做，因为它不支持通过加密TLS通道的POP3。
+
+Mailutils 版本能够处理多种邮箱格式，例如普通 Unix 邮箱、@code{maildir} 和 @code{MH} 邮箱等。它能够使用 POP3 或 IMAP4 协议访问远程邮箱，并可以使用 TLS 加密通道从中检索邮件。  它还接受 @acronym{URL} 形式的邮箱参数。  邮箱@acronym{URL}的详细说明可以在@ref{Mailbox,,,mailutils,GNU Mailutils Manual}中找到。  简而言之，@acronym{URL} 是：
+
+@smallexample
+@var{proto}://[@var{user}[:@var{password}]@@]@var{host-or-file-name}[:@var{port}]
+@end smallexample
+
+@noindent
+其中方括号表示可选元素。
+
+@table @var
+@cindex mailbox protocol, @command{movemail}
+@cindex format, of @command{movemail} mailbox
+@item proto
+指定要使用的 @dfn{mailbox protocol} 或 @dfn{format}。  其余 @acronym{URL} 元素的确切语义取决于 @var{proto} 的实际值（见下文）。
+
+@item user
+访问远程邮箱的用户名。
+
+@item password
+访问远程邮箱的用户密码。
+
+@item host-or-file-name
+远程邮箱的远程服务器的主机名或本地邮箱的文件名。
+
+@item port
+可选端口号（如果不是该协议的默认端口号）。
+@end table
+
+@noindent
+@var{proto} 可以是以下之一：
+
+@table @code
+@item mbox
+常见的 Unix 邮箱格式。  在这种情况下，不使用@var{user}、@var{pass}和@var{port}，@var{host-or-file-name}表示邮箱文件的文件名，例如@code{mbox:///var/spool/mail/smith}。
+
+@item mh
+@acronym{MH} 格式的本地邮箱。  不使用@var{user}、@var{pass} 和@var{port}。  @var{host-or-file-name}表示@acronym{MH}文件夹的名称，例如@code{mh:///Mail/inbox}。
+
+@item maildir
+@acronym{maildir} 格式的本地邮箱。  不使用@var{user}、@var{pass}和@var{port}，@var{host-or-file-name}表示@code{maildir}邮箱的名称，例如@code{maildir:///mail/inbox}。
+
+@item file
+邮箱格式的任何本地文件。  它的实际格式由@command{movemail}自动检测。
+
+@item pop
+@itemx pops
+通过 POP3 协议访问的远程邮箱。  @xref{Remote Mailboxes}，了解详情。
+
+@item imap
+@itemx imaps
+通过 IMAP4 协议访问的远程邮箱。  @xref{Remote Mailboxes}，了解详情。
+@end table
+
+或者，您可以指定要使用的邮箱的文件名。这相当于指定 @samp{file} 协议：
+
+@smallexample
+/var/spool/mail/@var{user} @equiv{} file:///var/spool/mail/@var{user}
+@end smallexample
+
+@vindex rmail-movemail-program
+@vindex rmail-movemail-search-path
+变量 @code{rmail-movemail-program} 控制使用哪个版本的 @command{movemail}。  如果这是一个字符串，则它指定 @command{movemail} 可执行文件的绝对文件名。  如果是@code{nil}，Rmail 将在@code{rmail-movemail-search-path} 中列出的目录中搜索@command{movemail}，然后在@code{exec-path} (@pxref{Shell}) 中搜索，然后在@code{exec-directory} 中搜索。  该变量应在启动 Rmail 之前自定义；如果在启动 Rmail 后进行自定义，则需要将 @code{rmail-movemail-variant-in-use} 设置为 @code{nil} 值，然后重新启动 Rmail。
+
+@node Remote Mailboxes
+@section 从远程邮箱检索邮件
+@pindex movemail
+@cindex remote mailboxes, accessing by @command{movemail}
+
+某些站点使用称为 POP3 的方法来访问用户的收件箱数据，而不是将数据存储在收件箱文件中。  Mailutils @command{movemail} 默认情况下支持采用 TLS 加密的 POP3。 @strong{Warning:} 虽然 @command{Emacs movemail} 支持 POP3，但不建议使用它，因为它不支持加密连接——Mailutils 版本支持。 @command{movemail} 的两个版本仅适用于 POP3，不适用于旧版本的 POP。
+
+@cindex @env{MAILHOST} environment variable
+@cindex POP3 mailboxes
+您可以使用 POP3 @dfn{URL} (@pxref{Movemail}) 指定 POP3 收件箱。  POP3 @acronym{URL} 的形式为 @samp{pop://@var{username}@@@var{hostname}:@var{port}}，其中 @var{hostname} 和 @var{port} 是远程邮件服务器的主机名（或 IP 地址）和端口号，@var{username} 是该服务器上的用户名。另外，您可以在邮箱@acronym{URL}：@samp{pop://@var{username}:@var{password}@@@var{hostname}:@var{port}}中指定密码。  在这种情况下，@var{password}优先于@code{rmail-remote-password}设置的值（见下文）。  如果您有多个具有不同密码的远程邮箱，这尤其有用。如果使用 Mailutils @command{movemail} 并且服务器支持加密连接，@command{movemail} 会尝试使用它；指定 @samp{pops:} 而不是 @samp{pop:} 来要求这样的连接。
+
+为了向后兼容，Rmail 还支持指定远程 POP3 邮箱的替代方法。  以 @samp{po:@var{username}:@var{hostname}:@var{port}} 形式指定收件箱名称相当于 @samp{pop://@var{username}@@@var{hostname}:@var{port}}。  如果省略 @var{:hostname} 部分，则 @env{MAILHOST} 环境变量指定要在其上查找 POP3 服务器的计算机。
+
+@cindex IMAP mailboxes
+另一种访问远程邮箱的方法是 IMAP@. 此方法仅受 Mailutils @command{movemail} 支持，并使用 IMAP4 协议。  要在收件箱列表中指定 IMAP 邮箱，请使用以下邮箱@acronym{URL}：@samp{imap://@var{username}[:@var{password}]@@@var{hostname}:@var{port}}。如上所述，@var{password}部分是可选的。  如果服务器支持，@command{movemail} 会尝试使用加密连接——使用 @samp{imaps:} 形式来请求加密连接。
+
+@vindex rmail-remote-password
+@vindex rmail-remote-password-required
+访问远程邮箱可能需要密码。  Rmail 使用以下算法来检索它：
+
+@enumerate
+@item
+如果邮箱 URL 中存在 @var{password}（见上文），则使用它。
+@item
+如果变量 @code{rmail-remote-password-required} 为 @code{nil}，Rmail 假定不需要密码。
+@item
+如果变量 @code{rmail-remote-password} 为非 @code{nil}，则使用其值。
+@item
+否则，Rmail 将要求您输入要使用的密码。
+@end enumerate
+
+在某些邮件服务器上，用户名包含域信息，这可能意味着它们包含 @samp{@@} 字符。  收件箱说明符字符串使用 @samp{@@} 来表示邮件服务器名称的开始。这会给 movemail 带来混乱。  如果您的用户名包含 @samp{@@} 并且您使用的是 Mailutils @command{movemail}，那么您可以解决此问题：将用户名中的 @code{@@} 替换为其 @acronym{URL} 编码 @samp{%40}。
+
+@vindex rmail-movemail-flags
+如果您需要将其他命令行标志传递给 @command{movemail}，请将变量 @code{rmail-movemail-flags} 设置为您希望使用的标志列表。  不要使用此变量传递 @samp{-p} 标志来保留收件箱内容；使用 @code{rmail-preserve-inbox} 代替。
+
+@cindex Kerberos POP3 authentication
+您站点上安装的 @command{movemail} 程序可能支持 Kerberos 身份验证。  如果支持，则当您在未设置 @code{rmail-remote-password} 和 @code{rmail-remote-password-required} 时尝试检索 POP3 邮件时，默认情况下会使用它。
+
+@cindex reverse order in POP3 inboxes
+某些 POP3 服务器以相反的顺序存储邮件。  如果您的服务器这样做，并且您希望按照收到的顺序阅读邮件，则可以通过将 @samp{-r} 标志添加到 @code{rmail-movemail-flags} 来告诉 @command{movemail} 颠倒下载邮件的顺序。
+
+@cindex TLS encryption (Rmail)
+Mailutils @command{movemail} 支持 TLS 加密。  如果您想使用它，请将 @samp{--tls} 标志添加到 @code{rmail-movemail-flags}。
+
+@node Other Mailbox Formats
+@section 从本地邮箱检索各种格式的邮件
+
+如果您收到的邮件以 Unix 邮箱以外的格式存储在本地计算机上，您将需要 Mailutils @command{movemail} 来检索它。  @xref{Movemail}，查看@command{movemail}版本的详细说明。  例如，要从位于 @file{/var/spool/mail/in} 的 @code{maildir} 格式的收件箱访问邮件，您应在 Rmail 收件箱列表中包含以下内容：
+
+@smallexample
+maildir:///var/spool/mail/in
+@end smallexample

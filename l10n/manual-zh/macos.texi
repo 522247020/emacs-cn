@@ -1,0 +1,174 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 2000--2026 Free Software Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Mac OS / GNUstep
+@appendix Emacs 和 macOS / GNUstep
+@cindex macOS
+@cindex Macintosh
+@cindex GNUstep
+
+本节介绍在 GNU/Linux 或其他操作系统上，或在具有本机窗口系统支持的 macOS 上使用使用 GNUstep 库构建的 Emacs 的特性。  在 macOS 上，Emacs 可以在没有窗口系统支持的情况下使用 X11 或使用 Cocoa 界面来构建；本节仅适用于 Cocoa 构建。  这不支持 macOS 10.6 之前的版本。
+
+GNUstep 是免费软件； macOS 不是。  由于 macOS 是一个非自由操作系统，因此剥夺了用户每个计算机用户应得的自由。  这是不公平的。  为了您的自由，我们强烈建议您切换到免费操作系统。
+
+我们在专有操作系统上支持 GNU Emacs，因为我们希望这种自由的味道能够激励用户摆脱它们。
+
+由于各种历史和技术原因，Emacs 在内部使用术语 @samp{Nextstep}，而不是“Cocoa”或“macOS”；例如，本节中描述的大多数命令和变量都以 @samp{ns-} 开头，它是 @samp{Nextstep} 的缩写。  NeXTstep 是 NeXT Inc.@: 在 20 世纪 80 年代发布的应用程序界面，Cocoa 是 NeXT Inc.@: 的直接后代。  除了Cocoa之外，还有另一个NeXTstep风格的系统：GNUstep，它是免费软件。  截至撰写本文时，Emacs GNUstep 支持处于 alpha 状态 (@pxref{GNUstep Support})，但我们希望将来能够改进它。
+
+@menu
+* Mac / GNUstep Basics::         GNUstep 或 macOS 下的基本 Emacs 使用。
+* Mac / GNUstep Customization::  GNUstep 或 macOS 下的自定义。
+* Mac / GNUstep Events::         如何处理窗口系统事件。
+* GNUstep Support::              有关 GNUstep 支持状态的详细信息。
+@end menu
+
+@node Mac / GNUstep Basics
+@section macOS 和 GNUstep 下的基本 Emacs 使用
+
+@cindex modifier keys (macOS)
+默认情况下，@key{Alt}和@key{Option}键与@key{Meta}相同。  Mac @key{Cmd} 键与 @key{Super} 相同，Emacs 使用此修饰键提供一组键绑定，模仿其他 Mac / GNUstep 应用程序 (@pxref{Mac / GNUstep Events})。  您可以按照通常的方式更改这些绑定 (@pxref{Key Bindings})。修饰符本身可以定制； @pxref{Mac / GNUstep Customization}。
+
+@kbd{S-mouse-1} 将区域调整到点击位置，就像@kbd{mouse-3} (@code{mouse-save-then-kill}) 一样；它不会像 @kbd{S-mouse-1} 通常那样弹出用于更改默认面的菜单 (@pxref{Text Scale})。  这一变化使得 Emacs 的行为更像其他 Mac/GNUstep 应用程序。
+
+当您使用菜单或使用 @kbd{Cmd-o} 和 @kbd{Cmd-S} 绑定打开或保存文件时，Emacs 使用图形文件对话框来读取文件名。  但是，如果您使用常规 Emacs 按键序列（例如 @kbd{C-x C-f}），Emacs 将使用迷你缓冲区来读取文件名。
+
+@cindex copy/paste to/from primary selection (macOS)
+在 GNUstep 上，在 X-windows 环境中，您需要使用 @kbd{Cmd-c} 而不是 @kbd{C-w} 或 @kbd{M-w} 命令之一将文本传输到 X 主选择；否则，Emacs 将使用剪贴板选择。  同样，@kbd{Cmd-y}（而不是@kbd{C-y}）从X主选择而不是kill-ring或剪贴板中进行拉取。
+
+
+@subsection 抓取环境变量
+
+@c How is this any different to launching from a window manager menu
+@c in GNU/Linux?  These are sometimes not login shells either.
+@cindex environment variables (macOS)
+许多在 Emacs 下运行的程序，如 Latex 或 man，都依赖于环境变量的设置。  如果 Emacs 是从 shell 启动的，它将自动继承这些环境变量，并且它的子进程也会从中继承它们。  但是，如果 Emacs 是从 Finder 启动的，那么它就不是任何 shell 的后代，因此它的环境变量尚未设置，这通常会导致它启动的子进程的行为与从 shell 启动时不同。
+
+对于 PATH 和 MANPATH 变量，建议在 macOS 上使用 @file{/etc/paths} 文件和 @file{/etc/paths.d} 目录设置系统范围的 PATH 方法。
+
+@node Mac / GNUstep Customization
+@section Mac / GNUstep 定制
+
+有一些特定于 Nextstep 端口的自定义选项。  例如，它们会影响修改键和全屏行为等内容。  要查看所有此类选项，请使用@kbd{M-x customize-group @key{RET} ns @key{RET}}。
+
+@subsection 修改键
+
+以下变量控制实际修饰键的行为：
+
+@table @code
+@vindex ns-alternate-modifier
+@vindex ns-right-alternate-modifier
+@item ns-alternate-modifier
+@itemx ns-right-alternate-modifier
+左右@key{Option}或@key{Alt}键。
+
+@vindex ns-command-modifier
+@vindex ns-right-command-modifier
+@item ns-command-modifier
+@itemx ns-right-command-modifier
+左右 @key{Command} 键。
+
+@vindex ns-control-modifier
+@vindex ns-right-control-modifier
+@item ns-control-modifier
+@itemx ns-right-control-modifier
+左右 @key{Control} 键。
+
+@vindex ns-function-modifier
+@item ns-function-modifier
+@key{Function} (fn) 键。
+@end table
+
+每个变量的值要么是一个符号，描述用于任何目的的键，要么是 @code{(:ordinary @var{symbol} :function @var{symbol} :mouse @var{symbol})} 形式的列表，它描述与普通键、功能键（不产生字符，例如箭头键）和鼠标单击一起使用时的修饰符。
+
+如果 0⁣ 是 @code{control}、@code{meta}、@code{alt}、@code{super} 或 @code{hyper} 之一，则描述它所代表的 Emacs 修饰符。  如果 @var{symbol} 是 @code{none}，Emacs 不会使用该键，它会保留其标准行为。  例如，macOS 中的 @key{Option} 键可用于组合其他字符。
+
+右手键的变量，如@code{ns-right-alternate-modifier}，也可以设置为@code{left}，这意味着使用与相应左手键相同的行为。
+
+@subsection 框架变量
+
+@table @code
+@vindex ns-use-proxy-icon
+@item ns-use-proxy-icon
+该变量指定是否在标题栏中显示代理图标。  代理图标可用于将与当前缓冲区关联的文件拖到其他应用程序、打印机、桌面等，就像从 Finder 中一样。  您可能必须禁用 @code{tool-bar-mode} 才能看到代理图标。
+
+@vindex ns-confirm-quit
+@item ns-confirm-quit
+该变量指定退出时是否显示图形确认对话框。
+
+@vindex ns-auto-hide-menu-bar
+@item ns-auto-hide-menu-bar
+此变量指定选择 Emacs 框架时是否隐藏 macOS 菜单栏。  如果非@code{nil}，则不会显示菜单栏，除非鼠标指针移动到屏幕顶部附近。
+
+@vindex ns-use-native-fullscreen
+@item ns-use-native-fullscreen
+此变量控制是使用本机还是非本机全屏。  本机全屏仅适用于 macOS 10.7 及更高版本。
+@end table
+
+@subsection macOS 触控板/鼠标滚轮变量
+
+这些变量仅适用于 macOS 10.7 (Lion) 及更高版本。
+
+@table @code
+@vindex ns-use-mwheel-acceleration
+@item ns-use-mwheel-acceleration
+该变量控制 Emacs 是否忽略系统鼠标滚轮加速度。  当 @code{nil} 时，鼠标滚轮的每次“点击”将与一个鼠标滚轮事件精确对应。  当非@code{nil}时，默认情况下，每次“单击”可能对应多个鼠标滚轮事件，具体取决于用户的输入。
+
+@vindex ns-use-mwheel-momentum
+@item ns-use-mwheel-momentum
+该变量控制使用触控板滚动时 Emacs 是否忽略系统“动量”。  当非 0 时，默认情况下，快速滚动可能会导致缓冲区在用户将手指离开触控板后继续滚动一小会儿。
+
+@vindex ns-mwheel-line-height
+@item ns-mwheel-line-height
+该变量控制触控板滚动的灵敏度。 Apple 触控板按像素滚动，而不是按行滚动，因此 Emacs 将系统的像素值转换为行。  当设置为数字时，此变量设置 Emacs 将视为一行的像素数。  当 @code{nil} 或非数字时，使用默认行高。
+
+设置较低的数字会使触控板更敏感，设置较高的数字会使触控板不太敏感。
+@end table
+
+@c  To make the setting permanent, use @samp{Save Options} in the
+@c Options menu, or run @code{menu-bar-options-save}.
+
+@node Mac / GNUstep Events
+@section macOS / GNUstep 下的窗口系统事件
+@cindex events on macOS
+
+Nextstep 应用程序会收到许多没有 X 等效事件的特殊事件。  它们作为专门定义的按键事件发送，不对应于任何击键序列。  在 Emacs 下，这些按键事件可以像普通击键一样绑定到函数。  以下是这些事件的列表。
+
+@table @key
+@item ns-open-file
+@cindex ns-open-file event
+@vindex ns-pop-up-frames
+当另一个 Nextstep 应用程序请求 Emacs 打开文件时，会发生此事件。  出现这种情况的典型原因是用户双击 Finder 应用程序中的文件。  默认情况下，Emacs 通过打开一个新框架并访问该框架中的文件来响应此事件 (@code{ns-find-file})。  作为例外，如果所选缓冲区是 @file{*scratch*} 缓冲区，Emacs 会访问所选帧中的文件。
+
+您可以通过更改变量 @code{ns-pop-up-frames} 来更改 Emacs 对 @code{ns-open-file} 事件的响应方式。  它的默认值@samp{fresh}就是我们刚才描述的。  值 @code{t} 表示始终在新帧中访问文件。  值 @code{nil} 表示始终访问所选帧中的文件。
+
+@item ns-open-temp-file
+@cindex ns-open-temp-file event
+当另一个应用程序请求 Emacs 打开临时文件时，会发生此事件。  默认情况下，这是通过生成一个 @code{ns-open-file} 事件来处理的，其结果如上所述。
+
+@item ns-open-file-line
+@cindex ns-open-file-line event
+某些应用程序（例如 ProjectBuilder 和 gdb）不仅请求特定文件，还请求文件中的特定行或行序列。  Emacs 通过访问该文件并突出显示请求的行 (@code{ns-open-file-select-line}) 来处理此问题。
+
+@item ns-power-off
+@cindex ns-power-off event
+当用户注销且 Emacs 仍在运行时，或者从应用程序菜单中选择“退出 Emacs”时，会发生此事件。默认行为是保存所有文件访问缓冲区。
+
+@item ns-show-prefs
+@cindex ns-show-prefs event
+当用户从应用程序菜单中选择“首选项”时，会发生此事件。  默认情况下，它绑定到命令@code{customize}。
+@end table
+
+@cindex using Nextstep services (macOS)
+Emacs 还允许用户通过一组名称以 @samp{ns-service-} 开头并以服务名称结尾的命令来使用 Nextstep 服务。  输入 @kbd{M-x ns-service- @key{TAB}} 查看这些命令的列表。  这些函数要么对标记的文本进行操作（用结果替换它），要么采用字符串参数并将结果作为字符串返回。  您还可以使用 Lisp 函数 @code{ns-perform-service} 将任意字符串传递给任意服务并接收返回结果。  请注意，您可能需要重新启动 Emacs 才能访问新可用的服务。
+
+@node GNUstep Support
+@section GNUstep 支持
+
+Emacs 可以在 GNUstep 下构建和运行，但仍有一些问题需要解决。  有兴趣的开发商请联系
+@ifnothtml
+@email{emacs-devel@@gnu.org}.
+@end ifnothtml
+@ifhtml
+@url{https://lists.gnu.org/mailman/listinfo/emacs-devel, the
+emacs-devel mailing list}.
+@end ifhtml

@@ -37,6 +37,11 @@ esac
 echo "==> 源码目录: $ROOT/src"
 cd "$ROOT/src"
 
+# 套用中文手册译文（若存在），使构建出的 Info 手册为中文
+if [ -d "$ROOT/l10n/manual-zh" ]; then
+  sh "$ROOT/ci/apply-manual-zh.sh"
+fi
+
 echo "==> autogen"
 ./autogen.sh
 

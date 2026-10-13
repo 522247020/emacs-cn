@@ -1,0 +1,293 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 2004--2026 Free Software Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@c
+@c This file is included either in emacs-xtra.texi (when producing the
+@c printed version) or in the main Emacs manual (for the on-line version).
+@node Emerge
+@section 使用 Emerge 合并文件
+@cindex Emerge
+@cindex merging files
+
+对于程序员来说，交叉信号并在两个不同方向修改同一个程序并不罕见。  要摆脱这种混乱，您需要合并两个版本。  Emerge 使这变得更容易。  有关比较文件的其他方法，请参阅
+@iftex
+@ref{Comparing Files,,, emacs, the Emacs Manual},
+@end iftex
+@ifnottex
+@ref{Comparing Files},
+@end ifnottex
+和@ref{Top,, Ediff, ediff, The Ediff Manual}。
+
+@menu
+* Overview of Emerge::      如何开始出现。  基本概念。
+* Submodes of Emerge::      快速模式与@:编辑模式。跳过偏好模式和自动前进模式。
+* State of Difference::     您可以通过为每个差异指定状态 A 或 B 来进行合并。
+* Merge Commands::          用于选择差异、更改差异状态等的命令。
+* Exiting Emerge::          完成合并后该怎么做。
+* Combining in Emerge::     如何保持两种选择的差异。
+* Fine Points of Emerge::   杂项问题。
+@end menu
+
+@node Overview of Emerge
+@subsection 出现概述
+
+要启动 Emerge，请运行以下四个命令之一：
+
+@table @kbd
+@item M-x emerge-files
+@findex emerge-files
+合并两个指定的文件。
+
+@item M-x emerge-files-with-ancestor
+@findex emerge-files-with-ancestor
+参考共同的祖先合并两个指定的文件。
+
+@item M-x emerge-buffers
+@findex emerge-buffers
+合并两个缓冲区。
+
+@item M-x emerge-buffers-with-ancestor
+@findex emerge-buffers-with-ancestor
+参考第三个缓冲区中的共同祖先合并两个缓冲区。
+@end table
+
+@cindex merge buffer (Emerge)
+@cindex A and B buffers (Emerge)
+Emerge 命令比较两个文件或缓冲区，并在三个缓冲区中显示比较结果：一个用于每个输入文本（@dfn{A buffer} 和 @dfn{B buffer}），另一个（@dfn{merge buffer}）用于发生合并。  合并缓冲区显示完整的合并文本，而不仅仅是差异。  无论两个输入文本有何不同，您都可以选择将其中之一包含在合并缓冲区中。
+
+从现有缓冲区获取输入的 Emerge 命令仅使用这些缓冲区的可访问部分（如果这些缓冲区已缩小）。
+@iftex
+@xref{Narrowing,,, emacs, the Emacs Manual}.
+@end iftex
+@ifnottex
+@xref{Narrowing}.
+@end ifnottex
+
+
+如果有一个共同的祖先版本可用，并且要合并的两个文本均源自该版本，则 Emerge 可以使用它来猜测哪个替代方案是正确的。  只要一个当前版本与祖先一致，Emerge 就会假定另一个当前版本是有意更改，应保留在合并版本中。  如果您想指定共同的祖先文本，请使用 @samp{with-ancestor} 命令。  这些命令读取三个文件或缓冲区名称——变体 A、变体 B 和共同祖先。
+
+比较完成并准备好缓冲区后，交互式合并开始。  您可以通过在合并缓冲区 (@pxref{Merge Commands}) 中键入特殊的 @dfn{merge commands} 来控制合并。对于输入文本之间的每一轮差异，您可以选择保留其中的一个，或一起编辑它们。
+
+合并缓冲区使用一种特殊的主要模式，即 Emerge 模式，以及用于进行这些选择的命令。  但您也可以使用普通的 Emacs 命令编辑缓冲区。
+
+在任何给定时间，Emerge 的注意力都集中在一个特定的差异上，称为“0”差异。  这种差异在三个缓冲区中被标记出来，如下所示：
+
+@example
+vvvvvvvvvvvvvvvvvvvv
+@var{text that differs}
+^^^^^^^^^^^^^^^^^^^^
+@end example
+
+@noindent
+按顺序显示所有差异的编号，模式行始终显示所选差异的编号。
+
+通常，合并缓冲区从文本的 A 版本开始。但是，当差异的 A 版本与共同祖先一致时，则该差异最初会首选 B 版本。
+
+退出时，Emerge 会将合并的文本保留在合并缓冲区中。  此时，您可以使用 @kbd{C-x C-w} 将其保存在文件中。  如果您向 @code{emerge-files} 或 @code{emerge-files-with-ancestor} 提供数字参数，它将使用迷你缓冲区读取输出文件的名称。  （这是这些命令读取的最后一个文件名。）然后退出 Emerge 会将合并的文本保存在输出文件中。
+
+通常，Emerge 命令在退出时将输出缓冲区保存在其文件中。  如果您使用 @kbd{C-]} 中止 Emerge，Emerge 命令不会保存输出缓冲区，但您可以根据需要自行保存。
+
+@node Submodes of Emerge
+@subsection Emerge 的子模式
+
+您可以选择两种模式来发出合并命令：快速模式和编辑模式。  在快速模式下，基本合并命令是单个字符，但普通 Emacs 命令被禁用。  如果您仅使用合并命令，这会很方便。  在编辑模式下，所有合并命令都以前缀键@kbd{C-c C-c}开头，并且普通的 Emacs 命令也可用。  这允许编辑合并缓冲区，但会减慢 Emerge 操作。
+
+使用@kbd{e}切换到编辑模式，使用@kbd{C-c C-c f}切换到快速模式。  模式行通过 @samp{E} 和 @samp{F} 指示编辑和快速模式。
+
+Emerge 有两个额外的子模式，它们会影响特定合并命令的工作方式：自动前进模式和跳过首选项模式。
+
+如果自动前进模式有效，@kbd{a} 和 @kbd{b} 命令前进到下一个差异。  只要您从输入中选择其中一种替代方案，您就可以更快地完成合并。  模式行用 @samp{A} 表示自动前进模式。
+
+如果 Skip Prefers 模式有效，@kbd{n} 和 @kbd{p} 命令会跳过状态“prefer-A”和“prefer-B”(@pxref{State of Difference}) 中的差异。  因此，您只能看到两个版本都被认为不正确的差异。  模式行用 @samp{S} 表示跳过偏好模式。  此模式仅在存在祖先时才相关。
+
+@findex emerge-auto-advance
+@findex emerge-skip-prefers
+使用命令 @kbd{s a} (@code{emerge-auto-advance}) 设置或清除自动前进模式。  使用 @kbd{s s} (@code{emerge-skip-prefers}) 设置或清除“跳过偏好”模式。  这些命令使用正参数打开模式，使用负参数或零参数将其关闭，以及不使用参数切换模式。
+
+@node State of Difference
+@subsection 差异化状态
+
+在合并缓冲区中，差异用 @samp{v} 和 @samp{^} 字符行标记。  每个差异都有以下七种状态之一：
+
+@table @asis
+@item 一个
+区别在于显示的是 A 版本。  @kbd{a} 命令总是产生此状态；模式线用@samp{A}表示。
+
+@item 乙
+区别在于显示 B 版本。  @kbd{b} 命令总是产生此状态；模式线用@samp{B}表示。
+
+@item 默认-A
+@itemx 默认-B
+区别在于默认显示 A 或 B 状态，因为您还没有做出选择。  所有差异均以默认 A 状态开始（因此合并缓冲区是 A 缓冲区的副本），但首选一种替代方案的差异除外（见下文）。
+
+当您选择差异时，其状态从default-A或default-B更改为普通A或B@.因此，所选差异永远不会具有状态default-A或default-B，并且这些状态永远不会显示在模式行中。
+
+命令 @kbd{d a} 选择 default-A 作为默认状态，而 @kbd{d b} 选择 default-B@. 此选择的默认值适用于您从未选择且没有首选替代方案的所有差异。如果您按顺序进行合并，则未选择的差异是所选差异之后的差异。  因此，在按顺序移动时，您可以通过在部分之间使用 @kbd{d a} 和 @kbd{d b} 有效地将 A 版本设置为合并缓冲区某些部分的默认值，将 B 版本设置为其他部分的默认值。
+
+@item 更喜欢-A
+@itemx 偏好-B
+区别在于显示 A 或 B 状态，因为它是 @dfn{preferred}。  这意味着您尚未做出明确的选择，但一种选择似乎可能是正确的，因为另一种选择与共同祖先一致。  因此，如果 A 缓冲区与共同祖先一致，则首选 B 版本，因为它很可能是实际更改的版本。
+
+这两种状态在模式行中显示为 @samp{A*} 和 @samp{B*}。
+
+@item 合并的
+区别在于显示 A 和 B 状态的组合，这是 @kbd{x c} 或 @kbd{x C} 命令的结果。
+
+一旦差异处于这种状态，@kbd{a}和@kbd{b}命令就不会对其执行任何操作，除非您给它们一个数字参数。
+
+模式行将此状态显示为 @samp{comb}。
+@end table
+
+@node Merge Commands
+@subsection 合并命令
+
+以下是快速模式的合并命令；在编辑模式下，在它们前面加上 @kbd{C-c C-c}：
+
+@table @kbd
+@item p
+选择之前的差异。
+
+@item n
+选择下一个差异。
+
+@item a
+选择此差异的 A 版本。
+
+@item b
+选择这个差异的B版本。
+
+@item C-u @var{n} j
+选择差值编号@var{n}。
+
+@item .
+选择差异包含点。
+@c [Does not work in the A or B buffer?]
+@c You can use this command in the merge buffer or in the A or B buffer.
+
+@item q
+退出——完成合并。
+
+@item C-]
+Abort——退出合并，不保存输出。
+
+@item f
+进入快速模式。  （在编辑模式下，这实际上是@kbd{C-c C-c f}。）
+
+@item e
+进入编辑模式。
+
+@item l
+使所有三个窗口居中（如 @kbd{C-l}）。  通过参数，重新建立默认的三窗口显示。
+
+@item -
+指定前缀数字参数的一部分。
+
+@item @var{digit}
+还指定前缀数字参数的一部分。
+
+@item d a
+从这里开始在合并缓冲区中选择 A 版本作为默认版本。
+
+@item d b
+从这里开始在合并缓冲区中选择 B 版本作为默认版本。
+
+@item c a
+将这个差异的 A 版本复制到 Kill Ring 中。
+
+@item c b
+将这个差异的 B 版本复制到 Kill Ring 中。
+
+@item i a
+在点处插入此差异的 A 版本。
+
+@item i b
+在点处插入此差异的 B 版本。
+
+@item m
+在差异周围放置点和标记。
+
+@item ^
+向下滚动所有三个窗口（如@kbd{M-v}）。
+
+@item v
+向上滚动所有三个窗口（如@kbd{C-v}）。
+
+@item <
+向左滚动所有三个窗口（如@kbd{C-x <}）。
+
+@item >
+向右滚动所有三个窗口（如 @kbd{C-x >}）。
+
+@item |
+重置所有三个窗口上的水平滚动。
+
+@item x 1
+将合并窗口缩小到一行。  （使用 @kbd{C-u l} 将其恢复为完整尺寸。）
+
+@item x c
+合并此差异的两个版本 (@pxref{Combining in Emerge})。
+
+@item x f
+在帮助窗口中显示 Emerge 正在运行的文件/缓冲区的名称。  （使用 @kbd{C-u l} 恢复窗口。）
+
+@item x j
+将这一差异与以下差异连接起来。 （@kbd{C-u x j} 将这一差异与前一个差异连接起来。）
+
+@item x s
+将这个差异分为两个差异。  在使用此命令之前，将三个缓冲区中的每个缓冲区中的点定位到要拆分差异的位置。
+
+@item x t
+修剪差异顶部和底部的相同线条。当 A 和 B 版本相同但与祖先版本不同时，就会出现此类行。
+@end table
+
+@node Exiting Emerge
+@subsection 退出出现
+
+@kbd{q} 命令 (@code{emerge-quit}) 完成合并，将结果存储到输出文件中（如果您指定了）。  它将 A 和 B 缓冲区恢复到正确的内容，或者杀死它们（如果它们是由 Emerge 创建的并且您没有更改它们）。  它还会禁用合并缓冲区中的 Emerge 命令，因为稍后执行这些命令可能会损坏各个缓冲区的内容。
+
+@kbd{C-]} 中止合并。  这意味着退出而不写入输出文件。  如果您没有指定输出文件，则中止合并和完成合并之间没有真正的区别。
+
+如果 Emerge 命令是从另一个 Lisp 程序调用的，那么它的返回值为 @code{t} 表示成功完成，或者 @code{nil} 表示中止。
+
+@node Combining in Emerge
+@subsection 结合两个版本
+
+有时您想为特定差异保留 @emph{both} 替代方案。  为此，请使用 @kbd{x c}，它会像这样编辑合并缓冲区：
+
+@example
+@group
+#ifdef NEW
+@var{version from B buffer}
+#else /* not NEW */
+@var{version from A buffer}
+#endif /* not NEW */
+@end group
+@end example
+
+@noindent
+@vindex emerge-combine-versions-template
+虽然此示例显示了分隔两个替代版本的 C 预处理器条件，但您可以通过将变量 @code{emerge-combine-versions-template} 设置为您选择的字符串来指定要使用的字符串。  在字符串中，@samp{%a} 表示放置版本 A 的位置，@samp{%b} 表示放置版本 B@. 的默认设置会生成上面显示的结果，如下所示：
+
+@example
+@group
+"#ifdef NEW\n%b#else /* not NEW */\n%a#endif /* not NEW */\n"
+@end group
+@end example
+
+@node Fine Points of Emerge
+@subsection 出现的要点
+
+在合并期间，您不得尝试自己编辑 A 和 B 缓冲区。 Emerge 会暂时修改它们，但最终会将它们恢复原样。
+
+您可以同时进行任意数量的合并——只是不要同时使用任何一个缓冲区作为多个合并的输入，因为在这些缓冲区中进行的临时更改会互相妨碍。
+
+启动 Emerge 可能需要很长时间，因为它需要完全比较文件。  在 @code{diff} 完成之前，Emacs 无法执行任何其他操作。也许将来有人会改变 Emerge，让其在输入文件很大时在后台进行比较——然后你可以继续使用 Emacs 做其他事情，直到 Emerge 准备好接受命令。
+
+@vindex emerge-startup-hook
+设置合并后，Emerge 运行钩子 @code{emerge-startup-hook}。
+@iftex
+@xref{Hooks,,, emacs, the Emacs Manual}.
+@end iftex
+@ifnottex
+@xref{Hooks}.
+@end ifnottex

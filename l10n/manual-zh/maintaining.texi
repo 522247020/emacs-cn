@@ -1,0 +1,2174 @@
+@c This is part of the Emacs manual., Abbrevs, This is part of the Emacs manual., Top
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 1999--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Maintaining
+@chapter 维护大型程序
+@cindex maintaining large programs
+@cindex large programming projects, maintaining
+
+本章介绍用于维护中型到大型程序和包的 Emacs 功能。  这些功能包括：
+
+@itemize @minus
+@item 
+支持版本控制系统 (@acronym{VCS}) 的统一接口，记录源文件更改的历史记录。
+
+@item 
+用于处理编程项目的命令。
+
+@item 
+用于维护 @file{ChangeLog} 文件的专用模式，该文件提供程序更改的时间顺序日志。
+
+@item 
+@acronym{Xref}，一组用于显示符号定义（又名@:“标识符”）及其引用的命令。
+
+@item 
+@acronym{EDE}，用于管理编程项目的替代工具，尤其是构建和调试。
+
+@ifnottex
+@item
+A mode for merging changes to program sources made on separate
+branches of development.
+@end ifnottex
+
+@item 
+次要模式，用于突出显示错误引用并访问问题跟踪器中引用的错误报告。
+@end itemize
+
+如果您正在维护一个大型 Lisp 程序，那么除了此处描述的功能之外，您可能会发现 Emacs Lisp 回归测试 (@acronym{ERT}) 库很有用 (@pxref{Top,,ERT,ert, Emacs Lisp Regression Testing})。
+
+@menu
+* Version Control::      使用版本控制系统。
+* Projects::             用于处理项目中的源文件的命令。
+* Change Log::           维护程序的更改历史记录。
+* Xref::                 查找程序中任何函数、方法、结构、宏、@dots{} 的定义和引用。
+* EDE::                  用于管理编程项目的替代工具。
+@ifnottex
+* Emerge::              A convenient way of merging two versions of a program.
+@end ifnottex
+* Bug Reference::        突出显示对错误报告的引用并在问题跟踪器中浏览它们。
+@end menu
+
+@node Version Control
+@section 版本控制
+@cindex version control
+
+@dfn{version control system} 是一个可以记录源文件的多个版本的程序，存储诸如每个版本的创建时间、创建者以及更改内容的描述等信息。
+
+@cindex VC
+Emacs 版本控制接口称为 @dfn{VC}@. VC 命令可与多种不同的版本控制系统配合使用；目前，它支持 Bazaar、CVS、Git、Mercurial、RCS、SRC、SCCS/CSSC 和 Subversion。  其中，GNU 项目分发了 CVS、RCS 和 Bazaar。
+
+每当您访问受版本控制系统控制的文件时，VC 都会自动启用。  要完全禁用 VC，请将可自定义变量 @code{vc-handled-backends} 设置为 @code{nil}
+@iftex
+(@pxref{Customizing VC,,,emacs-xtra, Specialized Emacs Features}).
+@end iftex
+@ifnottex
+(@pxref{Customizing VC}).
+@end ifnottex
+
+@findex vc-refresh-state
+@findex vc-state-refresh
+要更新当前缓冲区中访问的文件的 VC 状态信息，请使用命令@code{vc-refresh-state}。  当您在 Emacs 外部执行版本控制命令（例如，从 shell 提示符），或者将缓冲区的文件置于不同的版本控制系统下，或将其完全从版本控制中删除时，此命令非常有用。
+
+@cindex VC commands, in Dired buffers
+@cindex filesets, VC, in Dired buffers
+VC 也会在 Dired 缓冲区 (@pxref{Dired}) 中自动启用，显示其文件由 VCS@. 控制的目录。 本节中描述的所有 VC 命令都可以从任何显示包含 VC 控制文件的目录的 Dired 缓冲区调用；在 Dired 缓冲区 (@pxref{Marks vs Flags}) 中标记的任何文件都被视为属于当前文件集，并且 VC 命令对此文件集中的文件进行操作。  这允许您构建 VC 文件集，包括您想要的任何文件，无论其 VC 状态如何。  （如果从 Dired 缓冲区调用 VC 命令时没有标记任何文件，则缓冲区中当前行显示的文件被视为文件集中的唯一文件。）
+
+@menu
+* Introduction to VC::   版本控制的一般工作原理。
+* VC Mode Line::         模式行如何显示版本控制状态。
+* Basic VC Editing::     如何在版本控制下编辑文件。
+* Log Buffer::           日志条目缓冲区中可用的功能。
+* Registering::          将文件置于版本控制之下。
+* Old Revisions::        检查和比较旧版本。
+* VC Change Log::        查看 VC 更改日志。
+* VC Undo::              在提交之前或之后取消更改。
+* VC Ignore::            忽略版本控制系统下的文件。
+* VC Directory Mode::    列出由版本控制管理的文件。
+* Branches::             多线发展。
+@ifnottex
+* Miscellaneous VC::    Various other commands and features of VC.
+* Customizing VC::      Variables that change VC's behavior.
+@end ifnottex
+@end menu
+
+@node Introduction to VC
+@subsection 版本控制简介
+
+VC 允许您在 Emacs 中使用版本控制系统，将版本控制操作与编辑顺利集成。  它为许多版本控制系统中的常见操作提供了统一的接口。
+
+VC@. 不支持一些不常见或复杂的版本控制操作，例如更改存储库设置，您应该在 VC 之外执行此类任务，例如在命令行中。
+
+本节提供版本控制的总体概述，并描述 VC 支持的版本控制系统。  如果您已经熟悉要使用的版本控制系统，则可以跳过本节。
+
+@menu
+* Why Version Control?::     了解它解决的问题。
+* Version Control Systems::  支持版本控制后端系统。
+* VCS Concepts::             与版本控制相关的词语和概念。
+* VCS Merging::              如何处理文件冲突。
+* VCS Changesets::           如何对更改进行分组。
+* VCS Repositories::         存储版本控制存储库的位置。
+* Types of Log File::        VCS 日志与 ChangeLog 不同。
+@end menu
+
+@node Why Version Control?
+@subsubsection 了解它解决的问题
+
+版本控制系统为您提供三个重要的功能：
+
+@itemize @bullet
+@item 
+@dfn{Reversibility}：如果您发现所做的某些修改是错误或坏主意，则能够备份到以前的状态。
+
+@item 
+@dfn{Concurrency}：让许多人修改同一文件集合的能力，知道可以检测和解决冲突的修改。
+
+@item 
+@dfn{History}：将历史数据附加到您的数据的能力，例如有关每个更改背后的意图的解释性注释。即使对于单独工作的程序员来说，变更历史记录也是对记忆的重要帮助。对于多人项目来说，它们是开发人员之间极其重要的沟通形式。
+@end itemize
+
+@node Version Control Systems
+@subsubsection 支持的版本控制系统
+
+@cindex backend (version control)
+VC 目前可以与许多不同的版本控制系统配合使用，它被称为 @dfn{backends}：
+
+@itemize @bullet
+
+@cindex git
+@item 
+Git 是一个分散的版本控制系统，最初由 Linus Torvalds 发明，用于支持 Linux（他的内核）的开发。  VC 支持所有常见的 Git 操作，但值得注意的是，Git 变基除了简单地编辑提交消息之外还必须从命令行完成。
+
+@cindex CVS
+@item 
+CVS 是免费版本控制系统，直到 2008 年左右，大多数自由软件项目都在使用该系统。  从那时起，它已被更新的系统取代。  CVS 允许在本地或通过网络进行并发多用户开发。  与较新的系统不同，它缺乏对原子提交和文件移动/重命名的支持。  VC支持CVS下的所有基本编辑操作。
+
+@cindex SVN
+@cindex Subversion
+@item 
+Subversion (svn) 是一个免费的版本控制系统，设计与 CVS 类似，但没有它的问题（例如，它支持文件集的原子提交，以及目录、符号链接、元数据、重命名、复制和删除的版本控制）。
+
+@cindex SCCS
+@item 
+SCCS 是有史以来第一个版本控制系统，很久以前就被更先进的版本控制系统所取代。  VC 通过自己实现来补偿 SCCS 中缺少的某些功能（例如，版本的标签名称）。  其他 VC 功能（例如多分支）根本不可用。  由于 SCCS 不是免费的，我们建议避免使用它。
+
+@cindex CSSC
+@item 
+CSSC 是 SCCS@. 的免费替代品，仅当由于某种原因无法使用更新且设计更好的版本控制系统时，才应使用 CSSC。
+
+@cindex RCS
+@item 
+RCS 是免费的版本控制系统，VC 最初是围绕它构建的。  它相对原始：它不能通过网络使用，并且在单个文件级别上工作。  几乎所有可以用 RCS 完成的事情都可以通过 VC 完成。
+
+@cindex hg
+@cindex Mercurial
+@item 
+Mercurial (hg) 是一个分散的版本控制系统，与 Git 大致相似。  VC 支持大多数 Mercurial 命令。
+
+@cindex bzr
+@cindex Bazaar
+@item 
+Bazaar (bzr) 是一个去中心化版本控制系统，支持基于存储库和去中心化版本控制。  VC支持Bazaar下最基本的编辑操作。
+
+@cindex SRC
+@cindex src
+@item 
+SRC (src) 是重新加载的 RCS——一种专门为仅由一个人处理的单文件项目而设计的版本控制系统。  它允许具有独立版本控制历史的多个文件存在于一个目录中，因此特别适合维护小型文档、脚本和点文件。  虽然它使用 RCS 进行修订存储，但它提供了一个现代用户界面，具有无锁操作和整数顺序版本号。  VC支持几乎所有的SRC操作。
+@end itemize
+
+@node VCS Concepts
+@subsubsection 版本控制的概念
+
+@cindex repository
+@cindex registered file
+当文件处于版本控制之下时，我们称其在版本控制系统中为@dfn{registered}。  系统有一个@dfn{repository}，它存储文件的当前状态及其更改历史记录——足以重建当前版本或任何早期版本。  该存储库还包含其他信息，例如描述对每个文件所做的更改的@dfn{log entries}。
+
+@cindex work file
+@cindex checking out files
+您实际编辑的版本控制文件的副本称为 @dfn{work file}。  您可以像更改普通文件一样更改每个工作文件。  完成一组更改后，您可以@dfn{commit}（或@dfn{check in}）更改；这记录了存储库中的更改以及描述性日志条目。
+
+@cindex working tree
+工作文件的目录树称为@dfn{working tree}。
+
+@cindex revision
+@cindex revision ID
+每次提交都会在存储库中创建一个新的@dfn{revision}。  版本控制系统跟踪所有过去的修订以及每个修订中所做的更改。  每个修订版本都以@dfn{revision ID}命名，其格式取决于版本控制系统；在最简单的情况下，它只是一个整数。
+
+为了超越这些基本概念，您需要了解版本控制系统不同的三个方面。  正如接下来的三节中所解释的，它们可以是基于锁的或基于合并的；基于文件或基于变更集；以及集中式或分散式。  VC 处理所有这些操作模式，但它无法隐藏差异。
+
+@node VCS Merging
+@subsubsection 基于合并与基于锁定的版本控制
+
+版本控制系统通常具有某种机制来协调想要更改同一文件的用户。  有两种方法可以做到这一点：合并和锁定。
+
+@cindex merging-based version
+在使用合并的版本控制系统中，每个用户都可以随时修改工作文件。  系统允许您@dfn{merge}您的工作文件，其中可能包含尚未提交的更改以及其他人已提交的最新更改。
+
+@cindex locking-based version
+旧版本控制系统使用 @dfn{locking} 方案。在这里，工作文件通常是只读的。  要编辑文件，您可以通过 @dfn{locking} 请求版本控制系统使其可写；在任何给定时间只有一个用户可以锁定给定文件。  此过程类似于 Emacs 用于检测普通文件同时编辑的锁定 (@pxref{Interlocking})，但又有所不同。  当您提交更改时，文件就会解锁，并且工作文件再次变为只读。  然后其他用户可以锁定该文件以进行自己的更改。
+
+当多个用户尝试同时修改同一文件时，锁定和合并系统都可能出现问题。  锁定系统有@dfn{lock conflicts}；用户可能尝试检出文件但由于文件被锁定而无法检出。  在合并系统中，当您提交的文件更改与其他人在您签出后提交的更改冲突时，就会发生@dfn{merge conflicts}。  这两种冲突都必须通过人的判断和沟通来解决。  经验表明，合并优于锁定，既方便开发人员，又最大限度地减少实际发生的冲突的数量和严重性。
+
+SCCS 始终使用锁定。  RCS 默认情况下是基于锁的，但可以被告知以合并方式进行操作。  CVS 和 Subversion 默认情况下是基于合并的，但可以被告知以锁定模式运行。去中心化版本控制系统，例如 Git 和 Mercurial，完全基于合并。
+
+VC模式支持锁定和合并版本控制。  术语“提交”和“更新”用于较新的版本控制系统；较旧的基于锁的系统使用术语“签入”和“签出”。  VC尽可能地隐藏了它们之间的差异。
+
+@node VCS Changesets
+@subsubsection 基于变更集与基于文件的版本控制
+
+@cindex file-based version control
+在 SCCS、RCS、CVS 和其他早期版本控制系统（以及 SRC 中）上，版本控制操作是@dfn{file-based}：每个文件都有自己的注释和修订历史记录，与所有其他文件的注释和修订历史记录分开。  从 Subversion 开始的较新系统是@dfn{changeset-based}：一次提交可能包括对多个文件的更改，并且整个更改集作为一个单元进行处理。  与更改相关的任何注释不属于单个文件，而是属于更改集本身。
+
+@cindex changeset-based version control
+基于变更集的版本控制比基于文件的版本控制更灵活、更强大；通常，当必须撤消对多个文件的更改时，能够轻松识别并删除所有文件是件好事。
+
+@node VCS Repositories
+@subsubsection 分散式与集中式存储库
+
+@cindex centralized version control
+@cindex decentralized version control
+@cindex distributed version control
+早期的版本控制系统是围绕 @dfn{centralized} 模型设计的，其中每个项目只有一个供所有开发人员使用的存储库。  SCCS、RCS、CVS、Subversion 和 SRC 共享这种模型。  它的缺点之一是存储库是可靠性和效率的瓶颈。
+
+GNU Arch 率先提出了 @dfn{distributed} 或 @dfn{decentralized} 版本控制的概念，后来在 Git、Mercurial 和 Bazaar 中实现。  一个项目可能有几个不同的存储库，这些系统支持存储库之间的某种超级合并，试图协调它们的更改历史。  实际上，每个开发人员都有一个存储库，并且存储库合并取代了提交操作。
+
+VC 帮助您管理个人工作文件和存储库之间的流量。  存储库是单个主存储库还是对等存储库网络之一，都不是 VC 必须关心的事情。
+
+@node Types of Log File
+@subsubsection 日志文件的类型
+@cindex types of log file
+@cindex log File, types of
+@cindex version control log
+
+使用版本控制系统的项目可以有两种类型的更改日志。  一种是版本控制系统维护的日志：每次提交更改时，都会为更改填写@dfn{log entry} (@pxref{Log Buffer})。  这称为@dfn{version control log}。
+
+另一种日志是文件@file{ChangeLog} (@pxref{Change Log})。  它提供了对程序大部分内容（通常是一个目录及其子目录）的所有更改的时间顺序记录。一个小程序将使用一个 @file{ChangeLog} 文件；一个大型程序可能在每个主目录中都有一个 @file{ChangeLog} 文件。 @xref{Change Log}。  早在版本控制系统出现之前，程序员就已经使用了变更日志。
+
+基于变更集的版本系统通常会为整个系统维护一个基于变更集的修改日志，这使得变更日志文件有些冗余。  它们保留的一个优点是，有时能够将单个目录的事务历史记录与其他目录的事务历史记录分开查看是很有用的。  另一个优点是提交日志中的错误在许多版本控制系统中无法修复。
+
+使用版本控制维护的项目可以仅使用版本控制日志，也可以使用两种日志。  它可以以一种方式处理某些文件，以另一种方式处理某些文件。  每个项目都有其政策，您应该遵循。
+
+当策略要使用两者时，您通常希望为每个更改只写入一次条目，然后将其放入两个日志中。  您可以在 @file{ChangeLog} 中写入条目，然后在提交更改 (@pxref{Log Buffer}) 时使用 @kbd{C-c C-a} 将其复制到日志缓冲区。  或者，您可以在提交更改时将条目写入日志缓冲区（在@kbd{C-c C-w}的帮助下），然后使用@kbd{C-x v a}命令将其复制到@file{ChangeLog}
+@iftex
+(@pxref{Change Logs and VC,,,emacs-xtra, Specialized Emacs Features}).
+@end iftex
+@ifnottex
+(@pxref{Change Logs and VC}).
+@end ifnottex
+
+@node VC Mode Line
+@subsection 版本控制和模式线
+@cindex VC mode line indicator
+
+当您访问受版本控制的文件时，Emacs 在模式行上指示这一点。  例如，@samp{Bzr-1223}表示该文件使用 Bazaar，当前修订 ID 为 1223。
+
+@cindex version control status
+后端名称和修订 ID 之间的字符表示工作文件的@dfn{version control status}。  在基于合并的版本控制系统中，@samp{-}字符表示工作文件未修改，@samp{:}表示工作文件已被修改。  @samp{!} 表示该文件因最近的合并操作而包含冲突 (@pxref{Merging})，或者该文件已从版本控制中删除，或者它已版本化但也@dfn{ignored}，通常不应发生这种情况 (@pxref{VC Ignore})。  最后，@samp{?} 表示该文件受版本控制，但在工作树中丢失。
+
+在基于锁的系统中，@samp{-}表示未锁定的文件，@samp{:}表示锁定的文件；如果文件被其他用户锁定（例如，@samp{jim}），则显示为@samp{RCS:jim:1.3}。 @samp{@@} 表示该文件已在本地添加，但尚未提交到主存储库。
+
+在图形显示上，您可以将鼠标移到该模式线指示器上以弹出工具提示，其中显示版本控制状态的更详细描述。  在指示器上按 @kbd{mouse-1} 会弹出 VC 命令菜单，与菜单栏上的 @samp{Tools / Version Control} 相同。
+
+@vindex auto-revert-check-vc-info
+当自动恢复模式 (@pxref{Reverting}) 恢复受版本控制的缓冲区时，它会更新模式行中的版本控制信息。  但是，如果版本控制状态在当前 Emacs 会话外部未更改工作文件的情况下发生更改，自动恢复模式可能无法正确更新此信息。  如果将 @code{auto-revert-check-vc-info} 设置为 @code{t}，自动恢复模式会每 @code{auto-revert-interval} 秒更新一次版本控制状态信息，即使工作文件本身未更改也是如此。  所产生的 CPU 使用率取决于版本控制系统，但通常不会过多。
+
+@node Basic VC Editing
+@subsection 版本控制下的基本编辑
+
+@cindex filesets, VC
+@cindex VC filesets
+大多数 VC 命令在 @dfn{VC filesets} 上运行。  VC 文件集是 VC 操作所作用的一个或多个文件的集合。  当您在访问版本控制文件的缓冲区中键入 VC 命令时，VC 文件集就是那个文件。  当您在 VC 目录缓冲区中键入它们并且其中的某些文件被标记时，VC 文件集由标记的文件 (@pxref{VC Directory Mode}) 组成。  同样，当您从 Dired 缓冲区调用 VC 命令时，VC 文件集由标记的文件 (@pxref{Marks vs Flags}) 组成，如果没有标记文件，则默认为当前行上显示的文件。
+
+通过现代基于变更集的版本控制系统 (@pxref{VCS Changesets})，例如 Git、Mercurial 和 Bazaar，VC 命令将多文件 VC 文件集作为一个组进行处理。  例如，提交多文件 VC 文件集会生成单个修订版，其中包含对所有这些文件的更改。  在旧的基于文件的版本控制系统（如 CVS）上，多文件 VC 文件集中的每个文件都是单独处理的；因此，提交文件集会为文件集中的每个更改的文件生成一个修订版本。
+
+@table @kbd
+@item C-x v v
+对当前 VC 文件集执行下一个适当的版本控制操作。
+@end table
+
+@findex vc-next-action
+@kindex C-x v v
+主要的 VC 命令是一个多用途命令 @kbd{C-x v v} (@code{vc-next-action})，它对当前 VC 文件集执行最合适的操作：将其注册到版本控制系统，或提交它，或解锁它，或将更改合并到其中。以下小节详细描述了每种情况的具体操作。  您可以在文件访问缓冲区、Dired 缓冲区或 VC 目录缓冲区中使用 @kbd{C-x v v}；在后两种情况下，该命令对由标记文件组成的文件集进行操作。  您还可以在 Diff 模式 (@pxref{Diff Mode}) 下的带有补丁的缓冲区中使用@kbd{C-x v v}，在这种情况下，该命令将对其差异显示在缓冲区中的文件进行操作。
+
+请注意，VC 文件集与用于查看和访问功能组 (@pxref{Filesets}) 中的文件的命名文件集不同。  与命名文件集不同，VC 文件集没有命名，并且不会跨会话持续存在。
+
+@menu
+* VC With A Merging VCS::   不加锁：Git、Hg、SVN、CVS 的默认模式。
+* VC With A Locking VCS::   默认模式下的 RCS、SCCS 和可选的 CVS。
+* Advanced C-x v v::        通过前缀参数可以使用高级功能。
+@end menu
+
+@node VC With A Merging VCS
+@subsubsection 带有合并的基本版本控制
+
+使用现代基于合并的版本控制系统（例如 Git 和 Hg；@pxref{VCS Merging}），当从访问版本控制文件或 VC Directory 或 Dired 缓冲区的缓冲区调用时，@kbd{C-x v v} 会执行以下操作：
+
+@itemize @bullet
+@item
+如果 VC 文件集中存在多个文件，并且这些文件的版本控制状态不一致，则发出错误信号。  （但是请注意，文件集允许包含新添加的文件、删除的文件和修改的文件；@pxref{Registering}。）如果文件集中的任何文件被版本控制忽略，也会发出错误信号。
+
+@item
+如果 VC 文件集中的每个文件均已注册且相对于最新版本未更改，则不执行任何操作。
+
+@item
+如果 VC 文件集中的所有文件都没有向版本控制系统注册，则将新添加的文件注册到 VC 文件集中，即将它们置于版本控制之下。  @xref{Registering}。  如果 Emacs 找不到要注册的系统，它会提示输入存储库类型，创建一个新存储库，并向其注册 VC 文件集。您还可以显式指定系统，请参阅@ref{Advanced C-x v v}。  请注意，注册文件并不提交它们；而是提交文件。您必须再次调用 @w{@kbd{C-x v v}} 才能提交；请参阅下一点。
+
+@item
+如果 VC 文件集中的每个文件都已新增或修改，则提交更改的文件。  为此，Emacs 弹出一个 @file{*vc-log*} 缓冲区；输入所需的更改日志条目，然后按 @kbd{C-c C-c} 进行提交。  @xref{Log Buffer}。
+
+如果在 Diff 模式下从缓冲区调用 @kbd{C-x v v}，则该命令将缓冲区视为保存一个或多个文件的一组补丁。  然后，它将更改应用到相应的文件，并在弹出 @file{*vc-log*} 缓冲区后提交更改，以允许您键入合适的提交日志消息。
+
+输入 @kbd{C-x v v} 后，如果不先在 @file{*vc-log*} 缓冲区中输入 @kbd{C-c C-k} 取消提交，则无法更改文件集或补丁。  例如，如果在 Emacs 已弹出 @file{*vc-log*} 缓冲区后更改在 @file{*vc-dir*} 缓冲区中标记的文件，则旧文件集将在此提交中保持有效。  （这与不提交补丁时对文件集中文件@emph{contents}所做的更改形成对比：所有此类更改都将包含在提交中，即使它们是在 Emacs 弹出 @file{*vc-log*} 缓冲区之后进行的。）
+
+当您取消提交时，Emacs 会保存您的日志消息。  这意味着如果您需要调整文件集或补丁，很容易再次重新启动提交操作：输入@w{@kbd{C-c C-k C-x v v M-p}}。  这里 @kbd{C-c C-k} 取消提交，@kbd{C-x v v} 使用新文件集或补丁启动另一个提交，最后 @kbd{M-p} 调用您之前的日志消息。
+
+使用现代分散版本控制系统（Git、Mercurial 等），更改会在本地提交，不会自动传播到上游存储库（通常位于远程主机上）。  在这些情况下，如果自上次更新以来存储库已更改，则提交可能会失败。  在这种情况下，您必须从上游更新，然后重试。  使用 @kbd{C-x v +} (@pxref{Pulling / Pushing}) 或 @kbd{C-x v m} (@pxref{Merging}) 来实现。
+
+使用集中式版本控制系统，如果由于上游更改而提交失败，请再次输入@kbd{C-x v v}以合并上游存储库更改。
+
+@item
+最后，如果您使用集中式版本控制系统，如果 VC 文件集中的任何文件相对于上游存储库已过时，请主动从存储库更新文件集。
+@end itemize
+
+当您在非锁定模式下使用 RCS 时，这些规则也适用，但更改不会自动从存储库合并。自您开始编辑文件以来，如果其他用户在同一文件中提交了更改，则不会通知您；当您提交修订时，其他用户的更改将被删除（但是，它们保留在存储库中，因此不会不可挽回地丢失）。  因此，在提交更改之前，您必须验证当前版本是否未更改。  此外，即使在这种模式下，RCS 也可以锁定：未修改的文件的 @kbd{C-x v v} 会锁定文件，就像在正常锁定模式 (@pxref{VC With A Locking VCS}) 下使用 RCS 一样。
+
+@node VC With A Locking VCS
+@subsubsection 带锁定的基本版本控制
+
+对于基于锁定的版本控制系统（例如默认模式下的 SCCS 和 RCS），@kbd{C-x v v} 执行以下操作：
+
+@itemize @bullet
+@item
+如果 VC 文件集中存在多个文件，并且这些文件的版本控制状态不一致，则发出错误信号。  如果版本控制忽略文件集中的任何文件，也会发出错误信号。
+
+@item
+如果 VC 文件集中的每个文件都未向版本控制系统注册，则将新添加的文件注册到文件集中。 @xref{Registering}。  如果 Emacs 找不到要注册的系统，它会提示输入存储库类型，创建一个新存储库，并向其注册 VC 文件集。  您还可以显式指定系统，请参阅@ref{Advanced C-x v v}。
+
+@item
+如果每个文件都已注册并解锁，请检出文件：锁定每个文件并使其可写，以便您可以开始编辑它。
+
+@item
+如果每个文件都被您锁定并包含更改，请提交（又名@:“签入”）更改。  为此，Emacs 弹出一个 @file{*vc-log*} 缓冲区；输入新版本所需的日志条目，然后按 @kbd{C-c C-c} 进行提交 (@pxref{Log Buffer})。
+
+@item
+如果每个文件都被您锁定，但您没有更改它，请释放锁定并再次使该文件变为只读。  这将撤消先前对自签出以来未更改的文件的签出操作。
+
+@item
+如果每个文件都被其他用户锁定，请询问您是否要窃取该锁。  如果您选择“是”，该文件将被您锁定，并向之前锁定该文件的用户发送一条警告消息。
+
+@item
+如果文件集中的文件已解锁，但相对于其上次修订版有所更改，请提出为每个此类文件申请锁定或将文件恢复到上次签入的修订版。  （这种情况是特殊情况，通常不应发生。）
+@end itemize
+
+当您在锁定模式下使用 CVS 时，这些规则也适用，只不过 CVS 不支持窃取锁。
+
+@node Advanced C-x v v
+@subsubsection @kbd{C-x v v} 中的高级控制
+
+@cindex revision ID in version control
+当您为 @code{vc-next-action} (@kbd{C-u C-x v v}) 提供前缀参数时，它仍然执行下一个逻辑版本控制操作，但接受其他参数来精确指定如何执行该操作。
+
+@itemize @bullet
+@item
+@cindex specific version control system
+您可以指定版本控制系统的名称。  如果文件集可以由多个版本控制系统管理，并且 Emacs 无法检测到正确的版本控制系统，那么这一点很有用。
+
+@item
+否则，如果使用 CVS、RCS 或 SRC，您可以指定修订 ID。
+
+如果文件集被修改（或锁定），这会使 Emacs 提交具有该修订 ID 的文件@. 您可以通过提供适当的修订 ID (@pxref{Branches}) 来创建新分支。
+
+如果文件集未修改（且未锁定），则会将指定的修订检出到工作树中。  您还可以通过给出另一个分支的修订版或分支 ID (@pxref{Switching Branches}) 来指定另一个分支上的修订版。  空参数（即 @kbd{C-u C-x v v @key{RET}}）检查当前分支上的最新版本（又名@:“head”）。
+
+以这种方式指定修订 ID 会被分散的版本控制系统默默地忽略。  这些系统不允许您指定自己的修订 ID，也不使用签出单个文件的概念。
+@end itemize
+
+@node Log Buffer
+@subsection 日志条目缓冲区的特点
+
+@kindex C-c C-c @r{(Log Edit mode)}
+@findex log-edit-done
+当您告诉 VC 提交更改时，它会弹出一个名为 @file{*vc-log*} 的缓冲区。  在此缓冲区中，您应该编写一个 @dfn{log entry} 来描述您所做的更改 (@pxref{Why Version Control?})。完成后，输入 @kbd{C-c C-c} (@code{log-edit-done}) 退出缓冲区并提交更改以及日志条目。
+
+@cindex Log Edit mode
+@cindex mode, Log Edit
+@vindex vc-log-mode-hook
+@c FIXME: Mention log-edit-mode-hook here?  --xfq
+@file{*vc-log*} 缓冲区的主要模式是日志编辑模式，它是文本模式 (@pxref{Text Mode}) 的变体。  进入日志编辑模式时，Emacs 运行挂钩 @code{text-mode-hook} 和 @code{vc-log-mode-hook} (@pxref{Hooks})。
+
+在@file{*vc-log*}缓冲区中，您可以写入一个或多个@dfn{header lines}，指定要提供给版本控制系统的附加信息。  每个标题行必须在缓冲区顶部占据一行；非标题行的第一行被视为日志条目的开始。  例如，以下标题行表明当前更改不是由您编写的，而是由其他开发人员编写的：
+
+@smallexample
+Author: J. R. Hacker <jrh@@example.com>
+@end smallexample
+
+@noindent
+除了 0⁣ 标头之外，Emacs 还可以识别标头 @samp{Summary}（变更集的单行摘要）、@samp{Date}（手动指定的提交时间）和 @samp{Fixes}（对由变更修复的错误的引用）。  并非所有版本控制系统都能识别所有标头。  如果您为不支持的系统指定标头，则该标头将被视为日志条目的一部分。
+
+@kindex C-c C-f @r{(Log Edit mode)}
+@findex log-edit-show-files
+@kindex C-c C-d @r{(Log Edit mode)}
+@findex log-edit-show-diff
+在 @file{*vc-log*} 缓冲区中时，当前 VC 文件集被视为在您键入 @w{@kbd{C-c C-c}} 时将提交的文件集。  要查看 VC 文件集中的文件列表，请键入 @w{@kbd{C-c C-f}} (@code{log-edit-show-files})。  要查看 VC 文件集与开始编辑的版本 (@pxref{Old Revisions}) 之间的更改差异，请键入 @kbd{C-c C-d} (@code{log-edit-show-diff})。
+
+@kindex C-c C-w @r{(Log Edit mode)}
+@findex log-edit-generate-changelog-from-diff
+@vindex diff-add-log-use-relative-names
+为了帮助生成 ChangeLog 条目，请输入 @kbd{C-c C-w} (@code{log-edit-generate-changelog-from-diff})，以生成框架 ChangeLog 条目，根据 VC 文件集的差异列出所有已更改的文件和函数名称。  留空的连续条目将按 @kbd{M-q} (@code{fill-paragraph}) 合并。  默认情况下，框架仅包含文件名，没有任何前导目录。  如果您希望将前导目录添加到 VC 根目录之前，请自定义@code{diff-add-log-use-relative-names}。
+
+@kindex C-c C-a @r{(Log Edit mode)}
+@findex log-edit-insert-changelog
+如果 VC 文件集包含一个或多个 @file{ChangeLog} 文件 (@pxref{Change Log})，请键入 @kbd{C-c C-a} (@code{log-edit-insert-changelog}) 将相关条目拉入 @file{*vc-log*} 缓冲区。  如果每个 @file{ChangeLog} 中最上面的项目是在当前日期以您的用户名创建的，则此命令会在该项目中搜索与要提交的文件匹配的条目，并将其插入。
+@ifnottex
+If you are using CVS or RCS, see @ref{Change Logs and VC}, for the
+opposite way of working---generating ChangeLog entries from the Log
+Edit buffer.
+@end ifnottex
+
+要中止提交，只需在该缓冲区中键入 @emph{don't} 即可。  您可以切换缓冲区并进行其他编辑。  只要您不尝试进行另一次提交，您正在编辑的条目就会保留在 @file{*vc-log*} 缓冲区中，并且您可以随时返回该缓冲区以完成提交。
+
+@kindex M-n @r{(Log Edit mode)}
+@kindex M-p @r{(Log Edit mode)}
+@kindex M-s @r{(Log Edit mode)}
+@kindex M-r @r{(Log Edit mode)}
+您还可以浏览以前日志条目的历史记录以复制提交评论。  当您想要使用类似的注释进行多次提交时，这会很有用。  用于执行此操作的命令 @kbd{M-n}、@kbd{M-p}、@kbd{M-s} 和 @kbd{M-r} 就像迷你缓冲区历史命令 (@pxref{Minibuffer History}) 一样，只不过它们在迷你缓冲区之外使用。
+
+@node Registering
+@subsection 注册文件进行版本控制
+
+@table @kbd
+@item C-x v i
+注册访问的文件以进行版本控制。
+@end table
+
+@kindex C-x v i
+@findex vc-register
+命令 @kbd{C-x v i} (@code{vc-register}) @dfn{registers} 当前 VC 文件集中的每个文件，将其置于版本控制之下。这本质上相当于 @kbd{C-x v v} 对未注册的 VC 文件集 (@pxref{Basic VC Editing}) 的操作，除了如果 VC 文件集已注册，@kbd{C-x v i} 会发出错误信号，而 @kbd{C-x v v} 会执行其他操作。
+
+要注册文件，Emacs 必须选择版本控制系统。  对于多文件 VC 文件集，VC 目录缓冲区指定要使用的系统 (@pxref{VC Directory Mode})。  对于单文件 VC 文件集，如果该文件的目录已包含在版本控制系统中注册的文件，或者该目录是由版本控制系统控制的目录树的一部分，则 Emacs 将选择该系统。  如果适用多个版本控制系统，Emacs 将使用变量中第一个出现的版本控制系统
+@iftex
+@code{vc-handled-backends}.
+@end iftex
+@ifnottex
+@code{vc-handled-backends} (@pxref{Customizing VC}).
+@end ifnottex
+如果 Emacs 找不到版本控制系统来注册文件，它会提示输入存储库类型，创建一个新存储库，并将文件注册到该存储库中。
+
+@cindex added files, VC
+@cindex files added to VCS
+对于大多数版本控制系统，使用 @w{@kbd{C-x v i}} 或 @w{@kbd{C-x v v}} 注册文件会将其添加到工作树中，但不会提交它，即不将其添加到存储库中。  此类文件在 VC 目录缓冲区中标记为 @dfn{added}，访问此类文件的缓冲区的模式行显示修订 ID 为 @samp{@@@@}。  为了使注册在存储库中生效，您必须提交新添加的文件（@pxref{Basic VC Editing}）。请注意，单个提交可以包括文件添加和对 VCS 已知文件的编辑。
+
+使用基于锁定的版本控制系统 (@pxref{VCS Merging})，注册文件会使其处于解锁状态且只读。  输入 @kbd{C-x v v} 检出文件并开始编辑。
+
+@node Old Revisions
+@subsection 检查和比较旧版本
+
+@table @kbd
+@item C-x v =
+将当前 VC 文件集中的工作文件与您开始的版本 (@code{vc-diff}) 进行比较。  使用前缀参数，提示当前 VC 文件集的两个修订版本并比较它们。  您还可以从 Dired 缓冲区 (@pxref{Operating on Files}) 调用此命令。
+
+@ifnottex
+@item M-x vc-ediff
+Like @kbd{C-x v =}, but using Ediff.  @xref{Top,, Ediff, ediff, The
+Ediff Manual}.
+@end ifnottex
+
+@item C-x v D
+将整个工作树与您开始的修订版 (@code{vc-root-diff}) 进行比较。  使用前缀参数，提示两个修订并比较它们的树。
+
+@item C-x v ~
+提示当前文件的修订，并在单独的缓冲区中访问它（@code{vc-revision-other-window}）。
+
+@item C-x v g
+显示当前文件的带注释版本：对于每一行，显示对其进行修改的最新版本 (@code{vc-annotate})。
+@end table
+
+@findex vc-diff
+@kindex C-x v =
+@kbd{C-x v =} (@code{vc-diff}) 显示@dfn{diff}，它将当前 VC 文件集中的每个工作文件与您开始编辑的版本进行比较。  差异显示在另一个窗口中名为 @file{*vc-diff*} 的 Diff 模式缓冲区 (@pxref{Diff Mode}) 中。  常用的 Diff 模式命令在此缓冲区中可用。  特别是，@kbd{g} (@code{revert-buffer}) 命令再次执行文件比较，生成新的差异。
+
+@kindex C-u C-x v =
+要比较当前 VC 文件集的两个任意修订版，请使用前缀参数调用 @code{vc-diff}：@kbd{C-u C-x v =}。  这会提示输入两个修订 ID (@pxref{VCS Concepts})，并显示文件集这些版本之间的差异。  如果版本控制系统是基于文件而不是基于变更集（例如 CVS），这对于多文件 VC 文件集将无法可靠地工作，因为那时不同文件的修订 ID 将不会以任何有意义的方式相关。
+
+某些版本控制系统允许您以其他格式指定修订版本，而不是修订版本 ID。  例如，在 Bazaar 下，您可以输入 @samp{date:yesterday} 作为 @kbd{C-u C-x v =}（和相关命令）的参数，以指定昨天之后提交的第一个修订。  详细信息请参见版本控制系统的文档。
+
+如果从 Dired 缓冲区 (@pxref{Dired}) 调用 @kbd{C-x v =} 或 @kbd{C-u C-x v =}，则当前行列出的文件将被视为当前 VC 文件集。  VC 文件集还可以包含多个标记的文件。
+
+@ifnottex
+@findex vc-ediff
+  @kbd{M-x vc-ediff} works like @kbd{C-x v =}, except that it uses an
+Ediff session.  @xref{Top,, Ediff, ediff, The Ediff Manual}.
+@end ifnottex
+
+@findex vc-root-diff
+@kindex C-x v D
+@kbd{C-x v D} (@code{vc-root-diff}) 与@kbd{C-x v =}类似，但它显示整个当前工作树（即包含当前 VC 文件集的工作树）中的更改。  如果从 Dired 缓冲区调用此命令，它将应用于包含该目录的工作树。
+
+@findex vc-root-version-diff
+@kindex C-u C-x v D
+要比较整个树的两个任意修订，请使用前缀参数调用@code{vc-root-diff}：@kbd{C-u C-x v D}。  这会提示输入两个修订 ID (@pxref{VCS Concepts})，并显示整个版本控制目录树的这些版本之间的差异（RCS、SCCS、CVS 和 SRC 不支持此功能）。
+
+@vindex vc-diff-switches
+您可以自定义 @kbd{C-x v =} 和 @kbd{C-x v D} 用于生成差异的 @command{diff} 选项。  使用的选项按顺序取自变量 @code{vc-@var{backend}-diff-switches}、@code{vc-diff-switches} 和 @code{diff-switches} (@pxref{Comparing Files}) 中的第一个非 @code{nil} 值。  这里，@var{backend}代表相关的版本控制系统，例如@code{bzr}代表Bazaar。  由于@code{nil}表示检查序列中的下一个变量，因此前两个变量中的任何一个都可以使用值@code{t}来表示根本不进行切换。  大多数@code{vc-@var{backend}-diff-switches}变量默认为@code{nil}，但有些默认为@code{t}；这些适用于其 @code{diff} 实现不接受常见 diff 选项的版本控制系统，例如 Subversion。
+
+@findex vc-revision-other-window
+@kindex C-x v ~
+要直接检查文件的旧版本，请访问工作文件并输入 @kbd{C-x v ~ @var{revision} @key{RET}} (@code{vc-revision-other-window})。  这会检索与 @var{revision} 对应的文件版本，将其保存到 @file{@var{filename}.~@var{revision}~}，并在单独的窗口 (@pxref{Window Choice}) 中访问它。
+
+@findex vc-annotate
+@vindex vc-annotate-background-mode
+@kindex C-x v g
+许多版本控制系统允许您通过键入 @kbd{C-x v g} (@code{vc-annotate}) 查看文件 @dfn{annotated} 以及每行修订信息。  这将创建一个新的“注释”缓冲区，显示文件的文本，每行都用颜色显示它的年代。  红色文本是新的，蓝色是旧的，中间颜色表示中间年龄。  默认情况下，颜色在整个年龄范围内缩放，最旧的更改为蓝色，最新的更改为红色。  如果变量 @code{vc-annotate-background-mode} 为非 @code{nil}，则表示每行年龄的颜色将应用于背景颜色，使前景色保持默认颜色。
+
+@vindex vc-annotate-switches
+您可以通过自定义 @code{vc-@var{backend}-annotate-switches} 和 @code{vc-annotate-switches} 来自定义 @kbd{C-x v g} 使用的 @code{annotate} 选项。  它们的功能与上述 @code{vc-@var{backend}-diff-switches} 和 @code{vc-diff-switches} 类似。
+
+当您为 @kbd{C-x v g} 提供前缀参数时，Emacs 使用迷你缓冲区读取两个参数：要显示和注释的修订版本（而不是当前文件内容），以及颜色范围应覆盖的时间跨度（以天为单位）。
+
+在“注释”缓冲区中，这些和其他颜色缩放选项可从 @samp{VC-Annotate} 菜单获得。  在此缓冲区中，您还可以使用以下键来浏览过去修订的注释、查看差异或查看日志条目：
+
+@table @kbd
+@item p
+注释前一修订版，即当前注释修订版之前的修订版。  数字前缀参数是重复计数，因此 @kbd{C-u 10 p} 会让您返回 10 个修订版本。
+
+@item n
+注释下一个修订版本，即当前注释版本之后的修订版本。  数字前缀参数是重复计数。
+
+@item j
+注释当前行指示的修订。
+
+@item a
+在当前行指示的版本之前注释修订版本。这对于查看当前行发生更改之前文件所处的状态很有用。
+
+@item f
+在缓冲区中显示当前行指示的文件修订版本。
+
+@item d
+显示当前行的修订版与上一修订版之间的差异。  这对于查看文件中当前行的修订版实际更改的内容很有用。
+
+@item D
+显示变更集中所有文件的当前行修订版与上一修订版之间的差异（对于支持变更集的 VC 系统）。  这对于查看树中当前行的修订版实际更改的内容很有用。
+
+@item l
+显示当前行的修订日志。  这对于查看作者对当前行修订版本的更改的描述很有用。
+
+@item w
+注释工作修订版——您正在编辑的修订版。  如果您使用 @kbd{p} 和 @kbd{n} 浏览到其他版本，请使用此键返回到您的工作版本。
+
+@item v
+切换注释可见性。  这对于仅查看文件内容而不用分心注释非常有用。
+@end table
+
+@node VC Change Log
+@subsection VC变更日志
+@cindex VC change log
+
+@table @kbd
+@item C-x v l
+显示当前文件集的更改历史记录 (@code{vc-print-log})。
+
+@item C-x v L
+显示当前存储库的更改历史记录 (@code{vc-print-root-log})。
+
+@item C-u 1 C-x v L @var{revision} @key{RET}
+显示单个 @var{revision} (@code{vc-print-root-log}) 的日志条目和更改（差异）。
+
+@item C-x v b l
+显示另一个分支上当前文件集的更改历史记录 (@code{vc-print-fileset-branch-log})。
+
+@item C-x v b L
+显示另一个分支上当前存储库的更改历史记录 (@code{vc-print-root-branch-log})。
+
+@item C-x v I
+显示“拉”操作将检索的更改的日志条目 (@code{vc-root-log-incoming})。
+
+@vindex vc-use-incoming-outgoing-prefixes
+如果将@code{vc-use-incoming-outgoing-prefixes}自定义为非@code{nil}，则@kbd{C-x v I}将成为前缀键，@code{vc-root-log-incoming}将绑定到@kbd{C-x v I L}。
+
+@item M-x vc-root-diff-incoming
+显示拉取操作将检索的所有更改的差异。
+
+如果将@code{vc-use-incoming-outgoing-prefixes}自定义为非@code{nil}，则此命令在@kbd{C-x v I D}上可用。
+
+@item M-x vc-diff-incoming
+显示拉取操作将检索的更改的差异，但仅限于当前文件集。
+
+如果将@code{vc-use-incoming-outgoing-prefixes}自定义为非@code{nil}，则此命令在@kbd{C-x v I =}上可用。
+
+@item C-x v O
+显示下一个“推送”操作将发送的更改的日志条目 (@code{vc-root-log-outgoing})。
+
+如果将@code{vc-use-incoming-outgoing-prefixes}自定义为非@code{nil}，则@kbd{C-x v O}将成为前缀键，@code{vc-root-log-outgoing}将绑定到@kbd{C-x v O L}。
+
+@item M-x vc-root-diff-outgoing
+显示下一个推送操作将发送的所有更改的差异。
+
+如果将@code{vc-use-incoming-outgoing-prefixes}自定义为非@code{nil}，则该命令将绑定到@kbd{C-x v O D}。
+
+@item M-x vc-diff-outgoing
+显示下一个推送操作将发送的更改的差异，但仅限于当前文件集。
+
+如果将@code{vc-use-incoming-outgoing-prefixes}自定义为非@code{nil}，则此命令在@kbd{C-x v O =}上可用。
+
+@item C-x v E D
+显示下一个推送操作将发送的所有更改以及任何未提交的更改的组合差异。
+
+@item C-x v E =
+显示下一个推送操作将发送的所有更改以及任何未提交的更改的组合差异，但仅限于当前文件集。
+
+@item C-x v h
+显示当前缓冲区 (@code{vc-region-history}) 访问的文件区域中所做更改的历史记录。
+
+@item M-x vc-log-search @key{RET}
+搜索指定模式的更改历史记录。
+@end table
+
+@kindex C-x v l
+@findex vc-print-log
+@kbd{C-x v l} (@code{vc-print-log}) 显示名为 @file{*vc-change-log*} 的缓冲区，以长格式显示对当前文件集所做的更改历史记录，包括谁进行了更改、日期以及每个更改的日志条目（这些日志条目与您通过 @file{*vc-log*} 缓冲区输入的日志条目相同；@pxref{Log Buffer}）。  如果从访问文件的缓冲区调用，则当前文件集由该单个文件组成，并且显示的 @file{*vc-change-log*} 缓冲区中的点以该文件的修订版本为中心。  如果从 VC 目录缓冲区 (@pxref{VC Directory Mode}) 或 Dired 缓冲区 (@pxref{Operating on Files}) 调用，则文件集包含所有标记的文件，如果没有标记文件，则默认为目录缓冲区中当前行显示的文件。
+
+如果文件集包含一个或多个目录，则生成的 @file{*vc-change-log*} 缓冲区会显示一小段更改日志（每次更改一行）（如果 VC 后端支持）；否则它会以长格式显示日志。
+
+使用前缀参数，该命令会提示修订版在 @file{*vc-change-log*} 缓冲区中居中，并提示要显示的最大修订版数。
+
+@kindex C-x v L
+@findex vc-print-root-log
+@findex log-view-toggle-entry-display
+@kbd{C-x v L} (@code{vc-print-root-log}) 显示@file{*vc-change-log*}缓冲区，显示整个版本控制目录树的历史记录（RCS、SCCS、CVS 和 SRC 不支持此功能）。  使用前缀参数，该命令会提示输入要显示的最大修订版本数。  数字前缀参数指定不提示的最大修订次数。
+
+如果数字前缀参数为 1（如 @w{@kbd{C-1 C-x v L}} 或 @w{@kbd{C-u 1 C-x v L}}），该命令会提示输入修订 ID，并显示该修订的日志条目及其引入的更改（差异）。  （一些功能较差的版本控制系统，例如 RCS 和 CVS，没有命令来显示修订日志及其差异；对于它们来说，该命令仅显示日志条目，您可以通过键入 @kbd{d} 或 @kbd{D} 来请求显示差异，请参见下文。）
+
+@kbd{C-x v L} 历史记录以紧凑的形式显示，通常仅显示每个日志条目的第一行。  但是，您可以在 @file{*vc-change-log*} 缓冲区中键入 @key{RET} (@code{log-view-toggle-entry-display}) 以显示当时修订的整个日志条目。  第二个@key{RET}再次隐藏它。
+
+@kindex C-x v b l
+@kindex C-x v b L
+@findex vc-print-fileset-branch-log
+@findex vc-print-root-branch-log
+@kbd{C-x v b l @var{branch-name} @key{RET}} (@code{vc-print-fileset-branch-log}) 显示@file{*vc-change-log*}缓冲区，以长格式显示对当前文件集所做的更改历史记录，就像@code{vc-print-log} 一样，但它显示当前分支以外的分支的历史记录；它会提示输入您想要查看其历史记录的分支的名称。  @w{@kbd{C-x v b L @var{branch-name} @key{RET}}} (@code{vc-print-root-branch-log}) 类似，只是它显示版本控制目录树的历史记录，如@code{vc-print-root-log}。
+
+对于有意义的版本控制系统，您还可以指定修订 ID，而不是将分支名称指定为 @var{branch-name}，Emacs 将从该修订 ID 开始打印日志。  您还可以为 VCS 支持的特定修订指定其他名称，例如标签名称 (@pxref{Revision Tags})，或 Git 支持的远程分支引用。
+
+@kindex C-x v I
+@kindex C-x v O
+@findex vc-root-log-incoming
+@findex vc-root-log-outgoing
+在分散式版本控制系统上，@kbd{C-x v I} (@code{vc-root-log-incoming}) 命令显示一个日志缓冲区，其中显示下次运行版本控制系统的 pull 命令以从另一个远程位置获取新修订版本 (@pxref{Pulling / Pushing}) 时将应用的更改。  根据版本控制系统的定义，另一个远程位置是从中提取更改的默认位置；使用前缀参数，@code{vc-root-log-incoming} 提示输入特定的远程位置。  同样，@kbd{C-x v O} (@code{vc-root-log-outgoing}) 显示下次运行推送命令时将发送到另一个远程位置的更改；使用前缀参数，它提示特定的目的地，在某些版本控制系统的情况下可以是分支名称。
+
+@findex vc-root-diff-incoming
+@findex vc-root-diff-outgoing
+密切相关的命令 @code{vc-root-diff-incoming} 和 @code{vc-root-diff-outgoing} 是 @code{vc-root-log-incoming} 和 @code{vc-root-log-outgoing} 的 diff 类似物。  这些显示差异缓冲区报告将拉取或推送的更改。  您也可以在此处使用前缀参数来指定特定的远程位置。  @code{vc-root-diff-outgoing} 作为预览推送并快速检查是否已提交并将仅推送您打算包含的所有更改的方法非常有用。
+
+@findex vc-diff-incoming
+@findex vc-diff-outgoing
+命令@code{vc-diff-incoming}和@code{vc-diff-outgoing}非常相似。  它们还显示将被拉或推的更改。不同之处在于报告的差异仅限于当前文件集。  不要忘记实际的拉和推操作总是影响整个工作树，而不仅仅是当前的文件集。
+
+@kindex C-x v E =
+@kindex C-x v E D
+@findex vc-diff-outgoing-and-edited
+@findex vc-root-diff-outgoing-and-edited
+最后，还有 @kbd{C-x v E D} (@code{vc-root-diff-outgoing-and-edited})，它显示将推送的所有更改以及任何未提交的更改的组合差异。  显示仅本地存在的所有作品很有用。  还有 @kbd{C-x v E =} (@code{vc-diff-outgoing-and-edited})，它是相同的，但仅限于当前文件集。
+
+@cindex VC log buffer, commands in
+@cindex vc-log buffer
+在 @file{*vc-change-log*} 缓冲区中，您可以使用以下键在修订日志和文件日志之间移动，并检查和比较过去的修订 (@pxref{Old Revisions})：
+
+@table @kbd
+@item p
+移至上一个修订条目 (@code{log-view-msg-prev})。 （日志缓冲区中的修订条目通常按时间倒序排列，因此前一个修订项通常对应于较新的修订版。）数字前缀参数是重复计数。
+
+@item n
+移至下一个修订条目 (@code{log-view-msg-next})。  数字前缀参数是重复计数。
+
+@item a
+在当前行上注释修订版 (@code{log-view-annotate-version}; @pxref{Old Revisions})。
+
+@item e
+修改点(@code{log-view-modify-change-comment})处显示的更改注释。  请注意，并非所有 VC 系统都支持修改更改注释。
+
+@item f
+访问当前行 (@code{log-view-find-revision}) 指示的修订版本。
+
+@item d
+对于特定文件 (@code{log-view-diff})，显示当前版本与下一个早期版本之间的差异。
+
+@item D
+显示当前版本与下一个早期版本之间的变更集差异 (@code{log-view-diff-changeset})。  这显示了该修订版中对所有文件所做的更改。
+
+@item w
+将当前日志条目的修订 ID 复制到终止环 (@pxref{Kill Ring})，就像您使用了@kbd{M-w} (@code{log-view-copy-revision-as-kill}) 一样。  如果标记了多个修订，该命令会将所有修订的 ID 复制到终止环，并用空格分隔。
+
+@item @key{RET}
+在紧凑型日志缓冲区（例如，由@kbd{C-x v L}创建的日志缓冲区）中，在显示和隐藏点 (@code{log-view-toggle-entry-display}) 处的修订的完整日志条目之间切换。
+
+@item M-@key{RET}
+如果相关的话，像 @kbd{RET} 那样显示完整的日志条目，并且像 @kbd{D} 那样显示差异，但不选择显示差异的窗口 (@code{log-view-display-entry-and-diff})。  如果已显示完整的日志条目文本，则绝不隐藏它。
+
+@item M-p
+就像@kbd{p}后跟@kbd{M-@key{RET}}一样：移至上一个条目，如果相关则完整显示它，并显示其差异（@code{log-view-msg-and-diff-prev}）。  数字前缀参数是运动部分的重复计数；最多完整显示一项。
+
+@item M-n
+就像@kbd{n}后跟@kbd{M-@key{RET}}一样：移至上一个条目，如果相关则完整显示它，并显示其差异（@code{log-view-msg-and-diff-next}）。  数字前缀参数是运动部分的重复计数；最多完整显示一项。
+
+@item m
+在点 (@code{log-view-mark-entry}) 处标记条目。
+
+@item u
+取消标记点 (@code{log-view-unmark-entry}) 处的条目。
+
+@item U
+取消标记所有标记的条目 (@code{log-view-unmark-all-entries})。
+
+@item C
+将更改复制到当前签出的分支；要么是当前修订版的更改，要么是所有标记修订版的更改 (@code{log-view-cherry-pick})。
+
+@item R
+撤销旧修订的影响；要么是当前的修订版，要么是所有标记的修订版 (@code{log-view-revert-or-delete-revisions})。
+
+@item x
+从当前分支中删除比当前分支更新的修订版本，而不触及工作树 (@code{log-view-uncommit-revisions-from-end})。
+
+@item X
+删除比当前分支 (@code{log-view-delete-revisions-from-end}) 中的修订版更新的修订版。
+@end table
+
+@vindex vc-log-show-limit
+由于获取许多日志条目可能会很慢，因此 @file{*vc-change-log*} 缓冲区默认显示不超过 2000 个修订。  变量 @code{vc-log-show-limit} 指定此限制；如果将该值设置为零，则会消除限制。  您还可以通过单击缓冲区末尾的 @samp{Show 4X entries} 或 @samp{Show unlimited entries} 按钮来增加现有 @file{*vc-change-log*} 缓冲区中显示的修订数量。  但是，RCS、SCCS、CVS 和 SRC 不支持此功能。
+
+@kindex C-x v h
+@findex vc-region-history
+命令 @kbd{vc-region-history} 提供了检查更改历史记录的有用变体（默认绑定到 @kbd{C-x v h}），它显示了 @file{*VC-history*} 缓冲区，其中包含在点和标记 (@pxref{Mark}) 之间的当前缓冲区文件区域中所做的更改历史记录。  更改历史记录包括提交日志消息以及 Diff 格式的更改本身。
+
+在当前缓冲区中标记您感兴趣的更改区域后调用此命令。  在弹出的 @file{*VC-history*} 缓冲区中，您可以使用上述 @file{*vc-change-log*} 缓冲区中可用的所有命令，以及 Diff 模式 (@pxref{Diff Mode}) 定义的命令。
+
+此命令当前仅适用于 Git 和 Mercurial (hg)。
+
+@findex vc-log-search
+命令@code{vc-log-search}允许在更改日志中搜索模式。  它提示输入模式（正则表达式），并显示更改历史记录中日志消息与该模式匹配的所有条目。  当使用前缀参数调用时，该命令还将提示为此目的运行特定的 VCS shell 命令。
+
+@node VC Undo
+@subsection 撤消版本控制操作
+
+@table @kbd
+@item C-x v u
+@item C-x v @@
+将当前 VC 文件集中的工作文件恢复到最新版本 (@code{vc-revert})。
+
+@item M-x vc-revert-or-delete-revision
+撤消旧提交的影响。
+
+@item M-x vc-revert-revision
+进行一次新的提交，撤消旧提交所做的更改。
+
+@item M-x vc-delete-revision
+从修订历史记录中删除未推送的提交。
+@end table
+
+@kindex C-x v u
+@kindex C-x v @@
+@findex vc-revert
+@vindex vc-revert-show-diff
+如果要放弃对当前 VC 文件集所做的所有更改，请键入 @kbd{C-x v u} 或 @kbd{C-x v @@} (@code{vc-revert})。  这将要求您在放弃更改之前进行确认。  如果您同意，文件集将被恢复。
+
+如果 @code{vc-revert-show-diff} 不是 @code{nil}，此命令将显示工作文件与您开始编辑的修订版本之间的差异。  之后，差异缓冲区将被杀死（如果该变量为@code{kill}），或者缓冲区将被埋葬（任何其他非@code{nil}值）。  如果您不希望 @code{vc-revert} 显示差异，请将此变量设置为 @code{nil} （您仍然可以使用 @kbd{C-x v =}; @pxref{Old Revisions} 直接查看差异）。
+
+在基于锁定的版本控制系统上，@code{vc-revert} 使文件保持解锁状态；您必须再次锁定才能继续编辑。  如果您锁定文件然后决定不更改它，也可以使用 @code{vc-revert} 解锁文件。
+
+@findex vc-revert-or-delete-revision
+@cindex reverting commits
+要放弃您自己或其他人已经提交的更改，您可以使用@w{@kbd{M-x vc-revert-or-delete-revision}}。这称为 @dfn{reverting} 提交。  该命令提示要恢复的修订，然后 VC 后端将其恢复。
+
+大多数后端通过进行新的提交来撤消修订版所做的更改来实现这一点。  对于分布式 VCS，如果提交是您所做的但尚未推送，Emacs 将建议将其完全删除。  使用前缀参数，此命令将仅尝试完全删除修订版本，如果已推送则失败。
+
+访问此功能的另一种方法是使用 @code{log-view-revert-or-delete-revisions} 命令，该命令绑定到日志视图模式缓冲区 (@pxref{VC Change Log}) 中的 @kbd{R}。  与直接使用 @w{@kbd{M-x vc-revision revert}} 相比，这可以更轻松地确保您正在恢复您想要的修订。
+
+@findex vc-revert-revision
+@findex vc-delete-revision
+更具体、专门的命令是@w{@kbd{M-x vc-revert-revision}}和@w{@kbd{M-x vc-delete-revision}}。  其中第一个提示进行修订，然后始终进行新的提交，以撤消该修订所做的更改，无论使用哪个版本控制系统以及是否推送修订。  第二个命令提示进行修订，然后总是将其删除，但如果提交已推送，它将停止。  通常 @code{vc-revert-or-delete-revision} 就足够了，但 @code{vc-revert-revision} 和 @code{vc-delete-revision} 有时对于构建特定的版本控制历史很有用。
+
+@node VC Ignore
+@subsection 忽略版本控制文件
+
+@table @kbd
+@item C-x v G
+忽略当前版本控制系统下的文件。  (@code{vc-ignore})。
+@end table
+
+@kindex C-x v G
+@findex vc-ignore
+许多源代码树包含一些不需要版本控制的文件，例如编辑器备份、对象或字节码文件以及构建的程序。  您可以简单地不添加它们，但它们总是会以未知文件的形式出现。  您还可以通过将这些文件添加到树顶部的忽略文件中来告诉版本控制系统忽略这些文件。  @kbd{C-x v G} (@code{vc-ignore}) 可以帮助您做到这一点。  当使用前缀参数调用时，您可以从忽略文件列表中删除文件。
+
+@node VC Directory Mode
+@subsection VC目录模式
+
+@cindex VC Directory buffer
+@dfn{VC Directory buffer} 是一个专门的缓冲区，用于查看目录树中文件的版本控制状态，并对这些文件执行版本控制操作。  特别是，它用于为 @w{@kbd{C-x v v}} 等命令指定多文件 VC 文件集以执行 (@pxref{VC Directory Commands})。
+
+@kindex C-x v d
+@findex vc-dir
+要使用 VC 目录缓冲区，请键入 @kbd{C-x v d} (@code{vc-dir})。这将使用微型缓冲区读取目录名称，并切换到该目录的 VC Directory 缓冲区。  默认情况下，缓冲区命名为@file{*vc-dir*}。  其内容有描述
+@iftex
+below.
+@end iftex
+@ifnottex
+in @ref{VC Directory Buffer}.
+@end ifnottex
+
+@code{vc-dir} 命令自动检测指定目录中要使用的版本控制系统。  如果目录中使用多个系统，则应使用前缀参数 @kbd{C-u C-x v d} 调用该命令；这会提示 VC 目录缓冲区应使用的版本控制系统。
+
+@ifnottex
+@cindex PCL-CVS
+@pindex cvs
+@cindex CVS directory mode
+  In addition to the VC Directory buffer, Emacs has a similar facility
+called PCL-CVS which is specialized for CVS@.  @xref{Top, , About
+PCL-CVS, pcl-cvs, PCL-CVS---The Emacs Front-End to CVS}.
+@end ifnottex
+
+您还可以从 Dired 缓冲区 (@pxref{Dired}) 调用 VC 命令。在这种情况下，您调用的任何 VC 命令都会将标记的文件视为当前文件集 (@pxref{Basic VC Editing})，如果没有标记文件，则默认为当前行上的文件。
+
+@menu
+* Buffer: VC Directory Buffer.       缓冲区的外观和含义。
+* Commands: VC Directory Commands.   在 VC 目录缓冲区中使用的命令。
+@end menu
+
+@node VC Directory Buffer
+@subsubsection VC 目录缓冲区
+
+VC 目录缓冲区包含版本控制文件及其版本控制状态的列表。  它列出当前目录（调用 @kbd{C-x v d} 时指定的目录）及其子目录中的文件，但仅列出那些具有值得注意状态的文件。  最新的文件（即与存储库中的文件相同）或被忽略的文件将被忽略。  如果子目录中的所有文件都是最新的，则也不会列出该子目录。  作为例外，如果文件由于 VC 命令的直接结果而变为最新，则默认情况下会列出该文件。
+
+以下是 VC 目录缓冲区列表的示例：
+
+@smallexample
+@group
+                     ./
+    edited           configure.ac
+*   added            README
+    unregistered     temp.txt
+                     src/
+*   edited           src/main.c
+@end group
+@end smallexample
+
+@noindent
+两个工作文件已修改但未提交：当前目录中的 @file{configure.ac} 和 @file{src/} 子目录中的 @file{main.c}。  名为 @file{README} 的文件已添加但尚未提交，而 @file{temp.txt} 不受版本控制 (@pxref{Registering})。
+
+@file{README} 和 @file{src/main.c} 条目旁边的 @samp{*} 字符表示用户已将这些文件标记为当前 VC 文件集
+@iftex
+(see below).
+@end iftex
+@ifnottex
+(@pxref{VC Directory Commands}).
+@end ifnottex
+
+上面的示例是典型的去中心化版本控制系统，如 Bazaar、Git 或 Mercurial (@pxref{VCS Repositories})。  其他系统可以显示其他状态。  例如，如果存储库有尚未应用于工作文件的更改，CVS 会显示 @samp{needs-update} 状态。  RCS 和 SCCS 显示锁定文件的用户名作为其状态。
+
+@vindex vc-dir-auto-hide-up-to-date
+如上所述，默认情况下，在首次显示 VC 目录缓冲区后变为最新或被忽略的文件和目录将保持显示。  要自动从显示中删除此类文件，请将变量 @code{vc-dir-auto-hide-up-to-date} 自定义为值 @code{t}。  您还可以将其自定义为值 @code{revert}，在这种情况下，仅当您刷新 VC 目录显示时才会删除此类文件，例如，通过键入 @kbd{g} (@pxref{VC Directory Commands})。
+
+@ifnottex
+  On CVS, the @code{vc-dir} command normally contacts the repository,
+which may be on a remote machine, to check for updates.  If you change
+the variable @code{vc-cvs-stay-local} to @code{nil} (@pxref{CVS
+Options}), then Emacs avoids contacting a remote repository when
+generating the VC Directory buffer (it will still contact it when
+necessary, e.g., when doing a commit).  This may be desirable if you
+are working offline or the network is slow.
+@end ifnottex
+
+@vindex vc-directory-exclusion-list
+VC 目录缓冲区忽略变量 @code{vc-directory-exclusion-list} 中列出的子目录。  它的默认值包含版本控制系统内部使用的目录。
+
+在缓冲区的顶部，Emacs 显示有关存储库的一些信息，例如正在使用的后端的名称和工作目录。  此外，对于去中心化 VCS，如果您有传出提交 (@pxref{VC Change Log})，Emacs 会显示一行 @w{"Outgoing : N unpushed revisions"}，其中 @var{N} 是一个数字。  您可以单击此文本来执行@code{vc-root-log-outgoing}命令（@pxref{VC Change Log}）。
+
+@vindex vc-dir-show-outgoing-count
+Emacs 尝试使用缓存的信息来确定未推送的修订版本的数量，但对于某些后端来说这是不可能的。  在这些情况下，Emacs 必须偶尔从远程存储库获取数据以确定计数。  如果与远程存储库的连接速度很慢，则可能会导致刷新 VC 目录缓冲区的速度减慢，这是不可接受的。  如果这影响到您，您可以将 @code{vc-dir-show-outgoing-count} 自定义为 @code{nil} 以完全禁用未推送的修订计数。  您还可以使用目录局部变量 (@pxref{Directory Variables}) 在每个存储库的基础上进行设置。
+
+@node VC Directory Commands
+@subsubsection VC 目录命令
+
+Emacs 提供了多个命令，用于导航 VC 目录缓冲区、将文件标记为属于当前 VC 文件集以及对 VC 文件集进行操作。
+
+@table @kbd
+@item n
+@itemx @key{SPC}
+将点移动到下一个条目 (@code{vc-dir-next-line})。
+
+@item p
+将点移至上一个条目 (@code{vc-dir-previous-line})。
+
+@item @key{TAB}
+移至下一个目录条目 (@code{vc-dir-next-directory})。
+
+@item S-@key{TAB}
+移至上一个目录条目 (@code{vc-dir-previous-directory})。
+
+@item @key{RET}
+@itemx f
+访问当前行 (@code{vc-dir-find-file}) 列出的文件或目录。
+
+@item o
+在单独的窗口 (@code{vc-dir-find-file-other-window}) 中访问当前行的文件或目录。
+
+@item m
+标记当前行 (@code{vc-dir-mark}) 上的文件或目录，将其放入当前 VC 文件集中。  如果该区域处于活动状态，则标记该区域中的所有文件。
+
+如果文件已位于标记目录或其子目录之一中，则无法使用此命令对其进行标记。  同样，如果标记了树中的任何文件，则无法使用此命令标记目录。
+
+@item M
+如果点位于文件条目上，则将所有文件标记为相同状态；如果点位于目录条目上，则标记该目录树中的所有文件 (@code{vc-dir-mark-all-files})。  使用前缀参数标记所有列出的文件和目录。
+
+@findex vc-dir-mark-by-regexp
+@item % m
+@itemx * %
+您可以使用此命令通过正则表达式 (@code{vc-dir-mark-by-regexp}) 来标记文件。  如果给定前缀，则取消标记文件。
+
+@findex vc-dir-mark-registered-files
+@item * r
+您可以使用此命令来标记处于注册状态之一的文件，包括编辑、添加或删除。 (@code{vc-dir-mark-registered-files})。
+
+@item G
+将点下的文件添加到 VC 应忽略的文件列表中 (@code{vc-dir-ignore})。  例如，如果 VC 是 Git，它将将此文件追加到 @file{.gitignore} 文件中。  如果给定前缀，请对所有标记的文件执行此操作。
+
+@item @@
+放弃对当前文件集所做的所有更改 (@code{vc-revert})。
+
+@item V
+对 VC 目录缓冲区 (@code{vc-dir-root-next-action}) 中显示的所有文件进行下一个逻辑版本控制操作。  这类似于 @w{@kbd{C-x v v}} (@pxref{Basic VC Editing})，只不过它忽略了任何标记和点的位置。
+
+@item u
+取消标记当前行上的文件或目录。  如果该区域处于活动状态，请取消标记该区域中的所有文件 (@code{vc-dir-unmark})。
+
+@item U
+如果点位于文件条目上，则取消标记具有相同状态的所有文件；如果点位于目录条目上，则取消标记该目录树中的所有文件 (@code{vc-dir-unmark-all-files})。  使用前缀参数，取消标记所有文件和目录。
+
+@item x
+隐藏状态为 @samp{up-to-date} 或 @samp{ignored} (@code{vc-dir-hide-up-to-date}) 的文件。  使用前缀参数，隐藏其状态为当前项目状态的项目。
+
+@item g
+刷新 VC 目录缓冲区显示 (@code{revert-buffer})。
+
+@item q
+退出 VC 目录缓冲区，并将其埋葬 (@code{quit-window})。
+@end table
+
+@findex vc-dir-mark
+@findex vc-dir-mark-all-files
+在 VC 目录缓冲区中，所有用 @kbd{m} (@code{vc-dir-mark}) 或 @kbd{M} (@code{vc-dir-mark-all-files}) 标记的文件都位于当前 VC 文件集中。  如果用 @kbd{m} 标记目录条目，则该目录树中列出的所有文件都位于当前 VC 文件集中。  属于当前 VC 文件集的文件和目录在 VC 目录缓冲区中的 VC 状态旁边用 @samp{*} 字符指示。  通过这种方式，您可以设置一个由 VC 命令执行的多文件 VC 文件集，例如 @w{@kbd{C-x v v}} (@pxref{Basic VC Editing})、@w{@kbd{C-x v =}} (@pxref{Old Revisions}) 和 @w{@kbd{C-x v u}} (@pxref{VC Undo})。
+
+VC 目录缓冲区还为带有 @kbd{C-x v} 前缀的 VC 命令定义了一些单键快捷键：@kbd{=}、@kbd{+}、@kbd{l}、@kbd{i}、@kbd{D}、@kbd{L}、@kbd{G}、@kbd{I}、@kbd{O} 和@kbd{v}。
+
+例如，您可以通过打开 VC 目录缓冲区来提交一组已编辑的文件，其中文件以 @samp{edited} 状态列出；标记文件；并输入 @kbd{v} 或 @kbd{C-x v v} (@code{vc-next-action})。  如果版本控制系统是基于变更集的，Emacs 将在单个修订中提交文件。
+
+在 VC 目录缓冲区中时，您还可以使用以下命令对当前 VC 文件集执行搜索和替换：
+
+@table @kbd
+@item S
+搜索文件集 (@code{vc-dir-search})。
+
+@item Q
+对文件集执行正则表达式查询替换 (@code{vc-dir-query-replace-regexp})。
+
+@item M-s a C-s
+对文件集进行增量搜索 (@code{vc-dir-isearch})。
+
+@item M-s a C-M-s
+对文件集执行增量正则表达式搜索 (@code{vc-dir-isearch-regexp})。
+@end table
+
+@noindent
+除了作用于多个文件之外，这些命令的行为与单缓冲区对应命令 (@pxref{Search}) 非常相似。
+
+@c Unintegrated changes commands under 'T' are not mentioned because
+@c these are an advanced feature documented only in vc1-xtra.texi.
+
+VC Directory 缓冲区还定义了一些以前缀 @kbd{b} 开头的与分支相关的命令：
+
+@table @kbd
+@item b c
+创建一个新分支 (@code{vc-create-branch})。  @xref{Creating Branches}。
+
+@item b L
+提示输入分支名称并显示该分支的更改历史记录 (@code{vc-print-root-branch-log})。
+
+@item b s
+切换到分支 (@code{vc-switch-branch})。  @xref{Switching Branches}。
+
+@item d
+删除标记的文件，如果没有标记则删除当前文件（@code{vc-dir-delete-file)}。如果文件已注册，它们将在版本控制系统中标记为已删除。
+@end table
+
+@cindex stashes in version control
+@cindex shelves in version control
+上述命令也可以通过菜单栏以及通过 @kbd{mouse-2} 调用的上下文菜单来使用。  此外，一些 VC 后端使用菜单来提供额外的后端特定命令。  例如，Git 和 Bazaar 允许您操作 @dfn{stashes} 和 @dfn{shelves}（这是一种暂时搁置未提交更改并稍后将其恢复的方法）。
+
+@node Branches
+@subsection 版本控制分支
+@cindex branch (version control)
+
+版本控制的用途之一是支持多条独立的开发线，称为@dfn{branches}。  除其他外，分支可用于维护程序的单独稳定版本和开发版本，以及用于开发彼此隔离的不相关功能。
+
+目前VC对分支机构运营的支持相当有限。  对于去中心化版本控制系统，它为 @dfn{updating} 一个分支提供另一个分支的内容，并为 @dfn{merging} 提供对两个不同分支 (@pxref{Merging}) 进行的更改的命令。  对于集中式版本控制系统，它支持签出不同的分支并提交到新的或不同的分支。
+
+@menu
+* Switching Branches::        如何前往另一个现有分行。
+* Pulling / Pushing::         从其他地方接收/发送更改。
+* Merging::                   在分支之间转移更改。
+* Creating Branches::         如何开始一个新的分支。
+* Copying Between Branches::  复制修订版所做的更改。
+@end menu
+
+@node Switching Branches
+@subsubsection 分支间切换
+
+各种版本控制系统在分支的实现方式上有所不同，而这些差异并不能被VC完全掩盖。
+
+在一些去中心化版本控制系统上，包括正常运行模式下的 Bazaar 和 Mercurial，每个分支都有自己的工作目录树，因此分支之间的切换只涉及目录的切换。  在 Git 上，分支通常位于同一目录中，分支之间的切换是使用 1⁣ 命令完成的，该命令会更改工作树的内容以匹配您切换到的分支。  Bazaar 还支持并置分支，在这种情况下，@kbd{bzr switch} 命令将切换当前目录中的分支。  使用 Subversion，您可以使用 @kbd{svn switch} 命令切换到另一个分支。  对于 Mercurial，命令 @kbd{hg update} 用于切换到另一个分支。
+
+@kindex C-x v b s
+@findex vc-switch-branch
+切换到当前目录下的另一个分支的VC命令是@kbd{C-x v b s @var{branch-name} @key{RET}}（@code{vc-switch-branch}）。
+
+在集中式版本控制系统上，您还可以通过在最新工作文件 (@pxref{Advanced C-x v v}) 中键入 @kbd{C-u C-x v v} 并输入另一个分支上的修订版本 ID 来在分支之间切换。  例如，在 CVS 上，@dfn{trunk}（开发主线）上的修订版通常具有 1.1、1.2、1.3、@dots{} 形式的 ID，而从修订版 1.2 创建的第一个分支的修订版 ID 为 1.2.1.1、1.2.1.2、@dots{}，从修订版 1.2 创建的第二个分支的修订版 ID 为 1.2.1.1、1.2.1.2、@dots{}。 1.2.2.1、1.2.2.2、@dots{} 等等。  您还可以指定 @dfn{branch ID}，这是一个分支修订 ID，省略其最终组件（例如 1.2.1），以切换到该分支上的最新修订。
+
+在基于锁定的系统上，切换到不同的分支也会解锁（写保护）工作树。
+
+一旦您切换到某个分支，VC 命令将应用于该分支，直到您切换离开；例如，您提交的任何 VC 文件集都将提交到该特定分支。
+
+@node Pulling / Pushing
+@subsubsection 将更改拉入分支或从分支中推送更改
+
+@table @kbd
+@cindex push changes to upstream (VC)
+@item C-x v P
+使用分散版本控制系统，使用当前分支本地提交的更改（也称为@:@dfn{push}更改）更新另一个存储库。  集中式版本控制系统不存在这个概念
+
+@cindex pull changes from upstream (VC)
+@item C-x v +
+使用分散版本控制系统，通过另一个存储库的 @dfn{pulling in} 更改来更新本地存储库的当前分支。
+
+使用集中版本控制系统，从存储库更新当前的 VC 文件集。
+@end table
+
+@kindex C-x v P
+@findex vc-push
+@cindex upstream repository
+在去中心化版本控制系统上，命令 @kbd{C-x v P} (@code{vc-push}) 使用当前分支本地提交的更改来更新另一个位置（通常称为 @dfn{upstream repository}）。  使用前缀参数，它会提示运行确切的版本控制命令，这使您可以指定将更改推送到何处；对于 Bazaar，默认值为 @kbd{bzr push}；对于 Git，默认值为 @kbd{git push}；对于 Mercurial，默认值为 @kbd{hg push}。  默认命令始终推送到版本控制系统从分支配置确定的默认位置中的存储库。
+
+在推送之前，您可以使用 @kbd{C-x v O} (@code{vc-root-log-outgoing}) 查看要发送到上游的更改的日志缓冲区。  @xref{VC Change Log}。
+
+@cindex bound branch (Bazaar VCS)
+目前仅 Bazaar、Git 和 Mercurial 支持此命令。集中式版本控制系统不存在“推送”的概念，该操作是提交变更集的一部分，因此在集中式 VCS 上调用此命令会发出错误信号。  当在 Bazaar @dfn{bound branch} 中尝试时，此命令还会发出错误信号，其中提交变更集会自动将更改推送到本地分支绑定到的远程存储库。
+
+@kindex C-x v +
+@findex vc-pull
+使用分散版本控制系统，命令 @kbd{C-x v +} (@code{vc-pull}) 会使用上游存储库中所做的更改来更新本地存储库的当前分支及其工作树。  它通常用于更新远程分支的副本（又名@:@dfn{clone}）。  如果您提供前缀参数，该命令会提示输入要使用的确切版本控制命令，这使您可以指定从何处提取更改。  否则，它将从版本控制系统从分支配置确定的默认位置的存储库中提取。
+
+在去中心化版本控制系统中，@kbd{C-x v +}目前仅受 Bazaar、Git 和 Mercurial 支持。  对于 Bazaar，它为普通分支调用 @kbd{bzr pull}（从主分支拉取到镜像分支），为绑定分支（从中央存储库拉取）调用 @kbd{bzr update}。  使用 Git，它调用 @kbd{git pull} 从远程存储库获取更改并将其合并到当前分支中。  使用 Mercurial，它会调用 @kbd{hg pull -u} 从默认远程存储库获取变更集并更新工作目录。
+
+在拉取之前，您可以使用 @kbd{C-x v I} (@code{vc-root-log-incoming}) 查看要应用的更改的日志缓冲区。  @xref{VC Change Log}。
+
+使用 CVS 等集中式版本控制系统，@kbd{C-x v +} 从存储库更新当前 VC 文件集。
+
+@node Merging
+@subsubsection 合并分支
+@cindex merging changes
+
+@table @kbd
+@item C-x v m
+使用分散的版本控制系统，将另一个分支的更改合并到当前分支中。
+
+使用集中版本控制系统，将另一个分支的更改合并到当前的 VC 文件集中。
+@end table
+
+在开发分支时，您有时可能需要 @dfn{merge} 更改已在另一个分支中进行的更改。  这不是一个简单的操作，因为可能对两个分支进行了重叠和冲突的更改。
+
+使用分散版本控制系统，您可以使用命令 @kbd{C-x v m} (@code{vc-merge}) 合并更改。  对于 Bazaar，这会提示将确切的参数传递给 @command{bzr merge} 命令，并在可能的情况下提供合理的默认值。  对于 Git，这会提示输入要合并的分支的名称，并完成（基于当前存储库已知的分支名称）。  对于 Mercurial，这会提示将参数传递给 @command{hg merge}。  运行合并命令的输出显示在单独的缓冲区中。
+
+对于像 CVS 这样的集中式版本控制系统，@kbd{C-x v m} 会提示输入分支 ID 或一对修订 ID (@pxref{Switching Branches})；然后它会查找该分支中的更改或您指定的两个修订版之间的更改，并将这些更改合并到当前的 VC 文件集中。  如果您只是在提示符处输入 @kbd{@key{RET}}，Emacs 会简单地合并自您签出文件以来在同一分支上所做的任何更改。
+
+@cindex conflicts, VC
+@cindex resolving conflicts
+执行合并后，仅修改工作树，您可以使用 @kbd{C-x v D} 和相关命令 (@pxref{Old Revisions}) 查看合并产生的更改。  如果两个分支包含重叠的更改，则合并会产生 @dfn{conflict}；合并命令的输出中会出现警告，并且 @dfn{conflict markers} 会插入到每个受影响的工作文件中，围绕两组冲突的更改。  然后，您必须通过编辑冲突的文件来解决冲突；默认情况下，Emacs 会将存在 VC 冲突的缓冲区放置在特殊的 Smerge 模式下，该模式提供了用于解决合并冲突的特殊命令。解决完冲突并保存已解决冲突的文件后，必须以通常的方式提交这些文件才能使合并生效 (@pxref{Basic VC Editing})。
+
+@node Creating Branches
+@subsubsection 创建新分支
+
+在 CVS 等集中式版本控制系统上，Emacs 支持创建新分支作为提交操作的一部分。  提交修改后的 VC 文件集时，输入 @kbd{C-u C-x v v}（@code{vc-next-action} 带前缀参数；@pxref{Advanced C-x v v}）。  然后 Emacs 会提示输入新修订版的修订 ID。  您应该为从当前修订版开始的分支指定合适的分支 ID。  例如，如果当前修订版本为 2.5，则分支 ID 应为 2.5.1、2.5.2 等，具体取决于此时现有分支的数量。
+
+@kindex C-x v b c
+@findex vc-create-branch
+此过程不适用于 Git 或 Mercurial 等分布式版本控制系统。  对于这些系统，您应该使用命令 @code{vc-create-branch} (@w{@kbd{C-x v b c @var{branch-name} @key{RET}}})。
+
+要在较旧的修订版（不再是分支的头部）创建新分支，请首先选择该修订版 (@pxref{Switching Branches})。  然后，您的过程将有所不同，具体取决于您使用的是基于锁定还是基于合并的 VCS。
+
+在锁定 VCS 上，您需要使用 @kbd{C-x v v} 锁定旧版本分支。  当您锁定旧版本时，系统会要求您确认您确实打算创建一个新分支——如果您拒绝，您将有机会锁定最新版本。  在基于合并的 VCS 上，您将跳过此步骤。
+
+然后进行更改并再次输入 @kbd{C-x v v} 以提交新修订。  这会从选定的修订版本开始创建一个新分支。
+
+创建分支后，后续提交会在该分支上创建新的修订。  要离开分支，您必须使用 @kbd{C-u C-x v v} 显式选择不同的修订版本。
+
+@node Copying Between Branches
+@subsubsection 在分支之间复制修订所做的更改
+
+@table @kbd
+@item M-x vc-cherry-pick
+将单个修订复制到在此工作树中签出的分支。
+@end table
+
+@cindex cherry-pick
+@cindex revision, cherry-picks of
+有时将修订版本从一个分支复制到另一个分支很有用。这意味着创建一个新修订版，其更改、日志消息和作者信息与可在另一个分支上找到的现有修订版相同。  这通常称为 @dfn{cherry-picking} 从一个分支到另一个分支的修订。
+
+@cindex revisions, backporting
+最常见的情况是从不会合并 (@pxref{Merging}) 到当前分支的分支中复制修订版本。  例如，您的项目可能有一个功能冻结分支，仅接受错误修复。有人（可能是你）修复了主开发分支上的错误。  然后，您可以将该修订版挑选到功能冻结的分支上，以修复那里的错误。  这称为 @dfn{backporting} 修订版，或向后移植修复程序。
+
+@findex vc-cherry-pick
+您可以使用命令 @kbd{M-x vc-cherry-pick} 来挑选修订版本。  它提示对cherry-pick进行修订。  然后，它会弹出一个缓冲区，供您编辑新版本的日志消息。  通常，VC 后端会生成一条日志消息，其中包含对要复制的修订版本的引用，以便可以跟踪该副本。  如果您愿意，可以在输入 @kbd{C-c C-c} 结束挑选之前删除此引用。
+
+或者，您可以使用前缀参数调用该命令，即 @w{@kbd{C-u M-x vc-cherry-pick}}。  在这种情况下，源版本中的日志消息将不加修改地使用，并且立即进行挑选，而不会弹出用于日志消息编辑的缓冲区。
+
+访问此功能的另一种方法是使用 @code{log-view-cherry-pick} 命令，该命令绑定到日志视图模式缓冲区 (@pxref{VC Change Log}) 中的 @kbd{C}。  与直接使用 @w{@kbd{M-x vc-cherry-pick}} 相比，这可以更轻松地确保您正在挑选您想要的修订版。
+
+@ifnottex
+@include vc1-xtra.texi
+@end ifnottex
+
+@node Projects
+@section 处理项目
+@cindex projects
+
+@cindex project root
+@dfn{project} 是用于生成一个或多个程序的文件集合。  属于项目的文件通常存储在目录层次结构中；层次结构的顶级目录称为@dfn{project root}。
+
+@cindex project backend
+给定目录是否是某个项目的根目录由项目特定的基础设施（称为 @dfn{project backend}）决定。 Emacs 目前支持两个这样的后端： VC 感知 (@pxref{Version Control})，其中 VCS 存储库被视为一个项目；和 EDE (@pxref{EDE})。  预计将来会扩展以支持其他类型的项目。
+
+哪些文件属于或不属于项目也由项目后端决定。  例如，VC 感知后端不会将“忽略”文件 (@pxref{VC Ignore}) 视为项目的一部分。  有关描述和相关选项，请参阅下面的条目。
+
+@cindex current project name on mode line
+@defopt project-mode-line
+如果此用户选项为非@code{nil}，Emacs 将在模式行上显示当前项目的名称（如果有）；单击项目名称上的 @kbd{mouse-1} 将弹出包含项目相关命令的菜单。默认值为@code{nil}。  如果值为@code{non-remote}，Emacs 将仅对本地文件显示项目名称；当远程系统上项目的模式行更新由于网络延迟而缓慢时，这会派上用场。
+@end defopt
+
+@menu
+* Project File Commands::    用于处理项目文件的命令。
+* Project Buffer Commands::  用于处理项目缓冲区的命令。
+* Switching Projects::       在项目之间切换。
+* Managing Projects::        管理项目列表文件。
+* VC-Aware Project Backend::  默认项目后端。
+@end menu
+
+@node Project File Commands
+@subsection 对文件进行操作的项目命令
+
+@table @kbd
+@item C-x p f
+访问属于当前项目的文件 (@code{project-find-file})。
+@item C-x p g
+在属于当前项目的所有文件中查找正则表达式的匹配项 (@code{project-find-regexp})。
+@item M-x project-search
+在属于当前项目的所有文件中交互式搜索正则表达式匹配项。
+@item C-x p r
+对属于当前项目 (@code{project-query-replace-regexp}) 的所有文件中的正则表达式执行查询替换。
+@item C-x p D
+在当前项目的根目录 (@code{project-dired}) 中运行 Dired。
+@item C-x p v
+在当前项目的根目录（@code{project-vc-dir}）中运行@code{vc-dir}。
+@item C-x p s
+在当前项目的根目录 (@code{project-shell}) 中启动一个下级 shell。
+@item C-x p e
+在当前项目的根目录(@code{project-eshell})中启动Eshell。
+@item C-x p c
+在当前项目的根目录（@code{project-compile}）中运行编译。
+@item C-x p !
+在当前项目的根目录（@code{project-shell-command}）中运行 shell 命令。
+@item C-x p &
+在当前项目的根目录 (@code{project-async-shell-command}) 中异步运行 shell 命令。
+@item C-x p o
+在当前项目中运行下一个命令 (@code{project-any-command})。
+@end table
+
+Emacs 提供了方便处理项目文件的命令。本小节描述这些命令。
+
+@cindex current project
+这里描述的所有命令都共享 @dfn{current project} 的概念。  当前项目由调用命令时当前缓冲区的 @code{default-directory} (@pxref{File Names}) 确定。  如果该目录似乎不属于可识别的项目，这些命令会提示您输入项目目录。
+
+@findex project-find-file
+@vindex vc-directory-exclusion-list
+命令 @kbd{C-x p f} (@code{project-find-file}) 是访问属于当前项目的文件 (@pxref{Visiting}) 的便捷方法。  与@kbd{C-x C-f}不同，此命令不需要键入要访问的文件的完整文件名，您可以仅键入文件的基本名称（即省略前导目录）。  此外，该命令考虑的完成候选仅包括属于当前项目的文件，而不包括其他文件。  如果此时存在文件名，则此命令会将该文件提供为“未来历史记录”的第一个元素。  如果给定前缀，则包含项目根目录下的所有文件，除了@code{vc-directory-exclusion-list}中列出的@acronym{VCS}目录。
+
+@findex project-find-regexp
+命令@kbd{C-x p g} (@code{project-find-regexp}) 与@code{rgrep} (@pxref{Grep Searching}) 类似，但它仅搜索属于当前项目的文件。  该命令提示输入要搜索的正则表达式，并弹出带有搜索结果的外部参照模式缓冲区，您可以在其中使用外部参照模式命令 (@pxref{Xref Commands}) 选择匹配项。  当使用前缀参数调用时，此命令还会提示输入开始搜索的基本目录；例如，这允许将搜索限制为仅搜索项目根目录下的某个子目录下的项目文件。  该命令显示匹配的方式受@code{xref-auto-jump-to-first-xref} (@pxref{Identifier Search}) 值的影响。
+
+@findex project-search
+@kbd{M-x project-search} 是@code{project-find-regexp} 的顺序变体。  它提示使用正则表达式在当前项目的文件中进行搜索，但不是查找所有匹配项并显示它们，而是在找到匹配项时停止并访问匹配位置处的匹配文件，从而允许您编辑匹配的文件。  要查找其余的匹配项，请输入 @w{@kbd{M-x fileloop-continue @key{RET}}}。
+
+@findex project-query-replace-regexp
+@kbd{C-x p r} (@code{project-query-replace-regexp}) 与@code{project-search}类似，但它会提示您是否替换它找到的每个匹配项，就像@code{query-replace} (@pxref{Query Replace}) 一样，并在您响应后继续下一个匹配项。  如果您的响应导致 Emacs 退出查询替换循环，您可以稍后继续使用 @w{@kbd{M-x fileloop-continue @key{RET}}}。
+
+@findex project-find-dir
+命令@kbd{C-x p d} (@code{project-find-dir}) 提示您在当前项目中选择一个目录，然后完成。并打开一个 Dired 缓冲区 (@pxref{Dired})，列出其中的文件。
+
+@findex project-dired
+命令 @kbd{C-x p D} (@code{project-dired}) 打开 Dired 缓冲区 (@pxref{Dired})，列出当前项目根目录中的文件。
+
+@findex project-vc-dir
+命令 @kbd{C-x p v} (@code{project-vc-dir}) 打开 VC 目录缓冲区 (@pxref{VC Directory Mode})，列出当前项目根目录下目录树中文件的版本控制状态。
+
+@findex project-shell
+命令 @kbd{C-x p s} (@code{project-shell}) 在新缓冲区中启动 shell 会话 (@pxref{Shell})，并将当前项目的根目录作为工作目录。
+
+@findex project-eshell
+命令 @kbd{C-x p e} (@code{project-eshell}) 在新缓冲区中启动 Eshell 会话，并将当前项目的根目录作为工作目录。  @xref{Top,Eshell,Eshell, eshell, Eshell: The Emacs Shell}。
+
+@findex project-compile
+命令 @kbd{C-x p c} (@code{project-compile}) 在当前项目的根目录中运行编译 (@pxref{Compilation})。
+
+@findex project-shell-command
+命令 @kbd{C-x p !} (@code{project-shell-command}) 在当前项目的根目录中运行 @code{shell-command}。
+
+@findex project-async-shell-command
+命令 @kbd{C-x p &} (@code{project-async-shell-command}) 在当前项目的根目录中运行 @code{async-shell-command}。
+
+@findex project-any-command
+最后，命令 @kbd{C-x p o} (@code{project-any-command}) 将运行您在当前项目中键入的下一个命令，无论是否与文件相关。
+
+@node Project Buffer Commands
+@subsection 对缓冲区进行操作的项目命令
+
+@table @kbd
+@item C-x p b
+切换到属于当前项目的另一个缓冲区 (@code{project-switch-to-buffer})。
+@item C-x p C-b
+列出项目缓冲区 (@code{project-list-buffers})。
+@item C-x p k
+杀死属于当前项目的所有活动缓冲区 (@code{project-kill-buffers})。
+@item C-x p o
+在当前项目中运行下一个命令 (@code{project-any-command})。
+@end table
+
+@findex project-switch-to-buffer
+处理一个项目可能会涉及到让许多缓冲区访问属于该项目的文件，以及属于该项目但不访问任何文件的缓冲区（例如由 @code{project-compile} 创建的 @file{*compilation*} 缓冲区）。  命令 @kbd{C-x p b} (@code{project-switch-to-buffer}) 通过提示要切换的缓冲区并仅将当前项目的缓冲区视为完成的候选缓冲区，帮助您在属于当前项目的缓冲区之间进行切换。
+
+@findex project-list-buffers
+与命令 @code{list-buffers} (@pxref{List Buffers}) 一样，命令 @kbd{C-x p C-b} (@code{project-list-buffers}) 显示现有缓冲区的列表，但仅属于当前项目。
+
+@findex project-kill-buffers
+@vindex project-kill-buffer-conditions
+@vindex project-kill-buffers-display-buffer-list
+当您完成该项目时，您可能希望杀死属于该项目的所有缓冲区，以保持 Emacs 会话更小。  命令 @kbd{C-x p k} (@code{project-kill-buffers}) 完成以下任务：它杀死属于当前项目且满足 @code{project-kill-buffer-conditions} 中任何一个的缓冲区。  如果@code{project-kill-buffers-display-buffer-list}非@code{nil}，将首先显示要杀死的缓冲区。
+
+最后，命令 @kbd{C-x p o} (@code{project-any-command}) 将运行您在当前项目中键入的下一个命令，无论是否与缓冲区相关。
+
+@node Switching Projects
+@subsection 切换项目
+
+@table @kbd
+@item C-x p p
+为另一个项目运行 Emacs 命令 (@code{project-switch-project})。
+@end table
+
+@findex project-switch-project
+@vindex project-switch-commands
+当当前没有项目时，对项目文件进行操作的命令 (@pxref{Project File Commands}) 将方便地提示您输入项目目录。  当您在某个项目中，但想要对不同的项目进行操作时，请使用 @kbd{C-x p p} 命令 (@code{project-switch-project})。  此命令提示您在已知项目根目录中选择一个目录，然后显示可用于操作您选择的项目的命令菜单。  变量 @code{project-switch-commands} 控制菜单中可用的命令以及哪个键调用每个命令。
+
+@vindex project-list-file
+变量 @code{project-list-file} 命名 Emacs 记录已知项目列表的文件。  它默认为 @code{user-emacs-directory} (@pxref{Find Init}) 中的文件 @file{projects}。
+
+@node Managing Projects
+@subsection 管理项目列表文件
+
+@table @kbd
+@item M-x project-remember-project
+将当前项目添加到@code{project-list-file}。
+@item M-x project-forget-project
+从 @code{project-list-file} 中删除已知项目。
+@end table
+
+@findex project-remember-project
+@findex project-forget-project
+通常，Emacs 会自动在 @code{project-list-file} 中添加和删除项目，但有时您可能需要手动编辑可用项目。  @kbd{M-x project-remember-project} 会记住当前项目，@kbd{M-x project-forget-project} 提示您选择可用项目之一，然后将其从文件中删除。
+
+@vindex project-list-exclude
+用户选项@code{project-list-exclude}可以设置为始终忽略某些项目被记住并保存到@code{project-list-file}。  它是项目根和对象的正则表达式和谓词函数的列表。  正则表达式与项目根匹配，并且谓词应将项目对象作为唯一参数，如果项目应 @emph{not} 保存到 @code{project-list-file}，则返回非@code{nil}。
+
+@node VC-Aware Project Backend
+@subsection VC 感知项目后端
+@cindex VC-aware project backend
+@cindex project backend, VC-aware
+该后端是 Emacs 的一部分，并且默认启用。  （其他后端可能需要安装附加包及其正确的配置。）
+
+它根据 VCS 存储库的配置（如果有）确定项目的内容，从输出中排除“忽略”的文件。
+
+它对列出一些流行的 VCS 系统（目前是 Git 和 Mercurial）的文件进行了一些性能优化。
+
+@findex project-remember-projects-under
+它还使用基于时间的缓存。  如果模式行显示过时的项目信息，您可以键入 @kbd{M-x project-remember-projects-under RET} 刷新过时的缓存信息。
+
+@defopt project-vc-include-untracked
+默认情况下，既未向 VCS 注册也不被 VCS 忽略的文件被视为项目的一部分。  将此变量自定义为 nil 以更改它。
+@end defopt
+
+@defopt project-vc-ignores
+使用此变量，您可以向项目添加更多忽略模式，以从项目的文件列表中排除更多文件。  该值是一个全局字符串列表。  它们可以匹配常规文件和目录。  要将条目锚定到项目根目录，请以 @code{./} 开头。  要仅匹配目录，请以 @code{/} 结尾。  当该变量具有目录本地值时，它将仅应用于相应的目录子树。
+@end defopt
+
+@defopt project-vc-name
+该变量允许您将自动检测到的项目名称更改为您选择的字符串。  默认情况下，该名称是其根目录的基本名称。
+@end defopt
+
+@defopt project-vc-extra-root-markers
+此变量允许您在此后端设置对非 VC 项目的检测，并且还可以将一些子目录检测为单独的项目。  该值是一个列表。
+
+每个元素要么是一个基本文件名，要么是一个 glob 模式。
+
+示例值：@file{.dir-locals.el}、@file{package.json}、@file{requirements.txt}、@file{*.gemspec}。
+@end defopt
+
+@node Change Log
+@section 变更日志
+
+@cindex change log
+许多软件项目都保留@dfn{change log}。  这是一个文件，通常名为@file{ChangeLog}，包含程序更改时间和方式的时间记录。  有时，这些文件是从版本控制系统中存储的更改日志条目自动生成的，或者用于生成这些更改日志条目。有时，会有多个更改日志文件，每个更改日志文件都记录一个目录或目录树中的更改。
+
+@menu
+* Change Log Commands::  用于编辑更改日志文件的命令。
+* Format of ChangeLog::  更改日志文件是什么样子的。
+@end menu
+
+@node Change Log Commands
+@subsection 更改日志命令
+
+@kindex C-x 4 a
+@findex add-change-log-entry-other-window
+Emacs 命令 @kbd{C-x 4 a} 向您正在编辑的文件的更改日志文件添加一个新条目 (@code{add-change-log-entry-other-window})。  如果该文件实际上是备份文件，它会为该文件的父文件创建一个适当的条目，这对于为当前版本中已删除的函数创建日志条目非常有用。
+
+@kbd{C-x 4 a} 在所选窗口 (@pxref{Window Choice}) 之外的窗口中访问更改日志文件，并创建一个新条目，除非最近的条目是针对今天的日期和您的姓名。  它还为当前文件创建一个新项目。  对于许多语言，它甚至可以猜测函数或其他已更改对象的名称。
+
+@c Not worth it.
+@c @vindex change-log-directory-files
+为了查找更改日志文件，Emacs 从您正在编辑的文件中搜索目录树。  默认情况下，如果它发现一个似乎是版本控制存储库的根目录，它就会停止。要更改此设置，请自定义@code{change-log-directory-files}。
+
+@vindex add-log-keep-changes-together
+当变量 @code{add-log-keep-changes-together} 为非 @code{nil} 时，@kbd{C-x 4 a} 添加到文件的任何现有项目，而不是开始一个新项目。
+
+您可以组合相同性质的多个更改。  如果您在初始 @kbd{C-x 4 a} 之后未输入任何文本，则任何后续 @kbd{C-x 4 a} 都会向更改日志条目添加另一个符号。
+
+@vindex add-log-always-start-new-record
+如果 @code{add-log-always-start-new-record} 不是 @code{nil}，则 @kbd{C-x 4 a} 始终会创建一个新条目，即使最后一个条目是由您在同一日期创建的。
+
+@vindex change-log-version-info-enabled
+@vindex change-log-version-number-regexp-list
+@cindex file version in change log entries
+如果变量 @code{change-log-version-info-enabled} 的值不是 @code{nil}，则 @kbd{C-x 4 a} 将文件的版本号添加到更改日志条目中。  它通过使用变量 @code{change-log-version-number-regexp-list} 中的正则表达式搜索文件的前 10% 来查找版本号。
+
+@cindex Change Log mode
+@findex change-log-mode
+在更改日志模式下访问更改日志文件。  在这种主要模式中，每一组分组的项目都算作一个段落，每个条目都被视为一页。  这有助于编辑条目。 @kbd{C-j} 并自动填充缩进每个新行，就像前一行一样；这对于输入条目内容很方便。
+
+@findex change-log-goto-source
+当更改日志模式打开时，您可以使用命令 @code{change-log-goto-source}（默认绑定到 @kbd{C-c C-c}）转到更改日志条目附近的源位置。  然后，后续调用 @code{next-error} 命令（默认绑定到 @kbd{M-g M-n} 和 @kbd{C-x `}）将在更改日志中的条目之间移动。  您将跳转到文件中已更改的实际站点，而不仅仅是下一个更改日志条目。  您还可以使用 @code{previous-error} 向后移动更改日志条目。
+
+@findex change-log-merge
+您可以使用命令 @kbd{M-x change-log-merge} 将其他日志文件合并到更改日志模式下的缓冲区中，并保留条目的日期顺序。
+
+@vindex add-log-dont-create-changelog-file
+版本控制系统是跟踪程序更改并保留更改日志的另一种方法。  如今，许多使用 VCS 的项目不保留单独的版本更改日志文件，因此您可能希望避免在存储库中包含这样的文件。  如果 @code{add-log-dont-create-changelog-file} 的值不是 @code{nil}，则 @kbd{C-x 4 a} (@code{add-change-log-entry-other-window}) 之类的命令将在适当命名的临时缓冲区而不是文件中记录更改（如果此类文件尚不存在）。
+
+无论您有更改日志文件还是使用更改日志的临时缓冲区，都可以在 VC 日志缓冲区中键入 @kbd{C-c C-a} (@code{log-edit-insert-changelog}) 以插入相关的更改日志条目（如果存在）。  @xref{Log Buffer}。
+
+@node Format of ChangeLog
+@subsection 变更日志的格式
+
+更改日志条目以标题行开头，其中包含当前日期、您的姓名（取自变量 @code{add-log-full-name}）和您的电子邮件地址（取自变量 @code{add-log-mailing-address}）。  除了这些标题行之外，更改日志中的每一行都以空格或制表符开头。  条目的大部分内容由 @dfn{items} 组成，每个都以一行以空格和星号开头。  这里有两个条目，日期均为 1993 年 5 月，分别有 2 项和 1 项。
+
+@iftex
+@medbreak
+@end iftex
+@smallexample
+1993-05-25  Richard Stallman  <rms@@gnu.org>
+
+        * man.el: Rename symbols 'man-*' to 'Man-*'.
+        (manual-entry): Make prompt string clearer.
+
+        * simple.el (blink-matching-paren-distance):
+        Change default to 12,000.
+
+1993-05-24  Richard Stallman  <rms@@gnu.org>
+
+        * vc.el (minor-mode-map-alist): Don't use it if it's void.
+        (vc-cancel-version): Doc fix.
+@end smallexample
+
+一篇文章可以描述几个变化；每个更改都应该有自己的项目，或者项目中自己的行。  通常，项目之间应该有一个空行。  当项目相关时（相同更改的部分，在不同的位置），通过在它们之间不留空行来对它们进行分组。
+
+您应该在更改日志文件的末尾放置版权声明和许可声明。  这是一个例子：
+
+@smallexample
+Copyright 1997--1998, 2025--2026 Free Software Foundation, Inc.
+Copying and distribution of this file, with or without modification, are
+permitted provided the copyright notice and this notice are preserved.
+@end smallexample
+
+@noindent
+当然，您应该替换正确的年份和版权所有者。
+
+@node Xref
+@section 查找标识符参考
+@cindex xref
+
+@cindex tag
+@dfn{identifier} 是程序的语法子单元的名称：函数、子例程、方法、类、数据类型、宏等。在编程语言中，每个标识符都是该语言语法中的符号。  标识符也称为 @dfn{tags}。
+
+程序开发和维护需要能够快速查找每个标识符的定义和引用位置、在整个项目中重命名标识符等。这些功能对于查找主要模式中的引用（除了为支持编程语言而定义的模式之外）也很有用。  例如，文本或@TeX{}文档的章、节、附录等@:也可以被视为子单元，并且它们的名称可以用作标识符。  在本章中，我们使用术语“标识符”来统指程序源代码和其他类型文本中的任何类型子单元的名称。
+
+Emacs 为这些功能提供了一个统一的接口，称为 @samp{xref}。
+
+@cindex xref backend
+为了完成它的工作，@code{xref}需要利用信息并采用特定于主模式的方法。  在哪些文件中搜索标识符、如何查找对标识符的引用、如何完成标识符——所有这些以及更多内容都是特定于模式的知识。 @code{xref} 将其工作的模式特定部分委托给模式提供的@dfn{backend}；它还包括一些命令的默认值，适用于那些不提供自己的模式的命令。
+
+后端可以通过多种方式实现其功能。  以下是一些示例：
+
+@enumerate a
+@item
+一些主要模式提供了用于查找语言符号的内置方法。  例如，可以通过搜索由 Emacs Lisp 解释器维护的包加载历史记录以及查阅内置文档字符串来识别 Emacs Lisp 符号； Emacs Lisp 模式在其后端使用这些工具来允许查找符号的定义。  （这种后端的一个缺点是它只知道加载到解释器中的子单元。）
+
+@cindex eglot, for finding definitions of identifiers
+@item
+如果针对当前缓冲区的项目 (@pxref{Projects}) 和当前缓冲区的主模式激活了 Eglot，则 Eglot 会咨询外部语言服务器程序并提供服务器提供的有关项目中标识符定义的数据。  @xref{Eglot Features,,, eglot, Eglot: The Emacs LSP Client}。
+
+@item
+外部程序可以通过扫描相关文件来提取参考文献，并建立这些参考文献的数据库。  然后，后端可以在需要列出或查找引用时访问该数据库。 Emacs 发行版包含@command{etags}，这是一个用于在程序中标记标识符定义的命令，它通过将引用提取到@dfn{tags tables} 来支持许多编程语言和其他主要模式，例如 HTML。  @command{etags} 支持的语言的主要模式可以使用标签表作为其后端的基础。  启用 @code{etags-regen-mode} 可以在当前项目中为支持的文件类型生成标签表，并在编辑时自动更新。或者，您可以手动构建表来控制文件集，并在更新时查看@ref{Create Tags Table}。
+@end enumerate
+
+@menu
+* Find Identifiers::     用于查找定义或引用标识符的位置、列出标识符等的命令。
+* Tags Tables::          Tags表记录了哪个文件定义了一个符号。
+* Select Tags Table::    如何访问特定的标签表。
+@end menu
+
+@node Find Identifiers
+@subsection 查找标识符
+
+本小节介绍查找标识符引用并执行有关标识符的各种查询的命令。  每个这样的引用都可以 @emph{define} 一个标识符，例如，提供程序子单元的实现或文档部分的文本；或者它可以 @emph{use} 标识符，例如调用函数或方法、为变量赋值、在交叉引用中提及章节等。
+
+@menu
+* Looking Up Identifiers::  查找标识符定义的命令。
+* Xref Commands::           @file{*xref*} 缓冲区中的命令。
+* Identifier Search::       搜索和替换标识符。
+* List Identifiers::        列出标识符并完成它们。
+@end menu
+
+@node Looking Up Identifiers
+@subsubsection 查找标识符
+@cindex find definition of symbols
+@cindex identifier, finding definition of
+@cindex find references to symbols
+
+@code{xref} 使您能够做的最重要的事情是找到特定标识符的定义。
+
+@table @kbd
+@item M-.@:
+查找标识符 (@code{xref-find-definitions}) 的定义。
+@item C-M-. @var{pattern} @key{RET}
+查找名称与 @var{pattern} (@code{xref-find-apropos}) 匹配的所有标识符。
+@item C-x 4 .@: @key{RET}
+查找标识符的定义，但将其显示在另一个窗口中 (@code{xref-find-definitions-other-window})。
+@item C-x 5 .@: @key{RET}
+找到标识符的定义，并将其显示在新框架中（@code{xref-find-definitions-other-frame}）。
+@item M-x xref-find-definitions-at-mouse
+单击鼠标查找标识符的定义。
+@item M-,
+返回到您之前调用 @kbd{M-.} 和朋友 (@code{xref-go-back}) 的位置。
+@item C-M-,
+前进到您之前调用 @kbd{M-,} (@code{xref-go-forward}) 的位置。
+@item M-x xref-etags-mode
+切换 @code{xref} 以使用 @code{etags} 后端。
+@end table
+
+@kindex M-.
+@findex xref-find-definitions
+@vindex xref-prompt-for-identifier
+@kbd{M-.}@: (@code{xref-find-definitions}) 显示了点标识符的定义。  使用前缀参数，或者如果当前没有标识符，它会提示输入标识符。  （如果您希望它始终提示，请将@code{xref-prompt-for-identifier}自定义为@code{t}。）
+
+当将标识符参数输入到@kbd{M-.}时，您可以使用常用的迷你缓冲区完成命令（@pxref{Completion}），其中已知的标识符名称是完成候选。
+
+它使用当前的外部参照后端，并且在未配置任何配置时会发出错误信号，并提供一些建议。
+
+@kindex C-x 4 .
+@findex xref-find-definitions-other-window
+@kindex C-x 5 .
+@findex xref-find-definitions-other-frame
+与大多数可以切换缓冲区的命令一样，@code{xref-find-definitions} 有一种变体，可以在另一个窗口 (@pxref{Window Choice}) 中显示新缓冲区，并且可以为其创建一个新帧。  前者为@w{@kbd{C-x 4 .}} (@code{xref-find-definitions-other-window})，后者为@w{@kbd{C-x 5 .}} (@code{xref-find-definitions-other-frame})。
+
+@findex xref-mouse-mode
+命令 @code{xref-find-definitions-at-mouse} 的工作方式与 @code{xref-find-definitions} 类似，但它会在鼠标事件位置或周围查找标识符名称。  @code{xref-mouse-mode} 次要模式将命令绑定到 @kbd{C-mouse-1}。
+
+@kindex C-M-.
+@findex xref-find-apropos
+@vindex tags-apropos-additional-actions
+命令@kbd{C-M-.}@: (@code{xref-find-apropos}) 类似于标签的@code{apropos} (@pxref{Apropos})。  它显示所选标签表中名称与指定的@var{regexp}匹配的标识符列表。  这就像 @kbd{M-.} 一样，只不过它对标识符进行正则表达式匹配，而不是将符号名称匹配为固定字符串。  默认情况下，该命令会弹出 @file{*xref*} 缓冲区，如 @kbd{M-.}，但您可以通过自定义变量 @code{tags-apropos-additional-actions} 显示其他输出；有关详细信息，请参阅其文档。
+
+@vindex xref-auto-jump-to-first-definition
+如果上述任何命令找到多个匹配定义，则默认情况下会弹出显示匹配候选者的 @file{*xref*} 缓冲区并选择该缓冲区的窗口。  （如果找到至少一个匹配项，@kbd{C-M-.}@: @emph{always} 会弹出 @file{*xref*} 缓冲区。）每个候选者通常在该缓冲区中显示为文件名以及该文件中的匹配标识符。  在该缓冲区中，您可以选择任何要显示的候选项，并且您还有几个附加命令，如@ref{Xref Commands}中所述。但是，如果变量 @code{xref-auto-jump-to-first-definition} 的值为 @code{move}，Emacs 会自动将指针移动到 @file{*xref*} 缓冲区中的第一个候选值，因此只需输入 @key{RET} 就会显示该候选值的定义。  如果变量的值为@code{t}或@code{show}，则第一个候选者会自动显示在其自己的窗口中； @code{t} 还选择显示第一个候选定义的窗口，而 @code{show} 则选择 @file{*xfer*} 缓冲区的窗口。  默认值是 @code{nil}，它仅显示 @file{*xref*} 缓冲区中的候选者，但既不会选择其中任何一个，也不显示其定义，直到您在 @file{*xref*} 缓冲区中选择一个候选者为止。
+
+@findex next-error, in @file{*xref*} buffer
+@findex previous-error, in @file{*xref*} buffer
+@kindex M-g M-n, for navigation in @file{*xref*} buffer
+@kindex M-g M-p, for navigation in @file{*xref*} buffer
+如果您切换到显示多个候选的 @file{*xref*} 缓冲区的窗口，则可以使用命令 @w{@kbd{M-g M-n}} (@code{next-error}) 和 @w{@kbd{M-g M-p}} (@code{previous-error}) 从一个候选移动到另一个候选。  @xref{Compilation Mode}。
+
+@kindex M-,
+@findex xref-go-back
+要返回到已显示定义的位置 @emph{from where}，请使用 @kbd{M-,} (@code{xref-go-back})。  它跳回最后一次调用 @kbd{M-.} 的位置。  因此，您可以使用 @kbd{M-.} 查找并检查某事物的定义，然后返回到使用 @kbd{M-,} 的位置。  @kbd{M-,} 允许您追溯您在地点历史中前进的步骤，一直到历史上的第一个地点（您第一次调用 @kbd{M-.}），或者到中间的任何地点。
+
+@kindex C-M-,
+@findex xref-go-forward
+如果您之前使用 @kbd{M-,} 返回得太远，或者想要重新检查您返回的位置，则可以使用 @kbd{C-M-,} (@code{xref-go-forward}) 再次前进。  这与使用 @kbd{M-.} 类似，只不过您不需要在每个步骤中将指针移动到要查找其定义的标识符。  @kbd{C-M-,} 允许您追溯您在地点历史中所做的所有步骤，一直到您调用 @kbd{M-,} 的历史上最后一个地点，或中间的任何地点。
+
+@findex xref-etags-mode
+一些主要模式安装了@code{xref}支持设施，有时可能无法找到某些标识符。  例如，在 Emacs Lisp 模式下 (@pxref{Lisp Eval}) @kbd{M-.} 默认情况下将仅查找加载到当前 Emacs 会话或自动加载的 Lisp 包中的函数和变量 (@pxref{Autoload,,, elisp, The Emacs Lisp Reference Manual})。  如果 @kbd{M-.} 无法找到某些标识符，您可以尝试强制 @code{xref} 使用 @code{etags} 后端 (@pxref{Xref})。  为此，请使用 @w{@kbd{M-x xref-etags-mode}} 打开 Xref Etags 次要模式，然后再次调用 @kbd{M-.}。 （为此，请务必运行@command{etags}在源文件的目录树中创建标签表，请参阅@ref{Create Tags Table}。）
+
+@node Xref Commands
+@subsubsection @file{*xref*} 缓冲区中可用的命令
+@cindex commands in @file{*xref*} buffers
+@cindex Xref mode
+
+特殊外部参照模式在 @file{*xref*} 缓冲区中提供以下命令：
+
+@table @kbd
+@item @key{RET}
+@itemx mouse-1
+显示当前行上的引用 (@code{xref-goto-xref})。使用前缀参数，也隐藏 @file{*xref*} 缓冲区。
+
+@item mouse-2
+@findex xref-select-and-show-xref
+与@code{mouse-1}相同，但使显示@file{*xref*}的窗口缓冲选定的窗口（@code{xref-select-and-show-xref}）。
+
+@item n
+@itemx .
+@findex xref-next-line
+移至下一个参考并将其显示在另一个窗口中 (@code{xref-next-line})。
+
+@item N
+@findex xref-next-group
+移动到下一个参考组的第一个参考并将其显示在另一个窗口中 (@code{xref-next-group})。
+
+@item p
+@itemx ,
+@findex xref-prev-line
+移至上一个参考并将其显示在另一个窗口中 (@code{xref-prev-line})。
+
+@item P
+@findex xref-prev-group
+移动到上一个参考组的第一个参考并将其显示在另一个窗口中 (@code{xref-prev-group})。
+
+@item C-o
+@findex xref-show-location-at-point
+在另一个窗口中显示当前行的引用 (@code{xref-show-location-at-point})。
+
+@item r @var{pattern} @key{RET} @var{replacement} @key{RET}
+对匹配 @var{pattern} (@code{xref-query-replace-in-results}) 的引用执行交互式查询替换，将匹配项替换为 @var{replacement}。  此命令只能在 @file{*xref*} 缓冲区中使用，该缓冲区显示所有相关文件中标识符的所有匹配项。  @xref{Identifier Search}。
+
+@cindex revert-buffer, in @file{*xref*} buffers
+@item g
+刷新 @file{*xref*} 缓冲区 (@code{revert-buffer}) 的内容。 @xref{Reverting}。
+
+@item M-,
+@findex xref-quit-and-pop-marker-stack
+退出显示 @file{*xref*} 缓冲区的窗口，然后跳转到上一个外部参照堆栈位置 (@code{xref-quit-and-pop-marker-stack})。
+
+@item q
+@findex xref-quit
+退出显示 @file{*xref*} 缓冲区 (@code{xref-quit}) 的窗口。
+@end table
+
+此外，常用的导航命令（例如箭头键、@kbd{C-n} 和 @kbd{C-p}）可用于在缓冲区中移动而不显示引用。
+
+@node Identifier Search
+@subsubsection 搜索并用标识符替换
+@cindex search and replace in multiple source files
+@cindex multiple source file search and replace
+
+本节中的命令对标识符本身或引用它们的文件执行各种搜索和替换操作。
+
+@table @kbd
+@item M-?
+查找该标识符的所有引用。
+
+@item r
+@itemx M-x xref-query-replace-in-results @key{RET} @var{replacement} @key{RET}
+@itemx C-u M-x xref-query-replace-in-results @key{RET} @var{regexp} @key{RET} @var{replacement} @key{RET}
+以交互方式将 @file{*xref*} 缓冲区中显示的所有标识符的名称中的 @var{regexp} 替换为 @var{replacement}。
+
+@item M-x xref-find-references-and-replace @key{RET} @var{from} @key{RET} @var{to} @key{RET}
+以交互方式将标识符 @var{from} 的所有实例重命名为新名称 @var{to}。
+
+@item M-x tags-search @key{RET} @var{regexp} @key{RET}
+通过所选标签表中的文件搜索 @var{regexp}。
+
+@item M-x tags-query-replace @key{RET} @var{regexp} @key{RET} @var{replacement} @key{RET}
+对所选标签表中的每个文件执行 @code{query-replace-regexp}。
+
+@item M-x fileloop-continue
+从 point 的当前位置重新启动上面最后 2 个命令之一。
+@end table
+
+@kindex M-?
+@findex xref-find-references
+@kbd{M-?} 找到该标识符的所有引用，根据需要提示输入标识符，并完成。  根据当前后端 (@pxref{Xref})，即使该命令在此时找到有效标识符，也可能会提示。  当使用前缀参数调用时，它总是提示输入标识符。  （如果您希望它始终提示，请将变量 @code{xref-prompt-for-identifier} 的值自定义为 @code{t}；或者将其设置为 @code{nil}，以便仅在当前没有可用的标识符时进行提示。）然后，该命令会在 @file{*xref*} 缓冲区中显示对标识符的所有引用，显示文件名和引用标识符的行。  外部参照模式命令在此缓冲区中可用，请参阅@ref{Xref Commands}。
+
+当在主模式使用 @code{etags} 后端的缓冲区中调用时，@kbd{M-?} 搜索主模式与原始缓冲区的主模式匹配的文件和缓冲区。  它根据文件扩展名猜测该模式，因此如果 2⁣ 似乎正在跳过相关缓冲区或文件，请尝试自定义变量 @code{semantic-symref-filepattern-alist}（如果缓冲区的主模式中已有条目）或 @code{auto-mode-alist}（如果没有），从而通知 @code{xref} 缺少的扩展名 (@pxref{Choosing Modes})。
+
+@vindex xref-auto-jump-to-first-xref
+如果变量@code{xref-auto-jump-to-first-xref}的值为@code{t}，则@code{xref-find-references}自动跳转到@file{*xref*}缓冲区中的第一个结果，并选择显示该引用的窗口；您可以使用 @w{@kbd{M-g M-n}} (@code{next-error}) 和 @w{@kbd{M-g M-p}} (@code{previous-error}) (@pxref{Compilation Mode}) 选择其他结果。  如果值为 @code{show}，则显示第一个结果，但显示 @file{*xref*} 缓冲区的窗口保持选中状态。  如果值为@code{move}，则在@file{*xref*}缓冲区中选择第一个结果，但不显示；然后您可以使用 @key{RET} 实际显示参考。  默认值是@code{nil}，它只显示@file{*xref*}缓冲区中的结果，但不选择其中任何一个，也不显示引用本身。
+
+@findex xref-query-replace-in-results
+@kbd{r} (@code{xref-query-replace-in-results}) 读取 @var{replacement} 字符串，就像普通的 @kbd{M-x query-replace-regexp} 一样。  然后，它会在引用这些标识符的所有文件中的所有位置重命名 @file{*xref*} 缓冲区中显示的标识符，使得它们的新名称为 @var{replacement}。  当您在重构过程中重命名标识符时，这非常有用。  该命令应在 @kbd{M-?} 生成的 @file{*xref*} 缓冲区中调用。  默认情况下，该命令将每个标识符的整个名称替换为 @var{replacement}，但如果使用前缀参数调用，该命令会提示输入正则表达式来匹配标识符名称，并仅将标识符名称中该正则表达式的匹配项替换为 @var{replacement}。
+
+@findex xref-find-references-and-replace
+@kbd{M-x xref-find-references-and-replace} 的工作方式与 @code{xref-query-replace-in-results} 类似，但当您想要重命名由其名称 @var{from} 指定的单个标识符时，它更方便。
+
+@findex xref-change-to-xref-edit-mode
+@cindex Xref Edit mode
+@cindex mode, Xref Edit
+在 @file{*xref*} 缓冲区中键入 @kbd{e} 可使缓冲区可写并进入外部参照编辑模式。  与发生编辑模式 (@pxref{Other Repeating Search}) 类似，您可以编辑外部参照后端报告的匹配行，并将这些更改反映在访问原始文件的缓冲区中。  输入 @kbd{C-c C-c} 离开外部参照编辑模式并返回外部参照模式。
+
+@findex tags-search
+@kbd{M-x tags-search} 使用迷你缓冲区读取正则表达式，然后在选定标签表中的所有文件中搜索匹配项，一次一个文件。  它显示正在搜索的文件的名称，以便您可以跟踪其进度。  一旦发现出现，@code{tags-search}就会返回。  此命令要求标签表可用 (@pxref{Tags Tables})。
+
+@findex fileloop-continue
+找到与 @code{tags-search} 匹配的一个后，您可能想要找到其余所有匹配项。  @kbd{M-x fileloop-continue} 恢复@code{tags-search}，又找到一个匹配项。  这将搜索当前缓冲区的其余部分，然后是标签表的其余文件。
+
+@findex tags-query-replace
+@kbd{M-x tags-query-replace} 对标签表中的所有文件执行一次 @code{query-replace-regexp}。  它读取要搜索的正则表达式和要替换的字符串，就像普通的 @kbd{M-x query-replace-regexp} 一样。  它的搜索与 @kbd{M-x tags-search} 非常相似，但会重复地根据您的输入处理匹配项。  @xref{Query Replace}，有关查询替换的更多信息。
+
+@vindex tags-case-fold-search
+@cindex case-sensitivity and tags search
+您可以通过自定义变量 @code{tags-case-fold-search} 的值来控制标签搜索命令的大小写敏感性。  默认情况下使用与 @code{case-fold-search} (@pxref{Lax Search}) 的值相同的设置。
+
+通过一次调用 @kbd{M-x tags-query-replace} 可以获取标签表中的所有文件。  但通常暂时退出很有用，您可以对任何没有特殊查询替换含义的输入事件执行此操作。  您可以通过键入 @kbd{M-x fileloop-continue} 随后恢复查询替换；此命令将恢复您执行的最后一个标签搜索或替换命令。例如，要跳过当前文件的其余部分，您可以输入@w{@kbd{M-> M-x fileloop-continue}}。
+
+请注意，上述命令执行的搜索范围比 0⁣ 系列要广泛得多。  @code{xref-find-definitions} 命令仅搜索与您的字符串或正则表达式匹配的标识符的定义。  命令 @code{xref-find-references}、@code{tags-search} 和 @code{tags-query-replace} 查找标识符或正则表达式的每次出现，就像普通搜索命令和替换命令在当前缓冲区中所做的那样。
+
+作为 @code{xref-find-references} 和 @code{tags-search} 的替代方案，您可以将 @command{grep} 作为子进程运行，并让 Emacs 逐一显示匹配的行。  @xref{Grep Searching}。
+
+@node List Identifiers
+@subsubsection 标识符查询
+
+@table @kbd
+@item C-M-i
+@itemx M-@key{TAB}
+对点周围的文本执行补全，可能使用选定的标签表（如果已加载）（@code{completion-at-point}）。
+
+@item M-x list-tags @key{RET} @var{file} @key{RET}
+显示程序文件@var{file}中定义的标识符列表。
+
+@item C-M-. @var{regexp} @key{RET}
+显示与 @var{regexp} (@code{xref-find-apropos}) 匹配的所有标识符的列表。  @xref{Looking Up Identifiers}。
+
+@item M-x tags-next-file
+访问所选标签表中记录的文件。
+@end table
+
+在大多数编程语言模式下，您可以键入 @kbd{C-M-i} 或 @kbd{M-@key{TAB}} (@code{completion-at-point}) 来完成点处的符号。  某些模式为该模式提供了专门的完成命令；对于那些没有的人，如果加载了标签表，则此命令可以使用它来生成完成候选者。 @xref{Symbol Completion}。
+
+@findex list-tags
+@kbd{M-x list-tags} 完整读取所选标签表覆盖的文件之一的名称，并显示该文件中定义的标签列表；它提供当前缓冲区的文件名作为要列出其标签的默认文件。  不要将目录作为文件名的一部分，除非标记表中记录的文件名包含目录。  此命令仅适用于 etags 后端，并且需要项目的标签表可用。  @xref{Tags Tables}。
+
+@findex tags-next-file
+@kbd{M-x tags-next-file} 访问所选标签表覆盖的文件。第一次调用时，它会访问该表覆盖的第一个文件。  每个后续调用都会访问下一个覆盖的文件，除非提供了前缀参数，在这种情况下，它将返回到第一个文件。  该命令需要选择一个标签表。
+
+@node Tags Tables
+@subsection 标签 表格
+@cindex tags and tag tables
+
+A@dfn{tags table}记录了通过扫描某个程序或某个文档的源代码提取的标签@footnote{ A @dfn{tag} is a synonym for identifier reference.  Commands and features based on the @code{etags} package traditionally use ``tag'' with this meaning, and this subsection follows that tradition. }。  从生成的文件中提取的标签引用原始文件，而不是在标签提取期间扫描的生成的文件。  生成文件的示例包括从 Cweb 源文件、Yacc 解析器或 Lex 扫描器定义生成的 C 文件； @file{.i}预处理的C文件；以及通过预处理 @file{.fpp} 源文件生成的 Fortran 文件。
+
+@cindex etags
+要生成标签表，请在文档或源代码文件上运行 @command{etags} shell 命令。  @samp{etags} 程序将标签写入@dfn{tags table file}，简称为@dfn{tags file}。  标签文件的常规名称是 @file{TAGS}@. @xref{Create Tags Table}。  （也可以使用其他包中的命令之一来创建标签表，这些命令可以以相同的格式生成此类表。）如果启用 @code{etags-regen-mode} 全局次要模式，Emacs 将根据需要自动生成和更新标签表。
+
+Emacs 通过 @code{etags} 包使用标签表作为 @code{xref} 支持的后端之一。  由于标签表是由 Emacs 发行版中的 @command{etags} 命令生成的，因此我们在这里更详细地描述标签表。
+
+@cindex C++ class browser, tags
+@cindex tags, C++
+@cindex class browser, C++
+@cindex Ebrowse
+Ebrowse 工具与 @command{etags} 类似，但专门针对 C++ 定制。  @xref{Top,, Ebrowse, ebrowse, Ebrowse User's Manual}。  Semantic 包提供了另一种生成和使用标签的方法，与 @command{etags} 工具分开。 @xref{Semantic}。
+
+@menu
+* Tag Syntax::           各种类型的代码和文本文件的标记语法。
+* Create Tags Table::    使用 @command{etags} 创建和更新标签表。
+* Etags Regexps::        使用正则表达式创建任意标签。
+@end menu
+
+@node Tag Syntax
+@subsubsection 源文件标签语法
+
+以下是最流行语言的标签语法定义方式：
+
+@itemize @bullet
+@item
+在 C 代码中，任何 C 函数或 typedef 都是标签，@code{struct}、@code{union} 和 @code{enum} 的定义也是如此。 @code{#define}宏定义、@code{#undef}和@code{enum}常量也是标签，除非您在制作标签表时指定@samp{--no-defines}。同样，全局变量是标签，除非您指定@samp{--no-globals}，结构成员也是标签，除非您指定@samp{--no-members}。  使用@samp{--no-globals}、@samp{--no-defines}和@samp{--no-members}可以使标签表文件变得更小。
+
+除了函数定义之外，您还可以通过为 @command{etags} 提供 @samp{--declarations} 选项来标记函数声明和外部变量。
+
+@item
+在C++代码中，除了C代码的所有标记结构之外，还可以识别成员函数；除非您使用 @samp{--no-members} 选项，否则成员变量也会被识别。  @code{operator} 定义具有类似于 @samp{operator+} 的标签名称。  如果指定 @samp{--class-qualify} 选项，类中变量和函数的标签将命名为 ⁣​​4⁣ 和 @samp{@var{class}::@var{function}}。  默认情况下，类方法和成员不是类限定的，这有助于更准确地在源中识别它们的名称。
+
+@item
+在 Java 代码中，标签包括 C++ 中识别的所有结构，以及 @code{interface}、@code{extends} 和 @code{implements} 结构。类中变量和函数的标签名为 @samp{@var{class}.@var{variable}} 和 @samp{@var{class}.@var{function}}。
+
+@item
+在@LaTeX{}文档中，@code{\chapter}、@code{\section}、@code{\subsection}、@code{\subsubsection}、@code{\eqno}、@code{\label}、@code{\ref}、@code{\Ref}、@code{\footref}、@code{\cite}、@code{\bibitem}、 @code{\part}、@code{\appendix}、@code{\entry}、@code{\index}、@code{\def}、@code{\edef}、@code{\gdef}、@code{\xdef}、@code{\newcommand}、@code{\renewcommand}、@code{\newenvironment}、 @code{\renewenvironment}、@code{\DeclareRobustCommand}、@code{\newrobustcmd}、@code{\renewrobustcmd}、@code{\providecommand}、@code{\providerobustcmd}、@code{\NewDocumentCommand}、@code{\RenewDocumentCommand}、@code{\ProvideDocumentCommand}、@code{\DeclareDocumentCommand}、@code{\NewExpandableDocumentCommand}、 @code{\RenewExpandableDocumentCommand}、@code{\ProvideExpandableDocumentCommand}、@code{\DeclareExpandableDocumentCommand}、@code{\NewDocumentEnvironment}、@code{\RenewDocumentEnvironment}、@code{\ProvideDocumentEnvironment}、@code{\DeclareDocumentEnvironment}、@code{\csdef}、@code{\csedef}、@code{\csgdef}、@code{\csxdef}、 @code{\csletcs}、@code{\cslet}、@code{\letcs}、@code{\let}、@code{\cs_new_protected_nopar}、@code{\cs_new_protected}、@code{\cs_new_nopar}、@code{\cs_new_eq}、@code{\cs_new}、@code{\cs_set_protected_nopar}、@code{\cs_set_protected}、 @code{\cs_set_nopar}、@code{\cs_set_eq}、@code{\cs_set}、@code{\cs_gset_protected_nopar}、@code{\cs_gset_protected}、@code{\cs_gset_nopar}、@code{\cs_gset_eq}、@code{\cs_gset}、@code{\cs_generate_from_arg_count} 和 @code{\cs_generate_variant} 是标签。  这些命令的任何带星号变体的参数也是如此。
+
+如果您在调用 @command{etags} 之前在环境变量 @env{TEXTAGS} 中指定它们，其他命令也可以创建标签。  该环境变量的值应该是以冒号分隔的命令名称列表。  例如，
+
+@example
+TEXTAGS="mycommand:myothercommand"
+export TEXTAGS
+@end example
+
+@noindent
+指定（使用 Bourne shell 语法）命令 @samp{\mycommand} 和 @samp{\myothercommand} 也定义标签。
+
+@item
+在 Lisp 代码中，用 @code{defun} 定义的任何函数、用 @code{defvar} 或 @code{defconst} 定义的任何变量，以及一般来说，第 0 列中以 @samp{(def} 开头的任何表达式的第一个参数都是标签。  作为例外，@code{(defvar @var{foo})} 形式的表达式被视为声明，并且仅在给出 @samp{--declarations} 选项时才被标记。
+
+@item
+在Scheme代码中，标签包括使用@code{def}或名称以@samp{def}开头的构造定义的任何内容。  它们还包括在文件顶层用 @code{set!} 设置的变量。
+@end itemize
+
+还支持其他几种语言：
+
+@itemize @bullet
+
+@item
+在 Ada 代码中，函数、过程、包、任务和类型都是标签。  使用 @samp{--packages-only} 选项仅为包创建标签。
+
+在 Ada 中，相同的名称可以用于不同类型的实体（例如，过程和函数）。  此外，对于包、过程和函数之类的东西，还有规范（即接口）和主体（即实现）。  为了更轻松地选择所需的定义，Ada 标记名称具有指示实体类型的后缀：
+
+@table @samp
+@item /b
+封装体。
+@item /f
+功能。
+@item /k
+任务。
+@item /p
+程序。
+@item /s
+封装规格
+@item /t
+类型。
+@end table
+
+因此，@kbd{M-x find-tag @key{RET} bidule/b @key{RET}}将直接进入包体@code{bidule}，而@kbd{M-x find-tag @key{RET} bidule @key{RET}}将只搜索任何标签@code{bidule}。
+
+@item
+在汇编代码中，出现在行开头并后跟冒号的标签是标记。
+
+@item
+在 Bison 或 Yacc 输入文件中，每个规则将其构造的非终结符定义为标签。  文件中包含 C 代码的部分被解析为 C 代码。
+
+@item
+在 Cobol 代码中，标签是段落名称；也就是说，从第 8 列开始并后跟句点的任何单词。
+
+@item
+在Erlang代码中，标签是文件中定义的函数、记录和宏。
+
+@item
+在 Fortran 代码中，函数、子例程和块数据都是标签。
+
+@item
+在 Go 代码中，包、函数和类型都是标签。
+
+@item
+在 HTML 输入文件中，标签是 @code{title} 和 @code{h1}、@code{h2}、@code{h3} 标头。  此外，标签在锚点中是@code{name=}，并且所有出现的@code{id=}。
+
+@item
+在Lua输入文件中，所有函数都是标签。
+
+@item
+在 makefile 中，目标是标签；此外，除非您指定 @samp{--no-globals}，否则变量都是标签。
+
+@item
+在 Objective C 代码中，标签包括类、类类别、方法和协议的 Objective C 定义。  类中变量和函数的标签名为 @samp{@var{class}::@var{variable}} 和 @samp{@var{class}::@var{function}}。
+
+@item
+在 Pascal 代码中，标签是文件中定义的函数和过程。
+
+@item
+在 Perl 代码中，标签是由 @code{package}、@code{sub}、@code{use constant}、@code{my} 和 @code{local} 关键字定义的包、子例程和变量。  如果要标记全局变量，请使用@samp{--globals}。  子例程的标签名为 @samp{@var{package}::@var{sub}}。  默认包中定义的子例程的名称是@samp{main::@var{sub}}。
+
+@item
+在 PHP 代码中，标签是函数、类和定义。  变量也是标签，除非您使用 @samp{--no-members} 选项。
+
+@item
+在 PostScript 代码中，标签就是函数。
+
+@item
+在 Prolog 代码中，标签是行首的谓词和规则。
+
+@item
+在 Python 代码中，行开头的 @code{def} 或 @code{class} 会生成一个标记。
+
+@item
+在 Ruby 代码中，行开头的 @code{def} 或 @code{class} 或 @code{module} 会生成一个标记。  常量也会生成标签。
+
+@item
+在 Rust 代码中，标记使用 @code{fn}、@code{enum}、@code{struct} 或 @code{macro_rules!} 定义的任何内容。
+@end itemize
+
+您还可以基于正则表达式匹配 (@pxref{Etags Regexps}) 生成标签来处理其他格式和语言。
+
+@node Create Tags Table
+@subsubsection 创建标签表
+@cindex @command{etags} program
+
+@command{etags}程序用于创建标签表文件。  它知道多种语言的语法，如中所述
+@iftex
+the previous section.
+@end iftex
+@ifnottex
+@ref{Tag Syntax}.
+@end ifnottex
+以下是运行 @command{etags} 的方法：
+
+@example
+etags @var{inputfiles}@dots{}
+@end example
+
+@noindent
+@command{etags}程序读取指定的文件，并在当前工作目录中写入名为@file{TAGS}的标签表。  您可以选择使用 @samp{--output=@var{file}} 选项为标签表指定不同的文件名；指定 @file{-} 作为文件名会将标签表打印到标准输出。  您还可以使用 @samp{--append} 选项将新创建的标签表附加到现有文件中。
+
+如果指定的文件不存在，@command{etags} 查找它们的压缩版本并解压缩它们以读取它们。  在 MS-DOS 下，如果在命令行上给出了 @samp{mycode.c} 并且 @file{mycode.c} 不存在，@command{etags} 还会查找类似 @file{mycode.cgz} 的文件名。
+
+如果标签表由于其中描述的文件发生更改而变得过时，您可以通过再次运行 @command{etags} 程序来更新它。  如果标签表没有记录标签，或者将其记录到错误的文件中，那么在更新标签表之前，Emacs 将无法找到该定义。  但如果标签表中记录的位置变得有点错误（由于其他编辑），Emacs 仍然能够找到正确的位置，但会稍有延迟。
+
+因此，无需在每次编辑后更新标签表。当您定义要列出的新标签时，或者当您将标签定义从一个文件移动到另一个文件时，或者当更改变得重大时，您应该更新标签表。
+
+如果启用了下面描述的 0⁣ 次要模式，Emacs 将根据需要自动使标签表保持最新。
+
+您可以通过将 @samp{--include=@var{file}} 选项传递给 @command{etags} 来创建标签表 @dfn{include} 另一个标签表。  然后它覆盖包含的标签文件覆盖的所有文件以及它自己的文件。
+
+如果在运行@command{etags}时指定具有相对文件名的源文件，则标签文件将包含相对于最初写入标签文件的目录的文件名。  这样，您可以移动包含标签文件和源文件的整个目录树，并且标签文件仍将正确引用源文件。  但是，如果标签文件是 @file{-} 或位于 @file{/dev} 目录中，则文件名是相对于当前工作目录的。  例如，当将标签写入标准输出时，这很有用。
+
+使用相对文件名时，它不应该是指向不同目录中的标记文件的符号链接，因为这通常会使文件名无效。
+
+如果您指定绝对文件名作为 @command{etags} 的参数，则标签文件将包含绝对文件名。  这样，即使您移动标签文件，只要源文件保留在同一位置，标签文件仍将引用相同的文件。  绝对文件名以 @samp{/} 开头，或者在 MS-DOS 和 MS-Windows 上以 @samp{@var{device}:/} 开头。
+
+当您想要从大量文件创建标签表时，在命令行上列出它们可能会遇到问题，因为某些系统对其长度有限制。  您可以通过告诉 @command{etags} 从其标准输入读取文件名来规避此限制，方法是在文件名处键入破折号，如下所示：
+
+@smallexample
+find . -name "*.[chCH]" -print | etags -
+@end smallexample
+
+@command{etags} 根据输入文件的文件名和内容识别输入文件中使用的语言。  它首先尝试将文件名和扩展名与某些语言常用的文件名和扩展名相匹配。  有些语言具有已知名称的解释器（例如 Perl 的 @command{perl} 或 Prolog 的 @command{pl}），因此 @command{etags} 接下来在输入文件的第一行查找 @samp{#!@var{interp}} 形式的解释器规范，并将其与已知的解释器进行匹配。  如果这些都不起作用，或者如果您想覆盖语言的自动检测，则可以使用 @samp{--language=@var{name}} 选项显式指定语言。  您可以将这些选项与文件名混合使用；每一项都适用于其后面的文件名。  指定 @samp{--language=auto} 告诉 @command{etags} 继续根据文件名和文件内容猜测语言。  指定 @samp{--language=none} 以完全关闭特定于语言的处理；然后 @command{etags} 仅通过正则表达式匹配来识别标签 (@pxref{Etags Regexps})。  当输入文件使用 @command{etags} 尚不支持的语言，并且您希望避免 @command{etags} 使用 Fortran 和 C 作为默认语言时，这会派上用场。
+
+如果指定 @samp{--no-fallback-lang} 选项，还可以防止 @command{etags} 回退到 Fortran 和 C。  选项@samp{--fallback-lang}推翻了这一点。
+
+当从程序调用 @command{etags} 时，选项 @samp{--parse-stdin=@var{file}} 最有用。  它可以在命令行上使用（仅一次）代替文件名。  @command{etags}将从标准输入读取并将生成的标签标记为属于文件@var{file}。
+
+对于 C 和 C++，如果源文件不遵守 GNU 编码标准的约定，如果仅在顶级定义（如函数和 @code{struct} 定义）中在第 0 列中包含大括号 (@samp{@{} and @samp{@}})，我们建议您使用 @samp{--ignore-indentation} 选项，以防止 @command{etags} 错误地解释第 0 列中的右大括号。
+
+@samp{etags --help}输出@command{etags}知道的语言列表，以及猜测语言的文件名规则。  它还打印所有可用 @command{etags} 选项的列表，以及简短的说明。  如果后跟一个或多个 @samp{--language=@var{lang}} 选项，它将输出有关如何为 @var{lang} 生成标签的详细信息。
+
+默认情况下，@command{etags} 将其生成的所有扫描文件包含在标签表中，包括根本没有找到标签的文件。指定 @samp{--no-empty-file-entries} 可以防止这种情况发生；那么没有标签的文件将不会在标签表中提及。  但是，请注意，处理标签表中提到的文件的命令，例如 @code{tags-search} (@pxref{Identifier Search})，将处理因此从标签表中省略的文件。  选项@samp{--empty-file-entries}推翻了这一点。
+
+@findex etags-regen-mode
+您可以要求 Emacs 自动为您完成此操作，而不是通过手动调用 @command{etags} 来创建和更新标签表。全局次要模式@code{etags-regen-mode}如果启用，会根据需要自动生成标签表，并在您编辑任何提供标签的源文件时负责更新它们。  此模式使用当前项目配置 (@pxref{Projects}) 来确定将哪些文件提交到 @command{etags} 以重新生成项目的标签表。  您可以使用以下用户选项自定义此次要模式的工作方式：
+
+@vtable @code
+@item etags-regen-program
+重新生成标签表的程序；默认为@command{etags}。
+
+@item etags-regen-program-options
+传递给重新生成标签表的程序的命令行选项。
+
+@item etags-regen-ignores
+全局通配符模式列表，指定重新生成标签表时要忽略的文件。
+@end vtable
+
+@findex tags-reset-tags-tables
+如果您使用 @kbd{M-x visit-tags-table} (@pxref{Select Tags Table}) 手动选择标签表，@code{etags-regen-mode} 会有效地禁用自身：假设您更喜欢手动管理标签表，它将不再自动创建和更新标签表。  您可以通过调用命令@code{tags-reset-tags-tables}取消使用@code{visit-tags-table}的效果。
+
+@node Etags Regexps
+@subsubsection Etag 正则表达式
+
+@command{etags} 的 @samp{--regex} 选项允许通过正则表达式匹配来识别标签。  您可以将此选项与文件名混合使用；每一项都适用于其后面的源文件。  如果您指定多个 @samp{--regex} 选项，则所有这些选项都会并行使用。  语法是：
+
+@smallexample
+--regex=[@var{@{language@}}]/@var{tagregexp}/[@var{nameregexp}/]@var{modifiers}
+@end smallexample
+
+@noindent
+选项值的基本部分是@var{tagregexp}，匹配标签的正则表达式。  它始终用于锚定，即仅匹配行的开头。  如果您想允许缩进标签，请使用与初始空格匹配的正则表达式；从 @samp{[ \t]*} 开始。
+
+在这些正则表达式中，@samp{\}引用下一个字符，并且支持所有 C 字符转义序列：@samp{\a}表示响铃，@samp{\b}表示退格，@samp{\e}表示转义，@samp{\f}表示换页，@samp{\n}表示换行，@samp{\r}表示回车，@samp{\t}表示制表符，以及@samp{\v} 用于垂直制表符。  另外，@samp{\d}代表@code{DEL}字符。  否则，正则表达式语法与 Emacs 相同，只是反斜杠转义与 GNU grep 相同（这意味着，例如，不支持害羞组），并且不支持 @samp{[:ascii:]}、@samp{[:multibyte:]}、@samp{[:nonascii:]}、@samp{[:word:]} 和 @samp{[:unibyte:]}。
+
+理想情况下，@var{tagregexp} 匹配的字符数不应多于识别您要标记的内容所需的字符数。  如果语法要求您编写 @var{tagregexp} 以便匹配标签本身之外的更多字符，则您应该添加 @var{nameregexp}，以仅挑选标签。这将使 Emacs 能够更准确地查找标签并更可靠地完成标签名称。  在@var{nameregexp}中，使用“反向引用”（@pxref{Regexp Backslash}）来对@var{tagregexp}中的括号分组@w{@samp{\( @dots{} \)}}通常很方便。  例如，@samp{\1}指的是第一个这样的带括号的分组。  您可以在下面找到一些这样的示例。
+
+@var{modifiers} 是零个或多个字符的序列，用于修改 @command{etags} 进行匹配的方式。  不带修饰符的正则表达式以区分大小写的方式顺序应用于输入文件的每一行。  修饰符及其含义是：
+
+@table @samp
+@item i
+匹配此正则表达式时忽略大小写。
+@item m
+将此正则表达式与整个文件匹配，以便可以进行多行匹配。
+@item s
+将此正则表达式与整个文件匹配，并允许 @var{tagregexp} 中的 @samp{.} 匹配换行符。
+@end table
+
+@samp{-R} 选项取消前面 @samp{--regex} 选项定义的所有正则表达式。  它也适用于其后面的文件名。  这是一个例子：
+
+@smallexample
+etags --regex=/@var{reg1}/i voo.doo --regex=/@var{reg2}/m \
+    bar.ber -R --lang=lisp los.er
+@end smallexample
+
+@noindent
+这里@command{etags}根据@file{voo.doo}和@file{bar.ber}的内容选择解析语言。  @command{etags}还使用@var{reg1}来识别@file{voo.doo}中的附加标签，并使用@var{reg1}和@var{reg2}来识别@file{bar.ber}中的附加标签。  @var{reg1} 以不区分大小写的方式针对 @file{voo.doo} 和 @file{bar.ber} 的每一行进行检查，而 @var{reg2} 则针对整个 @file{bar.ber} 文件进行检查，以区分大小写的方式允许多行匹配。  @command{etags} 仅使用 Lisp 标签规则，没有用户指定的正则表达式匹配来识别 @file{los.er} 中的标签。
+
+您可以使用可选前缀 @var{@{language@}} 将 @samp{--regex} 选项限制为仅匹配给定语言的文件。 （@samp{etags --help}打印@command{etags}识别的语言列表。）当在文件中存储@command{etags}的许多预定义正则表达式时，这特别有用。  以下示例标记 Emacs 源文件中的 @code{DEFVAR} 宏，仅适用于 C 语言：
+
+@smallexample
+--regex='@{c@}/[ \t]*DEFVAR_[A-Z_ \t(]+"\([^"]+\)"/\1/'
+@end smallexample
+
+@noindent
+当您有复杂的正则表达式时，您可以将它们的列表存储在文件中。  以下选项语法指示 @command{etags} 读取两个正则表达式文件。  第二个文件中包含的正则表达式的匹配不区分大小写。
+
+@smallexample
+--regex=@@@var{case-sensitive-file} --ignore-case-regex=@@@var{ignore-case-file}
+@end smallexample
+
+@noindent
+@command{etags} 的正则表达式文件每行包含一个正则表达式。  空行以及以空格或制表符开头的行将被忽略。当一行中的第一个字符为 @samp{@@} 时，@command{etags} 假定该行的其余部分是另一个正则表达式文件的名称；因此，一个这样的文件可以包含另一个文件。  所有其他行都被视为正则表达式。  如果该行的第一个非空白文本是 @samp{--}，则该行是注释。
+
+例如，我们可以创建一个名为 @samp{emacs.tags} 的文件，其中包含以下内容：
+
+@smallexample
+        -- This is for GNU Emacs C source files
+@{c@}/[ \t]*DEFVAR_[A-Z_ \t(]+"\([^"]+\)"/\1/
+@end smallexample
+
+@noindent
+然后像这样使用它：
+
+@smallexample
+etags --regex=@@emacs.tags *.[ch] */*.[ch]
+@end smallexample
+
+这里还有一些例子。  引用正则表达式是为了保护它们免受 shell 解释。
+
+@itemize @bullet
+
+@item
+标记八度文件：
+
+@smallexample
+etags --language=none \
+      --regex='/[ \t]*function.*=[ \t]*\([^ \t]*\)[ \t]*(/\1/' \
+      --regex='/###key \(.*\)/\1/' \
+      --regex='/[ \t]*global[ \t].*/' \
+      *.m
+@end smallexample
+
+@noindent
+请注意，不会为脚本生成标签，因此如果您想跳转到它，您必须自己添加一行 @samp{###key @var{scriptname}} 形式的行。
+
+@item
+标记 Tcl 文件：
+
+@smallexample
+etags --language=none --regex='/proc[ \t]+\([^ \t]+\)/\1/' *.tcl
+@end smallexample
+
+@item
+标记 VHDL 文件：
+
+@smallexample
+etags --language=none \
+  --regex='/[ \t]*\(ARCHITECTURE\|CONFIGURATION\) +[^ ]* +OF/' \
+  --regex='/[ \t]*\(ATTRIBUTE\|ENTITY\|FUNCTION\|PACKAGE\
+  \( BODY\)?\|PROCEDURE\|PROCESS\|TYPE\)[ \t]+\([^ \t(]+\)/\3/'
+@end smallexample
+@end itemize
+
+@node Select Tags Table
+@subsection 选择标签表
+
+@findex visit-tags-table
+Emacs 在任何时候最多有一个 @dfn{selected} 标签表。  所有用于处理标签表的命令首先使用选定的标签表。要选择标签表，请输入 @kbd{M-x visit-tags-table}，它将读取标签表文件名作为参数，而 @file{TAGS} 默认为包含从默认目录向上递归搜索时遇到的名为 @file{TAGS} 的文件的第一个目录。
+
+如果启用 @code{etags-regen-mode} 全局次要模式，它将在需要时自动查找并访问标签表文件。  如果您随后手动调用 @code{visit-tags-table} 来选择标签表，@code{etags-regen-mode} 将禁用标签表的自动生成。  @xref{Create Tags Table}。
+
+@vindex tags-file-name
+在您尝试使用标签表内容之前，Emacs 并不真正读取它们； @code{visit-tags-table} 所做的只是将文件名存储在变量 @code{tags-file-name} 中，仅此而已。  变量的初始值为@code{nil}；该值告诉所有使用标签表的命令，它们必须要求提供要使用的标签表文件名。
+
+除了选定的标签表之外，Emacs 还维护您一起使用的多个标签表的列表。  例如，如果您正在开发一个使用库的程序，您可能希望程序和库的标签表都可用，以便 Emacs 可以轻松地从两者中找到标识符。  如果所选标签表没有标识符或未提及标签命令所需的源文件，则该命令将尝试使用当前标签表列表中的所有其他标签表。
+
+当另一个标签表已加载时，使用 @code{visit-tags-table} 加载新标签表可以为您提供一个选择：您可以将新标签表添加到当前标签表列表中，或者丢弃当前列表并开始一个新列表。  如果您开始一个新列表，则将使用其他标签表的@emph{instead}。  如果将新表添加到当前列表，则会使用 @emph{as well as} 其他表。
+
+@vindex tags-table-list
+您可以通过将变量 @code{tags-table-list} 设置为目录名称列表来指定标签表的精确列表，如下所示：
+
+@c keep this on two lines for formatting in smallbook
+@example
+@group
+(setq tags-table-list
+      '("~/.emacs.d" "/usr/local/lib/emacs/src"))
+@end group
+@end example
+
+@noindent
+这告诉标签命令查看 @file{~/.emacs.d} 目录和 @file{/usr/local/lib/emacs/src} 目录中的 @file{TAGS} 文件。  顺序取决于您所在的文件以及哪个标签表提到了该文件。
+
+不要同时设置@code{tags-file-name}和@code{tags-table-list}。
+
+@node EDE
+@section Emacs开发环境
+@cindex EDE (Emacs Development Environment)
+@cindex Emacs Development Environment
+@cindex Integrated development environment
+
+EDE (@dfn{Emacs Development Environment}) 是一个软件包，可简化使用 Emacs 创建、构建和调试大型程序的任务。  它提供了 Emacs 中 IDE 或 @dfn{Integrated Development Environment} 的一些功能。
+
+本节提供 EDE 用法的简要说明。
+@ifnottex
+For full details, see @ref{Top, EDE,, ede, Emacs Development Environment}.
+@end ifnottex
+@iftex
+For full details on Ede, type @kbd{C-h i} and then select the EDE
+manual.
+@end iftex
+
+EDE 作为全局次要模式 (@pxref{Minor Modes}) 实现。  要启用它，请输入 @kbd{M-x global-ede-mode} 或单击 @samp{Tools} 菜单中的 @samp{Project Support (EDE)} 项。  您还可以在每次启动 Emacs 时启用 EDE，方法是将以下行添加到初始化文件中：
+
+@smallexample
+(global-ede-mode t)
+@end smallexample
+
+@noindent
+激活 EDE 会将名为 @samp{Development} 的菜单添加到菜单栏。许多 EDE 命令，包括下面描述的命令，都可以从此菜单调用。
+
+EDE 将文件组织成@dfn{projects}，对应于目录树。  @dfn{project root} 是项目的最顶层目录。  要定义新项目，请访问所需项目根目录中的文件并输入@kbd{M-x ede-new}。  此命令提示输入@dfn{project type}，它指的是 EDE 将用于管理项目的基础方法 (@pxref{Creating a project, EDE,, ede, Emacs Development Environment})。  最常见的项目类型是@samp{Make}（使用 Makefile）和@samp{Automake}（使用 GNU Automake (@pxref{Top, Automake,, automake, Automake})）。  在这两种情况下，EDE 还会创建一个名为 @file{Project.ede} 的文件，其中存储有关项目的信息。
+
+一个项目可以包含一个或多个@dfn{targets}。  目标可以是目标文件、可执行程序或某种其他类型的文件，它们是根据项目中的一个或多个文件构建的。
+
+要将新的 @dfn{target} 添加到项目中，请输入 @kbd{C-c . t} (@code{M-x ede-new-target})。  此命令还会询问您是否希望将当前文件添加到该目标，这意味着目标将从该文件构建。  定义目标后，您可以通过键入 @kbd{C-c . a} (@code{ede-add-file}) 向其添加更多文件。
+
+要构建目标，请输入 @kbd{C-c . c} (@code{ede-compile-target})。要构建项目中的所有目标，请输入 @kbd{C-c . C} (@code{ede-compile-project})。  EDE 使用文件类型来猜测应该如何构建目标。
+
+@ifnottex
+@include emerge-xtra.texi
+@end ifnottex
+
+
+@node Bug Reference
+@section 错误参考
+@cindex bug reference
+
+大多数具有一定数量用户的项目都会在某些问题跟踪软件中跟踪错误报告，这些软件为每个报告分配一个唯一的简短编号或标识符。  它们用于引用给定的错误，例如，在修复某些错误的代码上方的源代码注释中、在文档文件中或在某些邮件列表或 IRC 频道的讨论中。
+
+@findex bug-reference-mode
+@findex bug-reference-prog-mode
+次要模式 @code{bug-reference-mode} 和 @code{bug-reference-prog-mode} 突出显示此类错误引用，并可以跟踪它们到项目问题跟踪器上的相应错误报告。  @code{bug-reference-prog-mode} 是 @code{bug-reference-mode} 的变体，它仅突出显示源代码注释和字符串中的错误引用。
+
+@vindex bug-reference-bug-regexp
+@vindex bug-reference-url-format
+为了正常工作，错误引用模式需要知道错误引用的语法 (@code{bug-reference-bug-regexp})，以及可以查找错误报告的跟踪器的 URL (@code{bug-reference-url-format})。  由于这些通常因项目而异，因此在 @pxref{Directory Variables} 或 @pxref{File Variables} 中指定它们是有意义的。
+
+例如，假设在我们的项目中，我们通常将错误报告的引用编写为 bug#1234 或 Bug-1234，并且该错误在问题跟踪器上的页面是@url{https://project.org/issues/1234}，那么这些局部变量部分就可以了。
+
+@smallexample
+;; Local Variables:
+;; bug-reference-bug-regexp: "\\([Bb]ug[#-]\\([0-9]+\\)\\)"
+;; bug-reference-url-format: "https://project.org/issues/%s"
+;; End:
+@end smallexample
+
+第一个正则表达式组捕获的字符串定义了覆盖错误引用创建的范围，即突出显示并可单击的部分。
+
+@code{bug-reference-bug-regexp} 中第二个正则表达式组捕获的字符串用于替换 @code{bug-reference-url-format} 中的 @code{%s} 模板。
+
+请注意，@code{bug-reference-url-format} 也可能是一个函数，以便满足更复杂的场景，例如，当必须使用 bug 参考的不同部分来区分问题和合并请求时，会导致不同的 URL。
+
+
+@heading 自动设置
+
+@vindex bug-reference-auto-setup-functions
+如果@code{bug-reference-mode}被激活，@code{bug-reference-mode-hook}已经运行，并且@code{bug-reference-bug-regexp}或@code{bug-reference-url-format}仍然是@code{nil}，该模式将尝试通过逐一调用@code{bug-reference-auto-setup-functions}中的函数来自动为这两个变量找到合适的值，直到成功为止。
+
+@vindex bug-reference-setup-from-vc-alist
+@vindex bug-reference-forge-alist
+@vindex bug-reference-setup-from-mail-alist
+@vindex bug-reference-setup-from-irc-alist
+目前，设置功能分为三种类型。
+
+@enumerate
+@item
+通过变量 @code{bug-reference-forge-alist} 和 @code{bug-reference-setup-from-vc-alist} 配置版本控制文件的设置。  默认情况下可以设置 GNU 项目，其中 @url{https://debbugs.gnu.org} 用作问题跟踪器，问题通常被引用为 @code{bug#13}（但也考虑许多不同的符号），以及其他几种软件版本，例如 GitLab、Gitea、SourceHut 和 GitHub。  如果您部署此类伪造的自托管实例，则告诉错误参考的最简单方法是通过@code{bug-reference-forge-alist}。
+
+@item
+设置根据邮件文件夹/mbox 名称猜测电子邮件，以及通过变量 @code{bug-reference-setup-from-mail-alist} 配置的邮件标头值。  支持内置新闻和邮件阅读器 @ref{Gnus} 和 @ref{Rmail}。
+
+@item
+IRC 通道的设置可通过变量 @code{bug-reference-setup-from-irc-alist} 进行配置。  支持内置 IRC 客户端 Rcirc、@xref{Top, Rcirc,, rcirc, The Rcirc Manual} 和 ERC、@xref{Top, ERC,, erc, The ERC Manual}。
+@end enumerate
+
+对于几乎所有这些模式，只需启用 @code{bug-reference-mode} 就足够了；只有 Rmail 需要稍微不同的设置。
+
+@smallexample
+;; Use VC-based setup if file is under version control.
+(add-hook 'prog-mode-hook #'bug-reference-prog-mode)
+
+;; Gnus (summary & article buffers)
+(add-hook 'gnus-mode-hook #'bug-reference-mode)
+
+;; Rmail
+(add-hook 'rmail-show-message-hook #'bug-reference-mode-force-auto-setup)
+
+;; Rcirc
+(add-hook 'rcirc-mode-hook #'bug-reference-mode)
+
+;; ERC
+(add-hook 'erc-mode-hook #'bug-reference-mode)
+@end smallexample
+
+在 Rmail 情况下，@code{rmail-show-message-hook} 必须与函数 @code{bug-reference-mode-force-auto-setup} 结合使用，而不是模式挂钩，该函数激活 @code{bug-reference-mode} 并强制自动设置。  原因是，对于 Rmail，所有消息都驻留在同一缓冲区中，但每当显示其他消息时都需要执行设置。
+
+
+@heading 添加对第三方软件包的支持
+
+@vindex bug-reference-auto-setup-functions
+添加对错误引用自动设置的支持通常非常简单：编写一个零参数的设置函数，该函数收集所需的信息（例如，在 MUA 的情况下，List-Id/To/From/Cc 邮件标头值），然后调用以下辅助函数之一：
+
+@itemize @bullet
+@item
+@code{bug-reference-maybe-setup-from-vc}，根据@code{bug-reference-setup-from-vc-alist}进行设置；
+
+@item
+@code{bug-reference-maybe-setup-from-mail}，根据@code{bug-reference-setup-from-mail-alist}进行设置；和
+
+@item
+@code{bug-reference-maybe-setup-from-irc}，根据@code{bug-reference-setup-from-irc-alist}进行设置。
+@end itemize
+
+如果设置函数可以设置错误引用模式，则它应该返回非@code{nil}，如果函数所做的最后一件事是调用上面的辅助函数之一，就是这种情况。
+
+最后，必须将设置函数添加到@code{bug-reference-auto-setup-functions}。
+
+请注意，这些自动设置功能应首先检查它们是否适用，例如，通过检查 @code{major-mode} 的值。
+
+
+@heading 与 debugs 包集成
+
+@findex debbugs-browse-mode
+如果您的项目问题在服务器 @url{https://debbugs.gnu.org} 上进行跟踪，您可以使用 @code{debbugs} 包直接在 Emacs 中浏览和回复报告，该包可以通过包菜单 (@pxref{Packages}) 下载。  该软件包添加了次要模式@code{debbugs-browse-mode}，可以在@code{bug-reference-mode}和@code{bug-reference-prog-mode}之上激活，如下所示：
+
+@smallexample
+(add-hook 'bug-reference-mode-hook 'debbugs-browse-mode)
+(add-hook 'bug-reference-prog-mode-hook 'debbugs-browse-mode)
+@end smallexample

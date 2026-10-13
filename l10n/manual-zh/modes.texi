@@ -1,0 +1,289 @@
+@c -*- coding: utf-8 -*-
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Modes
+@chapter 主要和次要模式
+
+Emacs 包含许多 @dfn{editing modes} 以有用的方式改变其基本行为。  它们分为@dfn{major modes}和@dfn{minor modes}。
+
+主要模式提供了用于处理特定文件类型（例如 C 源文件 (@pxref{Programs})）或特定类型的非文件缓冲区（例如 shell 缓冲区 (@pxref{Shell})）的专用工具。  主要模式是相互排斥的；每个缓冲区在任何时候都有一个且只有一个主要模式。
+
+次要模式是可选功能，您可以打开或关闭它们，不一定特定于文件或缓冲区的类型。  例如，自动填充模式是一种次要模式，其中 @key{SPC} 在您键入时在单词之间换行 (@pxref{Auto Fill})。  小调模式彼此独立，并且与所选的大调模式无关。
+
+@menu
+* Major Modes::          文本模式 vs.@: Lisp 模式 vs.@: C 模式...
+* Minor Modes::          每个次要模式都是您可以独立于其他任何模式打开的功能。
+* Choosing Modes::       访问文件时如何选择模式。
+@end menu
+
+@node Major Modes
+@section 主要模式
+@cindex major modes
+@cindex mode, major
+@kindex TAB @r{(and major modes)}
+@kindex DEL @r{(and major modes)}
+@kindex C-j @r{(and major modes)}
+
+每个缓冲区都拥有一个主模式，它决定了该缓冲区当前时 Emacs 的编辑行为。  模式行通常在括号中显示当前主模式的名称 (@pxref{Mode Line})。
+
+最不专业的主要模式称为 @dfn{Fundamental mode}。此模式没有特定于模式的重新定义或变量设置，因此每个 Emacs 命令都以其最通用的方式运行，并且每个用户选项变量都处于其默认状态。
+
+要编辑 Emacs 识别的特定类型的文本（例如 Lisp 代码或英语文本），通常使用更专门的主要模式，例如 Lisp 模式或文本模式。  大多数主要模式分为三大类。  第一组包含普通文本的模式，可以是纯文本，也可以是带有标记的文本。  它包括文本模式、HTML 模式、SGML 模式、@TeX{} 模式和大纲模式。  第二组包含特定编程语言的模式。  其中包括 Lisp 模式（有多种变体）、C 模式、Fortran 模式等。  第三组由与文件不直接关联的主要模式组成；它们被用在 Emacs 为特定目的创建的缓冲区中。  示例包括 Dired (@pxref{Dired}) 创建的缓冲区的 Dired 模式、@kbd{C-x m} (@pxref{Sending Mail}) 创建的缓冲区的消息模式以及用于与下级 shell 进程通信的缓冲区的 Shell 模式 (@pxref{Interactive Shell})。
+
+通常，当您第一次访问文件或创建缓冲区 (@pxref{Choosing Modes}) 时，Emacs 会自动设置主模式。  您可以使用 @kbd{M-x} 命令显式选择新的主要模式。获取模式名称并添加 @code{-mode} 以获得选择该模式的命令名称（例如，@kbd{M-x lisp-mode} 进入 Lisp 模式）。  由于每个缓冲区都有一个主要模式，因此无法“关闭”主要模式；相反，您必须切换到另一个。
+
+@vindex major-mode
+缓冲区局部变量 @code{major-mode} 的值是与主模式命令同名的符号（例如 @code{lisp-mode}）。该变量是自动设置的；你不应该自己改变它。
+
+@code{major-mode} 的默认值确定未指定主模式的文件以及使用 @kbd{C-x b} 创建的新缓冲区使用的主模式。  通常，该默认值是符号@code{fundamental-mode}，它指定基本模式。  您可以通过自定义界面 (@pxref{Easy Customization}) 更改此默认值，或者通过在初始化文件中添加如下行 (@pxref{Init File})：
+
+@example
+(setq-default major-mode 'text-mode)
+@end example
+
+@noindent
+如果@code{major-mode}的默认值为@code{nil}，则从先前的当前缓冲区中获取主模式。
+
+专门的主要模式通常会更改某些键的含义以执行更适合该模式的操作。  例如，编程语言模式绑定 @key{TAB} 以根据语言规则 (@pxref{Indentation}) 缩进当前行。  经常更改的键是 @key{TAB}、@key{DEL} 和 @kbd{C-j}。  许多模式还定义了自己的特殊命令，通常绑定到前缀键为 @kbd{C-c} (@pxref{Keys}) 的按键序列。  主要模式还可以改变用户选项和变量；例如，编程语言模式通常为变量@code{comment-start}设置一个缓冲区本地值，该值确定如何分隔源代码注释（@pxref{Comments}）。
+
+要查看当前主要模式的文档，包括其键绑定列表，请输入 @kbd{C-h m} (@code{describe-mode})。 @xref{Misc Help}。
+
+@cindex mode hook
+@vindex prog-mode-hook
+除了基本模式之外，每个主要模式都定义了一个 @dfn{mode hook}，这是一个可自定义的 Lisp 函数列表，每次在缓冲区中启用该模式时都会运行该列表。  @xref{Hooks}，了解有关钩子的更多信息。  每个模式钩子都以其主要模式命名，例如，Fortran 模式有 @code{fortran-mode-hook}。  此外，所有基于文本的主要模式都运行@code{text-mode-hook}，并且许多编程语言模式
+@footnote{More specifically, the modes which are ``derived'' from
+@code{prog-mode} (@pxref{Derived Modes,,, elisp, The Emacs Lisp Reference Manual}).} （包括所有随 Emacs 一起分发的）在运行它们自己的模式钩子之前运行 @code{prog-mode-hook}。  钩子函数可以查看变量 @code{major-mode} 的值来查看实际进入的模式。
+
+模式挂钩通常用于启用次要模式 (@pxref{Minor Modes})。  例如，您可以将以下行放入 init 文件中，以在所有基于文本的主要模式中启用 Flyspell 次要模式 (@pxref{Spelling})，以及在 Emacs Lisp 模式中启用 ElDoc 次要模式 (@pxref{Programming Language Doc})：
+
+@example
+(add-hook 'text-mode-hook 'flyspell-mode)
+(add-hook 'emacs-lisp-mode-hook 'eldoc-mode)
+@end example
+
+@node Minor Modes
+@section 小调
+@cindex minor modes
+@cindex mode, minor
+
+次要模式是一种可选的编辑模式，它以某种明确定义的方式改变 Emacs 的行为。  与主要模式不同，任意数量的次要模式可以随时生效。  一些次要模式是@dfn{buffer-local}，可以在某些缓冲区中打开（启用），在其他缓冲区中关闭（禁用）。  其他次要模式有@dfn{global}：启用后，它们会影响您在 Emacs 会话中的所有缓冲区中执行的所有操作。  大多数次要模式默认情况下处于禁用状态，但也有少数模式默认情况下处于启用状态。
+
+大多数缓冲区本地次要模式在启用时会在模式行中显示，就在主要模式指示符之后。  例如，模式行中的@samp{Fill}表示自动填充模式已启用。 @xref{Mode Line}。
+
+@cindex mode commands for minor modes
+与主要模式一样，每个次要模式都与 @dfn{mode command} 相关联，其名称由模式名称后跟 @samp{-mode} 组成。  例如，自动填充模式的模式命令是@code{auto-fill-mode}。  但与仅启用该模式的主要模式命令不同，次要模式的模式命令可以启用或禁用它：
+
+@itemize
+@item 
+如果您直接调用不带前缀参数的模式命令（通过 @kbd{M-x}，或将其绑定到某个键并键入该键；@pxref{Key Bindings}），则 @dfn{toggles} 为次要模式。  次要模式如果关闭则打开，如果打开则关闭。
+
+@item 
+如果您使用前缀参数调用模式命令，则当该参数为零或负数时，次要模式将无条件关闭；否则无条件开启。
+
+@item 
+如果通过 Lisp 调用 mode 命令，则如果省略参数或 @code{nil}，则无条件打开次要模式。这样可以轻松地从主模式的模式挂钩 (@pxref{Major Modes}) 打开次要模式。  如上所述，非 2⁣ 参数的处理方式类似于交互式前缀参数。
+@end itemize
+
+大多数次要模式还有一个 @dfn{mode variable}，与模式命令同名。  如果启用该模式，则其值为非 @code{nil}；如果禁用该模式，则其值为 @code{nil}。  一般来说，你不应该尝试通过直接在 Lisp 中更改 mode 变量的值来启用或禁用该模式；您应该运行模式命令。但是，通过自定义界面 (@pxref{Easy Customization}) 设置模式变量将始终正确启用或禁用该模式，因为自定义会自动为您运行模式命令。
+
+以下是一些缓冲区本地次要模式的列表：
+
+@itemize @bullet
+@item 
+缩写模式根据预定义的缩写定义自动扩展文本。  @xref{Abbrevs}。
+
+@item 
+自动填充模式会在您键入时插入换行符，以防止行变得太长。  @xref{Filling}。
+
+@item 
+自动保存模式会定期保存缓冲区内容，以减少崩溃时可能丢失的工作量。  @xref{Auto Save}。
+
+@item 
+电子报价模式自动转换引号。  例如，它将键入的文本 @kbd{`like this'} 重新引用为文本 @t{‘like this’}。  您可以控制它运行的文本类型，并且可以在各个缓冲区中完全禁用它。  @xref{Quotation Marks}。
+
+@item 
+丰富模式可以编辑和保存格式化文本。 @xref{Enriched Text}。
+
+@item 
+Flyspell 模式会自动突出显示拼写错误的单词。 @xref{Spelling}。
+
+@item 
+字体锁定模式自动突出显示程序中找到的某些文本单元。  默认情况下它是全局启用的，但您可以在各个缓冲区中禁用它。  @xref{Faces}。
+
+@item 
+显示行号模式是 @code{display-line-numbers} 的便捷包装，使用 @code{display-line-numbers-type} 的值进行设置。  @xref{Display Custom}。
+
+@item 
+大纲次要模式提供与主要模式类似的功能，称为大纲模式。  @xref{Outline Mode}。
+
+@cindex Overwrite mode
+@cindex mode, Overwrite
+@findex overwrite-mode
+@kindex INSERT
+@item 
+覆盖模式会导致普通打印字符替换现有文本，而不是将其推到右侧。  例如，如果点位于 @samp{FOOBAR} 中的 @samp{B} 前面，则在覆盖模式下键入 @kbd{G} 会将其更改为 @samp{FOOGAR}，而不是像往常一样生成 @samp{FOOGBAR}。  在覆盖模式下，命令 @kbd{C-q} 会插入下一个字符，无论它是什么，即使它是数字 — 这为您提供了一种插入字符而不是替换现有字符的方法。  模式命令 @code{overwrite-mode} 绑定到 @key{Insert} 键。
+
+@findex binary-overwrite-mode
+@item 
+二进制覆盖模式是覆盖模式的变体，用于编辑二进制文件；它像对待其他字符一样对待换行符和制表符，以便它们覆盖其他字符并且可以被它们覆盖。在二进制覆盖模式下，@kbd{C-q} 之后的数字像往常一样指定八进制字符代码。
+
+@item 
+Visual Line 模式执行自动换行，导致长行在单词边界处自动换行。  @xref{Visual Line Mode}。
+@end itemize
+
+@noindent
+这里有一些有用的全局次要模式：
+
+@itemize @bullet
+@item 
+列号模式允许在模式行中显示当前列号。  @xref{Mode Line}。
+
+@item 
+删除选择模式会导致文本插入首先删除该区域中的文本（如果该区域处于活动状态）。  @xref{Using Region}。
+
+@item 
+当您位于迷你缓冲区中并且完成处于活动状态时，Icomplete 模式会显示可用完成的指示。  @xref{Icomplete}。
+
+@item 
+行号模式可以在模式行中显示当前行号。  默认情况下它是启用的。  @xref{Mode Line}。
+
+@item 
+菜单栏模式为每个框架提供一个菜单栏。  默认情况下它是启用的。 @xref{Menu Bars}。
+
+@item 
+滚动条模式为每个窗口提供一个滚动条。  默认情况下启用，但滚动条仅显示在图形终端上。 @xref{Scroll Bars}。
+
+@item 
+工具栏模式为每个框架提供一个工具栏。  默认情况下启用，但工具栏仅显示在图形终端上。  @xref{Tool Bars}。
+
+@item 
+窗口工具栏模式为窗口提供了一个工具栏。  @xref{Window Tool Bar}。
+
+@item 
+标签栏模式为每个框架提供一个标签栏。  @xref{Tab Bars}。
+
+@item 
+制表符行模式为每个窗口提供一个制表符行。  @xref{Tab Line}。
+
+@item 
+瞬态标记模式会突出显示该区域，并在标记处于活动状态时使许多 Emacs 命令在该区域上运行。  默认情况下它是启用的。  @xref{Mark}。
+@end itemize
+
+@node Choosing Modes
+@section 选择文件模式
+
+@cindex choosing a major mode
+@cindex choosing a minor mode
+@vindex auto-mode-alist
+当您访问文件时，Emacs 会自动选择主要模式。通常，它根据文件名进行选择——例如，名称以@samp{.c}结尾的文件通常是在C模式下编辑的——但有时它会根据文件中的特殊文本来选择主模式。此特殊文本还可用于启用缓冲区本地次要模式。
+
+下面是具体的过程：
+
+首先，Emacs 检查文件是否包含文件本地模式变量。  @xref{File Variables}。  如果存在指定主要模式的文件本地变量，则 Emacs 将使用该主要模式，忽略所有其他条件。  有多种方法可以使用文件局部变量指定主要模式；最简单的方法是将模式名称放在第一个非空行中，前面和后面都是 @samp{-*-}。  其他文本也可能出现在该行上。  例如，
+
+@example
+; -*-Lisp-*-
+@end example
+
+@noindent
+告诉 Emacs 使用 Lisp 模式。  请注意如何使用分号让 Lisp 将此行视为注释。  你可以等效地写
+
+@example
+; -*- mode: Lisp;-*-
+@end example
+
+@noindent
+您还可以通过使用 @code{eval} 规范，使用文件局部变量来指定缓冲区局部次要模式。  例如，第一个非空行将缓冲区置于 Lisp 模式并启用自动填充模式：
+
+@example
+; -*- mode: Lisp; eval: (auto-fill-mode 1); -*-
+@end example
+
+@noindent
+但请注意，以这种方式启用次要模式通常是不合适的，因为大多数次要模式代表个人用户偏好。  如果您个人想要对特定文件类型使用次要模式，最好通过主要模式挂钩 (@pxref{Major Modes}) 启用次要模式。
+
+其次，Emacs 检查文件的扩展名是否与任何本地目录@code{auto-mode-alist} 中的条目匹配。  这些可以使用 @file{.dir-locals.el} 工具 (@pxref{Directory Variables}) 找到。
+
+@vindex interpreter-mode-alist
+第三，如果没有指定主模式的文件变量，Emacs 将检查文件内容是否以 @samp{#!} 开头。  如果是这样，则表明该文件可以用作可执行 shell 命令，该命令通过运行文件第一行上指定的解释器来工作（文件的其余部分用作解释器的输入）。因此，Emacs 尝试使用解释器名称来选择模式。例如，以 @samp{#!/usr/bin/perl} 开头的文件会在 Perl 模式下打开。  变量@code{interpreter-mode-alist}指定解释器程序名称和主要模式之间的对应关系。
+
+当第一行以 @samp{#!} 开头时，通常不能在第一行使用 @samp{-*-} 功能，因为系统在运行解释器时会感到困惑。  因此，Emacs 在此类文件的第二行以及第一行中查找 @samp{-*-}。  对于以魔术字符串 @samp{'\"} 开头来指定 troff 预处理器列表的手册页也是如此。
+
+@vindex magic-mode-alist
+第四，Emacs 尝试根据变量 @code{magic-mode-alist} 查看缓冲区开头的文本来确定主模式。  默认情况下，这个变量是 @code{nil} （空列表），所以 Emacs 会跳过这一步；但是，您可以在初始化文件中对其进行自定义 (@pxref{Init File})。  该值应该是表单元素的列表
+
+@example
+(@var{regexp} . @var{mode-function})
+@end example
+
+@noindent
+其中 @var{regexp} 是正则表达式 (@pxref{Regexps})，@var{mode-function} 是主模式命令。  如果文件开头的文本与 @var{regexp} 匹配，Emacs 将选择 @var{mode-function} 指定的主要模式。
+
+或者，@code{magic-mode-alist} 的元素可以具有以下形式
+
+@example
+(@var{match-function} . @var{mode-function})
+@end example
+
+@noindent
+其中@var{match-function}是一个在缓冲区开头调用的 Lisp 函数；如果函数返回非 @code{nil}，Emacs 将使用 @var{mode-function} 设置主模式。
+
+第五——如果 Emacs 仍然没有找到合适的主模式——它会查看文件的名称。  文件名和主要模式之间的对应关系由变量@code{auto-mode-alist}控制。  它的值是一个列表，其中每个元素都具有以下形式，
+
+@example
+(@var{regexp} . @var{mode-function})
+@end example
+
+@noindent
+或这种形式，
+
+@example
+(@var{regexp} @var{mode-function} @var{flag})
+@end example
+
+@noindent
+例如，通常在列表中找到的一个元素的形式为@code{(@t{"\\.c\\'"} . c-mode)}，它负责为名称以@file{.c}结尾的文件选择C模式。  （请注意，Lisp 语法中需要 @samp{\\} 才能在字符串中包含 @samp{\}，必须使用它来抑制 @samp{.} 在正则表达式中的特殊含义。）
+
+@cindex backup files, choosing a major mode
+@cindex encrypted files, choosing a major mode
+如果元素的形式为 @w{@code{(@var{regexp} @var{mode-function} @var{flag})}} 并且 @var{flag} 不是 @code{nil}，那么在调用 @var{mode-function}（如果它是非 @code{nil}）之后，Emacs 会丢弃与 @var{regexp} 匹配的后缀，并再次在列表中搜索另一个匹配项。  这种“递归扩展名剥离”用于具有多个扩展名的文件，“外部”扩展名隐藏了实际指定正确模式的“内部”扩展名。  例如，备份文件和扩展名为 @file{.gpg} 的 GPG 加密文件就使用此功能。
+
+@vindex auto-mode-case-fold
+在 GNU/Linux 和其他区分大小写文件名的系统上，Emacs 通过 @code{auto-mode-alist} 执行区分大小写的搜索；如果此搜索失败，它将通过列表执行第二次不区分大小写的搜索。  要抑制第二次搜索，请将变量 @code{auto-mode-case-fold} 更改为 @code{nil}。  在文件名不区分大小写的系统（例如 Microsoft Windows）上，Emacs 通过 @code{auto-mode-alist} 执行单个不区分大小写的搜索。
+
+@vindex magic-fallback-mode-alist
+最后，如果 Emacs @emph{still} 没有找到要使用的主要模式，它会将缓冲区开头的文本与变量 @code{magic-fallback-mode-alist} 进行比较。  该变量的工作方式类似于上面描述的@code{magic-mode-alist}，只不过它仅被参考@emph{after} @code{auto-mode-alist}。  默认情况下，@code{magic-fallback-mode-alist} 包含检查图像文件、HTML/XML/SGML 文件、PostScript 文件和 Unix 样式 Conf 文件的表单。
+
+@cindex remapping of major modes
+@cindex major modes, remapping
+@vindex major-mode-remap-alist
+一旦找到主模式，Emacs 就会进行最终检查，看看该模式是否已由 @dfn{remapped} 变为 @code{major-mode-remap-alist}，在这种情况下，它会使用重新映射的模式。  当同一文件类型可以使用多种不同的主要模式时，可以使用此选项，这样您就可以指定您喜欢的模式。  请注意，此重新映射会影响上述所有方法找到的主模式，因此，例如，文件第一行指定的模式不一定是访问文件的缓冲区中实际打开的模式。  （此重新映射还会影响 @code{revert-buffer}、@pxref{Reverting}。）当同一文件类型有多种模式可用时，您可以通过自定义 @code{major-mode-remap-alist} 告诉 Emacs 您的主要模式首选项。  例如，将其放入您的 @file{~/.emacs} 初始化文件 (@pxref{Init File})
+
+@lisp
+  (add-to-list 'major-mode-remap-alist '(c-mode . c-ts-mode))
+@end lisp
+
+@noindent
+当 @code{auto-mode-alist} 或文件局部变量指定 @code{c-mode} 时，强制 Emacs 调用 @code{c-ts-mode}。反过来，
+
+@lisp
+  (add-to-list 'major-mode-remap-alist '(c-mode))
+@end lisp
+
+@noindent
+将强制 Emacs 永远不会将 @code{c-mode} 重新映射到任何其他模式。
+
+@code{major-mode-remap-alist} 的默认值为 @code{nil}，因此不会发生重新映射。  然而，加载某些 Lisp 包或功能可能会引入模式重新映射，因为 Emacs 假定加载这些包或功能意味着用户更喜欢使用替代模式。  因此，为了实现可预测的行为，我们建议您始终自定义 @code{major-mode-remap-alist} 来表达您的坚定偏好，因为此变量会覆盖 Emacs 可能决定在内部执行的任何重新映射。
+
+@vindex treesit-enabled-modes
+作为启用基于树保姆库 (@pxref{Parsing Program Source,,, elisp, The Emacs Lisp Reference Manual}) 的主要模式的便利功能，您可以自定义用户选项 @code{treesit-enabled-modes} 以有选择地启用或禁用基于树保姆的模式：如果值为 @code{t}，则启用所有可用的基于树保姆的模式；如果值为 @code{t}，则启用所有可用的基于树保姆的模式；如果它是模式名称列表，则仅启用这些模式。  自定义此选项会将相应的映射添加到 @code{major-mode-remap-alist}，例如从 @code{c-mode} 重新映射到 @code{c-ts-mode}（如果启用后者）。  默认情况下，此选项的值为@code{nil}，因此不会启用基于树守护者的模式。
+
+启用基于树保姆的模式意味着访问相应编程语言的文件将自动打开该模式，而不是同一语言的任何基于非树保姆的模式。  例如，如果启用 @code{c-ts-mode}，访问 C 源文件将打开 @code{c-ts-mode} 而不是 @code{c-mode}。
+
+@findex normal-mode
+如果您更改了缓冲区的主模式，则可以通过键入 @kbd{M-x normal-mode} 返回到 Emacs 自动选择的主模式。  这与 @code{find-file} 调用以选择主要模式的函数相同。  如果缓冲区正在访问文件，则此命令还会处理文件的 @samp{-*-} 行和文件局部变量列表（如果有）。  @xref{File Variables}。如果缓冲区不访问文件，则该命令仅处理 @samp{-*-} 行和文件局部变量列表中的主模式规范（如果有）。  @kbd{M-x normal-mode} 考虑了模式重新映射，因此如果在 Emacs 选择缓冲区的主要模式后自定义 @code{major-mode-remap-alist}，@code{normal-mode} 可能会打开与 Emacs 最初选择的模式不同的模式。
+
+@vindex change-major-mode-with-file-name
+如果新文件名暗示一种模式 (@pxref{Saving})，则命令 @kbd{C-x C-w} 和 @code{set-visited-file-name} 会更改为新的主要模式。 （如果缓冲区没有访问文件，@kbd{C-x C-s}也会执行此操作。）但是，如果缓冲区内容指定了主要模式，并且某些特殊主要模式不允许更改模式，则不会发生这种情况。  您可以通过将 @code{change-major-mode-with-file-name} 设置为 @code{nil} 来关闭此模式更改功能。

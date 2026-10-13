@@ -1,0 +1,296 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Registers
+@chapter 寄存器
+@cindex registers
+
+Emacs @dfn{registers} 是一些隔间，您可以在其中保存文本、矩形、位置和其他内容以供以后使用。  一旦将文本或矩形保存到寄存器中，您可以将其复制到缓冲区一次或多次；一旦您在寄存器中保存了一个位置，您就可以跳回该位置一次或多次。
+
+每个寄存器都有一个由单个字符组成的名称，我们用@var{r}表示； @var{r}可以是字母（如@samp{a}）或数字（如@samp{1}）；大小写很重要，因此寄存器@samp{a}与寄存器@samp{A}不同。  您还可以使用非字母数字字符设置寄存器，例如使用 @key{C-q} @samp{C-d} 来设置@samp{C-d}。
+
+@findex view-register
+寄存器可以存储位置、一段文本、矩形、数字、窗口或框架配置、缓冲区名称或文件名，但在任何给定时间只能存储一件事。  您在寄存器中存储的任何内容都会保留在那里，直到您在该寄存器中存储其他内容为止。  要查看寄存器@var{r}包含什么，请使用@kbd{M-x view-register}：
+
+@table @kbd
+@item M-x view-register @key{RET} @var{r}
+显示寄存器@var{r}包含的内容的描述。
+@end table
+
+
+@cindex preview of registers
+@vindex register-use-preview
+所有提示输入寄存器的命令将默认显示一个预览窗口，在短暂的延迟后列出现有寄存器（如果有）及其当前值。  提示寄存器的这一方面和其他方面可以通过设置 @code{register-use-preview} 的值来自定义，该值可以具有以下值：
+
+@table @code
+@vindex register-preview-delay
+@item traditional
+使用这个默认值，Emacs 的行为就像 Emacs 29 之前的所有版本一样：它会在延迟后显示现有寄存器的预览，并允许您通过键入单个字符（寄存器名称）来覆盖现有寄存器的值。  预览出现在由可自定义变量 @code{register-preview-delay} 确定的延迟之后，该变量指定延迟（以秒为单位）；将其设置为 @code{nil} 会禁用预览（但您仍然可以在 Emacs 提示注册时按 @kbd{C-h} 或 @key{F1} 显式请求预览窗口）。
+
+@item t
+该值要求对现有寄存器进行更灵活的预览。当 Emacs 提示输入寄存器时，预览会立即出现（因此 @code{register-preview-delay} 不起作用），并且预览窗口提供导航：通过使用 @kbd{C-n} 和 @kbd{C-p}（或 @kbd{@key{UP}} 和 @kbd{@key{DOWN}} 箭头键），您可以在预览窗口中的寄存器之间移动。  要在此模式下覆盖现有寄存器的值，您需要在通过导航选择寄存器或键入其名称后键入@key{RET}。
+
+此外，预览显示的寄存器会根据弹出预览的命令进行过滤：例如，@code{insert-register}显示的预览将仅显示其值可以插入缓冲区的寄存器，省略保存窗口配置、位置和其他不可插入值的寄存器。
+
+@item insist
+该值类似于@code{t}，但除此之外，您还可以按一次与寄存器名称相同的键来退出迷你缓冲区，而不是按@key{RET}。
+
+@item nil
+该值请求的行为与@code{traditional}类似，但预览会立即显示，并根据命令进行过滤。
+
+@item never
+该值类似于@code{nil}，但它会禁用预览。
+@end table
+
+@dfn{Bookmarks} 记录文件和其中的位置，以便您再次查看文件时可以返回到这些位置。  书签在本质上与寄存器类似，因此本章也对它们进行了记录。
+
+@menu
+* Position Registers::         在寄存器中保存位置。
+* Text Registers::             将文本保存在寄存器中。
+* Rectangle Registers::        将矩形保存在寄存器中。
+* Configuration Registers::    将窗口/框架配置保存在寄存器中。
+* Number Registers::           寄存器中的数字。
+* File and Buffer Registers::  寄存器中的文件和缓冲区名称。
+* Keyboard Macro Registers::   寄存器中的键盘宏。
+* Bookmarks::                  书签就像寄存器一样，但是是持久的。
+@end menu
+
+@node Position Registers
+@section 保存寄存器中的位置
+@cindex saving position in a register
+
+@table @kbd
+@item C-x r @key{SPC} @var{r}
+将点的位置和当前缓冲区记录在寄存器@var{r} (@code{point-to-register}) 中。
+@item C-x r j @var{r}
+跳转到寄存器@var{r} (@code{jump-to-register}) 中保存的位置和缓冲区。
+@end table
+
+@kindex C-x r SPC
+@findex point-to-register
+键入@kbd{C-x r @key{SPC}} (@code{point-to-register})，后跟字符@kbd{@var{r}}，将点的位置和当前缓冲区保存在寄存器@var{r}中。  寄存器会保留此信息，直到您在其中存储其他内容为止。
+
+@kindex C-x r j
+@findex jump-to-register
+命令@kbd{C-x r j @var{r}}切换到寄存器@var{r}中记录的缓冲区，压入一个标记，并将点移动到记录的位置。  （如果点已经在记录的位置，或者连续调用命令，则不会推送标记。）寄存器的内容不会更改，因此您可以多次跳转到保存的位置。
+
+如果您使用 @kbd{C-x r j} 转到已保存的位置，但保存它的缓冲区已被终止，@kbd{C-x r j} 会尝试通过访问同一文件再次创建缓冲区。  当然，这仅适用于正在访问文件的缓冲区。
+
+@node Text Registers
+@section 将文本保存在寄存器中
+@cindex saving text in a register
+
+当您想要多次插入同一段文本的副本时，将其从删除环中拉出可能会很不方便，因为随后的每次删除都会将该条目进一步移到环中。  另一种方法是将文本存储在寄存器中，然后再检索它。
+
+@table @kbd
+@item C-x r s @var{r}
+将区域复制到寄存器@var{r} (@code{copy-to-register})。
+@item C-x r i @var{r}
+插入寄存器 @var{r} (@code{insert-register}) 中的文本。
+@item M-x append-to-register @key{RET} @var{r}
+将区域附加到寄存器@var{r}中的文本。
+
+当寄存器 @var{r} 包含文本时，您可以使用 @kbd{C-x r +} (@code{increment-register}) 附加到该寄存器。  请注意，如果 @var{r} 包含数字，则命令 @kbd{C-x r +} 的行为会有所不同。  @xref{Number Registers}。
+
+@item M-x prepend-to-register @key{RET} @var{r}
+将区域添加到寄存器@var{r}中的文本中。
+@end table
+
+@kindex C-x r s
+@findex copy-to-register
+@kbd{C-x r s @var{r}} 将区域文本的副本存储到名为 @var{r} 的寄存器中。  如果该标记处于非活动状态，Emacs 首先会在上次设置的位置重新激活该标记。  该命令结束时该标记被停用。  @xref{Mark}。  @kbd{C-u C-x r s @var{r}}，带有前缀参数的相同命令，将文本复制到寄存器@var{r}，并从缓冲区中删除文本；您可以将其视为将区域文本移动到寄存器中。
+
+@findex append-to-register
+@findex prepend-to-register
+@kbd{M-x append-to-register @key{RET} @var{r}} 将区域中文本的副本附加到已存储在名为 @var{r} 的寄存器中的文本。  如果使用前缀参数调用，它将在将其附加到寄存器后删除该区域。  命令 @code{prepend-to-register} 类似，只不过它是将区域文本 @emph{prepends} 改为寄存器中的文本，而不是 @emph{appending} 它。
+
+@vindex register-separator
+当您使用 @code{append-to-register} 和 @code{prepend-to-register} 收集文本时，您可能需要使用分隔符分隔各个收集的片段。  在这种情况下，配置 @code{register-separator} 并将分隔符文本存储到该寄存器中。  例如，要在收集过程中获取双换行符作为文本分隔符，可以使用以下设置。
+
+@example
+(setq register-separator ?+)
+(set-register register-separator "\n\n")
+@end example
+
+@kindex C-x r i
+@findex insert-register
+@kbd{C-x r i @var{r}} 将寄存器 @var{r} 中的文本插入缓冲区。  通常它会在文本后面留下点并在前面设置标记，而不激活它。  使用前缀参数，它会将点放在文本之前，将标记放在文本之后。
+
+@node Rectangle Registers
+@section 将矩形保存在寄存器中
+@cindex saving rectangle in a register
+
+寄存器可以包含矩形而不是线性文本。 @xref{Rectangles}，有关如何在缓冲区中指定矩形的基本信息。
+
+@table @kbd
+@findex copy-rectangle-to-register
+@kindex C-x r r
+@item C-x r r @var{r}
+将区域矩形复制到寄存器 @var{r} (@code{copy-rectangle-to-register}) 中。  对于前缀参数，也将其删除。
+@item C-x r i @var{r}
+插入存储在寄存器@var{r}中的矩形（如果它包含矩形）（@code{insert-register}）。
+@end table
+
+如果寄存器包含矩形，则之前在 2⁣ 中记录的 @kbd{C-x r i @var{r}} (@code{insert-register}) 命令会插入矩形而不是文本字符串。
+
+@node Configuration Registers
+@section 将窗口和框架配置保存在寄存器中
+@cindex saving window configuration in a register
+@cindex saving frame configuration in a register
+@cindex frameset, saving in a register
+
+@findex window-configuration-to-register
+@findex frameset-to-register
+@kindex C-x r w
+@kindex C-x r f
+您可以将所选帧的窗口配置保存在寄存器中，甚至可以将所有帧中所有窗口的配置保存起来，并在以后恢复配置。  @xref{Window Convenience}，有关窗口配置的信息。
+
+@table @kbd
+@item C-x r w @var{r}
+将所选框架窗口的状态保存在寄存器@var{r} (@code{window-configuration-to-register}) 中。
+@cindex frameset
+@item C-x r f @var{r}
+将所有帧的状态，包括所有窗口（又称为@: @dfn{frameset}）的状态保存在寄存器@var{r} (@code{frameset-to-register}) 中。
+@end table
+
+使用 @kbd{C-x r j @var{r}} 恢复窗口或框架配置。这与用于恢复光标位置的命令相同。  当您恢复框架配置时，任何未包含在配置中的现有框架将变得不可见。  如果您想删除这些帧，请使用@kbd{C-u C-x r j @var{r}}。
+
+@node Number Registers
+@section 将数字保存在寄存器中
+@cindex saving number in a register
+
+有一些命令可以将数字存储在寄存器中，以十进制形式将数字插入到缓冲区中，以及将其递增。  这些命令在键盘宏中很有用 (@pxref{Keyboard Macros})。
+
+@table @kbd
+@item C-u @var{number} C-x r n @var{r}
+@kindex C-x r n
+@findex number-to-register
+将 @var{number} 存储到寄存器 @var{r} (@code{number-to-register}) 中。
+@item C-u @var{number} C-x r + @var{r}
+@kindex C-x r +
+@findex increment-register
+如果@var{r}包含数字，则将该寄存器中的数字增加@var{number}。  请注意，如果 @var{r} 包含文本，则命令 @kbd{C-x r +} (@code{increment-register}) 的行为会有所不同。  @xref{Text Registers}。
+@item C-x r i @var{r}
+将寄存器 @var{r} 中的数字插入缓冲区。
+@end table
+
+@kbd{C-x r i} 与用于将任何其他类型的寄存器内容插入缓冲区的命令相同。  @kbd{C-x r +} 没有数字参数时，寄存器值加 1；没有数字参数的 @kbd{C-x r n} 在寄存器中存储零。
+
+@node File and Buffer Registers
+@section 将文件和缓冲区名称保存在寄存器中
+@cindex saving file name in a register
+@cindex saving buffer name in a register
+
+@table @kbd
+@item C-x r F @var{r}
+将当前访问的文件或目录存储在寄存器@var{r}（@code{file-to-register}）中。
+@item C-x r B @var{r}
+将当前访问的缓冲区存储在寄存器@var{r} (@code{buffer-to-register}) 中。
+@end table
+
+如果您经常访问某些文件或缓冲区，则将它们的名称放入寄存器中可以更方便地访问它们。
+
+@kindex C-x r F
+@findex file-to-register
+键入 @kbd{C-x r F} (@code{file-to-register})，后跟字符 @kbd{@var{r}}，将对当前访问的文件的引用保存在寄存器 @var{r} 中。  然后，您可以通过键入 @kbd{C-x r j} @var{r} 使用 @code{jump-to-register} 访问该文件。使用前缀参数，@code{file-to-register} 提示输入要存储在寄存器中的文件名。
+
+@kindex C-x r B
+@findex buffer-to-register
+键入 @kbd{C-x r B} (@code{buffer-to-register})，后跟字符 @kbd{@var{r}}，将对当前访问的缓冲区的引用保存在寄存器 @var{r} 中。  然后您可以使用 @code{jump-to-register} 重新访问缓冲区。使用前缀参数，@code{buffer-to-register}提示输入要存储在寄存器中的缓冲区名称。
+
+如果您将正在访问文件的缓冲区名称存储在寄存器中，然后关闭缓冲区，则寄存器会自动转换为文件引用，从而允许您快速重新打开已关闭的文件。
+
+@node Keyboard Macro Registers
+@section 键盘宏寄存器
+@cindex saving keyboard macro in a register
+@cindex keyboard macros, in registers
+
+@kindex C-x C-k x
+@findex kmacro-to-register
+如果需要频繁执行键盘宏（@pxref{Keyboard Macros}），将其放入寄存器或保存（@pxref{Save Keyboard Macro}）会更方便。  @kbd{C-x C-k x @var{r}} (@code{kmacro-to-register}) 将最后一个键盘宏存储在寄存器@var{r}中。
+
+要执行寄存器 @var{r} 中的键盘宏，请键入 @kbd{C-x r j @var{r}}。  （这与用于跳转到某个位置或恢复框架集的命令相同。）
+
+@node Bookmarks
+@section 书签
+@cindex bookmarks
+
+@dfn{Bookmarks} 有点像寄存器，它们记录可以跳转到的位置。  与寄存器不同，它们的名称很长，并且会自动从一个 Emacs 会话持续到下一个会话。  书签的典型用途是记录您在各种文件中阅读的位置。
+
+@table @kbd
+@item C-x r m @key{RET}
+为所访问的文件设置书签。
+
+@item C-x r m @var{bookmark} @key{RET}
+在点 (@code{bookmark-set}) 处设置名为 @var{bookmark} 的书签。
+
+@item C-x r M @var{bookmark} @key{RET}
+与 @kbd{C-x r m} 类似，但不覆盖现有书签。
+
+@item C-x r b @var{bookmark} @key{RET}
+跳转到名为 @var{bookmark} (@code{bookmark-jump}) 的书签。
+
+@item C-x r l
+列出所有书签 (@code{list-bookmarks})。
+
+@item M-x bookmark-save
+将所有当前书签值保存在默认书签文件中。
+@end table
+
+@kindex C-x r m
+@findex bookmark-set
+@kindex C-x r b
+@findex bookmark-jump
+要记录已访问文件中的当前位置，请使用命令@kbd{C-x r m}，该命令使用已访问文件名作为默认书签名称来设置书签。  如果您以每个书签指向的文件命名，那么您可以使用 @kbd{C-x r b} (@code{bookmark-jump}) 方便地重新访问这些文件中的任何一个，并同时移动到书签的位置。
+
+@vindex bookmark-fringe-mark
+除了记录当前位置之外，在图形显示器上@kbd{C-x r m}还会在与记录位置对应的屏幕线的左边缘 (@pxref{Fringes}) 上放置一个特殊图像，以指示那里有一个书签。  这可以通过用户选项@code{bookmark-fringe-mark}控制：将其自定义为@code{nil}以禁用边缘标记。  默认值为@code{bookmark-mark}，这是用于此目的的位图。  当您稍后使用@kbd{C-x r b}跳回书签时，边缘标记将再次显示在边缘上。
+
+@kindex C-x r M
+@findex bookmark-set-no-overwrite
+命令 @kbd{C-x r M} (@code{bookmark-set-no-overwrite}) 的工作方式与 @w{@kbd{C-x r m}} 类似，但如果指定的书签已存在，它会发出错误信号，而不是覆盖它。
+
+@kindex C-x r l
+@findex list-bookmarks
+要在单独的缓冲区中显示所有书签的列表，请输入 @kbd{C-x r l} (@code{list-bookmarks})。  如果切换到该缓冲区，则可以使用它来编辑书签定义或注释书签。  在书签缓冲区中键入 @kbd{C-h m} 以获取有关其特殊编辑命令的更多信息。
+
+@findex bookmark-save
+当您终止 Emacs 时，如果您更改了任何书签值，Emacs 会保存您的书签。  您还可以随时使用 @kbd{M-x bookmark-save} 命令保存书签。  书签保存到文件 @file{~/.emacs.d/bookmarks}（为了与旧版本的 Emacs 兼容，如果您有一个名为 @file{~/.emacs.bmk} 的文件，则使用该文件）。  书签命令会自动加载默认书签文件。  这种保存和加载就是书签从一个 Emacs 会话持续到下一个会话的方式。
+
+@vindex bookmark-save-flag
+如果将变量@code{bookmark-save-flag}设置为1，则每个设置书签的命令也会保存您的书签；这样，即使 Emacs 崩溃，您也不会丢失任何书签值。  该值（如果是数字）表示保存之间应进行多少次书签修改。  如果将此变量设置为 @code{nil}，则 Emacs 仅在显式使用 @kbd{M-x bookmark-save} 时才保存书签。
+
+@vindex bookmark-default-file
+变量 @code{bookmark-default-file} 指定默认保存书签的文件。
+
+@vindex bookmark-use-annotations
+@cindex bookmark annotations
+如果将变量 @code{bookmark-use-annotations} 设置为 @code{t}，则设置书签将查询注释。  如果书签有注释，当您跳转到该书签时，它会自动显示在单独的窗口中。
+
+@vindex bookmark-search-size
+书签位置值与周围的上下文一起保存，因此即使文件略有修改，@code{bookmark-jump}也可以找到正确的位置。  变量 @code{bookmark-search-size} 表示在书签位置的每一侧要记录多少个上下文字符。  （在访问加密文件的缓冲区中，无论此变量的值如何，书签文件中都不会保存任何上下文。）
+
+以下是一些用于处理书签的附加命令：
+
+@table @kbd
+@item M-x bookmark-load @key{RET} @var{filename} @key{RET}
+@findex bookmark-load
+加载名为 @var{filename} 的文件，其中包含书签值列表。  除了默认书签文件之外，您还可以使用此命令以及 @code{bookmark-write} 来处理其他书签值文件。
+
+@item M-x bookmark-write @key{RET} @var{filename} @key{RET}
+@findex bookmark-write
+将所有当前书签值保存在文件@var{filename}中。
+
+@item M-x bookmark-delete @key{RET} @var{bookmark} @key{RET}
+@findex bookmark-delete
+删除名为 @var{bookmark} 的书签。
+
+@item M-x bookmark-insert-location @key{RET} @var{bookmark} @key{RET}
+@findex bookmark-insert-location
+将书签 @var{bookmark} 指向的文件名插入到缓冲区中。
+
+@item M-x bookmark-insert @key{RET} @var{bookmark} @key{RET}
+@findex bookmark-insert
+将书签 @var{bookmark} 指向的文件的 @emph{contents} 插入到缓冲区中。
+@end table

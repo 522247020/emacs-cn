@@ -1,0 +1,256 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Indentation
+@chapter 缩进
+@cindex indentation
+@cindex tabs
+@cindex columns (indentation)
+
+@cindex whitespace character
+@dfn{Indentation} 指的是在一行文本的开头插入或调整@dfn{whitespace characters}（空格和/或制表符）。  本章介绍文本模式和相关模式以及编程语言模式常见的缩进命令和选项。  @xref{Program Indent}，有关编程模式中缩进的其他文档。
+
+@findex indent-for-tab-command
+@kindex TAB @r{(indentation)}
+执行缩进的最简单方法是按 @key{TAB} 键。  在大多数主要模式下，这会运行命令@code{indent-for-tab-command}。 （在 C 和相关模式中，@key{TAB} 运行命令 @code{c-indent-line-or-region}，其行为类似，@pxref{C Indent}）。
+
+@table @key
+@item TAB
+以适合模式的方式插入空格或缩进当前行 (@code{indent-for-tab-command})。  如果该区域处于活动状态，则缩进其中的所有行。
+@end table
+
+@key{TAB} 的确切行为取决于主模式。  在文本模式和相关主要模式中，@key{TAB} 通常会插入空格和制表符的某种组合，以前进到下一个制表位 (@pxref{Tab Stops})。  为此，前一行上第一个非空白字符的位置被视为附加制表位，因此您可以使用 @key{TAB} 将点与前一行对齐。  如果该区域处于活动状态 (@pxref{Using Region})，则 @key{TAB} 会特别起作用：它缩进该区域中的每一行，以便其第一个非空白字符与前一行对齐。
+
+在编程模式中，@key{TAB} 以一种在前面几行代码的情况下有意义的方式缩进当前代码行。  如果该区域处于活动状态，则该区域中的所有行都将以这种方式缩进。如果 point 最初位于当前行的缩进内，则会将其重新定位到该行的第一个非空白字符。
+
+如果您只想在缓冲区中插入制表符，请输入 @kbd{C-q @key{TAB}} (@pxref{Inserting Text})。
+
+@menu
+* Indentation Commands::   用于执行缩进的更多命令。
+* Tab Stops::              文本模式下缩进的停止点。
+* Just Spaces::            仅使用空格字符进行缩进。
+* Indent Convenience::     可选的缩进功能。
+* Code Alignment::         使行的公共部分从同一列开始。
+@end menu
+
+@node Indentation Commands
+@section 缩进命令
+
+除了 0⁣ (@code{indent-for-tab-command}) 命令之外，Emacs 还提供了多种命令以其他方式执行缩进。
+
+@table @kbd
+@item C-M-o
+@kindex C-M-o
+@findex split-line
+在点 (@code{split-line}) 处分割当前线。  point 之后的行上的文本成为新行，缩进到 point 所在的同一列。  该命令首先将点向前移动到任何空格和制表符上。  之后，point 被定位在插入的换行符之前。
+
+@kindex M-m
+@findex back-to-indentation
+@item M-m
+移动（向前或向后）到当前行的第一个非空白字符 (@code{back-to-indentation})。  如果该行中没有非空白字符，则移至该行末尾。
+
+@item M-i
+@kindex M-i
+@findex tab-to-tab-stop
+在点处缩进空格，直到下一个制表位 (@code{tab-to-tab-stop})。  @xref{Tab Stops}。
+
+@findex indent-relative
+@item M-x indent-relative
+在 point 处插入空格，直到 point 与上一行的第一个非空格字符（实际上是最后一个非空行）对齐。  如果 point 已经比该点更右，则运行 @code{tab-to-tab-stop} ——除非使用数字参数调用，在这种情况下不执行任何操作。
+
+@item M-^
+@kindex M-^
+@findex delete-indentation
+合并上一行和当前行 (@code{delete-indentation})。通过用一个空格替换当前行前面的任何缩进以及行边界，可以干净地连接两行。
+
+作为一种特殊情况（对 Lisp 代码有用），如果要连接的字符是连续的左括号和右括号，或者连接点后面有另一个换行符，则省略单个空格。
+
+如果有填充前缀，@kbd{M-^} 会删除出现在删除的换行符后面的填充前缀。  @xref{Fill Prefix}。
+
+使用前缀参数，将当前行连接到下一行。如果该区域处于活动状态，并且没有给出前缀参数，则连接该区域中的所有行。
+
+@item C-M-\
+@kindex C-M-\
+@findex indent-region
+缩进该区域中的所有行，就像您在每行的开头键入 @kbd{@key{TAB}} (@code{indent-region}) 一样。
+
+如果提供了数字参数，则将该区域中的每一行缩进到该列号。
+
+@item C-x @key{TAB}
+@kindex C-x TAB
+@findex indent-rigidly
+@cindex remove indentation
+缩进该区域中开始的所有行，将受影响的行作为刚性单位 (@code{indent-rigidly}) 移动。
+
+如果不带参数调用，此命令将激活瞬态模式，以交互方式调整受影响行的缩进。  当此瞬态模式处于活动状态时，键入 @kbd{@key{LEFT}} 或 @kbd{@key{RIGHT}} 会分别向左和向右缩进一个空格。  您还可以键入 @kbd{S-@key{LEFT}} 或 @kbd{S-@key{RIGHT}} 向左或向右缩进到下一个制表位 (@pxref{Tab Stops})。键入任何其他键都会禁用瞬态模式，然后按正常键操作该键。
+
+如果使用前缀参数 @var{n} 调用，此命令会将行向前缩进 @var{n} 空格（不启用瞬态模式）。 @var{n} 的负值向后缩进，因此您可以使用大的负参数从该区域中的行中删除所有缩进，如下所示：
+
+@smallexample
+C-u -999 C-x @key{TAB}
+@end smallexample
+@end table
+
+@node Tab Stops
+@section 制表位
+@cindex tab stops
+
+@vindex tab-stop-list
+Emacs 将某些列号定义为 @dfn{tab stops}。  在文本模式和相关模式 (@pxref{Indentation}) 中插入空格时，@key{TAB} 以及@kbd{M-i} (@pxref{Indentation Commands}) 等命令将这些用作停止点。  变量 @code{tab-stop-list} 控制这些位置。  默认值为@code{nil}，表示每 8 列一个制表位。  该值还可以是从零开始的列号列表（按升序排列），用于放置制表位。  Emacs 通过重复最后一个元素和倒数第二个元素之间的差异来永远扩展列表。
+
+@findex edit-tab-stops
+@kindex C-c C-c @r{(Edit Tab Stops)}
+查看和设置制表位的便捷方法是通过命令 @kbd{M-x edit-tab-stops}，而不是直接自定义变量 @code{tab-stop-list}。  这会切换到包含制表位设置描述的缓冲区，如下所示：
+
+@example
+        :       :       :       :       :       :
+0         1         2         3         4
+0123456789012345678901234567890123456789012345678
+To install changes, type C-c C-c
+@end example
+
+@noindent
+第一行在每个制表位处包含一个冒号。  接下来两行的数字只是为了指示冒号的位置。如果 @code{tab-stop-list} 的值为 @code{nil}（默认情况下），则最初不显示冒号。
+
+您可以编辑此缓冲区，通过在所需列上放置冒号来指定不同的制表位。  缓冲区使用覆盖模式 (@pxref{Minor Modes})。  请记住，Emacs 将通过重复您放置的最后两个显式停止位之间的差异来永远扩展制表位列表。  完成后，输入 @kbd{C-c C-c} 以使新的制表位生效。  通常，新的制表位设置适用于所有缓冲区。  但是，如果您已将 @code{tab-stop-list} 变量设置为调用 @kbd{M-x edit-tab-stops} (@pxref{Locals}) 的缓冲区的本地变量，则新的制表位设置仅适用于该缓冲区。  要为将来的 Emacs 会话保存制表位设置，请使用自定义界面保存 @code{tab-stop-list} (@pxref{Easy Customization}) 的值。
+
+请注意，本节中讨论的制表位与制表符在缓冲区中的显示方式无关。  制表符始终显示为延伸至下一个@dfn{display tab stop}的空格。  @xref{Text Display}。
+
+@node Just Spaces
+@section 制表符与@:空格
+
+通常，缩进命令插入（或删除）尽可能短的制表符和空格字符序列，以便与所需的列对齐。  制表符显示为延伸到下一个@dfn{display tab stop}的一段空白。  默认情况下，每 @code{tab-width} 列有一个显示制表位（默认为 8）。  @xref{Text Display}。
+
+@vindex indent-tabs-mode
+如果您愿意，所有缩进都可以仅由空格组成。  要请求此操作，请将缓冲区局部变量 @code{indent-tabs-mode} 设置为 @code{nil}。  @xref{Locals}，有关设置缓冲区局部变量的信息。  但请注意，无论 4⁣ 的值如何，@kbd{C-q @key{TAB}} 始终插入制表符。
+
+将 @code{indent-tabs-mode} 设置为 @code{nil} 的原因之一是并非所有编辑器都以相同的方式显示制表符。  Emacs 用户也可能有不同的 @code{tab-width} 自定义值。  通过仅使用空格，您可以确保您的文件始终看起来相同。如果您只关心它在 Emacs 中的外观，解决此问题的另一种方法是在文件局部变量 (@pxref{File Variables}) 中设置 @code{tab-width} 变量。
+
+@findex tabify
+@findex untabify
+还有一些命令可以将制表符转换为空格，反之亦然，始终保留所有非空白文本的列。  @kbd{M-x tabify} 扫描该区域中的空格序列，并将至少两个空格的序列转换为制表符（如果可以在不更改缩进的情况下完成）。  @kbd{M-x untabify} 将区域中的所有制表符更改为适当数量的空格。
+
+@node Indent Convenience
+@section 方便的缩进功能
+
+@vindex tab-always-indent
+变量 @code{tab-always-indent} 调整 @key{TAB} (@code{indent-for-tab-command}) 命令的行为。  默认值@code{t}给出@ref{Indentation}中描述的行为。  如果将值更改为符号 @code{complete}，则 @key{TAB} 首先尝试缩进当前行，如果该行已经缩进，它将尝试完成点 (@pxref{Symbol Completion}) 处的文本。  如果值为 @code{nil}，则仅当点位于左边距或行缩进中时，@key{TAB} 才会缩进当前行；否则，它会插入一个制表符。
+
+@vindex tab-first-completion
+如果@code{tab-always-indent}是@code{complete}，可以通过@code{tab-first-completion}变量进一步定制是否扩展或缩进。  例如，如果该变量是 @code{eol}，则仅当点位于行尾时才完成。  @xref{Mode-Specific Indent,,, elisp, The Emacs Lisp Reference Manual}，了解更多详情。
+
+@cindex Electric Indent mode
+@cindex mode, Electric Indent
+@findex electric-indent-mode
+电动缩进模式是一种全局次要模式，每次键入 @key{RET} 后都会自动缩进一行。  该模式默认启用。  要切换此次要模式，请输入 @kbd{M-x electric-indent-mode}。  要在单个缓冲区中切换模式，请使用@kbd{M-x electric-indent-local-mode}。
+
+@node Code Alignment
+@section 代码对齐
+@cindex code alignment
+@cindex aligning code
+
+@dfn{Alignment} 是调整区域中一系列行中的空白的过程，以便在所有行中某些部分从同一列开始。  这通常是为了增强一段文本或代码的可读性而执行的操作。  典型的例子是使用类似 C 的编程语言来对齐一系列作业：
+
+@example
+int a = 1;
+short foo = 2;
+double blah = 4;
+@end example
+
+@noindent
+通常对齐到：
+
+@example
+int    a    = 1;
+short  foo  = 2;
+double blah = 4;
+@end example
+
+@cindex alignment rules
+@findex align
+您可以使用命令 @kbd{M-x align} 来对齐当前区域中的线条。  该命令了解许多标记和编程语言的常见对齐模式。  它将这些模式编码为一组@dfn{alignment rules}，表示如何在不同的上下文中对齐不同类型的文本。
+
+@vindex align-rules-list
+@vindex align-mode-rules-list
+用户选项 @code{align-rules-list} 表示应参考哪些对齐规则 @kbd{M-x align}。  该选项的值是一个包含描述对齐规则的元素的列表。  每个元素都是一个 cons 单元格 @code{(@var{title} . @var{attributes})}，其中 @var{title} 是作为符号的对齐规则的名称，@var{attributes} 是规则属性列表，用于定义规则何时应用以及如何分区和对齐线。  每个规则属性都是一个 cons 单元格 @code{(@var{attribute} . @var{value})}，其中 @var{attribute} 是属性名称，@var{value} 是其值。  唯一必需的属性是 @code{regexp}，其值是一个正则表达式，其子表达式与每行中 @kbd{M-x align} 应扩展或收缩空格 (@pxref{Regexp Backslash}) 的部分相匹配。  有关可能的对齐规则属性的完整描述，请参阅 @code{align-rules-list} (@kbd{C-h v align-rules-list @key{RET}}) 的文档字符串。  默认情况下，此选项设置为 Emacs 支持的多种语言的一长串对齐规则。  默认规则使用 @code{modes} 规则属性来指定 @kbd{M-x align} 应应用它们的主要模式。  主要模式还可以通过将缓冲区局部变量 @code{align-mode-rules-list} 设置为非 @code{nil} 对齐规则列表来覆盖 @code{align-rules-list}。  当@code{align-mode-rules-list}非@code{nil}时，@kbd{M-x align}会参考它而不是@code{align-rules-list}。
+
+@cindex align exclusion rules
+@vindex align-exclude-rules-list
+@vindex align-mode-exclude-rules-list
+除了对齐规则之外，@kbd{M-x align}还使用另一种称为@dfn{exclusion rules}的规则。  排除规则规定了区域 @kbd{M-x align} 中的哪些部分不应对齐，而应保持它们完好无损。  用户选项@code{align-exclude-rules-list}指定这些排除规则。  与@code{align-rules-list}类似，@code{align-exclude-rules-list}的值也是描述排除规则的cons单元格列表。  默认情况下，@code{align-exclude-rules-list} 包括排除 Lisp、C 和其他语言中带引号的字符串和注释中的对齐的规则。  除了@code{align-exclude-rules-list}中的默认排除规则之外，主要模式还可以通过将@code{align-mode-exclude-rules-list}设置为非@code{nil}规则列表来定义定制排除规则，这会覆盖@code{align-exclude-rules-list}，就像@code{align-mode-rules-list}覆盖@code{align-rules-list}一样。
+
+@cindex alignment sections
+@vindex align-region-separate
+@kbd{M-x align} 将区域分割为一系列 @dfn{sections}，通常是非空白行序列，并根据所有匹配的对齐规则，通过扩展或收缩空白区域来对齐每个部分。  @kbd{M-x align} 一致地对齐单个部分内的所有线，但它可能会以不同的方式对齐该区域中的不同部分。  用户选项 @code{align-region-separate} 指定 @kbd{M-x align} 如何将区域分成多个部分。  此选项可以是符号 @code{entire}、@code{group} 之一或正则表达式。  如果 @code{align-region-separate} 是 @code{entire}，Emacs 会将整个区域对齐为单个部分。  如果此选项为@code{group}，Emacs 会将该区域中的每组连续非空行作为一个单独的部分进行对齐。  如果 @code{align-region-separate} 是正则表达式，则 @kbd{M-x align} 扫描该区域以查找与该正则表达式的匹配项，并将它们视为节分隔符。  默认情况下，@code{align-region-separate} 设置为匹配空白行和仅包含空格和单个大括号 (@samp{@{} or @samp{@}}) 的行的正则表达式。  对于正则表达式不够准确的特殊情况，您还可以将 @code{align-region-separate} 设置为一个函数，该函数表示如何将区域分隔到对齐部分。  有关更多详细信息，请参阅 @code{align-region-separate} 的文档字符串。  特定的对齐规则可以覆盖@code{align-region-separate}的值，并通过指定@code{separate}规则属性来定义自己的节分隔符。
+
+如果您使用前缀参数 (@kbd{C-u}) 调用 @kbd{M-x align}，它会启用更多对齐规则，这些规则通常很有用，但有时可能过于干扰。  例如，在具有以下形式的 Lisp 缓冲区中：
+
+@lisp
+(set-face-attribute 'mode-line-inactive nil
+                    :box nil
+                    :background nil
+                    :underline "black")
+@end lisp
+
+@noindent
+输入 (@kbd{C-u M-x align}) 会产生：
+
+@lisp
+(set-face-attribute 'mode-line-inactive nil
+                    :box                nil
+                    :background         nil
+                    :underline          "black")
+@end lisp
+
+在大多数情况下，您应该首先尝试不带前缀参数的 @kbd{M-x align}，如果这不能产生正确的结果，您可以使用 @kbd{C-/} 撤消，然后使用 @kbd{C-u M-x align} 重试。
+
+@findex align-highlight-rule
+@findex align-unhighlight-rule
+您可以使用命令 @kbd{M-x align-highlight-rule} 来可视化当前区域中特定对齐或排除规则的效果。  此命令会提示您输入规则的标题，并突出显示该规则影响的区域上的部分。  对于对齐规则，此命令突出显示 @kbd{M-x align} 将扩展或收缩的空白，而对于排除，此命令突出显示 @kbd{M-x align} 将在对齐中排除的部分。  要删除此命令创建的突出显示，请键入 @kbd{M-x align-unhighlight-rule}。
+
+@findex align-current
+@findex align-entire
+命令@kbd{M-x align-current}与@kbd{M-x align}类似，不同之处在于它仅对包含点的对齐部分进行操作，而与当前区域无关。  该命令根据@code{align-region-separate}定义的节分隔符确定当前节的边界。  @kbd{M-x align-entire}是@kbd{M-x align}的另一种变体，它忽略@code{align-region-separate}并将整个区域对齐为具有一致对齐的单个对齐部分。  如果将 @code{align-region-separate} 设置为 @code{entire}，默认情况下 @kbd{M-x align} 的行为类似于 @kbd{M-x align-entire}。  为了说明将整个区域对齐为单个对齐部分的效果，请考虑以下代码：
+
+@example
+one = 1;
+foobarbaz = 2;
+
+spam = 3;
+emacs = 4;
+@end example
+
+@noindent
+当该区域覆盖所有这些行时，输入 @kbd{M-x align} 会产生：
+
+@example
+one       = 1;
+foobarbaz = 2;
+
+spam  = 3;
+emacs = 4;
+@end example
+
+@noindent
+另一方面， @kbd{M-x align-entire} 将所有行对齐为一个部分，因此 @samp{=} 出现在所有行中的同一列：
+
+@example
+one       = 1;
+foobarbaz = 2;
+
+spam      = 3;
+emacs     = 4;
+@end example
+
+@findex align-regexp
+命令 @kbd{M-x align-regexp} 允许您将当前区域与您定义的临时对齐规则对齐，而不是使用 @code{align-rules-list} 中的预定义规则。  @kbd{M-x align-regexp} 提示您输入正则表达式，并使用该表达式作为该命令用来对齐当前区域的临时对齐规则的 @code{regexp} 属性。  默认情况下，此命令调整与您指定的正则表达式的第一个子表达式匹配的空格。  如果您使用前缀参数调用 @kbd{M-x align-regexp}，它还会提示您输入要使用的子表达式，并允许您指定用作填充的空白量，以及是否将规则重复应用于每行中正则表达式的所有匹配项。  @xref{Regexp Backslash}，有关正则表达式及其子表达式的更多信息。
+
+@vindex align-indent-before-aligning
+如果用户选项 @code{align-indent-before-aligning} 不是 @code{nil}，Emacs 会先缩进该区域，然后再将其与 @kbd{M-x align} 对齐。  @xref{Indentation}。  默认情况下，@code{align-indent-before-aligning} 设置为 @code{nil}。
+
+@vindex align-to-tab-stop
+用户选项 @code{align-to-tab-stop} 表示对齐的部件是否应从制表位 (@pxref{Tab Stops}) 开始。  如果此选项为 @code{nil}，则 @kbd{M-x align} 使用足够的空白进行对齐，忽略制表位。  如果这是一个非 @code{nil} 符号，@kbd{M-x align} 检查该符号的值，如果该值不是 @code{nil}，则 @kbd{M-x align} 与制表位对齐。  默认情况下，此选项设置为 @code{indent-tabs-mode}，因此对齐方式遵循使用制表符缩进的缓冲区中的制表位。  @xref{Just Spaces}。
+
+@vindex align-default-spacing
+用户选项 @code{align-default-spacing} 指定 @kbd{M-x align} 及其相关命令在对齐每行时用于在每行不同部分之间进行填充的默认空白量。当@code{align-to-tab-stop}为@code{nil}时，@code{align-default-spacing}的值为用于填充的空格数；当@code{align-to-tab-stop}非@code{nil}时，@code{align-default-spacing}的值是要使用的制表位数量。  每个对齐规则都可以覆盖 @code{align-default-spacing} 使用 @code{spacing} 属性规则指定的默认值。

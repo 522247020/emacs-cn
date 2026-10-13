@@ -1,0 +1,1160 @@
+@c -*- coding: utf-8 -*-
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Search
+@chapter 查找与替换
+@cindex searching
+@cindex finding strings within text
+
+与其他编辑器一样，Emacs 具有搜索字符串出现位置的命令。  Emacs 还具有用不同字符串替换出现的字符串的命令。  还有一些命令可以执行相同的操作，但搜索模式而不是固定字符串。
+
+您还可以在 @code{xref} (@pxref{Identifier Search}) 的控制下或通过 Dired @kbd{A} 命令 (@pxref{Operating on Files}) 搜索多个文件，或要求 @code{grep} 程序执行此操作 (@pxref{Grep Searching})。
+
+@menu
+* Incremental Search::         当您键入字符串时，就会进行搜索。
+* Nonincremental Search::      指定整个字符串然后搜索。
+* Word Search::                搜索单词序列。
+* Symbol Search::              搜索源代码符号。
+* Regexp Search::              搜索正则表达式的匹配项。
+* Regexps::                    正则表达式的语法。
+* Regexp Backslash::           正则表达式构造以“\”开头。
+* Regexp Example::             解释了一个复杂的正则表达式。
+* Lax Search::                 搜索会忽略相似字符之间的一些区别，例如字母大小写。
+* Replace::                    搜索并替换部分或全部匹配项。
+* Other Repeating Search::     对某些正则表达式的所有匹配项进行操作。
+* Search Customizations::      各种搜索定制。
+@end menu
+
+@node Incremental Search
+@section 增量搜索
+@cindex incremental search
+@cindex isearch
+
+Emacs 中的主要搜索命令是 @dfn{incremental}：一旦您键入搜索字符串的第一个字符，它就会开始搜索。  当您输入搜索字符串时，Emacs 会向您显示该字符串（正如您到目前为止所输入的那样）的位置。  当您输入足够多的字符来识别您想要的位置时，您可以停止。根据您下一步计划执行的操作，您可能需要也可能不需要使用 @key{RET} 显式终止搜索。
+
+@table @kbd
+@item C-s
+向前增量搜索 (@code{isearch-forward})。
+@item C-r
+向后增量搜索 (@code{isearch-backward})。
+@end table
+
+您还可以从菜单栏的 @samp{Edit->Search} 菜单调用增量搜索。
+
+@menu
+* Basic Isearch::         基本增量搜索命令。
+* Repeat Isearch::        再次搜索相同的字符串。
+* Isearch Yank::          将文本抓取到搜索字符串或编辑搜索字符串的命令。
+* Error in Isearch::      当找不到你的字符串时。
+* Special Isearch::       增量搜索中的特殊输入。
+* Not Exiting Isearch::   前缀参数和滚动命令。
+* Isearch Minibuffer::    增量搜索迷你缓冲区历史记录。
+@end menu
+
+@node Basic Isearch
+@subsection 增量搜索的基础知识
+
+@table @kbd
+@item C-s
+开始增量搜索 (@code{isearch-forward})。
+@item C-r
+开始反向增量搜索 (@code{isearch-backward})。
+@end table
+
+@kindex C-s
+@findex isearch-forward
+@kbd{C-s} (@code{isearch-forward}) 开始向前增量搜索。  它从键盘读取字符，并将指针移动到缓冲区中下一次出现这些字符的末尾。
+
+例如，如果您键入 @kbd{C-s}，然后键入 @kbd{F}，则会将光标置于起点之后缓冲区中出现的第一个 @samp{F} 之后。  如果您随后输入 @kbd{O}，光标将移动到第一个 @samp{FO} 之后； @samp{F} 中的 @samp{FO} 可能不是之前发现的第一个 @samp{F}。  在另一个@kbd{O}之后，光标移动到第一个@samp{FOO}之后。
+
+@cindex faces for highlighting search matches
+@cindex @code{isearch} face
+在每一步中，Emacs 使用 @code{isearch} 面 (@pxref{Faces}) 突出显示@dfn{current match}——与搜索字符串匹配的缓冲区文本。  @xref{Search Customizations}，用于自定义此突出显示的各种选项。  当前搜索字符串也会显示在回显区域中。
+
+@cindex isearch input item
+@cindex input item, isearch
+@findex isearch-delete-char
+@kindex DEL @r{(Incremental search)}
+如果您输入搜索字符串时出错，请输入 @key{DEL} (@code{isearch-delete-char})。  每个 @key{DEL} 都会取消搜索期间输入的最后一个输入项。  每当您键入更改搜索字符串、点的位置、搜索的成功或失败、搜索的方向、当前搜索结果的另一端的位置或搜索的“换行”的命令时，Emacs 都会记录一个新的@dfn{input item}。  @xref{Error in Isearch}，了解有关处理不成功搜索的更多信息。
+
+@cindex exit incremental search
+@cindex incremental search, exiting
+@findex isearch-exit
+@kindex RET @r{(Incremental search)}
+当您对到达的位置感到满意时，请输入 @key{RET} (@code{isearch-exit})。  这将停止搜索，将光标留在搜索所带来的位置。  此外，任何在搜索中没有特别意义的命令都会停止搜索，然后执行。因此，输入 @kbd{C-a} 退出搜索，然后移至行首；键入任一箭头键可退出搜索并执行相应的移动命令；仅当您要输入的下一个命令是打印字符、@key{DEL}、@key{RET}或搜索中的其他特殊字符（@kbd{C-q}、@kbd{C-w}、@kbd{C-r}、@kbd{C-s}、@kbd{C-y}、@kbd{M-y}、 @kbd{M-r}、@kbd{M-c}、@kbd{M-e} 以及下面描述的其他一些）。  您可以微调退出搜索的命令；参见@ref{Not Exiting Isearch}。
+
+作为特殊例外，当搜索字符串为空时输入 @key{RET} 会启动非增量搜索 (@pxref{Nonincremental Search})。 （这可以定制；请参阅@ref{Search Customizations}。）
+
+@findex isearch-abort
+@findex isearch-cancel
+@kindex C-g C-g @r{(Incremental Search)}
+@kindex ESC ESC ESC @r{(Incremental Search)}
+要放弃搜索并返回到开始位置，请输入 @kbd{@key{ESC} @key{ESC} @key{ESC}} (@code{isearch-cancel}) 或 @kbd{C-g C-g} (@code{isearch-abort})。
+
+当退出增量搜索时，会将point的原始值添加到标记环中，而不激活标记；因此，您可以使用 @kbd{C-u C-@key{SPC}} 或 @kbd{C-x C-x} 返回到开始搜索之前所在的位置。  @xref{Mark Ring}。  （只有当标记尚未激活时，Emacs 才会执行此操作；如果在您开始搜索时标记处于激活状态，@kbd{C-u C-@key{SPC}} 和 @kbd{C-x C-x} 都将转到该标记。）
+
+@kindex C-r
+@findex isearch-backward
+要向后搜索，请使用 @kbd{C-r} (@code{isearch-backward}) 而不是 @kbd{C-s} 开始搜索。  向后搜索会查找在起点之前结束的匹配项，就像向前搜索会查找在起点之后开始的匹配项一样。
+
+@node Repeat Isearch
+@subsection 重复增量搜索
+
+@kindex C-s @r{(repeating incremental search)}
+@kindex C-r @r{(repeating incremental search)}
+@findex isearch-repeat-forward
+@findex isearch-repeat-backward
+假设您向前搜索 @samp{FOO} 并找到一个匹配项，但不是您期望找到的匹配项：您要查找的 @samp{FOO} 稍后出现在缓冲区中。  在这种情况下，请键入另一个 @kbd{C-s} (@code{isearch-repeat-forward}) 以移至下一个出现的搜索字符串，或键入 @kbd{C-r} (@code{isearch-repeat-backward}) 以移至上一个出现的位置。  您可以多次重复这些命令。  或者，您可以向 @kbd{C-s} 和 @kbd{C-r} 提供数字前缀参数 @var{n} 来查找下一个或上一个出现的第 @var{n} 项。  如果超出，您可以使用 @key{DEL} 取消一些 @kbd{C-s} 命令。  类似地，向后增量搜索中的每个 @kbd{C-r} (@code{isearch-repeat-backward}) 重复向后搜索。
+
+@cindex lazy search highlighting
+如果您在增量搜索过程中暂停一会儿，Emacs 会突出显示屏幕上出现的搜索字符串的所有其他可能匹配项。  这可以帮助您预测通过键入 @kbd{C-s} 或 @kbd{C-r} 重复搜索可以到达的位置。  其他比赛的突出显示方式与当前比赛不同，使用可自定义的面@code{lazy-highlight} (@pxref{Faces})。  如果您不喜欢此功能，可以通过将 @code{isearch-lazy-highlight} 设置为 @code{nil} 来禁用它。  有关与突出显示匹配项相关的其他自定义，请参阅@ref{Search Customizations}。
+
+退出搜索后，您可以通过键入 @kbd{C-s C-s} 再次搜索相同的字符串。  第一个@kbd{C-s}是调用增量搜索的键，第二个@kbd{C-s}表示再次搜索最后一个搜索字符串。  类似地，@kbd{C-r C-r}向后搜索最后一个搜索字符串。  在确定最后一个搜索字符串时，是否使用 @kbd{C-s} 或 @kbd{C-r} 搜索该字符串并不重要。
+
+如果您正在向前搜索，但意识到自己正在寻找起点之前的内容，请输入 @kbd{C-r} 切换到向后搜索，保持搜索字符串不变。  类似地，向后搜索中的@kbd{C-s}切换到向前搜索。
+
+@cindex search, changing direction
+@vindex isearch-repeat-on-direction-change
+当您更改搜索方向时，默认情况下，您键入的第一个命令将保留在同一匹配项上，并且光标将移动到匹配项的另一端。  要立即移动到另一场比赛，请将变量 @code{isearch-repeat-on-direction-change} 自定义为 @code{t}。
+
+@cindex search, wrapping around
+@cindex search, overwrapped
+@cindex wrapped search
+@cindex overwrapped search
+如果搜索失败，并且您要求输入另一个 @kbd{C-s} 来重复搜索，则会从缓冲区的开头重新开始。使用 @kbd{C-r} 重新从末尾开始重复失败的反向搜索。  这称为 @dfn{wrapping around}，一旦发生这种情况，@samp{Wrapped} 就会出现在搜索提示中。  如果您继续越过搜索的原始起点，它会变为@samp{Overwrapped}，这意味着您正在重新访问已经见过的匹配项。
+
+@vindex isearch-wrap-pause
+您可以通过自定义 @code{isearch-wrap-pause} 用户选项来控制没有更多匹配项时发生的情况。  如果是@code{t}（默认值），则发出错误信号。  （重复搜索将绕回。）如果 @code{no}，发出 @code{ding} 并在到达最后一个匹配后立即绕回。  如果是@code{no-ding}，请立即包裹，但不要@code{ding}。  使用值 @code{no} 和 @code{no-ding} 搜索也会尝试在键入字符时回绕。最后，如果@code{nil}，则永远不会换行，而只是在最后一个匹配处停止。
+
+@cindex search ring
+@findex isearch-ring-advance
+@findex isearch-ring-retreat
+@kindex M-n @r{(Incremental search)}
+@kindex M-p @r{(Incremental search)}
+@vindex search-ring-max
+要重复使用较早的搜索字符串，请使用 @dfn{search ring}。  命令@kbd{M-p} (@code{isearch-ring-retreat}) 和@kbd{M-n} (@code{isearch-ring-advance}) 在环中移动以选择要重复使用的搜索字符串。  这些命令将选定的搜索环元素保留在迷你缓冲区中，您可以在其中对其进行编辑。  输入 @kbd{C-s}/@kbd{C-r} 或 @key{RET} 接受字符串并开始搜索。  搜索环中保存的最近使用的搜索字符串的数量由变量@code{search-ring-max}指定，默认为16。
+
+@cindex incremental search, edit search string
+@cindex interactively edit search string
+@findex isearch-edit-string
+@kindex M-e @r{(Incremental search)}
+@kindex mouse-1 @r{in the minibuffer (Incremental Search)}
+要编辑迷你缓冲区中的当前搜索字符串而不将其替换为搜索环中的项目，请在迷你缓冲区中输入 @kbd{M-e} (@code{isearch-edit-string}) 或单击 @kbd{mouse-1}。输入 @key{RET}、@kbd{C-s} 或 @kbd{C-r} 完成字符串编辑并搜索它。  键入 @kbd{C-f} 或 @kbd{@key{RIGHT}} 将开始搜索的缓冲区中点后面的字符添加到搜索字符串中。
+
+@node Isearch Yank
+@subsection Isearch 扬金
+
+在许多情况下，您需要使用点处或附近的文本作为搜索字符串。  本小节中描述的命令可让您方便地执行此操作。
+
+@kindex C-w @r{(Incremental search)}
+@findex isearch-yank-word-or-char
+@kbd{C-w} (@code{isearch-yank-word-or-char}) 将点处的下一个字符或单词附加到搜索字符串。  这是搜索该文本再次出现的简单方法。  （是否复制字符或单词的决定是启发式的。）使用前缀数字参数 @var{n}，附加接下来的 @var{n} 字符或单词。
+
+@kindex C-M-w @r{(Incremental search)}
+@findex isearch-yank-symbol-or-char
+@kbd{C-M-w} (@code{isearch-yank-symbol-or-char}) 将点处的下一个字符或符号附加到搜索字符串。  这是搜索该符号在该点再次出现的一种简单方法。  （是否复制字符或符号的决定是启发式的。）使用前缀数字参数 @var{n}，附加接下来的 @var{n} 字符或符号。
+
+@kindex M-s C-e @r{(Incremental search)}
+@findex isearch-yank-line
+@kbd{M-s C-e} (@code{isearch-yank-line}) 将当前行的其余部分附加到搜索字符串。  如果点已经位于行尾，则会附加下一行。  使用前缀参数 @var{n}，它会附加接下来的 @var{n} 行。
+
+@kindex C-M-z @r{(Incremental search)}
+@findex isearch-yank-until-char
+类似地，@kbd{C-M-z} (@code{isearch-yank-until-char}) 会将从点到下一次出现指定字符（不包括该字符）的所有内容附加到搜索字符串。  这对于键盘宏特别有用，例如在编程语言或标记语言中，该字符标记标记边界。  使用前缀数字参数 2⁣ 时，该命令会附加从点到指定字符第 3 次出现的所有内容。
+
+@kindex C-y @r{(Incremental search)}
+@kindex M-y @r{(Incremental search)}
+@kindex mouse-2 @r{in the minibuffer (Incremental search)}
+@findex isearch-yank-kill
+@findex isearch-yank-pop
+@findex isearch-yank-x-selection
+在增量搜索中，@kbd{C-y} (@code{isearch-yank-kill}) 将当前的kill 附加到搜索字符串。  @kbd{M-y} (@code{isearch-yank-pop})，如果在增量搜索期间在 @kbd{C-y} 之后调用，会将附加文本替换为较早的终止，类似于通常的 @kbd{M-y} (@code{yank-pop}) 命令。  单击回显区域中的 @kbd{mouse-2} 会将当前 X 选择 (@pxref{Primary Selection}) 附加到搜索字符串 (@code{isearch-yank-x-selection})。
+
+@kindex C-M-d @r{(Incremental search)}
+@kindex C-M-y @r{(Incremental search)}
+@findex isearch-del-char
+@findex isearch-yank-char
+@kbd{C-M-d} (@code{isearch-del-char}) 从搜索字符串中删除最后一个字符，@kbd{C-M-y} (@code{isearch-yank-char}) 将点后的字符附加到搜索字符串。  在点后添加字符的另一种方法是使用 @kbd{M-e} (@pxref{Repeat Isearch}) 输入迷你缓冲区，并在迷你缓冲区中搜索字符串的末尾键入 @kbd{C-f} 或 @kbd{@key{RIGHT}}。  您键入的每个 @kbd{C-f} 或 @kbd{@key{RIGHT}} 都会在点后面添加另一个字符到搜索字符串。
+
+通常，当搜索不区分大小写时，拉入搜索字符串的文本将转换为小写，以便搜索保持不区分大小写 (@pxref{Lax Search, case folding})。  但是，如果变量 @code{search-upper-case} (@pxref{Lax Search, search-upper-case}) 的值不是 @code{not-yanks}，则会禁用此向下转换。
+
+@kindex M-s M-.
+@findex isearch-forward-thing-at-point
+要开始新的增量搜索，并将近点文本拉入初始搜索字符串，请输入 @kbd{M-s M-.}，这将运行命令 @code{isearch-forward-thing-at-point}。  如果该区域处于活动状态，则它将文本从该区域拉入搜索字符串。否则，它会尝试提取在点附近找到的 URL、符号或表达式。  要提取的内容由用户选项@code{isearch-forward-thing-at-point} 定义。
+
+@node Error in Isearch
+@subsection 增量搜索中的错误
+
+@cindex @code{isearch-fail} face
+如果根本没有找到您的字符串，回显区域会显示 @samp{Failing I-Search}，并且光标将移过 Emacs 尽可能多地找到您的字符串的位置。  因此，如果您搜索 @samp{FOOT}，但没有 @samp{FOOT}，您可能会在 @samp{FOOL} 中的 @samp{FOO} 之后看到光标。  在回显区域中，使用面 @code{isearch-fail} 突出显示搜索字符串中未能匹配的部分。
+
+此时，您可以执行几项操作。  如果您的字符串输入错误，请使用 @key{DEL} 取消上一个输入项 (@pxref{Basic Isearch})，使用 @kbd{C-M-d} 一次删除一个字符，或使用 @kbd{M-e} 进行编辑。  如果您喜欢找到的地方，可以输入 @key{RET} 保留在那里。  或者您可以输入 @kbd{C-g}，它会从搜索字符串中删除无法找到的字符（@samp{FOOT} 中的 @samp{T}），保留找到的字符（@samp{FOOT} 中的 @samp{FOO}）。  此时第二个 @kbd{C-g} 会完全取消搜索，将点返回到搜索开始时的位置。
+
+@cindex quitting (in search)
+@kindex C-g @r{(Incremental search)}
+quit 命令 @kbd{C-g} 在搜索期间执行特殊操作；它的作用取决于搜索的状态。  如果搜索已找到您指定的内容并正在等待输入，@kbd{C-g} 会取消整个搜索，将光标移回您开始搜索的位置。  如果在搜索字符串中有尚未找到的字符时键入 @kbd{C-g} —— 因为 Emacs 仍在搜索它们，或者因为未能找到它们 —— 那么尚未找到的搜索字符串字符将从搜索字符串中丢弃。  随着它们消失，搜索现在成功并等待更多输入，因此第二个 @kbd{C-g} 将取消整个搜索。
+
+@node Special Isearch
+@subsection 增量搜索的特殊输入
+
+除了前面小节中描述的字符之外，您在增量搜索期间键入的一些其他字符也具有特殊效果。  此处对其进行了描述。
+
+要切换宽松空间匹配 (@pxref{Lax Search, lax space matching})，请输入 @kbd{M-s @key{SPC}}。
+
+要切换搜索的区分大小写，请输入 @kbd{M-c} 或 @kbd{M-s c}。  @xref{Lax Search, case folding}。  如果搜索字符串包含大写字母，则默认情况下搜索区分大小写。
+
+要切换搜索是否将相似和等效的字符视为匹配，请输入 @kbd{M-s '}。  @xref{Lax Search, character folding}。  如果搜索字符串包含重音字符，则会在搜索期间禁用字符折叠。
+
+@cindex invisible text, searching for
+@kindex M-s i @r{(Incremental search)}
+@findex isearch-toggle-invisible
+要切换搜索是否会查找因叠加而变得不可见的文本，请输入 @kbd{M-s i} (@code{isearch-toggle-invisible})。 @xref{Outline Search}。  要使所有增量搜索在不可见文本内找到匹配项（无论是由于文本属性还是覆盖属性），请将 @code{search-invisible} 自定义为值 @code{t}。
+
+@kindex M-r @r{(Incremental Search)}
+@kindex M-s r @r{(Incremental Search)}
+@findex isearch-toggle-regexp
+要在非正则表达式和正则表达式增量搜索之间切换，请输入 @kbd{M-r} 或 @kbd{M-s r} (@code{isearch-toggle-regexp})。 @xref{Regexp Search}。
+
+要切换符号模式，请输入 @kbd{M-s _}。  @xref{Symbol Search}。
+
+要搜索换行符，请键入 @kbd{C-j} 作为搜索字符串的一部分。
+
+要搜索非 @acronym{ASCII} 字符，请在增量搜索期间使用以下方法之一：
+
+@itemize @bullet
+@item
+@findex isearch-quote-char
+@kindex C-q @r{(Incremental Search)}
+键入 @kbd{C-q} (@code{isearch-quote-char})，后跟非图形字符或八进制数字序列。  这会向搜索字符串添加一个字符，类似于使用 @kbd{C-q} (@pxref{Inserting Text}) 插入缓冲区。  例如，增量搜索期间的 @kbd{C-q C-s} 将 @samp{control-S} 字符添加到搜索字符串中。
+
+@item
+@kindex C-^ @r{(Incremental Search)}
+@findex isearch-toggle-input-method
+@findex isearch-toggle-specified-input-method
+@findex isearch-transient-input-method
+使用输入法 (@pxref{Input Methods})。  如果在开始搜索时在当前缓冲区中启用了输入法，则当您键入搜索字符串时，相同的方法将在迷你缓冲区中处于活动状态。  输入搜索字符串时，您可以使用 @kbd{C-\} (@code{isearch-toggle-input-method}) 切换输入法。  您还可以使用 @kbd{C-^} (@code{isearch-toggle-specified-input-method}) 打开非默认输入法，该输入法会提示输入输入法的名称。  当增量搜索期间输入法处于活动状态时，搜索提示会包含输入法助记符，如下所示：
+
+@example
+I-search [@var{im}]:
+@end example
+
+@noindent
+其中@var{im}是当前输入法的助记符。  您在增量搜索过程中启用的任何输入法之后在当前缓冲区中仍保持启用状态。  最后，您可以暂时启用瞬态输入法 (@pxref{transient input method}) 和 @kbd{C-x \} (@code{isearch-transient-input-method})，以使用输入法将单个字符插入到搜索字符串中，然后自动禁用该输入法。
+
+@item
+@findex isearch-char-by-name
+@kindex C-x 8 RET @r{(Incremental Search)}
+键入 @kbd{C-x 8 @key{RET}} (@code{isearch-char-by-name})，后跟 Unicode 名称或十六进制代码点。  这会将指定的字符添加到搜索字符串中，类似于通常的 @code{insert-char} 命令 (@pxref{Inserting Text})。
+@end itemize
+
+@findex isearch-emoji-by-name
+@kindex C-x 8 e RET @r{(Incremental Search)}
+您还可以在搜索字符串中包含表情符号序列。  输入 @w{@kbd{C-x 8 e @key{RET}}} (@code{isearch-emoji-by-name})，后跟表情符号的 Unicode 名称（例如，@kbd{smiling face} 或 @kbd{heart with arrow}）。  这会将指定的表情符号添加到搜索字符串中。  如果您不知道要搜索的表情符号的名称，可以使用 @kbd{C-x 8 e l} (@code{emoji-list}) 和 @kbd{C-x 8 e d} (@code{emoji-describe}) (@pxref{Input Methods})。
+
+@kindex M-s o @r{(Incremental Search)}
+@findex isearch-occur
+在增量搜索中输入 @kbd{M-s o} 会调用 @code{isearch-occur}，后者会使用当前搜索字符串运行 @code{occur}。  @xref{Other Repeating Search, occur}。
+
+@findex isearch-query-replace
+@findex isearch-query-replace-regexp
+@kindex M-% @r{(Incremental search)}
+@kindex C-M-% @r{(Incremental search)}
+在增量搜索中键入 @kbd{M-%} (@code{isearch-query-replace}) 会调用 @code{query-replace} 或 @code{query-replace-regexp} （取决于搜索模式），并将当前搜索字符串用作要替换的字符串。  负前缀参数意味着向后替换。  @xref{Query Replace}。  键入 @kbd{C-M-%} (@code{isearch-query-replace-regexp}) 会调用@code{query-replace-regexp}，并将当前搜索字符串用作要替换的正则表达式。
+
+@findex isearch-complete
+@kindex M-TAB @r{(Incremental search)}
+在增量搜索中键入 @kbd{M-@key{TAB}} 会调用 @code{isearch-complete}，它尝试使用搜索环（您之前使用的搜索字符串）作为完成替代项列表来完成搜索字符串。  @xref{Completion}。  在许多操作系统中，@kbd{M-@key{TAB}} 键序列由窗口管理器捕获；然后，如果您想使用@code{isearch-complete}，则需要将其重新绑定到另一个按键序列（@pxref{Rebinding}）。
+
+@kindex M-s h r @r{(Incremental Search)}
+@findex isearch-highlight-regexp
+@kindex M-s h l @r{(Incremental Search)}
+@findex isearch-highlight-lines-matching-regexp
+您可以通过键入 @kbd{M-s h r} (@code{isearch-highlight-regexp}) 退出搜索，同时突出显示匹配项。  这将运行 @code{highlight-regexp} (@pxref{Highlight Interactively})，向其传递从搜索字符串派生的正则表达式，并提示您输入用于突出显示的面孔。  要突出显示包含匹配项的 @emph{whole lines}（而不是 @emph{just} 匹配项），请输入 @kbd{M-s h l} (@code{isearch-highlight-lines-matching-regexp})。  无论哪种情况，要删除突出显示，请输入 @kbd{M-s h u} (@code{unhighlight-regexp})。
+
+@cindex incremental search, help on special keys
+@kindex C-h C-h @r{(Incremental Search)}
+@findex isearch-help-map
+@vindex isearch-mode-map
+当增量搜索处于活动状态时，您可以键入 @kbd{C-h C-h} (@code{isearch-help-map}) 来访问交互式帮助选项，包括特殊键绑定列表。  这些键绑定是键映射@code{isearch-mode-map} (@pxref{Keymaps}) 的一部分。
+
+@cindex incremental search, go to first or last occurrence
+@kindex M-s M->
+@kindex M-s M-<
+当增量搜索处于活动状态时，输入 @kbd{M-s M->} 将转到搜索字符串的最后一次出现，而 @kbd{M-s M-<} 将转到搜索字符串的第一次出现。  使用前缀数字参数 2⁣ 时，这些命令将分别转到从缓冲区的开头或结尾计数的搜索字符串的第 3 个出现位置。
+
+@node Not Exiting Isearch
+@subsection 不退出增量搜索
+
+本小节介绍如何控制在执行命令之前键入对搜索没有特别意义的命令是否退出搜索。  它还描述了三类命令，您可以在不退出当前增量搜索的情况下键入这些命令，即使它们本身不是增量搜索的一部分。
+
+@vindex search-exit-option
+通常，输入不受增量搜索约束的命令会在执行该命令之前退出搜索。  因此，该命令对您调用搜索的缓冲区进行操作。但是，如果将变量 @code{search-exit-option} 自定义为 @code{append}，则增量搜索不会解释的您键入的字符将简单地附加到搜索字符串中。  这样您就可以在搜索字符串中包含控制字符，例如 @kbd{C-a}，这些字符通常会退出搜索并调用缓冲区上绑定到它们的命令。
+
+@table @asis
+@item 前缀参数
+@cindex prefix argument commands, during incremental search
+@vindex isearch-allow-prefix
+在增量搜索中，当您键入指定前缀参数 (@pxref{Arguments}) 的命令时，默认情况下它将应用于搜索中的下一个操作或退出搜索的命令。  换句话说，输入前缀参数本身不会终止搜索。
+
+在 Emacs 的早期版本中，输入前缀参数总是会终止搜索。  您可以通过将变量 @code{isearch-allow-prefix} 设置为 @code{nil} 来恢复此行为。
+
+当 @code{isearch-allow-scroll} 为非 @code{nil} 时（见下文），前缀参数始终具有上述默认行为，即，即使 @code{isearch-allow-prefix} 为 @code{nil}，它们也不会终止搜索。
+
+@item 滚动命令
+@cindex scrolling commands, during incremental search
+@vindex isearch-allow-scroll
+@cindex @code{scroll-command} property, and incremental search
+通常，滚动命令退出增量搜索。  但是，如果将变量 @code{isearch-allow-scroll} 更改为非 @code{nil} 值，则可以使用滚动条以及键盘滚动命令，例如 @kbd{C-v}、@kbd{M-v} 和 @kbd{C-l} (@pxref{Scrolling})，这些命令具有非 @code{nil} @code{scroll-command} 属性，而无需退出搜索。  这仅适用于通过绑定的键序列调用这些命令——键入 @kbd{M-x} 仍将退出搜索。  您可以按照通常的方式为这些命令提供前缀参数。  此功能通常不会让您将当前匹配项滚动到不可见的位置；但如果您将 @code{isearch-allow-scroll} 自定义为特殊值 @code{unlimited}，则该限制将被解除。
+
+@cindex @code{isearch-scroll} property
+@cindex prevent commands from exiting incremental search
+@code{isearch-allow-scroll} 功能还会影响其他一些命令，例如 @kbd{C-x 2} (@code{split-window-below}) 和 @kbd{C-x ^} (@code{enlarge-window})，它们并不完全滚动，但会影响文本在屏幕上的显示位置。  事实上，它会影响任何具有非 @code{nil} @code{isearch-scroll} 属性的命令。因此，您可以通过更改这些属性来控制哪些命令受到影响。
+
+例如，要使 @kbd{C-h l} 在未来所有 Emacs 会话的增量搜索中可用，请使用 @kbd{C-h c} 查找它运行的命令 (@pxref{Key Help})，即 @code{view-lossage}。  然后您可以将以下行放入您的初始化文件中 (@pxref{Init File})：
+
+@example
+(put 'view-lossage 'isearch-scroll t)
+@end example
+
+@noindent
+此功能可应用于任何不会永久更改点、缓冲区内容、匹配数据、当前缓冲区或选定窗口和帧的命令。  该命令本身不得尝试增量搜索。  如果 @code{isearch-allow-scroll} 为 @code{nil}（默认情况下），则禁用此功能。
+
+@vindex isearch-allow-motion
+@vindex isearch-motion-changes-direction
+同样，如果将变量 @code{isearch-allow-motion} 更改为非 @code{nil} 值，则可以使用键盘运动命令 @kbd{M-<}、@kbd{M->}、@kbd{C-v} 和 @kbd{M-v} 分别移动到缓冲区中当前搜索字符串的第一个出现位置、最后一个位置、当前窗口之后的第一个位置以及当前窗口之前的最后一个位置。  使用这些运动命令时，搜索方向不会改变，除非将变量 @code{isearch-motion-changes-direction} 更改为非 @code{nil} 值，在这种情况下，搜索方向在 @kbd{M-<} 和 @kbd{C-v} 之后为向前，在 @kbd{M->} 和 @kbd{M-v} 之后为向后。
+
+@item 动作命令
+@cindex motion commands, during incremental search
+当@code{isearch-yank-on-move}自定义为@code{shift}时，您可以通过在键入光标移动命令时按住Shift键来扩展搜索字符串。  在当前缓冲区中移动点后，它将拉出在新位置结束的文本。
+
+@cindex @code{isearch-move} property
+当@code{isearch-yank-on-move}为@code{t}时，您可以在不使用光标移动命令的Shift键的情况下扩展搜索字符串，但它仅适用于其符号上具有@code{isearch-move}属性的某些移动命令。
+@end table
+
+@node Isearch Minibuffer
+@subsection 搜索迷你缓冲区
+@cindex minibuffer history, searching
+@cindex incremental search in minibuffer history
+
+@kindex C-s @r{in minibuffer}
+@kindex C-r @r{in minibuffer}
+如果在迷你缓冲区处于活动状态时开始增量搜索，Emacs 将搜索迷你缓冲区的内容，就像在任何其他缓冲区中一样。  与搜索普通缓冲区不同，搜索字符串不会显示在回显区域中，因为它用于显示迷你缓冲区。
+
+如果在迷你缓冲区中进行增量搜索未能找到匹配项，它将尝试搜索迷你缓冲区历史记录。  @xref{Minibuffer History}。 Emacs 假装迷你缓冲区及其历史记录是一系列页面，最早的历史元素位于第一页，当前迷你缓冲区位于最后一页。  向前搜索@kbd{C-s}向前搜索后面的页面；反向搜索 @kbd{C-r} 向后搜索到较早的页面。  与普通的缓冲区搜索一样，失败的搜索可能会回绕，从最后一页到第一页，反之亦然。
+
+当迷你缓冲区中的增量搜索找到属于历史元素一部分的匹配时，该历史元素将被拉入迷你缓冲区并显示。  如果您正常退出增量搜索（例如，通过键入 @key{RET}），它随后仍保留在迷你缓冲区中。  使用 @kbd{C-g} 取消搜索会将迷你缓冲区的内容恢复到开始搜索时的内容。
+
+@node Nonincremental Search
+@section 非增量搜索
+@cindex nonincremental search
+
+Emacs 还具有传统的非增量搜索命令，它要求您在搜索开始之前键入整个搜索字符串。
+
+@table @kbd
+@item C-s @key{RET} @var{string} @key{RET}
+搜索@var{string}。
+@item C-r @key{RET} @var{string} @key{RET}
+向后搜索@var{string}。
+@end table
+
+要开始非增量搜索，请首先输入 @kbd{C-s @key{RET}}。这就进入minibuffer读取搜索字符串；以 @key{RET} 终止字符串，然后进行搜索。  如果未找到该字符串，则搜索命令会发出错误信号。
+
+当您输入 @kbd{C-s @key{RET}} 时，@kbd{C-s} 像往常一样调用增量搜索。  该命令经过专门编程，如果您指定的字符串为空，则可以调用非增量搜索命令。 （这样的空参数否则是无用的。）@kbd{C-r @key{RET}} 也这样做，调用非增量向后搜索命令。
+
+非增量搜索也可以从菜单栏的 @samp{Edit->Search} 菜单调用。
+
+@findex search-forward
+@findex search-backward
+您还可以使用两个更简单的命令：@kbd{M-x search-forward} 和 @kbd{M-x search-backward}。  这些命令查找您指定的文字字符串，并且不支持除大小写折叠之外的任何宽松搜索功能 (@pxref{Lax Search})。
+
+@node Word Search
+@section 单词搜索
+@cindex word search
+
+A @dfn{word search} 查找单词序列，而不考虑它们之间的标点符号类型。  例如，如果您输入的搜索字符串包含由一个空格分隔的两个单词，则搜索将匹配由一个或多个空格、换行符或其他标点符号分隔的这两个单词的任意序列。  这对于搜索文本文档特别有用，因为您不必担心要查找的单词是否由换行符或空格分隔。  请注意，编程语言的主要模式或其他专用模式可以修改单词的定义以适应其语法需求。
+
+@table @kbd
+@item M-s w
+如果增量搜索处于活动状态，则切换单词搜索模式 (@code{isearch-toggle-word})；否则，开始增量向前单词搜索 (@code{isearch-forward-word})。
+@item M-s w @key{RET} @var{words} @key{RET}
+使用前向非增量单词搜索来搜索 @var{words}。
+@item M-s w C-r @key{RET} @var{words} @key{RET}
+使用非增量单词搜索向后搜索 @var{words}。
+@item M-s M-w
+在网络上搜索该区域中的文本。
+@end table
+
+@findex isearch-forward-word
+@findex isearch-toggle-word
+@kindex M-s w
+要开始向前增量单词搜索，请输入 @kbd{M-s w}。  如果增量搜索尚未激活，则会运行命令@code{isearch-forward-word}。  如果增量搜索已处于活动状态（无论是向前搜索还是向后搜索），@kbd{M-s w} 运行命令 @code{isearch-toggle-word}，该命令切换到单词搜索，同时保持搜索方向和当前搜索字符串不变。  您可以通过再次输入 @kbd{M-s w} 来关闭单词搜索。
+
+@findex word-search-forward
+@findex word-search-backward
+要开始非增量单词搜索，请键入 @kbd{M-s w @key{RET}} 进行向前搜索，或键入 @kbd{M-s w C-r @key{RET}} 进行向后搜索。它们分别运行命令 @code{word-search-forward} 和 @code{word-search-backward}。
+
+增量和非增量单词搜索在查找匹配项的方式上略有不同。  在非增量单词搜索中，搜索字符串中的每个单词必须与整个单词完全匹配。  在增量单词搜索中，匹配更加宽松：当您键入搜索字符串时，其第一个和最后一个单词不需要匹配整个单词。  这样匹配就可以在您键入时逐步进行。  这种额外的宽松性不适用于延迟突出显示 (@pxref{Incremental Search})，它始终匹配整个单词。当您键入搜索字符串时，@samp{Pending} 会出现在搜索提示中，直到您使用@kbd{C-s} 等搜索重复键。
+
+单词搜索命令不执行字符折叠，并且切换宽松的空白匹配 (@pxref{Lax Search, lax space matching}) 对它们没有影响。
+
+@kindex M-s M-w
+@findex eww-search-words
+@vindex eww-search-prefix
+@cindex Internet search
+@cindex search Internet for keywords
+@cindex web search
+要在网络上搜索区域中的文本，请输入 @kbd{M-s M-w}。  该命令使用搜索引擎对区域中的单词执行互联网搜索，该搜索引擎的 1⁣ 由变量 @code{eww-search-prefix} (@pxref{Basics, EWW, , eww, The Emacs Web Wowser Manual}) 指定。  如果该区域未激活或不包含任何单词，则此命令会提示用户输入要搜索的 URL 或关键字。
+
+@findex dictionary-search
+@findex dictionary
+@findex dictionary-tooltip-mode
+@cindex dictionary server protocol (DICT)
+@cindex word definition search
+@vindex dictionary-server
+您还可以通过 @acronym{RFC} 2229 定义的 @sc{dict} 协议查询字典服务器来搜索单词的定义。Emacs 包含该协议的客户端。  输入 @w{@kbd{M-x dictionary-search @key{RET}}} 连接到 @sc{dict} 服务器并要求其提供单词的可用定义。  此命令提示查找单词，使用当前单词作为默认值，然后要求 @sc{dict} 服务器提供该单词在一本或多本词典中的定义。  默认情况下，该命令首先尝试连接到本地主机上安装的@sc{dict}服务器，如果失败，它会在请求确认后尝试@file{dict.org}；自定义变量 @code{dictionary-server} 以字符串形式指定要使用的单个服务器的 URL（如果您只想查询本地服务器，请使用 @samp{localhost}）。  通常，@code{dictionary-search} 告诉服务器在服务器可用的所有词典中查找单词，但如果您使用前缀参数调用该命令，它将提示您使用单个词典。  可以通过按 @file{*Dictionary*} 缓冲区中显示的 @samp{Select dictionary} 按钮来显示服务器可用的词典列表，如下所述。
+
+第一次使用 @code{dictionary-search} 时，它会创建一个新的 @file{*Dictionary*} 缓冲区并在其中打开特殊模式。  缓冲区显示用于选择字典、搜索另一个单词的定义等的按钮。后续的 @code{dictionary-search} 命令重用此缓冲区。  要创建另一个这样的缓冲区（例如，要查找其他单词，可能在另一本字典中），请输入@w{@kbd{M-x dictionary @key{RET}}}。
+
+如果您在缓冲区中打开 @code{dictionary-tooltip-mode}，Emacs 将在鼠标指针处查找单词的定义，并在工具提示中显示这些定义。  当您阅读包含许多单词且其含义不确定的文本时，这会很方便。
+
+有关字典搜索的其他选项，请参阅 @code{dictionary} 自定义组 (@pxref{Specific Customization})。
+
+@node Symbol Search
+@section 符号搜索
+@cindex symbol search
+
+@dfn{symbol search} 与普通搜索非常相似，只是搜索的边界必须与符号的边界相匹配。在此上下文中 @dfn{symbol} 的含义取决于主模式，通常指源代码标记，例如 Emacs Lisp 模式中的 Lisp 符号。  例如，如果您对 Lisp 符号 @code{forward-word} 执行增量符号搜索，它将与 @code{isearch-forward-word} 不匹配。  因此，此功能主要用于搜索源代码。
+
+@table @kbd
+@item M-s _
+@findex isearch-toggle-symbol
+如果增量搜索处于活动状态，则切换符号搜索模式 (@code{isearch-toggle-symbol})；否则，开始增量向前符号搜索 (@code{isearch-forward-symbol})。
+@item M-s .
+将在最初添加到搜索字符串的点附近找到的符号开始向前增量搜索。
+@item M-s _ @key{RET} @var{symbol} @key{RET}
+非递增地向前搜索 @var{symbol}。
+@item M-s _ C-r @key{RET} @var{symbol} @key{RET}
+非递增地向后搜索 @var{symbol}。
+@end table
+
+@kindex M-s _
+@kindex M-s .
+@findex isearch-forward-symbol
+@findex isearch-forward-symbol-at-point
+要开始向前增量符号搜索，请输入 @kbd{M-s _}（如果要搜索的符号位于点附近，则输入 @kbd{M-s .}）。  如果增量搜索尚未激活，@kbd{M-s _} 运行命令 @code{isearch-forward-symbol}，@kbd{M-s .} 运行命令 @code{isearch-forward-symbol-at-point}。  使用数字前缀参数 @var{n}，@kbd{M-s .} 将搜索 @var{n} 下一个出现的符号； @var{n} 的负值向后搜索。  如果增量搜索已处于活动状态，@kbd{M-s _} 切换到符号搜索，保留搜索方向和当前搜索字符串；您可以通过再次输入 @kbd{M-s _} 来禁用符号搜索。  在增量符号搜索中，当您键入搜索字符串时，仅需要搜索字符串的开头与符号的开头匹配，并且 @samp{Pending} 会出现在搜索提示中，直到您使用 @kbd{C-s} 等搜索重复键。
+
+要开始非增量符号搜索，请键入 @kbd{M-s _ @key{RET}} 进行向前搜索，或键入 @kbd{M-s _ C-r @key{RET}} 进行向后搜索。  在非增量符号搜索中，搜索字符串的开头和结尾需要分别匹配符号的开头和结尾。
+
+符号搜索命令不执行字符折叠，并且切换宽松的空白匹配 (@pxref{Lax Search, lax space matching}) 对它们没有影响。
+
+@node Regexp Search
+@section 正则表达式搜索
+@cindex regexp search
+@cindex search for a regular expression
+
+@dfn{regular expression}（或简称 @dfn{regexp}）是一种模式，表示一类要匹配的替代字符串。  Emacs 提供增量和非增量方式来搜索正则表达式的匹配项。  正则表达式的语法将在下一节中解释。
+
+@table @kbd
+@item C-M-s
+开始增量正则表达式搜索 (@code{isearch-forward-regexp})。
+@item C-M-r
+开始反向增量正则表达式搜索 (@code{isearch-backward-regexp})。
+@end table
+
+@kindex C-M-s
+@findex isearch-forward-regexp
+@kindex C-M-r
+@findex isearch-backward-regexp
+正则表达式的增量搜索是通过键入 @kbd{C-M-s} (@code{isearch-forward-regexp})、通过使用前缀参数（其值无关紧要）调用 @kbd{C-s} 或在前向增量搜索中键入 @kbd{M-r} 来完成的。  此命令与 @kbd{C-s} 一样以增量方式读取搜索字符串，但它将搜索字符串视为正则表达式，而不是查找与缓冲区中文本的精确匹配。  每次将文本添加到搜索字符串时，都会使正则表达式变长，并搜索新的正则表达式。  要向后搜索正则表达式，请在向后增量搜索中使用 @kbd{C-M-r} (@code{isearch-backward-regexp})、带有前缀参数的 @kbd{C-r} 或 @kbd{M-r}。
+
+@vindex regexp-search-ring-max
+普通增量搜索中的所有特殊键序列 (@pxref{Special Isearch}) 在增量正则表达式搜索中执行类似的操作。  例如，在开始搜索后立即输入 @kbd{C-s} 会检索最后使用的增量搜索正则表达式并向前搜索它。  增量正则表达式和非正则表达式搜索具有独立的默认值。  它们还有单独的搜索环，您可以使用 @kbd{M-p} 和 @kbd{M-n} 访问它们。  搜索环中保存的搜索正则表达式的最大数量由@code{regexp-search-ring-max}的值决定，默认为16。
+
+与普通的增量搜索不同，增量正则表达式搜索默认不使用宽松的空间匹配。  要切换此功能，请使用@kbd{M-s @key{SPC}} (@code{isearch-toggle-lax-whitespace})。然后，在增量正则表达式搜索中输入的任何 @key{SPC} 将匹配一个或多个空白字符的任何序列。  变量 @code{search-whitespace-regexp} 指定宽松空间匹配的正则表达式。  @xref{Special Isearch}。
+
+与普通增量搜索不同的是，增量正则表达式搜索不能使用字符折叠 (@pxref{Lax Search})。  （如果您在增量正则表达式搜索期间使用 @kbd{M-s '} 切换字符折叠，则搜索将变为非正则表达式搜索，并且您键入的搜索模式将被解释为文字字符串。）
+
+@cindex pending, in incremental search
+在某些情况下，在增量正则表达式搜索中向正则表达式添加字符可能会使光标向后移动并重新开始。  例如，如果您搜索了 @samp{foo} 并添加了 @samp{\|bar}，则光标会后退，以防第一个 @samp{bar} 在第一个 @samp{foo} 之前。  （提示将更改为“待处理”，以通知用户重新计算已发生。）@xref{Regexps}。
+
+正向和反向正则表达式搜索并不对称，因为 Emacs 中的正则表达式匹配始终从正则表达式的开头开始向前操作。  因此，正向正则表达式搜索向前扫描，在每个可能的起始位置尝试正向匹配。  向后正则表达式搜索向后扫描，在每个可能的起始位置尝试向前匹配。  这些搜索方法并不是镜像。
+
+@findex re-search-forward
+@findex re-search-backward
+正则表达式的非增量搜索是使用命令 @code{re-search-forward} 和 @code{re-search-backward} 完成的。  您可以使用 @kbd{M-x} 调用它们，或者使用 @kbd{C-M-s @key{RET}} 和 @kbd{C-M-r @key{RET}} 进行增量正则表达式搜索。  当您使用 @kbd{M-x} 调用这些命令时，它们会搜索您指定的确切正则表达式，因此不支持除大小写折叠之外的任何宽松搜索功能 (@pxref{Lax Search})。
+
+如果您使用带有前缀参数的增量正则表达式搜索命令，它们将执行普通字符串搜索，例如 @code{isearch-forward} 和 @code{isearch-backward}。  @xref{Incremental Search}。
+
+@node Regexps
+@section 正则表达式的语法
+@cindex syntax of regexps
+@cindex regular expression
+@cindex regexp
+
+本节（以及本手册）描述用户通常使用的正则表达式功能。  @xref{Regular Expressions,,, elisp, The Emacs Lisp Reference Manual}，主要用于 Lisp 程序的附加功能。
+
+正则表达式的语法中，一些字符为 @dfn{special constructs}，其余字符为 @dfn{ordinary}。  普通字符与同一个字符匹配，仅此而已。  特殊字符是@samp{$^.*+?[\}。  如果字符 @samp{]} 结束括号表达式（见下文），则它是特殊的。  字符 @samp{-} 在括号表达式中是特殊的。  正则表达式中出现的任何其他字符都是普通字符，除非其前面有 @samp{\}。  （当您在 Lisp 程序中使用正则表达式时，每个 @samp{\} 必须加倍，请参阅本节末尾附近的示例。）
+
+例如，@samp{f}不是特殊字符，因此它是普通字符，因此@samp{f}是与字符串@samp{f}匹配且不匹配其他字符串的正则表达式。  （它确实与 @emph{not} 匹配字符串 @samp{ff}。）同样，@samp{o} 是仅匹配 @samp{o} 的正则表达式。  （当忽略大小写区别时，这些正则表达式也匹配 @samp{F} 和 @samp{O}，但我们认为这是“同一字符串”的泛化，而不是例外。）
+
+任意两个正则表达式@var{a}和@var{b}都可以连接。如果 @var{a} 匹配某个字符串的开头部分并且 @var{b} 匹配该字符串的其余部分，则结果是一个匹配字符串的正则表达式。  作为一个简单的示例，连接正则表达式 @samp{f} 和 @samp{o} 得到正则表达式 @samp{fo}，它仅匹配字符串 @samp{fo}。  为了做一些不那么琐碎的事情，您需要使用特殊字符之一。这是其中的列表。
+
+@table @asis
+@item @kbd{.}@: @r{(Period)}
+是一个特殊字符，可以匹配除换行符之外的任何单个字符。  例如，正则表达式 @samp{a.b} 匹配以 @samp{a} 开头并以 @samp{b} 结尾的任何三字符字符串。
+
+@item @kbd{*}
+本身不是一个构造；它是一个后缀运算符，意味着重复匹配前面的正则表达式任意次数，尽可能多的次数。  因此，@samp{o*} 匹配任意数量的 @samp{o}，不包括 @samp{o}。
+
+@samp{*} 始终适用于 @emph{smallest} 可能的前面表达式。  因此，@samp{fo*}具有重复的@samp{o}，而不是重复的@samp{fo}。  它匹配 @samp{f}、@samp{fo}、@samp{foo} 等。
+
+匹配器通过立即匹配尽可能多的重复来处理 @samp{*} 构造。  然后继续该模式的其余部分。  如果失败，则会发生回溯，丢弃 @samp{*} 修改的构造的一些匹配项，以防可以匹配模式的其余部分。  例如，在将 @samp{ca*ar} 与字符串 @samp{caaar} 匹配时，@samp{a*} 首先尝试匹配所有三个 @samp{a}；但模式的其余部分是 @samp{ar} 并且只剩下 @samp{r} 可以匹配，所以这次尝试失败。下一个替代方案是 @samp{a*} 仅匹配两个 @samp{a}。通过此选择，正则表达式的其余部分将成功匹配。
+
+@item @kbd{+}
+是一个后缀运算符，与@samp{*}类似，只不过它必须与前面的表达式至少匹配一次。  因此，@samp{ca+r} 匹配字符串@samp{car} 和@samp{caaaar}，但不匹配字符串@samp{cr}，而@samp{ca*r} 匹配所有三个字符串。
+
+@item @kbd{?}
+是一个后缀运算符，与 @samp{*} 类似，只不过它可以匹配前面的表达式一次或根本不匹配。  因此，@samp{ca?r} 匹配@samp{car} 或@samp{cr}，而不匹配其他任何内容。
+
+@item @kbd{*?}, @kbd{+?}, @kbd{??}
+@cindex non-greedy regexp matching
+是上述运算符的非 @dfn{greedy} 变体。  普通运算符 @samp{*}、@samp{+}、@samp{?} 会尽可能匹配，只要整个正则表达式仍然可以匹配。  使用以下@samp{?}，它们将尽可能少地匹配。
+
+因此，@samp{ab*}和@samp{ab*?}都可以匹配字符串@samp{a}和字符串@samp{abbbb}；但如果您尝试将它们与文本 @samp{abbb} 匹配，@samp{ab*} 将匹配所有内容（最长的有效匹配），而 @samp{ab*?} 将仅匹配 @samp{a}（最短的有效匹配）。
+
+非贪婪运算符匹配从给定起始点开始的最短可能字符串；然而，在正向搜索中，最早可能的匹配起点始终是所选的起点。  因此，如果您针对后跟换行符的文本 @samp{abbab} 搜索 @samp{a.*?$}，它将匹配整个字符串。  由于它 @emph{can} 从第一个 @samp{a} 开始匹配，所以确实如此。
+
+@cindex bracket expression
+@cindex set of alternative characters, in regular expressions
+@cindex character set, in regular expressions
+@item @kbd{[ @dots{} ]}
+是 @dfn{bracket expression} （又名@: @dfn{set of alternative characters}），它匹配一组字符中的一个。
+
+在最简单的情况下，两个括号之间的字符就是这个集合可以匹配的字符。  因此，@samp{[ad]}匹配一个@samp{a}或一个@samp{d}，@samp{[ad]*}匹配仅由@samp{a}和@samp{d}组成的任何字符串（包括空字符串）。  由此可见，@samp{c[ad]*r} 匹配@samp{cr}、@samp{car}、@samp{cdr}、@samp{caddaar} 等。
+
+您还可以在字符集中包含字符范围，方法是在起始字符和结束字符之间添加 @samp{-}。  因此，@samp{[a-z]} 匹配任何小写的 @acronym{ASCII} 字母。  范围可以与单个字符自由混合，如 @samp{[a-z$%.]} 所示，它匹配任何小写 @acronym{ASCII} 字母或 @samp{$}、@samp{%} 或句点。  另一个例子，@samp{[α-ωί]} 匹配所有小写希腊字母。
+
+@cindex character classes, in regular expressions
+您还可以在字符集中包含某些特殊的 @dfn{character classes}。  A @samp{[:} 和平衡 @samp{:]} 将字符类括在括号表达式内。  例如，@samp{[[:alnum:]]} 匹配任何字母或数字。  @xref{Char Classes,,, elisp, The Emacs Lisp Reference Manual}，用于字符类列表。
+
+要将 @samp{]} 包含在字符集中，必须将其作为第一个字符。例如，@samp{[]a]} 匹配@samp{]} 或@samp{a}。  要包含 @samp{-}，请将 @samp{-} 写为该组的最后一个字符，但您也可以将其放在范围的前面或后面。  因此，@samp{[]-]} 匹配@samp{]} 和@samp{-}。
+
+要将 @samp{^} 包含在集合中，请将其放在集合开头以外的任何位置。  （一开始，它是对集合的补充——见下文。）
+
+当您在不区分大小写的搜索中使用范围时，您应该将范围的两端都写成大写，或者都写成小写，或者都应该是非字母。  混合大小写范围（例如 @samp{A-z}）的行为有些不明确，并且在未来的 Emacs 版本中可能会发生变化。
+
+要使用正则表达式搜索原始字节 (@pxref{International Chars})，请在括号表达式中指定它们的代码点，如 @w{@kbd{C-M-s [ C-x 8 @key{RET} 3fff80 @key{RET} - C-x 8 @key{RET} 3fffff @key{RET} ]}} 所示。  Emacs 将显示等效的
+
+@example
+Regexp I-search: [\200-\377]
+@end example
+
+@noindent
+在回声区。
+
+@item @kbd{[^ @dots{} ]}
+@samp{[^} 开始@dfn{complemented character set}，它匹配除指定字符之外的任何字符。  因此， @samp{[^a-z0-9A-Z]} 匹配所有字符 @emph{except} @acronym{ASCII} 字母和数字。
+
+@samp{^} 在字符集中并不特殊，除非它是第一个字符。  @samp{^} 之后的字符被视为第一个字符（换句话说，@samp{-} 和 @samp{]} 在那里并不特殊）。
+
+补码字符集可以匹配换行符，除非换行符被提及为不匹配的字符之一。  这与 @code{grep} 等程序中的正则表达式处理形成对比。
+
+@item @kbd{^}
+是匹配空字符串的特殊字符，但仅位于所匹配文本中的行的开头。  否则它无法匹配任何东西。  因此，@samp{^foo} 匹配出现在行首的@samp{foo}。
+
+出于历史兼容性原因，@samp{^}只能在正则表达式的开头，或者在@samp{\(}或@samp{\|}之后使用。
+
+@item @kbd{$}
+与 @samp{^} 类似，但仅匹配行尾。  因此，@samp{x+$} 匹配行尾包含 1 个或更多 @samp{x} 的字符串。
+
+出于历史兼容性原因，@samp{$}只能在正则表达式的末尾，或者在@samp{\)}或@samp{\|}之前使用。
+
+@item @kbd{\}
+有两个功能：它引用特殊字符（包括@samp{\}），并引入额外的特殊结构。
+
+因为@samp{\}引用特殊字符，所以@samp{\$}是仅匹配@samp{$}的正则表达式，@samp{\[}是仅匹配@samp{[}的正则表达式，依此类推。
+
+有关以 @samp{\} 开头的特殊结构，请参阅以下部分。
+@end table
+
+注意：为了历史兼容性，如果特殊字符处于其特殊含义没有意义的上下文中，则将其视为普通字符。  例如，@samp{*foo} 将 @samp{*} 视为普通表达式，因为@samp{*} 没有可以作用的前面表达式。  依赖这种行为是不好的做法；无论如何，最好引用特殊字符，无论它出现在哪里。
+
+由于 @samp{\} 在括号表达式中并不特殊，因此它永远不能删除 @samp{-}、@samp{^} 或 @samp{]} 的特殊含义。当这些字符没有特殊含义时，不应引用它们。  这不会澄清任何事情，因为反斜杠可以合法地位于这些具有特殊含义的字符之前，如 @samp{[^\]}（@code{"[^\\]"} 表示 Lisp 字符串语法），它匹配除反斜杠之外的任何单个字符。
+
+@node Regexp Backslash
+@section 正则表达式中的反斜杠
+
+在大多数情况下，@samp{\} 后跟任何字符仅匹配该字符。  但是，有几个例外：以 @samp{\} 开头的两个字符序列具有特殊含义。  序列中的第二个字符在单独使用时始终是普通字符。  这是 @samp{\} 结构的表。
+
+@table @kbd
+@item \|
+指定一个替代方案。  两个正则表达式 @var{a} 和 @var{b} 以及 @samp{\|} 组成一个表达式，如果 @var{a} 匹配它或 @var{b} 匹配它，则匹配某些文本。  它的工作原理是尝试匹配@var{a}，如果失败，则尝试匹配@var{b}。
+
+因此，@samp{foo\|bar} 匹配@samp{foo} 或@samp{bar}，但不匹配其他字符串。
+
+@samp{\|} 适用于最大可能的周围表达式。  只有周围的@samp{\( @dots{} \)}分组才能限制@samp{\|}的分组能力。
+
+存在完整的回溯功能来处理 @samp{\|} 的多次使用。
+
+@cindex sub-expressions, in regular expressions
+@cindex grouping, in regular expressions
+@item \( @dots{} \)
+是一个分组结构，具有三个目的：
+
+@enumerate
+@item
+包含一组用于其他操作的 @samp{\|} 替代方案。因此，@samp{\(foo\|bar\)x} 匹配@samp{foox} 或@samp{barx}。
+
+@item
+包含一个复杂的表达式，供后缀运算符 @samp{*}、@samp{+} 和 @samp{?} 进行操作。  因此， @samp{ba\(na\)*} 与 @samp{bananana} 等匹配，具有任何（零个或更多）数量的 @samp{na} 字符串。
+
+@item
+记录匹配的子字符串以供将来参考。
+@end enumerate
+
+最后一个应用程序不是括号分组思想的结果；而是一个应用程序。它是一个单独的功能，被指定为相同 @w{@samp{\( @dots{} \)}} 结构的第二个含义。  在实践中，这两种含义通常不会发生冲突；当发生冲突时，您可以使用害羞的团体，如下所述。
+
+@item \(?: @dots{} \)
+@cindex shy group, in regexp
+指定不记录匹配子串的@dfn{shy group}；你不能用 @samp{\@var{d}} 来引用它（见下文）。  这对于机械组合正则表达式非常有用，以便您可以出于语法目的添加组，而不会干扰要引用的组的编号。
+
+@item \@var{d}
+@cindex back reference, in regexp
+匹配与 @samp{\( @dots{} \)} 构造第 @var{d} 次出现匹配的相同文本。  这称为 @dfn{back reference}。
+
+在 @samp{\( @dots{} \)} 结构结束后，匹配器会记住该结构所匹配的文本的开头和结尾。然后，稍后在正则表达式中，您可以使用 @samp{\} 后跟数字 @var{d} 来表示“匹配与第 @var{d}th @samp{\( @dots{} \)} 构造匹配的相同文本”。
+
+与正则表达式中出现的前九个 @samp{\( @dots{} \)} 结构匹配的字符串按照左括号在正则表达式中出现的顺序分配数字 1 到 9。因此，您可以使用 @samp{\1} 到 @samp{\9} 来引用与相应 @samp{\( @dots{} \)} 结构匹配的文本。
+
+例如，@samp{\(.*\)\1} 匹配任何由两个相同的半部分组成的无换行符字符串。  @samp{\(.*\)} 匹配前半部分，可以是任何内容，但后面的 @samp{\1} 必须匹配相同的确切文本。
+
+如果特定的 @samp{\( @dots{} \)} 结构匹配多次（如果后面跟有 @samp{*}，则很容易发生这种情况），则仅记录最后一次匹配。
+
+@item @kbd{\@{@var{m}\@}}
+是指定 @var{m} 次重复的后缀运算符——也就是说，前面的正则表达式必须连续精确匹配 @var{m} 次。  例如，@samp{x\@{4\@}} 匹配字符串 @samp{xxxx}，仅匹配字符串。
+
+@item @kbd{\@{@var{m},@var{n}\@}}
+是一个后缀运算符，指定 @var{m} 和 @var{n} 重复次数——也就是说，前面的正则表达式必须匹配至少 @var{m} 次，但不超过 @var{n} 次。  如果省略@var{n}，则没有上限，但前面的正则表达式必须至少匹配@var{m}次。@*@samp{\@{0,1\@}}相当于@samp{?}。 @* @samp{\@{0,\@}} 相当于@samp{*}。 @* @samp{\@{1,\@}} 相当于@samp{+}。
+
+@item \`
+匹配空字符串，但仅在匹配的字符串或缓冲区（或其可访问部分）的开头。
+
+@item \'
+匹配空字符串，但仅在匹配的字符串或缓冲区（或其可访问部分）的末尾。
+
+@item \=
+匹配空字符串，但仅在点处匹配。
+
+@item \b
+匹配空字符串，但仅匹配单词的开头或结尾。  因此，@samp{\bfoo\b} 匹配任何出现的 @samp{foo} 作为单独的单词。  @samp{\bballs?\b} 与 @samp{ball} 或 @samp{balls} 作为单独的单词匹配。
+
+@samp{\b} 匹配缓冲区的开头或结尾，无论其旁边出现什么文本。
+
+@item \B
+匹配空字符串，但 @emph{not} 位于单词的开头或结尾。
+
+@item \<
+匹配空字符串，但仅匹配单词的开头。仅当后面有单词组成字符时，@samp{\<} 才在缓冲区的开头匹配。
+
+@item \>
+匹配空字符串，但仅匹配单词末尾。  仅当内容以单词组成字符结尾时，@samp{\>} 才在缓冲区末尾匹配。
+
+@item \w
+匹配任何单词组成字符。  语法表确定这些字符是哪些。  @xref{Syntax Tables,, Syntax Tables, elisp, The Emacs Lisp Reference Manual}。
+
+@item \W
+匹配任何不是单词组成部分的字符。
+
+@item \_<
+匹配空字符串，但仅匹配符号的开头。符号是一个或多个符号组成字符的序列。符号组成字符是语法为 @samp{w} 或 @samp{_} 的字符。  仅当后面有符号组成字符时，@samp{\_<} 才在缓冲区的开头匹配。  与单词一样，语法表确定哪些字符是符号组成部分。
+
+@item \_>
+匹配空字符串，但仅匹配符号末尾。  仅当内容以符号组成字符结尾时，@samp{\_>} 才在缓冲区末尾匹配。
+
+@item \s@var{c}
+匹配任何语法为 @var{c} 的字符。  这里@var{c}是指定特定语法类的字符：因此，@samp{w}表示单词成分，@samp{-}或@samp{ }表示空格，@samp{.}表示普通标点符号，等等。@xref{Syntax Class Table,, Syntax Class Table, elisp, The Emacs Lisp Reference Manual}。
+
+@item \S@var{c}
+匹配语法不是 @var{c} 的任何字符。
+
+@cindex categories of characters
+@cindex characters which belong to a specific language
+@findex describe-categories
+@item \c@var{c}
+匹配属于类别 @var{c} 的任何字符。  例如，@samp{\cc} 匹配中文字符，@samp{\cg} 匹配希腊字符等。对于已知类别的描述，请输入@kbd{M-x describe-categories @key{RET}}。
+
+@item \C@var{c}
+匹配 @emph{not} 属于类别 @var{c} 的任何字符。
+@end table
+
+与单词和语法相关的结构由语法表的设置控制。  @xref{Syntax Tables,, Syntax Tables, elisp, The Emacs Lisp Reference Manual}。
+
+@node Regexp Example
+@section 正则表达式示例
+
+下面是一个正则表达式的例子——类似于 Emacs 默认使用的正则表达式，用于识别句子的结尾，不包括以下空格（即变量 @code{sentence-end-base}）：
+
+@example
+@verbatim
+[.?!][]\"')}]*
+@end verbatim
+@end example
+
+@noindent
+它包含连续的两个部分：匹配句点、@samp{?}或@samp{!}的字符集，以及匹配右括号、引号或圆括号的字符集，重复零次或多次。
+
+@node Lax Search
+@section 搜索过程中的松散匹配
+
+@cindex lax search
+@cindex character equivalence in search
+通常，您希望搜索命令忽略您键入的搜索字符串和正在搜索的文本之间的某些细微差别。  例如，不同长度的空白字符序列通常被认为是等效的；字母大小写的差异通常并不重要；等等。这被称为@dfn{character equivalence}。
+
+本节介绍 Emacs 宽松的搜索功能，以及如何根据您的需要定制它们。
+
+@cindex lax space matching in search
+@kindex M-s SPC @r{(Incremental search)}
+@kindex SPC @r{(Incremental search)}
+@findex isearch-toggle-lax-whitespace
+@vindex search-whitespace-regexp
+默认情况下，搜索命令执行@dfn{lax space matching}：每个空格或空格序列与文本中的一个或多个空白字符的任意序列匹配。  更准确地说，Emacs 将搜索字符串中的每个空格字符序列与用户选项 @code{search-whitespace-regexp} 指定的正则表达式进行匹配。  该选项的默认值将任何空格和制表符序列视为空白。因此，@w{@samp{foo bar}} 匹配@w{@samp{foo bar}}、@w{@samp{foo@ @ bar}}、@w{@samp{foo@ @ @ bar}} 等（但不匹配@samp{foobar}）。  如果您想让空格匹配换行符以及空格和制表符序列，请自定义该选项以使其值为正则表达式@samp{[ \t\n]+}。  （增量正则表达式搜索的默认行为是不同的；请参阅@ref{Regexp Search}。）
+
+如果您希望空白字符完全匹配，可以通过在增量搜索中键入 @kbd{M-s @key{SPC}} (@code{isearch-toggle-lax-whitespace}) 来关闭宽松的空格匹配。另一个 @kbd{M-s @key{SPC}} 重新打开宽松的空间匹配。  要对所有搜索禁用宽松的空白匹配，请将 @code{search-whitespace-regexp} 更改为 @code{nil}；那么搜索字符串中的每个空格恰好匹配一个空格。
+
+@cindex case folding in search
+@cindex case-sensitivity and search
+如果您以小写形式指定搜索字符串，则默认情况下，Emacs 中的搜索会忽略正在搜索的文本的大小写。因此，如果您指定搜索 @samp{foo}，则 @samp{Foo} 和 @samp{fOO} 也会匹配。  正则表达式，特别是字符集，行为类似：@samp{[ab]} 匹配 @samp{a} 或 @samp{A} 或 @samp{b} 或 @samp{B}。  此功能称为@dfn{case folding}，增量和非增量搜索模式均支持该功能。
+
+@vindex search-upper-case
+搜索字符串中任何位置的大写字母都会使搜索区分大小写。  因此，搜索 @samp{Foo} 找不到 @samp{foo} 或 @samp{FOO}。  这适用于正则表达式搜索以及文字字符串搜索。  如果从搜索字符串中删除大写字母，效果就会消失。  变量@code{search-upper-case}控制这一点：如果它是非@code{nil}，则搜索字符串中的大写字符使搜索区分大小写；将其设置为 @code{nil} 会禁用大写字符的这种效果。  该变量的默认值为@code{not-yanks}，如果搜索字符串中存在大写字母，则搜索区分大小写，并且还会导致拉入搜索字符串 (@pxref{Isearch Yank}) 的文本小写，因此此类搜索默认不区分大小写。
+
+@vindex case-fold-search
+如果将变量 @code{case-fold-search} 设置为 @code{nil}，则所有字母必须完全匹配，包括大小写。  这是每个缓冲区的变量；更改变量通常仅影响当前缓冲区，除非更改其默认值。  @xref{Locals}。该变量也适用于非增量搜索，包括由替换命令 (@pxref{Replace}) 和迷你缓冲区历史匹配命令 (@pxref{Minibuffer History}) 执行的搜索。
+
+@kindex M-c @r{(Incremental search)}
+@kindex M-s c @r{(Incremental search)}
+@findex isearch-toggle-case-fold
+在增量搜索中键入 @kbd{M-c} 或 @kbd{M-s c} (@code{isearch-toggle-case-fold}) 可切换该搜索的区分大小写。  该效果不会超出当前增量搜索范围，但它会覆盖在当前搜索中添加或删除大写字母的效果。
+
+几个相关变量控制特定命令或活动的搜索和匹配的大小写敏感性。  例如，@code{tags-case-fold-search} 控制@code{find-tag} 的区分大小写。  要找到这些变量，请执行@kbd{M-x apropos-variable @key{RET} case-fold-search @key{RET}}。
+
+@cindex character folding in search
+@cindex equivalent character sequences
+大小写折叠忽略字符之间的大小写区别，使大写字符与小写变体匹配，反之亦然。  大小写折叠的概括是 @dfn{character folding}，它忽略了相似字符之间更广泛的区别类别。例如，在字符折叠下，字母 @code{a} 匹配其所有带重音的表兄弟，如 @code{@"a} 和 @code{@'a}，即，匹配忽略区分这些变体的变音符号。  此外，@code{a} 匹配与其相似的其他字符，或将其作为其图形表示的一部分，例如 U+00AA @sc{feminine ordinal indicator} 和 U+24D0 @sc{circled latin small letter a}（看起来像圆圈内的小@code{a}）。同样，@acronym{ASCII}双引号字符@code{"}匹配 Unicode 标准定义的所有其他双引号变体。  最后，字符折叠可以使一个或多个字符的序列与另一个不同长度的序列匹配：例如，两个字符的序列@code{ff}匹配U+FB00@sc{latin small ligature ff}，序列@code{(a)}匹配U+249C@sc{parenthesized latin small letter a}。  不相同但在字符折叠下匹配的字符序列称为 @dfn{equivalent character sequences}。
+
+@kindex M-s ' @r{(Incremental Search)}
+@findex isearch-toggle-char-fold
+通常，Emacs 中的搜索命令默认情况下不会执行字符折叠以匹配等效的字符序列。您可以通过将变量 @code{search-default-mode} 自定义为 @code{char-fold-to-regexp} 来启用此行为。 @xref{Search Customizations}。  在增量搜索中，输入 @kbd{M-s '} (@code{isearch-toggle-char-fold}) 会切换字符折叠，但仅限于该搜索。  （替换命令有不同的默认值，由单独的选项控制；请参阅@ref{Replacement and Lax Matches}。）
+
+@vindex char-fold-symmetric
+默认情况下，作为搜索字符串的一部分键入字符的显式变体（例如 @code{@"a}）与其基本字符（例如 @code{a}）不匹配。  但是，如果将变量 @code{char-fold-symmetric} 自定义为 @code{t}，则搜索命令会同等对待等效字符，并且在搜索字符串中使用一组等效字符中的任何一个都会在正在搜索的文本中找到其中的任何一个，因此键入重音字符 @code{@"a} 会匹配字母 @code{a} 以及所有其他变体，例如 @code{@'a}。
+
+@vindex char-fold-include
+@vindex char-fold-exclude
+@vindex char-fold-override
+您可以使用可自定义变量@code{char-fold-include}添加新折叠，或使用可自定义变量@code{char-fold-exclude}删除现有折叠。  您还可以将 @code{char-fold-override} 自定义为 @code{t} 以禁用所有等效字符，除了您使用 @code{char-fold-include} 添加的字符之外。
+
+@node Replace
+@section 替换命令
+@cindex replacement
+@cindex search-and-replace commands
+@cindex string substitution
+@cindex global substitution
+
+Emacs 提供了多个用于执行搜索和替换操作的命令。  除了简单的 @kbd{M-x replace-string} 命令之外，还有 @kbd{M-%} (@code{query-replace})，它会显示搜索模式的每次出现，并询问您是否替换它。
+
+替换命令通常对缓冲区中从点到末尾的文本进行操作。  当该区域处于活动状态时，它们会对其进行操作 (@pxref{Mark})。  基本替换命令将一个@dfn{search string}（或正则表达式）替换为一个@dfn{replacement string}。  使用命令 @code{expand-region-abbrevs} (@pxref{Expanding Abbrevs}) 可以并行执行多个替换。
+
+@menu
+* Unconditional Replace::    替换字符串的所有匹配项。
+* Regexp Replace::           替换正则表达式的所有匹配项。
+* Replacement and Lax Matches:: 搜索要替换的文本不严格。
+* Query Replace::            如何使用查询。
+@end menu
+
+@node Unconditional Replace
+@subsection 无条件换货
+@findex replace-string
+
+@table @kbd
+@item M-x replace-string @key{RET} @var{string} @key{RET} @var{newstring} @key{RET}
+将每次出现的 @var{string} 替换为 @var{newstring}。
+@end table
+
+要将点之后的每个 @samp{foo} 实例替换为 @samp{bar}，请使用命令 @kbd{M-x replace-string} 以及两个参数 @samp{foo} 和 @samp{bar}。  替换仅发生在点之后的文本中，因此如果您想覆盖整个缓冲区，则必须首先转到开头。  直到缓冲区末尾的所有出现的地方都将被替换；要限制对缓冲区部分的替换，请激活该部分周围的区域。  当区域处于活动状态时，替换仅限于区域 (@pxref{Mark})。
+
+当@code{replace-string}退出时，它会替换最后一次出现的点。  它将点的先前位置（发出 @code{replace-string} 命令的位置）添加到标记环，而不激活标记；使用 @kbd{C-u C-@key{SPC}} 移回到那里。 @xref{Mark Ring}。
+
+前缀参数将替换限制为由单词边界包围的匹配。
+
+@xref{Replacement and Lax Matches}，有关替换命令中区分大小写和字符折叠的详细信息。
+
+@node Regexp Replace
+@subsection 正则表达式替换
+@findex replace-regexp
+
+@kbd{M-x replace-string} 命令替换单个字符串的精确匹配。  类似的命令 @kbd{M-x replace-regexp} 替换指定正则表达式模式 (@pxref{Regexps}) 的任何匹配项。
+
+@table @kbd
+@item M-x replace-regexp @key{RET} @var{regexp} @key{RET} @var{newstring} @key{RET}
+将 @var{regexp} 的每个匹配项替换为 @var{newstring}。
+@end table
+
+@cindex back reference, in regexp replacement
+在@code{replace-regexp}中，@var{newstring}不必是常数：它可以指与@var{regexp}匹配的全部或部分内容。 @var{newstring}中的@samp{\&}代表整场比赛被替换。  @var{newstring}中的@samp{\@var{d}}，其中@var{d}是从1开始的数字，代表与@var{regexp}中第@var{d}括号分组相匹配的内容。  （这称为“后向引用”。）@samp{\#} 指的是此命令中已进行的替换的计数，以十进制数表示。  在第一次替换中，@samp{\#}代表@samp{0}；在第二个中，对于@samp{1}；等等。例如，
+
+@example
+M-x replace-regexp @key{RET} c[ad]+r @key{RET} \&-safe @key{RET}
+@end example
+
+@noindent
+（例如）将 @samp{cadr} 替换为 @samp{cadr-safe}，将 @samp{cddr} 替换为 @samp{cddr-safe}。
+
+@example
+M-x replace-regexp @key{RET} \(c[ad]+r\)-safe @key{RET} \1 @key{RET}
+@end example
+
+@noindent
+执行逆变换。  要在文本中包含 @samp{\} 来替换，您必须输入 @samp{\\}。
+
+如果您想每次手动输入部分替换字符串，请在替换字符串中使用 @samp{\?}。  每次替换都会要求您编辑迷你缓冲区中的替换字符串，将点放在 @samp{\?} 所在的位置。
+
+本小节的其余部分适用于专门任务，并且需要 Lisp 知识。  大多数读者可以跳过它。
+
+您可以使用 Lisp 表达式来计算替换字符串的部分内容。  为此，请写入 @samp{\,}，后跟替换字符串中的表达式。  每个替换都会计算表达式的值并将其转换为不带引号的文本（如果它是字符串，这意味着使用字符串的内容），并在替换字符串中使用它来代替表达式本身。  如果表达式是符号，则符号名称后面的替换字符串中的一个空格会与符号名称一起出现，因此该值会同时替换它们。
+
+在这样的表达式中，您可以使用一些特殊的序列。 @samp{\&} 和 @samp{\@var{d}} 在这里，像往常一样，将整个匹配称为字符串，将子匹配称为字符串。  @var{d}可以是多个数字，如果第@var{d}括号内的分组不匹配，则@samp{\@var{d}}的值为@code{nil}。  您还可以使用 @samp{\#&} 和 @samp{\#@var{d}} 将这些匹配项称为数字（当匹配项或子匹配项具有数字形式时，这有效）。 @samp{\#} 这里也代表已经完成的替换的数量。
+
+例如，我们可以这样交换@samp{x}和@samp{y}：
+
+@example
+M-x replace-regexp @key{RET} \(x\)\|y @key{RET}
+\,(if \1 "y" "x") @key{RET}
+@end example
+
+对于计算 @samp{\,} 的替换字符串，@code{format} 函数通常很有用 (@pxref{Formatting Strings,,, elisp, The Emacs Lisp Reference Manual})。  例如，要将连续编号的字符串（如 @samp{ABC00042}）添加到第 73 列@w{to 80}（除非它们已被占用），您可以使用
+
+@example
+M-x replace-regexp @key{RET} ^.\@{0,72\@}$ @key{RET}
+\,(format "%-72sABC%05d" \& \#) @key{RET}
+@end example
+
+@node Replacement and Lax Matches
+@subsection 替换命令和宽松的匹配
+
+本小节描述了替换命令相对于宽松匹配 (@pxref{Lax Search}) 的行为以及如何自定义它。一般来说，替换命令通常默认比搜索命令更严格的匹配。
+
+@cindex lax space matching in replace commands
+@vindex replace-lax-whitespace
+与增量搜索不同，替换命令默认不使用宽松空间匹配 (@pxref{Lax Search, lax space matching})。要启用宽松的替换空间匹配，请将变量 @code{replace-lax-whitespace} 更改为非 @code{nil}。  （这仅影响 Emacs 如何查找要替换的文本，而不影响替换文本。）
+
+@vindex replace-regexp-lax-whitespace
+伴随变量 @code{replace-regexp-lax-whitespace} 控制 @code{query-replace-regexp} 在搜索模式时是否使用宽松的空白匹配。
+
+@cindex case folding in replace commands
+如果替换命令的第一个参数全部为小写，则该命令在搜索要替换的匹配项时会忽略大小写，前提是 @code{case-fold-search} 是非 @code{nil} 并且 @code{search-upper-case} 也是非 @code{nil}。  如果@code{search-upper-case} (@pxref{Lax Search, search-upper-case}) 为@code{nil}，则搜索是否忽略大小写仅由@code{case-fold-search} 决定，无论命令第一个参数的字母大小写如何。  如果 @code{case-fold-search} 设置为 @code{nil}，则在所有搜索中大小写始终重要。
+
+@vindex case-replace
+@cindex case preservation in replace commands
+此外，当替换命令的第二个参数全部或部分小写时，替换命令会尝试保留每次出现的大小写模式。  因此，命令
+
+@example
+M-x replace-string @key{RET} foo @key{RET} bar @key{RET}
+@end example
+
+@noindent
+将小写的 @samp{foo} 替换为小写的 @samp{bar}，将全大写的 @samp{FOO} 替换为 @samp{BAR}，将大写的 @samp{Foo} 替换为 @samp{Bar}。  （@code{replace-string} 只能区分这三种选择——小写、全部大写和大写。）请注意，Emacs 通过分析被替换文本中的每个单词来决定替换文本是大写还是大写，并且只有当 @emph{all} 的单词使用相同的字母大小写时，才会保留被替换文本的字母大小写。  因此，命令
+
+@example
+M-x replace-string @key{RET} foo bar @key{RET} baz quux @key{RET}
+@end example
+
+@noindent
+将 @samp{Foo Bar} 替换为 @samp{Baz Quux}，因为 @samp{Foo Bar} 中的两个单词都是大写的。  相比之下，同一命令将 @samp{Foo bar} 替换为 @samp{baz quux}，即 @: 保持替换文本的字母大小写不变，因为 @samp{Foo bar} 中的两个单词使用不同的大小写。  到底什么被认为是“单词”取决于当前缓冲区中有效的语法表（@pxref{Syntax Tables,,, elisp, The Emacs Lisp Reference Manual}）；因此，@samp{Foo_Bar}在文本模式下是两个单词，但在支持编程语言的某些主要模式下可能是单个单词。
+
+如果替换字符串中使用大写字母，则每次插入文本时它们都保持大写。  如果第一个参数中使用大写字母，则始终按照给定的方式精确替换第二个参数，而不进行大小写转换。  同样，如果 @code{case-replace} 或 @code{case-fold-search} 设置为 @code{nil}，则无需进行大小写转换即可完成替换。
+
+@cindex character folding in replace commands
+默认情况下，替换命令在查找要替换的文本时不使用字符折叠 (@pxref{Lax Search, character folding})。  要启用字符折叠以在 @code{query-replace} 和 @code{replace-string} 中进行匹配，请将变量 @code{replace-char-fold} 设置为非 @code{nil} 值。  （此设置不会影响替换文本，只会影响 Emacs 如何查找要替换的文本。它也不会影响 @code{replace-regexp}。）
+
+@node Query Replace
+@subsection 查询替换
+@cindex query replace
+
+@table @kbd
+@item M-% @var{string} @key{RET} @var{newstring} @key{RET}
+将某些出现的 @var{string} 替换为 @var{newstring}。
+@item C-M-% @var{regexp} @key{RET} @var{newstring} @key{RET}
+将 @var{regexp} 的一些匹配项替换为 @var{newstring}。
+@end table
+
+@kindex M-%
+@findex query-replace
+如果您只想将出现的部分 @samp{foo} 更改为 @samp{bar}，而不是全部，请使用 @kbd{M-%} (@code{query-replace})。该命令逐一查找 @samp{foo} 的出现，显示每个出现的位置并询问您是否替换它。  除了查询之外，@code{query-replace} 的工作方式与 @code{replace-string} (@pxref{Unconditional Replace}) 类似。  特别是，如果 8⁣ 是非 9⁣，它会保留大小写，通常是 (@pxref{Replacement and Lax Matches})。  数字参数意味着仅考虑由单词分隔符字符界定的出现次数。  负前缀参数替换向后的。
+
+@kindex C-M-%
+@findex query-replace-regexp
+@kbd{C-M-%} 执行正则表达式搜索和替换 (@code{query-replace-regexp})。它的工作方式类似于 @code{replace-regexp}，只不过它的查询类似于 @code{query-replace}。
+
+@vindex query-replace-from-to-separator
+您可以使用这些命令重复使用早期的替换内容。  当 @code{query-replace} 或 @code{query-replace-regexp} 提示输入搜索字符串时，使用 @kbd{M-p} 和 @kbd{M-n} 以 @samp{@var{from} -> @var{to}} 的形式显示先前的替换，其中 @var{from} 是搜索模式，@var{to} 是其替换，它们之间的分隔符由变量 @code{query-replace-from-to-separator} 的值确定。  输入 @key{RET} 选择所需的替换。  如果此变量的值为@code{nil}，则替换不会添加到命令历史记录中，并且无法重复使用。
+
+@cindex faces for highlighting query replace
+@cindex @code{query-replace} face
+@cindex @code{lazy-highlight} face, in replace
+@vindex query-replace-highlight
+@vindex query-replace-highlight-submatches
+@vindex query-replace-lazy-highlight
+@vindex query-replace-show-replacement
+这些命令使用面 @code{query-replace} 突出显示当前匹配。  您可以通过将变量 @code{query-replace-highlight} 设置为 @code{nil} 来禁用此突出显示。  他们使用 @code{lazy-highlight} 突出显示其他匹配项，就像增量搜索 (@pxref{Incremental Search}) 一样；可以通过将 @code{query-replace-lazy-highlight} 设置为 @code{nil} 来禁用此功能。  默认情况下，@code{query-replace-regexp} 将显示迷你缓冲区中当前匹配项的替换字符串。  如果您想保持特殊序列 @samp{\&} 和 @samp{\@var{n}} 不展开，请自定义 @code{query-replace-show-replacement} 变量。与 @code{search-highlight-submatches} 在增量搜索中突出显示子表达式 (@pxref{Search Customizations}) 一样，变量 @code{query-replace-highlight-submatches} 定义是否在正则表达式替换命令中突出显示子表达式。
+
+@vindex query-replace-skip-read-only
+变量 @code{query-replace-skip-read-only} 如果设置为非 @code{nil}，将导致替换命令忽略只读文本中的匹配。  默认情况下不忽略它们。
+
+当显示字符串或正则表达式的匹配项时，您可以键入的字符有：
+
+@ignore @c Not worth it.
+@kindex SPC @r{(query-replace)}
+@kindex DEL @r{(query-replace)}
+@kindex , @r{(query-replace)}
+@kindex RET @r{(query-replace)}
+@kindex . @r{(query-replace)}
+@kindex ! @r{(query-replace)}
+@kindex ^ @r{(query-replace)}
+@kindex C-r @r{(query-replace)}
+@kindex C-w @r{(query-replace)}
+@kindex C-l @r{(query-replace)}
+@end ignore
+
+@c WideCommands
+@table @kbd
+@item @key{SPC}
+@itemx y
+将出现的事件替换为 @var{newstring}。
+
+@item @key{DEL}
+@itemx @key{Delete}
+@itemx @key{BACKSPACE}
+@itemx n
+跳到下一个出现的位置而不替换当前出现的位置。
+
+@item , @r{(Comma)}
+替换此事件并显示结果。  然后，系统会要求您输入另一个输入字符来说明下一步要做什么。  由于替换已经完成，在这种情况下@key{DEL}和@key{SPC}是等价的；两者都会移动到下一个出现的位置。
+
+您可以在此时输入@kbd{C-r}（见下文）来更改替换的文本。  您还可以使用 @code{undo} 命令撤消替换（例如，键入 @kbd{C-x u}; @pxref{Undo}）；这将退出@code{query-replace}，因此如果您想进一步替换，则必须使用@kbd{C-x @key{ESC} @key{ESC} @key{RET}}重新启动（@pxref{Repetition}）。
+
+@item @key{RET}
+@itemx q
+退出而不进行任何更多替换。
+
+@item .@: @r{(Period)}
+替换此事件，然后退出而不搜索更多事件。
+
+@item !
+替换所有剩余的事件而无需再次询问。
+
+@item ^
+返回到上一次出现的位置（或曾经出现过的位置），以防您错误地更改了它或想要重新检查它。
+
+@item u
+撤消上次替换并返回到进行替换的位置。
+
+@item U
+撤消所有替换并返回到进行第一个替换的位置。
+
+@item d
+显示将所有出现的情况更改为其替换的差异缓冲区。
+
+@item C-r
+进入递归编辑级别，以防需要编辑该事件，而不仅仅是用 @var{newstring} 替换。  完成后，使用 @kbd{C-M-c} 退出递归编辑级别以继续下一个事件。  @xref{Recursive Edit}。
+
+@item C-w
+删除该事件，然后输入递归编辑级别，如@kbd{C-r}所示。  使用递归编辑插入文本来替换已删除的@var{string}。  完成后，使用 @kbd{C-M-c} 退出递归编辑级别以继续下一个事件。
+
+@item e
+编辑迷你缓冲区中的替换字符串。  当您通过键入 @key{RET} 退出迷你缓冲区时，迷你缓冲区内容将替换当前出现的模式。  它们也成为任何进一步出现的新替换字符串。
+
+@item E
+类似于@kbd{e}，但下一次替换将使用精确的大小写。  也就是说，如果您有从@samp{foo}到@samp{bar}的@code{query-replace}，则像@samp{Foo}这样的文本通常会被替换为@samp{Bar}。  使用此命令可以使用精确的大小写进行当前替换。
+
+@item d
+将当前匹配的替换显示为原始文本和已替换匹配的文本之间的差异缓冲区。
+
+@item C-l
+重新显示屏幕。  然后，您必须键入另一个字符来指定如何处理此事件。
+
+@item Y @r{(Upper-case)}
+替换多缓冲区替换中所有剩余缓冲区中的所有剩余事件（例如对选定文件执行查询替换的 Dired @kbd{Q} 命令）。  它以“是”回答这个问题以及该系列中的所有后续问题，无需进一步的用户交互。
+
+@item N @r{(Upper-case)}
+在多缓冲区替换中跳到下一个缓冲区，而不替换当前缓冲区中的剩余匹配项。  它回答这个问题“否”，放弃当前缓冲区的问题，并继续处理序列中的下一个缓冲区。
+
+@item C-h
+@itemx ?
+@itemx @key{F1}
+显示总结这些选项的消息。  然后，您必须键入另一个字符来指定如何处理此事件。
+@end table
+
+除此之外，任何其他字符都会退出 @code{query-replace}，然后作为按键序列的一部分重新读取。  因此，如果您输入@kbd{C-k}，它将退出@code{query-replace}，然后杀死到行尾。  特别是，@kbd{C-g}只是退出@code{query-replace}。
+
+要在退出后重新启动@code{query-replace}，请使用@kbd{C-x @key{ESC} @key{ESC}}，它会重复@code{query-replace}，因为它使用迷你缓冲区来读取其参数。  @xref{Repetition, C-x @key{ESC} @key{ESC}}。
+
+@cindex invisible text, and query-replace
+选项 @code{search-invisible} 决定 @code{query-replace} 如何处理不可见文本。  @xref{Outline Search}。
+
+@xref{Operating on Files}，用于 Dired @kbd{Q} 命令，该命令对所选文件执行查询替换。  另请参阅@ref{Transforming File Names}，了解通过替换文件名中的正则表达式匹配来重命名、复制或链接文件的 Dired 命令。
+
+@node Other Repeating Search
+@section 其他搜索和循环命令
+
+以下是一些查找正则表达式匹配项的其他命令。  如果模式不包含大写字母并且 @code{case-fold-search} 不是 @code{nil}，则它们在匹配时都会忽略大小写。除了始终搜索整个缓冲区的 @code{multi-occur} 和 @code{multi-occur-in-matching-buffers} 之外，所有命令都对缓冲区中从点到末尾的文本进行操作，或者对处于活动状态的区域进行操作。
+
+@table @kbd
+@findex multi-isearch-buffers
+@cindex isearch multiple buffers
+@cindex multiple-buffer isearch
+@item M-x multi-isearch-buffers
+提示输入一个或多个缓冲区名称，以@key{RET}结尾；然后，在这些缓冲区中开始多缓冲区增量搜索。  （如果在一个缓冲区中搜索失败，则下一个 @kbd{C-s} 会尝试搜索下一个指定的缓冲区，依此类推。）使用前缀参数，提示输入正则表达式，并在与该正则表达式匹配的缓冲区中开始多缓冲区增量搜索。
+
+@findex multi-isearch-buffers-regexp
+@item M-x multi-isearch-buffers-regexp
+该命令与 @code{multi-isearch-buffers} 类似，只不过它执行增量正则表达式搜索。
+
+@findex multi-isearch-files
+@cindex isearch multiple files
+@cindex multiple-file isearch
+@item M-x multi-isearch-files
+提示输入一个或多个文件名，以@key{RET}结尾；然后，在这些文件中开始多文件增量搜索。  （如果在一个文件中搜索失败，则下一个 @kbd{C-s} 会尝试搜索下一个指定文件，依此类推。）使用前缀参数，提示输入正则表达式，并在与该正则表达式匹配的文件中开始多文件增量搜索。
+
+@findex multi-isearch-files-regexp
+@item M-x multi-isearch-files-regexp
+该命令与 @code{multi-isearch-files} 类似，只不过它执行增量正则表达式搜索。
+
+在某些设置缓冲区局部变量@code{multi-isearch-next-buffer-function}的模式下（例如，在更改日志模式下），会自动激活多文件增量搜索。
+
+@cindex Occur mode
+@cindex mode, Occur
+@cindex match (face name)
+@vindex list-matching-lines-default-context-lines
+@vindex list-matching-lines-jump-to-current-line
+@c Too long.
+@c @cindex list-matching-lines-current-line-face (face name)
+@kindex M-s o
+@findex occur
+@item M-x occur
+@itemx M-s o
+提示输入正则表达式，并显示一个列表，其中显示缓冲区中包含匹配项的每一行。  如果您在提示符下键入 @kbd{M-n}，则可以重复使用之前增量搜索中的搜索字符串。  匹配的文本使用 @code{match} 面突出显示。  数字参数 @var{n} 指定在每个匹配行之前和之后显示 @var{n} 行上下文。
+
+默认的上下文行数由变量@code{list-matching-lines-default-context-lines}指定。  当@code{list-matching-lines-jump-to-current-line}非@code{nil}时，当前行以面@code{list-matching-lines-current-line-face}突出显示，并且该点设置在该行之后的第一个匹配处。
+
+当增量搜索处于活动状态时，您还可以运行@kbd{M-s o}；这使用当前的搜索字符串。
+
+请注意，您键入的正则表达式的匹配项将扩展为包含完整的行，并且在上一个匹配项结束之前开始的匹配项不被视为匹配项。
+
+@kindex RET @r{(Occur mode)}
+@kindex o @r{(Occur mode)}
+@kindex C-o @r{(Occur mode)}
+@file{*Occur*} 缓冲区使用 Occur 模式作为其主要模式。  您可以使用@kbd{n}和@kbd{p}键移动到下一个或上一个匹配；使用前缀数字参数，这些命令会移动许多匹配项。  数字键绑定到 @code{digit-argument}，因此 @kbd{5 n} 移动到下一个第五个匹配项（您不必键入 @kbd{C-u}）。 @key{SPC} 和 @key{DEL} 上下滚动 @file{*Occur*} 缓冲区。单击那里的匹配或移动点并输入 @key{RET} 访问搜索到的原始缓冲区中的相应位置。 @kbd{o} 和 @kbd{C-o} 在另一个窗口中显示匹配； @kbd{C-o} 不选择该窗口。  或者，您可以使用 @kbd{M-g M-n} (@code{next-error}) 命令逐一访问出现的情况 (@pxref{Compilation Mode})。  最后，@kbd{q}退出显示@file{*Occur*}缓冲区的窗口并隐藏缓冲区。
+
+@cindex Occur Edit mode
+@cindex mode, Occur Edit
+在 @file{*Occur*} 缓冲区中键入 @kbd{e} 可使缓冲区可写并进入发生编辑模式，在该模式下您可以编辑匹配行并将这些编辑反映在原始缓冲区中的文本中。  输入 @kbd{C-c C-c} 离开发生编辑模式并返回到发生模式。
+
+@findex list-matching-lines
+命令@kbd{M-x list-matching-lines} 是@kbd{M-x occur} 的同义词。
+
+@findex multi-occur
+@item M-x multi-occur
+该命令与 @code{occur} 类似，只不过它能够搜索多个缓冲区。  它要求您一一指定缓冲区名称。
+
+@findex multi-occur-in-matching-buffers
+@item M-x multi-occur-in-matching-buffers
+该命令与@code{multi-occur}类似，不同之处在于要搜索的缓冲区是由与访问的文件名匹配的正则表达式指定的。  通过前缀参数，它使用正则表达式来匹配缓冲区名称。
+
+@findex how-many
+@item M-x how-many
+提示输入正则表达式，并在点后打印缓冲区中匹配的数量。  如果该区域处于活动状态，则会对该区域进行操作。
+
+@findex flush-lines
+@item M-x flush-lines
+提示输入正则表达式，并删除包含匹配项的每一行，对点之后的文本进行操作。  命令完成后，它会打印已删除的匹配行的数量。
+
+如果当前行包含从点之后开始的匹配项，则此命令将删除当前行。  如果该区域处于活动状态，则改为对该区域进行操作；如果部分包含在该区域中的行包含完全包含在该区域中的匹配项，则将其删除。
+
+如果匹配项跨行分割，@code{flush-lines} 会删除所有这些行。  它会在开始查找下一个匹配项之前删除这些行；因此，它会忽略从另一场比赛结束的同一行开始的比赛。
+
+@findex keep-lines
+@item M-x keep-lines
+提示输入正则表达式，并删除 @emph{does not} 包含匹配项的每一行，对点之后的文本进行操作。  如果点不在行的开头，则此命令始终保留当前行。如果该区域处于活动状态，则该命令将对该区域进行操作；它永远不会删除仅部分包含在该区域中的行（结束行的换行符算作该行的一部分）。
+
+如果匹配项跨行分割，此命令将保留所有这些行。
+
+@findex kill-matching-lines
+@item M-x kill-matching-lines
+与 @code{flush-lines} 类似，但还将匹配行添加到杀死环中。  该命令将匹配的行作为单个字符串添加到终止环，包括分隔行的换行符。
+
+@findex copy-matching-lines
+@item M-x copy-matching-lines
+与@code{kill-matching-lines}类似，但匹配的行不会从缓冲区中删除。
+@end table
+
+@node Search Customizations
+@section 根据您的需求定制搜索
+@cindex search customizations
+
+本节描述其他地方未描述的各种与搜索相关的自定义。
+
+@cindex default search mode
+@cindex search mode, default
+增量搜索的默认搜索模式由变量@code{search-default-mode}指定。  它可以是 @code{nil}、@code{t} 或函数。  如果是 @code{nil}，则默认模式是进行文字搜索，不进行字符折叠，但使用大小写折叠和宽松的空白匹配，分别由 @code{case-fold-search} 和 @code{search-whitespace-regexp} (@pxref{Lax Search}) 确定。  如果值为@code{t}，则增量搜索默认为正则表达式搜索。  默认值指定仅执行大小写折叠和宽松空白匹配的函数。
+
+@vindex search-highlight
+正在进行的增量搜索的当前匹配使用 @code{isearch} 面突出显示。  可以通过将变量 @code{search-highlight} 设置为 @code{nil} 来禁用此突出显示。
+
+@vindex search-highlight-submatches
+当搜索正则表达式（例如，使用 @kbd{C-M-s}）时，子表达式会根据 @code{search-highlight-submatches} 变量进行特殊突出显示。  如果此变量的值为 @code{nil}，则不会进行特殊突出显示，但如果该值为非 @code{nil}，则正则表达式中与 @samp{\( @dots{} \)} 结构（也称为@:“子表达式”）匹配的文本将以不同的面突出显示。  默认情况下，定义两个不同的面，命名为 ⁣​​6⁣ 和 @code{isearch-group-2}。对于这两个面，奇数子表达式将使用 @code{isearch-group-1} 面突出显示，偶数子表达式将使用 @code{isearch-group-2} 面突出显示。  例如，当搜索@samp{foo-\([0-9]+\)\([a-z]+\)}时，与@samp{[0-9]+}匹配的部分将使用@code{isearch-group-1}面突出显示，与@samp{[a-z]+}匹配的部分将使用@code{isearch-group-2}突出显示。  如果您使用相同的编号方案定义其他面，即@: @code{isearch-group-3}、@code{isearch-group-4}、@dots{}，则@code{isearch-group-@var{M}} 面将用于突出显示第 @var{M}'、@code{@var{N}+@var{M}}'、@code{2@var{N}+@var{M}}'、@dots{}子表达式，其中 @var{N} 是 @code{isearch-group-@var{M}} 形式的面总数。
+
+@cindex lazy highlighting customizations
+@vindex isearch-lazy-highlight
+@cindex @code{lazy-highlight} face
+显示中可见的搜索字符串的其他匹配项使用 @code{lazy-highlight} 面突出显示。  将变量 @code{isearch-lazy-highlight} 设置为 @code{nil} 将禁用此突出显示。  以下是一些自定义延迟突出显示的其他变量：
+
+@vtable @code
+@item lazy-highlight-initial-delay
+突出显示可见匹配项之前等待的时间（以秒为单位）。仅当搜索字符串长度小于 @code{lazy-highlight-no-delay-length} 个字符时才适用。
+
+@item lazy-highlight-no-delay-length
+对于至少与此变量的值一样长的搜索字符串，匹配项的延迟突出显示会立即开始。
+
+@item lazy-highlight-interval
+突出显示连续比赛之间的时间（以秒为单位）。
+
+@item lazy-highlight-max-at-a-time
+在检查输入之前突出显示的最大匹配数。大量的数字可能需要一些时间来突出显示，因此如果您想继续搜索并在此期间输入 @kbd{C-s} 或 @kbd{C-r}，Emacs 将不会响应，直到它完成突出显示所有这些匹配项。  因此，较小的值使 Emacs 的响应速度更快。
+
+@item isearch-lazy-count
+在搜索提示中显示当前匹配数和匹配总数。
+
+@item lazy-count-prefix-format
+@itemx lazy-count-suffix-format
+这两个变量确定显示 @code{isearch-lazy-count} 的当前匹配数和总匹配数的格式。
+
+@item lazy-highlight-buffer
+如果非@code{nil}，则延迟突出显示会突出显示整个缓冲区中的匹配项，而不仅仅是当前窗口显示中可见的匹配项（因此，例如，它们在显示相同缓冲区的其他窗口中也将变得可见）。
+
+@item lazy-highlight-buffer-max-at-a-time
+与 @code{lazy-highlight-max-at-a-time} 类似，但当 @code{lazy-highlight-buffer} 为非 @code{nil} 时，用于突出显示当前在窗口中不可见的匹配项。  默认为200；设置为 @code{nil} 以突出显示缓冲区中的所有匹配项，而不检查输入。  @strong{Warning:} 这可能会使 Emacs 在搜索大缓冲区时不响应。
+@end vtable
+
+@vindex search-nonincremental-instead
+通常，当搜索字符串为空时，在增量搜索中输入 @key{RET} 会启动非增量搜索。  （实际上，它允许您编辑搜索字符串，然后下一个@key{RET}进行搜索。）但是，如果您将变量@code{search-nonincremental-instead}自定义为@code{nil}，则键入@key{RET}将始终退出增量搜索，即使搜索字符串为空。
+
+@vindex isearch-hide-immediately
+默认情况下，增量搜索和查询替换命令会匹配不可见文本，但一旦当前匹配移出不可见文本，就会隐藏任何此类匹配项。  如果将变量 @code{isearch-hide-immediately} 自定义为 @code{nil}，则找到匹配项的任何不可见文本都会一直显示，直到搜索或替换命令退出。
+
+@cindex search display on slow terminals
+@vindex search-slow-speed
+@vindex search-slow-window-lines
+在慢速终端（例如通过慢速连接连接到远程计算机的显示器）上进行增量搜索可能会很烦人，因为在搜索过程中需要重绘大部分显示。  Emacs 为慢速终端提供了一种特殊的显示模式，搜索会弹出一个单独的小窗口，并在该窗口中显示匹配项周围的文本。  小窗口显示速度更快，因此缓解了速度慢的恼人影响。  变量 @code{search-slow-speed} 确定波特率阈值，低于该阈值 Emacs 将使用此显示模式。  变量@code{search-slow-window-lines}控制Emacs弹出的用于显示搜索结果的窗口的行数；默认为 1 行。  通常，这个窗口会弹出在窗口的底部，显示您开始搜索的缓冲区，但如果@code{search-slow-window-lines}的值为负数，则意味着将窗口放在顶部，并为其指定行数，即@code{search-slow-window-lines}的绝对值。

@@ -1,0 +1,553 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 2004--2026 Free Software Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@c
+@c This file is included either in vc-xtra.texi (when producing the
+@c printed version) or in the main Emacs manual (for the on-line version).
+
+@node Miscellaneous VC
+@subsection VC 的各种命令和功能
+
+本节介绍 VC 不常用的功能。
+
+@menu
+* Change Logs and VC::    从日志条目生成更改日志文件。
+* VC Delete/Rename::      删除和重命名版本控制文件。
+* Revision Tags::         修订的符号名称。
+* Merge Bases::           两个分支上都存在最新的修订版。
+* Unintegrated Changes::  差异包括分支上所有未集成的更改。
+* Other Working Trees::   多组工作文件。
+* Version Headers::       将版本控制标头插入工作文件中。
+* Editing VC Commands::   编辑 Emacs 将运行的 VC shell 命令。
+* Preparing Patches::     在 VC 中准备和编写补丁。
+* VC Auto-Reverting::     VCS 操作后更新缓冲区内容。
+* Rewinding Branches::    从分支末端删除修订的命令。
+@end menu
+
+@node Change Logs and VC
+@subsubsection 变更日志和 VC
+
+如果您对带有 @file{ChangeLog} 文件的程序使用 RCS 或 CVS
+@iftex
+(@pxref{Change Log,,,emacs, the Emacs Manual}),
+@end iftex
+@ifnottex
+(@pxref{Change Log}),
+@end ifnottex
+您可以从以前提交的版本控制日志条目生成更改日志条目。
+
+请注意，这仅适用于 RCS 或 CVS@. 此过程在现代基于变更集的版本控制系统上尤其不正确，其中对 @file{ChangeLog} 文件的更改通常会作为变更集的一部分提交。  在这种情况下，您应该先写入更改日志条目，然后在提交时将它们拉入 @samp{*vc-log*} 缓冲区
+@iftex
+(@pxref{Log Buffer,,,emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{Log Buffer}).
+@end ifnottex
+
+@table @kbd
+@item C-x v a
+@kindex C-x v a
+@findex vc-update-change-log
+访问当前目录的 @file{ChangeLog} 文件，并且对于该目录中的已注册文件，为自最近更改日志条目 (@code{vc-update-change-log}) 以来提交的版本创建新条目。
+
+@item C-u C-x v a
+如上所述，但仅查找当前缓冲区文件的条目。
+@end table
+
+例如，假设 @file{ChangeLog} 的第一行日期为 1999-04-10，并且自那时起唯一的签入是 Nathaniel Bowditch 于 1999-05-22 使用日志条目 @samp{Ignore log messages that start with '#'.} 到 @file{rcs2log}。  然后 @kbd{C-x v a} 插入此 @file{ChangeLog} 条目：
+
+@iftex
+@medbreak
+@end iftex
+@smallexample
+@group
+1999-05-22  Nathaniel Bowditch  <nat@@apn.org>
+
+        * rcs2log: Ignore log messages that start with '#'.
+@end group
+@end smallexample
+@iftex
+@medbreak
+@end iftex
+
+@noindent
+如果版本控制日志条目指定了函数名称（在行首的括号中），则会反映在 @file{ChangeLog} 条目中。  例如，如果 @file{vc.el} 的日志条目为 @samp{(vc-do-command): Check call-process status.}，则 @file{ChangeLog} 条目为：
+
+@iftex
+@medbreak
+@end iftex
+@smallexample
+@group
+1999-05-06  Nathaniel Bowditch  <nat@@apn.org>
+
+        * vc.el (vc-do-command): Check call-process status.
+@end group
+@end smallexample
+@iftex
+@medbreak
+@end iftex
+
+当 @kbd{C-x v a} 一次添加多个更改日志条目时，如果相关日志条目几乎同时由同一作者签入，则会将它们分组在一起。  如果多个此类文件的日志条目都具有相同的文本，则会将它们合并为一个条目。
+
+@node VC Delete/Rename
+@subsubsection 删除和重命名版本控制文件
+@cindex renaming version-controlled files
+
+@table @kbd
+@item C-x v x
+提示输入文件名，从工作树中删除文件，并安排删除以供提交。
+
+@item C-x v R
+提示输入两个文件名@var{old}和@var{new}，在工作树中重命名它们，并安排重命名以供提交。  如果 @var{old} 文件位于 VC 下，则默认为当前缓冲区的文件名。
+@end table
+
+@findex vc-delete-file
+如果您想删除版本控制文件，请输入@kbd{C-x v x} (@code{vc-delete-file})。  这会提示输入文件名，并通过版本控制系统将其删除。  该文件将从工作树中删除，并在 VC 目录缓冲区中
+@iftex
+(@pxref{VC Directory Mode,,, emacs, the Emacs Manual}),
+@end iftex
+@ifnottex
+(@pxref{VC Directory Mode}),
+@end ifnottex
+它显示为 @samp{removed} 状态。  当您提交它时，删除就会在存储库中生效。
+
+@findex vc-rename-file
+要重命名版本控制文件，请键入 @kbd{C-x v R} (@code{vc-rename-file})。  这会提示输入两个参数：您要重命名的文件的名称和新名称；然后它通过版本控制系统执行重命名。  重命名会立即在工作树中生效，并在提交重命名的文件时在存储库中生效。
+
+在具有内置重命名支持的现代版本控制系统上，重命名的文件保留原始文件的完整更改历史记录。  在 CVS 和较旧的版本控制系统上，@code{vc-rename-file} 命令实际上是通过以新名称创建旧文件的副本、注册它并删除旧文件来工作的。  在这种情况下，不会保留更改历史记录。
+
+@node Revision Tags
+@subsubsection 修订标签
+@cindex revision tag
+@cindex tags for version control
+
+大多数版本控制系统允许您将 @dfn{revision tag} 应用于版本控制树的特定版本。  在现代基于变更集的版本控制系统上，修订标签只是特定修订的符号名称。  在 CVS 等较旧的基于文件的系统上，每个标签都添加到整套版本控制文件中，从而允许将它们作为一个单元进行处理。  修订标签通常用于标识分发给用户的版本。
+
+标签有两个基本命令；一个使用给定名称创建标签，另一个检索命名标签。
+
+@table @code
+@kindex C-x v s
+@findex vc-create-tag
+@item C-x v s @var{name} @key{RET}
+将当前目录中或下的每个注册文件的工作版本定义为名为 @var{name} (@code{vc-create-tag}) 的标签。
+
+@kindex C-x v r
+@findex vc-retrieve-tag
+@item C-x v r @var{name} @key{RET}
+对于当前目录级别或当前目录级别以下的所有已注册文件，检索标记的修订版@var{name}。  如果 @var{name} 是分支名称并且您的 VCS 区分分支和标签，则此命令将切换到分支。  (@code{vc-retrieve-tag})。
+
+如果任何文件被锁定在当前目录或当前目录下，则此命令会报告错误，而不进行任何更改；这是为了避免覆盖正在进行的工作。
+@end table
+
+您可以将标签或分支名称作为参数提供给 @kbd{C-x v =} 或 @kbd{C-x v ~}
+@iftex
+(@pxref{Old Revisions,,,emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{Old Revisions}).
+@end ifnottex
+因此，您可以使用它来将标记版本与当前文件进行比较，或者将两个标记版本相互进行比较。
+
+在SCCS上，VC自己实现标签；这些标签只能通过 VC@. 看到。大多数较新的系统（包括 CVS、Subversion、bzr、git 和 hg）都有本地标签工具，VC 在可用的情况下使用它；即使您绕过 VC，这些标签也将可见。
+
+在基于文件的版本控制系统中，当您重命名注册文件时，您需要同时重命名其主文件；命令 @kbd{C-x v R} (@code{vc-rename-file}) 将自动执行此操作
+@iftex
+(@pxref{VC Delete/Rename,,,emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{VC Delete/Rename}).
+@end ifnottex
+如果您使用 SCCS，您还必须更新标签的记录，以通过新名称提及文件（@kbd{C-x v R} 也执行此操作）。  引用已记录名称下不再存在的主文件的旧标签无效； VC 无法再检索它。  对 RCS 和 SCCS 进行足够的解释以解释如何手动更新标签超出了本手册的范围。  使用@kbd{C-x v R}使标签对于检索仍然有效，但并不能解决所有问题。  例如，程序中的某些文件可能通过名称引用其他文件。  至少，makefile 可能提到了您重命名的文件。  如果检索旧标记，则会以其新名称检索重命名的文件，该新名称不是 makefile 期望的名称。  所以该程序不会真正按照检索的方式工作。
+
+@node Merge Bases
+@subsubsection 合并基地
+@cindex merge bases
+
+@table @kbd
+@item C-x v M D
+报告分支上更改的差异，因为它与另一个分支不同 (@code{vc-diff-mergebase})。
+
+@item C-x v M L
+显示分支上的修订日志消息，因为它与另一个分支不同 (@code{vc-log-mergebase})。
+@end table
+
+@c This definition is possibly dVCS-specific -- can revisions exist on
+@c more than one branch for older VCS?  This needs thinking through if
+@c any of our centralized VCS gain support for these commands.
+两个分支的 @dfn{merge base} 是两个分支上存在的最新版本。  如果两个分支都没有合并到另一个分支中 (@pxref{Merging})，则合并基础是两个分支中较旧的分支在从其创建新分支时所处的版本 (@pxref{Creating Branches})。  如果其中一个分支曾经合并到另一个分支中，则合并基础是最近的合并点。
+
+本节中描述的命令当前仅针对分散版本控制系统（@pxref{VCS Repositories}）实现。
+
+@kindex C-x v M D
+@findex vc-diff-mergebase
+@kindex C-x v M L
+@findex vc-log-mergebase
+合并基对于在分支之间进行某些比较很有用，Emacs 提供了两个命令来执行此操作。  @kbd{C-x v M D} (@code{vc-diff-mergebase}) 和@kbd{C-x v M L} (@code{vc-log-mergebase}) 中的每一个都提示输入两个分支，找到它们的合并基础，然后将该合并基础与两个分支中的第二个进行比较。  这些命令分别报告差异并显示更改历史记录。
+
+这些命令的典型用例是，其中一个分支最初是从另一个分支创建的，并且您或协作者已将其中一个分支至少合并到另一个分支中一次。  然后，您可以使用这些命令查看一个分支上的哪些更改尚未合并到另一分支中。
+
+将包含您感兴趣的更改的分支称为“源分支”，将这些更改尚未合并到的分支称为“目标分支”。  当提示“旧版本”时指定目标分支，当提示“新版本”时指定源分支。@footnote{The concept of merge bases generalizes from branches to any two revisions.  The merge base of two revisions is the most recent revision that can be found in the revision history of both of the two revisions.  @kbd{C-x v M D} and @kbd{C-x v M L} accept any two revisions, not just branches.  Comparing two branches is the same as comparing the revisions at the ends of the branches.
+
+（事实上​​，这个概念可以推广到任意数量的修订版，但 Emacs 的合并基础命令仅适用于两个版本，因此我们仅限于此。）} 然后 @kbd{C-x v M D} 向您显示如果您要将源分支合并到目标分支中，目标分支上将发生哪些更改的预览，而 @kbd{C-x v M L} 向您显示尚未合并到目标分支中的源分支上的更改日志。
+
+@node Unintegrated Changes
+@subsubsection 查看所有未集成更改的命令
+@cindex unintegrated changes
+@cindex remote unintegrated changes
+
+@table @kbd
+@item C-x v T =
+显示自该分支与其上游对应分支 (@code{vc-diff-unintegrated}) 合并基础以来 VC 文件集更改的差异。
+
+@item C-x v T D
+显示自该分支与其上游对应分支 (@code{vc-root-diff-unintegrated}) 的合并基础以来所有更改的差异。
+
+@item C-x v T l
+显示自该分支与其上游副本 (@code{vc-log-unintegrated}) 合并基础以来 VC 文件集更改的日志消息。
+
+@item C-x v T L
+显示自该分支与其上游对应分支 (@code{vc-root-log-unintegrated}) 合并基础以来的所有更改的日志消息。
+
+@item C-x v T R =
+显示自此主题分支及其上游对应分支 (@code{vc-diff-remote-unintegrated}) 的合并基础以来对 VC 文件集的远程更改的差异。
+
+@item C-x v T R D
+显示自该主题分支与其上游对应分支 (@code{vc-root-diff-remote-unintegrated}) 的合并基础以来所有远程更改的差异。
+
+@item C-x v T R l
+显示自该主题分支及其上游对应分支 (@code{vc-log-remote-unintegrated}) 的合并基础以来对 VC 文件集进行远程更改的日志消息。
+
+@item C-x v T R L
+显示自该主题分支及其上游对应分支 (@code{vc-root-log-remote-unintegrated}) 的合并基础以来所有远程更改的日志消息。
+@end table
+
+对于分散版本控制系统 (@pxref{VCS Repositories})，这些命令提供@kbd{C-x v M L}和@w{@kbd{C-x v M D}}的专用版本（请参阅@pxref{Merge Bases}），它们还考虑了上游存储库的状态。  这些命令在处理单个分支和在单独的分支上开发功能时都很有用 (@pxref{Branches})。  这两种情况在概念上是不同的，因此我们将分别介绍。
+
+首先，考虑在单个分支上工作。  @dfn{Unintegrated changes} 是那些你还没有推到上游的。  这包括工作树中未推送的提交和未提交的更改。  在许多情况下，这些更改尚未推送的原因是它们尚未完成：到目前为止提交的更改单独而言没有意义。
+
+@kindex C-x v T =
+@findex vc-diff-unintegrated
+@kindex C-x v T D
+@findex vc-root-diff-unintegrated
+输入 @kbd{C-x v T D} (@code{vc-root-diff-unintegrated}) 以显示所有这些更改（已提交和未提交）的摘要。  此摘要的形式是提交和推送 (@pxref{Pulling / Pushing}) 所有这些更改将对上游存储库执行的操作的差异。  您可以使用 @kbd{C-x v T =} (@code{vc-diff-unintegrated}) 来限制当前 VC 文件集更改的显示。  （@w{@kbd{C-x v T D}} 和 @w{@kbd{C-x v T =}} 之间的差异就像 @kbd{C-x v D} 和 @kbd{C-x v =} (@pxref{Old Revisions}) 之间的差异。）@footnote{Another point of comparison is that these commands are like @w{@kbd{C-x v O =}} (@code{vc-fileset-diff-outgoing}) and @kbd{C-x v O D} (@code{vc-root-diff-outgoing}) except that they include uncommitted changes in the reported diffs.  Like those other commands, you can use a prefix argument to specify a particular upstream location.}
+
+@kindex C-x v T l
+@findex vc-log-unintegrated
+@kindex C-x v T L
+@findex vc-root-log-unintegrated
+输入 @kbd{C-x v T L} (@code{vc-root-log-unintegrated}) 以修订日志的形式显示相同更改的摘要；这不包括未提交的更改。  您可以使用 @kbd{C-x v T l} (@code{vc-log-unintegrated}) 来限制当前 VC 文件集更改的显示。
+
+其次，考虑在单独的分支上开发功能。  将其称为@dfn{topic branch},@footnote{What we mean by a topic branch is any shorter-lived branch used for work which will later be merged into a longer-lived branch.  Topic branches are sometimes called ``feature branches''.  It is also common for the term ``feature branch'' to be reserved for a particular kind of topic branch, one that another branch or other branches are repeatedly merged into.}，并将最初创建主题分支的分支称为@dfn{trunk} 或@dfn{development trunk}。
+
+在这种情况下，未集成的更改是一个更具体的概念，而不仅仅是主题分支上未推送和未提交的更改。  在将更改合并到主干并推送之前，您尚未完成与协作者的共享更改。  因此，在此示例中，未集成的更改是那些尚未包含在上游存储库的开发主干中的更改。  这意味着主题分支上尚未合并到主干的已提交更改，以及未提交的更改。
+
+当当前分支是主题分支并且您输入 @kbd{C-x v T D} 时，Emacs 会显示当前分支将合并到的主干上所有未完成更改的摘要。  此摘要的形式是提交和推送所有更改（@emph{and} 随后合并主题分支）将对主干执行的操作的差异。如上所述，您可以使用 @kbd{C-x v T =} 来限制当前 VC 文件集更改的显示。  @kbd{C-x v T L} 和 @kbd{C-x v T l} 显示相应的修订日志，不包括上述未提交的更改。
+
+@findex vc-diff-remote-unintegrated
+@findex vc-root-diff-remote-unintegrated
+@findex vc-log-remote-unintegrated
+@findex vc-root-log-remote-unintegrated
+在主题分支上，有时查看相同的信息也很有用，但主题分支的远程存储库版本除外。这是已推送但尚未合并的主题分支上的杰出工作。  它对您的协作者可见，但在其他方面仍然未集成。  我们称这样的工作为@dfn{remote unintegrated changes}。  到目前为止讨论的四个命令都有一个对应的命令，但它对当前主题分支的远程存储库版本进行操作：@w{@kbd{C-x v R T =}} (@code{vc-diff-remote-unintegrated})、@w{@kbd{C-x v R T D}} (@code{vc-root-diff-remote-unintegrated})、@w{@kbd{C-x v R T l}} (@code{vc-log-remote-unintegrated}) 和@w{@kbd{C-x v R T L}} (@code{vc-root-log-remote-unintegrated})。
+
+所有这些功能都依赖于 Emacs 正确检测当前分支是主干分支还是主题分支，并在后一种情况下正确确定主题分支最终将合并到的分支。  如果自动检测没有产生正确的结果，有几个选项可以调整和覆盖它。
+
+@vindex vc-trunk-branch-regexps
+@vindex vc-topic-branch-regexps
+变量 @code{vc-trunk-branch-regexps} 和 @code{vc-topic-branch-regexps} 包含与应始终分别被视为主干和主题分支的分支名称相匹配的正则表达式列表。  您还可以为 @kbd{C-x v T @dots{}} 指定前缀参数。  以下是如何使用这些控件的摘要：
+
+@enumerate
+@item
+如果问题是 Emacs 认为您的主题分支是主干，您可以将其名称或与其名称匹配的正则表达式 (@pxref{Regexps}) 添加到 @code{vc-topic-branch-regexps} 变量。有几种特殊类型的值可以简化常见用例：
+
+@itemize
+@item
+如果元素不包含正则表达式中的特殊字符，则正则表达式隐式锚定在两端，即，它仅匹配具有完全相同名称的分支。
+
+@item
+如果 @code{vc-topic-branch-regexps} 的第一个元素是符号 @code{not}，则 @code{vc-topic-branch-regexps} 的含义相反，因为 Emacs 将名称 @emph{don't} 与 @code{vc-topic-branch-regexps} 的任何元素匹配的所有分支视为主题分支。
+
+@item
+如果 @code{vc-topic-branch-regexps} 变量具有特殊值 @code{t}，而不是正则表达式列表，则 Emacs 会将 @code{vc-trunk-branch-regexps} 变量未明确标识为主干的任何分支视为主题分支。
+@end itemize
+
+@xref{Directory Variables}，关于如何为单个 VC 存储库指定 @code{vc-topic-branch-regexps} 和 @code{vc-trunk-branch-regexps} 的值。
+
+@item
+如果问题是 Emacs 认为您的主干是主题分支，您可以将其名称或与其名称匹配的正则表达式添加到 @code{vc-trunk-branch-regexps} 变量。  这就像 @code{vc-topic-branch-regexps} 一样，具有我们刚才描述的相同的特殊值。  例如，如果 @code{vc-trunk-branch-regexps} 的值为 @code{t}，则 Emacs 会将 @code{vc-topic-branch-regexps} 变量未识别为主题分支的任何分支视为主干。
+
+@item
+提供一个双前缀参数，即 @w{@kbd{C-u C-u C-x v T @dots{}}}，Emacs 无论如何都会将当前分支视为主干。当您只想获取所有传出更改 (@pxref{VC Change Log}) 以及未提交更改的差异时，这非常有用。
+
+@item
+@cindex outgoing base, version control
+最后，您可以通过提供单个前缀参数（即 @w{@kbd{C-u C-x v T @dots{}}}）来进行完全手动控制。  Emacs 将提示您输入 @dfn{outgoing base}，这是更改不再未完成后所指向的上游位置。
+
+要将当前分支视为主干，请指定对当前分支的上游版本的引用，您和您的协作者将完成的工作推送到该版本。  要将当前分支视为主题分支，请指定对主题分支稍后将合并到的主干的上游版本的引用。
+
+具体如何指定对分支上游版本的引用取决于所使用的版本控制系统。  例如，使用 Git，要引用分支 @var{foo} 的上游版本，您可以提供 @kbd{origin/@var{foo}}。  因此，如果 2⁣ 是当前分支，那么您将输入 @kbd{origin/@var{foo}} 的传出基础，将 @var{foo} 视为主干，或输入 @kbd{origin/@var{bar}} 的传出基础，将 @var{foo} 视为主题分支，该分支稍后将合并到名为 @var{bar} 的主干中。
+
+如果有默认选项，则 Emacs 认为您需要输入该选项才能将当前分支视为主题分支。  如果没有默认值，则在提示符下不输入任何内容意味着将当前分支视为主干。
+@end enumerate
+
+@node Other Working Trees
+@subsubsection 一个存储库的多个工作树
+
+@cindex other working trees
+@cindex multiple working trees
+某些 VCS 支持多个具有相同后备存储库或修订存储的工作树。  这意味着您可以在不同的工作树中同时签出不同的修订或分支 (@pxref{Branches})，但共享所有修订历史记录、分支、标签和其他元数据。
+
+假设您的项目有一个主干，您正在开发软件的新版本 3，还有一个稳定发布分支，您可以从中发布版本 2。有人向您发送了修复版本 2 中存在的错误的补丁。您的主工作树已签出版本 3，并且您正在进行一次您不想打扰的大型重构。  因此，您输入 @kbd{C-x v w c} （见下文）并创建一个新的工作树，按照提示查看那里的版本 2 分支。
+
+您可以使用@w{@kbd{C-x v w a}}（见下文）将补丁应用到该工作树，构建并测试它。  满意后，您可以在另一个工作树中使用@w{@kbd{C-x v P}} (@pxref{Pulling / Pushing})。  在测试补丁的过程中，您发现该软件的第 3 版中也存在该错误。  因此，您切换回第一个工作树，并使用 @kbd{C-x v m} (@pxref{Merging}) 合并您在另一个工作树中签出的分支。  现在，您的主干版本已将版本 2 的所有修复合并到其中，但您尚未推送它，因为您仍在重构。  稍后您将使用@kbd{C-x v P}。
+
+当存在其他工作树时，像 @kbd{C-x v v} (@pxref{Basic VC Editing}) 和 @kbd{C-x v d} (@pxref{VC Directory Mode}) 这样的普通 VC 命令的工作方式没有任何不同，除了它们创建的提交、分支和其他 VC 工件将在所有工作树中可见。  另一种说法是，在 VCS 后备存储中创建新工件的任何工作树中采取的任何操作都将从其他工作树中可见，但仅影响工作文件的操作则不会。  因此，如果您对一个工作树中的某些工作文件应用补丁，则只会影响该工作树。  但是，如果您提交通过应用补丁所做的更改，则会在后备存储中创建一个新的修订版，因此此操作会影响其他工作树，因为它们对存储库历史记录的视图现在将有一个额外的提交。
+
+以下特殊命令可让您在不同的工作树之间切换和修改。  在 VC 工作树之外使用它们是错误的；也就是说，来自访问 VCS 控制文件的缓冲区，或者来自 @code{default-directory} (@pxref{File Names}) 位于 VC 工作树内的缓冲区。
+
+@table @kbd
+@item C-x v w c
+添加一个新的工作树。
+
+@item C-x v w w
+访问另一个工作树中的此文件或目录。
+
+@item C-x v w k
+杀死其他工作树中访问此文件的缓冲区。
+
+@item C-x v w s
+调用 @kbd{C-x p p} (@code{project-switch-project}) 但仅限于其他工作树。
+
+@item C-x v w a
+将文件集更改复制或移动到另一个工作树。
+
+@item C-x v w A
+将所有更改复制或移动到另一个工作树。
+
+@item C-x v w x
+删除不再需要的工作树。
+
+@item C-x v w R
+将工作树重新定位到另一个文件名。
+@end table
+
+@kindex C-x v w c
+@findex vc-add-working-tree
+您可以通过使用命令 @w{@kbd{C-x v w c}} (@code{vc-add-working-tree}) 创建新的工作树来开始使用多个工作树。  这会提示您指定一个目标目录，该目录标识工作树，并将保存新的工作文件集。
+
+不同的 VCS 对于在其他工作树中可以和必须检查的内容有不同的规则，因此根据所使用的 VCS，可能会有其他提示。  例如，Git 要求每次只能在一个工作树中签出每个分支，因此在使用 Git 时，Emacs 也会提示您在新工作树中签出的分支的名称。
+
+@kindex C-x v w w
+@findex vc-switch-working-tree
+一旦您的存储库有其他工作树，您可以使用命令 @kbd{C-x v w w} (@code{vc-switch-working-tree}) 在它们之间切换。它尝试在另一个工作树下找到当前缓冲区的文件或目录的类似物。  通常，不同工作树下的工作文件集在文件内容上的差异比文件存在和不存在的差异更大。  换句话说，当前缓冲区访问的文件或目录可能也存在于其他工作树中，并且此命令允许您切换到该文件的这些版本。
+
+@kbd{C-x v w w} 也适用于 Diff 模式 (@pxref{Diff Mode}) 和日志视图模式 (@pxref{VC Change Log})。  该命令不是切换到不同的缓冲区，而是将缓冲区的默认目录更改为另一个工作树下的相应目录。  这对于由 @kbd{C-x v L} (@pxref{VC Change Log}) 等命令生成的日志视图模式缓冲区特别有用。  使用 @kbd{C-x v w w} 更改日志视图缓冲区的默认目录后，您可以将点移动到感兴趣的修订版并输入 @kbd{=} (@code{log-view-diff}) 以打开包含该修订版更改的 Diff 模式缓冲区。  然后，您可以使用标准 Diff 模式命令，例如 @w{@kbd{C-c C-a}} (@code{diff-apply-hunk}) 将块应用到其他工作树。
+
+@kindex C-x v w k
+@findex vc-kill-other-working-tree-buffers
+在文件访问缓冲区中使用@kbd{C-x v w w}后，您将有多个缓冲区访问同名文件（@pxref{Uniquify}）。您可以通过键入 @kbd{C-x v w k} (@code{vc-kill-other-working-tree-buffers}) 来终止除其中一个缓冲区之外的所有缓冲区。  此命令会终止访问其他工作树中当前缓冲区文件版本的缓冲区，从而保留当前缓冲区。  它不适用于非文件访问缓冲区。
+
+@kindex C-x v w s
+@findex vc-working-tree-switch-project
+在工作树之间切换的另一种方法是@kbd{C-x v w s} (@code{vc-working-tree-switch-project})。  这会提示您选择一个工作树，然后显示对其进行操作的命令菜单。这实际上只是 @kbd{C-x p p} (@code{project-switch-project}) (@pxref{Switching Projects})，但项目的选择仅限于其他工作树。  @kbd{C-x v w w} 和 @kbd{C-x v w s} 之间的主要区别在于，前者在另一个工作树中寻找当前缓冲区的类似物，而后者将另一个工作树视为一个整体、独立的项目。
+
+@kindex C-x v w a
+@findex vc-apply-to-other-working-tree
+命令 @kbd{C-x v w a} (@code{vc-apply-to-other-working-tree}) 提示您选择另一个工作树，然后将更改从当前工作树复制到另一个工作树。  使用前缀参数，它可以移动更改而不仅仅是复制它们。  通常该命令对当前 VC 文件集的本地（未提交）更改进行操作。  当在 Diff 模式 (@pxref{Diff Mode}) 下的缓冲区中调用时，它会对缓冲区内容指定的更改进行操作。  如果任何更改不适用于目标工作树，该命令将停止并且不执行任何操作。
+
+@kbd{C-x v w a} 对于将更改复制到临时工作树以进行测试非常有用。  将修复复制回主工作树以进行签入也很有用。例如，您可以破解临时工作树中的错误并修复它。  然后，您需要将修复复制或移回主工作树以将其签入并推送。
+
+@kindex C-x v w A
+@findex vc-apply-root-to-other-working-tree
+命令 @kbd{C-x v w A} 的工作方式类似，只是它总是将所有本地更改复制或移动到整个工作树，而不仅仅是对当前 VC 文件集的更改或 Diff 模式缓冲区内容表示的更改。  通过两个前缀参数，此命令显示要复制的更改的预览，让您可以使用标准 Diff 模式命令（如 @kbd{C-c C-a} 和 @w{@kbd{C-c <RET> a}} (@pxref{Diff Mode})）来应用它们。  （@w{@kbd{C-u C-u C-x v w A}} 大致相当于键入 @w{@kbd{C-x v D}}，然后键入 @w{@kbd{C-x v w w}}。）
+
+@kindex C-x v w x
+@kindex C-x v w R
+@findex vc-delete-working-tree
+@findex vc-move-working-tree
+命令 @kbd{C-x v w x} (@code{vc-delete-working-tree}) 和 @kbd{C-x v w R} (@code{vc-move-working-tree}) 用于在其他工作树上执行维护任务，让您删除、移动和重命名它们。  删除其他工作树特别有用，因为多个工作树的常见用途是创建存储库的一次性副本以快速测试更改，而不会干扰主工作树中可能有的任何正在进行的工作。
+
+@node Version Headers
+@subsubsection 插入版本控制标头
+
+在 Subversion、CVS、RCS 和 SCCS 上，您可以将某些名为 @dfn{version headers} 的特殊字符串放入工作文件中。  提交文件时，版本控制系统会自动将修订号、提交用户的名称以及其他相关信息放入版本标头中。
+
+@vindex vc-consult-headers
+VC 通常不使用版本标头中的信息。  作为例外，当使用 RCS 时，Emacs 使用版本标头（如果有）来确定文件版本，因为它通常比 RCS 主文件更可靠。  要禁止以这种方式使用版本标头，请将变量 @code{vc-consult-headers} 更改为 @code{nil}。  然后，VC 始终使用文件权限（如果应该信任它们），否则检查主文件。
+
+@findex vc-insert-headers
+@vindex vc-@var{backend}-header
+要将合适的标头字符串插入当前缓冲区，请使用命令@kbd{M-x vc-insert-headers}。  此命令仅适用于 Subversion、CVS、RCS 和 SCCS@. 变量 @code{vc-@var{backend}-header} 包含要插入版本标头的关键字列表；例如，CVS 使用@code{vc-cvs-header}，其默认值为@code{'("\$Id\$")} (@pxref{Keyword substitution,,,cvs,CVS--Concurrent Versions System})。  （如果使用版本控制来维护定义字符串常量的 Emacs Lisp 文件，则额外的反斜杠会阻止字符串常量被解释为标头。） @code{vc-insert-headers} 命令将列表中的每个关键字插入新行中的点，并用制表符包围，并在必要时在注释分隔符内插入。
+
+@vindex vc-static-header-alist
+变量 @code{vc-static-header-alist} 指定根据缓冲区名称添加的更多字符串。  它的值应该是 @code{(@var{regexp} . @var{format})} 形式的元素列表。  每当 2⁣ 与缓冲区名称匹配时，@var{format} 也会作为版本标头的一部分插入。  @var{format} 中的@samp{%s} 替换为文件的版本控制类型。
+
+@node Editing VC Commands
+@subsubsection 编辑 VC 命令
+
+@findex vc-edit-next-command
+@kindex C-x v !
+您可以使用 @kbd{C-x v !} (@code{vc-edit-next-command}) 前缀命令来编辑 VC 将要运行的 shell 命令行。  这主要是为了能够向 VCS 命令添加可选的命令行参数，而不会使 VC 命令集及其与后端的接口变得不必要的复杂化。
+
+例如，Git 可以生成多个分支的日志，但 @w{@kbd{C-x v b L}} (@code{vc-print-root-branch-log}) 只会提示输入一个分支的名称。  要获取多个分支的日志，您可以键入 @w{@kbd{C-x v ! C-x v b L}}，然后将其他分支的名称附加到 VC 将要运行的 @samp{git log} 命令的末尾。
+
+@node Preparing Patches
+@subsubsection 准备补丁
+
+@findex vc-prepare-patch
+在项目协作时，通常通过电子邮件发送补丁以共享更改。  您可以使用 VC 的 @code{vc-prepare-patch} 命令来完成此操作。  这将提示您输入想要共享的修订以及要使用的目标电子邮件地址。  使用 @var{crm-separator} 的值分隔修订版本，默认为逗号。  然后，该命令将使用您的 @abbr{MUA, Mail User Agent} 准备这些修订供您查看和发送。
+
+当在带有标记修订的日志视图缓冲区中交互调用时，将使用那些标记的修订。
+
+@vindex vc-prepare-patches-separately
+根据用户选项@code{vc-prepare-patches-separately}的值，@code{vc-prepare-patch}将生成一条或多条消息。  默认值 @code{t} 表示为每个修订准备并依次显示一条消息。  值 3⁣ 表示生成一条消息，其中所有补丁都附加在正文中。
+
+@vindex vc-default-patch-addressee
+如果您希望定期贡献补丁，您可以将用户选项 @code{vc-default-patch-addressee} 设置为您希望使用的地址。  调用 @code{vc-prepare-patch} 时，这将用作默认值。  项目维护者可以考虑将其设置为目录局部变量
+@iftex
+(@pxref{Directory Variables,,Per-Directory Local Variables,
+emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{Directory Variables}).
+@end ifnottex
+
+@node VC Auto-Reverting
+@subsubsection 自动恢复访问跟踪文件的缓冲区
+
+当 Emacs 执行它知道可能会更改跟踪文件内容的 VCS 操作时，它会恢复访问这些文件的缓冲区 (@pxref{Reverting})。  它以 VCS 感知方式执行此操作，即使 VCS 操作导致 VCS 关键字扩展 (@pxref{Version Headers})，仍保留点和标记的位置。
+
+@findex vc-auto-revert-mode
+此功能的一个重要限制是，当您在 Emacs 外部执行其他 VCS 操作（例如在 shell 提示符下或通过脚本）时，Emacs 不知道要恢复缓冲区。  如果您经常这样做，并且不使用带有关键字扩展的 VCS（所有现代 VCS，没有特殊配置），您可能希望通过将该变量自定义为非 1⁣ 值来启用 @code{vc-auto-revert-mode}。
+
+此模式类似于 @code{global-auto-revert-mode} (@pxref{Auto Revert})，但仅限于访问 VCS 跟踪文件的文件。  它确保 Emacs 在 VCS 操作更改其内容时始终恢复缓冲区，无论 Emacs 是否启动了这些操作。
+
+@xref{VC Mode Line}，有关访问跟踪文件的缓冲区中的自动恢复模式的详细信息（这是 @code{vc-auto-revert-mode} 启用的功能）。
+
+@node Rewinding Branches
+@subsubsection 倒带分支
+@cindex rewinding a branch (VC)
+
+@table @kbd
+@item M-x vc-delete-revisions-from-end
+从当前分支末尾删除修订。
+
+@item M-x vc-uncommit-revisions-from-end
+从当前分支末尾删除修订，而不触及工作树。
+@end table
+
+@findex vc-delete-revisions-from-end
+对于分散版本控制系统（@pxref{VCS Repositories}），这些命令提供了将当前分支移回到早期版本的方法。  @code{vc-delete-revisions-from-end} 提示进行修订，然后删除从分支末尾直到但不包括指定修订的所有修订。  我们说分支@dfn{rewound}回到指定的修订版。
+
+此命令将从工作树中删除修订版所做的更改。  因此，如果有任何未提交的更改，则必须首先将其还原 (@pxref{VC Undo})。  如有必要，此命令将提示您执行此操作。  如果您提供前缀参数，Emacs 将删除未提交的更改而不提示。
+
+@cindex uncommitting revisions
+@findex vc-uncommit-revisions-from-end
+“取消提交”修订意味着将其从修订历史记录中删除，而不从工作树中删除其更改。  就好像您已进行更改但尚未签入它们。命令 @code{vc-uncommit-revisions-from-end} 提示进行修订，然后取消提交从分支末尾到指定修订（但不包括）的所有修订。  分支将回退到指定的修订版本，但更改会保留在工作树中。
+
+回滚当前分支时，如果从修订历史记录中删除的所有修订都在您已拉取或推送的修订中，那么这些操作不会永久删除任何内容：简单的 @w{@kbd{C-x v +}} (@pxref{Pulling / Pushing}) 将恢复修订。  另一方面，如果分支末​​尾有尚未推送的新修订，那么这些命令将永久删除它们。  Emacs 尝试检测这种情况并询问您是否确定要删除它们。
+
+访问此功能的替代方法是使用 @code{log-view-uncommit-revisions-from-end} 和 @code{log-view-delete-revisions-from-end} 命令，在日志视图模式缓冲区 (@pxref{VC Change Log}) 中分别绑定到 @kbd{x} 和 @kbd{X}。与直接使用此处描述的命令相比，日志视图模式命令可以更轻松地确保您正在回退到您想要的修订版本。
+
+@node Customizing VC
+@subsection 定制VC
+
+@vindex vc-handled-backends
+变量@code{vc-handled-backends}决定VC应该处理哪个版本控制系统。  默认值为@code{(RCS CVS SVN SCCS SRC Bzr Git Hg)}，因此包含当前支持的所有版本系统。  如果您希望 VC 忽略这些系统中的一个或多个，请从列表中排除其名称。  要完全禁用 VC，请将此变量设置为@code{nil}。
+
+列表中系统的顺序很重要：当您访问在多个系统中注册的文件时，VC 默认使用 @code{vc-handled-backends} 中第一个系统。  当您第一次注册文件时，该顺序也很重要
+@iftex
+(@pxref{Registering,,,emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{Registering}).
+@end ifnottex
+
+@menu
+* General VC Options::   适用于多个后端的选项。
+* RCS and SCCS::         RCS 和 SCCS 选项。
+* CVS Options::          CVS 选项。
+@end menu
+
+@node General VC Options
+@subsubsection 一般选项
+
+@vindex vc-make-backup-files
+Emacs 通常不会为使用版本控制维护的源文件保存备份文件。  如果您甚至想为使用版本控制的文件创建备份文件，请将变量 @code{vc-make-backup-files} 设置为非 @code{nil} 值。
+
+@vindex vc-follow-symlinks
+@cindex symbolic links (and version control)
+如果您不知道基础文件是版本控制的，则通过符号链接编辑版本控制文件可能会导致意外结果。  如果您尝试访问指向版本控制文件的符号链接，变量 @code{vc-follow-symlinks} 控制 Emacs 执行的操作。  如果值为 @code{ask} （默认值），Emacs 会要求确认。  如果是@code{nil}，Emacs 只会显示一条警告消息。  如果是 @code{t}，Emacs 会自动跟踪链接并访问真实文件。
+
+@vindex vc-suppress-confirm
+如果@code{vc-suppress-confirm}是非@code{nil}，则@kbd{C-x v v}和@kbd{C-x v i}可以在不询问的情况下保存当前缓冲区，而@kbd{C-x v u}也可以在不询问确认的情况下进行操作。
+
+@vindex vc-command-messages
+VC 模式通过运行适当版本控制系统的 shell 命令来完成大部分工作。  如果 @code{vc-command-messages} 的值为 @code{log}，VC 会将消息记录到 @file{*Messages*} 缓冲区以指示它运行的 shell 命令，并在命令完成时记录其他消息。  如果变量具有任何其他非 3⁣ 值，Emacs 会记录并显示这些消息。
+
+@vindex vc-display-failed-async-commands
+VC 模式异步运行某些 shell 命令，允许您在命令完成时继续将 Emacs 用于其他目的。这主要用于访问网络的命令，例如分布式 VCS 的拉动和推送 (@pxref{Pulling / Pushing})。当命令启动时，VC 显示一个缓冲区，命令输出将写入其中。  如果@code{vc-display-failed-async-commands}非@code{nil}，VC将额外确保当命令完成运行但失败时显示该缓冲区。  这意味着您可以自由关闭显示命令缓冲区的窗口，并且知道在运行命令失败的情况下它会再次弹出。
+
+@vindex vc-async-checkin
+通常签入操作是同步完成的；也就是说，Emacs 会等到签入完成后再执行其他操作。  对于签入操作缓慢的存储库（例如签入对非常大文件的更改的 Git 存储库或具有大量文件的 Mercurial 存储库）来说，这可能会很不方便。
+
+对于支持它的后端，将 @code{vc-async-checkin} 设置为非 @code{nil} 会切换为异步执行签入操作。这作为签入操作缓慢的存储库中的目录局部变量特别有用 (@pxref{Directory Local Variables,,,elisp,GNU Emacs Lisp Reference Manual})。
+
+当异步签入操作正在进行时，如果您使用 @kbd{C-x C-s} 保存访问当前 VC 树中任何文件的缓冲区，则该操作将恢复为同步签入，并且 Emacs 会在保存缓冲区之前等待其完成。  这是为了避免关于究竟签入哪些更改的不确定性。
+
+@node RCS and SCCS
+@subsubsection RCS 和 SCCS 选项
+
+@cindex non-strict locking (RCS)
+@cindex locking, non-strict (RCS)
+默认情况下，RCS 使用锁定来协调多个用户的活动，但有一种名为 @dfn{non-strict locking} 的模式，您可以在不先锁定文件的情况下签入更改。  使用 @samp{rcs -U} 切换到特定文件的非严格锁定，有关详细信息，请参阅 @code{rcs} 手册页。
+
+在推导 RCS 文件的版本控制状态时，VC 首先在文件中查找 RCS 版本标头字符串 (@pxref{Version Headers})。  如果没有头字符串，VC通常会查看工作文件的文件权限；这很快。  但可能存在文件权限不可信的情况。  在这种情况下，必须查阅主文件，这是相当昂贵的。  此外，主文件只能告诉您 @emph{if} 文件上有任何锁定，但不能告诉您的工作文件是否确实包含该锁定版本。
+
+您可以通过将@code{vc-consult-headers}设置为@code{nil}来告诉VC不要使用版本标头来确定文件状态。  然后，VC 始终使用文件权限（如果应该信任它们），否则检查主文件。
+
+VC 确定 SCCS 下文件的版本控制状态，就像 RCS@. 一样，但它不考虑 SCCS 版本标头。  因此，变量 1⁣ 不会影响 SCCS 的使用。
+
+@node CVS Options
+@subsubsection CVS 特定选项
+
+@vindex vc-cvs-global-switches
+您可以指定附加命令行选项以传递给变量 @code{vc-cvs-global-switches} 中的所有 CVS 操作。  这些开关紧接在 @code{cvs} 命令之后、要调用的操作名称之前插入。
+
+@vindex vc-cvs-stay-local
+@cindex remote repositories (CVS)
+在远程计算机上使用 CVS 存储库时，VC 可以尝试将网络交互保持在最低限度。  这是由变量@code{vc-cvs-stay-local}控制的。  如果@code{vc-cvs-stay-local}是@code{only-file}（默认），VC仅使用本地CVS子目录中的条目和先前CVS命令返回的信息来确定每个文件的版本控制状态。  因此，如果您修改了文件并且其他人签入了其他更改，则在您尝试提交之前，您不会收到冲突通知。
+
+如果将 @code{vc-cvs-stay-local} 更改为 @code{nil}，VC 会查询远程存储库 @emph{before}，它会决定在 @code{vc-next-action} (@kbd{C-x v v}) 中执行哪些操作，就像对本地存储库所做的那样。
+
+您还可以将 @code{vc-cvs-stay-local} 设置为与存储库主机名匹配的正则表达式；然后，VC 仅针对与该模式匹配的主机中的存储库保留在本地。
+
+@cindex automatic version backups
+使用远程存储库时，Emacs 通常会生成每个编辑文件的原始版本的 @dfn{automatic version backups}。  每当您将第一个更改保存到文件时，就会创建这些本地备份，并在您将更改提交到存储库后将其删除。 （请注意，这些与普通的 Emacs 备份文件不同；
+@iftex
+@pxref{Backup,,,emacs, the Emacs Manual}.)
+@end iftex
+@ifnottex
+@pxref{Backup}.)
+@end ifnottex
+如果可能的话，像@kbd{C-x v =}和@kbd{C-x v u}这样的命令会使用自动版本备份，以避免访问网络。
+
+将 @code{vc-cvs-stay-local} 设置为 @code{nil} 将禁用自动版本备份。
+
+@cindex manual version backups
+自动版本备份的名称格式为@w{@code{@var{file}.~@var{version}.~}}。  这类似于 @kbd{C-x v ~} 保存旧版本的名称
+@iftex
+(@pxref{Old Revisions,,,emacs, the Emacs Manual}),
+@end iftex
+@ifnottex
+(@pxref{Old Revisions}),
+@end ifnottex
+除了版本后面的附加点 (@samp{.}) 之外。  相关VC命令可以使用这两种版本备份。  主要区别在于，当您提交时，@kbd{C-x v ~} 所做的手动版本备份不会自动删除。
+
+@cindex locking (CVS)
+CVS 默认情况下不使用锁定，但有一些方法可以使用其 @env{CVSREAD} 或 @dfn{watch} 功能来启用类似锁定的行为；有关详细信息，请参阅 CVS 文档。  如果是这种情况，您可以在 Emacs 中使用 @kbd{C-x v v} 来切换锁定，就像使用基于锁定的版本控制系统一样
+@iftex
+(@pxref{VC With A Locking VCS,,,emacs, the Emacs Manual}).
+@end iftex
+@ifnottex
+(@pxref{VC With A Locking VCS}).
+@end ifnottex

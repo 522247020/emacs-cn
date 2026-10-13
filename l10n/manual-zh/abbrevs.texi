@@ -1,0 +1,277 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Abbrevs
+@chapter 缩写
+@cindex abbrevs
+@cindex expansion (of abbrevs)
+
+已定义的 @dfn{abbrev} 是一个单词 @dfn{expands}（如果将其插入到其他文本中）。  缩写由用户定义以特定方式扩展。  例如，您可以将 @samp{foo} 定义为扩展到 @samp{find outer otter} 的缩写。  然后您可以通过输入 @kbd{f o o @key{SPC}} 将 @samp{find outer otter } 插入到缓冲区中。
+
+第二种缩写工具称为 @dfn{dynamic abbrev expansion}。  您可以使用动态缩写扩展和显式命令来扩展缓冲区中 point 之前的字母，方法是在缓冲区中查找以这些字母开头的其他单词。  @xref{Dynamic Abbrevs}。
+
+第三种，@dfn{hippie expansion}，概括了缩写扩展。 @xref{Hippie Expand, , Hippie Expansion, autotype, Features for Automatic Typing}。
+
+@menu
+* Abbrev Concepts::    定义缩写的基础知识。
+* Defining Abbrevs::   定义缩写，以便在键入时它会扩展。
+* Expanding Abbrevs::  控制扩展：前缀、取消扩展。
+* Abbrevs Suggestions::  获取有关已定义缩写的自动建议。
+* Editing Abbrevs::    查看或编辑已定义缩写的整个列表。
+* Saving Abbrevs::     保存整个缩写列表以供另一个会话使用。
+* Dynamic Abbrevs::    缓冲区中已有单词的缩写。
+* Dabbrev Customization::  什么是单词，动态缩写。  办案。
+@end menu
+
+@node Abbrev Concepts
+@section 缩写概念
+
+@dfn{abbrev} 是已将 @dfn{expand} 定义为指定 @dfn{expansion} 的字。  当您在缩写后面插入单词分隔符时，会扩展缩写 — 用其扩展替换缩写。  例如，如果 @samp{foo} 定义为扩展到 @samp{find outer otter} 的缩写，则输入 @kbd{f o o .} 将插入 @samp{find outer otter.}。
+
+@findex abbrev-mode
+@cindex Abbrev mode
+@cindex mode, Abbrev
+Abbrev 仅在启用 Abbrev 模式（一种缓冲区本地次要模式）时展开。  禁用缩写模式不会导致缩写定义被遗忘，但在再次启用缩写模式之前它们不会扩展。命令 @kbd{M-x abbrev-mode} 切换当前缓冲区中的 Abbrev 模式；对于数字参数，如果参数为正，则打开 Abbrev 模式，否则关闭 (@pxref{Minor Modes})。  要在所有缓冲区中默认启用 Abbrev 模式，请将变量 @code{abbrev-mode} 自定义为非 @code{nil} 值 (@pxref{Easy Customization})。
+
+缩写可以有 @dfn{mode-specific} 定义，仅在一种主要模式下有效。  缩写还可以具有在所有主要模式中都有效的 @dfn{global} 定义。  相同的缩写可以具有全局定义和针对不同主要模式的各种特定于模式的定义。  当前主模式的模式特定定义会覆盖全局定义。
+
+无论是否启用缩写模式，您都可以在编辑会话期间以交互方式定义缩写。  您还可以将缩写定义列表保存在文件中，然后可以重新加载该文件以在以后的会话中使用。
+
+@node Defining Abbrevs
+@section 定义缩写
+
+@table @kbd
+@item C-x a g
+定义一个缩写，使用 point 之前的一个或多个单词作为其扩展 (@code{add-global-abbrev})。
+
+@item C-x a l
+类似，但定义一个特定于当前主模式的缩写 (@code{add-mode-abbrev})。
+
+@item C-x a i g
+将缓冲区中的单词定义为缩写 (@code{inverse-add-global-abbrev})。
+
+@item C-x a i l
+将缓冲区中的单词定义为特定于模式的缩写 (@code{inverse-add-mode-abbrev})。
+
+@item M-x define-global-abbrev @key{RET} @var{abbrev} @key{RET} @var{exp} @key{RET}
+将@var{abbrev}定义为扩展到@var{exp}的缩写。
+
+@item M-x define-mode-abbrev @key{RET} @var{abbrev} @key{RET} @var{exp} @key{RET}
+将 @var{abbrev} 定义为扩展到 @var{exp} 的模式特定缩写。
+
+@item M-x kill-all-abbrevs
+放弃所有缩写定义，留下一张白纸。
+@end table
+
+@kindex C-x a g
+@findex add-global-abbrev
+定义缩写的常用方法是输入要缩写扩展的文本，在其后面定位点，然后输入 @kbd{C-x a g} (@code{add-global-abbrev})。  这使用迷你缓冲区读取缩写本身，然后将其定义为点之前的一个或多个单词的缩写。  使用数字参数来表示 point 之前有多少个单词应被视为扩展。  例如，要定义如上所述的缩写 @samp{foo}，请插入文本 @samp{find outer otter}，然后键入 @kbd{C-u 3 C-x a g f o o @key{RET}}。
+
+如果您使用 @code{transient-mark-mode} （这是默认值），活动区域将用作所定义缩写的扩展。  如果不是，@kbd{C-x a g} 的参数为零意味着使用该区域的内容。
+
+@kindex C-x a l
+@findex add-mode-abbrev
+命令 @kbd{C-x a l} (@code{add-mode-abbrev}) 类似，但为当前主模式定义了特定于模式的缩写。  这些参数的作用与 @kbd{C-x a g} 相同。
+
+@kindex C-x a i g
+@findex inverse-add-global-abbrev
+@kindex C-x a i l
+@findex inverse-add-mode-abbrev
+@kbd{C-x a i g} (@code{inverse-add-global-abbrev}) 和@kbd{C-x a i l} (@code{inverse-add-mode-abbrev}) 执行相反的任务：如果缩写文本已在缓冲区中，则可以使用这些命令通过指定迷你缓冲区中的扩展来定义缩写。  这些命令将扩展用于定义的缩写文本。
+
+@findex define-mode-abbrev
+@findex define-global-abbrev
+您可以使用命令 @code{define-global-abbrev} 定义缩写，而无需在缓冲区中插入缩写或其扩展。它读取两个参数——缩写及其扩展。  命令 @code{define-mode-abbrev} 对于模式特定的缩写也有同样的作用。
+
+要更改缩写的定义，只需重新定义即可。当缩写有先前定义时，缩写定义命令会在替换之前要求确认。
+
+@findex kill-all-abbrevs
+要删除缩写定义，请为缩写定义命令提供一个负参数：@kbd{C-u - C-x a g} 或 @kbd{C-u - C-x a l}。前者删除全局定义，而后者删除特定于模式的定义。  @kbd{M-x kill-all-abbrevs} 删除所有缩写定义，包括全局和本地。
+
+@node Expanding Abbrevs
+@section 控制缩写扩展
+
+启用缩写模式后，每当缩写出现在点之前的缓冲区中并且您键入自动插入的空格或标点字符（@key{SPC}、逗号等）时，缩写就会展开。  更准确地说，任何不是单词构成的字符都会扩展缩写，并且任何单词构成字符都可以是缩写的一部分。使用缩写的最常见方法是插入缩写，然后插入标点符号或空格字符来扩展它。
+
+@vindex abbrev-all-caps
+缩写扩展保留大小写：@samp{foo}扩展为@samp{find outer otter}，@samp{Foo}扩展为@samp{Find outer otter}。  默认情况下，@samp{FOO} 扩展为 @samp{Find Outer Otter}，但如果将变量 @code{abbrev-all-caps} 更改为非 @code{nil} 值，它将扩展为 @samp{FIND OUTER OTTER}。
+
+这些命令用于控制缩写扩展：
+
+@table @kbd
+@item M-'
+将前缀与后面要扩展的缩写分开 (@code{abbrev-prefix-mark})。
+
+@item C-x a e
+@findex expand-abbrev
+展开点 (@code{expand-abbrev}) 之前的缩写。即使未启用缩写模式，此功能也有效。
+
+@item M-x unexpand-abbrev
+@findex unexpand-abbrev
+撤消最后扩展的缩写的扩展。
+
+@item M-x expand-region-abbrevs
+展开在该区域中找到的部分或全部缩写。
+@end table
+
+@kindex M-'
+@findex abbrev-prefix-mark
+您可能希望扩展一个缩写并在扩展后附加一个前缀；例如，如果 @samp{cnst} 扩展为 @samp{construction}，您可能想用它来输入 @samp{reconstruction}。  输入 @kbd{recnst} 不起作用，因为它不一定是定义的缩写。  您可以做的是在前缀 @samp{re} 和缩写 @samp{cnst} 之间使用命令 @kbd{M-'} (@code{abbrev-prefix-mark})。  首先，插入@samp{re}。  然后输入@kbd{M-'}；这会在缓冲区中插入一个连字符，以表明它已完成其工作。  然后插入缩写 @samp{cnst};缓冲区现在包含@samp{re-cnst}。  现在插入一个非单词字符将缩写 @samp{cnst} 扩展为 @samp{construction}。  此扩展步骤还会删除指示已使用 @kbd{M-'} 的连字符。  结果是所需的@samp{reconstruction}。
+
+如果您实际上想要缓冲区中缩写的文本，而不是其扩展，您可以通过插入以下标点符号 @kbd{C-q} 来完成此操作。  因此，@kbd{foo C-q ,}将@samp{foo,}留在缓冲区中，而不是扩展它。
+
+如果您错误地扩展了缩写，您可以通过键入 @kbd{C-/} (@code{undo}) 来撤消扩展。  @xref{Undo}。  这将撤消缩写扩展的插入并返回缩写文本。  如果您想要的结果是终止非单词字符加上未展开的缩写，则必须重新插入终止字符，并用 @kbd{C-q} 引用它。  您还可以使用命令@kbd{M-x unexpand-abbrev}取消最后一次扩展而不删除终止字符。
+
+@findex expand-region-abbrevs
+@kbd{M-x expand-region-abbrevs} 在该区域中搜索定义的缩写，并为找到的每个缩写提供用其扩展替换它。如果您使用缩写输入文本但忘记先打开缩写模式，则此命令非常有用。  它也可能与一组特殊的缩写定义一起使用，用于一次进行多个全局替换。  即使未启用缩写模式，该命令也有效。
+
+函数@code{expand-abbrev}通过调用@code{abbrev-expand-function}指定的函数来执行扩展。  通过更改此函数，您可以对缩写扩展进行任意更改。  @xref{Abbrev Expansion,,, elisp, The Emacs Lisp Reference Manual}。
+
+@node Abbrevs Suggestions
+@section 缩写建议
+
+当您手动键入当前存在活动定义缩写的文本时，您可以获得缩写建议。  例如，如果有一个缩写 @samp{foo} 扩展为 @samp{find outer otter}，并且您手动键入 @samp{find outer otter}，Emacs 会注意到这一点，并在您停止键入时在回显区域中显示提示。
+
+@vindex abbrev-suggest
+要启用缩写建议功能，请将选项 @code{abbrev-suggest} 自定义为非 @code{nil} 值。
+
+@vindex abbrev-suggest-hint-threshold
+变量 @code{abbrev-suggest-hint-threshold} 控制何时向用户建议缩写。  该变量定义 Emacs 建议使用缩写所需的最小节省量（就用户不必键入的字符数而言）。  例如，如果用户键入@samp{foo bar}（七个字符）并且定义了缩写@samp{fubar}（五个字符），则用户将不会得到任何建议，除非将阈值设置为数字 2 或更低。使用默认值 3，用户在本例中不会得到任何建议，因为使用缩写所节省的成本低于阈值。  如果您总是想获得缩写建议，请将此变量的值设置为零。
+
+@findex abbrev-suggest-show-report
+命令 @code{abbrev-suggest-show-report} 显示一个缓冲区，其中包含当前编辑会话期间显示的所有缩写建议。如果您收到几个缩写建议但不记得全部，这可能会很有用。
+
+@node Editing Abbrevs
+@section 检查和编辑缩写
+
+@table @kbd
+@item M-x list-abbrevs
+显示所有缩写定义的列表。  使用数字参数时，仅列出本地缩写。
+
+@item M-x edit-abbrevs
+编辑缩写列表；您可以添加、更改或删除定义。
+@end table
+
+@findex list-abbrevs
+@kbd{M-x list-abbrevs} 的输出如下所示：
+
+@example
+@var{various other tables@dots{}}
+(python-mode-skeleton-abbrev-table)
+"class" (sys)	    0 "" python-skeleton-class
+(lisp-mode-abbrev-table)
+"ks"          0    "keymap-set"
+(global-abbrev-table)
+"dfn"         0    "definition"
+@end example
+
+@noindent
+（一些没有语义意义的空行和其他一些缩写表已被省略。）
+
+括号中包含名称的行是特定缩写表中缩写的标题； @code{global-abbrev-table} 包含所有全局缩写，以主要模式命名的其他缩写表包含特定于模式的缩写。
+
+在每个缩写表中，每个非空行定义一个缩写。  行首的单词是缩写。  后面的数字是缩写已扩展的次数。  Emacs 会跟踪这一点，以帮助您了解实际使用的缩写，以便您可以消除那些不经常使用的缩写。  行尾的字符串是扩展。
+
+一些缩写标有@samp{(sys)}。  这些 @dfn{system abbrevs} (@pxref{Abbrevs,,, elisp, The Emacs Lisp Reference Manual}) 是由各种模式预定义的，不会保存到您的缩写文件中。  要禁用系统缩写，请定义一个扩展为自身的同名缩写，并将其保存到缩写文件中。  系统缩写有一个关联的钩子函数，调用该函数来执行缩写扩展；该函数的名称遵循 @code{list-abbrevs} 所示的缓冲区中的缩写扩展。
+
+@findex edit-abbrevs
+@kindex C-c C-c @r{(Edit Abbrevs)}
+@kbd{M-x edit-abbrevs} 允许您通过在 Emacs 缓冲区中编辑缩写定义列表来添加、更改或删除缩写定义。  该列表具有与上述相同的格式。  缩写的缓冲区称为@file{*Abbrevs*}，并且处于编辑缩写模式。  在此缓冲区中键入 @kbd{C-c C-c} 以安装缓冲区中指定的缩写定义 — 并删除任何未列出的缩写定义。
+
+命令@code{edit-abbrevs}实际上与@code{list-abbrevs}相同，只是它选择缓冲区@file{*Abbrevs*}，而@code{list-abbrevs}仅将其显示在另一个窗口中。
+
+@node Saving Abbrevs
+@section 保存缩写
+
+这些命令允许您在编辑会话之间保留缩写定义。
+
+@table @kbd
+@item M-x write-abbrev-file @key{RET} @var{file} @key{RET}
+编写一个文件 @var{file} 描述所有已定义的缩写。
+
+@item M-x read-abbrev-file @key{RET} @var{file} @key{RET}
+读取文件 @var{file} 并定义其中指定的缩写。
+
+@item M-x define-abbrevs
+从当前缓冲区中的定义定义缩写。
+
+@item M-x insert-abbrevs
+将所有缩写及其扩展插入当前缓冲区。
+@end table
+
+@findex write-abbrev-file
+@kbd{M-x write-abbrev-file} 使用迷你缓冲区读取文件名，然后将所有当前缩写定义的描述写入该文件。  这用于保存缩写定义以供稍后会话使用。  文件中存储的文本是一系列 Lisp 表达式，这些表达式在执行时定义与您当前拥有的相同的缩写。
+
+@findex read-abbrev-file
+@findex quietly-read-abbrev-file
+@vindex abbrev-file-name
+@cindex abbrev file
+@kbd{M-x read-abbrev-file} 使用迷你缓冲区读取文件名，然后读取文件，根据文件内容定义缩写。  功能 @code{quietly-read-abbrev-file} 类似，只是它不在回显区域显示消息；您不能以交互方式调用它，它主要在您的 init 文件中使用 (@pxref{Init File})。  如果使用 @code{nil} 作为参数调用这两个函数中的任何一个，它将使用变量 @code{abbrev-file-name} 给出的文件，默认情况下为 @file{~/.emacs.d/abbrev_defs}。  这是标准缩写定义文件，Emacs 在启动时会自动从中加载缩写。  （作为例外，Emacs 在以批处理模式启动时不会加载缩写文件。@xref{Initial Options}，了解批处理模式的说明。）
+
+@vindex save-abbrevs
+如果您更改了任何缩写，无论何时，只要 Emacs 提供保存所有文件（对于 @kbd{C-x s} 或 @kbd{C-x C-c}），Emacs 都会自动保存缩写。  它将它们保存在@code{abbrev-file-name}指定的文件中。  可以通过将变量@code{save-abbrevs}设置为@code{nil}来抑制此功能；将其设置为@code{silently}将自动保存缩写，无需询问。
+
+@findex insert-abbrevs
+@findex define-abbrevs
+命令 @kbd{M-x insert-abbrevs} 和 @kbd{M-x define-abbrevs} 与前面的命令类似，但作用于 Emacs 缓冲区中的文本。 @kbd{M-x insert-abbrevs} 将文本插入到当前缓冲区中的 point 之后，描述所有当前的缩写定义； @kbd{M-x define-abbrevs} 解析整个当前缓冲区并相应地定义缩写。
+
+@node Dynamic Abbrevs
+@section 动态缩写扩展
+
+当您插入文本时，上述缩写工具会自动运行，但所有缩写都必须明确定义。  相比之下，@dfn{dynamic abbrevs}允许根据缓冲区的内容自动确定缩写词的含义，但动态缩写词扩展仅在您明确请求时才会发生。
+
+@kindex M-/
+@kindex C-M-/
+@findex dabbrev-expand
+@findex dabbrev-completion
+@table @kbd
+@item M-/
+通过搜索以该缩写 (@code{dabbrev-expand}) 开头的单词，将 point 之前的缓冲区中的单词扩展为 @dfn{dynamic abbrev}。
+
+@item C-M-/
+将 point 之前的单词作为动态缩写完成 (@code{dabbrev-completion})。
+@end table
+
+@vindex dabbrev-limit
+例如，如果缓冲区包含 @samp{does this follow } 并且您键入 @kbd{f o M-/}，则效果是插入 @samp{follow}，因为这是缓冲区中以 @samp{fo} 开头的最后一个单词。  @kbd{M-/} 的数字参数表示采用第二个、第三个等。@: 从点向后看发现的不同扩展。  重复 @kbd{M-/} 通过向后看来寻找替代扩展。  扫描完点之前的所有文本后，它会搜索点之后的文本。变量@code{dabbrev-limit}，如果不是@code{nil}，则指定在缓冲区中搜索扩展的距离。
+
+@vindex dabbrev-check-all-buffers
+@vindex dabbrev-check-other-buffers
+@vindex dabbrev-ignored-buffer-modes
+扫描当前缓冲区后，@kbd{M-/}通常会搜索其他缓冲区。  变量@code{dabbrev-check-all-buffers}和@code{dabbrev-check-other-buffers}可用于确定搜索哪些其他缓冲区（如果有）。  具有源自 @code{dabbrev-ignored-buffer-modes} 中任何模式的主要模式的缓冲区将被忽略。
+
+@vindex dabbrev-ignored-buffer-names
+@vindex dabbrev-ignored-buffer-regexps
+为了更好地控制要扫描的缓冲区，请自定义变量 @code{dabbrev-ignored-buffer-names} 和 @code{dabbrev-ignored-buffer-regexps}。  前者的值是要跳过的缓冲区名称列表。  后者的值是正则表达式列表；如果缓冲区的名称与这些正则表达式中的任何一个匹配，则动态缩写扩展会跳过该缓冲区。
+
+@kbd{M-/} 的否定参数（如 @kbd{C-u - M-/} 中所示）表示首先搜索 point 之后的扩展，然后搜索其他缓冲区，并且仅将 point 之前的扩展视为最后的手段。  如果重复 @kbd{M-/} 来查找另一个扩展，请不要指定参数。  重复 @kbd{M-/} 循环遍历 point 之后的所有扩展，然后循环遍历 point 之前的扩展。
+
+展开动态缩写后，您可以在其原始上下文中复制展开后的其他单词。  只需为要复制的每个附加单词键入 @kbd{@key{SPC} M-/} 即可。  单词之间的空格和标点符号会随单词一起复制。
+
+您可以控制@kbd{M-/}确定要扩展的单词以及如何扩展它的方式，请参阅@ref{Dabbrev Customization}。
+
+命令@kbd{C-M-/} (@code{dabbrev-completion}) 执行动态缩写的完成。  它不是一一尝试可能的扩展，而是找到所有扩展，然后插入它们共有的文本。  如果它们没有共同点，@kbd{C-M-/} 显示完成列表，您可以按照通常的方式从中选择一个选项。  @xref{Completion}。
+
+动态缩写扩展完全独立于缩写模式；具有 @kbd{M-/} 的单词的扩展完全独立于它是否具有普通缩写的定义。
+
+@node Dabbrev Customization
+@section 自定义动态缩写
+
+通常，动态缩写扩展在搜索扩展时会忽略大小写。  也就是说，扩展不必与您正在扩展的单词一致。
+
+@vindex dabbrev-case-fold-search
+此功能由变量@code{dabbrev-case-fold-search} 控制。  如果是@code{t}，则本次搜索忽略大小写；如果是@code{nil}，则单词和扩展必须大小写匹配。  如果值为 @code{case-fold-search}（默认值），则变量 @code{case-fold-search} 控制在搜索扩展时是否忽略大小写 (@pxref{Lax Search})。
+
+通常，动态缩写扩展通过将扩展转换为大小写模式来保留大小写模式 @emph{of the dynamic abbrev you are expanding}。
+
+@vindex dabbrev-case-replace
+变量 @code{dabbrev-case-replace} 控制是否保留动态缩写的大小写模式。  如果是@code{t}，则在大多数情况下会保留动态缩写的大小写模式；如果是@code{nil}，则总是逐字复制扩展。  如果值为 @code{case-replace}（默认值），则变量 @code{case-replace} 控制是否逐字复制扩展 (@pxref{Replacement and Lax Matches})。
+
+但是，如果扩展包含复杂的混合大小写模式，并且动态缩写与该模式尽可能匹配，则扩展始终会逐字复制，而不管这些变量如何。因此，例如，如果缓冲区包含 @code{variableWithSillyCasePattern}，并且您键入 @kbd{v a M-/}，它将逐字复制扩展，包括其大小写模式。
+
+@vindex dabbrev-abbrev-char-regexp
+变量@code{dabbrev-abbrev-char-regexp}（如果非@code{nil}）控制哪些字符被视为单词的一部分，以实现动态扩展目的。  正则表达式必须仅匹配一个字符，不能匹配两个或多个字符。  相同的正则表达式还确定哪些字符是扩展的一部分。  （默认）值@code{nil}具有特殊含义：动态缩写（即@:处的单词）由单词字符组成，但它们的扩展被视为单词和符号字符的序列。  这通常适用于扩展程序源中的符号以及许多语言中的人类可读文本，但可能不是您在包含不常见标点符号的文本缓冲区中想要的；在这种情况下，值 @code{"\\sw"} 可能会产生更好的结果。
+
+@vindex dabbrev-abbrev-skip-leading-regexp
+在 shell 脚本和 makefile 中，变量名有时带有 @samp{$} 前缀，有时则没有。  此类文本的主要模式可以通过设置变量@code{dabbrev-abbrev-skip-leading-regexp}来自定义动态缩写扩展以处理可选前缀。  它的值应该是一个正则表达式，与动态缩写表达式应忽略的可选前缀相匹配。  默认值为@code{nil}，这意味着不应跳过任何字符。

@@ -1,0 +1,1107 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--2026 Free Software Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Frames
+@chapter 框架和图形显示
+@cindex frames
+
+当 Emacs 在图形显示上启动时，例如在 X Window 系统上，它会占用图形系统级显示区域。  在本手册中，我们将其称为@dfn{frame}，为用于显示缓冲区的帧部分保留“窗口”一词。  一帧最初包含一个窗口，但它可以细分为多个窗口（@pxref{Windows}）。  框架通常还包含菜单栏、工具栏和回显区域。
+
+您还可以创建其他框架 (@pxref{Creating Frames})。在同一 Emacs 会话中创建的所有框架都可以访问相同的底层缓冲区和其他数据。  例如，如果一个缓冲区在多个帧中显示，则在一帧中对其所做的任何更改也会立即显示在其他帧中。
+
+键入 @kbd{C-x C-c} 将关闭当前显示器上的所有框架，如果在任何其他显示器上都没有打开的框架，则结束 Emacs 会话 (@pxref{Exiting})。  要仅关闭选定的帧，请输入 @kbd{C-x 5 0}（即零，而不是 @kbd{o}）。
+
+本章介绍特定于图形显示的 Emacs 功能（特别是鼠标命令）以及管理多个框架的功能。  在文本终端上，其中许多功能不可用。但是，仍然可以在文本终端上创建多个框架；这样的帧一次显示一个，填满整个终端屏幕 (@pxref{Text Terminals})。  也可以在某些文本终端上使用鼠标（@pxref{Text-Only Mouse}，用于在 GNU 和 Unix 系统上执行此操作；以及
+@iftex
+@pxref{MS-DOS Mouse,,,emacs-xtra,Specialized Emacs Features},
+@end iftex
+@ifnottex
+@pxref{MS-DOS Mouse},
+@end ifnottex
+用于在 MS-DOS 上执行此操作）。  所有文本终端都支持菜单。
+
+@menu
+* Mouse Commands::       使用鼠标移动、剪切和粘贴。
+* Word and Line Mouse::  用于选择整个单词或行的鼠标命令。
+* Mouse References::     使用鼠标从列表中选择一个项目。
+* Menu Mouse Clicks::    单击鼠标即可调出菜单。
+* Mode Line Mouse::      鼠标单击模式线。
+* Creating Frames::      创建具有各种内容的附加 Emacs 框架。
+* Frame Commands::       图标化、删除和切换框架。
+* Fonts::                更改框架字体。
+* Speedbar::             如何制作和使用速度栏框架。
+* Multiple Displays::    一个 Emacs 实例如何与多个显示器通信。
+* Frame Parameters::     更改框架的颜色和其他模式。
+* Scroll Bars::          如何启用和禁用滚动条；如何使用它们。
+* Window Dividers::      可以用鼠标拖动的窗口分隔符。
+* Drag and Drop::        使用拖放打开文件并插入文本。
+* Menu Bars::            启用和禁用菜单栏。
+* Tool Bars::            启用和禁用工具栏。
+* Tab Bars::             启用和禁用选项卡栏。
+* System Taskbar::       使用系统 GUI 任务栏功能。
+* Dialog Boxes::         控制对话框的使用。
+* Tooltips::             显示当前鼠标位置的信息。
+* Mouse Avoidance::      防止鼠标指针遮挡文本。
+* Text Terminals::       终端上的多个框架仅显示一个。
+* Text-Only Mouse::      在文本终端中使用鼠标。
+@end menu
+
+@node Mouse Commands
+@section 用于编辑的鼠标命令
+@cindex mouse buttons (what they do)
+@cindex mouse, selecting text using
+
+@kindex mouse-1
+@kindex mouse-2
+@kindex mouse-3
+@table @kbd
+@item mouse-1
+将点移动到单击的位置 (@code{mouse-set-point})。
+
+@item Drag-mouse-1
+通过拖动激活所选文本周围的区域，并将文本放入主选择中 (@code{mouse-set-region})。
+
+@item S-mouse-1
+调整已选择的区域。
+
+@item mouse-2
+将点移动到单击的位置，然后在其中插入主要选择的内容 (@code{mouse-yank-primary})。
+
+@item mouse-3
+如果该区域处于活动状态，则将该区域的近端移动到单击位置；否则，将mark设置为point的当前值，并将point设置为单击位置。  将生成的区域保存在 Kill Ring 中；第二次点击，杀死它（@code{mouse-save-then-kill}）。
+
+@item C-M-mouse-1
+通过拖动激活选定文本周围的矩形区域。 @xref{Rectangles}。
+@end table
+
+@findex mouse-set-point
+最基本的鼠标命令是 @code{mouse-set-point}，通过在窗口的文本区域中单击鼠标左键 @kbd{mouse-1} 来调用。  这会将点移动到您单击的位置。  如果该窗口不是选定的窗口，它将成为选定的窗口。  您还可以通过双击 @kbd{mouse-1} (@pxref{Word and Line Mouse}) 来激活区域。
+
+@vindex x-mouse-click-focus-ignore-position
+通常，如果您单击的帧不是选定的帧，除了选择窗口和设置光标之外，还会将其设为选定的帧。  在 X Window 系统上，您可以通过将变量 @code{x-mouse-click-focus-ignore-position} 设置为 @code{t} 来更改此设置。  在这种情况下，首次单击未选择的框架只会选择该框架，而不执行任何其他操作；再次单击将选择窗口并设置光标位置。
+
+@cindex mouse, dragging
+@findex mouse-set-region
+按住 @kbd{mouse-1} 并将鼠标拖动到一段文本上会激活该文本周围的区域 (@code{mouse-set-region})，将标记放置在您开始按住鼠标按钮的位置，然后指向您释放鼠标按钮的位置 (@pxref{Mark})。此外，该区域中的文本成为主要选择 (@pxref{Primary Selection})。
+
+@vindex mouse-drag-copy-region
+如果将变量 @code{mouse-drag-copy-region} 更改为非 @code{nil} 值，则将鼠标拖动到一段文本上也会将文本添加到终止环中。  默认值为@code{nil}。
+
+如果此变量为@code{non-empty}，则仅在该区域非空时才复制到 Kill Ring。  例如，如果您用鼠标拖动小于半个字符的区域，通常会在删除环中得到空字符串，但是使用@code{non-empty}，这种短距离的鼠标拖动不会影响删除环。
+
+@findex mouse-shift-adjust-mode
+如果激活“鼠标-Shift-调整”次要模式，则使用 @kbd{Shift} 修饰符 (@kbd{S-down-mouse-1}) 单击鼠标左键可调整（扩展或缩小，具体取决于单击的位置）已选定的区域。
+
+@vindex mouse-scroll-min-lines
+如果您在拖动时将鼠标移离窗口的顶部或底部，窗口会以稳定的速度滚动，直到您将鼠标移回到窗口中。  这样，您就可以选择不完全适合屏幕的区域。  每一步滚动的行数取决于鼠标离开窗口边缘的距离；变量@code{mouse-scroll-min-lines}指定最小步长。
+
+@vindex mouse-drag-mode-line-buffer
+如果启用选项 @code{mouse-drag-mode-line-buffer} 并且窗口系统支持拖动文件，则在模式行的缓冲区名称部分上拖动鼠标会将该缓冲区的文件拖动到另一个程序或框架。
+
+@findex mouse-yank-primary
+@findex mouse-yank-at-click
+单击鼠标中键 @kbd{mouse-2}，将点移动到单击的位置并插入主选择内容 (@code{mouse-yank-primary})。  @xref{Primary Selection}。此行为与其他 X 应用程序一致。  或者，您可以将 @kbd{mouse-2} 重新绑定到 @code{mouse-yank-at-click}，这会在您单击的位置执行拉动。
+
+@vindex mouse-yank-at-point
+如果将变量 @code{mouse-yank-at-point} 更改为非 @code{nil} 值，@kbd{mouse-2} 不会移动点；它会在该点插入文本，无论您单击何处，甚至单击框架的哪个窗口。  该变量同时影响 @code{mouse-yank-primary} 和 @code{mouse-yank-at-click}。
+
+@findex mouse-save-then-kill
+单击鼠标右键@kbd{mouse-3}，运行命令@code{mouse-save-then-kill}。  这将根据您单击的位置和区域的状态执行多项操作：
+
+@itemize @bullet
+@item
+如果没有区域处于活动状态，则单击 @kbd{mouse-3} 会激活该区域，将标记放置在点所在位置，并将点放置在单击的位置。
+
+@item
+如果某个区域处于活动状态，单击 @kbd{mouse-3} 可以通过将其移动到单击的位置来调整该区域的近端。  调整后的区域文本被复制到killring；如果原始区域中的文本已经在杀戮环上，它将在那里替换它。
+
+@item
+如果您最初使用双倍或三倍 @kbd{mouse-1} 指定区域，以便将该区域定义为由整个单词或行 (@pxref{Word and Line Mouse}) 组成，则使用 @kbd{mouse-3} 调整区域也会按整个单词或行进行。
+
+@item
+如果您在同一位置连续第二次使用@kbd{mouse-3}，则会杀死已选择的区域。  因此，用鼠标删除文本的最简单方法是在一端单击 @kbd{mouse-1}，然后在另一端单击 @kbd{mouse-3} 两次。  要将文本复制到 Kill Ring 中而不将其从缓冲区中删除，只需按 @kbd{mouse-3} 一次，或者只需使用 @kbd{mouse-1} 拖动文本即可。  然后你可以通过拉动它来将其复制到其他地方。
+@end itemize
+
+@code{mouse-save-then-kill} 命令还遵循变量 @code{mouse-drag-copy-region}（如上所述）。  如果该值为非@code{nil}，则每当命令设置或调整活动区域时，该区域中的文本也会添加到 Kill Ring 中。  如果以相同方式添加了最新的终止环条目，则该条目将被替换，而不是创建新条目。
+
+每当您使用上述任何鼠标命令设置区域时，除了停用标记的常用方法之外，任何后续未移动的光标运动命令都会停用该标记。  @xref{Shift Selection}。
+
+@cindex mouse wheel
+@findex mouse-wheel-mode
+@cindex Mouse Wheel minor mode
+@cindex mode, Mouse Wheel
+@vindex mouse-wheel-follow-mouse
+@vindex mouse-wheel-scroll-amount
+@vindex mouse-wheel-progressive-speed
+@cindex wheel-up, a mouse event
+@cindex wheel-down, a mouse event
+@cindex wheel-left, a mouse event
+@cindex wheel-right, a mouse event
+有些鼠标有一个可用于滚动的“轮子”。  默认情况下，在大多数图形显示器上，Emacs 支持使用鼠标滚轮滚动窗口。  要切换此功能，请使用@kbd{M-x mouse-wheel-mode}。  变量 @code{mouse-wheel-follow-mouse} 和 @code{mouse-wheel-scroll-amount} 确定缓冲区滚动的位置和滚动量。  变量 @code{mouse-wheel-progressive-speed} 确定滚动速度是否与您移动滚轮的速度相关。  此模式还支持增加或减小字体大小，默认情况下绑定到使用 @key{Ctrl} 修饰符滚动。  启用此模式后，鼠标滚轮会产生特殊事件，例如 @code{wheel-up} 和 @code{wheel-down}。  （一些较旧的系统将它们报告为 @code{mouse-4} 和 @code{mouse-5}。）如果鼠标有水平滚轮，它也会生成 @code{wheel-left} 和 @code{wheel-right} 事件。
+
+@vindex mouse-wheel-scroll-amount-horizontal
+Emacs 还支持使用 @key{Shift} 修饰符进行水平滚动。  在开始水平滚动之前键入数字前缀 arg（例如 @kbd{M-5}）会更改由用户选项 @code{mouse-wheel-scroll-amount-horizontal} 定义的步长值。
+
+@vindex mouse-wheel-tilt-scroll
+@vindex mouse-wheel-flip-direction
+如果您的鼠标滚轮可以倾斜，或者您的触摸板支持，那么您还可以通过将变量 @code{mouse-wheel-tilt-scroll} 自定义为非 @code{nil} 值来启用水平滚动。默认情况下，倾斜鼠标滚轮会沿倾斜方向水平滚动窗口视图：例如，向右倾斜会将窗口向右滚动，从而使窗口中显示的文本水平向左移动。  如果您想反转水平滚动的方向，请将变量 @code{mouse-wheel-flip-direction} 自定义为非 @code{nil} 值。
+
+当鼠标指针位于图像模式 @pxref{Image Mode} 下的图像上时，使用 @key{Ctrl} 修饰符滚动鼠标滚轮可缩放鼠标指针下的图像，使用 @key{Shift} 修饰符滚动鼠标滚轮可水平滚动图像。
+
+
+@node Word and Line Mouse
+@section 单词和线条的鼠标命令
+
+@kbd{mouse-1} 的这些变体一次选择整个单词或行。  Emacs 激活所选文本周围的区域，该区域也被复制到终止环。
+
+@table @kbd
+@item Double-mouse-1
+选择您单击的单词或字符周围的文本。
+
+双击具有符号语法（例如 C 模式下的下划线）的字符可以选择该字符周围的符号。双击具有左括号或右括号语法的字符可以选择该字符开始或结束的括号分组。  双击带有字符串分隔符语法的字符（例如 C 中的单引号或双引号）可以选择字符串常量（Emacs 使用启发式方法来确定该字符是它的开头还是结尾）。
+
+双击括号分组的开头或开始字符串分隔符会将 point 移动到区域的末尾，如果需要，则向前滚动缓冲区显示以显示 point 的新位置。  默认情况下，双击括号分组的末尾或结束字符串分隔符会将点保留在区域的末尾，因此如果区域的开头位于窗口顶部上方，则该区域的开头将不可见；将用户选项 @code{mouse-select-region-move-to-beginning} 设置为非 @code{nil} 会更改此设置以将点移动到区域的开头，并在必要时向后滚动显示。
+
+@item Double-Drag-mouse-1
+选择您拖过的文本（以整个单词为单位）。
+
+@item Triple-mouse-1
+选择您单击的行。
+
+@item Triple-Drag-mouse-1
+选择您拖动的文本（以整行为单位）。
+@end table
+
+@node Mouse References
+@section 用鼠标跟踪参考文献
+@kindex mouse-1 @r{(on buttons)}
+@kindex mouse-2 @r{(on buttons)}
+@cindex hyperlinks
+@cindex links
+@cindex text buttons
+@cindex buttons
+
+@vindex mouse-highlight
+一些 Emacs 缓冲区包括 @dfn{buttons} 或 @dfn{hyperlinks}：激活时（例如，通过单击它们）执行某些操作（例如，遵循引用）的文本片段。  通常，按钮的文本在视觉上突出显示：带有下划线，或者在其周围绘制一个框。  如果将鼠标移到按钮上，鼠标光标的形状会发生变化并且按钮会亮起。  如果将变量 @code{mouse-highlight} 更改为 @code{nil}，Emacs 将禁用此突出显示。
+
+您可以通过将指针移至按钮并键入 @key{RET} 或单击按钮上的 @kbd{mouse-1} 或 @kbd{mouse-2} 来激活按钮。  例如，在 Dired 缓冲区中，每个文件名都是一个按钮；激活它会导致 Emacs 访问该文件 (@pxref{Dired})。  在 @file{*Compilation*} 缓冲区中，每个错误消息都是一个按钮，激活它会访问该错误的源代码 (@pxref{Compilation})。
+
+虽然单击按钮上的 @kbd{mouse-1} 通常会激活该按钮，但如果您在释放鼠标按钮之前按住鼠标按钮一段时间（具体来说，超过 450 毫秒），则 Emacs 会将点移动到您单击的位置，而不激活该按钮。通过这种方式，您可以使用鼠标将点移动到按钮上，而无需激活它。  将鼠标拖动到按钮上或按钮上具有设置区域的通常行为，并且不会激活按钮。
+
+@vindex mouse-1-click-follows-link
+您可以通过自定义变量 @code{mouse-1-click-follows-link} 来更改 @kbd{mouse-1} 应用于按钮的方式。  如果该值为正整数，则确定需要按住鼠标按钮多长时间（以毫秒为单位）才能取消按钮激活；默认值为 450，如上一段所述。  如果值为 @code{nil}，则 @kbd{mouse-1} 仅设置您单击的位置，而不激活按钮。  如果值为@code{double}，双击激活按钮，但单击仅设置点。
+
+@vindex mouse-1-click-in-non-selected-windows
+通常，即使按钮位于未选定的窗口中，按钮上的 @kbd{mouse-1} 也会激活该按钮。  如果将变量 @code{mouse-1-click-in-non-selected-windows} 更改为 @code{nil}，则未选定窗口中按钮上的 @kbd{mouse-1} 会将点移动到单击的位置并选择该窗口，而不激活该按钮。
+
+@node Menu Mouse Clicks
+@section 鼠标点击菜单
+
+使用 @key{Ctrl} 和 @key{SHIFT} 修饰符单击几次鼠标会弹出菜单。
+
+@table @kbd
+@item C-mouse-1
+@kindex C-mouse-1
+该菜单用于选择缓冲区。
+
+MSB（“鼠标选择缓冲区”）全局次要模式使该菜单更智能且更可定制。  @xref{Buffer Menus}。
+
+@item C-mouse-2
+@kindex C-mouse-2
+该菜单包含用于检查面孔和其他文本属性以及设置它们的条目（后者主要在编辑丰富文本时有用；@pxref{Enriched Text}）。
+
+@item C-mouse-3
+@kindex C-mouse-3
+该菜单是特定于模式的。  对于大多数模式，如果菜单栏模式打开，则此菜单具有与所有特定于模式的菜单栏菜单放在一起的相同项目。  某些模式可能会为此按钮指定不同的菜单。  如果菜单栏模式关闭，则此菜单包含菜单栏中出现的所有项目（而不仅仅是特定于模式的项目），以便您无需显示菜单栏即可访问它们。
+
+@item S-mouse-1
+此菜单用于更改窗口缓冲区内的默认面。 @xref{Text Scale}。
+@end table
+
+@cindex context menu
+@findex context-menu-mode
+@vindex context-menu-functions
+@kindex Down-mouse-3
+@kindex S-F10
+许多 GUI 应用程序使用 @kbd{mouse-3} 显示 @dfn{context menus}：提供对鼠标单击位置和上下文的各种相关设置和操作的访问的菜单。  如果您在 Emacs 中更喜欢此功能，而不是绑定到 @code{mouse-save-then-kill} 命令 (@pxref{Mouse Commands}) 的默认函数 @kbd{mouse-3}，则可以启用次要模式 @code{context-menu-mode}。然后，当您单击 @kbd{mouse-3} 时，Emacs 将显示上下文菜单。  这些上下文菜单的具体内容取决于当前的主模式以及单击鼠标位置周围的缓冲区内容。  要自定义上下文菜单的内容，您可以使用变量@code{context-menu-functions} (@pxref{Major Mode Conventions,,, elisp, The Emacs Lisp Reference Manual})。您还可以通过按 @kbd{S-@key{F10}} 调用上下文菜单。
+
+@node Mode Line Mouse
+@section 模式行鼠标命令
+@cindex mode line, mouse
+@cindex mouse on mode line
+
+您可以使用鼠标单击窗口模式线来选择和操作窗口。
+
+模式行的某些区域（例如缓冲区名称以及主要和次要模式名称）有自己特殊的鼠标绑定。  当您将鼠标悬停在这些区域上时，这些区域会突出显示，并且将显示有关特殊绑定的信息 (@pxref{Tooltips})。  本节的命令不适用于这些区域。
+
+@table @kbd
+@item mouse-1
+@kindex mouse-1 @r{(mode line)}
+模式行上的@kbd{mouse-1} 选择它所属的窗口。  通过拖动模式线上的@kbd{mouse-1}，您可以移动它，从而改变上方和下方窗口的高度。  以这种方式用鼠标更改高度永远不会删除窗口，它只是拒绝使任何窗口小于最小高度。
+
+@item mouse-2
+@kindex mouse-2 @r{(mode line)}
+模式行上的 @kbd{mouse-2} 会扩展该窗口以填充其框架。
+
+@item mouse-3
+@kindex mouse-3 @r{(mode line)}
+模式行上的@kbd{mouse-3}删除它所属的窗口。  如果框架只有一个窗口，则它不会执行任何操作。
+
+@item C-mouse-2
+模式线上的 @kbd{C-mouse-2} 会分割该窗口，生成两个并排的窗口，其边界穿过单击位置 (@pxref{Split Window})。
+@end table
+
+@kindex mouse-1 @r{(scroll bar)}
+此外，通过单击并拖动两条并排模式线之间的分隔线上的@kbd{mouse-1}，您可以将垂直边界向左或向右移动。
+
+请注意，调整窗口大小受@code{window-resize-pixelwise}值的影响，请参阅@ref{Split Window}。
+
+@node Creating Frames
+@section 创建框架
+@cindex creating frames
+
+@kindex C-x 5
+前缀键 @kbd{C-x 5} 类似于 @kbd{C-x 4}。  每个 @kbd{C-x 4} 命令都会在所选帧 (@pxref{Pop Up Window}) 的不同窗口中弹出缓冲区，而 @kbd{C-x 5} 命令则使用不同的帧。  如果现有的可见或图标化（又名@:“最小化”，@pxref{Visibility of Frames,,, elisp, The Emacs Lisp Reference Manual}）帧已经显示请求的缓冲区，则该帧将被提升并取消图标化（“非最小化”）；否则，在当前显示终端上创建一个新的帧。
+
+各种 @kbd{C-x 5} 命令的不同之处在于它们如何查找或创建要选择的缓冲区：
+
+@table @kbd
+@kindex C-x 5 2
+@findex make-frame-command
+@item C-x 5 2
+使用默认框架参数 (@code{make-frame-command}) 创建一个新框架。
+
+@kindex C-x 5 c
+@findex clone-frame
+@item C-x 5 c
+使用当前帧的窗口配置和帧参数创建一个新帧 (@code{clone-frame})。
+
+@item C-x 5 b @var{bufname} @key{RET}
+在另一个帧中选择缓冲区@var{bufname}。  这运行@code{switch-to-buffer-other-frame}。
+
+@item C-x 5 f @var{filename} @key{RET}
+访问文件@var{filename}并在另一帧中选择其缓冲区。  这运行@code{find-file-other-frame}。  @xref{Visiting}。
+
+@item C-x 5 d @var{directory} @key{RET}
+在另一个帧中为目录@var{directory}选择一个 Dired 缓冲区。这运行@code{dired-other-frame}。  @xref{Dired}。
+
+@item C-x 5 m
+开始在另一个框架中撰写邮件消息。  这运行@code{compose-mail-other-frame}。  它是 @kbd{C-x m} 的其他框架变体。  @xref{Sending Mail}。
+
+@item C-x 5 .
+在另一个框架中查找标识符的定义。  这将运行@code{xref-find-definitions-other-frame}，即@kbd{M-.}的多帧变体。  @xref{Xref}。
+
+@kindex C-x 5 r
+@findex find-file-read-only-other-frame
+@item C-x 5 r @var{filename} @key{RET}
+以只读方式访问文件@var{filename}，并在另一帧中选择其缓冲区。  这运行@code{find-file-read-only-other-frame}。 @xref{Visiting}。
+
+@kindex C-x 5 5
+@findex other-frame-prefix
+@item C-x 5 5
+更通用的前缀命令，影响在此前缀命令 (@code{other-frame-prefix}) 之后调用的后续命令显示的缓冲区。  它请求通过后续命令显示缓冲区以在另一帧中显示。
+@end table
+
+您可以通过指定 @dfn{frame parameters} 来控制新创建的框架的外观和行为。  @xref{Frame Parameters}。
+
+@node Frame Commands
+@section 帧命令
+
+以下命令用于删除和操作帧：
+
+@table @kbd
+@kindex C-x 5 0
+@findex delete-frame
+@item C-x 5 0
+删除选定的帧 (@code{delete-frame})。  如果只有一帧，则会发出错误信号。
+
+@kindex C-x 5 u
+@findex undelete-frame
+@findex undelete-frame-mode
+@item C-x 5 u
+启用 @code{undelete-frame-mode} 后，取消删除最近删除的 16 个帧之一。  如果没有前缀参数，则取消删除最近删除的帧。  使用 1 到 16 之间的数字前缀参数（其中 1 是最近删除的帧），取消删除相应的已删除帧。
+
+@kindex C-z @r{(X windows)}
+@item C-z
+最小化（或图标化）选定的 Emacs 框架 (@code{suspend-frame})。  @xref{Exiting}。
+
+@kindex C-x 5 o
+@findex other-frame
+@item C-x 5 o
+选择另一个框架并将其抬起。  如果重复此命令，它将循环显示终端上的所有帧。
+
+@kindex C-x 5 1
+@findex delete-other-frames
+@item C-x 5 1
+删除当前终端上除所选帧之外的所有帧。
+
+@kindex M-F10
+@findex toggle-frame-maximized
+@item M-@key{F10}
+切换当前帧的最大化状态。  当框架最大化时，它会填满屏幕。
+
+@kindex F11
+@findex toggle-frame-fullscreen
+@vindex alter-fullscreen-frames
+@cindex resizing full-screen frames
+@item @key{F11}
+切换当前帧的全屏模式。  （全屏和最大化之间的区别通常是前者隐藏了窗口管理器装饰，为 Emacs 本身提供了更多的屏幕空间。）请注意，是否允许调整全屏框架的大小以及 Emacs 如何处理它是由用户选项 @code{alter-fullscreen-frames} 控制的。
+@end table
+
+@vindex frame-resize-pixelwise
+请注意，对于某些窗口管理器，您可能必须将变量 @code{frame-resize-pixelwise} 自定义为非 @code{nil} 值，以使框架真正最大化或全屏。  当此变量设置为非 2⁣ 值时，通常允许以像素分辨率调整帧大小，而不是行和列的整数倍。
+
+@kbd{C-x 5 0} (@code{delete-frame}) 命令删除选定的帧。  但是，它会拒绝删除 Emacs 会话中的最后一帧，以防止您失去与 Emacs 会话交互的能力。  请注意，当 Emacs 作为守护进程 (@pxref{Emacs Server}) 运行时，在所有普通的交互式框架被删除后，始终会保留一个虚拟框架。  这种情况下，@kbd{C-x 5 0}可以删除最后一个交互帧；您可以使用 @command{emacsclient} 重新连接到 Emacs 会话。
+
+@kbd{C-x 5 1} (@code{delete-other-frames}) 命令删除当前终端上的所有其他框架（该终端指的是图形显示或文本终端；@pxref{Text Terminals}）。如果 Emacs 会话在其他图形显示器或文本终端上打开了框架，则不会删除这些框架。
+
+@vindex focus-follows-mouse
+@kbd{C-x 5 o} (@code{other-frame}) 命令选择当前终端上的下一帧。  如果您在 X Window 系统上使用 Emacs，并且窗口管理器选择（或 2⁣）鼠标光标所在的任何帧，则必须将变量 @code{focus-follows-mouse} 更改为 @code{t} 才能使该命令正常工作。  然后调用 @kbd{C-x 5 o} 也会将鼠标光标扭曲到所选帧。
+
+@node Fonts
+@section 字体
+@cindex fonts
+
+默认情况下，Emacs 使用 10 点等宽字体在图形显示器上显示文本，并且可以交互更改字体大小 (@pxref{Text Scale})。
+
+有几种不同的方法可以指定不同的字体：
+
+@itemize
+@item
+单击 @samp{Options} 菜单中的 @samp{Set Default Font}。  这使得所选字体成为所有现有图形框架上的默认字体。要保存此内容以供将来使用，请单击 @samp{Options} 菜单中的 @samp{Save Options}。
+
+@item
+在初始化文件中添加一行，修改变量 @code{default-frame-alist} 以指定 @code{font} 参数 (@pxref{Frame Parameters})，如下所示：
+
+@example
+(add-to-list 'default-frame-alist
+             '(font . "DejaVu Sans Mono-10"))
+@end example
+
+@noindent
+这使得该字体成为使用该 init 文件重新启动 Emacs 后创建的所有图形框架上的默认字体。
+
+@cindex X defaults file
+@cindex X resources file
+@item
+将 @samp{emacs.font} X 资源设置添加到您的 X 资源文件中，如下所示：
+
+@example
+emacs.font: DejaVu Sans Mono-12
+@end example
+
+@noindent
+您必须重新启动X，或使用@command{xrdb}命令，X资源文件才能生效。  @xref{Resources}。  不要在 X 资源文件中引用字体名称。
+
+@item
+如果您在 GNOME 桌面或 Haiku 上运行 Emacs，您可以通过将变量 @code{font-use-system-font} 设置为 @code{t}（默认值为 @code{nil}）来告诉 Emacs 调整框架的默认字体以及对默认系统字体的更改。为此，Emacs 必须在编译时支持 Gsettings（或旧版 Gconf）。  （具体来说，使用的 Gsettings 配置名称是@samp{org.gnome.desktop.interface monospace-font-name}和@samp{org.gnome.desktop.interface font-name}。）
+
+@item
+使用命令行选项 @samp{-fn}（或 @samp{--font}）。  @xref{Font X}。
+@end itemize
+
+要检查您当前使用的字体，@kbd{C-u C-x =} 命令可能会有所帮助。  它描述了该点的字符，并命名了它所呈现的字体。
+
+@cindex fontconfig
+有四种不同的方式来表达字体名称。  第一种是使用@dfn{Fontconfig pattern}。  Fontconfig 模式具有以下形式：
+
+@example
+@var{fontname}[-@var{fontsize}][:@var{name1}=@var{values1}][:@var{name2}=@var{values2}]...
+@end example
+
+@noindent
+在此格式中，括号中的任何元素都可以省略。这里，@var{fontname}为字体的@dfn{family name}，如@samp{Monospace}或@samp{DejaVu Sans Mono}； @var{fontsize} 是字体的 @dfn{point size}（一个 @dfn{printer's point} 约为 1/72 英寸）； @samp{@var{name}=@var{values}} 条目指定字体的倾斜度和粗细等设置。  每个 8 可以是单个值，也可以是用逗号分隔的值列表。  此外，某些属性值仅对一种属性名称有效，在这种情况下，可以省略 @samp{@var{name}=} 部分。
+
+以下是常见字体属性的列表：
+
+@table @samp
+@item slant
+@samp{italic}、@samp{oblique} 或 @samp{roman} 之一。
+
+@item weight
+@samp{light}、@samp{medium}、@samp{demibold}、@samp{bold} 或 @samp{black} 之一。
+
+@item style
+某些字体定义了特殊样式，它们是倾斜和粗细的组合。  例如，@samp{Dejavu Sans}定义了@samp{book}样式，它会覆盖倾斜和粗细属性。
+
+@item width
+@samp{condensed}、@samp{normal} 或 @samp{expanded} 之一。
+
+@item spacing
+@samp{monospace}、@samp{proportional}、@samp{dual-width} 或 @samp{charcell} 之一。
+@end table
+
+@noindent
+以下是 Fontconfig 模式的一些示例：
+
+@example
+Monospace
+Monospace-12
+Monospace-12:bold
+DejaVu Sans Mono:bold:italic
+Monospace-12:weight=bold:slant=italic
+@end example
+
+有关 Fontconfig 模式的更详细描述，请参阅 Fontconfig 手册，该手册随 Fontconfig 一起分发，并可在 @url{https://fontconfig.org/fontconfig-user.html} 在线获取。
+
+在 MS-Windows 上，所有字体仅支持 @var{fontname}[-@var{fontsize}] 形式的子集；完整的 Fontconfig 模式可能不适用于所有这些。
+
+@cindex GTK font pattern
+指定字体的第二种方法是使用 @dfn{GTK font pattern}。这些有语法
+
+@example
+@var{fontname} [@var{properties}] [@var{fontsize}]
+@end example
+
+@noindent
+其中 @var{fontname} 是姓氏，@var{properties} 是由空格分隔的属性值列表，@var{fontsize} 是磅值。  您可以为 GTK 字体模式指定的属性如下：
+
+@itemize
+@item
+倾斜属性：@samp{Italic} 或@samp{Oblique}。  如果省略，则暗示默认（罗马）倾斜。
+@item
+权重属性：@samp{Bold}、@samp{Book}、@samp{Light}、@samp{Medium}、@samp{Semi-bold} 或 @samp{Ultra-light}。  如果省略，则隐含 @samp{Medium} 重量。
+@item
+宽度属性：@samp{Semi-Condensed} 或 @samp{Condensed}。  如果省略，则使用默认宽度。
+@end itemize
+
+@noindent
+以下是 GTK 字体模式的一些示例：
+
+@example
+Monospace 12
+Monospace Bold Italic 12
+@end example
+
+在 MS-Windows 上，仅支持子集 @var{fontname}。
+
+@cindex XLFD
+@cindex X Logical Font Description
+指定字体的第三种方法是使用 @dfn{XLFD} (@dfn{X Logical Font Description})。  这是 X 下指定字体的传统方法，MS-Windows 也支持。  每个 XLFD 由 14 个单词或数字组成，用破折号分隔，如下所示：
+
+@example
+-misc-fixed-medium-r-semicondensed--13-*-*-*-c-60-iso8859-1
+@end example
+
+@noindent
+XLFD 中的通配符 (@samp{*}) 匹配任何字符序列（包括无），@samp{?} 匹配任何单个字符。  但是，匹配取决于实现，并且当通配符与长名称中的破折号匹配时可能不准确。  为了获得可靠的结果，请提供全部 14 个破折号并仅在字段内使用通配符。 XLFD@. 中大小写无关紧要 XLFD 的语法如下：
+
+@example
+-@var{maker}-@var{family}-@var{weight}-@var{slant}-@var{widthtype}-@var{style}@dots{}
+@dots{}-@var{pixels}-@var{height}-@var{horiz}-@var{vert}-@var{spacing}-@var{width}-@var{registry}-@var{encoding}
+@end example
+
+@noindent
+这些条目具有以下含义：
+
+@table @var
+@item maker
+字体制造商的名称。
+@item family
+字体系列的名称（例如，@samp{courier}）。
+@item weight
+字体粗细——通常为 @samp{bold}、@samp{medium} 或 @samp{light}。  某些字体名称支持其他值。
+@item slant
+字体倾斜——通常为@samp{r}（罗马字体）、@samp{i}（斜体）、@samp{o}（斜体）、@samp{ri}（反斜体）或@samp{ot}（其他）。某些字体名称支持其他值。
+@item widthtype
+字体宽度——通常为 @samp{normal}、@samp{condensed}、@samp{semicondensed} 或 @samp{extended}。  某些字体名称支持其他值。
+@item style
+可选的附加样式名称。  通常它是空的——大多数 XLFD 此时都有两个连续的连字符。  样式名称还可以指定两个字母的 ISO-639 语言名称，例如 @samp{ja} 或 @samp{ko}；一些支持 CJK 脚本的字体在样式名称部分中有拼写。
+@item pixels
+字体高度，以像素为单位。
+@item height
+屏幕上的字体高度，以打印机点的十分之一为单位测量。  这是字体的磅值乘以十。  对于给定的垂直分辨率，@var{height} 和 @var{pixels} 成正比；因此，通常只指定其中一个，而使用 @samp{*} 来指定另一个。
+@item horiz
+字体所针对的屏幕的水平分辨率（以每英寸像素为单位）。
+@item vert
+字体所针对的屏幕的垂直分辨率（以每英寸像素为单位）。  通常，系统上字体的分辨率是适合您屏幕的值；因此，您通常为此指定 @samp{*} 和 @var{horiz}。
+@item spacing
+这是@samp{m}（等宽）、@samp{p}（比例）或@samp{c}（字符单元格）。
+@item width
+平均字符宽度（以像素为单位）乘以十。
+@item registry
+@itemx encoding
+字体描述的 X 字体字符集。  （X 字体字符集与 Emacs 字符集不同，但它们很相似。）您可以使用 @command{xfontsel} 程序来检查您有哪些选择。  通常，您应该使用 @samp{iso8859} 代替 @var{registry}，使用 @samp{1} 代替 @var{encoding}。
+@end table
+
+指定字体的第四种也是最后一种方法是使用字体昵称。  某些字体具有较短的昵称，您可以使用它们来代替正常的字体规范。  例如，@samp{6x13} 相当于
+
+@example
+-misc-fixed-medium-r-semicondensed--13-*-*-*-c-60-iso8859-1
+@end example
+
+MS-Windows 不支持此形式。
+
+@cindex client-side fonts
+@cindex server-side fonts
+在 X 上，Emacs 识别两种类型的字体：@dfn{client-side} 字体（由 Xft 和 Fontconfig 库提供）和 @dfn{server-side} 字体（由 X 服务器本身提供）。大多数客户端字体支持高级字体功能，例如抗锯齿和子像素提示，而服务器端字体则不支持。 Fontconfig 和 GTK 模式仅匹配客户端字体。
+
+@cindex listing system fonts
+您可能想要使用固定宽度的默认字体，即所有字符都具有相同宽度的字体。  对于 Xft 和 Fontconfig 字体，您可以使用 @command{fc-list} 命令列出可用的固定宽度字体，如下所示：
+
+@example
+fc-list :spacing=mono
+fc-list :spacing=charcell
+@end example
+
+@noindent
+对于服务器端 X 字体，您可以使用 @command{xlsfonts} 程序列出可用的固定宽度字体，如下所示：
+
+@example
+xlsfonts -fn '*x*' | grep -E '^[0-9]+x[0-9]+'
+xlsfonts -fn '*-*-*-*-*-*-*-*-*-*-*-m*'
+xlsfonts -fn '*-*-*-*-*-*-*-*-*-*-*-c*'
+@end example
+
+@noindent
+XLFD 的 @var{spacing} 字段中带有 @samp{m} 或 @samp{c} 的任何字体都是固定宽度字体。  要查看特定字体的外观，请使用 @command{xfd} 命令。  例如：
+
+@example
+xfd -fn 6x13
+@end example
+
+@noindent
+显示整个字体@samp{6x13}。
+
+运行 Emacs 时，您还可以设置特定类型文本的字体 (@pxref{Faces}) 或特定框架 (@pxref{Frame Parameters})。
+
+@node Speedbar
+@section 速度栏框架
+@cindex speedbar
+
+@cindex attached frame (of speedbar)
+@dfn{speedbar} 是一个特殊的框架，用于方便地在另一个框架中导航或操作。  速度栏，当它存在时，总是与一个特定的帧相关联，称为它的 @dfn{attached frame}；所有速度栏操作都作用于该帧。
+
+输入 @kbd{M-x speedbar} 创建速度栏并将其与当前帧关联。  要关闭速度栏，请再次输入 @kbd{M-x speedbar}，或选择速度栏并输入 @kbd{q}。  （您也可以像删除任何其他 Emacs 框架一样删除速度栏框架。）如果您希望将速度栏与其他框架关联，请将其关闭并从该框架调用 @kbd{M-x speedbar}。
+
+速度栏可以在多种模式下运行。  它的默认模式是@dfn{File Display}模式，该模式显示附加框架所选窗口当前目录中的文件，每行一个文件。  单击非目录可在附加框架的选定窗口中访问该文件，单击目录会在速度栏中显示该目录 (@pxref{Mouse References})。  每行还有一个框 @samp{[+]} 或 @samp{<+>}，您可以单击该框来@dfn{expand} 该项目的内容。  展开目录会将该目录的内容添加到速度栏显示中，位于该目录自己的行下方。  展开普通文件会将该文件中的标签列表添加到速度栏显示中；您可以单击标签名称以跳转到附加框架的选定窗口中的该标签。当文件或目录展开时，@samp{[+]}变为@samp{[-]}；您可以单击该框来@dfn{contract}该项目，隐藏其内容。
+
+您也可以使用键盘在速度栏上导航。  当点位于速度栏中的一行上时键入 @key{RET} 相当于单击当前行上的项目，而 @key{SPC} 会展开或收缩该项目。  @kbd{U} 显示当前目录的父目录。  要复制、删除或重命名当前行的文件，请分别键入 @kbd{C}、@kbd{D} 和 @kbd{R}。  要创建新目录，请输入@kbd{M}。
+
+另一种通用的速度条模式是@dfn{Buffer Display}模式；在此模式下，速度栏显示 Emacs 缓冲区列表。  要切换到此模式，请在速度栏中输入@kbd{b}。  要返回文件显示模式，请键入 @kbd{f}。  您还可以通过单击速度栏窗口中的任意位置的@kbd{mouse-3}（或模式行上的@kbd{mouse-1}）并在弹出菜单中选择@samp{Displays}来更改显示模式。
+
+一些主要模式，包括Rmail模式、Info和GUD，都有专门的方法将有用的项目放入速度栏中供您选择。  例如，在 Rmail 模式下，速度栏显示 Rmail 文件列表，并允许您通过单击其 @samp{<M>} 框将当前消息移动到另一个 Rmail 文件。
+
+在终端和图形模式下，速度栏可以选择显示为窗口而不是单独的框架。
+
+有关使用和编程速度栏的更多详细信息，@xref{Top, Speedbar,,speedbar, Speedbar Manual}。
+
+@node Multiple Displays
+@section 多显示器
+@cindex multiple displays
+@cindex display server
+
+一台 Emacs 可以与多个 X 显示器通信。  最初，Emacs 仅使用一种显示——使用 @env{DISPLAY} 环境变量或使用 @samp{--display} 选项 (@pxref{Initial Options}) 指定的显示。  要连接到另一个显示器，请使用命令@code{make-frame-on-display}：
+
+@findex make-frame-on-display
+@table @kbd
+@item M-x make-frame-on-display @key{RET} @var{display} @key{RET}
+在显示器上创建一个新帧@var{display}。
+@end table
+
+一台 X 服务器可以处理多个屏幕。  当您在属于一台服务器的两个屏幕上打开框架时，Emacs 知道它们共享一个键盘，并且它将来自这些屏幕的所有命令视为单个输入流。
+
+当您在不同的 X 服务器上打开框架时，Emacs 会为每个服务器创建一个单独的输入流。  每个服务器也有自己选择的框架。  您通过特定 X 服务器输入的命令适用于该服务器的选定框架。
+
+在多显示器显示器上，可以使用命令@code{make-frame-on-monitor}：
+
+@findex make-frame-on-monitor
+@table @kbd
+@item M-x make-frame-on-monitor @key{RET} @var{monitor} @key{RET}
+在监视器 @var{monitor} 上创建一个新框架，其屏幕区域是当前显示的一部分。
+@end table
+
+@subsection 单键盘模式
+@cindex single-keyboard mode
+
+每个显示器都有一个关联的键盘。  通常，Emacs 假设这些键盘在物理上是不同的，因此某人可以在一个键盘上打字，而其他人可以在另一个键盘上打字，从而进入不同终端上的不同框架。  然而，在某些情况下，Emacs 会输入@dfn{single-keyboard mode}，此时除了一个键盘之外的所有键盘输入都会被阻止。  这可以防止在一个键盘上键入的按键干扰在另一键盘上启动的操作。  适用的主要操作是输入递归编辑 (@pxref{Recursive Edit})，其中包括所有迷你缓冲区提示 (@pxref{Basic Minibuffer})。
+
+当存在不同的显示器和不同的键盘，但只有一名用户和一个物理键盘控制 Emacs 时，单键盘模式可能会很不方便。  X 转发可能会发生这种情况：使用远程 Emacs 守护进程和使用 @w{@code{ssh -X daemon-host emacsclient -c}} 这样的命令创建的多个框架，然后从远程 Emacs 守护进程的角度来看，每个调用 @w{@code{ssh -X daemon-host}} 命令都有一个终端和一个键盘，但实际上，单个本地 X 服务器显示所有框架，并且只有一个物理键盘。
+
+@vindex multiple-terminals-merge-keyboards
+在这种情况下，您可能更喜欢让不同的框架表现得好像它们是使用 @kbd{C-x 5 2} (@pxref{Creating Frames}) 创建的。  在这种情况下，在一帧中开始递归编辑并不意味着其他帧中的键盘输入被阻止。  将变量 @code{multiple-terminals-merge-keyboards} 自定义为非 @code{nil} 值以实现此目的。
+
+@node Frame Parameters
+@section 机架参数
+@vindex default-frame-alist
+
+您可以通过在变量 @code{default-frame-alist} 中指定默认列表 @dfn{frame parameters} 来控制所有框架的默认外观和行为。  它的值应该是一个条目列表，每个条目指定一个参数名称和该参数的值。每当 Emacs 创建新框架（包括初始框架）时，这些条目就会生效。
+
+@cindex frame size, specifying default
+例如，您可以将以下行添加到初始化文件 (@pxref{Init File})，以将默认框架宽度设置为 90 个字符列，将默认框架高度设置为 40 个字符行，并将默认字体设置为 @samp{Monospace-10}：
+
+@example
+(add-to-list 'default-frame-alist '(width  . 90))
+(add-to-list 'default-frame-alist '(height . 40))
+(add-to-list 'default-frame-alist '(font . "Monospace-10"))
+@end example
+
+有关框架参数及其效果的列表，请参阅@ref{Frame Parameters,,, elisp, The Emacs Lisp Reference Manual}。
+
+@vindex initial-frame-alist
+您还可以通过自定义变量 @code{initial-frame-alist} 来指定仅适用于初始帧的帧参数列表。
+
+如果 Emacs 被编译为使用 X 工具包，则指定颜色和字体的框架参数不会影响菜单和菜单栏，因为它们是由工具包绘制的，而不是直接由 Emacs 绘制的。
+
+框架外观和行为也可以通过 X 资源进行定制 (@pxref{X Resources})；这些会覆盖 init 文件中指定的初始帧的参数。
+
+请注意，如果您使用桌面库来保存和恢复会话，则要恢复的帧及其参数将记录在桌面文件中。  当这些帧被恢复时，记录的参数优先于初始化文件中@code{default-frame-alist}和@code{initial-frame-alist}指定的帧参数。  @xref{Saving Emacs Sessions}，了解如何避免这种情况。
+
+@node Scroll Bars
+@section 滚动条
+@cindex Scroll Bar mode
+@cindex mode, Scroll Bar
+@cindex Vertical Scroll Bar
+
+在图形显示上，每个 Emacs 窗口的侧面都有一个 @dfn{vertical scroll bar}。  单击滚动条的向上和向下按钮上的 @kbd{mouse-1} 可将窗口一次滚动一行（但某些工具包允许您自定义滚动条以不显示这些按钮）。  单击滚动条内框上方或下方的 @kbd{mouse-1} 可以将窗口滚动到窗口的几乎整个高度，分别类似于 @kbd{M-v} 和 @kbd{C-v} (@pxref{Moving Point})。  （对于某些工具包，这也可能有不同的行为。）拖动内部框会连续滚动。
+
+如果 Emacs 是在没有 X 工具包支持的 X Window 系统上编译的，则滚动条的行为会有所不同。  单击滚动条上任意位置的 @kbd{mouse-1} 会像 @kbd{C-v} 一样向前滚动，而 @kbd{mouse-3} 则会像 @kbd{M-v} 一样向后滚动。  单击滚动条中的 @kbd{mouse-2} 可以上下拖动内部框。
+
+@findex scroll-bar-mode
+@findex toggle-scroll-bar
+要切换垂直滚动条的使用，请输入 @kbd{M-x scroll-bar-mode}。  该命令适用于所有帧，包括尚未创建的帧。  要仅切换所选帧的垂直滚动条，请使用命令@kbd{M-x toggle-scroll-bar}。
+
+@vindex scroll-bar-mode
+要控制启动时垂直滚动条的使用，请自定义变量@code{scroll-bar-mode} (@pxref{Customization})。  它的值应该是@code{right}（将滚动条放在窗口的右侧）、@code{left}（将它们放在左侧）或@code{nil}（禁用垂直滚动条）。  默认情况下，如果 Emacs 是在 X Window 系统、MS-Windows 或 macOS 上使用 GTK+ 支持编译的，那么它会将滚动条放在右侧；如果在没有 GTK+ 支持的 X Window 系统上编译，Emacs 会将滚动条放在左侧（遵循 X 应用程序的旧约定）。
+
+@vindex scroll-bar-width
+@cindex width of the vertical scroll bar
+您还可以使用 X 资源@samp{verticalScrollBars} 启用或禁用滚动条 (@pxref{Resources})。  要控制滚动条宽度，请更改 @code{scroll-bar-width} 框架参数 (@pxref{Frame Parameters,,, elisp, The Emacs Lisp Reference Manual})。
+
+@vindex scroll-bar-adjust-thumb-portion
+@cindex overscrolling
+如果您在 X 上使用 Emacs（使用 GTK+ 或 Motif），则可以自定义变量 @code{scroll-bar-adjust-thumb-portion} 来控制滚动条的 @dfn{overscrolling}，即，即使缓冲区末尾可见，也可以向下拖动滑块。  如果其值为非@code{nil}，则即使显示缓冲区末尾，也可以向下拖动滚动条；如果@code{nil}，则当显示缓冲区末尾时，拇指将位于底部。  当整个缓冲区可见时，您无法过度滚动。
+
+@cindex @code{scroll-bar} face
+滚动条的视觉外观由 @code{scroll-bar} 面控制。  （某些工具包，例如 GTK+ 和 MS-Windows，忽略此面；滚动条外观只能在系统范围内自定义，对于 GTK+ @pxref{GTK resources}）。
+
+@cindex vertical border
+在图形框架上，垂直滚动条隐式地用于在视觉上分隔并排窗口。  当垂直滚动条被禁用时，Emacs 默认情况下会借助一像素宽的 @dfn{vertical border} 来分隔此类窗口。  该边框占据右侧窗口的第一个像素列，因此可能会过度绘制此处显示的任何字形的最左侧像素。  如果这些像素传达重要信息，您可以通过启用窗口分隔符使它们可见，请参阅@ref{Window Dividers}。  要复制垂直边框的外观，请将框架的 @code{right-divider-width} 参数设置为 1，并让 @code{window-divider} 面继承自 @code{vertical-border}、@ref{Window Dividers,, Window Dividers, elisp, The Emacs Lisp Reference Manual} 的面。
+
+@cindex Horizontal Scroll Bar
+@cindex Horizontal Scroll Bar mode
+在具有工具包支持的图形显示上，Emacs 还可能在每个窗口的底部提供一个@dfn{horizontal scroll bar}。  单击滚动条左侧和右侧按钮上的@kbd{mouse-1} 可将窗口一次水平滚动一列。  （请注意，某些工具包允许自定义滚动条，从而导致这些按钮不显示。）单击滚动条内部框左侧或右侧的 @kbd{mouse-1} 可将窗口滚动四列。  拖动内部框可连续滚动窗口。
+
+请注意，这种水平滚动可能会使窗口的点位置在左侧或右侧消失。  键入字符以插入文本或使用键盘命令移动点通常会将其带回到视图中。
+
+@findex horizontal-scroll-bar-mode
+要切换水平滚动条的使用，请输入 @w{@kbd{M-x horizontal-scroll-bar-mode}}。  该命令适用于所有帧，包括尚未创建的帧。  要仅切换所选帧的水平滚动条，请使用命令@w{@kbd{M-x toggle-horizontal-scroll-bar}}。
+
+@vindex horizontal-scroll-bar-mode
+要控制启动时水平滚动条的使用，请自定义变量@code{horizontal-scroll-bar-mode}。
+
+@vindex scroll-bar-height
+@cindex height of the horizontal scroll bar
+您还可以使用 X 资源@samp{horizontalScrollBars} 启用或禁用水平滚动条 (@pxref{Resources})。  要控制滚动条高度，请更改 @code{scroll-bar-height} 框架参数 (@pxref{Frame Parameters,,, elisp, The Emacs Lisp Reference Manual})。
+
+@node Window Dividers
+@section 窗隔板
+@cindex Window Divider mode
+@cindex mode, Window Divider
+
+在图形显示上，您可以使用 @dfn{window dividers} 来直观地分隔窗口。  窗口分隔线是可以用鼠标拖动的栏，从而使您可以轻松调整相邻窗口的大小。
+
+@findex window-divider-mode
+要切换窗口分隔线的显示，请使用命令@kbd{M-x window-divider-mode}。
+
+@vindex window-divider-default-places
+要自定义分隔线的显示位置，请使用选项 @code{window-divider-default-places}。  它的值应该是@code{bottom-only}（仅在窗口底部显示分隔线）、@code{right-only}（仅在窗口右侧显示分隔线）或@code{t}（在底部和右侧显示分隔线）。
+
+@vindex window-divider-default-bottom-width
+@vindex window-divider-default-right-width
+要调整此模式显示的窗口分隔线的宽度，请自定义选项 @code{window-divider-default-bottom-width} 和 @code{window-divider-default-right-width}。
+
+当垂直滚动条被禁用时，分​​隔线也可用于使窗口的第一个像素列可见，否则该像素列将被用于分隔并排窗口的垂直边框覆盖 (@pxref{Scroll Bars})。
+
+有关窗分隔板的更多详细信息，请参阅@ref{Window Dividers,, Window Dividers, elisp, The Emacs Lisp Reference Manual}。
+
+@node Drag and Drop
+@section 拖放
+@cindex drag and drop
+
+在大多数图形桌面环境中，Emacs 都对 @dfn{drag and drop} 操作有基本支持。  例如，将文本拖放到 Emacs 框架上会将文本插入到拖放的位置。  将文件拖放到 Emacs 框架上即可访问该文件。  作为一种特殊情况，将文件拖放到 Dired 缓冲区上会将该文件（根据其来源的应用程序的约定）移动或复制到该缓冲区中显示的目录中。
+
+@vindex dnd-open-file-other-window
+放置文件通常会在放置文件的窗口中访问该文件。  如果您希望在这种情况下在新窗口中访问文件，请自定义变量@code{dnd-open-file-other-window}。
+
+目前支持 XDND 和 Motif 拖放协议以及旧的 KDE 1.x 协议。
+
+@vindex dnd-indicate-insertion-point
+@vindex dnd-scroll-margin
+
+将文本拖到 Emacs 窗口时，滚动窗口或确定插入文本的位置可能很困难。将选项 @code{dnd-indicate-insertion-point} 设置为非 @code{nil} 值会使点移动到当鼠标在拖动过程中在窗口中移动时将插入任何放置的文本的位置，并且将 @code{dnd-scroll-margin} 设置为整数值会导致如果鼠标在拖动过程中鼠标在窗口顶部或底部的那么多行内移动，则窗口会滚动。
+
+@vindex mouse-drag-and-drop-region
+Emacs 还可以选择使用鼠标将该区域拖动到该缓冲区或另一个缓冲区的另一部分中。  要启用此功能，请将变量 @code{mouse-drag-and-drop-region} 自定义为非 @code{nil} 值。  通常，当目标与源位于同一缓冲区时，文本会被移动，即@:剪切和粘贴；将区域放到另一个缓冲区上会复制文本。  如果此变量的值命名了一个修饰键，例如 @samp{shift}、@samp{control} 或 @samp{alt}，那么在放置文本时按该修饰键将复制它而不是剪切它，即使您放置在与文本来源相同的缓冲区上也是如此。
+
+@vindex mouse-drag-and-drop-region-cut-when-buffers-differ
+@vindex mouse-drag-and-drop-region-show-tooltip
+@vindex mouse-drag-and-drop-region-show-cursor
+为了在源缓冲区和目标缓冲区不同时剪切文本，请将选项 @code{mouse-drag-and-drop-region-cut-when-buffers-differ} 设置为非 @code{nil} 值。  默认情况下，在图形显示上，选定的文本显示在工具提示中，并且在拖动过程中点与鼠标光标一起移动。  要抑制此类行为，请将选项 @code{mouse-drag-and-drop-region-show-tooltip} 和/或 @code{mouse-drag-and-drop-region-show-cursor} 设置为 @code{nil}。
+
+@vindex mouse-drag-and-drop-region-cross-program
+要将文本从 Emacs 拖到其他程序，请将选项 @code{mouse-drag-and-drop-region-cross-program} 设置为非 @code{nil} 值。
+
+在 X window 系统上，某些程序可以将文件拖放到 Emacs 上，期望 Emacs 保存它们。  通常，Emacs 会提示输入保存文件的文件名，然后打开该文件，但可以通过更改变量 @code{x-dnd-direct-save-function} 来更改该行为。  @xref{Drag and Drop,,, elisp, The Emacs Lisp Reference Manual}。
+
+@node Menu Bars
+@section 菜单栏
+@cindex menu bar mode
+@cindex mode, Menu Bar
+@findex menu-bar-mode
+@vindex menu-bar-mode
+
+您可以使用 @kbd{M-x menu-bar-mode} 切换菜单栏的使用。如果不带参数，此命令会切换菜单栏模式，这是一种全局次要模式。  对于参数，如果参数为正，该命令将打开菜单栏模式；如果参数不是正，则关闭菜单栏模式。  要控制启动时菜单栏的使用，请自定义变量@code{menu-bar-mode}。
+
+@kindex C-mouse-3 @r{(when menu bar is disabled)}
+专家用户经常关闭菜单栏，尤其是在文本终端上，这使得多一行可用于文本。如果菜单栏关闭，您仍然可以在支持弹出菜单的显示器上使用 @kbd{C-mouse-3} 弹出其内容的菜单。或者您可以启用@code{context-menu-mode}并自定义变量@code{context-menu-functions}以弹出带有@kbd{mouse-3}的上下文菜单。  @xref{Menu Mouse Clicks}。
+
+@xref{Menu Bar}，有关如何使用菜单栏调用命令的信息。  @xref{X Resources}，了解如何自定义菜单栏菜单的视觉外观。
+
+@node Tool Bars
+@section 工具栏
+@cindex tool bar mode
+@cindex tool bar, attached to frame
+@cindex mode, tool bar
+@cindex icons, toolbar
+
+在图形显示上，Emacs 在每个框架的顶部、菜单栏的正下方放置一个 @dfn{tool bar}。  这是一排带有图标的按钮，您可以用鼠标单击来调用各种命令。  Emacs 还可以选择在每个窗口的顶部显示一个工具栏 (@pxref{Window Tool Bar})。
+
+@vindex tool-bar-always-show-default
+全局（默认）工具栏包含常规命令。  一些主要模式定义了自己的工具栏；每当具有此类主要模式的缓冲区处于当前状态时，该模式的工具栏就会替换全局工具栏。  为了防止发生这种替换，请自定义变量@code{tool-bar-always-show-default}。
+
+@findex tool-bar-mode
+@vindex tool-bar-mode
+要切换工具栏的使用，请输入 @kbd{M-x tool-bar-mode}。  该命令适用于所有帧，包括尚未创建的帧。  要控制启动时工具栏的使用，请自定义变量@code{tool-bar-mode}。
+
+@vindex tool-bar-style
+@cindex tool bar style
+当 Emacs 编译为支持 GTK+ 时，每个工具栏项都可以包含一个图像或一个文本标签，或两者都包含。  默认情况下，Emacs 遵循 Gnome 桌面的工具栏样式设置；如果未定义，则它将工具栏项目仅显示为图像。  要施加特定的工具栏样式，请自定义变量@code{tool-bar-style}。
+
+@cindex tool bar position
+您还可以使用框架参数 @code{tool-bar-position} 控制 GTK+ 工具栏的工具栏位置。  @xref{Frame Parameters,,, elisp, The Emacs Lisp Reference Manual}。
+
+NS 构建将工具栏视为窗口装饰，因此当窗口未装饰时不会显示它。  @xref{Frame Parameters,,, elisp, The Emacs Lisp Reference Manual}。  在 macOS 上，当框架进入全屏时，工具栏会隐藏，但可以通过将鼠标指针移动到屏幕顶部来显示。
+
+@vindex modifier-bar-mode
+@findex modifier-bar-mode
+@cindex displaying modifier keys in the tool bar
+@cindex mode, Modifier Bar
+@cindex Modifier Bar
+键盘通常缺少 Emacs 用户可能想要使用的一个或多个修饰键 (@pxref{Modifier Keys})，这使得使用这些修饰符输入按键序列变得困难或不可能。  例如，许多键盘缺少 Hyper 和 Super 修饰符，智能手机通常也缺少 Ctrl 和 Alt 修饰符。  Emacs 可以选择显示可以替代修改键的按钮工具栏；这个附加工具栏称为 @dfn{modifier bar}。  单击修饰栏中的按钮将导致按钮上显示的修饰键应用于 Emacs 读取的下一个键盘事件。  全局小模式@code{modifier-bar-mode}启用时显示修改栏；为此，请输入 @kbd{M-x modifier-bar-mode}。
+
+@node Tab Bars
+@section 标签栏
+@cindex tab bar mode
+@cindex mode, Tab Bar
+@cindex tabs, on the Tab Bar
+
+在图形显示器和文本终端上，Emacs 可以选择在每个框架的顶部、菜单栏 (@pxref{Menu Bars}) 下方以及工具栏 (@pxref{Tool Bars}) 上方或下方显示@dfn{Tab Bar}，具体取决于变量 @code{tab-bar-position}。选项卡栏是一排 @dfn{tabs} 按钮，您可以单击这些按钮在窗口配置之间进行切换。
+
+选项卡栏上的每个选项卡代表其框架的命名持久窗口配置，即该框架如何分区为窗口以及每个窗口中显示哪个缓冲区。  选项卡的名称由该窗口配置的窗口中显示的缓冲区名称列表组成。  点击选项卡切换到该选项卡记录的窗口配置；它是窗口和缓冲区的配置，当该选项卡是当前选项卡时，先前在框架中使用了该配置。
+
+如果您使用桌面库保存和恢复会话 (@pxref{Saving Emacs Sessions})，选项卡栏中的选项卡及其关联的窗口配置将记录在桌面文件中，并在恢复会话后可用。
+
+请注意，选项卡栏与选项卡行 (@pxref{Tab Line}) 不同。每个窗口顶部的选项卡行上的选项卡用于在窗口中的缓冲区之间切换，而每个框架顶部的选项卡栏上的选项卡用于在包含多个显示一个或多个缓冲区的窗口的窗口配置之间切换。
+
+@findex tab-bar-mode
+要切换选项卡栏的使用，请输入 @kbd{M-x tab-bar-mode}。  该命令适用于所有帧，包括尚未创建的帧。  要在启动时控制选项卡栏的使用，请自定义变量 @code{tab-bar-mode} 并保存您的自定义设置。
+
+@vindex tab-bar-show
+变量@code{tab-bar-show}控制是否自动打开选项卡栏模式。  如果值为 @code{t}，则在使用创建新选项卡的命令时启用 @code{tab-bar-mode}。  当只有一个选项卡时，值 @code{1} 将隐藏选项卡栏，并在创建更多选项卡时再次显示它。  更一般地，非负整数值会导致仅当选项卡数量大于该整数时才显示选项卡栏。值 @code{nil} 始终隐藏选项卡栏；在这种情况下，仍然可以使用 @kbd{M-x tab-next}、@kbd{M-x tab-switcher} 和其他提供选项卡名称补全功能的命令在命名窗口配置之间切换，而不显示选项卡栏。  此外，还可以使用命令 @kbd{M-x tab-new}、@kbd{M-x tab-close} 等在没有选项卡栏的情况下创建和关闭选项卡。
+
+请注意，数值 @code{tab-bar-show} 可能会导致选项卡栏显示在某些框架上，但不会显示在其他框架上，具体取决于每个框架上创建的选项卡数量。
+
+@findex toggle-frame-tab-bar
+要仅在选定的框架上切换选项卡栏的使用，请键入 @kbd{M-x toggle-frame-tab-bar}。  此命令有助于有选择地在某些框架上启用选项卡栏，同时在其他框架上保持禁用状态，无论 @code{tab-bar-mode} 和 @code{tab-bar-show} 的值如何。
+
+@kindex C-x t
+前缀键 @kbd{C-x t} 类似于 @kbd{C-x 5}。每个 @kbd{C-x 5} 命令都会在不同的帧 (@pxref{Creating Frames}) 中弹出缓冲区，而 @kbd{C-x t} 命令在所选帧中使用具有不同窗口配置的不同选项卡。
+
+各种 @kbd{C-x t} 命令的不同之处在于它们如何查找或创建要选择的缓冲区。  以下命令可用于在新选项卡中选择缓冲区：
+
+@table @kbd
+@kindex C-x t 2
+@findex tab-new
+@vindex tab-bar-tab-name-function
+@item C-x t 2
+添加新选项卡 (@code{tab-new})。  您可以通过自定义变量 @code{tab-bar-new-tab-choice} 来控制新选项卡中显示的缓冲区的选择。  您可以通过自定义变量 @code{tab-bar-tab-name-function} 来控制新选项卡的默认名称。
+
+@kindex C-x t b
+@findex switch-to-buffer-other-tab
+@item C-x t b @var{bufname} @key{RET}
+在另一个选项卡中选择缓冲区@var{bufname}。  这运行@code{switch-to-buffer-other-tab}。
+
+@kindex C-x t f
+@findex find-file-other-tab
+@item C-x t f @var{filename} @key{RET}
+访问文件 @var{filename} (@pxref{Visiting}) 并在另一个选项卡中选择其缓冲区。  这运行@code{find-file-other-tab}。
+
+@kindex C-x t d
+@findex dired-other-tab
+@item C-x t d @var{directory} @key{RET}
+在另一个选项卡中编辑指定的 @var{directory} (@pxref{Dired})。这运行@code{dired-other-tab}。
+
+@kindex C-x t t
+@findex other-tab-prefix
+@item C-x t t
+这是一个前缀命令 (@code{other-tab-prefix})，它影响紧随该前缀命令之后调用的下一个命令。  它请求下一个命令显示的缓冲区显示在另一个选项卡中。
+@end table
+
+@vindex tab-bar-new-tab-choice
+默认情况下，新选项卡从调用添加新选项卡的命令之前的当前缓冲区开始。要使用其他缓冲区启动新选项卡，请自定义变量@code{tab-bar-new-tab-choice}。
+
+@vindex tab-bar-new-tab-to
+变量 @code{tab-bar-new-tab-to} 定义放置新选项卡的位置。默认情况下，新选项卡会添加到当前选项卡的右侧。
+
+以下命令可用于删除选项卡：
+
+@table @kbd
+@kindex C-x t 0
+@findex tab-close
+@vindex tab-bar-close-last-tab-choice
+@item C-x t 0
+关闭所选选项卡 (@code{tab-close})。  如果只有一个选项卡，这不会产生任何影响，除非将变量 @code{tab-bar-close-last-tab-choice} 自定义为非默认值。
+
+@kindex C-x t 1
+@findex tab-close-other
+@item C-x t 1
+关闭所选框架上除所选选项卡外的所有选项卡。
+@end table
+
+@vindex tab-bar-close-tab-select
+变量 @code{tab-bar-close-tab-select} 定义关闭当前选项卡后选择哪个选项卡。  默认情况下，它选择最近使用的选项卡。
+
+@findex tab-undo
+命令 @code{tab-undo} 恢复上次关闭的选项卡。
+
+可以使用以下命令在选项卡之间切换：
+
+@table @kbd
+@kindex C-x t o
+@kindex C-TAB
+@findex tab-next
+@item C-x t o
+@itemx C-@key{TAB}
+切换到下一个选项卡 (@code{tab-next})。  如果重复此命令，它将循环显示所选帧上的所有选项卡。  使用正数值参数@var{n}，它会切换到第@var{n}下一个选项卡；使用负参数@minus{}@var{n}，它会切换回第@var{n}前一个选项卡。
+
+@kindex S-C-TAB
+@findex tab-previous
+@item S-C-@key{TAB}
+切换到上一个选项卡 (@code{tab-previous})。  使用正数值参数@var{n}，它会切换到第@var{n}前一个选项卡；使用负参数 @minus{}@var{n} 时，它会切换到下一个@var{n}选项卡。
+
+@kindex C-x t @key{RET}
+@findex tab-switch
+@item C-x t @key{RET} @var{tabname} @key{RET}
+通过名称 (@code{tab-switch}) 切换到选项卡，并完成所有选项卡名称。  选项卡名称的默认值和“未来历史记录”按新近度排序，因此您可以使用 @kbd{M-n} (@code{next-history-element}) 获取最后访问的选项卡的名称、倒数第二个选项卡的名称，依此类推。
+
+@kindex C-1, tab bar
+@kindex M-1, tab bar
+@findex tab-select
+@vindex tab-bar-select-tab-modifiers
+@vindex tab-bar-tab-hints
+@item @var{modifier}-@var{tab-number}
+按编号 @var{tab-number} (@code{tab-select}) 切换到选项卡。自定义变量 @code{tab-bar-select-tab-modifiers} 以指定一个或多个 @var{modifier} 键后，您可以使用指定修饰符之一结合要选择的选项卡编号，按序号选择选项卡。  数字 9 可用于选择最后一个选项卡。  您可以选择 Emacs 支持的任何修饰符，@pxref{Modifier Keys}。  要在选项卡名称旁边显示选项卡编号，您可以自定义另一个变量@code{tab-bar-tab-hints}。这将帮助您决定按哪个数字键来按编号选择选项卡。
+
+@kindex C-9, tab bar
+@kindex M-9, tab bar
+@findex tab-last
+@item @var{modifier}-@kbd{9}
+切换到最后一个选项卡 (@code{tab-last})。  组合键是由 @code{tab-bar-select-tab-modifiers} 和键 @kbd{9} 定义的修饰键。  使用数字参数@var{n}，切换到最后一个@var{n}选项卡。
+
+@kindex C-0, tab bar
+@kindex M-0, tab bar
+@findex tab-recent
+@item @var{modifier}-@kbd{0}
+切换到最近的选项卡 (@code{tab-recent})。  组合键是由 @code{tab-bar-select-tab-modifiers} 和键 @kbd{0} 定义的修饰键。  使用数字参数@var{n}，切换到第@var{n}最近的选项卡。
+@end table
+
+可以使用以下命令对选项卡进行操作：
+
+@table @kbd
+@kindex C-x t r
+@findex tab-rename
+@item C-x t r @var{tabname} @key{RET}
+将当前选项卡重命名为@var{tabname} (@code{tab-rename})。
+
+@kindex C-x t m
+@findex tab-move
+@item C-x t m
+将当前选项卡向右移动一位 (@code{tab-move})。使用正数值参数 @var{n}，将其向右移动多个位置；如果参数 @minus{}@var{n} 为负，则将其向左移动 @var{n} 个位置。
+@end table
+
+您可以使用鼠标对选项卡进行操作。  单击 @kbd{mouse-2} 关闭选项卡。  单击 @kbd{mouse-3} 会弹出上下文菜单，其中包含在单击的选项卡上操作的项目。  使用 @kbd{mouse-1} 拖动选项卡会将其移动到选项卡栏上的另一个位置。  鼠标滚轮滚动切换到下一个或上一个选项卡。  滚动期间按住 @key{SHIFT} 键可将选项卡向左或向右移动。
+
+触摸屏输入 (@pxref{Other Input}) 也可用于选项卡上的操作。  长按 (@pxref{Touchscreens}) 选项卡将显示一个上下文菜单，其中包含对按下的选项卡进行操作的项目，长按选项卡栏本身将显示一个上下文菜单，可让您创建和删除选项卡；点击选项卡本身将导致选择该选项卡的窗口配置，点击选项卡栏上的按钮将表现得就像用 @kbd{mouse-1} 单击一样。
+
+@findex tab-bar-history-mode
+您可以启用 @code{tab-bar-history-mode} 来记住每个选项卡中使用的窗口配置，并在以后恢复它们。
+
+@table @kbd
+@findex tab-bar-history-back
+@item M-x tab-bar-history-back
+恢复当前选项卡中使用的先前窗口配置。这将导航回窗口配置的历史记录。
+
+@findex tab-bar-history-forward
+@item M-x tab-bar-history-forward
+取消恢复以前的窗口配置。这在窗口配置的历史上向前迈进了一步。
+@end table
+
+可以通过用户选项@code{tab-bar-format}自定义选项卡栏上显示的项目。
+
+@node System Taskbar
+@section 使用系统 GUI 任务栏功能
+@cindex system taskbar
+@cindex mode, system taskbar
+
+Emacs 可以使用 GUI 系统任务栏在 Emacs 任务栏图标上显示徽章叠加、进度条报告，并提醒用户 Emacs 会话需要注意。  注意：系统任务栏可能称为扩展坞、启动器或类似名称。
+
+@cindex system taskbar, GNU/Linux
+在符合 GNU/Linux 标准的 GUI 桌面上，系统任务栏效果将显示在由 shell 扩展确定的桌面目标上，最常见的是应用程序启动器或停靠面板或顶部面板。  对于 Emacs 实例来说，效果是全局的。
+
+注意：GNU/Linux 实现使用 D-Bus 将系统任务栏消息发送到 GUI。  您可能需要安装或配置 shell 扩展，例如实现 Ubuntu 的 Unity D-Bus 启动器规范的 @url{https://extensions.gnome.org/extension/307/dash-to-dock/}，您可以在此处阅读更多相关信息 @url{https://wiki.ubuntu.com/Unity/LauncherAPI}。 @xref{Top,,, dbus, The D-Bus Manual}。
+
+@cindex system taskbar, macOS/GNUstep
+@cindex system taskbar, NS
+在 macOS/GNUstep 10.5+ 上，系统任务栏效果出现在 Dock 和应用程序切换器中。  对于 Emacs 实例来说，效果是全局的。 macOS/GNUstep 无需特殊配置。
+
+@cindex system taskbar, MS-Windows
+在 MS-Windows 7+ 上，任务栏效果出现在 Windows 系统任务栏上。效果与其启动的帧相关联。 MS-Windows 不需要特殊配置。
+
+@findex system-taskbar-mode
+使用前必须初始化系统任务栏。  为此，请输入 @kbd{M-x system-taskbar-mode}。
+
+@vindex system-taskbar-use-progress-reporter
+用户选项 @code{system-taskbar-use-progress-reporter} 将 @code{system-taskbar-mode} 与 Emacs 进度报告功能集成，许多运行时间较长的函数使用这些功能来指示其工作进度。  进度报告将出现在回显区域和系统任务栏 Emacs 图标上。  该变量默认为@code{t}。  在启用 @code{system-taskbar-mode} 之前自定义此变量。  @xref{Progress,,, elisp}
+
+@vindex system-taskbar-clear-attention-on-frame-focus
+用户选项 @code{system-taskbar-clear-attention-on-frame-focus} 打开一个在 GNU/Linux D-Bus 平台上有用的帮助程序，当任何 Emacs 框架聚焦时，它会自动清除系统任务栏注意指示器。  这对 macOS/GNUstep 或 MS-Windows 没有影响。  默认为@code{t}。  在启用 @code{system-taskbar-mode} 之前自定义此变量。
+
+@vindex system-taskbar-dbus-desktop-file-name
+用户选项 @code{system-taskbar-dbus-desktop-file-name} 帮助 GNU/Linux 上的 D-Bus 识别已启动的 Emacs 实例。  它默认为 @samp{emacsclient}，可能需要更改为 @samp{emacs}，具体取决于您的 GNU/Linux 配置。
+
+@vindex system-taskbar-dbus-timeout
+用户选项 @code{system-taskbar-dbus-timeout} 是一个故障排除工具，可能不需要自定义。  它默认为 @code{nil}，它使用 D-Bus 默认超时，即 25,000 毫秒或 25 秒。
+
+@xref{System Taskbar,,, elisp, The Emacs Lisp Reference Manual}
+
+@node Dialog Boxes
+@section 使用对话框
+@cindex dialog boxes
+
+@vindex use-dialog-box
+对话框是一种特殊的菜单，用于询问是或否问题或其他一些特殊问题。  如果您使用鼠标调用引发问题的命令，许多 Emacs 命令都会使用对话框来询问是或否问题。
+
+要禁用对话框，请将变量 @code{use-dialog-box} 更改为 @code{nil}。  在这种情况下，Emacs 始终使用回显区域和键盘输入来执行是或否提示。此变量还控制是否使用文件选择窗口（但并非所有平台都支持这些窗口）。
+
+@vindex use-file-dialog
+@cindex file selection dialog, how to disable
+文件选择窗口是一种特殊的对话框，用于询问文件名。  您可以自定义变量 @code{use-file-dialog} 来禁止使用文件选择窗口，即使您仍然需要其他类型的对话框。  如果您使用变量 @code{use-dialog-box} 抑制了所有对话框，则该变量无效。
+
+@vindex x-gtk-show-hidden-files
+@vindex x-gtk-file-dialog-help-text
+@cindex hidden files, in GTK+ file chooser
+@cindex help text, in GTK+ file chooser
+当 Emacs 编译为支持 GTK+ 时，它使用 GTK+ 文件选择器对话框。  Emacs 在此对话框中添加了一个附加切换按钮，您可以使用该按钮在该对话框中启用或禁用隐藏文件（以点开头的文件）的显示。  如果您希望默认激活此切换，请将变量 @code{x-gtk-show-hidden-files} 更改为 @code{t}。  此外，Emacs 在 GTK+ 文件选择器对话框中添加了帮助文本；要禁用此帮助文本，请将变量 @code{x-gtk-file-dialog-help-text} 更改为 @code{nil}。
+
+@node Tooltips
+@section 工具提示
+@cindex tooltips
+
+@dfn{Tooltips} 是小的特殊框架，显示当前鼠标位置的文本信息。  当鼠标在窗口中的某些重要文本、模式行或 Emacs 框架的其他部分（例如工具栏按钮或菜单项）上移动时暂停时，它们会激活。
+
+@findex tooltip-mode
+您可以使用命令 @kbd{M-x tooltip-mode} 切换工具提示的使用。  当工具提示模式被禁用时，帮助文本将显示在回显区域中。  要在启动时控制工具提示的使用，请自定义变量@code{tooltip-mode}。
+
+以下变量提供工具提示显示的自定义选项：
+
+@vtable @code
+@item tooltip-delay
+该变量指定 Emacs 在显示第一个工具提示之前应等待的时间。  该值以秒为单位。
+
+@item tooltip-short-delay
+该变量指定 Emacs 在显示第一个工具提示后在不同项目上显示后续工具提示之前应等待的时间。  该值以秒为单位。
+
+@item tooltip-hide-delay
+如果鼠标不移动，从显示工具提示到隐藏它的秒数。
+
+@item tooltip-x-offset
+@itemx tooltip-y-offset
+工具提示左上角距鼠标指针位置的 X 和 Y 偏移量（以像素为单位）。  请注意，如果 @code{tooltip-frame-parameters} 被自定义为分别包含 @code{left} 和 @code{top} 参数，则这些将被忽略。  应选择偏移值，以便工具提示不会覆盖鼠标指针的热点，否则可能会干扰单击鼠标。
+
+@item tooltip-frame-parameters
+用于显示工具提示的框架参数。  @xref{Frame Parameters,,, elisp, The Emacs Lisp Reference Manual}，还有@ref{Tooltips,,, elisp, The Emacs Lisp Reference Manual}。
+@end vtable
+
+如需显示工具提示的其他自定义选项，请使用 @kbd{M-x customize-group @key{RET} tooltip @key{RET}}。
+
+@vindex use-system-tooltips
+如果 Emacs 是使用 GTK+ 工具包、Nextstep 窗口或 Haiku 窗口支持构建的，它会通过工具包显示工具提示，并使用工具包工具提示的默认外观。@footnote{The foreground and background colors of toolkit-created tooltips on Nextstep can also be customized by setting the @code{foreground} and @code{background} frame parameters that are part of @code{tooltip-frame-parameters}.} 要禁用此功能，请将变量 @code{use-system-tooltips} 更改为 @code{nil}。  如果您这样做，或者如果构建 Emacs 时没有适当的窗口支持，则工具提示文本的大多数属性都由 @code{tooltip} 面和 X 资源 (@pxref{X Resources}) 指定。
+
+@dfn{GUD tooltips} 是特殊的工具提示，在使用 GUD@. @xref{Debugger Operation} 调试程序时显示变量的值。
+
+@node Mouse Avoidance
+@section 鼠标回避
+@cindex avoiding mouse in the way of your typing
+@cindex mouse avoidance
+
+在图形终端上，鼠标指针可能会遮挡 Emacs 框架中的文本。  Emacs 提供了两种方法来避免这个问题。
+
+首先，如果鼠标指针位于 Emacs 框架内，则每次键入自插入字符时，Emacs 都会隐藏鼠标指针；移动鼠标指针使其再次可见。  要禁用此功能，请将变量 @code{make-pointer-invisible} 设置为 @code{nil}。 @xref{Display Custom}。
+
+@vindex mouse-avoidance-mode
+其次，您可以使用鼠标回避模式（一种次要模式）来使鼠标指针远离点。  要使用鼠标回避模式，请自定义变量@code{mouse-avoidance-mode}。  您可以将其设置为各种值，以通过多种方式移动鼠标：
+
+@table @code
+@item banish
+在任意按键上将指针移动到框架的一角。  您可以自定义变量 @code{mouse-avoidance-banish-position} 来指定指针被消除时的去向。
+@item exile
+仅当光标太靠近时才消除指针，并在光标移开后允许其返回。
+@item jump
+如果光标距离指针太近，请将指针移动随机距离和方向。
+@item animate
+与@code{jump}一样，但显示了沿途的步骤以产生运动错觉。
+@item cat-and-mouse
+与@code{animate}相同。
+@item proteus
+与@code{animate}一样，但也会改变鼠标指针的形状。
+@end table
+
+@findex mouse-avoidance-mode
+您还可以使用命令@kbd{M-x mouse-avoidance-mode} 启用该模式。  每当鼠标回避模式移动鼠标时，它也会升高框架。
+
+@node Text Terminals
+@section 文本终端
+@cindex text terminal
+
+在文本终端上，Emacs 一次只能显示一个 Emacs 框架。  但是，您仍然可以创建多个 Emacs 框架，并在它们之间进行切换。  在这些终端上切换框架很像在不同的窗口配置之间切换。
+
+使用@kbd{C-x 5 2}创建一个新框架并切换到它；使用 @kbd{C-x 5 o} 循环浏览现有帧；使用 @kbd{C-x 5 0} 删除当前帧。
+
+每个帧都有一个编号来区分。  如果您的终端一次只能显示一帧，则所选帧的编号 @var{n} 会出现在模式行开头附近，格式为 @samp{F@var{n}}。
+
+@findex set-frame-name
+@findex select-frame-by-name
+@samp{F@var{n}} 实际上是框架的初始名称。  如果您愿意，您可以为框架指定更有意义的名称，并且可以通过名称选择框架。  使用命令 @kbd{M-x set-frame-name @key{RET} @var{name} @key{RET}} 为所选帧指定新名称，并使用 @kbd{M-x select-frame-by-name @key{RET} @var{name} @key{RET}} 根据名称选择帧。  当选择框架时，您指定的名称将出现在模式行中。
+
+@node Text-Only Mouse
+@section 在文本终端中使用鼠标
+@cindex mouse support
+@cindex terminal emulators, mouse support
+
+某些文本终端支持在终端窗口中单击鼠标。
+
+@cindex xterm
+@findex xterm-mouse-mode
+在与 @command{xterm} 兼容的终端模拟器中，您可以使用 @kbd{M-x xterm-mouse-mode} 来让 Emacs 控制鼠标的简单使用——基本上，只支持未经修改的单击。  较新版本的 @command{xterm} 还支持鼠标跟踪。  通过在按下鼠标按钮时按住 @key{SHIFT} 键，仍然可以使用用于此类单击的正常 @command{xterm} 鼠标功能。  Xterm 鼠标模式是一种全局次要模式 (@pxref{Minor Modes})，如果 Emacs 在启动时检测到终端支持它，则默认打开该模式。  重复该命令会再次关闭该模式。
+
+@findex gpm-mouse-mode
+在 GNU/Linux 的控制台中，您可以使用 @kbd{M-x gpm-mouse-mode} 启用鼠标支持。  您必须在系统上安装并运行 gpm 服务器才能使其正常工作。  请注意，启用此模式后，您无法使用鼠标在 Emacs 和其他使用 GPM@. 的程序之间传输文本，这是由于 GPM 和 Linux 内核的限制。
+
+@iftex
+@xref{MS-DOS Mouse,,,emacs-xtra,Specialized Emacs Features},
+@end iftex
+@ifnottex
+@xref{MS-DOS Mouse},
+@end ifnottex
+有关 MS-DOS 上鼠标支持的信息。

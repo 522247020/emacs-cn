@@ -1,0 +1,877 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@iftex
+@chapter Dealing with Common Problems
+
+  If you type an Emacs command you did not intend, the results are often
+mysterious.  This chapter tells what you can do to cancel your mistake or
+recover from a mysterious situation.  Emacs bugs and system crashes are
+also considered.
+@end iftex
+
+@ifnottex
+@raisesections
+@end ifnottex
+
+@node Quitting
+@section 退出和中止
+
+@table @kbd
+@item C-g
+@itemx C-@key{Break} @r{(MS-DOS only)}
+退出：取消正在运行或部分键入的命令。
+@item C-]
+中止最内层的递归编辑级别并取消调用它的命令 (@code{abort-recursive-edit})。
+@item @key{ESC} @key{ESC} @key{ESC}
+要么退出，要么中止，无论哪个有意义 (@code{keyboard-escape-quit})。
+@item M-x top-level
+中止当前正在执行的所有递归编辑级别。
+@item C-/
+@itemx C-x u
+@itemx C-_
+取消先前对缓冲区内容所做的更改 (@code{undo})。
+@end table
+
+在命令完成之前取消命令有两种方法：使用@kbd{C-g}使用@dfn{quitting}，使用@kbd{C-]}或@kbd{M-x top-level}使用@dfn{aborting}。  退出会取消部分键入的命令或仍在运行的命令。  中止退出递归编辑级别并取消调用递归编辑的命令 (@pxref{Recursive Edit})。
+
+@cindex quitting
+@kindex C-g
+使用 @kbd{C-g} 退出是摆脱部分键入的命令或不需要的数字参数的方法。  此外，如果您正在执行正在运行的命令，@kbd{C-g} 会以相对安全的方式停止该命令。  例如，如果您退出需要很长时间的终止命令，则您的文本将 @emph{all} 仍然在缓冲区中，或者它将 @emph{all} 在终止环中，或者两者都有。  如果该区域处于活动状态，@kbd{C-g} 会停用该标记，除非瞬态标记模式关闭 (@pxref{Disabled Transient Mark})。  如果您正在进行增量搜索，@kbd{C-g} 会有特殊的表现；可能需要两个连续的 @kbd{C-g} 字符才能退出搜索。 @xref{Incremental Search}，了解详情。
+
+如果您在迷你缓冲区中键入 @kbd{C-g}，则会退出打开该迷你缓冲区的命令，并将其关闭。  如果该迷你缓冲区不是最近打开的缓冲区（当 @code{minibuffer-follows-selected-frame} 为 @code{nil} (@pxref{Basic Minibuffer}) 时可能会发生这种情况），@kbd{C-g} 也会在要求您确认后关闭最近打开的缓冲区，退出其关联命令。
+
+在 MS-DOS 上，字符 @kbd{C-@key{Break}} 用作退出字符，如 @kbd{C-g}。  原因是在 MS-DOS 上，在命令运行时、与用户交互之间识别 @kbd{C-g} 是不可行的。  相比之下，@emph{is}始终可以识别@kbd{C-@key{Break}}。
+@iftex
+@xref{MS-DOS Keyboard,,,emacs-xtra, Specialized Emacs Features}.
+@end iftex
+@ifnottex
+@xref{MS-DOS Keyboard}.
+@end ifnottex
+
+@findex keyboard-quit
+@kbd{C-g} 的工作原理是在键入 @kbd{C-g} 时将变量 @code{quit-flag} 设置为 @code{t}； Emacs Lisp 经常检查这个变量，如果它是非@code{nil} 则退出。  如果您在 Emacs 等待输入时键入 @kbd{C-g}，则它实际上只是作为命令执行。  在这种情况下，它运行的命令是@code{keyboard-quit}。
+
+在文本终端上，如果在识别第一个 @kbd{C-g} 之前第二次使用 @kbd{C-g} 退出，则会激活紧急逃生功能并返回到 shell。  @xref{Emergency Escape}。
+
+@cindex NFS and quitting
+在某些情况下，您无法退出。  当 Emacs 等待操作系统执行某些操作时，退出是不可能的，除非对 Emacs 中发生等待的特定系统调用付出了特殊的努力。  我们已经为用户可能想要退出的系统调用执行了此操作，但您可能会遇到未处理的情况。  在一种非常常见的情况下——使用 NFS 等待文件输入或输出——Emacs 本身知道如何退出，但许多 NFS 实现根本不允许用户程序在 NFS 服务器挂起时停止等待 NFS。
+
+@cindex aborting recursive edit
+@findex abort-recursive-edit
+@kindex C-]
+使用 @kbd{C-]} (@code{abort-recursive-edit}) 中止用于退出递归编辑级别并取消调用它的命令。  使用 @kbd{C-g} 退出不会执行此操作，也无法执行此操作，因为它用于取消部分键入的命令 @emph{within} 的递归编辑级别。  这两种操作都很有用。  例如，如果您处于递归编辑中并键入 @kbd{C-u 8} 输入数字参数，则可以使用 @kbd{C-g} 取消该参数并保留在递归编辑中。
+
+@findex keyboard-escape-quit
+@kindex ESC ESC ESC
+序列@kbd{@key{ESC} @key{ESC} @key{ESC}} (@code{keyboard-escape-quit}) 可以退出或中止。  （我们这样定义它是因为 @key{ESC} 在许多 PC 程序中意味着“退出”。）它可以取消前缀参数、清除选定区域或退出查询替换，如 @kbd{C-g}。  它可以脱离迷你缓冲区或递归编辑，如@kbd{C-]}。  它也可以摆脱将框架分割成多个窗口的问题，就像@kbd{C-x 1}一样。  然而，它不能做的一件事是停止正在运行的命令。  这是因为它作为普通命令执行，并且 Emacs 在准备好执行下一个命令之前不会注意到它。
+
+@findex top-level
+命令 @kbd{M-x top-level} 相当于足够的 @kbd{C-]} 命令，可以让您退出当前所在的所有递归编辑级别；如果它处于活动状态，它也会退出迷你缓冲区。 @kbd{C-]} 一次让你退出一个级别，但@kbd{M-x top-level} 一次退出所有级别。  @kbd{C-]} 和 @kbd{M-x top-level} 与所有其他命令一样，但与 @kbd{C-g} 不同，它们仅在 Emacs 准备好命令时才会生效。  @kbd{C-]} 是一个普通键，仅由于它在键盘映射中的绑定而具有其意义。  @xref{Recursive Edit}。
+
+@kbd{C-/} (@code{undo}) 严格来说并不是取消命令的一种方式，但你可以将其视为取消已经执行完毕的命令。  @xref{Undo}，有关撤消功能的更多信息。
+
+@node Lossage
+@section 处理 Emacs 问题
+@cindex troubleshooting Emacs
+
+本节介绍如何识别和处理 Emacs 无法按预期工作的情况，例如键盘代码混淆、显示乱码、内存不足以及崩溃和挂起。
+
+@xref{Bugs}，当您认为在 Emacs 中发现错误时该怎么做。
+
+@menu
+* Stuck Recursive::        括号周围的模式行中的“[...]”。
+* Screen Garbled::         屏幕上有垃圾。
+* Text Garbled::           文中垃圾。
+* Memory Full::            当内存不足时如何应对。
+* Crashing::               Emacs 崩溃时会做什么。
+* After a Crash::          恢复崩溃的 Emacs 会话中的编辑。
+* Emergency Escape::       如果 Emacs 停止响应该怎么办。
+* DEL Does Not Delete::    如果@key{DEL}不删除怎么办。
+@end menu
+
+@node Stuck Recursive
+@subsection 递归编辑级别
+@cindex stuck in recursive editing
+@cindex recursive editing, cannot exit
+
+递归编辑级别是 Emacs 重要且有用的功能，但如果您不了解它们，它们可能会出现故障。
+
+如果模式行的括号内包含方括号@samp{[@dots{}]}，其中包含主要模式和次要模式的名称，则您已进入递归编辑级别。  如果您不是故意这样做的，或者如果您不明白这意味着什么，那么您应该退出递归编辑级别。  为此，请输入 @kbd{M-x top-level}。  @xref{Recursive Edit}。
+
+@node Screen Garbled
+@subsection 屏幕上的垃圾
+@cindex garbled display
+@cindex display, incorrect
+@cindex screen display, wrong
+
+如果文本终端上的文本看起来有误，首先要做的是查看缓冲区中的文本是否有误。  输入 @kbd{C-l} (@code{recenter-top-bottom}) 重新显示整个屏幕。  如果此后屏幕显示正确，则问题完全出在之前的屏幕更新中。  （否则，请参阅以下部分。）
+
+显示更新问题通常是由于您所使用的终端的 terminfo 条目不正确而导致的。  Emacs 发行版中的文件 @file{etc/TERMS} 给出了此类已知问题的修复。  @file{INSTALL} 在其中一个章节中包含针对这些问题的一般建议。  如果您似乎使用了正确的 terminfo 条目，则 terminfo 条目中可能存在错误，或者 Emacs 中针对某些终端类型出现错误。
+
+@node Text Garbled
+@subsection 文中的垃圾
+@cindex garbled text
+@cindex buffer text garbled
+
+如果 @kbd{C-l} 显示文本错误，请首先键入 @kbd{C-h l} (@code{view-lossage}) 以查看您键入了哪些命令来产生观察到的结果。  然后尝试使用 @kbd{C-x u} (@code{undo}) 逐步撤消更改，直到恢复到您认为正确的状态。
+
+如果缓冲区开头或结尾处似乎缺少大部分文本，请检查模式行中是否有单词 @samp{Narrow}。如果出现，则您看不到的文本可能仍然存在，但暂时不受限制。  要使其再次可访问，请输入 @kbd{C-x n w} (@code{widen})。  @xref{Narrowing}。
+
+@node Memory Full
+@subsection 内存不足
+@cindex memory full
+@cindex out of memory
+
+如果收到错误消息 @samp{Virtual memory exceeded}，请使用 @kbd{C-x s} (@code{save-some-buffers}) 保存修改后的缓冲区。这种保存方法对额外内存的需求最小。  Emacs 会保留一定的内存，以便在发生此错误时可用；这应该足以使 @kbd{C-x s} 完成其工作。  当储备已被使用时，@samp{!MEM FULL!}出现在模式行的开头，表示没有更多的储备。
+
+保存修改的缓冲区后，您可以退出此 Emacs 会话并启动另一个会话，也可以使用 @kbd{M-x kill-some-buffers} 释放当前 Emacs 作业中的空间。  如果这释放了足够的空间，Emacs 将重新填充其内存储备，并且 @samp{!MEM FULL!} 将从模式行中消失。  这意味着您可以在同一个 Emacs 会话中安全地继续编辑。
+
+当内存不足时，不要使用@kbd{M-x buffer-menu}来保存或终止缓冲区，因为缓冲区菜单本身需要相当数量的内存，而储备供应可能不够。
+
+@cindex out of memory killer, GNU/Linux
+@cindex OOM killer
+在 GNU/Linux 系统上，Emacs 通常不会收到有关内存不足情况的通知；相反，操作系统可以在内存不足时终止 Emacs 进程。  此功能称为 @dfn{out-of-memory killer} 或 @dfn{@acronym{OOM} killer}。  当此行为生效时，Emacs 无法及时检测到内存不足的情况，并且无法让您如上所述保存缓冲区。  然而，可以关闭操作系统的这种行为，从而使 Emacs 有机会在被终止之前以更有用的方式处理内存不足的情况。  为此，请成为超级用户，编辑文件 @code{/etc/sysctl.conf} 以包含下面所示的行，然后从 shell 提示符调用命令 @w{@kbd{sysctl -p}}：
+
+@example
+vm.overcommit_memory=2
+vm.overcommit_ratio=0
+@end example
+
+@noindent
+请注意，上述设置会影响系统上的所有进程，并且通常会影响系统在内存压力下的行为，而不仅仅是 Emacs 进程。
+
+@node Crashing
+@subsection 当 Emacs 崩溃时
+
+@cindex crash report
+@cindex backtrace
+@cindex @file{emacs_backtrace.txt} file, MS-Windows
+Emacs 不应该崩溃，但如果崩溃了，它会在退出之前生成一个 @dfn{crash report} 。  崩溃报告被打印到标准错误流。  如果 Emacs 是从 GNU 或 Unix 系统上的图形桌面启动的，则标准错误流通常会重定向到诸如 1⁣ 之类的文件，因此您可以在那里查找崩溃报告。  在 MS-Windows 上，除了标准错误流之外，崩溃报告还会写入 Emacs 进程当前目录中名为 @file{emacs_backtrace.txt} 的文件中。
+
+崩溃报告的格式取决于平台。  在某些平台上，例如使用 GNU C 库的平台，崩溃报告包含一个 @dfn{backtrace} 描述崩溃之前的执行状态，可用于帮助调试崩溃。  以下是 GNU 系统的示例：
+
+@example
+Fatal error 11: Segmentation fault
+Backtrace:
+emacs[0x5094e4]
+emacs[0x4ed3e6]
+emacs[0x4ed504]
+/lib64/libpthread.so.0[0x375220efe0]
+/lib64/libpthread.so.0(read+0xe)[0x375220e08e]
+emacs[0x509af6]
+emacs[0x5acc26]
+@dots{}
+@end example
+
+@noindent
+数字@samp{11}是与崩溃相对应的系统信号编号——在本例中是分段错误。  十六进制数字是程序地址，可以使用调试工具将其与源代码行关联起来。  例如，GDB 命令 @samp{list *0x509af6} 打印与 @samp{emacs[0x509af6]} 条目相对应的源代码行。  如果您的系统有 @command{addr2line} 实用程序，则以下 shell 命令会输出带有源代码行号的回溯：
+
+@example
+sed -n 's/.*\[\(.*\)]$/\1/p' @var{backtrace} |
+  addr2line -C -f -i -p -e @var{bindir}/@var{emacs-binary}
+@end example
+
+@noindent
+在 MS-Windows 上，回溯看起来有些不同，例如：
+
+@example
+Backtrace:
+00007ff61166a12e
+00007ff611538be1
+00007ff611559601
+00007ff6116ce84a
+00007ff9b7977ff0
+@dots{}
+@end example
+
+@noindent
+因此，不需要通过@command{sed}进行过滤，显示源代码行号的命令是
+
+@example
+ addr2line -C -f -i -p -e @var{bindir}/@var{emacs-binary} < @var{backtrace}
+@end example
+
+@noindent
+这里， @var{backtrace} 是包含回溯副本的文本文件的名称（在 MS-Windows 上，@file{emacs_backtrace.txt} 在启动 Emacs 的目录中）， @var{bindir} 是包含 Emacs 可执行文件的目录名称，@var{emacs-binary} 是 Emacs 可执行文件的名称，在 GNU 和 Unix 系统上通常为 @file{emacs} 和 @file{emacs.exe}在 MS-Windows 和 MS-DOS 上@. 如果您的 @command{addr2line} 版本太旧而无法使用，请忽略 @option{-p} 选项。
+
+@cindex core dump
+或者，在支持核心文件的系统上，Emacs 崩溃时可以生成 @dfn{core dump}。  核心转储是一个包含有关崩溃之前程序状态的大量数据的文件，通常通过将其加载到调试器（例如 GDB@.）中进行检查。在许多平台上，默认情况下禁用核心转储，并且您必须通过运行 shell 命令@samp{ulimit -c unlimited}（例如，在 shell 启动脚本中）显式启用它们。
+
+@node After a Crash
+@subsection 崩溃后恢复
+@cindex recovering crashed session
+
+如果 Emacs 或计算机崩溃，您可以从自动保存文件中恢复崩溃时正在编辑的文件。  为此，请再次启动 Emacs 并输入命令 @kbd{M-x recover-session}。
+
+此命令最初显示一个缓冲区，其中列出了中断的会话文件，每个文件都有其日期。  您必须选择要从哪个会话中恢复。  通常，您想要的就是最新的。  将光标移至您选择的位置，然后输入 @kbd{C-c C-c}。
+
+然后 @code{recover-session} 考虑您在该会话期间编辑的每个文件；对于每个这样的文件，它会询问是否恢复该文件。  如果您对某个文件回答@kbd{y}，它会显示该文件及其自动保存文件的日期，然后再次询问是否恢复该文件。  对于第二个问题，您必须用@kbd{yes}确认。  如果这样做，Emacs 会访问该文件，但会从自动保存文件中获取文本。
+
+@code{recover-session} 完成后，您选择恢复的文件将出现在 Emacs 缓冲区中。  然后你应该保存它们。  只有这样——保存它们——才能更新文件本身。
+
+作为最后的手段，如果您的缓冲区内容不与任何文件关联，或者自动保存的时间不够长，无法记录重要更改，则可以使用 @file{etc/emacs-buffer.gdb} 脚本和 GDB（GNU 调试器）从核心转储中检索它们 — 前提是已保存核心转储，并且 Emacs 可执行文件未删除其调试符号。
+
+一旦获得核心转储，请将其重命名为另一个名称，例如 @file{core.emacs}，这样下次崩溃就不会覆盖它。
+
+要使用此脚本，请使用 Emacs 可执行文件的文件名和核心转储的文件名运行 @code{gdb}，例如 @samp{gdb /usr/bin/emacs core.emacs}。  在 @code{(gdb)} 提示符下，加载恢复脚本：@samp{source /usr/src/emacs/etc/emacs-buffer.gdb}。然后输入命令 @code{ybuffer-list} 查看哪些缓冲区可用。  对于每个缓冲区，它列出了一个缓冲区编号。  要保存缓冲区，请使用@code{ysave-buffer}；您指定缓冲区编号以及要写入该缓冲区的文件名。  您应该使用尚不存在的文件名；如果该文件确实存在，则脚本不会备份其旧内容。
+
+@node Emergency Escape
+@subsection 紧急逃生
+@cindex emergency escape
+
+在文本终端上，如果您在 Emacs 实际响应第一次退出之前再次键入 @kbd{C-g}，@dfn{emergency escape} 功能会立即暂停 Emacs。  这样您就可以随时退出 GNU Emacs，无论它挂起的情况有多严重。当一切正常时，Emacs 会快速识别并处理第一个 @kbd{C-g}，以致第二个不会触发紧急逃生。  但是，如果某些问题阻止 Emacs 正确处理第一个 @kbd{C-g}，那么第二个问题将使您返回 shell。
+
+当您在因紧急逃生而暂停后恢复 Emacs 时，它会报告恢复情况并在返回到之前执行的操作之前询问一两个问题：
+
+@example
+Emacs is resuming after an emergency escape.
+Auto-save? (y or n)
+Abort (and dump core)? (y or n)
+@end example
+
+@noindent
+用 @kbd{y} 或 @kbd{n} 回答每个问题，然后用 @key{RET} 回答。
+
+说出 @kbd{y} 到 @samp{Auto-save?} 会立即自动保存所有启用自动保存的已修改缓冲区。  说 @kbd{n} 会跳过这个。  如果 Emacs 处于无法安全地进行自动保存的状态，则可以忽略此问题。
+
+对 @samp{Abort (and dump core)?} 说出 @kbd{y} 会导致 Emacs 崩溃，转储核心。  这是为了让向导能够找出 Emacs 无法退出的原因。  核心转储后不会继续执行。
+
+如果您回答这个问题@kbd{n}，Emacs 执行将恢复。  幸运的话，Emacs 最终会执行所请求的退出。  如果没有，随后的每个@kbd{C-g}都会再次调用紧急逃生。
+
+如果 Emacs 没有真正挂起，只是速度缓慢，您可能会无意中调用 double @kbd{C-g} 功能。  然后继续回答这两个问题@kbd{n}，你就会回到之前的状态。  你所要求的退出将会逐渐发生。
+
+紧急逃生仅对文本终端有效。  在图形显示上，您可以使用鼠标来终止 Emacs 或切换到另一个程序。
+
+在 MS-DOS 上，您必须键入 @kbd{C-@key{Break}}（两次）才能引起紧急逃生 — 但在某些情况下它不起作用，例如系统调用挂起或 Emacs 陷入 C 代码的紧密循环中。
+
+@node DEL Does Not Delete
+@subsection 如果@key{DEL}删除失败
+@cindex @key{DEL} vs @key{BACKSPACE}
+@cindex @key{BACKSPACE} vs @key{DEL}
+@cindex @key{DEL} does not delete
+
+每个键盘都有一个大键，通常标记为@key{BACKSPACE}，通常用于删除您键入的最后一个字符。在 Emacs 中，该键应该相当于 @key{DEL}。
+
+当 Emacs 在图形显示器上启动时，它会自动确定哪个键应该是 @key{DEL}。  在某些异常情况下，Emacs 从系统获取错误信息，并且 @key{BACKSPACE} 最终会向前删除而不是向后删除。
+
+有些键盘还有一个@key{Delete}键，通常用于删除前进。  如果这个键在 Emacs 中向后删除，那也表明 Emacs 得到了错误的信息——但意义相反。
+
+在文本终端上，如果您发现@key{BACKSPACE}提示输入帮助命令，例如@kbd{Control-h}，而不是删除字符，则意味着该键实际上正在发送@samp{BS}字符。  Emacs 应该将 @key{BS} 视为 @key{DEL}，但事实并非如此。
+
+@findex normal-erase-is-backspace-mode
+在所有这些情况下，立即补救措施都是相同的：使用命令@kbd{M-x normal-erase-is-backspace-mode}。  这会在 Emacs 支持处理 @key{DEL} 的两种模式之间切换，因此如果 Emacs 以错误的模式启动，则应切换到正确的模式。  在文本终端上，如果您想在 @key{BS} 被视为 @key{DEL} 时寻求帮助，请使用 @key{F1} 而不是 @kbd{C-h}；如果发送字符代码 127，@kbd{C-?} 也可以工作。
+
+要修复每个 Emacs 会话中的问题，请将以下行之一放入初始化文件 (@pxref{Init File})。  对于上面的第一种情况，其中 @key{BACKSPACE} 向前删除而不是向后删除，请使用此行使 @key{BACKSPACE} 充当 @key{DEL}：
+
+@lisp
+(normal-erase-is-backspace-mode 0)
+@end lisp
+
+@noindent
+对于其他两种情况，请使用以下行：
+
+@lisp
+(normal-erase-is-backspace-mode 1)
+@end lisp
+
+@vindex normal-erase-is-backspace
+解决每个 Emacs 会话问题的另一种方法是自定义变量 @code{normal-erase-is-backspace}：值 @code{t} 指定模式，其中 @key{BS} 或 @key{BACKSPACE} 为 @key{DEL}，@code{nil} 指定另一种模式。  @xref{Easy Customization}。
+
+@node Bugs
+@section 报告错误
+
+@cindex bugs
+如果您认为您在 Emacs 中发现了错误，请报告它。  我们不能承诺修复它，或者总是同意它是一个错误，但我们当然想听到它。  这同样适用于您希望添加的新功能。  本节将帮助您确定是否发现了错误，如果是，则构建有效的错误报告。
+
+当您发现可能存在错误的内容时，一般过程如下：
+
+@itemize @bullet
+@item
+查看您发现的是否是已知问题或已报告和/或修复的错误。  @xref{Known Problems}，您可以在其中找到如何查找已知问题和错误。
+
+@item
+如果您不确定所看到的行为是否是错误，请参阅@ref{Bug Criteria}，它告诉我们我们认为 Emacs 中的明显错误。
+
+@item
+一旦您确定发现了错误，请参阅@ref{Understanding Bug Reporting}，这可以帮助您以最有效的方式描述您所看到的内容，使我们能够更轻松地重现问题并进行调查。
+
+@item
+接下来，请参阅@ref{Checklist, Checklist for Bug Reports}，其中我们详细描述了如何提交错误报告以及其中应包含哪些信息。  简而言之，您可以使用 Emacs 命令 @code{report-emacs-bug} 通过电子邮件提交错误报告，该命令可以帮助您完成此操作。  提交错误报告会启动调查和修复错误的过程，您将收到讨论该错误的电子邮件副本，我们可能会要求您提供更多信息、测试可能的修复等。
+
+@cindex security, reporting issues
+@item
+如果您认为您可能发现了需要私下沟通的安全问题，请直接联系 GNU Emacs 维护人员。  请参阅 Emacs 发行版中的文件 @file{admin/MAINTAINERS} 了解他们的联系方式。
+
+@item
+最后，如果您想对 Emacs 提出具体更改，无论是修复错误、添加新功能还是改进我们的文档，请参阅@ref{Sending Patches}，了解有关提交此类更改的详细信息。
+@end itemize
+
+@menu
+* Known Problems::                如何阅读已知问题和错误。
+* Criteria:  Bug Criteria.        你真的发现bug了吗？
+* Understanding Bug Reporting::   如何有效地报告错误。
+* Checklist::                     良好的错误报告应遵循的步骤。
+* Sending Patches::               如何发送 GNU Emacs 补丁。
+@end menu
+
+@node Known Problems
+@subsection 阅读现有的错误报告和已知问题
+@cindex known bugs and problems
+
+在报告错误之前，如果可能的话，请检查我们是否已经了解该错误。  事实上，它可能已经在 Emacs 的后续版本或开发版本中得到修复。  以下是您可以阅读有关已知问题的主要位置的列表：
+
+@itemize
+@item
+@file{etc/PROBLEMS} 文件；输入 @kbd{C-h C-p} 来读取它。  该文件包含在编译、安装和运行 Emacs 时遇到的特别众所周知的问题的列表，特别强调由其他软件引起的在 Emacs 中无法轻松解决的问题。  通常，您会发现有关解决方法和解决方案的建议。
+
+@cindex bug tracker
+@cindex issue tracker
+@cindex search known bugs
+@item
+GNU Bug Tracker 位于@url{https://debbugs.gnu.org}。  Emacs 错误和问题记录在 @samp{emacs} 包下的跟踪器中。  跟踪器记录有关每个错误的状态、初始错误报告以及错误报告者和参与讨论和修复错误的 Emacs 开发人员的后续消息。  您可以按主题、严重性和其他条件搜索错误。  对于更复杂的搜索条件，请使用@url{https://debbugs.gnu.org/cgi/search.cgi}。
+
+@cindex debbugs package
+您可以使用 @code{debbugs} 包从 Emacs 中浏览它，而不是作为网页浏览错误跟踪器，该包可以通过包菜单 (@pxref{Packages}) 下载。  该软件包提供了命令 @kbd{M-x debbugs-gnu} 来列出错误，并提供命令 @kbd{M-x debbugs-gnu-search} 来搜索特定错误。  由 Emacs 维护者应用的用户标签由 @kbd{M-x debbugs-gnu-usertags} 显示。
+
+@item
+@samp{bug-gnu-emacs} 邮件列表（也可作为新闻组 @samp{gnu.emacs.bug}）。  您可以在@url{https://lists.gnu.org/mailman/listinfo/bug-gnu-emacs}阅读列表档案。  该列表充当 Emacs 错误报告和发送到错误跟踪器的后续消息的镜像。  它还包含 bug 跟踪器引入之前（2008 年初）的旧 bug 报告。
+
+如果您愿意，可以订阅该列表。  请注意，其目的是为 Emacs 维护人员提供有关错误和功能请求的信息，因此报告可能包含相当大量的数据；观众不应该对此抱怨。
+
+@item
+@samp{emacs-pretest-bug} 邮件列表。  该列表已不再使用，主要具有历史意义。  曾经，它被用于 Emacs 开发（即尚未发布）版本中的错误报告。  您可以在 @url{https://lists.gnu.org/r/emacs-pretest-bug/} 阅读 2003 年至 2007 年中期的档案。  如今，发送到此列表的电子邮件将被重定向到@samp{bug-gnu-emacs}。
+
+@item
+@samp{emacs-devel} 邮件列表。  有时人们会向此邮件列表报告错误。  然而，这不是该列表的主要目的，最好将错误报告发送到错误列表。  在报告错误之前，您不应该觉得有必要阅读此列表。
+@end itemize
+
+
+@node Bug Criteria
+@subsection 什么时候有Bug
+@cindex bug criteria
+@cindex what constitutes an Emacs bug
+
+如果 Emacs 访问无效的内存位置（又名@:“分段错误”）或退出并显示操作系统错误消息，表明程序存在问题（而不是“磁盘已满”），那么它肯定是一个错误。
+
+如果 Emacs 显示与缓冲区的内容不正确对应，则这是一个错误。  但您应该检查诸如缓冲区缩小 (@pxref{Narrowing}) 之类的功能（可以隐藏部分缓冲区或更改其显示方式）是否不负责。
+
+花费很长时间才能完成一个命令可能是一个错误，但您必须确保这确实是 Emacs 的错误。  有些命令只是需要很长时间。  输入 @kbd{C-g}（在 MS-DOS 上为 @kbd{C-@key{Break}}），然后输入 @kbd{C-h l} 查看 Emacs 收到的输入是否是您想要输入的内容；如果输入是这样的，您 @emph{know} 它应该被快速处理，请报告错误。  如果您不知道该命令是否需要花费很长时间，请通过查看手册或寻求帮助来找出答案。
+
+如果您熟悉的命令在其通常定义应该合理的情况下导致 Emacs 错误消息，那么它可能是一个错误。
+
+如果一个命令做了错误的事情，那就是一个错误。  但请确保您确切地知道它应该做什么。  如果您不熟悉该命令，它实际上可能工作正常。  如果有疑问，请阅读命令的文档 (@pxref{Name Help})。
+
+命令的预期定义可能不是用于编辑的最佳定义。  这是一个非常重要的问题，但也是一个判断问题。  而且，由于对某些现有特征的无知，很容易得出这样的结论。  最好不要抱怨这样的问题，直到您以通常的方式检查了文档，确信自己理解了它，并且确定您想要的东西不可用。  也请询问其他 Emacs 用户。  如果您在仔细阅读手册后不确定该命令的用途，请检查索引和术语表中是否有任何不清楚的术语。
+
+如果仔细重读手册后您仍然不明白该命令应该做什么，则表明手册中存在错误，您应该报告该错误。  本手册的作用是让非 Emacs 专家（包括您）明白所有内容。  报告文档错误与报告程序错误同样重要。
+
+如果函数或变量的内置文档与手册不一致，则其中之一一定是错误的；这是一个错误。
+
+对于不属于 Emacs 的包的问题，​​最好首先向包开发人员报告它们。
+
+@node Understanding Bug Reporting
+@subsection 了解错误报告
+@cindex bug reporting, principles
+@cindex report an Emacs bug, how to
+
+当您确定存在错误时，报告它并以有用的方式报告它很重要。  最有用的是对您键入的命令的准确描述，从运行 Emacs 的 shell 命令开始，直到问题发生，以及键入这些命令所产生的效果。
+
+报告bug最重要的原则是报告@emph{facts}。  假设和口头描述不能替代详细的原始数据。  报道事实很简单，但许多人却竭力提出解释并报道，而不是报道事实。  如果这些解释是基于对 Emacs 如何实现的猜测，那么它们可能没有用；同时，由于缺乏事实，我们将无法获得有关该错误的真实信息。  如果您想真正解决问题，并报告不仅仅是猜测的解释，这是有用的——但也请包括原始事实。
+
+例如，假设您输入 @kbd{C-x C-f /glorp/baz.ugh @key{RET}}，访问一个（您知道）恰好相当大的文件，并且 Emacs 显示 @samp{I feel pretty today}。  错误报告需要提供所有这些信息。  您不应该假设问题是由于文件的大小引起的，并说：“我访问了一个大文件，Emacs 显示了@samp{I feel pretty today}。”这就是我们所说的“猜测解释”的意思。  该问题可能是由于文件名中存在 @samp{z} 造成的。  如果是这样，那么当我们收到您的报告时，我们会尝试使用一些大文件（可能名称中没有 @samp{z}）来解决该问题，但不会发现任何问题。  我们不可能猜测我们应该尝试访问名称中带有 @samp{z} 的文件。
+
+你甚至不应该说“访问文件”而不是 @kbd{C-x C-f}。这是因为一个文件可以通过多种方式访问​​，并且不能确定所有这些方式都会重现该问题。  同样，不要说“如果我一行中有三个字符”，而是说“在我输入@kbd{@key{RET} A B C @key{RET} C-p}”之后，如果这是您输入文本的方式——也就是说，请告诉我们在您的情况下产生问题的文本。
+
+如果可能，请尝试通过使用 @command{emacs -Q} 调用 Emacs（以便 Emacs 启动时不进行初始自定义；@pxref{Initial Options}）来快速重现该错误，并重复触发该错误所采取的步骤。  如果您可以通过这种方式重现错误，则可以排除您个人自定义中的错误，并使错误更容易重现。  然后，您的错误报告应该首先说明您使用 @command{emacs -Q} 启动 Emacs，然后是重现该错误的确切步骤顺序。  如果可能，请告知我们重现错误所需的任何文件的确切内容。
+
+有些错误无法从 @command{emacs -Q} 重现；有些根本不容易重现。  在这种情况下，您应该报告您所拥有的内容，但是，像以前一样，请坚持有关您第一次触发错误的操作的原始事实。
+
+如果您想要报告多个问题，请为每个问题单独提交错误报告。
+
+@node Checklist
+@subsection 错误报告清单
+@cindex checklist before reporting a bug
+@cindex bug reporting, checklist
+@cindex report bugs in Emacs
+
+在报告错误之前，首先尝试查看该问题是否已报告（@pxref{Known Problems}）。
+
+如果可以，请尝试最新版本的 Emacs，看看问题是否已得到解决。  更好的是尝试最新的开发版本。  我们认识到这对某些人来说并不容易，因此不要认为您在举报之前绝对必须这样做。
+
+@findex report-emacs-bug
+为 Emacs 编写错误报告的最佳方法是使用命令 @kbd{M-x report-emacs-bug}。  这会设置一个邮件缓冲区 (@pxref{Sending Mail}) 并自动插入 @emph{some} 基本信息。  然而，它无法提供所有必要的信息；您仍应阅读并遵循以下指南，以便您可以在发送消息之前手动输入其他重要信息。  您可能会觉得@kbd{M-x report-emacs-bug}插入的一些信息不相关，但除非您绝对确定，否则最好保留它，以便开发人员自己决定。
+
+当你写完报告后，输入 @kbd{C-c C-c} 它将被发送给 Emacs 维护者：
+@ifnothtml
+@email{bug-gnu-emacs@@gnu.org}.
+@end ifnothtml
+@ifhtml
+@url{https://lists.gnu.org/mailman/listinfo/bug-gnu-emacs, bug-gnu-emacs}.
+@end ifhtml
+如果您无法从 Emacs 内部发送邮件，您可以将报告文本复制到普通邮件客户端（如果您的系统支持，您可以输入 @kbd{C-c M-i} 让 Emacs 为您执行此操作）并将其发送到该地址。  或者，您可以简单地向该地址发送一封电子邮件来描述问题，包括下面提到的必要信息。
+
+如果您想向 Emacs 提交代码（以修复问题或实现新功能），最简单的方法是将补丁发送到 Emacs 问题跟踪器。  使用 @kbd{M-x submit-emacs-patch} 命令，其工作方式与报告错误时非常相似； @pxref{Sending Patches}。
+
+无论如何，您的报告将被发送到 @samp{bug-gnu-emacs} 邮件列表，并存储在 GNU Bug Tracker 的 @url{https://debbugs.gnu.org} 中。  请附上有效的回复电子邮件地址，以便我们需要向您询问有关报告的更多信息。  提交内容会经过审核，因此您的报告实际显示在跟踪器上可能会有延迟。
+
+您无需了解 GNU Bug Tracker 的工作原理即可报告 bug，但如果您愿意，您可以读取跟踪器的 @uref{https://debbugs.gnu.org/Advanced.html, online documentation} 来查看您可以使用的各种功能。
+
+所有发送到 @samp{bug-gnu-emacs} 邮件列表的邮件也会通过网关发送到 @samp{gnu.emacs.bug} 新闻组。  反之亦然，但我们要求您不要通过新闻组发布错误报告（或回复）。  如果我们需要获取更多信息，它可能会让联系您变得更加困难，并且它不能与错误跟踪器很好地集成。
+
+如果您的数据超过500,000字节，请不要直接将其包含在错误报告中；相反，可以根据要求提供发送信息，或者在线提供并说明地址。  大附件最好压缩发送。
+
+GNU Bug Tracker 将为您的报告分配一个 Bug 编号；请在下面的讨论中使用它，将Bug地址保留在收件人列表中，以便Bug讨论被跟踪器记录。  错误地址将类似于 @samp{@var{nnnnn}@@debbugs.gnu.org}，其中 @var{nnnnn} 是错误编号。
+
+为了使维护人员能够调查错误，您的报告应包含以下所有内容：
+
+@itemize @bullet
+@item
+描述您观察到的您认为不正确的行为。  例如，“Emacs 进程收到致命信号”，或者“结果文本如下，我认为这是错误的。”
+
+当然，如果错误是 Emacs 收到致命信号，那么就不能错过它。  但如果错误是不正确的文本，维护者可能无法注意到问题所在。  为什么要听凭机遇呢？
+
+即使你遇到的问题是一个致命的信号，你仍然应该明确地说出来。  假设发生了一些奇怪的事情，例如，您的源代码副本不同步，或者您在系统上的 C 库中遇到了错误。  （这已经发生了！）您的副本可能会崩溃，而此处的副本可能不会。  如果您 @emph{said} 预计会发生崩溃，那么当这里的 Emacs 未能崩溃时，我们就会知道该错误没有发生。  如果您不说预计会发生崩溃，那么我们将不知道该错误是否正在发生——我们将无法从我们的观察中得出任何结论。
+
+通常，对行为和重现问题的方式的描述需要指定以下一个或多个方面：
+
+@itemize @minus
+@item
+重现错误所需的任何文件的完整文本。
+
+如果您能告诉我们在不访问任何文件的情况下导致问题的方法，请告诉我们。  这使得调试变得更加容易。  如果您确实需要文件，请确保安排我们查看其确切内容。  例如，行尾是否有空格，或者缓冲区中最后一行之后是否有换行符可能很重要（没有什么应该关心最后一行是否终止，但尝试告诉错误）。
+
+@item
+我们需要输入精确的命令来重现错误。  如果可能的话，给出以 @samp{-Q} 选项 (@pxref{Initial Options}) 开头的 Emacs 的完整配方。  这会绕过您的个人定制。
+
+@findex open-dribble-file
+@cindex dribble file
+@cindex logging keystrokes
+精确记录 Emacs 输入的一种方法是编写一个 dribble 文件。  要启动该文件，请使用命令@w{@kbd{M-x open-dribble-file}}。从那时起，Emacs 会将您的所有输入复制到指定的 dribble 文件中，直到 Emacs 进程被终止。  请注意，敏感信息（例如密码）最终可能会记录在运球文件中。
+
+@item
+如果错误是 Emacs 手册或 Emacs Lisp 参考手册未能描述 Emacs 的实际行为，或者文本令人困惑，请从手册中复制您认为有问题的文本。  如果节很小，只需节名称就足够了。
+
+@item
+如果错误的表现是 Emacs 错误消息，则报告错误消息的精确文本以及显示 Emacs 中的 Lisp 程序如何到达错误的回溯非常重要。
+
+要准确获取错误消息文本，请将其从 @file{*Messages*} 缓冲区复制到错误报告中。  复制全部，而不是部分。
+
+@item
+检查您加载到 Lisp 世界中的任何程序（包括初始化文件）是否设置了可能影响 Emacs 功能的任何变量。  另外，看看问题是否发生在新启动的 Emacs 中，而没有加载初始化文件（使用 @code{-Q} 开关启动 Emacs 以防止加载初始化文件）。如果问题确实发生了，您必须报告必须加载到 Lisp 世界中才能导致问题发生的任何程序的准确内容。
+
+@item
+如果问题确实取决于 init 文件或其他不属于标准 Emacs 系统的 Lisp 程序，那么您应该首先向其维护者投诉，以确保这不是这些程序中的错误。  在他们验证他们正在以预期的方式使用 Emacs 后，他们应该报告该错误。
+
+@item
+如果您想提及 GNU Emacs 源代码中的某些内容，请显示该代码行以及几行上下文。  不要只给出行号。
+
+开发源代码中的行号与您的源代码中的行号不匹配。  维护人员需要做额外的工作才能确定您的版本中给定行号的代码，而且我们无法确定。
+
+@item
+@findex open-termscript
+@cindex termscript file
+@vindex TERM@r{, environment variable, and display bugs}
+对于文本模式终端上可能出现的显示错误，终端类型（环境变量 @env{TERM} 的值）、@file{/etc/termcap} 中终端的完整 termcap 条目（因为该文件在所有计算机上并不相同）以及 Emacs 实际发送到终端的输出。
+
+收集终端输出的方法是在启动 Emacs 后调用命令 @kbd{M-x open-termscript}；它会提示您输入记录所有终端输出的文件名，直到 Emacs 进程被终止。  如果问题发生在 Emacs 启动时，请将 Lisp 表达式放入
+
+@example
+(open-termscript "~/termscript")
+@end example
+
+@noindent
+到 Emacs 初始化文件中，以便 Emacs 第一次显示屏幕时打开 termscript 文件。
+
+请注意：如果不访问引发错误的终端类型，修复与终端相关的错误通常很困难，有时甚至是不可能的。
+@end itemize
+
+@item
+Emacs 的版本号。  如果没有这个，我们就不知道在当前版本的 GNU Emacs 中寻找 bug 是否有任何意义。
+
+@findex emacs-version
+@kbd{M-x report-emacs-bug} 自动包含此信息，但如果您未在报告中使用该命令，则可以通过键入 @kbd{M-x emacs-version @key{RET}} 获取版本号。  如果该命令不起作用，您可能拥有 GNU Emacs 之外的其他东西，因此您必须在其他地方报告该错误。
+
+@item
+您正在使用的机器类型，以及操作系统名称和版本号（同样，自动包含在 @w{@kbd{M-x report-emacs-bug}} 中）。  @w{@kbd{M-x emacs-version @key{RET}}} 也提供了此信息。  从 @file{*Messages*} 缓冲区复制其输出，以便获得全部并准确获取，或者使用 @w{@kbd{C-u M-x emacs-version @key{RET}}} 将版本信息插入到当前缓冲区中。
+
+@item
+构建 Emacs 时赋予 @code{configure} 命令的命令行参数（由 @kbd{M-x report-emacs-bug} 自动包含）。
+
+@item
+您对 Emacs 源代码所做的任何修改的完整列表。 （我们可能没有时间调查该错误，除非它发生在未经修改的 Emacs 中。但如果您进行了修改并且没有告诉我们，那么您就让我们白费力气了。）
+
+准确地了解这些变化。  英文描述是不够的——为它们发送统一的上下文差异。
+
+添加您自己的文件，或移植到另一台机器，都是对源代码的修改。
+
+@item
+与安装 GNU Emacs 标准过程的任何其他偏差的详细信息。
+
+@item
+如果非 @acronym{ASCII} 文本或国际化相关，则为启动 Emacs 时当前的语言环境。   这会自动包含在 @kbd{M-x report-emacs-bug} 中；或者，在 GNU/Linux 和 Unix 系统上，或者如果您使用 POSIX 风格的 shell（例如 Bash），则可以使用此 shell 命令来查看相关值：
+
+@smallexample
+echo LC_ALL=$LC_ALL LC_COLLATE=$LC_COLLATE LC_CTYPE=$LC_CTYPE \
+  LC_MESSAGES=$LC_MESSAGES LC_TIME=$LC_TIME LANG=$LANG
+@end smallexample
+
+您还可以使用 @command{locale} 命令（如果您的系统有）来显示您的区域设置。
+@end itemize
+
+以下是错误报告中不必要的一些内容：
+
+@itemize @bullet
+@item
+对错误包络的描述——对于可重现的错误来说，这不是必需的。
+
+遇到错误的人通常会花费大量时间来调查输入文件的哪些更改将使错误消失以及哪些更改不会影响它。
+
+这通常很耗时而且不太有用，因为我们找到错误的方法是在调试器下使用断点运行单个示例，而不是通过一系列示例的纯粹推导。您不妨不搜索其他示例来节省时间。最好立即发送错误报告，然后返回编辑，然后找到另一个错误来报告。
+
+当然，如果你能找到一个更简单的例子来报告原始的@emph{instead}，那就方便了。  输出中的错误将更容易发现，在调试器下运行将花费更少的时间，等等。
+
+然而，简化并不重要。如果您无法执行此操作或没有时间尝试，请使用原始测试用例报告该错误。
+
+@item
+核心转储文件。
+
+调试核心转储可能很有用，但只能在您的计算机上使用 Emacs 可执行文件来完成。  因此，将核心转储文件发送给 Emacs 维护人员是没有用的。  最重要的是，不要在电子邮件错误报告中包含核心文件！  如此大的消息可能会非常不方便。
+
+@item
+Emacs 执行的系统调用跟踪。
+
+系统调用跟踪对于某些特殊类型的调试非常有用，但在大多数情况下，它们提供的有用信息很少。  因此，奇怪的是，许多人似乎认为 @emph{the} 报告崩溃信息的方法是发送系统调用跟踪。  也许这是由于调试没有源代码或调试符号的程序的经验而形成的习惯。
+
+在大多数程序中，回溯通常比系统调用跟踪提供更多信息。  即使在 Emacs 中，简单的回溯通常也能提供更多信息，但为了提供完整的信息，您应该通过显示变量值并将其打印为带有 @code{pr} 的 Lisp 对象来补充回溯（见上文）。
+
+@item
+该错误的补丁。
+
+如果 bug 的补丁是好的，那么它是有用的。  但不要忽略错误报告所需的其他信息，例如测试用例，假设补丁就足够了。  我们可能会发现您的补丁存在问题，并决定以其他方式解决该问题，或者我们可能根本不理解它。  如果我们无法理解您要修复的错误，或者为什么您的补丁应该有所改进，我们就不能安装它。  @xref{Sending Patches}，了解如何让我们轻松理解和安装您的补丁的指南。
+
+@item
+猜测 bug 是什么或者它依赖什么。
+
+这样的猜测通常是错误的。  如果不首先使用调试器找到事实，即使是专家也无法正确猜测此类事情。
+@end itemize
+
+如果您愿意调试 Emacs 并提供有关该错误的其他信息，这里有一些有用的建议：
+
+@findex toggle-debug-on-error
+@pindex Edebug
+@itemize
+@item
+如果 bug 本身表现为错误消息，请尝试为该错误提供 Lisp 回溯。  要对错误进行回溯，请在错误发生之前使用@kbd{M-x toggle-debug-on-error}（也就是说，您必须发出该命令，然后使错误发生）。  这会导致启动 Lisp 调试器时出错，并显示回溯。  将调试器回溯的文本复制到错误报告中。  （如果您在触发错误之前加载相关的 Lisp @file{*.el} 源文件，则回溯会更详细，因此如果您知道如何查找和加载这些文件，请执行此操作。）
+
+要调试错误，我们建议使用 Edebug。  @xref{Edebug,, Edebug, elisp, the Emacs Lisp Reference Manual}，有关使用 Edebug 包调试 Emacs Lisp 程序的信息。
+
+仅当您知道如何使错误再次发生时，才可以使用调试器。  如果您无法再次发生这种情况，至少复制整个错误消息。
+
+@vindex debug-on-quit
+@item
+如果 Emacs 似乎陷入无限循环或非常长的操作中，则键入 @kbd{C-g} 以及变量 @code{debug-on-quit} 非 @code{nil} 将启动 Lisp 调试器并显示回溯。此回溯对于调试如此长的循环非常有用，因此如果您可以生成它，请将其复制到错误报告中。
+
+@vindex debug-on-event
+如果您无法让 Emacs 响应 @kbd{C-g}（例如，因为设置了 @code{inhibit-quit}），那么您可以尝试从 Emacs 外部发送 @code{debug-on-event}（默认 SIGUSR2）指定的信号，使其进入调试器。
+
+@item
+来自 C 调试器（例如 GDB）的附加信息可能使某人能够在他没有的机器上发现问题。如果你不知道如何使用GDB，请阅读GDB手册——它不是很长，使用GDB很容易。  您可以找到 GDB 发行版，包括在线形式的 GDB 手册，在大多数相同的地方您可以找到 Emacs 发行版。  要在 GDB 下运行 Emacs，您应该切换到编译 Emacs 的 @file{src} 子目录，然后输入 @kbd{gdb ./emacs}。  目录 @file{src} 必须是最新的，这样 GDB 才能读取该目录中的 @file{.gdbinit} 文件。  （您还可以通过输入 @kbd{source ./.gdbinit} 告诉 GDB 从 GDB 内部读取该文件。）
+
+但是，当您收集附加信息时，您需要考虑是否希望它显示导致错误的原因。
+
+@cindex backtrace for bug reports
+例如，许多人只发送 C 级回溯，但这本身并不是很有用。  带有参数的简单回溯通常无法传达 GNU Emacs 内部发生的情况，因为回溯中列出的大多数参数都是指向 Lisp 对象的指针。这些指针的数值没有任何意义；重要的是它们指向的对象的内容（大多数内容本身就是指针）。
+
+@findex debug_print
+为了提供有用的信息，您需要以 Lisp 表示法显示 Lisp 对象的值。  对靠近堆栈底部的几个堆栈帧中的每个 Lisp 对象变量执行此操作。  查看源代码以查看哪些变量是 Lisp 对象，因为调试器将它们视为整数。
+
+要以 Lisp 语法显示变量的值，请首先打印其值，然后使用用户定义的 GDB 命令@code{pr} 以 Lisp 语法打印 Lisp 对象。  （如果必须使用另一个调试器，请使用该对象作为参数调用函数 @code{debug_print}。） @code{pr} 命令由文件 @file{.gdbinit} 定义，并且仅在调试正在运行的进程（不使用核心转储）时才有效。
+
+要使 Lisp 错误停止 Emacs 并返回到 GDB，请在@code{Fsignal}处放置一个断点。
+
+要查看正在运行的 Lisp 函数的回溯，请输入 GDB 命令@code{xbacktrace}。
+
+文件 @file{.gdbinit} 定义了其他几个命令，这些命令对于检查 Lisp 对象的数据类型和内容很有用。  他们的名字以@samp{x}开头。  这些命令的工作级别低于 @code{pr}，并且不太方便，但即使 @code{pr} 不工作，它们也可能工作，例如在调试核心转储时或 Emacs 出现致命信号时。
+
+@cindex debugging Emacs, tricks and techniques
+Emacs 发行版中的文件@file{etc/DEBUG} 提供了更详细的建议和其他有用的调试 Emacs 的技术。该文件还包括调查 Emacs 停止响应问题的说明（许多人认为 Emacs 被“挂起”，而实际上它可能处于无限循环中）。
+
+要在 Emacs 安装中查找文件 @file{etc/DEBUG}，请使用变量 @code{data-directory} 中存储的目录名称。
+@end itemize
+
+@node Sending Patches
+@subsection 发送 GNU Emacs 补丁
+
+@cindex sending patches for GNU Emacs
+@cindex patches, sending
+如果您想为 GNU Emacs 编写错误修复或改进，这非常有帮助。  当您发送更改时，请遵循这些指南，以便维护人员轻松使用它们。  如果您不遵循这些准则，您的信息可能仍然有用，但使用它需要额外的工作。  即使在最好的情况下，维护 GNU Emacs 也是一项艰巨的工作，除非您尽力提供帮助，否则我们无法跟上。
+
+每个补丁都必须有几条信息，然后我们才能正确评估它。  它们的描述如下。
+
+当您拥有所有这些部分后，请使用 @kbd{M-x submit-emacs-patch} 命令发送补丁。  该命令将提示您输入补丁的主题和补丁文件。  然后，它将创建并显示一个消息模式缓冲区，并将补丁文件作为附件，显示该缓冲区，并让您解释有关补丁的更多信息，并按下面的要求添加任何其他信息。  完成后，输入 @kbd{C-c C-c} 通过电子邮件将补丁发送给开发人员。  它将被发送到 GNU Bug Tracker (@url{https://debbugs.gnu.org})。  跟踪器将为您的提交分配一个编号，就像错误报告一样。  开发人员通常会回复，可能会要求您提供更多详细信息或任何其他信息，因此请务必包含有效的回复电子邮件地址。
+
+以下是我们要求您在提交补丁时提供的内容：
+
+@itemize @bullet
+@item
+解释您正在修复什么问题或补丁将带来什么改进：
+
+@itemize @minus
+@item
+要修复现有错误，最好回复 @samp{bug-gnu-emacs} 列表上的相关讨论，或 GNU Bug Tracker @url{https://debbugs.gnu.org} 中的错误条目。  解释为什么您的更改修复了该错误。
+
+@item
+对于新功能，请包含该功能的描述和您的实现。
+
+@item
+对于新错误，请针对您认为已修复的问题提供适当的错误报告； @pxref{Checklist, Checklist for Bug Reports}。  在安装之前，我们需要说服自己更改是正确的。即使它是正确的，如果我们没有办法重现它试图解决的问题，我们也可能很难理解它。
+@end itemize
+
+@item
+在代码更改中包含所有适合帮助将来阅读源代码的人理解为什么需要此更改的注释。
+
+@item
+不要将出于不同原因所做的更改混在一起。发送给他们@emph{individually}。
+
+如果您出于不同的原因进行了两项更改，那么我们可能不想同时安装它们。  我们可能只想安装一个，或者在不同版本的 Emacs 中分别安装它们。  如果您将它们全部混杂地发送到一组差异中，我们就必须做额外的工作来理清它们——找出更改的哪些部分服务于哪个目的。  如果我们没有时间这样做，我们可能不得不推迟很长时间包含您的补丁。
+
+如果您在写完每个更改后立即发送它，并附上自己的解释，那么两个更改就永远不会纠缠在一起，我们可以正确考虑每个更改，而无需任何额外的工作来理清它们。
+
+@item
+更改完成后立即发送该更改。  有时，人们认为他们通过积累许多变化并将其全部发送到一起来帮助我们。  如上所述，这绝对是您能做的最糟糕的事情。
+
+由于您应该单独发送每个更改，因此您最好立即发送。  如果重要的话，我们可以选择立即安装它。
+
+@item
+补丁本身。  这可以通过以下方式之一生成：
+
+@itemize @minus
+@item
+如果您使用 Emacs 存储库，请确保您的副本是最新的（例如，带有 @code{git pull}）。  您可以将更改提交到私有分支，并使用 @code{git format-patch master} 从主版本生成补丁。  （这是首选方法，因为它使我们应用补丁的工作变得更容易。）或者您可以不提交更改并使用@code{git diff}，如下所述。
+
+@item
+使用 @kbd{diff -u} 进行差异。  如果您有 GNU diff，请在对 C 代码进行 diff 时使用 @w{@kbd{diff -u -F'^[_a-zA-Z0-9$]\+ *('}}。这显示了每次更改发生的函数的名称。
+
+生成差异时，避免任何关于哪个是旧版本、哪个是新版本的歧义。  请将旧版本作为 diff 的第一个参数，将新版本作为第二个参数。  请为其中一个版本起一个名称，以表明它是旧版本还是新更改的版本。
+@end itemize
+
+@item
+写入您的更改的提交日志条目。  这既可以节省我们编写它们的额外工作，也可以帮助解释您的更改，以便我们能够理解它们。
+
+提交日志的目的是解释更改的基本原理、修改后的代码解决补丁试图修复的任何问题的方式，并向人们展示在哪里可以找到更改的内容。因此，您需要具体说明更改了哪些功能以及原因。有关我们的风格和良好提交日志消息要求的详细信息，请参阅 Emacs 源代码树中文件 @file{CONTRIBUTE} 的“提交消息”部分。
+
+另请查看最近提交的提交日志条目，以了解要放入哪些类型的信息，并了解我们使用的样式。  请注意，与其他一些项目不同，我们确实需要文档的提交日志，即 Texinfo 文件。  @xref{Change Log},
+@ifset WWW_GNU_ORG
+参见@url{https://www.gnu.org/prep/standards/html_node/Change-Log-Concepts.html}，
+@end ifset
+@xref{Change Log Concepts, Change Log Concepts, Change Log Concepts, standards, GNU Coding Standards}.
+
+@item
+当您编写修复程序时，请记住，我们无法安装会破坏其他系统的更改。  请考虑如果在其他类型的系统上编译和/或使用您的更改会产生什么影响。
+
+有时人们会发送修复程序，认为 @emph{might} 总体上是一种改进——但很难确定这一点。  实施此类更改很困难，因为我们必须非常仔细地研究它们。  当然，对您认为更改正确的推理进行良好的解释可以帮助说服我们。
+
+最安全的更改是对仅用于特定机器或特定系统的文件或文件部分进行更改。  它们是安全的，因为它们不会在其他机器或系统上产生新的错误。
+
+请以明显可以安全安装的形式设计补丁，帮助我们跟上工作量。
+@end itemize
+
+@node Contributing
+@section 为 Emacs 开发做出贡献
+@cindex contributing to Emacs
+
+Emacs 是一个协作项目，我们鼓励任何人做出贡献。
+
+为 Emacs 做出贡献的方法有很多种：
+
+@itemize
+@item
+发现并报告错误； @pxref{Bugs}。
+
+@item
+回答 Emacs 用户邮件列表 @url{https://lists.gnu.org/mailman/listinfo/help-gnu-emacs} 上的问题。
+
+@item
+编写文档，可以在 @uref{https://www.emacswiki.org/, wiki} 上，也可以在 Emacs 源存储库 (@pxref{Sending Patches}) 中。
+
+@item
+检查现有的错误报告是否已在较新版本的 Emacs @url{https://debbugs.gnu.org/cgi/pkgreport.cgi?which=pkg&data=emacs} 中得到修复。
+
+@item
+修复现有的错误报告。
+
+@item
+@c etc/TODO not in WWW_GNU_ORG
+实现 Emacs 发行版中 @file{etc/TODO} 文件中列出的功能，并提交补丁。
+
+@item
+实现新功能并提交补丁。
+
+@item
+开发一个与 Emacs 配合使用的包，并自行发布或在 GNU ELPA (@url{https://elpa.gnu.org/}) 中发布。
+
+@item
+将 Emacs 移植到新平台，但这在当今并不常见。
+
+@end itemize
+
+如果您想致力于改进 Emacs，请联系维护人员：
+@ifnothtml
+@email{emacs-devel@@gnu.org}.
+@end ifnothtml
+@ifhtml
+@url{https://lists.gnu.org/mailman/listinfo/emacs-devel, the
+emacs-devel mailing list}.
+@end ifhtml
+您可以询问建议的项目或提出您自己的想法。
+
+如果您有功能请求或关于如何改进 Emacs 的建议，最好将其发送到
+@ifnothtml
+@email{bug-gnu-emacs@@gnu.org}
+@end ifnothtml
+@ifhtml
+@url{https://lists.gnu.org/mailman/listinfo/bug-gnu-emacs, bug-gnu-emacs}
+@end ifhtml
+。  请尽可能清楚地解释您希望看到哪些更改，以及您认为它将如何改进 Emacs 的原因和方式。
+
+如果您已经编写了改进，请告诉我们。  如果您尚未开始工作，请联系
+@ifnothtml
+@email{emacs-devel@@gnu.org}
+@end ifnothtml
+@ifhtml
+@url{https://lists.gnu.org/mailman/listinfo/emacs-devel, emacs-devel}
+@end ifhtml
+在你开始之前；也许可以提出一些建议，使您的扩展更好地适应 Emacs 的其余部分。
+
+实现功能时，请遵循Emacs编码标准； @pxref{Coding Standards}。  此外，实质性贡献需要向 FSF 转让版权； @pxref{Copyright Assignment}。
+
+Emacs 的开发版本可以从存储库下载，该存储库由一组开发人员积极维护。有关访问详细信息，请参阅 Emacs 项目页面 @url{https://savannah.gnu.org/projects/emacs/}。
+
+根据当前工作版本编写补丁非常重要。  如果您从旧版本开始，您的补丁可能已经过时（因此维护人员将很难应用它），或者 Emacs 中的更改可能使您的补丁变得不必要。  下载存储库源代码后，您应该阅读文件 @file{INSTALL.REPO} 来获取构建说明（它们在某种程度上与正常构建不同）。
+
+如果您想做出更广泛的贡献，请参阅 Emacs 源代码树中的 @file{CONTRIBUTE} 文件以获取有关如何成为 Emacs 开发人员的信息。  该文件作为每个已发布的 Emacs 版本的源 tarball 的一部分进行分发，也可以在 @url{https://git.savannah.gnu.org/cgit/emacs.git/tree/CONTRIBUTE, Emacs on-line source repository}.h 中在线找到。  如果您克隆了 Emacs 存储库，按照@url{https://savannah.gnu.org/projects/emacs/}中的说明，您将在源 Emacs 树的顶级目录中找到此文件。
+
+有关 Emacs 的文档（以了解如何实现所需的更改），请参阅：
+
+@itemize
+@item
+@ifset WWW_GNU_ORG
+@ifhtml
+the Emacs Manual
+@url{https://www.gnu.org/software/emacs/manual/emacs.html}.
+@end ifhtml
+@ifnothtml
+@xref{Top, Emacs Manual,,emacs}.
+@end ifnothtml
+@end ifset
+@ifclear WWW_GNU_ORG
+@xref{Top, Emacs Manual,,emacs}.
+@end ifclear
+
+@item
+@ifset WWW_GNU_ORG
+@ifhtml
+the Emacs Lisp Reference Manual
+@url{https://www.gnu.org/software/emacs/manual/elisp.html}.
+@end ifhtml
+@ifnothtml
+@xref{Top, Emacs Lisp Reference Manual,,elisp}.
+@end ifnothtml
+@end ifset
+@ifclear WWW_GNU_ORG
+@xref{Top, Emacs Lisp Reference Manual,,elisp}.
+@end ifclear
+
+@item
+@url{https://www.gnu.org/software/emacs}
+
+@item
+@url{https://www.emacswiki.org/}
+@end itemize
+
+@menu
+* Coding Standards::         GNU Emacs 编码标准
+* Copyright Assignment::     将版权分配给 FSF
+@end menu
+
+@node Coding Standards
+@subsection 编码标准
+@cindex coding standards for Emacs submissions
+
+贡献的代码应遵循 GNU 编码标准。  该手册可在 @url{https://www.gnu.org/prep/standards/} 在线获取。  它也可能在您系统上的本地信息中提供，请参阅@pxref{Top,,, standards, GNU Coding Standards}。
+
+如果没有，我们需要找人修复代码才能使用它。
+
+Emacs 有额外的样式和编码约定：
+
+@itemize
+@item
+@ifset WWW_GNU_ORG
+@ifhtml
+the ``Tips and Conventions'' Appendix in the Emacs Lisp Reference
+@url{https://www.gnu.org/software/emacs/manual/html_node/elisp/Tips.html}.
+@end ifhtml
+@ifnothtml
+@xref{Tips, ``Tips and Conventions'' Appendix in the Emacs Lisp Reference, Tips Appendix, elisp, Emacs Lisp Reference}.
+@end ifnothtml
+@end ifset
+@ifclear WWW_GNU_ORG
+@xref{Tips, ``Tips and Conventions'' Appendix in the Emacs Lisp Reference, Tips Appendix, elisp, Emacs Lisp Reference}.
+@end ifclear
+
+@item
+避免使用 @code{advice-add} 或 @code{with-eval-after-load} 将 Lisp 代码包含在 Emacs 中。
+
+@item
+删除所有源文件和文本文件中的所有尾随空格。
+
+@item
+在 Lisp 代码中使用 @code{?\s} 而不是 @code{? } 来表示空格字符。
+
+@end itemize
+
+@node Copyright Assignment
+@subsection 版权转让
+@cindex copyright assignment
+
+FSF（自由软件基金会）是 GNU Emacs 的版权所有者。 FSF 是一个非营利组织，其全球使命是促进计算机用户自由并捍卫所有自由软件用户的权利。有关一般信息，请参阅网站 @url{https://www.fsf.org/}。
+
+一般来说，对于 GNU Emacs 和 GNU ELPA 中存储的软件包的重要贡献，我们要求将版权分配给 FSF@. 其背后的原因，请参阅@url{https://www.gnu.org/licenses/why-assign.html}。
+
+版权转让是一个简单的过程。  许多国家的居民可以完全通过电子方式完成此操作。  首先，请按照 Emacs 发行版中的文件 @file{etc/copyright-assign.txt} 中的说明进行操作。  我们可以在 @email{emacs-devel@@gnu.org} 邮件列表中回答您可能有的任何问题（或为您提供答案）。
+
+（请注意：关于为什么某些 GNU 项目要求版权分配的一般讨论与 emacs-devel 无关。请参阅 gnu-misc-discuss。）
+
+版权免责声明也是一种可能性，但我们更喜欢转让。请注意，免责声明与作业一样，涉及您将签名的文件发送给 FSF（仅仅说“这是公共领域的”是不够的）。  此外，免责声明不能应用于未来的工作，每次您想发送新内容时都必须重复该免责声明。
+
+我们可以接受小的更改（大约少于 15 行）而无需分配。  这是您所有贡献的累积限制（例如，三个单独的 5 行补丁）。
+
+@node Service
+@section 如何获取有关 GNU Emacs 的帮助
+@cindex help in using Emacs
+@cindex @samp{help-gnu-emacs} mailing list
+@cindex @samp{gnu.emacs.help} newsgroup
+
+如果您在安装、使用或更改 GNU Emacs 方面需要帮助，可以通过两种方式找到它：
+
+@itemize @bullet
+@item
+发送消息至
+@ifnothtml
+邮件列表@email{help-gnu-emacs@@gnu.org}，
+@end ifnothtml
+@ifhtml
+@url{https://lists.gnu.org/mailman/listinfo/help-gnu-emacs, the
+help-gnu-emacs mailing list},
+@end ifhtml
+或在新闻组@code{gnu.emacs.help}上发布您的请求。  （此邮件列表和新闻组相互连接，因此使用哪一个并不重要。）
+
+@item
+在 @uref{https://www.fsf.org/resources/service/, service directory} 中寻找可能为您提供付费帮助的人。
+@end itemize
+
+@ifnottex
+@lowersections
+@end ifnottex

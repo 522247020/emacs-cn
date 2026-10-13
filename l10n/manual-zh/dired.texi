@@ -1,0 +1,1162 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Dired
+@chapter Dired，目录编辑器
+@c This node is referenced in the tutorial.  When renaming or deleting
+@c it, the tutorial needs to be adjusted.
+@cindex Dired
+@cindex file management
+
+Dired 制作一个 Emacs 缓冲区，其中包含目录列表，以及可选的一些子目录。  您可以使用普通的 Emacs 命令在此缓冲区中移动，并使用特殊的 Dired 命令来操作列出的文件。  Dired 适用于本地和远程目录。
+
+Dired 缓冲区通常是只读的，并且不允许在其中插入文本（但是，Wdired 模式允许这样做，@pxref{Wdired}）。普通打印字符如@kbd{d}和@kbd{x}被重新定义为特殊的Dired命令。  一些Dired命令@dfn{mark}或@dfn{flag}@dfn{current file}（即当前行的文件）；其他命令对标记的文件或标记的文件进行操作。  您首先标记某些文件，以便使用一个命令对所有文件进行操作。
+
+Dired-X 软件包为 Dired 模式提供了各种额外功能。 @xref{Top, Dired-X,,dired-x, Dired Extra User's Manual}。
+
+您还可以使用 @kbd{C-x C-d} (@code{list-directory}) 查看目录中的文件列表。  与 Dired 不同，此命令不允许您对列出的文件进行操作。  @xref{Directories}。
+
+@menu
+* Enter: Dired Enter.          如何调用 Dired.
+* Navigation: Dired Navigation.    Dired 缓冲区中的特殊运动命令。
+* Deletion: Dired Deletion.    使用 Dired 删除文件。
+* Flagging Many Files::        根据文件名称标记文件。
+* Visit: Dired Visiting.       其他文件操作通过 Dired 进行。
+* Marks vs Flags::             删除标记与标记。
+* Operating on Files::         如何复制、重命名、打印、压缩等一个或多个文件。
+* Shell Commands in Dired::    对标记的文件运行 shell 命令。
+* Shell Command Guessing::     猜测文件的 shell 命令。
+* Transforming File Names::    使用模式重命名多个文件。
+* Comparison in Dired::        通过 Dired 运行 @code{diff}。
+* Subdirectories in Dired::    将子目录添加到 Dired 缓冲区。
+@ifnottex
+* Subdir Switches::           Subdirectory switches in Dired.
+@end ifnottex
+* Subdirectory Motion::        跨子目录、上下移动。
+* Hiding Subdirectories::      使子目录可见或不可见。
+* Updating: Dired Updating.    丢弃不感兴趣的文件的行。
+* Find: Dired and Find.        使用 @code{find} 选择 Dired 的文件。
+* Wdired::                     通过编辑 Dired 缓冲区来操作文件。
+* Image-Dired::                在 Dired 中查看图像缩略图。
+* Misc: Misc Dired Features.   各种其他功能。
+@end menu
+
+@node Dired Enter
+@section 进入迪雷德
+
+@findex dired
+@kindex C-x d
+@vindex dired-listing-switches
+要调用 Dired，请输入 @kbd{C-x d} (@code{dired})。  这使用迷你缓冲区读取目录的名称，并打开列出该目录中文件的@dfn{Dired buffer}。  您还可以提供通配符文件名模式作为 minibuffer 参数，在这种情况下，Dired 缓冲区会列出与该模式匹配的所有文件。  通配符也可能出现在目录部分中。例如，
+
+@example
+C-x d  ~/foo/*.el  @key{RET}
+C-x d  ~/foo/*/*.el  @key{RET}
+@end example
+
+前者列出了目录@samp{foo}中扩展名为@samp{.el}的所有文件。  后者列出了 @samp{foo} 的所有子目录中扩展名为 @samp{.el} 的文件。
+
+@cindex globstar, in Dired
+在 Posix 系统上，当系统 shell 支持 @dfn{globstar}（一种递归通配符功能）并且启用该支持时，您可以在 Dired 中使用递归通配符：
+
+@example
+C-x d  ~/foo/**/*.el  @key{RET}
+@end example
+
+此命令生成一个目录列表，其中包含扩展名为 @samp{.el} 的所有文件，在 @samp{foo} 的所有子目录中递归递减。  请注意，不同 shell 之间的 globstar 实现存在细微差别。  检查您的 shell 手册以了解预期的行为。
+
+@vindex dired-maybe-use-globstar
+@vindex dired-enable-globstar-in-shell
+如果 shell 支持 globstar，但默认情况下该支持被禁用，您仍然可以通过将 @code{dired-maybe-use-globstar} 自定义为非 @code{nil} 值来让 Dired 使用此功能；然后 Dired 将为那些它知道如何启用的 shell 启用 globstar（有关这些 shell 的列表，请参见 @code{dired-enable-globstar-in-shell}）。
+
+常用的历史记录和完成命令可以在迷你缓冲区中使用；特别是，@kbd{M-n}将访问的文件的名称（如果有）放入迷你缓冲区（@pxref{Minibuffer History}）中。
+
+您还可以通过为 @kbd{C-x C-f} (@code{find-file}) 提供目录名称来调用 Dired。
+
+@findex dired-jump
+@findex dired-jump-other-window
+@kindex C-x C-j
+@kindex C-x 4 C-j
+您可以要求 Emacs 通过键入 @kbd{C-x C-j} (@code{dired-jump}) 在任何缓冲区的默认目录 (@pxref{File Names, default-directory}) 上调用 Dired。  如果缓冲区访问一个文件，该命令会将指针移动到它显示的 Dired 缓冲区中该文件的行；否则，点将最终位于目录列表中的第一个文件上。  作为例外，如果您在 Dired 缓冲区中键入 @kbd{C-x C-j}，Emacs 将显示父目录的目录列表，并将点放置在与您调用 @code{dired-jump} 的目录相对应的行上。  键入 @kbd{C-x 4 C-j} (@code{dired-jump-other-window}) 具有相同的效果，但在新窗口 (@pxref{Window Choice}) 中显示 Dired 缓冲区。
+
+变量 @code{dired-listing-switches} 指定为 @command{ls} 提供的用于列出目录的选项；该字符串@emph{must}包含@samp{-l}。  如果您在 @code{dired} 命令中使用前缀参数，则可以在输入目录规范之前使用迷你缓冲区指定 @command{ls} 开关。  无论如何指定，@command{ls} 开关都可以包含不需要参数的短选项（即单个字符），以及参数由 @samp{=} 指定的长选项（以 @samp{--} 开头）。
+
+您可以将 @code{dired-listing-switches} 声明为连接局部变量，以便调整其值以匹配远程系统期望的值 (@pxref{Connection Variables})。
+
+@cindex file names with newline character in Dired
+@cindex newline character in file names in Dired
+@anchor{File names with newline}
+当文件名包含换行符时，Dired 默认将其显示为文字换行符，因此该文件名的显示在 Dired 缓冲区中占用不止一行。  如果您对这样的文件列表调用 Dired 操作，在许多情况下它将失败并发出错误信号。因此，当 Dired 显示包含文字换行符的文件名时，Emacs 会识别这一点并自动弹出一个带有信息警告的缓冲区。  对于此类文件名，Dired 提供了另一种显示方式，使用 @command{ls} 开关 @samp{-b}，其中换行符由 @samp{\n} 表示，文件的 Dired 列表照常占据一行，因此您可以对其执行所有适用的 Dired 操作。@footnote{Note that with the @samp{-b} switch Dired displays tab characters in file names as @samp{\t} and escapes other control characters and also spaces in file names with @samp{\}.}
+
+Emacs 提供了两种不同的方法让 Dired 使用 @samp{-b} 开关：
+
+@itemize @bullet
+@item 
+您可以在调用 @code{dired} 之前将 @samp{-b} 添加到 @code{dired-listing-switches}。  由于此变量是用户选项，因此您可以通过使用自定义界面 (@pxref{Saving Customizations}) 或使用初始化文件中的 @code{setopt} 宏 (@pxref{Examining}) 来永久更改其值。@footnote{If @code{dired-listing-switches} contains @samp{-b} when you invoke dired on a directory containing a file name with a newline, the newline is displayed as @samp{\n}, so Emacs will not pop up a warning.} 您还可以通过键入 @kbd{C-u C-x d} 为下一个 @code{dired} 调用添加 @samp{-b}。
+
+@item 
+@vindex dired-auto-toggle-b-switch
+如果您启用用户选项 @code{dired-auto-toggle-b-switch}，那么当您访问包含名称带有换行符的文件的目录时，Emacs 将自动添加 @samp{-b} 开关并在 Dired 中重新显示该目录，以在文件名中显示 @samp{\n}。  如果您编辑文件名并删除 @samp{\n} 字符，那么在完成编辑后，Emacs 会自动删除 @samp{-b} 开关并重新显示 Dired 缓冲区，以便带有制表符或空格字符的文件名现在显示不带反斜杠的文字空格。  如果在访问包含换行符的文件名的目录后启用或禁用 @code{dired-auto-toggle-b-switch}，Emacs 将根据需要添加或删除 @samp{-b} 开关，并自动重新显示 Dired 缓冲区。
+@end itemize
+
+@vindex dired-switches-in-mode-line
+Dired 在模式行中显示用于调用 @command{ls} 的开关的指示。  默认情况下，Dired 将尝试确定开关是否指示按名称或日期排序，并在模式行中如此说明。  如果 @code{dired-switches-in-mode-line} 变量是 @code{as-is}，则开关将逐字显示。  如果该变量的值为整数，则开关显示将被截断为该长度。  该变量也可以是一个函数，它将以 @code{dired-actual-switches} 作为唯一参数进行调用，并应返回一个字符串以显示在模式行中。
+
+@vindex dired-use-ls-dired
+如果您的 @command{ls} 程序支持 @samp{--dired} 选项，Dired 会自动传递该选项；这会导致 @command{ls} 为某些不寻常的文件名发出特殊的转义序列，否则 Dired 将无法解析这些名称。  第一次在 Emacs 会话中运行 Dired 时，它会通过使用该选项调用一次来检查 @command{ls} 是否支持 @samp{--dired} 选项。  如果退出代码为 0，Dired 随后将使用 @samp{--dired} 选项；否则就不会。  您可以通过自定义变量 @code{dired-use-ls-dired} 来禁止此检查。  值@code{unspecified}（默认值）表示执行检查；任何其他非 @code{nil} 值都意味着使用 @samp{--dired} 选项； @code{nil} 表示不使用@samp{--dired} 选项。
+
+在 MS-Windows 和 MS-DOS 系统以及某些远程系统上，Emacs 模拟 @command{ls}。  @xref{ls in Lisp}，了解此仿真的选项和特性。
+
+@findex dired-other-window
+@kindex C-x 4 d
+@findex dired-other-frame
+@kindex C-x 5 d
+要在另一个窗口中显示 Dired 缓冲区，请使用 @kbd{C-x 4 d} (@code{dired-other-window})。  @kbd{C-x 5 d} (@code{dired-other-frame}) 在单独的帧中显示 Dired 缓冲区。  @xref{Window Choice}。
+
+@kindex q @r{(Dired)}
+@findex quit-window@r{, in Dired buffers}
+键入 @kbd{q} (@code{quit-window}) 会隐藏 Dired 缓冲区，并删除其窗口（如果该窗口是仅为该缓冲区创建的）。
+
+@node Dired Navigation
+@section 在 Dired 缓冲区中导航
+
+@kindex C-n @r{(Dired)}
+@kindex C-p @r{(Dired)}
+@findex dired-next-line
+@findex dired-previous-line
+所有常用的 Emacs 光标移动命令都可以在 Dired 缓冲区中使用。  键@kbd{C-n}和@kbd{C-p}被重新定义为分别运行@code{dired-next-line}和@code{dired-previous-line}，它们将光标放在该行文件名的开头，而不是行的开头。
+
+@kindex SPC @r{(Dired)}
+为了更加方便，Dired 中的 @key{SPC} 和 @kbd{n} 相当于 @kbd{C-n}。  @kbd{p} 相当于@kbd{C-p}。  （按行移动在 Dired 中非常常见，因此应该易于键入。）@key{DEL}（向上移动并取消标记）也通常仅用于向上移动 (@pxref{Dired Deletion})。
+
+@findex dired-goto-file
+@kindex j @r{(Dired)}
+@kbd{j} (@code{dired-goto-file}) 提示使用迷你缓冲区输入文件名，并将指针移动到 Dired 缓冲区中描述该文件的行。
+
+@cindex searching Dired buffers
+@findex dired-isearch-filenames
+@vindex dired-isearch-filenames
+@findex dired-isearch-filenames-regexp
+@kindex M-s f C-s @r{(Dired)}
+@kindex M-s f M-C-s @r{(Dired)}
+@kbd{M-s f C-s} (@code{dired-isearch-filenames}) 在 Dired 缓冲区中执行向前增量搜索，仅在文件名中查找匹配项并忽略缓冲区中的其余文本。  @kbd{M-s f M-C-s} (@code{dired-isearch-filenames-regexp}) 使用正则表达式搜索执行相同的操作。  如果将变量 @code{dired-isearch-filenames} 更改为 @code{t}，则通常的搜索命令也会将其自身限制为文件名；例如，@kbd{C-s} 的行为类似于 @kbd{M-s f C-s}。  如果值为@code{dwim}，则搜索命令仅当点最初位于文件名上时才匹配文件名。  @xref{Search}，有关增量搜索的信息。
+
+当 Dired 缓冲区包含多个目录时，一些附加的导航命令可用。  @xref{Subdirectory Motion}。
+
+@node Dired Deletion
+@section 使用 Dired 删除文件
+@cindex flagging files (in Dired)
+@cindex deleting files (in Dired)
+
+Dired 最常见的用法之一是首先删除 @dfn{flag} 文件，然后删除已标记的文件。
+
+@table @kbd
+@item d
+将此文件标记为删除 (@code{dired-flag-file-deletion})。
+@item u
+移除删除标志 (@code{dired-unmark})。
+@item @key{DEL}
+将点移动到上一行并删除该行上的删除标志 (@code{dired-unmark-backward})。
+@item x
+删除标记为删除的文件 (@code{dired-do-flagged-delete})。
+@end table
+
+@kindex d @r{(Dired)}
+@findex dired-flag-file-deletion
+您可以通过移至描述文件的行并键入 @kbd{d} (@code{dired-flag-file-deletion}) 来标记要删除的文件。  删除标志在行首可见为 @samp{D}。该命令将点移动到下一行，以便重复的 @kbd{d} 命令标记连续的文件。  数字前缀参数用作重复计数；负计数意味着标记前面的文件。
+
+如果该区域处于活动状态，@kbd{d} 命令会将该区域中的所有文件标记为删除；在这种情况下，该命令不会移动点，并忽略任何前缀参数。
+
+@kindex u @r{(Dired deletion)}
+@kindex DEL @r{(Dired)}
+将文件标记为删除而不是立即删除文件的原因是为了减少意外删除文件的危险。  在您指示 Dired 删除标记的文件之前，您可以使用命令 @kbd{u} 和 @key{DEL} 删除删除标记。 @kbd{u} (@code{dired-unmark}) 的工作方式与 @kbd{d} 类似，但删除标志而不是创建标志。  @key{DEL} (@code{dired-unmark-backward}) 向上移动，移除标志；它就像带有参数 @minus{}1 的@kbd{u}。  任一命令的数字前缀参数用作重复计数，负计数意味着在相反方向取消标记。  如果该区域处于活动状态，这些命令会取消该区域中所有文件的标记，而不移动点。
+
+@kindex x @r{(Dired)}
+@findex dired-do-flagged-delete
+要删除标记的文件，请输入 @kbd{x} (@code{dired-do-flagged-delete})。  此命令显示所有标记为删除的文件名的列表，并使用 @kbd{yes} 请求确认。  如果您确认，Dired 将删除标记的文件，然后从 Dired 缓冲区的文本中删除它们的行。  Dired 缓冲区的行数稍少，仍保持选中状态。
+
+如果您在要求确认时回答 @kbd{no} 或使用 @kbd{C-g} 退出，您将立即返回 Dired，删除标志仍然存在于缓冲区中，并且没有实际删除的文件。
+
+@cindex recursive deletion
+@vindex dired-recursive-deletes
+您可以像删除其他文件一样删除空目录，但通常 Dired 无法删除非空目录。  然而，如果变量 @code{dired-recursive-deletes} 不是 @code{nil}，则允许 Dired 删除非空目录，包括其所有内容。  这可能有点冒险。  如果变量的值为@code{always}，Dired会递归删除非空目录，风险更大。
+
+即使您已将 @code{dired-recursive-deletes} 设置为 @code{nil}，您有时也可能希望递归删除目录，而不要求确认所有目录。  例如，当您将许多目录标记为删除并且您非常确定可以安全地删除所有目录时，您可能希望这样做。  对于每个非空目录，系统都会要求您确认删除，如果您回答@code{all}，那么所有剩余的目录将被删除，没有任何进一步的问题。
+
+@vindex delete-by-moving-to-trash@r{, and Dired}
+如果将变量 @code{delete-by-moving-to-trash} 更改为 @code{t}，上述删除命令会将受影响的文件或目录移动到操作系统的垃圾箱中，而不是直接删除它们。  @xref{Misc File Ops}。
+
+删除文件的另一种方法是用 @kbd{m} 标记它们并用 @kbd{D} 删除，请参阅 @ref{Operating on Files}。
+
+@node Flagging Many Files
+@section 一次标记多个文件
+@cindex flagging many files for deletion (in Dired)
+
+@kbd{#}、@kbd{~}、@kbd{.}、@kbd{% &} 和 @kbd{% d} 命令根据文件名标记许多文件以进行删除：
+
+@table @kbd
+@item #
+将所有自动保存文件（名称以 @samp{#} 开头和结尾的文件）标记为删除 (@pxref{Auto Save})。
+
+@item ~
+将所有备份文件（名称以 @samp{~} 结尾的文件）标记为删除 (@pxref{Backup})。
+
+@item .@: @r{(Period)}
+标记多余的数字备份文件以进行删除。  任一文件的最旧和最新的几个备份文件除外；中间的有标记。
+
+@item % &
+标记删除具有特定名称的所有文件，这表明您可以轻松地再次创建这些文件。
+
+@item % d @var{regexp} @key{RET}
+标记删除名称与正则表达式@var{regexp}匹配的所有文件。
+@end table
+
+@kindex # @r{(Dired)}
+@findex dired-flag-auto-save-files
+@cindex deleting auto-save files
+@kbd{#} (@code{dired-flag-auto-save-files}) 标记所有名称看起来像自动保存文件的文件——即名称以 @samp{#} 开头和结尾的文件。  @xref{Auto Save}。
+
+@kindex ~ @r{(Dired)}
+@findex dired-flag-backup-files
+@kbd{~} (@code{dired-flag-backup-files}) 标记名称为备份文件的所有文件，即名称以 @samp{~} 结尾的文件。  @xref{Backup}。
+
+@kindex . @r{(Dired)}
+@vindex dired-kept-versions
+@findex dired-clean-directory
+@kbd{.}（句点，@code{dired-clean-directory}）仅标记一些要删除的备份文件：任何一个文件的除最旧的几个和最新的几个备份之外的所有备份文件。  通常，为每个文件保留的最新版本的数量由变量 @code{dired-kept-versions} 给出（@emph{not} @code{kept-new-versions}；仅在保存时适用）。要保留的最旧版本的数量由变量 @code{kept-old-versions} 给出。
+
+带有正数字参数的句点（如@kbd{C-u 3 .}）指定要保留的最新版本的数量，覆盖@code{dired-kept-versions}。  负数值参数会覆盖 @code{kept-old-versions}，使用负参数值来指定要保留的每个文件的最旧版本的数量。
+
+@kindex % & @r{(Dired)}
+@findex dired-flag-garbage-files
+@vindex dired-garbage-files-regexp
+@cindex deleting some backup files
+@kbd{% &} (@code{dired-flag-garbage-files}) 标记名称与变量@code{dired-garbage-files-regexp}指定的正则表达式匹配的文件。  默认情况下，这与 @TeX{}、@samp{.bak} 文件生成的某些文件以及@code{patch} 生成的 @samp{.orig} 和 @samp{.rej} 文件相匹配。
+
+@findex dired-flag-files-regexp
+@kindex % d @r{(Dired)}
+@kbd{% d} 标记名称与指定正则表达式 (@code{dired-flag-files-regexp}) 匹配的所有文件。  仅使用文件名的非目录部分进行匹配。  您可以使用 @samp{^} 和 @samp{$} 来锚定匹配。  您可以在使用 @kbd{% d} 时隐藏某些子目录，从而从标记中排除它们。  @xref{Hiding Subdirectories}。
+
+@node Dired Visiting
+@section 访问 Dired 中的文件
+
+有几个 Dired 命令用于访问或检查 Dired 缓冲区中列出的文件。  所有这些都适用于当前行的文件；如果该文件确实是一个目录，这些命令会在该子目录上调用 Dired（创建一个单独的 Dired 缓冲区）。
+
+@table @kbd
+@item f
+@kindex f @r{(Dired)}
+@findex dired-find-file
+访问当前行描述的文件，例如输入 @kbd{C-x C-f} 并提供该文件名 (@code{dired-find-file})。  @xref{Visiting}。
+
+@item @key{RET}
+@itemx e
+@kindex RET @r{(Dired)}
+@kindex e @r{(Dired)}
+相当于@kbd{f}。
+
+@ignore  @c This command seems too risky to document at all.
+@item a
+@kindex a @r{(Dired)}
+@findex dired-find-alternate-file
+Like @kbd{f}, but replaces the contents of the Dired buffer with
+that of an alternate file or directory (@code{dired-find-alternate-file}).
+@end ignore
+
+@item o
+@kindex o @r{(Dired)}
+@findex dired-find-file-other-window
+与 @kbd{f} 类似，但使用另一个窗口 (@pxref{Window Choice}) 来显示文件的缓冲区 (@code{dired-find-file-other-window})。  Dired 缓冲区在第一个窗口中保持可见。  这就像使用 @kbd{C-x 4 C-f} 来访问文件一样。  @xref{Windows}。
+
+@item C-o
+@kindex C-o @r{(Dired)}
+@findex dired-display-file
+访问当前行描述的文件，并在另一个窗口中显示缓冲区，但不要选择该窗口 (@code{dired-display-file})。
+
+@item mouse-1
+@itemx mouse-2
+@findex dired-mouse-find-file-other-window
+访问您单击其名称的文件 (@code{dired-mouse-find-file-other-window})。  这使用另一个窗口来显示文件，如 @kbd{o} 命令。
+
+@item v
+@kindex v @r{(Dired)}
+@findex dired-view-file
+使用查看模式 (@code{dired-view-file}) 查看当前行描述的文件。  查看模式提供了方便的命令来导航缓冲区，但禁止更改它； @xref{View Mode}。
+
+@item @@
+@kindex @@ @r{(Dired)}
+@findex tramp-dired-find-file-with-sudo
+使用超级用户或 root 权限 (@code{tramp-dired-find-file-with-sudo}) 打开当前行描述的文件。  如果使用 @kbd{C-u} 前缀参数调用，它会提示使用默认的 @option{sudo} 之外的另一个 Tramp 方法。  @xref{Ad-hoc multi-hops, Tramp,, tramp, The Tramp Manual}。
+
+@item ^
+@kindex ^ @r{(Dired)}
+@findex dired-up-directory
+访问当前目录的父目录（@code{dired-up-directory}）。  这相当于移动到 @file{..} 行并在那里键入 @kbd{f}。
+@end table
+
+@defopt dired-kill-when-opening-new-dired-buffer
+当访问 Dired 中的新子目录时，Emacs 将（默认情况下）打开一个新缓冲区来显示这个新目录，并保持旧 Dired 缓冲区不变。  如果此用户选项为非@code{nil}，则在选择新目录后旧的 Dired 缓冲区将被杀死。  这意味着，如果您在 Dired 中遍历目录结构，最终不会得到多个 Dired 缓冲区。
+@end defopt
+
+@node Marks vs Flags
+@section 可怕标记 vs.@: 旗帜
+
+@cindex marking many files (in Dired)
+您可以使用其他字符（通常是 2⁣）@dfn{mark} 来标记文件，而不是使用 @samp{D} 来标记文件。  大多数对文件进行操作的 Dired 命令都使用标有 @samp{*} 的文件。  对标记文件进行操作的唯一命令是@kbd{x}，它会删除它们。
+
+以下是一些使用 @samp{*} 进行标记、取消标记以及对标记进行操作的命令。  （@xref{Dired Deletion}，用于标记和取消标记文件的命令。）
+
+@table @kbd
+@item m
+@itemx * m
+@kindex m @r{(Dired)}
+@kindex * m @r{(Dired)}
+@findex dired-mark
+用 @samp{*} (@code{dired-mark}) 标记当前文件。  如果该区域处于活动状态，则标记该区域中的所有文件；否则，如果提供了数字参数 @var{n}，则从当前文件开始标记接下来的 @var{n} 文件（如果 @var{n} 为负数，则标记之前的 @minus{}@var{n} 文件）。  如果在子目录标题行 (@pxref{Subdirectories in Dired}) 上调用，此命令将标记该子目录中的所有文件。
+
+@item * N
+@kindex * N @r{(Dired)}
+@findex dired-number-of-marked-files
+报告标记文件的数量和大小 (@code{dired-number-of-marked-files})。
+
+@item * *
+@kindex * * @r{(Dired)}
+@findex dired-mark-executables
+@cindex marking executable files (in Dired)
+用 @samp{*} (@code{dired-mark-executables}) 标记所有可执行文件。  使用数字参数，取消标记所有这些文件。
+
+@item * @@
+@kindex * @@ @r{(Dired)}
+@findex dired-mark-symlinks
+@cindex marking symbolic links (in Dired)
+用 @samp{*} (@code{dired-mark-symlinks}) 标记所有符号链接。使用数字参数，取消标记所有这些文件。
+
+@item * /
+@kindex * / @r{(Dired)}
+@findex dired-mark-directories
+@cindex marking subdirectories (in Dired)
+用 @samp{*} 标记所有目录文件，除了 @file{.} 和 @file{..} (@code{dired-mark-directories})。  使用数字参数，取消标记所有这些文件。
+
+@item * s
+@kindex * s @r{(Dired)}
+@findex dired-mark-subdir-files
+标记当前子目录中除 @file{.} 和 @file{..} (@code{dired-mark-subdir-files}) 之外的所有文件。
+
+@item u
+@itemx * u
+@kindex u @r{(Dired)}
+@kindex * u @r{(Dired)}
+@findex dired-unmark
+删除该行上的任何标记 (@code{dired-unmark})。  如果该区域处于活动状态，则取消标记该区域中的所有文件；否则，如果提供了数字参数 @var{n}，则取消标记下一个 @var{n} 文件，从当前文件开始（如果 @var{n} 为负数，则取消标记之前的 @minus{}@var{n} 文件）。
+
+@item @key{DEL}
+@itemx * @key{DEL}
+@kindex * DEL @r{(Dired)}
+@findex dired-unmark-backward
+@cindex unmarking files (in Dired)
+将点移动到上一行并删除该行上的任何标记 (@code{dired-unmark-backward})。  如果该区域处于活动状态，则取消标记该区域中的所有文件；否则，如果提供了数字参数 @var{n}，则取消标记 @var{n} 前面的文件，从当前文件开始（如果 @var{n} 为负，则取消标记接下来的 @minus{}@var{n} 文件）。
+
+@item * !
+@itemx U
+@kindex * ! @r{(Dired)}
+@kindex U @r{(Dired)}
+@findex dired-unmark-all-marks
+删除此 Dired 缓冲区 (@code{dired-unmark-all-marks}) 中所有文件的所有标记。
+
+@item * ? @var{markchar}
+@itemx M-@key{DEL}
+@kindex * ? @r{(Dired)}
+@kindex M-DEL @r{(Dired)}
+@findex dired-unmark-all-files
+删除所有使用字符 @var{markchar} (@code{dired-unmark-all-files}) 的标记。  如果使用 @kbd{M-@key{DEL}} 调用，命令会提示输入 @var{markchar}。  @var{markchar} 是单个字符——不要使用 @key{RET} 来终止它。  请参阅下面 @kbd{* c} 命令的说明，该命令允许您将一个标记字符替换为另一个标记字符。
+
+使用数字参数，此命令查询每个标记的文件，询问是否删除其标记。  您可以回答 @kbd{y} 表示是，@kbd{n} 表示否，或回答 @kbd{!} 从剩余文件中删除标记，而无需询问它们。
+
+@item * C-n
+@itemx M-@}
+@findex dired-next-marked-file
+@kindex * C-n @r{(Dired)}
+@kindex M-@} @r{(Dired)}
+向下移动到下一个标记的文件 (@code{dired-next-marked-file})。如果文件有任何类型的标记，则该文件被“标记”。
+
+@item * C-p
+@itemx M-@{
+@findex dired-prev-marked-file
+@kindex * C-p @r{(Dired)}
+@kindex M-@{ @r{(Dired)}
+向上移动到上一个标记的文件 (@code{dired-prev-marked-file})。
+
+@item t
+@itemx * t
+@kindex t @r{(Dired)}
+@kindex * t @r{(Dired)}
+@findex dired-toggle-marks
+@cindex toggling marks (in Dired)
+切换所有标记 (@code{dired-toggle-marks})：用 @samp{*} 标记的文件变为未标记，未标记的文件用 @samp{*} 标记。  以任何其他方式标记的文件不受影响。
+
+@item * c @var{old-markchar} @var{new-markchar}
+@kindex * c @r{(Dired)}
+@findex dired-change-marks
+将所有使用字符 @var{old-markchar} 的标记替换为使用字符 @var{new-markchar} (@code{dired-change-marks}) 的标记。此命令是创建或使用 @samp{*} 或 @samp{D} 以外的标记的主要方式。  参数是单个字符——不要使用 @key{RET} 来终止它们。
+
+通过该命令可以使用几乎任何字符作为标记字符，以区分各类文件。  如果@var{old-markchar}是空格（@samp{ }），则该命令对所有未标记的文件进行操作；如果 2⁣ 是空格，则该命令取消标记其作用的文件。
+
+为了说明此命令的强大功能，以下是如何在所有没有标记的文件上放置 @samp{D} 标志，同时取消所有已具有 @samp{D} 标志的文件的标志：
+
+@example
+* c D t  * c @key{SPC} D  * c t @key{SPC}
+@end example
+
+这假设没有文件已标记为 @samp{t}。
+
+@item % m @var{regexp} @key{RET}
+@itemx * % @var{regexp} @key{RET}
+@findex dired-mark-files-regexp
+@kindex % m @r{(Dired)}
+@kindex * % @r{(Dired)}
+标记（使用@samp{*}）名称与正则表达式@var{regexp} (@code{dired-mark-files-regexp}) 匹配的所有文件。  此命令类似于 @kbd{% d}，只不过它用 @samp{*} 标记文件，而不是用 @samp{D} 标记。
+
+仅使用文件名的非目录部分进行匹配。  使用 @samp{^} 和 @samp{$} 来锚定匹配。  您可以通过暂时隐藏子目录来排除它们 (@pxref{Hiding Subdirectories})。
+
+@item % g @var{regexp} @key{RET}
+@findex dired-mark-files-containing-regexp
+@kindex % g @r{(Dired)}
+@cindex finding files containing regexp matches (in Dired)
+标记（使用 @samp{*}）@emph{contents} 包含正则表达式 @var{regexp} (@code{dired-mark-files-containing-regexp}) 匹配的所有文件。  该命令类似于@kbd{% m}，只不过它搜索文件内容而不是文件名。  请注意，如果在 Emacs 缓冲区中访问文件，并且 @code{dired-always-read-filesystem} 为 @code{nil}（默认值），则此命令将在缓冲区中查找而不重新访问该文件，因此如果自上次访问以来其内容已更改，则结果可能与磁盘上的文件不一致。  如果您不希望这样做，您可能希望在调用此命令之前恢复您在缓冲区中访问过的文件，或者在这些缓冲区中打开自动恢复模式。 @xref{Reverting}。  如果您希望此命令始终重新访问文件，而不必恢复文件或启用自动恢复模式，则可能需要将 @code{dired-always-read-filesystem} 设置为非 @code{nil}。
+
+@item C-/
+@itemx C-x u
+@itemx C-_
+@kindex C-_ @r{(Dired)}
+@findex dired-undo
+撤消 Dired 缓冲区中的更改，例如添加或删除标记 (@code{dired-undo})。  @emph{This command does not revert the actual file operations, nor recover lost files!} 它只是撤消缓冲区本身的更改。  与 2⁣ 一样，数字前缀参数指定重复计数。
+
+在某些情况下，在对文件进行操作的命令之后使用此命令可能会导致问题。  例如，重命名一个或多个文件后，@code{dired-undo} 会恢复 Dired 缓冲区中的原始名称，这会使 Dired 缓冲区与目录的实际内容不同步。
+
+@item touchscreen-hold
+@kindex touchscreen-hold @r{(Dired)}
+@findex dired-click-to-select-mode
+@findex dired-enable-click-to-select-mode
+输入“单击选择”模式 (@code{dired-click-to-select-mode})，在文件名上使用鼠标按钮 @kbd{mouse-2} 将导致其标记被切换。  当使用触摸屏设备执行文件管理时，此模式非常有用。
+
+当在文件名上检测到“按住”手势 (@pxref{Touchscreens}) 时，它会启用，并且一旦对标记文件进行操作的 Dired 命令完成，它就会自动禁用。
+@end table
+
+@node Operating on Files
+@section 对文件进行操作
+@cindex operating on files in Dired
+
+本节介绍对一个或多个文件进行操作的基本 Dired 命令。  其中许多命令都是大写字母；他们都使用迷你缓冲区，在行动之前读取参数或请求确认。  所有这些都允许您指定要通过以下方式操作的文件：
+
+@itemize @bullet
+@item
+如果您为该命令提供数字前缀参数 @var{n}，它将对下一个 @var{n} 文件进行操作，从当前文件开始。  （如果 2⁣ 为负数，则该命令对当前行之前的 @minus{}@var{n} 文件进行操作。）
+
+@item
+否则，如果某些文件标有 @samp{*}，则该命令将对所有这些文件进行操作。
+
+@item
+否则，该命令仅对当前文件进行操作。
+@end itemize
+
+@noindent
+某些其他 Dired 命令，例如 @kbd{!} 和 @samp{%} 命令，使用相同的约定来决定要处理哪些文件。
+
+除了此处描述的 Dired 命令之外，您还可以对 Dired 缓冲区中显示的一个或多个文件调用版本控制 (VC) 命令。  @xref{Version Control}。
+
+@vindex dired-dwim-target
+@cindex two directories (in Dired)
+要求目标目录的命令（例如复制和重命名文件或为其创建链接的命令）会尝试猜测操作的默认目标目录。  通常，他们建议 Dired 缓冲区的默认目录，但如果选项 @code{dired-dwim-target} 不是 @code{nil}，并且如果某个窗口中显示另一个 Dired 缓冲区，则建议使用其他缓冲区的目录。您可以自定义 @code{dired-dwim-target} 以选择下一个带有 Dired 缓冲区的窗口，或者最近使用的带有 Dired 缓冲区的窗口，或者使用任何其他函数。  当该值是一个函数时，它将被不带参数地调用，并预计返回将用作默认值的目录列表（即默认目标和“未来历史记录”）。
+
+以下是对文件进行操作的 Dired 命令。
+
+@table @kbd
+@findex dired-do-copy
+@kindex C @r{(Dired)}
+@cindex copying files (in Dired)
+@item C @var{new} @key{RET}
+复制指定文件 (@code{dired-do-copy})。  参数 @var{new} 是要复制到的目录，或者（如果复制单个文件）新名称。  这就像 shell 命令@code{cp}。
+
+@vindex dired-create-destination-dirs
+选项 @code{dired-create-destination-dirs} 控制 Dired 在复制/重命名文件时是否应在目标中创建不存在的目录。  默认值@code{nil}意味着 Dired 永远不会创建此类丢失的目录；  值@code{always}，表示 Dired 自动创建它们；值 @code{ask} 表示 Dired 在创建它们之前要求您确认。
+
+@vindex dired-create-destination-dirs-on-trailing-dirsep
+如果除了@code{dired-create-destination-dirs}之外，选项@code{dired-create-destination-dirs-on-trailing-dirsep}不是@code{nil}，则将特殊对待目标目录处的尾随目录分隔符。  在这种情况下，当复制到@samp{test/}且不存在目录@samp{test}时，将创建该目录并将指定的源文件或目录复制到新创建的目录中。
+
+@vindex dired-copy-preserve-time
+如果@code{dired-copy-preserve-time}非@code{nil}，则使用此命令进行复制会在副本中保留旧文件的修改时间，如@samp{cp -p}。
+
+@vindex dired-recursive-copies
+@cindex recursive copying
+变量@code{dired-recursive-copies}控制是否递归复制目录（如@samp{cp -r}）。  默认为@code{top}，这意味着在递归复制目录之前询问。
+
+@vindex dired-copy-dereference
+@cindex follow symbolic links
+@cindex dereference symbolic links
+变量 @code{dired-copy-dereference} 控制是将符号链接复制为链接还是在取消引用后复制（如 @samp{cp -L}）。默认值为@code{nil}，这意味着通过创建新符号链接来复制符号链接。
+
+@vindex dired-keep-marker-copy
+@code{dired-keep-marker-copy} 用户选项控制此命令如何处理文件标记。  默认情况下，所有新的文件副本都带有 @samp{C} 标记。
+
+@findex dired-do-delete
+@kindex D @r{(Dired)}
+@item D
+删除指定文件 (@code{dired-do-delete})。  这就像 shell 命令@code{rm}。
+
+与本节中的其他命令一样，该命令对 @emph{marked} 文件或接下来的 @var{n} 文件进行操作。  相比之下，@kbd{x} (@code{dired-do-flagged-delete}) 会删除所有@dfn{flagged} 文件。
+
+@findex dired-do-open
+@kindex E @r{(Dired)}
+@item E
+使用外部程序“打开”指定的文件 (@code{dired-do-open})。该程序根据系统约定进行选择，由变量 @code{shell-command-guess-open} 确定。
+
+@findex dired-do-rename
+@kindex R @r{(Dired)}
+@cindex renaming files (in Dired)
+@cindex moving files (in Dired)
+@item R @var{new} @key{RET}
+重命名指定文件 (@code{dired-do-rename})。  如果重命名单个文件，则参数 @var{new} 是文件的新名称。  如果重命名多个文件，参数 @var{new} 是将文件移动到的目录（这类似于 shell 命令 @command{mv}）。
+
+选项 @code{dired-create-destination-dirs} 控制 Dired 是否应在 @var{new} 中创建不存在的目录。
+
+除了 1 之外还设置了选项 0 来控制是否特殊处理目标处的尾随目录分隔符。  在这种情况下，当将目录@samp{old}重命名为@samp{new/}且不存在目录@samp{new}时，将创建该目录并将@samp{old}移动到新创建的目录中。否则，@samp{old} 重命名为 ⁣​​7⁣。
+
+Dired 会自动更改与重命名文件关联的缓冲区的已访问文件名，以便它们引用新名称。
+
+@vindex dired-vc-rename-file
+如果变量@code{dired-vc-rename-file}的值不是@code{nil}，则使用底层VCS的命令重命名文件，通过
+@ifnottex
+@code{vc-rename-file} (@pxref{VC Delete/Rename}).
+@end ifnottex
+@iftex
+@code{vc-rename-file} (@pxref{VC Delete/Rename,, Deleting and Renaming
+Version-Controlled Files, emacs-xtra, Specialized Emacs Features}).
+@end iftex
+
+@findex dired-do-hardlink
+@kindex H @r{(Dired)}
+@cindex hard links (in Dired)
+@item H @var{new} @key{RET}
+建立指向指定文件的硬链接 (@code{dired-do-hardlink})。这就像 shell 命令@command{ln}。  参数 @var{new} 是要在其中创建链接的目录，或者（如果仅创建一个链接）为链接提供的名称。
+
+@findex dired-do-symlink
+@kindex S @r{(Dired)}
+@cindex symbolic links (creation in Dired)
+@item S @var{new} @key{RET}
+建立指向指定文件的符号链接 (@code{dired-do-symlink})。这就像@samp{ln -s}。  参数 @var{new} 是要在其中创建链接的目录，或者（如果仅创建一个链接）为链接提供的名称。
+
+@findex dired-do-relsymlink
+@kindex Y @r{(Dired)}
+@item Y @var{new} @key{RET}
+建立指向指定文件的相对符号链接 (@code{dired-do-relsymlink})。  参数 @var{new} 是要在其中创建链接的目录，或者（如果仅创建一个链接）为链接提供的名称。  这类似于 @code{dired-do-symlink} 但创建相对符号链接。  例如：
+
+@example
+    foo -> ../bar/foo
+@end example
+
+@noindent
+它不会创建绝对的，例如：
+
+@example
+    foo -> /path/that/may/change/any/day/bar/foo
+@end example
+
+@findex dired-do-chmod
+@kindex M @r{(Dired)}
+@cindex changing file permissions (in Dired)
+@item M @var{modespec} @key{RET}
+更改指定文件 (@code{dired-do-chmod}) 的模式（也称为@dfn{permission bits}）。  @var{modespec} 可以采用八进制或符号表示法，就像 @command{chmod} 程序处理的参数一样。  此命令不遵循符号链接，因此如果您尝试在此类模式不可变的平台上更改符号链接的模式，它会报告错误。
+
+@findex dired-do-chgrp
+@kindex G @r{(Dired)}
+@cindex changing file group (in Dired)
+@item G @var{newgroup} @key{RET}
+将指定文件的组更改为@var{newgroup} (@code{dired-do-chgrp})。
+
+@findex dired-do-chown
+@kindex O @r{(Dired)}
+@cindex changing file owner (in Dired)
+@item O @var{newowner} @key{RET}
+将指定文件的所有者更改为@var{newowner} (@code{dired-do-chown})。  （在大多数系统上，只有超级用户才能执行此操作。）
+
+@vindex dired-chown-program
+变量 @code{dired-chown-program} 指定用于完成工作的程序的名称。  （这个变量是必要的，因为不同的系统将@command{chown}放在不同的位置）。
+
+@findex dired-do-touch
+@kindex T @r{(Dired)}
+@cindex changing file time (in Dired)
+@item T @var{timestamp} @key{RET}
+触摸指定的文件 (@code{dired-do-touch})。  这意味着将它们的修改时间更新为@var{timestamp}，默认为当前时间。  这就像 shell 命令@command{touch}。
+
+@findex dired-do-print
+@kindex P @r{(Dired)}
+@cindex printing files (in Dired)
+@item P @var{command} @key{RET}
+打印指定的文件(@code{dired-do-print})。  您必须指定用于打印它们的命令，但迷你缓冲区首先使用变量 @code{lpr-command} 和 @code{lpr-switches}（与 @code{lpr-buffer} 使用的变量相同；@pxref{Printing}）进行适当的猜测。
+
+@findex dired-do-compress
+@kindex Z @r{(Dired)}
+@cindex compressing files (in Dired)
+@item Z
+压缩指定文件 (@code{dired-do-compress})。  如果该文件看起来已经是压缩文件，请将其解压缩。  每个标记的文件都被压缩到自己的存档中；如果可用，则使用 @command{gzip} 程序，否则使用 @command{compress}。
+
+对于目录名称，此命令根据 @code{dired-compress-directory-default-suffix} 用户选项生成压缩存档。  默认值是包含所有目录文件的 @file{.tar.gz} 存档，通过运行 @command{tar} 命令并将输出通过管道传输到 @command{gzip}。  要允许解压缩压缩目录，请在 @file{.tar.gz} 或 @file{.tgz} 存档文件上键入 @kbd{Z} 会将存档中的所有文件解压到一个目录，该目录的名称是存档名称并删除扩展名。
+
+@findex dired-do-compress-to
+@kindex c @r{(Dired)}
+@item c
+将指定文件 (@code{dired-do-compress-to}) 压缩到文件系统上任意位置的单个存档中。  默认存档由 @code{dired-compress-directory-default-suffix} 用户选项控制。  另请参阅@code{dired-compress-files-alist}。
+
+@cindex Dired and version control
+@findex dired-vc-next-action
+@kindex C-x v v @r{(Dired)}
+@item C-x v v
+@itemx C-x v = @r{(Dired)}
+@itemx C-x v l @r{(Dired)}
+如果您正在访问的目录受版本控制（@pxref{Version Control}），则普通的 VC 命令将对所选文件进行操作。  例如，@kbd{C-x v v}调用@code{dired-vc-next-action}，它与访问版本控制下的文件的缓冲区中的@code{vc-next-action}执行相同的操作（@pxref{Basic VC Editing}）。  同样，@kbd{C-x v =} 显示标记文件与其提交版本之间的差异，@code{C-x v l} 显示标记文件的 VC 更改历史记录。
+
+@findex epa-dired-do-decrypt
+@kindex :d @r{(Dired)}
+@cindex decrypting files (in Dired)
+@item :d
+解密指定文件 (@code{epa-dired-do-decrypt})。 @xref{Dired integration,,, epa, EasyPG Assistant User's Manual}。
+
+@findex epa-dired-do-verify
+@kindex :v @r{(Dired)}
+@cindex verifying digital signatures on files (in Dired)
+@item :v
+验证指定文件上的数字签名 (@code{epa-dired-do-verify})。 @xref{Dired integration,,, epa, EasyPG Assistant User's Manual}。
+
+@findex epa-dired-do-sign
+@kindex :s @r{(Dired)}
+@cindex signing files (in Dired)
+@item :s
+对指定文件进行数字签名 (@code{epa-dired-do-sign})。 @xref{Dired integration,,, epa, EasyPG Assistant User's Manual}。
+
+@findex epa-dired-do-encrypt
+@kindex :e @r{(Dired)}
+@cindex encrypting files (in Dired)
+@item :e
+加密指定文件 (@code{epa-dired-do-encrypt})。 @xref{Dired integration,,, epa, EasyPG Assistant User's Manual}。
+
+@findex dired-do-load
+@kindex L @r{(Dired)}
+@cindex loading several files (in Dired)
+@item L
+加载指定的 Emacs Lisp 文件 (@code{dired-do-load})。 @xref{Lisp Libraries}。
+
+@findex dired-do-byte-compile
+@kindex B @r{(Dired)}
+@cindex byte-compiling several files (in Dired)
+@item B
+字节编译指定的 Emacs Lisp 文件 (@code{dired-do-byte-compile})。  @xref{Byte Compilation,, Byte Compilation, elisp, The Emacs Lisp Reference Manual}。
+
+@findex dired-do-info
+@kindex I @r{(Dired)}
+@cindex running info on files (in Dired)
+@item I
+对此文件（假设是 Info 格式的文件）运行 Info。
+
+@findex dired-do-man
+@kindex N @r{(Dired)}
+@cindex running man on files (in Dired)
+@item N
+对此文件运行 man （假设是 @code{nroff} 格式的文件）。
+
+@kindex A @r{(Dired)}
+@findex dired-do-find-regexp
+@cindex search multiple files (in Dired)
+@item A @var{regexp} @key{RET}
+在所有指定文件中搜索正则表达式@var{regexp} (@code{dired-do-find-regexp})。
+
+此命令是 @code{xref-find-references} (@pxref{Identifier Search}) 的变体，它显示 @file{*xref*} 缓冲区，您可以在其中在匹配项之间导航并使用 @ref{Xref Commands} 中描述的命令根据需要显示它们。
+
+@vindex grep-find-ignored-files @r{(Dired)}
+@vindex grep-find-ignored-directories @r{(Dired)}
+如果任何标记的文件是目录，则此命令将递归地搜索这些目录中的所有文件及其任何子目录，但名称与 @code{grep-find-ignored-files} 匹配的文件和名称与 @code{grep-find-ignored-directories} 匹配的子目录除外。
+
+@kindex Q @r{(Dired)}
+@findex dired-do-find-regexp-and-replace
+@cindex search and replace in multiple files (in Dired)
+@item Q @var{regexp} @key{RET} @var{to} @key{RET}
+对每个指定文件执行 @code{query-replace-regexp}，用字符串 @var{to} (@code{dired-do-find-regexp-and-replace}) 替换 @var{regexp} 的匹配项。
+
+该命令是 @code{xref-query-replace-in-results} 的变体。  它提供了一个 @file{*xref*} 缓冲区，其中列出了 @var{regexp} 的所有匹配项，您可以在该缓冲区 (@pxref{Xref Commands}) 中使用特殊命令。  特别是，如果退出查询替换循环，则可以在该缓冲区中使用 @kbd{r} 来替换更多匹配项。 @xref{Identifier Search}。
+
+与 @code{dired-do-find-regexp} 一样，如果任何标记的文件是目录，则此命令会递归地对这些目录及其任何子目录中的所有文件执行替换，但名称与 @code{grep-find-ignored-files} 匹配的文件和名称与 @code{grep-find-ignored-directories} 匹配的子目录除外。
+@end table
+
+@node Shell Commands in Dired
+@section Dired 中的 Shell 命令
+@cindex shell commands, Dired
+
+@findex dired-do-shell-command
+@kindex ! @r{(Dired)}
+@kindex X @r{(Dired)}
+@vindex dired-confirm-shell-command
+Dired 命令@kbd{!} (@code{dired-do-shell-command}) 读取迷你缓冲区中的 shell 命令字符串，并对一个或多个文件运行该 shell 命令。  shell 命令操作的文件以 Dired 命令的常用方式确定 (@pxref{Operating on Files})。  命令@kbd{X} 是@kbd{!} 的同义词。
+
+命令 @kbd{&} (@code{dired-do-async-shell-command}) 执行相同的操作，只不过它异步运行 shell 命令。  （您也可以使用 @kbd{!} 来执行此操作，方法是在 shell 命令末尾附加一个 @samp{&} 字符。）当该命令对多个文件进行操作时，它会运行指定 shell 命令的多个并行副本，每个文件一个。  作为例外，如果指定的 shell 命令以 @samp{;} 或 @samp{;&} 结尾，则该 shell 命令将在后台按顺序对每个文件运行； Emacs 等待每个调用的 shell 命令终止，然后再运行下一个命令。
+
+对于@kbd{!}和@kbd{&}来说，shell命令的工作目录是Dired缓冲区的顶级目录。
+
+如果您告诉 @kbd{!} 或 @kbd{&} 对多个文件进行操作，则 shell 命令字符串将确定如何将这些文件传递给 shell 命令：
+
+@itemize @bullet
+@item
+如果您在命令字符串中使用由空格包围的@samp{*}，则该命令仅运行一次，并用文件名列表替换@samp{*}。  文件名的顺序是 Dired 缓冲区中出现的顺序。
+
+因此，@kbd{! tar cf foo.tar * @key{RET}}对整个文件名列表运行@code{tar}，将它们放入一个 tar 文件@file{foo.tar}。
+
+如果您想使用 @samp{*} 作为 shell 通配符，并且周围有空格，请编写 @samp{*""}。  在 shell 中，这相当于 2⁣；但由于 @samp{*} 没有被空格包围，因此 Dired 不会特殊对待它。  如果您这样做，Emacs 将提示您确认，除非 @code{dired-confirm-shell-command} 是 @code{nil}。
+
+@item
+否则，如果命令字符串包含由空格或 1⁣ 包围的 @samp{?}，Emacs 将运行 shell 命令一次 @emph{for each file}，每次都用当前文件名替换 @samp{?} 和 @samp{`?`}。  您可以在命令中多次使用@samp{?}和@samp{`?`}；相同的文件名会替换每次出现的情况。如果将它们与 @samp{*} 混合，该命令会发出错误信号。
+
+@item
+如果命令字符串既不包含 @samp{*} 也不包含 @samp{?} 也不包含 @samp{`?`}，Emacs 将为每个文件运行一次 shell 命令，并在末尾添加文件名。  例如，@kbd{! uudecode @key{RET}} 对每个文件运行 @code{uudecode}。
+@end itemize
+
+要以更复杂的方式迭代文件名，您可能更喜欢使用显式 shell 循环。  例如，以下是如何对每个文件进行 uuencode，通过将 @samp{.uu} 附加到输入文件名来生成输出文件名：
+
+@example
+for file in * ; do uuencode "$file" "$file" >"$file".uu; done
+@end example
+
+使用 @samp{`?`} 表示法的相同示例：
+@example
+uuencode ? ? > `?`.uu
+@end example
+
+@kbd{!} 和 @kbd{&} 命令不会尝试更新 Dired 缓冲区以显示新的或修改的文件，因为它们不知道哪些文件将被更改。  使用 @kbd{g} 命令更新 Dired 缓冲区 (@pxref{Dired Updating})。
+
+@xref{Single Shell}，有关在 Dired 之外运行 shell 命令的信息。
+
+@node Shell Command Guessing
+@section Shell 命令猜测
+@cindex guessing shell commands for files (in Dired)
+
+根据文件名，Dired 尝试猜测您可能想要对其应用什么 shell 命令。  例如，如果您指向名为 @file{foo.tar} 的文件并按 @kbd{!}，Dired 会猜测您要运行 @samp{tar xvf}，并建议将其作为默认 shell 命令。
+
+您可以输入 @kbd{M-n} 将默认值放入迷你缓冲区中进行编辑。  如果给定文件有多个命令，请多次键入 @kbd{M-n} 以按顺序查看每个匹配的命令。
+
+Dired 只尝试猜测单个文件的命令，而不会尝试猜测标记文件列表。
+
+@defvar dired-guess-shell-alist-default
+该变量指定猜测适合某些文件的 shell 命令的预定义规则。  将其设置为 @code{nil} 以关闭猜测。  @code{dired-guess-shell-alist-user} 的元素（由用户定义）将覆盖这些规则。
+@end defvar
+
+@defvar dired-guess-shell-alist-optional
+该变量类似于@code{dired-guess-shell-alist-default}，但包含各种媒体格式的外部查看器和播放器。将其设置为 @code{nil} 会关闭猜测。  变量@code{dired-guess-shell-alist-user}和@code{dired-guess-shell-alist-default}将覆盖这些规则。
+@end defvar
+
+@defvar dired-guess-shell-alist-user
+如果非@code{nil}，则此变量指定用户定义的文件正则表达式列表及其建议的命令。  当 @code{dired-do-shell-command} 运行时，这些规则优先于变量 @code{dired-guess-shell-alist-default} 和 @code{dired-guess-shell-alist-optional} 中的预定义规则）。  默认值为@code{nil}。
+
+alist 的每个元素看起来像
+
+@example
+(@var{regexp} @var{command}@dots{})
+@end example
+
+@noindent
+其中每个 @var{command} 可以是字符串，也可以是计算结果为字符串的 Lisp 表达式。  如果发出多个命令，所有命令都会暂时被推送到历史记录中。
+
+shell命令中的@samp{*}代表与@var{regexp}匹配的文件名。  当 Emacs 调用 @var{command} 时，它会用匹配的文件名替换 @samp{*} 的每个实例。
+
+要添加 @samp{.foo} 和 @samp{.bar} 文件扩展名的规则，请将其添加到您的 Init 文件中：
+
+@example
+(setq dired-guess-shell-alist-user
+      (list
+       (list "\\.foo$" "@var{foo-command}")  ; fixed rule
+       ;; possibly more rules...
+       (list "\\.bar$"  ; rule with condition test
+             '(if @var{condition}
+                  "@var{bar-command-1}"
+                "@var{bar-command-2}"))))
+@end example
+
+@noindent
+这将覆盖相同扩展名的任何预定义规则。
+@end defvar
+
+您可以使用 @kbd{M-x customize-group @key{RET} dired-guess @key{RET}} 找到更多用户选项。
+
+@node Transforming File Names
+@section 转换 Dired 中的文件名
+
+本节介绍以系统方式更改文件名的 Dired 命令。  每个命令都对部分或全部标记的文件进行操作，使用通过转换现有名称而生成的新名称。
+
+与基本的 Dired 文件操作命令 (@pxref{Operating on Files}) 类似，此处描述的命令可以对接下来的 @var{n} 文件进行操作，或者对所有标有 @samp{*} 的文件进行操作，或者对当前文件进行操作。  （要标记文件，请使用@ref{Marks vs Flags}中描述的命令。）
+
+本节中描述的所有命令都有效@emph{interactively}：它们要求您确认每个候选文件的操作。  因此，您可以选择比实际需要操作更多的文件（例如，使用匹配许多文件的正则表达式），然后在命令提示确认时键入 @kbd{y} 或 @kbd{n} 来过滤所选名称。
+
+@table @kbd
+@findex dired-upcase
+@kindex % u @r{(Dired)}
+@cindex upcase file names
+@item % u
+将每个选定的文件重命名为大写名称 (@code{dired-upcase})。  如果旧文件名为 @file{Foo} 和 @file{bar}，则新名称为 @file{FOO} 和 @file{BAR}。
+
+@item % l
+@findex dired-downcase
+@kindex % l @r{(Dired)}
+@cindex downcase file names
+将每个选定的文件重命名为小写名称 (@code{dired-downcase})。  如果旧文件名为 @file{Foo} 和 @file{bar}，则新名称为 @file{foo} 和 @file{bar}。
+
+@item % R @var{from} @key{RET} @var{to} @key{RET}
+@kindex % R @r{(Dired)}
+@findex dired-do-rename-regexp
+@itemx % C @var{from} @key{RET} @var{to} @key{RET}
+@kindex % C @r{(Dired)}
+@findex dired-do-copy-regexp
+@itemx % H @var{from} @key{RET} @var{to} @key{RET}
+@kindex % H @r{(Dired)}
+@findex dired-do-hardlink-regexp
+@itemx % S @var{from} @key{RET} @var{to} @key{RET}
+@kindex % S @r{(Dired)}
+@findex dired-do-symlink-regexp
+@itemx % Y @var{from} @key{RET} @var{to} @key{RET}
+@kindex % Y @r{(Dired)}
+@findex dired-do-relsymlink-regexp
+这五个命令重命名、复制、创建硬链接、创建软链接和创建相对软链接，在每种情况下都通过从旧文件的名称进行正则表达式替换来计算新名称。
+@end table
+
+四个正则表达式替换命令有效地对所选文件名执行搜索和替换。  他们读取两个参数：正则表达式@var{from}和替换模式@var{to}；它们将每个旧文件名与 @var{from} 进行匹配，然后用 @var{to} 替换匹配部分。  您可以在 @var{to} 中使用 @samp{\&} 和 @samp{\@var{digit}} 来引用旧文件名中匹配的模式的全部或部分，如 @code{replace-regexp} (@pxref{Regexp Replace}) 中。  如果正则表达式在文件名中多次匹配，则仅替换第一个匹配项。
+
+例如，@kbd{% R ^.*$ @key{RET} x-\& @key{RET}} 通过在其名称前添加 @samp{x-} 来重命名每个选定的文件。  相反，从每个文件名前面删除@samp{x-}也是可能的：一种方法是@kbd{% R ^x-\(.*\)$ @key{RET} \1 @key{RET}}；另一个是@kbd{% R ^x- @key{RET} @key{RET}}。  （使用 @samp{^} 和 @samp{$} 来锚定应跨越整个文件名的匹配项。）
+
+通常，替换过程不考虑文件的目录名；它对目录中的文件名进行操作。  如果指定数字参数为零，则替换会影响整个绝对文件名，包括目录名。  （非零参数指定要操作的文件数。）
+
+您可能需要使用与操作它们相同的正则表达式@var{from}来选择要操作的文件集。  为此，请用 @kbd{% m @var{from} @key{RET}} 标记这些文件，然后在命令中使用相同的正则表达式对文件进行操作。  为了更方便，操作文件的 @kbd{%} 命令默认使用任何 @kbd{%} 命令中指定的最后一个正则表达式。
+
+@node Comparison in Dired
+@section 与 Dired 进行文件比较
+@cindex file comparison (in Dired)
+@cindex compare files (in Dired)
+
+@findex dired-diff
+@kindex = @r{(Dired)}
+@kbd{=} (@code{dired-diff}) 命令使用 @command{diff} 程序将当前文件（当前文件）与另一个文件（使用迷你缓冲区读取）进行比较。  用迷你缓冲区指定的文件是@command{diff}的第一个参数，指向的文件是第二个参数。  @command{diff} 程序的输出使用 Diff 模式 (@pxref{Comparing Files}) 显示在缓冲区中。
+
+如果区域处于活动状态，则使用迷你缓冲区读取的文件的默认值是标记处的文件（即普通的 Emacs 标记，而不是 Dired 标记；@pxref{Setting Mark}）。  否则，如果此时的文件有备份文件 (@pxref{Backup})，则这是默认文件。
+
+您还可以使用@code{ediff-files}比较文件，请参阅@ref{Major Entry Points,,, ediff, Ediff User's Manual}。
+
+@node Subdirectories in Dired
+@section Dired 中的子目录
+@cindex subdirectories in Dired
+@cindex expanding subdirectories in Dired
+
+Dired 缓冲区通常只显示一个目录，但您也可以选择包含其子目录。
+
+在一个 Dired 缓冲区中包含多个目录的最简单方法是指定运行 @command{ls} 的选项 @samp{-lR}。  （如果在运行 Dired 时给出数字参数，则可以在迷你缓冲区中指定这些选项。）这会生成一个递归目录列表，显示所有级别的所有子目录。
+
+更常见的是，您只想显示特定的子目录。  您可以使用 @kbd{i} (@code{dired-maybe-insert-subdir}) 执行此操作：
+
+@table @kbd
+@findex dired-maybe-insert-subdir
+@kindex i @r{(Dired)}
+@item i
+@cindex inserted subdirectory (Dired)
+@cindex in-situ subdirectory (Dired)
+稍后将子目录的内容插入缓冲区。
+@end table
+
+@noindent
+如果在描述目录文件的行上使用此命令，它将将该目录的内容插入到同一个 Dired 缓冲区中，并移动到那里。  插入的子目录内容位于 Dired 缓冲区的顶级目录之后，就像它们在 @samp{ls -lR} 输出中一样。
+
+如果子目录的内容已经存在于缓冲区中，则@kbd{i}命令只会移动到它。
+
+无论哪种情况，@kbd{i}都会在移动之前设置 Emacs 标记，因此 @kbd{C-u C-@key{SPC}} 返回到 Dired 缓冲区中之前的位置 (@pxref{Setting Mark})。  您还可以使用 @samp{^} 返回到同一 Dired 缓冲区 (@pxref{Dired Visiting}) 中的父目录。
+
+使用 @kbd{l} 命令 (@code{dired-do-redisplay}) 更新子目录的内容，并在子目录标题行上使用 @kbd{C-u k} 删除子目录列表 (@pxref{Dired Updating})。  您还可以隐藏和显示插入的子目录 (@pxref{Hiding Subdirectories})。
+
+@ifnottex
+@include dired-xtra.texi
+@end ifnottex
+
+@node Subdirectory Motion
+@section 移动子目录
+
+当 Dired 缓冲区列出子目录时，您可以使用页面移动命令 @kbd{C-x [} 和 @kbd{C-x ]} 移动整个目录 (@pxref{Pages})。
+
+@cindex header line (Dired)
+@cindex directory header lines
+以下命令在一个 Dired 缓冲区内的目录树中上下移动。  它们移动到 @dfn{directory header lines}，即在目录内容的开头给出目录名称的行。
+
+@table @kbd
+@findex dired-next-subdir
+@kindex C-M-n @r{(Dired)}
+@item C-M-n
+转到下一个子目录标题行，无论级别如何 (@code{dired-next-subdir})。
+
+@findex dired-prev-subdir
+@kindex C-M-p @r{(Dired)}
+@item C-M-p
+转到上一个子目录标题行，无论级别如何 (@code{dired-prev-subdir})。
+
+@findex dired-tree-up
+@kindex C-M-u @r{(Dired)}
+@item C-M-u
+转到父目录的标题行 (@code{dired-tree-up})。
+
+@findex dired-tree-down
+@kindex C-M-d @r{(Dired)}
+@item C-M-d
+在目录树中向下移动到第一个子目录的标题行 (@code{dired-tree-down})。
+
+@findex dired-prev-dirline
+@kindex < @r{(Dired)}
+@item <
+向上移动到上一个目录文件行 (@code{dired-prev-dirline})。这些行将目录描述为其父目录中的文件。
+
+@findex dired-next-dirline
+@kindex > @r{(Dired)}
+@item >
+向下移动到下一个目录文件行 (@code{dired-next-dirline})。
+
+@findex dired-goto-subdir
+@kindex M-G @r{(Dired)}
+@item M-G
+提示输入目录并移至其目录文件行 (@code{dired-goto-subdir})。
+@end table
+
+@node Hiding Subdirectories
+@section 隐藏子目录
+@cindex hiding subdirectories (Dired)
+@cindex showing hidden subdirectories (Dired)
+
+@dfn{Hiding} 子目录意味着使其不可见，除了其标题行。
+
+@table @kbd
+@item $
+@findex dired-hide-subdir
+@kindex $ @r{(Dired)}
+隐藏或显示该点所在的子目录，并将点移动到下一个子目录（@code{dired-hide-subdir}）。  这是一个切换。  数字参数用作重复计数。
+
+@item M-$
+@findex dired-hide-all
+@kindex M-$ @r{(Dired)}
+隐藏此 Dired 缓冲区中的所有子目录，仅保留其标题行 (@code{dired-hide-all})。  或者，如果当前隐藏任何子目录，则使所有子目录再次可见。  您可以使用此命令来获取非常深的目录树的概览或快速移动到较远的子目录。
+@end table
+
+普通 Dired 命令从不考虑隐藏子目录中的文件。  例如，对标记文件进行操作的命令会忽略隐藏目录中的文件，即使它们已被标记。  因此，您可以使用隐藏功能暂时从操作中排除子目录，而无需删除这些子目录中文件上的 Dired 标记。
+
+@xref{Subdirectories in Dired}，了解如何插入子目录列表，参见@ref{Dired Updating}，了解如何删除子目录列表。
+
+@node Dired Updating
+@section 更新 Dired 缓冲区
+@cindex updating Dired buffer
+@cindex refreshing displayed files
+
+本节介绍更新 Dired 缓冲区以反映目录和文件中的外部（非 Dired）更改以及删除部分 Dired 缓冲区的命令。
+
+@table @kbd
+@item g
+更新 Dired 缓冲区的全部内容 (@code{revert-buffer})。
+
+@item l
+更新指定的文件 (@code{dired-do-redisplay})。  您可以按照与文件操作相同的方式为 @kbd{l} 指定文件。
+
+@item k
+删除指定的@emph{file lines}——不是文件，只是行(@code{dired-do-kill-lines})。
+
+@item s
+在字母顺序和日期/时间顺序之间切换 (@code{dired-sort-toggle-or-edit})。
+
+@item C-u s @var{switches} @key{RET}
+使用 @var{switches} 作为 @code{dired-listing-switches} 刷新 Dired 缓冲区。
+@end table
+
+@kindex g @r{(Dired)}
+@findex revert-buffer @r{(Dired)}
+键入 @kbd{g} (@code{revert-buffer}) 以根据列出的文件和目录中的更改来更新 Dired 缓冲区的内容。这将保留除已消失文件上的标记之外的所有标记。隐藏的子目录会更新，但仍保持隐藏状态。
+
+@kindex l @r{(Dired)}
+@findex dired-do-redisplay
+要仅更新部分文件，请输入 @kbd{l} (@code{dired-do-redisplay})。  与 Dired 文件操作命令一样，此命令对下一个 @var{n} 文件（或前一个 @minus{}@var{n} 文件）、标记文件（如果有）或当前文件进行操作。  更新文件意味着读取它们的当前状态，然后更新缓冲区中的行以指示该状态。
+
+如果在子目录标题行上使用@kbd{l}，它将更新相应子目录的内容。
+
+@vindex dired-auto-revert-buffer
+如果您使用 @kbd{C-x d} 或其他 Dired 命令来访问已在 Dired 缓冲区中显示的目录，Dired 会切换到该缓冲区但不会更新它。  如果缓冲区不是最新的，Dired 会显示一条警告，告诉您输入 @kbd{g} 来更新它。  您还可以通过将变量 @code{dired-auto-revert-buffer} 设置为非 @code{nil} 值，告诉 Emacs 在重新访问每个 Dired 缓冲区时自动恢复它。
+
+@kindex k @r{(Dired)}
+@findex dired-do-kill-lines
+要从缓冲区中删除 @emph{file lines}（而不实际删除文件），请键入 @kbd{k} (@code{dired-do-kill-lines})。  与文件操作命令一样，此命令对接下来的 @var{n} 文件或标记的文件（如果有）进行操作。  但是，它不会对当前文件进行操作，否则错误输入 @kbd{k} 可能会很烦人。
+
+如果您使用 @kbd{k} 终止已作为子目录 (@pxref{Subdirectories in Dired}) 插入 Dired 缓冲区中的目录文件的行，它也会删除子目录列表。  在子目录的标题行上键入 @kbd{C-u k} 也会从 Dired 缓冲区中删除该子目录行。
+
+@kbd{g} 命令会带回您以这种方式删除的所有单独行，但不会带回子目录——您必须使用 @kbd{i} 重新插入子目录。
+
+@cindex Dired sorting
+@cindex sorting Dired buffer
+@kindex s @r{(Dired)}
+@findex dired-sort-toggle-or-edit
+Dired 缓冲区中的文件通常按文件名的字母顺序列出。  或者 Dired 可以按日期/时间对它们进行排序。  Dired 命令@kbd{s} (@code{dired-sort-toggle-or-edit}) 在这两种排序模式之间切换。  Dired 缓冲区中的模式行指示当前的排序方式——按名称或按日期。
+
+@kbd{C-u s @var{switches} @key{RET}} 可让您为 @code{dired-listing-switches} 指定新值。
+
+@node Dired and Find
+@section 迪尔德和@code{find}
+@cindex @code{find} and Dired
+
+您可以通过使用 @command{find} 实用程序选择文件来更灵活地选择一组文件以在 Dired 缓冲区中显示。
+
+@findex find-name-dired
+要搜索名称与通配符模式匹配的文件，请使用@kbd{M-x find-name-dired}。  它读取参数@var{directory}和@var{pattern}，并选择@var{directory}或其子目录中单个名称与@var{pattern}匹配的所有文件。
+
+这样选择的文件将显示在 Dired 缓冲区中，其中可以使用普通的 Dired 命令。
+
+@findex find-grep-dired
+如果您想测试文件的内容而不是文件名称，请使用@kbd{M-x find-grep-dired}。  该命令读取两个迷你缓冲区参数，@var{directory}和@var{regexp}；它选择 @var{directory} 或其子目录中包含与 @var{regexp} 匹配的所有文件。  它通过运行程序@command{find}和@command{grep}来工作。  另请参见@ref{Grep Searching}中的@kbd{M-x grep-find}。  请记住编写 @command{grep} 的正则表达式，而不是 Emacs 的正则表达式。  （显示内容与给定正则表达式匹配的文件的另一种方法是 @kbd{% g @var{regexp}} 命令，请参阅 @ref{Marks vs Flags}。）
+
+@findex find-dired
+本系列中最通用的命令是 @kbd{M-x find-dired}，它允许您指定 @command{find} 可以测试的任何条件。  它需要两个迷你缓冲区参数，@var{directory}和@var{find-args}；它在@var{directory}中运行@command{find}，并传递@var{find-args}来告诉@command{find}要测试什么条件。  要使用此命令，您需要知道如何使用@command{find}。
+
+@vindex find-ls-option
+这些命令生成的列表的格式由变量@code{find-ls-option}控制。  这是一对选项；第一个指定如何调用 @command{find} 来生成文件列表，第二个告诉 Dired 解析输出。
+
+@findex locate
+@findex locate-with-filter
+@cindex file database (locate)
+@vindex locate-command
+命令 @kbd{M-x locate} 提供与 @command{locate} 程序类似的界面。  @kbd{M-x locate-with-filter} 类似，但仅保留名称与给定正则表达式匹配的文件。
+
+这些缓冲区的工作方式并不完全像普通的 Dired 缓冲区：文件操作可以工作，但并不总是自动更新缓冲区。使用 @kbd{g} 恢复缓冲区会删除所有插入的子目录，并擦除所有标志和标记。
+
+@node Wdired
+@section 编辑 Dired 缓冲区
+
+@cindex wdired mode
+@findex wdired-change-to-wdired-mode
+Wdired 是一种特殊模式，允许您通过直接编辑 Dired 缓冲区来执行文件操作（“Wdired”中的“W”代表“可写”）。  要进入 Wdired 模式，请在 Dired 缓冲区中键入 @kbd{C-x C-q} (@code{dired-toggle-read-only})。或者，使用 @samp{Immediate / Edit File Names} 菜单项。
+
+@findex wdired-finish-edit
+在 Wdired 模式下，您可以通过编辑 Dired 缓冲区中显示的文件名来重命名文件。  所有普通的 Emacs 编辑命令，包括矩形操作和@code{query-replace}，都可用于此。  完成编辑后，输入 @kbd{C-c C-c} (@code{wdired-finish-edit})。  这将应用您的更改并切换回普通 Dired 模式。
+
+除了简单地重命名文件之外，您还可以通过键入新文件名（绝对或相对）将文件移动到另一个目录。  要将文件标记为删除，请删除整个文件名。要更改符号链接的目标，请编辑链接名称旁边显示的链接目标名称。
+
+如果您编辑文件名来创建新的子目录，Wdired 将自动创建这些新目录。  要抑制此行为，请将 @code{wdired-create-parent-directories} 设置为 @code{nil}。
+
+缓冲区中的其余文本（例如文件大小和修改日期）被标记为只读，因此您无法对其进行编辑。但是，如果将 @code{wdired-allow-to-change-permissions} 设置为 @code{t}，则可以编辑文件权限。  例如，您可以将 @samp{-rw-r--r--} 更改为 @samp{-rw-rw-rw-} 以使文件全局可写。  当您键入 @kbd{C-c C-c} 时，这些更改也会生效。
+
+@node Image-Dired
+@section 在 Dired 中查看图像缩略图
+@cindex @code{image-dired} mode
+@cindex @code{image-dired}
+
+Image-Dired 是浏览图像文件的工具。  它提供了在 Emacs 内或通过外部查看器以缩略图或全尺寸形式查看图像的功能。  这与用于访问 Emacs 缓冲区中的图像文件的图像模式 (@pxref{Image Mode}) 不同。
+
+@kindex C-t d @r{(Image-Dired)}
+@findex image-dired-display-thumbs
+要进入 Image-Dired，请像往常一样使用 @kbd{m} 标记要在 Dired 缓冲区中查看的图像文件。  然后输入@kbd{C-t d} (@code{image-dired-display-thumbs})。  这将创建并切换到包含 Image-Dired 的缓冲区，对应于标记的文件。
+
+您也可以通过输入 @kbd{M-x image-dired} 直接输入 Image-Dired。  这会提示输入一个目录；指定具有图像文件的一个。  这会为该目录中的所有图像创建缩略图，并将它们全部显示在缩略图缓冲区中。  缩略图在后台生成，并在可用时加载。
+
+@vindex image-dired-thumbnail-storage
+Image-Dired 支持三种生成和存储缩略图的方法，由选项 @code{image-dired-thumbnail-storage} 的值控制：
+
+@table @code
+@vindex image-dired-dir
+@vindex image-dired-thumb-naming
+@item image-dired
+此方法将缩略图作为 JPEG 图像存储在变量 @code{image-dired-dir} 指定的单个目录中。  这是默认设置。在这种情况下，缩略图文件的名称是根据@code{image-dired-thumb-naming}的值构建的。
+@item standard
+@itemx standard-large
+@itemx standard-x-large
+@itemx standard-xx-large
+这些方法由 @url{https://specifications.freedesktop.org/thumbnail-spec/thumbnail-spec-latest.html, Thumbnail Managing Standard} 强制执行，将缩略图作为 @acronym{PNG} 图像存储在环境变量 @env{XDG_CACHE_HOME}（默认为 @file{~/.cache}）指定的目录的 @file{thumbnails} 子目录下。
+@item per-directory
+此方法将每个目录的缩略图存储在该目录的 @file{.image-dired} 子目录中，作为 @acronym{jpeg} 图像。
+@end table
+
+@vindex image-dired-thumb-size
+您可以通过自定义变量@code{image-dired-thumb-size}来控制缩略图的大小。  默认值为 128 像素。该变量仅对上述第一种和第三种缩略图存储方法有效；缩略图管理标准使用由以下方法确定的固定大小：@code{standard} 使用 128 像素、@code{standard-large} 256 像素等。如果在创建某些缩略图后更改大小，则需要从其目录中删除缩略图文件才能使新大小生效。
+
+@findex image-dired-display-this
+@findex image-dired-display-next
+@findex image-dired-display-previous
+当指向缩略图缓冲区时，您可以键入 @key{RET} (@code{image-dired-display-this}) 以在另一个窗口中显示图像。  使用标准 Emacs 移动键绑定或箭头键在缩略图缓冲区中移动。  为了方便浏览，请使用 @key{SPC} (@code{image-dired-display-next}) 前进并显示下一张图像。  键入 @key{DEL} (@code{image-dired-display-previous}) 将返回到上一个缩略图并显示该缩略图。
+
+@vindex image-dired-external-viewer
+输入 @kbd{C-@key{RET}} (@code{image-dired-thumbnail-display-external}) 以在外部查看器中显示图像。  您必须首先配置@code{image-dired-external-viewer}。
+
+您也可以通过 Image-Dired 删除图像。  键入 @kbd{d} (@code{image-dired-flag-thumb-original-file}) 以标记要在 Dired 缓冲区中删除的图像文件。  或者，您可以通过键入 @kbd{C-d} (@code{image-dired-delete-char}) 从缩略图缓冲区中删除图像的缩略图，而不将图像标记为删除。
+
+@findex image-dired-dired-toggle-marked-thumbs
+@findex image-dired-dired-display-external
+@findex image-dired-dired-display-image
+您还可以使用 Image-Dired 进行“内联”操作（即直接进入 Dired 缓冲区）。  输入@kbd{C-t C-t}，Dired 中所选图像的缩略图将出现在其名称前面 (@code{image-dired-dired-toggle-marked-thumbs})。  @kbd{C-t i} 和 @kbd{C-t x} 将分别在 Emacs 或外部查看器中显示该点下的图像。
+
+更高级的功能包括@dfn{image tags}，它们是用于对图像文件进行分类的元数据。  标签存储在由@code{image-dired-tags-db-file}配置的纯文本文件中。
+
+要标记图像文件，请在 Dired 缓冲区中标记它们（您也可以通过键入 @kbd{m} 在缩略图缓冲区中标记 Dired 中的文件）并键入 @kbd{C-t t} (@code{image-dired-tag-files})。  这会读取迷你缓冲区中的标签名称。  要标记具有特定标签的文件，请输入 @kbd{C-t f} (@code{image-dired-mark-tagged-files})。  将图像文件标记为特定标签后，可以使用@kbd{C-t d}查看它们。
+
+@findex image-dired-dired-comment-files
+@findex image-dired-dired-edit-comment-and-tags
+您还可以通过键入 @kbd{t t} 直接从缩略图缓冲区标记文件，并且可以通过键入 @kbd{t r} 删除标记。  每个文件还有一个名为“comment”的特殊标签（它与其他标签的意义并不完全相同，处理方式略有不同）。  用于输入有关图像的评论或描述。  您可以通过键入 @kbd{c} 来注释缩略图缓冲区中的文件。  系统将提示您发表评论。  输入 @kbd{C-t c} 添加来自 Dired (@code{image-dired-dired-comment-files}) 的评论。 @kbd{C-t e} 将带来一个缓冲区来编辑评论和标签（@code{image-dired-dired-edit-comment-and-tags}）。
+
+@findex image-dired-thumbnail-set-image-description
+如果您安装了 @command{exiftool} 程序，则可以通过指向图像文件的缩略图调用 @code{image-dired-thumbnail-set-image-description} 命令来设置图像文件的 @acronym{EXIF} @samp{ImageDescription} 标签。  此命令提示输入图像的描述，并向其添加 @acronym{EXIF} 标签。
+
+@vindex image-dired-thumb-visible-marks
+如果@code{image-dired-thumb-visible-marks}非@code{nil}（这是默认值），则在 Dired 中标记的文件也将在 Image-Dired 中标记。
+
+Image-Dired 还提供简单的图像操作。  在缩略图缓冲区中，键入 @kbd{L} 将原始图像逆时针旋转 90 度，然后键入 @kbd{R} 将其顺时针旋转 90 度。  此旋转是无损的，并使用名为 @command{jpegtran} 的外部实用程序，您需要先安装该实用程序。
+
+@node Misc Dired Features
+@section 其他令人讨厌的功能
+
+@vindex dired-free-space
+默认情况下，Dired 在目录列表的第一行、目录名称后面显示目录磁盘上的可用空间。  您可以通过自定义变量@code{dired-free-space} 来控制此显示。  它的默认值为@code{first}，它在目录名称后生成可用空间。  如果您将其自定义为值@code{separate}，Dired 将在目录名称行之后的单独行中显示磁盘空间信息，并将在该行中包含当前目录中文件使用的空间以及可用磁盘空间。  如果将其设置为@code{nil}，则根本不会显示可用磁盘空间信息。
+
+@vindex dired-check-symlinks
+Dired 将 Dired 缓冲区中的项目字体化。  如果该缓冲区的 @code{default-directory} 是远程的，这对于符号链接来说可能会很昂贵，因为需要访问它们的 @code{file-truename} 。  为了避免由此导致 Dired 速度变慢，请将用户选项 @code{dired-check-symlinks} 设置为 @code{nil} 对于连接速度较慢的远程目录。  它可以声明为连接本地变量，以匹配远程系统的连接方式 (@pxref{Connection Variables})。
+
+@kindex + @r{(Dired)}
+@findex dired-create-directory
+命令 @kbd{+} (@code{dired-create-directory}) 读取目录名称并创建该目录。  如果该目录已存在，则会发出错误信号。
+
+@findex dired-create-empty-file
+命令 (@code{dired-create-empty-file}) 读取文件名并创建该文件。  如果文件已存在，则会发出错误信号。
+
+@cindex searching multiple files via Dired
+@kindex M-s a C-s @r{(Dired)}
+@kindex M-s a M-C-s @r{(Dired)}
+@findex dired-do-isearch
+@findex dired-do-isearch-regexp
+命令@kbd{M-s a C-s} (@code{dired-do-isearch}) 开始对标记文件进行多文件增量搜索。  如果搜索在文件末尾失败，请键入 @kbd{C-s} 前进到下一个标记的文件并重复搜索；在最后一个标记文件的末尾，搜索将回绕到第一个标记文件。  命令 @kbd{M-s a M-C-s} (@code{dired-do-isearch-regexp}) 对正则表达式搜索执行相同的操作。  @xref{Repeat Isearch}，有关搜索重复的信息。
+
+@cindex adding to the kill ring in Dired
+@kindex w @r{(Dired)}
+@findex dired-copy-filename-as-kill
+命令 @kbd{w} (@code{dired-copy-filename-as-kill}) 将标记的（或下一个 @var{n}）文件的名称放入删除环中，就像您使用 @kbd{C-w} 杀死了它们一样。  名称之间用空格分隔。
+
+如果使用零前缀参数，则使用每个标记文件的绝对文件名。  对于前缀值 1，它使用相对于项目根目录的名称。  仅使用 @kbd{C-u} 作为前缀参数，它使用相对于 Dired 缓冲区默认目录的文件名。  （如果在子目录中，它仍然可以包含斜杠。）作为特殊情况，如果点位于目录标题行上，@kbd{w} 将为您提供该目录的绝对名称。  在这种情况下，任何前缀参数或标记的文件都将被忽略。
+
+该命令的主要目的是让您可以将文件名拉入其他 Emacs 命令的参数中。  它还显示添加到 Kill Ring 的内容，因此您可以使用它在回显区域显示当前标记的文件列表。
+
+@kindex W @r{(Dired)}
+@findex browse-url-of-dired-file
+如果文件列表中有 HTML 文件，则使用浏览器查看该文件会很有用。  @kbd{W} (@code{browse-url-of-dired-file}) 命令将使用标准配置的浏览器来查看该文件。
+
+@kindex ( @r{(Dired)}
+@findex dired-hide-details-mode
+@vindex dired-hide-details-hide-symlink-targets
+@vindex dired-hide-details-hide-information-lines
+@cindex hiding details in Dired
+命令 @kbd{(} (@code{dired-hide-details-mode}) 切换详细信息（例如所有权或文件权限）在当前 Dired 缓冲区中是否可见。  默认情况下，它还隐藏符号链接的目标以及除标题行和文件/目录列表之外的所有行。  要更改此设置，请分别自定义选项 @code{dired-hide-details-hide-symlink-targets} 和 @code{dired-hide-details-hide-information-lines}。
+
+@findex dired-compare-directories
+命令@kbd{M-x dired-compare-directories}用于将当前 Dired 缓冲区与另一个目录进行比较。  它标记两个目录之间所有不同的文件。  它将这些标记放在列出这些文件的所有 Dired 缓冲区中，其中当然包括当前缓冲区。
+
+默认的比较方法（如果在提示符下键入 @key{RET} 则使用）是仅比较文件名——如果文件名未出现在其他目录中，则文件名会有所不同。  您可以通过输入 Lisp 表达式来指定更严格的比较，该表达式可以引用变量 @code{size1} 和 @code{size2}，即各自的文件大小； @code{mtime1}和@code{mtime2}，最后修改时间（以秒为单位），为浮点数；以及@code{fa1}和@code{fa2}，各自的文件属性列表（由函数@code{file-attributes}返回）。  针对每对名称相似的文件计算此表达式，如果表达式的值非 @code{nil}，则文件会有所不同。
+
+例如，序列 @kbd{M-x dired-compare-directories @key{RET} (> mtime1 mtime2) @key{RET}} 标记该目录中的文件比另一个目录中的文件新，并且标记另一个目录中的文件比该目录中的文件旧。  它还一如既往地在两个目录中标记没有对应项的文件。
+
+@cindex drag and drop, Dired
+@vindex dired-mouse-drag-files
+在 X Window 系统上，Emacs 支持拖放协议。您可以将文件对象从另一个程序中拖放到 Dired 缓冲区中；这会移动、复制或创建指向该目录中文件的链接。  具体采取哪种操作由原始程序决定。  还支持将文件拖出 Dired 缓冲区，通过启用用户选项@code{dired-mouse-drag-files}，可以使用鼠标将文件拖到其他程序上。  当设置为@code{link}时，它将使其他程序（通常是文件管理器）创建到该文件的符号链接；当设置为@code{move}时，它将使其他程序将文件移动到新位置，并将其设置为任何其他非@code{nil}值将使其他程序打开或创建文件的副本。  在拖放操作期间按下的键盘修饰符还可以控制其他程序对文件采取的操作。

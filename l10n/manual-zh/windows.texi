@@ -1,0 +1,408 @@
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Windows
+@chapter 多个窗口
+@cindex windows in Emacs
+@cindex multiple windows in Emacs
+
+Emacs 可以将一个框架分割成两个或多个窗口。  多个窗口可以显示不同缓冲区的一部分，或一个缓冲区的不同部分。  多个框架总是意味着多个窗口，因为每个框架都有自己的一组窗口。  每个窗口属于一个且仅一个框架。
+
+@menu
+* Basic Window::         Emacs 窗口简介。
+* Split Window::         新窗口是通过分割现有窗口创建的。
+* Other Window::         移动到另一个窗口或对其执行某些操作。
+* Pop Up Window::        在另一个窗口中查找文件或缓冲区。
+* Change Window::        删除窗口并更改其大小。
+* Displaying Buffers::   Emacs 如何选择一个窗口来显示缓冲区。
+* Window Convenience::   窗口处理的便捷功能。
+* Tab Line::             窗口选项卡线。
+* Window Tool Bar::      附加到窗口的工具栏。
+@end menu
+
+@node Basic Window
+@section Emacs Windows 的概念
+
+每个 Emacs 窗口随时显示一个 Emacs 缓冲区。  单个缓冲区可能出现在多个窗口中；如果是这样，其文本的任何更改都会显示在它出现的所有窗口中。  但这些窗口可以显示缓冲区的不同部分，因为每个窗口都有自己的点值。
+
+@cindex selected window
+在任何时候，一个 Emacs 窗口都是 @dfn{selected window}；该窗口显示的缓冲区是当前缓冲区。  在图形显示上，该点在选定窗口中由实心闪烁光标表示，在未选定窗口中由空心框表示。  在文本终端上，光标仅绘制在选定的窗口中。 @xref{Cursor Display}。
+
+移动点的命令仅影响所选 Emacs 窗口的点值。  它们不会更改其他 Emacs 窗口中的 point 值，即使是那些显示相同缓冲区的窗口。  对于 @kbd{C-x b} 等缓冲区切换命令也是如此；它们根本不影响其他窗口。  但是，还有其他命令（例如 @kbd{C-x 4 b}）可以选择不同的窗口并在其中切换缓冲区。此外，所有在窗口中显示信息的命令，包括（例如）@kbd{C-h f} (@code{describe-function}) 和@kbd{C-x C-b} (@code{list-buffers})，通常通过在非选定窗口中显示缓冲区来工作，而不影响选定窗口。
+
+当多个窗口显示相同的缓冲区时，它们可以具有不同的区域，因为它们可以具有不同的点值。  然而，它们都具有相同的标记值，因为每个缓冲区只有一个标记位置。
+
+每个窗口都有自己的模式行，显示窗口中显示的缓冲区的缓冲区名称、修改状态以及主要和次要模式。  所选窗口的模式线以不同的颜色显示。  @xref{Mode Line}，了解详情。
+
+@node Split Window
+@section 分割窗口
+
+@table @kbd
+@item C-x 2
+将选定的窗口拆分为两个窗口，一个位于另一个之上 (@code{split-window-below})。
+@item C-x 3
+将选定的窗口拆分为两个并排放置的窗口 (@code{split-window-right})。
+@item C-mouse-2
+在窗口的模式行中，分割该窗口。
+@end table
+
+@kindex C-x 2
+@findex split-window-below
+@kbd{C-x 2} (@code{split-window-below}) 将选定的窗口分成两个窗口，一个在另一个窗口之上。  分割后，上方是选中的窗口，下方是新分割的窗口。两个窗口都具有与以前相同的 point 值，并显示缓冲区的相同部分（或尽可能接近）。  如有必要，窗口会滚动以保持屏幕上的点。  默认情况下，两个窗口的高度均为原始窗口的一半。  正数值参数指定向顶部窗口提供多少行；负数值参数指定向底部窗口提供多少行。
+
+@vindex split-window-keep-point
+如果将变量@code{split-window-keep-point}更改为@code{nil}，则@kbd{C-x 2}会调整两个窗口显示的缓冲区部分以及每个窗口中的point值，以使屏幕上的文本尽可能接近之前的内容；此外，如果点位于原始窗口的下半部分，则选择底部窗口而不是上部窗口。
+
+@kindex C-x 3
+@findex split-window-right
+@kbd{C-x 3} (@code{split-window-right}) 将选定的窗口拆分为两个并排的窗口。  左侧窗口为选中窗口；右侧窗口显示同一缓冲区的同一部分，并具有相同的点值。  正数值参数指定左窗口有多少列；负数值参数指定为右侧窗口提供多少列。
+
+@vindex truncate-partial-width-windows
+当您使用 @kbd{C-x 3} 分割窗口时，每个生成的窗口占用的空间都小于框架的整个宽度。  如果它变得太窄，并且使用连续行，则缓冲区可能难以读取 (@pxref{Continuation Lines})。  因此，如果窗口宽度小于 50 列，Emacs 会自动切换到行截断。  无论变量 @code{truncate-lines} (@pxref{Line Truncation}) 的值如何，都会发生这种截断；它由变量 @code{truncate-partial-width-windows} 控制。  如果该变量的值为正整数（默认为50），则指定发生自动行截断之前部分宽度窗口的最小总宽度；如果值为@code{nil}，则禁用自动行截断；对于任何其他非 6⁣ 值，Emacs 会截断每个部分宽度窗口中的行，无论其宽度如何。窗口的总宽度以列为单位，由 @code{window-total-width} (@pxref{Window Sizes,,, elisp, The Emacs Lisp Reference Manual}) 报告，它包括边缘、延续和截断字形、边距和滚动条。
+
+在文本终端上，并排窗口由使用 @code{vertical-border} 面绘制的垂直分隔线分隔。
+
+@kindex C-mouse-2 @r{(mode line)}
+@kindex C-mouse-2 @r{(scroll bar)}
+如果您在窗口的模式行中单击@kbd{C-mouse-2}，则会分割窗口，并在您单击的位置放置一个垂直分隔线。根据 Emacs 的编译方式，您还可以通过单击滚动条中的@kbd{C-mouse-2} 来分割窗口，这会在您单击的位置放置一个水平分隔线（当 Emacs 使用 GTK+ 滚动条时，此功能不起作用）。
+
+@vindex window-resize-pixelwise
+默认情况下，当您拆分窗口时，Emacs 会给出每个结果窗口的尺寸，该尺寸是框架默认字体大小的整数倍。  这可能会在生成的窗口之间不均匀地细分屏幕空间。  如果将变量 @code{window-resize-pixelwise} 设置为非 @code{nil} 值，Emacs 将为每个窗口提供相同数量的像素（如果初始尺寸为奇数个像素，则给出或取一个像素）。  请注意，当帧的像素大小不是帧字符大小的倍数时，即使此选项为@code{nil}，至少一个窗口可能会按像素调整大小。
+
+@node Other Window
+@section 使用其他窗口
+
+@table @kbd
+@item C-x o
+选择另一个窗口 (@code{other-window})。
+@item C-x O
+向后选择另一个窗口 (@code{other-window-backward})。
+@item C-M-v
+向上滚动下一个窗口 (@code{scroll-other-window})。
+@item C-M-S-v
+向下滚动下一个窗口 (@code{scroll-other-window-down})。
+@item C-M-S-l
+将下一个窗口居中 (@code{recenter-other-window})。
+@item mouse-1
+@kbd{mouse-1}，在窗口的文本区域中，选择窗口并将光标移动到单击的位置。  单击模式线即可选择窗口而不移动其中的点。
+@end table
+
+@kindex C-x o
+@findex other-window
+使用键盘，您可以通过输入@kbd{C-x o} (@code{other-window}) 来切换窗口。  这是一个@kbd{o}，代表“其他”，而不是零。当有两个以上窗口时，该命令以循环顺序移动所有窗口，通常是从上到下、从左到右。在最右边和最底部的窗口之后，它返回到左上角的窗口。  数字参数意味着按照窗口的循环顺序移动几个步骤。  否定论证以相反的顺序围绕循环移动。  当迷你缓冲区处于活动状态时，迷你缓冲区窗口是循环中的最后一个窗口；您可以从迷你缓冲区窗口切换到其他窗口之一，然后再切换回来并完成提供所请求的迷你缓冲区参数。 @xref{Minibuffer Edit}。 @kbd{C-x O} 类似，但默认顺序相反。
+
+@findex next-window-any-frame
+@code{other-window} 命令通常只会切换到当前帧中的下一个窗口（除非另有配置）。  如果您在多帧环境中工作，并且希望所有帧中的窗口都成为循环的一部分，则可以将 @kbd{C-x o} 重新绑定到 @code{next-window-any-frame} 命令。  （@xref{Rebinding}，了解如何重新绑定命令。）
+
+@kindex C-M-v
+@findex scroll-other-window
+@kindex C-M-S-v
+@findex scroll-other-window-down
+@kindex C-M-S-l
+@findex recenter-other-window
+常用的滚动命令 (@pxref{Display}) 仅适用于选定的窗口，但也有滚动下一个窗口的命令。 @kbd{C-M-v} (@code{scroll-other-window}) 滚动@kbd{C-x o} 将选择的窗口。  在其他方面，该命令的行为类似于 @kbd{C-v}；两者都将缓冲区文本相对于窗口向上移动，并采用正参数和负参数。  （在迷你缓冲区中，@kbd{C-M-v}滚动与迷你缓冲区关联的帮助窗口（如果有），而不是标准循环顺序中的下一个窗口；@pxref{Minibuffer Edit}。）@kbd{C-M-S-v} (@code{scroll-other-window-down}) 以类似的方式向下滚动下一个窗口。  同样，@kbd{C-M-S-l} (@code{recenter-other-window}) 在下一个窗口中的行为类似于@kbd{C-l} (@code{recenter-top-bottom})。
+
+@vindex mouse-autoselect-window
+如果将 @code{mouse-autoselect-window} 设置为非 @code{nil} 值，则将鼠标移到不同的窗口上会选择该窗口。  该功能默认关闭。
+
+@node Pop Up Window
+@section 在另一个窗口中显示
+
+@cindex selecting buffers in other windows
+@kindex C-x 4
+@kbd{C-x 4} 是切换到不同窗口中的缓冲区的各种命令的前缀键——另一个现有窗口，或者通过拆分所选窗口创建的新窗口。  @xref{Window Choice}，了解 Emacs 如何选择或创建要使用的窗口。
+
+@table @kbd
+@item C-x 4 b @var{bufname} @key{RET}
+在另一个窗口 (@code{switch-to-buffer-other-window}) 中选择缓冲区@var{bufname}。  @xref{Select Buffer}。
+
+@findex display-buffer @r{(command)}
+@kindex C-x 4 C-o
+@item C-x 4 C-o @var{bufname} @key{RET}
+在某个窗口中显示缓冲区@var{bufname}，而不尝试选择它（@code{display-buffer}）。  @xref{Displaying Buffers}，了解如何选择窗口的详细信息。
+
+@item C-x 4 f @var{filename} @key{RET}
+访问文件 @var{filename} 并在另一个窗口 (@code{find-file-other-window}) 中选择其缓冲区。  @xref{Visiting}。
+
+@item C-x 4 d @var{directory} @key{RET}
+在另一个窗口 (@code{dired-other-window}) 中为目录@var{directory}选择 Dired 缓冲区。  @xref{Dired}。
+
+@c Don't index @kbd{C-x 4 m} and @code{compose-mail-other-window}
+@c here, they are indexed in sending.texi, in the "Sending Mail" node.
+@item C-x 4 m
+开始撰写邮件消息，类似于 @kbd{C-x m} (@pxref{Sending Mail})，但在另一个窗口中 (@code{compose-mail-other-window})。
+
+@findex find-tag-other-window
+@item C-x 4 .
+查找标识符的定义，类似于 @kbd{M-.} (@pxref{Xref})，但在另一个窗口中 (@code{xref-find-definitions-other-window})。
+
+@item C-x 4 r @var{filename} @key{RET}
+以只读方式访问文件 @var{filename}，并在另一个窗口 (@code{find-file-read-only-other-window}) 中选择其缓冲区。  @xref{Visiting}。
+
+@kindex C-x 4 4
+@findex other-window-prefix
+@item C-x 4 4
+更通用的前缀命令会影响在此前缀命令 (@code{other-window-prefix}) 之后调用的后续命令显示的缓冲区。  它请求后续命令显示的缓冲区显示在另一个窗口中。
+
+@item C-x 4 1
+该通用前缀命令请求下一个命令的缓冲区显示在同一窗口中。
+@end table
+
+@node Change Window
+@section 删除窗口并调整其大小
+
+@cindex delete window
+@cindex deleting windows
+@table @kbd
+@item C-x 0
+删除选定的窗口 (@code{delete-window})。
+@item C-x 1
+删除所选帧中除所选窗口 (@code{delete-other-windows}) 之外的所有窗口。
+@item C-x 4 0
+删除所选窗口并终止其中显示的缓冲区 (@code{kill-buffer-and-window})。  该按键序列中的最后一个字符是零。
+@item C-x w 0 @key{RET} @var{buffer} @key{RET}
+删除显示指定@var{buffer}的窗口。
+@item C-x ^
+使选定的窗口更高 (@code{enlarge-window})。
+@item C-x @}
+使选定的窗口更宽 (@code{enlarge-window-horizontally})。
+@item C-x @{
+使选定的窗口变窄 (@code{shrink-window-horizontally})。
+@item C-x -
+如果其缓冲区不需要这么多行，则缩小此窗口 (@code{shrink-window-if-larger-than-buffer})。
+@item C-x +
+平衡所选框架的所有窗口的大小 (@code{balance-windows})。
+@end table
+
+@kindex C-x 0
+@findex delete-window
+要删除选定的窗口，请输入 @kbd{C-x 0} (@code{delete-window})。  （这是一个零。）一旦删除了一个窗口，它所占用的空间就会分配给相邻的窗口（但不会分配给迷你缓冲区窗口，即使它当时处于活动状态）。  删除窗口对其用于显示的缓冲区没有影响；缓冲区继续存在，您仍然可以使用 @kbd{C-x b} 切换到它。选项 @code{delete-window-choose-selected} 控制选择哪个窗口作为新选定的窗口 (@pxref{Deleting Windows,,, elisp, The Emacs Lisp Reference Manual})。
+
+@findex kill-buffer-and-window
+@kindex C-x 4 0
+@kbd{C-x 4 0} (@code{kill-buffer-and-window}) 是比 @kbd{C-x 0} 更强的命令；它会杀死当前缓冲区，然后删除选定的窗口。
+
+@kindex C-x 1
+@findex delete-other-windows
+@kbd{C-x 1} (@code{delete-other-windows}) 删除所有窗口，@emph{except} 删除选定的窗口；选定的窗口将扩展以使用整个框架。  （当迷你缓冲区窗口处于活动状态时，无法使用此命令；尝试这样做会发出错误信号。）
+
+@kbd{M-x delete-windows-on} 删除显示特定缓冲区的窗口。  它提示输入缓冲区，默认为当前缓冲区。如果前缀参数为零，@kbd{C-u 0}，此命令仅删除当前显示器帧上的窗口。
+
+@cindex resize window
+@cindex resizing windows
+@kindex C-x ^
+@findex enlarge-window
+@kindex C-x @}
+@vindex window-min-height
+命令 @kbd{C-x ^} (@code{enlarge-window}) 使选定的窗口高一行，在不改变框架高度的情况下占用垂直相邻窗口的空间。  使用正数值参数，此命令将窗口高度增加那么多行；如果参数为负，则高度会减少那么多行。如果没有垂直相邻的窗口（即窗口处于全帧高度），则表示错误。  如果您尝试将任何窗口的高度降低到低于由变量 @code{window-min-height} 指定的某个最小行数（默认值为 4），该命令也会发出错误信号。
+
+@findex enlarge-window-horizontally
+@findex shrink-window-horizontally
+@vindex window-min-width
+类似地，@kbd{C-x @}} (@code{enlarge-window-horizontally}) 使所选窗口变宽，而@kbd{C-x @{} (@code{shrink-window-horizontally}) makes it narrower.  These commands signal an error if you attempt to reduce the width of any window below a certain minimum number of columns, specified by the variable @code{window-min-width} (the default is 10).
+
+鼠标单击模式线 (@pxref{Mode Line Mouse}) 或窗口分隔线 (@pxref{Window Dividers}) 提供了另一种更改窗口高度以及分割或删除窗口的方法。
+
+@kindex C-x -
+@findex shrink-window-if-larger-than-buffer
+如果所选窗口的高度高于显示正在显示的缓冲区的整个文本所需的高度，则@kbd{C-x -} (@code{shrink-window-if-larger-than-buffer}) 会降低所选窗口的高度。  它为框架中的其他窗口提供了额外的线条。
+
+@kindex C-x +
+@findex balance-windows
+您还可以使用 @kbd{C-x +} (@code{balance-windows}) 来平衡所选帧的所有窗口的大小（除了迷你缓冲区窗口 @pxref{Minibuffer}）。  此命令使每个水平方向的相邻窗口对具有相同的高度，并且每个垂直方向的相邻窗口对具有相同的宽度。
+
+@node Displaying Buffers
+@section 在窗口中显示缓冲区
+
+显示或弹出某些缓冲区以响应用户命令是常见的 Emacs 操作。  命令有多种不同的方式来执行此操作。
+
+许多命令，如 @kbd{C-x C-f} (@code{find-file})，默认情况下通过“接管”所选窗口来显示缓冲区，期望用户的注意力将转移到该缓冲区。
+
+某些命令尝试智能显示，尝试不接管所选窗口，例如，通过拆分新窗口并在那里显示所需的缓冲区。  此类命令包括各种帮助命令 (@pxref{Help})，通过内部调用 @code{display-buffer} 来工作。  @xref{Window Choice}，了解详情。
+
+其他命令的作用与@code{display-buffer}相同，并另外选择显示窗口，以便您可以开始编辑其缓冲区。  命令 @kbd{M-g M-n} (@code{next-error}) 就是一个示例 (@pxref{Compilation Mode})。  此类命令通过在内部调用函数 @code{pop-to-buffer} 来工作。  @xref{Switching Buffers,,Switching to a Buffer in a Window, elisp, The Emacs Lisp Reference Manual}。
+
+名称以 @code{-other-window} 结尾的命令的行为类似于 @code{display-buffer}，只不过它们从不显示在所选窗口中，可能会拆分所选窗口以创建新窗口 (@pxref{Window Choice})。  其中几个命令绑定在 @kbd{C-x 4} 前缀键 (@pxref{Pop Up Window}) 中。
+
+名称以 @code{-other-frame} 结尾的命令的行为类似于 @code{display-buffer}，只不过它们 (i) 从不显示在所选窗口中，并且 (ii) 更喜欢创建新帧或使用其他帧上的窗口来显示所需的缓冲区。  其中几个命令绑定在 @kbd{C-x 5} 前缀键中。
+
+@cindex dedicated window
+有时，窗口“专用”于其当前缓冲区。 @xref{Dedicated Windows,,, elisp, The Emacs Lisp Reference Manual}。 @code{display-buffer} 在大多数情况下将避免重复使用专用窗口。  这由模式行 (@pxref{Mode Line}) 中的@samp{d} 表示。  窗口也可以是强专用的，这可以防止对窗口中显示的缓冲区进行任何更改。  这由模式行中的 @samp{D} 指示。
+
+通常，专用窗口用于显示专用缓冲区，但专用窗口有时在交互方面很有用。  例如，当使用 @kbd{M-g M-n} @code{next-error} 查看错误时，新显示的源代码可能会替换您想要引用的缓冲区。  如果您将一个窗口专用于该缓冲区，则命令（通过@code{display-buffer}）将更喜欢使用不同的窗口。
+
+@kindex C-x w d
+@findex toggle-window-dedicated
+您可以使用命令 @kbd{C-x w d} (@code{toggle-window-dedicated}) 来切换所选窗口是否专用于当前缓冲区。  通过前缀参数，它使窗口具有强烈的专用性。
+
+@menu
+* Window Choice::    @code{display-buffer} 如何工作。
+* Temporary Displays::    显示不可编辑的缓冲区。
+@end menu
+
+@node Window Choice
+@subsection @code{display-buffer} 的工作原理
+@findex display-buffer@r{, detailed description}
+
+@code{display-buffer} 命令（以及内部调用它的命令）按照下面给出的步骤选择要显示的窗口。  @xref{Choosing Window,,Choosing a Window for Displaying a Buffer, elisp, The Emacs Lisp Reference Manual}，了解有关如何更改此步骤顺序的详细信息。
+
+@itemize
+@item
+如果无论其他考虑因素如何，缓冲区都应显示在所选窗口中，请重用所选窗口。  默认情况下，会跳过此步骤，但您可以通过将与缓冲区名称匹配的正则表达式以及对 @code{display-buffer-same-window} 操作函数 (@pxref{Buffer Display Action Functions,,Action Functions for Buffer Display, elisp, The Emacs Lisp Reference Manual}) 的引用添加到选项 @code{display-buffer-alist} (@pxref{Choosing Window,,Choosing a Window for Displaying a Buffer, elisp, The Emacs Lisp Reference Manual}) 来告诉 Emacs 不要跳过此步骤。例如，要最好在选定的窗口中显示缓冲区 @file{*scratch*} ，请写入：
+
+@example
+@group
+(setopt
+ display-buffer-alist
+ '(("\\*scratch\\*" (display-buffer-same-window))))
+@end group
+@end example
+
+默认情况下，@code{display-buffer-alist} 为@code{nil}。
+
+@item
+否则，如果缓冲区已显示在现有窗口中，请重用该窗口。  通常，仅考虑选定帧上的窗口，但如果使用相应的 @code{reusable-frames} 操作列表条目 (@pxref{Buffer Display Action Alists,,Action Alists for Buffer Display, elisp, The Emacs Lisp Reference Manual})，其他帧上的窗口也可以重用。  有关如何执行此操作的示例，请参阅下一步。
+
+@item
+否则，可以选择创建一个新帧并在其中显示缓冲区。默认情况下，会跳过此步骤。  要启用它，请更改选项 @code{display-buffer-base-action} (@pxref{Choosing Window,,Choosing a Window for Displaying a Buffer, elisp, The Emacs Lisp Reference Manual}) 的值，如下所示：
+
+@example
+@group
+(setopt
+ display-buffer-base-action
+ '((display-buffer-reuse-window display-buffer-pop-up-frame)
+   (reusable-frames . 0)))
+@end group
+@end example
+
+此自定义还将尝试使前面的步骤在所有可见或图标化框架上搜索可重用窗口。
+
+@item
+否则，尝试通过在所选帧上拆分窗口来创建新窗口，并在该新窗口中显示缓冲区。
+
+@vindex split-height-threshold
+@vindex split-width-threshold
+@vindex split-window-preferred-direction
+@cindex portrait frame
+@cindex landscape frame
+分割可以是垂直的，也可以是水平的，具体取决于变量@code{split-height-threshold}和@code{split-width-threshold}。  这些变量应该具有整数值。  如果 2⁣ 小于所选窗口的高度，则分割会将新窗口置于下方。  否则，如果 3⁣ 小于窗口的宽度，则分割会将新窗口放在右侧。  如果这两个条件都不成立，Emacs 会尝试分割以使新窗口位于下方——但前提是该窗口之前没有分割过（以避免过度分割）。  当两个条件都成立时，Emacs 是否首先尝试垂直或水平分割由@code{split-window-preferred-direction} 的值决定。  它的默认值为 @code{longest}，这意味着如果窗口的框架高于其宽度（@dfn{portrait} 框架），则垂直分割；如果窗口的宽度大于其高度（@dfn{landscape} 框架），则水平分割。  值 @code{vertical} 和 @code{horizontal} 始终分别首选垂直或水平分割。
+
+@item
+否则，在先前显示该缓冲区的窗口中显示该缓冲区。通常，仅考虑所选帧上的窗口，但使用合适的 @code{reusable-frames} 动作列表条目（见上文），窗口也可能位于另一个帧上。
+
+@item
+否则，在所选帧的现有窗口中显示缓冲区。
+
+@item
+如果上述所有方法由于某种原因失败，请创建一个新帧并在其中显示缓冲区。
+@end itemize
+
+
+@node Temporary Displays
+@subsection 显示不可编辑的缓冲区。
+@cindex temporary windows
+
+一些缓冲区显示在窗口中是为了细读而不是为了编辑。帮助命令 (@pxref{Help}) 通常使用名为 @file{*Help*} 的缓冲区来实现此目的，迷你缓冲区完成 (@pxref{Completion}) 使用名为 @file{*Completions*} 的缓冲区等。此类缓冲区通常仅显示很短的时间。
+
+通常，Emacs 通过 @code{display-buffer} 选择用于此类临时显示的窗口，如上一小节所述。  另一方面，@file{*Completions*}缓冲区通常显示在所选帧底部的窗口中，无论该帧上已显示的窗口数量如何。
+
+如果您希望 Emacs 以不同的方式显示临时缓冲区，请适当地自定义变量 @code{display-buffer-alist} (@pxref{Choosing Window,,Choosing a Window for Displaying a Buffer, elisp, The Emacs Lisp Reference Manual})。  例如，要始终在所选窗口下方显示 @file{*Completions*}，请在初始化文件 (@pxref{Init File}) 中使用以下形式：
+
+@example
+@group
+(setopt
+ display-buffer-alist
+ '(("\\*Completions\\*" display-buffer-below-selected)))
+@end group
+@end example
+
+@findex temp-buffer-resize-mode
+@file{*Completions*} 缓冲区也很特殊，因为 Emacs 通常会尝试使其窗口尽可能大以显示其所有内容。  要调整显示其他临时显示的窗口（例如 @file{*Help*} 缓冲区）的大小，请打开次要模式 (@pxref{Minor Modes}) @code{temp-buffer-resize-mode} (@pxref{Temporary Displays,,Temporary Displays, elisp, The Emacs Lisp Reference Manual})。
+
+@vindex temp-buffer-max-height
+@vindex temp-buffer-max-width
+通过 @code{temp-buffer-resize-mode} 调整大小的窗口的最大尺寸可以通过自定义选项 @code{temp-buffer-max-height} 和 @code{temp-buffer-max-width} (@pxref{Temporary Displays,,Temporary Displays, elisp, The Emacs Lisp Reference Manual}) 来控制，并且不能超过包含框架的尺寸。
+
+@cindex warning buffer, display
+@vindex warning-display-at-bottom
+显示警告的缓冲区（例如字节编译警告，@pxref{Compilation Functions,, Byte Compilation Functions, elisp, The Emacs Lisp Reference Manual}）也默认显示在所选帧底部的窗口中。  您可以使用变量 @code{warning-display-at-bottom} 进行控制：如果设置为 @code{nil}，Emacs 将使用 @code{display-buffer} (@pxref{Window Choice}) 的正常逻辑，并且您可以通过 @code{display-buffer-alist} 进行自定义。
+
+@node Window Convenience
+@section 窗户处理的便利功能
+
+@findex winner-mode
+@vindex winner-dont-bind-my-keys
+@vindex winner-ring-size
+@vindex winner-boring-buffers
+@vindex winner-boring-buffers-regexp
+@cindex Winner mode
+@cindex mode, Winner
+@cindex undoing window configuration changes
+@cindex window configuration changes, undoing
+获胜者模式是一种全局次要模式，它记录窗口配置中的更改（即，框架如何划分为窗口），以便您可以撤消它们。  您可以使用 @kbd{M-x winner-mode} 或自定义变量 @code{winner-mode} 来切换获胜者模式。  启用该模式后，@kbd{C-c left} (@code{winner-undo}) 将撤消上次窗口配置更改。  如果您在撤消操作时改变了主意，可以使用 @kbd{C-c right} (@code{M-x winner-redo}) 重做已撤消的更改。  为了防止获胜者模式绑定@kbd{C-c left}和@kbd{C-c right}，您可以将变量@code{winner-dont-bind-my-keys}自定义为非@code{nil}值。  默认情况下，获胜者模式每帧最多存储 200 个窗口配置，但您可以通过修改变量 @code{winner-ring-size} 来更改它。  如果您不希望恢复某些缓冲区的获胜者模式窗口，请将它们的名称添加到列表变量@code{winner-boring-buffers}或正则表达式@code{winner-boring-buffers-regexp}。
+
+跟随模式 (@kbd{M-x follow-mode}) 同步同一缓冲区上的多个窗口，以便它们始终显示该缓冲区的相邻部分。  @xref{Follow Mode}。
+
+@cindex Windmove package
+@cindex directional window selection
+@findex windmove-right
+@findex windmove-default-keybindings
+@findex windmove-display-default-keybindings
+@findex windmove-delete-default-keybindings
+@findex windmove-swap-states-default-keybindings
+Windmove 包定义了在框架中的相邻窗口之间定向移动的命令。  @kbd{M-x windmove-right} 选择紧邻当前所选窗口右侧的窗口，左侧、上、下对应窗口也类似。 @code{windmove-default-keybindings} 将这些命令绑定到 @kbd{S-right} 等；这样做会禁用这些键的 Shift 选择 (@pxref{Shift Selection})。  与可以为定向选择窗口的命令定义键绑定的方式相同，您可以使用 @code{windmove-display-default-keybindings} 为命令定义键绑定，指定在哪个方向上显示下一个命令将要显示的缓冲区的窗口。  还有 @code{windmove-delete-default-keybindings} 定义用于定向删除窗口的命令的键绑定，以及 @code{windmove-swap-states-default-keybindings} 定义用于将选定窗口的窗口内容与指定方向的窗口交换的命令的键绑定。
+
+命令 @kbd{M-x compare-windows} 可让您比较不同窗口中显示的文本。  @xref{Comparing Files}。
+
+@vindex scroll-all-mode
+@cindex scrolling windows together
+@cindex Scroll-all mode
+@cindex mode, Scroll-all
+全部滚动模式 (@kbd{M-x scroll-all-mode}) 是一种全局次要模式，它使滚动命令和点运动命令应用于每个窗口。
+
+
+@node Tab Line
+@section 窗口标签线
+
+@findex global-tab-line-mode
+@cindex tab line
+命令 @code{global-tab-line-mode} 切换每个窗口顶部屏幕行上 @dfn{tab line} 的显示。  选项卡行为窗口中显示的每个缓冲区显示特殊按钮（“选项卡”），并允许通过单击相应的按钮切换到任何这些缓冲区。  单击 @kbd{+} 图标会将新缓冲区添加到缓冲区的窗口本地选项卡行，单击选项卡的 @kbd{x} 图标会将其删除。  选项卡行上的鼠标滚轮可水平滚动选项卡。
+
+触摸屏输入 (@pxref{Other Input}) 也可用于与“制表符行”交互。  长按 (@pxref{Touchscreens}) 选项卡将显示上下文菜单，其中包含可在按下的选项卡上进行操作的项目；点击选项卡本身将导致切换到该选项卡的缓冲区，点击选项卡行上的按钮将表现得就像用 @kbd{mouse-1} 单击一样。
+
+选择上一个窗口本地选项卡与键入 @kbd{C-x @key{LEFT}} (@code{previous-buffer}) 相同，选择下一个选项卡与键入 @kbd{C-x @key{RIGHT}} (@code{next-buffer}) 相同。  这两个命令都支持数字前缀参数作为重复计数。
+
+您可以自定义变量 @code{tab-line-tabs-function} 来定义选项卡行的首选内容。  默认情况下，它显示窗口中先前访问过的所有缓冲区，如上所述。  但您也可以将其设置为显示与当前缓冲区具有相同主模式的缓冲区列表，或者显示按主模式分组的缓冲区，其中单击第一个选项卡中的模式名称将显示所有主模式的列表，您可以在其中选择另一组缓冲区。
+
+请注意，选项卡行与选项卡栏 (@pxref{Tab Bars}) 不同。每个框架顶部的选项卡栏上的选项卡用于在包含多个带有缓冲区的窗口的窗口配置之间切换，而每个窗口顶部的选项卡行上的选项卡用于在窗口中的缓冲区之间切换。
+
+另请注意，选项卡行与窗口工具栏显示在同一空间中，因此在任何给定时间只能显示其中一个，除非您在 Lisp 中自定义 @code{tab-line-format} 的值以将 @w{@code{(:eval (tab-line-format))}} 添加到 @code{tab-line-format}。 @xref{Mode Line Format,,, elisp, The Emacs Lisp Reference Manual}。
+
+
+@node Window Tool Bar
+@section 窗口工具栏
+
+@cindex window tool bar
+@cindex mode, window tool bar
+@cindex tool bar, attached to window
+
+@findex global-window-tool-bar-mode
+命令 @code{global-window-tool-bar-mode} 切换每个窗口顶部工具栏的显示。  启用后，多个窗口可以同时显示自己的工具栏。  为了节省空间，如果没有可显示的按钮，即如果 2⁣ 为 3⁣，则隐藏窗口工具栏。
+
+@findex window-tool-bar-mode
+如果您只想切换某些缓冲区的窗口工具栏的显示，请在这些缓冲区中运行命令 @code{window-tool-bar-mode}。这对于放入模式挂钩很有用。  例如，如果您希望窗口工具栏仅针对不代表文件且具有自定义工具栏的缓冲区显示，您可以将以下代码添加到您的初始化文件中 (@pxref{Init File})：
+
+@example
+(add-hook 'special-mode-hook 'window-tool-bar-mode)
+@end example
+
+@vindex window-tool-bar-style
+@cindex window tool bar style
+在图形显示上，窗口工具栏可以以多种不同的样式显示。  默认情况下，窗口工具栏仅将项目显示为图像。  要施加特定样式，请自定义变量@code{window-tool-bar-style}。
+
+在纯文本显示中，即使指定了其他样式，窗口工具栏也仅显示每个按钮的文本。
+
+Emacs 还可以在框架顶部显示单个工具栏 (@pxref{Tool Bars})。
+
+请注意，窗口工具栏与选项卡行显示在同一空间中，因此在任何给定时间只能显示其中之一，除非您自定义 @code{tab-line-format} 的值以将 @w{@code{(:eval (window-tool-bar-string))}} 添加到 @code{tab-line-format}。  @xref{Mode Line Format,,, elisp, The Emacs Lisp Reference Manual}。

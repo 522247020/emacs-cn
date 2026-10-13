@@ -1,0 +1,1379 @@
+@c -*- coding: utf-8 -*-
+@c This is part of the Emacs manual.
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 1999--2026 Free Software
+@c Foundation, Inc.
+@c See file emacs.texi for copying conditions.
+@node Programs
+@chapter 编辑节目
+@cindex Lisp editing
+@cindex C editing
+@cindex program editing
+
+本章介绍 Emacs 方便编辑程序的功能。  这些功能可以做的一些事情包括：
+
+@itemize @bullet
+@item 
+查找或移动顶级定义 (@pxref{Defuns})。
+@item 
+应用语言的常用缩进约定 (@pxref{Program Indent})。
+@item 
+平衡括号 (@pxref{Parentheses})。
+@item 
+插入、删除或对齐注释 (@pxref{Comments})。
+@item 
+突出显示程序语法 (@pxref{Font Lock})。
+@end itemize
+
+@menu
+* Program Modes::        编辑程序的主要模式。
+* Defuns::               对程序的主要顶层部分进行操作的命令。
+* Program Indent::       调整缩进以显示嵌套。
+* Parentheses::          对括号进行操作的命令。
+* Comments::             插入、删除和对齐注释。
+* Documentation::        获取您计划调用的函数的文档。
+* Hideshow::             有选择地显示块。
+* Symbol Completion::    完成程序或语言的符号名称。
+* MixedCase Words::      像这样处理标识符。
+* Semantic::             基于源代码解析的编辑工具套件。
+* Misc for Programs::    其他对于编辑程序有用的 Emacs 功能。
+* C Modes::              C、C++、Objective-C、Java、IDL、Pike 和 AWK 模式的特殊命令。
+* Asm Mode::             Asm 模式及其特殊功能。
+@ifnottex
+* Fortran::             Fortran mode and its special features.
+@end ifnottex
+@end menu
+
+@node Program Modes
+@section 编程语言的主要模式
+@cindex modes for programming languages
+
+Emacs 为许多编程语言提供了专门的主要模式 (@pxref{Major Modes})。  编程语言模式通常指定表达式的语法、缩进的习惯规则、如何对语言进行语法突出显示以及如何查找函数定义的开头或结尾。  它通常还具有编译和调试程序的功能。  每种语言的主要模式均以该语言命名；例如，C 编程语言的主要模式是@code{c-mode}。
+
+@cindex Perl mode
+@cindex Icon mode
+@cindex Makefile mode
+@cindex Tcl mode
+@cindex CPerl mode
+@cindex DSSSL mode
+@cindex Octave mode
+@cindex Metafont mode
+@cindex Modula2 mode
+@cindex Prolog mode
+@cindex Python mode
+@cindex Ruby mode
+@cindex Simula mode
+@cindex Verilog mode
+@cindex VHDL mode
+@cindex M4 mode
+@cindex Shell-script mode
+@cindex OPascal mode
+@cindex PostScript mode
+@cindex Conf mode
+@cindex DNS mode
+@cindex Javascript mode
+@cindex Awk mode
+@cindex C# mode
+@cindex JSON mode
+@cindex SQL mode
+@cindex TypeScript mode
+@cindex CSS mode
+@cindex Dockerfile mode
+@cindex CMake mode
+@cindex TOML mode
+Emacs 具有 Lisp、Scheme、基于 Scheme 的 DSSSL 表达式语言、Ada、ASM、AWK、C、C++、C#、Elixir、Fortran、Icon、IDL (CORBA)、HEEx、Java、Javascript、Lua、M4、Makefiles、Metafont（@TeX{} 的字体创建伴侣）、Modula2、Object Pascal、Objective-C、Octave、Pascal、Perl 的编程语言模式， PHP、Pike、PostScript、Prolog、Python、Ruby、Simula、SQL、Tcl、TypeScript、Verilog 和 VHDL@. Perl 的推荐模式称为 CPerl 模式。  模式还适用于常见 GNU 和 Unix shell 的脚本语言、MS-DOS/MS-Windows @samp{BAT} 文件、JSON、DNS 主文件、CSS（级联样式表）、Dockerfile、CMake 文件和各种配置文件。
+
+理想情况下，Emacs 应该为您可能想要编辑的每种编程语言提供一个主要模式。  如果它没有适合您最喜欢的语言的模式，则该模式可能会在未随 Emacs 分发的包中实现 (@pxref{Packages})；或者您也可以贡献一份。
+
+@cindex tree-sitter library, supported major modes
+如果 Emacs 是使用 @samp{tree-sitter} 库编译的，它会基于该库提供几种可选的编辑模式，这些模式利用 @samp{tree-sitter} 提供的增量解析功能。  这些模式的名称中带有@samp{-ts-}；例如 @code{c-ts-mode}、@code{python-ts-mode} 等。
+
+@cindex LSP
+@cindex language server
+@cindex Eglot
+编程语言的主要模式可以通过 Eglot 包提供的设施使用 @dfn{language servers} 的服务。 Eglot 实现了 LSP，@dfn{language server protocol}，它允许 Emacs 接收特定于语言的信息和服务，从而丰富和扩展源代码编辑功能。  @xref{Eglot Features,,, eglot, Eglot: The Emacs LSP Client}。
+
+@kindex DEL @r{(programming modes)}
+@findex backward-delete-char-untabify
+在大多数编程语言中，行与行之间的缩进应该有所不同，以说明程序的结构。  因此，在大多数编程语言模式中，键入 @kbd{@key{TAB}} 会更新当前行的缩进 (@pxref{Program Indent})。此外，@kbd{@key{DEL}}通常绑定到@code{backward-delete-char-untabify}，它向后删除将每个制表符视为相同数量的空格，这样您就可以删除一列缩进，而不必担心空白是由空格还是制表符组成。
+
+@cindex mode hook, and major modes
+@vindex c-mode-hook
+@vindex lisp-mode-hook
+@vindex emacs-lisp-mode-hook
+@vindex lisp-interaction-mode-hook
+@vindex scheme-mode-hook
+进入编程语言模式会运行钩子变量 @code{prog-mode-hook} 中指定的自定义 Lisp 函数，然后运行该模式自己的模式钩子 (@pxref{Major Modes}) 中指定的函数。例如，进入 C 模式会运行钩子 @code{prog-mode-hook} 和 @code{c-mode-hook}。  @xref{Hooks}，有关挂钩的信息。
+
+@ifnottex
+  Separate manuals are available for the modes for Ada (@pxref{Top,, Ada
+Mode, ada-mode, Ada Mode}), C/C++/Objective C/Java/Corba IDL/Pike/AWK
+(@pxref{Top, , CC Mode, ccmode, CC Mode}), Octave, and VHDL.
+@end ifnottex
+@iftex
+  The Emacs distribution contains Info manuals for the major modes for
+Ada, C/C++/Objective C/Java/Corba IDL/Pike/AWK, Octave, VHDL, and
+IDLWAVE@.  For Fortran mode, @pxref{Fortran,,, emacs-xtra, Specialized
+Emacs Features}.
+@end iftex
+
+@node Defuns
+@section 顶级定义或 Defuns
+
+在 Emacs 中，缓冲区顶层的主要定义（例如函数）称为 @dfn{defun}。  该名称来自 Lisp，但在 Emacs 中我们将它用于所有语言。
+
+@menu
+* Left Margin Paren::    如果左括号或类似的左分隔符位于左边距，则它会启动 defun。
+* Moving by Defuns::     用于移动或标记主要定义的命令。
+* Moving by Sentences::  移动某些代码单元的命令。
+* Imenu::                将缓冲区索引制作为菜单。
+* Which Function::       哪个功能模式显示您处于哪个功能。
+@end menu
+
+@node Left Margin Paren
+@subsection 左边距约定
+
+@cindex open-parenthesis in leftmost column
+@cindex ( in leftmost column
+许多编程语言模式传统上假设在左边距找到的任何左括号或大括号都是顶级定义或 defun 的开始。  因此，默认情况下，寻求 defun 开头的命令接受这样的分隔符来表示该位置。
+
+@vindex open-paren-in-column-0-is-defun-start
+如果您想覆盖此约定，可以通过将用户选项 @code{open-paren-in-column-0-is-defun-start} 设置为 @code{nil} 来实现。  如果此选项设置为 @code{t} （默认值），则寻找 defun 开头的命令将在零列处的左括号或大括号处停止，而这些括号或大括号不在注释或字符串中。  当它是@code{nil}时，通过在最外层搜索括号或大括号来找到defun。  由于低级 Emacs 例程不再依赖于此约定，因此您通常不需要更改 @code{open-paren-in-column-0-is-defun-start} 的默认值。
+
+@node Moving by Defuns
+@subsection 移动由 Defuns 提供
+@cindex defuns
+
+这些命令根据顶级主要定义（也称为 @dfn{defuns}）移动点或设置区域。
+
+@table @kbd
+@item C-M-a
+移至当前或前一个 defun 的开头 (@code{beginning-of-defun})。
+@item C-M-e
+移至当前或下一个 defun 的末尾 (@code{end-of-defun})。
+@item C-M-h
+将区域放置在整个当前或后续 defun 周围 (@code{mark-defun})。
+@end table
+
+@cindex move to beginning or end of function
+@cindex function, move to beginning or end
+@kindex C-M-a
+@kindex C-M-e
+@kindex C-M-h
+@findex beginning-of-defun
+@findex end-of-defun
+@findex mark-defun
+移动到当前 defun 的开头和结尾的命令是 @kbd{C-M-a} (@code{beginning-of-defun}) 和 @kbd{C-M-e} (@code{end-of-defun})。  如果重复这些命令之一，或使用正数值参数，则每次重复都会移动到运动方向上的下一个 defun。
+
+带有负参数的@kbd{C-M-a}@minus{}@var{n}向前移动@var{n}次到defun的下一个开头。  这与带有参数 @var{n} 的 @kbd{C-M-e} 移动到的位置并不完全相同；该 defun 的结尾通常与下一个 defun 的开头不完全相同。  （空格、注释，也许还有声明可以将它们分开。）同样，带有负参数的 @kbd{C-M-e} 移回到 defun 的末尾，这与带有正参数的 @kbd{C-M-a} 不太一样。
+
+@kindex C-M-h @r{(C mode)}
+@findex c-mark-function
+要对当前 defun 进行操作，请使用 @kbd{C-M-h} (@code{mark-defun})，它将标记设置在当前 defun 的末尾，并将 point 放在其开头。  @xref{Marking Objects}。  这是准备杀死 defun 以便将其移动到文件中的其他位置的最简单方法。  如果 defun 直接前面有注释（中间没有空行），它们也会被标记。如果在点位于 defun 之间时使用该命令，它将使用以下 defun。  如果在标记已处于活动状态时使用该命令，它会扩展该区域的末尾以包含另一个 defun。使用前缀参数，它可以标记许多 defun 或通过适当数量的 defun 扩展区域。  使用负前缀参数，它标记相反方向的 defuns，并且还改变后续使用 @code{mark-defun} 的选择方向。
+
+在C模式下，@kbd{C-M-h}运行函数@code{c-mark-function}，与@code{mark-defun}几乎相同；不同之处在于，它备份参数声明、函数名称和返回的数据类型，以便整个 C 函数都位于该区域内。  这是主要模式如何调整标准键绑定以便它们以更好地适合特定语言的方式完成其标准工作的示例。  为此，其他主要模式可能会取代任何或所有这些键绑定。
+
+@cindex nested defuns
+@vindex treesit-defun-tactic
+一些编程语言支持 @dfn{nested defuns}，因此可以在另一个 defun 内部（即，作为主体的一部分）定义一个 defun（例如函数、方法或类）。  上面描述的命令默认查找 @emph{innermost} defun 周围点的开头和结尾。  基于tree-sitter库的主要模式提供了对此行为的控制：默认情况下，@code{treesit-defun-tactic}的值设置为@code{nested}；如果设置为@code{top-level}，则 defun 命令将查找 @emph{outermost} defun；如果该值设置为@code{parent-first}，defun命令总是尝试移出当前封闭的defun，而不是移动到点周围的上一个或下一个defun；如果没有封闭的 defun，则移动到上一个或下一个 defun。
+
+@node Moving by Sentences
+@subsection 按句子移动
+@cindex sentences, in programming languages
+
+这些命令根据代码单元移动点或设置区域，也称为@dfn{sentences}。  尽管在编写人类语言时通常会考虑句子，但 Emacs 可以使用相同的命令来移动编程语言中的某些结构（@pxref{Sentences}、@pxref{Moving by Defuns}）。  在编程语言中，句子通常是一个完整的语言结构，小于 defuns，但大于 sexps (@pxref{List Motion,,, elisp, The Emacs Lisp Reference Manual})。  在这种情况下，句子到底是什么取决于编程语言，但通常它是一个完整的语句，例如变量定义和初始化，或者条件语句。  C 语言中的一个句子的示例可以是
+
+@example
+int x = 5;
+@end example
+
+@noindent
+或者在 JavaScript 语言中它可能看起来像
+
+@example
+@group
+const thing = () => console.log("Hi");
+@end group
+@group
+const foo = [1] == '1'
+  ? "No way"
+  : "...";
+@end group
+
+@end example
+
+@table @kbd
+@item M-a
+移至当前句子或前一个句子的开头 (@code{backward-sentence})。
+@item M-e
+移至当前或下一个句子的末尾 (@code{forward-sentence})。
+@end table
+
+@cindex move to beginning or end of sentence
+@cindex sentence, move to beginning or end
+@kindex M-a @r{(programming modes)}
+@kindex M-e @r{(programming modes)}
+@findex backward-sentence @r{(programming modes)}
+@findex forward-sentence @r{(programming modes)}
+移动到当前句子开头和结尾的命令是@kbd{M-a} (@code{backward-sentence}) 和@kbd{M-e} (@code{forward-sentence})。  如果重复这些命令之一，或使用正数值参数，则每次重复都会沿运动方向移动到下一个句子。
+
+带有否定参数的@kbd{M-a}@minus{}@var{n}向前移动@var{n}次到句子的下一个结尾。  同样，带有否定参数的 @kbd{M-e} 移回到句子的开头。
+
+@node Imenu
+@subsection 伊梅努
+@cindex index of buffer definitions
+@cindex buffer definitions index
+
+Imenu 工具提供了一种按名称查找文件中主要定义的方法。  它在编程语言主要模式（定义是变量、函数等）和文本格式化程序主要模式（将每个章节等视为定义）中都很有用。  （@xref{Xref}，更强大的功能，可以同时处理多个文件。）
+
+@findex imenu
+@vindex imenu-flatten
+如果您键入 @kbd{M-g i} (@code{imenu})，它会使用迷你缓冲区读取定义的名称，然后将指针移动到该定义。您可以使用补全来指定名称；该命令显示完成缓冲区中匹配的有效名称的列表。  如果索引是分层的，那么默认情况下，补全候选也会分层显示，作为嵌套列表：首先需要选择一个部分，然后是一个小节等，最后是定义的名称。但是，如果将 @code{imenu-flatten} 设置为非 @code{nil} 值，则可以从扁平化定义列表中选择完成候选，而不是嵌套菜单。  章节和小节在完成候选的扁平化列表中的显示方式取决于 @code{imenu-flatten} 的值，该值可以是以下之一：
+
+@table @code
+@vindex imenu-level-separator
+@item prefix
+这显示了每个候选者以其部分、子部分、子子部分等名称为前缀，每个级别与下一个级别之间通过值为 @code{imenu-level-separator} 的字符串分隔，默认为 @samp{:}。
+
+@item annotation
+这将节名称显示为注释，位于每个定义名称之后。
+
+@item group
+这显示了按其部分分组的完成候选者。
+@end table
+
+@findex imenu-add-menubar-index
+或者，您可以将命令 @code{imenu} 绑定到鼠标单击。  然后它会显示鼠标菜单供您选择定义名称。  您还可以通过调用 @code{imenu-add-menubar-index} 将缓冲区的索引添加到菜单栏。  如果您希望此菜单栏项可用于某个主要模式下的所有缓冲区，您可以通过将 @code{imenu-add-menubar-index} 添加到其模式挂钩来实现。  但如果您这样做了，每次在该模式下访问文件时，您都必须等待一段时间，而 Emacs 会查找该缓冲区中的所有定义。
+
+@vindex imenu-auto-rescan
+当您更改缓冲区的内容时，如果添加或删除定义，则可以通过调用菜单中的@samp{*Rescan*} 项来根据新内容更新缓冲区的索引。如果您将 @code{imenu-auto-rescan} 设置为非 @code{nil} 值，则会自动进行重新扫描。  无需因为文本的微小变化而重新扫描。
+
+@vindex imenu-auto-rescan-maxout
+@vindex imenu-max-index-time
+在字节数大于 1⁣ 的缓冲区中，@code{imenu-auto-rescan} 将被禁用，如果扫描时间超过 @code{imenu-max-index-time} 秒，扫描就会停止。
+
+@vindex imenu-sort-function
+您可以通过设置变量@code{imenu-sort-function}来自定义菜单的排序方式。  默认情况下，名称按照它们在缓冲区中出现的顺序进行排序；如果您想要按字母顺序排序，请使用符号 @code{imenu--sort-by-name} 作为值。  您还可以通过编写 Lisp 代码来定义自己的比较函数。
+
+您还可以通过更改变量 @code{completion-category-overrides} 并为类别 @code{imenu} 设置其 @code{display-sort-function} 来自定义 Imenu 完成的排序方式。
+
+@cindex eglot, for producing Imenu index
+如果针对当前缓冲区的项目 (@pxref{Projects}) 和当前缓冲区的主要模式激活了 Eglot，则 Eglot 会提供自己的工具，用于根据管理当前缓冲区的语言服务器对程序源的分析来生成缓冲区索引。  @xref{Eglot Features,,, eglot, Eglot: The Emacs LSP Client}。
+
+Imenu 提供指导哪个功能模式的信息
+@ifnottex
+(@pxref{Which Function}).
+@end ifnottex
+@iftex
+(see below).
+@end iftex
+Speedbar 也可以使用它 (@pxref{Speedbar})。
+
+@node Which Function
+@subsection 哪种功能模式
+@cindex current function name in mode line
+
+哪个函数模式是全局次要模式 (@pxref{Minor Modes})，它在模式行或标题行中显示当前函数名称，并在缓冲区中移动时更新它。
+
+@findex which-function-mode
+@vindex which-func-modes
+要启用或禁用“哪个功能”模式，请使用命令@kbd{M-x which-function-mode}。  其中Function模式是全局次要模式。  默认情况下，它在所有知道如何支持它的主要模式下生效（即所有支持 Imenu 的主要模式）。  您可以通过将变量 @code{which-func-modes} 的值从 @code{t} （这意味着支持所有可用的主要模式）更改为主要模式名称列表，将其限制为特定的主要模式列表。
+
+@vindex which-func-display
+默认情况下，“哪个函数”模式使用模式行显示当前函数名称。  将 @code{which-func-display} 自定义为 @code{header}、@code{mode} 或 @code{mode-and-header} 以分别使用标题行、模式行或两者。
+
+@node Program Indent
+@section 程序缩进
+@cindex indentation for programs
+
+保持程序正确缩进的最佳方法是在更改程序时使用 Emacs 重新缩进。  Emacs 具有用于缩进单行、指定行数或单个括号分组内的所有行的命令。
+
+@xref{Indentation}，有关缩进的一般信息。  本节介绍特定于编程语言模式的缩进功能。
+
+@menu
+* Basic Indent::         缩进一行。
+* Multi-line Indent::    一次重新缩进多行的命令。
+* Lisp Indent::          指定每个 Lisp 函数应如何缩进。
+* C Indent::             用于缩进 C 和相关模式的额外功能。
+* Custom C Indent::      控制 C 和相关模式的缩进样式。
+@end menu
+
+@cindex pretty-printer
+Emacs 还在 @code{pp} 包中提供了一个 Lisp 漂亮打印机，它可以用漂亮的缩进重新格式化 Lisp 对象。 @xref{Output Functions, pp,, elisp, The Emacs Lisp Reference Manual}。
+
+@node Basic Indent
+@subsection 基本程序缩进命令
+
+@table @kbd
+@item @key{TAB}
+调整当前行的缩进（@code{indent-for-tab-command}）。
+@item @key{RET}
+插入换行符，然后调整下一行的缩进 (@code{newline})。
+@end table
+
+@kindex TAB @r{(programming modes)}
+@findex indent-line-function
+基本的缩进命令是 @kbd{@key{TAB}} (@code{indent-for-tab-command})，其记录在 @ref{Indentation} 中。  在编程语言模式中，@kbd{@key{TAB}} 根据前一行的缩进和语法内容缩进当前行；如果该区域处于活动状态，@kbd{@key{TAB}} 会缩进该区域内的每一行，而不仅仅是当前行。
+
+命令@kbd{@key{RET}} (@code{newline})（记录在@ref{Inserting Text}中）与@kbd{C-j}后接@kbd{@key{TAB}}的作用相同：它插入一个新行，然后调整该行的缩进。
+
+当缩进在括号分组内开始的行时，Emacs 通常将行的开头放在组内的前一行下方，或放在括号后面的文本下方。  如果您手动为这些行之一指定非标准缩进（例如，出于美观目的），下面的行将跟随它。
+
+大多数编程语言模式的缩进命令假定左侧的左括号、左大括号或其他左分隔符是函数的开始。  如果您正在编辑的代码违反了此假设（即使分隔符出现在字符串或注释中），您必须将 @code{open-paren-in-column-0-is-defun-start} 设置为 @code{nil} 才能使缩进正常工作。  @xref{Left Margin Paren}。
+
+@node Multi-line Indent
+@subsection 缩进几行
+
+有时，您可能想一次重新缩进多行代码。一种方法是使用标记；当标记处于活动状态且区域非空时，@kbd{@key{TAB}} 缩进该区域中的每一行。或者，命令 @kbd{C-M-\} (@code{indent-region}) 缩进该区域中的每一行，无论标记是否处于活动状态 (@pxref{Indentation Commands})。
+
+此外，Emacs 还提供了以下命令来缩进大块代码：
+
+@table @kbd
+@item C-M-q
+重新缩进一组括号内的所有行。
+@item M-q
+在 defun 中填充单个段落，或重新缩进该 defun 中的所有行。
+@item C-u @key{TAB}
+将整个括号组严格地横向移动，以便其第一行正确缩进。
+@item M-x indent-code-rigidly
+严格地向侧面移动该区域中的所有行，但不要更改在注释和字符串内开始的行。
+@end table
+
+@kindex C-M-q
+@findex indent-pp-sexp
+要重新缩进单个括号分组的内容，请将点定位在分组开头之前并输入 @kbd{C-M-q}。  这会更改分组内的相对缩进，而不影响其整体缩进（即分组开始的行的缩进）。  @kbd{C-M-q} 运行的函数取决于主模式；在 Lisp 模式下为 @code{indent-pp-sexp}，在 C 模式下为 @code{c-indent-exp}，等等。要更正整体缩进，请先输入 @kbd{@key{TAB}}。
+
+@kindex M-q
+@findex prog-fill-reindent-defun
+@vindex beginning-of-defun-function
+@vindex end-of-defun-function
+@vindex fill-paragraph-function
+要重新缩进点周围的整个 defun，请输入 @kbd{M-q} (@code{prog-fill-reindent-defun})。  如果点位于注释或字符串中，则此命令将填充并缩进注释或字符串。注释、字符串或 defun 的具体构成取决于主要模式：defun 的边界由变量 @code{beginning-of-defun-function} 和 @code{end-of-defun-function} (@pxref{List Motion,,, elisp, The Emacs Lisp Reference Manual}) 决定，填充机制由 @code{fill-paragraph-function} (@pxref{Filling,,, elisp, The Emacs Lisp Reference Manual}) 决定。
+
+@kindex C-u TAB
+如果您喜欢分组内的相对缩进，但不喜欢其第一行的缩进，请将光标移至第一行并输入 @kbd{C-u @key{TAB}}。  在 Lisp、C 和其他一些主要模式中，带有数字参数的 @kbd{@key{TAB}} 像往常一样重新缩进当前行，然后以相同的量重新缩进从当前行开始的括号分组中的所有行。  不过，它很聪明，并且不会改变从字符串内部开始的行。  在 C 模式下，它也不会改变 C 预处理器行，但它会重新缩进可能附加到它们的任何连续行。
+
+@findex indent-code-rigidly
+命令 @kbd{M-x indent-code-rigidly} 严格地将区域中的所有线横向移动，就像 @code{indent-rigidly} 所做的那样 (@pxref{Indentation Commands})。  它不会改变在字符串内开始的行的缩进，除非该区域也在该字符串内开始。  前缀 arg 指定要缩进的列数。
+
+@node Lisp Indent
+@subsection 自定义 Lisp 缩进
+@cindex customizing Lisp indentation
+
+Lisp 表达式的缩进模式取决于表达式调用的函数。  对于每个 Lisp 函数，您可以在几种预定义的缩进模式中进行选择，或者使用 Lisp 程序定义任意一种缩进模式。
+
+标准的缩进模式如下：如果第一个参数与表达式的开头位于同一行，则表达式的第二行缩进到第一个参数下方；否则，第二行将在函数名称下方缩进。  接下来的每一行都缩进到嵌套深度相同的前一行下方。
+
+@vindex lisp-indent-offset
+如果变量 @code{lisp-indent-offset} 是非 @code{nil} ，它会覆盖表达式第二行的常用缩进模式，因此这些行总是比包含列表缩进 @code{lisp-indent-offset} 多列。
+
+@vindex lisp-body-indent
+某些函数会覆盖标准模式。  名称以 @code{def} 开头的函数将第二行视为 @dfn{body} 的开头，方法是将第二行 @code{lisp-body-indent} 附加列缩进到开始表达式的左括号之外。
+
+@cindex @code{lisp-indent-function} property
+您可以根据函数名称的 @code{lisp-indent-function} 属性，以各种方式覆盖各个函数的标准模式。  这通常是使用 @code{declare} 结构对宏定义完成的。  @xref{Defining Macros,,, elisp, The Emacs Lisp Reference Manual}。
+
+在 Emacs Lisp 中，列表通常是缩进的，就好像它们是类似函数的形式一样：
+
+@lisp
+(setq foo '(bar zot
+                gazonk))
+@end lisp
+
+然而，如果你在左括号后面添加一个空格，这会告诉 Emacs 这是一个数据列表而不是一段代码，然后 Emacs 会像这样缩进：
+
+@lisp
+(setq foo '( bar zot
+             gazonk))
+@end lisp
+
+@node C Indent
+@subsection C 缩进命令
+
+以下是 C 模式和相关模式中缩进的特殊功能：
+
+@table @kbd
+@item C-c C-q
+@kindex C-c C-q @r{(C mode)}
+@findex c-indent-defun
+@findex c-ts-mode-indent-defun
+重新缩进当前顶级函数定义或聚合类型声明（CC 模式下的@code{c-indent-defun}，基于树守护者的@code{c-ts-mode} 中的@code{c-ts-mode-indent-defun}）。
+
+@item C-M-q
+@kindex C-M-q @r{(C mode)}
+@findex c-indent-exp
+@findex prog-indent-sexp
+重新缩进点后面的平衡表达式 (@pxref{Expressions})（也称为“sexp”）中的每一行。  在 CC 模式下，这会调用 @code{c-indent-exp}；在基于树保姆的@code{c-ts-mode}中，这调用了更通用的@code{prog-indent-sexp}。  前缀参数禁止显示有关无效语法的警告消息。
+
+@item @key{TAB}
+@findex c-indent-line-or-region
+重新缩进当前行、活动区域或从此行开始的块 (@code{c-indent-line-or-region})。  使用前缀参数，如果当前行需要重新缩进，则严格重新缩进从当前行开始的平衡表达式。
+
+@vindex c-tab-always-indent
+如果 @code{c-tab-always-indent} 是 @code{t}，则此命令始终重新缩进当前行，并且不执行任何其他操作。  这是默认设置。
+
+如果该变量为 @code{nil}，则仅当点位于左边距或行缩进中时，此命令才会重新缩进当前行；否则，它会插入一个制表符（或同等数量的空格，如果 @code{indent-tabs-mode} 是 @code{nil}）。
+
+任何其他值（不是 @code{nil} 或 @code{t}）意味着始终重新缩进该行，并且如果在注释或字符串中则插入制表符。
+@end table
+
+要重新缩进整个当前缓冲区，请输入 @kbd{C-x h C-M-\}。  首先选择整个缓冲区作为区域，然后重新缩进该区域。
+
+要重新缩进当前块，请使用 @kbd{C-M-u C-M-q}。  这会移动到块的前面，然后将其全部重新缩进。
+
+@node Custom C Indent
+@subsection 自定义 C 缩进
+@cindex style (for indentation)
+
+C 模式和相关模式使用灵活的机制来自定义缩进。  C 模式分两步缩进源代码行：首先，根据内容和上下文对行进行语法分类；其次，它确定您选择的 @dfn{style} 与语法结构关联的缩进偏移量，并将其添加到 @dfn{anchor statement} 的缩进上。
+
+@table @kbd
+@item C-c . @var{style} @key{RET}
+选择预定义样式 @var{style}（CC 模式中的 @code{c-set-style}，基于树保姆的 @code{c-ts-mode} 中的 @code{c-ts-mode-set-style}）。
+@end table
+
+@dfn{style} 是可在 C 模式及相关模式中使用的命名自定义集合。  @ref{Styles,,, ccmode, The CC Mode Manual}，完整的描述。  Emacs 附带了多种预定义样式，包括 @code{gnu}、@code{k&r}、@code{bsd}、@code{stroustrup}、@code{linux}、@code{python}、@code{java}、@code{whitesmith}、@code{ellemtel} 和 @code{awk}。  其中一些样式主要适用于一种语言，但其中任何一种都可以与这些模式支持的任何语言一起使用。  要了解样式的外观，请选择它并重新缩进一些代码，例如，通过在函数定义的开头键入 @kbd{C-M-q} 。
+
+@kindex C-c . @r{(C mode)}
+@findex c-set-style
+@findex c-ts-mode-set-style
+要为当前缓冲区选择样式，请使用命令@w{@kbd{C-c .}}。  指定样式名称作为参数（大小写不重要）。该命令仅影响当前缓冲区，并且仅影响将来调用的缩进命令；它不会重新缩进缓冲区中已有的代码。  要以新样式重新缩进整个缓冲区，您可以输入@kbd{C-x h C-M-\}。
+
+@vindex c-default-style
+使用CC模式时，还可以设置变量@code{c-default-style}来指定各种主要模式的默认样式。  它的值应该是样式的名称（字符串）或列表，其中每个元素指定一种主要模式以及要使用的缩进样式。  例如，
+
+@example
+(setq c-default-style
+      '((java-mode . "java")
+        (awk-mode . "awk")
+        (other . "gnu")))
+@end example
+
+@noindent
+指定 Java 和 AWK 模式的显式选择，以及其他类似 C 模式的默认 @samp{gnu} 样式。  （这些设置实际上是默认设置。）当您选择一种类 C 主要模式时，此变量才会生效；因此，如果您为 Java 模式指定新的默认样式，则可以通过在现有 Java 模式缓冲区中键入 @kbd{M-x java-mode} 使其在现有 Java 模式缓冲区中生效。
+
+@vindex c-ts-mode-indent-style
+当使用基于树的@code{c-ts-mode}时，您可以通过自定义变量@code{c-ts-mode-indent-style}来设置默认缩进样式。
+
+@code{gnu} 样式指定 GNU 项目推荐的 C 格式；它是默认的，以鼓励使用我们推荐的样式。
+
+@xref{Indentation Engine Basics,,, ccmode, the CC Mode Manual} 和 @ref{Customizing Indentation,,, ccmode, the CC Mode Manual}，了解有关自定义 C 和相关模式缩进的更多信息，包括如何覆盖现有样式的部分以及如何定义您自己的样式。
+
+@findex c-guess
+@findex c-guess-install
+作为指定样式的替代方法，您可以通过在示例代码缓冲区中键入 @kbd{M-x c-guess} 来告诉 Emacs 猜测样式。  然后，您可以使用 @kbd{M-x c-guess-install} 将猜测的样式应用到其他缓冲区。  @xref{Guessing the Style,,, ccmode, the CC Mode Manual}，了解详情。
+
+@node Parentheses
+@section 带括号的编辑命令
+
+@findex check-parens
+@cindex unbalanced parentheses and quotes
+本节介绍在程序中利用括号结构或帮助您保持平衡的命令和功能。
+
+当谈论这些设施时，术语“括号”还包括大括号、方括号或定义为成对匹配的任何分隔符。  主要模式通过语法表 (@pxref{Syntax Tables,, Syntax Tables, elisp, The Emacs Lisp Reference Manual}) 控制哪些定界符是重要的。  在 Lisp 中，只有括号才算数；在 C 语言中，这些命令也适用于大括号和方括号。
+
+您可以使用 @kbd{M-x check-parens} 查找缓冲区中任何不平衡的括号和不平衡的字符串引号。
+
+@menu
+* Expressions::          带有平衡括号的表达式。
+* Moving by Parens::     在括号结构中向上、向下和横向移动的命令。
+* Matching::             插入结束分隔符会闪烁匹配打开分隔符。
+@end menu
+
+@node Expressions
+@subsection 带有平衡括号的表达式
+
+@cindex sexp
+@cindex expression
+@cindex balanced expression
+每种编程语言模式都有自己的 @dfn{balanced expression} 定义。  平衡表达式通常包括单独的符号、数字和字符串常量，以及包含在一对匹配的分隔符中的代码段。  以下命令处理平衡表达式（在 Emacs 中，此类表达式在内部称为 @dfn{sexps}@footnote{The word ``sexp'' is used to refer to an expression in Lisp.}）。
+
+@table @kbd
+@item C-M-f
+在平衡表达式 (@code{forward-sexp}) 上向前移动。
+@item C-M-b
+向后移动平衡表达式 (@code{backward-sexp})。
+@item C-M-k
+向前杀死平衡表达式 (@code{kill-sexp})。
+@item C-M-t
+转置表达式 (@code{transpose-sexps})。
+@item C-M-@@
+@itemx C-M-@key{SPC}
+在下面的表达式 (@code{mark-sexp}) 后面加上标记。
+@end table
+
+@kindex C-M-f
+@kindex C-M-b
+@findex forward-sexp
+@findex backward-sexp
+要在平衡表达式上前进，请使用 @kbd{C-M-f} (@code{forward-sexp})。  如果点之后的第一个有效字符是开始分隔符（例如，@samp{(}、@samp{[} 或 @samp{@{} in C), this command moves past the matching closing delimiter.  If the character begins a symbol, string, or number, the command moves over that.
+
+命令 @kbd{C-M-b} (@code{backward-sexp}) 在平衡表达式上向后移动——类似于 @kbd{C-M-f}，但方向相反。如果表达式前面有任何前缀字符（Lisp 中的单引号、反引号和逗号），则命令也会向后移动到它们之上。
+
+带参数的@kbd{C-M-f}或@kbd{C-M-b}重复该操作指定的次数；带有否定参数意味着朝相反方向移动。  在大多数模式下，这两个命令在注释之间移动，就像它们是空格一样。  请注意，它们的键@kbd{C-M-f}和@kbd{C-M-b}类似于@kbd{C-f}和@kbd{C-b}（按字符移动（@pxref{Moving Point}））以及@kbd{M-f}和@kbd{M-b}（按字移动（@pxref{Words}））。
+
+@cindex killing expressions
+@kindex C-M-k
+@findex kill-sexp
+要终止整个平衡表达式，请输入 @kbd{C-M-k} (@code{kill-sexp})。  这会杀死 @kbd{C-M-f} 将移动的文本。
+
+@cindex transposition of expressions
+@kindex C-M-t
+@findex transpose-sexps
+@kbd{C-M-t} (@code{transpose-sexps}) 交换前一个平衡表达式和下一个平衡表达式的位置。  它类似于 @kbd{C-t} 命令，可转置字符 (@pxref{Transpose})。 @kbd{C-M-t} 的参数用作重复计数，将前一个表达式移动到许多后续表达式上。  否定参数将先前的平衡表达式向后移动。  参数为零，而不是不执行任何操作，而是转置在点和标记处或之后结束的平衡表达式。
+
+@kindex C-M-SPC
+要使用作用于区域的命令对平衡表达式进行操作，请输入 @kbd{C-M-@key{SPC}} (@code{mark-sexp})。  这设置了 @kbd{C-M-f} 将移动到的标记。  当标记处于活动状态时，每次连续调用此命令都会通过将标记移动一个表达式来扩展区域。  正或负数值参数将标记向前或向后移动指定数量的表达式。别名 @kbd{C-M-@@} 相当于 @kbd{C-M-@key{SPC}}。 @xref{Marking Objects}，有关此命令和相关命令的更多信息。
+
+在使用中缀运算符的语言（例如 C）中，不可能识别所有平衡表达式，因为给定位置可能存在多种可能性。  例如，C 模式不会将 0⁣ 视为单个表达式，即使它是 1⁣ 一个 C 表达式；相反，它将 @samp{foo} 识别为一个表达式，将 @samp{bar} 识别为另一个表达式，并使用 @samp{+} 作为它们之间的标点符号。然而，由于括号的存在，C 模式将 @samp{(foo + bar)} 识别为单个表达式。
+
+@node Moving by Parens
+@subsection 在括号结构中移动
+
+@cindex parenthetical groupings
+@cindex parentheses, moving across
+@cindex matching parenthesis and braces, moving to
+@cindex braces, moving across
+@cindex list commands
+
+以下命令移动由括号（或您正在使用的语言中充当分隔符的任何其他内容）分隔的分组。  它们忽略字符串和注释，包括其中的任何括号，并且还忽略用转义字符引用的括号。  这些命令主要用于编辑程序，但对于编辑任何包含括号的文本也很有用。  它们在内部被称为“列表命令”，因为在 Lisp 中这些分组是列表。
+
+这些命令假定起点不在字符串或注释内。  如果从字符串或注释内部调用它们，结果是不可靠的。
+
+@table @kbd
+@item C-M-n
+向前移动到括号组 (@code{forward-list})。
+@item C-M-p
+向后移动到括号组 (@code{backward-list})。
+@item C-M-u
+在括号结构中向上移动 (@code{backward-up-list})。
+@item C-M-d
+在括号结构中向下移动 (@code{down-list})。
+@end table
+
+@kindex C-M-n
+@kindex C-M-p
+@findex forward-list
+@findex backward-list
+列表命令@kbd{C-M-n} (@code{forward-list}) 和@kbd{C-M-p} (@code{backward-list}) 在一个（或@var{n}）括号分组上向前或向后移动。
+
+@kindex C-M-u
+@findex backward-up-list
+@kbd{C-M-n} 和 @kbd{C-M-p} 尝试在括号结构中保持同一水平。  要移动 @emph{up} 一级（或 @var{n}）级，请使用 @kbd{C-M-u} (@code{backward-up-list})。  @kbd{C-M-u} 向后移动超过一个不匹配的起始分隔符。  正数作为重复计数；负参数会反转运动方向，以便命令向前移动并向上移动一层或多层。
+
+@kindex C-M-d
+@findex down-list
+要在括号结构中移动@emph{down}，请使用@kbd{C-M-d} (@code{down-list})。  在 Lisp 模式中，@samp{(} 是唯一的开始定界符，这几乎与搜索 @samp{(} 相同。  参数指定要下降的级别数。
+
+@node Matching
+@subsection 匹配括号
+@cindex matching, parentheses and other paired delimiters
+@cindex parentheses, displaying matches
+
+Emacs 有许多 @dfn{parenthesis matching} 功能，可以轻松查看括号（或其他配对分隔符）如何以及是否匹配。
+
+每当您键入作为结束分隔符的自插入字符时，Emacs 都会简要指示匹配的开始分隔符的位置（前提是该字符位于屏幕上）。  如果它不在屏幕上，Emacs 会在回显区域中显示其附近的一些文本。无论哪种方式，您都可以知道要关闭哪个分组。  如果开始分隔符和结束分隔符不匹配（例如@samp{[x)}），则会在回显区域中显示一条警告消息。
+
+@vindex blink-matching-paren
+@vindex blink-matching-paren-distance
+@vindex blink-matching-delay
+三个变量控制匹配括号的显示：
+
+@itemize @bullet
+@item
+@code{blink-matching-paren} 打开或关闭该功能：@code{nil} 禁用它，但默认为 @code{t} 启用它。  将其设置为 @code{jump} 可以通过将光标暂时移动到匹配的开始分隔符来使指示起作用。  将其设置为 @code{jump-offscreen} 以使光标跳转，即使起始分隔符在屏幕外也是如此。
+
+@item
+@code{blink-matching-delay} 表示保持指示匹配的开始分隔符的秒数。  这可以是整数或浮点数；默认值为 1。
+
+@item
+@code{blink-matching-paren-distance} 指定返回搜索多少个字符以查找匹配的开始分隔符。  如果在该距离内未找到匹配项，Emacs 将停止扫描并且不显示任何内容。  默认值为 102400。
+@end itemize
+
+@cindex Show Paren mode
+@cindex highlighting matching parentheses
+@findex show-paren-mode
+@findex show-paren-local-mode
+Show Paren 模式是一种次要模式，提供更强大的自动匹配。  每当点位于开始分隔符之前或结束分隔符之后时，该分隔符、其匹配的分隔符以及它们之间的文本（可选）都会突出显示。  要全局切换 Show Paren 模式，请输入 @kbd{M-x show-paren-mode}。  要仅在当前缓冲区中切换它，请输入 @kbd{M-x show-paren-local-mode}。
+
+@vindex show-paren-predicate
+默认情况下，此模式在所有用于编辑的缓冲区中打开，但在显示数据的缓冲区中不启用。  这是由 @code{show-paren-predicate} 用户选项控制的。
+
+要自定义模式，请输入 @w{@kbd{M-x customize-group @key{RET} paren-showing}}。  控制此模式操作的可自定义选项包括：
+
+@itemize @bullet
+@item
+@vindex show-paren-highlight-openparen
+@code{show-paren-highlight-openparen} 控制当点位于其前面时是否突出显示左括号，因此无论如何它的位置都会由光标标记。  默认值是非@code{nil}（是）。
+
+@item
+@vindex show-paren-style
+@code{show-paren-style} 控制是仅突出显示两个括号，还是突出显示它们之间的文本。  这里的有效选项是@code{parenthesis}（显示匹配的括号）、@code{expression}（突出显示括号内的整个表达式）和@code{mixed}（如果匹配的括号在窗口中可见，则突出显示匹配的括号，否则突出显示表达式）。
+
+@item
+@vindex show-paren-when-point-inside-paren
+@code{show-paren-when-point-inside-paren}，当非 @code{nil} 时，当点位于括号内时也会导致突出显示。  默认值为@code{nil}。
+
+@item
+@vindex show-paren-when-point-in-periphery
+@code{show-paren-when-point-in-periphery}，当非 @code{nil} 时，当 point 位于行首的空白中并且该行的第一个或最后一个非空白位置有一个括号时，或者当 point 位于行的末尾并且该行的最后一个非空白位置有一个括号时，也会导致突出显示。
+
+@item
+@vindex show-paren-context-when-offscreen
+@code{show-paren-context-when-offscreen}，当非@code{nil}时，当点位于结束分隔符且开始分隔符在屏幕外时，显示回显区域中的一些上下文。  上下文通常是包含开始定界符的行，除非开始定界符位于其自己的行上，在这种情况下，上下文包括前一个非空行。
+
+@item
+@vindex show-paren-not-in-comments-or-strings
+如果@code{show-paren-not-in-comments-or-strings}的值为@code{all}，则注释和字符串内的分隔符将不会突出显示。  否则，如果该值设置为@code{on-mismatch}，注释内不匹配的分隔符将不会突出显示。  默认值为 @code{nil}，因此注释和字符串内的分隔符始终突出显示。
+@end itemize
+
+@cindex Electric Pair mode
+@cindex inserting matching parentheses
+@findex electric-pair-mode
+Electric Pair 模式是一种次要模式，它提供了一种轻松插入匹配分隔符对的方法：圆括号、大括号、中括号、引号等@:（什么算作匹配分隔符取决于主要模式）。  要全局切换电动配对模式，请输入 @w{@kbd{M-x electric-pair-mode}}。  要仅在当前缓冲区中切换它，请输入 @w{@kbd{M-x electric-pair-local-mode}}。
+
+启用此模式后，键入开始分隔符会插入该字符以及紧随其后的匹配结束分隔符，并在两者之间留下点。  这使得在大多数情况下无需键入匹配的结束分隔符。  如果您仍然输入一个字符，Emacs 只会插入该字符，除非 point 紧邻相同类型的结束分隔符之前；在这种情况下，点会立即移动到结束分隔符之后，并且不会插入其他结束分隔符。  因此，输入序列 <opening delimiter>, <matching close delimiter> 可能比序列 <opening delimiter>, @kbd{C-f} 更方便。
+
+对于活动区域 (@pxref{Mark})，电对模式的操作方式有所不同：插入开始或结束分隔符会将区域中的字符包含在生成的一对匹配定界符内，并在您键入的定界符之后留下点（这有助于在开始定界符之后的文本之前或结束定界符之后继续键入）。
+
+如果在插入开始分隔符时提供前缀参数（并且如果区域处于活动状态，则在插入结束分隔符时也如此），这会导致插入与该前缀参数的数值一样多的嵌套匹配分隔符对。
+
+有多个用户选项可用于修改电动配对模式的行为：
+
+@itemize @bullet
+@item
+@vindex electric-pair-preserve-balance
+@code{electric-pair-preserve-balance}，当非@code{nil}（默认）时，使键入分隔符保持开始和结束分隔符之间的平衡。  因此，如果您键入一个开始分隔符，并且稍后在缓冲区中有一个未配对的匹配结束分隔符，则仅插入该开始分隔符（而不是紧随其后的匹配结束分隔符）；同样，如果存在未配对的开始定界符，则稍后在缓冲区中键入匹配的结束定界符会插入该字符，即使后面的字符是另一个匹配的结束定界符也是如此。
+
+当设置为 @code{nil} 时，键入开始分隔符仅插入此字符，但仅当 point 紧邻匹配的开始分隔符之前或之后，或者紧邻字母或数字之前；在所有其他位置，插入开始定界符会自动在其后立即插入匹配的结束定界符，即使稍后在缓冲区中存在未配对的匹配结束定界符。  在相同类型的另一个结束定界符之前键入结束定界符不会插入该字符，而是会如上所述移动点，即使缓冲区中较早存在未配对的匹配开始定界符也是如此。
+
+如果存在活动区域​​，则该变量无效。
+
+@item
+@vindex electric-pair-delete-adjacent-pairs
+@code{electric-pair-delete-adjacent-pairs}，当非 @code{nil}（默认值）时，通过键入 @key{DEL} 键（通常是 @key{BACKSPACE} 键；@pxref{DEL Does Not Delete}）删除开始分隔符也会自动删除紧随其后的匹配结束分隔符（但如果配对分隔符之间有任何字符（包括空格）则不会删除）。  设置为 @code{nil} 时，键入 @key{BACKSPACE} 仅删除起始分隔符。  （键入 @key{BACKSPACE} 删除结束分隔符始终仅删除该字符。）
+
+@item
+@vindex electric-pair-open-newline-between-pairs
+当 @code{electric-pair-open-newline-between-pairs} 为非 @code{nil} （默认）并且 point 位于开始分隔符和紧随其后的匹配结束分隔符之间时，输入换行符会自动在 point 之后插入额外的换行符（可能会缩进空行点，具体取决于主要模式）。  当设置为 @code{nil} 时，键入换行符只会在点之前插入一个换行符，像往常一样。
+
+@item
+@vindex electric-pair-skip-whitespace
+当 @code{electric-pair-skip-whitespace} 具有默认的非 @code{nil} 值并且 point 与结束分隔符仅通过空格分隔时，输入相同类型的结束分隔符不会插入该字符，而是将 point 移动到紧邻已存在的结束分隔符之后。  您还可以设置此选项以另外删除点移动过的任何空白。  当设置为 @code{nil} 时，键入结束分隔符只会插入该字符（即使这会使相同类型的以下结束分隔符不平衡）。
+@end itemize
+
+@node Comments
+@section 操纵评论
+@cindex comments
+
+由于注释是编程的重要组成部分，因此 Emacs 提供了用于编辑和插入注释的特殊命令。  它还可以使用 Flyspell Prog 模式 (@pxref{Spelling}) 对注释进行拼写检查。
+
+一些主要模式对于缩进不同类型的注释有特殊的规则。  例如，在 Lisp 代码中，以两个分号开头的注释会缩进，就好像它们是代码行一样，而以三个分号开头的注释应该与左边距对齐，并且通常用于分段目的。  Emacs 理解这些约定；例如，在注释行上键入 @kbd{@key{TAB}} 会将注释缩进到适当的位置。
+
+@example
+;; This function is just an example.
+;;; Here either two or three semicolons are appropriate.
+(defun foo (x)
+;;;  And now, the first part of the function:
+  ;; The following line adds one.
+  (1+ x))           ; This line adds one.
+@end example
+
+@menu
+* Comment Commands::     插入、删除和对齐注释。
+* Multi-Line Comments::  用于添加和编辑多行注释的命令。
+* Options for Comments:: 自定义评论功能。
+@end menu
+
+@node Comment Commands
+@subsection 评论命令
+@cindex indentation for comments
+@cindex alignment for comments
+
+以下命令对注释进行操作：
+
+@table @asis
+@item @kbd{M-;}
+在当前行插入或重新对齐注释；如果该区域处于活动状态，则注释或取消注释该区域 (@code{comment-dwim})。
+@item @kbd{C-x C-;}
+注释或取消注释当前行 (@code{comment-line})。  如果该区域处于活动状态，请注释或取消注释该区域中的行。
+@item @kbd{C-u M-;}
+删除当前行的注释 (@code{comment-kill})。
+@item @kbd{C-x ;}
+设置注释栏（@code{comment-set-column}）。
+@item @kbd{C-M-j}
+@itemx @kbd{M-j}
+类似于 @kbd{@key{RET}}，然后插入并对齐注释 (@code{default-indent-new-line})。  @xref{Multi-Line Comments}。
+@item @kbd{M-x comment-region}
+@itemx @kbd{C-c C-c}（在类 C 模式下）
+向该区域中的所有行添加注释分隔符。
+@end table
+
+@kindex M-;
+@findex comment-dwim
+创建或对齐注释的命令是@kbd{M-;} (@code{comment-dwim})。  “dwim”这个词是“Do What I Mean”的缩写；它表明该命令可以用于许多与注释相关的不同工作，具体取决于您使用它的情况。
+
+当某个区域处于活动状态 (@pxref{Mark}) 时，@kbd{M-;} 要么向该区域添加注释分隔符，要么将其删除。  如果该区域中的每一行都已经是注释，则会通过删除注释分隔符来取消注释每一行。  否则，它会添加注释分隔符以将文本括在该区域中。
+
+如果在区域处于活动状态时向 @kbd{M-;} 提供前缀参数，则指定要添加或删除的注释分隔符的数量。  正参数 @var{n} 添加 @var{n} 分隔符，而负参数 @minus{}@var{n} 删除 @var{n} 分隔符。
+
+如果该区域未激活，并且当前行上没有现有注释，则 @kbd{M-;} 会向当前行添加新注释。  如果该行为空（即空或仅包含空白字符），则注释将缩进到 @kbd{@key{TAB}} 缩进到 (@pxref{Basic Indent}) 的相同位置。  如果该行非空白，则注释将放置在该行最后一个非空白字符之后。  如果可能，Emacs 会尝试将注释放在变量 @code{comment-column} 和 @code{comment-fill-column} (@pxref{Options for Comments}) 指定的列之间。  否则，它会选择其他一些合适的位置，通常与非注释文本至少间隔一个空格。  在每种情况下，Emacs 都会在注释的起始分隔符之后放置点，以便您可以立即开始输入注释文本。
+
+您还可以使用 @kbd{M-;} 来对齐现有注释。  如果一行已经包含注释开始字符串，@kbd{M-;} 会将其重新对齐到常规对齐方式，并将点移动到注释的起始分隔符之后。  作为例外，从第 0 列开始的注释不会被移动。  即使现有注释已正确对齐，@kbd{M-;} 对于直接移动到注释文本的开头仍然很有用。
+
+@findex comment-line
+@kindex C-x C-;
+@kbd{C-x C-;} (@code{comment-line}) 注释或取消注释完整行。  当某个区域处于活动状态时 (@pxref{Mark})，@kbd{C-x C-;} 注释或取消注释该区域中的行。  如果该区域未激活，此命令将注释或取消注释该线点。使用正前缀参数 @var{n}，它在从当前行开始的 @var{n} 行上运行；使用负参数@minus{}@var{n}，它会影响@var{n}前面的行。  使用负参数调用此命令后，使用正参数的连续调用将在前面的行上运行，就像参数被否定一样。
+
+@findex comment-kill
+@kindex C-u M-;
+当区域未激活时，@kbd{C-u M-;}（@code{comment-dwim}带有前缀参数）会杀死当前行上的任何注释及其前面的空格。  由于注释已保存到 Kill Ring，因此您可以通过移动到该行的末尾，执行 @kbd{C-y}，然后执行 @kbd{M-;} 来重新将其插入到另一行，以重新对齐注释。  您可以通过输入 @kbd{M-x comment-kill} 实现与 @kbd{C-u M-;} 相同的效果（当给定前缀参数时，@code{comment-dwim} 实际上将 @code{comment-kill} 作为子例程调用）。  使用前缀数字参数调用@code{comment-dwim}（如@w{@kbd{C-u @var{n} M-;}}），当没有活动区域时，告诉@code{comment-kill}删除@var{n}行上的注释。
+
+@kindex C-c C-c @r{(C mode)}
+@findex comment-region
+@findex uncomment-region
+命令 @kbd{M-x comment-region} 相当于在活动区域​​上调用 @kbd{M-;}，只不过它始终作用于该区域，即使标记处于非活动状态也是如此。  在 C 模式及相关模式下，该命令绑定到@kbd{C-c C-c}。  命令 @kbd{M-x uncomment-region} 取消区域中每一行的注释；数字前缀参数指定要删除的注释分隔符的数量（负参数指定要添加的注释分隔符的数量）。
+
+对于类 C 模式，您可以通过设置变量 @code{c-indent-comment-alist} 和 @code{c-indent-comments-syntactically-p} 来配置 @kbd{M-;} 的确切效果。  例如，在以右大括号结尾的行上，@kbd{M-;} 将注释放在大括号后面一个空格而不是@code{comment-column}。  有关完整详细信息，请参阅@ref{Comment Commands,,, ccmode, The CC Mode Manual}。
+
+@node Multi-Line Comments
+@subsection 多行评论
+
+@kindex C-M-j
+@kindex M-j
+@cindex blank lines in programs
+@findex default-indent-new-line
+@vindex comment-multi-line
+如果您正在输入注释并希望继续到另一行，请输入 @kbd{M-j} 或 @kbd{C-M-j} (@code{default-indent-new-line})。  这会中断当前行，并插入必要的注释分隔符和缩进以继续注释。
+
+对于带有结束注释分隔符的语言（例如，C 中的 @samp{*/}），@kbd{M-j} 的确切行为取决于变量 @code{comment-multi-line} 的值。  如果值为@code{nil}，则该命令关闭旧行上的注释并在新行上开始新注释。  否则，它将在当前注释分隔符内打开一个新行。
+
+当自动填充模式打开时，在键入注释时越过填充列也会继续注释，就像显式调用 @kbd{M-j} 一样。
+
+要将现有行转换为注释行，请在区域处于活动状态时使用 @kbd{M-;}，或使用 @kbd{M-x comment-region}
+@ifinfo
+(@pxref{Comment Commands}).
+@end ifinfo
+@ifnotinfo
+如上一节所述。
+@end ifnotinfo
+
+您可以配置 C 模式，以便当您在多行块注释的行开头键入 @samp{/} 时，会关闭注释。  为此启用 @code{comment-close-slash} 清理。 @xref{Clean-ups,,, ccmode, The CC Mode Manual}。
+
+@node Options for Comments
+@subsection 控制评论的选项
+
+@vindex comment-column
+@vindex comment-fill-column
+@kindex C-x ;
+@findex comment-set-column
+如@ref{Comment Commands}中所述，当@kbd{M-j}命令向行添加注释时，它会尝试将注释放置在缓冲区局部变量@code{comment-column}和@code{comment-fill-column}指定的列之间（或者如果是@code{nil}，则为@code{fill-column}、@pxref{Fill Commands}的值）。  您可以按照通常的方式设置这些缓冲区局部变量的局部值或默认值 (@pxref{Locals})。  或者，您可以输入 @kbd{C-x ;} (@code{comment-set-column}) 将当前缓冲区中@code{comment-column}的值设置为点当前所在的列。  @kbd{C-u C-x ;} 设置注释列以匹配缓冲区中点之前的最后一个注释，然后执行 @kbd{M-;} 将当前行的注释与前一行注释对齐。
+
+@vindex comment-start-skip
+注释命令根据作为变量@code{comment-start-skip} 值的正则表达式来识别注释。确保此正则表达式与空字符串不匹配。  它可能比严格意义上的注释起始分隔符匹配更多；例如，在 C 模式下，变量的值可以是
+@c This stops M-q from breaking the line inside that @code.
+@code{@w{"/\\*+[ \t]*\\|//+[ \t]*"}}，匹配 @samp{/*} 本身之后的额外星号和空格，并且还接受 C++ 风格 (@samp{//}) 注释。  （请注意，Lisp 语法中需要使用 @samp{\\} 来在字符串中包含 @samp{\}，从而否认第一个星号在正则表达式语法中的特殊含义。@xref{Regexp Backslash}。）
+
+@vindex comment-start
+@vindex comment-end
+当注释命令创建新注释时，它会插入 @code{comment-start} 的值作为开始注释分隔符。  它还在点之后插入 @code{comment-end} 的值，作为结束注释分隔符。  例如，在 Lisp 模式下，@code{comment-start} 是 @samp{";"}，@code{comment-end} 是@code{""}（空字符串）。  在 C 模式下，@code{comment-start} 为 @code{"/* "}，@code{comment-end} 为 @code{" */"}。
+
+@vindex comment-padding
+变量 @code{comment-padding} 指定注释命令应在注释分隔符和注释文本之间插入的字符串。  默认值 @samp{" "} 指定单个空格。或者，该值可以是一个数字，它指定空格的数量，或者 2⁣ ，这意味着根本没有空格。
+
+变量 @code{comment-multi-line} 控制 @kbd{M-j} 和自动填充模式如何在多行上继续注释。 @xref{Multi-Line Comments}。
+
+@vindex comment-indent-function
+变量 @code{comment-indent-function} 应包含一个函数，该函数将被调用来计算新插入注释的对齐方式或对齐现有注释。  不同主要模式的设置不同。  调用该函数时不带任何参数，但在注释的开头或行的末尾添加点（如果要插入新注释）。  它应该返回评论应该开始的列。  例如，默认函数根据现有注释开始的注释字符数来决定。
+
+Emacs 还尝试对齐相邻行上的注释。  为了覆盖这一点，该函数可以返回两个（可能相等）整数的 cons 以指示可接受的缩进范围。
+
+@node Documentation
+@section 文档查找
+
+Emacs 提供了多种功能，可用于查找您计划在程序中使用的函数、变量和命令的文档。
+
+@menu
+* Info Lookup::          在信息文件中查找库函数和命令。
+* Man Page::             查找库函数和命令的手册页。
+* Programming Language Doc::  查找程序函数、变量等。
+@end menu
+
+@node Info Lookup
+@subsection 信息文档查找
+
+@findex info-lookup-file
+对于适用于在 Info 中具有文档的语言的主要模式，您可以使用 @kbd{C-h S} (@code{info-lookup-symbol}) 查看程序中使用的符号的 Info 文档。  您可以使用迷你缓冲区指定符号；默认值是出现在缓冲区中的符号。  例如，在 C 模式下，它会在 C 库手册中查找符号。  仅当安装了相应手册的信息文件时，该命令才有效。
+
+Emacs 根据主模式确定在哪里查找符号文档（要查找哪些信息文件以及要搜索哪些索引）。  您还可以使用 @kbd{M-x info-lookup-file} 查找文件名的文档。
+
+如果您在不支持的主要模式中使用@kbd{C-h S}，它会要求您指定符号帮助模式。  您应该输入一个命令，例如 @code{c-mode} 来选择 @kbd{C-h S} 支持的主要模式。
+
+@node Man Page
+@subsection 手册页查找
+
+@cindex man page
+在 Unix 上，在线文档的主要形式是 @dfn{manual page} 或 @dfn{man page}。  在 GNU 操作系统中，我们的目标是用组织更好的手册取代手册页，您可以使用 Info (@pxref{Misc Help}) 浏览这些手册。  此过程尚未完成，因此阅读手册页仍然有用。
+
+@findex man
+您可以使用 @kbd{M-x man} 命令阅读操作系统命令、库函数或系统调用的手册页。  这会提示输入主题并完成 (@pxref{Completion})，并运行 @command{man} 程序来格式化相应的手册页。  如果系统允许，它会异步运行@command{man}，以便您可以在页面格式化时继续编辑。  结果放入名为 @file{*Man @var{topic}*} 的缓冲区中。  这些缓冲区使用一种特殊的主要模式，即“Man”模式，可以方便地滚动和跳转到其他手册页。  有关详细信息，请在手动模式缓冲区中键入@kbd{C-h m}。
+
+@cindex sections of manual pages
+每个手册页属于十个或更多 @dfn{sections} 之一，每个都由数字或数字和字母命名。  有时，不同部分中会有同名的手册页。  要阅读特定部分的手册页，请在 @kbd{M-x man} 提示输入主题时键入 @samp{@var{topic}(@var{section})} 或 @samp{@var{section} @var{topic}}。  例如，C 库函数 @code{chmod} 的手册页位于第 2 节中，但有一个同名的 shell 命令，其手册页位于第 1 节中；要查看前者，请输入 @w{@kbd{M-x man @key{RET} chmod(2) @key{RET}}}。
+
+@vindex Man-switches
+@kindex M-n @r{(Man mode)}
+@kindex M-p @r{(Man mode)}
+如果不指定部分，@kbd{M-x man} 通常仅显示找到的第一个手册页。  在某些系统上，@code{man}程序接受@samp{-a}命令行选项，该选项告诉它显示指定主题的所有手册页。  要利用此功能，请将变量 @code{Man-switches} 的值更改为 @samp{"-a"}。  然后，在手册模式缓冲区中，您可以键入 @kbd{M-n} 和 @kbd{M-p} 在不同部分的手册页之间切换。  模式行显示有多少手册页可用。
+
+@vindex Man-prefer-synchronous-call
+默认情况下，@kbd{M-x man} 异步调用@code{man} 程序。  您可以通过将 @code{Man-prefer-synchronous-call} 自定义为非 @code{nil} 值来强制调用同步。
+
+@vindex Man-support-remote-systems
+如果用户选项 @code{Man-support-remote-systems} 为非 @code{nil}，且 @code{default-directory} 表示远程系统 (@pxref{Remote Files})，则手册页取自远程系统。使用 @kbd{C-u M-x man} 等前缀调用 @code{man} 命令会恢复该调用的 @code{Man-support-remote-systems} 值。
+
+@findex woman
+@cindex manual pages, on MS-DOS/MS-Windows
+阅读手册页的另一种方法是使用 @kbd{M-x woman} 命令。  与@kbd{M-x man}不同，它不运行任何外部程序来格式化和显示手册页；格式化是由 Emacs 完成的，因此它可以在 MS-Windows 等 @command{man} 程序可能不可用的系统上运行。  它提示输入手册页，并将其显示在名为 @file{*WoMan @var{section} @var{topic}} 的缓冲区中。
+
+@kbd{M-x woman} 在您第一次调用该命令时计算联机帮助页的完成列表。  使用数字参数，它会重新计算该列表；如果您添加或删除手册页，这非常有用。
+
+如果您键入手册页的名称，并且 @kbd{M-x woman} 发现不同部分中存在多个同名的手册页，则会弹出一个窗口，其中包含可能的候选者，要求您选择其中一个。
+
+请注意，@kbd{M-x woman} 尚不支持现代手册页的最新功能，因此我们建议使用 @kbd{M-x man}（如果您的系统可用）。
+
+有关设置和使用 @kbd{M-x woman} 的更多信息，请参阅
+@ifinfo
+@ref{Top, WoMan, Browse UN*X Manual Pages WithOut Man, woman, The WoMan Manual}.
+@end ifinfo
+@ifnotinfo
+WoMan Info 手册，随 Emacs 一起分发。
+@end ifnotinfo
+
+@node Programming Language Doc
+@subsection 编程语言文档查找
+@cindex documentation for program symbols
+@cindex program functions and variables, documentation lookup
+
+编辑 Emacs Lisp 代码时，可以使用命令 @kbd{C-h f} (@code{describe-function}) 和 @kbd{C-h v} (@code{describe-variable}) 查看要使用的 Lisp 函数和变量的内置文档。  @xref{Name Help}。
+
+@cindex ElDoc mode
+@cindex at-point documentation for program symbols
+@findex eldoc-mode
+@findex global-eldoc-mode
+ElDoc@footnote{ The name ``ElDoc'' is a historical accident: this mode started by supporting Emacs Lisp buffers. } 是一种缓冲区本地次要模式，有助于查找程序中符号（函数、方法、类、变量等）的文档。  启用此模式后，只要该点有记录的符号，回显区域就会显示有用的信息。  例如，在 Emacs Lisp 模式下的缓冲区中，它显示函数在该点的参数列表，对于 Lisp 变量，它显示变量文档字符串的第一行。
+
+要切换 ElDoc 模式，请输入 @kbd{M-x eldoc-mode}。  还有一个全局 ElDoc 模式，默认情况下打开，并在其主要模式设置下面描述的变量的缓冲区中打开 ElDoc 模式。  使用 @w{@kbd{M-x global-eldoc-mode}} 将其全局关闭。
+
+@cindex eglot, using with ElDoc
+各种主要模式配置 Global ElDoc 模式以使用其文档功能。  示例包括 Emacs Lisp 模式、Python 模式和 Cfengine 模式。  此外，为几种主要模式提供支持的 Emacs 功能将 ElDoc 配置为使用其工具来检索文档。  例如 Eglot (@pxref{Eglot Features,,, eglot, Eglot: The Emacs LSP Client})，它根据语言服务器的信息提供文档； Semantic 的空闲摘要模式 (@pxref{Idle Summary Mode,,, semantic, Semantic Manual})； Flymake，它使用 ElDoc 显示点 (@pxref{Finding diagnostics,,, flymake, GNU Flymake manual}) 处的诊断信息。
+
+ElDoc 模式的工作原理是在 Emacs 闲置一段短时间后安排显示符号的可用文档。  当您快速无延迟地键入时，这可以避免回显区域或模式行中文档消息出现烦人的闪烁。
+
+@findex eldoc-print-current-symbol-info
+您还可以使用命令 @kbd{M-x eldoc-print-current-symbol-info} 触发某个符号的文档显示。
+
+以下变量可用于配置 ElDoc 模式：
+
+@vtable @code
+@item eldoc-idle-delay
+该用户选项的值控制显示当前文档之前的空闲时间量。  应设置为等待的秒数；值为零表示没有任何延迟地显示。  默认值为 0.5 秒。
+
+@item eldoc-print-after-edit
+如果此用户选项为非@code{nil}，ElDoc 将仅在某些编辑命令（例如插入或删除某些文本）之后显示文档。  如果您希望 Emacs 仅显示有关您键入的符号的文档，而不显示有关缓冲区中已有符号的文档（因此仅阅读源代码将不会显示文档），那么这会很方便。  默认值为@code{nil}。  如果更改该值，则需要关闭然后再次打开 @code{eldoc-mode}。
+
+@item eldoc-echo-area-use-multiline-p
+此用户选项控制是否以及如何截断文档文本（如果文档文本长于回显区域可以显示为单个屏幕行的长度）。  如果该值为正数，则指定ElDoc允许在回显区域显示而不截断文档的屏幕行数。  正整数指定要使用的绝对最大屏幕行数；浮点数指定屏幕行数作为框架高度的一部分。  @code{t} 的值表示永远不会截断文档（回显区域的大小将调整为 @code{max-mini-window-height}、@pxref{Minibuffer Edit} 允许的高度），而 @code{nil} 的值表示如果文档长于单个屏幕行，则截断。  最后，特殊值 @code{truncate-sym-name-if-fit} （默认值）意味着截断文档中表示符号名称的部分（如果这样做将使文档适合单个屏幕行）。
+
+@item eldoc-echo-area-display-truncation-message
+如果非 @code{nil} （默认值），并且回显区域中显示的文档由于太长而被截断，请按照文档中有关如何查看完整文档文本的说明进行操作。  如果@code{nil}，只需用@samp{@dots{}} 指示文档已被截断。
+
+@findex eldoc-doc-buffer
+@item eldoc-echo-area-prefer-doc-buffer
+如果此用户选项的值为@code{t}，并且带有文档的 ElDoc 缓冲区已在某些窗口中显示，ElDoc 将不会在回显区域中显示文档。  （您可以随时使用命令@kbd{M-x eldoc-doc-buffer}来显示ElDoc缓冲区。）如果该选项的值为符号@code{maybe}，则当ElDoc缓冲区显示在某些窗口中时，文档将不会显示在回显区域中，并且如果显示在回显区域中，文档文本必须被截断。  最后，@code{nil}的值（默认值）意味着始终在回显区域中显示文档。
+
+@item eldoc-documentation-strategy
+此可自定义变量的值是用于检索和显示该符号的文档的函数。  该文档是由钩子 @code{eldoc-documentation-functions} 中的函数生成的。  @code{eldoc-documentation-strategy} 的默认值指定 ElDoc 应显示 @code{eldoc-documentation-functions} 挂钩中的函数生成的第一个文档文本，但您可以自定义 @code{eldoc-documentation-strategy} 以其他方式工作，例如显示连接在一起的所有文档文本。
+
+@item eldoc-documentation-functions
+这个异常钩子的值是一个函数列表，可以为当前缓冲区的主模式生成适当的符号文档。  这些函数充当 ElDoc 后端的集合。  主要模式通过将其函数添加到该变量的缓冲区本地值来向 ElDoc 注册其文档查找函数。
+@end vtable
+
+@node Hideshow
+@section 隐藏显示小模式
+@cindex Hideshow mode
+@cindex mode, Hideshow
+
+@findex hs-minor-mode
+Hideshow 模式是一种缓冲区本地次要模式，允许您有选择地显示程序的部分内容，这些部分称为 @dfn{blocks}。  输入 @kbd{M-x hs-minor-mode} 切换此次要模式 (@pxref{Minor Modes})。
+
+当您使用隐藏模式隐藏某个块时，该块将从屏幕上消失，并替换为省略号（连续三个句点）。  块的构成取决于主模式。  在 C 模式和相关模式中，块由大括号分隔，而在 Lisp 模式中它们由括号分隔。  多行注释也算作块。
+
+此外，Hideshow 模式支持可选的基于缩进的隐藏/显示。  默认情况下这是禁用的；要启用它，请打开缓冲区本地次要模式@code{hs-indentation-mode}。  启用 @code{hs-indentation-mode} 并不要求 @code{hs-minor-mode} 已启用。
+
+@vindex hs-prefix-map
+
+Hideshow 模式提供以下命令（在@code{hs-prefix-map}中定义）：
+
+@findex hs-hide-all
+@findex hs-hide-block
+@findex hs-show-all
+@findex hs-show-block
+@findex hs-show-region
+@findex hs-hide-level
+@findex hs-toggle-hiding
+@findex hs-cycle
+@kindex C-c @@ C-h
+@kindex C-c @@ C-s
+@kindex C-c @@ C-c
+@kindex C-c @@ C-M-h
+@kindex C-c @@ C-M-s
+@kindex C-c @@ C-r
+@kindex C-c @@ C-l
+@kindex C-c @@ TAB
+@kindex C-c @@ <backtab>
+@kindex S-mouse-2
+@table @kbd
+@item C-c @@ C-h
+@itemx C-c @@ C-d
+隐藏当前块 (@code{hs-hide-block})。
+@item C-c @@ C-s
+显示当前块（@code{hs-show-block}）。
+@item C-c @@ C-c
+@itemx C-c @@ C-e
+@itemx S-mouse-2
+隐藏或显示当前块 (@code{hs-toggle-hiding})。
+@item C-c @@ C-M-h
+@itemx C-c @@ C-t
+隐藏所有顶级块 (@code{hs-hide-all})。
+@item C-c @@ C-M-s
+@itemx C-c @@ C-a
+显示缓冲区中的所有块 (@code{hs-show-all})。
+@item C-u @var{n} C-c @@ C-l
+隐藏该块 (@code{hs-hide-level}) 下面的所有块 @var{n} 级别。
+@item C-c @@ TAB
+循环当前块的可见性状态（@code{hs-cycle}）。
+@item C-c @@ <backtab>
+隐藏或显示当前缓冲区中的所有块。 (@code{hs-toggle-all})。
+@end table
+
+@vindex hs-hide-comments-when-hiding-all
+@vindex hs-display-lines-hidden
+@vindex hs-show-indicators
+@vindex hs-indicator-type
+@vindex hs-indicator-maximum-buffer-size
+@vindex hs-isearch-open
+@vindex hs-hide-block-behavior
+@vindex hs-cycle-filter
+@vindex hs-indentation-respect-end-block
+这些变量可用于自定义 Hideshow 模式：
+
+@table @code
+@item hs-hide-comments-when-hiding-all
+如果非 @code{nil}，@code{hs-hide-all}、@code{hs-cycle} 和 @code{hs-hide-level} 也会隐藏注释。
+
+@item hs-hide-block-behavior
+该变量控制@code{hs-hide-block}、@code{hs-cycle}、@code{hs-hide-level}和@code{hs-toggle-hiding}应如何隐藏块。可能的值可以是 @code{after-bol} 隐藏当前行所属的最里面的块，或 @code{after-point} 隐藏点之后的块。
+
+@item hs-display-lines-hidden
+如果非@code{nil}，则显示省略号旁边的隐藏行数。
+
+@item hs-show-indicators
+此变量控制隐藏显示模式是否应显示隐藏和显示块的指示符。  指示器还允许切换每个块的隐藏/显示状态。  如果该值非@code{nil}，则启用指示器。  默认值为 @code{nil}，禁用指示器。
+
+@item hs-indicator-type
+该变量控制指示器的显示位置（如果已启用）。  您可以将它们显示在边缘 (@pxref{Fringes}) 或窗口的边缘。  默认情况下，如果可用，则使用边缘，否则使用边距。
+
+@item hs-indicator-maximum-buffer-size
+该变量将 hideshow 指示器的显示限制为不太大的缓冲区。  （较大的缓冲区可能会对重新显示性能产生不利影响。）默认情况下，大于 2MB 的缓冲区会禁用指示器；无论缓冲区大小如何，@code{nil} 的值都会激活指标。
+
+@item hs-cycle-filter
+此变量控制在具有可隐藏块的行上键入 @kbd{@key{TAB}} 键将循环块的可见性。  根据其非 @code{nil} 值，@key{TAB} 可以在此类线路的不同部分上处于活动状态。  @key{TAB} 线上的任何其他位置都有其默认的键绑定。  值 @code{nil} 意味着 @key{TAB} 无法循环标题线上任何位置的块的可见性。
+
+@item hs-isearch-open
+此变量指定当块中出现匹配文本时增量搜索应取消隐藏隐藏块的条件。  它的值应该是@code{code}（仅取消隐藏代码块）、@code{comment}（仅取消隐藏注释）、@code{t}（同时取消隐藏代码块和注释）或@code{nil}（既不取消隐藏代码块也不取消注释）。  默认值为@code{code}。
+
+@item hs-indentation-respect-end-block
+该变量控制块的末尾是否应与隐藏区域一起隐藏。  仅当启用 @code{hs-indentation-mode} 时，此选项才有效。
+@end table
+
+@node Symbol Completion
+@section 符号名称的补全
+@cindex completion (symbol names)
+
+完成通常在迷你缓冲区 (@pxref{Completion}) 中完成，但您也可以在普通 Emacs 缓冲区中完成符号名称。
+
+@cindex tags-based completion
+@kindex M-TAB
+@kindex C-M-i
+@findex completion-at-point@r{, in programming language modes}
+@cindex Lisp symbol completion
+@cindex completion (Lisp symbols)
+@cindex code completion
+在大多数编程语言模式中，@kbd{C-M-i}（或@kbd{M-@key{TAB}}@footnote{ On graphical displays, the @kbd{M-@key{TAB}} key is usually reserved by the window manager for switching graphical windows, so you should type @kbd{C-M-i} or @kbd{@key{ESC} @key{TAB}} instead. }）调用命令@code{completion-at-point}，该命令生成该点符号的可能完成列表。  此命令使用可用的支持设施来提出完成候选：
+
+@itemize @bullet
+@cindex eglot, using to complete symbol at point
+@item
+如果为当前缓冲区的项目 (@pxref{Projects}) 和当前缓冲区的主模式激活了 Eglot，则该命令会尝试使用相应的语言服务器来生成完成候选列表。  @xref{Eglot Features,,, eglot, Eglot: The Emacs LSP Client}。
+
+@item
+如果启用语义模式 (@pxref{Semantic})，该命令会尝试使用语义解析器数据来完成。
+
+@item
+如果语义模式未启用或执行完成失败，该命令会尝试使用选定的标签表 (@pxref{Tags Tables}) 来完成；您需要使用 @w{@kbd{M-x visit-tags-table}} 访问标签表才能正常工作。
+
+@item
+在 Emacs Lisp 模式下，该命令使用当前 Emacs 会话中定义的函数、变量或属性名称来执行补全。
+@end itemize
+
+在所有其他方面，缓冲区内符号完成的行为类似于迷你缓冲区完成。  例如，如果 Emacs 无法补全唯一符号，它会在另一个窗口中显示补全选项列表。  然后，您可以使用键 @kbd{M-@key{DOWN}} 和 @kbd{M-@key{UP}} 浏览完成缓冲区中显示的完成，而无需离开原始缓冲区，并使用键 @kbd{M-@key{RET}} 将当前突出显示的完成插入到缓冲区。  @xref{Completion}。
+
+在文本模式和相关模式下，@kbd{M-@key{TAB}} 根据拼写检查器的词典完成单词。  @xref{Spelling}。
+
+@cindex completion preview
+@cindex preview completion
+@cindex suggestion preview
+@cindex Completion Preview mode
+@findex completion-preview-mode
+@findex global-completion-preview-mode
+完成预览模式是一种次要模式，可在您键入时显示完成建议。  您可以使用 @kbd{M-x completion-preview-mode} 为当前缓冲区启用它，或者使用 @w{@kbd{M-x global-completion-preview-mode}} 全局启用它。  当完成预览模式打开时，Emacs 会自动将点周围文本的建议完成显示为点后的内嵌预览；输入 @key{TAB} 接受建议。
+
+@node MixedCase Words
+@section 混合大小写单词
+@cindex camel case
+
+一些编程风格使用混合大小写（或“CamelCase”）符号，例如 @samp{unReadableSymbol}。  （在 GNU 项目中，我们建议使用下划线来分隔标识符中的单词，而不是使用大小写区别。）Emacs 具有各种功能，可以更轻松地处理此类符号。
+
+@cindex Glasses mode
+@cindex mode, Glasses
+眼镜模式是一种缓冲区本地次要模式，通过改变这些符号的显示方式，可以更轻松地读取这些符号。  默认情况下，它在每个小写字母和后面的大写字母之间显示额外的下划线。  这不会改变缓冲区文本，只会改变它的显示方式。
+
+要切换眼镜模式，请输入 @kbd{M-x glasses-mode} (@pxref{Minor Modes})。  启用眼镜模式后，次要模式指示器 @samp{o^o} 会出现在模式行中。  有关眼镜模式的更多信息，请输入@kbd{C-h P glasses @key{RET}}。
+
+@cindex Subword mode
+@findex subword-mode
+子字模式是另一种缓冲区本地次要模式。  在子字模式下，Emacs 的单词命令将 @samp{StudlyCapsIdentifiers} 中的大写字母识别为单词边界。  启用子字模式后，次要模式指示器 @samp{,} 出现在模式行中。另请参见类似的@code{superword-mode} (@pxref{Misc for Programs})。
+
+@node Semantic
+@section 语义学
+@cindex Semantic package
+
+Semantic 是一个基于 @code{source code parsers} 提供语言感知编辑命令的包。  本节提供语义的简要描述；欲了解完整详情，
+@ifnottex
+see @ref{Top, Semantic,, semantic, Semantic}.
+@end ifnottex
+@iftex
+see the Semantic Info manual, which is distributed with Emacs.
+@end iftex
+
+Emacs 中的大多数语言感知功能，例如字体锁定模式 (@pxref{Font Lock})，都依赖于经验法则@footnote{Regular expressions and syntax tables.}，这些规则通常会给出良好的结果，但永远不会完全准确。  相比之下，Semantic 使用的解析器对编程语言语法有准确的理解。  这使得 Semantic 能够提供强大且精确的搜索、导航和完成命令。
+
+@cindex Semantic mode
+@cindex mode, Semantic
+要开始使用 Semantic，请输入 @kbd{M-x semantic-mode} 或单击 @samp{Tools} 菜单中名为 @samp{Source Code Parsers (Semantic)} 的菜单项。  这将启用语义模式，一种全局次要模式。
+
+启用语义模式后，Emacs 会自动尝试解析您访问的每个文件。  目前，Semantic 可以理解 C、C++、HTML、Java、Javascript、Make、Python、Scheme、SRecode 和 Texinfo。在每个解析的缓冲区中，可以使用以下命令：
+
+@table @kbd
+@item C-c , j
+@kindex C-c , j
+提示输入当前文件中定义的函数名称，并将点移动到那里 (@code{semantic-complete-jump-local})。
+
+@item C-c , J
+@kindex C-c , J
+提示输入 Emacs 已解析的任何文件中定义的函数名称，并将点移动到那里 (@code{semantic-complete-jump})。
+
+@item C-c , @key{SPC}
+@kindex C-c , SPC
+显示点 (@code{semantic-complete-analyze-inline}) 处符号的可能完成列表。  这还会激活一组用于选择完成的特殊键绑定：@kbd{@key{RET}}接受当前完成，@kbd{M-n}和@kbd{M-p}循环可能的完成，@kbd{@key{TAB}}尽可能完成然后循环，@kbd{C-g}或任何其他键中止完成。
+
+@item C-c , l
+@kindex C-c , l
+在另一个窗口 (@code{semantic-analyze-possible-completions}) 中显示该符号在该点可能的补全列表。
+@end table
+
+@noindent
+除了上述命令之外，Semantic 包还提供了多种其他方式来使用解析器信息。  例如，您可以使用它在 Emacs 空闲时显示完成列表。
+@ifnottex
+@xref{Top, Semantic,, semantic, Semantic}, for details.
+@end ifnottex
+
+@node Misc for Programs
+@section 对编辑程序有用的其他功能
+
+尽管如此，一些并非专门为编辑程序而设计的 Emacs 命令对此很有用。
+
+对单词、句子和段落进行操作的 Emacs 命令对于编辑代码非常有用。  大多数符号名称都包含单词 (@pxref{Words})，而句子可以在字符串和注释中找到 (@pxref{Sentences})。  至于段落，它们在大多数编程语言模式中被定义为以空行开始和结束 (@pxref{Paragraphs})。  因此，明智地使用空行使程序更清晰也将为段落命令的处理提供有用的文本块。  如果在编程语言主要模式中启用自动填充模式，则会缩进它创建的新行。
+
+@findex superword-mode
+超级字模式是一种缓冲区本地次要模式，它使编辑和运动命令将符号（例如，@samp{this_is_a_symbol}）视为单词。当启用超级字模式时，次要模式指示灯
+@iftex
+@samp{@math{^2}}
+@end iftex
+@ifnottex
+@samp{²}
+@end ifnottex
+出现在模式行中。  另请参见类似的@code{subword-mode} (@pxref{MixedCase Words})。
+
+@findex electric-layout-mode
+电动布局模式（@kbd{M-x electric-layout-mode}）是一种全局次要模式，当您键入某些字符时会自动插入换行符；例如，Javascript 模式下的 @samp{@{}, @samp{@}} 和 @samp{;}。
+
+除了隐藏显示模式 (@pxref{Hideshow}) 之外，选择性显示节目部分的另一种方法是使用选择性显示功能 (@pxref{Selective Display})。  编程模式通常还支持大纲次要模式 (@pxref{Outline Mode})，可以与 Foldout 包 (@pxref{Foldout}) 一起使用。
+
+@ifinfo
+自动打字功能对于编写程序可能很有用。 @xref{Top,,Autotyping, autotype, Autotyping}。
+@end ifinfo
+
+@findex prettify-symbols-mode
+美化符号模式是一种缓冲区本地次要模式，出于显示目的，它用更具吸引力的版本替换某些字符串。例如，在 Emacs Lisp 模式下，它将字符串 @samp{lambda} 替换为希腊 lambda 字符 @samp{λ}。  在 @TeX{} 缓冲区中，它将用 Unicode 字符替换 @samp{\alpha} @dots{} @samp{\omega} 和其他数学宏。  您可能也希望在非编程模式下使用它。  您可以通过向 @code{prettify-symbols-alist} 添加更多条目来自定义模式。  如果默认值@code{prettify-symbols-default-compose-p}不合适，可以通过自定义@code{prettify-symbols-compose-predicate}进行更精细的定制。  还有一个全局版本@code{global-prettify-symbols-mode}，它在所有支持它的缓冲区中启用该模式。
+
+点处的符号可以以其原始形式显示。  这是由变量 @code{prettify-symbols-unprettify-at-point} 控制的：如果非 @code{nil}，则只要 point 位于该点，该点符号的原始形式就会被恢复。
+
+
+@node C Modes
+@section C 及相关模式
+@cindex C mode
+@cindex Java mode
+@cindex Pike mode
+@cindex IDL mode
+@cindex CORBA IDL mode
+@cindex Objective C mode
+@cindex C++ mode
+@cindex AWK mode
+@cindex mode, Java
+@cindex mode, C
+@cindex mode, C++
+@cindex mode, Objective C
+@cindex mode, CORBA IDL
+@cindex mode, Pike
+@cindex mode, AWK
+
+本节简要描述 C、C++、Objective-C、Java、CORBA IDL、Pike 和 AWK 模式中可用的特殊功能。 （这些称为“C 模式和相关模式”。）
+@ifinfo
+@xref{Top,, CC Mode, ccmode, CC Mode}，了解更多详情。
+@end ifinfo
+@ifnotinfo
+有关更多详细信息，请参阅随 Emacs 一起分发的 CC 模式信息手册。
+@end ifnotinfo
+
+@menu
+* Motion in C::                  通过 C 语句等移动的命令
+* Electric C::                   冒号和其他字符可以自动重新缩进。
+* Hungry Delete::                更强大的 DEL 命令。
+* Other C Commands::             填充注释、查看宏扩展以及其他简洁的功能。
+@end menu
+
+@node Motion in C
+@subsection C 模式运动命令
+
+本节介绍 C 模式及相关模式下的移动点命令。
+
+@table @code
+@item C-M-a
+@itemx C-M-e
+@findex c-beginning-of-defun
+@findex c-end-of-defun
+将点移动到当前函数或顶级定义的开头或结尾。  在具有封闭作用域的语言中（例如 C++ 的类），@dfn{current function} 是直接作用域，可能位于作用域内。  否则它是由最少的括号定义的。  （相比之下，@code{beginning-of-defun}和@code{end-of-defun}在零列中搜索大括号。）@xref{Moving by Defuns}。
+
+@item C-c C-u
+@kindex C-c C-u @r{(C mode)}
+@findex c-up-conditional
+将点移回包含预处理器的条件，留下标记。  前缀参数充当重复计数。  如果参数为负，则将点向前移动到包含预处理器条件的末尾。
+
+@samp{#elif} 相当于@samp{#else} 后跟@samp{#if}，因此该函数在向后移动时会停在@samp{#elif}，但在向前移动时不会。
+
+@item C-c C-p
+@kindex C-c C-p @r{(C mode)}
+@findex c-backward-conditional
+将点移回到预处理器条件上，留下标记。  前缀参数充当重复计数。  带着消极的论点，继续前进。
+
+@item C-c C-n
+@kindex C-c C-n @r{(C mode)}
+@findex c-forward-conditional
+在预处理器条件中向前移动点，将标记留在后面。  前缀参数充当重复计数。  有了否定的论据，就向后退。
+
+@item M-a
+@kindex M-a @r{(C mode)}
+@findex c-beginning-of-statement
+将指针移至最内层 C 语句的开头 (@code{c-beginning-of-statement})。  如果 point 已经位于语句的开头，则移至前一个语句的开头。  使用前缀参数 @var{n}，向后移动 @var{n} @minus{} 1 个语句。
+
+在注释或跨行以上的字符串中，此命令按句子而不是语句移动。
+
+@item M-e
+@kindex M-e @r{(C mode)}
+@findex c-end-of-statement
+将point移动到最里面的C语句或句子的末尾；类似于@kbd{M-a}，只不过它朝另一个方向移动 (@code{c-end-of-statement})。
+@end table
+
+@node Electric C
+@subsection 电动C字
+
+在 C 模式和相关模式中，某些打印字符是 @dfn{electric}——除了插入自身之外，它们还会重新缩进当前行，并且还可以选择插入换行符。  电子字符为@kbd{@{}, @kbd{@}}、@kbd{:}、@kbd{#}、@kbd{;}、@kbd{,}、@kbd{<}、@kbd{>}、@kbd{/}、@kbd{*}、@kbd{(} 和@kbd{)}。
+
+如果您正在编辑混乱的缩进代码，您可能会发现电动缩进很不方便。  如果您是 CC 模式的新手，您可能会发现它令人不安。  您可以使用命令@kbd{C-c C-l}切换电动动作；启用后，@samp{/@var{c}l} 出现在模式行中模式名称之后（其中 @var{c}，如果存在，则为 @samp{*} 或 @samp{/}，具体取决于注释样式是块还是行）。 @xref{Minor Modes,,, ccmode, The CC Mode Manual}，了解有关 CC 模式下模式线指示器的更多信息。
+
+@table @kbd
+@item C-c C-l
+@kindex C-c C-l @r{(C mode)}
+@findex c-toggle-electric-state
+切换电动动作 (@code{c-toggle-electric-state})。  如果前缀参数为正，则该命令启用电动动作，如果前缀参数为负，则禁用电动动作。
+@end table
+
+仅当除电动状态外，启用 @dfn{auto-newline} 功能（在模式名称后面的模式行中用 @samp{/@var{c}la} 表示）时，电动字符才会插入换行符。  您可以使用命令@kbd{C-c C-a}打开或关闭此功能：
+
+@table @kbd
+@item C-c C-a
+@kindex C-c C-a @r{(C mode)}
+@findex c-toggle-auto-newline
+切换自动换行功能 (@code{c-toggle-auto-newline})。  使用前缀参数时，如果参数为正，此命令将打开自动换行功能；如果参数为负，则关闭自动换行功能。
+@end table
+
+通常，CC 模式样式会配置 Emacs 插入自动换行符的确切环境。  您也可以直接配置它。  @xref{Custom Auto-newlines,,, ccmode, The CC Mode Manual}。
+
+@node Hungry Delete
+@subsection C 中的饥饿删除功能
+@cindex hungry deletion (C Mode)
+
+如果要删除该点处的整个空白块，可以使用@dfn{hungry deletion}。  这会在单个操作中删除点之前或点之后的所有连续空格。 @dfn{Whitespace} 这里包括制表符和换行符，但不包括注释或预处理器命令。
+
+@table @kbd
+@item C-c C-@key{DEL}
+@itemx C-c @key{DEL}
+@findex c-hungry-delete-backwards
+@kindex C-c C-DEL @r{(C Mode)}
+@kindex C-c DEL @r{(C Mode)}
+删除点 (@code{c-hungry-delete-backwards}) 之前的整个空白块。
+
+@item C-c C-d
+@itemx C-c C-@key{Delete}
+@itemx C-c @key{Delete}
+@findex c-hungry-delete-forward
+@kindex C-c C-d @r{(C Mode)}
+@kindex C-c C-Delete @r{(C Mode)}
+@kindex C-c Delete @r{(C Mode)}
+删除点 (@code{c-hungry-delete-forward}) 之后的整个空白块。
+@end table
+
+作为上述命令的替代方法，您可以启用 @dfn{hungry delete mode}。  启用此功能后（在模式名称后面的模式行中的 @samp{/} 后面用 @samp{h} 表示），单个 @kbd{@key{DEL}} 会删除所有前面的空格，而不仅仅是一个空格，单个 @kbd{C-d}（但@emph{not} plain @kbd{@key{Delete}}）会删除所有后面的空格。
+
+@table @kbd
+@item M-x c-toggle-hungry-state
+@findex c-toggle-hungry-state
+切换饥饿删除功能 (@code{c-toggle-hungry-state})。  使用前缀参数时，如果参数为正，则此命令将打开饥饿删除功能；如果参数为负，则关闭饥饿删除功能。
+@end table
+
+@vindex c-hungry-delete-key
+变量@code{c-hungry-delete-key}控制是否启用饥饿删除功能。
+
+@node Other C Commands
+@subsection C 模式的其他命令
+
+@table @kbd
+@item M-x c-context-line-break
+@findex c-context-line-break
+此命令插入换行符并以适合上下文的方式缩进新行。  在普通代码中，它执行 @kbd{@key{RET}} (@code{newline}) 的工作，在 C 预处理器行中，它还在换行符处插入 @samp{\}，在注释中它类似于 @kbd{M-j} (@code{c-indent-new-comment-line})。
+
+默认情况下，@code{c-context-line-break} 未绑定到键，但它需要绑定才能使用。  以下代码将其绑定到@kbd{@key{RET}}。  我们在这里使用 @code{c-initialization-hook} 来确保在尝试更改键盘映射之前已加载它。
+
+@example
+(defun my-bind-clb ()
+  (keymap-set c-mode-base-map "RET"
+              'c-context-line-break))
+(add-hook 'c-initialization-hook 'my-bind-clb)
+@end example
+
+@item C-M-h
+将标记放在函数定义的末尾，并将点放在开头 (@code{c-mark-function})。
+
+@item M-q
+@kindex M-q @r{(C mode)}
+@findex c-fill-paragraph
+填充一个段落，处理 C 和 C++ 注释 (@code{c-fill-paragraph})。如果当前行的任何部分是注释或注释内，则此命令将填充注释或该点所在的段落，并保留注释缩进和注释分隔符。
+
+@item C-c C-e
+@cindex macro expansion in C
+@cindex expansion of C macros
+@findex c-macro-expand
+@kindex C-c C-e @r{(C mode)}
+对区域中的文本运行 C 预处理器，并显示结果，其中包括所有宏调用的扩展 (@code{c-macro-expand})。  为了在那里定义的宏，该区域之前的缓冲区文本也包含在预处理中，但未显示该部分的输出。
+
+当您调试使用宏的 C 代码时，有时很难准确地弄清楚宏是如何扩展的。  有了这个命令，你就不用去弄清楚；你可以看到扩展。
+
+@item C-c C-\
+@findex c-backslash-region
+@kindex C-c C-\ @r{(C mode)}
+在区域行的末尾插入或对齐 @samp{\} 个字符 (@code{c-backslash-region})。  这在编写或编辑 C 宏定义后非常有用。
+
+如果一行已经以 @samp{\} 结尾，此命令会调整其前面的空白量。  否则，它会插入一个新的@samp{\}。  然而，该区域的最后一行受到特殊处理；该行上没有插入任何@samp{\}，并且删除任何@samp{\}。
+
+@item M-x cpp-highlight-buffer
+@cindex preprocessor highlighting
+@findex cpp-highlight-buffer
+根据预处理器条件突出显示文本的各个部分。此命令显示另一个名为 @file{*CPP Edit*} 的缓冲区，它用作图形菜单，用于选择如何显示特定类型的条件及其内容。  更改各种设置后，单击 @samp{[A]pply these settings}（或转到该缓冲区并键入 @kbd{a}）以相应地重新突出显示 C 模式缓冲区。
+
+@item C-c C-s
+@findex c-show-syntactic-information
+@kindex C-c C-s @r{(C mode)}
+显示有关当前源代码行的语法信息 (@code{c-show-syntactic-information})。  此信息指示该行的缩进方式。
+
+@item M-x cwarn-mode
+@itemx M-x global-cwarn-mode
+@findex cwarn-mode
+@findex global-cwarn-mode
+@vindex global-cwarn-mode
+@cindex CWarn mode
+@cindex suspicious constructions in C, C++
+CWarn 次要模式突出显示某些可疑的 C 和 C++ 结构：
+
+@itemize @bullet{}
+@item
+表达式内的赋值。
+@item
+紧跟在 @samp{if}、@samp{for} 和 @samp{while} 之后的分号（@samp{do @dots{} while} 语句之后除外）；
+@item
+带有参考参数的 C++ 函数。
+@end itemize
+
+@noindent
+您可以使用命令 @kbd{M-x cwarn-mode} 为一个缓冲区启用该模式，或者使用命令 @kbd{M-x global-cwarn-mode} 或通过自定义变量 @code{global-cwarn-mode} 为所有合适的缓冲区启用该模式。  您还必须启用字体锁定模式才能使其工作。
+
+@item M-x hide-ifdef-mode
+@findex hide-ifdef-mode
+@cindex Hide-ifdef mode
+@vindex hide-ifdef-shadow
+Hide-ifdef 次要模式隐藏 @samp{#if} 和 @samp{#ifdef} 预处理器块中选定的代码。  如果将变量 @code{hide-ifdef-shadow} 更改为 @code{t}，Hide-ifdef 次要模式会通过以不太突出的面显示预处理器块来隐藏它们，而不是完全隐藏它们。  有关更多信息，请参阅 @code{hide-ifdef-mode} 的文档字符串。
+
+@item M-x ff-find-related-file
+@cindex related files
+@findex ff-find-related-file
+@vindex ff-related-file-alist
+查找与当前缓冲区访问的文件以特殊方式相关的文件。  通常，这将是与 C/C++ 源文件对应的头文件，反之亦然。  变量@code{ff-related-file-alist}指定如何计算相关文件名。
+@end table
+
+@node Asm Mode
+@section 汇编模式
+
+@cindex Asm mode
+@cindex assembler mode
+Asm模式是编辑汇编代码文件的主要模式。  它定义了这些命令：
+
+@table @kbd
+@item @key{TAB}
+@code{tab-to-tab-stop}.
+@c FIXME: Maybe this should be consistent with other programming modes.
+
+@item C-j
+插入换行符，然后使用 @code{tab-to-tab-stop} 缩进。
+
+@item :
+插入冒号，然后删除冒号前面的标签之前的缩进。  然后执行@code{tab-to-tab-stop}。
+
+@item ;
+插入或对齐注释。
+@end table
+
+变量 @code{asm-comment-char} 指定汇编语法中注释的起始字符。
+
+@ifnottex
+@include fortran-xtra.texi
+@end ifnottex
