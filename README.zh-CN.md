@@ -128,6 +128,18 @@ Doom loaded 143 packages across 37 modules
 
 ## 构建与安装
 
+依赖安装脚本同时支持 **Arch** 与 **Debian/Ubuntu**（自动识别包管理器）：
+
+```sh
+# 1) 安装构建依赖（Arch: pacman；Debian/Ubuntu: apt）
+sh ci/install-deps.sh
+
+# 2) 构建（自动处理原生编译回退；PREFIX/NATIVE/JOBS 可调）
+PREFIX=/home/mhwy/Code/emacs/install31 sh ci/build-emacs.sh
+```
+
+也可手动构建：
+
 ```sh
 cd src
 ./autogen.sh
@@ -137,6 +149,10 @@ cd src
 make -j16
 make install
 ```
+
+> `ci/install-deps.sh` 在各发行版上安装的包：
+> - **Arch**：`base-devel autoconf automake texinfo pkgconf zstd gnutls libxml2 jansson gmp gtk3 harfbuzz ncurses zlib libjpeg-turbo libpng giflib libtiff librsvg libxpm libotf m17n-lib libsystemd dbus sqlite libffi nettle p11-kit libidn2 libunistring acl libselinux gpm libgccjit`
+> - **Debian/Ubuntu**：`build-essential autoconf automake texinfo pkg-config zstd libgnutls28-dev libxml2-dev libjansson-dev libgmp-dev libgtk-3-dev libharfbuzz-dev libncurses-dev zlib1g-dev libjpeg-dev libpng-dev libgif-dev libtiff-dev librsvg2-dev libxpm-dev libotf-dev libm17n-dev libsystemd-dev libdbus-1-dev libsqlite3-dev libffi-dev libnettle-dev libp11-kit-dev libidn2-dev libunistring-dev libacl1-dev libselinux1-dev libgpm-dev` + `libgccjit-<ver>-dev`
 
 ## 自动构建（GitHub / Gitea）
 
@@ -221,6 +237,7 @@ sudo tar --zstd -xf emacs-cn-linux-x86_64.tar.zst -C /
 sh ci/update-emacs.sh emacs-31
 
 # 2) 查看变化并构建验证
+sh ci/install-deps.sh
 cd src && ./autogen.sh
 ./configure --prefix=/home/mhwy/Code/emacs/install31 \
             --with-x-toolkit=gtk3 --with-native-compilation --without-tree-sitter

@@ -48,40 +48,7 @@ jobs:
 
       - name: 安装构建依赖
         working-directory: repo
-        run: |
-          set -eu
-          SUDO=""
-          [ "$(id -u)" -ne 0 ] && SUDO="sudo"
-          # 默认 apt 源不可用时，尝试切换为清华镜像
-          if ! $SUDO apt-get update -qq; then
-            echo "==> 默认 apt 源不可用，切换到清华镜像"
-            for f in /etc/apt/sources.list /etc/apt/sources.list.d/*; do
-              [ -f "$f" ] || continue
-              $SUDO sed -i \
-                -e 's|https\?://archive.ubuntu.com/ubuntu|https://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' \
-                -e 's|https\?://security.ubuntu.com/ubuntu|https://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' \
-                -e 's|https\?://ports.ubuntu.com/ubuntu-ports|https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|g' \
-                "$f" 2>/dev/null || true
-            done
-            $SUDO apt-get update -qq
-          fi
-          $SUDO apt-get install -y --no-install-recommends \
-            build-essential autoconf automake texinfo pkg-config zstd curl ca-certificates \
-            libgnutls28-dev libxml2-dev libjansson-dev libgmp-dev \
-            libgtk-3-dev libharfbuzz-dev libncurses-dev zlib1g-dev \
-            libjpeg-dev libpng-dev libgif-dev libtiff-dev librsvg2-dev libxpm-dev
-          # libgccjit 的 dev 包在 universe 里，先确保启用
-          $SUDO apt-get install -y software-properties-common >/dev/null 2>&1 || true
-          $SUDO add-apt-repository -y universe >/dev/null 2>&1 || true
-          $SUDO apt-get update -qq || true
-          # 依次尝试常见版本（仅 -dev 包才有 -lgccjit）
-          for v in 15 14 13 12 11 10; do
-            if $SUDO apt-get install -y "libgccjit-${v}-dev"; then
-              echo "已安装 libgccjit-${v}-dev"
-              break
-            fi
-          done
-          # 安装成功与否都不致命：构建脚本会自动回退到无原生编译
+        run: sh ci/install-deps.sh
 
       - name: 构建并打包
         working-directory: repo

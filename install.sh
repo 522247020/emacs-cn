@@ -65,19 +65,27 @@ install_missing() {
       $SUDO apt-get update -qq || true
       $SUDO apt-get install -y --no-install-recommends $pkgs || true
     fi
-  elif command -v dnf >/dev/null 2>&1; then
-    echo "==> 用 dnf 尝试安装（可能需要调整包名）"
-    $SUDO dnf install -y gtk3 libxml2 gnutls jansson harfbuzz \
-      ncurses-libs libotf m17n-lib libgccjit dbus-libs libselinux \
-      libgomp 2>/dev/null || true
   elif command -v pacman >/dev/null 2>&1; then
-    echo "==> 用 pacman 尝试安装（可能需要调整包名）"
-    $SUDO pacman -S --needed --noconfirm gtk3 libxml2 gnutls jansson \
-      harfbuzz ncurses libotf m17n-lib libgccjit dbus 2>/dev/null || true
+    echo "==> 用 pacman 安装运行时依赖"
+    $SUDO pacman -S --needed --noconfirm \
+      gtk3 libxml2 gnutls jansson harfbuzz ncurses zlib \
+      libjpeg-turbo libpng giflib libtiff librsvg libxpm \
+      libotf m17n-lib libsystemd dbus sqlite libffi nettle p11-kit \
+      libidn2 libunistring acl libselinux gpm libgccjit || true
+  elif command -v dnf >/dev/null 2>&1; then
+    echo "==> 用 dnf 安装运行时依赖"
+    $SUDO dnf install -y \
+      gtk3 libxml2 gnutls jansson harfbuzz ncurses-libs zlib \
+      libjpeg-turbo libpng giflib libtiff librsvg2 libXpm \
+      libotf m17n-lib systemd-libs dbus-libs sqlite-libs libffi \
+      nettle p11-kit libidn2 libunistring acl libselinux libgccjit || true
   elif command -v zypper >/dev/null 2>&1; then
-    echo "==> 用 zypper 尝试安装（可能需要调整包名）"
-    $SUDO zypper --non-interactive install gtk3 libxml2 gnutls jansson \
-      harfbuzz ncurses libotf m17n-lib libgccjit dbus-1 2>/dev/null || true
+    echo "==> 用 zypper 安装运行时依赖"
+    $SUDO zypper --non-interactive install \
+      gtk3 libxml2 gnutls jansson harfbuzz libncurses6 zlib \
+      libjpeg-turbo libpng16 giflib libtiff librsvg libXpm \
+      libotf m17n-lib libsystemd0 dbus-1 sqlite3 libffi8 \
+      libnettle8 p11-kit libidn2 unistring libacl1 libselinux1 libgccjit0 || true
   else
     echo "未能识别包管理器，请手动安装上面的库。"
   fi
