@@ -104,3 +104,69 @@ jobs:
             echo "未能获取 Release id（可能权限不足）"
             exit 1
           fi
+
+  # Arch 版本：在 archlinux 容器里构建，产出的二进制用 Arch 的
+  # libxml2.so.16 等 soname，可直接在 Arch/Manjaro/Omarchy 上运行。
+  build-arch:
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 240
+    container:
+      image: archlinux:latest
+    steps:
+      - name: 准备 git
+        run: pacman -Sy --noconfirm git
+
+      - name: Checkout（git clone）
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          SCHEME=$(printf '%s' "$GITHUB_SERVER_URL" | sed -E 's#^(https?)://.*#\1#')
+          HOST=${GITHUB_SERVER_URL#*://}
+          git config --global --add safe.directory '*'
+          rm -rf repo
+          git clone --depth 1 \
+            "${SCHEME}://oauth2:${TOKEN}@${HOST}/${GITHUB_REPOSITORY}.git" repo
+          cd repo
+          if [ -n "${GITHUB_REF_NAME:-}" ] \
+             && git ls-remote --tags origin "refs/tags/${GITHUB_REF_NAME}" | grep -q .; then
+            git fetch --depth 1 origin "refs/tags/${GITHUB_REF_NAME}"
+            git checkout -q FETCH_HEAD
+          fi
+          git log --oneline -1
+
+      - name: 安装依赖（Arch）
+        working-directory: repo
+        run: sh ci/install-deps.sh
+
+      - name: 构建并打包（Arch）
+        working-directory: repo
+        env:
+          PREFIX: /opt/emacs-cn
+          NATIVE: yes
+          OUT: emacs-cn-arch-x86_64.tar.zst
+        run: sh ci/build-emacs.sh
+
+      - name: 上传 Arch 产物到 Release
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+        working-directory: repo
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          API="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
+          AUTH="Authorization: token ${TOKEN}"
+          case "${GITHUB_REF:-}" in
+            refs/tags/*) TAG="${GITHUB_REF_NAME}" ;;
+            *)           TAG="v$(cat VERSION)" ;;
+          esac
+          RID=$(curl -sf -H "$AUTH" "$API/releases/tags/$TAG" \
+                | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2 || true)
+          if [ -n "${RID:-}" ]; then
+            curl -sf -X POST "$API/releases/$RID/assets?name=emacs-cn-arch-x86_64.tar.zst" \
+              -H "$AUTH" -F "attachment=@emacs-cn-arch-x86_64.tar.zst"
+            echo "已上传 Arch 产物到 Release $TAG"
+          else
+            echo "未找到 Release $TAG（可能 Debian 构建尚未发布），跳过"
+          fi

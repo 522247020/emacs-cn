@@ -15,6 +15,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 PREFIX=${PREFIX:-/opt/emacs-cn}
 NATIVE=${NATIVE:-yes}
 JOBS=${JOBS:-$(nproc 2>/dev/null || echo 2)}
+OUT=${OUT:-emacs-cn-linux-x86_64.tar.zst}
 
 case "$NATIVE" in
   yes|true|1) NATIVE_OPT=--with-native-compilation ;;
@@ -62,6 +63,6 @@ make install DESTDIR="$ROOT/stage"
 
 echo "==> 打包"
 cd "$ROOT/stage"
-tar --zstd -cf "$ROOT/emacs-cn-linux-x86_64.tar.zst" .
-echo "==> 完成: $ROOT/emacs-cn-linux-x86_64.tar.zst"
-ls -lh "$ROOT/emacs-cn-linux-x86_64.tar.zst"
+tar --zstd -cf "$ROOT/$OUT" .
+echo "==> 完成: $ROOT/$OUT"
+ls -lh "$ROOT/$OUT"

@@ -189,16 +189,37 @@ make install
 - **推送 `v*` 标签**：为该标签创建 Release 并附上产物。
 - **发布新版本**：修改 `VERSION`（如 `31.1.50-cn1` → `31.1.50-cn2`）后推送到 `main` 即可。
 
-使用产物：
+使用产物（**按发行版选对应包**）：
+
+| 产物 | 适用 | 说明 |
+| --- | --- | --- |
+| `emacs-cn-linux-x86_64.tar.zst` | Debian / Ubuntu | 在 Ubuntu runner 上构建 |
+| `emacs-cn-arch-x86_64.tar.zst` | Arch / Manjaro / Omarchy | 在 archlinux 容器里构建 |
 
 ```sh
 # 解包（需要写入 /opt）
-sudo tar --zstd -xf emacs-cn-linux-x86_64.tar.zst -C /
+sudo tar --zstd -xf emacs-cn-<distro>-x86_64.tar.zst -C /
 /opt/emacs-cn/bin/emacs -nw
 ```
 
-> 注意：产物里的 Emacs 把安装前缀 `/opt/emacs-cn` 编译进了路径，必须解到该位置。
-> 想换路径就修改 `ci/build-emacs.sh` 里的 `PREFIX` 后重新构建。
+> **为什么必须分发行版**：Emacs 是动态链接的，依赖系统的 soname。
+> 例如 `libxml2`：Ubuntu 是 `libxml2.so.2`，而较新的 Arch 是
+> `libxml2.so.16`。用 Ubuntu 版在 Arch 上跑会报
+> `libxml2.so.2: cannot open shared object file`——装 `libxml2` 也没用。
+> 所以请用对应发行版的产物；不确定就**在目标机上自行编译**（见下）。
+>
+> 另：产物把安装前缀 `/opt/emacs-cn` 编进了路径，必须解到该位置。
+> 想换路径就改 `ci/build-emacs.sh` 的 `PREFIX` 后重新构建。
+
+### 在目标机上自行编译（最稳）
+
+任何发行版都适用：
+
+```sh
+sh ci/install-deps.sh                          # Arch: pacman；Debian: apt
+PREFIX=$HOME/.local/emacs-cn sh ci/build-emacs.sh
+$HOME/.local/emacs-cn/bin/emacs -nw
+```
 
 ### GitHub 与 Gitea 的主要差异
 

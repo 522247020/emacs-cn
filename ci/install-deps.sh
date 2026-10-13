@@ -14,7 +14,9 @@ SUDO=""
 
 if command -v pacman >/dev/null 2>&1; then
   echo "==> 检测到 Arch Linux，使用 pacman 安装依赖"
-  $SUDO pacman -Sy --needed --noconfirm \
+  # 容器里 keyring 可能过期
+  $SUDO pacman -Sy --noconfirm archlinux-keyring || true
+  $SUDO pacman -Syu --needed --noconfirm \
     base-devel git autoconf automake texinfo pkgconf zstd \
     gnutls libxml2 jansson gmp gtk3 harfbuzz ncurses zlib \
     libjpeg-turbo libpng giflib libtiff librsvg libxpm \
