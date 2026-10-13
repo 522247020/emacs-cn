@@ -1,0 +1,3344 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Frames
+@chapter 镜框
+@cindex frame
+
+@dfn{frame} 是一个包含一个或多个 Emacs 窗口 (@pxref{Windows}) 的屏幕对象。  它是一种在图形环境术语中称为“窗口”的对象；但我们不能在这里将其称为“窗口”，因为 Emacs 以不同的方式使用该词。  在 Emacs Lisp 中，@dfn{frame object} 是一个代表屏幕上框架的 Lisp 对象。  @xref{Frame Type}。
+
+一个框架最初包含一个主窗口和/或一个迷你缓冲窗口；您可以将主窗口垂直或水平细分为更小的窗口。  @xref{Splitting Windows}。
+
+@cindex terminal
+@dfn{terminal} 是一种能够显示一个或多个 Emacs 框架的显示设备。  在 Emacs Lisp 中，@dfn{terminal object} 是代表终端的 Lisp 对象。  @xref{Terminal Type}。
+
+@cindex text terminal
+@cindex graphical terminal
+@cindex graphical display
+@cindex top frame
+有两类终端：@dfn{text terminals} 和 @dfn{graphical terminals}。  文本终端是不支持图形功能的显示器，包括 @command{xterm} 和其他终端模拟器。  在文本终端上，每个 Emacs 框架占据终端的整个屏幕；尽管您可以创建其他帧并在它们之间切换，但终端一次仅显示一个非子帧。  该帧被称为该终端的 @dfn{top frame} ，并且可以使用下面描述的函数 @code{tty-top-frame} 来检索。  顶部框架可以有子框架 (@pxref{Child Frames})，它们将与其一起显示，但它本身不能是子框架。
+
+另一方面，图形终端由图形显示系统（例如 X Window 系统）管理，该系统允许 Emacs 在同一显示器上同时显示多个帧。
+
+在 GNU 和 Unix 系统上，您可以在单个 Emacs 会话中的任何可用终端上创建附加框架，无论 Emacs 是在文本终端还是图形终端上启动。  Emacs 可以同时在图形和文本终端上显示。  例如，当您从多个远程位置连接到同一会话时，这会很方便。  @xref{Multiple Terminals}。
+
+@defun framep object
+如果 1⁣ 是一个帧，则该谓词返回非 @code{nil} 值，否则返回 @code{nil}。  对于框架，该值指示框架使用哪种显示：
+
+@table @code
+@item t
+该框架显示在文本终端上。
+@item x
+该框架显示在 X 图形终端上。
+@item w32
+该框架显示在 MS-Windows 图形终端上。
+@item ns
+该框架显示在 GNUstep 或 Macintosh Cocoa 图形终端上。
+@item pc
+该帧显示在 MS-DOS 终端上。
+@item haiku
+该框架使用俳句应用程序套件显示。
+@item pgtk
+该框架使用纯 GTK 设施显示。
+@item android
+该框架显示在 Android 设备上。
+@end table
+@end defun
+
+@defun frame-terminal &optional frame
+该函数返回显示 @var{frame} 的终端对象。  如果 @var{frame} 为 @code{nil} 或未指定，则默认为所选帧 (@pxref{Input Focus})。
+@end defun
+
+@defun terminal-live-p object
+如果 1⁣ 是活动的终端（即未删除），则该谓词返回非 @code{nil} 值，否则返回 @code{nil}。对于直播终端，返回值表示该终端显示什么样的帧；可能值的列表与上面的@code{framep}相同。
+@end defun
+
+@defun frame-initial-p &optional frame
+如果 1⁣ 是或保存在守护进程模式 (@pxref{Initial Options, daemon,, emacs, The GNU Emacs Manual})、批处理模式 (@pxref{Batch Mode}) 和启动早期阶段 (@pxref{Startup Summary}) 期间内部使用的初始文本框架，则此谓词返回非 @code{nil}。  例如，交互式和图形程序可以使用此谓词来避免对从未显示的初始帧进行操作。
+
+如果@var{frame}是终端，并且@var{frame}保持初始帧，则该函数返回非@code{nil}。  如果省略@var{frame}或@code{nil}，则默认为所选的。
+@end defun
+
+@cindex top-level frame
+在图形终端上，我们区分两种类型的框架： 普通 @dfn{top-level frame} 是一个框架，其窗口系统窗口是该终端的窗口系统根窗口的子窗口。  子框架是指其窗口系统窗口是另一个 Emacs 框架的窗口系统窗口的子窗口的框架。  @xref{Child Frames}。
+
+在文本终端上，您可以使用以下函数获取其顶部框架：
+
+@defun tty-top-frame &optional terminal
+该函数返回 @var{terminal} 上的顶部帧。  @var{terminal} 应该是一个终端对象、一个框架（表示该框架的终端）或 @code{nil} （表示所选框架的终端）。  如果它不是指文本终端，则返回值为@code{nil}。  顶部框架必须是根框架，这意味着它本身不能是子框架（@pxref{Child Frames}），但可以有任意数量的从其下降的子框架。
+@end defun
+
+@cindex frame identifier
+@defun frame-id &optional frame
+该函数返回帧的唯一标识符，一个整数，分配给@var{frame}。  如果 @var{frame} 为 @code{nil} 或未指定，则默认为所选帧 (@pxref{Input Focus})。  这可用于在您不使用或不能使用框架对象的上下文中明确标识框架。
+
+使用 @command{undelete-frame} 取消删除的帧将保留其标识符。  使用@command{clone-frame}克隆的帧将不会保留其原始标识符。  @xref{Frame Commands,,,emacs, the Emacs Manual}。
+
+使用桌面库 (@pxref{Desktop Save Mode})、@command{frameset-to-register} 或 @code{frameset-save} 不会保留帧标识符，并且每个恢复的帧都将带有一个新的唯一 ID。
+@end defun
+
+@menu
+* Creating Frames::              创建附加框架。
+* Multiple Terminals::           在多个不同的设备上显示。
+* Frame Geometry::               框架的几何特性。
+* Frame Parameters::             控制框架大小、位置、字体等。
+* Terminal Parameters::          终端上所有帧通用的参数。
+* Frame Titles::                 自动更新框架标题。
+* Deleting Frames::              帧持续到明确删除为止。
+* Finding All Frames::           如何检查所有现有框架。
+* Splitting and Merging Frames::  在框架之间传输窗口布局。
+* Minibuffers and Frames::       帧如何找到要使用的迷你缓冲区。
+* Input Focus::                  指定选定的框架。
+* Visibility of Frames::         框架可能是可见的或不可见的，也可能是图标。
+* Raising and Lowering::         升高、降低和重新堆叠框架。
+* Frame Configurations::         保存所有帧的状态。
+* Child Frames::                 使一个框架成为另一个框架的子框架。
+* Mouse Tracking::               获取表示鼠标何时移动的事件。
+* Mouse Position::               询问鼠标在哪里，或者移动它。
+* Pop-Up Menus::                 显示菜单供用户选择。
+* On-Screen Keyboards::		 显示虚拟键盘。
+* Dialog Boxes::                 显示一个框询问是或否。
+* Pointer Shape::                指定鼠标指针的形状。
+* Window System Selections::     与其他 X 客户端之间传输文本。
+* Accessing Selections::         多种不同类型的选择。
+* Yanking Media::                拉取非纯文本的内容。
+* Drag and Drop::                拖放实现的内部结构。
+* Color Names::                  获取颜色名称的定义。
+* Text Terminal Colors::         定义文本终端的颜色。
+* Resources::                    从服务器获取资源值。
+* Display Feature Testing::      确定终端的功能。
+@end menu
+
+
+@node Creating Frames
+@section 创建框架
+@cindex frame creation
+
+要创建新框架，请调用函数@code{make-frame}。
+
+@deffn Command make-frame &optional parameters
+该函数创建并返回一个新帧，显示当前缓冲区。
+
+@var{parameters} 参数是一个列表，指定新帧的帧参数。  @xref{Frame Parameters}。  如果您在 @var{parameters} 中指定 @code{terminal} 参数，则会在该终端上创建新框架。  否则，如果您在 @var{parameters} 中指定 @code{window-system} 框架参数，则确定框架应显示在文本终端还是图形终端上。  @xref{Window Systems}。  如果两者均未指定，则将在与所选框架相同的终端中创建新框架。
+
+@var{parameters} 中未提及的任何参数默认为列表@code{default-frame-alist} (@pxref{Initial Parameters}) 中的值；未指定的参数默认来自 X 资源或操作系统上的等效资源 (@pxref{X Resources,, X Resources, emacs, The GNU Emacs Manual})。  创建框架后，此函数将应用 @code{frame-inherited-parameters} 中指定的任何尚未分配的参数（见下文），并从调用 @code{make-frame} 时选择的框架中获取值。
+
+请注意，在多显示器显示 (@pxref{Multiple Terminals}) 上，窗口管理器对框架的定位可能与 @var{parameters} (@pxref{Position Parameters}) 中的位置参数指定的位置不同。  例如，某些窗口管理器的策略是在包含窗口最大部分的监视器（也称为@: @dfn{dominating} 监视器）上显示框架。
+
+此函数本身并不使新帧成为选定帧。 @xref{Input Focus}。  先前选择的帧保持选中状态。然而，在图形终端上，窗口系统可能会出于其自身原因选择新框架。
+
+默认情况下，如果缓冲区被隐藏，即名称以空格开头，则此函数不会在新帧中显示当前缓冲区。在这种情况下，它将显示另一个缓冲区——可以由函数 @code{other-buffer} (@pxref{Buffer List}) 返回的缓冲区。然而，如果变量@code{expose-hidden-buffer}不是@code{nil}，则该函数将显示当前缓冲区，即使它是隐藏的。
+@end deffn
+
+@defvar before-make-frame-hook
+在创建框架之前由 @code{make-frame} 运行的普通钩子。
+@end defvar
+
+@defvar after-make-frame-functions
+@code{make-frame} 创建框架后运行的异常钩子。 @code{after-make-frame-functions} 中的每个函数都接收一个参数，即刚刚创建的框架。
+
+您可以在函数中查阅帧参数 @code{cloned-from} 和 @code{undeleted} 以确定是否使用 @command{clone-frame} 克隆了帧，或者是否使用 @command{undelete-frame} 取消删除了帧。  @xref{Frame Parameters}。
+@end defvar
+
+请注意，由初始文件添加到这些挂钩的任何函数通常不会在初始框架中运行，因为 Emacs 仅在创建该框架后才读取初始文件。  但是，如果指定初始帧使用单独的迷你缓冲区帧 (@pxref{Minibuffers and Frames})，则将为无迷你缓冲区帧和迷你缓冲区帧运行这些函数。  或者，您可以在“早期初始化文件”(@pxref{Init File}) 中向这些钩子添加函数，在这种情况下，它们也将对初始帧有效。
+
+@defvar frame-inherited-parameters
+该变量指定新创建的框架从当前选定的框架继承的框架参数列表。  对于作为此列表中的元素并且之前在处理 @code{make-frame} 时尚未分配的每个参数（符号），该函数将该参数在创建的帧中的值设置为其在所选帧中的值。
+@end defvar
+
+@defopt server-after-make-frame-hook
+当 Emacs 服务器开始使用客户端框架时运行的正常挂钩。当调用此钩子时，客户端框架就是选定的框架。  请注意，根据@command{emacsclient}的调用方式（@pxref{Invoking emacsclient,,, emacs, The GNU Emacs Manual}），该客户端框架可以是为客户端创建的新框架，也可以是服务器重用用于处理客户端命令的现有框架。  @xref{Emacs Server,,, emacs, The GNU Emacs Manual}。
+@end defopt
+
+
+@node Multiple Terminals
+@section 多终端
+@cindex multiple terminals
+@cindex multi-tty
+@cindex multiple X displays
+@cindex displays, multiple
+
+Emacs 将每个终端表示为 @dfn{terminal object} 数据类型 (@pxref{Terminal Type})。  在 GNU 和 Unix 系统上，Emacs 可以在每个会话中同时使用多个终端。  在其他系统上，它只能使用单个终端。  每个终端对象都具有以下属性：
+
+@itemize @bullet
+@item
+终端使用的设备的名称（例如，@samp{:0.0} 或 @file{/dev/tty}）。
+
+@item
+终端和终端上使用的键盘编码系统。 @xref{Terminal I/O Encoding}。
+
+@item
+与终端关联的显示类型。  这是函数 @code{terminal-live-p} 返回的符号（即 @code{x}、@code{t}、@code{w32}、@code{ns}、@code{pc}、@code{haiku}、@code{pgtk} 或 @code{android}）。  @xref{Frames}。
+
+@item
+终端参数列表。  @xref{Terminal Parameters}。
+@end itemize
+
+没有用于创建终端对象的原语。  Emacs 根据需要创建它们，例如当您调用 @code{make-frame-on-display} 时（如下所述）。
+
+@defun terminal-name &optional terminal
+该函数返回@var{terminal}使用的设备的文件名。  如果省略 @var{terminal} 或 @code{nil}，则默认为所选帧的终端。  @var{terminal} 也可以是一个框架，表示该框架的终端。
+@end defun
+
+@defun terminal-list
+此函数返回所有活动终端对象的列表。
+@end defun
+
+@defun get-device-terminal device
+该函数返回一个终端，其设备名称由@var{device}给出。  如果@var{device}是一个字符串，它可以是终端设备的文件名，也可以是@samp{@var{host}:@var{server}.@var{screen}}形式的X显示器的名称。  如果 3⁣ 是一个帧，该函数返回该帧的终结点； @code{nil} 表示所选帧。  最后，如果 5⁣ 是代表活动终端的终端对象，则返回该终端。  如果函数的参数不是上述任何一个，则该函数会发出错误信号。
+@end defun
+
+@defun delete-terminal &optional terminal force
+该函数删除@var{terminal}上的所有帧并释放其使用的资源。  它运行异常钩子@code{delete-terminal-functions}，并将@var{terminal}作为参数传递给每个函数。
+
+如果省略@var{terminal}或@code{nil}，则默认为所选帧的终端。  @var{terminal} 也可以是一个帧，表示该帧的终端。
+
+通常，如果您尝试删除唯一的活动终端，此函数会发出错误信号，但如果 @var{force} 为非 @code{nil}，则允许您这样做。  当删除终端上的最后一帧时，Emacs 会自动调用此函数 (@pxref{Deleting Frames})。
+@end defun
+
+@defvar delete-terminal-functions
+由@code{delete-terminal}运行的异常钩子。  每个函数接收一个参数，将 @var{terminal} 参数传递给 @code{delete-terminal}。  由于技术细节的原因，这些函数可能会在终端被删除之前或之后被调用。
+@end defvar
+
+@cindex terminal-local variables
+一些 Lisp 变量是 @dfn{terminal-local}；也就是说，它们对每个终端都有单独的绑定。  任何时刻有效的绑定都是针对当前所选帧所属终端的绑定。  这些变量包括 @code{default-minibuffer-frame}、@code{defining-kbd-macro}、@code{last-kbd-macro} 和 @code{system-key-alist}。  它们始终是终端本地的，并且永远不能是缓冲区本地的 (@pxref{Buffer-Local Variables})。
+
+在 GNU 和 Unix 系统上，每个 X 显示都是一个单独的图形终端。  当 Emacs 从 X 窗口系统中启动时，它使用由 @env{DISPLAY} 环境变量或 @samp{--display} 选项 (@pxref{Initial Options,,, emacs, The GNU Emacs Manual}) 指定的 X 显示。  Emacs 可以通过命令 @code{make-frame-on-display} 连接到其他 X 显示器。  每个 X 显示器都有自己选定的帧和自己的迷你缓冲区窗口；然而，在任何给定时刻，这些帧中只有一个是 @emph{the} 选择的帧 (@pxref{Input Focus})。  Emacs 甚至可以通过与 @command{emacsclient} 程序交互来连接到其他文本终端。 @xref{Emacs Server,,, emacs, The GNU Emacs Manual}。
+
+@cindex X display names
+@cindex display name on X
+一台 X 服务器可以处理多个显示器。  每个 X 显示都有一个由三部分组成的名称：@samp{@var{hostname}:@var{displaynumber}.@var{screennumber}}。  第一部分 @var{hostname} 指定显示器物理连接的机器的名称。  第二部分 @var{displaynumber} 是一个从零开始的数字，用于标识连接到该计算机且共享通用键盘和指点设备（鼠标、平板电脑等）的一台或多台显示器。  第三部分，@var{screennumber}，标识一个从零开始的屏幕编号（一个单独的监视器），它是该 X 服务器上单个监视器集合的一部分。当您使用属于一台服务器的两个或多个屏幕时，Emacs 通过其名称的相似性知道它们共享一个键盘。
+
+不使用 X 窗口系统的系统（例如 MS-Windows）不支持 X 显示器的概念，并且每台主机上只有一个显示器。  这些系统上的显示名称不遵循上述三部分格式；例如，MS-Windows 系统上的显示名称是常量字符串@samp{w32}，其存在是为了兼容性，以便您可以将其传递给需要显示名称的函数。
+
+@deffn Command make-frame-on-display display &optional parameters
+该函数在 @var{display} 上创建并返回一个新帧，并从列表 @var{parameters} 中获取其他帧参数。 @var{display} 应该是 X 显示的名称（字符串）。
+
+在创建框架之前，此函数确保 Emacs 设置为显示图形。  例如，如果 Emacs 尚未处理 X 资源（例如，如果它是在文本终端上启动的），那么它此时会处理。  在所有其他方面，该函数的行为类似于 @code{make-frame} (@pxref{Creating Frames})。
+@end deffn
+
+@defun x-display-list
+此函数返回一个列表，指示 Emacs 已连接到哪个 X 显示。  列表的元素是字符串，每个元素都是一个显示名称。
+@end defun
+
+@defun x-open-connection display &optional xrm-string must-succeed
+此函数打开与 X 显示器@var{display} 的连接，而不在该显示器上创建框架。  通常，Emacs Lisp 程序不需要调用此函数，因为 @code{make-frame-on-display} 自动调用它。  调用它的唯一原因是检查是否可以与给定的 X 显示建立通信。
+
+可选参数 @var{xrm-string}（如果不是 @code{nil}）是一个资源名称和值的字符串，其格式与 @file{.Xresources} 文件中使用的格式相同。  @xref{X Resources,, X Resources, emacs, The GNU Emacs Manual}。  这些值适用于在此显示上创建的所有 Emacs 框架，覆盖 X 服务器中记录的资源值。以下是该字符串的示例：
+
+@example
+"*BorderWidth: 3\n*InternalBorder: 2\n"
+@end example
+
+如果 @var{must-succeed} 不是 @code{nil}，则无法打开连接将终止 Emacs。  否则，这是一个普通的 Lisp 错误。
+@end defun
+
+@defun x-close-connection display
+该函数关闭与显示@var{display}的连接。  在执行此操作之前，您必须首先删除该显示器上打开的所有框架 (@pxref{Deleting Frames})。
+@end defun
+
+@cindex multi-monitor
+在某些多显示器设置中，单个 X 显示器会输出到多个物理显示器。  您可以使用函数 @code{display-monitor-attributes-list} 和 @code{frame-monitor-attributes} 获取有关此类设置的信息。
+
+@cindex display geometry
+@cindex monitor geometry
+@cindex geometry of display monitor
+@defun display-monitor-attributes-list &optional display
+该函数返回@var{display}上的物理监视器属性列表，可以是显示名称（字符串）、终端或框架；如果省略或@code{nil}，则默认为所选帧的显示。  列表中的每个元素都是一个关联列表，代表物理监视器的属性。  第一个元素对应于主监视器。  属性键和值是：
+
+@table @samp
+@item geometry
+显示器屏幕左上角的位置及其大小（以像素为单位），如@samp{(@var{x} @var{y} @var{width} @var{height})}。  请注意，如果显示器不是主显示器，则某些坐标可能为负值。
+
+@item workarea
+左上角的位置和工作区域（可用空间）的大小（以像素为单位）为 @samp{(@var{x} @var{y} @var{width} @var{height})}。这可能与 @samp{geometry} 不同，因为各种窗口管理器功能（停靠栏、任务栏等）@: 占用的空间可能会被排除在工作区域之外。  这些功能是否实际上会减少工作区域取决于平台和环境。同样，如果显示器不是主显示器，则某些坐标可能为负值。
+
+@item mm-size
+宽度和高度（以毫米为单位）为 @samp{(@var{width} @var{height})}
+
+@item frames
+该物理监视器控制的帧列表（见下文）。
+
+@item name
+物理监视器的名称为@var{string}。
+
+@item source
+多显示器信息来源为@var{string}；在 X 上，它可以是 @samp{XRandR 1.5}、@samp{XRandr}、@samp{Xinerama}、@samp{Gdk} 或 @samp{fallback}。  @samp{source} 的最后一个值意味着 Emacs 是在没有 GTK 且没有 XRandR 或 Xinerama 扩展的情况下构建的，在这种情况下，将提供有关多个物理监视器的信息，就好像它们作为一个整体形成一个监视器一样。
+@end table
+
+@var{x}、@var{y}、@var{width}和@var{height}是整数。 @samp{name}和@samp{source}可以不存在。
+
+当帧的最大区域驻留在该监视器中，或者（如果该帧不与任何物理监视器相交）该监视器距离该帧最近时，该帧就被该物理监视器@dfn{dominated}。  图形显示中的每个（非工具提示）帧（无论是否可见）一次仅由一个物理显示器控制，尽管该帧可以跨越多个（或不跨越）物理显示器。
+
+以下是此函数在 2 台显示器上生成的数据示例：
+
+@lisp
+  (display-monitor-attributes-list)
+  @result{}
+  (((geometry 0 0 1920 1080) ;; @r{Left-hand, primary monitor}
+    (workarea 0 0 1920 1050) ;; @r{A taskbar occupies some of the height}
+    (mm-size 677 381)
+    (name . "DISPLAY1")
+    (frames #<frame emacs@@host *Messages* 0x11578c0>
+            #<frame emacs@@host *scratch* 0x114b838>))
+   ((geometry 1920 0 1680 1050) ;; @r{Right-hand monitor}
+    (workarea 1920 0 1680 1050) ;; @r{Whole screen can be used}
+    (mm-size 593 370)
+    (name . "DISPLAY2")
+    (frames)))
+@end lisp
+
+@end defun
+
+@defun frame-monitor-attributes &optional frame
+该函数返回主控物理监视器的属性（见上文）@var{frame}，默认为所选帧。
+@end defun
+
+在多显示器显示器上，可以使用命令 @code{make-frame-on-monitor} 在指定显示器上制作帧。
+
+@deffn Command make-frame-on-monitor monitor &optional display parameters
+该函数在位于 @var{display} 的 @var{monitor} 上创建并返回一个新框架，并从列表 @var{parameters} 中获取其他框架参数。  @var{monitor} 应该是物理监视器的名称，与属性 @code{name} 中函数 @code{display-monitor-attributes-list} 返回的字符串相同。 @var{display} 应该是 X 显示的名称（字符串）。
+@end deffn
+
+@cindex monitor change functions
+@defvar display-monitors-changed-functions
+当显示器配置更改时，此变量是异常挂钩运行，如果在多显示器设置中旋转、移动、添加或删除显示器，如果主显示器发生变化，或者显示器的分辨率发生变化，则可能会发生这种情况。  它使用单个参数调用，该参数由监视器配置更改的终端组成。  程序应使用终端作为参数调用 @code{display-monitor-attributes-list} 来检索该终端上的新监视器配置。
+@end defvar
+
+@node Frame Geometry
+@section 框架几何形状
+@cindex frame geometry
+@cindex frame position
+@cindex position of frame
+@cindex frame size
+@cindex size of frame
+
+框架的几何形状取决于用于构建此 Emacs 实例的工具包以及显示框架的终端。  本章描述了这些依赖关系以及一些处理它们的函数。  请注意，所有这些函数的 @var{frame} 参数都必须指定活动帧 (@pxref{Deleting Frames})。  如果省略或 @code{nil}，则指定选定的帧 (@pxref{Input Focus})。
+
+@menu
+* Frame Layout::             框架的基本布局。
+* Frame Font::               框架的默认字体以及如何设置它。
+* Frame Position::           框架在其显示上的位置。
+* Frame Size::               指定和检索框架的大小。
+* Implied Frame Resizing::   隐含的框架大小调整以及如何防止它。
+@end menu
+
+
+@node Frame Layout
+@subsection 框架布局
+@cindex frame layout
+@cindex layout of frame
+
+可见框架占据其终端显示屏上的矩形区域。该区域可能包含许多嵌套的矩形，每个矩形都有不同的用途。  下图描绘了图形终端上框架的布局：
+@smallexample
+@group
+
+        <------------ Outer Frame Width ----------->
+        ____________________________________________
+     ^(0)  ________ External/Outer Border _______   |
+     | |  |_____________ Title Bar ______________|  |
+     | | (1)_____________ Menu Bar ______________|  | ^
+     | | (2)_____________ Tool Bar ______________|  | ^
+     | | (3)_____________ Tab Bar _______________|  | ^
+     | |  |  _________ Internal Border ________  |  | ^
+     | |  | |   ^                              | |  | |
+     | |  | |   |                              | |  | |
+Outer  |  | | Inner                            | |  | Native
+Frame  |  | | Frame                            | |  | Frame
+Height |  | | Height                           | |  | Height
+     | |  | |   |                              | |  | |
+     | |  | |<--+--- Inner Frame Width ------->| |  | |
+     | |  | |   |                              | |  | |
+     | |  | |___v______________________________| |  | |
+     | |  |___________ Internal Border __________|  | |
+     | | (4)__________ Bottom Tool Bar __________|  | v
+     v |___________ External/Outer Border __________|
+           <-------- Native Frame Width -------->
+
+@end group
+@end smallexample
+
+实际上，并非图中所示的所有区域都将或可能出现。  这些区域的含义如下所述。
+
+@table @asis
+@item 外框
+@cindex outer frame
+@cindex outer edges
+@cindex outer width
+@cindex outer height
+@cindex outer size
+@dfn{outer frame}是包含图中所示的所有区域的矩形。  该矩形的边缘称为框架的 @dfn{outer edges}。  框架的 @dfn{outer width} 和 @dfn{outer height} 一起指定该矩形的 @dfn{outer size}。
+
+了解框架的外部尺寸对于将框架适合其显示器的工作区域 (@pxref{Multiple Terminals}) 或将两个框架在屏幕上彼此相邻放置非常有用。  通常，只有在帧被映射（使其可见，@pxref{Visibility of Frames}）至少一次之后，帧的外部尺寸才可用。  对于初始框架或尚未创建的框架，外部尺寸只能估计或必须根据窗口系统或窗口管理器的默认值计算。  一种解决方法是获取映射帧的外部尺寸和原始尺寸（见下文）的差异，并使用它们来计算新帧的外部尺寸。
+
+@cindex outer position
+外框左上角的位置（上图中用@samp{(0)}表示）就是该框的@dfn{outer position}。  图形框架的外部位置也称为框架的“位置”，因为每当调整框架大小或更改其布局时，它通常在其显示上保持不变。
+
+外部位置由 @code{left} 和 @code{top} 框架参数 (@pxref{Position Parameters}) 指定并可通过其设置。  对于正常的顶级框架，这些参数通常表示其相对于其显示原点的绝对位置（见下文）。  对于子框架 (@pxref{Child Frames})，这些参数表示其相对于其父框架的原始位置（见下文）的位置。  对于文本终端上的根框架 (@pxref{Child Frames})，这些参数的值毫无意义且始终为零。
+
+@item 外部边框
+@cindex external border
+@dfn{external border} 是窗口管理器提供的装饰的一部分。  它通常用于使用鼠标调整框架大小，因此不会显示在“fullboth”和最大化框架上（@pxref{Size Parameters}）。  它的宽度由窗口管理器决定，不能由 Emacs 函数更改。
+
+文本终端框架上不存在外部边框。  对于图形框架，可以通过设置 @code{override-redirect} 或 @code{undecorated} 框架参数 (@pxref{Management Parameters}) 来抑制其显示。
+
+@item 外边框
+@cindex outer border
+@dfn{outer border} 是一个单独的边框，其宽度可以使用 @code{border-width} 框架参数 (@pxref{Layout Parameters}) 指定。  实际上，会显示框架的外部或外边框，但不会同时显示两者。  通常，仅对于不（完全）由窗口管理器控制的特殊框架（如工具提示框架 (@pxref{Tooltips})、子框架 (@pxref{Child Frames}) 和 @code{undecorated} 或 @code{override-redirect} 框架 (@pxref{Management Parameters})）显示外边框。
+
+通常，外部边框永远不会显示在文本终端框架和 GTK+ 例程生成的框架上。  对于文本终端上的子框架，您可以通过将该框架的 @code{undecorated} 参数设置为 @code{nil} (@pxref{Layout Parameters}) 来模拟外边框。  在 MS-Windows 上，外边框是借助一像素宽的外边框来模拟的。  基于 X 的非工具包构建允许通过设置 @code{border-color} 框架参数 (@pxref{Layout Parameters}) 来更改外边框的颜色。
+
+@item 标题栏
+@cindex title bar
+@cindex caption bar
+@dfn{title bar}，又名@ @dfn{caption bar}，也是窗口管理器装饰的一部分，通常显示框架的标题 (@pxref{Frame Titles}) 以及用于最小化、最大化和删除框架的按钮。  它还可以用于用鼠标拖动框架。  标题栏通常不会在完整的 (@pxref{Size Parameters})、工具提示 (@pxref{Tooltips}) 和子框架 (@pxref{Child Frames}) 中显示，并且对于终端框架也不存在。  通过设置 @code{override-redirect} 或 @code{undecorated} 框架参数 (@pxref{Management Parameters}) 可以抑制标题栏的显示。
+
+@item 菜单栏
+@cindex internal menu bar
+@cindex external menu bar
+菜单栏 (@pxref{Menu Bar}) 可以是内部的（由 Emacs 本身绘制）或外部的（由工具包绘制）。  大多数版本（GTK+、Lucid、Motif 和 MS-Windows）都依赖于外部菜单栏。  NS 还使用外部菜单栏，但它不是外框架的一部分。非工具包构建可以提供内部菜单栏。  在文本终端框架上，菜单栏是框架根窗口 (@pxref{Windows and Frames}) 的一部分。  通常，菜单栏永远不会显示在子框架上 (@pxref{Child Frames})。  通过将 @code{menu-bar-lines} 参数 (@pxref{Layout Parameters}) 设置为零可以抑制菜单栏的显示。
+
+当菜单栏的宽度变得太大而无法适应其框架时，菜单栏是否被包裹或截断取决于工具包。通常，只有 Motif 和 MS-Windows 版本可以包裹菜单栏。  当他们（解开）包裹菜单栏时，他们尝试保持框架的外部高度不变，因此框架的原始高度（见下文）将会改变。
+
+@item 工具栏
+@cindex internal tool bar
+@cindex external tool bar
+与菜单栏一样，工具栏 (@pxref{Tool Bar}) 可以是内部的（由 Emacs 本身绘制）或外部的（由工具包绘制）。  GTK+ 和 NS 版本具有由工具包绘制的工具栏。  其余版本使用内部工具栏。  使用 GTK+，工具栏可以位于框架的任一侧，紧邻内部边框之外，见下文。  子框架通常不显示工具栏 (@pxref{Child Frames})。  通过将 @code{tool-bar-lines} 参数 (@pxref{Layout Parameters}) 设置为零可以抑制工具栏的显示。
+
+如果变量 @code{auto-resize-tool-bars} 不是 @code{nil}，则当内部工具栏的宽度对于其框架而言太大时，Emacs 会包裹内部工具栏。  如果 Emacs（取消）包裹内部工具栏，默认情况下它会保持框架的外部高度不变，因此框架的本机高度（见下文）将会改变。  另一方面，使用 GTK+ 构建的 Emacs 不会包裹工具栏，而是会自动增加框架的外部宽度，以容纳过长的工具栏。
+
+@item 标签栏
+@cindex tab bar
+选项卡栏 (@pxref{Tab Bars,,,emacs, The GNU Emacs Manual}) 始终由 Emacs 本身绘制。  在使用内部工具栏构建的 Emacs 中，选项卡栏显示在工具栏上方，而在使用外部工具栏构建的 Emacs 中，选项卡栏显示在工具栏下方。可以通过将 @code{tab-bar-lines} 参数 (@pxref{Layout Parameters}) 设置为零来抑制选项卡栏的显示。
+
+@item 原生框架
+@cindex native frame
+@cindex native edges
+@cindex native width
+@cindex native height
+@cindex native size
+@dfn{native frame} 是一个完全位于外框内的矩形。  它不包括外部或外边框、标题栏以及任何外部菜单或工具栏占用的区域。  原生框架的边缘称为框架的 @dfn{native edges}。  帧的 @dfn{native width} 和 @dfn{native height} 一起指定帧的 @dfn{native size}。
+
+框架的本机大小是在 Emacs 内创建框架或调整框架大小时 Emacs 传递给窗口系统或窗口管理器的大小。它也是 Emacs 从窗口系统或窗口管理器接收的大小，无论何时调整框架的窗口系统窗口的大小，例如，在通过单击标题栏中的相应按钮最大化框架后或用鼠标拖动其外部边框时。
+
+@cindex native position
+原生框架左上角的位置指定框架的@dfn{native position}。  上图中的 (1)--(3) 表示各个构建的位置：
+
+@itemize @w{}
+@item (1) 非工具包、Android、Haiku、终端框架
+
+@item (2) Lucid、Motif 和 MS-Windows 框架
+
+@item (3) GTK+和NS框架
+@end itemize
+
+因此，框架的本机高度可以包括工具栏的高度，但不包括菜单栏（Lucid、Motif、MS-Windows）或菜单栏和工具栏（非工具包和文本终端框架）的高度。
+
+如果原始位置为 (2)，但工具栏如 (4) 中所示放置在框架的底部，则框架的原始位置将变为选项卡栏的位置。
+
+框架的本机位置是设置或返回鼠标当前位置的函数 (@pxref{Mouse Position}) 以及处理窗口位置的函数（如 @code{window-edges}、@code{window-at} 或 @code{coordinates-in-window-p} (@pxref{Coordinates and Windows})）的参考位置。  它还指定用于在该帧内定位和定位子帧的 (0, 0) 原点 (@pxref{Child Frames})。
+
+另请注意，通过更改框架的 @code{override-redirect} 或 @code{undecorated} 参数 (@pxref{Management Parameters}) 来删除或添加窗口管理器装饰时，框架的原始位置通常在其显示上保持不变。
+
+@item 内部边界
+内部边框是 Emacs 围绕内部框架绘制的边框（见下文）。  其外观规范取决于给定框架是否是子框架 (@pxref{Child Frames})。
+
+对于普通框架，其宽度由 @code{internal-border-width} 框架参数 (@pxref{Layout Parameters}) 指定，其颜色由 @code{internal-border} 面的背景指定。
+
+对于子框架，其宽度由 @code{child-frame-border-width} 框架参数指定（但将使用 @code{internal-border-width} 参数作为后备），其颜色由 @code{child-frame-border} 面的背景指定。
+
+@item 内框
+@cindex inner frame
+@cindex inner edges
+@cindex inner width
+@cindex inner height
+@cindex inner size
+@cindex display area
+@dfn{inner frame} 是为框架窗口保留的矩形。它由内部边框包围，但内部边框不是内部框架的一部分。  它的边缘称为框架的@dfn{inner edges}。 @dfn{inner width} 和 @dfn{inner height} 指定矩形的 @dfn{inner size}。  内框架有时也称为框架的@dfn{display area}。
+
+@cindex minibuffer-less frame
+@cindex minibuffer-only frame
+通常，内部帧被细分为帧的根窗口 (@pxref{Windows and Frames}) 和帧的迷你缓冲区窗口 (@pxref{Minibuffer Windows})。  此规则有两个值得注意的例外： A @dfn{minibuffer-less frame} 仅包含根窗口，不包含迷你缓冲区窗口。  @dfn{minibuffer-only frame} 仅包含一个迷你缓冲区窗口，该窗口也用作该帧的根窗口。 @xref{Initial Parameters}，了解如何创建此类框架配置。
+
+@item 文本区
+@cindex text area
+框架的 @dfn{text area} 是一个有点虚构的区域，可以嵌入到本机框架中。  其位置未明确。  它的宽度可以通过从原始宽度中删除内部边框、一个垂直滚动条以及一个左边缘和一个右边缘（如果为此框架指定）的宽度来获得，请参见@ref{Layout Parameters}。  其高度可以通过从原始高度中删除内部边框的宽度以及框架的内部菜单和工具栏、选项卡栏和一个水平滚动条（如果为此框架指定）的高度来获得。
+@end table
+
+@cindex absolute position
+@cindex absolute frame position
+@cindex absolute edges
+@cindex absolute frame edges
+@cindex display origin
+@cindex origin of display
+帧的 0⁣ 给出为相对于帧显示的原点 (0, 0) 的一对水平和垂直像素偏移 (X, Y)。  相应地，帧的 @dfn{absolute edges} 给出为距该原点的像素偏移量。
+
+请注意，对于多个显示器，显示的原点不一定与终端的整个可用显示区域的左上角一致。  因此，在这种环境中，即使该框架完全可见，该框架的绝对位置也可能为负。
+
+按照惯例，垂直偏移量“向下”增加。  这意味着框架的高度是通过从其底部边缘的偏移量减去其顶部边缘的偏移量获得的。  正如预期的那样，水平偏移量“向右”增加，因此帧的宽度是通过从其右边缘的偏移量减去其左边缘的偏移量来计算的。
+
+对于图形终端上的框架，以下函数返回上述区域的大小：
+
+@defun frame-geometry &optional frame
+该函数返回 @var{frame} 的几何属性。  返回值是下面列出的属性的关联列表。  所有坐标、高度和宽度值都是计数像素的整数。  请注意，如果 @var{frame} 尚未映射，(@pxref{Visibility of Frames}) 一些返回值可能仅表示实际值的近似值——那些在帧映射后可以看到的值。
+
+@table @code
+@item outer-position
+cons 表示外部 @var{frame} 相对于 @var{frame} 显示位置 (0, 0) 处的原点的绝对位置。
+
+@item outer-size
+@var{frame} 的外部宽度和高度的缺点。
+
+@item external-border-size
+由窗口管理器提供的 @var{frame} 外部边框的水平和垂直宽度的缺点。  如果窗口管理器不提供这些值，Emacs 将尝试根据外框和内框的坐标来猜测它们。
+
+@item outer-border-width
+@var{frame} 外边框的宽度。  该值仅对非 GTK+ X 版本有意义。
+
+@item title-bar-size
+由窗口管理器或操作系统提供的@var{frame}标题栏的宽度和高度的缺点。  如果两者都为零，则框架没有标题栏。  如果宽度为零，Emacs 将无法检索宽度信息。
+
+@item menu-bar-external
+如果非@code{nil}，则意味着菜单栏是外部的（不是@var{frame}本机框架的一部分）。
+
+@item menu-bar-size
+@var{frame} 菜单栏宽度和高度的缺点。
+
+@item tool-bar-external
+如果非@code{nil}，则意味着工具栏是外部的（不是@var{frame}原生框架的一部分）。
+
+@item tool-bar-position
+这告诉 @var{frame} 上的工具栏位于哪一侧，并且可以是 @code{left}、@code{top}、@code{right} 或 @code{bottom} 之一。
+
+值 @code{left} 和 @code{right} 仅在使用 GTK+ 工具包的构建中受支持；除 NS 之外的所有版本都支持 @code{bottom}，并且所有地方都支持 @code{top}。
+
+@item tool-bar-size
+工具栏宽度和高度的缺点为@var{frame}。
+
+@item internal-border-width
+@var{frame} 内部边框的宽度。
+@end table
+@end defun
+
+以下函数可用于检索外部框架、本机框架和内部框架的边缘。
+
+@defun frame-edges &optional frame type
+该函数返回 @var{frame} 的外部、本机或内部框架的绝对边缘。  @var{frame} 必须是实时帧并且默认为所选帧。  返回的列表具有 @w{@code{(@var{left} @var{top} @var{right} @var{bottom})}} 的形式，其中所有值均以相对于 @var{frame} 显示原点的像素为单位。  对于终端帧，@var{left}和@var{top}返回的值始终为零。
+
+可选参数@var{type}指定要返回的边的类型：@code{outer-edges}表示返回@var{frame}的外边，@code{native-edges}（或@code{nil}）表示返回其本机边，@code{inner-edges}表示返回其内边。
+
+按照惯例，为 @var{left} 和 @var{top} 返回的值处的显示器像素被认为位于 @var{frame} 内部（部分）。  因此，如果@var{left}和@var{top}都为零，则显示器原点处的像素是@var{frame}的一部分。  另一方面，@var{bottom} 和@var{right} 处的像素被认为紧邻@var{frame} 之外。  这意味着，例如，如果您有两个并排的框架，使得左侧框架的右外边缘等于右侧框架的左外边缘，则该边缘处的像素将显示右侧框架的一部分。
+@end defun
+
+
+@node Frame Font
+@subsection 框架字体
+@cindex default font
+@cindex default character size
+@cindex default character width
+@cindex default width of character
+@cindex default character height
+@cindex default height of character
+每个帧都有一个 @dfn{default font} ，它指定该帧的默认字符大小。  该大小是指以列或行的形式检索或更改框架的大小 (@pxref{Size Parameters})。  调整窗口大小 (@pxref{Window Sizes}) 或分割 (@pxref{Splitting Windows}) 窗口时也会使用它。
+
+@cindex line height
+@cindex column width
+@cindex canonical character height
+@cindex canonical character width
+有时使用术语 @dfn{line height} 和 @dfn{canonical character height} 代替“默认字符高度”。  类似地，使用术语 @dfn{column width} 和 @dfn{canonical character width} 代替“默认字符宽度”。
+
+@defun frame-char-height &optional frame
+@defunx frame-char-width &optional frame
+这些函数返回 @var{frame} 中字符的默认高度和宽度（以像素为单位）。  这些值共同确定了 @var{frame} 上默认字体的大小。  这些值取决于 @var{frame} 的字体选择，请参阅 @ref{Font and Color Parameters}。
+@end defun
+
+也可以直接使用以下函数设置默认字体：
+
+@deffn Command set-frame-font font &optional keep-size frames
+这会将默认字体设置为@var{font}。  当以交互方式调用时，它会提示输入字体名称，并在选定的框架上使用该字体。  当从 Lisp 调用时，@var{font} 应该是字体名称（字符串）、字体对象、字体实体或字体规范。
+
+如果可选参数@var{keep-size}为@code{nil}，则框架行数和列数保持固定。  （如果非@code{nil}，下一节中描述的选项@code{frame-inhibit-implied-resize}将覆盖它。）如果@var{keep-size}非@code{nil}（或带有前缀参数），它会尝试通过调整行数和列数来保持当前帧显示区域的大小固定。
+
+如果可选参数 @var{frames} 为 @code{nil}，则仅将字体应用于所选框架。  如果@var{frames}不是@code{nil}，它应该是要作用的框架列表，或者@code{t}表示所有现有的和所有未来的图形框架。
+@end deffn
+
+
+@node Frame Position
+@subsection 框架位置
+@cindex frame position
+@cindex position of frame
+
+在图形系统上，普通顶级框架的位置被指定为其外框架的绝对位置（@pxref{Frame Geometry}）。  子帧 (@pxref{Child Frames}) 的位置是通过其外边缘相对于其父帧的原始位置的像素偏移来指定的。
+
+您可以使用帧参数 @code{left} 和 @code{top} (@pxref{Position Parameters}) 访问或更改帧的位置。这里有两个附加函数用于处理现有可见框架的位置。  对于这两个函数，参数 @var{frame} 必须表示实时帧并默认为所选帧。
+
+@defun frame-position &optional frame
+对于正常的非子帧，此函数返回其外部位置 (@pxref{Frame Layout}) 相对于其显示原点 @code{(0, 0)} 的像素坐标的 cons。  对于子帧 (@pxref{Child Frames})，此函数返回其外部位置相对于 @var{frame} 父级原始位置处的原点 @code{(0, 0)} 的像素坐标。
+
+负值绝不表示与 @var{frame} 的显示或父框架的右边缘或下边缘的偏移。  相反，它们意味着 1⁣ 的外部位置位于其显示原点或其父框架的本机位置的左侧和/或上方。  这通常意味着 @var{frame} 仅部分可见（或完全不可见）。  但是，在显示器原点与其左上角不重合的系统上，该框架可能在辅助监视器上可见。
+
+在文本终端框架上，根框架的两个值均为零 (@pxref{Child Frames})。
+@end defun
+
+@defun set-frame-position frame x y
+该函数将 @var{frame} 的外框位置设置为 (@var{x}, @var{y})。  后面的参数指定像素，通常从 @var{frame} 显示的位置 (0, 0) 处的原点开始计数。  对于子框架，它们从 @var{frame} 父框架的原始位置开始计数。
+
+负参数值将外框的右边缘定位为距屏幕右边缘（或父框架的原生矩形）向左 @var{-x} 像素，将下边缘定位为距屏幕下边缘（或父框架的原生矩形）向上 @var{-y} 像素。
+
+请注意，负值不允许将 @var{frame} 的右边缘或下边缘与其显示器或父框架的右边缘或下边缘精确对齐。  它们也不允许指定不在显示器或父框架边缘内的位置。  帧参数 @code{left} 和 @code{top} (@pxref{Position Parameters}) 允许这样做，但可能仍然无法为初始帧或新帧提供良好的结果。
+
+此功能对文本终端框架没有影响。
+@end defun
+
+@defvar move-frame-functions
+@cindex frame position changes, a hook
+该挂钩指定当窗口系统或窗口管理器移动 Emacs 框架（分配新位置）时运行的函数。  这些函数使用一个参数运行，即移动的框架。  对于子框架 (@pxref{Child Frames})，仅当框架的位置相对于其父框架的位置发生变化时，才会运行这些函数。
+@end defvar
+
+
+@node Frame Size
+@subsection 框架尺寸
+@cindex frame size
+@cindex text width of a frame
+@cindex text height of a frame
+@cindex text size of a frame
+在 Emacs 中指定 @dfn{size of a frame} 的规范方法是指定其 @dfn{text size}——框架文本区域的宽度和高度的元组 (@pxref{Frame Layout})。  它可以以像素为单位或以帧的规范字符大小 (@pxref{Frame Font}) 来衡量。
+
+对于具有内部菜单或工具栏的框架，在实际绘制框架之前无法准确告知框架的原始高度。这意味着通常您不能使用本机大小来指定帧的初始大小。  一旦您知道可见帧的原始大小，您就可以通过添加 @code{frame-geometry} 返回值中的剩余分量来计算其外部大小 (@pxref{Frame Layout})。  然而，对于不可见的框架或尚未创建的框架，只能估计外部尺寸。  这也意味着通过距屏幕右边缘或下边缘 (@pxref{Frame Position}) 的偏移来计算指定帧的精确初始位置是不可能的。
+
+可以借助 @code{height} 和 @code{width} 框架参数 (@pxref{Size Parameters}) 设置和检索任何框架的文本大小。  初始框架的文本大小也可以借助 X 样式几何规范来设置。  @xref{Emacs Invocation,, Command Line Arguments for Emacs Invocation, emacs, The GNU Emacs Manual}。  下面我们列出了一些用于访问和设置现有可见框架（默认情况下选定的框架）大小的函数。
+
+@defun frame-height &optional frame
+@defunx frame-width &optional frame
+这些函数返回 @var{frame} 文本区域的高度和宽度，以 @var{frame} (@pxref{Frame Font}) 的默认字体高度和宽度为单位测量。  这些函数是 @code{(frame-parameter frame 'height)} 和 @code{(frame-parameter frame 'width)} 的简单简写。
+
+如果 @var{frame} 的文本区域（以像素为单位）不是其默认字体大小的倍数，则这些函数返回的值将向下舍入为完全适合文本区域的默认字体的字符数。
+@end defun
+
+接下来的函数返回给定帧的本机、外部和内部框架以及文本区域 (@pxref{Frame Layout}) 的像素宽度和高度。  对于文本终端，结果以字符而不是像素为单位。
+
+@defun frame-outer-width &optional frame
+@defunx frame-outer-height &optional frame
+这些函数返回 @var{frame} 的外部宽度和高度（以像素为单位）。
+@end defun
+
+@defun frame-native-height &optional frame
+@defunx frame-native-width &optional frame
+这些函数返回 @var{frame} 的原始宽度和高度（以像素为单位）。
+@end defun
+
+@defun frame-inner-width &optional frame
+@defunx frame-inner-height &optional frame
+这些函数返回 @var{frame} 的内部宽度和高度（以像素为单位）。
+@end defun
+
+@defun frame-text-width &optional frame
+@defunx frame-text-height &optional frame
+这些函数返回 @var{frame} 文本区域的宽度和高度（以像素为单位）。
+@end defun
+
+在支持它的窗口系统上，Emacs 默认情况下尝试使以像素为单位的框架文本大小为框架字符大小的倍数。  然而，这通常意味着当拖动框架的外部边框时，只能以字符大小增量来调整框架的大小。  它还可能会破坏真正最大化框架或使其成为“全高”或“全宽”（@pxref{Size Parameters}）的尝试，从而在框架下方和/或右侧留下一些空白空间。  在这种情况下，以下选项可能会有所帮助。
+
+@defopt frame-resize-pixelwise
+如果此选项为 @code{nil}（默认值），则每当调整框架大小时，框架的文本像素大小通常会舍入为该框架的 @code{frame-char-height} 和 @code{frame-char-width} 当前值的倍数。  如果这是非@code{nil}，则不会发生舍入，因此帧大小可以增加/减少一个像素。
+
+设置此变量通常会导致下一个调整大小操作将相应的大小提示传递给窗口管理器。  这意味着该变量只能在用户的初始文件中设置；应用程序不应该临时绑定它。
+
+此选项的 @code{nil} 值的精确含义取决于所使用的工具包。  如果窗口管理器愿意处理相应的大小提示，则用鼠标拖动外部边框是按字符完成的。  但是，使用未将帧大小指定为其字符大小的整数倍的参数调用 @code{set-frame-size}（见下文）可能会：被忽略、导致舍入（GTK+）或被接受（Lucid、Motif、MS-Windows）。
+
+对于某些窗口管理器，您可能必须将其设置为非@code{nil}才能使框架真正最大化或全屏显示。
+@end defopt
+
+@defun set-frame-size frame width height &optional pixelwise
+此函数设置 @var{frame} 文本区域的大小，以 @var{frame} (@pxref{Frame Font}) 上字符的规范高度和宽度来测量。
+
+可选参数@var{pixelwise}非@code{nil}表示以像素为单位测量新的宽度和高度。  请注意，如果 @code{frame-resize-pixelwise} 是 @code{nil}，如果不将帧大小增加/减少到其字符大小的倍数，某些工具包可能会拒绝真正满足该请求。
+@end defun
+
+@defun set-frame-height frame height &optional pretend pixelwise
+此函数将 @var{frame} 文本区域的大小调整为 @var{height} 行的高度。  @var{frame} 中现有窗口的大小会按比例更改以适应。
+
+如果 @var{pretend} 为非 @code{nil}，则 Emacs 在 @var{frame} 中显示 @var{height} 行输出，但不会更改其实际框架高度的值。  这仅在文本终端上有用。使用比终端实际实现的更小的高度可能有助于重现在较小屏幕上观察到的行为，或者如果终端在使用整个屏幕时出现故障。  直接设置框架高度并不总是有效，因为为了在文本终端上正确定位光标可能需要了解正确的实际尺寸。
+
+可选的第四个参数@var{pixelwise}非@code{nil}意味着@var{frame}应该是@var{height}像素高。  请注意，如果 @code{frame-resize-pixelwise} 是 @code{nil}，如果不将框架高度增加/减少到其字符高度的倍数，某些窗口管理器可能会拒绝真正满足该请求。
+
+当交互使用时，此命令将询问用户用于设置当前选定框架的高度的行数。  您还可以为该值提供数字前缀。
+@end defun
+
+@defun set-frame-width frame width &optional pretend pixelwise
+该函数设置 @var{frame} 文本区域的宽度，以字符为单位。  参数@var{pretend} 与@code{set-frame-height} 具有相同的含义。
+
+可选的第四个参数@var{pixelwise}非@code{nil}意味着@var{frame}应该是@var{width}像素宽。  请注意，如果 @code{frame-resize-pixelwise} 是 @code{nil}，如果不将帧宽度增加/减少到其字符宽度的倍数，某些窗口管理器可能会拒绝完全满足该请求。
+
+当交互使用时，此命令将询问用户列数以设置当前选定框架的宽度。  您还可以为该值提供数字前缀。
+@end defun
+
+这三个函数都不会使框架小于显示所有窗口及其滚动条、边缘、边距、分隔线、模式和标题行所需的框架。  这与窗口管理器触发的请求形成对比，例如，通过用鼠标拖动框架的外部边框来触发。  如有必要，此类请求始终会通过剪切无法显示在框架右下角的部分来满足。  在 Emacs 内更改帧大小时，可以使用参数 @code{min-width} 和 @code{min-height} (@pxref{Size Parameters}) 获得类似的行为。
+
+当框架处于全屏状态 (@pxref{Size Parameters}) 时，Emacs 本身或窗口管理器可能支持或拒绝通过这些函数之一更改框架大小的请求。以下变量提供了对结果行为的更多控制。
+
+@cindex altering the size of fullscreen frames
+@cindex resizing fullscreen frames
+@defopt alter-fullscreen-frames
+此选项控制如何处理更改全屏帧的请求。当 Emacs 被要求通过 @code{set-frame-size} 等函数调整全屏框架大小或设置框架的 @code{width} 或 @code{height} 参数时，Emacs 会参考它。  提供以下值：
+
+@table @code
+@item nil
+这会将调整大小请求转发给窗口管理器，并让后者如何继续。
+
+@item t
+这将首先重置全屏状态，然后将调整大小请求转发到窗口管理器。
+
+@item inhibit
+这将拒绝调整大小请求并保持全屏状态不变。
+@end table
+
+NS 版本上的默认值为 @code{inhibit} ，其他地方的默认值为 @code{nil} 。
+@end defopt
+
+@defun set-frame-size-and-position &optional frame width height left top
+该函数一步设置@var{frame}的新大小和位置； @var{frame} 默认为选定的帧。  大小和位置通过相应的框架参数 @code{width}、@code{height}、@code{left} 和 @code{top}（@pxref{Size Parameters} 和 @pxref{Position Parameters}）指定。  如果省略这 4 个参数中的任何一个或@code{nil}，则表示不更改@var{frame} 的相应参数。
+@end defun
+
+@cindex gravity of frame
+@defun set-frame-size-and-position-pixelwise frame width height x y &optional gravity
+该函数设置帧的新大小和位置，与@code{set-frame-size-and-position}类似，但以像素为单位。  可选参数@var{gravity}指定@var{frame}的新@dfn{gravity}，并且必须是0到10之间的值；它默认为 1。重力与窗口系统相关，从概念上讲，当该框架或其父框架的大小发生变化时，该框架的哪个角保留其相对于其父框架的位置。  （顶级框架没有父框架，在这方面，窗口系统根窗口将被视为其父窗口。）值 1 指定西北重力，意味着框架的左上角应保持其相对位置。  许多窗口管理器似乎忽略了重力。
+@end defun
+
+@cindex tracking frame size changes
+异常钩子@code{window-size-change-functions}（@pxref{Window Hooks}）跟踪帧内部大小的所有变化，包括由窗口系统或窗口管理器的请求引起的变化。  要排除仅更改框架窗口的大小而不实际更改内部框架的大小时可能发生的误报，请使用以下函数。
+
+@defun frame-size-changed-p &optional frame
+自上次为 @var{frame} 运行 @code{window-size-change-functions} 以来，当 @var{frame} 的内部宽度或高度发生变化时，此函数返回非 @code{nil}。  它总是在为 @var{frame} 运行 @code{window-size-change-functions} 后立即返回 @code{nil}。
+@end defun
+
+
+@node Implied Frame Resizing
+@subsection 隐含的帧大小调整
+@cindex implied frame resizing
+@cindex implied resizing of frame
+
+默认情况下，Emacs 尝试保持框架文本区域 (@pxref{Frame Layout}) 的行数和列数不变，例如，在切换菜单或工具栏、更改默认字体或设置该框架上滚动条的默认宽度时。  当工具包绘制任何这些装饰时，这通常意味着 Emacs 必须针对该工具包工作，因为后者通常会在装饰大小更改时尝试保持外框大小不变，从而隐式更改框架文本区域的大小。
+
+实际上，这意味着每当 Emacs 发出添加或删除此类装饰的请求时，它都会发出第二个请求，旨在恢复框架文本区域的原始大小。  当 Emacs 本身绘制任何这些装饰时（例如带有 Lucid 或 MS-Windows 版本的工具栏或选项卡栏），Emacs 可能仍然需要相应地更改本机框架的大小并发出调整大小请求，因为这些装饰不应由框架的文本区域考虑。
+
+有时，这样的 @dfn{implied frame resizing} 可能是不需要的，例如，当框架已最大化或全屏时（默认情况下关闭）。  一般来说，用户可以使用以下选项禁用隐式调整大小：
+
+@defopt frame-inhibit-implied-resize
+如果此选项为@code{nil}，则更改框架的字体、菜单栏、工具栏、内部边框、边缘或滚动条可能会调整其外部框架的大小，以保持其文本区域的列数或行数不变。
+
+如果此选项为@code{t}，则一旦 Emacs 与窗口管理器就该框架的最终初始大小达成一致，则在任何这些情况下都不会调整该框架的大小。  更准确地说，这意味着 Emacs 可以隐式调整框架的大小，直到考虑到其所有装饰并且已给出用户请求的初始大小。  装饰的任何进一步变化都不会导致框架的隐含大小调整。
+
+如果此选项等于符号 @code{force}，则即使在与窗口管理器就该框架的最终初始大小达成一致之前，Emacs 也不会执行任何隐含的框架大小调整。  因此，框架文本区域的初始大小可能不一定反映用户指定的大小。  该值对于平铺窗口管理器非常有用，其中框架的初始大小由外部方式确定。
+
+该选项的值也可以是帧参数列表。  在这种情况下，一旦 Emacs 与窗口管理器就该框架的最终初始大小达成一致，就禁止更改该列表中出现的任何参数，从而禁止隐式调整该框架的大小。  该选项当前处理的参数有 @code{font}、@code{font-backend}、@code{internal-border-width}、@code{menu-bar-lines} 和 @code{tool-bar-lines}。
+
+更改任何 @code{scroll-bar-width}、@code{scroll-bar-height}、@code{vertical-scroll-bars}、@code{horizontal-scroll-bars}、@code{left-fringe} 和 @code{right-fringe} 帧参数的处理方式就像该帧仅包含一个活动窗口一样。  这意味着，例如，如果该选项为@code{nil}，则删除包含多个并排窗口的框架上的垂直滚动条将使外部框架宽度缩小一个滚动条的宽度，如果该选项为@code{t}或包含@code{vertical-scroll-bars}的列表，则保持其不变。
+
+Lucid、Motif 和 MS-Windows 的默认值为 @code{(tab-bar-lines tool-bar-lines)}（这意味着添加/删除工具或选项卡栏不会更改外框高度），包括 GTK+ 在内的所有其他窗口系统上的默认值为 @code{(tab-bar-lines)}（这意味着更改上面列出的任何参数（@code{tab-bar-lines} 除外）可能会更改外框的大小），否则为 @code{t}（这意味着外框大小永远不会改变）当没有窗口系统支持时隐式进行）。
+
+请注意，当框架不够大，无法容纳上面列出的任何参数的更改时，即使此选项为非@code{nil}，Emacs 也可能会尝试扩大框架。
+
+另请注意，窗口管理器在更改外部菜单或工具栏占用的行数时通常不会要求调整框架大小。  通常，当用户水平缩小框架时，就会发生这种“环绕”，从而无法显示其菜单或工具栏的所有元素。  它们也可能是由于改变菜单或工具栏的项目数量的主模式的改变而导致的。  任何此类换行都可能隐式改变框架文本区域的行数，并且不受此选项设置的影响。
+@end defopt
+
+
+@node Frame Parameters
+@section 机架参数
+@cindex frame parameters
+
+框架有许多控制其外观和行为的参数。哪些参数对框架有意义取决于它使用的显示机制。  许多框架参数的存在主要是为了图形显示，当应用于文本终端的顶部框架 (@pxref{Frames}) 时没有任何效果。
+
+默认情况下，当变量 @code{desktop-restore-frames} 为非 @code{nil} 时，框架参数由桌面库函数 (@pxref{Desktop Save Mode}) 保存和恢复。  应用程序有责任将其参数包含在@code{frameset-persistent-filter-alist}中，以避免它们在恢复的会话中获得无意义甚至有害的值。
+
+@menu
+* Parameter Access::        如何更改框架的参数。
+* Initial Parameters::      制作框架时指定框架参数。
+* Window Frame Parameters::  窗口系统的框架参数列表。
+* Geometry::                解析几何规范。
+@end menu
+
+@node Parameter Access
+@subsection 访问帧参数
+
+这些函数允许您读取和更改框架的参数值。
+
+@defun frame-parameter frame parameter
+该函数返回@var{frame}的参数@var{parameter}（符号）的值。  如果@var{frame}为@code{nil}，则返回所选帧的参数。  如果@var{frame}没有设置@var{parameter}，则该函数返回@code{nil}。
+@end defun
+
+@defun frame-parameters &optional frame
+函数@code{frame-parameters}返回一个列表，列出@var{frame}的所有参数及其值。  如果 @var{frame} 为 @code{nil} 或省略，则返回所选帧的参数
+@end defun
+
+@defun modify-frame-parameters frame alist
+该函数根据 @var{alist} 的元素更改框架 @var{frame}。  @var{alist} 的每个元素具有@code{(@var{parm} . @var{value})} 的形式，其中@var{parm} 是命名参数的符号。  如果您没有在 @var{alist} 中提及某个参数，则其值不会改变。  如果 @var{frame} 为 @code{nil}，则默认为所选帧。
+
+某些参数仅对某些类型的显示器上的帧有意义 (@pxref{Frames})。  如果@var{alist}包含对@var{frame}显示无意义的参数，此函数将更改其在框架参数列表中的值，但否则将忽略它。
+
+当 @var{alist} 指定多个参数（其值会影响 @var{frame} 的新大小）时，框架的最终大小可能会根据所使用的工具包而有所不同。  例如，指定框架从现在开始应该有菜单和/或工具栏，而不是没有菜单和/或工具栏，同时指定框架的新高度将不可避免地导致重新计算框架的高度。  从概念上讲，在这种情况下，该函数将尝试以明确的高度规范为准。  然而，不能排除菜单或工具栏的添加（或删除）在最终由工具包执行时将违背这一意图。
+
+有时，将 @code{frame-inhibit-implied-resize} (@pxref{Implied Frame Resizing}) 绑定到调用此函数的非 @code{nil} 值可能会解决此处列出的问题。  然而，有时正是这样的绑定可能会受到问题的影响。
+@end defun
+
+@defun set-frame-parameter frame parm value
+该函数将帧参数@var{parm}设置为指定的@var{value}。  如果 @var{frame} 为 @code{nil}，则默认为所选帧。
+@end defun
+
+@defun modify-all-frames-parameters alist
+该函数根据@var{alist}更改所有现有框架的框架参数，然后修改@code{default-frame-alist}（如有必要，还可以修改@code{initial-frame-alist}）以将相同的参数值应用于以后将创建的框架。
+@end defun
+
+@node Initial Parameters
+@subsection 初始帧参数
+@cindex parameters of initial frame
+
+您可以通过在初始化文件中设置@code{initial-frame-alist} (@pxref{Init File}) 来指定初始启动框架的参数。
+
+@defopt initial-frame-alist
+该变量的值是创建初始帧时使用的参数值列表。  您可以设置此变量来指定初始帧的外观，而不更改后续帧。每个元素的形式如下：
+
+@example
+(@var{parameter} . @var{value})
+@end example
+
+Emacs 在读取初始化文件之前创建初始框架。  读取该文件后，Emacs 检查@code{initial-frame-alist}，并将更改后的值中的参数设置应用于已创建的初始框架。
+
+如果这些设置影响框架的几何形状和外观，您将看到框架显示错误的几何形状和外观，然后更改为指定的框架。  如果这让您烦恼，您可以使用 X 资源指定相同的几何形状和外观；这些确实在创建框架之前生效。  @xref{X Resources,, X Resources, emacs, The GNU Emacs Manual}。
+
+X 资源设置通常适用于所有框架。  如果您只想为了初始帧而指定某些 X 资源，并且不希望它们应用于后续帧，请按以下方法实现此目的。  在@code{default-frame-alist}中指定参数以覆盖后续帧的X资源；然后，为了防止这些影响初始帧，请在 @code{initial-frame-alist} 中指定相同的参数以及与 X 资源匹配的值。
+@end defopt
+
+@cindex minibuffer-only frame
+如果这些参数包含@code{(minibuffer . nil)}，则表明初始帧不应有迷你缓冲区。  在这种情况下，Emacs 也会创建一个单独的 @dfn{minibuffer-only frame}。
+
+@defopt minibuffer-frame-alist
+该变量的值是创建初始仅迷你缓冲区帧（即，如果 @code{initial-frame-alist} 指定没有迷你缓冲区的帧，则 Emacs 创建的仅迷你缓冲区帧）时使用的参数值列表。
+@end defopt
+
+@defopt default-frame-alist
+这是一个列表，指定所有 Emacs 框架（第一个框架和后续框架）的框架参数的默认值。  当使用X Window系统时，在很多情况下可以通过X资源得到相同的结果。
+
+设置此变量不会影响现有框架。  此外，在单独的帧中显示缓冲区的函数可以通过提供自己的参数来覆盖默认参数。
+@end defopt
+
+如果您使用指定框架外观的命令行选项调用 Emacs，则这些选项通过将元素添加到 @code{initial-frame-alist} 或 @code{default-frame-alist} 来生效。  仅影响初始帧的选项，例如@samp{--geometry}和@samp{--maximized}，添加到@code{initial-frame-alist}；其他的加到@code{default-frame-alist}。  @pxref{Emacs Invocation,, Command Line Arguments for Emacs Invocation, emacs, The GNU Emacs Manual}。
+
+@node Window Frame Parameters
+@subsection 窗框参数
+@cindex frame parameters for windowed displays
+
+框架具有哪些参数取决于它使用的显示机制。  本节介绍一些或全部终端上有特殊含义的参数。
+
+@menu
+* Basic Parameters::             基本参数。
+* Position Parameters::          框架在屏幕上的位置。
+* Size Parameters::              框架的尺寸。
+* Layout Parameters::            框架各部分的大小，以及启用或禁用某些部分。
+* Buffer Parameters::            哪些缓冲区已经或应该显示。
+* Frame Interaction Parameters::   与其他框架交互的参数。
+* Mouse Dragging Parameters::    用于使用鼠标调整帧大小和移动帧的参数。
+* Management Parameters::        与窗口管理器通信。
+* Cursor Parameters::            控制光标的外观。
+* Font and Color Parameters::    框架文本的字体和颜色。
+@end menu
+
+@node Basic Parameters
+@subsubsection 基本参数
+
+这些帧参数提供了有关帧的最基本信息。  @code{title} 和 @code{name} 在所有终端上都有意义。
+
+@table @code
+@vindex display@r{, a frame parameter}
+@item display
+打开此框架的显示器。  它应该是 @samp{@var{host}:@var{dpy}.@var{screen}} 形式的字符串，就像 @env{DISPLAY} 环境变量一样。  @xref{Multiple Terminals}，有关显示名称的更多详细信息。
+
+@vindex display-type@r{, a frame parameter}
+@item display-type
+该参数描述了该帧中可以使用的可能颜色的范围。  其值为 @code{color}、@code{grayscale} 或 @code{mono}。
+
+@vindex title@r{, a frame parameter}
+@item title
+如果框架具有非 @code{nil} 标题，则该标题将出现在框架顶部的窗口系统标题栏中，并且如果 @code{mode-line-frame-identification} 使用 @samp{%F} (@pxref{%-Constructs})，也会出现在该框架中窗口的模式行中。  当 Emacs 不使用窗口系统并且一次只能显示一帧时，通常会出现这种情况。  当 Emacs 使用窗口系统时，该参数如果不是@code{nil}，则会覆盖@code{name}参数确定的标题和根据@code{frame-title-format}计算的隐式标题。  它还会覆盖由 @code{icon-title-format} 确定的图标化框架的标题。  @xref{Frame Titles}。
+
+@vindex name@r{, a frame parameter}
+@item name
+框架的名称。  如果您没有通过此参数指定名称，Emacs 会自动设置框架名称，如 @code{frame-title-format} 和 @code{icon-title-format} 指定的那样，这就是当 Emacs 使用窗口系统时显示的框架标题（除非 @code{title} 参数覆盖它）。
+
+如果在创建框架时显式指定框架名称，则在查找框架的 X 资源时也会使用该名称（而不是 Emacs 可执行文件的名称）。
+
+@vindex explicit-name@r{, a frame parameter}
+@item explicit-name
+如果在创建框架时明确指定了框架名称，则此参数将是该名称。  如果框架没有明确命名，则此参数将为@code{nil}。
+
+@vindex environment@r{, a frame parameter}
+@item environment
+字符串列表，每个字符串描述一个环境变量。  该列表与 @code{process-environment} (@pxref{System Environment}) 中的列表类似，但它列出了特定于框架的变量和值。
+@end table
+
+
+@node Position Parameters
+@subsubsection 位置参数
+@cindex window position on display
+@cindex frame position
+
+描述帧的 X 和 Y 偏移的参数始终以像素为单位进行测量。  对于普通的非子框架，它们指定框架相对于其显示原点的外部位置 (@pxref{Frame Geometry})。  对于子框架 (@pxref{Child Frames})，它们指定框架相对于框架父框架的本机位置的外部位置。  在文本终端上，这些参数仅对子框架有意义。
+
+@table @code
+@vindex left@r{, a frame parameter}
+@item left
+框架的左外边缘相对于框架的显示器或父框架的左边缘的位置（以像素为单位）。  可以通过以下方式之一指定。
+
+@table @asis
+@item 一个整数
+正整数始终将框架的左边缘与其显示器或父框架的左边缘相关联。  负整数将右框架边缘与显示器或父框架的右边缘相关。
+
+@item @code{(+ @var{pos})}
+这指定左框架边缘相对于其显示器或父框架的左边缘的位置。  The integer @var{pos} may be positive or negative;负值指定屏幕或父框架之外的位置，或者指定主监视器以外的监视器上的位置（对于多监视器显示）。
+
+@item @code{(- @var{pos})}
+这指定右框架边缘相对于显示器或父框架右边缘的位置。  The integer @var{pos} may be positive or negative;负值指定屏幕或父框架之外的位置，或者指定主监视器以外的监视器上的位置（对于多监视器显示）。
+
+@cindex left position ratio
+@cindex top position ratio
+@item 浮点值
+0.0 到 1.0 范围内的浮点值通过框架的 @dfn{left position ratio} 指定左边缘的偏移量——其外框架的左边缘与框架工作区宽度 (@pxref{Multiple Terminals}) 或其父级本机框架 (@pxref{Child Frames}) 减去外框架宽度的比率。  因此，左侧位置比率 0.0 会将框架刷新到左侧，比率 0.5 会将其居中，比率 1.0 会将其刷新到其显示器或父框架的右侧。类似地，框架的 @dfn{top position ratio} 是框架顶部位置与其工作区或父框架高度减去框架高度的比率。
+
+如果子框架具有非 @code{nil} @code{keep-ratio} 参数 (@pxref{Frame Interaction Parameters}) 并且其父框架已调整大小，Emacs 将尝试保持子框架的位置比率不变。
+
+由于在框架可见之前，框架的外部尺寸 (@pxref{Frame Geometry}) 通常不可用，因此通常不建议在创建装饰框架时使用浮点值。浮点值更适合确保（未修饰的）子框架很好地定位在其父框架的区域内。
+
+当前在文本终端框架上不处理浮点值。
+@end table
+
+一些窗口管理器忽略程序指定的位置。  如果您想确保指定的位置不被忽略，请为 @code{user-position} 参数指定非 @code{nil} 值，如下例所示：
+
+@example
+(modify-frame-parameters
+  nil '((user-position . t) (left . (+ -4))))
+@end example
+
+一般来说，将框架相对于其显示器的右边缘或下边缘定位并不是一个好主意。  定位初始框架或新框架要么不准确（因为在框架可见之前尚未完全了解外框架的大小），要么会导致额外的闪烁（如果框架在变得可见后必须重新定位）。
+
+另请注意，相对于显示器、工作区或父框架的右/下边缘指定的位置以及浮点偏移在内部存储为相对于显示器、工作区或父框架边缘的左/上边缘的整数偏移量。  它们也由 @code{frame-parameters} 等函数原样返回，并由桌面保存例程原样恢复。
+
+@vindex top@r{, a frame parameter}
+@item 顶部
+顶部（或底部）边缘相对于显示器或父框架的顶部（或底部）边缘的屏幕位置（以像素为单位）。  它的工作原理与 @code{left} 类似，只是垂直而不是水平。
+
+@vindex icon-left@r{, a frame parameter}
+@item 图标向左
+框架图标左边缘的屏幕位置（以像素为单位），从屏幕左边缘开始计数。  如果窗口管理器支持此功能，则该功能在框架图标化时生效。  如果您为此参数指定一个值，则还必须为 @code{icon-top} 指定一个值，反之亦然。  该参数在文本终端上没有意义。
+
+@vindex icon-top@r{, a frame parameter}
+@item 图标顶部
+框架图标顶部边缘的屏幕位置（以像素为单位），从屏幕顶部边缘开始计数。  如果窗口管理器支持此功能，则该功能在框架图标化时生效。  该参数在文本终端上没有意义。
+
+@vindex user-position@r{, a frame parameter}
+@item 用户位置
+当您创建框架并使用 @code{left} 和 @code{top} 参数指定其屏幕位置时，请使用此参数来说明指定的位置是用户指定的（由人类用户以某种方式明确请求）还是仅仅是程序指定的（由程序选择）。非 2⁣ 值表示该位置是用户指定的。  该参数在文本终端上没有意义。
+
+@cindex window positions and window managers
+窗口管理器通常会注意用户指定的位置，有些窗口管理器也会注意程序指定的位置。  但许多人忽略程序指定的位置，以默认方式放置窗口或让用户用鼠标放置它。  一些窗口管理器，包括@code{twm}，让用户指定是否遵循程序指定的位置或忽略它们。
+
+当您调用 @code{make-frame} 时，如果 @code{left} 和 @code{top} 参数的值代表用户声明的偏好，则应为此参数指定非 @code{nil} 值；否则，使用@code{nil}。
+
+@vindex z-group@r{, a frame parameter}
+@item z组
+此参数指定框架的窗口系统窗口在框架显示的堆叠 (Z-) 顺序中的相对位置。它尚未在文本终端上实现。
+
+If this is @code{above}, the window-system will display the window that corresponds to the frame above all other window-system windows that do not have the @code{above} property set.  If this is @code{nil}, the frame's window is displayed below all windows that have the @code{above} property set and above all windows that have the @code{below} property set.  如果这是 @code{below}，则框架的窗口将显示在所有未设置 @code{below} 属性的窗口下方。
+
+要将框架定位在特定其他框架的上方或下方，请使用函数 @code{frame-restack} (@pxref{Raising and Lowering})。
+@end table
+
+
+@node Size Parameters
+@subsubsection 尺寸参数
+@cindex window size on display
+
+帧参数通常以字符为单位指定帧大小。  在图形显示上，@code{default} 面决定这些字符单元 (@pxref{Face Attributes}) 的实际像素大小。  在文本终端上，大小参数仅影响子框架。
+
+@table @code
+@vindex width@r{, a frame parameter}
+@item width
+该参数指定框架的宽度。  可以通过以下方式指定：
+
+@table @asis
+@item 一个整数
+正整数指定框架文本区域 (@pxref{Frame Geometry}) 的字符宽度。
+
+@item 一个缺点细胞
+如果这是一个 cons 单元格，其 @sc{car} 中带有符号 @code{text-pixels}，则该单元格的 @sc{cdr} 指定框架文本区域的宽度（以像素为单位）。
+
+@cindex frame width ratio
+@cindex frame height ratio
+@item 浮点值
+A floating-point number between 0.0 and 1.0 can be used to specify the width of a frame via its @dfn{width ratio}---the ratio of its outer width (@pxref{Frame Geometry}) to the width of the frame's workarea (@pxref{Multiple Terminals}) or its parent frame's (@pxref{Child Frames}) native frame.  因此，值 0.5 使框架占据其工作区或父框架宽度的一半，值 1.0 则占据整个宽度。  类似地，框架的 @dfn{height ratio} 是其外部高度与其工作区或其父级本机框架的高度之比。
+
+如果子框架具有非 @code{nil} @code{keep-ratio} 参数 (@pxref{Frame Interaction Parameters}) 并且其父框架已调整大小，Emacs 将尝试保持子框架的宽度和高度比率不变。
+
+由于在框架可见之前框架的外部尺寸通常不可用，因此通常不建议在创建装饰框架时使用浮点值。  浮点值更适合确保子框架始终适合其父框架的区域，例如，通过 @code{display-buffer-in-child-frame} 自定义 @code{display-buffer-alist} (@pxref{Choosing Window}) 时。
+@end table
+
+Regardless of how this parameter was specified, functions reporting the value of this parameter like @code{frame-parameters} always report the width of the frame's text area in characters as an integer rounded, if necessary, to a multiple of the frame's default character width.  该值也由桌面保存例程使用。
+
+@vindex height@r{, a frame parameter}
+@item 高度
+该参数指定框架的高度。  它的工作原理与 @code{width} 类似，只是垂直而不是水平。
+
+@vindex user-size@r{, a frame parameter}
+@item 用户规模
+这对于尺寸参数 @code{height} 和 @code{width} 的作用与 @code{user-position} 参数 (@pxref{Position Parameters, user-position}) 对于位置参数 @code{top} 和 @code{left} 的作用相同。  该参数在文本终端上没有意义。
+
+@vindex min-width@r{, a frame parameter}
+@item 最小宽度
+此参数指定框架的最小本机宽度 (@pxref{Frame Geometry})，以字符为单位。  Normally, the functions that establish a frame's initial width or resize a frame horizontally make sure that all the frame's windows, vertical scroll bars, fringes, margins and vertical dividers can be displayed.  如果该参数为非@code{nil}，则可以使框架比框架更窄，结果是任何不适合的组件都将被窗口管理器剪掉。
+
+@vindex min-height@r{, a frame parameter}
+@item 最小高度
+此参数指定框架的最小原始高度 (@pxref{Frame Geometry})，以字符为单位。  通常，建立框架的初始大小或调整框架大小的功能可确保框架的所有窗口、水平滚动条和分隔线、模式和标题行、回显区域以及内部菜单和工具栏都可以显示。  如果该参数为非@code{nil}，则可以使框架小于该参数，结果是任何不适合的组件都将被窗口管理器剪掉。
+
+@cindex fullboth frames
+@cindex fullheight frames
+@cindex fullwidth frames
+@cindex maximized frames
+@vindex fullscreen@r{, a frame parameter}
+@item 全屏
+此参数指定是否最大化框架的宽度、高度或两者。  它在文本终端上没有任何意义。  它的值可以是 @code{fullwidth}、@code{fullheight}、@code{fullboth} 或 @code{maximized}。@footnote{On PGTK frames, setting the values @code{fullheight} and @code{fullwidth} has no effect.} @dfn{fullwidth} 框架尽可能宽，@dfn{fullheight} 框架尽可能高，@dfn{fullboth} 框架尽可能宽和高。  @dfn{maximized} 框架类似于“fullboth”框架，只不过它通常保留其标题栏以及用于调整框架大小和关闭框架的按钮。  此外，最大化框架通常可以避免隐藏桌面上显示的任何任务栏或面板。  另一方面，“fullboth”框架通常会省略标题栏并占据整个可用的屏幕空间。
+
+在这方面，全高和全宽框架与最大化框架更相似。  但是，这些通常会显示外部边框，而最大化的框架可能会不存在该外部边框。  因此，最大化和全高帧的高度以及最大化和全宽帧的宽度通常相差几个像素。
+
+对于某些窗口管理器，您可能必须自定义变量 @code{frame-resize-pixelwise} (@pxref{Frame Size}) 才能使框架真正显示为最大化或全屏。  此外，某些窗口管理器可能不支持各种全屏或最大化状态之间的平滑过渡。  自定义变量 @code{x-frame-normalize-before-maximize} 可以帮助克服这个问题。
+
+macOS 上的全屏会隐藏工具栏和菜单栏，但如果鼠标指针移动到屏幕顶部，两者都会显示。
+
+@vindex fullscreen-restore@r{, a frame parameter}
+@item 全屏恢复
+该参数指定在“fullboth”状态下调用 @code{toggle-frame-fullscreen} 命令 (@pxref{Frame Commands,,, emacs, The GNU Emacs Manual}) 后所需的帧全屏状态。通常，当将状态切换为 fullboth 时，该命令会自动安装此参数。  但是，如果您在“fullboth”状态下启动 Emacs，则必须在初始文件中指定所需的行为，例如
+
+@example
+(setq default-frame-alist
+    '((fullscreen . fullboth)
+      (fullscreen-restore . fullheight)))
+@end example
+
+第一次输入 @key{F11} 后，这将给出一个新的框架全高。  该参数在文本终端上没有意义。
+
+@vindex fit-frame-to-buffer-margins@r{, a frame parameter}
+@item 适合框架到缓冲区边距
+当使用 @code{fit-frame-to-buffer} (@pxref{Resizing Windows}) 将此帧安装到其根窗口的缓冲区时，此参数可以覆盖选项 @code{fit-frame-to-buffer-margins} 的值。
+
+@vindex fit-frame-to-buffer-sizes@r{, a frame parameter}
+@item 适合帧到缓冲区大小
+当使用 @code{fit-frame-to-buffer} (@pxref{Resizing Windows}) 将此帧安装到其根窗口的缓冲区时，此参数可以覆盖选项 @code{fit-frame-to-buffer-sizes} 的值。
+@end table
+
+
+@node Layout Parameters
+@subsubsection 布局参数
+@cindex layout parameters of frames
+@cindex frame layout parameters
+
+这些框架参数启用或禁用框架的各个部分，或控制它们的大小。  除非另有说明，这些参数在文本终端上没有任何意义。
+
+@table @code
+@vindex undecorated@r{, a frame parameter}
+@item undecorated
+如果非@code{nil}，则在图形系统上，绘制此框架的窗口系统窗口时不带任何装饰，例如标题、最小化/最大化框和外部边框。  这通常意味着无法使用鼠标拖动窗口、调整大小、图标化、最大化或删除窗口。  如果@code{nil}，框架的窗口通常使用上面列出的所有元素来绘制，除非它们的显示已通过窗口管理器设置暂停。
+
+在 X 下，Emacs 使用 Motif 窗口管理器提示来关闭装饰。  某些窗口管理器可能不遵守这些提示。
+
+NS 构建将工具栏视为装饰，因此将其隐藏在未装饰的框架上。
+
+在文本终端上，此参数如果非@code{nil}，将使子框架显示外边框，从而允许通过鼠标拖动来调整该框架的大小（@pxref{Mouse Dragging Parameters}）。
+
+@vindex border-width@r{, a frame parameter}
+@item border-width
+框架外边框的宽度（以像素为单位）(@pxref{Frame Geometry})。
+
+@vindex internal-border-width@r{, a frame parameter}
+@item internal-border-width
+框架内部边框的宽度（以像素为单位）(@pxref{Frame Geometry})。
+
+@vindex child-frame-border-width@r{, a frame parameter}
+@item child-frame-border-width
+如果给定框架是子框架 (@pxref{Child Frames})，则框架内部边框 (@pxref{Frame Geometry}) 的宽度（以像素为单位）。如果这是 @code{nil}，则使用 @code{internal-border-width} 参数指定的值。
+
+@vindex vertical-scroll-bars@r{, a frame parameter}
+@item vertical-scroll-bars
+框架是否有用于垂直滚动的滚动条 (@pxref{Scroll Bars})，以及它们应位于框架的哪一侧。  对于没有滚动条，可能的值为 @code{left}、@code{right} 和 @code{nil}。
+
+@vindex horizontal-scroll-bars@r{, a frame parameter}
+@item horizontal-scroll-bars
+框架是否有用于水平滚动的滚动条（@code{t}和@code{bottom}表示有，@code{nil}表示没有）。
+
+@vindex scroll-bar-width@r{, a frame parameter}
+@item scroll-bar-width
+垂直滚动条的宽度，以像素为单位，或 @code{nil} 表示使用默认宽度。
+
+@vindex scroll-bar-height@r{, a frame parameter}
+@item scroll-bar-height
+水平滚动条的高度，以像素为单位，或 @code{nil} 表示使用默认高度。
+
+@vindex left-fringe@r{, a frame parameter}
+@vindex right-fringe@r{, a frame parameter}
+@item left-fringe
+@itemx right-fringe
+该帧中窗口左右边缘的默认宽度 (@pxref{Fringes})。  如果其中任何一个为零，则有效地去除相应的条纹。
+
+当您使用@code{frame-parameter}查询这两个帧参数中的任何一个的值时，返回值始终是整数。使用 @code{set-frame-parameter} 时，传递 @code{nil} 值会施加 8 个像素的实际默认值。
+
+@vindex right-divider-width@r{, a frame parameter}
+@item right-divider-width
+为框架上任何窗口的右分隔线 (@pxref{Window Dividers}) 保留的宽度（厚度），以像素为单位。  值为零意味着不绘制右分隔线。
+
+@vindex bottom-divider-width@r{, a frame parameter}
+@item bottom-divider-width
+为框架上任何窗口的底部分隔线 (@pxref{Window Dividers}) 保留的宽度（厚度），以像素为单位。  值为零意味着不绘制底部分隔线。
+
+@vindex menu-bar-lines@r{, a frame parameter}
+@item menu-bar-lines
+在菜单栏框架顶部分配的行数 (@pxref{Menu Bar})。  如果启用菜单栏模式，则默认值为 1，否则默认值为 0。  @xref{Menu Bars,,,emacs, The GNU Emacs Manual}。  对于外部菜单栏 (@pxref{Frame Layout})，即使菜单栏换行为两行或更多行，该值也保持不变。  在这种情况下，@code{frame-geometry} (@pxref{Frame Geometry}) 返回的 @code{menu-bar-size} 值可用于确定菜单栏是否实际占用一行或多行。  此参数也会影响文本终端的根框架 (@pxref{Child Frames}) 上菜单栏的存在。  在文本终端上，该值可能仅为 0 或 1。
+
+@vindex tool-bar-lines@r{, a frame parameter}
+@item tool-bar-lines
+用于工具栏的行数 (@pxref{Tool Bar})。  如果启用工具栏模式，则默认值为 1，否则默认值为 0。 @xref{Tool Bars,,,emacs, The GNU Emacs Manual}。  当工具栏换行时，该值可能会发生变化 (@pxref{Frame Layout})。
+
+@vindex tool-bar-position@r{, a frame parameter}
+@item tool-bar-position
+工具栏的位置。  它的值可以是@code{top}、@code{bottom}、@code{left}、@code{right}之一。  默认值为@code{top}。
+
+在使用 Nextstep 以外的任何工具包构建的 Emacs 上，它可以设置为 @code{bottom}，在使用 GTK+ 构建的情况下，它可以设置为 @code{left} 或 @code{right}。
+
+@vindex tab-bar-lines@r{, a frame parameter}
+@item tab-bar-lines
+用于选项卡栏的行数 (@pxref{Tab Bars,,,emacs, The GNU Emacs Manual})。  如果启用选项卡栏模式，则默认值为 1，否则默认值为 0。  当标签栏换行时，该值可能会发生变化 (@pxref{Frame Layout})。  此参数也会影响文本终端的根框架 (@pxref{Child Frames}) 上选项卡栏的存在。
+
+@vindex line-spacing@r{, a frame parameter}
+@item line-spacing
+每个文本行下方留出的额外空间，以像素为单位（正整数）。  @xref{Line Height}，了解更多信息。
+
+@vindex no-special-glyphs@r{, a frame parameter}
+@item no-special-glyphs
+如果这是非 @code{nil} ，它将抑制该帧显示的所有缓冲区的任何截断 (@pxref{Truncation}) 和连续字形的显示。  当通过 @code{fit-frame-to-buffer} (@pxref{Resizing Windows}) 将框架安装到其缓冲区时，这对于消除此类字形很有用。  此框架参数仅对图形显示器上显示的 GUI 框架有效，并且仅在禁用边缘时有效。  此参数旨在作为纯粹的演示功能，特别是不应该用于用户可以交互式插入文本的框架，或者更一般地说，不应该用于显示光标的框架。使用此功能的框架的一个显着示例是工具提示框架 (@pxref{Tooltips})。  此参数也会影响文本终端。
+@end table
+
+
+@node Buffer Parameters
+@subsubsection 缓冲区参数
+@cindex frame, which buffers to display
+@cindex buffers to display on frame
+
+这些帧参数对各种终端都有意义，它们处理哪些缓冲区已经或应该在帧中显示。
+
+@table @code
+@vindex minibuffer@r{, a frame parameter}
+@item minibuffer
+该帧是否有自己的迷你缓冲区。  值@code{t}表示是，@code{nil}表示否，@code{only}表示该帧只是一个迷你缓冲区。  如果该值是一个迷你缓冲区窗口（在其他某个帧中），则该帧将使用该迷你缓冲区。
+
+该参数在创建框架时生效。  如果指定为 @code{nil}，Emacs 将尝试将其设置为 @code{default-minibuffer-frame} (@pxref{Minibuffers and Frames}) 的迷你缓冲区窗口。  对于现有帧，此参数可以专门用于指定另一个迷你缓冲区窗口。  不允许将其从迷你缓冲区窗口更改为@code{t}，反之亦然，或从@code{t}更改为@code{nil}。  如果该参数已经指定了一个迷你缓冲区窗口，则将其设置为 @code{nil} 无效。
+
+特殊值 @code{child-frame} 表示创建一个仅包含迷你缓冲区的子帧 (@pxref{Child Frames})，其父级成为所创建的帧。  就像指定为@code{nil}一样，Emacs 会将此参数设置为子框架的迷你缓冲区窗口，但在子框架创建后不会选择子框架。  值 @code{child-frame} 对文本终端没有影响，您必须手动创建仅包含迷你缓冲区的帧 (@pxref{Child Frame Peculiarities})。
+
+@vindex buffer-predicate@r{, a frame parameter}
+@item buffer-predicate
+该帧的缓冲区谓词函数。  如果谓词不是 1⁣，函数 @code{other-buffer} 使用此谓词（来自所选帧）来决定应考虑哪些缓冲区。  它使用一个参数（一个缓冲区）调用谓词，每个缓冲区调用一次；如果谓词返回非 2⁣ 值，则它会考虑该缓冲区。
+
+@vindex buffer-list@r{, a frame parameter}
+@item buffer-list
+在此帧中已选择的缓冲区列表，按最近选择的顺序排列在前面。
+
+@vindex unsplittable@r{, a frame parameter}
+@item unsplittable
+如果非@code{nil}，则该框架的窗口永远不会自动分割。
+@end table
+
+
+@node Frame Interaction Parameters
+@subsubsection 框架交互参数
+@cindex frame interaction parameters
+@cindex interaction parameters between frames
+
+这些参数提供了不同框架之间交互的形式。
+
+@table @code
+@vindex visibility@r{, a frame parameter}
+@item visibility
+框架的可见性状态。  有三种可能性：@code{nil}表示不可见，@code{t}表示可见，@code{icon}表示图标化。  @xref{Visibility of Frames}。
+
+@vindex parent-frame@r{, a frame parameter}
+@item parent-frame
+如果非@code{nil}，则表示该帧是子帧（@pxref{Child Frames}），并且该参数指定其父帧。如果@code{nil}，这意味着该帧是一个普通的顶级帧。
+
+@vindex delete-before@r{, a frame parameter}
+@item delete-before
+如果非@code{nil}，则该参数指定另一个帧，其删除将自动触发该帧的删除。  @xref{Deleting Frames}。
+
+@vindex mouse-wheel-frame@r{, a frame parameter}
+@item mouse-wheel-frame
+如果非@code{nil}，则此参数指定每当鼠标指针悬停在该框架上并滚动鼠标滚轮时，其窗口将滚动的框架，请参见@ref{Mouse Commands,,, emacs, The GNU Emacs Manual}。  该参数在文本终端上没有意义。
+
+@vindex no-other-frame@r{, a frame parameter}
+@item no-other-frame
+如果这是非@code{nil}，则该帧不符合函数@code{next-frame}、@code{previous-frame}（@pxref{Finding All Frames}）和@code{other-frame}的候选者的资格，请参阅@ref{Frame Commands,,, emacs, The GNU Emacs Manual}。
+
+@vindex auto-hide-function@r{, a frame parameter}
+@item auto-hide-function
+当此参数指定一个函数时，当退出框架的唯一窗口（@pxref{Quitting Windows}）并且还剩下其他框架时，将调用该函数而不是变量@code{frame-auto-hide-function}指定的函数。  该参数尚未在文本终端上实现。
+
+@vindex minibuffer-exit@r{, a frame parameter}
+@item minibuffer-exit
+当此参数为非 @code{nil} 时，每当退出迷你缓冲区 (@pxref{Minibuffers}) 时，Emacs 默认都会使该帧不可见。或者，它可以指定函数 @code{iconify-frame} 和 @code{delete-frame}。  该参数可用于使子框架在退出迷你缓冲区时自动消失（类似于 Emacs 处理窗口的方式）。  该参数尚未在文本终端上实现。
+
+@vindex keep-ratio@r{, a frame parameter}
+@item keep-ratio
+该参数目前仅对子帧 (@pxref{Child Frames}) 有意义。  如果它不是 @code{nil}，那么无论何时调整其父框架的大小，Emacs 都会尝试保持框架的大小（宽度和高度）比率 (@pxref{Size Parameters}) 及其左右位置比率 (@pxref{Position Parameters}) 不变。
+
+如果该参数的值为@code{nil}，则当父框架调整大小时，框架的位置和大小保持不变，因此位置和大小比例可能会发生变化。  如果此参数的值为@code{t}，Emacs 将尝试保留框架的大小和位置比率，因此框架相对于其父框架的大小和位置可能会发生变化。
+
+通过使用 cons 单元可以进行更多单独的控制：在这种情况下，如果单元的 @sc{car} 是 @code{t} 或 @code{width-only}，则保留帧的宽度比。  如果单元的 @sc{car} 是 @code{t} 或 @code{height-only}，则高度比将被保留。  如果单元格的@sc{cdr}是@code{t}或@code{left-only}，则保留左侧位置比例。  如果单元格的@sc{cdr}是@code{t}或@code{top-only}，则保留顶部位置比率。  该参数尚未在文本终端上实现。
+
+@vindex cloned-from@r{, a frame parameter}
+@item cloned-from
+原始帧（如果该帧是通过 @code{clone-frame} (@pxref{Creating Frames,,,emacs, the Emacs Manual}) 创建的）。
+
+@vindex undeleted@r{, a frame parameter}
+@item undeleted
+如果使用命令 @command{undelete-frame} (@pxref{Frame Commands,,,emacs, the Emacs Manual}) 取消删除该帧，则该值为非@code{nil}。
+@end table
+
+@node Mouse Dragging Parameters
+@subsubsection 鼠标拖动参数
+@cindex mouse dragging parameters
+@cindex parameters for resizing frames with the mouse
+@cindex parameters for moving frames with the mouse
+
+下面描述的参数支持通过使用鼠标拖动框架的内部边框来调整框架的大小。  它们还允许通过拖动最顶部窗口的标题或选项卡线或最底部窗口的模式线来使用鼠标移动框架。
+
+这些参数对于没有窗口管理器装饰的子框架 (@pxref{Child Frames}) 最有用。  如有必要，它们也可用于未装饰的顶级框架。  在文本终端上，这些参数仅影响子框架。
+
+@table @code
+@vindex drag-internal-border@r{, a frame parameter}
+@item drag-internal-border
+如果非 0⁣，则可以通过使用鼠标拖动其内部边框（如果存在）来调整框架的大小。  在文本终端上，必须拖动子框架的装饰。
+
+@vindex drag-with-header-line@r{, a frame parameter}
+@item drag-with-header-line
+如果非@code{nil}，则可以通过拖动最上面窗口的标题行来用鼠标移动框架。
+
+@vindex drag-with-tab-line@r{, a frame parameter}
+@item drag-with-tab-line
+如果非@code{nil}，则可以通过拖动最上面窗口的选项卡线来用鼠标移动框架。
+
+@vindex drag-with-mode-line@r{, a frame parameter}
+@item drag-with-mode-line
+如果非@code{nil}，则可以通过拖动最底部窗口的模式线来用鼠标移动框架。  请注意，这样的帧不允许有自己的迷你缓冲区窗口。
+
+@vindex snap-width@r{, a frame parameter}
+@item snap-width
+每当用鼠标移动的框架被拖动到接近此参数指定的像素数的边缘时，它就会“捕捉”到显示器或其父框架的边框。
+
+@vindex top-visible@r{, a frame parameter}
+@item top-visible
+如果此参数是数字，则框架的上边缘永远不会出现在其显示器或父框架的上边缘之上。  此外，当框架相对于其显示器或父框架的任何剩余边缘移动时，由该数字指定的尽可能多的框架像素将保持可见。  设置此参数有助于防止将具有非 @code{nil} @code{drag-with-header-line} 参数的子框架完全拖出其父框架的区域。
+
+@vindex bottom-visible@r{, a frame parameter}
+@item bottom-visible
+如果此参数是数字，则框架的下边缘永远不会出现在其显示器或父框架的下边缘下方。  此外，当框架相对于其显示器或父框架的任何剩余边缘移动时，由该数字指定的尽可能多的框架像素将保持可见。  设置此参数有助于防止将具有非 @code{nil} @code{drag-with-mode-line} 参数的子框架完全拖出其父框架的区域。
+@end table
+
+
+@node Management Parameters
+@subsubsection 窗口管理参数
+@cindex window manager interaction, and frame parameters
+
+以下框架参数控制框架与窗口管理器或窗口系统交互的各个方面。  它们对文本终端没有影响。
+
+@table @code
+@vindex auto-raise@r{, a frame parameter}
+@item auto-raise
+如果非 0⁣，Emacs 在选择时会自动抬起框架。  一些窗口管理器不允许这样做。
+
+@vindex auto-lower@r{, a frame parameter}
+@item auto-lower
+如果非 0⁣，则取消选择时 Emacs 会自动降低框架。  一些窗口管理器不允许这样做。
+
+@vindex icon-type@r{, a frame parameter}
+@item icon-type
+用于此框架的图标类型。  如果该值为字符串，则指定包含要使用的位图的文件； @code{nil} 指定没有图标（在这种情况下，窗口管理器决定显示什么）；任何其他非 1⁣ 值指定默认的 Emacs 图标。
+
+@vindex icon-name@r{, a frame parameter}
+@item icon-name
+当图标出现时，此框架的图标中使用的名称。  如果这是 @code{nil}，则使用帧的标题。
+
+@vindex window-id@r{, a frame parameter}
+@item window-id
+图形显示为此帧使用的 ID 号。  Emacs 在创建框架时分配该参数；更改参数对实际 ID 号没有影响。
+
+@vindex outer-window-id@r{, a frame parameter}
+@item outer-window-id
+框架所在的最外层窗口系统窗口的 ID 号。  与@code{window-id}一样，更改此参数没有实际效果。
+
+@vindex wait-for-wm@r{, a frame parameter}
+@item wait-for-wm
+如果非@code{nil}，则告诉 Xt 等待窗口管理器确认几何更改。  某些窗口管理器（包括 Fvwm2 和 KDE 版本）无法确认，因此 Xt 挂起。  将其设置为 @code{nil} 以防止这些窗口管理器挂起。
+
+@vindex sticky@r{, a frame parameter}
+@item sticky
+如果非@code{nil}，则该框架在具有虚拟桌面的系统上的所有虚拟桌面上都可见。
+
+@vindex shaded@r{, a frame parameter}
+@item shaded
+如果非@code{nil}，则告诉窗口管理器以隐藏其内容的方式显示框架，仅保留标题栏。
+
+@vindex use-frame-synchronization@r{, a frame parameter}
+@item use-frame-synchronization
+如果非@code{nil}，则将帧重新显示与显示器的刷新率同步，以避免图形撕裂。  目前，这仅在 Haiku 和无工具包和 X 工具包构建中的 X 窗口系统上实现，无法与工具包滚动条一起正常工作，并且需要支持相关显示同步协议的合成管理器。  @code{synchronizeResize} X 资源还必须设置为字符串@code{"extended"}。
+
+@vindex inhibit-double-buffering@r{, a frame parameter}
+@item inhibit-double-buffering
+如果非@code{nil}，则帧将在没有双缓冲的情况下绘制到屏幕上。  Emacs 通常尝试使用双缓冲（如果可用）来减少闪烁；然而，这个参数是为双缓冲导致显示损坏的情况以及那些渴望曾经困扰 Emacs 的远古闪烁的怪人提供的。
+
+@vindex skip-taskbar@r{, a frame parameter}
+@item skip-taskbar
+如果非@code{nil}，则告诉窗口管理器从与框架显示关联的任务栏中删除框架的图标，并禁止通过组合@kbd{Alt-@key{TAB}}切换到框架的窗口。在 MS-Windows 上，图标化这样的框架将“滚入”桌面底部的窗口系统窗口。  某些窗口管理器可能不支持此参数。
+
+@vindex no-focus-on-map@r{, a frame parameter}
+@item no-focus-on-map
+如果非@code{nil}，则意味着该帧在映射时不想接收输入焦点 (@pxref{Visibility of Frames})。  某些窗口管理器可能不支持此参数。
+
+@vindex no-accept-focus@r{, a frame parameter}
+@item no-accept-focus
+如果非 @code{nil}，这意味着框架不希望通过显式鼠标单击或通过 @code{focus-follows-mouse} (@pxref{Input Focus}) 或 @code{mouse-autoselect-window} (@pxref{Mouse Window Auto-selection}) 将鼠标移动到其中时接收输入焦点。这可能会产生不需要的副作用，即用户无法使用鼠标滚动未选择的帧。  某些窗口管理器可能不支持此参数。  在 Haiku 上，它还有一个副作用，即窗口将无法接收用户的任何键盘输入，即使用户使用组合键 @kbd{Alt-@key{TAB}} 切换到框架也是如此。
+
+@vindex override-redirect@r{, a frame parameter}
+@item override-redirect
+@cindex override redirect frames
+如果非@code{nil}，这意味着这是一个@dfn{override redirect}框架——在X@.下不由窗口管理器处理的框架覆盖重定向框架没有窗口管理器装饰，只能通过Emacs的定位和调整大小功能来定位和调整大小，并且通常绘制在所有其他框架之上。  设置此参数对 MS-Windows 没有影响。
+
+@ignore
+@vindex parent-id@r{, a frame parameter}
+@item parent-id
+@c ??? Not yet working.
+The X window number of the window that should be the parent of this one.
+Specifying this lets you create an Emacs window inside some other
+application's window.  (It is not certain this will be implemented; try
+it and see if it works.)
+@end ignore
+
+@vindex ns-appearance@r{, a frame parameter}
+@item ns-appearance
+仅在 macOS 上可用，如果设置为 @code{dark} 使用“充满活力的黑暗”主题绘制此框架的窗口系统窗口，如果设置为 @code{light} 使用“aqua”主题，否则使用系统默认值。当使用带有深色背景的 Emacs 主题时，“充满活力的深色”主题可用于将工具栏和滚动条设置为深色外观。
+
+@vindex ns-transparent-titlebar@r{, a frame parameter}
+@item ns-transparent-titlebar
+仅在 macOS 上可用，如果非@code{nil}，请将标题栏和工具栏设置为透明。  这有效地设置了两者的背景颜色以匹配 Emacs 背景颜色。
+@end table
+
+
+@node Cursor Parameters
+@subsubsection 光标参数
+@cindex cursor, and frame parameters
+
+此框架参数控制光标的外观。
+
+@table @code
+@vindex cursor-type@r{, a frame parameter}
+@item cursor-type
+如何显示光标。  合法的值是：
+
+@table @code
+@item box
+显示一个填充框。  （这是默认设置。）
+@item (box . @var{size})
+显示一个填充框。  但是，如果点位于任一维度上大于 @var{size} 像素的遮罩图像下，则将其显示为空心框。
+@item hollow
+显示一个空心盒子。
+@item nil
+不显示光标。
+@item bar
+在字符之间显示竖线。
+@item (bar . @var{width})
+在字符之间显示 @var{width} 像素宽的垂直条。
+@item hbar
+显示水平条。
+@item (hbar . @var{height})
+显示水平条 @var{height} 像素高。
+@end table
+@end table
+
+@vindex cursor-type
+@code{cursor-type} 帧参数可以被 @code{set-window-cursor-type} (@pxref{Window Point}) 以及变量 @code{cursor-type} 和 @code{cursor-in-non-selected-windows} 覆盖：
+
+@defopt cursor-type
+此缓冲区局部变量控制光标在显示缓冲区的选定窗口中的外观。  如果其值为@code{t}，则表示使用@code{cursor-type}框架参数指定的光标。否则，该值应该是上面列出的光标类型之一，并且它会覆盖 @code{cursor-type} 框架参数。
+@end defopt
+
+@defopt cursor-in-non-selected-windows
+此缓冲区局部变量控制光标在未选择的窗口中的外观。  它支持与 @code{cursor-type} 帧参数相同的值；另外，@code{nil}表示不在未选定的窗口中显示光标，@code{t}（默认）表示使用通常光标类型的标准修改（实心框变为空心框，条形变为较窄的条形）。
+@end defopt
+
+@defopt x-stretch-cursor
+此变量控制在超宽字形（例如制表符或一段空白区域）上显示的块光标的宽度。  默认情况下，块光标仅与字体的默认字符一样宽，并且如果该字形超宽，则不会覆盖其下方字形的所有宽度。  该变量的非 0⁣ 值意味着将块光标绘制为其下方字形的宽度。  默认值为@code{nil}。
+
+该变量对文本模式框架没有影响，因为文本模式光标是由终端绘制的，不受 Emacs 的控制。
+@end defopt
+
+@defopt blink-cursor-alist
+该变量指定如何闪烁光标。  每个元素的形式为@code{(@var{on-state} . @var{off-state})}。  每当光标类型等于@var{on-state}（使用@code{equal}进行比较）时，相应的@var{off-state}指定光标闪烁时的样子。  @var{on-state} 和 @var{off-state} 都应该是@code{cursor-type} 框架参数的合适值。
+
+如果此处未将类型提及为 @var{on-state}，则每种类型的光标闪烁方式有多种默认值。  仅当您指定 @code{cursor-type} 框架参数时，此变量中的更改不会立即生效。
+@end defopt
+
+@node Font and Color Parameters
+@subsubsection 字体和颜色参数
+@cindex font and color, frame parameters
+
+这些框架参数控制字体和颜色的使用。
+
+@table @code
+@vindex font-backend@r{, a frame parameter}
+@item font-backend
+符号列表，按优先级顺序指定用于在框架上绘制字符的 @dfn{font backends}。  在没有 Cairo 在 X 上绘图的情况下构建的 Emacs 中，当前存在三种可能可用的字体后端：@code{x}（X 核心字体驱动程序）、@code{xft}（Xft 字体驱动程序）和 @code{xfthb}（具有 HarfBuzz 文本整形的 Xft 字体驱动程序）。  如果使用 Cairo 绘图构建，X 上还有三种可能可用的字体后端：@code{x}、@code{ftcr}（Cairo 上的 FreeType 字体驱动程序）和 @code{ftcrhb}（Cairo 上的 FreeType 字体驱动程序，具有 HarfBuzz 文本整形功能）。  当使用 HarfBuzz 构建 Emacs 时，默认字体驱动程序是 @code{ftcrhb}，尽管仍然可以使用 @code{ftcr} 驱动程序，但不推荐。  在 MS-Windows 上，当前有三种可用的字体后端：@code{gdi}（核心 MS-Windows 字体驱动程序）、@code{uniscribe}（通过 Uniscribe 引擎进行文本整形的 OTF 和 TTF 字体的字体驱动程序）和 @code{harfbuzz}（通过 HarfBuzz 文本整形的 OTF 和 TTF 字体的字体驱动程序）(@pxref{Windows Fonts,,, emacs, The GNU Emacs Manual})。  同样推荐 @code{harfbuzz} 驱动程序。  在 Haiku 上，可以有多个字体驱动程序 (@pxref{Haiku Fonts,,, emacs, The GNU Emacs Manual})，就像在 Android 上 (@pxref{Android Fonts,,, emacs, The GNU Emacs Manual}) 一样。
+
+在其他系统上，只有一个可用的字体后端，因此修改此框架参数没有意义。
+
+@vindex background-mode@r{, a frame parameter}
+@item background-mode
+根据背景颜色是浅色还是深色，该参数是@code{dark}或@code{light}。
+
+@vindex tty-color-mode@r{, a frame parameter}
+@item tty-color-mode
+@cindex standard colors for character terminals
+此参数会覆盖系统终端功能数据库给定的终端颜色支持，因为此参数的值指定在文本终端上使用的颜色模式。  该值可以是符号或数字。  数字指定要使用的颜色数量（以及间接指定要发出哪些命令来生成每种颜色）。  例如，@code{(tty-color-mode . 8)} 指定对 8 种标准文本颜色使用 ANSI 转义序列。  值为 @minus{}1 会关闭颜色支持。
+
+如果参数的值是一个符号，则通过@code{tty-color-mode-alist}的值指定一个数字，并使用关联的数字来代替。  此参数支持在运行 Emacs 会话期间动态更改（但不适用于 MS-Windows 和 MS-DOS）。
+
+@vindex screen-gamma@r{, a frame parameter}
+@item screen-gamma
+@cindex gamma correction
+如果这是一个数字，Emacs 会执行伽玛校正，调整所有颜色的亮度。  该值应该是显示器的屏幕伽玛值。
+
+通常的 PC 显示器的屏幕伽玛值为 2.2，因此 Emacs 和 X windows 中的颜色值通常经过校准，以便在具有该伽玛值的显示器上正确显示。  如果您为 @code{screen-gamma} 指定 2.2，则意味着不需要校正。  其他值需要进行校正，旨在使校正后的颜色在屏幕上显示的方式与未经校正的情况下在伽马值为 2.2 的普通显示器上的显示方式相同。
+
+如果您的显示器显示颜色太浅，则应指定小于 2.2 的 @code{screen-gamma} 值。  这需要进行使颜色变暗的校正。  1.5 的屏幕伽玛值可能会给 LCD 彩色显示器带来良好的效果。
+
+@vindex alpha@r{, a frame parameter}
+@item alpha
+@cindex opacity, frame
+@cindex transparency, frame
+@vindex frame-alpha-lower-limit
+此参数指定在支持可变不透明度的图形显示上框架的不透明度。  它应该是 0 到 100 之间的整数，其中 0 表示完全透明，100 表示完全不透明。  它还可以有一个 @code{nil} 值，该值告诉 Emacs 不要设置框架不透明度（将其留给窗口管理器）。
+
+为了防止框架从视图中完全消失，变量 @code{frame-alpha-lower-limit} 定义了不透明度下限。如果frame参数的值小于该变量的值，Emacs将使用后者。  默认情况下，@code{frame-alpha-lower-limit} 为 20。
+
+@code{alpha} 框架参数也可以是 cons 单元格 @code{(@var{active} . @var{inactive})}，其中 @var{active} 是选择框架时框架的不透明度，@var{inactive} 是未选择框架时的不透明度。
+
+某些窗口系统不支持子框架 (@pxref{Child Frames}) 的 @code{alpha} 参数。
+
+@vindex alpha-background@r{, a frame parameter}
+@item alpha-background
+@cindex opacity, frame
+@cindex transparency, frame
+设置框架的背景透明度。  与 @code{alpha} 帧参数不同，这仅控制背景的透明度，同时保持前景元素（例如文本）完全不透明。  它应该是 0 到 100 之间的整数，其中 0 表示完全透明，100 表示完全不透明（默认）。  该值也可以是 0 到 1.0 之间的浮点数，其中 1.0 表示完全不透明。
+
+@vindex borders-respect-alpha-background@r{, a frame parameter}
+@item borders-respect-alpha-background
+@cindex opacity, frame
+@cindex transparency, frame
+当非@code{nil}时，根据@code{alpha-background}，内部边框和窗口分隔线是透明的。
+@end table
+
+以下帧参数已半过时，因为它们自动等效于特定面部的特定面部属性 (@pxref{Standard Faces,,, emacs, The Emacs Manual})：
+
+@table @code
+@vindex font@r{, a frame parameter}
+@item font
+用于在框架中显示文本的字体名称。  这是一个字符串，可以是系统的有效字体名称，也可以是 Emacs 字体集的名称 (@pxref{Fontsets})。  它相当于 @code{default} 面的 @code{font} 属性。
+
+@vindex foreground-color@r{, a frame parameter}
+@item foreground-color
+用于字符的颜色。  它相当于 @code{default} 面的 @code{:foreground} 属性。
+
+@vindex background-color@r{, a frame parameter}
+@item background-color
+用于字符背景的颜色。  它相当于 @code{default} 面的 @code{:background} 属性。
+
+@vindex mouse-color@r{, a frame parameter}
+@item mouse-color
+鼠标指针的颜色。  它相当于 @code{mouse} 面 (@pxref{Basic Faces}) 的 @code{:background} 属性。
+
+@vindex cursor-color@r{, a frame parameter}
+@item cursor-color
+显示点的光标的颜色。  它相当于 @code{cursor} 面的 @code{:background} 属性。
+
+@vindex border-color@r{, a frame parameter}
+@item border-color
+框架边框的颜色。  它相当于 @code{border} 面的 @code{:background} 属性。
+
+@vindex scroll-bar-foreground@r{, a frame parameter}
+@item scroll-bar-foreground
+如果非@code{nil}，则为滚动条的前景颜色。  它相当于 @code{scroll-bar} 面的 @code{:foreground} 属性。
+
+@vindex scroll-bar-background@r{, a frame parameter}
+@item scroll-bar-background
+如果非@code{nil}，则滚动条的背景颜色。  它相当于 @code{scroll-bar} 面的 @code{:background} 属性。
+@end table
+
+
+@node Geometry
+@subsection 几何学
+
+以下是如何检查 X 样式窗口几何规范中的数据：
+
+@defun x-parse-geometry geom
+@cindex geometry specification
+函数 @code{x-parse-geometry} 将标准 X 窗口几何字符串转换为列表，您可以将其用作 @code{make-frame} 参数的一部分。
+
+alist 描述了在 @var{geom} 中指定了哪些参数，并给出了为它们指定的值。  每个元素看起来都像@code{(@var{parameter} . @var{value})}。  可能的 @var{parameter} 值为 @code{left}、@code{top}、@code{width} 和 @code{height}。
+
+对于大小参数，该值必须是整数。  位置参数名称 @code{left} 和 @code{top} 并不完全准确，因为某些值指示右边缘或下边缘的位置。  位置参数的 @var{value} 可能性为：整数、列表 @code{(+ @var{pos})} 或列表 @code{(- @var{pos})}；如前所述 (@pxref{Position Parameters})。
+
+这是一个例子：
+
+@example
+(x-parse-geometry "35x70+0-0")
+     @result{} ((height . 70) (width . 35)
+         (top - 0) (left . 0))
+@end example
+@end defun
+
+@node Terminal Parameters
+@section 终端参数
+@cindex terminal parameters
+
+每个终端都有一个相关参数的列表。  这些@dfn{terminal parameters}主要是存储终端局部变量的便捷方式，但某些终端参数具有特殊含义。
+
+本节介绍读取和更改终端参数值的功能。  他们都接受终端或框架作为参数；后者意味着使用该框架的终端。  参数 @code{nil} 表示所选帧的终端。
+
+@defun terminal-parameters &optional terminal
+该函数返回一个列表，列出 @var{terminal} 的所有参数及其值。
+@end defun
+
+@defun terminal-parameter terminal parameter
+该函数返回@var{terminal}的参数@var{parameter}（符号）的值。  如果@var{terminal}没有@var{parameter}的设置，则该函数返回@code{nil}。
+@end defun
+
+@defun set-terminal-parameter terminal parameter value
+该函数将 @var{terminal} 的参数 @var{parameter} 设置为指定的 @var{value}，并返回该参数之前的值。
+@end defun
+
+以下是一些具有特殊含义的终端参数的列表：
+
+@table @code
+@item background-mode
+终端背景颜色的分类，@code{light} 或@code{dark}。
+@item normal-erase-is-backspace
+值为 1 或 0，具体取决于该终端上的 @code{normal-erase-is-backspace-mode} 是打开还是关闭。  @xref{DEL Does Not Delete,,, emacs, The Emacs Manual}。
+@item terminal-initted
+终端初始化后，将其设置为终端特定的初始化函数。
+@item tty-mode-set-strings
+如果存在，则包含 Emacs 在配置 tty 进行渲染时输出的转义序列的字符串列表。  Emacs 仅在配置终端时发出这些字符串：如果您想在已处于活动状态的终端上启用模式（例如，在 @code{tty-setup-hook} 中），除了将序列添加到 @code{tty-mode-set-strings} 之外，还可以使用 @code{send-string-to-terminal} 显式输出必要的转义序列。
+@item tty-mode-reset-strings
+如果存在，则为撤销 @code{tty-mode-set-strings} 中字符串效果的字符串列表。  Emacs 在退出、删除终端或挂起自身时发出这些字符串。
+@end table
+
+@node Frame Titles
+@section 框架标题
+@cindex frame title
+
+每帧都有一个@code{name}参数；这是窗口系统通常显示在框架顶部的框架标题的默认值。  您可以通过设置 @code{name} 框架属性显式指定名称。
+
+通常，您不会显式指定名称，Emacs 会根据变量 @code{frame-title-format} 中存储的模板自动计算框架名称。  每次重新显示框架时，Emacs 都会重新计算名称。
+
+@defvar frame-title-format
+该变量指定当您未显式指定框架名称时如何计算框架名称（通过框架的参数；@pxref{Basic Parameters}）。  该变量的值实际上是一个模式行构造，就像 @code{mode-line-format} 一样，只不过 @samp{%c}、@samp{%C} 和 @samp{%l} 构造被忽略。 @xref{Mode Line Data}。
+@end defvar
+
+@defvar icon-title-format
+当您没有通过框架的参数显式指定框架的名称时，此变量指定如何计算图标化框架的名称。  生成的标题出现在框架的图标本身中。  如果该值是字符串，则应该是类似于 0⁣ 的模式行结构。  该值也可以是@code{t}，即用@code{frame-title-format}代替；这避免了某些窗口管理器和桌面环境的问题，其中框架标题的更改（当框架被图标化时）被解释为抬起框架和/或为其提供输入焦点的请求。  如果您希望框架的标题相同，无论框架是否图标化，它也很有用。  默认值是与 @code{frame-title-format} 的默认值相同的字符串。
+@end defvar
+
+@defvar multiple-frames
+该变量由 Emacs 自动设置。  当有两个或更多帧时（不包括仅迷你缓冲区帧或不可见帧），其值为@code{t}。  @code{frame-title-format}的默认值使用@code{multiple-frames}，以便仅当有多于一帧时才将缓冲区名称放入帧标题中。
+
+除了处理 @code{frame-title-format} 或 @code{icon-title-format} 时，不保证该变量的值是准确的。
+@end defvar
+
+@node Deleting Frames
+@section 删除帧
+@cindex deleting frames
+
+A @dfn{live frame} 是尚未被删除的。  当一个框架被删除时，它会从终端显示中删除，尽管它可能会继续作为 Lisp 对象存在，直到不再有对它的引用。
+
+@deffn Command delete-frame &optional frame force
+@vindex delete-frame-functions
+@vindex after-delete-frame-functions
+该函数删除帧@var{frame}。  参数 @var{frame} 必须指定实时帧（见下文）并默认为所选帧。
+
+它首先删除 @var{frame} (@pxref{Child Frames}) 的任何子帧以及 @code{delete-before} 帧参数 (@pxref{Frame Interaction Parameters}) 指定 @var{frame} 的任何帧。  所有此类删除都是递归执行的；所以这一步确保不存在以 5⁣ 作为祖先的其他帧。  然后，除非 @var{frame} 指定了工具提示，否则该函数会在实际终止框架之前运行钩子 @code{delete-frame-functions}（每个函数获取一个参数，@var{frame}）。  在实际杀死该帧并从帧列表中删除该帧后，@code{delete-frame}运行@code{after-delete-frame-functions}。
+
+请注意，只要一个帧的迷你缓冲区充当另一个帧的代理迷你缓冲区 (@pxref{Minibuffers and Frames})，就无法删除该帧。通常，如果所有其他帧都不可见，则无法删除帧，但如果 1⁣ 是非 2⁣，则允许您这样做。此外，当且仅当 4⁣ 为非 5⁣ 时，才能删除作为守护进程运行的 Emacs 进程 (@pxref{Initial Options, daemon,, emacs, The GNU Emacs Manual}) 的初始终端框架。
+@end deffn
+
+@defun frame-live-p frame
+如果帧@var{frame}尚未被删除，则该函数返回非@code{nil}。  可能的非@code{nil}返回值与@code{framep}的返回值类似。  @xref{Frames}。
+@end defun
+
+一些窗口管理器提供删除窗口的命令。  它们通过向操作窗口的程序发送特殊消息来工作。当 Emacs 获取这些命令之一时，它会生成一个 @code{delete-frame} 事件，其正常定义是调用函数 @code{delete-frame} 的命令。  @xref{Misc Events}。
+
+@deffn Command delete-other-frames &optional frame iconify
+该命令删除 @var{frame} 终端上除 @var{frame} 之外的所有帧。  如果 2⁣ 使用另一个帧的迷你缓冲区，则该迷你缓冲区帧保持不变。  参数 @var{frame} 必须指定实时帧并默认为所选帧。  在内部，该命令通过调用 @code{delete-frame} 和 @var{force} @code{nil} 来删除所有要删除的帧。
+
+此函数不会删除 @var{frame} 的任何子框架 (@pxref{Child Frames})。  如果 @var{frame} 是子框架，它仅删除 @var{frame} 的兄弟框架。
+
+使用前缀参数@var{iconify}，框架被图标化而不是被删除。
+@end deffn
+
+以下函数检查是否可以安全删除帧。  它对于避免后续调用 @code{delete-frame} 无法删除其参数 @var{frame} 和/或发出错误信号的情况很有用。  为此，仅当以下函数返回非 @code{nil} 时，您的 Lisp 程序才应调用 @code{delete-frame}。
+
+@defun frame-deletable-p &optional frame
+如果@var{frame}指定的帧可以被安全删除，则该函数返回非@code{nil}。  @var{frame} 必须是实时帧并且默认为所选帧。
+
+在以下情况下无法安全删除帧：
+
+@itemize @bullet
+@item
+它是其终端上唯一可见或图标化的框架 (@pxref{Visibility of Frames})。
+
+@item
+它托管活动的迷你缓冲区窗口，并且迷你缓冲区窗口不遵循所选帧 (@pxref{Basic Minibuffer,,, emacs})。
+
+@item
+同一终端上的所有其他可见或图标化框架都是子框架 (@pxref{Child Frames}) 或具有非@code{nil} @code{delete-before} 参数。
+
+@item
+该框架或其后代之一托管不是该框架后代的框架的迷你缓冲区窗口 (@pxref{Child Frames})。
+@end itemize
+
+这些条件涵盖了从顶层调用时 @code{delete-frame} 可能失败的大多数情况。  它们不会捕获一些特殊情况，例如在拖放操作期间删除框架 (@pxref{Drag and Drop})。  在任何这种情况下，最好将 @code{delete-frame} 调用包装为 @code{condition-case} 形式。
+@end defun
+
+当选定的框架被删除时，Emacs 必须选择另一个框架。  以下选项可让您选择哪一个。
+
+@defopt delete-frame-choose-selected
+该变量指定删除所选帧后要选择哪个帧。  默认值 @code{mru} 意味着 @code{delete-frame} 应尝试选择同一终端上 @code{get-mru-frame} (@pxref{Input Focus}) 返回的最近使用的帧。  值 @code{nil} 意味着 @code{delete-frame} 将尝试选择与已删除帧相同的终端上最旧的可见帧。
+@end defopt
+
+
+@node Finding All Frames
+@section 查找所有帧
+@cindex frames, scanning all
+
+@defun frame-list
+此函数返回所有实时帧的列表，即那些尚未删除的帧。  它类似于缓冲区的 @code{buffer-list}，并且包括除工具提示帧 (@pxref{Tooltips}) 之外的所有终端上的帧。  您获得的列表是新创建的，因此修改列表不会对 Emacs 的内部产生任何影响。
+@end defun
+
+@defun visible-frame-list
+此函数返回当前可见帧的列表。 @xref{Visibility of Frames}。  即使实际上只显示选定的框架，文本终端上的框架也将被视为可见。
+@end defun
+
+@defun frame-list-z-order &optional display
+该函数返回 Emacs 框架的列表，按 Z（堆叠）顺序 (@pxref{Raising and Lowering})。  可选参数@var{display}指定要轮询的显示。  @var{display} 应该是框架或显示名称（字符串）。  如果省略或@code{nil}，则代表所选帧的显示。  如果 5⁣ 不包含 Emacs 框架，则返回 4⁣。
+
+框架按从最顶部（第一个）到最底部（最后一个）的顺序列出。  作为一种特殊情况，如果 @var{display} 为非 @code{nil} 并指定活动帧，则它将按 Z（堆叠）顺序返回该帧的子帧。
+
+该功能在文本终端上没有意义。
+@end defun
+
+@defun next-frame &optional frame minibuf
+此功能使您可以从任意起点方便地循环浏览特定终端上的所有帧。  它返回@var{frame}终端上所有活动帧列表中@var{frame}之后的帧。  参数 @var{frame} 必须指定实时帧并默认为所选帧。  它不会返回 @code{no-other-frame} 参数 (@pxref{Frame Interaction Parameters}) 为非 @code{nil} 的帧。
+
+第二个参数 @var{minibuf} 表示在决定下一帧应该是什么时要考虑哪些帧：
+
+@table @asis
+@item @code{nil}
+考虑除仅微型缓冲区帧之外的所有帧。
+@item @code{visible}
+仅考虑可见框架。
+@item 0
+仅考虑可见或图标化的框架。
+@item 一扇窗户
+仅考虑使用该特定窗口作为其迷你缓冲区窗口的帧。
+@item 还要别的吗
+考虑所有框架。
+@end table
+
+如果此函数未找到合适的框架，即使根据 @var{minibuf} 参数或其 @code{no-other-frame} 参数不符合条件，它也会返回 @var{frame}。
+@end defun
+
+@defun previous-frame &optional frame minibuf
+与@code{next-frame}类似，但以相反方向循环遍历所有帧。
+@end defun
+
+另请参见@ref{Cyclic Window Ordering}中的@code{next-window}和@code{previous-window}。
+
+一些 Lisp 程序需要找到一个或多个满足给定标准的框架。  函数@code{filtered-frame-list}就是为此目的而提供的。
+
+@defun filtered-frame-list predicate
+该函数返回满足指定@var{predicate}的所有实时帧的列表。  参数@var{predicate}必须是一个参数的函数，一个要根据过滤标准进行测试的框架，并且如果框架满足标准，则应返回非@code{nil}。
+@end defun
+
+
+@node Splitting and Merging Frames
+@section 分割和合并帧
+@cindex splitting a frame
+@cindex merging two frames
+@cindex transferring window layouts to frames
+
+以下两个函数可用于将一帧的部分窗口布局 (@pxref{Basic Windows}) 传输到两个单独的框架，以及将两个单独框架的窗口布局合并为一帧。
+
+@deffn Command split-frame &optional frame arg
+该命令将指定 @var{frame} 的一些窗口转移到新帧，然后在 @var{frame} 上删除它们。  @var{frame} 必须是实时帧并且默认为所选帧。  @var{arg} 指定要传输的窗口数，默认为 1。交互地，@var{arg} 是前缀参数。
+
+第一步，它将 @var{frame} 的主窗口 (@pxref{Side Windows}) 的子窗口 (@pxref{Windows and Frames}) 分为两部分。  如果 @var{arg} 为正，第一部分包括第一个 @var{arg} 子窗口；如果 @var{arg} 为负，则第一部分包括 @minus{}@var{arg} 最后一个子窗口。  第二部分包括@var{frame}主窗口的其余子窗口。
+
+在第二步中，它将不包括 @var{frame} 的选定窗口 (@pxref{Selecting Windows}) 的部分的每个窗口克隆 (@pxref{Window Configurations}) 到新创建的框架中，并从 @var{frame} 中删除这些窗口。  请注意，克隆窗口的原始标识 (@pxref{Basic Windows}) 在此步骤中丢失。  然而，@var{frame} 上保留的窗口的身份被保留。最后一步，它删除从 @var{frame} 克隆的窗口并返回新创建的框架。
+
+如果 @var{arg} 为零或不是数字，或者 @var{frame} 的主窗口处于活动状态或没有比 @var{arg} 的绝对值指定的子窗口更多的子窗口，则此函数会发出错误信号。
+@end deffn
+
+@deffn Command merge-frames &optional frame1 frame2 vertical
+该命令将@var{frame2}的主窗口（@pxref{Side Windows}）转移到@var{frame1}。  @var{frame1} 和 @var{frame2} 都必须指定实时帧。
+
+第一步，它分割 @var{frame1} 的主窗口。  如果@var{vertical}非@code{nil}，它会使新窗口位于@var{frame1}的旧主窗口下方。  否则，它会在 @var{frame1} 主窗口的右侧创建新窗口。
+
+在第二步中，它使新窗口成为@var{frame2}主窗口的克隆（@pxref{Window Configurations}）。  克隆窗口的原始标识 (@pxref{Basic Windows}) 在此步骤中丢失。  在最后一步中，如果合并成功完成，它将删除 @var{frame2} 并返回 @var{frame1}。
+
+交互地，@var{vertical} 是前缀参数，@var{frame1} 是选定的帧，@var{frame2} 是所有帧列表中@var{frame1} 之后的帧 (@pxref{Finding All Frames})。  如果在 Lisp 调用中省略 @var{frame1} 和 @var{frame2} 或省略 @code{nil}，则它们默认为上述值。
+@end deffn
+
+一般来说，您不能通过后续的 @code{merge-frames} 调用“撤消”@code{split-frame} 调用，原因如下： 在第二步中，@code{merge-frame} 将 @var{frame2} 的主窗口放入第一步中分离的内部窗口中。  在调用 @code{split-frame} 之前，@var{frame1} 的配置中不存在这样的窗口。  另外，合并完成后，从@var{frame2}主窗口克隆的窗口将占用与合并前@var{frame1}主窗口一样多的空间。  这可能与原始布局的空间分布不匹配。
+
+因此，如果您的首选工作流程是暂时拆分窗口以便在单独的框架中对其进行处理，然后继续使用原始框架的原始布局，则应按以下步骤操作：保存原始框架的配置 (@pxref{Window Configurations})，调用 @code{split-frame} 创建单独的框架，最后恢复原始框架的已保存配置并删除单独的框架。
+
+
+@node Minibuffers and Frames
+@section 迷你缓冲区和帧
+
+通常，每个帧的底部都有自己的迷你缓冲区窗口，每当选择该帧时都会使用该窗口。  您可以使用函数 @code{minibuffer-window} (@pxref{Minibuffer Windows}) 获取该窗口。
+
+@cindex frame without a minibuffer
+@cindex surrogate minibuffer frame
+但是，您也可以创建没有迷你缓冲区的帧。  这样的帧必须使用其他帧的迷你缓冲区窗口。  该其他帧将充当该帧的 @dfn{surrogate minibuffer frame} ，并且只要该帧处于活动状态，就无法通过 @code{delete-frame} (@pxref{Deleting Frames}) 删除。
+
+创建帧时，您可以使用 @code{minibuffer} 帧参数 (@pxref{Buffer Parameters}) 显式指定其迷你缓冲区窗口（在其他某个帧中）。  如果不这样做，则会在帧中找到迷你缓冲区，它是变量 @code{default-minibuffer-frame} 的值。  它的值应该是一个有迷你缓冲区的帧。
+
+如果您使用仅包含迷你缓冲区的帧，您可能希望在进入迷你缓冲区时提升该帧。  如果是这样，请将变量 @code{minibuffer-auto-raise} 设置为 @code{t}。  @xref{Raising and Lowering}。
+
+@defvar default-minibuffer-frame
+默认情况下，此变量指定用于迷你缓冲区窗口的帧。  它不会影响现有框架。  它始终是当前终端本地的，并且不能是缓冲区本地的。  @xref{Multiple Terminals}。
+@end defvar
+
+
+@node Input Focus
+@section 输入焦点
+@cindex input focus
+@cindex selected frame
+
+在任何时候，Emacs 中的一帧都是 @dfn{selected frame}。  选定的窗口 (@pxref{Selecting Windows}) 始终驻留在选定的框架上。
+
+当 Emacs 在多个终端上显示其框架 (@pxref{Multiple Terminals}) 时，每个终端都有自己选择的框架。  但其中只有一个是 @emph{the} 选定的帧：它是属于最近输入来自的终端的帧。  也就是说，当 Emacs 运行来自某个终端的命令时，所选框架就是该终端的框架。  由于 Emacs 在任何给定时间只运行一个命令，因此它一次只需要考虑一个选定的帧；该框架就是我们在本手册中所说的@dfn{the selected frame}。  显示所选帧的显示屏是@dfn{selected frame's display}。
+
+@defun selected-frame
+该函数返回选定的帧。
+@end defun
+
+一些窗口系统和窗口管理器将键盘输入直接发送到鼠标所在的窗口对象；其他则需要显式单击或命令 @dfn{shift the focus} 到各种窗口对象。  无论哪种方式，Emacs 都会自动跟踪哪些帧具有焦点。  要从 Lisp 函数显式切换到不同的框架，请调用 @code{select-frame-set-input-focus}。
+
+上一段中的复数“框架”是经过深思熟虑的：虽然 Emacs 本身只有一个选定的框架，但 Emacs 可以在许多不同的终端上拥有框架（回想一下，到窗口系统的连接算作一个终端），并且每个终端对于哪个框架具有输入焦点都有自己的想法。  在 X Window 系统下，用户输入被组织成单独的输入“座位”，每个座位又可以有自己特定的输入焦点。  当您将输入焦点设置到某个框架时，您将该框架的终端的焦点设置在与 Emacs 交互的最后一个席位上，但其他终端和席位上的框架可能仍保持焦点。
+
+如果在指定终端上发生任何用户交互之前设置输入焦点，则 X 服务器会随机选择一个座位（通常是编号最小的座位）并将输入焦点设置在那里。
+
+Lisp程序可以通过调用函数@code{select-frame}来临时切换帧。  这不会改变窗口系统的焦点概念；相反，它会脱离窗口管理器的控制，直到以某种方式重新声明该控制。
+
+使用文本终端时，终端上一次只能显示一帧，因此调用 @code{select-frame} 后，下一次重新显示实际上会显示新选择的帧。  该帧保持选中状态，直到随后调用@code{select-frame}。  文本终端上的每个帧都有一个数字，该数字出现在模式行中缓冲区名称之前 (@pxref{Mode Line Variables})。
+
+@defun select-frame-set-input-focus frame &optional norecord
+该函数选择@var{frame}，将其提升（如果它碰巧被其他框架遮挡）并尝试将窗口系统的焦点赋予它。  在文本终端上，下一次重新显示会在整个终端屏幕上显示新框架。  可选参数 @var{norecord} 与 @code{select-frame} 具有相同的含义（见下文）。该函数的返回值并不重要。
+@end defun
+
+理想情况下，接下来描述的功能应该聚焦一个框架，而不会将其提升到其他框架之上。  不幸的是，许多窗口系统或窗口管理器可能拒绝遵守。
+
+@defun x-focus-frame frame &optional noactivate
+该函数赋予 @var{frame} X 服务器焦点，而不必提升它。  @var{frame} @code{nil} 表示使用所选帧。  在X下，可选参数@var{noactivate}，如果不是@code{nil}，意味着避免使@var{frame}的窗口系统窗口成为“活动”窗口，该窗口应该更加坚持避免将@var{frame}提升到其他框架之上。
+
+在 MS-Windows 上，@var{noactivate} 参数无效。  但是，如果 1⁣ 是子框架 (@pxref{Child Frames})，则此函数通常会聚焦 @var{frame}，而不将其提升到其他子框架之上。
+
+如果没有窗口系统支持，这个函数什么也不做。
+@end defun
+
+@deffn Command select-frame frame &optional norecord
+该函数选择帧@var{frame}，暂时忽略 X 服务器的焦点（如果有）。  @var{frame} 的选择将持续到用户下一次执行某些操作来选择不同的帧，或者直到下一次调用此函数。  （如果您使用的是窗口系统，则返回命令循环后，先前选择的帧可能会恢复为所选帧，因为它仍然可能具有窗口系统的输入焦点。）
+
+指定的@var{frame}成为选定的帧，其端子成为选定的端子。  然后，该函数将 @code{select-window} 作为子例程调用，将 @var{frame} 中选择的窗口作为其第一个参数，并将 @var{norecord} 作为其第二个参数（因此，如果 @var{norecord} 为非 @code{nil}，这可以避免更改最近选择的窗口和缓冲区列表的顺序）。  @xref{Selecting Windows}。
+
+该函数返回 @var{frame}，如果 @var{frame} 已被删除，则返回 @code{nil}。
+
+一般来说，您永远不应该以可能切换到不同终端而不在完成后切换回来的方式使用 @code{select-frame}。
+@end deffn
+
+@cindex frame use time
+@cindex use time of frame
+@cindex frame order by time of last use
+@defun frame-use-time &optional frame
+
+该函数返回帧@var{frame}的使用时间。  @var{frame} 必须是实时帧并且默认为所选帧。
+
+@dfn{use time of a frame} 是 @var{frame} 上任何窗口的 @code{window-use-time} 报告的最高使用时间。
+@end defun
+
+@defun get-mru-frame &optional all-frames exclude-child-frames exclude-frame
+
+此函数返回 @code{frame-use-time} 报告的使用时间最长的帧。  如果没有找到候选帧，它会返回@code{nil}，如果借助可选参数排除帧，通常会发生这种情况。
+
+默认情况下，工具提示和仅包含迷你缓冲区的帧永远不是候选帧。  如果可选参数@var{exclude-child-frames}非零，则子框架也被排除。  @var{exclude-frame} 参数（如果存在）也排除它指定的框架。  由于实际上最近使用的帧始终是选定的帧，因此使用指定选定帧的非 @code{nil} @var{exclude-frame} 参数调用此函数通常是有意义的。
+
+可选参数 @var{all-frames} 指定要考虑的帧：
+
+@itemize @bullet
+@item @code{visible}
+表示考虑当前终端或@var{exclude-frame}终端上的所有可见帧。
+
+@item 0
+意味着考虑当前终端或@var{exclude-frame}终端上的所有可见或图标化框架。
+
+@item 还要别的吗
+意味着考虑所有框架。
+@end itemize
+@end defun
+
+@defun get-mru-frames &optional all-frames exclude-child-frames exclude-frame
+
+此函数返回按 @code{frame-use-time} 报告的最高使用时间排序的帧列表，该列表是使用每个帧最近使用的窗口计算的。
+
+默认情况下，工具提示和仅包含迷你缓冲区的帧永远不是候选帧。  如果可选参数@var{exclude-child-frames}非零，则子框架也被排除。  @var{exclude-frame} 参数（如果存在）也排除它指定的框架。
+
+它可以返回@code{nil}，如果在可选参数的帮助下排除帧，则可能会发生这种情况，例如，如果有单个帧并且@var{exclude-frame}是选定的帧。
+
+可选参数 @var{all-frames} 指定要考虑的帧：
+
+@itemize @bullet
+@item @code{visible}
+表示考虑当前终端或@var{exclude-frame}终端上的所有可见帧。
+
+@item 0
+意味着考虑当前终端或@var{exclude-frame}终端上的所有可见或图标化框架。
+
+@item 还要别的吗
+意味着考虑所有框架。
+@end itemize
+@end defun
+
+@deffn Command select-frame-by-id id &optional noerror
+此函数搜索打开且不可删除的帧以查找匹配的帧标识符@var{id} (@pxref{Frames})。  如果找到，则取消删除其框架，如有必要，然后将其提升，给予焦点，并制作选定的框架。  在文本终端上，抬起框架会使其占据整个终端显示屏。
+
+如果未找到 @var{id}，此函数将返回选定的帧或发出错误信号，除非 @var{noerror} 是非 @code{nil}，在这种情况下，它将返回 @code{nil}。
+@end deffn
+
+@deffn Command undelete-frame-by-id id &optional noerror
+此函数在不可删除的帧中搜索匹配的帧标识符@var{id} (@pxref{Frames})。  如果找到，则其框架将被取消删除、提升、给予焦点并成为选定的框架。  在文本终端上，抬起框架会使其占据整个终端显示屏。
+
+如果未找到 @var{id}，此函数将返回未删除的帧或发出错误信号，除非 @var{noerror} 是非 @code{nil}，在这种情况下它返回 @code{nil}。
+@end deffn
+
+@cindex text-terminal focus notification
+Emacs 通过根据服务器和窗口管理器的请求安排选择框架来与窗口系统协作。  当窗口系统通知 Emacs 其框架之一已被选择时，Emacs 内部会生成一个 @dfn{focus-in} 事件。  当 Emacs 框架显示在文本终端仿真器（例如支持焦点更改通知报告的@command{xterm}）上时，即使对于文本模式框架，焦点进入和焦点离开事件也可用。  焦点事件通常由@code{handle-focus-in}处理。
+
+@deffn Command handle-focus-in event
+此函数处理来自支持显式焦点通知的窗口系统和终端的焦点事件。  它更新 @code{frame-focus-state} 查询并调用 @code{after-focus-change-function} 的每帧焦点标志。  此外，它还生成一个 2⁣ 事件，以便将所选帧的 Emacs 概念切换到某个终端中最近聚焦的帧。需要注意的是，将 Emacs 所选框架切换到最近获得焦点的框架并不意味着其他框架不会继续在各自的终端中获得焦点。  不要自己调用此函数：而是将逻辑附加到@code{after-focus-change-function}。
+@end deffn
+
+@deffn Command handle-switch-frame frame
+此函数处理切换帧事件，Emacs 在焦点通知时或在涉及输入事件到达与上一个事件不同的帧的各种其他情况下为自己生成该事件。  不要自己调用此函数。
+@end deffn
+
+@defun redirect-frame-focus frame &optional focus-frame
+此函数将焦点从@var{frame}重定向到@var{focus-frame}。这意味着 @var{focus-frame} 将接收针对 @var{frame} 的后续击键和事件。  在这样的事件之后，@code{last-event-frame}的值将是@var{focus-frame}。  此外，指定 @var{frame} 的切换帧事件将改为选择 @var{focus-frame}。
+
+如果省略 @var{focus-frame} 或 @code{nil}，则会取消 @var{frame} 的任何现有重定向，因此它会再次接收自己的事件。
+
+焦点重定向的一种用途是用于没有迷你缓冲区的帧。这些帧使用其他帧上的迷你缓冲区。  激活另一个帧上的迷你缓冲区会将焦点重定向到该帧。  这会将焦点放在迷你缓冲区所属的帧上，即使鼠标仍保留在激活迷你缓冲区的帧中。
+
+选择框架还可以更改焦点重定向。  当选择了 1⁣ 后，选择帧 @code{bar} 会更改指向 @code{foo} 的任何重定向，以便它们改为指向 @code{bar}。  当用户使用 @code{select-window} 从一帧切换到另一帧时，这允许焦点重定向正常工作。
+
+这意味着焦点重定向到其自身的帧与焦点未重定向的帧的处理方式不同。 @code{select-frame} 影响前者，但不影响后者。
+
+重定向一直持续到调用 @code{redirect-frame-focus} 来更改它为止。
+@end defun
+
+@defun frame-focus-state &optional frame
+此函数检索 @var{frame} 最后已知的焦点状态。 @var{frame} 默认为选定的帧。
+
+如果已知框架未获得焦点，则返回 @code{nil}；如果已知框架获得焦点，则返回 @code{t}；如果 Emacs 不知道框架的焦点状态，则返回 @code{unknown}。  （您可能会在不支持显式焦点通知的终端上运行的 TTY 帧中看到最后一个状态。）
+@end defun
+
+@defvar after-focus-change-function
+当 Emacs 注意到框架可能已获得或失去焦点时，将不带参数调用此函数。  焦点事件是异步传递的，并且可能不会按预期顺序传递，因此想要根据焦点帧的状态执行某些操作的代码必须遍历所有帧并进行检查。
+
+例如，下面是一个简单的示例函数，它根据框架是否具有焦点来设置背景颜色：
+
+@lisp
+(add-function :after after-focus-change-function
+              #'my-change-background)
+(defun my-change-background ()
+  (dolist (frame (frame-list))
+    (pcase (frame-focus-state frame)
+      (`t (set-face-background 'default "black" frame))
+      (`nil (set-face-background 'default "#404040" frame)))))
+@end lisp
+
+由于焦点事​​件传递差异、多个 Emacs 终端的存在以及其他因素，多个框架可能会出现同时具有输入焦点的情况，面对这种情况，代码应该是健壮的。
+
+根据窗口系统的不同，焦点事件也可能会在达到预期值之前以不同的焦点状态重复传递。  依赖于焦点通知的代码应该“消除”由焦点更改引起的任何用户可见的更新，也许可以通过将工作推迟到重新显示来实现。
+
+该函数可以在任意上下文中调用，包括从 @code{read-event} 内部调用，因此请像编写进程过滤器时一样小心。
+@end defvar
+
+@defopt focus-follows-mouse
+当您将鼠标指针移动到框架中时，此选项通知 Emacs 窗口管理器是否以及如何转移焦点。  它可以具有三个有意义的值：
+
+@table @asis
+@item @code{nil}
+当您的窗口管理器遵循“单击焦点”策略（您必须在框架内单击鼠标才能使该框架获得焦点）时，应使用默认值@code{nil}。
+
+@item @code{t}
+当您的窗口管理器使焦点自动跟随鼠标指针的位置，但获得焦点的框架不会自动提升，甚至可能仍然被其他窗口系统窗口遮挡时，应使用值@code{t}。
+
+@item @code{auto-raise}
+当窗口管理器使焦点自动跟随鼠标指针的位置并且自动提升获得焦点的框架时，应使用值@code{auto-raise}。
+@end table
+
+如果该选项为非@code{nil}，Emacs 会将鼠标指针移动到@code{select-frame-set-input-focus} 选择的帧。  该函数由许多命令使用，例如 @code{other-frame} 和 @code{pop-to-buffer}。
+
+对于“普通”框架，不需要区分值 @code{t} 和 @code{auto-raise} ，因为窗口管理器通常负责提升它们。  通过 @code{mouse-autoselect-window} (@pxref{Mouse Window Auto-selection}) 自动提升子框架很有用。
+
+请注意，此选项不区分“草率”焦点（只要鼠标指针不移动到另一个窗口系统窗口，先前具有焦点的框架就会保留焦点）和“严格”焦点（当鼠标指针离开框架时，框架立即失去焦点）。  它也无法识别您的窗口管理器是否支持延迟聚焦或自动提升，您可以在其中明确指定新框架获得焦点或自动提升之前的时间。
+
+您可以通过自定义变量 @code{mouse-autoselect-window} (@pxref{Mouse Window Auto-selection}) 为各个 Emacs 窗口提供“焦点跟随鼠标”策略。
+@end defopt
+
+
+@node Visibility of Frames
+@section 框架的可见性
+@cindex visible frame
+@cindex invisible frame
+@cindex iconified frame
+@cindex minimized frame
+@cindex frame visibility
+
+图形显示器上的帧可以是 @dfn{visible}、@dfn{invisible} 或 @dfn{iconified}。  如果它可见，则其内容将以通常的方式显示。  如果它被图标化，它的内容不会显示，但有一个小图标可以让框架重新进入视图（一些窗口管理器将此状态称为@dfn{minimized}而不是@dfn{iconified}，但从 Emacs 的角度来看它们是同一件事）。如果框架不可见，则根本不会显示它。
+
+在文本终端上，框架可能仅可见或不可见。  终端的顶框 (@pxref{Frames}) 不能不可见。
+
+@cindex mapped frame
+@cindex unmapped frame
+在图形显示上，可见性的概念与（未）映射的帧的概念密切相关。  当框架（或者更准确地说，它的窗口系统窗口）第一次显示时，以及每当它的可见状态从 @code{iconified} 或 @code{invisible} 更改为 @code{visible} 时，它就会变成 @dfn{mapped}。  相反，每当帧的状态从 @code{visible} 更改为 @code{iconified} 或 @code{invisible} 时，帧就会变成 @dfn{unmapped}。
+
+@defun frame-visible-p frame
+该函数返回帧@var{frame}的可见性状态。  如果 2⁣ 可见，则值为 @code{t}；如果不可见，则值为 @code{nil}；如果图标化，则值为 @code{icon}。
+
+请注意，此函数（以及 @code{visibility} 帧参数 @pxref{Frame Interaction Parameters}）报告的帧的可见性状态不一定表明该帧是否确实在显示器上可见。  任何此类框架都可能被同一图形终端上的其他窗口管理器窗口部分或完全遮挡。  是否完全隐藏框架可能取决于遮蔽窗口的透明度。  框架还可以驻留在与当前桌面不同的虚拟桌面上，并且仅当将该桌面设为当前桌面时才可以看到。  子框架有一个值得注意的限制 (@pxref{Child Frames})：当且仅当此函数为其所有祖先（包括框架本身及其根框架）返回 true 时，才能看到子框架。
+
+在文本终端上，实际上只能看到该终端的顶部框架及其子框架。  即使此函数认为其他根框架及其子框架可见，也看不到它们。
+@end defun
+
+@deffn Command iconify-frame &optional frame
+该函数表示帧@var{frame}。  如果省略 @var{frame}，它将图标化所选框架。  此函数还会从显示中删除 @var{frame} 的所有子框架 (@pxref{Child Frames}) 及其后代。  如果@var{frame}本身是子框架，则行为取决于变量@code{iconify-child-frame}的值。  如果 @var{frame} 是文本终端 (@pxref{Frames}) 的顶部框架，则此功能无效。
+@end deffn
+
+@deffn Command make-frame-visible &optional frame
+此函数使框架 @var{frame} 可见。  如果省略 @var{frame}，它会使所选帧可见。  这不会升高框架，但如果您愿意，可以使用 @code{raise-frame} 来实现此目的 (@pxref{Raising and Lowering})。
+
+使帧可见会使其所有具有可见祖先的子帧再次显示出来 (@pxref{Child Frames})。
+@end deffn
+
+@deffn Command make-frame-invisible &optional frame force
+此函数使框架 @var{frame} 不可见。  如果省略 @var{frame}，则会使选定的框架不可见。  通常，这也会使 @var{frame} （及其后代）的所有子框架也不可见 (@pxref{Child Frames})。
+
+除非@var{force}非@code{nil}，否则如果所有其他帧都不可见，则此函数拒绝使@var{frame}不可见。  在文本终端上，当且仅当@var{frame}是子框架（@pxref{Child Frames}）时，这将使@var{frame}不可见。  在这种情况下，如果选择@var{frame}，它将选择@var{frame}的第一个可见祖先。  此外，它还会从显示中删除所有以 7⁣ 作为祖先的子帧。
+@end deffn
+
+框架的可见性状态也可用作框架参数。  您可以这样阅读或更改它。  @xref{Frame Interaction Parameters}。  用户还可以使用窗口管理器对框架进行图标化和去图标化。  这种情况发生在 Emacs 可以施加任何控制的级别以下，但 Emacs 确实提供了可用于跟踪此类更改的事件。  @xref{Misc Events}。
+
+@defun x-double-buffered-p &optional frame
+如果 @var{frame} 当前正在使用双缓冲渲染，则此函数返回非 @code{nil}。  @var{frame} 默认为选定的帧。
+@end defun
+
+
+@node Raising and Lowering
+@section 升高、降低和重新堆叠框架
+
+@cindex raising a frame
+@cindex lowering a frame
+@cindex restacking a frame
+@cindex frame stacking order
+@cindex frame Z-order
+@cindex Z-order
+大多数窗口系统都使用桌面比喻。  这个比喻的一部分是这样的想法：系统级窗口（代表例如 Emacs 框架）堆叠在垂直于屏幕表面的概念三维中。  由堆叠产生的顺序是总的，通常称为堆叠（或 Z-）顺序。  如果两个窗口的区域重叠，则按顺序较高的窗口将（部分）覆盖下面的窗口。
+
+您可以使用函数 @code{raise-frame} 和 @code{lower-frame} 将 @dfn{raise} 一个框架移至该顺序的顶部，或者将 @dfn{lower} 一个框架移至其底部。  您可以使用函数 @code{frame-restack} @dfn{restack} 直接在另一个框架之上或之下的框架。
+
+请注意，下面描述的所有函数都将尊重框架（以及所有其他窗口系统窗口）对其各自 z 组 (@pxref{Position Parameters}) 的依从性。  例如，您通常不能将框架降低到桌面窗口下方，也不能将 @code{z-group} 参数为 @code{nil} 的框架升高到窗口系统任务栏或工具提示窗口上方。
+
+@deffn Command raise-frame &optional frame
+此函数将帧 @var{frame}（默认为所选帧）提升到与 @var{frame} 属于相同或较低 z 组的所有其他帧之上。  如果 @var{frame} 不可见或图标化，则它会变得可见。  如果 @var{frame} 是子框架 (@pxref{Child Frames})，则会将 @var{frame} 提升到其父框架的所有其他子框架之上。  对于文本终端上的非子框架，此功能无效。
+@end deffn
+
+@deffn Command lower-frame &optional frame
+此函数将帧 @var{frame}（默认为所选帧）降低到与 @var{frame} 属于相同或更高 z 组的所有其他帧以下。  如果 2⁣ 是子框架 (@pxref{Child Frames})，则 @var{frame} 会低于其父框架的所有其他子框架。  对于文本终端上的非子框架，此功能无效。
+@end deffn
+
+@defun frame-restack frame1 frame2 &optional above
+此函数将 @var{frame1} 重新堆叠到 @var{frame2} 下面。  这意味着如果两个框架都是可见的并且它们的显示区域重叠，则@var{frame2}将（部分）遮盖@var{frame1}。  如果可选的第三个参数@var{above}非-@code{nil}，则该函数将@var{frame1}重新堆叠到@var{frame2}之上。  这意味着如果两个框架都可见并且它们的显示区域重叠，则@var{frame1}将（部分）遮盖@var{frame2}。
+
+从技术上讲，这个函数可以被认为是分两步执行的原子操作：第一步从显示中删除 @var{frame1} 的窗口系统窗口。  第二步将@var{frame1}的窗口重新插入@var{frame2}的显示下方（如果@var{above}为真则在上方）。  因此，@var{frame2} 在其显示器的 Z（堆叠）顺序中相对于除 5⁣ 之外的所有其他帧的位置保持不变。
+
+一些窗口管理器可能拒绝重新堆叠窗口。  该功能尚未在文本终端上实现。
+@end defun
+
+请注意，只有当所涉及的框架均未图标化或不可见时，重新堆叠的效果才会保持。  您可以使用 @code{z-group} (@pxref{Position Parameters}) 框架参数将框架添加到永久显示在其他框架上方或下方的一组框架中。  只要框架属于这些组之一，重新堆叠它只会影响其在该组内的相对堆叠位置。重新堆叠属于不同 z 组的帧的效果未定义。  您可以使用函数 @code{frame-list-z-order} (@pxref{Finding All Frames}) 按当前堆叠顺序列出帧。
+
+@defopt minibuffer-auto-raise
+如果该值非 0，则激活迷你缓冲区会引发迷你缓冲区窗口所在的帧。此变量对文本终端没有影响。
+@end defopt
+
+在窗口系统上，您还可以使用框架参数启用自动升起（在选择框架时）或自动降低（在取消选择框架时）。  @xref{Management Parameters}。
+
+
+@node Frame Configurations
+@section 框架配置
+@cindex frame configuration
+
+A @dfn{frame configuration} 记录当前帧的排列、它们的所有属性以及每个帧的窗口配置。 （@xref{Window Configurations}。）
+
+@defun current-frame-configuration
+该函数返回一个帧配置列表，描述帧的当前排列及其内容。
+@end defun
+
+@defun set-frame-configuration configuration &optional nodelete
+该函数恢复@var{configuration}中描述的帧状态。  但是，此功能无法恢复已删除的帧。
+
+通常，此函数会删除 @var{configuration} 中未列出的所有现有帧。  但如果@var{nodelete}非@code{nil}，则不需要的帧将被图标化。
+@end defun
+
+
+@node Child Frames
+@section 子框架
+@cindex child frames
+
+子框架是介于窗口 (@pxref{Windows}) 和“正常”框架之间的对象。  像窗户一样，它们连接到所属的框架上。与窗口不同，它们可能会相互重叠——更改一个子框架的大小或位置不会更改其任何同级子框架的大小或位置。
+
+根据设计，创建或修改子框架的操作是在框架参数 (@pxref{Frame Parameters}) 的帮助下实现的，无需任何专门的函数或可自定义的变量。  子框架在图形和文本终端上有意义。
+
+@menu
+* Child Frame Operations::   制作和研究子框架。
+* Child Frame Properties::   子框架的特殊属性。
+* Child Frame Peculiarities::  子框架的异常行为。
+@end menu
+
+@node Child Frame Operations
+@subsection 子框架操作
+
+要创建新的子框架或将普通框架转换为子框架，请将该框架的 @code{parent-frame} 参数 (@pxref{Frame Interaction Parameters}) 设置为已存在框架的参数。  只要该参数未更改或重置，该参数指定的框架将成为该框架的父框架。  从技术上讲，在 GUI 上，这使得子框架的窗口系统窗口成为父框架的窗口系统窗口的子窗口。  在文本终端上，这使得框架通常与其父框架出现在同一终端上，从而遮挡了它的某些部分。
+
+@cindex reparenting frames
+@cindex nesting frames
+@cindex top-level frame
+@code{parent-frame} 参数可以随时更改。  将其设置为另一个框架 @dfn{reparents} 子框架。  将其设置为另一个子框架使该框架成为 @dfn{nested} 子框架。  将其设置为 @code{nil} 会将框架的状态恢复为顶级框架 — 该框架的窗口系统窗口是其显示器根窗口的子窗口。@footnote{On Haiku, child frames are only visible when a parent frame is active, owing to a limitation of the Haiku windowing system. Owing to the same limitation, child frames are only guaranteed to appear above their top-level parent; that is to say, the top-most frame in the hierarchy, which does not have a parent frame.} 在文本终端上，顶级框架称为根框架（见下文）。
+
+由于子框架可以任意嵌套，因此一个框架既可以是子框架，也可以是父框架。  此外，子框架和父框架的相对角色可以随时颠倒（尽管通常最好保持子框架的大小比其父框架的大小足够小）。  如果尝试使框架成为其自身的祖先，则会发出错误信号。
+
+当父框架即将被删除时（@pxref{Deleting Frames}），其之前的子框架将被递归删除。  此规则有一个例外：当子帧充当另一个帧的代理迷你缓冲区帧 (@pxref{Minibuffers and Frames}) 时，它会保留到父帧被删除为止。  如果此时没有剩余框架使用该子框架作为其迷你缓冲区框架，Emacs 也会尝试删除该子框架。  如果由于某种原因删除失败，则子框架将成为顶级框架。  由于在文本终端上不可能进行此类转换，因此如果要删除的代理微型缓冲区帧被不会被删除的帧使用，则删除帧可能会引发错误。
+
+以下三个函数有助于理解父框架和子框架如何相互关联。
+
+@defun frame-parent &optional frame
+该函数返回@var{frame}的父框架。  如果@var{frame}没有父框架，则返回@code{nil}。
+@end defun
+
+@cindex ancestor frame
+@cindex descendant frame
+@defun frame-ancestor-p ancestor descendant
+如果@var{ancestor}是@var{descendant}的祖先，则该函数返回非@code{nil}。  当@var{ancestor}是@var{descendant}的父框架或@var{descendant}的父框架的祖先时，它是@var{descendant}的祖先。  @var{ancestor} 和 @var{descendant} 都必须指定实时帧。
+@end defun
+
+@cindex root frame
+@defun frame-root-frame &optional frame
+该函数返回指定@var{frame}的根框架。 @var{frame} 必须是实时帧并且默认为所选帧。  @var{frame} 的根框架是通过跟踪从 @var{frame} 开始的父框架链直到到达没有父框架的框架而获得的框架。  如果@var{frame}没有父框架，则其根框架是@var{frame}本身。
+@end defun
+
+在文本终端上，根框架始终位于其终端的左上角，并且始终占据其终端的整个大小。
+
+
+@node Child Frame Properties
+@subsection 子框架属性
+
+大多数窗口系统在其父框架的本机边缘 (@pxref{Frame Geometry}) 处剪辑子框架——这些边缘之外的所有内容通常都是不可见的。  子框架的 @code{left} 和 @code{top} 参数指定相对于其父本机框架左上角的位置。  当父框架调整大小时，该位置在概念上保持不变。
+
+NS 构建和文本终端不会在父框架的边缘剪裁子框架，从而允许对它们进行定位，以便它们不会遮挡父框架，同时仍然可见。
+
+另请注意函数 @code{window-largest-empty-rectangle} (@pxref{Coordinates and Windows})，它可用于在现有窗口的最大空白区域中写入子框架。  这对于避免子框架遮盖该窗口中显示的任何文本很有用。
+
+通常，移动父框架也会沿着其所有子框架及其后代移动，保持它们的相对位置不变。请注意，仅当子框架相对于其父框架的位置发生变化时，才会为子框架运行钩子 @code{move-frame-functions} (@pxref{Frame Position})。
+
+当父框架调整大小时，其子框架在概念上保留其先前的大小以及相对于父框架左上角的位置。  这意味着当父框架缩小时，子框架可能会（部分）变得不可见。  参数 @code{keep-ratio} (@pxref{Frame Interaction Parameters}) 可用于在调整父框架大小时按比例调整子框架的大小和位置。  这可以避免当父框架缩小时框架的某些部分变得模糊。
+
+可见的子框架始终出现在其父框架的顶部，从而遮盖了其部分内容，除非在 NS 构建中，子框架可能位于父框架下方。  这与顶层框架的窗口系统窗口相当，顶层框架也始终出现在其父窗口（桌面的根窗口）之上。  当父框架被图标化或不可见（@pxref{Visibility of Frames}）时，即使@code{frame-visible-p}为其返回@code{t}，从其下降的任何子框架也不会显示。  当父框架被去图标化或变得可见时，从其下降的任何子框架都将再次显示（前提是它们及其所有祖先框架也可见）。  如果子帧用作代理迷你缓冲区帧 (@pxref{Minibuffers and Frames})，则由应用程序在迷你缓冲区激活时保证该帧的可见性。
+
+子框架是否可以有菜单或工具栏取决于窗口系统或窗口管理器。  大多数窗口系统明确禁止子框架的菜单栏。  似乎建议通过框架的初始参数设置禁用菜单和工具栏。  在文本终端上，子框架使用其根框架的菜单栏（前提是它有一个）。
+
+通常，子框架不会显示窗口管理器装饰，例如标题栏或外部边框 (@pxref{Frame Geometry})。  当子框架不显示菜单或工具栏时，可以使用任何其他框架边框 (@pxref{Layout Parameters}) 来代替外部边框。
+
+特别是，在 X 下（但不是使用 GTK+ 构建时），可以使用框架的外边框。  在 MS-Windows 上，指定非零外边框宽度将显示一像素宽的外边框。  在所有窗口系统下，都可以使用内部边框。  无论哪种情况，建议使用 @code{undecorated} 框架参数 (@pxref{Management Parameters}) 禁用子框架的窗口管理器装饰。  另一方面，在文本终端上，最好保留该参数，这样您的子框架将使用外边框绘制。
+
+要使用鼠标调整无边框子框架的大小或移动无边框子框架，必须使用特殊的框架参数 (@pxref{Mouse Dragging Parameters})。子框架的内部边框（如果存在）可用于通过鼠标调整框架的大小，前提是该框架具有非 @code{nil} @code{drag-internal-border} 参数。  如果设置，@code{snap-width}参数指示帧@dfn{snaps}位于其父帧的相应边缘或角处的像素数。  在文本终端上，外边框可用于调整大小。
+
+使用鼠标拖动整个子框架有三种方法： @code{drag-with-mode-line} 参数，如果非 @code{nil}，则可以通过其最底部窗口的模式线区域拖动没有迷你缓冲区窗口 (@pxref{Minibuffer Windows}) 的框架。  @code{drag-with-header-line} 和 @code{drag-with-tab-line} 参数（如果非 @code{nil}）允许通过其最顶部窗口的标题或制表符行区域拖动框架（仅当制表符行上方没有标题行时才可以使用制表符行拖动）。
+
+为了给子框架一个可拖动的标题或模式线，窗口参数@code{mode-line-format}和@code{header-line-format}很方便（@pxref{Window Parameters}）。  这些允许删除不需要的模式线（当选择@code{drag-with-header-line}时）并删除可能干扰帧拖动的鼠标敏感区域。
+
+当用户用鼠标拖动框架并超出范围时，很容易将框架拖出其父级的屏幕区域。  一旦释放鼠标按钮，检索这样的帧可能会很困难。  为了防止出现这种情况，建议设置框架的 @code{top-visible} 或 @code{bottom-visible} 参数 (@pxref{Mouse Dragging Parameters})。
+
+当您打算允许通过标题或选项卡线拖动子框架时，请将子框架的 @code{top-visible} 参数设置为数字。  将 @code{top-visible} 设置为数字可禁止将子框架的上边缘拖动到其父框架的上边缘之上。  当您打算通过其模式线拖动该帧时，将 @code{bottom-visible} 参数设置为一个数字；这会阻止将子框架的底部边缘拖动到其父框架的底部边缘下方。  无论哪种情况，该数字还指定在拖动期间保持可见的子框架区域的宽度和高度（以像素为单位）。
+
+当子框架用于通过@code{display-buffer-in-child-frame}（@pxref{Buffer Display Action Functions}）显示缓冲区时，可以将框架的@code{auto-hide-function}参数（@pxref{Frame Interaction Parameters}）设置为函数，以便在显示缓冲区的窗口退出时适当地处理该框架。
+
+当在迷你缓冲区交互期间使用子帧时，例如，为了在单独的窗口中显示完成内容，@code{minibuffer-exit} 参数 (@pxref{Frame Interaction Parameters}) 非常有用，以便在退出迷你缓冲区时处理该帧。
+
+
+@node Child Frame Peculiarities
+@subsection 儿童框架的特点
+
+子框架的行为在许多特殊方面与正常框架的行为有所不同。  我们在这里画出其中的一些草图：
+
+@itemize @bullet
+@item 
+最大化和图标化子框架的语义高度依赖于窗口系统。  通常，应用程序永远不应该在子框架上调用这些操作。  默认情况下，在子框架上调用 @code{iconify-frame} 将尝试图标化与该子框架对应的顶级框架。  为了获得不同的行为，用户可以自定义下面描述的选项@code{iconify-child-frame}。
+
+@item 
+升高、降低和重新堆叠子框架 (@pxref{Raising and Lowering}) 或更改子框架的 @code{z-group} (@pxref{Position Parameters}) 仅更改具有相同父框架的子框架的堆叠顺序。  文本终端上尚未实现重新堆叠。
+
+@item 
+许多窗口系统无法更改子框架的不透明度 (@pxref{Font and Color Parameters})。
+
+@item 
+对于某些窗口系统，通过在祖先窗口的可见部分中单击鼠标将焦点从子框架转移到不是其父级的祖先可能会失败。  您可能必须先单击直接父级的窗口系统窗口。
+
+@item 
+窗口管理器可能不会费心将遵循鼠标策略的焦点扩展到子框架。  自定义 @code{mouse-autoselect-window} 可以在这方面提供帮助 (@pxref{Mouse Window Auto-selection})。
+
+@item 
+在子框架上放置 (@pxref{Drag and Drop}) 并不保证在所有窗口系统上都有效。  有些会将对象放在父框架或某个祖先框架上。
+@end itemize
+
+自定义以下选项对于调整子帧的 @code{iconify-frame} 行为非常有用。
+
+@defopt iconify-child-frame
+当 Emacs 被要求图标化子框架时，此选项告诉 Emacs 如何继续。  如果它是@code{nil}，则@code{iconify-frame}在子框架上调用时将不执行任何操作。  如果是 2⁣，Emacs 将尝试图标化该子框架的根框架。  如果是@code{make-invisible}，Emacs 将尝试使该子框架不可见，而不是将其图标化。
+
+任何其他值都意味着尝试图标化子框架。  由于这种尝试可能不会被所有窗口管理器所接受，甚至可能导致子框架对用户操作无响应，因此默认情况下是图标化根框架。
+
+在文本终端上，唯一可行的值是 @code{nil} 和 @code{make-invisible}。
+@end defopt
+
+在文本终端上，存在一些关于重定父级的限制：其一是顶部框架 (@pxref{Frames}) 不能直接成为子框架 — 您首先必须将另一个根框架设为其终端的新顶部框架。  另一方面，如果您希望子框架成为其终端的新顶部框架，则必须首先将其设为根框架。
+
+此外，文本终端上任何帧的代理微型缓冲区窗口必须驻留在具有相同根帧的帧上。  每当违反此限制时，重新设置父子关系就会抛出错误。  这也意味着制作一个无迷你缓冲区的帧，其迷你缓冲区窗口驻留在仅包含迷你缓冲区的子帧上会更加棘手。  在 GUI 上，当用户为 @code{initial-frame-alist} (@pxref{Initial Parameters}) 中的 @code{minibuffer} 参数指定值 @code{child-frame} 时，Emacs 将按如下方式进行：
+
+@enumerate
+@item 
+创建一个仅包含迷你缓冲区的帧。
+
+@item 
+创建一个无迷你缓冲区的帧，并将其 @code{minibuffer} 参数设置为仅迷你缓冲区帧的窗口。
+
+@item 
+使无迷你缓冲区帧成为仅迷你缓冲区帧的父帧。
+
+@item 
+删除原来选择的框架。
+@end enumerate
+
+在文本终端上，您必须手动执行这些操作，如以下代码片段所示：
+
+@example
+@group
+(let* ((selected (selected-frame))
+       (mini-only
+        (make-frame
+         `((parent-frame . ,selected)
+           (minibuffer . only)
+           (left . 1) (top . -1) (width . 20) (height . 1))))
+       (mini-less
+        (make-frame
+         (append `((parent-frame . ,selected)
+                   (minibuffer . ,(minibuffer-window mini-only)))))))
+  (set-frame-parameter mini-only 'parent-frame mini-less)
+  (set-frame-parameter mini-less 'parent-frame nil)
+  (select-frame mini-less)
+  (delete-frame selected))
+@end group
+@end example
+
+这意味着您首先必须安装无迷你缓冲区和仅迷你缓冲区帧作为所选帧的子帧，并将无迷你缓冲区帧的 @code{minibuffer} 参数设置为仅迷你缓冲区帧的迷你缓冲区窗口。  然后使仅迷你缓冲区帧成为无迷你缓冲区帧的子帧，并使无迷你缓冲区帧成为新的根帧。  最后，选择无迷你缓冲区的帧并删除原来选择的帧。
+
+
+@node Mouse Tracking
+@section 鼠标追踪
+@cindex mouse tracking
+@c @cindex tracking the mouse   Duplicates track-mouse
+
+有时，@dfn{track}鼠标很有用，这意味着显示一些内容来指示鼠标所在的位置，并随着鼠标的移动而移动指示器。  为了有效地跟踪鼠标，您需要一种方法来等待鼠标实际移动。
+
+跟踪鼠标的便捷方法是请求代表鼠标运动的事件。  然后您可以通过等待事件来等待动作。  此外，您可以轻松处理可能发生的任何其他类型的事件。  这很有用，因为通常您不想永远跟踪鼠标——直到发生其他事件，例如释放按钮。
+
+@defmac track-mouse body@dots{}
+该宏执行@var{body}，并启用鼠标运动事件的生成。  通常，@var{body}会使用@code{read-event}来读取运动事件并相应地修改显示。  @xref{Motion Events}，鼠标移动事件的格式。
+
+@code{track-mouse} 的值是@var{body} 中最后一种形式的值。  您应该设计 @var{body} 当它看到指示按钮释放的向上事件时返回，或者任何类型的事件意味着是时候停止跟踪了。  它的值还控制按住鼠标按钮时如何报告鼠标事件：如果它是@code{dropping}或@code{drag-source}，则相对于指针下方的帧报告运动事件。  如果没有这样的框架，则将相对于第一次按下鼠标按钮的框架来报告事件。  另外，如果值为@code{drag-source}，则鼠标位置列表的@code{posn-window}将为@code{nil}。  这对于确定框架在鼠标指针下方是否不直接可见非常有用。
+
+@code{track-mouse} 宏使 Emacs 通过将变量 @code{track-mouse} 绑定到非 @code{nil} 值来生成鼠标移动事件。  如果该变量具有特殊值@code{dragging}，它还会指示显示引擎不要更改鼠标指针的形状。  这对于需要在 Emacs 显示的大部分区域上拖动鼠标的 Lisp 程序来说是可取的，否则可能会导致鼠标指针根据其悬停的显示部分改变其形状 (@pxref{Pointer Shape})。  因此，需要鼠标指针在拖动过程中保持其原始形状的 Lisp 程序应该将 @code{track-mouse} 绑定到其 @var{body} 开头的值 @code{dragging}。
+@end defmac
+
+跟踪鼠标运动的通常目的是在屏幕上指示在当前位置按下或释放按钮的后果。
+
+在许多情况下，您可以使用 @code{mouse-face} 文本属性 (@pxref{Special Properties}) 避免跟踪鼠标。它的工作级别要低得多，并且比 Lisp 级别的鼠标跟踪运行得更流畅。
+
+@ignore
+@c These are not implemented yet.
+
+These functions change the screen appearance instantaneously.  The
+effect is transient, only until the next ordinary Emacs redisplay.  That
+is OK for mouse tracking, since it doesn't make sense for mouse tracking
+to change the text, and the body of @code{track-mouse} normally reads
+the events itself and does not do redisplay.
+
+@defun x-contour-region window beg end
+This function draws lines to make a box around the text from @var{beg}
+to @var{end}, in window @var{window}.
+@end defun
+
+@defun x-uncontour-region window beg end
+This function erases the lines that would make a box around the text
+from @var{beg} to @var{end}, in window @var{window}.  Use it to remove
+a contour that you previously made by calling @code{x-contour-region}.
+@end defun
+
+@defun x-draw-rectangle frame left top right bottom
+This function draws a hollow rectangle on frame @var{frame} with the
+specified edge coordinates, all measured in pixels from the inside top
+left corner.  It uses the cursor color, the one used for indicating the
+location of point.
+@end defun
+
+@defun x-erase-rectangle frame left top right bottom
+This function erases a hollow rectangle on frame @var{frame} with the
+specified edge coordinates, all measured in pixels from the inside top
+left corner.  Erasure means redrawing the text and background that
+normally belong in the specified rectangle.
+@end defun
+@end ignore
+
+@node Mouse Position
+@section 鼠标位置
+@cindex mouse position
+@cindex position of mouse
+
+函数@code{mouse-position}和@code{set-mouse-position}可以访问鼠标的当前位置。
+
+@defun mouse-position
+该函数返回鼠标位置的描述。  该值看起来像 @code{(@var{frame} @var{x} . @var{y})}，其中 @var{x} 和 @var{y} 是整数，以 @var{frame} (@pxref{Frame Font}) 的默认字符大小的倍数给出相对于 @var{frame} (@pxref{Frame Geometry}) 的本机位置的位置（可能是四舍五入的）。
+@end defun
+
+@defvar mouse-position-function
+如果非@code{nil}，则该变量的值是@code{mouse-position}要调用的函数。  @code{mouse-position} 在返回之前调用此函数，以其正常返回值作为唯一参数，并返回此函数返回给它的任何内容。
+
+这个异常钩子的存在是为了像@file{xt-mouse.el}这样需要在 Lisp 级别进行鼠标处理的包的好处。
+@end defvar
+
+@defvar tty-menu-calls-mouse-position-function
+如果非 @code{nil}，TTY 菜单将调用 @code{mouse-position-function}，如上所述。  当 TTY 菜单调用 @code{mouse-position-function} 不安全时，例如它可能触发重新显示，就会存在这种情况。
+@end defvar
+
+@defun set-mouse-position frame x y
+该函数将@dfn{warps the mouse}移动到帧@var{frame}中的位置@var{x}、@var{y}。  参数 @var{x} 和 @var{y} 是整数，以 @var{frame} (@pxref{Frame Font}) 的默认字符大小的倍数给出相对于 @var{frame} (@pxref{Frame Geometry}) 的本机位置的位置。
+
+生成的鼠标位置被限制在 @var{frame} 的本机框架内。  如果 1⁣ 不可见，则该函数不执行任何操作。返回值并不重要。
+@end defun
+
+@defun mouse-pixel-position
+该函数与 @code{mouse-position} 类似，只不过它返回以像素为单位而不是字符为单位的坐标。
+@end defun
+
+@defun set-mouse-pixel-position frame x y
+此函数像 @code{set-mouse-position} 一样扭曲鼠标，只不过 @var{x} 和 @var{y} 以像素为单位而不是字符为单位。
+
+生成的鼠标位置不限于 @var{frame} 的本机框架。  如果 1⁣ 不可见，则该函数不执行任何操作。返回值并不重要。
+@end defun
+
+在图形终端上，以下两个函数允许检索和设置鼠标光标的绝对位置。
+
+@defun mouse-absolute-pixel-position
+此函数返回鼠标光标位置相对于所选帧显示的位置 (0, 0) 的坐标（以像素为单位）的 cons 单元 (@var{x} . @var{y})。
+@end defun
+
+@defun set-mouse-absolute-pixel-position x y
+该函数将鼠标光标移动到位置（@var{x}，@var{y}）。坐标 @var{x} 和 @var{y} 以相对于所选帧显示的位置 (0, 0) 的像素为单位进行解释。
+@end defun
+
+以下函数可以判断鼠标光标当前在框架上是否可见：
+
+@defun frame-pointer-visible-p &optional frame
+如果 @var{frame} 上显示的鼠标指针可见，则该谓词函数返回非 @code{nil}；否则返回@code{nil}。 @var{frame}省略或@code{nil}表示所选帧。  当@code{make-pointer-invisible}设置为@code{t}时，这很有用：它可以让您知道指针是否已被隐藏。 @xref{Mouse Avoidance,,,emacs, The Emacs Manual}。
+@end defun
+
+@need 3000
+
+@node Pop-Up Menus
+@section 弹出菜单
+@cindex menus, popup
+
+Lisp 程序可以弹出一个菜单，以便用户可以用鼠标选择替代方案。  在文本终端上，如果鼠标不可用，用户可以使用键盘动作键---@kbd{C-n}、@kbd{C-p}或向上和向下箭头键来选择替代方案。
+
+@defun x-popup-menu position menu
+该函数显示一个弹出菜单并返回用户所做选择的指示。
+
+参数 @var{position} 指定屏幕上放置菜单左上角的位置。  它可以是鼠标按钮或 @code{touchscreen-begin} 事件（表示将菜单放在用户启动按钮的位置）或以下形式的列表：
+
+@example
+((@var{xoffset} @var{yoffset}) @var{window})
+@end example
+
+@noindent
+其中@var{xoffset}和@var{yoffset}是坐标，以像素为单位，从@var{window}的左上角开始计数。  @var{window}可以是窗户或框架。
+
+如果@var{position}是@code{t}，则表示使用当前鼠标位置（如果鼠标在文本终端上不可用，则使用框架的左上角）。  如果@var{position}是@code{nil}，则意味着预先计算@var{menu}中指定的键映射的键绑定等效项，而不实际显示或弹出菜单。
+
+参数 @var{menu} 表示菜单中显示的内容。  它可以是键盘映射或键盘映射列表 (@pxref{Menu Keymaps})。  在这种情况下，返回值是与用户选择相对应的事件列表。如果选择发生在子菜单中，则该列表有多个元素。  （请注意，@code{x-popup-menu} 实际上并不执行绑定到该事件序列的命令。）在支持菜单标题的文本终端和工具包上，如果 @var{menu} 是键盘映射，则标题取自 @var{menu} 的提示字符串；如果@var{menu} 是键映射列表 (@pxref{Defining Menus})，则取自 @var{menu} 中第一个键盘映射的提示字符串。
+
+或者，@var{menu} 可以具有以下形式：
+
+@example
+(@var{title} @var{pane1} @var{pane2}...)
+@end example
+
+@noindent
+其中每个窗格都是表单列表
+
+@example
+(@var{title} @var{item1} @var{item2}...)
+@end example
+
+每个 @var{item} 应该是一个 cons 单元格 @code{(@var{line} . @var{value})}，其中 @var{line} 是一个字符串，@var{value} 是选择 @var{line} 时要返回的值。  与菜单键盘映射不同，@code{nil} @var{value} 不会使菜单项变得不可选择。或者，每个@var{item}可以是一个字符串而不是一个cons单元；这使得菜单项不可选择。
+
+如果用户在没有做出有效选择的情况下退出菜单，例如通过单击鼠标远离有效选择或输入 @kbd{C-g}，那么这通常会导致退出并且 @code{x-popup-menu} 不会返回。  但如果@var{position}是鼠标按钮事件（表明用户用鼠标调用了菜单），则不会发生退出并且@code{x-popup-menu}返回@code{nil}。
+@end defun
+
+@strong{Usage note:} 如果您可以使用菜单键映射定义的前缀键来完成此工作，请不要使用 @code{x-popup-menu} 显示菜单。如果您使用菜单键映射来实现菜单，@kbd{C-h c} 和 @kbd{C-h a} 可以查看该菜单中的各个项目并为它们提供帮助。相反，如果您通过定义调用 @code{x-popup-menu} 的命令来实现菜单，则帮助工具无法知道该命令内部发生的情况，因此它们无法为菜单项提供任何帮助。
+
+菜单栏机制允许您通过移动鼠标在子菜单之间切换，但无法在命令的定义中查看它是否调用 @code{x-popup-menu}。  因此，如果您尝试使用@code{x-popup-menu}实现子菜单，它无法以集成方式与菜单栏一起使用。  这就是为什么所有菜单栏子菜单都使用父菜单中的菜单键盘映射来实现，而不是使用 @code{x-popup-menu} 来实现。  @xref{Menu Bar}。
+
+如果您希望菜单栏子菜单具有不同的内容，您仍然应该使用菜单键盘映射来实现它。  要使内容有所不同，请向 @code{menu-bar-update-hook} 添加钩子函数，以根据需要更新菜单键盘映射的内容。
+
+@defvar x-pre-popup-menu-hook
+正常的钩子在弹出菜单显示之前立即运行，可以直接调用@code{x-popup-menu}，也可以通过菜单键盘映射。  如果 @code{x-popup-menu} 由于其他原因返回而不显示弹出菜单，则不会调用它。
+@end defvar
+
+@node On-Screen Keyboards
+@section 屏幕键盘
+
+屏幕键盘是系统提供的一种特殊的弹出窗口，其中有几排可点击的按钮，充​​当真正的键盘。
+
+在某些系统 (@pxref{On-Screen Keyboards,,,emacs, The Emacs Manual}) 上，Emacs 应该根据用户是否要输入内容来显示和隐藏屏幕键盘。
+
+@defun frame-toggle-on-screen-keyboard frame hide
+该函数代表框架@var{frame}显示或隐藏屏幕键盘。  如果@var{hide}非@code{nil}，则隐藏屏幕键盘；否则显示。
+
+它返回屏幕键盘@strong{may}是否已显示，用于确定稍后是否隐藏屏幕键盘。
+
+如果系统自动检测何时显示屏幕键盘或何时不提供任何屏幕键盘，则此操作无效。
+@end defun
+
+@node Dialog Boxes
+@section 对话框
+@cindex dialog boxes
+
+对话框是弹出菜单的一种变体——它看起来有点不同，它总是出现在框架的中心，并且只有一层和一个或多个按钮。  对话框的主要用途是提出问题，用户可以用“是”、“否”和其他一些选项来回答。  通过一个按钮，它们还可以迫使用户承认重要信息。  当从通过鼠标单击调用的命令调用时，函数 @code{y-or-n-p} 和 @code{yes-or-no-p} 使用对话框而不是键盘。
+
+@defun x-popup-dialog position contents &optional header
+此函数显示一个弹出对话框并返回用户所做选择的指示。  参数 @var{contents} 指定要提供的替代方案；它有这样的格式：
+
+@example
+(@var{title} (@var{string} . @var{value})@dots{})
+@end example
+
+@noindent
+它看起来像为 @code{x-popup-menu} 指定单个窗格的列表。
+
+所选替代方案的返回值为@var{value}。
+
+至于@code{x-popup-menu}，列表的元素可能只是一个字符串，而不是cons单元@code{(@var{string} . @var{value})}。这会产生一个无法选择的框。
+
+如果列表中出现@code{nil}，则将左侧项目与右侧项目分开； @code{nil}之前的项目显示在左侧，@code{nil}之后的项目显示在右侧。  如果列表中不包含 @code{nil}，则每侧都会显示大约一半的项目。
+
+对话框总是出现在框架的中央；参数 @var{position} 指定哪个帧。  可能的值如@code{x-popup-menu}所示，但精确的坐标或单个窗口并不重要；只有框架很重要。
+
+如果@var{header}非@code{nil}，则框的帧标题为@samp{Information}，否则为@samp{Question}。  前者用于@code{message-box} (@pxref{message-box})。  （在文本终端上，不显示框标题。）
+
+在某些配置中，Emacs 无法显示真实的对话框；因此，它会在框架中央的弹出菜单中显示相同的项目。
+
+如果用户在没有做出有效选择的情况下退出对话框（例如使用窗口管理器），则会导致退出并且 @code{x-popup-dialog} 不会返回。
+@end defun
+
+@node Pointer Shape
+@section 指针形状
+@cindex pointer shape
+@cindex mouse pointer shape
+
+您可以使用 @code{pointer} 文本属性指定特定文本或图像的鼠标指针样式，也可以使用 @code{:pointer} 和 @code{:map} 图像属性指定图像的鼠标指针样式。  下表中列出了您可以在这些属性中使用的值。  实际形状可能因系统而异；描述均为示例。
+
+@table @code
+@item text
+@itemx nil
+通常在文本上使用的鼠标指针样式（类似“I”的形状）。
+
+@item arrow
+@itemx vdrag
+@itemx modeline
+指向西北的箭头。
+
+@item hand
+一只手指向上方。
+
+@item hdrag
+一个左右箭头。
+
+@item nhdrag
+一个向上向下的箭头。
+
+@item hourglass
+一个旋转环。
+@end table
+
+在窗口的空白部分（不对应于任何缓冲区内容的部分）上，鼠标指针通常使用 @code{arrow} 样式，但您可以通过设置 @code{void-text-area-pointer} 指定不同的样式（上述样式之一）。
+
+@defopt void-text-area-pointer
+该变量指定空白文本区域的鼠标指针样式。这些包括缓冲区中行尾之后或最后一行下方的区域。  默认是使用 @code{arrow} （非文本）指针样式。
+@end defopt
+
+使用某些窗口系统时，您可以通过设置变量 @code{x-pointer-shape} 来指定 @code{text} 指针样式的实际外观。
+
+@defvar x-pointer-shape
+该变量指定 Emacs 框架中通常使用的指针形状，即 @code{text} 指针样式。
+@end defvar
+
+@defvar x-sensitive-text-pointer-shape
+此变量指定当鼠标悬停在鼠标敏感文本上时要使用的指针形状。
+@end defvar
+
+这些变量会影响新创建的框架。  它们通常不会影响现有框架；但是，如果您设置框架的鼠标颜色，也会安装这两个变量的当前值。 @xref{Font and Color Parameters}。
+
+您可以使用指定这些指针形状的值在文件 @file{lisp/term/x-win.el}.h 中定义。  使用 @kbd{M-x apropos @key{RET} x-pointer @key{RET}} 查看它们的列表。
+
+@node Window System Selections
+@section 窗口系统选择
+@cindex selection (for window systems)
+@cindex clipboard
+@cindex primary selection
+@cindex secondary selection
+
+在窗口系统中，比如X，可以通过@dfn{selections}在不同的应用程序之间传输数据。  每个窗口系统定义任意数量的@dfn{selection types}，都存储自己的数据；然而，常用的只有三种：@dfn{clipboard}、@dfn{primary selection} 和 @dfn{secondary selection}。  @xref{Cut and Paste,, Cut and Paste, emacs, The GNU Emacs Manual}，对于使用这些选择的 Emacs 命令。  本节记录了用于读取和设置窗口系统选择的低级函数； @xref{Accessing Selections}，有关特定窗口系统下的选择类型和数据格式的文档。
+
+@deffn Command gui-set-selection type data
+该函数设置窗口系统选择。  它需要两个参数：选择类型@var{type}，以及分配给它的值@var{data}。
+
+@var{type} 应该是一个符号；它通常是@code{PRIMARY}、@code{SECONDARY}或@code{CLIPBOARD}之一。  这些符号通常是名称大写的符号，符合 X Window 系统约定。  如果@var{type}是@code{nil}，则代表@code{PRIMARY}。
+
+如果@var{data}为@code{nil}，则表示清除选择。否则，@var{data}可以是字符串、符号、整数、覆盖或指向同一缓冲区的两个标记的缺点。  覆盖层或一对标记代表覆盖层中或标记之间的文本。  参数@var{data}也可以是有效非向量选择值的向量。
+
+如果 @var{data} 是字符串，则其文本属性可以指定用于各个数据类型的值。  例如，如果 @var{data} 有一个名为 @code{text/uri-list} 的属性，则使用数据类型 @code{text/uri-list} 调用 @code{gui-get-selection} 将导致使用该属性的值，而不是 @var{data} 本身。
+
+该函数返回@var{data}。
+@end deffn
+
+@defun gui-get-selection &optional type data-type
+此函数访问由 Emacs 或其他程序设置的选择。  它有两个可选参数：@var{type} 和 @var{data-type}。  选择类型 @var{type} 的默认值为 @code{PRIMARY}。
+
+@var{data-type} 参数指定要使用的数据转换形式，将从另一个程序获得的原始数据转换为 Lisp 数据。  默认为@code{STRING}。  @xref{X Selections}，用于 X 上有效的数据类型的枚举，@pxref{Other Selections} 用于其他地方的数据类型。  在 X Window 系统上，我们建议始终指定特定的 @var{data-type}，特别是如果预计选择的是非 ASCII 文本（在这种情况下，Lisp 程序应该更喜欢 @code{UTF8_STRING} 作为 @var{data-type} 的值）。  这是因为默认的 @var{data-type} 值 @code{STRING} 只能支持 Latin-1 文本，这在许多情况下是不够的。
+@end defun
+
+@defopt selection-coding-system
+该变量提供了一个编码系统（@pxref{Coding Systems}），用于对选择数据进行编码，并在 MS-Windows 和 X@. 上生效。当它在 MS-Windows 上运行时，它也在 MS-DOS 端口中使用，并且可以访问 Windows 剪贴板文本。
+
+在 X 上，此变量的值提供了 @code{gui-get-selection} 将用于解码文本数据类型子集的选择数据的编码系统，并且还强制对多态 @code{TEXT} 数据类型的选择请求的回复由 @code{compound-text-with-extensions} 编码系统而不是 Unicode 进行编码。
+
+在 MS-Windows 上，通常会忽略此变量，因为 MS-Windows 剪贴板提供有关解码的信息作为剪贴板数据的一部分，并根据需要自动使用 UTF-16 或特定于区域设置的编码。  我们建议仅在较旧的 Windows 9X 上设置此变量的值，因为只有在剪贴板数据提供的信息由于某种原因无法使用的极少数情况下才使用它。
+
+该变量的默认值是 MS-Windows 98 或 Me 下的系统代码页，Windows NT/W2K/XP/Vista/7/8/10/11 上的@code{utf-16le-dos}，MS-DOS 上的@code{iso-latin-1-dos}，以及其他地方的@code{nil}。
+@end defopt
+
+为了向后兼容，有过时的别名 @code{x-get-selection} 和 @code{x-set-selection}，它们是 Emacs 25.1 之前的 @code{gui-get-selection} 和 @code{gui-set-selection} 的名称。
+
+@node Accessing Selections
+@section 访问选择
+
+@code{gui-get-selection} 和 @code{gui-set-selection} 所理解的数据类型和选择并未精确指定，并且根据运行 Emacs 的窗口系统而有所不同。
+
+同时，@code{gui-set-selection}抽象了很多复杂性：它的@var{data}参数被逐字赋予系统特定的代码，以适合传输到窗口系统或请求客户端。
+
+X Window 系统下存在最全面的选择实现。  这既是历史的产物（X 是 Emacs 支持的第一个窗口系统），也是出于技术考虑而引起的：X 选择不仅仅是客户端之间传输文本和多媒体内容的权宜之计，而且是通用的客户端间通信系统，这种设计导致了选择和数据类型的激增。
+
+使这种混乱更加复杂的是，X 下还有另一种客户端间通信机制：客户端间交换。  ICE 仅由 Emacs 用于与会话管理器通信，并且是一个单独的主题。
+
+@menu
+* X Selections::         X@. 上的选择数据类型（及更多）
+* Other Selections::     它们如何在其他窗口系统上工作。
+@end menu
+
+@node X Selections
+@subsection X精选
+
+X 避免为选择数据或固定数量的选择定义固定数据类型。  选择由 X“原子”标识，它是 X 服务器为字符串名称发出的唯一 29 位标识符。  这种复杂性被 Emacs 隐藏了：当 Lisp 提供一个名为原子的符号时，Emacs 将请求这些标识符而无需进一步干预。
+
+当一个程序在 X 下“设置”一个选择时，它实际上使自己成为该选择的“所有者”——X 服务器随后将向该程序发送选择请求，该程序有义务用选择数据响应请求的客户端。
+
+类似地，程序不会从 X 服务器“获取”选择数据。  相反，它的选择请求将发送到带有最后断言选择所有权的窗口的客户端，该窗口预计会以请求的数据进行响应。
+
+每个选择请求包含三个参数：
+
+@itemize @bullet
+@item
+请求选择的窗口，它标识
+@c Not a typo: X spells ``requestor'' with an o.
+请求程序，也称为@dfn{requestor}。
+
+@item
+一个原子，标识所有者应将选择转换为的 @dfn{target}。  最容易将转换目标视为请求者想要的数据类型：在 Emacs 发出的选择请求中，目标由 @code{gui-get-selection} 的 @var{type} 参数确定。
+
+@item
+一个 32 位时间戳，表示请求者最后一次接收输入的 X 服务器时间；该参数与 Lisp 代码无关，因为它仅用于促进 X 服务器、所有者和请求者之间的同步。
+@end itemize
+
+选择所有者通过向请求者传输一系列字节、16 位字或 32 位字以及标识这些字类型的另一个原子来做出响应。  请求选择后，Emacs 会应用自己对数据格式和数据类型的解释，将选择所有者传输的数据转换为 Lisp 表示形式，然后 @code{gui-get-selection} 返回。
+
+Emacs 将由任何字节序列组成的选择数据转换为保存这些字节的单字节字符串，该字符串由单个 16 位或 32 位字组成，作为无符号数，由多个此类字组成，作为无符号数向量。  此一般模式的例外是 Emacs 对来自以下转换目标的数据进行特殊处理：
+
+@table @code
+@item INTEGER
+这种类型的 16 位或 32 位字被视为有符号整数而不是无符号整数。  如果选择数据中有多个单词，则返回一个向量；否则，整数本身返回。
+
+@item ATOM
+这种类型的 32 位字被视为 X 原子，并通过它们标识的名称作为 Lisp 符号返回（单独或作为向量）。无效原子被 @code{nil} 取代。
+
+@item COMPOUND_TEXT
+@item UTF8_STRING
+@item STRING
+设置为选择数据类型的单个 @code{foreign-selection} 文本属性将被放置在从对这些数据类型的请求派生的单字节字符串中。
+@end table
+
+每个选择所有者必须返回至少两个选择目标：@code{TARGETS}，返回描述所有者支持的选择目标的原子数量，以及@code{MULTIPLE}，由 X 客户端用于内部目的。  选择所有者可以支持任意数量的其他目标，其中一些目标可能由 X Consortium 的 @url{https://x.org/releases/X11R7.6/doc/xorg-docs/specs/ICCCM/icccm.html, Inter-Client Communication Conventions Manual} 标准化，而其他目标（例如 @code{UTF8_STRING}）本应由 XFree86 项目标准化，但它们的标准化从未完成。
+
+按照惯例，对给定选择目标的请求可以返回特定类型的数据，也可以返回多种类型之一的数据，以选择所有者最方便的为准；后一种类型的选择目标被称为@dfn{polymorphic target}。响应于请求，选择目标也可能根本不返回任何数据，此后选择所有者执行一些操作作为副作用。  如此回复的目标被称为@dfn{side-effect targets}。
+
+以下是一些选择目标，当从 @code{CLIPBOARD}、@code{PRIMARY} 或 @code{SECONDARY} 选择请求时，其行为通常与标准一致。
+
+@table @code
+@item ADOBE_PORTABLE_DOCUMENT_FORMAT
+该目标以 Adob​​e 系统的“便携式文档格式”格式返回数据（作为字符串）。
+
+@item APPLE_PICT
+该目标以字符串形式返回 Macintosh 计算机上使用的“PICT”图像格式的数据。
+
+@item BACKGROUND
+@item BITMAP
+@item COLORMAP
+@item FOREGROUND
+这四个目标一起返回使用存储在 X 服务器上的位图图像所需的整数数据：位图背景颜色的像素值、位图的 X 标识符、在其中分配背景和前景的颜色图以及位图前景色的像素值。
+
+@item CHARACTER_POSITION
+该目标返回两个@code{SPAN}类型的无符号32位整数，描述包含它的文本字段中选择数据的开始和结束位置（以字节为单位）。
+
+@item COMPOUND_TEXT
+该目标返回 X Consortium 的多字节文本编码系统中类型为 @code{COMPOUND_TEXT} 的字符串。
+
+@item DELETE
+该目标不返回任何内容，但副作用是从包含它们的任何文本字段中删除选择内容。
+
+@item DRAWABLE
+@item PIXMAP
+该目标返回一个无符号 32 位整数列表，每个整数对应一个 X 服务器可绘制对象或像素图。
+
+@item ENCAPSULATED_POSTSCRIPT
+@item _ADOBE_EPS
+该目标返回一个包含封装的 Postscript 代码的字符串。
+
+@item FILE_NAME
+该目标返回一个包含一个或多个文件名的字符串，并以 NULL 字符分隔。
+
+@item HOST_NAME
+此目标返回一个字符串，其中包含运行选择所有者的计算机的完全限定域名。
+
+@item USER
+此目标返回一个字符串，其中包含运行选择所有者的计算机的用户名。
+
+@item LENGTH
+该目标返回一个无符号 32 位或 16 位整数，其中包含选择数据的长度。
+
+@item LINE_NUMBER
+该目标返回两个@code{SPAN}类型的无符号32位整数，描述与包含它的文本字段中选择数据的开始和结束位置相对应的行号。
+
+@item MODULE
+该目标返回包含选择数据的任何函数的名称。  它主要是文本编辑器的要求。
+
+@item STRING
+该目标将选择数据返回为 @code{STRING} 类型的字符串，以 ISO Latin-1 格式编码，并带有 Unix 换行符。
+
+@item C_STRING
+该目标将选择数据作为“C 字符串”返回。  这被解释为表示所有者使用的任何编码的原始选择数据，要么以 NULL 字节终止，要么根本不终止，要么以 ASCII 字符串终止，也可能不终止。
+
+@item UTF8_STRING
+这将选择数据返回为 @code{UTF8_STRING} 类型的字符串，以 UTF-8 编码，具有未指定的 EOL 格式。
+
+@item TIMESTAMP
+该目标以 @code{CARDINAL} 类型的 16 位或 32 位字返回选择所有者取得选择所有权时的 X 服务器时间。
+
+@item TEXT
+此多态目标以字符串形式返回选择数据，可以是 @code{COMPOUND_TEXT}、@code{STRING}、@code{C_STRING} 或 @code{UTF8_STRING}，无论哪种数据类型对于选择所有者来说都是方便的。
+@end table
+
+当使用函数 @code{gui-get-selection} 发出对目标 @code{STRING}、@code{COMPOUND_TEXT} 或 @code{UTF8_STRING} 的请求且未设置 @code{selection-coding-system} 和 @code{next-selection-coding-system} 时，生成的字符串将由这些目标的正确编码系统分别解码：@code{iso-8859-1}、@code{compound-text-with-extensions} 和 @code{utf-8}。
+
+除了上面指定的目标（以及各种程序出于其自身目的而使用的许多目标）之外，一些流行的程序和工具包还定义了自己的选择数据类型，而无需咨询相应的 X 标准机构。  这些目标通常以 @code{text/html} 或 @code{image/jpeg} 等 MIME 类型命名；据目击他们返回以下形式的数据：
+
+@itemize @bullet
+@item
+图像或文本文件的未终止、换行符终止或 NULL 字符终止的文件名。
+
+@item
+适当格式的图像或文本数据。
+
+@item
+@code{file://} URI（或者可能是换行符或 NUL 终止的 URI 列表）以适当的格式标识文件。
+@end itemize
+
+这些选择目标最初由 Netscape 使用，但现在由各种程序提供，特别是那些基于最新版本的 GTK+ 或 Qt 工具包的程序。
+
+Emacs 还能够充当选择所有者。  当 0⁣ 被调用时，提供的选择数据被记录在内部，并且 Emacs 获得所设置的选择的所有权。
+
+@defvar selection-converter-alist
+“选择转换器”功能的选择目标列表。  当收到选择请求时，Emacs 查找与请求的选择目标相关的选择转换器。
+
+使用三个参数调用选择转换器：与标识所请求的选择的原子相对应的符号、所请求的选择目标以及使用 @code{gui-set-selection} 设置的值。  它们必须返回的值要么是指定数据类型和数字的符号的conses，符号，数字或符号的向量，要么是此类conses本身的cdrs。
+
+如果选择转换器的值是特殊符号@code{NULL}，则返回到其请求者的数据类型将设置为@code{NULL}，并且不发送任何数据作为响应。
+
+如果这样的值是字符串，则它必须是单字节字符串；如果没有显式指定数据类型，则数据将以类型 @code{STRING} 传输到其请求者。
+
+如果它是一个符号，则检索其“原子”，并将其作为 32 位值传输给其请求者——如果未指定数据类型，则其类型为@code{ATOM}。
+
+如果它是 @code{-32769} 和 @code{32768} 之间的数字，则会将其作为 16 位值传输给请求者——如果未指定数据类型，则其类型为 @code{INTEGER}。
+
+如果是其他数字，则按 32 位值计算。  即使返回的数字是无符号的，其请求者也会将 @code{INTEGER} 类型的字视为有符号。  要返回无符号值，请在其位置指定类型 @code{CARDINAL}。
+
+如果它是符号或数字的向量，则对其请求者的响应将是多个原子或数字的列表。  未明确设置时返回的数据类型是列表第一个元素的数据类型。
+@end defvar
+
+默认情况下，Emacs 配置了用于以下选择目标的选择转换器：
+
+@table @code
+@item TEXT
+该选择转换器返回选择数据为：
+
+@itemize @bullet
+@item
+如果选择内容不包含多字节字符，或者包含“原始 8 位字节”(@pxref{Text Representations})，则为 @code{C_STRING} 类型的字符串。
+
+@item
+如果选择内容可以表示为 ISO-Latin-1 文本，则为 @code{STRING} 类型的字符串。
+
+@item
+@code{COMPOUND_TEXT} 类型的字符串，如果选择内容可以用 X 联盟的复合文本编码进行编码，并且 @code{selection-coding-system} 或 @code{next-selection-coding-system} 设置为 @code{:mime-charset} 属性为 @code{x-ctext} 的编码系统。
+
+@item
+否则为 @code{UTF8_STRING} 类型的字符串。
+@end itemize
+
+@item COMPOUND_TEXT
+该选择转换器以 @code{COMPOUND_TEXT} 类型的字符串形式返回选择数据。
+
+@item STRING
+该选择转换器将选择数据返回为 @code{STRING} 类型的字符串，以 ISO-Latin-1 格式编码。
+
+@item UTF8_STRING
+此选择转换器返回 UTF-8 格式的选择数据。
+
+@item text/plain
+@item text/plain;charset=utf-8
+@item text/uri-list
+@item text/x-xdnd-username
+@item XmTRANSFER_SUCCESS
+@item XmTRANSFER_FAILURE
+@item FILE
+@item _DT_NETFILE
+这些选择转换器在拖放操作期间用于内部目的，不可用于 @code{XdndSelection} 以外的选择。
+
+@item TARGETS
+该选择转换器返回一个原子列表，一个原子列表对应 Emacs 理解的每个选择目标。
+
+@item MULTIPLE
+该选择转换器以C代码实现，用于实现同时指定多个选择目标的选择请求的高效传输。
+
+@item LENGTH
+该选择转换器返回选择数据的长度（以字节为单位）。
+
+@item DELETE
+该选择转换器在拖放操作期间用于内部目的。
+
+@item FILE_NAME
+该选择转换器返回包含选择数据的缓冲区的文件名。
+
+@item CHARACTER_POSITION
+该选择转换器返回包含选择数据的缓冲区中选择的每一端的字符位置。
+
+@item LINE_NUMBER
+@item COLUMN_NUMBER
+该选择转换器返回包含选择数据的缓冲区中选择的每一端的行号和列号。
+
+@item OWNER_OS
+此选择转换器返回运行 Emacs 的操作系统的名称。
+
+@item HOST_NAME
+此选择转换器返回运行 Emacs 的计算机的完全限定域名。
+
+@item USER
+此选择转换器返回运行 Emacs 的用户帐户的用户名。
+
+@item CLASS
+@item NAME
+这些选择转换器返回 Emacs 使用的资源类和名称。
+
+@item INTEGER
+该选择转换器逐字返回整数值。
+
+@item SAVE_TARGETS
+@item _EMACS_INTERNAL
+这些选择转换器用于内部目的。
+@end table
+
+除了@code{INTEGER}之外，所有选择转换器都期望提供给@code{gui-set-selection}的数据为以下数据之一：
+
+@itemize @bullet
+@item
+一根绳子。
+
+@item
+@w{@code{(@var{beg} @var{end} @var{buf})}} 形式的列表，其中 @var{beg} 和 @var{end} 是两个标记或覆盖层，描述缓冲区 @var{buf} 中选择数据的边界。
+@end itemize
+
+@node Other Selections
+@subsection 其他选择
+
+MS-Windows、Nextstep、Haiku 和 Android 等窗口系统下的选择与 X@. 下的选择不一致，这些窗口系统中的每一个都临时改进了自己的选择机制，而不采用前面节点中所示的“选择转换器”机制。一般仅支持 @code{PRIMARY}、@code{CLIPBOARD} 和 @code{SECONDARY} 选择，记录拖放数据的 @code{XdndSelection} 选择也可在 Nextstep 和 Haiku 下使用。
+
+@cindex PGTK selections
+GTK 试图模拟 X 选择系统，但它的模拟并不完全可靠，每个主题的整体质量都取决于所使用的 GDK 后端。  因此，使用 PGTK 构建的 Emacs 将提供与使用 X 构建的 Emacs 相同的选择界面，但许多选择目标将没有用处。
+
+@cindex MS-Windows selection emulation
+@cindex MS-Windows primary and secondary selection
+尽管存在剪贴板，但 MS-Windows 操作系统中不存在主要或次要选择的概念。  在此系统上，Emacs 模拟主要和次要选择的存在，同时根据需要保存到剪贴板或从剪贴板检索。
+
+主要和次要选择的模拟是通过将提供给 @code{gui-set-selection} 的值保存在指定相关选择的符号的 @code{x-selections} 属性内（即 @code{gui-get-selection} 的 @var{type} 参数）来进行的。随后对 @code{gui-get-selection} 的每个调用都会依次返回其值，该值不受进一步检查（例如类型检查等）。  在这种情况下，@var{data-type}论证通常被忽略。  （但有关 @code{TARGETS} 的资格请参见下文。）
+
+@cindex MS-Windows clipboard
+在涉及剪贴板选择的情况下（当@var{type}为@code{CLIPBOARD}时），@code{gui-set-selection}验证提供的值是否为字符串，并在由@code{selection-coding-system}中配置的编码系统编码后将其保存在系统剪贴板中。  @code{gui-get-selection} 的调用者需要将 @var{data-type} 设置为 @code{STRING} 或 @code{TARGETS}。
+
+当在调用@code{gui-get-selection}时将@var{data-type}设置为@code{TARGETS}时，当存在选择数据时返回符号向量，就像在X@.下一样。除了@code{STRING}之外，不可能请求任何格式的剪贴板数据，因为不存在先决数据转换例程。  正如保存到剪贴板中的字符串由 @code{selection-coding-system} 编码一样，从剪贴板读取的字符串也由相同的编码系统解码；当将选择文本保存到剪贴板时遇到困难时，该变量及其表兄弟 @code{next-selection-coding-system} 值得特别仔细检查。
+
+@cindex Nextstep selections
+X 中的所有三个选择标准也存在于 Nextstep 中，但 Emacs 只能将字符串保存到此类选择中。对 @code{gui-set-selection} 调用的限制与 MS-Windows 上的限制非常相似，尽管文本统一编码为 @code{utf-8-unix} 而不考虑 @code{selection-coding-system} 的值。  @code{gui-get-selection} 更加慈善，接受以下评选目标的请求：
+
+@c FIXME: how is the text coding system determined, and do image/* or
+@c application/* return image data or file names?
+@itemize @bullet
+@item text/plain
+@item image/png
+@item text/html
+@item application/pdf
+@item application/rtf
+@item application/rtfd
+@item STRING
+@item text/plain
+@item image/tiff
+@end itemize
+
+@code{XdndSelection} 选择也出现在 Nextstep 下，以存储库的形式记录提供给 @code{gui-set-selection} 的值。  它的唯一目的是为基本拖放功能@code{x-begin-drag} (@pxref{Drag and Drop}) 保存这些值；当其他任何东西读取时，不保证其价值。
+
+@cindex Haiku selections
+Haiku 系统上的选择包括 X 和记录拖放数据的 @code{XdndSelection} 下惯用的所有三个选择。
+
+当为前三个选择调用@code{gui-set-selection}时，提供的数据通过@dfn{selection encoder}函数列表转换为窗口服务器“消息”，并将其发送到窗口服务器。
+
+@defvar haiku-normal-selection-encoders
+选择编码器功能列表。  当调用 @code{gui-set-selection} 时，将使用其 @var{selection} 和 @var{value} 参数连续调用此列表中的每个函数。  如果这样的函数返回非@code{nil}，则其返回值必须是@w{@code{(@var{key} @var{type} @var{value})}}形式的列表。  在这个列表中，@var{key}必须是正在传输的数据的名称，通常是MIME类型的名称，例如@samp{"text/plain"}，而@var{type}是指示数据类型的符号或数字；因此也决定了 @var{value} 的解释；以下是有效数据类型的列表以及每种数据类型如何导致 @var{value} 被解释。
+
+@table @code
+@item string
+单字节字符串。  该字符串在放入消息后以 NULL 结尾。
+
+@item ref
+一个文件名。  该文件被定位并且标识该文件的索引节点被放置在消息中。
+
+@item short
+16 位整数值。
+
+@item long
+32 位整数值。
+
+@item llong
+64 位整数值。
+
+@item byte
+@item char
+0 到 255 之间的无符号字节。
+
+@item size_t
+0 到 1 之间的数字减去运行 Emacs 的计算机的字大小的 2 次方。
+
+@item ssize_t
+适合 C 类型@code{ssize_t} 的数字。
+
+@item point
+两个浮点数的缺点，指定屏幕上的坐标。
+
+@item float
+@item double
+未指定格式的单精度或双精度浮点数。
+
+@item (haiku-numeric-enum MIME)
+包含特定 MIME 类型数据的单字节字符串。
+@end table
+@end defvar
+
+对 @code{gui-get-selection} 的调用通常会返回选择消息中名为 @var{data-type} 的数据，尽管如果它是以下 X 选择目标之一，则用替代名称替换 @var{data-type}：
+
+@table @code
+@item STRING
+这表示 X 下的 Latin-1 文本：``text/plain;charset=iso-8859-1''
+
+@item UTF8_STRING
+这代表 UTF-8 文本：``text/plain''
+@end table
+
+如果@var{data-type}是文本类型，例如@code{STRING}或与模式@samp{`text/*}匹配的MIME类型，则字符串数据在返回之前会使用适合它的编码系统进行解码。
+
+此外，两种数据类型@var{TIMESTAMP}和@code{TARGETS}受到特殊处理；第一个返回的值是自系统启动以来修改选择的次数（@emph{not}时间戳），另一个返回的值是可用选择数据类型的向量，与其他地方一样。
+
+@cindex Android selections
+与 MS-Windows 非常相似，Android 提供了剪贴板，但没有主要或次要选择； @code{gui-set-selection} 通过将提供的值保存到随后调用 @code{gui-get-selection} 返回的变量中来模拟主要和次要选择。
+
+从剪贴板，@code{gui-get-selection} 能够返回 @code{STRING} 类型的 UTF-8 字符串数据、@code{TARGETS} 数据类型或任何 MIME 类型的图像和应用程序数据。 @code{gui-set-selection} 仅设置字符串数据，与 MS-Windows 下非常相似，尽管该数据不受 @code{selection-coding-system} 值的影响。  相比之下，只能将字符串数据保存到主要和次要选择中或从主要和次要选择中保存；但由于该数据不与 Emacs 之外的程序通信，因此它不受任何编码系统的编码或解码。
+
+@node Yanking Media
+@section 扬京传媒
+@cindex yank media from window-system selections
+
+保存在窗口系统选择和 MS-Windows 剪贴板中的数据不限于纯文本。  选择数据可以包含图像或其他类似的二进制数据，以及由 HTML 和 PostScript 实例化的富文本内容。  由于与该数据相关的选择数据类型与纯文本的选择数据类型不同，因此一组称为 0⁣ 的函数有助于插入此类数据，这些函数由进行插入的每个主要模式注册，并在执行 @code{yank-media} 命令时调用。
+
+@defun yank-media-handler types handler
+注册一个适用于当前缓冲区的 yank-media 处理程序。
+
+@var{types} 可以是指定选择数据类型的符号 (@pxref{Accessing Selections})、与此类类型相匹配的正则表达式，或者这些符号和正则表达式的列表。  例如：
+
+@example
+(yank-media-handler 'text/html #'my-html-handler)
+(yank-media-handler "image/.*" #'my-image-handler)
+@end example
+
+当选择提供与@var{types}匹配的数据类型时，调用函数@var{handler}来插入其数据，符号指定匹配的选择数据类型，以及@code{gui-get-selection}返回的数据。
+@end defun
+
+默认情况下，@code{yank-media} 命令自动选择首选的 @sc{mime} 类型。  用于选择的规则可以通过变量@code{yank-media-autoselect-function}和@code{yank-media-preferred-types}控制。
+
+@defvar yank-media-autoselect-function
+该变量应指定一个函数，该函数将使用当前主要模式可用的 @sc{mime} 类型列表进行调用，并且应返回要使用的首选 @sc{mime} 类型列表。  当请求自动选择时，列表中的第一个 @sc{mime} 类型将始终由 @code{yank-media} 命令使用。
+@end defvar
+
+@defvar yank-media-preferred-types
+该变量改变了@code{yank-media-autoselect-function}的默认选择过程。  这是一个列表，应包含唯一的 @sc{mime} 类型，以便按照他们的偏好顺序进行选择。  它还可以包含一个函数，在这种情况下，它会使用可用的 @sc{mime} 类型列表来调用，并且必须按其偏好顺序返回首选 @sc{mime} 类型的列表。  该列表被传递到 @code{yank-media} 命令，以便在请求自动选择时选择返回列表的第一个元素。
+@end defvar
+
+@code{yank-media-types} 命令提供当前可用的选择数据类型列表，这在实现 yank-media 处理程序时很有用；因为程序通常提供不拘一格且很少一致的数据类型混合体。
+
+@node Drag and Drop
+@section 拖放
+@cindex drag and drop
+
+通过拖放传输的数据通常是纯文本或指定文件或其他资源的 URL 列表。  当文本被丢弃时，它会被插入到丢弃的位置，如果不可能的话，可以将其保存到 Kill Ring 中。
+
+删除的 URL 将提供给变量 @code{dnd-protocol-alist} 中的相关@dfn{DND handler functions}，或者由变量 @code{browse-url-handlers} 和 @code{browse-url-default-handlers} 指定的“URL 处理程序”；如果没有任何类型的匹配处理程序，它们将被视为纯文本并插入到缓冲区中。
+
+@defvar dnd-protocol-alist
+此变量是 URL 匹配的正则表达式和删除匹配 URL 时调用的 DND 处理程序函数之间的列表。
+
+@cindex dnd-multiple-handler, a symbol property
+如果处理函数是一个设置了 @code{dnd-multiple-handler} 属性 (@pxref{Symbol Properties}) 的符号，则在放置时会给出与其正则表达式匹配的每个 URL 的列表；如果没有此属性，则会为每个 URL 调用一次。  第一个参数后面是符号 @code{copy}、@code{move}、@code{link}、@code{private} 或 @code{ask} 之一，标识要采取的操作。
+
+如果@var{action}为@code{private}，则发起丢弃的程序不会坚持其接收者的任何特定行为；在这种情况下，采取的合理操作是打开 URL 或将其内容复制到当前缓冲区中。  @var{action} 的其他值与 @code{dnd-begin-file-drag} 的 @var{action} 参数含义大致相同。
+
+一旦其工作完成，处理函数必须返回一个符号来指定它所采取的操作：要么是它所提供的操作，要么是符号@code{private}，它向 drop 源传达它所指定的操作尚未执行。
+
+当多个处理程序与放置中的重叠项目子集匹配时，将调用与最大数量的项目匹配的处理程序来打开该子集。  随后，它所提供的物品将被其他处理程序扣留，即使它们也匹配。
+@end defvar
+
+@cindex drag and drop, X
+@cindex drag and drop, other formats
+Emacs 不采取措施接受除文本和 URL 之外的数据，因为支持此操作的窗口系统接口彼此相距太远，无法一致地进行抽象。  DND 处理程序也不会对其应采取的操作施加影响，因为特定的拖放协议拒绝接收者进行此类控制。  X11 拖放实现依赖于多个底层协议，这些协议利用选择传输并共享许多共同点，通过以下函数和变量提供低级访问：
+
+@defvar x-dnd-test-function
+调用此函数以确定 Emacs 是否应该接受删除。  它用三个参数调用：
+
+@itemize @bullet
+@item
+被拖动的项目下方的窗口，也就是说其缓冲区要接收拖放的窗口。  如果该项目位于框架的非窗口组件（例如滚动条、工具栏和类似的东西）上，则框架本身将被提供在其位置。
+
+@item
+符号@code{move}、@code{copy}、@code{link} 或@code{ask} 之一，表示对掉落源建议的物品数据采取的操作。  这些符号具有与@code{x-begin-drag}中相同的含义。
+
+@item
+该项目提供的选择数据类型 (@pxref{X Selections}) 的向量。
+@end itemize
+
+该函数必须返回@code{nil}以拒绝丢弃或拒绝将要采取的操作（例如通过传输到 DND 处理函数）以及要请求的选择数据类型。  该 cons 中返回的操作也可能是符号 @code{private}，这表明所采取的操作尚未确定。
+@end defvar
+
+@defvar x-dnd-known-types
+修改 @code{x-dnd-test-function} 通常是没有必要的，因为可以通过更改此选择数据类型列表来调整其默认的接受丢弃的标准集。  每个元素都是一个字符串，如果默认的“测试函数”在数据类型列表中找到该字符串作为元素的符号名称，则将导致该函数接受删除。
+
+除非将对应的处理函数附加到@code{x-dnd-types-alist}，否则向此列表引入新条目是没有用的。
+@end defvar
+
+@defvar x-dnd-types-alist
+该变量是指定选择数据类型的字符串和删除此类类型的内容时调用的函数之间的列表。
+
+每个这样的函数都提供三个参数；第一个是水滴位置下方的窗口或框架，如 @code{x-dnd-test-function} 中；第二个是要采取的操作，可以是测试函数返回的任何操作，第三个是选择数据本身 (@pxref{Accessing Selections})。
+@end defvar
+
+X11 拖放协议提供的选择数据类型有时与 ICCCM 和符合剪贴板或主要选择所有者提供的数据类型不同。  通常，MIME 类型的名称（例如 @code{"text/plain;charset=utf-8"}（“utf-8”的大小写不同））会替换为标准 X 选择名称，例如 @code{UTF8_STRING}。
+
+@cindex XDS
+@cindex direct save protocol
+@vindex x-dnd-direct-save-function
+X 直接保存 (@acronym{XDS}) 协议使程序能够将命名已删除文件的责任移交给接收者。当发生此类丢弃时，DND 处理程序和前述 X 特定接口在很大程度上被规避，从而向不同的功能分配响应丢弃的任务。
+
+@defvar x-dnd-direct-save-function
+该变量应设置为一个函数，该函数在两步过程中注册并命名使用 @acronym{XDS} 协议删除的文件。  它提供了两个参数，@var{need-name}和@var{filename}。
+
+@enumerate 1
+@item
+从中拖动文件的应用程序要求 Emacs 提供用于保存文件的完整文件名。  为此，调用直接保存函数，其第一个参数 @var{need-name} 非 @code{nil}，第二个参数 @var{filename} 设置为要保存的文件的基本名称。  它应该返回保存文件的完全展开的绝对文件名。  例如，如果将文件拖到 Dired 窗口，则该文件的自然目录是拖放位置处显示的文件目录。  如果由于某种原因无法保存文件，该函数应返回@code{nil}，这将取消拖放操作。
+
+@item
+从中拖动文件的应用程序会将文件保存在第一次调用直接保存函数返回的名称下。  如果成功保存文件，则会再次调用直接保存函数，这次第一个参数 @var{need-name} 设置为 @code{nil}，第二个参数 @var{filename} 设置为已保存文件的完整绝对名称。  鉴于文件已保存，该函数预计会执行所需的操作。  例如，Dired 应该通过在其中显示新文件来更新显示的目录。
+@end enumerate
+
+它的默认@code{x-dnd-direct-save-function}是@code{x-dnd-save-direct}。
+@end defvar
+
+@defun x-dnd-save-direct need-name filename
+当使用 @var{need-name} 参数非 @code{nil} 调用时，此函数会提示用户输入应保存的绝对文件名。  如果指定的文件已经存在，还会询问用户是否覆盖，只有用户确认覆盖后才返回绝对文件名。
+
+当使用 @var{need-name} 参数 @code{nil} 调用时，如果当前缓冲区处于 Dired 模式或其后代模式之一，它将恢复 Dired 列表，否则通过调用 @code{find-file} (@pxref{Visiting Functions}) 访问该文件。
+@end defun
+
+@defun x-dnd-save-direct-immediately need-name filename
+此函数的工作方式与 @code{x-dnd-save-direct} 相似，但当使用非 @code{nil} 参数调用 @var{need-name} 时，它不会提示用户输入要保存的文件的全名；相反，它返回针对当前缓冲区的默认目录 (@pxref{File Name Expansion}) 展开的参数 @var{filename}。  （它仍然要求确认默认目录中是否已存在同名的文件。）
+@end defun
+
+@cindex initiating drag-and-drop
+当当前窗口系统支持时，还可以将内容从 Emacs 拖动到其他程序。  为此提供的函数如下：
+
+@cindex drop target, in drag-and-drop operations
+@defun dnd-begin-text-drag text &optional frame action allow-same-frame
+该函数启动从@var{frame}到另一个程序（称为@dfn{drop target}）的拖放操作，并在@var{text}被放下或取消操作时返回。
+
+@var{action} 必须是符号 @code{copy} 或 @code{move} 之一，其中 @code{copy} 表示 @var{text} 应由放置目标插入，@code{move} 表示与 @code{copy} 相同，但调用者还必须从其源中删除 @var{text}，如下列表所述。
+
+@var{frame} 是鼠标当前按住的帧，或者@code{nil}，表示使用选定的帧。  由于如果没有按住鼠标按钮，此函数可能会立即返回，因此应该仅在响应 @code{down-mouse-1} 或类似事件 (@pxref{Mouse Events}) 时调用它，并将 @var{frame} 设置为生成该事件的帧 (@pxref{Click Events})。
+
+如果 @var{allow-same-frame} 是 @code{nil}，则@var{frame} 顶部的水滴将被忽略。
+
+返回值反映了放置目标实际执行的操作，以及调用者应该采取的操作（如果有）。  它是以下符号之一：
+
+@table @code
+@item copy
+放置目标插入了放置的文本。
+
+@item move
+放置目标插入了放置的文本，并且调用者应该从提取它的缓冲区中删除@var{text}（如果适用）。
+
+@item private
+掉落目标还采取了一些其他未指定的行动。
+
+@item nil
+拖放操作被取消。
+@end table
+
+@end defun
+
+@defun dnd-begin-file-drag file &optional frame action allow-same-frame
+该函数启动从@var{frame}到另一个程序（称为@dfn{drop target}）的拖放操作，并在@var{file}被放下或取消操作时返回。
+
+如果@var{file}是远程文件，则将制作临时本地副本。
+
+@var{action} 必须是符号 @code{copy}、@code{move} 或 @code{link} 之一，其中 @code{copy} 表示 @var{file} 应由放置目标打开或复制，@code{move} 表示放置目标应将文件移动到另一个位置，@code{link} 表示放置目标应创建一个符号链接@var{file}。  如果 10⁣ 是远程文件，则指定 @code{link} 作为操作是错误的。
+
+@var{frame} 和 @var{allow-same-frame} 的含义与调用 @code{dnd-begin-text-drag} 时的含义相同。
+
+返回值是放置目标实际执行的操作，为以下符号之一：
+
+@table @code
+@item copy
+放置目标打开或复制 @var{file} 到不同位置。
+
+@item move
+放置目标已移动 @var{file} 到不同的位置。
+
+@item link
+放置目标（通常是文件管理器）创建了指向 @var{file} 的符号链接。
+
+@item private
+放置目标执行了一些其他未指定的操作。
+
+@item nil
+拖放操作被取消。
+@end table
+
+@end defun
+
+@defun dnd-begin-drag-files files &optional frame action allow-same-frame
+该函数与 @code{dnd-begin-file-drag} 类似，只不过 @var{files} 是文件列表。  如果放置目标不支持放置多个文件，则将使用第一个文件。
+@end defun
+
+@defun dnd-direct-save file name &optional frame allow-same-frame
+此函数的行为类似于 @code{dnd-begin-file-drag}（当使用默认操作 @code{copy} 时），不同之处在于它接受要归档副本的名称。
+@end defun
+
+@cindex initiating drag-and-drop, low-level
+上述高级接口是在较低级原语之上实现的。  低级接口@code{x-begin-drag}还可用于拖动文本和文件之外的内容。  它需要详细了解其调用者希望支持的每个平台上的程序所理解的数据类型和操作。
+
+@defun x-begin-drag targets &optional action frame return-frame allow-current-frame follow-tooltip
+该函数从 @var{frame} 开始拖动，并在拖放操作结束时返回（因为放置成功，或者因为放置被拒绝）。  当在除 1⁣（@dfn{drop target}）以外的 X 窗口或任何 X 窗口（如果 @var{allow-current-frame} 为非 @code{nil}）顶部释放所有鼠标按钮时，会发生放下操作。  如果拖放操作开始时没有按住鼠标按钮，该函数可能会立即返回@code{nil}。
+
+@var{targets} 是表示选择目标的字符串列表，非常类似于 @code{gui-get-selection} 的 @var{data-type} 参数，放置目标可以从 Emacs (@pxref{Window System Selections}) 请求。
+
+@var{action} 是一个符号，指定向目标推荐的操作。  它可以是@code{XdndActionCopy}或@code{XdndActionMove}；两者都意味着将选择的内容复制到放置目标，但后者还传达了在复制后删除选择的内容的承诺。
+
+@var{action} 也可以是一个列表，它在表示可用操作的符号和放置目标呈现给用户以供他在这些操作之间进行选择的字符串之间进行关联。
+
+如果@var{return-frame}非@code{nil}并且鼠标在第一次移出@var{frame}后移动到Emacs框架上，那么鼠标移动到的框架将立即返回。  如果@var{return-frame}是符号@code{now}，则鼠标指针下方的任何帧都将返回，而无需等待鼠标首先移出@var{frame}。  当您想要专门将内容从一个框架拖动到另一个框架，同时还将内容拖动到其他程序时，@var{return-frame} 非常有用，但不能保证它在所有系统和所有窗口管理器上都能正常工作。
+
+如果 @var{follow-tooltip} 不是 @code{nil}，则任何工具提示（例如 @code{tooltip-show} 显示的工具提示）的位置将跟随鼠标指针在拖放操作期间移动时的位置。  释放所有鼠标按钮后，工具提示将隐藏。
+
+如果放置被拒绝或未找到放置目标，则此函数返回@code{nil}。  否则，它返回一个表示目标选择采取的操作的符号，如果放置目标不支持，则该符号可能与 @var{action} 不同。  除了@code{XdndActionCopy}和@code{XdndActionMove}之外，@code{XdndActionPrivate}也是有效的返回值；它表明放置目标选择了不确定的操作，并且调用者不需要采取进一步的操作。
+
+调用者必须配合目标来完成目标所选择的动作。  例如，如果此函数返回 @code{XdndActionMove}，调用者应删除任何被拖动的缓冲区文本，对于适用类似标准的其他拖动数据也同样如此。
+@end defun
+
+@cindex drag and drop protocols, X
+
+函数 @code{x-begin-drag} 在“幕后”利用了多个拖放协议。  当拖动已知特定拖放协议不支持的内容时，可以通过更改以下变量的值来禁用该协议：
+
+@defvar x-dnd-disable-motif-protocol
+当该值为非 0 时，Motif 拖放协议将被禁用，并且拖放到只能理解它们的程序上将不起作用。
+@end defvar
+
+@defvar x-dnd-use-offix-drop
+当该值为 0 时，OffiX（旧 KDE）拖放协议被禁用。  当这是符号 @code{files} 时，仅当@code{"FILE_NAME"} 是给@code{x-begin-drag} 的目标之一时才会使用 OffiX 协议。  任何其他值都意味着使用 OffiX 协议删除所有支持的内容。
+@end defvar
+
+@defvar x-dnd-use-unsupported-drop
+当 @code{"STRING"}、@code{"UTF8_STRING"}、@code{"COMPOUND_TEXT"} 或 @code{"TEXT"} 目标之一出现在给定 @code{x-begin-drag} 的列表中时，如果放置目标根本不支持任何拖放协议，Emacs 将尝试使用合成鼠标事件和主要选择来插入文本。
+
+一个副作用是 Emacs 将成为此类删除后主要选择的所有者。  可以通过将此变量设置为 @code{nil} 来禁用此类仿真。
+@end defvar
+
+@node Color Names
+@section 颜色名称
+
+@cindex color names
+@cindex specify color
+@cindex numerical RGB color specification
+颜色名称是指定颜色的文本（通常为字符串）。允许使用符号名称，例如 @samp{black}、@samp{white}、@samp{red} 等；使用 @kbd{M-x list-colors-display} 查看已定义名称的列表。  您还可以以 @samp{#@var{rgb}} 和 @samp{RGB:@var{r}/@var{g}/@var{b}} 等形式以数字方式指定颜色，其中 @var{r} 指定红色级别，@var{g} 指定绿色级别，@var{b} 指定蓝色级别。  您可以使用一位、两位、三位或四位十六进制数字来表示 @var{r}；那么您也必须对所有 @var{g} 和 @var{b} 使用相同数量的十六进制数字，总共为 3、6、9 或 12 个十六进制数字。  （有关颜色的数字 RGB 规范的更多详细信息，请参阅 X Window 系统的文档。）
+
+这些函数提供了一种方法来确定哪些颜色名称有效以及它们的外观。  在某些情况下，该值取决于 0⁣，如下所述；参见@ref{Input Focus}，了解术语“选定帧”的含义。
+
+要完整读取用户输入的颜色名称，请使用@code{read-color} (@pxref{High-Level Completion, read-color})。
+
+@defun color-defined-p color &optional frame
+此函数报告颜色名称是否有意义。  如果是，则返回@code{t}；否则，@code{nil}。  参数 @var{frame} 表示要询问哪个帧的显示；如果省略@var{frame}或@code{nil}，则使用所选帧。
+
+请注意，这并不能告诉您所使用的显示器是否真正支持该颜色。  使用 X 时，您可以在任何类型的显示器上请求任何定义的颜色，并且您将得到一些结果——通常是它能做到的最接近的结果。  要确定框架是否确实可以显示某种颜色，请使用@code{color-supported-p}（见下文）。
+@end defun
+
+@defun defined-colors &optional frame
+此函数返回框架 @var{frame}（默认为所选框架）上定义和支持的颜色名称列表。如果@var{frame}不支持颜色，则值为@code{nil}。
+@end defun
+
+@defun color-supported-p color &optional frame background-p
+如果@var{frame}确实可以显示颜色@var{color}（或至少接近它），则返回@code{t}。  如果省略 @var{frame} 或 @code{nil}，则问题适用于所选帧。
+
+某些终端支持不同的前景和背景颜色集。  如果@var{background-p}非@code{nil}，那就意味着你在问@var{color}是否可以用作背景；否则你会问它是否可以用作前景。
+
+参数 @var{color} 必须是有效的颜色名称。
+@end defun
+
+@defun color-gray-p color &optional frame
+如果@var{color}是灰色阴影（如@var{frame}显示屏上所定义），则返回@code{t}。  如果省略 @var{frame} 或 @code{nil}，则问题适用于所选帧。  如果@var{color}不是有效的颜色名称，则此函数返回@code{nil}。
+@end defun
+
+@defun color-values color &optional frame
+@cindex rgb value
+该函数返回一个值，该值描述 @var{color} 在 @var{frame} 上的理想外观。  如果定义了@var{color}，则该值是三个整数的列表，分别给出红色的量、绿色的量和蓝色的量。  每个整数的范围原则上是从 0 到 65535，但某些显示器可能不会使用整个范围。  这个三元素列表称为颜色的@dfn{rgb values}。
+
+如果@var{color}未定义，则值为@code{nil}。
+
+@example
+(color-values "black")
+     @result{} (0 0 0)
+(color-values "white")
+     @result{} (65535 65535 65535)
+(color-values "red")
+     @result{} (65535 0 0)
+(color-values "pink")
+     @result{} (65535 49344 52171)
+(color-values "hungry")
+     @result{} nil
+@end example
+
+返回颜色值用于 @var{frame} 的显示。  如果省略 @var{frame} 或 @code{nil}，则返回所选帧显示的信息。  如果框架无法显示颜色，则值为@code{nil}。
+@end defun
+
+@defun color-name-to-rgb color &optional frame
+此函数的作用与 @code{color-values} 相同，但它返回 0.0 到 1.0 之间（含 0.0 和 1.0）之间的浮点数颜色值。
+@end defun
+
+@defun color-dark-p rgb
+如果 RGB 三元组 @var{rgb} 描述的颜色在白色背景下比在深色背景下更易读，则此函数返回非 @code{nil}。  参数 @var{rgb} 应该是 @w{@code{(@var{r} @var{g} @var{b})}} 形式的列表，每个组件都是 0.0 到 1.0（含）范围内的浮点数。  您可以使用 @code{color-name-to-rgb} 将颜色名称转换为这样的列表。
+@end defun
+
+@node Text Terminal Colors
+@section 文本终端颜色
+@cindex colors on text terminals
+
+文本终端通常仅支持少量颜色，并且计算机使用小整数来选择终端上的颜色。这意味着计算机无法可靠地判断所选颜色是什么样子；相反，您必须告知应用程序哪些小整数对应于哪些颜色。  然而，Emacs 确实知道标准的颜色集，并且会尝试自动使用它们。
+
+本节中描述的函数控制 Emacs 如何使用终端颜色。
+
+其中一些函数使用或返回@dfn{rgb values}，如@ref{Color Names}中所述。
+
+这些函数接受显示（框架或终端名称）作为可选参数。  我们希望未来能够让Emacs在不同的文本终端上支持不同的颜色；那么该参数将指定要在哪个终端上进行操作（默认为所选帧的终端；@pxref{Input Focus}）。  但目前，@var{frame} 论点没有任何作用。
+
+@defun tty-color-define name number &optional rgb frame
+此函数将终端上的颜色名称 @var{name} 与颜色编号 @var{number} 相关联。
+
+可选参数 @var{rgb}（如果指定）是一个 rgb 值，它是一个由三个数字组成的列表，用于指定颜色的实际外观。如果不指定 @var{rgb}，那么@code{tty-color-approximate} 就不能使用该颜色来近似其他颜色，因为 Emacs 不会知道它是什么样子。
+@end defun
+
+@defun tty-color-clear &optional frame
+此函数清除文本终端的已定义颜色表。
+@end defun
+
+@defun tty-color-alist &optional frame
+此函数返回一个记录文本终端支持的已知颜色的列表。
+
+每个元素的形式为 @code{(@var{name} @var{number} . @var{rgb})} 或 @code{(@var{name} @var{number})}。  这里，@var{name}是颜色名称，@var{number}是用于向终端指定它的数字。如果存在，@var{rgb} 是三个颜色值（红色、绿色和蓝色）的列表，表示颜色的实际外观。
+@end defun
+
+@defun tty-color-approximate rgb &optional frame
+此函数在 @var{display} 支持的已知颜色中查找与 rgb 值 @var{rgb}（颜色值列表）描述的颜色最接近的颜色。  返回值是@code{tty-color-alist}的元素。
+@end defun
+
+@defun tty-color-translate color &optional frame
+此函数在 @var{display} 支持的已知颜色中查找最接近 @var{color} 的颜色，并返回其索引（整数）。如果未定义名称 @var{color}，则值为 @code{nil}。
+@end defun
+
+@node Resources
+@section X资源
+
+本节介绍一些用于查询和使用 X 资源的函数和变量，或者操作系统上的等效函数和变量。  @xref{X Resources,, X Resources, emacs, The GNU Emacs Manual}，有关 X 资源的更多信息。
+
+@defun x-get-resource attribute class &optional component subclass
+函数 @code{x-get-resource} 从 ​​X Window 默认数据库中检索资源值。
+
+资源通过 @dfn{key} 和 @dfn{class} 的组合进行索引。该函数使用 @samp{@var{instance}.@var{attribute}} 形式的键（其中 @var{instance} 是调用 Emacs 的名称）进行搜索，并使用 @samp{Emacs.@var{class}} 作为类。
+
+可选参数 @var{component} 和 @var{subclass} 分别添加到键和类中。  您必须指定两者或都不指定。如果指定它们，则键为@samp{@var{instance}.@var{component}.@var{attribute}}，类为@samp{Emacs.@var{class}.@var{subclass}}。
+@end defun
+
+@defvar x-resource-class
+该变量指定 @code{x-get-resource} 应查找的应用程序名称。  默认值为@code{"Emacs"}。  您可以通过将此变量绑定到某个其他字符串（围绕对 @code{x-get-resource} 的调用）来检查 X 资源中的其他应用程序名称。
+@end defvar
+
+@defvar x-resource-name
+该变量指定 @code{x-get-resource} 应查找的实例名称。  默认值是调用 Emacs 时使用的名称，或者使用 @samp{-name} 或 @samp{-rn} 开关指定的值。
+@end defvar
+
+为了说明上面的一些内容，假设您有以下行：
+
+@example
+xterm.vt100.background: yellow
+@end example
+
+@noindent
+在您的 X 资源文件中（其名称通常为 @file{~/.Xdefaults} 或 @file{~/.Xresources}）。  然后：
+
+@example
+@group
+(let ((x-resource-class "XTerm") (x-resource-name "xterm"))
+  (x-get-resource "vt100.background" "VT100.Background"))
+     @result{} "yellow"
+@end group
+@group
+(let ((x-resource-class "XTerm") (x-resource-name "xterm"))
+  (x-get-resource "background" "VT100" "vt100" "Background"))
+     @result{} "yellow"
+@end group
+@end example
+
+@defvar inhibit-x-resources
+如果该变量为非@code{nil}，Emacs 不会查找 X 资源，并且 X 资源在创建新框架时不会产生任何影响。
+@end defvar
+
+@node Display Feature Testing
+@section 显示功能测试
+@cindex display feature testing
+
+本节中的功能描述了特定显示器的基本功能。  Lisp 程序可以使用它们来调整自己的行为以适应显示器的功能。  例如，如果不支持弹出菜单，通常使用弹出菜单的程序可以使用迷你缓冲区。
+
+这些函数中的可选参数@var{display}指定要询问的问题的显示。  它可以是显示名称、框架（指定该框架所在的显示器）或@code{nil}（指所选框架的显示器@pxref{Input Focus}）。
+
+@xref{Color Names}、@ref{Text Terminal Colors}，用于其他函数来获取有关显示器的信息。
+
+@defun display-popup-menus-p &optional display
+如果 @var{display} 支持弹出菜单，则此函数返回 @code{t}，如果不支持，则返回 @code{nil}。  对弹出菜单的支持要求鼠标可用，因为通过在 Emacs 显示的某些部分上单击鼠标来弹出菜单。
+@end defun
+
+@defun display-graphic-p &optional display
+如果@var{display}是能够同时显示多个帧和几种不同字体的图形显示器，则此函数返回@code{t}。  对于使用窗口系统（例如 X）的显示器来说，这是正确的，对于文本终端来说，这是错误的。
+@end defun
+
+@defun display-mouse-p &optional display
+@cindex mouse, availability
+如果 1⁣ 有可用鼠标，则该函数返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@defun display-color-p &optional display
+如果屏幕是彩色屏幕，则此函数返回@code{t}。
+@end defun
+
+@defun display-grayscale-p &optional display
+如果屏幕可以显示灰色阴影，则此函数返回@code{t}。 （所有彩色显示器都可以做到这一点。）
+@end defun
+
+@defun display-supports-face-attributes-p attributes &optional display
+@anchor{Display Face Attribute Testing}
+如果支持 @var{attributes} 中的所有面部属性 (@pxref{Face Attributes})，则此函数返回非 @code{nil}。
+
+“支持”的定义有点启发式，但基本上意味着包含 @var{attributes} 中所有属性的面，当与默认面合并显示时，可以用以下方式表示
+
+@enumerate
+@item
+外观与默认面孔不同，并且
+
+@item
+即使不准确，在精神上也接近于属性指定的内容。
+@end enumerate
+
+点(2)意味着任何可以显示粗体的显示器都将满足@code{:weight black}属性，只要可以显示某种淡黄色，@code{:foreground "yellow"}也将满足@code{:slant italic}属性，但@code{:slant italic}将通过tty显示代码自动用暗淡的斜体替换来满足@code{:slant italic}属性。
+@end defun
+
+@defun display-selections-p &optional display
+如果@var{display} 支持选择，则此函数返回@code{t}。窗口显示通常支持选择，但在某些其他情况下也可能受支持。
+@end defun
+
+@defun display-images-p &optional display
+如果@var{display}可以显示图像，该函数返回@code{t}。原则上，窗口显示器应该能够处理图像，但某些系统缺乏对此的支持。  在不支持图像的显示器上，Emacs 无法显示工具栏。
+@end defun
+
+@defun display-screens &optional display
+此函数返回与显示器关联的屏幕数量。
+@end defun
+
+@defun display-pixel-height &optional display
+此函数返回屏幕的高度（以像素为单位）。在字符终端上，它给出字符的高度。
+
+对于图形终端，请注意，在多显示器设置中，这指的是与 @var{display} 关联的所有物理显示器的像素高度。  @xref{Multiple Terminals}。
+@end defun
+
+@defun display-pixel-width &optional display
+此函数返回屏幕的宽度（以像素为单位）。在字符终端上，它给出字符的宽度。
+
+对于图形终端，请注意，在多显示器设置中，这指的是与 @var{display} 关联的所有物理显示器的像素宽度。  @xref{Multiple Terminals}。
+@end defun
+
+@defun display-mm-height &optional display
+此函数返回屏幕的高度（以毫米为单位），如果 Emacs 无法获取该信息，则返回 @code{nil}。
+
+对于图形终端，请注意，在多显示器设置中，这指的是与 @var{display} 关联的所有物理显示器的高度。  @xref{Multiple Terminals}。
+@end defun
+
+@defun display-mm-width &optional display
+此函数返回屏幕宽度（以毫米为单位），如果 Emacs 无法获取该信息，则返回 @code{nil}。
+
+对于图形终端，请注意，在多显示器设置中，这指的是与 @var{display} 关联的所有物理显示器的宽度。  @xref{Multiple Terminals}。
+@end defun
+
+@defopt display-mm-dimensions-alist
+该变量允许用户指定 @code{display-mm-height} 和 @code{display-mm-width} 返回的图形显示尺寸，以防系统提供不正确的值。
+@end defopt
+
+@cindex backing store
+@defun display-backing-store &optional display
+此函数返回显示器的后备存储功能。后备存储意味着记录未曝光的窗口（以及窗口的一部分）的像素，以便在曝光时可以非常快速地显示它们。
+
+值可以是符号 @code{always}、@code{when-mapped} 或 @code{not-useful}。  当问题不适用于某种显示时，该函数还可以返回@code{nil}。
+@end defun
+
+@cindex SaveUnder feature
+@defun display-save-under &optional display
+如果显示器支持 SaveUnder 功能，则此函数返回非@code{nil}。  弹出窗口使用该功能来保存它们隐藏的像素，以便它们可以快速弹出。
+@end defun
+
+@defun display-planes &optional display
+此函数返回显示器支持的平面数。这通常是每个像素的位数。对于 tty 显示，它以支持的颜色数量的二为底。
+@end defun
+
+@defun display-visual-class &optional display
+此函数返回屏幕的视觉类。  该值是符号 @code{static-gray}（有限的、不可更改的灰度数）、@code{gray-scale}（全范围的灰度）、@code{static-color}（有限的、不可更改的颜色数）、@code{pseudo-color}（有限的颜色数）、@code{true-color}（全范围的颜色）和 @code{direct-color}（全范围的颜色）之一。
+@end defun
+
+@defun display-color-cells &optional display
+此函数返回屏幕支持的颜色单元数。
+@end defun
+
+这些函数获取有关正在使用的窗口系统的附加信息，其中 Emacs 显示指定的@var{display}。  （由于历史原因，他们的名字以@code{x-}开头。）
+
+@defun x-server-version &optional display
+该函数返回在 @var{display} 上运行的 GUI 窗口系统的版本号列表，例如 GNU 和 Unix 系统上的 X 服务器。  该值是三个整数的列表：协议的主版本号和次版本号，以及窗口系统软件本身的发行商特定版本号。  在 GNU 和 Unix 系统上，这些通常是 X 协议的版本和 X 服务器软件的发行商特定版本号。  在 MS-Windows 上，这是 Windows 操作系统的版本。
+@end defun
+
+@defun x-server-vendor &optional display
+此函数返回提供窗口系统软件的供应商（作为字符串）。  在 GNU 和 Unix 系统上，这实际上意味着谁分发了 X 服务器。  在 MS-Windows 上，这是 Windows 操作系统 (Microsoft) 的供应商 ID 字符串。
+
+当 X 的开发人员将软件分销商标记为“供应商”时，他们表明了他们的错误假设：任何系统都不能以非商业方式开发和分发。
+@end defun
+
+@ignore
+@defvar x-no-window-manager
+This variable's value is @code{t} if no X window manager is in use.
+@end defvar
+@end ignore

@@ -1,0 +1,303 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Parsing Expression Grammars
+@chapter 解析表达式语法
+@cindex text parsing
+@cindex parsing expression grammar
+@cindex PEG
+
+Emacs Lisp 提供了多种用于解析和匹配文本的工具，从正则表达式 (@pxref{Regular Expressions}) 到完整的从左到右（又名@: @acronym{LL}）语法解析器 (@pxref{Top,, Bovine parser development,bovine})。  @dfn{Parsing Expression Grammars} (@acronym{PEG}) 是另一种文本解析方法，它提供比正则表达式更多的结构和可组合性，但比上下文无关语法复杂性更低。
+
+解析表达式语法 (@acronym{PEG}) 根据一组用于识别语言中字符串的规则来描述形式语言。  在 Emacs 中，@acronym{PEG} 解析器被定义为命名规则列表，每个规则都匹配文本模式和/或包含对其他规则的引用。  解析是用函数@code{peg-run}或宏@code{peg-parse}（见下文）启动的，并使用给定的一组规则解析当前缓冲区中点之后的文本。
+
+@cindex parsing expression
+@cindex root, of parsing expression grammar
+@cindex entry-point, of parsing expression grammar
+@acronym{PEG} 中的每条规则都称为 @dfn{parsing expression} (@acronym{PEX})，并且可以指定为文字字符串、类似正则表达式的字符范围或集、类似于 Emacs Lisp 函数调用的特定于挂钩的构造、对另一个规则的引用或其中任何内容的组合。  语法被表示为规则树，其中一个规则通常被视为“根”或“入口点”规则。  例如：
+
+@example
+@group
+((number sign digit (* digit))
+ (sign   (or "+" "-" ""))
+ (digit  [0-9]))
+@end group
+@end example
+
+一旦定义，语法可以用于以多种方式解析当前缓冲区中的点之后的文本。  @code{peg-parse} 宏是最简单的：
+
+@defmac peg-parse &rest pexs
+在点处匹配@var{pexs}。
+@end defmac
+
+@example
+@group
+(peg-parse
+  (number sign digit (* digit))
+  (sign   (or "+" "-" ""))
+  (digit  [0-9]))
+@end group
+@end example
+
+虽然这个宏很简单，但也很不灵活，因为规则必须直接写入源代码中。  通过使用其他函数和宏的组合可以获得更大的灵活性。
+
+@defmac with-peg-rules rules &rest body
+使用 @var{rules}（实际上是 @acronym{PEX} 的列表）执行 @var{body}。  在@var{BODY}内，解析是通过调用@code{peg-run}来启动的。
+@end defmac
+
+@defun peg-run peg-matcher &optional failure-function success-function
+该函数接受单个 @var{peg-matcher}，它是在命名规则上调用 @code{peg}（见下文）的结果，通常是较大语法的入口点。
+
+解析结束时，根据解析是否成功，调用 @var{failure-function} 或 @var{success-function} 之一。  如果提供了@var{success-function}，它应该是一个接收匿名函数作为其唯一参数的函数，该匿名函数运行解析期间在堆栈上收集的所有操作。  默认情况下，这个匿名函数只是简单地执行。  如果解析失败，将调用 @var{failure-function} 提供的函数，并使用解析期间失败的 @acronym{PEG} 表达式列表。  默认情况下，该列表将被丢弃。
+@end defun
+
+传递给@code{peg-run}的@var{peg-matcher}是通过调用@code{peg}产生的：
+
+@defmac peg &rest pexs
+将@var{pexs}转换为适合传递给@code{peg-run}的单个钉匹配器。
+@end defmac
+
+上面的 @code{peg-parse} 示例扩展为对这些函数的一组调用，并且可以完整写为：
+
+@example
+@group
+(with-peg-rules
+    ((number sign digit (* digit))
+     (sign   (or "+" "-" ""))
+     (digit  [0-9]))
+  (peg-run (peg number)))
+@end group
+@end example
+
+这种方法允许对解析的“入口点”进行更明确的控制，并允许组合来自不同来源的规则。
+
+还可以使用更像 @code{defun} 的语法，使用宏 @code{define-peg-rule} 来定义单个规则：
+
+@defmac define-peg-rule name args &rest pexs
+将@var{name}定义为接受@var{args}并在点处匹配@var{pexs}的PEG规则。
+@end defmac
+
+例如：
+
+@example
+@group
+(define-peg-rule digit ()
+  [0-9])
+@end group
+@end example
+
+参数可以通过 @code{funcall} PEG 规则 (@pxref{PEX Definitions}) 提供给规则。
+
+另一种可能性是使用 @code{define-peg-ruleset} 定义一组命名规则：
+
+@defmac define-peg-ruleset name &rest rules
+将@var{name}定义为@var{rules}的标识符。
+@end defmac
+
+@example
+@group
+(define-peg-ruleset number-grammar
+  ;; `digit' here references the definition above.
+  (number () sign digit (* digit))
+  (sign () (or "+" "-" "")))
+@end group
+@end example
+
+以这种方式定义的规则和规则集可以在以后调用@code{peg-run}或@code{with-peg-rules}时通过名称引用：
+
+@example
+@group
+(with-peg-rules number-grammar
+  (peg-run (peg number)))
+@end group
+@end example
+
+默认情况下，调用 @code{peg-run} 或 @code{peg-parse} 不会产生输出：解析只是移动点。  为了返回或以其他方式处理解析后的字符串，规则可以包括@dfn{actions}，请参阅@ref{Parsing Actions}。
+
+@menu
+* PEX Definitions::              PEX规则的语法。
+* Parsing Actions::              成功解析后运行操作。
+* Writing PEG Rules::            编写解析规则的提示。
+@end menu
+
+@node PEX Definitions
+@section PEX 定义
+
+可以使用以下语法定义解析表达式：
+
+@table @code
+@item (and @var{e1} @var{e2}@dots{})
+必须全部匹配的 @acronym{PEX} 序列。  @code{and} 形式是可选且隐式的。
+
+@item (or @var{e1} @var{e2}@dots{})
+优先选择，这意味着，就像在 Elisp 中一样，按顺序尝试选择，并使用第一个成功的匹配。  请注意，这与上下文无关语法不同，在上下文无关语法中，多个匹配之间的选择是不确定的。
+
+@item (any)
+匹配任何单个字符，如正则表达式“.”。
+
+@item @var{string}
+一个文字字符串。
+
+@item (char @var{c})
+单个字符 @var{c}，作为 Elisp 字符文字。
+
+@item (* @var{e})
+表达式 @var{e} 的零个或多个实例，如正则表达式 @samp{*}。匹配总是“贪婪”的。
+
+@item (+ @var{e})
+表达式 @var{e} 的一个或多个实例，如正则表达式 @samp{+}。匹配总是“贪婪”的。
+
+@item (opt @var{e})
+表达式 @var{e} 的零个或一个实例，如正则表达式 @samp{?}。
+
+@item @var{symbol}
+代表先前定义的 PEG 规则的符号。
+
+@item (range @var{ch1} @var{ch2})
+字符范围在 @var{ch1} 和 @var{ch2} 之间，如正则表达式 @samp{[@var{ch1}-@var{ch2}]}。
+
+@item [@var{ch1}-@var{ch2} "+*" ?x]
+字符集，可以包括范围、字符文字或字符串。
+
+@item [ascii cntrl]
+命名字符类的列表。
+
+@item (syntax-class @var{name})
+单个语法类。
+
+@item (funcall @var{e} @var{args}@dots{})
+使用参数 @var{args} 调用 @acronym{PEX} @var{e}（之前使用 @code{define-peg-rule} 定义）。
+
+@item (null)
+空字符串。
+@end table
+
+以下表达式用作锚点或测试 - 它们不移动点，但返回一个布尔值，该值可用于约束匹配作为控制解析过程的一种方式（@pxref{Writing PEG Rules}）。
+
+@table @code
+@item (bob)
+缓冲区的开始。
+
+@item (eob)
+缓冲区结束。
+
+@item (bol)
+行的开头。
+
+@item (eol)
+行尾。
+
+@item (bow)
+词的开头。
+
+@item (eow)
+词末。
+
+@item (bos)
+符号的开始。
+
+@item (eos)
+符号结束。
+
+@item (if @var{e})
+如果从点解析@acronym{PEX}@var{e}成功（点未移动），则返回非@code{nil}。
+
+@item (not @var{e})
+如果从点解析@acronym{PEX}@var{e}失败（点未移动），则返回非@code{nil}。
+
+@item (guard @var{exp})
+将 Lisp 表达式 @var{exp} 的值视为布尔值。
+@end table
+
+@vindex peg-char-classes
+字符类匹配可以参考@code{peg-char-classes}中命名的类，相当于正则表达式中的字符类(@pxref{Top,, Character Classes,elisp})
+
+@node Parsing Actions
+@section 解析动作
+
+@cindex parsing actions
+@cindex parsing stack
+默认情况下，解析过程只是移动当前缓冲区中的点，如果解析成功，最终返回@code{t}，如果失败则返回@code{nil}。  还可以定义 @dfn{parsing actions} 来在解析文本中的某些点运行任意 Elisp。  这些操作可以选择影响称为 @dfn{parsing stack} 的内容，它是解析过程返回的值列表。  仅当解析过程最终成功时，这些操作才会运行（并且仅返回值）；如果失败，则操作代码根本不会运行。
+
+可以将操作添加到规则定义中的任何位置。  它们与解析表达式的区别在于初始反引号 (@samp{`})，后跟括号形式，其中必须在其中的某处包含一对连字符 (@samp{--})。  连字符左侧的符号绑定到从堆栈中弹出的值（它们有点类似于 lambda 形式的参数列表）。  连字符右侧的代码生成的值被推入堆栈（类似于 lambda 的返回值）。  例如，可以通过操作来增强前面的语法，以将解析后的数字作为实际整数返回：
+
+@example
+@group
+(with-peg-rules ((number sign digit (* digit
+                                       `(a b -- (+ (* a 10) b)))
+                         `(sign val -- (* sign val)))
+                 (sign (or (and "+" `(-- 1))
+                           (and "-" `(-- -1))
+                           (and ""  `(-- 1))))
+                 (digit [0-9] `(-- (- (char-before) ?0))))
+  (peg-run (peg number)))
+@end group
+@end example
+
+堆栈上必须有值才能弹出并返回 - 如果没有足够的堆栈值来绑定到操作的左侧项，它们将绑定到 @code{nil}。  仅包含右侧项的操作会将值推入堆栈；仅包含左侧项的操作将消耗（并丢弃）堆栈中的值。解析结束时，堆栈值作为平面列表返回。
+
+要返回与 @acronym{PEX} 匹配的字符串（而不是简单地将点移到其上），语法可以使用如下规则：
+
+@example
+@group
+(one-word
+  `(-- (point))
+  (+ [word])
+  `(start -- (buffer-substring start (point))))
+@end group
+@end example
+
+@noindent
+上面的第一个动作将 point 的初始值压入堆栈。中间的 @acronym{PEX} 将点移动到下一个单词上。  第二个操作从堆栈中弹出前一个值（将其绑定到变量@code{start}），然后使用该值从缓冲区中提取子字符串并将其推入堆栈。  这种模式非常常见，以至于 @acronym{PEG} 提供了一个简写函数来完成上述操作，以及一些常见场景的其他简写：
+
+@table @code
+@findex substring (a PEG shorthand)
+@item (substring @var{e})
+匹配 @acronym{PEX} @var{e} 并将匹配的字符串压入堆栈。
+
+@findex region (a PEG shorthand)
+@item (region @var{e})
+匹配@var{e}并将匹配区域的开始和结束位置压入堆栈。
+
+@findex replace (a PEG shorthand)
+@item (replace @var{e} @var{replacement})
+匹配@var{e}并将匹配区域替换为字符串@var{replacement}。
+
+@findex list (a PEG shorthand)
+@item (list @var{e})
+匹配@var{e}，将@var{e}（及其子表达式）生成的所有值收集到列表中，并将该列表压入堆栈。  堆栈值通常作为平面列表返回；这是一种将价值观“分组”在一起的方式。
+@end table
+
+@node Writing PEG Rules
+@section 编写 PEG 规则
+@cindex PEG rules, pitfalls
+@cindex Parsing Expression Grammar, pitfalls in rules
+
+在编写 PEG 规则时需要注意的是，它们是贪婪的。  可以消耗可变数量文本的规则将始终消耗可能的最大数量，即使这会导致本来可能匹配的规则稍后失败 - 没有回溯。  例如，这条规则永远不会成功：
+
+@example
+(forest (+ "tree" (* [blank])) "tree" (eol))
+@end example
+
+@noindent
+@acronym{PEX} @w{@code{(+ "tree" (* [blank]))}} 将消耗单词 @samp{tree} 的所有重复，不留下任何与最后的 @samp{tree} 匹配的内容。
+
+在这些情况下，可以通过使用谓词和防护（即 @code{not}、@code{if} 和 @code{guard} 表达式）来约束行为来获得所需的结果。  例如：
+
+@example
+(forest (+ "tree" (* [blank])) (not (eol)) "tree" (eol))
+@end example
+
+@noindent
+@code{if} 和 @code{not} 运算符接受解析表达式并将其解释为布尔值，而不移动点。  @code{guard} 运算符的内容被评估为常规 Lisp（不是 @acronym{PEX}），并且应该返回一个布尔值。  @code{nil} 值会导致匹配失败。
+
+另一个潜在的意外行为是，即使解析最终失败，解析也会尽可能地移动点。  这条规则：
+
+@example
+(end-game "game" (eob))
+@end example
+
+@noindent
+当在点后包含文本“游戏结束”的缓冲区中运行时，会将点移动到“游戏”之后，然后停止解析，返回@code{nil}。  成功的解析将始终返回@code{t}，或者解析堆栈的上下文。

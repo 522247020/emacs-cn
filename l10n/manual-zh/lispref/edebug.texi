@@ -1,0 +1,1203 @@
+@comment -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1992--1994, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+
+@c This file can also be used by an independent Edebug User
+@c Manual in which case the Edebug node below should be used
+@c with the following links to the Bugs section and to the top level:
+
+@c , Bugs and Todo List, Top, Top
+
+@node Edebug
+@section 埃德布格
+@cindex edebug
+
+Edebug 是 Emacs Lisp 程序的源代码级调试器，使用它您可以：
+
+@itemize @bullet
+@item 
+逐步进行评估，在每个表达式之前和之后停止。
+
+@item 
+设置条件或无条件断点。
+
+@item 
+当指定条件为真时停止（全局中断事件）。
+
+@item 
+慢速或快速跟踪，在每个停止点或每个断点处短暂停止。
+
+@item 
+显示表达式结果并评估表达式，就像在 Edebug 外部一样。
+
+@item 
+每次 Edebug 更新显示时，自动重新计算表达式列表并显示其结果。
+
+@item 
+输出有关函数调用和返回的跟踪信息。
+
+@item 
+发生错误时停止。
+
+@item 
+显示回溯，省略 Edebug 自己的帧。
+
+@item 
+指定宏的参数评估和定义形式。
+
+@item 
+获得基本的覆盖测试和频率计数。
+@end itemize
+
+下面的前三节应该告诉您有关 Edebug 的足够信息，以便您开始使用它。
+
+@menu
+* Using Edebug::                 Edebug的使用介绍。
+* Instrumenting::                您必须检测代码才能使用 Edebug 进行调试。
+* Modes: Edebug Execution Modes.  执行模式，或多或少地停止。
+* Jumping::                      跳转到指定位置的命令。
+* Misc: Edebug Misc.             各种命令。
+* Breaks::                       设置断点使程序停止。
+* Trapping Errors::              使用 Edebug 捕获错误。
+* Views: Edebug Views.           Edebug 内部和外部的视图。
+* Eval: Edebug Eval.             评估 Edebug 中的表达式。
+* Eval List::                    每次进入 Edebug 时都会显示其值的表达式。
+* Printing in Edebug::           印刷定制。
+* Trace Buffer::                 如何在缓冲区中生成跟踪输出。
+* Coverage Testing::             如何测试评估覆盖率。
+* The Outside Context::          Edebug 保存和恢复的数据。
+* Edebug and Macros::            指定如何处理宏调用。
+* Options: Edebug Options.       用于自定义 Edebug 的选项变量。
+@end menu
+
+@node Using Edebug
+@subsection 使用Edebug
+
+@cindex Edebug, how to start debugging
+要使用 Edebug 调试 Lisp 程序，您必须首先@dfn{instrument} 要调试的 Lisp 代码。  一个简单的方法是首先将 point 移到函数或宏的定义中，然后执行 @kbd{C-u C-M-x} （@code{eval-defun} 带前缀参数）。 @xref{Instrumenting}，用于检测代码的替代方法。
+
+一旦函数被检测，对该函数的任何调用都会激活 Edebug。  根据您选择的 Edebug 执行模式，激活 Edebug 可能会停止执行并让您单步执行该函数，也可能会更新显示并在检查调试命令时继续执行。  默认执行模式是step，即停止执行。  @xref{Edebug Execution Modes}。
+
+当您完成调试并希望在没有检测的情况下运行该函数时，您可以使用@ref{Instrumenting}中描述的方法之一删除检测。
+
+在 Edebug 中，您通常会查看 Emacs 缓冲区，其中显示您正在调试的 Lisp 代码的源代码。  这被称为 @dfn{source code buffer}，它暂时是只读的。
+
+左边缘的箭头表示函数正在执行的行。  Point 最初显示函数在行内执行的位置，但如果您自己移动 Point，则情况不再如此。
+
+如果您检测 @code{fac} 的定义（如下所示），然后执行 @code{(fac 3)}，您通常会看到以下内容。  点位于 @code{if} 之前的左括号处。
+
+@example
+(defun fac (n)
+=>@point{}(if (< 0 n)
+      (* n (fac (1- n)))
+    1))
+@end example
+
+@cindex stop points
+函数内 Edebug 可以停止执行的位置称为 @dfn{stop points}。  这些出现在作为列表的每个子表达式之前和之后，以及每个变量引用之后。这里我们使用句点来表示函数@code{fac}中的停止点：
+
+@example
+(defun fac (n)
+  .(if .(< 0 n.).
+      .(* n. .(fac .(1- n.).).).
+    1).)
+@end example
+
+除了 Emacs Lisp 模式的命令之外，源代码缓冲区中还提供了 Edebug 的特殊命令。  例如，您可以键入 Edebug 命令@key{SPC} 执行到下一个停止点。如果在输入 @code{fac} 后输入 @key{SPC} 一次，您将看到以下显示：
+
+@example
+(defun fac (n)
+=>(if @point{}(< 0 n)
+      (* n (fac (1- n)))
+    1))
+@end example
+
+当 Edebug 在表达式之后停止执行时，它会在回显区域中显示表达式的值。
+
+其他常用命令包括@kbd{b}在停止点设置断点、@kbd{g}执行直到到达断点以及@kbd{q}退出 Edebug 并返回到顶层命令循环。  输入 @kbd{?} 显示所有 Edebug 命令的列表。
+
+@node Instrumenting
+@subsection Edebug 检测
+@cindex instrumenting for Edebug
+
+为了使用 Edebug 调试 Lisp 代码，您必须首先 @dfn{instrument} 代码。  检测代码会在其中插入额外的代码，以在适当的位置调用 Edebug。
+
+@kindex C-M-x
+@findex eval-defun @r{(Edebug)}
+当您在函数定义上使用前缀参数调用命令 @kbd{C-M-x} (@code{eval-defun}) 时，它会在评估定义之前对其进行检测。  （这不会修改源代码本身。）如果变量 @code{edebug-all-defs} 不是 @code{nil}，则会反转前缀参数的含义：在这种情况下，@kbd{C-M-x} 工具定义 @emph{unless} 它有一个前缀参数。  @code{edebug-all-defs} 的默认值为 @code{nil}。  命令@kbd{M-x edebug-all-defs}切换变量@code{edebug-all-defs}的值。
+
+@findex eval-region @r{(Edebug)}
+@findex eval-buffer @r{(Edebug)}
+如果 @code{edebug-all-defs} 是非 @code{nil}，则命令 @code{eval-region} 和 @code{eval-buffer} 也会检测它们评估的任何定义。  类似地，@code{edebug-all-forms}控制@code{eval-region}是否应该使用@emph{any}形式，甚至是非定义形式。  这不适用于迷你缓冲区中的加载或评估。  命令 @kbd{M-x edebug-all-forms} 切换此选项。
+
+@findex edebug-eval-top-level-form
+@findex edebug-defun
+另一个命令 @kbd{M-x edebug-eval-top-level-form} 可用于检测任何顶级表单，无论 @code{edebug-all-defs} 和 @code{edebug-all-forms} 的值如何。 @code{edebug-defun} 是@code{edebug-eval-top-level-form} 的别名。
+
+当 Edebug 处于活动状态时，命令 @kbd{I} (@code{edebug-instrument-callee}) 会检测点后列表形式调用的函数或宏的定义（如果尚未检测）。  只有当 Edebug 知道在哪里可以找到该函数的源代码时，这才是可能的；因此，加载 Edebug 后，@code{eval-region} 会记录它评估的每个定义的位置，即使没有对其进行检测。  另请参见 @kbd{i} 命令 (@pxref{Jumping})，该命令在检测函数后进入调用。
+
+Edebug 知道如何检测所有标准特殊形式、带有表达式参数的 @code{interactive} 形式、匿名 lambda 表达式和其他定义形式。  但是，Edebug 无法自行确定用户定义的宏将如何处理宏调用的参数，因此您必须使用 Edebug 规范提供该信息；欲了解详情，@pxref{Edebug and Macros}。
+
+当 Edebug 第一次在会话中检测代码时，它会运行钩子 @code{edebug-setup-hook}，然后将其设置为 @code{nil}。  您可以使用它来加载与您正在使用的包关联的 Edebug 规范，但仅当您使用 Edebug 时。
+
+@cindex edebug, failure to instrument
+如果 Edebug 在检测时检测到语法错误，它会在错误代码处留下指针并发出 @code{invalid-read-syntax} 错误信号。
+@c FIXME?  I can't see that it "leaves point at the erroneous code".
+例子：
+
+@example
+@error{} Invalid read syntax: "Expected lambda expression"
+@end example
+
+检测失败的一个潜在原因是 Emacs 尚不知道某些宏定义。  要解决此问题，请加载定义您要检测的函数的文件。
+
+@cindex remove Edebug instrumentation
+@cindex Edebug, finish debugging
+@findex eval-expression @r{(Edebug)}
+要从定义中删除插装，只需以不插装的方式重新评估其定义即可。  有两种方法可以评估从不检测它们的表单：使用 @code{load} 从文件中，以及使用 @code{eval-expression} (@kbd{M-:}) 从迷你缓冲区中。  此外，不带前缀参数的 @kbd{C-M-x} 以及将 @code{edebug-all-defs} 设置为 @code{nil} 也会评估函数的定义而不对其进行检测。
+
+@findex edebug-remove-instrumentation
+从定义中删除检测的另一种方法是使用 @code{edebug-remove-instrumentation} 命令。  它还允许从已检测的所有内容中删除检测。
+
+@xref{Edebug Eval}，用于 Edebug 内部可用的其他评估函数。
+
+@node Edebug Execution Modes
+@subsection Edebug 执行模式
+
+@cindex Edebug execution modes
+Edebug 支持多种执行模式来运行您正在调试的程序。  我们称这些替代方案为@dfn{Edebug execution modes}；不要将它们与主要模式或次要模式混淆。  当前的 Edebug 执行模式决定 Edebug 在停止之前继续执行多远（例如，是否在每个停止点停止，或者继续到下一个断点）以及 Edebug 在停止之前显示评估进度的程度。
+
+通常，您可以通过键入命令来指定 Edebug 执行模式，以某种模式继续程序。  这是这些命令的表格；除了@kbd{S} 之外的所有内容都恢复程序的执行，至少一定距离。
+
+@table @kbd
+@findex edebug-stop
+@item S
+停止：不再执行程序，而是等待更多 Edebug 命令 (@code{edebug-stop})。
+@c FIXME Does not work. https://debbugs.gnu.org/9764
+
+@findex edebug-step-mode
+@item @key{SPC}
+步骤：停在遇到的下一个停止点（@code{edebug-step-mode}）。
+
+@findex edebug-next-mode
+@item n
+下一个：在表达式 (@code{edebug-next-mode}) 之后遇到的下一个停止点停止。  另请参见@ref{Jumping}中的@code{edebug-forward-sexp}。
+
+@findex edebug-trace-mode
+@item t
+跟踪：在每个 Edebug 停止点 (@code{edebug-trace-mode}) 暂停（通常为一秒）。
+
+@findex edebug-Trace-fast-mode
+@item T
+快速跟踪：在每个停止点更新显示，但实际上并不暂停 (@code{edebug-Trace-fast-mode})。
+
+@findex edebug-go-mode
+@item g
+Go：运行直到下一个断点（@code{edebug-go-mode}）。  @xref{Breakpoints}。
+
+@findex edebug-continue-mode
+@item c
+继续：在每个断点处暂停一秒，然后继续 (@code{edebug-continue-mode})。
+
+@findex edebug-Continue-fast-mode
+@item C
+快速继续：将点移动到每个断点，但不暂停 (@code{edebug-Continue-fast-mode})。
+
+@findex edebug-Go-nonstop-mode
+@item G
+不间断：忽略断点 (@code{edebug-Go-nonstop-mode})。  您仍然可以通过键入 @kbd{S} 或任何编辑命令来停止程序。
+@end table
+
+一般来说，上面列表中较靠前的执行模式比列表中靠后的模式运行程序的速度更慢或停止得更快。
+
+当您进入新的 Edebug 级别时，Edebug 通常会在遇到的第一个检测函数处停止。  如果您希望仅在断点处停止或根本不停止（例如，收集覆盖率数据时），请将 @code{edebug-initial-mode} 的值从默认值 @code{step} 更改为 @code{go}、@code{Go-nonstop} 或其其他值之一 (@pxref{Edebug Options})。  您可以使用 @kbd{C-x C-a C-m} (@code{edebug-set-initial-mode}) 轻松完成此操作：
+
+@deffn Command edebug-set-initial-mode
+@kindex C-x C-a C-m
+该命令绑定到@kbd{C-x C-a C-m}，设置@code{edebug-initial-mode}。  它会提示您输入一个键来指示模式。  您应该输入上面列出的八个键之一，以设置相应的模式。
+@end deffn
+
+请注意，您可能会多次重新输入相同的 Edebug 级别，例如，如果从一个命令多次调用一个检测函数。
+
+在执行或跟踪时，您可以通过键入任何 Edebug 命令来中断执行。  Edebug 在下一个停止点停止程序，然后执行您键入的命令。  例如，在执行期间键入 @kbd{t} 会在下一个停止点切换到跟踪模式。  您可以使用 @kbd{S} 停止执行而不执行任何其他操作。
+
+如果您的函数碰巧读取输入，则该函数可能会读取您键入的打算中断执行的字符。  您可以通过注意程序何时需要输入来避免此类意外结果。
+
+@cindex keyboard macros (Edebug)
+包含本节中命令的键盘宏不能完全工作：退出 Edebug、恢复程序，会失去对键盘宏的跟踪。  这并不容易解决。  此外，在 Edebug 外部定义或执行键盘宏不会影响 Edebug 内部的命令。  这通常是一个优势。  另请参阅@ref{Edebug Options} 中的@code{edebug-continue-kbd-macro} 选项。
+
+@defopt edebug-sit-for-seconds
+此选项指定跟踪模式或继续模式下执行步骤之间等待的秒数。  默认值为 1 秒。
+@end defopt
+
+@node Jumping
+@subsection 跳跃
+
+本节中描述的命令将执行直至到达指定位置。  除@kbd{i} 外，所有其他都设置临时断点来确定停止位置，然后切换到运行模式 (@pxref{Edebug Execution Modes})。  在预期停止点之前到达的任何其他断点也将停止执行。  @xref{Breakpoints}，有关断点的详细信息。
+
+在非本地退出的情况下，这些命令可能无法按预期工作，因为这可以绕过您希望程序停止的临时断点。
+
+@table @kbd
+@findex edebug-goto-here
+@item h
+前往 (@code{edebug-goto-here}) 点附近的停止点。
+
+@findex edebug-forward-sexp
+@item f
+针对一个表达式 (@code{edebug-forward-sexp}) 运行程序。
+
+@findex edebug-step-out
+@item o
+运行程序直到包含 sexp (@code{edebug-step-out}) 的末尾。
+
+@findex edebug-step-in
+@item i
+单步执行点 (@code{edebug-step-in}) 之后的形式调用的函数或宏。
+@end table
+
+@kbd{h} 命令使用临时断点前进到当前点位置或之后的停止点。
+
+@kbd{f} 命令在一个表达式上向前运行程序。  更准确地说，它在@code{forward-sexp}将到达的位置设置一个临时断点，然后以go模式执行，以便程序在断点处停止。
+
+使用前缀参数 @var{n}，临时断点放置在点之外 @var{n} 六倍处。  如果包含列表在 @var{n} 个元素之前结束，则停止位置位于包含表达式之后。
+
+您必须检查@code{forward-sexp}找到的位置是否是程序真正到达的地方。  例如，在@code{cond}中，这可能不是真的。
+
+为了灵活性，@kbd{f}命令从点开始执行@code{forward-sexp}，而不是在停止点。  如果要执行一个表达式 @emph{from the current stop point}，请先键入 @kbd{w} (@code{edebug-where}) 将点移动到那里，然后键入 @kbd{f}。
+
+@kbd{o} 命令在表达式之外继续。  它在包含 sexp 的点的末尾放置一个临时断点。  如果包含的 sexp 本身就是一个函数定义，则 @kbd{o} 会一直持续到定义中最后一个 sexp 之前。  如果这就是您现在所处的位置，它将从该函数返回，然后停止。  换句话说，此命令不会退出当前正在执行的函数，除非您位于该函数的最后一个 sexp 之后。
+
+通常，@kbd{h}、@kbd{f} 和 @kbd{o} 命令显示“Break”并暂停@code{edebug-sit-for-seconds}，然后显示刚刚评估的表单结果。  您可以通过将 @code{edebug-sit-on-break} 设置为 @code{nil} 来避免这种暂停。  @xref{Edebug Options}。
+
+@kbd{i} 命令在点后进入列表形式调用的函数或宏，并在第一个停止点处停止。  请注意，该表格不必是要评估的表格。  但是，如果表单是要评估的函数调用，请记住在评估任何参数之前使用此命令，否则就太晚了。
+
+@kbd{i} 命令会检测它应该进入的函数或宏（如果尚未检测）。  这很方便，但请记住，除非您明确安排取消检测，否则函数或宏仍保持检测状态。
+
+@node Edebug Misc
+@subsection 杂项 Edebug 命令
+
+此处描述了一些杂项 Edebug 命令。
+
+@table @kbd
+@findex edebug-help
+@item ?
+显示 Edebug (@code{edebug-help}) 的帮助消息。
+
+@findex abort-recursive-edit @r{(Edebug)}
+@item a
+@itemx C-]
+中止一个级别返回到上一个命令级别 (@code{abort-recursive-edit})。  @xref{Recursive Editing}。
+
+@findex top-level @r{(Edebug)}
+@item q
+返回顶层编辑器命令循环 (@code{top-level})。  这将退出所有递归编辑级别，包括 Edebug 活动的所有级别。  但是，使用 @code{unwind-protect} 或 @code{condition-case} 形式保护的检测代码可能会恢复调试。
+
+@findex edebug-top-level-nonstop
+@item Q
+与 @kbd{q} 类似，但即使对于受保护的代码也不要停止 (@code{edebug-top-level-nonstop})。
+
+@findex edebug-previous-result
+@item r
+在回显区域 (@code{edebug-previous-result}) 中重新显示最近已知的表达结果。
+
+@findex edebug-pop-to-backtrace
+@item d
+显示回溯，为了清晰起见，不包括 Edebug 自己的函数 (@code{edebug-pop-to-backtrace})。
+
+@xref{Backtraces}，用于描述回溯以及对其起作用的命令。
+
+@findex edebug-backtrace-show-instrumentation
+@findex edebug-backtrace-hide-instrumentation
+如果您想在回溯中查看 Edebug 的函数，请使用@kbd{M-x edebug-backtrace-show-instrumentation}。  要再次隐藏它们，请使用@kbd{M-x edebug-backtrace-hide-instrumentation}。
+
+如果回溯帧以 @samp{>} 开头，则意味着 Edebug 知道该帧的源代码所在的位置。  使用 @kbd{s} 跳转到当前帧的源代码。
+
+当您继续执行时，回溯缓冲区将自动终止。
+@end table
+
+您可以从 Edebug 调用命令，以递归方式再次激活 Edebug。  每当 Edebug 处于活动状态时，您可以使用 @kbd{q} 退出到顶层，或使用 @kbd{C-]} 中止一个递归编辑级别。  您可以使用 @kbd{d} 显示所有待处理评估的回溯。
+
+@node Breaks
+@subsection 休息时间
+
+当到达下一个停止点时，Edebug 的单步模式 (@pxref{Edebug Execution Modes}) 停止执行。  一旦 Edebug 开始执行，还有其他三种方法可以停止它：断点、全局中断条件和源断点。
+
+@menu
+* Breakpoints::                  在停止点处断点。
+* Global Break Condition::       打破一个事件。
+* Source Breakpoints::           在源代码中嵌入断点。
+@end menu
+
+@node Breakpoints
+@subsubsection Edebug 断点
+
+@cindex breakpoints (Edebug)
+使用 Edebug 时，您可以在正在测试的程序中指定@dfn{breakpoints}：这些是执行应该停止的地方。  您可以在任意停止点设置断点，如@ref{Using Edebug}中所定义。  对于设置和取消设置断点，受影响的停止点是源代码缓冲区中该点或该点之后的第一个停止点。  以下是断点的 Edebug 命令：
+
+@table @kbd
+@findex edebug-set-breakpoint
+@vindex edebug-enabled-breakpoint @r{(face)}
+@vindex edebug-disabled-breakpoint @r{(face)}
+@item b
+在点 (@code{edebug-set-breakpoint}) 或之后的停止点设置断点。  如果您使用前缀参数，则断点是临时的——它会在第一次停止程序时关闭。  在断点处放置具有 @code{edebug-enabled-breakpoint} 或 @code{edebug-disabled-breakpoint} 面的叠加层。
+
+@findex edebug-unset-breakpoint
+@item u
+在点 (@code{edebug-unset-breakpoint}) 处或之后的停止点取消设置断点（如果有）。
+
+@findex edebug-unset-breakpoints
+@item U
+取消设置当前表单中的所有断点 (@code{edebug-unset-breakpoints})。
+
+@findex edebug-toggle-disable-breakpoint
+@item D
+切换是否禁用点 (@code{edebug-toggle-disable-breakpoint}) 附近的断点。  如果断点是有条件的并且需要一些工作来重新创建条件，则此命令非常有用。
+
+@findex edebug-set-conditional-breakpoint
+@item x @var{condition} @key{RET}
+设置一个条件断点，仅当计算 @var{condition} 产生非 @code{nil} 值 (@code{edebug-set-conditional-breakpoint}) 时才会停止程序。  使用前缀参数时，断点是临时的。
+
+@item X @var{condition} @key{RET}
+将 @code{edebug-global-break-condition} 设置为 @var{condition}。
+
+@findex edebug-next-breakpoint
+@item B
+将点移动到当前定义中的下一个断点 (@code{edebug-next-breakpoint})。
+@end table
+
+在 Edebug 中，您可以使用 @kbd{b} 设置断点并使用 @kbd{u} 取消设置。  首先将点移动到您选择的 Edebug 停止点，然后键入 @kbd{b} 或 @kbd{u} 在那里设置或取消设置断点。取消设置未设置断点的情况下没有效果。
+
+重新评估或重新检测定义会删除其之前的所有断点。
+
+A @dfn{conditional breakpoint} 程序每次到达那里时都会测试一个条件。  由于评估条件而发生的任何错误都将被忽略，就好像结果是@code{nil}一样。  要设置条件断点，请使用@kbd{x}，并在迷你缓冲区中指定条件表达式。  在具有先前建立的条件断点的停止点处设置条件断点会将先前的条件表达式放入迷你缓冲区中，以便您可以对其进行编辑。 （您还可以使用@kbd{X}设置全局中断条件，在每个停止点@pxref{Global Break Condition}进行评估。）
+
+您可以通过在命令中使用前缀参数来设置条件或无条件断点 @dfn{temporary} 来设置断点。  当临时断点停止程序时，它会自动取消设置。
+
+Edebug 总是在断点处停止或暂停，除非 Edebug 模式为 Go-nonstop。  在该模式下，它完全忽略断点。
+
+要找出断点所在的位置，请使用 @kbd{B} 命令，该命令会将点移动到同一函数内的下一个断点，或者如果没有后续断点，则移动到第一个断点。  该命令不会继续执行——它只是移动缓冲区中的点。
+
+@node Global Break Condition
+@subsubsection 全局中断条件
+
+@cindex stopping on events
+@cindex global break condition
+当满足指定条件时，A @dfn{global break condition} 停止执行，无论这可能发生在哪里。  Edebug 在每个停止点评估全局中断条件；如果它的计算结果为非 @code{nil} 值，则执行将根据执行模式 (@pxref{Edebug Execution Modes}) 停止或暂停，就像命中断点一样。  如果评估条件出错，则执行不会停止。
+
+@findex edebug-set-global-break-condition
+条件表达式存储在@code{edebug-global-break-condition}中。  当 Edebug 处于活动状态时，您可以使用源代码缓冲区中的 @kbd{X} 命令指定新表达式，或者只要加载了 Edebug (@code{edebug-set-global-break-condition})，就可以随时使用任何缓冲区中的 @kbd{C-x X X} 来指定新表达式。
+
+全局中断条件是查找代码中某个事件发生位置的最简单方法，但它会使代码运行速度变慢。  所以不使用时应将条件重置为@code{nil}。
+
+@node Source Breakpoints
+@subsubsection 源断点
+
+@findex edebug@r{ function}
+@cindex source breakpoints
+每次重新检测定义时，定义中的所有断点都会被忘记。  如果您希望设置一个不会被忘记的断点，您可以编写一个@dfn{source breakpoint}，它只是对源代码中函数@code{edebug}的调用。  当然，您可以对此类调用进行有条件的调用。  例如，在 @code{fac} 函数中，您可以插入如下所示的第一行，以在参数达到零时停止：
+
+@example
+(defun fac (n)
+  (if (= n 0) (edebug))
+  (if (< 0 n)
+      (* n (fac (1- n)))
+    1))
+@end example
+
+当 @code{fac} 定义被检测并调用该函数时，对 @code{edebug} 的调用充当断点。  根据执行模式 (@pxref{Edebug Execution Modes})，Edebug 会在此处停止或暂停。
+
+如果调用 @code{edebug} 时没有执行检测代码，则该函数调用 @code{debug}。
+@c This may not be a good idea anymore.
+
+@node Trapping Errors
+@subsection 捕获错误
+
+当发出错误信号且未使用 @code{condition-case} 处理时，Emacs 通常会显示错误消息。  当 Edebug 处于活动状态并执行检测代码时，它通常会响应所有未处理的错误。  您可以使用选项 @code{edebug-on-error} 和 @code{edebug-on-quit} 进行自定义；参见@ref{Edebug Options}。
+
+当 Edebug 响应错误时，它会显示错误之前遇到的最后一个停止点。  这可能是对未检测的函数的调用位置，并且在该位置实际发生了错误。  对于未绑定的变量错误，最后一个已知的停止点可能距离有问题的变量引用很远。  在这种情况下，您可能想要显示完整的回溯 (@pxref{Edebug Misc})。
+
+@c Edebug should be changed for the following: -- dan
+如果您在 Edebug 处于活动状态时更改@code{debug-on-error} 或 @code{debug-on-quit}，则当 Edebug 变为非活动状态时，这些更改将被忘记。  此外，在 Edebug 的递归编辑过程中，这些变量会绑定到它们在 Edebug 之外的值。
+
+@node Edebug Views
+@subsection Edebug 视图
+
+这些 Edebug 命令可让您查看缓冲区和窗口状态的各个方面，就像进入 Edebug 之前一样。  外部窗口配置是在 Edebug 外部有效的窗口和内容的集合。
+
+@table @kbd
+@findex edebug-view-outside
+@item v
+切换到查看外部窗口配置 (@code{edebug-view-outside})。  输入 @kbd{C-x X w} 返回 Edebug。
+
+@findex edebug-bounce-point
+@item p
+暂时显示外部当前缓冲区，点位于其外部位置 (@code{edebug-bounce-point})，暂停一秒钟，然后返回 Edebug。  使用前缀参数 @var{n}，暂停 @var{n} 秒。
+
+@findex edebug-bounce-to-previous-value
+@item P
+暂时显示外部当前缓冲区，其外部点对应于先前计算的值（@code{edebug-bounce-to-previous-value}），暂停一秒钟，然后返回 Edebug。  使用前缀参数 @var{n}，暂停 @var{n} 秒。
+
+@findex edebug-where
+@item w
+将点移回源代码缓冲区中的当前停止点 (@code{edebug-where})。
+
+如果您在显示相同缓冲区的不同窗口中使用此命令，则将来将使用该窗口来显示当前定义。
+
+@findex edebug-toggle-save-windows
+@item W
+@c Its function is not simply to forget the saved configuration -- dan
+切换 Edebug 是否保存和恢复外部窗口配置 (@code{edebug-toggle-save-windows})。
+
+使用前缀参数，@kbd{W} 仅切换所选窗口的保存和恢复。  要指定不显示源代码缓冲区的窗口，必须使用全局键盘映射中的@kbd{C-x X W}。
+@end table
+
+您可以使用 @kbd{v} 查看外部窗口配置，或者使用 @kbd{p} 弹跳到当前缓冲区中的位置，即使它没有正常显示。
+
+您还可以弹跳到点以外的缓冲位置。  假设您正在调试表单
+
+@example
+(make-overlay beg end)
+@end example
+
+@noindent
+并且您想知道 @code{beg} 和 @code{end} 位于外部缓冲区中的位置。  然后，您可以使用 @kbd{C-x C-e} 评估这些，或者使用 @kbd{n} 跨过它们，然后立即按 @kbd{P}，弹跳到您之前评估的位置。  @kbd{P} 命令的前一个值是 Edebug 在其最后一个停止点之前计算的值，或者是您在 Edebug 外部的上下文中计算的值，例如使用 @kbd{C-x C-e}。
+
+移动点后，您可能希望跳回停止点。您可以使用源代码缓冲区中的 @kbd{w} 来完成此操作。  您可以使用@kbd{C-x X w}从任何缓冲区跳回源代码缓冲区中的停止点。
+
+每次使用@kbd{W}转保存@emph{off}时，Edebug 都会忘记保存的外部窗口配置——因此，即使您转回保存@emph{on}，当您下次退出 Edebug（通过继续程序）时，当前窗口配置也保持不变。  但是，除非打开了足够多的窗口，否则 @file{*edebug*} 和 @file{*edebug-trace*} 的自动重新显示可能会与您希望查看的缓冲区发生冲突。
+
+@node Edebug Eval
+@subsection 评估
+
+在 Edebug 中，您可以计算表达式，就好像 Edebug 没有运行一样。  Edebug 试图对表达式的求值和打印不可见。  对引起副作用的表达式的求值将按预期工作，但 Edebug 显式保存和恢复的数据更改除外。  @xref{The Outside Context}，了解此过程的详细信息。
+
+@table @kbd
+@findex edebug-eval-expression
+@item e @var{exp} @key{RET}
+在 Edebug (@code{edebug-eval-expression}) 之外的上下文中计算表达式 @var{exp}。  也就是说，Edebug 试图尽量减少其对评估的干扰。  结果显示在回显区域中，或者，如果该命令给出了前缀，则弹出一个新缓冲区并在那里漂亮地打印结果。
+
+默认情况下，此命令会在求值期间抑制调试器，以便求值表达式中的错误不会在现有错误之上添加新错误。将 @code{debug-allow-recursive-debug} 用户选项 (@pxref{Error Debugging}) 设置为非 @code{nil} 值以覆盖此值。
+
+@findex eval-expression @r{(Edebug)}
+@item M-: @var{exp} @key{RET}
+在 Edebug 本身的上下文中计算表达式 @var{exp} (@code{eval-expression})。
+
+@findex edebug-eval-last-sexp
+@item C-x C-e
+在 Edebug (@code{edebug-eval-last-sexp}) 之外的上下文中计算 point 之前的表达式，并在迷你缓冲区中显示该值。当前缀参数为零 (@kbd{C-u 0 C-x C-e}) 时，由于 @code{edebug-print-length} 和 @code{edebug-print-level} (@pxref{Printing in Edebug})，在显示值时不要缩短长项（如字符串和列表）。  任何其他前缀都会导致该值在单独的缓冲区而不是迷你缓冲区中完美打印。
+@end table
+
+@xref{Eval List}，用于与交互式评估表达式列表相关的其他 Edebug 功能。
+
+@cindex lexical binding (Edebug)
+@findex cl-macrolet @r{(Edebug)}
+@findex cl-symbol-macrolet @r{(Edebug)}
+Edebug 支持对包含对 @file{cl-lib.el} 中以下构造创建的词法绑定符号的引用的表达式求值：@code{cl-macrolet} 和 @code{cl-symbol-macrolet}。
+@c FIXME?  What about lexical-binding = t?
+
+@node Eval List
+@subsection 评估列表缓冲区
+
+@cindex evaluation list buffer
+您可以使用 @dfn{evaluation list buffer}（称为 @file{*edebug*}）以交互方式计算表达式。  您还可以设置每次 Edebug 更新显示时自动计算的 @dfn{evaluation list} 表达式。
+
+@table @kbd
+@findex edebug-visit-eval-list
+@item E
+切换到评估列表缓冲区@file{*edebug*} (@code{edebug-visit-eval-list})。
+@end table
+
+在 @file{*edebug*} 缓冲区中，您可以使用 Lisp 交互模式 (@pxref{Lisp Interaction,,, emacs, The GNU Emacs Manual}) 的命令以及这些特殊命令：
+
+@table @kbd
+@findex edebug-eval-print-last-sexp
+@item C-j
+在外部上下文中计算 point 之前的表达式，并将值插入缓冲区 (@code{edebug-eval-print-last-sexp})。当前缀参数为零 (@kbd{C-u 0 C-j}) 时，不要由于 @code{edebug-print-length} 和 @code{edebug-print-level} (@pxref{Printing in Edebug}) 缩短长项（如字符串和列表）。
+
+@findex edebug-eval-last-sexp
+@item C-x C-e
+在 Edebug 外部的上下文中计算 point 之前的表达式 (@code{edebug-eval-last-sexp})。
+
+@findex edebug-update-eval-list
+@item C-c C-u
+从缓冲区的内容构建一个新的评估列表 (@code{edebug-update-eval-list})。
+
+@findex edebug-delete-eval-item
+@item C-c C-d
+删除该点所在的评估列表组 (@code{edebug-delete-eval-item})。
+
+@item C-c C-w
+
+@end table
+
+
+
+
+
+@cindex evaluation list group
+To do this, write one or more @dfn{evaluation list groups} in the evaluation list buffer.  An evaluation list group consists of one or more Lisp expressions.  组由注释行分隔。
+
+命令 @kbd{C-c C-u} (@code{edebug-update-eval-list}) 重建评估列表，扫描缓冲区并使用每组的第一个表达式。  （这个想法是该组的第二个表达式是先前计算和显示的值。）
+
+Edebug 的每个条目都会通过在缓冲区中插入每个表达式及其当前值来重新显示评估列表。  它还插入注释行，以便每个表达式成为自己的组。因此，如果您再次键入 @kbd{C-c C-u} 而不更改缓冲区文本，则评估列表实际上不会改变。
+
+如果在评估列表的评估过程中发生错误，则错误消息会显示在字符串中，就像结果一样。因此，使用当前无效变量的表达式不会中断您的调试。
+
+
+
+@smallexample
+@group
+(current-buffer)
+#<buffer *scratch*>
+;---------------------------------------------------------------
+@end group
+@group
+(selected-window)
+#<window 16 on *scratch*>
+;---------------------------------------------------------------
+@end group
+@group
+(point)
+196
+;---------------------------------------------------------------
+@end group
+@group
+bad-var
+"Symbol's value as variable is void: bad-var"
+;---------------------------------------------------------------
+@end group
+@group
+(recursion-depth)
+0
+;---------------------------------------------------------------
+@end group
+@group
+this-command
+eval-last-sexp
+;---------------------------------------------------------------
+@end group
+@end smallexample
+
+要删除组，请将点移入其中并输入 @kbd{C-c C-d}，或者直接删除该组的文本并使用 @kbd{C-c C-u} 更新评估列表。  要将新表达式添加到计算列表中，请将表达式插入到合适的位置，插入新的注释行，然后键入 @kbd{C-c C-u}。  您无需在注释行中插入破折号——其内容并不重要。
+
+After selecting @file{*edebug*}, you can return to the source code buffer with @kbd{C-c C-w} (@pxref{Edebug Views}).  当您继续执行时，@file{*edebug*}缓冲区将被终止，并在下次需要时重新创建。
+
+@node Printing in Edebug
+@subsection 在 Edebug 中打印
+
+@cindex printing (Edebug)
+@cindex printing circular structures
+
+
+处理循环结构的一种方法是设置@code{print-length}或@code{print-level}来截断打印。  Edebug 会为你做这件事；它将 @code{print-length} 和 @code{print-level} 绑定到变量 @code{edebug-print-length} 和 @code{edebug-print-level} 的值（只要它们具有非 @code{nil} 值）。  @xref{Output Variables}。
+
+@defopt edebug-print-length
+如果非 @code{nil}，Edebug 在打印结果时将 @code{print-length} 绑定到该值。  默认值为@code{50}。
+@end defopt
+
+@defopt edebug-print-level
+If non-@code{nil}, Edebug binds @code{print-level} to this value while printing results.  默认值为@code{50}。
+@end defopt
+
+您还可以通过将 @code{print-circle} 绑定到非 @code{nil} 值来打印圆形结构和共享元素的结构，以提供更多信息。
+
+
+
+@example
+@group
+(setq a (list 'x 'y))
+(setcar a a)
+@end group
+@end example
+
+@noindent
+如果@code{print-circle}非@code{nil}，打印函数（例如@code{prin1}）会将@code{a}打印为@samp{#1=(#1# y)}。  @samp{#1=} 表示法用标签 @samp{1} 标记其后面的结构，@samp{#1#} 表示法引用先前标记的结构。  此表示法用于列表或向量的任何共享元素。
+
+@defopt edebug-print-circle
+If non-@code{nil}, Edebug binds @code{print-circle} to this value while printing results.  默认值为@code{t}。
+@end defopt
+
+
+
+@node Trace Buffer
+@subsection 跟踪缓冲器
+@cindex trace buffer
+@cindex Edebug trace buffer
+@cindex tracing in Edebug
+
+Edebug 可以记录执行跟踪，并将其存储在名为 @file{*edebug-trace*} 的缓冲区中。  这是函数调用和返回的日志，显示函数名称及其参数和值。  要启用跟踪记录，请将 @code{edebug-trace} 设置为非 @code{nil} 值 (@pxref{Edebug Options})。
+
+创建跟踪缓冲区与使用跟踪执行模式 (@pxref{Edebug Execution Modes}) 不同。
+
+启用跟踪记录后，每个函数入口和出口都会向跟踪缓冲区添加行。  函数入口记录由 @samp{::::@{}, followed by the function name and argument values.  A function exit record consists of @samp{::::@}} 组成，后跟函数名称和函数结果。
+
+条目中@samp{:}的数量显示了其递归深度。  您可以使用跟踪缓冲区中的大括号来查找函数调用的匹配开头或结尾。
+
+@findex edebug-print-trace-before
+@findex edebug-print-trace-after
+您可以通过重新定义函数@code{edebug-print-trace-before}和@code{edebug-print-trace-after}来自定义函数进入和退出的跟踪记录。
+
+@defmac edebug-tracing string body@dots{}
+该宏请求有关 @var{body} 表单执行的附加跟踪信息。  参数 @var{string} 指定要放入跟踪缓冲区中的文本，位于 @samp{@{} or @samp{@}} 之后。  所有参数都会被计算，@code{edebug-tracing} 返回 @var{body} 中最后一个形式的值。
+@end defmac
+
+@defun edebug-trace format-string &rest format-args
+该函数在跟踪缓冲区中插入文本。  它使用 @w{@code{(apply 'format @var{format-string} @var{format-args})}} 计算文本。它还会在单独的条目中附加换行符。
+@end defun
+
+每当调用 @code{edebug-tracing} 和 @code{edebug-trace} 时，即使 Edebug 未激活，它们也会在跟踪缓冲区中插入行。将文本添加到跟踪缓冲区还会滚动其窗口以显示最后插入的行。
+
+@node Coverage Testing
+@subsection 覆盖率测试
+
+@cindex coverage testing (Edebug)
+@cindex frequency counts
+@cindex performance analysis (Edebug)
+Edebug 提供基本的覆盖测试和执行频率的显示。
+
+覆盖率测试的工作原理是将每个表达式的结果与之前的结果进行比较；如果自您开始在当前 Emacs 会话中测试覆盖范围以来，程序中的每个表单返回两个不同的值，则该表单被视为已覆盖。  因此，要对程序进行覆盖率测试，请在各种条件下执行它并注意它的行为是否正确；当您尝试了足够多的不同条件，每个表单都返回了两个不同的值时，Edebug 会告诉您。
+
+覆盖率测试会使执行速度变慢，因此仅当 @code{edebug-test-coverage} 为非 @code{nil} (@pxref{Edebug Options}) 时才进行。即使执行模式是 Go-nonstop，也无论是否启用覆盖测试，都会对检测函数的所有执行执行频率计数。
+
+@kindex C-x X =
+@findex edebug-temp-display-freq-count
+使用 @kbd{C-x X =} (@code{edebug-display-freq-count}) 显示定义的覆盖范围信息和频率计数。只是 @kbd{=} (@code{edebug-temp-display-freq-count}) 会暂时显示相同的信息，直到您键入另一个键为止。
+
+@deffn Command edebug-display-freq-count
+此命令显示当前定义的每行的频率计数数据。
+
+它在每行代码后面插入频率计数作为注释行。您可以使用一个 @code{undo} 命令撤消所有插入。  计数出现在表达式之前的 @samp{(} 或表达式之后的 @samp{)} 下方，或者变量的最后一个字符上。  为了简化显示，如果计数等于同一行上较早表达式的计数，则不会显示该计数。
+
+表达式计数后面的字符 @samp{=} 表示该表达式每次计算时都返回相同的值。换句话说，它尚未被覆盖用于覆盖测试目的。
+
+要清除定义的频率计数和覆盖数据，只需使用 @code{eval-defun} 重新检测即可。
+@end deffn
+
+例如，在使用源断点评估 @code{(fac 5)} 并将 @code{edebug-test-coverage} 设置为 @code{t} 后，当到达断点时，频率数据如下所示：
+
+@example
+@group
+(defun fac (n)
+  (if (= n 0) (edebug))
+;#6           1      = =5
+  (if (< 0 n)
+;#5         =
+      (* n (fac (1- n)))
+;#    5               0
+    1))
+a;#   0
+@end group
+@end example
+
+注释行显示 @code{fac} 被调用了 6 次。  第一个 @code{if} 语句返回 5 次，每次结果相同；第二个@code{if}的条件也是如此。 @code{fac}的递归调用根本没有返回。
+
+
+@node The Outside Context
+@subsection 外部环境
+
+Edebug 尝试对您正在调试的程序透明，但它并没有完全成功。  当您使用 @kbd{e} 或计算列表缓冲区计算表达式时，Edebug 还尝试通过临时恢复外部上下文来保持透明。  本节准确解释了 Edebug 恢复的上下文，以及 Edebug 如何无法完全透明。
+
+@menu
+* Checking Whether to Stop::     当 Edebug 决定要做什么时。
+* Edebug Display Update::        当 Edebug 更新显示时。
+* Edebug Recursive Edit::        当Edebug停止执行时。
+@end menu
+
+@node Checking Whether to Stop
+@subsubsection 检查是否停止
+
+每当进入Edebug时，在决定是否生成跟踪信息或停止程序之前，它都需要保存和恢复某些数据。
+
+@itemize @bullet
+@item
+@vindex edebug-max-depth
+增加@code{max-lisp-eval-depth}（@pxref{Eval}）以减少Edebug对堆栈的影响。  但是，使用 Edebug 时，您仍然可能会耗尽堆栈空间。  如果 Edebug 达到包含非常大的引用列表的递归深度检测代码的限制，您还可以放大 @code{edebug-max-depth} 的值。
+
+@vindex executing-kbd-macro @r{(Edebug)}
+@item
+保存和恢复键盘宏执行的状态。  当 Edebug 处于活动状态时，@code{executing-kbd-macro} 绑定到 @code{nil}，除非 @code{edebug-continue-kbd-macro} 是非 @code{nil} (@pxref{Edebug Options})。
+@end itemize
+
+
+@node Edebug Display Update
+@subsubsection Edebug 显示更新
+@cindex Edebug and display updates
+@cindex display updates, and Edebug
+
+@c This paragraph is not filled, because LaLiberte's conversion script
+@c needs an xref to be on just one line.
+当 Edebug 需要显示某些内容时（例如，在跟踪模式下），它会从 Edebug 外部保存当前窗口配置 (@pxref{Window Configurations})。  当您退出 Edebug 时，它会恢复之前的窗口配置。
+
+Emacs 仅在暂停时重新显示。  通常，当您继续执行时，程序会在断点处或单步执行后重新进入 Edebug，而不会在中间暂停或读取输入。  在这种情况下，Emacs 永远没有机会重新显示外部配置。因此，您看到的窗口配置与上次 Edebug 处于活动状态时相同，没有中断。
+
+进入 Edebug 来显示某些内容还会保存并恢复以下数据（尽管如果发生错误或退出信号，其中一些数据会故意不恢复）。
+
+@itemize @bullet
+@cindex current buffer point and mark (Edebug)
+@item
+保存和恢复哪个缓冲区是当前缓冲区，以及当前缓冲区中的点和标记的位置。
+
+@cindex window configuration (Edebug)
+@item
+如果 @code{edebug-save-windows} 为非 @code{nil} (@pxref{Edebug Options})，则保存并恢复外部窗口配置。如果@code{edebug-save-windows}的值为列表，则仅保存和恢复列出的窗口。
+
+错误或退出时不会恢复窗口配置，但在 @code{save-excursion} 处于活动状态时，即使发生错误或退出，也会重新选择外部选定的窗口 @emph{is}。
+
+然而，窗口启动和源代码缓冲区的水平滚动不会恢复，因此 Edebug 中的显示保持一致。
+
+@cindex buffer point changed by Edebug
+@cindex Edebug overwrites buffer point position
+保存和恢复外部窗口配置有时会更改正在调试的 Lisp 程序运行的缓冲区中的点位置，尤其是当您的程序移动点时。如果发生这种情况并干扰您的调试，我们建议将 @code{edebug-save-windows} 设置为 @code{nil} (@pxref{Edebug Options})。
+
+@item
+如果@code{edebug-save-displayed-buffer-points}非@code{nil}，则保存并恢复每个显示缓冲区中的点值。
+
+@vindex overlay-arrow-position @r{(Edebug)}
+@vindex overlay-arrow-string @r{(Edebug)}
+@item
+变量 @code{overlay-arrow-position} 和 @code{overlay-arrow-string} 被保存和恢复，因此您可以从同一缓冲区中其他位置的递归编辑安全地调用 Edebug。
+
+@vindex cursor-in-echo-area @r{(Edebug)}
+@item
+@code{cursor-in-echo-area} 局部绑定到 @code{nil}，以便光标显示在窗口中。
+@end itemize
+
+@node Edebug Recursive Edit
+@subsubsection Edebug 递归编辑
+@cindex Edebug and recursive edit
+@cindex recursive edit, and Edebug
+
+当输入 Edebug 并实际读取用户的命令时，它会保存（并稍后恢复）这些附加数据：
+
+@itemize @bullet
+@item
+当前比赛数据。  @xref{Match Data}。
+
+@item
+变量 @code{last-command}、@code{this-command}、@code{last-command-event}、@code{last-input-event}、@code{last-event-frame}、@code{last-nonmenu-event} 和 @code{track-mouse}。  Edebug 中的命令不会影响 Edebug 外部的这些变量。
+
+在 Edebug 中执行命令可以更改 @code{this-command-keys} 返回的按键序列，并且无法从 Lisp 中重置按键序列。
+
+Edebug无法保存和恢复@code{unread-command-events}的值。  当该变量具有重要值时输入 Edebug 可能会干扰正在调试的程序的执行。
+
+@item
+在 Edebug 中执行的复杂命令将添加到变量 @code{command-history} 中。  在极少数情况下，这可能会改变执行情况。
+
+@item
+在 Edebug 内部，递归深度比 Edebug 外部的递归深度深一倍。  自动更新的评估列表窗口并非如此。
+
+@item
+@code{standard-output} 和 @code{standard-input} 通过 @code{recursive-edit} 绑定到 @code{nil}，但 Edebug 在评估期间暂时恢复它们。
+
+@item
+保存和恢复键盘宏定义的状态。  当 Edebug 处于活动状态时，@code{defining-kbd-macro} 绑定到 @code{edebug-continue-kbd-macro}。
+@end itemize
+
+@node Edebug and Macros
+@subsection Edebug 和宏
+@cindex Edebug and macros
+@cindex macros, debugging with Edebug
+
+为了使 Edebug 正确地检测调用宏的表达式，需要额外小心。  本小节解释了详细信息。
+
+@menu
+* Instrumenting Macro Calls::    基本问题。
+* Specification List::           如何指定复杂的评估模式。
+* Backtracking::                 当匹配失败时 Edebug 会做什么。
+* Specification Examples::       帮助理解规格。
+@end menu
+
+@node Instrumenting Macro Calls
+@subsubsection 检测宏调用
+
+当 Edebug 检测调用 Lisp 宏的表达式时，它需要有关宏的附加信息才能正确完成工作。  这是因为没有先验的方法来判断宏调用的哪些子表达式是要计算的形式。  （求值可能会在宏体中显式发生，或者在求值结果扩展时或之后的任何时间发生。）
+
+因此，您必须为 Edebug 将遇到的每个宏定义一个 Edebug 规范，以解释对该宏的调用格式。  为此，请在宏定义中添加 @code{debug} 声明 (@pxref{Declare Form})。  这是一个简单的示例，显示了 @code{for} 示例宏 (@pxref{Argument Evaluation}) 的规范。
+
+@smallexample
+@group
+(defmacro for (var from init to final do &rest body)
+  "Execute a simple \"for\" loop.
+For example, (for i from 1 to 10 do (print i))."
+  (declare (debug (symbolp "from" form "to" form "do" &rest form)))
+  ...)
+@end group
+@end smallexample
+
+Edebug 规范规定了宏调用的哪些部分是要评估的形式。  对于简单的宏，规范通常看起来与宏定义的形式参数列表非常相似，但规范比宏参数更通用。  @xref{Declare Form}，了解有关 @code{declare} 形式的更多详细信息。
+
+@c See, e.g., https://debbugs.gnu.org/10577
+@c FIXME  Maybe there should be an Edebug option to get it to
+@c automatically load the entire source file containing the function
+@c being instrumented.  That would avoid this.
+当您检测代码时，请注意确保 Edebug 知道这些规范。  如果您正在检测使用另一个文件中定义的宏的函数，您可能首先需要评估包含函数的文件中的 @code{require} 形式，或者显式加载包含宏的文件。  如果宏的定义被 @code{eval-when-compile} 包裹，您可能需要对其求值。
+
+您还可以使用 @code{def-edebug-spec} 与宏定义分开定义宏的 edebug 规范。  对于 Lisp 中的宏定义，添加 @code{debug} 声明是首选，也更方便，但是 @code{def-edebug-spec} 可以为 C 中实现的特殊形式定义 Edebug 规范。
+
+@defmac def-edebug-spec macro specification
+指定宏 @var{macro} 调用的哪些表达式是要计算的形式。  @var{specification} 应该是 Edebug 规范。两个参数均不被评估。
+
+@var{macro} 参数实际上可以是任何符号，而不仅仅是宏名称。
+@end defmac
+
+下面是 @var{specification} 的可能性以及每种可能性如何指导参数处理的表格。
+
+@table @asis
+@item @code{t}
+所有参数均用于评估。这是 @code{(body)} 的缩写。
+
+@item 一个符号
+该符号必须具有 Edebug 规范，该规范将被使用。重复这种间接寻址，直到找到另一种规范。  这允许您从另一个宏继承规范。
+
+@item 一个清单
+列表的元素描述调用形式的参数的类型。  以下部分描述了规范列表的可能元素。
+@end table
+
+如果宏没有 Edebug 规范，无论是通过 @code{debug} 声明还是通过 @code{def-edebug-spec} 调用，变量 @code{edebug-eval-macro-args} 都会发挥作用。
+
+@defopt edebug-eval-macro-args
+这控制了 Edebug 在没有明确 Edebug 规范的情况下处理宏参数的方式。  如果它是@code{nil}（默认值），则不会对任何参数进行评估。  否则，所有参数都会被检测。
+@end defopt
+
+@node Specification List
+@subsubsection 规格表
+
+@cindex Edebug specification list
+@cindex specification list, Edebug
+如果宏调用的某些参数被求值而其他参数则不求值，则 Edebug 规范需要 @dfn{specification list}。  规范列表中的某些元素与一个或多个参数匹配，但其他元素会修改所有后续元素的处理。  后者称为 @dfn{specification keywords}，是以 @samp{&} 开头的符号（例如 @code{&optional}）。
+
+规范列表可以包含子列表，子列表与本身就是列表的参数相匹配，或者它可以包含用于分组的向量。  因此，子列表和组将规范列表细分为层次结构。  规范关键字仅适用于它们所包含的子列表或组的其余部分。
+
+当规范列表涉及替代或重复时，将其与实际宏调用进行匹配可能需要回溯。  欲了解更多详情，@pxref{Backtracking}。
+
+Edebug 规范提供了正则表达式匹配的功能，以及一些上下文无关的语法结构：带有平衡括号的子列表的匹配、表单的递归处理以及通过间接规范的递归。
+
+下面是规范列表中可能的元素及其含义（@pxref{Specification Examples}，用于引用的示例）：
+
+@table @code
+@item sexp
+单个未评估的 Lisp 对象，未进行检测。
+@c an "expression" is not necessarily intended for evaluation.
+如果宏在宏扩展时计算参数，则应使用 @code{sexp} 而不是 @code{form}。
+
+@item form
+已检测的单个计算表达式。  如果您的宏在求值之前用 @code{lambda} 包装表达式，请改用 @code{def-form}。  参见下文@code{def-form}。
+
+@item place
+广义变量。  @xref{Generalized Variables}。
+
+@item body
+@code{&rest form} 的缩写。  参见下文@code{&rest}。  如果您的宏在求值之前用 @code{lambda} 包装其代码主体，请改用 @code{def-body}。  参见下文@code{def-body}。
+
+@item lambda-expr
+不带引号的 lambda 表达式。
+
+@item &optional
+@c @kindex &optional @r{(Edebug)}
+规格列表中​​的所有以下元素都是可选的；一旦不匹配，Edebug 就会在此级别停止匹配。
+
+要仅使几个元素可选，然后是非可选元素，请使用 @code{[&optional @var{specs}@dots{}]}。  要指定多个元素必须全部匹配或都不匹配，请使用 @code{&optional [@var{specs}@dots{}]}。  请参阅 @code{defun} 示例。
+
+@item &rest
+@c @kindex &rest @r{(Edebug)}
+规范列表中的所有以下元素重复零次或多次。  然而，在最后一次重复中，如果表达式在匹配规范列表的所有元素之前就用完了，也不是问题。
+
+要仅重复几个元素，请使用 @code{[&rest @var{specs}@dots{}]}。要指定每次重复时都必须匹配的多个元素，请使用@code{&rest [@var{specs}@dots{}]}。
+
+@item &or
+@c @kindex &or @r{(Edebug)}
+规范列表中的以下每个元素都是替代元素。  替代方案之一必须匹配，否则 @code{&or} 规范将失败。
+
+@code{&or} 之后的每个列表元素都是一个单一的替代项。  要将两个或多个列表元素分组为单个替代项，请将它们括在 @code{[@dots{}]} 中。
+
+@item &not
+@c @kindex &not @r{(Edebug)}
+下面的每个元素都作为替代项进行匹配，就像使用 @code{&or} 一样，但如果其中任何一个元素匹配，则规范失败。  如果它们都不匹配，则没有任何内容匹配，但 @code{&not} 规范成功。
+
+@c FIXME &key?
+
+@item &define
+@c @kindex &define @r{(Edebug)}
+表示该规范是针对定义形式的。  Edebug 对定义表单的定义是包含一个或多个代码表单的表单，这些代码表单在执行定义表单之后保存并稍后执行。
+
+定义表单本身不会被检测（也就是说，Edebug 不会在定义表单之前和之后停止），但其中的表单通常会被检测。  @code{&define} 关键字应该是列表规范中的第一个元素。
+
+@item nil
+当当前参数列表级别没有更多参数可匹配时，此操作成功；否则会失败。  请参阅子列表规范和反引号示例。
+
+@cindex preventing backtracking, in Edebug specification list
+@item gate
+没有匹配任何参数，但在匹配此级别的其余规范时，将禁用通过门的回溯。  这主要用于生成更具体的语法错误消息。 @xref{Backtracking}，了解更多详情。  另请参阅 @code{let} 示例。
+
+@item &error
+在 edebug-spec 中，@code{&error} 后面应该跟一个字符串，即错误消息；它会中止检测，并在迷你缓冲区中显示消息。
+
+@item &interpose
+让函数控制剩余代码的解析。它采用 @code{&interpose @var{spec} @var{fun} @var{args...}} 的形式，意味着 Edebug 首先将 @var{spec} 与代码进行匹配，然后使用与 @code{spec} 匹配的代码调用 @var{fun}，解析函数 @var{pf}，最后调用 @var{args...}。  解析函数需要一个参数来指示用于解析剩余代码的规范列表。  它应该被调用一次并返回 @var{fun} 预期返回的检测代码。例如，@code{(&interpose symbolp pcase--match-pat-args)}匹配第一个元素是符号的sexp，然后让@code{pcase--match-pat-args}根据@code{pcase--match-pat-args}查找与该头符号关联的规格，并将它们传递给它作为参数接收的@var{pf}。
+
+@cindex indirect specifications
+@item @var{other-symbol}
+规范列表中的任何其他符号都可以是谓词或间接规范。
+
+如果符号具有 Edebug 规范，则此 @dfn{indirect specification} 应该是用于代替符号的列表规范，或者是调用来处理参数的函数。  该规范可以用 @code{def-edebug-elem-spec} 定义：
+
+@defun def-edebug-elem-spec element specification
+定义 @var{specification} 以代替符号 @var{element}。 @var{specification} 必须是一个列表。
+@end defun
+
+否则，该符号应该是谓词。  使用参数调用谓词，如果谓词返回@code{nil}，则说明失败并且不会检测参数。
+
+一些合适的谓词包括@code{symbolp}、@code{integerp}、@code{stringp}、@code{vectorp}和@code{atom}。
+
+@cindex [@dots{}] (Edebug specification)
+@item [@var{elements}@dots{}]
+元素向量将元素分组为单个 @dfn{group specification}。  它的含义与向量无关。
+
+@item "@var{string}"
+参数应该是一个名为 @var{string} 的符号。  该规范等价于带引号的符号@code{'@var{symbol}}，其中@var{symbol}的名称是@var{string}，但首选字符串形式。
+
+@item (vector @var{elements}@dots{})
+参数应该是一个向量，其元素必须与规范中的 @var{elements} 匹配。  请参阅反引号示例。
+
+@item (@var{elements}@dots{})
+任何其他列表都是 @dfn{sublist specification} 并且参数必须是其元素与规范 @var{elements} 匹配的列表。
+
+@cindex dotted lists (Edebug)
+子列表规范可以是点列表，并且相应的列表参数则可以是点列表。  或者，点分列表规范的最后一个 0⁣ 可以是另一个子列表规范（通过分组或间接规范，例如 11），其元素与非点分列表参数匹配。这在递归规范中很有用，例如在反引号示例中。  另请参阅上面 @code{nil} 规范的描述以终止此类递归。
+
+请注意，写为 @code{(specs .  nil)} 的子列表规范等效于 @code{(specs)}，@code{(specs . (sublist-elements@dots{}))} 等效于 @code{(specs sublist-elements@dots{})}。
+@end table
+
+@c Need to document extensions with &symbol and :symbol
+
+以下是仅在 @code{&define} 之后出现的附加规格列表。  请参阅@code{defun}示例。
+
+@table @code
+@item &name
+从代码中提取当前定义表单的名称。它采用 @code{&name [@var{prestring}] @var{spec} [@var{poststring}] @var{fun} @var{args...}} 的形式，意味着 Edebug 将 @var{spec} 与代码进行匹配，然后使用当前名称、@var{args...}、@var{prestring}、匹配@code{spec} 和 @var{poststring} 的代码的串联来调用 @var{fun}。  如果 @var{fun} 不存在，则默认为连接参数的函数（在先前名称和新名称之间使用 @code{@@}）。
+
+@item name
+参数（符号）是定义形式的名称。 @code{[&name symbolp]} 的简写。
+
+定义表单不需要有名称字段；并且它可能有多个名称字段。
+
+@item arg
+参数（符号）是定义形式的参数的名称。但是，不允许使用 lambda 列表关键字（以 @samp{&} 开头的符号）。
+
+@cindex lambda-list (Edebug)
+@item lambda-list
+这匹配 lambda 列表——lambda 表达式的参数列表。
+
+@item def-body
+参数是定义中的代码主体。  这类似于上面描述的@code{body}，但是定义主体必须使用不同的 Edebug 调用进行检测，该调用查找与定义相关的信息。  使用 @code{def-body} 作为定义中最高级别的表单列表。
+
+@item def-form
+参数是定义中的单一、最高级别的形式。  这类似于 @code{def-body}，只不过它用于匹配单个表单而不是表单列表。  作为一种特殊情况，@code{def-form}也意味着在执行表单时不输出跟踪信息。  请参阅 @code{interactive} 示例。
+@end table
+
+@node Backtracking
+@subsubsection 规格回溯
+
+@cindex backtracking
+@cindex syntax error (Edebug)
+如果规范在某些时候无法匹配，这并不一定意味着会发出语法错误信号；相反，@dfn{backtracking}将会发生，直到用尽所有替代方案。  最终，参数列表中的每个元素都必须与规范中的某个元素匹配，并且规范中的每个必需元素都必须与某个参数匹配。
+
+当检测到语法错误时，可能要等到很久以后，在用尽更高级别的替代方案之后，并且该点距离真正的错误更远时，才会报告该错误。  但如果发生错误时禁用回溯，则可以立即报告。  请注意，在某些情况下回溯也会自动重新启用；当@code{&optional}、@code{&rest}或@code{&or}建立新的替代项时，或者在开始处理子列表、组或间接指定时。  启用或禁用回溯的效果仅限于当前正在处理的级别的其余部分和较低级别。
+
+匹配任何表单规范（即 @code{form}、@code{body}、@code{def-form} 和 @code{def-body}）时，回溯将被禁用。  这些规范将匹配任何表单，因此任何错误都必须出现在表单本身中，而不是更高级别的错误。
+
+成功匹配带引号的符号、字符串规范或 @code{&define} 关键字后，回溯也会被禁用，因为这通常表示已识别的构造。  但是，如果您有一组均以相同符号开头的替代构造，则通常可以通过从替代项中分解符号来解决此约束，例如 @code{["foo" &or [first case] [second case] ...]}。
+
+自动禁用回溯的这两种方式可以满足大多数需求，但有时使用 @code{gate} 规范显式禁用回溯会很有用。  当您知道没有更高的替代方案可以应用时，这非常有用。  请参阅 @code{let} 规范的示例。
+
+@node Specification Examples
+@subsubsection 规格示例
+
+通过研究此处提供的示例，可能会更容易理解 Edebug 规范。
+
+考虑一个假设的宏@code{my-test-generator}，它对提供的数据列表运行测试。  尽管 Edebug 的默认行为是不将参数作为代码进行检测（由 @code{edebug-eval-macro-args} (@pxref{Instrumenting Macro Calls}) 控制），但明确记录参数是数据可能很有用：
+
+@example
+(def-edebug-spec my-test-generator (&rest sexp))
+@end example
+
+@code{let} 特殊形式具有一系列绑定和主体。  每个绑定要么是一个符号，要么是一个带有符号和可选表达式的子列表。  在下面的规范中，请注意子列表内部的@code{gate}，以防止在找到子列表后回溯。
+
+@ignore
+@c FIXME?  The actual definition in edebug.el looks like this (and always
+@c has AFAICS).  In fact, nothing in edebug.el uses gate.  So maybe
+@c this is just an example for illustration?
+(def-edebug-spec let
+  ((&rest
+    &or (symbolp &optional form) symbolp)
+   body))
+@end ignore
+@example
+(def-edebug-spec let
+  ((&rest
+    &or symbolp (gate symbolp &optional form))
+   body))
+@end example
+
+Edebug 对 @code{defun} 以及相关参数列表和 @code{interactive} 规范使用以下规范。  有必要专门处理交互式形式，因为表达式参数实际上是在函数体外部求值的。  （@code{defmacro} 的规范与 @code{defun} 的规范非常相似，但允许使用 @code{declare} 语句。）
+
+@smallexample
+(def-edebug-spec defun
+  (&define name lambda-list
+           [&optional stringp]   ; @r{Match the doc string, if present.}
+           [&optional ("interactive" interactive)]
+           def-body))
+
+(def-edebug-elem-spec 'lambda-list
+  '(([&rest arg]
+     [&optional ["&optional" arg &rest arg]]
+     &optional ["&rest" arg]
+     )))
+
+(def-edebug-elem-spec 'interactive
+  '(&optional &or stringp def-form))    ; @r{Notice: @code{def-form}}
+@end smallexample
+
+下面的反引号规范说明了如何匹配点列表并使用 @code{nil} 终止递归。  它还说明了如何匹配向量的分量。  （Edebug 定义的实际规范有点不同，并且不支持点列表，因为这样做会导致非常深的递归，可能会失败。）
+
+@smallexample
+(def-edebug-spec \` (backquote-form))   ; @r{Alias just for clarity.}
+
+(def-edebug-elem-spec 'backquote-form
+  '(&or ([&or "," ",@@"] &or ("quote" backquote-form) form)
+        (backquote-form . [&or nil backquote-form])
+        (vector &rest backquote-form)
+        sexp))
+@end smallexample
+
+
+@node Edebug Options
+@subsection 调试选项
+
+这些选项影响 Edebug 的行为：
+@c Previously defopt'd:
+@c edebug-sit-for-seconds, edebug-print-length, edebug-print-level
+@c edebug-print-circle, edebug-eval-macro-args
+
+@defopt edebug-setup-hook
+使用 Edebug 之前调用的函数。  每次设置为新值时，Edebug 都会调用这些函数一次，然后将@code{edebug-setup-hook}重置为@code{nil}。  您可以使用它来加载与您正在使用的包关联的 Edebug 规范，但前提是您也使用 Edebug。 @xref{Instrumenting}。
+@end defopt
+
+@defopt edebug-all-defs
+如果这是非 @code{nil}，则对定义形式（如 @code{defun} 和 @code{defmacro}）的正常评估会为 Edebug 提供工具。  这适用于 @code{eval-defun}、@code{eval-region} 和 @code{eval-buffer}。
+
+使用命令 @kbd{M-x edebug-all-defs} 切换此选项的值。  @xref{Instrumenting}。
+@end defopt
+
+@defopt edebug-all-forms
+如果这是非 @code{nil}，则命令 @code{eval-defun}、@code{eval-region} 和 @code{eval-buffer} 检测所有形式，甚至是那些没有定义任何内容的形式。  这不适用于迷你缓冲区中的加载或评估。
+
+使用命令 @kbd{M-x edebug-all-forms} 切换此选项的值。  @xref{Instrumenting}。
+@end defopt
+
+@defopt edebug-eval-macro-args
+当该值非 0 时，所有宏参数都将在生成的代码中进行检测。  对于任何宏，@code{debug}声明都会覆盖此选项。  因此，要为某些参数被评估而另一些参数未被评估的宏指定异常，请使用 @code{debug} 声明指定 Edebug 表单规范。
+@end defopt
+
+@defopt edebug-save-windows
+如果不是@code{nil}，Edebug 会保存并恢复窗口配置。  这需要一些时间，因此如果您的程序不关心窗口配置发生什么，最好将此变量设置为@code{nil}。  如果默认值导致 Edebug 覆盖您正在调试的程序中涉及的缓冲区中的点位置（作为保存和恢复窗口配置的结果），我们还建议将其设置为@code{nil}；如果您的程序在一个或多个缓冲区中移动点，则可能会发生这种情况。在这种情况下尝试自定义的另一个选项是@code{edebug-save-displayed-buffer-points}，如下所述。
+
+如果@code{edebug-save-windows}的值为列表，则仅保存和恢复列出的窗口。
+
+您可以在 Edebug 中使用 @kbd{W} 命令以交互方式更改此变量。  @xref{Edebug Display Update}。
+@end defopt
+
+@defopt edebug-save-displayed-buffer-points
+如果该值非@code{nil}，Edebug 将保存并恢复所有显示缓冲区中的点。
+
+如果您正在调试更改非选定窗口中显示的缓冲区的缓冲点 (@pxref{Point}) 的代码，则需要在其他缓冲区中保存和恢复点。  如果 Edebug 或用户选择了窗口，则该缓冲区中的点将移动到窗口的点值。
+
+在所有缓冲区中保存和恢复点的成本很高，因为它需要选择每个窗口两次，因此仅在需要时才启用此功能。  @xref{Edebug Display Update}。
+@end defopt
+
+@defopt edebug-initial-mode
+如果该变量为非@code{nil}，则它指定 Edebug 首次激活时的初始执行模式。  可能的值为 @code{step}、@code{next}、@code{go}、@code{Go-nonstop}、@code{trace}、@code{Trace-fast}、@code{continue} 和 @code{Continue-fast}。
+
+默认值为@code{step}。  该变量可以与 @kbd{C-x C-a C-m} (@code{edebug-set-initial-mode}) 交互设置。 @xref{Edebug Execution Modes}。
+@end defopt
+
+@defopt edebug-trace
+如果这是非@code{nil}，则跟踪每个函数的入口和出口。跟踪输出显示在名为 @file{*edebug-trace*} 的缓冲区中，每行一个函数入口或出口，按递归级别缩进。
+
+另请参见@ref{Trace Buffer}中的@code{edebug-tracing}。
+@end defopt
+
+@defopt edebug-test-coverage
+如果非@code{nil}，Edebug 测试所有调试表达式的覆盖率。 @xref{Coverage Testing}。
+@end defopt
+
+@defopt edebug-continue-kbd-macro
+如果非@code{nil}，则继续定义或执行在 Edebug 外部执行的任何键盘宏。   请谨慎使用它，因为它未经调试。 @xref{Edebug Execution Modes}。
+@end defopt
+
+@defopt edebug-print-length
+如果非@code{nil}，则在 Edebug 中打印结果的默认值@code{print-length}。  @xref{Output Variables}。
+@end defopt
+
+@defopt edebug-print-level
+如果非@code{nil}，则在 Edebug 中打印结果的默认值@code{print-level}。  @xref{Output Variables}。
+@end defopt
+
+@defopt edebug-print-circle
+如果非@code{nil}，则在 Edebug 中打印结果的默认值@code{print-circle}。  @xref{Output Variables}。
+@end defopt
+
+@defopt edebug-unwrap-results
+如果非@code{nil}，Edebug 在显示表达式结果时会尝试删除其自己的任何检测。  这在调试宏时是相关的，其中表达式的结果本身就是经过检测的表达式。  作为一个非常人为的示例，假设示例函数 @code{fac} 已被检测，并考虑以下形式的宏：
+
+@c FIXME find a less silly example.
+@smallexample
+(defmacro test () "Edebug example."
+  (if (symbol-function 'fac)
+      @dots{}))
+@end smallexample
+
+如果您检测 @code{test} 宏并单步执行它，则默认情况下 @code{symbol-function} 调用的结果具有大量 @code{edebug-after} 和 @code{edebug-before} 形式，这可能会导致很难看到实际结果。  如果@code{edebug-unwrap-results} 不是@code{nil}，Edebug 会尝试从结果中删除这些形式。
+@end defopt
+
+@defopt edebug-on-error
+如果 @code{debug-on-error} 之前是 @code{nil}，Edebug 将 @code{debug-on-error} 绑定到该值。  @xref{Trapping Errors}。
+@end defopt
+
+@defopt edebug-on-quit
+如果 @code{debug-on-quit} 之前是 @code{nil}，Edebug 将 @code{debug-on-quit} 绑定到该值。  @xref{Trapping Errors}。
+@end defopt
+
+如果在 Edebug 处于活动状态时更改 @code{edebug-on-error} 或 @code{edebug-on-quit} 的值，则在通过新命令调用 @emph{next} 时间 Edebug 之前，不会使用它们的值。
+@c Not necessarily a deeper command level.
+@c A new command is not precisely true, but that is close enough -- dan
+
+@defopt edebug-global-break-condition
+如果非@code{nil}，则在每个停止点测试一个表达式。  如果结果是非@code{nil}，则中断。  错误被忽略。 @xref{Global Break Condition}。
+@end defopt
+
+@defopt edebug-sit-for-seconds
+到达断点且执行模式为跟踪或继续时暂停的秒数。  @xref{Edebug Execution Modes}。
+@end defopt
+
+@defopt edebug-sit-on-break
+是否在到达断点时暂停@code{edebug-sit-for-seconds}。  设置为 @code{nil} 以防止暂停，非 @code{nil} 则允许暂停。
+@end defopt
+
+@cindex Edebug, changing behavior with instrumented code
+@defopt edebug-behavior-alist
+默认情况下，此列表包含一个带有键 @code{edebug} 的条目和一个包含三个函数的列表，这三个函数是插入到检测代码中的函数的默认实现：@code{edebug-enter}、@code{edebug-before} 和 @code{edebug-after}。  要全局更改 Edebug 的行为，请修改默认条目。
+
+@vindex edebug-behavior, symbol property
+Edebug 的行为也可以根据每个定义进行更改，方法是向此列表添加一个条目，并使用您选择的键和三个函数。  然后将检测定义的 @code{edebug-behavior} 符号属性设置为新条目的键，Edebug 将调用新函数来代替该定义自己的函数。
+@end defopt
+
+@defopt edebug-new-definition-function
+Edebug 在包装定义或闭包主体后运行的函数。  Edebug 初始化自己的数据后，将使用一个参数调用该函数，即与定义相关的符号，该符号可能是实际定义的符号，也可能是由 Edebug 生成的符号。  此函数可用于设置 Edebug 检测的每个定义的 @code{edebug-behavior} 符号属性。
+@end defopt
+
+@defopt edebug-after-instrumentation-function
+要在使用之前检查或修改 Edebug 的检测，请将​​此变量设置为一个函数，该函数接受一个参数（一种检测的顶级形式），并返回相同或替换的形式，然后 Edebug 将使用该函数作为检测的最终结果。
+@end defopt

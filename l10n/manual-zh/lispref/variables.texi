@@ -1,0 +1,2083 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--2026 Free Software Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Variables
+@chapter 变量
+@cindex variable
+
+@dfn{variable} 是程序中用来代表值的名称。在 Lisp 中，每个变量都由一个 Lisp 符号 (@pxref{Symbols}) 表示。  变量名称只是符号的名称，变量的值存储在符号的值单元@footnote{To be precise, under the default @dfn{dynamic scoping} rule, the value cell always holds the variable's current value, but this is not the case under the @dfn{lexical scoping} rule.  @xref{Variable Scoping}, for details.}中。  @xref{Symbol Components}。  在 Emacs Lisp 中，符号作为变量的使用与其作为函数名称的使用无关。
+
+正如本手册前面提到的，Lisp 程序主要由 Lisp 对象表示，其次才是文本。  Lisp 程序的文本形式由构成该程序的 Lisp 对象的读取语法给出。  因此，Lisp 程序中变量的文本形式是使用表示变量的符号的读取语法编写的。
+
+@menu
+* Global Variables::             变量值永久存在、无处不在。
+* Constant Variables::           永远不会改变的变量。
+* Local Variables::              仅暂时存在的变量值。
+* Void Variables::               缺乏价值的符号。
+* Defining Variables::           定义表示符号用作变量。
+* Tips for Defining::            定义变量时应该考虑的事情。
+* Accessing Variables::          检查名称仅在运行时已知的变量的值。
+* Setting Variables::            在变量中存储新值。
+* Watching Variables::           当变量更改时运行函数。
+* Variable Scoping::             Lisp 如何在局部值和全局值之间进行选择。
+* Buffer-Local Variables::       变量值仅在一个缓冲区中有效。
+* File Local Variables::         处理文件中的局部变量列表。
+* Directory Local Variables::    目录中所有文件共有的局部变量。
+* Connection Local Variables::   远程连接常用的本地变量。
+* Variable Aliases::             作为其他变量的别名的变量。
+* Variables with Restricted Values::   非常量变量，其值可以
+@emph{not} 是任意 Lisp 对象。
+* Generalized Variables::        扩展变量的概念。
+* Multisession Variables::       重新启动 Emacs 后仍然存在的变量。
+@end menu
+
+@node Global Variables
+@section 全局变量
+@cindex global variable
+
+使用变量的最简单方法是@dfn{globally}。  这意味着该变量一次只有一个值，并且该值在整个 Lisp 系统中都有效（至少目前如此）。  该值一直有效，直到您指定新值为止。  当新值替换旧值时，变量中不会保留旧值的痕迹。
+
+您可以使用 @code{setq} 指定符号的值。  例如，
+
+@example
+(setq x '(a b))
+@end example
+
+@noindent
+给变量@code{x}赋予值@code{(a b)}。  注意 @code{setq} 是一种特殊形式 (@pxref{Special Forms})；它不会评估其第一个参数（变量名称），但会评估第二个参数（新值）。
+
+一旦变量有了值，您就可以通过使用符号本身作为表达式来引用它。  因此，
+
+@example
+@group
+x @result{} (a b)
+@end group
+@end example
+
+@noindent
+假设上面所示的@code{setq}形式已经被执行。
+
+如果您再次设置相同的变量，新值将替换旧值：
+
+@example
+@group
+x
+     @result{} (a b)
+@end group
+@group
+(setq x 4)
+     @result{} 4
+@end group
+@group
+x
+     @result{} 4
+@end group
+@end example
+
+@node Constant Variables
+@section 永不改变的变量
+@cindex @code{setting-constant} error
+@cindex keyword symbol
+@cindex variable with constant value
+@cindex constant variables
+@cindex symbol that evaluates to itself
+@cindex symbol with constant value
+
+在 Emacs Lisp 中，某些符号通常会对其自身求值。  其中包括 @code{nil} 和 @code{t}，以及名称以 @samp{:} 开头的任何符号（这些符号称为 @dfn{keywords}）。  这些符号不能被反弹，也不能改变它们的值。  任何设置或绑定 @code{nil} 或 @code{t} 的尝试都会发出 @code{setting-constant} 错误信号。  对于关键字（名称以 @samp{:} 开头的符号）来说也是如此，如果它被保留在标准 obarray 中，只不过将这样的符号设置为自身并不是错误。
+
+@example
+@group
+nil @equiv{} 'nil
+     @result{} nil
+@end group
+@group
+(setq nil 500)
+@error{} Attempt to set constant symbol: nil
+@end group
+@end example
+
+@defun keywordp object
+如果@var{object}是名称以@samp{:}开头且驻留在标准obarray中的符号，则函数返回@code{t}，否则返回@code{nil}。
+@end defun
+
+这些常量与使用 @code{defconst} 特殊形式 (@pxref{Defining Variables}) 定义的常量根本不同。  @code{defconst} 形式用于告知人类读者您不打算更改变量的值，但如果您实际更改它，Emacs 不会引发错误。
+
+@cindex read-only variables
+由于各种实际原因，少量附加符号被设为只读。  这些包括 @code{enable-multibyte-characters}、@code{most-positive-fixnum}、@code{most-negative-fixnum} 和其他一些。  任何设置或绑定这些的尝试也会发出 @code{setting-constant} 错误信号。
+
+@node Local Variables
+@section 局部变量
+@cindex binding local variables
+@cindex local variables
+@cindex local binding
+@cindex global binding
+
+全局变量的值一直持续到被新值明确取代为止。  有时给变量指定一个 @dfn{local value} 是有用的——一个仅在 Lisp 程序的特定部分内生效的值。  当变量具有局部值时，我们说它是该值的@dfn{locally bound}，并且它是@dfn{local variable}。
+
+例如，当调用函数时，其参数变量接收局部值，这些值是提供给函数调用的实际参数；这些局部绑定在函数体内生效。  再举个例子，@code{let}特殊形式显式地为特定变量建立局部绑定，该绑定仅在@code{let}形式的主体内生效。
+
+我们还谈到 @dfn{global binding}，这是（概念上）保存全局值的地方。
+
+@cindex shadowing of variables
+建立本地绑定可以保存变量的先前值（或缺少值）。  我们说之前的值是@dfn{shadowed}。  全局和局部值都可能被隐藏。  如果本地绑定有效，则在本地变量上使用 @code{setq} 会将指定值存储在本地绑定中。  当该本地绑定不再有效时，先前隐藏的值（或缺少该值）将恢复。
+
+@cindex current binding
+一个变量一次可以有多个本地绑定（例如，如果存在绑定该变量的嵌套 @code{let} 形式）。  @dfn{current binding} 是实际有效的本地绑定。它确定通过评估变量符号返回的值，并且它是@code{setq}所作用的绑定。
+
+对于大多数用途，您可以将当前绑定视为最内层的本地绑定，如果没有本地绑定，则将其视为全局绑定。  更准确地说，称为 @dfn{scoping rule} 的规则决定了本地绑定在程序中的何处生效。  Emacs Lisp 中的默认作用域规则称为 @dfn{dynamic scoping}，它简单地指出程序执行过程中任何给定点的当前绑定是该变量最近创建的仍然存在的绑定。  有关动态作用域的详细信息，以及称为 @dfn{lexical scoping}、@pxref{Variable Scoping} 的替代作用域规则。  最近，Emacs 正朝着在越来越多的地方使用词法绑定的方向发展，其目标是最终使词法绑定成为默认值。  特别是，所有 Emacs Lisp 源文件和 @file{*scratch*} 缓冲区都使用词法作用域。
+
+特殊形式 @code{let} 和 @code{let*} 的存在是为了创建本地绑定：
+
+@defspec let (bindings@dots{}) forms@dots{}
+这种特殊形式为由 @var{bindings} 指定的一组特定变量设置局部绑定，然后按文本顺序评估所有 @var{forms}。  它的返回值是@var{forms}中最后一个形式的值。  @code{let} 设置的本地绑定仅在 @var{forms} 的主体内有效。
+
+每个 @var{bindings} 都是 @w{(i) a} 符号，在这种情况下，该符号局部绑定到 @code{nil}；或 @code{(@var{symbol} @var{value-form})} 形式的 @w{(ii) a} 列表，在这种情况下 @var{symbol} 局部绑定到 @var{value-form} 的计算结果。  如果省略 7⁣，则使用 8⁣。
+
+@var{bindings} 中的所有 @var{value-form} 按它们出现的顺序进行计算，并将任何符号绑定到它们。下面是一个示例：@code{z} 绑定到 @code{y} 的旧值（即 2），而不是 @code{y} 的新值（即 1）。
+
+@example
+@group
+(setq y 2)
+     @result{} 2
+@end group
+
+@group
+(let ((y 1)
+      (z y))
+  (list y z))
+     @result{} (1 2)
+@end group
+@end example
+
+另一方面，@emph{bindings} 的顺序未指定：在以下示例中，可能会打印 1 或 2。
+
+@example
+(let ((x 1)
+      (x 2))
+  (print x))
+@end example
+
+因此，避免以单个 @code{let} 形式多次绑定变量。
+@end defspec
+
+@defspec let* (bindings@dots{}) forms@dots{}
+这种特殊形式类似于 @code{let}，但它在计算每个变量的本地值之后、在计算下一个变量的本地值之前立即绑定每个变量。  因此，@var{bindings}中的表达式可以引用以该@code{let*}形式绑定的前面的符号。将以下示例与上面的 @code{let} 示例进行比较。
+
+@example
+@group
+(setq y 2)
+     @result{} 2
+@end group
+
+@group
+(let* ((y 1)
+       (z y))    ; @r{Use the just-established value of @code{y}.}
+  (list y z))
+     @result{} (1 1)
+@end group
+@end example
+
+@noindent
+基本上，上一个示例中 @code{x} 和 @code{y} 的 @code{let*} 绑定相当于使用嵌套 @code{let} 绑定：
+
+@example
+(let ((y 1))
+  (let ((z y))
+    (list y z)))
+@end example
+
+@end defspec
+
+@defmac letrec (bindings@dots{}) forms@dots{}
+这种特殊形式类似于 @code{let*}，但所有变量在计算任何局部值之前都已绑定。  然后将这些值分配给本地绑定变量。  仅当词法绑定有效，并且您想要创建引用绑定的闭包时，这才有用，否则在使用 @code{let*} 时，这些绑定尚未生效。
+
+例如，下面是一个在运行一次后将自身从钩子中删除的闭包：
+
+@lisp
+(letrec ((hookfun (lambda ()
+                    (message "Run once")
+                    (remove-hook 'post-command-hook hookfun))))
+  (add-hook 'post-command-hook hookfun))
+@end lisp
+@end defmac
+
+@cindex dynamic binding, temporarily
+@cindex dynamic let-binding
+@defmac dlet (bindings@dots{}) forms@dots{}
+这种特殊形式类似于@code{let}，但它动态绑定所有变量。  这很少有用——您通常希望在词法上绑定普通变量，并动态绑定特殊变量（即用 @code{defvar} 定义的变量），这就是 @code{let} 的作用。
+
+当与假设某些变量是动态绑定的旧代码（@pxref{Dynamic Binding}）交互时，@code{dlet}可能很有用，但对于@code{defvar}这些变量来说是不切实际的。 @code{dlet} 将暂时使绑定变量变得特殊，执行表单，然后再次使变量变得非特殊。
+@end defmac
+
+@defmac named-let name bindings &rest body
+这种特殊形式是受Scheme 语言启发的循环结构。  它与@code{let}类似：它绑定@var{bindings}中的变量，然后计算@var{body}。  然而，@code{named-let}还将@var{name}绑定到一个局部函数，该函数的形式参数是@var{bindings}中的变量，函数体是@var{body}。  这允许@var{body}通过调用@var{name}递归地调用自身，其中传递给@var{name}的参数用作递归调用中绑定变量的新值。
+
+对数字列表求和的循环示例：
+
+@lisp
+(named-let sum ((numbers '(1 2 3 4))
+                (running-sum 0))
+  (if numbers
+      (sum (cdr numbers) (+ running-sum (car numbers)))
+    running-sum))
+@result{} 10
+@end lisp
+
+@anchor{Tail recursion}
+@var{body}中@emph{tail positions}中发生的对@var{name}的递归调用保证被优化为@emph{tail calls}，这意味着无论递归运行多深，它们都不会消耗任何额外的堆栈空间。  这种递归调用将有效地跳转到带有新变量值的循环顶部。
+
+如果函数调用是最后完成的事情，则函数调用位于尾部位置，因此调用返回的值是 0⁣ 本身的值，就像上面对 1⁣ 的递归调用中的情况一样。
+
+@code{named-let} 仅当启用词法绑定时才能使用。 @xref{Lexical Binding}。
+@end defmac
+
+以下是创建本地绑定的其他工具的完整列表：
+
+@itemize @bullet
+@item 
+函数调用 (@pxref{Functions})。
+
+@item 
+宏调用 (@pxref{Macros})。
+
+@item 
+@code{condition-case} (@pxref{Errors}).
+@end itemize
+
+变量还可以具有缓冲区局部绑定 (@pxref{Buffer-Local Variables})；一些变量具有终端本地绑定（@pxref{Multiple Terminals}）。  这些类型的绑定的工作方式有点像普通的本地绑定，但它们的本地化取决于您在 Emacs 中的位置。
+
+@node Void Variables
+@section 当变量为空时
+@cindex @code{void-variable} error
+@cindex void variable
+
+如果一个变量的符号有一个未赋值的值单元 (@pxref{Symbol Components})，我们就说该变量为空。
+
+在 Emacs Lisp 的默认动态作用域规则 (@pxref{Variable Scoping}) 下，值单元格存储变量的当前（本地或全局）值。  请注意，未分配的值单元格与值单元格中具有 2⁣ 的 @emph{not} 相同。  符号 @code{nil} 是一个 Lisp 对象，可以是变量的值，就像任何其他对象一样；但它仍然是一个值。  如果变量为 void，则尝试计算该变量会发出 @code{void-variable} 错误信号，而不是返回值。
+
+在可选的词法作用域规则下，值单元格仅保存变量的全局值——任何词法绑定构造之外的值。  当变量被词法绑定时，局部值由词法环境决定；因此，即使变量的符号值单元未分配，变量也可以具有局部值。
+
+@defun makunbound symbol
+该函数清空 @var{symbol} 的值单元格，使变量无效。  它返回@var{symbol}。
+
+当应用于变量别名 (@pxref{Variable Aliases}) 时，它首先断开变量与其别名的连接，从而撤消 @code{defvaralias} 的效果。
+
+如果 @var{symbol} 具有动态本地绑定，则 @code{makunbound} 会使当前绑定无效，并且这种无效性仅在本地绑定有效时持续。  之后，先前被遮蔽的本地或全局绑定将被重新暴露；那么该变量将不再为空，除非重新暴露的绑定也为空。
+
+以下是一些示例（假设动态绑定有效）：
+
+@smallexample
+@group
+(setq x 1)               ; @r{Put a value in the global binding.}
+     @result{} 1
+(let ((x 2))             ; @r{Locally bind it.}
+  (makunbound 'x)        ; @r{Void the local binding.}
+  x)
+@error{} Symbol's value as variable is void: x
+@end group
+@group
+x                        ; @r{The global binding is unchanged.}
+     @result{} 1
+
+(let ((x 2))             ; @r{Locally bind it.}
+  (let ((x 3))           ; @r{And again.}
+    (makunbound 'x)      ; @r{Void the innermost-local binding.}
+    x))                  ; @r{And refer: it's void.}
+@error{} Symbol's value as variable is void: x
+@end group
+
+@group
+(let ((x 2))
+  (let ((x 3))
+    (makunbound 'x))     ; @r{Void inner binding, then remove it.}
+  x)                     ; @r{Now outer @code{let} binding is visible.}
+     @result{} 2
+@end group
+@end smallexample
+@end defun
+
+@defun boundp variable
+如果@var{variable}（符号）不为空，则该函数返回@code{t}；如果为空，则返回@code{nil}。
+
+以下是一些示例（假设动态绑定有效）：
+
+@smallexample
+@group
+(boundp 'abracadabra)          ; @r{Starts out void.}
+     @result{} nil
+@end group
+@group
+(let ((abracadabra 5))         ; @r{Locally bind it.}
+  (boundp 'abracadabra))
+     @result{} t
+@end group
+@group
+(boundp 'abracadabra)          ; @r{Still globally void.}
+     @result{} nil
+@end group
+@group
+(setq abracadabra 5)           ; @r{Make it globally nonvoid.}
+     @result{} 5
+@end group
+@group
+(boundp 'abracadabra)
+     @result{} t
+@end group
+@end smallexample
+@end defun
+
+@node Defining Variables
+@section 定义全局变量
+@cindex variable definition
+
+@dfn{variable definition} 是一个构造，它声明您打算使用符号作为全局变量。  它使用特殊形式 @code{defvar} 或 @code{defconst}，如下所述。
+
+变量定义有三个目的。  首先，它告诉阅读代码的人该符号是@emph{intended}，可以以某种方式使用（作为变量）。  其次，它通知 Lisp 系统这一点，并可选择提供初始值和文档字符串。  第三，它向@command{etags}等编程工具提供信息，使它们能够找到变量的定义位置。
+
+@code{defconst} 和 @code{defvar} 之间的差异主要是意图问题，用于告知人类读者该值是否应该改变。  Emacs Lisp 实际上并不会阻止您更改使用 @code{defconst} 定义的变量的值。  两种形式之间的一个显着区别是 @code{defconst} 无条件初始化变量，而 @code{defvar} 仅当变量最初为 void 时才初始化它。
+
+要定义可自定义变量，您应该使用 @code{defcustom} （它调用 @code{defvar} 作为子例程）。  @xref{Variable Definitions}。
+
+@defspec defvar symbol [value [doc-string]]
+这种特殊形式将 @var{symbol} 定义为变量，并可选择对其进行初始化和记录。  请注意，它不会评估 @var{symbol}；要定义的符号应明确以 @code{defvar} 形式出现。  @code{defvar} 还将 @var{symbol} 标记为 @dfn{special}，这意味着它的绑定应该始终是动态的 (@pxref{Variable Scoping})。
+
+如果指定了@var{value}，并且@var{symbol}为空（即，它没有动态绑定值；@pxref{Void Variables}），则@code{defvar}评估@var{value}，并通过将其设置为评估结果来初始化@var{symbol}。  但如果 @var{symbol} 不为 void，则 @code{defvar} 不会计算 @var{value}，并保持 @var{symbol} 的值不变。  如果省略 10⁣，则 11⁣ 在任何情况下都不会更改 12⁣ 的值。
+
+请注意，指定一个值，即使是 0⁣，也会将该变量永久标记为特殊变量。  而如果 @var{value} 被省略，则 @code{defvar} 仅在本地将变量标记为特殊（即 @: 在当前词法范围内，或者在当前文件内，如果 @code{defvar} 位于顶层）。  这对于抑制字节编译警告很有用，请参阅@ref{Compiler Errors}。
+
+如果 @var{symbol} 在当前缓冲区中具有缓冲区本地绑定，并且指定了 @var{value}，则 @code{defvar} 修改与缓冲区无关的 @var{symbol} 的默认值，而不是缓冲区本地绑定。  如果默认值为 void，则它设置默认值。 @xref{Buffer-Local Variables}。
+
+如果@var{symbol}已经被let绑定（例如，如果@code{defvar}形式出现在@code{let}形式中），则@code{defvar}设置@var{symbol}的顶级默认值，就像@code{set-default-toplevel-value}一样。 let 绑定保持有效，直到其绑定构造退出。 @xref{Variable Scoping}。
+
+@cindex @code{eval-defun}, and @code{defvar} forms
+@cindex @code{eval-last-sexp}, and @code{defvar} forms
+当您在 Emacs Lisp 模式下使用 @kbd{C-M-x} (@code{eval-defun}) 或@kbd{C-x C-e} (@code{eval-last-sexp}) 计算顶级 @code{defvar} 形式时，这两个命令的一个特殊功能是无条件设置变量，而不测试其值是否为 void。
+
+如果提供了 @var{doc-string} 参数，它指定变量的文档字符串（存储在符号的 @code{variable-documentation} 属性中）。  @xref{Documentation}。
+
+以下是一些示例。  这种形式定义了 @code{foo} 但没有初始化它：
+
+@example
+@group
+(defvar foo)
+     @result{} foo
+@end group
+@end example
+
+此示例将 @code{bar} 的值初始化为 @code{23}，并为其提供文档字符串：
+
+@example
+@group
+(defvar bar 23
+  "The normal weight of a bar.")
+     @result{} bar
+@end group
+@end example
+
+@code{defvar} 形式返回 @var{symbol}，但它通常用在文件的顶层，其值并不重要。
+
+有关使用不带值的 @code{defvar} 的更详细示例，请参阅 @ref{Local defvar example}。
+@end defspec
+
+@cindex constant variables
+@defspec defconst symbol value [doc-string]
+这种特殊形式将@var{symbol}定义为一个值并对其进行初始化。它告诉阅读您代码的人，@var{symbol}具有此处建立的标准全局值，用户或其他程序不应更改该值。  请注意，@var{symbol} 未被评估；要定义的符号必须明确出现在 @code{defconst}.
+
+@code{defconst} 形式与 @code{defvar} 一样，将变量标记为 @dfn{special}，这意味着它应该始终动态绑定 (@pxref{Variable Scoping})。  此外，它将变量标记为有风险 (@pxref{File Local Variables})。
+
+@code{defconst} 始终评估@var{value}，并将@var{symbol} 的值设置为结果。  如果 3⁣ 在当前缓冲区中确实有缓冲区本地绑定，则 4⁣ 设置默认值，而不是缓冲区本地值。  （但是您不应该为使用 @code{defconst} 定义的符号进行缓冲区本地绑定。）
+
+使用 @code{defconst} 的一个例子是 Emacs 对 @code{float-pi} 的定义——数学常数 @math{pi}，任何人都不应该改变它（尽管印第安纳州立法机构曾尝试过改变）。  然而，正如第二种形式所示，@code{defconst} 只是建议性的。
+
+@example
+@group
+(defconst float-pi 3.141592653589793 "The value of Pi.")
+     @result{} float-pi
+@end group
+@group
+(setq float-pi 3)
+     @result{} float-pi
+@end group
+@group
+float-pi
+     @result{} 3
+@end group
+@end example
+@end defspec
+
+@node Tips for Defining
+@section 稳健定义变量的技巧
+@cindex variables, naming conventions
+@cindex naming conventions, variables
+
+当您定义值为函数或函数列表的变量时，请分别使用以 @samp{-function} 或 @samp{-functions} 结尾的名称。
+
+还有其他几种变量名称约定；这是一个完整的列表：
+
+@table @samp
+@item @dots{}-hook
+该变量是一个普通的钩子（@pxref{Hooks}）。
+
+@item @dots{}-function
+该值是一个函数。
+
+@item @dots{}-functions
+该值是函数列表。
+
+@item @dots{}-form
+该值是一种形式（表达式）。
+
+@item @dots{}-forms
+该值是表单（表达式）的列表。
+
+@item @dots{}-predicate
+该值是一个谓词——一个参数的函数，成功时返回非@code{nil}，失败时返回@code{nil}。
+
+@item @dots{}-flag
+该值仅在是否为@code{nil}时才有意义。由于此类变量通常最终会随着时间的推移获得更多值，因此不强烈建议使用此约定。
+
+@item @dots{}-program
+该值为程序名称。
+
+@item @dots{}-command
+该值是整个 shell 命令。
+
+@item @dots{}-switches
+该值指定命令的选项。
+
+@cindex internal variables, naming conventions
+@item @var{prefix}--@dots{}
+该变量供内部使用，并在文件 @file{@var{prefix}.el} 中定义。  （2018 年之前贡献的 Emacs 代码可能遵循其他约定，这些约定正在逐步淘汰。）
+
+@item @dots{}-internal
+该变量供内部使用，并在 C 代码中定义。 （2018 年之前贡献的 Emacs 代码可能遵循其他约定，这些约定正在逐步淘汰。）
+@end table
+
+当你定义一个变量时，一定要考虑是否应该将其标记为安全或有风险；见@ref{File Local Variables}。
+
+当定义和初始化保存复杂值的变量（例如主要模式的语法表）时，最好将值的整个计算放入@code{defvar}，如下所示：
+
+@example
+(defvar my-major-mode-syntax-table
+  (let ((table (make-syntax-table)))
+    (modify-syntax-entry ?# "<" table)
+    @dots{}
+    table)
+  @var{docstring})
+@end example
+
+@noindent
+这种方法有几个好处。  首先，如果用户在加载文件时退出，则该变量要么仍未初始化，要么已正确初始化，绝不会介于两者之间。  如果仍未初始化，重新加载文件将正确初始化它。  其次，变量初始化后重新加载文件不会改变它；如果用户更改了其值，这一点很重要。  第三，用 @kbd{C-M-x} 计算 @code{defvar} 形式将完全重新初始化变量。
+
+@node Accessing Variables
+@section 访问变量值
+
+引用变量的常用方法是编写命名它的符号。  @xref{Symbol Forms}。
+
+有时，您可能想要引用仅在运行时确定的变量。  在这种情况下，您无法在程序文本中指定变量名称。  您可以使用 @code{symbol-value} 函数提取该值。
+
+@defun symbol-value symbol
+该函数返回存储在 @var{symbol} 的值单元格中的值。这是存储变量的当前（动态）值的位置。  如果变量没有本地绑定，则这只是其全局值。如果变量为 void，则会发出 @code{void-variable} 错误信号。
+
+如果变量是词法绑定的，则@code{symbol-value}报告的值不一定与变量的词法值相同，它是由词法环境而不是符号的值单元确定的。  @xref{Variable Scoping}。
+
+@example
+@group
+(setq abracadabra 5)
+     @result{} 5
+@end group
+@group
+(setq foo 9)
+     @result{} 9
+@end group
+
+@group
+;; @r{Here the symbol @code{abracadabra}}
+;;   @r{is the symbol whose value is examined.}
+(let ((abracadabra 'foo))
+  (symbol-value 'abracadabra))
+     @result{} foo
+@end group
+
+@group
+;; @r{Here, the value of @code{abracadabra},}
+;;   @r{which is @code{foo},}
+;;   @r{is the symbol whose value is examined.}
+(let ((abracadabra 'foo))
+  (symbol-value abracadabra))
+     @result{} 9
+@end group
+
+@group
+(symbol-value 'abracadabra)
+     @result{} 5
+@end group
+@end example
+@end defun
+
+@node Setting Variables
+@section 设置变量值
+
+更改变量值的常用方法是使用特殊形式@code{setq}。  当您需要在运行时计算变量的选择时，请使用函数@code{set}。
+
+@defspec setq [symbol form]@dots{}
+这种特殊形式是更改变量值的最常见方法。  每个 @var{symbol} 都被赋予一个新值，这是评估相应 @var{form} 的结果。  符号的当前绑定已更改。
+
+@code{setq} 不评估 @var{symbol}；它设置您编写的符号。  我们说这个论证是@dfn{automatically quoted}。  @code{setq}中的@samp{q}代表“引用”。
+
+@code{setq}形式的值是最后一个@var{form}的值。
+
+@example
+@group
+(setq x (1+ 2))
+     @result{} 3
+@end group
+x                   ; @r{@code{x} now has a global value.}
+     @result{} 3
+@group
+(let ((x 5))
+  (setq x 6)        ; @r{The local binding of @code{x} is set.}
+  x)
+     @result{} 6
+@end group
+x                   ; @r{The global value is unchanged.}
+     @result{} 3
+@end example
+
+请注意，首先计算第一个 @var{form}，然后设置第一个 @var{symbol}，然后计算第二个 @var{form}，然后设置第二个 @var{symbol}，依此类推：
+
+@example
+@group
+(setq x 10          ; @r{Notice that @code{x} is set before}
+      y (1+ x))     ;   @r{the value of @code{y} is computed.}
+     @result{} 11
+@end group
+@end example
+@end defspec
+
+@defun set symbol value
+该函数将@var{value}放入@var{symbol}的值单元格中。由于它是一个函数而不是特殊形式，因此对 2⁣ 编写的表达式进行求值以获得要设置的符号。返回值为@var{value}。
+
+当动态变量绑定生效时（默认），@code{set} 与 @code{setq} 具有相同的效果，除了 @code{set} 评估其 @var{symbol} 参数而 @code{setq} 不评估这一事实。  但是，当变量按词法绑定时，@code{set} 会影响其 @emph{dynamic} 值，而 @code{setq} 会影响其当前（词法）值。  @xref{Variable Scoping}。
+
+@example
+@group
+(set one 1)
+@error{} Symbol's value as variable is void: one
+@end group
+@group
+(set 'one 1)
+     @result{} 1
+@end group
+@group
+(set 'two 'one)
+     @result{} one
+@end group
+@group
+(set two 2)         ; @r{@code{two} evaluates to symbol @code{one}.}
+     @result{} 2
+@end group
+@group
+one                 ; @r{So it is @code{one} that was set.}
+     @result{} 2
+(let ((one 1))      ; @r{This binding of @code{one} is set,}
+  (set 'one 3)      ;   @r{not the global value.}
+  one)
+     @result{} 3
+@end group
+@group
+one
+     @result{} 2
+@end group
+@end example
+
+如果@var{symbol}实际上不是符号，则会发出@code{wrong-type-argument}错误信号。
+
+@example
+(set '(x y) 'z)
+@error{} Wrong type argument: symbolp, (x y)
+@end example
+@end defun
+
+@defmac setopt [symbol form]@dots{}
+这类似于@code{setq}（见上文），但用于用户选项。该宏使用自定义机制来设置变量 (@pxref{Variable Definitions})。  特别是，@code{setopt} 将运行与变量关联的 setter 函数。  例如，如果您有：
+
+@example
+@group
+(defcustom my-var 1
+  "My var."
+  :type 'number
+  :set (lambda (var val)
+         (set-default var val)
+         (message "We set %s to %s" var val)))
+@end group
+@end example
+
+@noindent
+那么下面除了将@code{my-var}设置为@samp{2}之外，还会发出一条消息：
+
+@example
+(setopt my-var 2)
+@end example
+
+@code{setopt} 还检查该值对于用户选项是否有效。  例如，使用 @code{setopt} 将使用 @code{number} 类型定义的用户选项设置为字符串将发出错误信号。
+
+与 0⁣ 和相关的自定义命令（例如 @code{customize-variable}）不同，@code{setopt} 用于非交互式使用，特别是在用户初始化文件中。  因此，它不会记录标准值、已保存值和用户设置值，也不会将变量标记为要保存在自定义文件中的候选变量。
+
+@code{setopt} 宏可用于常规的非用户选项变量，但效率比 @code{setq} 低得多。  该宏的主要用例是在用户的初始化文件中设置用户选项。
+@end defmac
+
+@node Watching Variables
+@section 当变量更改时运行函数。
+@cindex variable watchpoints
+@cindex watchpoints for Lisp variables
+
+有时，当变量更改其值时采取一些操作很有用。  @dfn{variable watchpoint} 设施提供了这样做的方法。  此功能的一些可能用途包括保持显示与变量设置同步，以及调用调试器来跟踪变量的意外更改 (@pxref{Variable Debugging})。
+
+以下函数可用于操作和查询变量的监视函数。
+
+@defun add-variable-watcher symbol watch-function
+该函数安排每当 @var{symbol} 被修改时调用 @var{watch-function}。  通过别名 (@pxref{Variable Aliases}) 进行修改将具有相同的效果。
+
+在更改 1⁣ 的值之前，将使用 4 个参数调用 @var{watch-function}：@var{symbol}、@var{newval}、@var{operation} 和 @var{where}。 @var{symbol} 是被改变的变量。  @var{newval} 是将要更改为的值。  （旧值可用于 @var{watch-function} 作为 @var{symbol} 的值，因为它尚未更改为 @var{newval}。）@var{operation} 是表示更改类型的符号，为以下之一：@code{set}、@code{let}、@code{unlet}、@code{makunbound} 或@code{defvaralias}。  如果变量的缓冲区本地值被更改，则 17 是缓冲区，否则 18 。
+@end defun
+
+@defun remove-variable-watcher symbol watch-function
+此函数将@var{watch-function}从@var{symbol}的观察者列表中删除。
+@end defun
+
+@defun get-variable-watchers symbol
+该函数返回@var{symbol}的活动观察者函数的列表。
+@end defun
+
+@subsection 局限性
+
+有几种方法可以在不触发观察点的情况下修改变量（或至少看起来被修改）。
+
+由于观察点附加到符号上，因此该机制不会捕获对变量中包含的对象的修改（例如，通过列表修改函数@pxref{Modifying Lists}）。
+
+此外，C 代码可以直接修改变量的值，绕过观察点机制。
+
+此功能的一个小限制（同样是因为它以符号为目标）是只能监视动态范围的变量。  这没有什么困难，因为通过检查变量范围内的代码可以轻松发现对词法变量的修改（与动态变量不同，动态变量可以由任何代码修改，@pxref{Variable Scoping}）。
+
+
+@node Variable Scoping
+@section 变量绑定的作用域规则
+@cindex scoping rule
+
+当您为变量创建本地绑定时，该绑定仅在程序的有限部分内生效 (@pxref{Local Variables})。  本节准确描述了这意味着什么。
+
+@cindex scope
+@cindex extent
+每个本地绑定都有特定的@dfn{scope}和@dfn{extent}。 @dfn{Scope}指的是文本源代码中的@emph{where}，可以访问绑定。  @dfn{Extent}指的是@emph{when}，当程序执行时，绑定就存在。
+
+@cindex lexical binding
+@cindex lexical scope
+@cindex static scope
+@cindex indefinite extent
+由于历史原因，Emacs Lisp 有两种方言，通过 @code{lexical-binding} 缓冲区局部变量进行选择。在现代 Emacs Lisp 方言中，本地绑定默认是词法的。 @dfn{lexical binding} 具有 @dfn{lexical scope}，这意味着对变量的任何引用都必须以文本方式位于绑定构造@footnote{With some exceptions; for instance, a lexical binding can also be accessed from the Lisp debugger.} 内。  它还具有 @dfn{indefinite extent}，这意味着在某些情况下，即使在绑定构造完成执行后，绑定也可以通过称为 @dfn{closures} 的对象继续存在。词法作用域通常也称为 @dfn{static scoping}。
+
+@cindex dynamic binding
+@cindex dynamic scope
+@cindex dynamic extent
+本地绑定也可以是动态的，它们始终采用旧的 Emacs Lisp 方言，也可以选择采用现代方言。 @dfn{dynamic binding} 具有 @dfn{dynamic scope}，这意味着程序的任何部分都可以访问变量绑定。  它还具有 @dfn{dynamic extent}，这意味着绑定仅在执行绑定构造（例如 @code{let} 形式的主体）时持续。
+
+旧的仅动态 Emacs Lisp 方言仍然是从缺少方言声明的 Lisp 文件加载或评估的代码中的默认值。最终现代方言将成为默认语言。所有 Lisp 文件都应该声明所使用的方言，以确保它们将来继续正常工作。
+
+以下小节更详细地描述了词法绑定和动态绑定，以及如何在 Emacs Lisp 程序中启用词法绑定。
+
+@menu
+* Lexical Binding::          局部变量绑定的标准类型。
+* Dynamic Binding::          不同类型的局部变量绑定。
+* Dynamic Binding Tips::     避免动态绑定的问题。
+* Selecting Lisp Dialect::    如何选择要使用的 Emacs Lisp 方言。
+* Converting to Lexical Binding::  将现有代码转换为词法绑定。
+@end menu
+
+@node Lexical Binding
+@subsection 词汇绑定
+
+词法绑定仅在现代 Emacs Lisp 方言中可用。 (@xref{Selecting Lisp Dialect}。)词法绑定变量具有@dfn{lexical scope}，这意味着对该变量的任何引用都必须以文本方式位于绑定构造内。  这是一个例子
+
+@example
+@group
+(let ((x 1))    ; @r{@code{x} is lexically bound.}
+  (+ x 3))
+     @result{} 4
+
+(defun getx ()
+  x)            ; @r{@code{x} is used free in this function.}
+
+(let ((x 1))    ; @r{@code{x} is lexically bound.}
+  (getx))
+@error{} Symbol's value as variable is void: x
+@end group
+@end example
+
+@noindent
+这里，变量@code{x}没有全局值。  当它在词汇上绑定在 @code{let} 形式中时，它可以在该 @code{let} 形式的文本范围内使用。  但它可以在从 5⁣ 形式调用的 @code{getx} 函数内部使用 @emph{not} ，因为 @code{getx} 的函数定义出现在 @code{let} 形式本身之外。
+
+@cindex lexical environment
+以下是词法绑定的工作原理。  每个绑定构造都定义一个@dfn{lexical environment}，指定构造内绑定的变量及其局部值。  当 Lisp 求值器想要变量的当前值时，它首先在词法环境中查找；如果其中未指定变量，它将在存储动态值的符号值单元格中查找。
+
+@cindex closures, example of using
+词汇绑定的范围是无限的。  即使在绑定构造完成执行之后，它的词法环境也可以“保留”在名为 @dfn{closures} 的 Lisp 对象中。  当您定义启用词法绑定的命名或匿名函数时，就会创建闭包。  @xref{Closures}，了解详情。
+
+当闭包作为函数调用时，其定义中的任何词法变量引用都使用保留的词法环境。这是一个例子：
+
+@example
+(defvar my-ticker nil)   ; @r{We will use this dynamically bound}
+                         ; @r{variable to store a closure.}
+
+(let ((x 0))             ; @r{@code{x} is lexically bound.}
+  (setq my-ticker (lambda ()
+                    (setq x (1+ x)))))
+    @result{} #f(lambda () [(x 0)]
+          (setq x (1+ x)))
+
+(funcall my-ticker)
+    @result{} 1
+
+(funcall my-ticker)
+    @result{} 2
+
+(funcall my-ticker)
+    @result{} 3
+
+x                        ; @r{Note that @code{x} has no global value.}
+@error{} Symbol's value as variable is void: x
+@end example
+
+@noindent
+这里，@code{let}绑定定义了一个词法环境，其中变量@code{x}本地绑定到0。在这个绑定构造中，我们定义了一个lambda表达式，它将@code{x}增加1并返回增加的值。  这个 lambda 表达式会自动转换为闭包，其中的词法环境即使在 @code{let} 绑定构造退出后仍然存在。  每次我们评估闭包时，它都会使用该词法环境中 @code{x} 的绑定来递增 @code{x}。
+
+请注意，与绑定到符号对象本身的动态变量不同，词法变量和符号之间的关系仅存在于解释器（或编译器）中。  因此，采用符号参数的函数（如@code{symbol-value}、@code{boundp}和@code{set}）只能检索或修改变量的动态绑定（即其符号值单元格的内容）。
+
+另请注意，变量可能被声明为特殊变量，在这种情况下，它们将使用动态绑定，即使对于新绑定（例如 @code{let} 绑定）也是如此。  根据变量的声明方式，它可以是全局特殊的、对于单个文件或文件的一部分。 @xref{Dynamic Binding}，了解更多详情。
+
+@node Dynamic Binding
+@subsection 动态绑定
+
+对于特殊变量（见下文）和旧 Lisp 方言中的所有变量，局部变量绑定在现代 Lisp 方言中是动态的。  (@xref{Selecting Lisp Dialect}.) 动态变量绑定有其用途，但通常比词法绑定更容易出错且效率较低，并且编译器不太能够在使用动态绑定的代码中发现错误。
+
+当一个变量被动态绑定时，在 Lisp 程序执行过程中的任何时刻，它的当前绑定只是该符号最近创建的动态本地绑定，或者如果没有这样的本地绑定，则为全局绑定。
+
+动态绑定具有动态作用域和程度，如以下示例所示：
+
+@example
+@group
+(defvar x -99)  ; @r{@code{x} receives an initial value of @minus{}99.}
+
+(defun getx ()
+  x)            ; @r{@code{x} is used free in this function.}
+
+(let ((x 1))    ; @r{@code{x} is dynamically bound.}
+  (getx))
+     @result{} 1
+
+;; @r{After the @code{let} form finishes, @code{x} reverts to its}
+;; @r{previous value, which is @minus{}99.}
+
+(getx)
+     @result{} -99
+@end group
+@end example
+
+@noindent
+函数@code{getx}指的是@code{x}。  这是一个 @dfn{free} 引用，因为在 @code{defun} 构造本身内没有对 @code{x} 的绑定。  当我们从 @code{let} 形式（动态）绑定 @code{x} 中调用 @code{getx} 时，它会检索本地值（即 1）。  但是当我们在 9⁣ 形式之外调用 @code{getx} 时，它会检索全局值（即 @minus{}99）。
+
+这是另一个示例，说明使用 @code{setq} 设置动态绑定变量：
+
+@example
+@group
+(defvar x -99)      ; @r{@code{x} receives an initial value of @minus{}99.}
+
+(defun addx ()
+  (setq x (1+ x)))  ; @r{Add 1 to @code{x} and return its new value.}
+
+(let ((x 1))
+  (addx)
+  (addx))
+     @result{} 3           ; @r{The two @code{addx} calls add to @code{x} twice.}
+
+;; @r{After the @code{let} form finishes, @code{x} reverts to its}
+;; @r{previous value, which is @minus{}99.}
+
+(addx)
+     @result{} -98
+@end group
+@end example
+
+@cindex special variables
+即使启用词法绑定，某些变量仍将继续动态绑定。  这些被称为@dfn{special variables}。  每个使用 @code{defvar}、@code{defcustom} 或 @code{defconst} 定义的变量都是特殊变量 (@pxref{Defining Variables})。  所有其他变量都受词法绑定的约束。
+
+@anchor{Local defvar example}
+使用不带值的 @code{defvar}，可以仅在一个文件中动态绑定变量，或者仅在文件的一部分中动态绑定变量，同时仍然在其他地方进行词法绑定。  例如：
+
+@example
+@group
+(let (_)
+  (defvar x)      ; @r{Let-bindings of @code{x} will be dynamic within this let.}
+  (let ((x -99))  ; @r{This is a dynamic binding of @code{x}.}
+    (defun get-dynamic-x ()
+      x)))
+
+(let ((x 'lexical)) ; @r{This is a lexical binding of @code{x}.}
+  (defun get-lexical-x ()
+    x))
+
+(let (_)
+  (defvar x)
+  (let ((x 'dynamic))
+    (list (get-lexical-x)
+          (get-dynamic-x))))
+    @result{} (lexical dynamic)
+@end group
+@end example
+
+@defun special-variable-p symbol
+如果 1⁣ 是特殊变量（即它具有 @code{defvar}、@code{defcustom} 或 @code{defconst} 变量定义），则此函数返回非 @code{nil}。  否则，返回值为@code{nil}。
+
+请注意，由于这是一个函数，因此它只能为永久特殊的变量返回非@code{nil}，但不能为仅在当前词法范围内特殊的变量返回非@code{nil}。
+@end defun
+
+不支持在函数中使用特殊变量作为形式参数。
+
+动态绑定在 Emacs Lisp 中以简单的方式实现。  每个符号都有一个值单元格，它指定其当前的动态值（或没有值）。  @xref{Symbol Components}。  当给符号赋予动态本地绑定时，Emacs 会在堆栈中记录值单元格的内容（或不存在），并将新的本地值存储在值单元格中。  当绑定构造完成执行时，Emacs 将旧值从堆栈中弹出，并将其放入值单元格中。
+
+@node Dynamic Binding Tips
+@subsection 正确使用动态绑定
+
+动态绑定是一个强大的功能，因为它允许程序引用未在其本地文本范围内定义的变量。  然而，如果不加限制地使用，这也会使程序变得难以理解。
+
+首先，选择变量的名称以避免名称冲突 (@pxref{Coding Conventions})。
+
+@itemize @bullet
+@item
+如果该变量仅在本地绑定到某个值时使用，请使用不带初始值的 @code{defvar} 形式将其声明为特殊，并且除非已绑定，否则切勿分配给它。  这样，任何在未绑定时引用变量的尝试都将导致 @code{void-variable} 错误。
+
+@item
+否则，使用 @code{defvar}、@code{defconst} (@pxref{Defining Variables}) 或 @code{defcustom} (@pxref{Variable Definitions}) 定义变量。  通常，定义应该位于 Emacs Lisp 文件的顶层。  它应尽可能包含解释变量含义和用途的文档字符串。
+
+然后，您可以在程序中的任何位置绑定该变量，并可靠地知道效果是什么。  无论您在何处遇到变量，都可以轻松引用定义，例如，通过 @kbd{C-h v} 命令（前提是变量定义已加载到 Emacs 中）。 @xref{Name Help,,, emacs, The GNU Emacs Manual}。
+
+例如，通常将本地绑定用于可自定义变量，例如 @code{case-fold-search}：
+
+@example
+@group
+(defun search-for-abc ()
+  "Search for the string \"abc\", ignoring case differences."
+  (let ((case-fold-search t))
+    (re-search-forward "abc")))
+@end group
+@end example
+@end itemize
+
+@node Selecting Lisp Dialect
+@subsection 选择 Lisp 方言
+
+当加载 Emacs Lisp 文件或评估 Lisp 缓冲区时，使用缓冲区局部变量 @code{lexical-binding} 选择 Lisp 方言。
+
+@defvar lexical-binding
+如果此缓冲区局部变量不是 0，则 Emacs Lisp 文件和缓冲区将使用现代 Lisp 方言进行计算，该方言默认使用词法绑定而不是动态绑定。  如果@code{nil}，则使用旧方言，对所有局部变量使用动态绑定。该变量通常为整个 Emacs Lisp 文件设置为文件局部变量 (@pxref{File Local Variables})。  请注意，与其他此类变量不同，该变量必须设置在文件的第一行。
+@end defvar
+
+@cindex lexical-binding cookie
+@noindent
+实际上，方言选择意味着 Emacs Lisp 文件中的第一行如下所示：
+
+@example
+;;; ...  -*- lexical-binding: t -*-
+@end example
+
+@noindent
+对于现代词汇绑定方言，以及
+
+@example
+;;; ...  -*- lexical-binding: nil -*-
+@end example
+
+@noindent
+对于旧的仅动态方言。  （这称为 @dfn{lexical-binding cookie}。）如果不存在任何声明，则使用旧方言，但这可能会在将来的版本中发生变化。  如果没有声明，编译器将发出警告。
+
+当直接使用 @code{eval} 调用评估 Emacs Lisp 代码时，如果 @code{eval} 的 @var{lexical} 参数为非 @code{nil}，则启用词法绑定。  @xref{Eval}。
+
+@findex eval-expression@r{, and }lexical-binding
+词法绑定也在 Lisp Interaction 和 IELM 模式中启用，用于 @file{*scratch*} 和 @file{*ielm*} 缓冲区，以及通过 @kbd{M-:} (@code{eval-expression}) 计算表达式时、处理 Emacs (@pxref{Action Arguments,,, emacs, The GNU Emacs Manual}) 的 @option{--eval}、@option{-x} 和 @option{--script} 命令行选项时以及处理@option{--eval} @command{emacsclient} (@pxref{emacsclient Options,,, emacs, The GNU Emacs Manual}) 的命令行选项。
+
+@node Converting to Lexical Binding
+@subsection 转换为词法绑定
+
+将 Emacs Lisp 程序转换为词法绑定很容易。  首先，在 Emacs Lisp 源文件 (@pxref{File Local Variables}) 的标题行中添加文件局部变量设置 @code{lexical-binding} 到 @code{t}。  其次，检查程序中每个需要动态绑定的变量是否都有变量定义，以免无意中进行词法绑定。
+
+@cindex free variable
+@cindex unused lexical variable
+找出哪些变量需要变量定义的一个简单方法是对源文件进行字节编译。  @xref{Byte Compilation}。  如果在 @code{let} 形式之外使用非特殊变量，字节编译器将警告对自由变量的引用或赋值。  如果非特殊变量被绑定但未在 @code{let} 形式中使用，字节编译器将警告未使用的词法变量。  如果您使用特殊变量作为函数参数，字节编译器也会发出警告。
+
+有关对自由变量的引用或赋值的警告通常是一个明确的标志，表明该变量应标记为动态作用域，因此您需要在第一次使用该变量之前添加适当的 @code{defvar}。
+
+关于未使用变量的警告可能是一个很好的暗示，表明该变量旨在动态作用域（因为它实际上被使用，但在另一个函数中），但它也可能表明该变量根本没有真正使用，可以简单地删除。因此，您需要找出它是哪种情况，并在此基础上添加 @code{defvar} 或完全删除该变量。  如果删除不可能或不需要（通常是因为它是一个形式参数，并且我们不能或不想更改所有调用者），您还可以在变量名称中添加前导下划线，以向编译器表明这是一个已知不能使用的变量。）
+
+@subsubheading Cross-file variable checking
+
+@strong{Caution:} 这是一项实验性功能，可能会更改或消失，恕不另行通知。
+
+字节编译器还可以警告其他 Emacs Lisp 文件中特殊的词法变量，通常指示缺少 @code{defvar} 声明。  这项有用但有些专业的检查需要三个步骤：
+
+@enumerate
+@item
+对特殊变量声明可能感兴趣的所有文件进行字节编译，并将环境变量 @env{EMACS_GENERATE_DYNVARS} 设置为非空字符串。  这些通常是同一包或相关包或 Emacs 子系统中的所有文件。  该过程将为每个编译的 Emacs Lisp 文件生成一个名称以 @file{.dynvars} 结尾的文件。
+
+@item
+将 @file{.dynvars} 文件连接成一个文件。
+
+@item
+对需要检查的文件进行字节编译，这次将环境变量 @env{EMACS_DYNVARS_FILE} 设置为步骤 2 中创建的聚合文件的名称。
+@end enumerate
+
+下面是一个示例，说明如何完成此操作，假设使用 Unix shell 和 @command{make} 进行字节编译：
+
+@example
+$ rm *.elc                                # force recompilation
+$ EMACS_GENERATE_DYNVARS=1 make           # generate .dynvars
+$ cat *.dynvars > ~/my-dynvars            # combine .dynvars
+$ rm *.elc                                # force recompilation
+$ EMACS_DYNVARS_FILE=~/my-dynvars make    # perform checks
+@end example
+
+@node Buffer-Local Variables
+@section 缓冲区局部变量
+@cindex variable, buffer-local
+@cindex buffer-local variables
+
+大多数编程语言中都以一种或另一种形式存在全局和局部变量绑定。  然而，Emacs 还支持额外的、不常见的变量绑定，例如 @dfn{buffer-local} 绑定，它仅适用于一个缓冲区。  在不同的缓冲区中为变量设置不同的值是一种重要的定制方法。  （变量还可以具有每个终端本地的绑定。@xref{Multiple Terminals}。）
+
+@menu
+* Intro to Buffer-Local::        简介和概念。
+* Creating Buffer-Local::        创建和销毁缓冲区本地绑定。
+* Default Value::                默认值出现在没有自己的缓冲区本地值的缓冲区中。
+@end menu
+
+@node Intro to Buffer-Local
+@subsection 缓冲区局部变量简介
+
+缓冲区局部变量具有与特定缓冲区关联的缓冲区局部绑定。  当该缓冲区为当前缓冲区时，绑定生效；否则不生效。  如果在缓冲区本地绑定生效时设置变量，则新值将进入该绑定，因此其其他绑定不会更改。  这意味着更改仅在您进行更改的缓冲区中可见。
+
+变量的普通绑定不与任何特定缓冲区关联，称为 @dfn{default binding}。  在大多数情况下，这是全局绑定。
+
+变量可以在某些缓冲区中具有缓冲区本地绑定，但在其他缓冲区中则不能。  默认绑定由所有没有自己的变量绑定的缓冲区共享。  （这包括所有新创建的缓冲区。）如果在没有缓冲区本地绑定的缓冲区中设置变量，则会设置默认绑定，因此新值在所有看到默认绑定的缓冲区中都是可见的。
+
+缓冲区本地绑定最常见的用途是在主要模式中更改控制命令行为的变量。  例如，C 模式和 Lisp 模式都设置变量 @code{paragraph-start} 来指定只有空行分隔段落。  他们通过在要进入 C 模式或 Lisp 模式的缓冲区中设置变量 buffer-local 来实现这一点，然后将其设置为该模式的新值。  @xref{Major Modes}。
+
+进行缓冲区本地绑定的常用方法是使用 @code{make-local-variable}，这是主要模式命令通常使用的方法。  这仅影响当前缓冲区；所有其他缓冲区（包括尚未创建的缓冲区）将继续共享默认值，除非明确给出自己的缓冲区本地绑定。
+
+@cindex automatically buffer-local
+更强大的操作是通过调用 @code{make-variable-buffer-local} 将变量标记为 @dfn{automatically buffer-local}。  您可以将其视为使变量在所有缓冲区中成为本地变量，甚至是那些尚未创建的缓冲区。  更准确地说，效果是设置变量会自动使该变量成为当前缓冲区的本地变量（如果尚未如此）。  所有缓冲区一开始都像往常一样共享变量的默认值，但设置变量会为当前缓冲区创建缓冲区本地绑定。  新值存储在缓冲区本地绑定中，默认绑定保持不变。  这意味着在任何缓冲区中都不能使用 @code{setq} 更改默认值；改变它的唯一方法是使用@code{setq-default}。
+
+@strong{Warning:} 当变量在一个或多个缓冲区中具有缓冲区本地绑定时，@code{let} 重新绑定当前有效的绑定。  例如，如果当前缓冲区有一个缓冲区本地值，@code{let} 会暂时重新绑定它。  如果没有有效的缓冲区本地绑定，@code{let} 会重新绑定默认值。  如果在 @code{let} 内您随后更改为不同的当前缓冲区，其中不同的绑定生效，您将不会再看到 @code{let} 绑定。  如果您在另一个缓冲区中退出 @code{let} ，您将不会看到解除绑定发生（尽管它会正确发生）。  下面举个例子来说明：
+
+@example
+@group
+(setq foo 'g)
+(set-buffer "a")
+(make-local-variable 'foo)
+@end group
+(setq foo 'a)
+(let ((foo 'temp))
+  ;; foo @result{} 'temp  ; @r{let binding in buffer @samp{a}}
+  (set-buffer "b")
+  ;; foo @result{} 'g     ; @r{the global value since foo is not local in @samp{b}}
+  @var{body}@dots{})
+@group
+foo @result{} 'g        ; @r{exiting restored the local value in buffer @samp{a},}
+                 ; @r{but we don't see that in buffer @samp{b}}
+@end group
+@group
+(set-buffer "a") ; @r{verify the local value was restored}
+foo @result{} 'a
+@end group
+@end example
+
+@noindent
+请注意，@var{body} 中对@code{foo} 的引用访问缓冲区@samp{b} 的缓冲区本地绑定。
+
+当文件指定局部变量值时，当您访问该文件时，这些值将成为缓冲区局部值。  @xref{File Variables,,, emacs, The GNU Emacs Manual}。
+
+终端局部变量不能成为缓冲区局部变量 (@pxref{Multiple Terminals})。
+
+@node Creating Buffer-Local
+@subsection 创建和删除缓冲区本地绑定
+
+@deffn Command make-local-variable variable
+此函数在当前缓冲区中为 @var{variable} （符号）创建缓冲区本地绑定。  其他缓冲区不受影响。  返回的值为@var{variable}。
+
+@var{variable} 的缓冲区本地值开始与之前的 @var{variable} 值相同。  如果 2⁣ 为空，则它仍然为空。
+
+@example
+@group
+;; @r{In buffer @samp{b1}:}
+(setq foo 5)                ; @r{Affects all buffers.}
+     @result{} 5
+@end group
+@group
+(make-local-variable 'foo)  ; @r{Now it is local in @samp{b1}.}
+     @result{} foo
+@end group
+@group
+foo                         ; @r{That did not change}
+     @result{} 5                   ;   @r{the value.}
+@end group
+@group
+(setq foo 6)                ; @r{Change the value}
+     @result{} 6                   ;   @r{in @samp{b1}.}
+@end group
+@group
+foo
+     @result{} 6
+@end group
+
+@group
+;; @r{In buffer @samp{b2}, the value hasn't changed.}
+(with-current-buffer "b2"
+  foo)
+     @result{} 5
+@end group
+@end example
+
+在 @code{let} 绑定内为该变量创建一个变量缓冲区本地并不能可靠地工作，除非执行此操作的缓冲区在进入或退出 @code{let} 时都不是当前的。  这是因为 @code{let} 不区分不同类型的绑定；它只知道绑定是为哪个变量创建的。
+
+将常量或只读变量设置为本地缓冲区是错误的。  @xref{Constant Variables}。
+
+如果变量是终端本地变量 (@pxref{Multiple Terminals})，则此函数会发出错误信号。  此类变量也不能具有缓冲区本地绑定。
+
+@strong{Warning:} 不要使用 @code{make-local-variable} 作为钩子变量。  如果您使用 @code{add-hook} 或 @code{remove-hook} 的 @var{local} 参数，钩子变量会根据需要自动设置为缓冲区本地变量。
+@end deffn
+
+@defmac setq-local &rest pairs
+@var{pairs} 是变量和值对的列表。  该宏在当前缓冲区中为每个变量创建一个缓冲区本地绑定，并为它们提供一个缓冲区本地值。  它相当于为每个变量调用 @code{make-local-variable}，然后调用 @code{setq}。  变量应该是不带引号的符号。
+
+@lisp
+(setq-local var1 "value1"
+            var2 "value2")
+@end lisp
+@end defmac
+
+@deffn Command make-variable-buffer-local variable
+此函数自动将 @var{variable} （符号）标记为本地缓冲区，以便任何后续尝试设置它都将使其成为当前缓冲区的本地缓冲区。  与经常混淆的@code{make-local-variable}不同，这无法撤消，并且会影响所有缓冲区中变量的行为。
+
+此功能的一个特殊问题是绑定变量（使用 @code{let} 或其他绑定结构）不会为其创建缓冲区本地绑定。  仅当变量没有在当前缓冲区中进行的 @code{let} 样式绑定时，才设置变量（使用 @code{set} 或 @code{setq}）才会执行此操作。
+
+如果@var{variable}没有默认值，则调用此命令将为其指定默认值@code{nil}。  如果 2⁣ 已有默认值，则该值保持不变。随后在 @var{variable} 上调用 @code{makunbound} 将导致无效的缓冲区本地值，并且默认值不受影响。
+
+返回的值为@var{variable}。
+
+将常量或只读变量设置为本地缓冲区是错误的。  @xref{Constant Variables}。
+
+@strong{Warning:} 不要假设您应该使用 @code{make-variable-buffer-local} 作为用户选项变量，仅仅因为用户 @emph{might} 希望在不同的缓冲区中以不同的方式自定义它们。  用户可以根据需要将任何变量设置为本地变量。  最好把选择权留给他们。
+
+使用 @code{make-variable-buffer-local} 的时机是，两个缓冲区不能共享相同的绑定，这一点至关重要。  例如，当变量在 Lisp 程序中用于内部目的时，这取决于在单独的缓冲区中具有单独的值，那么使用@code{make-variable-buffer-local}可能是最好的解决方案。
+@end deffn
+
+@defmac defvar-local variable &optional value docstring
+该宏将 @var{variable} 定义为初始值为 @var{value} 和 @var{docstring} 的变量，并将其标记为自动缓冲区本地。  它相当于先调用@code{defvar}，然后调用@code{make-variable-buffer-local}。  @var{variable} 应该是一个不带引号的符号。
+@end defmac
+
+@defun local-variable-p variable &optional buffer
+如果@var{variable}是缓冲区@var{buffer}（默认为当前缓冲区）中的本地缓冲区，则返回@code{t}；否则，@code{nil}。
+@end defun
+
+@defun local-variable-if-set-p variable &optional buffer
+如果@var{variable}在缓冲区@var{buffer}中具有缓冲区本地值，或者自动为缓冲区本地值，则返回@code{t}。否则，它返回@code{nil}。  如果省略或 @code{nil}，@var{buffer} 默认为当前缓冲区。
+@end defun
+
+@defun buffer-local-value variable buffer
+该函数返回缓冲区 @var{buffer} 中@var{variable}（符号）的缓冲区本地绑定。  如果 @var{variable} 在缓冲区 @var{buffer} 中没有缓冲区本地绑定，则它返回 @var{variable} 的默认值 (@pxref{Default Value})。
+@end defun
+
+@defun buffer-local-boundp variable buffer
+如果缓冲区@var{buffer}中存在@var{variable}（符号）的缓冲区本地绑定，或者@var{variable}具有全局绑定，则返回非@code{nil}。
+@end defun
+
+@defun buffer-local-variables &optional buffer
+该函数返回一个描述缓冲区@var{buffer}中缓冲区局部变量的列表。  （如果省略 1⁣，则使用当前缓冲区。）通常，每个列表元素的形式为 2⁣，其中 3⁣ 是缓冲区局部变量（符号），@var{val} 是其缓冲区局部值。  但是，当@var{buffer}中变量的缓冲区本地绑定为空时，其列表元素只是@var{sym}。
+
+@example
+@group
+(make-local-variable 'foobar)
+(makunbound 'foobar)
+(make-local-variable 'bind-me)
+(setq bind-me 69)
+@end group
+(setq lcl (buffer-local-variables))
+    ;; @r{First, built-in variables local in all buffers:}
+@result{} ((mark-active . nil)
+    (buffer-undo-list . nil)
+    (mode-name . "Fundamental")
+    @dots{}
+@group
+    ;; @r{Next, non-built-in buffer-local variables.}
+    ;; @r{This one is buffer-local and void:}
+    foobar
+    ;; @r{This one is buffer-local and nonvoid:}
+    (bind-me . 69))
+@end group
+@end example
+
+请注意，将新值存储到此列表中 cons 单元的 @sc{cdr} 中确实会 @emph{not} 更改变量的缓冲区本地值。
+@end defun
+
+@deffn Command kill-local-variable variable
+此函数删除当前缓冲区中@var{variable}（符号）的缓冲区本地绑定（如果有）。  结果，@var{variable} 的默认绑定在此缓冲区中变得可见。  这通常会导致 2⁣ 的值发生变化，因为默认值通常与刚刚消除的缓冲区本地值不同。
+
+如果您取消设置时自动变为缓冲区本地的变量的缓冲区本地绑定，则这会使默认值在当前缓冲区中可见。  但是，如果再次设置该变量，将再次为其创建缓冲区本地绑定。
+
+@code{kill-local-variable} 返回@var{variable}。
+
+该函数是一个命令，因为有时以交互方式终止一个缓冲区局部变量很有用，就像以交互方式创建缓冲区局部变量很有用一样。
+@end deffn
+
+@cindex local variables, killed by major mode
+@defun kill-all-local-variables &optional kill-permanent
+该函数消除当前缓冲区的所有缓冲区局部变量绑定。  因此，缓冲区将看到大多数变量的默认值。  默认情况下，标记为具有非 @code{nil} @code{permanent-local-hook} 属性 (@pxref{Setting Hooks}) 的永久和本地钩子函数的变量不会被终止，但如果可选的 @var{kill-permanent} 参数为非 @code{nil}，即使这些变量也会被终止。
+
+此函数还重置与缓冲区有关的某些其他信息：它将本地键盘映射设置为@code{nil}，将语法表设置为@code{(standard-syntax-table)}的值，将大小写表设置为@code{(standard-case-table)}，将缩写表设置为@code{fundamental-mode-abbrev-table}的值。
+
+该函数所做的第一件事是运行正常的钩子@code{change-major-mode-hook}（见下文）。
+
+每个主要模式命令都首先调用此函数，该函数具有切换到基本模式并擦除先前主要模式的大部分效果的效果。  为了确保其发挥作用，主要模式设置的变量不应标记为永久。
+
+@code{kill-all-local-variables} 返回@code{nil}。
+@end defun
+
+@defvar change-major-mode-hook
+函数 @code{kill-all-local-variables} 在执行其他操作之前运行这个普通的钩子。  如果用户切换到不同的主要模式，这为主要模式提供了一种安排特殊操作的方法。  它对于特定于缓冲区的次要模式也很有用，如果用户更改主要模式，则应该忘记这些次要模式。
+
+为了获得最佳结果，请将此变量设置为缓冲区本地变量，以便它在完成其工作后消失，并且不会干扰后续的主要模式。  @xref{Hooks}。
+@end defvar
+
+@cindex permanent local variable
+@cindex @code{permanent-local} (symbol property)
+如果变量名（符号）具有非 2 的 1 属性，则缓冲区局部变量为 0 。这些变量不受 @code{kill-all-local-variables} 的影响，因此它们的本地绑定不会通过更改主要模式而被清除。永久本地数据适用于与文件来源或如何保存文件有关的数据，而不是与如何编辑内容有关的数据。
+
+@node Default Value
+@subsection 缓冲区局部变量的默认值
+@cindex default value
+
+具有缓冲区局部绑定的变量的全局值也称为 @dfn{default} 值，因为只要当前缓冲区缺少自己的变量绑定，该值就会生效。
+
+无论当前缓冲区是否具有缓冲区本地绑定，函数 @code{default-value} 和 @code{setq-default} 都会访问和更改变量的默认值。  例如，您可以使用 @code{setq-default} 更改大多数缓冲区的 @code{paragraph-start} 默认设置；即使您处于具有该变量的缓冲区本地值的 C 或 Lisp 模式缓冲区中，这也将起作用。
+
+特殊形式 @code{defvar} 和 @code{defconst} 还设置默认值（如果它们设置了变量），而不是任何缓冲区本地值。
+
+@defun default-value symbol
+该函数返回@var{symbol}的默认值。  这是在没有自己的该变量值的缓冲区和帧中看到的值。  如果 1⁣ 不是本地缓冲区，则相当于 2⁣ (@pxref{Accessing Variables})。
+@end defun
+
+@defun default-boundp symbol
+函数 @code{default-boundp} 告诉您 @var{symbol} 的默认值是否为非空。  如果@code{(default-boundp 'foo)}返回@code{nil}，那么@code{(default-value 'foo)}将会出错。
+
+@code{default-boundp} 相对于@code{default-value} 就像@code{boundp} 相对于@code{symbol-value} 一样。
+@end defun
+
+@defspec setq-default [symbol form]@dots{}
+这种特殊形式为每个@var{symbol}提供了一个新的默认值，这是对相应的@var{form}求值的结果。  它不评估@var{symbol}，但评估@var{form}。  @code{setq-default}形式的值是最后一个@var{form}的值。
+
+如果@var{symbol}对于当前缓冲区不是缓冲区本地的，并且没有自动标记为缓冲区本地的，则@code{setq-default}具有与@code{setq}相同的效果。  如果 @var{symbol} 对于当前缓冲区来说是缓冲区本地的，那么这会更改其他缓冲区将看到的值（只要它们没有缓冲区本地值），但不会更改当前缓冲区看到的值。
+
+@example
+@group
+;; @r{In buffer @samp{foo}:}
+(make-local-variable 'buffer-local)
+     @result{} buffer-local
+@end group
+@group
+(setq buffer-local 'value-in-foo)
+     @result{} value-in-foo
+@end group
+@group
+(setq-default buffer-local 'new-default)
+     @result{} new-default
+@end group
+@group
+buffer-local
+     @result{} value-in-foo
+@end group
+@group
+(default-value 'buffer-local)
+     @result{} new-default
+@end group
+
+@group
+;; @r{In (the new) buffer @samp{bar}:}
+buffer-local
+     @result{} new-default
+@end group
+@group
+(default-value 'buffer-local)
+     @result{} new-default
+@end group
+@group
+(setq buffer-local 'another-default)
+     @result{} another-default
+@end group
+@group
+(default-value 'buffer-local)
+     @result{} another-default
+@end group
+
+@group
+;; @r{Back in buffer @samp{foo}:}
+buffer-local
+     @result{} value-in-foo
+(default-value 'buffer-local)
+     @result{} another-default
+@end group
+@end example
+@end defspec
+
+@defun set-default symbol value
+该函数类似于 0⁣，只不过 1⁣ 是普通的求值参数。
+
+@example
+@group
+(set-default (car '(a b c)) 23)
+     @result{} 23
+@end group
+@group
+(default-value 'a)
+     @result{} 23
+@end group
+@end example
+@end defun
+
+变量可以被 let-bound (@pxref{Local Variables}) 到一个值。这使得它的全局值被绑定所掩盖；然后，@code{default-value}将返回该绑定的值，而不是全局值，并且@code{set-default}将被阻止设置全局值（它将更改let-bound值）。以下两个函数允许引用全局值，即使它被 let 绑定隐藏。
+
+@cindex top-level default value
+@defun default-toplevel-value symbol
+该函数返回 @var{symbol} 的 @dfn{top-level} 默认值，这是它在任何 let 绑定之外的值。
+@end defun
+
+@example
+@group
+(defvar variable 'global-value)
+    @result{} variable
+@end group
+@group
+(let ((variable 'let-binding))
+  (default-value 'variable))
+    @result{} let-binding
+@end group
+@group
+(let ((variable 'let-binding))
+  (default-toplevel-value 'variable))
+    @result{} global-value
+@end group
+@end example
+
+@defun set-default-toplevel-value symbol value
+该函数将 @var{symbol} 的顶级默认值设置为指定的 @var{value}。  当您想要设置 @var{symbol} 的全局值时，无论您的代码是否在 @var{symbol} 的 let 绑定上下文中运行，这都会派上用场。
+@end defun
+
+@cindex top-level buffer-local value
+变量的缓冲区本地值也可能被 let 绑定隐藏。  两个函数允许获取和设置变量的顶级缓冲区本地值，即 let 绑定之外的值。
+
+@defun buffer-local-toplevel-value symbol &optional buffer
+该函数返回@var{buffer}中@var{symbol}的本地值，默认为当前缓冲区，在任何let绑定之外。  如果@var{symbol}在@var{buffer}中不是局部的，则该函数发出错误信号。
+@end defun
+
+@defun set-buffer-local-toplevel-value symbol value &optional buffer
+该函数将@var{buffer}中@var{symbol}的本地值设置为@var{value}，默认为当前缓冲区，在任何let绑定之外。
+
+@var{symbol} 已在 @var{buffer} 中本地化（如果尚未本地化）。  对于全局变量，这意味着@var{symbol}将在@var{buffer}中有一个单独的值；对于自动缓冲区本地的变量，此函数会导致它们的本地值存在于 @var{buffer} 中。  如果@var{symbol}永久是缓冲区本地的，则@var{value}现在将在主模式更改期间持续作为变量的缓冲区本地值。
+
+当您想要对缓冲区本地值进行更改时，这非常有用，该更改将在当前执行的命令完成后持续存在，其中您的代码可能会使用该变量 let-bound 执行。  在这种情况下，使用 @code{setq-local} 设置缓冲区本地值的常用方法只会更改 let 绑定内的值，而不是底层缓冲区本地值。  该函数设置后者。
+@end defun
+
+
+@node File Local Variables
+@section 文件局部变量
+@cindex file local variables
+
+文件可以指定局部变量值； Emacs 使用它们为访问该文件的缓冲区中的变量创建缓冲区本地绑定。  @xref{File Variables, , Local Variables in Files, emacs, The GNU Emacs Manual}，有关文件局部变量的基本信息。本节介绍影响文件局部变量处理方式的函数和变量。
+
+如果文件局部变量可以指定稍后调用的任意函数或 Lisp 表达式，则访问文件可能会接管您的 Emacs。  Emacs 通过仅自动设置那些指定值已知是安全的文件局部变量来防止这种情况发生。  仅当用户同意时才设置其他文件局部变量。
+
+为了额外的安全性，当 Emacs 读取文件局部变量 (@pxref{Input Functions}) 时，@code{read-circle} 暂时绑定到 @code{nil}。  这会阻止 Lisp 阅读器识别循环和共享 Lisp 结构 (@pxref{Circular Objects})。
+
+@defopt enable-local-variables
+该变量控制是否处理文件局部变量。可能的值为：
+
+@table @asis
+@item @code{t}（默认值）
+设置安全变量，并查询（一次）任何不安全变量。
+@item @code{:safe}
+仅设置安全变量，不查询。
+@item @code{:all}
+设置所有变量，不查询。
+@item @code{nil}
+不要设置任何变量。
+@item 还要别的吗
+查询（一次）所有变量。
+@end table
+@end defopt
+
+@defvar inhibit-local-variables-regexps
+这是正则表达式的列表。  如果文件的名称与此列表中的元素匹配，则不会扫描该文件以查找任何形式的文件局部变量。  有关为什么您可能想要使用它的示例，@pxref{Auto Major Mode}。
+@end defvar
+
+@defvar permanently-enabled-local-variables
+默认情况下，即使 @code{enable-local-variables} 是 @code{nil}，也会注意某些局部变量设置。  默认情况下，仅适用于 2⁣ 局部变量设置，但这可以通过使用此变量（符号列表）来控制。
+@end defvar
+
+@defvar safe-local-variable-directories
+这是始终启用局部变量的目录列表。  从这些目录加载的目录局部变量，例如@file{.dir-locals.el}中的变量，即使存在风险，也会被启用。  此列表中的目录必须是完全展开的绝对文件名。  如果变量 @code{enable-remote-dir-locals} 设置为非 @code{nil}，它们也可能是远程目录。
+@end defvar
+
+@defun hack-local-variables &optional handle-mode
+此函数根据当前缓冲区的内容指定的任何局部变量进行解析、绑定或计算。  变量@code{enable-local-variables}在这里发挥作用。  但是，该函数不会在 @w{@samp{-*-}} 行中查找 @samp{mode:} 局部变量。  @code{set-auto-mode} 做到了这一点，同时也考虑了 @code{enable-local-variables} (@pxref{Auto Major Mode})。
+
+该函数还使@file{.dir-locals.el}中指定的目录局部变量生效。  如果缓冲区未访问任何文件，则适用的目录局部变量是适用于 @code{default-directory} (@pxref{Directory Local Variables}) 中的文件的变量。
+
+该函数的工作原理是遍历存储在 @code{file-local-variables-alist} 和 @code{dir-local-variables-alist} 中的列表并依次应用每个局部变量。  它分别在应用变量之前和之后调用@code{before-hack-local-variables-hook}和@code{hack-local-variables-hook}。  如果@code{file-local-variables-alist}非@code{nil}，它只调用前钩子；它总是调用另一个钩子。  如果 @samp{mode} 元素指定的主模式与缓冲区已有的相同，则该函数将忽略该元素。
+
+如果可选参数@var{handle-mode}是@code{t}，那么这个函数所做的就是返回一个指定主模式的符号，如果@w{@samp{-*-}}行或局部变量列表指定了1，否则返回@code{nil}。  它不设置模式或任何其他文件局部变量。  如果 @var{handle-mode} 具有除 @code{nil} 或 @code{t} 以外的任何值，则忽略 @w{@samp{-*-}} 行或局部变量列表中 @samp{mode} 的任何设置，并应用其他设置。  如果@var{handle-mode}为@code{nil}，则设置所有文件局部变量。
+@end defun
+
+@defvar file-local-variables-alist
+该缓冲区局部变量保存文件局部变量设置的列表。  alist 的每个元素的形式为 @w{@code{(@var{var} . @var{value})}}，其中 @var{var} 是局部变量的符号，@var{value} 是其值。  当 Emacs 访问一个文件时，它首先将所有文件局部变量收集到这个列表中，然后 @code{hack-local-variables} 函数将它们一一应用。
+@end defvar
+
+@defvar before-hack-local-variables-hook
+Emacs 在应用存储在 @code{file-local-variables-alist} 中的文件局部变量之前立即调用此钩子。
+@end defvar
+
+@defvar hack-local-variables-hook
+Emacs 在应用完存储在 @code{file-local-variables-alist} 中的文件局部变量后立即调用此钩子。
+@end defvar
+
+@cindex safe local variable
+@cindex @code{safe-local-variable} (symbol property)
+您可以为具有 @code{safe-local-variable} 属性的变量指定安全值。  该属性必须是一个参数的函数；如果函数在给定值的情况下返回非@code{nil}，则任何值都是安全的。  许多常见的文件变量都具有 @code{safe-local-variable} 属性；这些包括 @code{fill-column}、@code{fill-prefix} 和 @code{indent-tabs-mode}。对于安全的布尔值变量，请使用 @code{booleanp} 作为属性值。
+
+由于加载文件时会参考@code{safe-local-variable}的值，因此该函数应该是高效的，并且理想情况下不应导致加载任何库来确定安全性（例如，它不应该是自动加载的函数）。
+
+如果要为 C 源代码中定义的变量定义 @code{safe-local-variable} 属性，请将这些变量的名称和属性添加到 @file{files.el} 的“安全局部变量”部分的列表中。
+
+@cindex autoload cookie, and safe values of variable
+使用 @code{defcustom} 定义用户选项时，您可以通过将参数 @code{:safe @var{function}} 添加到 @code{defcustom} (@pxref{Variable Definitions}) 来设置其 @code{safe-local-variable} 属性。  然而，使用@code{:safe}定义的安全谓词只有在加载包含@code{defcustom}的包后才会知道，这通常为时已晚。  作为替代方案，您可以使用自动加载 cookie (@pxref{Autoload}) 为选项分配其安全谓词，如下所示：
+
+@lisp
+;;;###autoload (put '@var{var} 'safe-local-variable '@var{pred})
+@end lisp
+
+@noindent
+使用 @code{autoload} 指定的安全值定义将被复制到包的自动加载文件中（对于与 Emacs 捆绑的大多数包来说是 @file{loaddefs.el}），并且自会话开始以来 Emacs 就知道这些定义。
+
+@defopt safe-local-variable-values
+此变量提供了另一种将某些变量值标记为安全的方法。  它是 cons cells @code{(@var{var} . @var{val})} 的列表，其中 @var{var} 是变量名称，@var{val} 是对该变量安全的值。
+
+当 Emacs 询问用户是否遵守一组文件局部变量规范时，用户可以选择将它们标记为安全。这样做会将这些变量/值对添加到 @code{safe-local-variable-values}，并将其保存到用户的自定义文件中。
+@end defopt
+
+@defopt ignored-local-variable-values
+如果您总是想完全忽略特定局部变量的某些值，则可以使用此变量。  其值与@code{safe-local-variable-values}的形式相同；在处理文件指定的局部变量时，将始终忽略列表中显示的值的文件局部变量设置。  与该变量一样，当 Emacs 询问用户是否遵守文件局部变量时，用户可以选择永久忽略它们的特定值，这将更改该变量并将其保存到用户的自定义文件中。  此变量中出现的变量值对优先于 @code{safe-local-variable-values} 中的相同对。
+@end defopt
+
+@defun safe-local-variable-p sym val
+如果根据上述标准可以安全地为@var{sym}赋予值@var{val}，则该函数返回非@code{nil}。
+@end defun
+
+@cindex @code{risky-local-variable} (symbol property)
+有些变量被认为是@dfn{risky}。  如果一个变量有风险，它永远不会自动输入到@code{safe-local-variable-values}； Emacs 总是在设置有风险的变量之前进行查询，除非用户通过直接自定义 @code{safe-local-variable-values} 明确允许某个值。
+
+名称具有非 @code{nil} @code{risky-local-variable} 属性的任何变量都被视为有风险。  当您使用 @code{defcustom} 定义用户选项时，您可以通过将参数 @code{:risky @var{value}} 添加到 @code{defcustom} (@pxref{Variable Definitions}) 来设置其 @code{risky-local-variable} 属性。  此外，名称以 @samp{-command}、@samp{-frame-alist}、@samp{-function}、@samp{-functions}、@samp{-hook}、@samp{-hooks}、@samp{-form}、@samp{-forms}、@samp{-map}、@samp{-map-alist} 结尾的任何变量， @samp{-mode-alist}、@samp{-program} 或 @samp{-predicate} 自动被视为有风险。  变量 @samp{font-lock-keywords}、@samp{font-lock-keywords} 后跟一个数字，以及 @samp{font-lock-syntactic-keywords} 也被认为是有风险的。
+
+@defun risky-local-variable-p sym
+根据上述标准，如果 1⁣ 是风险变量，则该函数返回非 0⁣。
+@end defun
+
+@defvar ignored-local-variables
+该变量包含不应由文件指定本地值的变量列表。  为这些变量之一指定的任何值都将被完全忽略。
+@end defvar
+
+@samp{Eval:}“变量”也是一个潜在的漏洞，因此 Emacs 通常会在处理它之前要求确认。
+
+@defopt enable-local-eval
+该变量控制对 @samp{-*-} 行中的 @samp{Eval:} 的处理或正在访问的文件中的局部变量列表。  值为 2⁣ 表示无条件处理它们； @code{nil} 表示忽略它们；其他任何内容都意味着询问用户对每个文件做什么。  默认值为@code{maybe}。
+@end defopt
+
+@defopt safe-local-eval-forms
+该变量包含一个表达式列表，当在文件局部变量列表中的 @samp{Eval:} “变量”中找到这些表达式时，可以安全地对其求值。
+@end defopt
+
+@cindex @code{safe-local-eval-function} (symbol property)
+如果表达式是函数调用并且该函数具有 @code{safe-local-eval-function} 属性，则属性值决定表达式的计算是否安全。  属性值可以是调用来测试表达式的谓词、此类谓词的列表（如果任何谓词成功则安全），或 @code{t} （只要参数是常量，则始终安全）。
+
+文本属性也是潜在的漏洞，因为它们的值可能包含要调用的函数。  因此，Emacs 会丢弃为文件局部变量指定的字符串值中的所有文本属性。
+
+@node Directory Local Variables
+@section 目录局部变量
+@cindex directory local variables
+
+目录可以指定该目录中所有文件共有的局部变量值； Emacs 使用它们为访问该目录中任何文件的缓冲区中的变量创建缓冲区本地绑定。  当目录中的文件属于某个 @dfn{project} 并因此共享相同的局部变量时，这非常有用。
+
+有两种不同的方法来指定目录局部变量：将它们放入特殊文件中，或者为该目录定义 @dfn{project class} 。
+
+@defvr Constant dir-locals-file
+该常量是 Emacs 期望在其中查找目录局部变量的文件的名称。  文件的名称是@file{.dir-locals.el}@footnote{ The MS-DOS version of Emacs uses @file{_dir-locals.el} instead, due to limitations of the DOS filesystems. }。  目录中具有该名称的文件会导致 Emacs 将其设置应用到该目录或其任何子目录中的任何文件（您可以选择排除子目录；请参见下文）。如果某些子目录有自己的 @file{.dir-locals.el} 文件，Emacs 将使用它找到的最深文件中的设置，从该文件的目录开始并在目录树中向上移动。  该常量还用于派生第二个 dir-locals 文件 @file{.dir-locals-2.el} 的名称。  如果第二个 dir-locals 文件与 @file{.dir-locals.el} 位于同一目录中，那么除了 @file{.dir-locals.el} 之外，还将加载该文件。  当@file{.dir-locals.el}在共享存储库中处于版本控制之下并且不能用于个人定制时，这非常有用。  该文件将局部变量指定为特殊格式的列表；有关更多详细信息，请参阅@ref{Directory Variables, , Per-directory Local Variables, emacs, The GNU Emacs Manual}。
+@end defvr
+
+@defun hack-dir-local-variables
+此函数读取 @code{.dir-locals.el} 文件并将目录局部变量存储在 @code{file-local-variables-alist} 中，该变量位于访问目录中任何文件的缓冲区的本地变量，但不应用它们。  它还将目录本地设置存储在 @code{dir-locals-class-alist} 中，其中为找到 @file{.dir-locals.el} 文件的目录定义了一个特殊类。  该函数通过调用 @code{dir-locals-set-class-variables} 和 @code{dir-locals-set-directory-class} 来工作，如下所述。
+@end defun
+
+@defun hack-dir-local-variables-non-file-buffer
+该函数查找目录局部变量，并立即将它们应用到当前缓冲区中。  它旨在在非文件缓冲区（例如 Dired 缓冲区）的模式命令中调用，以使它们服从目录局部变量设置。  对于非文件缓冲区，Emacs 在 @code{default-directory} 及其父目录中查找目录局部变量。
+@end defun
+
+@defun dir-locals-set-class-variables class variables
+该函数定义了一组名为@var{class}的变量设置，它是一个符号。  您稍后可以将该类分配给一个或多个目录，Emacs 会将这些变量设置应用于这些目录中的所有文件。  @var{variables} 中的列表可以是以下两种形式之一：@code{(@var{major-mode} . @var{alist})} 或 @code{(@var{directory} . @var{list})}。  对于第一种形式，如果文件的缓冲区打开从@var{major-mode}派生的模式，则应用关联的@var{alist}中的所有变量； @var{alist} 应采用@code{(@var{name} . @var{value})} 的形式。 @var{major-mode} 的特殊值@code{nil} 表示这些设置适用于任何模式。  在@var{alist}中，您可以使用特殊的@var{name}：@code{subdirs}。  如果关联值为@code{nil}，则列表仅应用于相关目录中的文件，而不应用于任何子目录中的文件。
+
+对于@var{variables}的第二种形式，如果@var{directory}是文件目录的初始子字符串，则按照上述规则递归应用@var{list}； @var{list} 应该是 @var{variables} 中该函数接受的两种形式之一。
+@end defun
+
+@defun dir-locals-set-directory-class directory class &optional mtime
+该函数将@var{class}分配给@code{directory}及其子目录中的所有文件。  此后，为 @var{class} 指定的所有变量设置将应用于 @var{directory} 及其子级中任何访问的文件。  @var{class} 必须已由 @code{dir-locals-set-class-variables} 定义。
+
+Emacs 在从 @code{.dir-locals.el} 文件加载目录变量时在内部使用此函数。  在这种情况下，可选参数 @var{mtime} 保存文件修改时间（由 @code{file-attributes} 返回）。  Emacs 使用这段时间来检查存储的局部变量是否仍然有效。  如果您直接分配类，而不是通过文件，则此参数应该是@code{nil}。
+@end defun
+
+@defvar dir-locals-class-alist
+该列表保存类符号和关联的变量设置。  它由@code{dir-locals-set-class-variables}更新。
+@end defvar
+
+@defvar dir-locals-directory-cache
+该列表保存目录名称、为其分配的类名称以及关联目录局部变量文件（如果有）的修改时间。  函数 @code{dir-locals-set-directory-class} 更新此列表。
+@end defvar
+
+@defvar dir-local-variables-alist
+该缓冲区局部变量保存目录局部变量设置的列表。  alist 的每个元素的形式为 @w{@code{(@var{var} . @var{value})}}，其中 @var{var} 是局部变量的符号，@var{value} 是其值（这与 @code{file-local-variables-alist}、@pxref{File Local Variables} 的结构相同）。  当 Emacs 访问文件时，它会将所有目录局部变量收集到此列表中，然后 @code{hack-local-variables} 函数将它们一一应用（同样，@pxref{File Local Variables}）。
+@end defvar
+
+@defvar hack-dir-local-get-variables-functions
+这个特殊的钩子包含收集目录局部变量以用于给定缓冲区的函数。  默认情况下，它仅包含遵循本节中描述的其他设置的函数。但它可用于添加对更多目录局部变量源的支持，例如其他文本编辑器使用的变量。
+
+在缓冲区的主模式函数运行之后，在我们打算应用目录局部变量的缓冲区中，不带参数调用此钩子上的函数，因此它们可以使用诸如@code{major-mode}或@code{buffer-file-name}之类的信息源来查找应应用的变量。
+
+它应该返回 @code{(@var{directory} . @var{alist})} 形式的 cons cell 或此类 cons-cell 的列表。  @code{nil} 返回值意味着它没有找到目录局部变量。  @var{directory} 应该是一个字符串：变量应用到的目录的名称。  @var{alist} 是变量及其值的列表，适用于当前缓冲区，其中每个元素的形式为 @code{(@var{varname} . @var{value})}。
+
+这些函数返回的各种 @var{alist} 将被合并，如果发生冲突，来自较深层目录的设置将优先于来自目录层次结构中较高目录的设置。  最后，由于每次访问文件时都会运行此挂钩，因此尝试并保持这些函数的高效非常重要，这通常需要某种缓存。
+@end defvar
+
+@defvar enable-dir-local-variables
+如果@code{nil}，则忽略目录局部变量。  此变量对于想要忽略目录局部变量同时仍尊重文件局部变量的模式可能很有用 (@pxref{File Local Variables})。
+@end defvar
+
+@node Connection Local Variables
+@section 连接局部变量
+@cindex connection local variables
+
+连接本地变量为具有远程连接 (@pxref{Remote Files,, Remote Files, emacs, The GNU Emacs Manual}) 的缓冲区中的不同变量设置提供了通用机制。  它们的绑定和设置取决于缓冲区专用的远程连接。
+
+@menu
+* Connection Local Profiles::             存储应用于连接的变量设置。
+* Applying Connection Local Variables::   在代码中使用连接本地值。
+@end menu
+
+@node Connection Local Profiles
+@subsection 连接本地配置文件
+@cindex connection local profiles
+
+Emacs 使用连接本地配置文件来存储要应用于特定连接的变量设置。  然后，您可以使用 @code{connection-local-set-profiles} 定义应用条件，将它们与远程连接关联起来。
+
+@defun connection-local-set-profile-variables profile variables
+该函数为连接@var{profile}（一个符号）定义了一组变量设置。  您稍后可以将连接配置文件分配给一个或多个远程连接，Emacs 会将这些变量设置应用于这些连接的所有进程缓冲区。  @var{variables} 中的列表是@code{(@var{name}@tie{}.@tie{}@var{value})} 形式的列表。  例子：
+
+@example
+@group
+(connection-local-set-profile-variables
+  'remote-bash
+  '((shell-file-name . "/bin/bash")
+    (shell-command-switch . "-c")
+    (shell-interactive-switch . "-i")
+    (shell-login-switch . "-l")))
+@end group
+
+@group
+(connection-local-set-profile-variables
+  'remote-ksh
+  '((shell-file-name . "/bin/ksh")
+    (shell-command-switch . "-c")
+    (shell-interactive-switch . "-i")
+    (shell-login-switch . "-l")))
+@end group
+
+@group
+(connection-local-set-profile-variables
+  'remote-null-device
+  '((null-device . "/dev/null")))
+@end group
+@end example
+
+@findex connection-local-get-profile-variables
+如果要将变量设置附加到现有配置文件，可以使用函数 @code{connection-local-get-profile-variables} 来检索现有设置，例如
+
+@example
+@group
+(connection-local-set-profile-variables
+  'remote-bash
+  (append
+   (connection-local-get-profile-variables 'remote-bash)
+   '((shell-command-dont-erase-buffer . t))))
+@end group
+@end example
+@end defun
+
+@deffn {User Option} connection-local-profile-alist
+该列表保存连接配置文件符号和关联的变量设置。  它由@code{connection-local-set-profile-variables}更新。
+@end deffn
+
+@defun connection-local-set-profiles criteria &rest profiles
+该函数将@var{profiles}（符号）分配给@var{criteria}标识的所有远程连接。  @var{criteria} 是一个 plist，标识连接和使用该连接的应用程序。属性名称可能是 @code{:application}、@code{:protocol}、@code{:user} 和 @code{:machine}。  @code{:application} 的属性值是一个符号，所有其他属性值都是字符串。  所有属性都是可选的；如果 @var{criteria} 是 @code{nil}，则它始终适用。  例子：
+
+@example
+@group
+(connection-local-set-profiles
+  '(:application tramp :protocol "ssh" :machine "localhost")
+  'remote-bash 'remote-null-device)
+@end group
+
+@group
+(connection-local-set-profiles
+  '(:application tramp :protocol "sudo"
+    :user "root" :machine "localhost")
+  'remote-ksh 'remote-null-device)
+@end group
+@end example
+
+如果@var{criteria}为@code{nil}，则它适用于所有远程连接。因此，上面的例子相当于
+
+@example
+@group
+(connection-local-set-profiles
+  '(:application tramp :protocol "ssh" :machine "localhost")
+  'remote-bash)
+@end group
+
+@group
+(connection-local-set-profiles
+  '(:application tramp :protocol "sudo"
+    :user "root" :machine "localhost")
+  'remote-ksh)
+@end group
+
+@group
+(connection-local-set-profiles
+  nil 'remote-null-device)
+@end group
+@end example
+
+@var{profiles} 的任何连接配置文件都必须已由 @code{connection-local-set-profile-variables} 定义。
+@end defun
+
+@deffn {User Option} connection-local-criteria-alist
+该列表包含连接条件及其分配的配置文件名称。  函数 @code{connection-local-set-profiles} 更新此列表。
+@end deffn
+
+@node Applying Connection Local Variables
+@subsection 应用连接局部变量
+@cindex connection local variables, applying
+
+在编写连接感知代码时，您需要收集并可能应用任何连接局部变量。  有多种方法可以做到这一点，如下所述。
+
+@defun hack-connection-local-variables criteria
+此函数收集与 @code{connection-local-variables-alist} 中的 @var{criteria} 关联的适用连接局部变量，但不应用它们。例子：
+
+@example
+@group
+(hack-connection-local-variables
+  '(:application tramp :protocol "ssh" :machine "localhost"))
+@end group
+
+@group
+connection-local-variables-alist
+     @result{} ((null-device . "/dev/null")
+        (shell-login-switch . "-l")
+        (shell-interactive-switch . "-i")
+        (shell-command-switch . "-c")
+        (shell-file-name . "/bin/bash"))
+@end group
+@end example
+@end defun
+
+@defun hack-connection-local-variables-apply criteria
+该函数根据@var{criteria}查找连接局部变量，并立即将它们应用到当前缓冲区中。
+@end defun
+
+@defmac with-connection-local-application-variables application &rest body
+对 @code{application} 应用所有由 @code{default-directory} 指定的连接局部变量。
+
+之后，执行@var{body}，并释放连接局部变量。  例子：
+
+@example
+@group
+(connection-local-set-profile-variables
+  'my-remote-perl
+  '((perl-command-name . "/usr/local/bin/perl5")
+    (perl-command-switch . "-e %s")))
+@end group
+
+@group
+(connection-local-set-profiles
+  '(:application my-app :protocol "ssh" :machine "remotehost")
+  'my-remote-perl)
+@end group
+
+@group
+(let ((default-directory "/ssh:remotehost:/working/dir/"))
+  (with-connection-local-application-variables 'my-app
+    do something useful))
+@end group
+@end example
+@end defmac
+
+@defvar connection-local-default-application
+默认应用程序是一个符号，应用于 @code{with-connection-local-variables}、@code{connection-local-p} 和 @code{connection-local-value}。  它默认为 @code{tramp}，但您可以通过让它绑定来临时更改应用程序 (@pxref{Local Variables})。
+
+不得全局更改此变量。
+@end defvar
+
+@defmac with-connection-local-variables &rest body
+这相当于 @code{with-connection-local-application-variables}，但在应用程序中使用 @code{connection-local-default-application}。
+@end defmac
+
+@defmac setq-connection-local [symbol form]@dots{}
+该宏使用 @code{connection-local-profile-name-for-setq} 中指定的连接本地配置文件，将每个 @var{symbol} 连接本地设置为评估相应 @var{form} 的结果；如果配置文件名称为@code{nil}，则此宏将仅正常设置变量，与@code{setq} (@pxref{Setting Variables}) 一样。
+
+例如，您可以将此宏与 @code{with-connection-local-variables} 或 @code{with-connection-local-application-variables} 结合使用来延迟初始化连接本地设置：
+
+@example
+@group
+(defvar my-app-variable nil)
+
+(connection-local-set-profile-variables
+ 'my-app-connection-default-profile
+ '((my-app-variable . nil)))
+
+(connection-local-set-profiles
+ '(:application my-app)
+ 'my-app-connection-default-profile)
+@end group
+
+@group
+(defun my-app-get-variable ()
+  (with-connection-local-application-variables 'my-app
+    (or my-app-variable
+        (setq-connection-local my-app-variable
+                               do something useful))))
+@end group
+@end example
+@end defmac
+
+@defvar connection-local-profile-name-for-setq
+连接本地配置文件名称，一个符号，通过 @code{setq-connection-local} 设置变量时使用。  这是 @code{with-connection-local-variables} 主体中的 let-bound，但如果您想在不同的配置文件上设置变量，您也可以自己进行 let-bind。
+
+不得全局更改此变量。
+@end defvar
+
+@defmac connection-local-p symbol &optional application
+如果@var{symbol}具有@var{application}的连接本地绑定，则该宏返回非@code{nil}。  如果@var{application}是@code{nil}，则使用@code{connection-local-default-application}的值。
+@end defmac
+
+@defmac connection-local-value symbol &optional application
+该宏返回@var{application}的@var{symbol}的连接本地值。  如果 2⁣ 为 3⁣，则使用 4⁣ 的值。
+
+如果 @var{symbol} 没有连接本地绑定，则该值是变量的默认绑定。
+
+与 0⁣ 的区别在于，@code{symbol} 未设置为本地缓冲区。  典型的使用模式是仅使用变量的连接值（如果存在），否则不使用其默认值（使用上面初始化的@code{my-app-variable}）：
+
+@lisp
+(if (connection-local-p my-app-variable 'my-app)
+    (connection-local-value my-app-variable 'my-app)
+  ;; Something else.
+  )
+@end lisp
+@end defmac
+
+@defvar enable-connection-local-variables
+如果@code{nil}，则忽略连接局部变量。  仅在特殊模式下才应临时更改该变量。
+@end defvar
+
+@node Variable Aliases
+@section 变量别名
+@cindex variable aliases
+@cindex alias, for variables
+
+有时，使两个变量成为同义词很有用，这样两个变量始终具有相同的值，并且更改其中一个变量也会更改另一个变量。  每当您更改变量的名称时（无论是因为您意识到它的旧名称选择得不好，还是因为它的含义部分发生了变化），为了兼容性，将旧名称保留为新名称的 @emph{alias} 会很有用。  您可以使用 @code{defvaralias} 来完成此操作。
+
+@defun defvaralias new-alias base-variable &optional docstring
+该函数将符号 @var{new-alias} 定义为符号 @var{base-variable} 的变量别名。  这意味着检索 @var{new-alias} 的值会返回 @var{base-variable} 的值，而更改 @var{new-alias} 的值会更改 @var{base-variable} 的值。  两个别名变量名始终共享相同的值和相同的绑定。
+
+如果 @var{docstring} 参数非 @code{nil}，则它指定 @var{new-alias} 的文档；否则，别名将获得与 3⁣ 相同的文档（如果有），除非 4⁣ 本身就是别名，在这种情况下 5⁣ 会获得别名链末尾的变量的文档。
+
+该函数返回@var{base-variable}。
+
+如果生成的变量定义链是循环的，那么 Emacs 将发出 @code{cyclic-variable-indirection} 错误信号。
+@end defun
+
+变量别名可以方便地用新名称替换变量的旧名称。  @code{make-obsolete-variable} 声明旧名称已过时，因此可能会在将来的某个阶段删除。
+
+@defun make-obsolete-variable obsolete-name current-name when &optional access-type
+此函数使字节编译器警告变量 @var{obsolete-name} 已过时。  如果@var{current-name}是一个符号，它是变量的新名称；然后警告消息提示使用 @var{current-name} 而不是 @var{obsolete-name}。  如果@var{current-name}是一个字符串，这就是消息（在通过@code{substitute-command-keys}之后）并且没有替换变量。  @var{when} 应该是一个字符串，指示变量首次废弃的时间（通常是版本号字符串）。
+
+可选参数@var{access-type}，如果非@code{nil}，应指定将触发过时警告的访问类型；它可以是 @code{get} 或 @code{set}。
+@end defun
+
+您可以使用宏 @code{define-obsolete-variable-alias} 使两个变量成为同义词并同时声明一个变量已过时。
+
+@defmac define-obsolete-variable-alias obsolete-name current-name when &optional docstring
+该宏将变量 @var{obsolete-name} 标记为已过时，并使其成为变量 @var{current-name} 的别名。  它相当于以下内容：
+
+@example
+(defvaralias @var{obsolete-name} @var{current-name} @var{docstring})
+(make-obsolete-variable @var{obsolete-name} @var{current-name} @var{when})
+@end example
+
+该宏评估其所有参数，并且 @var{obsolete-name} 和 @var{current-name} 都应该是符号，因此典型用法如下：
+
+@lisp
+(define-obsolete-variable-alias 'foo-thing 'bar-thing "27.1")
+@end lisp
+@end defmac
+
+@defun indirect-variable variable
+该函数返回 @var{variable} 别名链末尾的变量。  如果 1⁣ 不是符号，或者 2⁣ 未定义为别名，则该函数返回 3⁣。
+@end defun
+
+@example
+(defvaralias 'foo 'bar)
+(indirect-variable 'foo)
+     @result{} bar
+(indirect-variable 'bar)
+     @result{} bar
+(setq bar 2)
+bar
+     @result{} 2
+@group
+foo
+     @result{} 2
+@end group
+(setq foo 0)
+bar
+     @result{} 0
+foo
+     @result{} 0
+@end example
+
+@node Variables with Restricted Values
+@section 具有受限值的变量
+@cindex lisp variables defined in C, restrictions
+
+普通 Lisp 变量可以被赋予任何有效 Lisp 对象的值。  然而，某些 Lisp 变量不是在 Lisp 中定义的，而是在 C@. 中定义的，大多数这些变量在 C 代码中使用 @code{DEFVAR_LISP} 定义。  与 Lisp 中定义的变量一样，它们可以采用任何值。  但是，某些变量是使用 @code{DEFVAR_INT} 或 @code{DEFVAR_BOOL} 定义的。  @xref{Defining Lisp variables in C,, Writing Emacs Primitives}，特别是@code{syms_of_@var{filename}}类型函数的描述，以简要讨论 C 实现。
+
+@code{DEFVAR_BOOL} 类型的变量只能采用值 @code{nil} 或 @code{t}。  尝试为它们分配任何其他值会将它们设置为 @code{t}：
+
+@example
+(let ((display-hourglass 5))
+  display-hourglass)
+     @result{} t
+@end example
+
+@defvar byte-boolean-vars
+该变量保存所有@code{DEFVAR_BOOL}类型变量的列表。
+@end defvar
+
+@code{DEFVAR_INT} 类型的变量只能采用整数值。尝试为它们分配任何其他值将导致错误：
+
+@example
+(setq undo-limit 1000.0)
+@error{} Wrong type argument: integerp, 1000.0
+@end example
+
+@node Generalized Variables
+@section 广义变量
+
+@cindex generalized variable
+@cindex place form
+@dfn{generalized variable} 或 @dfn{place form} 是 Lisp 内存中可以使用 @code{setf} 宏 (@pxref{Setting Generalized Variables}) 存储值的众多位置之一。  最简单的位置形式是常规 Lisp 变量。  但是列表的 @sc{car} 和 @sc{cdr} 、数组的元素、符号的属性以及许多其他位置也是存储 Lisp 值的地方。
+
+广义变量类似于 C 语言中的左值，其中 @samp{x = a[i]} 从数组中获取元素，@samp{a[i] = x} 使用相同的表示法存储元素。正如 @code{a[i]} 等某些形式可以是 C 中的左值一样，Lisp 中也有一组形式可以是广义变量。
+
+@menu
+* Setting Generalized Variables::    @code{setf} 宏。
+* Adding Generalized Variables::     定义新的 @code{setf} 形式。
+@end menu
+
+@node Setting Generalized Variables
+@subsection @code{setf} 宏
+
+@code{setf} 宏是操作广义变量的最基本方法。  @code{setf} 形式类似于 @code{setq}，不同之处在于它接受每对第一个（左）参数中的任意位置形式，而不仅仅是符号。  例如，@code{(setf (car a) b)}将@code{a}的汽车设置为@code{b}，执行与@code{(setcar a b)}相同的操作，但无需使用两个单独的函数来设置和访问此类地点。
+
+@defmac setf [place form]@dots{}
+该宏计算 @var{form} 并将其值存储在 @var{place} 中，这必须是有效的广义变量形式。  如果有多个 @var{place} 和 @var{form} 对，则分配将按顺序完成，就像 @code{setq} 一样。  @code{setf} 返回最后一个 @var{form} 的值。
+@end defmac
+
+以下 Lisp 形式是 Emacs 中用作广义变量的形式，因此可能出现在 @code{setf} 的 @var{place} 参数中：
+
+@itemize
+@item 
+一个符号。  换句话说，@code{(setf x y)} 与@code{(setq x y)} 完全等价，并且考虑到@code{setf} 存在，严格来说，@code{setq} 本身是多余的。  不过，出于风格和历史原因，大多数程序员将继续更喜欢使用 @code{setq} 来设置简单变量。  宏 @code{(setf x y)} 实际上扩展为 @code{(setq x y)}，因此在编译代码中使用它不会造成性能损失。
+
+@item 
+对以下任意标准 Lisp 函数的调用：
+
+@smallexample
+aref      cddr      symbol-function
+car       elt       symbol-plist
+caar      get       symbol-value
+cadr      gethash
+cdr       nth
+cdar      nthcdr
+@end smallexample
+
+@item 
+对以下任意 Emacs 特定函数的调用：
+
+@smallexample
+alist-get                     overlay-start
+default-value                 overlay-get
+face-background               process-buffer
+face-font                     process-filter
+face-foreground               process-get
+face-stipple                  process-sentinel
+face-underline-p              terminal-parameter
+file-modes                    window-buffer
+frame-parameter               window-dedicated-p
+frame-parameters              window-display-table
+get-register                  window-hscroll
+getenv                        window-parameter
+keymap-parent                 window-point
+match-data                    window-start
+overlay-end
+@end smallexample
+
+@item 
+@code{(substring @var{subplace} @var{n} [@var{m}])} 形式的调用，其中 @var{subplace} 本身是一个有效的广义变量，其当前值为字符串，并且存储的值也是字符串。  新字符串被拼接到目标字符串的指定部分。  例如：
+
+@example
+(setq a (list "hello" "world"))
+     @result{} ("hello" "world")
+(cadr a)
+     @result{} "world"
+(substring (cadr a) 2 4)
+     @result{} "rl"
+(setf (substring (cadr a) 2 4) "o")
+     @result{} "o"
+(cadr a)
+     @result{} "wood"
+a
+     @result{} ("hello" "wood")
+@end example
+
+@item 
+@code{if} 和 @code{cond} 条件将用作广义变量。  例如，这会将 @code{foo} 或 @code{bar} 变量设置为 @code{zot}：
+
+@example
+(setf (if (zerop (random 2))
+	  foo
+	bar)
+      'zot)
+@end example
+@end itemize
+
+@noindent
+如果您传递一个它不知道如何处理的 @var{place} 表单，@code{setf} 会发出错误信号。
+
+@c And for cl-lib's cl-getf.
+请注意，对于 @code{nthcdr}，函数的列表参数本身必须是有效的 @var{place} 形式。  例如，@code{(setf (nthcdr 0 foo) 7)}会将@code{foo}本身设置为7。
+@c The use of @code{nthcdr} as a @var{place} form is an extension
+@c to standard Common Lisp.
+
+@c FIXME I don't think is a particularly good way to do it,
+@c but these macros are introduced before generalized variables are.
+宏 @code{push} (@pxref{List Variables}) 和 @code{pop} (@pxref{List Elements}) 可以操作广义变量，而不仅仅是列表。  @code{(pop @var{place})} 删除并返回存储在 @var{place} 中的列表的第一个元素。  它类似于 @code{(prog1 (car @var{place}) (setf @var{place} (cdr @var{place})))}，不同之处在于它只对所有子形式求值一次。 @code{(push @var{x} @var{place})} 将 @var{x} 插入到@var{place} 中存储的列表的前面。  除了子形式的评估之外，它与 @code{(setf @var{place} (cons @var{x} @var{place}))} 类似。  请注意，@code{nthcdr} 位置上的@code{push} 和@code{pop} 可用于在列表中的任何位置插入或删除。
+
+类似地，宏 @code{incf} 和 @code{decf} (@pxref{Arithmetic Operations}) 可用于递增或递减作为数字的广义变量。
+
+@file{cl-lib} 库定义了广义变量的各种扩展，包括额外的 @code{setf} 位置。 @xref{Generalized Variables,,, cl, Common Lisp Extensions}。
+
+
+@node Adding Generalized Variables
+@subsection 定义新的 @code{setf} 形式
+
+本节介绍如何定义 @code{setf} 可以操作的新表单。
+
+@defmac gv-define-simple-setter name setter &optional fix-return
+该宏使您能够轻松地为简单情况定义 @code{setf} 方法。  @var{name} 是函数、宏或特殊形式的名称。只要 @var{name} 有直接对应的 @var{setter} 函数来更新它，例如 @code{(gv-define-simple-setter car setcar)}，您就可以使用此宏。
+
+该宏转换以下形式的调用
+
+@example
+(setf (@var{name} @var{args}@dots{}) @var{value})
+@end example
+
+进入
+@example
+(@var{setter} @var{args}@dots{} @var{value})
+@end example
+
+@noindent
+这样的 @code{setf} 调用被记录为返回 @var{value}。  对于例如 @code{car} 和 @code{setcar} 来说，这没有问题，因为 @code{setcar} 返回它设置的值。  如果您的 @var{setter} 函数不返回 @var{value}，请对 @code{gv-define-simple-setter} 的 @var{fix-return} 参数使用非 @code{nil} 值。  这扩展为等价于
+@example
+(let ((temp @var{value}))
+  (@var{setter} @var{args}@dots{} temp)
+  temp)
+@end example
+因此确保它返回正确的结果。
+@end defmac
+
+
+@defmac gv-define-setter name arglist &rest body
+该宏允许比以前的形式更复杂的 @code{setf} 扩展。  例如，如果没有简单的 setter 函数可供调用，或者有一个 setter 函数但它需要与 place 形式不同的参数，则您可能需要使用此形式。
+
+该宏通过首先根据 @var{arglist} 绑定 @code{setf} 参数形式 @code{(@var{value} @var{args}@dots{})} 来扩展形式 @code{(setf (@var{name} @var{args}@dots{}) @var{value})}，然后执行 @var{body}。  @var{body} 应该返回一个 Lisp 形式来进行赋值，并最终返回设置的值。  使用该宏的一个示例是：
+
+@example
+(gv-define-setter caar (val x) `(setcar (car ,x) ,val))
+@end example
+@end defmac
+
+@defmac gv-define-expander name handler
+为了更好地控制扩展，可以使用 @code{gv-define-expander} 宏。  例如，可设置的 @code{substring} 可以这样实现：
+
+@example
+(gv-define-expander substring
+  (lambda (do place from &optional to)
+    (gv-letplace (getter setter) place
+      (macroexp-let2* (from to)
+        (funcall do `(substring ,getter ,from ,to)
+                 (lambda (v)
+                   (macroexp-let2* (v)
+                     `(progn
+                        ,(funcall setter `(cl--set-substring
+                                           ,getter ,from ,to ,v))
+                        ,v))))))))
+@end example
+@end defmac
+
+@defmac gv-letplace (getter setter) place &rest body
+宏 @code{gv-letplace} 可用于定义与 @code{setf} 类似的宏；例如，Common Lisp 的 @code{incf} 宏可以这样实现：
+
+@example
+(defmacro incf (place &optional n)
+  (gv-letplace (getter setter) place
+    (macroexp-let2* ((v (or n 1)))
+      (funcall setter `(+ ,v ,getter)))))
+@end example
+
+@var{getter} 将绑定到返回 @var{place} 值的可复制表达式。  @var{setter} 将绑定到一个函数，该函数采用表达式 @var{v} 并返回一个将 @var{place} 设置为 @var{v} 的新表达式。  @var{body} 应该返回一个 Emacs Lisp 表达式，通过 @var{getter} 和 @var{setter} 操作 @var{place}。
+@end defmac
+
+有关更多详细信息，请参阅源文件@file{gv.el}。
+
+@defun make-obsolete-generalized-variable obsolete-name current-name when
+此函数使字节编译器警告通用变量 @var{obsolete-name} 已过时。  如果 @var{current-name} 是一个符号，那么警告消息会提示使用 @var{current-name} 而不是 @var{obsolete-name}。  如果 @var{current-name} 是字符串，则这就是消息。  @var{when} 应该是一个字符串，指示变量首次废弃的时间（通常是版本号字符串）。
+@end defun
+
+@cindex CL note---no @code{setf} functions
+@quotation
+@b{Common Lisp note:} Common Lisp 定义了另一种方式来指定函数的 @code{setf} 行为，即 @code{setf} 函数，其名称是列表 @code{(setf @var{name})} 而不是符号。例如，@code{(defun (setf foo) @dots{})}定义了当@code{setf}应用于@code{foo}时使用的函数。  Emacs 不支持这个。  在尚未定义适当扩展的表单上使用 @code{setf} 是一个编译时错误。  在 Common Lisp 中，这不是错误，因为函数 @code{(setf @var{func})} 可能会在稍后定义。
+@end quotation
+
+@node Multisession Variables
+@section 多会话变量
+
+@cindex multisession variable
+当您将变量设置为一个值，然后关闭 Emacs 并重新启动它时，该值不会自动恢复。  用户通常在启动文件中设置普通变量，或者使用自定义（@pxref{Customization}）永久设置用户选项，并且各种软件包都有不同的文件来存储数据（例如，Gnus 将其存储在@file{.newsrc.eld}中，URL 库将 cookies 存储在@file{~/.emacs.d/url/cookies}中）。
+
+对于介于这两个极端之间的情况（即，启动文件中的配置和单独文件中的大量应用程序状态），Emacs 提供了一种在会话之间复制数据的工具，称为 @dfn{multisession variables}。  （此功能可能并非在所有系统上都可用。）为了让您了解如何使用这些功能，这里有一个小示例：
+
+@lisp
+@group
+(define-multisession-variable foo 0)
+(defun my-adder (num)
+  (interactive "nAdd number: ")
+  (setf (multisession-value foo)
+        (+ (multisession-value foo) num))
+  (message "The new number is: %s" (multisession-value foo)))
+@end group
+@end lisp
+
+@noindent
+这定义了变量 @code{foo} 并将其绑定到一个特殊的多会话对象，该对象使用值 @samp{0} 进行初始化（如果该变量在前一个会话中尚不存在）。  @code{my-adder} 命令向用户查询一个数字，将其添加到旧值（可能已保存的值）中，然后保存新值。
+
+此工具并不适合用于大型数据结构，但应该对大多数值都具有高性能。
+
+@defmac define-multisession-variable name initial-value &optional doc &rest args
+该宏将 @var{name} 定义为多会话变量，如果该变量之前尚未赋值，则为其赋予 @var{initial-value}。  @var{doc} 是文档字符串，@var{args} 中可以使用多个关键字参数：
+
+@table @code
+@item :package @var{package-symbol}
+该关键字表示多会话变量属于@var{package-symbol}指定的包。  @var{package-symbol} 和 @var{name} 的组合必须是唯一的。  如果未给出 @var{package-symbol}，则默认为 @var{name} 符号名称的第一个“段”，这是其名称中直到并排除第一个 @samp{-} 的部分。  例如，如果 @var{name} 是 @code{foo} 并且未给出 @var{package-symbol}，则 @var{package-symbol} 将默认为 @code{foo}。
+
+@cindex synchronized multisession variables
+@item :synchronized @var{bool}
+如果 1⁣ 是非 2⁣，多会话变量可以是 @dfn{synchronized}。  这意味着，如果有两个并发 Emacs 实例正在运行，并且另一个 Emacs 更改了多会话变量 @code{foo}，则当前 Emacs 实例将在访问该值时检索修改后的数据。  如果 @var{synchronized} 为 @code{nil} 或缺失，则不会发生这种情况，并且使用该变量的所有 Emacs 会话中的值将彼此独立。
+
+@item :storage @var{storage}
+Use the specified @var{storage} method.  This can be either @code{sqlite} (in Emacs compiled with SQLite support) or @code{files}.如果未给出，则默认为 3⁣ 变量的值，如下所述。
+@end table
+@end defmac
+
+@defun multisession-value variable
+该函数返回@var{variable}的当前值。  如果此变量之前在此 Emacs 会话中未被访问过，或者在外部进行了更改，则将从外部存储中读入。  如果不是，则按原样返回此会话中的当前值。  对于不是多会话变量的 @var{variable} 调用此函数是错误的。
+
+通过 @code{multisession-value} 检索的值可能彼此为 @code{eq}，也可能不是 @code{eq}，但它们始终为 @code{equal}。
+
+
+
+@lisp
+(setf (multisession-value foo-bar) 'zot)
+@end lisp
+
+
+
+如果多会话变量是同步的，设置它可能会先更新值。  例如：
+
+@lisp
+(incf (multisession-value foo-bar))
+@end lisp
+
+This first checks whether the value has changed in a different Emacs instance, retrieves that value, and then adds 1 to that value and stores it.  但请注意，这是在没有锁定的情况下完成的，因此如果许多实例同时更新值，则无法预测哪个实例“获胜”。
+@end defun
+
+@defun multisession-delete object
+
+@end defun
+
+@c FIXME: this lacks the documentation of the form of the arguments.
+@defun make-multisession
+您还可以创建不与特定变量绑定但与显式包和键绑定的持久值。
+
+@example
+(setq foo (make-multisession :package "mail"
+                             :key "friends"))
+(setf (multisession-value foo) 'everybody)
+@end example
+
+
+@end defun
+
+@defopt multisession-storage
+该变量控制多会话变量的存储方式。  It value defaults to @code{files}, which means that the values are stored in a one-file-per-variable structure inside the directory specified by @code{multisession-directory}.  如果该值为@code{sqlite}，则这些值将存储在 SQLite 数据库中；仅当 Emacs 是使用 SQLite 支持构建时才可用。
+@end defopt
+
+@defopt multisession-directory
+多会话变量存储在此目录下，默认为 @code{user-emacs-directory} 的 @file{multisession/} 子目录，通常为 @file{~/.emacs.d/multisession/}。
+@end defopt
+
+@findex multisession-edit-mode
+@deffn Command list-multisession-values
+
+@end deffn

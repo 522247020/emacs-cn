@@ -1,0 +1,756 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Loading
+@chapter 加载中
+@cindex loading
+@cindex library
+@cindex Lisp library
+
+加载 Lisp 代码文件意味着将其内容以 Lisp 对象的形式引入 Lisp 环境。  Emacs 查找并打开文件，读取文本，评估每个表单，然后关闭文件。  这样的文件也称为@dfn{Lisp library}。
+
+加载函数计算文件中的所有表达式，就像 0⁣ 函数计算缓冲区中的所有表达式一样。  不同之处在于加载函数读取并评估磁盘上文件中的文本，而不是 Emacs 缓冲区中的文本。
+
+@cindex top-level form
+加载的文件必须包含 Lisp 表达式，可以是源代码，也可以是字节编译代码。  文件中的每个表单称为 @dfn{top-level form}。  可加载文件中的表单没有特殊格式；文件中的任何形式都可以直接输入到缓冲区中并在那里进行评估。  （事实上​​，大多数代码都是通过这种方式进行测试的。）最常见的形式是函数定义和变量定义。
+
+Emacs 还可以加载已编译的动态模块：提供在 Emacs Lisp 程序中使用的附加功能的共享库，就像用 Emacs Lisp 编写的包一样。  当加载动态模块时，Emacs 会调用模块需要实现的专门命名的初始化函数，并将附加函数和变量公开给 Emacs Lisp 程序。
+
+用于按需加载某些 Emacs 原语需要的外部库，@pxref{Dynamic Libraries}。
+
+@menu
+* How Programs Do Loading::  @code{load} 函数及其他。
+* Load Suffixes::            有关 @code{load} 尝试的后缀的详细信息。
+* Library Search::           寻找要加载的库。
+* Loading Non-ASCII::        Emacs Lisp 文件中的非@acronym{ASCII} 字符。
+* Autoload::                 设置自动加载功能。
+* Repeated Loading::         两次加载文件的注意事项。
+* Named Features::           如果尚未加载库，则加载该库。
+* Where Defined::            查找哪个文件定义了某个符号。
+* Unloading::                如何卸载已加载的库。
+* Hooks for Loading::        提供加载特定库时要运行的代码。
+* Dynamic Modules::          模块提供了额外的 Lisp 原语。
+@end menu
+
+@node How Programs Do Loading
+@section 程序如何加载
+
+Emacs Lisp 有几个用于加载的接口。  例如，@code{autoload}为文件中定义的函数创建占位符对象；尝试调用自动加载函数加载文件以获取函数的真实定义（@pxref{Autoload}）。  @code{require} 加载尚未加载的文件 (@pxref{Named Features})。  最终，所有这些设施都会调用 @code{load} 函数来完成工作。
+
+@defun load filename &optional missing-ok nomessage nosuffix must-suffix
+该函数查找并打开一个 Lisp 代码文件，评估其中的所有表单，然后关闭该文件。
+
+要查找该文件，@code{load} 首先查找名为 @file{@var{filename}.elc} 的文件，即查找名称为 @var{filename} 并附加扩展名 @samp{.elc} 的文件。  如果这样的文件存在，并且 Emacs 是使用本机编译支持 (@pxref{Native Compilation}) 进行编译的，@code{load} 会尝试查找相应的 @samp{.eln} 文件，如果找到，则加载它而不是 @file{@var{filename}.elc}。  否则，它将加载 @file{@var{filename}.elc} （并启动后台本机编译以生成丢失的 @samp{.eln} 文件，然后加载该文件）。  如果没有 @file{@var{filename}.elc}，则 @code{load} 查找名为 @file{@var{filename}.el} 的文件。  如果该文件存在，则加载该文件。  如果 Emacs 是在支持动态模块 (@pxref{Dynamic Modules}) 的情况下编译的，@code{load} 接下来会查找名为 @file{@var{filename}.@var{ext}} 的文件，其中 @var{ext} 是共享库的系统相关文件扩展名（在 GNU 和 Unix 系统上为 @samp{.so}）。  最后，如果这两个名称都没有找到，@code{load} 会查找名为 @var{filename} 且不添加任何内容的文件，如果存在则加载它。  （@code{load}函数在查看@var{filename}时并不聪明。在名为@file{foo.el.el}的文件的反常情况下，对@code{(load "foo.el")}的评估确实会找到它。）
+
+如果启用自动压缩模式（默认情况下），那么如果 @code{load} 找不到文件，它会在尝试其他文件名之前搜索该文件的压缩版本。  如果存在的话，它会解压缩并加载它。  它通过将 @code{jka-compr-load-suffixes} 中的每个后缀附加到文件名来查找压缩版本。该变量的值必须是字符串列表。  其标准值为@code{(".gz")}。
+
+如果可选参数 @var{nosuffix} 为非 @code{nil}，则 @code{load} 不会尝试后缀 @samp{.elc} 和 @samp{.el}。  在这种情况下，您必须指定所需的精确文件名，但如果启用自动压缩模式，@code{load}仍将使用@code{jka-compr-load-suffixes}来查找压缩版本。  通过指定精确的文件名并使用 @code{t} 代替 @var{nosuffix}，您可以防止尝试像 @file{foo.el.el} 这样的文件名。
+
+如果可选参数@var{must-suffix}不​​是@code{nil}，则@code{load}坚持使用的文件名必须以@samp{.el}或@samp{.elc}（可能使用压缩后缀扩展）或共享库扩展名结尾，除非它包含显式目录名。
+
+如果选项 @code{load-prefer-newer} 为非 @code{nil}，则在搜索后缀时，@code{load} 选择最近修改的文件版本（@samp{.elc}、@samp{.el} 等）@:。在这种情况下，@code{load} 不会加载 @samp{.eln} 本机编译文件，即使它存在。
+
+如果 @var{filename} 是相对文件名，例如 @file{foo} 或 @file{baz/foo.bar}，则 @code{load} 使用变量 @code{load-path} 搜索文件。  它将 @var{filename} 附加到 @code{load-path} 中列出的每个目录，并加载它找到的名称匹配的第一个文件。  仅当在@code{load-path}中指定时才会尝试当前默认目录，其中@code{nil}代表默认目录。 @code{load} 尝试@code{load-path} 中第一个目录中的所有三个可能的后缀，然后尝试第二个目录中的所有三个后缀，依此类推。  @xref{Library Search}。
+
+无论最终找到文件的名称是什么，以及 Emacs 找到它的目录是什么，Emacs 都会将变量 @code{load-file-name} 的值设置为该文件的名称。
+
+如果您收到警告，指出 @file{foo.elc} 早于 @file{foo.el}，则意味着您应该考虑重新编译 @file{foo.el}。  @xref{Byte Compilation}。
+
+当加载源文件（未编译）时，@code{load} 执行字符集转换，就像 Emacs 访问文件时所做的那样。 @xref{Coding Systems}。
+
+@c This is referred to from the Macros chapter.
+@c Not sure if it should be the other way round.
+@cindex eager macro expansion
+当加载未编译的文件时，Emacs 会尝试展开该文件包含的所有宏 (@pxref{Macros})。  我们将此称为@dfn{eager macro expansion}。  这样做（而不是推迟扩展直到相关代码运行）可以显着加快未编译代码的执行速度。  有时，由于循环依赖，这种宏展开无法完成。  在最简单的示例中，您正在加载的文件引用了另一个文件中定义的宏，而该文件又需要您正在加载的文件。  Emacs 将发出有关 (@samp{Eager macro-expansion skipped due to cycle@dots{}}) 的错误，给出问题的详细信息。  您必须重构代码，以免发生这种情况。  加载已编译的文件不会导致宏扩展，因为这应该在编译期间已经发生。  @xref{Compiling Macros}。
+
+除非@var{nomessage} 是非@code{nil}，否则诸如@samp{Loading foo...} 和@samp{Loading foo...done} 之类的消息会在加载期间出现在回显区域中。  如果加载了本机编译的 @samp{.eln} 文件，则会显示该消息。
+
+@cindex load errors
+加载文件时出现任何未处理的错误都会终止加载。  如果加载是为了@code{autoload}而完成的，则加载期间所做的任何函数定义都将被撤消。
+
+@kindex file-error
+如果@code{load}找不到要加载的文件，那么通常它会发出@code{file-error}信号（与@samp{Cannot open load file @var{filename}}）。  但如果@var{missing-ok}不是@code{nil}，那么@code{load}只返回@code{nil}。
+
+您可以使用变量 @code{load-read-function} 为 @code{load} 指定一个函数，以代替 @code{read} 来读取表达式。见下文。
+
+如果文件加载成功，@code{load}返回@code{t}。
+@end defun
+
+@deffn Command load-file filename
+该命令加载文件@var{filename}。  如果 1⁣ 是相对文件名，则假定当前默认目录。该命令不使用@code{load-path}，也不附加后缀。  但是，它确实会查找压缩版本（如果启用了自动压缩模式）。  如果您希望精确指定要加载的文件名，请使用此命令。
+@end deffn
+
+@deffn Command load-library library
+此命令加载名为 @var{library} 的库。  它与 @code{load} 等效，只是它以交互方式读取其参数的方式不同。 @xref{Lisp Libraries,,,emacs, The GNU Emacs Manual}。
+@end deffn
+
+@defvar load-in-progress
+如果 Emacs 正在加载文件，则该变量为非@code{nil}，否则为 @code{nil}。
+@end defvar
+
+@defvar load-file-name
+当 Emacs 正在加载文件时，此变量的值是该文件的名称，因为 Emacs 在本节前面描述的搜索过程中找到了它。
+@end defvar
+
+@defvar load-read-function
+@anchor{Definition of load-read-function}
+@c do not allow page break at anchor; work around Texinfo deficiency.
+该变量为 @code{load} 和 @code{eval-region} 指定替代表达式读取函数，以代替 @code{read} 使用。该函数应该接受一个参数，就像 @code{read} 一样。
+
+默认情况下，该变量的值为@code{read}。  @xref{Input Functions}。
+
+不使用此变量，使用另一个更新的功能会更简洁：将函数作为 @var{read-function} 参数传递给 @code{eval-region}。  @xref{Definition of eval-region,, Eval}。
+@end defvar
+
+@defun load-path-filter-cache-directory-files path filename suffixes
+此函数过滤 @var{path} 以删除无法容纳 @var{filename} 和 @var{suffixes} 中任何一个的目录，并返回过滤后的目录列表。  该函数会缓存它扫描的目录及其内部的文件，并在后续调用中使用缓存，这会加快@var{path}中文件的重复查找速度。
+@end defun
+
+@defvar load-path-filter-function
+如果此变量命名一个函数，则 @code{load} 在扫描 @code{load-path} 查找文件时将调用该函数。  该函数将使用 3 个参数进行调用：@code{load-path}、@var{filename} 的值、传递给 @code{load} 的正在查找的文件名以及要附加到 @var{filename} 的后缀列表。  它应该返回 @var{filename} 可以驻留的较短目录列表，从而使查找速度更快。  函数 @code{load-path-filter-cache-directory-files} 是这样一个函数的良好候选者。
+@end defvar
+
+有关如何在构建 Emacs 时使用 @code{load} 的信息，请参阅 @ref{Building Emacs}。
+
+@node Load Suffixes
+@section 加载后缀
+我们现在描述一些有关 @code{load} 尝试的确切后缀的技术细节。
+
+@defvar load-suffixes
+这是指示（已编译或源）Emacs Lisp 文件的后缀列表。  它不应包含空字符串。  @code{load} 在将 Lisp 后缀附加到指定文件名时按顺序使用这些后缀。  标准值是 @code{(".elc" ".el")} ，它会产生上一节中描述的行为。
+@end defvar
+
+@defvar load-file-rep-suffixes
+这是表示同一文件的后缀列表。  该列表通常应以空字符串开头。当 @code{load} 搜索文件时，它会在搜索另一个文件之前按顺序将此列表中的后缀附加到文件名。
+
+启用自动压缩模式会将 @code{jka-compr-load-suffixes} 中的后缀附加到此列表中，禁用自动压缩模式会再次删除它们。  如果禁用自动压缩模式，@code{load-file-rep-suffixes} 的标准值为@code{("")}。  假设@code{jka-compr-load-suffixes}的标准值为@code{(".gz")}，如果启用自动压缩模式，@code{load-file-rep-suffixes}的标准值为@code{("" ".gz")}。
+@end defvar
+
+@defun get-load-suffixes
+当 @var{must-suffix} 参数为非 @code{nil} 时，此函数返回 @code{load} 应按顺序尝试的所有后缀列表。这同时考虑了@code{load-suffixes}和@code{load-file-rep-suffixes}。  如果 @code{load-suffixes}、@code{jka-compr-load-suffixes} 和 @code{load-file-rep-suffixes} 都有其标准值，则如果启用自动压缩模式，则此函数返回 @code{(".elc" ".elc.gz" ".el" ".el.gz")}；如果禁用自动压缩模式，则此函数返回 @code{(".elc" ".el")}。
+@end defun
+
+总而言之，@code{load}通常首先尝试@code{(get-load-suffixes)}值中的后缀，然后尝试@code{load-file-rep-suffixes}中的后缀。  如果@var{nosuffix}是非@code{nil}，则跳过前一组，如果@var{must-suffix}是非@code{nil}，则跳过后一组。
+
+@defopt load-prefer-newer
+如果此选项不是 @code{nil}，则 @code{load} 不会在存在的第一个后缀处停止，而是测试所有后缀，并使用最新的文件。
+@end defopt
+
+@node Library Search
+@section 图书馆检索
+@cindex library search
+@cindex find library
+
+当 Emacs 加载 Lisp 库时，它会在变量 @code{load-path} 指定的目录列表中搜索该库。
+
+@defvar load-path
+该变量的值是使用 @code{load} 加载文件时要搜索的目录列表。  每个元素都是一个字符串（必须是目录）或@code{nil}（代表当前工作目录）。
+@end defvar
+
+当 Emacs 启动时，它分几步设置 @code{load-path} 的值。  首先，它使用编译 Emacs 时设置的默认位置来查找包含其自己的 Lisp 文件的目录。  它将这个目录保存在@code{lisp-directory}中。  通常，这是安装 @file{*.elc} 文件的目录，类似于
+
+@example
+"/usr/local/share/emacs/@var{version}/lisp"
+@end example
+
+@noindent
+其中 @var{version} 是 Emacs 版本。  （在本例和以下示例中，将 @file{/usr/local} 替换为适合您的 Emacs 安装的前缀。）此目录及其子目录包含 Emacs 附带的标准 Lisp 文件。  如果 Emacs 找不到自己的 Lisp 文件，它将无法正确启动。
+
+如果您从构建 Emacs 的目录（即尚未安装的可执行文件）运行 Emacs，Emacs 会使用包含构建源的目录的 @file{lisp} 子目录来初始化 @code{lisp-directory}。
+
+然后 Emacs 用这个 @code{lisp-directory} 初始化 @code{load-path}。
+@c Though there should be no *.el files in builddir/lisp, so it's pointless.
+如果您在与源代码不同的目录中构建 Emacs，它还会添加构建目录的 @file{lisp} 子目录。
+
+所有这些目录都作为绝对文件名存储在上述两个变量中。
+
+@cindex site-lisp directories
+除非您使用 @option{--no-site-lisp} 选项启动 Emacs，否则它会在 @code{load-path} 的前面添加两个以上 @file{site-lisp} 目录。  这些用于本地安装的 Lisp 文件，通常采用以下形式：
+
+@example
+"/usr/local/share/emacs/@var{version}/site-lisp"
+@end example
+
+@noindent
+和
+
+@example
+"/usr/local/share/emacs/site-lisp"
+@end example
+
+@noindent
+第一个是当前 Emacs @var{version} 本地安装的文件；第二个是本地安装的文件，旨在与任何已安装的 Emacs 版本一起使用。  （如果 Emacs 在卸载状态下运行，它还会从源目录和构建目录中添加 @file{site-lisp} 子目录（如果存在）。但是，通常源目录和构建目录不包含 @file{site-lisp} 子目录。）
+
+@cindex @env{EMACSLOADPATH} environment variable
+如果设置了环境变量@env{EMACSLOADPATH}，则会修改上述初始化过程。  Emacs 根据环境变量的值初始化@code{load-path}。
+
+@env{EMACSLOADPATH} 的语法与@env{PATH} 相同；目录由 @samp{:}（或 @samp{;}，在某些操作系统上）分隔。
+@ignore
+@c AFAICS, does not (yet) work right to specify non-absolute elements.
+and @samp{.} stands for the current default directory.
+@end ignore
+以下是如何设置 @env{EMACSLOADPATH} 变量的示例（从 @command{sh} 样式 shell）：
+
+@example
+export EMACSLOADPATH=/home/foo/.emacs.d/lisp:
+@end example
+
+环境变量值中的空元素，无论是尾随（如上例所示，注意尾随 @samp{:}）、前导还是嵌入，都将替换为由标准初始化过程确定的默认值 @code{load-path}。  如果不存在这样的空元素，则@env{EMACSLOADPATH}指定整个@code{load-path}。  您必须包含一个空元素，或者包含标准 Lisp 文件的目录的显式路径，否则 Emacs 将无法运行。 （修改 @code{load-path} 的另一种方法是在启动 Emacs 时使用 @option{-L} 命令行选项；请参见下文。）
+
+对于@code{load-path}中的每个目录，Emacs 然后检查它是否包含文件@file{subdirs.el}，如果是，则加载它。  @file{subdirs.el} 文件是在构建/安装 Emacs 时创建的，并且包含导致 Emacs 将这些目录的任何子目录添加到 @code{load-path} 的代码。  直接子目录和多层子目录都会被添加。  但它排除名称不以字母或数字开头的子目录、名为 @file{RCS} 或 @file{CVS} 的子目录以及包含名为 @file{.nosearch} 的文件的子目录。
+
+接下来，Emacs 添加您使用 @option{-L} 命令行选项 (@pxref{Action Arguments,,,emacs, The GNU Emacs Manual}) 指定的任何额外加载目录。  它还添加安装可选软件包的目录（如果有）（@pxref{Packaging Basics}）。
+
+向初始化文件 (@pxref{Init File}) 添加代码以向 @code{load-path} 添加一个或多个目录是很常见的。  例如：
+
+@example
+(push "~/.emacs.d/lisp" load-path)
+@end example
+
+@noindent
+@xref{List Variables, push}，用于描述@code{push}。
+
+转储 Emacs 使用特殊值 @code{load-path}。  如果您使用 @file{site-load.el} 或 @file{site-init.el} 文件来自定义转储的 Emacs (@pxref{Building Emacs})，则这些文件对 @code{load-path} 所做的任何更改都将在转储后丢失。
+
+@defvar lisp-directory
+该变量保存一个字符串，该字符串命名保存 Emacs 自己的 @file{*.el} 和 @file{*.elc} 文件的目录。  这通常是这些文件在 Emacs 安装树中所在的位置，除非 Emacs 从其构建目录运行，在这种情况下，它指向构建 Emacs 的源目录中的 @file{lisp} 子目录。
+@end defvar
+
+@deffn Command locate-library library &optional nosuffix path interactive-call
+此命令查找库 @var{library} 的精确文件名。  它以与 @code{load} 相同的方式搜索库，并且参数 @var{nosuffix} 与 @code{load} 中的含义相同：不要将后缀 @samp{.elc} 或 @samp{.el} 添加到指定名称 @var{library}。
+
+如果 @var{path} 不是 @code{nil}，则使用该目录列表而不是 @code{load-path}。
+
+当从程序中调用 @code{locate-library} 时，它会以字符串形式返回文件名。  当用户交互运行@code{locate-library}时，参数@var{interactive-call}是@code{t}，这告诉@code{locate-library}在回显区域显示文件名。
+@end deffn
+
+@cindex shadowed Lisp files
+@deffn Command list-load-path-shadows &optional stringp
+此命令显示 @dfn{shadowed} Emacs Lisp 文件的列表。  隐藏文件是一种通常不会被加载的文件，尽管位于 @code{load-path} 上的目录中，但由于 @code{load-path} 上较早的目录中存在另一个名称相似的文件。
+
+例如，假设 @code{load-path} 设置为
+
+@example
+  ("/opt/emacs/site-lisp" "/usr/share/emacs/29.1/lisp")
+@end example
+
+@noindent
+并且这两个目录都包含一个名为 @file{foo.el}.那么@code{(require 'foo)}永远不会加载第二个目录中的文件。  这种情况可能表明 Emacs 的安装方式存在问题。
+
+当从 Lisp 调用时，此函数会打印一条消息，列出隐藏的文件，而不是在缓冲区中显示它们。  如果可选参数 @code{stringp} 不是 @code{nil}，它将以字符串形式返回隐藏文件。
+@end deffn
+
+如果 Emacs 是在支持本机编译 (@pxref{Native Compilation}) 的情况下编译的，那么当通过搜索 @code{load-path} 找到@samp{.elc} 字节编译文件时，Emacs 将尝试查找包含相应本机编译代码的相应 @samp{.eln} 文件。  在@code{native-comp-eln-load-path}列出的目录中查找本机编译的文件。
+
+@vindex comp-native-version-dir
+@defvar native-comp-eln-load-path
+该变量保存 Emacs 查找本机编译的 @samp{.eln} 文件的目录列表。  列表中非绝对的文件名被解释为相对于 @code{invocation-directory} (@pxref{System Environment})。  列表中的最后一个目录是系统目录，即 @: 包含由 Emacs 构建和安装过程安装的 @samp{.eln} 文件的目录。  在列表中的每个目录中，Emacs 在子目录中查找 @samp{.eln} 文件，其名称由 Emacs 版本和取决于当前本机编译的 8 字符哈希构造而成 @acronym{ABI}；该子目录的名称存储在变量@code{comp-native-version-dir}中。
+@end defvar
+
+@node Loading Non-ASCII
+@section 加载非@acronym{ASCII}字符
+@cindex loading, and non-ASCII characters
+@cindex non-ASCII characters in loaded files
+
+当 Emacs Lisp 程序包含带有非 0⁣ 字符的字符串常量时，它们可以在 Emacs 中表示为单字节字符串或多字节字符串 (@pxref{Text Representations})。  使用哪种表示形式取决于文件如何读入 Emacs。  如果通过解码为多字节表示形式读取，则 Lisp 程序的文本将是多字节文本，并且其字符串常量将是多字节字符串。  如果在不解码的情况下读取包含 Latin-1 字符（例如）的文件，则程序的文本将是单字节文本，并且其字符串常量将是单字节字符串。 @xref{Coding Systems}。
+
+在大多数 Emacs Lisp 程序中，非 0⁣ 字符串是多字节字符串的事实应该不会被注意到，因为将它们插入单字节缓冲区中会自动将它们转换为单字节。  但是，如果这确实有影响，您可以通过在局部变量部分写入 @samp{coding: raw-text} 来强制将特定 Lisp 文件解释为单字节。  使用该指示符，文件将无条件地被解释为单字节。  当将键绑定到写为 @code{?v@var{literal}} 的非 2⁣ 字符时，这可能很重要。
+
+@node Autoload
+@section 自动加载
+@cindex autoload
+
+@dfn{autoload} 工具可让您注册函数或宏的存在，但推迟加载定义它的文件。  对该函数的第一次调用会自动加载正确的库，以便安装真正的定义和其他相关代码，然后运行真正的定义，就像它一直被加载一样。还可以通过查找函数或宏的文档（@pxref{Documentation Basics}）以及完成变量和函数名称（下面的@pxref{Autoload by Prefix}）来触发自动加载。
+
+@menu
+* Autoload by Prefix::  按前缀自动加载。
+* When to Autoload::    何时使用自动加载。
+@end menu
+
+有两种方法可以设置自动加载函数：调用 @code{autoload}，以及在源代码中真正定义之前编写“神奇”注释。  @code{autoload} 是自动加载的低级原语；任何 Lisp 程序都可以随时调用 @code{autoload}。  对于与 Emacs 一起安装的软件包，魔术注释是自动加载函数的最便捷方法。  这些注释本身没有任何作用，但它们充当命令 @code{loaddefs-generate} 的指南，该命令构造对 @code{autoload} 的调用并安排在 Emacs 构建时执行它们。
+
+@defun autoload function filename &optional docstring interactive type
+该函数定义了名为@var{function}的函数（或宏），以便从@var{filename}自动加载。  字符串 @var{filename} 指定要加载的文件以获取 @var{function} 的真实定义。
+
+如果 @var{filename} 不包含目录名，也不包含后缀 @code{.el} 或 @code{.elc}，则此函数坚持添加这些后缀之一，并且不会从名称为 @var{filename} 且未添加后缀的文件中加载。  （变量 @code{load-suffixes} 指定所需的确切后缀。）
+
+参数 @var{docstring} 是函数的文档字符串。  在调用 @code{autoload} 时指定文档字符串可以在不加载函数实际定义的情况下查看文档。  通常，这应该与函数定义本身中的文档字符串相同。  如果不是，函数定义的文档字符串将在加载时生效。
+
+如果@var{interactive}非@code{nil}，则表示@var{function}可以交互调用。  这使得 @kbd{M-x} 中的补全工作无需加载 @var{function} 的真实定义。  这里不给出完整的交互规范；除非用户实际调用@var{function}，否则不需要它，当发生这种情况时，就该加载真正的定义了。
+
+如果@var{interactive}是一个列表，它被解释为该命令适用的模式列表。
+
+您可以自动加载宏和键盘映射以及普通功能。如果 @var{function} 实际上是一个宏，则将 @var{type} 指定为 @code{macro}。如果@var{function}确实是键盘映射，则将@var{type}指定为@code{keymap}。  Emacs 的各个部分需要知道这些信息而不加载真正的定义。
+
+当前缀键的绑定是符号 @var{function} 时，自动加载的键映射会在键查找期间自动加载。  对于其他类型的键盘映射访问，不会发生自动加载。  特别是，当 Lisp 程序从变量的值获取键盘映射并调用 @code{keymap-set}; 时，不会发生这种情况。即使变量名是相同的符号@var{function}也不行。
+
+@cindex function cell in autoload
+如果@var{function}已经有一个不是自动加载对象的非void函数定义，则该函数不执行任何操作并返回@code{nil}。否则，它构造一个自动加载对象 (@pxref{Autoload Type})，并将其存储为 @var{function} 的函数定义。  自动加载对象具有以下形式：
+
+@example
+(autoload @var{filename} @var{docstring} @var{interactive} @var{type})
+@end example
+
+例如，
+
+@example
+@group
+(symbol-function 'run-prolog)
+     @result{} (autoload "prolog" 169681 t nil)
+@end group
+@end example
+
+@noindent
+在这种情况下，@code{"prolog"}是要加载的文件的名称，169681指的是@file{emacs/etc/DOC}文件中的文档字符串（@pxref{Documentation Basics}），@code{t}表示该功能是交互式的，@code{nil}表示它不是宏或键盘映射。
+@end defun
+
+@defun autoloadp object
+如果 1⁣ 是自动加载对象，则此函数返回非 0⁣。  例如，要检查 @code{run-prolog} 是否定义为自动加载函数，请计算
+
+@smallexample
+(autoloadp (symbol-function 'run-prolog))
+@end smallexample
+@end defun
+
+@cindex autoload errors
+自动加载的文件通常包含其他定义，并且可能需要或提供一项或多项功能。  如果文件未完全加载（由于评估其内容时出现错误），则加载期间发生的任何函数定义或 @code{provide} 调用都将被撤消。  这是为了确保下次尝试从此文件调用任何自动加载函数时将再次尝试加载该文件。  如果不是这样，则文件中的某些函数可能是由中止的加载定义的，但由于缺少某些未成功加载的子例程而无法正常工作，因为它们位于文件的后面。
+
+如果自动加载的文件无法定义所需的 Lisp 函数或宏，则会通过数据 @code{"Autoloading failed to define function @var{function-name}"} 发出错误信号。
+
+@findex loaddefs-generate
+@cindex magic autoload comment
+@cindex autoload cookie
+@anchor{autoload cookie}
+神奇的自动加载注释（通常称为 @dfn{autoload cookie}）由 @samp{;;;###autoload} 组成，单独占一行，位于可自动加载源文件中函数的实际定义之前。  函数@code{loaddefs-generate}将相应的@code{autoload}调用写入@file{loaddefs.el}。 （用作自动加载 cookie 的字符串和由 @code{loaddefs-generate} 生成的文件名可以更改上述默认值，请参见下文。）构建 Emacs 会加载 @file{loaddefs.el} 并因此调用 @code{autoload}。
+
+同样的神奇注释可以将任何类型的形式复制到@file{loaddefs.el}中。  魔术注释后面的形式将被逐字复制，除非它是自动加载工具专门处理的形式，通过直接转换为 @code{autoload} 调用，或通过递归扩展宏。  任何宏都可以请求扩展自动加载，并在生成期间调用它； @xref{autoload-macro expand}。
+
+以下表格需特殊处理：
+
+@table @asis
+@item 函数或类函数对象的定义：
+@code{defun}和@code{defmacro}；还有@code{cl-defun}和@code{cl-defmacro}（@pxref{Argument Lists,,,cl,Common Lisp Extensions}）和@code{define-overloadable-function}（参见@file{mode-local.el}中的注释）。
+
+@item 主要或次要模式的定义：
+@code{define-minor-mode}、@code{define-globalized-minor-mode}、@code{define-generic-mode}、@code{define-derived-mode} 和 @code{define-compilation-mode}。
+
+@item 其他定义类型：
+@code{defcustom}、@code{defgroup}、@code{deftheme}、@code{defclass} (@pxref{Top,EIEIO,,eieio,EIEIO})、@code{define-skeleton} (@pxref{Top,Autotyping,,autotype,Autotyping})、@code{transient-define-prefix}、@code{transient-define-suffix}、@code{transient-define-infix}、@code{transient-define-argument} 和 @code{transient-define-group} （@pxref{Top,Transient,,transient,Transient User and Developer Manual}）。
+@end table
+
+您还可以使用魔术注释在构建时执行表单@emph{without}在加载文件本身时执行它。  为此，请编写 @emph{on the same line} 形式作为魔术注释。  由于它在注释中，因此当您加载源文件时它不会执行任何操作；但是@code{loaddefs-generate}将其复制到@file{loaddefs.el}，在构建Emacs时执行它。
+
+以下示例显示了如何使用神奇注释准备 @code{doctor} 进行自动加载：
+
+@example
+;;;###autoload
+(defun doctor ()
+  "Switch to *doctor* buffer and start giving psychotherapy."
+  (interactive)
+  (switch-to-buffer "*doctor*")
+  (doctor-mode))
+@end example
+
+@noindent
+这是 @file{loaddefs.el} 中产生的结果：
+
+@example
+(autoload 'doctor "doctor" "\
+Switch to *doctor* buffer and start giving psychotherapy.
+
+\(fn)" t nil)
+@end example
+
+@noindent
+@cindex @code{fn} in function's documentation string
+虽然 @file{loaddefs.el} 不用于编辑，但我们尽力保持人们的可读性。  例如，@code{defvar}值中的控制字符被转义，我们在文档字符串的双引号后立即插入反斜杠和换行符，以减少行长度。  当各种帮助函数 (@pxref{Help Functions}) 显示它时，文档字符串的用法部分中的@samp{(fn)} 会替换为函数名称。
+
+@anchor{autoload-macro expand}
+如果您使用不寻常的宏编写函数定义，该宏不是已知和公认的函数定义方法之一，则使用普通的魔术自动加载注释来调用宏将需要自动加载宏定义本身才能工作。  这样做会将整个宏定义复制到自动加载文件中。  如果不需要，您可以在宏定义 (@pxref{Declare Form}) 中使用特殊声明形式 @code{(autoload-macro expand)}，而不是自动加载它。这向自动加载系统指示应扩展对 @samp{;;;###autoload} 之后的宏的调用，类似于上面列出的特殊函数的处理方式。  例如，包装 @code{define-minor-mode} 的宏可以请求扩展，以便生成对其定义的函数的正确 @code{autoload} 调用。
+
+@cindex @code{:autoload-end}
+关键字符号 @code{:autoload-end} 可用于宏的扩展，以防止在自动加载输出中包含不需要的形式。  它的存在会导致表单中任何其他元素看起来都被默默地跳过。  例如，如果在自动加载生成期间，宏的扩展包括：
+
+@example
+(progn
+  (put my-mode 'visible-prop t)
+  :autoload-end
+  (put my-mode 'hidden-prop nil))
+@end example
+
+@noindent
+最终形式 (@w{@code{(put my-mode 'hidden-prop nil)}}) 将不会复制到自动加载文件中。
+
+请注意，如果在自动加载生成过程中发现自动加载表单的 @code{car} 中的符号未定义，则出现关联的 @samp{;;;###autoload} 的文件本身将被加载，以便为宏提供定义的机会。  因此，使用特殊加载机制（包括加载自己的 @file{@var{package}-loaddefs.el} 文件）的包应该妥善处理加载错误，因为这些文件在自动加载生成期间可能还不存在。  例如，可以通过将 @code{require} 的 @var{no-error} 参数设置为非 @code{nil} (@pxref{Named Features})) 来完成。
+
+或者，您可以通过编写以下代码将所需的 @code{autoload} 调用放入 @file{loaddefs.el} 中，而不是扩展：
+
+@example
+;;;###autoload (autoload 'foo "myfile")
+(mydefunmacro foo
+  ...)
+@end example
+
+您可以使用非默认字符串作为自动加载 cookie，并将相应的自动加载调用写入名称与默认 @file{loaddefs.el} 不同的文件中。  Emacs 提供了两个变量来控制这一点：
+
+@defvar lisp-mode-autoload-regexp
+该常量的值是与自动加载cookie匹配的正则表达式。 @code{loaddefs-generate} 将 cookie 后面的 Lisp 表单复制到它生成的自动加载文件中。  这将匹配像@samp{;;;###autoload}和@samp{;;;###calc-autoload}这样的注释。
+@end defvar
+
+@defvar generated-autoload-file
+此变量的值命名自动加载调用应所在的 Emacs Lisp 文件。  默认值是 @file{loaddefs.el}，但您可以覆盖它，例如，在 @file{.el} 文件 (@pxref{File Local Variables}) 的局部变量部分中。  假定自动加载文件包含以换页符开头的预告片。
+@end defvar
+
+以下函数可用于显式加载由自动加载对象指定的库：
+
+@defun autoload-do-load autoload &optional name macro-only
+该函数执行@var{autoload}指定的加载，它应该是一个自动加载对象。  可选参数@var{name}，如果非@code{nil}，应该是一个函数值为@var{autoload}的符号；在这种情况下，该函数的返回值是符号的新函数值。  如果可选参数@var{macro-only}的值为@code{macro}，则该函数避免加载函数，而仅加载宏。
+@end defun
+
+@node Autoload by Prefix
+@subsection 按前缀自动加载
+@cindex autoload by prefix
+
+@vindex definition-prefixes
+@vindex help-definition-prefixes
+@findex register-definition-prefixes
+@vindex autoload-compute-prefixes
+在完成命令 @code{describe-variable} 和 @code{describe-function} 期间，Emacs 将尝试加载可能包含与正在完成的前缀匹配的定义的文件。  变量@code{definition-prefixes}和@code{help-definition-prefixes}驱动这个过程。  @code{definition-prefixes} 保存一个哈希表，将前缀映射到要加载的相应文件列表，@code{help-definition-prefixes} 保存执行相同映射的基数树。  当您使用完成并且 Emacs 加载文件时，条目将从这些变量中删除，因为不需要再次加载文件。
+
+@code{definition-prefixes} 中的条目是通过调用 @code{register-definition-prefixes} 添加的，@code{register-definition-prefixes} 是由 @code{loaddefs-generate} (@pxref{Autoload}) 生成的。  不包含任何值得加载的定义的文件（例如测试文件）应将 @code{autoload-compute-prefixes} 设置为 @code{nil} 作为文件局部变量。
+
+当您开始对相关命令使用补全功能时，@code{help-definition-prefixes} 中的条目将从 @code{definition-prefixes} 中的条目添加。  在未来的某个时候，@code{help-definition-prefixes}可能会被删除，以有利于使@code{definition-prefixes}成为基数树。
+
+@node When to Autoload
+@subsection 何时使用自动加载
+@cindex autoload, when to use
+
+除非确实有必要，否则不要添加自动加载注释。自动加载代码意味着它始终是全局可见的。  一旦项目被自动加载，就没有兼容的方法可以转换回不自动加载的状态（在人们习惯于无需显式加载即可使用它之后）。
+
+@itemize
+@item 
+最常见的自动加载项目是库的交互式入口点。  例如，如果 @file{python.el} 是一个定义用于编辑 Python 代码的主模式的库，则自动加载 @code{python-mode} 函数的定义，以便人们可以简单地使用 @kbd{M-x python-mode} 来加载该库。
+
+@item 
+变量通常不需要自动加载。  一个例外是，如果变量本身通常是有用的，而无需加载整个定义库。  （一个例子可能是@code{find-exec-terminator}。）
+
+@item 
+不要自动加载用户选项以便用户可以设置它。
+
+@item 
+切勿添加自动加载 @emph{comment} 来消除另一个文件中的编译器警告。  在产生警告的文件中，使用 @code{(defvar foo)} 使未定义的变量警告静音，使用 @code{declare-function} (@pxref{Declaring Functions}) 使未定义的函数警告静音；或者需要相关的库；或使用显式自动加载@emph{statement}。
+@end itemize
+
+@node Repeated Loading
+@section 重复加载
+@cindex repeated loading
+
+您可以在 Emacs 会话中多次加载给定文件。  例如，通过在缓冲区中编辑来重写并重新安装函数定义后，您可能希望返回到原始版本；您可以通过重新加载它来自的文件来完成此操作。
+
+当您加载或重新加载文件时，请记住 @code{load} 和 @code{load-library} 函数会自动加载字节编译文件，而不是类似名称的非编译文件。  如果你重写了一个文件并打算保存并重新安装，则需要对新版本进行字节编译；否则，Emacs 将加载较旧的字节编译文件，而不是较新的未编译文件！  如果发生这种情况，加载文件时显示的消息包括@samp{(compiled; note, source is newer)}，提醒您重新编译它。
+
+在 Lisp 库文件中编写表单时，请记住该文件可能会被多次加载。  例如，考虑在重新加载库时是否应该重新初始化每个变量；如果变量已经初始化，@code{defvar} 不会更改值。  （@xref{Defining Variables}。）
+
+将元素添加到列表的最简单方法如下：
+
+@example
+(push '(leif-mode " Leif") minor-mode-alist)
+@end example
+
+@noindent
+但如果重新加载库，这会添加多个元素。  为了避免这个问题，请使用 @code{add-to-list} (@pxref{List Variables})：
+
+@example
+(add-to-list 'minor-mode-alist '(leif-mode " Leif"))
+@end example
+
+有时您会想要显式测试库是否已加载。  如果库使用 @code{provide} 提供命名功能，您可以在文件的前面使用 @code{featurep} 来测试 @code{provide} 调用是否已在之前执行过 (@pxref{Named Features})。  或者，你可以使用这样的东西：
+
+@example
+(defvar foo-was-loaded nil)
+
+(unless foo-was-loaded
+  @var{execute-first-time-only}
+  (setq foo-was-loaded t))
+@end example
+
+@noindent
+
+@node Named Features
+@section 特征
+@cindex features
+@cindex requiring features
+@cindex providing features
+
+@code{provide} 和 @code{require} 是 @code{autoload} 的替代方案，用于自动加载文件。  它们以命名为 ⁣​​3⁣ 的方式工作。  自动加载是通过调用特定函数来触发的，但是当另一个程序第一次通过名称请求某个功能时，就会加载该功能。
+
+功能名称是代表函数、变量等集合的符号。定义它们的文件应该@dfn{provide}该功能。  使用它们的另一个程序可以确保它们由 @dfn{requiring} 该功能定义。  如果尚未加载定义文件，则会加载定义文件。
+
+@cindex load error with require
+要要求存在某个功能，请使用功能名称作为参数调用 @code{require}。  @code{require} 查看全局变量 @code{features} 以查看是否已提供所需的功能。  如果没有，它会从适当的文件加载该功能。  该文件应在顶层调用@code{provide}以将功能添加到@code{features}；如果失败，@code{require} 会发出错误信号。
+
+例如，在@file{idlwave.el}中，@code{idlwave-complete-filename}的定义包括以下代码：
+
+@example
+(defun idlwave-complete-filename ()
+  "Use the comint stuff to complete a file name."
+   (require 'comint)
+   (let* ((comint-file-name-chars "~/A-Za-z0-9+@@:_.$#%=@{@}\\-")
+          (comint-completion-addsuffix nil)
+          ...)
+       (comint-dynamic-complete-filename)))
+@end example
+
+@noindent
+如果尚未加载文件 @file{comint.el}，则表达式 @code{(require 'comint)} 会加载该文件，从而确保定义 @code{comint-dynamic-complete-filename}。  功能通常以提供它们的文件命名，因此不需要为 @code{require} 提供文件名。  （请注意，重要的是 @code{require} 语句位于 @code{let} 的主体之外。在变量被 let 绑定时加载库可能会产生意想不到的后果，即变量在 let 退出后变得未绑定。）
+
+@file{comint.el} 文件包含以下顶级表达式：
+
+@example
+(provide 'comint)
+@end example
+
+@noindent
+这会将 @code{comint} 添加到全局 @code{features} 列表中，以便 @code{(require 'comint)} 从此知道不需要执行任何操作。
+
+@cindex byte-compiling @code{require}
+当 @code{require} 在文件的顶层使用时，它会在您对该文件 (@pxref{Byte Compilation}) 进行字节编译以及加载时生效。  这是为了防止所需的包包含字节编译器必须知道的宏。  它还可以避免对使用 @code{require} 加载的文件中定义的函数和变量发出字节编译器警告。
+
+尽管在字节编译期间会评估对 @code{require} 的顶级调用，但 @code{provide} 调用则不会。  因此，您可以通过包含 @code{provide} 后跟 @code{require} 来确保在字节编译之前加载定义文件，以表示相同的功能，如下例所示。
+
+@example
+@group
+(provide 'my-feature)  ; @r{Ignored by byte compiler,}
+                       ;   @r{evaluated by @code{load}.}
+(require 'my-feature)  ; @r{Evaluated by byte compiler.}
+@end group
+@end example
+
+@noindent
+编译器忽略 @code{provide}，然后通过加载相关文件来处理 @code{require}。  加载文件确实会执行 @code{provide} 调用，因此加载文件时后续的 @code{require} 调用不会执行任何操作。
+
+@defun provide feature &optional subfeatures
+此函数宣布 @var{feature} 现已加载或正在加载到当前 Emacs 会话中。  这意味着与 @var{feature} 相关的设施现在或将来可用于其他 Lisp 程序。
+
+调用 @code{provide} 的直接效果是将 @var{feature} 添加到 @code{features} 的前面（如果它尚未在该列表中），并调用等待它的任何 @code{eval-after-load} 代码 (@pxref{Hooks for Loading})。  参数 @var{feature} 必须是一个符号。 @code{provide} 返回@var{feature}。
+
+如果提供，@var{subfeatures}应该是一个符号列表，指示此版本的@var{feature}提供的一组特定子功能。  您可以使用 @code{featurep} 测试子功能是否存在。  子功能的想法是，当一个包（一个@var{feature}）足够复杂以至于可以为包的各个部分或功能命名时使用它们，这些部分或功能可能会被加载，也可能不会被加载，或者可能会或可能不会出现在给定版本中。  以@xref{Network Feature Testing}为例。
+
+@example
+features
+     @result{} (bar bish)
+
+(provide 'foo)
+     @result{} foo
+features
+     @result{} (foo bar bish)
+@end example
+
+当加载文件以满足自动加载的要求时，由于评估其内容时出现错误而停止，加载期间发生的任何函数定义或 @code{provide} 调用都将被撤消。 @xref{Autoload}。
+@end defun
+
+@defun require feature &optional filename noerror
+该函数检查当前 Emacs 会话中是否存在 @var{feature}（使用 @code{(featurep @var{feature})}；见下文）。  参数 @var{feature} 必须是一个符号。
+
+如果该功能不存在，则 @code{require} 会使用 @code{load} 加载 @var{filename}。  如果未提供 @var{filename}，则符号 @var{feature} 的名称将用作要加载的基本文件名。然而，在这种情况下，@code{require}坚持寻找带有添加的@samp{.el}或@samp{.elc}后缀（可能用压缩后缀扩展）的@var{feature}；名称仅为 9⁣ 的文件将不会被使用。  （变量 @code{load-suffixes} 指定了所需的确切 Lisp 后缀。）
+
+如果@var{noerror}非@code{nil}，则可以抑制文件实际加载时出现的错误。  在这种情况下，如果加载文件失败，@code{require}将返回@code{nil}。  通常，@code{require} 返回 @var{feature}。
+
+如果加载文件成功但未提供 @var{feature}，则 @code{require} 会发出有关缺少功能的错误信号。
+@end defun
+
+@defun require-with-check feature &optional filename noerror
+此函数的工作方式与 @code{require} 类似，除非 @var{feature} 已加载（即 @: 已是 @code{features} 中列表的成员，见下文）。  如果 @var{feature} 已加载，此函数会检查 @var{feature} 是否由与 @var{filename} 不同的文件提供，如果是，则默认发出错误信号。  如果可选参数@var{noerror}的值为@code{reload}，则该函数不会发出错误信号，而是强制重新加载@var{filename}；如果 @var{noerror} 是其他非 @code{nil} 值，则该函数会发出有关 @var{feature} 已由另一个文件提供的警告。
+@end defun
+
+@defun featurep feature &optional subfeature
+如果当前 Emacs 会话中已提供 @var{feature}（即，如果 @var{feature} 是 @code{features} 的成员），则此函数返回 @code{t}。如果 @var{subfeature} 不是 - @code{nil}，则仅当也提供了该子功能时，该函数才返回 @code{t}（即，如果 @var{subfeature} 是@var{feature} 符号的 @code{subfeature} 属性的成员。）
+@end defun
+
+@defvar features
+该变量的值是符号列表，这些符号是当前 Emacs 会话中加载的功能。  每个符号都通过调用 @code{provide} 放入此列表中。  @code{features} 列表中元素的顺序并不重要。
+@end defvar
+
+@cindex loading and configuring features
+@code{use-package} 宏提供了一种加载功能并对其进行配置以供使用的便捷方法。  它提供了一种将需要的功能（如 @code{require} 所做的）与实际加载该功能时运行的代码结合起来的方法，类似于加载时挂钩 (@pxref{Hooks for Loading})。  @code{use-package} 的声明性语法使其在用户初始化文件中使用起来非常容易。
+
+@defmac use-package feature &rest args
+该宏指定如何加载命名的@var{feature}以及如何配置和自定义它以供使用。  参数 @var{args} 是关键字-值对。  一些重要的关键字及其值是：
+
+@table @code
+@item :init @var{forms}
+指定 @var{forms} 在加载 @var{feature} 之前执行。
+
+@item :config @var{forms}
+指定 @var{forms} 在加载 @var{feature} 之后执行。
+
+@item :defer @var{condition}
+如果@var{condition}非@code{nil}，则指定推迟加载@var{feature}，直到首次使用@var{feature}的任何自动加载命令或变量。  如果@var{condition}是数字@var{n}，则它指定应在@var{n}秒空闲时间后加载@var{feature}。
+
+@item :commands @var{commands}@dots{}
+指定要自动加载的 @var{feature} 命令。
+
+@item :bind @var{keybindings}@dots{}
+为@var{feature}s 命令指定@var{keybindings}。  每个绑定都有以下形式
+
+@lisp
+(@var{key-sequence} . @var{command})
+@end lisp
+@noindent
+或者
+@lisp
+(:map @var{keymap} (@var{key-sequence} . @var{command}))
+@end lisp
+
+@noindent
+其中@var{key-sequence}采用@code{kbd}宏(@pxref{Key Sequences})接受的形式。
+@end table
+
+有关@code{use-package}的更多详细信息，请参阅@ref{Top,,, use-package, use-package User Manual}。
+@end defmac
+
+
+@node Where Defined
+@section 哪个文件定义了某个符号
+@cindex symbol, where defined
+@cindex where was a symbol defined
+
+@defun symbol-file symbol &optional type native-p
+该函数返回定义@var{symbol}的文件的名称。如果@var{type}是@code{nil}，那么任何类型的定义都是可以接受的。如果@var{type}是@code{defun}、@code{defvar}或@code{defface}，则仅指定函数定义、变量定义或面定义。
+
+该值通常是绝对文件名。  如果定义不与任何文件关联，它也可以是@code{nil}。  如果@var{symbol}指定自动加载函数，则该值可以是不带扩展名的相对文件名。
+
+如果可选的第三个参数 @var{native-p} 不是 @code{nil}，并且 Emacs 是使用本机编译支持 (@pxref{Native Compilation}) 构建的，则此函数将尝试查找定义 @var{symbol} 的 @file{.eln} 文件，而不是 @file{.elc} 或 @file{.el} 文件。  如果找到这样的@file{.eln}文件并且没有过期，该函数将返回其绝对文件名；否则它将报告源文件或字节编译文件的名称。
+@end defun
+
+@code{symbol-file} 的基础是变量 @code{load-history} 中的数据。
+
+@defvar load-history
+该变量的值是一个列表，它将加载的库文件的名称与它们定义的函数和变量的名称以及它们提供或需要的功能相关联。
+
+该列表中的每个元素描述一个加载的库（包括启动时预加载的库）。  它是一个列表，其中 @sc{car} 是库的绝对文件名（字符串）。  其余列表元素具有以下形式：
+
+@table @code
+@item @var{var}
+符号 @var{var} 被定义为变量。
+@item (defun . @var{fun})
+定义了函数@var{fun}。 @code{(defun . @var{fun})}，表示将@var{fun}定义为函数。
+@item (defface . @var{face})
+定义了面 @var{face}。
+@item (require . @var{feature})
+需要特征@var{feature}。
+@item (provide . @var{feature})
+提供了特征@var{feature}。
+@item (cl-defmethod @var{method} @var{specializers})
+命名的 @var{method} 是通过使用 @code{cl-defmethod} 定义的，并以 @var{specializers} 作为其特化器。
+@item (define-type . @var{type})
+定义了类型@var{type}。
+@end table
+
+@code{load-history} 的值可以有一个 @sc{car} 为 @code{nil} 的元素。  该元素描述了在不访问文件的缓冲区上使用 @code{eval-buffer} 所做的定义。
+@end defvar
+
+命令 @code{eval-region} 更新 @code{load-history}，但通过添加定义到正在访问的文件的元素的符号来实现，而不是替换该元素。  @xref{Eval}。
+
+@kindex function-history @r{(function symbol property)}
+除了@code{load-history}之外，每个函数都在符号属性@code{function-history}中跟踪自己的历史记录。在这方面对函数进行特殊处理的原因是，函数通常在两个不同的文件中分两步定义（通常其中一个是自动加载），因此为了能够正确地@emph{unload}一个文件，我们需要更准确地知道该文件对函数定义做了什么。
+
+符号属性@code{function-history}包含@w{@code{(@var{file1} @var{def2} @var{file2} @var{def3} ...)}}形式的列表，其中@var{file1}是最后一个更改定义的文件，@var{def2}是@var{file1}之前的定义，由@var{file2}等设置。从逻辑上讲，此列表应以定义此函数的第一个文件的名称结尾，但为了节省空间，通常省略最后一个元素。
+
+@node Unloading
+@section 卸货
+@cindex unloading packages
+
+您可以丢弃库加载的函数和变量，为其他 Lisp 对象回收内存。  为此，请使用函数 @code{unload-feature}：
+
+@deffn Command unload-feature feature &optional force
+此命令卸载提供功能@var{feature}的库。它取消定义在该库中使用 @code{defun}、@code{defalias}、@code{defsubst}、@code{defmacro}、@code{defconst}、@code{defvar} 和 @code{defcustom} 定义的所有函数、宏和变量。然后它会恢复以前与这些符号关联的所有自动加载。 （加载会将它们保存在符号的 @code{function-history} 属性中。）
+
+在恢复以前的定义之前，@code{unload-feature}运行@code{remove-hook}以从某些钩子中删除库定义的函数。  这些钩子包括名称以 @samp{-hook}（或已弃用的后缀 @samp{-hooks}）结尾的变量，以及 @code{unload-feature-special-hooks} 和 @code{auto-mode-alist} 中列出的变量。  这是为了防止 Emacs 停止运行，因为重要的钩子引用了不再定义的函数。
+
+标准卸载活动还会撤消该库中函数的 ELP 分析，取消提供该库提供的任何功能，并取消该库定义的变量中保存的计时器。
+
+@vindex @var{feature}-unload-function
+如果这些措施不足以防止故障，库可以定义一个名为 @code{@var{feature}-unload-function} 的显式卸载器。如果该符号被定义为函数，则 @code{unload-feature} 在执行其他操作之前不带参数调用它。  它可以执行任何适当的操作来卸载库。  如果它返回@code{nil}，则@code{unload-feature}继续执行正常的卸载操作。否则它认为工作已完成。
+
+通常，@code{unload-feature} 拒绝卸载其他已加载库所依赖的库。  （如果 @var{a} 包含 @var{b} 的 @code{require}，则库 @var{a} 依赖于库 @var{b}。）如果可选参数 @var{force} 为非 @code{nil}，则依赖项将被忽略，您可以卸载任何库。
+@end deffn
+
+@code{unload-feature} 函数是用 Lisp 编写的；它的动作基于变量@code{load-history}。
+
+@defvar unload-feature-special-hooks
+该变量保存在卸载库之前要扫描的钩子列表，以删除库中定义的函数。
+@end defvar
+
+@node Hooks for Loading
+@section 装载挂钩
+@cindex loading hooks
+@cindex hooks for loading
+
+您可以使用变量 @code{after-load-functions} 要求每次 Emacs 加载库时执行代码：
+
+@defvar after-load-functions
+该异常钩子在加载文件后运行。  挂钩中的每个函数都使用单个参数调用，即刚刚加载的文件的绝对文件名。
+@end defvar
+
+如果您希望在加载 @emph{particular} 库时执行代码，请使用宏 @code{with-eval-after-load}：
+
+@defmac with-eval-after-load library body@dots{}
+该宏安排在每次加载 @var{library} 时，在加载文件 @var{library} 结束时评估 @var{body}。  如果 @var{library} 已经加载，它会立即评估 @var{body}。
+
+通常 @var{library} 是一个特征（即符号），在这种情况下 @var{body} 在调用 @code{(provide @var{library})} 的任何文件的末尾进行计算。
+
+@var{library} 也可以是文件名（即字符串）。您不需要在文件名中给出目录或扩展名@var{library}。  通常，您只需提供一个简单的文件名，如下所示：
+
+@example
+(with-eval-after-load "js" (keymap-set js-mode-map "C-c C-c" 'js-eval))
+@end example
+
+要限制哪些文件可以触发评估，请在 @var{library} 中包含目录或扩展名或两者。  只有绝对名称与所有给定名称组件匹配的文件才会匹配。在以下示例中，某个目录 @code{..../foo/bar} 中的 @file{my_inst.elc} 或 @file{my_inst.elc.gz} 将触发求值，但 @file{my_inst.el} 不会：
+
+@example
+(with-eval-after-load "foo/bar/my_inst.elc" @dots{})
+@end example
+
+@var{body} 中的错误不会撤消加载，但会阻止执行 @var{body} 的其余部分。
+@end defmac
+
+通常，设计良好的 Lisp 程序不应该使用@code{with-eval-after-load}。  如果您需要检查和设置另一个库中定义的变量（那些供外部使用的变量），您可以立即执行此操作，无需等到库加载。  如果需要调用该库定义的函数，则应该加载该库，最好使用 @code{require} (@pxref{Named Features})。
+
+@node Dynamic Modules
+@section Emacs 动态模块
+@cindex dynamic modules
+
+@dfn{dynamic Emacs module} 是一个共享库，它提供了在 Emacs Lisp 程序中使用的附加功能，就像用 Emacs Lisp 编写的包一样。
+
+加载 Emacs Lisp 包的函数也可以加载动态模块。  他们通过查看文件扩展名（又名@:“后缀”）来识别动态模块。  该后缀与平台相关。
+
+@defvar module-file-suffix
+该变量保存模块文件的文件扩展名的系统相关值。  在 POSIX 主机上其值为 @file{.so}，在 macOS 上为 @file{.dylib}，在 MS-Windows 上为 @file{.dll}。
+@end defvar
+
+在 macOS 上，除了 1⁣ 之外，动态模块还可以具有后缀 @file{.so}。
+
+@findex emacs_module_init
+@vindex plugin_is_GPL_compatible
+每个动态模块都应导出一个名为 @code{emacs_module_init} 的 C 可调用函数，Emacs 将在调用加载模块的 @code{load} 或 @code{require} 时调用该函数。  它还应该导出一个名为 @code{plugin_is_GPL_compatible} 的符号，以表明其代码是在 GPL 或兼容许可证下发布的；如果您的程序尝试加载不导出此类符号的模块，Emacs 将发出错误信号。
+
+如果模块需要调用 Emacs 函数，则应通过作为 Emacs 发行版一部分的头文件 @file{emacs-module.h} 中定义和记录的@acronym{API}（应用程序编程接口）来执行此操作。  @xref{Writing Dynamic Modules}，了解在编写自己的模块时使用该 API 的详细信息。
+
+@cindex user-ptr object
+@cindex user pointer object
+模块可以创建 @code{user-ptr} Lisp 对象，该对象嵌入指向模块定义的 C 结构体的指针。  这对于保留模块创建的复杂数据结构非常有用，并将其传递回模块的函数。  用户指针对象还可以具有关联的@dfn{finalizers}——对象被 GC 时运行的函数；这对于释放为底层数据结构分配的任何资源非常有用，例如内存、打开的文件描述符等。@xref{Module Values}。
+
+@defun user-ptrp object
+如果该函数的参数是 @code{user-ptr} 对象，则返回 @code{t}。
+@end defun
+
+@defun module-load file
+Emacs 调用这个低级原语来从指定的 @var{file} 加载模块并执行模块的必要初始化。  这是确保模块导出 @code{plugin_is_GPL_compatible} 符号、调用模块的 @code{emacs_module_init} 函数的原语，并在该函数返回错误指示或用户在初始化期间键入 @kbd{C-g} 时发出错误信号。  如果初始化成功，@code{module-load}返回@code{t}。  请注意，@var{file} 必须已经具有正确的文件扩展名，因为与@code{load} 不同，此函数不会尝试查找具有已知扩展名的文件。
+
+与 0⁣ 不同，@code{module-load} 不会在 @code{load-history} 中记录模块，不会打印任何消息，并且不会防止递归加载。  因此，大多数用户应该使用 @code{load}、@code{load-file}、@code{load-library} 或 @code{require} 而不是 @code{module-load}。
+@end defun
+
+Emacs 中的可加载模块通过在配置时使用 @kbd{--with-modules} 选项来启用。

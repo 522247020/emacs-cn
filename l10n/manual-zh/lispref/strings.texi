@@ -1,0 +1,1070 @@
+@c -*- mode: texinfo; coding: utf-8 -*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Strings and Characters
+@chapter 字符串和字符
+@cindex strings
+@cindex character arrays
+@cindex characters
+@cindex bytes
+
+Emacs Lisp 中的字符串是一个包含有序字符序列的数组。  字符串用作符号、缓冲区和文件的名称；向用户发送消息；保存在缓冲区之间复制的文本；以及许多其他目的。  由于字符串非常重要，Emacs Lisp 有许多专门用于操作字符串的函数。  Emacs Lisp 程序使用字符串比单个字符更频繁。
+
+@xref{Strings of Events}，用于键盘字符事件字符串的特殊考虑。
+
+@menu
+* Basics: String Basics.       字符串和字符的基本属性。
+* Predicates for Strings::     测试对象是字符串还是字符。
+* Creating Strings::           分配新字符串的函数。
+* Modifying Strings::          更改现有字符串的内容。
+* Text Comparison::            比较字符或字符串。
+* String Conversion::          字符和字符串之间的转换。
+* Formatting Strings::         @code{format}：Emacs 的@code{printf} 类似物。
+* Custom Format Strings::      格式化自定义 @code{format} 规格。
+* Case Conversion::            大小写转换函数。
+* Case Tables::                自定义大小写转换。
+@end menu
+
+@node String Basics
+@section 字符串和字符基础知识
+
+字符是一个 Lisp 对象，代表文本的单个字符。  在 Emacs Lisp 中，字符只是整数；整数是否是字符仅取决于它的使用方式。 @xref{Character Codes}，有关 Emacs 中字符表示的详细信息。
+
+字符串是固定的字符序列。  它是一种称为 @dfn{array} 的序列类型，这意味着它的长度是固定的，一旦创建就无法更改 (@pxref{Sequences Arrays Vectors})。  与 C 不同，Emacs Lisp 字符串以 @emph{not} 不同的字符代码结尾。
+
+由于字符串是数组，因此也是序列，因此您可以使用 @ref{Sequences Arrays Vectors} 中记录的通用数组和序列函数对它们进行操作。  例如，您可以使用函数 @code{aref} (@pxref{Array Functions}) 访问字符串中的各个字符。
+
+Emacs 字符串（和缓冲区）中的非 0⁣ 字符有两种文本表示形式：单字节和多字节。对于大多数 Lisp 编程，您不需要关心这两种表示形式。  @xref{Text Representations}，了解详情。
+
+有时按键序列表示为单字节字符串。  当单字节字符串是键序列时，128 到 255 范围内的字符串元素表示元字符（它们是大整数），而不是 128 到 255 范围内的字符代码。字符串不能包含具有 hyper、super 或 alt 修饰符的字符；它们可以容纳 @acronym{ASCII} 控制字符，但不能容纳其他控制字符。它们不区分 @acronym{ASCII} 控制字符的大小写。如果要将此类字符存储在序列（例如按键序列）中，则必须使用向量而不是字符串。  @xref{Character Type}，有关键盘输入字符的更多信息。
+
+字符串对于保存正则表达式很有用。  您还可以使用 @code{string-match} (@pxref{Regexp Search}) 将正则表达式与字符串进行匹配。  函数 @code{match-string} (@pxref{Simple Match Data}) 和 @code{replace-match} (@pxref{Replacing Match}) 对于在匹配正则表达式后分解和修改字符串非常有用。
+
+与缓冲区一样，字符串可以包含其中字符的文本属性以及字符本身。  @xref{Text Properties}。所有将文本从字符串复制到缓冲区或其他字符串的 Lisp 原语也会复制所复制字符的属性。
+
+@xref{Text}，有关显示字符串或将字符串复制到缓冲区的函数的信息。  @xref{Character Type} 和 @ref{String Type}，了解有关字符和字符串语法的信息。 @xref{Non-ASCII Characters}，用于在文本表示之间进行转换以及对字符代码进行编码和解码的函数。另请注意，@code{length} 应该使用 @emph{not} 来计算显示字符串的宽度；使用 @code{string-width} (@pxref{Size of Displayed Text}) 代替。
+
+@node Predicates for Strings
+@section 字符串谓词
+@cindex predicates for strings
+@cindex string predicates
+
+有关一般序列和数组谓词的更多信息，请参阅@ref{Sequences Arrays Vectors}和@ref{Arrays}。
+
+@defun stringp object
+如果 1⁣ 是字符串，则该函数返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@defun string-or-null-p object
+如果 1⁣ 是字符串或 2⁣，则此函数返回 @code{t}。  否则返回@code{nil}。
+@end defun
+
+@defun char-or-string-p object
+如果 1⁣ 是字符串或字符（即整数），则该函数返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@node Creating Strings
+@section 创建字符串
+@cindex creating strings
+@cindex string creation
+
+以下函数可以从头开始创建字符串，也可以通过将字符串放在一起或将它们分开来创建字符串。  （对于根据其他字符串的修改内容创建字符串的函数，例如 @code{string-replace} 和 @code{replace-regexp-in-string}，请参阅 @ref{Search and Replace}。）
+
+@defun make-string count character &optional multibyte
+该函数返回一个由 @var{count} 重复 @var{character} 组成的字符串。  如果 2⁣ 为负，则会发出错误信号。
+
+@example
+(make-string 5 ?x)
+     @result{} "xxxxx"
+(make-string 0 ?x)
+     @result{} ""
+@end example
+
+通常，如果 @var{character} 是 @acronym{ASCII} 字符，则结果是单字节字符串。  但如果可选参数 @var{multibyte} 不是 @code{nil}，则该函数将生成一个多字节字符串。  当您稍后需要将结果与非 @acronym{ASCII} 字符串连接或将其某些字符替换为非 @acronym{ASCII} 字符时，这非常有用。
+
+与此比较的其他函数包括 @code{make-vector} (@pxref{Vectors}) 和 @code{make-list} (@pxref{Building Lists})。
+@end defun
+
+@defun string &rest characters
+这将返回一个包含字符 @var{characters} 的字符串。
+
+@example
+(string ?a ?b ?c)
+     @result{} "abc"
+@end example
+@end defun
+
+@defun substring string &optional start end
+此函数返回一个新字符串，该字符串由 @var{string} 中的字符组成，范围从（并包括）索引 @var{start} 处的字符到（但不包括）索引 @var{end} 处的字符。  第一个字符位于索引零处。  通过一个参数，该函数仅复制 @var{string}。
+
+@example
+@group
+(substring "abcdefg" 0 3)
+     @result{} "abc"
+@end group
+@end example
+
+@noindent
+在上面的示例中，@samp{a} 的索引为 0，@samp{b} 的索引为 1，@samp{c} 的索引为 2。索引 3（字符串中的第四个字符）标记子字符串复制到的字符位置。  因此，@samp{abc}是从字符串@code{"abcdefg"}复制的。
+
+负数从字符串末尾开始计数，因此 @minus{}1 表示字符串最后一个字符的索引。  例如：
+
+@example
+@group
+(substring "abcdefg" -3 -1)
+     @result{} "ef"
+@end group
+@end example
+
+@noindent
+在此示例中，@samp{e} 的索引为@minus{}3，@samp{f} 的索引为@minus{}2，@samp{g} 的索引为@minus{}1。因此，包括@samp{e}和@samp{f}，并且排除@samp{g}。
+
+当@code{nil}用于@var{end}时，它代表字符串的长度。  因此，
+
+@example
+@group
+(substring "abcdefg" -3 nil)
+     @result{} "efg"
+@end group
+@end example
+
+省略参数 @var{end} 相当于指定 @code{nil}。由此可见 @code{(substring @var{string} 0)} 返回所有 @var{string} 的副本。
+
+@example
+@group
+(substring "abcdefg" 0)
+     @result{} "abcdefg"
+@end group
+@end example
+
+@noindent
+但我们建议为此目的使用 @code{copy-sequence} (@pxref{Sequence Functions})。
+
+如果从 @var{string} 复制的字符具有文本属性，则这些属性也会复制到新字符串中。  @xref{Text Properties}。
+
+@code{substring} 还接受第一个参数的向量。例如：
+
+@example
+(substring [a b (c) "d"] 1 3)
+     @result{} [b (c)]
+@end example
+
+如果 1⁣ 不是整数或者 2⁣ 既不是整数也不是 3⁣，则会发出 @code{wrong-type-argument} 错误信号。  如果 5⁣ 指示 6⁣ 之后的字符，或者任一整数超出 7⁣ 的范围，则会发出 @code{args-out-of-range} 错误信号。
+
+将此函数与 @code{buffer-substring} (@pxref{Buffer Contents}) 进行对比，后者返回一个包含当前缓冲区中文本的一部分的字符串。  字符串的开头位于索引 0 处，但缓冲区的开头位于索引 1 处。
+@end defun
+
+@defun substring-no-properties string &optional start end
+这与 @code{substring} 类似，但会丢弃值中的所有文本属性。  此外，@var{start} 可以省略或@code{nil}，它相当于 0。因此，@w{@code{(substring-no-properties @var{string})}} 返回 @var{string} 的副本，并删除所有文本属性。
+@end defun
+
+@defun concat &rest sequences
+@cindex copying strings
+@cindex concatenating strings
+此函数返回一个由传递给它的参数中的字符组成的字符串（及其文本属性，如果有）。  参数可以是字符串、数字列表或数字向量；他们本身并没有改变。  如果 @code{concat} 未接收任何参数，则返回空字符串。
+
+@example
+(concat "abc" "-def")
+     @result{} "abc-def"
+(concat "abc" (list 120 121) [122])
+     @result{} "abcxyz"
+;; @r{@code{nil} is an empty sequence.}
+(concat "abc" nil "-def")
+     @result{} "abc-def"
+(concat "The " "quick brown " "fox.")
+     @result{} "The quick brown fox."
+(concat)
+     @result{} ""
+@end example
+
+@noindent
+此函数并不总是分配新字符串。  建议调用者不要依赖结果是新字符串，也不依赖它是现有字符串的 @code{eq}。
+
+特别是，改变返回值可能会无意中更改另一个字符串，更改程序中的常量字符串，甚至引发错误。  要获得可以安全变异的字符串，请在结果上使用 @code{copy-sequence}。
+
+如果您需要创建由给定源字符串 @var{source} 的 @var{n} 副本组成的字符串，则可以使用 @code{concat}，如下所示：
+
+@lisp
+  (apply #'concat (make-list @var{n} @var{source}))
+@end lisp
+
+@noindent
+这利用了 @code{concat} 可以采用任何类型的序列作为其参数的事实。
+
+有关其他串联函数的信息，请参阅@ref{Mapping Functions}中的@code{mapconcat}、@ref{Vector Functions}中的@code{vconcat}和@ref{Building Lists}中的@code{append}的描述。  要将各个命令行参数连接成字符串以用作 shell 命令，请参阅@ref{Shell Arguments, combine-and-quote-strings}。
+@end defun
+
+@defun split-string string &optional separators omit-empty trim
+该函数根据正则表达式 @var{separators} (@pxref{Regular Expressions}) 将 @var{string} 拆分为子字符串。  @var{separators} 的每个匹配定义一个分裂点；将分割点之间的子串制成一个列表并返回。
+
+如果 @var{separators} 为 @code{nil}（或省略），则默认值为 @code{split-string-default-separators} 的值，并且该函数的行为就像 @var{omit-empty} 为 @code{t} 一样。
+
+如果@var{omit-empty}是@code{nil}（或省略），则只要@var{separators}有两个连续匹配项，或者匹配项与@var{string}的开头或结尾相邻，结果就包含空字符串。  如果 @var{omit-empty} 是 @code{t}，则结果中将省略这些空字符串。
+
+如果可选参数@var{trim}不​​是@code{nil}，则它应该是一个正则表达式，用于匹配要从每个子字符串的开头和结尾修剪的文本。  如果如上所述 @var{omit-empty} 是 @code{t}，修剪可能会使子字符串为空并从结果中省略。
+
+如果您需要将字符串拆分为适合 @code{call-process} 或 @code{start-process} 的单独命令行参数列表，请参阅@ref{Shell Arguments, split-string-and-unquote}。
+
+不要使用与空字符串匹配的 @var{separators} 值，否则结果将不可预测。  要将字符串拆分为单个字符，请使用 @code{string-to-list} 或 @code{string-to-vector}。
+
+示例：
+
+@example
+@group
+(split-string "  one  two   ")            @result{} ("one" "two")
+(split-string "one::two:" ":")            @result{} ("one" "" "two" "")
+(split-string "one::two:" ":+")           @result{} ("one" "two" "")
+(split-string "one::two:" ":" t)          @result{} ("one" "two")
+(split-string "one: : two : " ":" t " +") @result{} ("one" "two")
+@end group
+@end example
+@end defun
+
+@defvar split-string-default-separators
+@code{split-string} 的默认值为@var{separators}。  它的通常值为@w{@code{"[ \f\t\n\r\v]+"}}。
+@end defvar
+
+@defun string-clean-whitespace string
+通过将空白区域折叠为单个空格字符来清理 @var{string} 中的空白，并删除 @var{string} 开头和结尾的所有空白。
+@end defun
+
+@defun string-trim-left string &optional regexp
+从 @var{string} 中删除与 @var{regexp} 匹配的前导文本。 @var{regexp} 默认为 @samp{[ \t\n\r]+}。
+@end defun
+
+@defun string-trim-right string &optional regexp
+从 @var{string} 中删除与 @var{regexp} 匹配的尾随文本。 @var{regexp} 默认为 @samp{[ \t\n\r]+}。
+@end defun
+
+@defun string-trim string &optional trim-left trim-right
+从 @var{string} 中删除与 @var{trim-left} 匹配的前导文本和与 @var{trim-right} 匹配的尾随文本。  两个正则表达式都默认为 @samp{[ \t\n\r]+}。
+@end defun
+
+@defun string-fill string width
+尝试自动换行 @var{string}，使其显示的行不宽于 @var{width}。  仅在空白边界上进行填充。如果存在比 @var{width} 长的单个单词，这些单词将不会被缩短，因此在这种情况下，@var{string} 可能会以比 @var{width} 宽的线条显示。
+@end defun
+
+@defun string-limit string length &optional end coding-system
+如果 @var{string} 短于 @var{length} 个字符，则按原样返回 @var{string}。  否则，返回由前 @var{length} 字符组成的 @var{string} 子字符串。  如果给出了可选的 @var{end} 参数，则返回 @var{length} 最后一个字符的字符串。
+
+如果@var{coding-system}非@code{nil}，@var{string}将在限制之前进行编码，结果将是一个比@code{length}字节短的单字节字符串。  如果 @var{string} 包含编码为多个字节的字符（例如，使用 @code{utf-8} 时），则生成的单字节字符串永远不会在字符表示形式的中间被截断。
+
+此函数以字符或字节为单位测量字符串长度，因此如果您需要缩短字符串以进行显示，则通常不合适；使用 @code{truncate-string-to-width} 或 @code{window-text-pixel-size} 或 @code{string-glyph-split} 代替 (@pxref{Size of Displayed Text})。
+@end defun
+
+@defun string-lines string &optional omit-empty keep-newlines
+将 @var{string} 拆分为换行符边界上的字符串列表。  如果可选参数@var{omit-empty}非@code{nil}，则从结果中删除空行。  如果可选参数 @var{keep-newlines} 不是 @code{nil}，则不要从结果字符串中删除尾随换行符。
+@end defun
+
+@defun string-pad string length &optional padding start
+使用 @var{padding} 作为填充字符将 @var{string} 填充为给定的 @var{length}。  @var{padding} 默认为空格字符。  如果@var{string}长于@var{length}，则不进行填充。  如果@var{start}为@code{nil}或省略，则填充将附加到@var{string}的字符，如果它不是@code{nil}，则填充将附加到@var{string}的字符。
+@end defun
+
+@defun string-chop-newline string
+从 @var{string} 中删除最后的换行符（如果有）。
+@end defun
+
+@node Modifying Strings
+@section 修改字符串
+@cindex modifying strings
+@cindex string modification
+
+您可以通过本节中描述的操作更改可变字符串的内容。  @xref{Mutability}。
+
+更改现有字符串内容的最基本方法是使用 @code{aset} (@pxref{Array Functions})。  @w{@code{(aset @var{string} @var{idx} @var{char})}} 将 @var{char} 存储到 @var{string} 的字符索引 @var{idx} 处。  当@var{string}是单字节字符串（@pxref{Text Representations}）时，@var{char}必须是单字节（0--255）；当 9⁣ 是多字节时，@var{char} 和 @var{idx} 处的前一个字符都必须是 ASCII (0--127)。
+
+要清除包含密码的字符串，请使用 @code{clear-string}：
+
+@defun clear-string string
+这使得 @var{string} 成为单字节字符串，将其内容清除为空字符，并删除所有文本属性。  它还可能改变@var{string}的长度。
+@end defun
+
+要修改字符串的文本属性，请使用@ref{Changing Properties}中描述的函数。
+
+@need 2000
+@node Text Comparison
+@section 字符和字符串的比较
+@cindex string equality
+@cindex text comparison
+@cindex string comparison
+
+@cindex compare characters
+@defun char-equal character1 character2
+如果参数表示相同字符，则该函数返回 @code{t}，否则返回 @code{nil}。  如果 @code{case-fold-search} 为非 @code{nil}，此函数会忽略差异。
+
+@example
+(char-equal ?x ?x)
+     @result{} t
+(let ((case-fold-search nil))
+  (char-equal ?x ?X))
+     @result{} nil
+@end example
+@end defun
+
+@cindex compare strings
+@defun string-equal string1 string2
+如果两个字符串的字符完全匹配，则该函数返回@code{t}。  符号也可以作为参数，在这种情况下使用符号名称。  无论@code{case-fold-search}如何，大小写始终很重要。
+
+此函数相当于比较两个字符串 (@pxref{Equality Predicates}) 的 @code{equal}。  特别是，两个字符串的文本属性被忽略；如果您需要区分仅文本属性不同的字符串，请使用 @code{equal-including-properties}。  但是，与 3⁣ 不同，如果任一参数不是字符串或符号，则 4⁣ 会发出错误信号。
+
+@example
+(string-equal "abc" "abc")
+     @result{} t
+(string-equal "abc" "ABC")
+     @result{} nil
+(string-equal "ab" "ABC")
+     @result{} nil
+@end example
+
+单字节和多字节字符串在 0⁣ 意义上是相等的，当且仅当它们包含相同的字符代码序列且全部在 0--127 (@acronym{ASCII}) 范围内时。 @xref{Text Representations}。
+@end defun
+
+@defun string= string1 string2
+@code{string=} 是@code{string-equal} 的另一个名称。
+@end defun
+
+@cindex case-insensitive string comparison
+@defun string-equal-ignore-case string1 string2
+@code{string-equal-ignore-case} 比较字符串时忽略大小写差异，就像 @code{case-fold-search} 为 @code{t} 时的 @code{char-equal} 一样。
+@end defun
+
+@cindex locale-dependent string equivalence
+@defun string-collate-equalp string1 string2 &optional locale ignore-case
+如果 @var{string1} 和 @var{string2} 相对于指定 @var{locale} 的排序规则（默认为当前系统区域设置）相等，则此函数返回 @code{t}。  排序规则不仅由 @var{string1} 和 @var{string2} 中包含的字符的字典顺序决定，还由有关这些字符之间关系的进一步规则决定。  通常，它由 Emacs 运行的语言环境和 Emacs 所链接的标准 C 库定义@footnote{ For more information about collation rules and their locale dependencies, see @uref{https://unicode.org/reports/tr10/, The Unicode Collation Algorithm}.  Some Standard C libraries, such as the @acronym{GNU} C Library (a.k.a.@: @dfn{glibc}) implement large portions of the Unicode Collation Algorithm and use the associated locale data, Common Locale Data Repository, or @acronym{CLDR}. }。
+
+例如，具有不同代码点但具有相同含义的字符（如不同的重音 Unicode 字符）在某些语言环境中可能被视为相等：
+
+@example
+@group
+(string-collate-equalp (string ?\uFF40) (string ?\u1FEF))
+     @result{} t
+@end group
+@end example
+
+可选参数 @var{locale} 是一个字符串，它会覆盖当前区域设置标识符的排序规则设置。  该值取决于系统； a @var{locale} @code{"en_US.UTF-8"} 适用于 POSIX 系统，而@code{"enu_USA.1252"} 适用于 MS-Windows 系统。
+
+如果@var{ignore-case}非@code{nil}，则通过将字符转换为小写来不区分大小写地进行比较。  但是，如果底层系统库不提供特定于区域设置的排序规则，则此函数将回退到 @code{string-equal}，在这种情况下，@var{ignore-case} 参数将被忽略，并且比较将始终区分大小写。
+
+@vindex w32-collate-ignore-punctuation
+要在 MS-Windows 系统上模拟 Unicode 兼容排序规则，请将 @code{w32-collate-ignore-punctuation} 绑定到非 @code{nil} 值，因为语言环境的代码集部分在 MS-Windows 上不能为 @code{"UTF-8"}。
+
+如果您的系统不支持语言环境，则此函数的行为类似于 @code{string-equal}。
+
+@emph{not} 使用此函数来比较文件名是否相等，因为文件系统通常不支持排序规则实现的字符串的语言等效性。
+@end defun
+
+@cindex lexical comparison of strings
+@anchor{definition of string-lessp}
+@defun string-lessp string1 string2
+该函数一次比较两个字符串的一个字符。  它同时扫描两个字符串以查找第一对不匹配的相应字符。  如果这两个字符中较小的一个是@var{string1}中的字符，则@var{string1}较小，并且该函数返回@code{t}。  如果较小的字符是 @var{string2} 中的字符，则 @var{string1} 更大，并且此函数返回 @code{nil}。  如果两个字符串完全匹配，则值为@code{nil}。
+
+字符对根据其字符代码进行比较。请记住，小写字母在 @acronym{ASCII} 字符集中比大写字母具有更高的数值；数字和许多标点符号的数值低于大写字母。  @acronym{ASCII} 字符少于任何非 @acronym{ASCII} 字符。但是，由于单字节和多字节字符串仅具有共同的 @acronym{ASCII} 字符集，因此比较这两种类型的字符串 (@pxref{Text Representations}) 之间的其他字符通常没有意义。
+
+@example
+@group
+(string-lessp "abc" "abd")
+     @result{} t
+(string-lessp "abd" "abc")
+     @result{} nil
+(string-lessp "123" "abc")
+     @result{} t
+@end group
+@end example
+
+当字符串的长度不同，并且它们匹配到@var{string1}的长度时，则结果是@code{t}。  如果它们匹配到@var{string2}的长度，则结果是@code{nil}。  不含字符的字符串比任何其他字符串都要少。
+
+@example
+@group
+(string-lessp "" "abc")
+     @result{} t
+(string-lessp "ab" "abc")
+     @result{} t
+(string-lessp "abc" "")
+     @result{} nil
+(string-lessp "abc" "ab")
+     @result{} nil
+(string-lessp "" "")
+     @result{} nil
+@end group
+@end example
+
+符号也可以作为参数，在这种情况下，将比较它们的打印名称。
+@end defun
+
+@defun string< string1 string2
+@code{string<} 是@code{string-lessp} 的另一个名称。
+@end defun
+
+@defun string-greaterp string1 string2
+该函数返回@var{string1}和@var{string2}以相反顺序比较的结果，即相当于调用@code{(string-lessp @var{string2} @var{string1})}。
+@end defun
+
+@defun string> string1 string2
+@code{string>} 是@code{string-greaterp} 的另一个名称。
+@end defun
+
+@cindex locale-dependent string comparison
+@cindex string collation
+@defun string-collate-lessp string1 string2 &optional locale ignore-case
+如果按照指定 @var{locale} 的排序顺序（默认为当前系统区域设置），@var{string1} 小于 @var{string2}，则此函数返回 @code{t}。  排序规则不仅由 @var{string1} 和 @var{string2} 中包含的字符的字典顺序决定，而且还由有关这些字符之间关系的进一步规则决定。  通常，它是由 Emacs 运行的语言环境以及 Emacs 所链接的标准 C 库定义的。
+
+例如，排序时可能会忽略标点符号和空白字符 (@pxref{Sequence Functions})：
+
+@example
+@group
+(sort '("11" "12" "1 1" "1 2" "1.1" "1.2")
+       :lessp #'string-collate-lessp)
+     @result{} ("11" "1 1" "1.1" "12" "1 2" "1.2")
+@end group
+@end example
+
+此行为取决于系统；例如，无论语言环境如何，Cygwin 上的标点符号和空格都不会被忽略。
+
+可选参数 @var{locale} 是一个字符串，它会覆盖当前区域设置标识符的排序规则设置。  该值取决于系统； a @var{locale} @code{"en_US.UTF-8"} 适用于 POSIX 系统，而@code{"enu_USA.1252"} 适用于 MS-Windows 系统。  @code{"POSIX"} 或 @code{"C"} 的 @var{locale} 值让 @code{string-collate-lessp} 表现得像 @code{string-lessp}：
+
+@example
+@group
+(sort '("11" "12" "1 1" "1 2" "1.1" "1.2")
+      :lessp (lambda (s1 s2) (string-collate-lessp s1 s2 "POSIX")))
+     @result{} ("1 1" "1 2" "1.1" "1.2" "11" "12")
+@end group
+@end example
+
+如果@var{ignore-case}非@code{nil}，则通过将字符转换为小写来不区分大小写地进行比较。  但是，如果底层系统库不提供特定于区域设置的排序规则，则此函数将回退到 @code{string-lessp}，在这种情况下，@var{ignore-case} 参数将被忽略，并且比较将始终区分大小写。
+
+要在 MS-Windows 系统上模拟 Unicode 兼容排序规则，请将 @code{w32-collate-ignore-punctuation} 绑定到非 @code{nil} 值，因为语言环境的代码集部分在 MS-Windows 上不能为 @code{"UTF-8"}。
+
+如果您的系统不支持语言环境，则此函数的行为类似于 @code{string-lessp}。
+@end defun
+
+@cindex version comparison
+@cindex comparing version strings
+@defun string-version-lessp string1 string2
+此函数按字典顺序比较字符串，但它将数字字符序列视为包含十进制数字，然后比较这些数字。  因此，根据这个谓词，@samp{foo2.png}“小于”@samp{foo12.png}，即使@samp{12}按字典顺序“小于”@samp{2}。
+@end defun
+
+@cindex string starts with prefix
+@defun string-prefix-p string1 string2 &optional ignore-case
+如果@var{string1}是@var{string2}的前缀，则该函数返回非@code{nil}；即，如果 @var{string2} 以 @var{string1} 开头。  如果可选参数 @var{ignore-case} 为非 @code{nil}，则比较将忽略大小写差异。
+@end defun
+
+@cindex string ends with suffix
+@defun string-suffix-p suffix string &optional ignore-case
+如果@var{suffix}是@var{string}的后缀，则该函数返回非@code{nil}；即，如果 @var{string} 以 @var{suffix} 结尾。  如果可选参数 @var{ignore-case} 为非 @code{nil}，则比较将忽略大小写差异。
+@end defun
+
+@defun string-search needle haystack &optional start-pos
+返回@var{needle}在@var{haystack}中的第一个实例的位置，这两个实例都是字符串。  如果@var{start-pos}非@code{nil}，则从@var{haystack}中的该位置开始搜索。如果未找到匹配项，则返回@code{nil}。该函数在进行比较时仅考虑字符串中的字符；文本属性被忽略。  匹配始终区分大小写。
+@end defun
+
+@defun compare-strings string1 start1 end1 string2 start2 end2 &optional ignore-case
+该函数将 @var{string1} 的指定部分与 @var{string2} 的指定部分进行比较。  @var{string1} 的指定部分从索引 @var{start1}（包含）到索引 @var{end1}（不包含）； @var{start1} 的@code{nil} 表示字符串的开头，@var{end1} 的@code{nil} 表示字符串的长度。  同样，@var{string2}的指定部分从索引@var{start2}一直到索引@var{end2}。
+
+字符串通过其字符的数值进行比较。例如，如果 @var{str1} 的第一个不同字符具有较小的数值，则认为 @var{str1} 小于 @var{str2}。  如果 2⁣ 不是 3⁣，则在比较字符之前，使用当前缓冲区的大小写表 (@pxref{Case Tables}) 将字符转换为大写。  将单字节字符串转换为多字节进行比较 (@pxref{Text Representations})，因此单字节字符串与其转换为多字节的字符串始终被视为相等。
+
+如果两个字符串的指定部分匹配，则值为@code{t}。  否则，该值为一个整数，指示有多少个前导字符一致，以及哪个字符串较少。  它的绝对值是一加上两个字符串开头一致的字符数。  如果 @var{string1} （或其指定部分）较小，则符号为负。
+@end defun
+
+@cindex Levenshtein distance
+@cindex distance between strings
+@cindex edit distance between strings
+@defun string-distance string1 string2 &optional bytecompare
+该函数返回源字符串@var{string1}和目标字符串@var{string2}之间的@dfn{Levenshtein distance}。  编辑距离是将源字符串转换为目标字符串所需的单字符更改（删除、插入或替换）的数量；这是字符串之间 @dfn{edit distance} 的一种可能定义。
+
+字符串的字母大小写对于计算的距离很重要，但它们的文本属性将被忽略。  如果可选参数 @var{bytecompare} 为非 @code{nil}，则该函数以字节而不是字符来计算距离。  逐字节比较使用 Emacs 内部的字符表示形式，因此对于包含原始字节 (@pxref{Text Representations}) 的多字节字符串会产生不准确的结果；如果您需要使用原始字节获得准确的结果，请通过对字符串进行编码 (@pxref{Explicit Encoding}) 将字符串设为单字节。
+@end defun
+
+@defun assoc-string key alist &optional case-fold
+该函数的工作方式与 @code{assoc} 类似，只不过 @var{key} 必须是字符串或符号，并且使用 @code{compare-strings} 进行比较。在测试之前将符号转换为字符串。如果@var{case-fold}非@code{nil}，则@var{key}和@var{alist}的元素在比较之前转换为大写。与@code{assoc}不同，此函数还可以匹配列表中字符串或符号而不是常量的元素。  特别是，@var{alist}可以是字符串或符号的列表，而不是实际的列表。 @xref{Association Lists}。
+@end defun
+
+另请参阅 @ref{Comparing Text} 中的函数 @code{compare-buffer-substrings}，了解比较缓冲区中文本的方法。  函数@code{string-match}将正则表达式与字符串进行匹配，可用于一种字符串比较；参见@ref{Regexp Search}。
+
+@node String Conversion
+@section 字符和字符串的转换
+@cindex conversion of strings
+
+本节介绍字符、字符串和整数之间转换的函数。  @code{format} (@pxref{Formatting Strings}) 和 @code{prin1-to-string} (@pxref{Output Functions}) 也可以将 Lisp 对象转换为字符串。  @code{read-from-string} (@pxref{Input Functions}) 可以将 Lisp 对象的字符串表示形式转换为对象。  函数 @code{string-to-multibyte} 和 @code{string-to-unibyte} 转换字符串的文本表示形式 (@pxref{Converting Representations})。
+
+@xref{Documentation}，用于生成文本字符和一般输入事件的文本描述的函数（@code{single-key-description} 和 @code{text-char-description}）。  这些主要用于制作帮助消息。
+
+@defun number-to-string number
+@cindex integer to string
+@cindex integer to decimal
+该函数返回一个字符串，其中包含 @var{number} 的打印的十进制表示形式。  如果参数为负数，则返回值以负号开头。
+
+@example
+(number-to-string 256)
+     @result{} "256"
+@group
+(number-to-string -23)
+     @result{} "-23"
+@end group
+(number-to-string -23.5)
+     @result{} "-23.5"
+@end example
+
+@cindex @code{int-to-string}
+@code{int-to-string} 是此函数的半过时别名。
+
+另请参见 @ref{Formatting Strings} 中的函数 @code{format}。
+@end defun
+
+@defun string-to-number string &optional base
+@cindex string to number
+该函数返回@var{string}中字符的数值。  如果 1⁣ 不是 2⁣，则它必须是 2 到 16（含）之间的整数，并且整数以该基数进行转换。如果@var{base}是@code{nil}，则使用基数十。  浮点转换仅适用于基数十；我们还没有为浮点数实现其他基数，因为那会需要更多工作，而且似乎没什么用。
+
+解析会跳过 @var{string} 开头的空格和制表符，然后读取尽可能多的 @var{string} ，因为它可以将其解释为给定基数中的数字。  （在某些系统上，它会忽略开头的其他空格，而不仅仅是空格和制表符。）如果 @var{string} 无法解释为数字，则此函数返回 0。
+
+@example
+(string-to-number "256")
+     @result{} 256
+(string-to-number "25 is a perfect square.")
+     @result{} 25
+(string-to-number "X256")
+     @result{} 0
+(string-to-number "-4.5")
+     @result{} -4.5
+(string-to-number "1e5")
+     @result{} 100000.0
+@end example
+@end defun
+
+@defun char-to-string character
+@cindex character to string
+此函数返回一个包含一个字符 @var{character} 的新字符串。  该函数已半过时，因为函数 @code{string} 更为通用。  @xref{Creating Strings}。
+@end defun
+
+@defun string-to-char string
+该函数返回@var{string}中的第一个字符。  这与 1⁣ 基本相同，只是如果字符串为空则返回 0。  （当 @var{string} 的第一个字符是空字符，@acronym{ASCII} 代码 0 时，该值也为 0。）如果该函数看起来没有足够的用处，因此将来可能会被删除。
+@end defun
+
+以下是一些可以与字符串相互转换的其他函数：
+
+@table @code
+@item concat
+该函数将向量或列表转换为字符串。 @xref{Creating Strings}。
+
+@item vconcat
+该函数将字符串转换为向量。  @xref{Vector Functions}。
+
+@item append
+该函数将字符串转换为列表。  @xref{Building Lists}。
+
+@item byte-to-string
+该函数将一个字节的字符数据转换为一个单字节字符串。 @xref{Converting Representations}。
+@end table
+
+@node Formatting Strings
+@section 格式化字符串
+@cindex formatting strings
+@cindex strings, formatting them
+
+@dfn{Formatting} 表示通过在常量字符串中的各个位置替换计算值来构造字符串。  该常量字符串控制其他值的打印方式以及它们出现的位置；它被称为@dfn{format string}。
+
+格式化对于计算要显示的消息通常很有用。  事实上，函数 @code{message} 和 @code{error} 提供了与此处描述的相同的格式化功能；它们与 @code{format-message} 的不同之处仅在于它们如何使用格式化结果。
+
+@defun format string &rest objects
+此函数返回等于 @var{string} 的字符串，用相应 @var{objects} 的编码替换任何格式规范。  参数 @var{objects} 是要格式化的计算值。
+
+@var{string} 中的字符（格式规范除外）将直接复制到输出中，包括它们的文本属性（如果有）。  格式规范的任何文本属性都会复制到参数 @var{objects} 生成的字符串表示形式。
+
+输出字符串不需要重新分配。  例如，如果 @code{x} 是字符串 @code{"foo"}，则表达式 @code{(eq x (format x))} 和 @code{(eq x (format "%s" x))} 可能都会产生 @code{t}。
+@end defun
+
+@defun format-message string &rest objects
+@cindex curved quotes, in formatted messages
+@cindex curly quotes, in formatted messages
+此函数的作用与 @code{format} 类似，但它还根据 @code{text-quoting-style} 的值转换 @var{string} 中的任何重音符号 (@t{`}) 和撇号 (@t{'})。
+
+通常，格式中的重音符号和撇号会转换为匹配的弯曲引号，例如，@t{"Missing `%s'"} 可能会导致@t{"Missing ‘foo’"}。  @xref{Text Quoting Style}，了解如何影响或抑制这种翻译。
+@end defun
+
+@cindex @samp{%} in format
+@cindex format specification
+格式规范是以 @samp{%} 开头的字符序列。  因此，如果 2⁣ 中有 @samp{%d}，@code{format} 函数会将其替换为要格式化的值之一的打印表示形式（参数 @var{objects} 之一）。例如：
+
+@example
+@group
+(format "The value of fill-column is %d." fill-column)
+     @result{} "The value of fill-column is 72."
+@end group
+@end example
+
+由于 @code{format} 将 @samp{%} 字符解释为格式规范，因此您应该 @emph{never} 传递任意字符串作为第一个参数。  当字符串由某些 Lisp 代码生成时尤其如此。  除非字符串是 @emph{known} 不包含任何 @samp{%} 字符，否则传递 @code{"%s"}（如下所述）作为第一个参数，并将字符串作为第二个参数，如下所示：
+
+@example
+  (format "%s" @var{arbitrary-string})
+@end example
+
+某些格式规范需要特定类型的值。  如果您提供的值不符合要求，则会发出错误信号。
+
+以下是有效格式规范表：
+
+@table @samp
+@item %s
+将规范替换为不带引号的对象的打印表示（即使用 @code{princ}，而不是 @code{prin1}---@pxref{Output Functions}）。  因此，字符串仅由其内容表示，没有 @samp{"} 字符，并且符号出现时没有 @samp{\} 字符。
+
+如果对象是字符串，则其文本属性将复制到输出中。  @samp{%s} 本身的文本属性也会被复制，但对象的文本属性优先。
+
+@item %S
+将规范替换为通过引用制成的对象的打印表示（即使用 @code{prin1}---@pxref{Output Functions}）。  因此，字符串包含在 @samp{"} 字符中，并且 @samp{\} 字符在必要时出现在特殊字符之前。
+
+@item %b
+@item %B
+@cindex integer to binary
+将规范替换为整数的基数或二进制表示形式。如果为负，则表示具有前导 @samp{-}；对于可能为负整数@var{n}的无符号二进制补码表示，格式为@code{(logand @var{n} @var{mask})}，其中@var{mask}对应于所需的字长。尽管普通的 @samp{%b} 和 @samp{%B} 相同，但 @samp{%#b} 前缀为小写，@samp{0b} 和 @samp{%#B} 为大写。该对象也可以是格式化为整数的浮点数，删除任何小数。
+
+@item %o
+@cindex integer to octal
+将规范替换为整数的以 8 为基数的表示形式。  与 @samp{%b} 类似，如果为负，则该表示具有前导 @samp{-}；该对象也可以是格式化为整数的浮点数，删除任何小数。
+
+@item %d
+@itemx %i
+将规范替换为有符号整数的十进制表示形式。  该对象也可以是格式化为整数的浮点数，删除任何小数。
+
+@item %x
+@itemx %X
+@cindex integer to hexadecimal
+将规范替换为整数的十六进制表示形式。  与 @samp{%b} 类似，如果为负，则表示形式具有前导 @samp{-}。 @samp{%x} 使用小写字母，@samp{%X} 使用大写字母。该对象也可以是格式化为整数的浮点数，删除任何小数。
+
+@item %c
+将规范替换为给定值的字符。
+
+@item %e
+将规范替换为浮点数的指数表示法。
+
+@item %f
+将规范替换为浮点数的小数点表示法。
+
+@item %g
+使用指数表示法或小数点表示法将规范替换为浮点数表示法。  如果指数小于 @minus{}4 或大于或等于精度（默认值：6），则使用指数表示法。  默认情况下，尾随零将从结果的小数部分中删除，并且仅当小数点字符后跟数字时才会出现。
+
+@item %%
+将规范替换为单个 @samp{%}。  这种格式规范很不寻常，因为它的唯一形式是普通的 @samp{%%} 并且不使用值。  例如，@code{(format "%% %d" 30)} 返回@code{"% 30"}。
+@end table
+
+任何其他格式字符都会导致 @samp{Invalid format operation} 错误。
+
+以下是几个示例，假设典型的 @code{text-quoting-style} 设置：
+
+@example
+@group
+(format "The octal value of %d is %o,
+         and the hex value is %x." 18 18 18)
+     @result{} "The octal value of 18 is 22,
+         and the hex value is 12."
+
+(format-message
+ "The name of this buffer is ‘%s’." (buffer-name))
+     @result{} "The name of this buffer is ‘strings.texi’."
+
+(format-message
+ "The buffer object prints as `%s'." (current-buffer))
+     @result{} "The buffer object prints as ‘strings.texi’."
+@end group
+@end example
+
+默认情况下，格式规范对应于 @var{objects} 中的连续值。  因此，@var{string}中的第一个格式规范使用第一个这样的值，第二个格式规范使用第二个这样的值，依此类推。  任何额外的格式规范（没有相应值的格式规范）都会导致错误。  任何要格式化的额外值都将被忽略。
+
+@cindex field numbers in format spec
+格式规范可以有一个 @dfn{field number}，它是紧跟在初始 @samp{%} 之后的十进制数字，后跟文字美元符号 @samp{$}。  它导致格式规范将参数转换为给定的数字而不是下一个参数。  字段编号从 1 开始。格式可以包含编号格式规范或未编号格式规范，但不能同时包含两者，除非 @samp{%%} 可以与编号规范混合。
+
+@example
+(format "%2$s, %3$s, %%, %1$s" "x" "y" "z")
+     @result{} "y, z, %, x"
+@end example
+
+@cindex flags in format specifications
+在@samp{%}和任何字段编号之后，您可以放置​​某些@dfn{flag characters}。
+
+标志 @samp{+} 在非负数之前插入一个加号，以便它始终有一个符号。  作为标志的空格字符在非负数之前插入一个空格。  （否则，非负数从第一个数字开始。）这些标志对于确保非负数和负数使用相同的列数非常有用。  除了 @samp{%d}、@samp{%e}、@samp{%f}、@samp{%g} 之外，它们都会被忽略，如果两个标志都使用，则@samp{+} 优先。
+
+标志 @samp{#} 指定取决于所使用的格式的替代形式。  对于@samp{%o}，它确保结果以@samp{0}开始。  对于@samp{%x}、@samp{%X}、@samp{%b} 和@samp{%B}，它分别在非零结果前加上@samp{0x}、@samp{0X}、@samp{0b} 或@samp{0B} 前缀。  对于 @samp{%e} 和 @samp{%f}，@samp{#} 标志意味着即使精度为零，也包含小数点。  对于@samp{%g}，它始终包含一个小数点，并且还强制将小数点后面的任何尾随零保留在原位，否则它们将被删除。
+
+标志 @samp{0} 确保填充由 @samp{0} 字符而不是空格组成。  对于非数字规范字符（例如 @samp{%s}、@samp{%S} 和 @samp{%c}），该标志将被忽略。这些规范字符接受 @samp{0} 标志，但仍用 @emph{spaces} 填充。
+
+标志 @samp{-} 导致按宽度插入的任何填充（如果指定）将插入到右侧而不是左侧。如果 @samp{-} 和 @samp{0} 都存在，则忽略 @samp{0} 标志。
+
+@example
+@group
+(format "%06d is padded on the left with zeros" 123)
+     @result{} "000123 is padded on the left with zeros"
+
+(format "'%-6d' is padded on the right" 123)
+     @result{} "'123   ' is padded on the right"
+
+(format "The word '%-7s' actually has %d letters in it."
+        "foo" (length "foo"))
+     @result{} "The word 'foo    ' actually has 3 letters in it."
+@end group
+@end example
+
+@cindex field width
+@cindex padding
+规范可以有一个 @dfn{width}，它是出现在任何字段编号和标志之后的十进制数字。  如果对象的打印表示包含的字符少于此宽度，则 @code{format} 使用填充来扩展它。  宽度引入的任何填充通常由插入到左侧的空格组成：
+
+@example
+(format "%5d is padded on the left with spaces" 123)
+     @result{} "  123 is padded on the left with spaces"
+@end example
+
+@noindent
+如果宽度太小，@code{format} 不会截断对象的打印表示。  因此，您可以使用宽度来指定列之间的最小间距，而不会有丢失信息的风险。在以下两个示例中，@samp{%7s} 指定最小宽度为 7。在第一种情况下，插入到@samp{%7s} 位置的字符串只有 3 个字母，并且需要 4 个空格作为填充。  在第二种情况下，字符串 @code{"specification"} 的宽度为 13 个字母，但不会被截断。
+
+@example
+@group
+(format "The word '%7s' has %d letters in it."
+        "foo" (length "foo"))
+     @result{} "The word '    foo' has 3 letters in it."
+(format "The word '%7s' has %d letters in it."
+        "specification" (length "specification"))
+     @result{} "The word 'specification' has 13 letters in it."
+@end group
+@end example
+
+@cindex precision in format specifications
+所有规范字符都允许在字段编号、标志和宽度（如果存在）之后添加可选的 @dfn{precision}。  精度是小数点 @samp{.} 后跟数字字符串。  对于浮点规范（@samp{%e} 和 @samp{%f}），精度指定要显示小数点后的位数；如果为零，则小数点本身也被省略。  对于@samp{%g}，精度指定要显示多少个有效数字（有效数字是小数点之前的第一位数字及其之后的所有数字）。  如果 %g 的精度为零或未指定，则将其视为 1。对于 @samp{%s} 和 @samp{%S}，精度会将字符串截断为给定宽度，因此 @samp{%.3s} 仅显示 @var{object} 表示形式的前三个字符。  对于其他规范字符，精度的影响是 @code{printf} 系列的本地库函数产生的。
+
+@cindex formatting numbers for rereading later
+如果您计划稍后在格式化字符串上使用 @code{read} 来检索格式化值的副本，请使用允许 @code{read} 重建该值的规范。  要以这种可逆的方式格式化数字，您可以使用 @samp{%s} 和 @samp{%S}，要仅格式化整数，您还可以使用 @samp{%d}、@samp{#x%x}、@samp{#o%o} 和 @samp{#b%b}。其他格式不保证保留所有值；例如，@samp{%g} 可能会丢失精度和类型，并且不会保留 NaN 或无穷大。  @xref{Input Functions}。
+
+本节中描述的函数接受一组固定的规范字符。  下一节将介绍一个函数 @code{format-spec}，它可以接受自定义规范字符，例如 @samp{%a} 或 @samp{%z}。
+
+@node Custom Format Strings
+@section 自定义格式字符串
+@cindex custom format string
+@cindex custom @samp{%}-sequence in format
+
+有时，允许用户和 Lisp 程序等通过自定义格式控制字符串来控制某些文本的生成方式很有用。  例如，格式字符串可以控制如何显示某人的名字、姓氏和电子邮件地址。  使用上一节中描述的函数@code{format}，格式字符串可能类似于@w{@code{"%s %s <%s>"}}。  然而，这种方法很快就变得不切实际，因为可能不清楚哪个规范字符对应于哪条信息。
+
+对于这种情况，更方便的格式字符串类似于 @w{@code{"%f %l <%e>"}}，其中每个规范字符携带更多语义信息，并且可以轻松地相对于其他规范字符重新排列，从而使用户更容易自定义此类格式字符串。
+
+本节中描述的函数@code{format-spec}执行与@code{format}类似的功能，不同之处在于它对使用任意规范字符的格式控制字符串进行操作。
+
+@defun format-spec template spec-alist &optional ignore-missing split
+该函数返回根据@var{spec-alist}中指定的转换从格式字符串@var{template}生成的字符串，它是@w{@code{(@var{letter} . @var{replacement})}}形式的alist (@pxref{Association Lists})。  当格式化结果字符串时，@var{template}中的每个规范@code{%@var{letter}}将被替换为@var{replacement}。
+
+@var{template} 中的字符（格式规范除外）将直接复制到输出中，包括它们的文本属性（如果有）。  格式规范的任何文本属性都会复制到其替换位置。
+
+使用 alist 来指定转换会产生一些有用的属性：
+
+@itemize @bullet
+@item
+如果 @var{spec-alist} 包含的唯一 @var{letter} 键多于 @var{template} 中的唯一规范字符，则将忽略未使用的键。
+@item
+如果 @var{spec-alist} 包含多个与相同 @var{letter} 的关联，则使用距离列表开头最近的一个。
+@item
+如果 @var{template} 多次包含相同的规范字符，则在 @var{spec-alist} 中找到的相同 @var{replacement} 将用作所有该字符替换的基础。
+@item
+@var{template} 中的规范顺序不必与 @var{spec-alist} 中的关联顺序相对应。
+@end itemize
+
+REPLACMENT 也可以是不带参数的函数，并返回用于替换的字符串。  仅当 TEMPLATE 中使用相应的 LETTER 时才会调用它。  例如，这对于避免提示输入（除非需要）很有用。
+
+可选参数 @var{ignore-missing} 指示如何处理 @var{template} 中未在 @var{spec-alist} 中找到的规范字符。  如果它是 @code{nil} 或被省略，则函数发出错误信号；如果是@code{ignore}，这些格式规范将逐字保留在输出中，包括它们的文本属性（如果有）；如果是@code{delete}，则从输出中删除这些格式规范；任何其他非 @code{nil} 值的处理方式与 @code{ignore} 类似，但任何出现的 @samp{%%} 也会逐字保留在输出中。
+
+如果可选参数 @var{split} 为非 @code{nil}，@code{format-spec} 将根据执行替换的位置将结果拆分为字符串列表，而不是返回单个字符串。  例如：
+
+@example
+(format-spec "foo %b bar" '((?b . "zot")) nil t)
+     @result{} ("foo " "zot" " bar")
+@end example
+@end defun
+
+@code{format-spec} 接受的格式规范的语法与 @code{format} 接受的格式规范类似，但不相同。  在这两种情况下，格式规范都是以 @samp{%} 开头并以字母（例如 @samp{s}）结尾的字符序列。
+
+与 @code{format} 不同，@code{format} 为一组固定的规范字符分配特定含义，@code{format-spec} 接受任意规范字符并同等对待它们。  例如：
+
+@example
+@group
+(setq my-site-info
+      (list (cons ?s system-name)
+            (cons ?t (symbol-name system-type))
+            (cons ?c system-configuration)
+            (cons ?v emacs-version)
+            (cons ?e invocation-name)
+            (cons ?p (number-to-string (emacs-pid)))
+            (cons ?a user-mail-address)
+            (cons ?n user-full-name)))
+
+(format-spec "%e %v (%c)" my-site-info)
+     @result{} "emacs 27.1 (x86_64-pc-linux-gnu)"
+
+(format-spec "%n <%a>" my-site-info)
+     @result{} "Emacs Developers <emacs-devel@@gnu.org>"
+@end group
+@end example
+
+格式规范可以在 @samp{%} 之后包含任意数量的以下标志字符，以修改替换的各个方面。
+
+@table @samp
+@item 0
+该标志导致宽度指定的任何填充由 @samp{0} 字符而不是空格组成。
+
+@item -
+此标志会导致宽度指定的任何填充插入到右侧而不是左侧。
+
+@item <
+该标志导致替换在左侧截断为给定的宽度和精度（如果指定）。
+
+@item >
+该标志导致替换在右侧截断为给定的宽度和精度（如果指定）。
+
+@item ^
+该标志将替换文本转换为大写 (@pxref{Case Conversion})。
+
+@item _@r{ (underscore)}
+该标志将替换文本转换为小写 (@pxref{Case Conversion})。
+@end table
+
+使用矛盾标志（例如，大写和小写）的结果是未定义的。
+
+与 0⁣ 的情况一样，格式规范可以包括宽度（它是出现在任何标志之后的十进制数）和精度（它是小数点 @samp{.} 后跟出现在任何标志和宽度之后的十进制数）。
+
+如果替换包含的字符少于其指定宽度，则会在左侧填充：
+
+@example
+@group
+(format-spec "%8a is padded on the left with spaces"
+             '((?a . "alpha")))
+     @result{} "   alpha is padded on the left with spaces"
+@end group
+@end example
+
+如果替换包含的字符多于其指定的精度，则会在右侧被截断：
+
+@example
+@group
+(format-spec "%.2a is truncated on the right"
+             '((?a . "alpha")))
+     @result{} "al is truncated on the right"
+@end group
+@end example
+
+这是一个更复杂的示例，结合了上述几个功能：
+
+@example
+@group
+(setq my-battery-info
+      (list (cons ?p "73")      ; Percentage
+            (cons ?L "Battery") ; Status
+            (cons ?t "2:23")    ; Remaining time
+            (cons ?c "24330")   ; Capacity
+            (cons ?r "10.6")))  ; Rate of discharge
+
+(format-spec "%>^-3L : %3p%% (%05t left)" my-battery-info)
+     @result{} "BAT :  73% (02:23 left)"
+
+(format-spec "%>^-3L : %3p%% (%05t left)"
+             (cons (cons ?L "AC")
+                   my-battery-info))
+     @result{} "AC  :  73% (02:23 left)"
+@end group
+@end example
+
+正如本节中的示例所示，@code{format-spec} 通常用于有选择地格式化各种不同的信息。  这在提供用户可定制格式字符串的程序中非常有用，因为用户可以选择使用常规语法并以任何所需的顺序仅对程序提供的信息的子集进行格式化。
+
+@node Case Conversion
+@section Lisp 中的大小写转换
+@cindex upper case
+@cindex lower case
+@cindex character case
+@cindex case conversion in Lisp
+
+字符大小写函数更改单个字符或字符串内容的大小写。  这些函数通常仅转换字母字符（字母 @samp{A} 到 @samp{Z} 和 @samp{a} 到 @samp{z}，以及非 @acronym{ASCII} 字母）；其他字符不变。  您可以通过指定案例表 (@pxref{Case Tables}) 来指定不同的案例转换映射。
+
+这些函数不会修改作为参数传递给它们的字符串。
+
+下面的示例使用字符 @samp{X} 和 @samp{x}，其 @acronym{ASCII} 代码分别为 88 和 120。
+
+@defun downcase string-or-char
+该函数将@var{string-or-char}（应该是字符或字符串）转换为小写。
+
+当@var{string-or-char}是字符串时，该函数返回一个新字符串，其中参数中的每个大写字母都转换为小写。  当@var{string-or-char}为字符时，该函数返回对应的小写字符（整数）；如果原始字符是小写，或者不是字母，则返回值等于原始字符。
+
+@example
+(downcase "The cat in the hat")
+     @result{} "the cat in the hat"
+
+(downcase ?X)
+     @result{} 120
+@end example
+@end defun
+
+@defun upcase string-or-char
+该函数将@var{string-or-char}（应该是字符或字符串）转换为大写。
+
+当@var{string-or-char}是字符串时，该函数返回一个新字符串，其中参数中的每个小写字母都转换为大写。  当@var{string-or-char}为字符时，该函数返回对应的大写字符（整数）；如果原始字符是大写，或者不是字母，则返回值等于原始字符。
+
+@example
+(upcase "The cat in the hat")
+     @result{} "THE CAT IN THE HAT"
+
+(upcase ?x)
+     @result{} 88
+@end example
+@end defun
+
+@defun capitalize string-or-char
+@cindex capitalization
+此函数将字符串或字符大写。  如果@var{string-or-char}是一个字符串，该函数返回一个新字符串，其内容是@var{string-or-char}的副本，其中每个单词都大写。  这意味着每个单词的第一个字符转换为大写，其余字符转换为小写。
+
+@vindex case-symbols-as-words
+单词的定义是当前语法表中分配给单词构成语法类的任何连续字符序列（@pxref{Syntax Class Table}）；如果@code{case-symbols-as-words}非@code{nil}，则分配给符号构成语法类的字符也被视为单词构成。
+
+当 @var{string-or-char} 是字符时，此函数执行与 @code{upcase} 相同的操作。
+
+@example
+@group
+(capitalize "The cat in the hat")
+     @result{} "The Cat In The Hat"
+@end group
+
+@group
+(capitalize "THE 77TH-HATTED CAT")
+     @result{} "The 77th-Hatted Cat"
+@end group
+
+@group
+(capitalize ?x)
+     @result{} 88
+@end group
+@end example
+@end defun
+
+@defun upcase-initials string-or-char
+如果 @var{string-or-char} 是字符串，则此函数将 @var{string-or-char} 中单词的首字母大写，而不更改除首字母以外的任何字母。  它返回一个新字符串，其内容是 2⁣ 的副本，其中每个单词的首字母都转换为大写。
+
+该功能的单词定义与上面@code{capitalize}的描述相同，@code{case-symbols-as-words}对单词组成字符具有相同的效果。
+
+当 @code{upcase-initials} 的参数是字符时，@code{upcase-initials} 与 @code{upcase} 具有相同的结果。
+
+@example
+@group
+(upcase-initials "The CAT in the hAt")
+     @result{} "The CAT In The HAt"
+@end group
+@end example
+@end defun
+
+请注意，大小写转换不是代码点的一对一映射，结果的长度可能与参数的长度不同。此外，由于传递字符会强制返回类型为字符，因此函数无法执行正确的替换，并且与处理单字符字符串相比，结果可能会有所不同。  例如：
+
+@ifnottex
+@example
+@group
+(upcase "ﬁ")  ; note: single character, ligature "fi"
+     @result{} "FI"
+@end group
+@group
+(upcase ?ﬁ)
+     @result{} 64257  ; i.e. ?ﬁ
+@end group
+@end example
+@end ifnottex
+@iftex
+@example
+@group
+(upcase "@r{fi}")  ; note: single character, ligature "fi"
+     @result{} "FI"
+@end group
+@group
+(upcase ?@r{fi})
+     @result{} 64257  ; i.e. ?@r{fi}
+@end group
+@end example
+@end iftex
+
+为了避免这种情况，必须首先使用 @code{string} 函数将字符转换为字符串，然后再将其传递给大小写函数之一。  当然，可以不对结果的长度做出任何假设。
+
+其他字符也可以有特殊的大小写转换规则。  它们都具有 Unicode 标准定义的非 @code{nil} 字符属性 @code{special-uppercase}、@code{special-lowercase} 或 @code{special-titlecase} (@pxref{Character Properties})。  这些属性定义了特殊的大小写转换规则，它们覆盖当前的大小写表 (@pxref{Case Tables})。
+
+@xref{Text Comparison}，用于比较字符串的函数；其中一些忽略大小写差异，或者可以选择忽略大小写差异。
+
+@node Case Tables
+@section 案例表
+
+您可以通过安装特殊的@dfn{case table}来自定义大小写转换。  大小写表指定大写字母和小写字母之间的映射。  它会影响 Lisp 对象的大小写转换函数（请参阅上一节）和应用于缓冲区中文本的函数 (@pxref{Case Changes})。  每个缓冲区都有一个case表；还有一个标准的情况表，用于初始化新缓冲区的情况表。
+
+案例表是一个子类型为 @code{case-table} 的字符表 (@pxref{Char-Tables})。  该字符表将每个字符映射为相应的小写字符。  它有三个额外的插槽，用于保存相关表：
+
+@table @var
+@item upcase
+大写表将每个字符映射为相应的大写字符。
+@item canonicalize
+规范化表将所有与大小写相关的字符集映射到该集的特定成员。
+@item equivalences
+等价表将一组与大小写相关的字符中的每个字符映射到该组中的下一个字符。
+@end table
+
+在简单的情况下，您只需指定映射到小写字母即可；三个相关的表将根据该表自动计算。
+
+对于某些语言，大小写字母并不是一一对应的。  可能有两个不同的小写字母具有相同的大写字母。  在这些情况下，您需要指定小写和大写的映射。
+
+某些字符具有为其定义的特殊大小写转换规则，默认情况下会覆盖当前的大小写表。  这些字符具有 Unicode 标准定义的非 @code{nil} 字符属性 @code{special-uppercase}、@code{special-lowercase} 或 @code{special-titlecase} (@pxref{Character Properties})。  例如，U+00DF LATIN SMALL LETTER SHARP S, @ss{}，默认情况下大写为字符串 @code{"SS"}，而不是 U+1E9E LATIN CAPITAL LETTER SHARP S@. 要强制这些字符遵循大小写表转换，请将相应的 Unicode 属性设置为 @code{nil}：
+
+@example
+ (upcase "@ss{}")
+  => "SS"
+ (put-char-code-property ?@ss{} 'special-uppercase nil)
+ (upcase "@ss{}")
+  => "ẞ"
+@end example
+
+案例表的额外槽 @var{canonicalize} 将每个字符映射到规范的等效字符；通过大小写转换相关的任何两个字符都具有相同的规范等效字符。  例如，由于 @samp{a} 和 @samp{A} 通过大小写转换相关，因此它们应该具有相同的规范等效字符（对于它们两者来说应该是 @samp{a} ，或者对于它们两者来说都是 @samp{A} ）。
+
+额外的槽 @var{equivalences} 是一个循环排列每个等价类（具有相同规范等价的字符）的映射。  （对于普通的@acronym{ASCII}，这会将@samp{a}映射到@samp{A}，并将@samp{A}映射到@samp{a}，对于每组等效字符也是如此。）
+
+构建案例表时，可以为@var{canonicalize}提供@code{nil}；然后 Emacs 从小写和大写映射中填充这个槽。  您还可以为@var{equivalences}提供@code{nil}；然后 Emacs 从 @var{canonicalize} 开始填充这个槽。  在实际使用的案例表中，这些组件是非@code{nil}的。  不要尝试在未同时指定 @var{canonicalize} 的情况下指定 @var{equivalences}。
+
+以下是使用案例表的函数：
+
+@defun case-table-p object
+如果 1⁣ 是有效的 case 表，则该谓词返回非 0⁣。
+@end defun
+
+@defun set-standard-case-table table
+该函数使 @var{table} 成为标准情况表，以便它将在随后创建的任何缓冲区中使用。
+@end defun
+
+@defun standard-case-table
+这将返回标准案例表。
+@end defun
+
+@defun current-case-table
+该函数返回当前缓冲区的情况表。
+@end defun
+
+@defun set-case-table table
+这会将当前缓冲区的情况表设置为@var{table}。
+@end defun
+
+@defmac with-case-table table body@dots{}
+@code{with-case-table}宏保存当前情况表，使@var{table}成为当前情况表，评估@var{body}形式，最后恢复情况表。  返回值是@var{body}中最后一个表单的值。  即使通过 @code{throw} 或错误 (@pxref{Nonlocal Exits}) 异常退出，案例表也会恢复。
+@end defmac
+
+某些语言环境会修改 @acronym{ASCII} 字符的大小写转换；例如，在土耳其语环境中，@acronym{ASCII} 大写字母 I 会小写为土耳其语无点 i (@samp{@dotless{i}})。  这可能会干扰需要普通 @acronym{ASCII} 大小写转换的代码，例如基于 @acronym{ASCII} 的网络协议的实现。  在这种情况下，请使用 @code{with-case-table} 宏和变量 @var{ascii-case-table}，该变量存储 @acronym{ASCII} 字符集的未修改的大小写表。
+
+@defvar ascii-case-table
+@acronym{ASCII} 字符集的大小写表。  任何语言环境设置都不应修改此值。
+@end defvar
+
+以下三个函数是定义非 0⁣ 字符集的包的方便子例程。  他们修改指定的案例表@var{case-table}；他们还修改了标准语法表。 @xref{Syntax Tables}。  通常您会使用这些函数来更改标准案例表。
+
+@defun set-case-syntax-pair uc lc case-table
+该函数指定一对对应的字母，一个大写，一个小写。
+@end defun
+
+@defun set-case-syntax-delims l r case-table
+此函数使字符 @var{l} 和 @var{r} 成为一对匹配的大小写不变的分隔符。
+@end defun
+
+@defun set-case-syntax char syntax case-table
+该函数使 @var{char} 大小写不变，语法为 @var{syntax}。
+@end defun
+
+@deffn Command describe-buffer-case-table
+此命令显示当前缓冲区案例表内容的描述。
+@end deffn

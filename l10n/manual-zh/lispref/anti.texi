@@ -1,0 +1,74 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1999, 2002--2026 Free Software Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+
+@c This node must have no pointers.
+
+@node Antinews
+@appendix Emacs 30 反新闻
+@c Update the elisp.texi Antinews menu entry with the above version number.
+
+对于那些生活在过去的用户，以下是有关降级到 Emacs 版本 30.2 的信息。  我们希望您能享受到由于缺少许多 @w{Emacs @value{EMACSVER}} 功能而带来的更大的简单性。
+
+@itemize @bullet
+@item 
+Lisp 字符串现在是可变的。  您可以在单字节字符串上使用 @code{aset} 将单个字节替换为多字节字符，而在多字节字符串上使用 @code{aset} 可以将任何字符替换为任何其他字符，无论它们是 ASCII 还是多字节非 ASCII@. 我们认为这些限制不符合 Emacsy，并且妨碍使用字符串执行各种令人兴奋的操作。
+
+@item 
+非主线程当前的缓冲区不能被其他线程杀死。  我们决定摆脱允许杀死此类缓冲区所需的众多复杂性。  如果您的程序需要终止此类缓冲区，则需要使用严格的方法，首先使其他一些缓冲区成为线程的当前缓冲区。
+
+@item 
+我们取消了对继承自自身的面孔的早期检测。随着时光倒流，Emacs Lisp 程序员变得越来越熟练，因此禁止此类技巧感觉是错误的。  那些不太了解自己在做什么的人将受到严重惩罚，因为他们的 Lisp 程序会在显示时崩溃，甚至会影响 Emacs。
+
+@item 
+现在，在批处理模式下调用 @code{debug} 会终止 Emacs。  我们认为继续进入调试器的批处理会话是没有意义的：无论如何，谁以及如何调试它？
+
+出于同样的原因，批处理模式下的@kbd{C-c}现在总是杀死 Emacs，它永远不会退出。
+
+@item 
+访问和操作错误描述符的函数已被删除。像@code{error-type}、@code{error-slot-value}之类的函数都是无用的膨胀，因为 Lisp 程序可以直接访问数据结构，正如上帝的意图！
+
+@item 
+我们删除了@code{frame-initial-p}，因为它的工作可以通过测试几个模糊的变量和框架参数轻松完成。
+
+@item 
+我们添加了 @code{redisplay-dont-pause} 变量，因此我们可以允许中断 Emacs 过去版本之一中失控的重新显示周期。
+
+@item 
+不再保证所有数字字符都属于 @code{digit} (@code{?6}) 类别。  我们觉得这种愚蠢的一致性剥夺了 Lisp 程序员太多的乐趣，他们应该通过反复试验来发现哪些数字属于这一类别。
+
+出于同样的原因，并非所有属于 @code{symbol} 脚本的字符都具有 @code{symbol} (@code{?5}) 类别。
+
+@item 
+Lisp 程序现在可以通过调用 @code{delete-frame} 轻松删除该守护进程框架，就像删除任何其他框架一样。  我们认为没有理由对守护进程框架进行特殊处理，特别是因为某些过去的 Emacs 版本将完全删除守护进程功能。
+
+@item 
+在 @code{load-path} 上找到的 Lisp 文件不再被缓存。  当我们转向以前版本的 Emacs 时，我们打算让 @code{load-path} 列表变得越来越短，因此缓存文件会带来不必要的复杂性，并且会占用宝贵的内存。
+
+@item 
+加载 Lisp 文件时有关缺少 @code{lexical-binding} cookie 的烦人警告已被删除。  这是在过去的版本之一中，朝着最终消除 Emacs 中的词法绑定又迈出了一步。
+
+出于同样的原因，通过 @option{-x} 和 @option{--script} 命令行选项加载的 Lisp 文件默认不再使用词法绑定。
+
+@item 
+为了保持 Emacs 的干净和优雅，我们删除了 @code{setopt-local} 宏。  这是又一个无用的膨胀，因为使用@code{setq-local}很容易做同样的事情，并且避免了关于值和@code{defcustom}定义的预期类型不匹配的烦人警告。
+
+@item 
+纯存储现在是 Emacs 的一部分，并且会一直存在。  函数 @code{purecopy} 实际上将其参数复制到纯存储中。  这是使 Emacs 在过去的计算机上更具内存效率的重要一步，更广泛地说，是朝着使用 @code{unexec} 作为转储 Emacs 的唯一方法迈出的重要一步。
+
+@item 
+@code{cond*} 宏已被删除。  您仍然可以使用 @code{pcase} 代替，但最好开始专门使用古老的 @code{cond}，因为 @code{pcase} 及其同类将在不久的将来从 Emacs 中消失。没有人应该需要这些花哨且难以阅读的结构及其晦涩的语义和无数的反引号！  原始 Emacs Lisp 的原始控制流特殊形式已经足够了。
+
+@item 
+外部参照命令自动建议访问标签表。  这是为了启用符号补全，并且通常会移除除过去某些 Emacs 版本中的 @code{etags} 后端之外的所有后端。
+
+@item 
+函数 @code{secure-hash} 中删除了对 SHA-3 消息摘要的支持。  我们计划继续从该函数中删除算法，以使 Emacs 尽可能精简。  最终，只需一种摘要就足以满足每个人的需要！
+
+@item 
+我们删除了不必要的函数，如 @code{incf}、@code{decf}、@code{plusp}、@code{minusp}、@code{oddp} 和 @code{evenp}。  使用@file{cl-lib}中的相应函数，或者在需要时编写这些简单的函数。  出于同样的原因，@code{all}、@code{any}、@code{drop-while}和@code{take-while}也消失了。
+
+@item 
+作为不断追求简单性的一部分，许多其他函数和变量已被消除。  其他自 Emacs 25 起就被声明为过时的函数和变量已被添加回来，为在遥远的过去发布 Emacs 25 做准备。
+@end itemize

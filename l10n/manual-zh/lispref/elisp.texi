@@ -1,0 +1,1649 @@
+\输入 texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename ../../info/elisp.info
+
+@ifset VOL1
+@set volflag
+@set voltitle Volume 1
+@end ifset
+
+@ifset VOL2
+@set volflag
+@set voltitle Volume 2
+@end ifset
+
+@ifset volflag
+@settitle GNU Emacs Lisp 参考手册：@value{voltitle}
+@end ifset
+@ifclear volflag
+@settitle GNU Emacs Lisp 参考手册
+@end ifclear
+@documentlanguage en
+@include docstyle.texi
+
+@c %**end of header
+
+@c See two-volume-cross-refs.txt.
+@tex
+@ifset VOL1
+\message{Formatting for two volume edition...Volume 1...}
+%
+% Read special toc file, set up in two-volume.make.
+\gdef\tocreadfilename{elisp1-toc-ready.toc}
+%
+% Don't make outlines, they're not needed and \readdatafile can't pay
+% attention to the special definition above.
+\global\let\pdfmakeoutlines=\relax
+%
+% Start volume 1 chapter numbering at 1; this must be listed as chapno0.
+\global\chapno=0
+@end ifset
+@ifset VOL2
+\message{Formatting for two volume edition...Volume 2...}
+%
+% Read special toc file, set up in two-volume.make.
+\gdef\tocreadfilename{elisp2-toc-ready.toc}
+%
+% Don't make outlines, they're not needed and \readdatafile can't pay
+% attention to the special definition above.
+\global\let\pdfmakeoutlines=\relax
+%
+% Start volume 2 chapter numbering at 27; this must be listed as chapno26
+\global\chapno=26
+@end ifset
+@end tex
+
+@include emacsver.texi
+
+@c in general, keep the following line commented out, unless doing a
+@c copy of this manual that will be published.  The manual should go
+@c onto the distribution in the full, 8.5 x 11" size.
+@c @set smallbook
+
+@ifset volflag
+@smallbook
+@end ifset
+
+@ifset smallbook
+@smallbook
+@end ifset
+
+@c per rms and peterb, use 10pt fonts for the main text, mostly to
+@c save on paper cost.
+@c Do this inside @tex for now, so current makeinfo does not complain.
+@tex
+@ifset smallbook
+@fonttextsize 10
+@end ifset
+\global\hbadness=6666 % don't worry about not-too-underfull boxes
+@end tex
+
+@c Combine indices.
+@synindex cp fn
+@syncodeindex vr fn
+@syncodeindex ky fn
+@syncodeindex pg fn
+@c We use the "type index" to index new functions and variables.
+@c @syncodeindex tp fn
+
+@c When printing, define VERSION to be the printed edition number and
+@c DATE to be the printed edition's date.  E.g., run the shell command
+@c "texi2any -D 'VERSION 3.2' -D 'DATE 31 March 2020'".  This relates
+@c mainly to the published book sold by the FSF.
+
+@copying
+@ifset VERSION
+这是 @cite{GNU Emacs Lisp Reference Manual}、@* 的第 @value{VERSION} 版
+@end ifset
+@ifclear VERSION
+这就是@cite{GNU Emacs Lisp Reference Manual}
+@end ifclear
+对应 Emacs 版本@value{EMACSVER}。
+
+版权所有 @copyright{} 1990--1996, 1998--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；不变部分为“GNU 通用公共许可证”，封面文本为“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。  从 FSF 购买副本支持其开发 GNU 和促进软件自由。”
+@end quotation
+@end copying
+
+@dircategory Emacs lisp
+@direntry
+* Elisp: (elisp).                Emacs Lisp 参考手册。
+@end direntry
+
+@titlepage
+@title GNU Emacs Lisp 参考手册
+@ifset volflag
+@subtitle @value{voltitle}
+@end ifset
+@subtitle 对于 Emacs 版本@value{EMACSVER}
+@ifset VERSION
+@subtitle 修订版@value{VERSION}、@value{DATE}
+@end ifset
+
+@author by Bil Lewis, Dan LaLiberte, Richard Stallman,
+@author the GNU Manual Group, et al.
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+
+@sp 2
+
+
+@sp 2
+封面艺术由艾蒂安·苏瓦萨 (Etienne Suvasa) 绘制。
+@end titlepage
+
+
+@c Print the tables of contents
+@summarycontents
+@contents
+
+
+@ifnottex
+@node Top
+@top Emacs Lisp
+
+@ifset WWW_GNU_ORG
+@html
+<p>The GNU Emacs website is at
+<a href="/software/emacs/">https://www.gnu.org/software/emacs/</a>.<br>
+For information on using Emacs, refer to the
+<a href="/software/emacs/manual/emacs.html">Emacs Manual</a>.<br>
+To view this manual in other formats, click
+<a href="/software/emacs/manual/elisp.html">here</a>.
+@end html
+@end ifset
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Introduction::             使用的介绍和约定。
+
+* Lisp Data Types::          Emacs Lisp 中对象的数据类型。
+* Numbers::                  数字和算术函数。
+* Strings and Characters::   字符串以及对其进行操作的函数。
+* Lists::                    列表、cons 单元格和相关函数。
+* Sequences Arrays Vectors::   列表、字符串和向量称为序列。某些函数作用于任何类型的序列。向量的描述也在这里。
+* Records::                  具有程序员定义类型的复合对象。
+* Hash Tables::              
+* Symbols::                  符号代表名称，独一无二。
+
+* Evaluation::               Lisp 表达式是如何计算的。
+* Control Structures::       条件、循环、非本地退出。
+* Variables::                在程序中使用符号来代表值。
+* Functions::                
+* Macros::                   宏是扩展 Lisp 语言的一种方式。
+* Customization::            使变量和面孔可定制。
+
+* Loading::                  将 Lisp 代码文件读入 Lisp。
+* Byte Compilation::         编译使程序运行得更快。
+* Native Compilation::       将 Lisp 编译为本机机器代码。
+* Debugging::                调试 Lisp 程序的工具和技巧。
+
+* Read and Print::           将 Lisp 对象与文本相互转换。
+* Minibuffers::              使用迷你缓冲区读取输入。
+* Command Loop::             编辑器命令循环如何工作，以及如何调用其子例程。
+* Keymaps::                  定义从键到命令的绑定。
+* Modes::                    定义主要模式和次要模式。
+* Documentation::            编写和使用文档字符串。
+
+* Files::                    
+* Backups and Auto-Saving::  控制备份和自动保存文件的方式。
+* Buffers::                  创建和使用缓冲区对象。
+* Windows::                  操作窗口和显示缓冲区。
+* Frames::                   制作多个系统级窗口。
+* Positions::                缓冲区位置和运动功能。
+* Markers::                  标记代表位置并在文本更改时自动更新。
+
+* Text::                     检查和更改缓冲区中的文本。
+* Non-ASCII Characters::     缓冲区和字符串中的非 ASCII 文本。
+* Searching and Matching::   在缓冲区中搜索字符串或正则表达式。
+* Syntax Tables::            语法表控制单词和列表解析。
+* Parsing Expression Grammars::  解析结构化缓冲区文本。
+* Parsing Program Source::   生成程序源的语法树。
+* Abbrevs::                  Abbrev 模式的工作原理及其数据结构。
+
+* Threads::                  Emacs Lisp 中的并发。
+* Processes::                运行子进程并与子进程通信。
+* Display::                  用于控制屏幕显示的功能。
+* System Interface::         获取用户 ID、系统类型、环境变量和其他此类信息。
+
+* Packaging::                准备 Lisp 代码以供分发。
+
+附录
+
+* Antinews::                 降级到 Emacs 30 的用户的信息。
+* GNU Free Documentation License::  本文档的许可证。
+* GPL::                      复制和更改 GNU Emacs 的条件。
+* Tips::                     Emacs Lisp 的建议和编码约定。
+* GNU Emacs Internals::      构建和转储 Emacs；内部数据结构。
+* Standard Errors::          一些标准错误符号的列表。
+* Standard Keymaps::         一些标准键盘映射的列表。
+* Standard Hooks::           一些标准钩子变量的列表。
+
+* Index::                    索引包括概念、函数​​、变量和其他术语。
+
+@ignore
+* New Symbols::             New functions and variables in Emacs @value{EMACSVER}.
+@end ignore
+
+@c Do NOT modify the following 3 lines!  They must have this form to
+@c be correctly identified by 'texinfo-multiple-files-update'.  In
+@c particular, the detailed menu header line MUST be identical to the
+@c value of 'texinfo-master-menu-header'.  See texnfo-upd.el.
+
+@detailmenu
+--- 详细节点列表 --- ---------------------------------
+
+以下是已列出的其他节点的子节点，请在此处提及，以便您可以一步访问它们：
+
+介绍
+
+* Caveats::                  缺陷和请求帮助。
+* Lisp History::             Emacs Lisp 是 Maclisp 的后代。
+* Conventions::              手册的格式如何。
+* Version Info::             正在运行哪个 Emacs 版本？
+* Acknowledgments::          本手册的作者、编辑和赞助者。
+
+惯例
+
+* Some Terms::               本手册中使用的术语的解释。
+* nil and t::                如何使用符号 @code{nil} 和 @code{t}。
+* Evaluation Notation::      我们用于评估示例的格式。
+* Printing Notation::        我们在示例打印文本时使用的格式。
+* Error Messages::           我们用于错误示例的格式。
+* Buffer Text Notation::     我们在示例中用于缓冲区内容的格式。
+* Format of Descriptions::   用于描述函数、变量等的符号。
+
+描述格式
+
+* A Sample Function Description::   虚函数 @code{foo} 的描述。
+* A Sample Variable Description::   虚数变量 @code{electric-future-map} 的描述。
+
+Lisp 数据类型
+
+* Printed Representation::   Lisp 对象如何表示为文本。
+* Special Read Syntax::      所有特殊序列的概述。
+* Comments::                 注释及其格式约定。
+* Programming Types::        所有 Lisp 系统中都存在的类型。
+* Editing Types::            Emacs 特有的类型。
+* Circular Objects::         读取循环结构的语法。
+* Type Predicates::          与类型相关的测试。
+* Equality Predicates::      测试任意两个对象之间的相等性。
+* Mutability::               某些对象不应被修改。
+* Type Hierarchy::           Emacs Lisp 对象的类型层次结构。
+
+编程类型
+
+* Integer Type::         没有小数部分的数字。
+* Floating-Point Type::  带有小数部分且范围很大的数字。
+* Character Type::       字母、数字和控制字符的表示。
+* Symbol Type::          引用函数、变量或属性列表并具有唯一标识的多用途对象。
+* Sequence Type::        列表和数组都被归类为序列。
+* Cons Cell Type::       缺点单元格和列表（由缺点单元格组成）。
+* Array Type::           数组包括字符串和向量。
+* String Type::          （有效的）字符数组。
+* Vector Type::          一维数组。
+* Char-Table Type::      按字符索引的一维稀疏数组。
+* Bool-Vector Type::     @code{t} 或 @code{nil} 的一维数组。
+* Hash Table Type::      超快的查找表。
+* Function Type::        您可以从其他地方调用的一段可执行代码。
+* Macro Type::           一种将一个表达式扩展为另一个表达式的方法，更基本但不太美观。
+* Primitive Function Type::      用 C 编写的函数，可从 Lisp 调用。
+* Closure Type::         用 Lisp 编写的函数，然后进行编译。
+* Record Type::          具有程序员定义类型的复合对象。
+* Type Descriptors::     保存有关类型信息的对象。
+* Autoload Type::        用于自动加载很少使用的函数的类型。
+* Finalizer Type::       当不再可达时运行代码。
+
+字符类型
+
+* Basic Char Syntax::        常规字符的语法。
+* General Escape Syntax::    如何通过代码指定字符。
+* Ctl-Char Syntax::          控制字符的语法。
+* Meta-Char Syntax::         元字符的语法。
+* Other Char Bits::          超级字符、超级字符和替代字符的语法。
+
+缺点 单元格和列表类型
+
+* Box Diagrams::             绘制列表图片。
+* Dotted Pair Notation::     cons 单元格的通用语法。
+* Association List Type::    专门构建的列表。
+
+字符串类型
+
+* Syntax for Strings::       如何指定 Lisp 字符串。
+* Non-ASCII in Strings::     字符串中的国际字符。
+* Nonprinting Characters::   字符串中不可打印的文字字符。
+* Text Props and Strings::   具有文本属性的字符串。
+
+编辑类型
+
+* Buffer Type::              编辑的基本对象。
+* Marker Type::              缓冲区中的一个位置。
+* Window Type::              缓冲区显示在窗口中。
+* Frame Type::               Windows 细分框架。
+* Terminal Type::            终端设备显示帧。
+* Window Configuration Type::   记录帧的细分方式。
+* Frame Configuration Type::    记录所有帧的状态。
+* Process Type::             运行在底层操作系统上的 Emacs 子进程。
+* Thread Type::              Emacs Lisp 执行的线程。
+* Mutex Type::               用于线程同步的独占锁。
+* Condition Variable Type::     线程同步的条件变量。
+* Stream Type::              接收或发送字符。
+* Keymap Type::              击键会调用什么功能。
+* Overlay Type::             如何表示叠加层。
+* Font Type::                用于显示文本的字体。
+* Xwidget Type::             可嵌入的小部件。
+
+数字
+
+* Integer Basics::           整数的表示和范围。
+* Float Basics::             浮点数的表示形式和范围。
+* Predicates on Numbers::    测试数字。
+* Comparison of Numbers::    等式和不等式谓词。
+* Numeric Conversions::      将浮点数转换为整数，反之亦然。
+* Arithmetic Operations::    如何加、减、乘、除。
+* Rounding Operations::      显式舍入浮点数。
+* Bitwise Operations::       逻辑与、或、非移位。
+* Math Functions::           三角函数、指数函数和对数函数。
+* Random Numbers::           获取随机整数，无论​​是否可预测。
+
+字符串和字符
+
+* String Basics::            字符串和字符的基本属性。
+* Predicates for Strings::   测试对象是字符串还是字符。
+* Creating Strings::         分配新字符串的函数。
+* Modifying Strings::        更改现有字符串的内容。
+* Text Comparison::          比较字符或字符串。
+* String Conversion::        字符和字符串之间的转换。
+* Formatting Strings::       @code{format}：Emacs 的@code{printf} 类似物。
+* Case Conversion::          大小写转换函数。
+* Case Tables::              自定义大小写转换。
+
+列表
+
+* Cons Cells::               列表是如何由 cons 单元格组成的。
+* List-related Predicates::  这个对象是一个列表吗？  比较两个列表。
+* List Elements::            提取列表的各个部分。
+* Building Lists::           创建列表结构。
+* List Variables::           修改存储在变量中的列表。
+* Modifying Lists::          将新片段存储到现有列表中。
+* Sets And Lists::           列表可以表示有限的数学集合。
+* Association Lists::        列表可以表示有限关系或映射。
+* Property Lists::           成对元素的列表。
+
+修改现有列表结构
+
+* Setcar::                   替换列表中的元素。
+* Setcdr::                   替换部分列表主干。这可用于删除或添加元素。
+* Rearrangement::            对列表中的元素重新排序；组合列表。
+
+房产清单
+
+* Plists and Alists::        属性列表和关联列表的优点比较。
+* Plist Access::             访问存储在其他地方的属性列表。
+
+序列、数组和向量
+
+* Sequence Functions::       接受任何类型序列的函数。
+* Arrays::                   Emacs Lisp 中数组的特征。
+* Array Functions::          专门用于数组的函数。
+* Vectors::                  Emacs Lisp 向量的特殊特征。
+* Vector Functions::         专门针对向量的函数。
+* Char-Tables::              如何使用字符表。
+* Bool-Vectors::             如何使用布尔向量。
+* Rings::                    管理固定大小的对象环。
+
+记录
+
+* Record Functions::         记录功能。
+* Backward Compatibility::   cl-defstruct 的兼容性。
+
+哈希表
+
+* Creating Hash::            创建哈希表的函数。
+* Hash Access::              读取和写入哈希表内容。
+* Defining Hash::            定义新的比较方法。
+* Other Hash::               各种各样的。
+
+符号
+
+* Symbol Components::        符号具有名称、值、函数定义和属性列表。
+* Definitions::              定义说明了如何使用符号。
+* Creating Symbols::         如何保持符号的独特性。
+* Symbol Properties::        每个符号都有一个属性列表，用于记录各种信息。
+* Shorthands::               正确组织您的符号名称，但少输入它们。
+* Symbols with Position::    包含整数位置的符号变体
+
+符号属性
+
+* Symbol Plists::            访问符号属性。
+* Standard Properties::      符号属性的标准含义。
+
+评估
+
+* Intro Eval::               在事物的计划中进行评估。
+* Forms::                    如何评估各种类型的对象。
+* Quoting::                  避免求值（将常量放入程序中）。
+* Backquote::                更容易构建列表结构。
+* Eval::                     如何显式调用 Lisp 解释器。
+* Deferred Eval::            表单的延迟和惰性评估。
+
+表格种类
+
+* Self-Evaluating Forms::    自我评估的形式。
+* Symbol Forms::             符号作为变量进行计算。
+* Classifying Lists::        如何区分各种列表形式。
+* Function Indirection::     当一个符号作为列表中的汽车出现时，我们可以通过该符号找到真正的功能。
+* Function Forms::           调用函数的表单。
+* Macro Forms::              调用宏的表单。
+* Special Forms::            特殊形式是特殊的原语，其中大多数都非常重要。
+* Autoloading::              设置函数来加载包含其真实定义的文件。
+
+控制结构
+
+* Sequencing::               按文本顺序进行评估。
+* Conditionals::             @code{if}, @code{cond}, @code{when}, @code{unless}.
+* Combining Conditions::     @code{and}, @code{or}, @code{not}.
+* Pattern-Matching Conditional::   如何使用@code{pcase}和朋友。
+* Iteration::                @code{while} 循环。
+* Generators::               通用序列和协程。
+* Nonlocal Exits::           跳出序列。
+
+非本地出口
+
+* Catch and Throw::          非本地退出是为了程序自身的目的。
+* Examples of Catch::        展示如何编写此类非本地出口。
+* Errors::                   如何发出错误信号并处理错误。
+* Cleanups::                 如果发生错误，安排运行清理表单。
+
+错误
+
+* Signaling Errors::         如何报告错误。
+* Processing of Errors::     当您报告错误时 Emacs 会做什么。
+* Handling Errors::          如何捕获错误并继续执行。
+* Error Symbols::            如何对错误进行分类以捕获错误。
+
+变量
+
+* Global Variables::         变量值永久存在、无处不在。
+* Constant Variables::       永远不会改变的变量。
+* Local Variables::          仅暂时存在的变量值。
+* Void Variables::           缺乏价值的符号。
+* Defining Variables::       定义表示符号用作变量。
+* Tips for Defining::        定义变量时应该考虑的事情。
+* Accessing Variables::      检查名称仅在运行时已知的变量的值。
+* Setting Variables::        在变量中存储新值。
+* Watching Variables::       当变量更改时运行函数。
+* Variable Scoping::         Lisp 如何在局部值和全局值之间进行选择。
+* Buffer-Local Variables::   变量值仅在一个缓冲区中有效。
+* File Local Variables::     处理文件中的局部变量列表。
+* Directory Local Variables::  目录中所有文件共有的局部变量。
+* Connection Local Variables::   远程连接常用的本地变量。
+* Variable Aliases::         作为其他变量的别名的变量。
+* Variables with Restricted Values::   非常量变量，其值可以
+@emph{not} 是任意 Lisp 对象。
+* Generalized Variables::    扩展变量的概念。
+* Multisession Variables::   重新启动 Emacs 后仍然存在的变量。
+
+变量绑定的作用域规则
+
+* Lexical Binding::          局部变量绑定的标准类型。
+* Dynamic Binding::          不同类型的局部变量绑定。
+* Dynamic Binding Tips::     避免动态绑定的问题。
+* Selecting Lisp Dialect::    如何选择要使用的 Emacs Lisp 方言。
+* Converting to Lexical Binding::  将现有代码转换为词法绑定。
+
+缓冲区局部变量
+
+* Intro to Buffer-Local::    简介和概念。
+* Creating Buffer-Local::    创建和销毁缓冲区本地绑定。
+* Default Value::            默认值出现在没有自己的缓冲区本地值的缓冲区中。
+
+广义变量
+
+* Setting Generalized Variables::    @code{setf} 宏。
+* Adding Generalized Variables::     定义新的 @code{setf} 形式。
+
+多会话变量
+
+* Multisession Variables::       重新启动 Emacs 后仍然存在的变量。
+
+功能
+
+* What Is a Function::       Lisp 函数与@:原语；术语。
+* Lambda Expressions::       函数如何表达为 Lisp 对象。
+* Function Names::           符号可以用作函数的名称。
+* Defining Functions::       用于定义函数的 Lisp 表达式。
+* Calling Functions::        如何使用现有功能。
+* Mapping Functions::        将函数应用于列表的每个元素等。
+* Anonymous Functions::      Lambda 表达式是没有名称的函数。
+* Generic Functions::        多态性，Emacs 风格。
+* Function Cells::           访问或设置符号的函数定义。
+* Closures::                 包含词法环境的函数。
+* OClosures::                带有元数据的函数对象。
+* Advising Functions::       添加到函数的定义中。
+* Obsolete Functions::       声明函数已过时。
+* Inline Functions::         定义编译器将内联扩展的函数。
+* Declare Form::           添加有关函数的附加信息。
+* Declaring Functions::      告诉编译器定义了一个函数。
+* Function Safety::          确定函数调用是否安全。
+* Related Topics::           对特定 Lisp 原语的交叉引用，这些原语对函数的工作方式有特殊影响。
+
+定义函数
+
+* Finding Definitions::      查找由宏创建的函数定义。
+
+拉姆达表达式
+
+* Lambda Components::        lambda 表达式的各个部分。
+* Simple Lambda::            一个简单的例子。
+* Argument List::            参数列表的详细信息和特殊功能。
+* Function Documentation::   如何将文档放入函数中。
+
+为 Emacs Lisp 函数提供建议
+
+* Core Advising Primitives::   操纵建议的原语。
+* Advising Named Functions::   建议命名函数。
+* Advice Combinators::         撰写建议的方法。
+* Porting Old Advice::         使用旧的默认设置调整代码。
+* Advice and Byte Code::       并非所有功能都可以提供建议。
+
+宏
+
+* Simple Macro::             一个基本的例子。
+* Expansion::                如何、何时以及为何扩展宏。
+* Compiling Macros::         编译器如何扩展宏。
+* Defining Macros::          如何编写宏定义。
+* Problems with Macros::     不要多次评估宏参数。不要隐藏用户的变量。
+* Indenting Macros::         指定如何缩进宏调用。
+
+使用宏的常见问题
+
+* Wrong Time::              在扩展中进行工作，而不是在宏中进行。
+* Argument Evaluation::     扩展应该对每个宏参数求值一次。
+* Surprising Local Vars::   扩展中的局部变量绑定需要特别小心。
+* Eval During Expansion::   不要评价他们；将它们放入扩展中。
+* Repeated Expansion::      避免依赖于扩展完成的次数。
+
+自定义设置
+
+* Common Keywords::          各种自定义声明的通用关键字参数。
+* Group Definitions::        编写自定义组定义。
+* Variable Definitions::     声明用户选项。
+* Customization Types::      指定用户选项的类型。
+* Applying Customizations::  应用自定义设置的功能。
+* Custom Themes::            编写自定义主题。
+
+定制类型
+
+* Simple Types::             简单的自定义类型：sexp、integer 等。
+* Composite Types::          从其他类型或数据构建新类型。
+* Splicing into Lists::      使用 @code{:inline} 将元素拼接到列表中。
+* Type Keywords::            自定义类型中的关键字参数对。
+* Defining New Types::       为您的类型命名。
+
+加载中
+
+* How Programs Do Loading::  @code{load} 函数及其他。
+* Load Suffixes::            有关 @code{load} 尝试的后缀的详细信息。
+* Library Search::           寻找要加载的库。
+* Loading Non-ASCII::        Emacs Lisp 文件中的非@acronym{ASCII} 字符。
+* Autoload::                 设置自动加载功能。
+* Repeated Loading::         两次加载文件的注意事项。
+* Named Features::           如果尚未加载库，则加载该库。
+* Where Defined::            查找哪个文件定义了某个符号。
+* Unloading::                如何卸载已加载的库。
+* Hooks for Loading::        提供加载特定库时要运行的代码。
+* Dynamic Modules::          模块提供了额外的 Lisp 原语。
+
+字节编译
+
+* Speed of Byte-Code::       字节编译加速的示例。
+* Compilation Functions::    字节编译函数。
+* Docs and Compilation::     文档字符串的动态加载。
+* Eval During Compile::      编译时要评估的代码。
+* Compiler Errors::          处理编译器错误消息。
+* Closure Objects::          用于字节编译函数的数据类型。
+* Disassembly::              反汇编字节码；如何读取字节码。
+
+原生编译
+
+* Native-Compilation Functions::   本地编译 Lisp 的函数。
+* Native-Compilation Variables::   控制本机编译的变量。
+
+调试 Lisp 程序
+
+* Debugger::                 Emacs Lisp 评估器的调试器。
+* Edebug::                   源代码级 Emacs Lisp 调试器。
+* Syntax Errors::            如何查找语法错误。
+* Test Coverage::            确保您已测试代码中的所有分支。
+* Profiling::                测量代码使用的资源。
+
+Lisp 调试器
+
+* Error Debugging::          发生错误时进入调试器。
+* Infinite Loops::           停止并调试不退出的程序。
+* Function Debugging::       当调用某个函数时输入它。
+* Variable Debugging::       修改变量时输入它。
+* Explicit Debug::           在程序中的某个点输入它。
+* Using Debugger::           调试器做什么。
+* Backtraces::               您在调试器中看到的内容。
+* Debugger Commands::        在调试器中使用的命令。
+* Invoking the Debugger::    如何调用函数@code{debug}。
+* Internals of Debugger::    调试器的子例程和全局变量。
+
+埃德布格
+
+* Using Edebug::             Edebug的使用介绍。
+* Instrumenting::            您必须检测代码才能使用 Edebug 进行调试。
+* Edebug Execution Modes::   执行模式，或多或少地停止。
+* Jumping::                  跳转到指定位置的命令。
+* Edebug Misc::              各种命令。
+* Breaks::                   设置断点使程序停止。
+* Trapping Errors::          使用 Edebug 捕获错误。
+* Edebug Views::             Edebug 内部和外部的视图。
+* Edebug Eval::              评估 Edebug 中的表达式。
+* Eval List::                每次进入 Edebug 时都会显示其值的表达式。
+* Printing in Edebug::       印刷定制。
+* Trace Buffer::             如何在缓冲区中生成跟踪输出。
+* Coverage Testing::         如何测试评估覆盖率。
+* The Outside Context::      Edebug 保存和恢复的数据。
+* Edebug and Macros::        指定如何处理宏调用。
+* Edebug Options::           用于自定义 Edebug 的选项变量。
+
+休息时间
+
+* Breakpoints::              在停止点处断点。
+* Global Break Condition::   打破一个事件。
+* Source Breakpoints::       在源代码中嵌入断点。
+
+外部环境
+
+* Checking Whether to Stop:: 当 Edebug 决定要做什么时。
+* Edebug Display Update::    当 Edebug 更新显示时。
+* Edebug Recursive Edit::    当Edebug停止执行时。
+
+Edebug 和宏
+
+* Instrumenting Macro Calls:: 基本问题。
+* Specification List::       如何指定复杂的评估模式。
+* Backtracking::             当匹配失败时 Edebug 会做什么。
+* Specification Examples::   帮助理解规格。
+
+调试无效的 Lisp 语法
+
+* Excess Open::              如何找到虚假的开括号或丢失的闭括号。
+* Excess Close::             如何找到虚假的闭括号或丢失的开括号。
+
+读取和打印 Lisp 对象
+
+* Streams Intro::            流、读取和打印概述。
+* Input Streams::            可用作输入流的各种数据类型。
+* Input Functions::          从文本中读取 Lisp 对象的函数。
+* Output Streams::           可用作输出流的各种数据类型。
+* Output Functions::         将 Lisp 对象打印为文本的函数。
+* Output Variables::         控制打印函数功能的变量。
+* Output Overrides::         覆盖输出变量。
+
+迷你缓冲区
+
+* Intro to Minibuffers::     有关迷你缓冲区的基本信息。
+* Text from Minibuffer::     如何读取直接文本字符串。
+* Object from Minibuffer::   如何读取 Lisp 对象或表达式。
+* Minibuffer History::       记录以前的迷你缓冲区输入，以便用户可以重复使用它们。
+* Initial Input::            指定迷你缓冲区的初始内容。
+* Completion::               如何调用和自定义完成。
+* Yes-or-No Queries::        提出问题并给出简单的答案。
+* Multiple Queries::         问一系列类似的问题。
+* Reading a Password::       从终端读取密码。
+* Minibuffer Commands::      用作迷你缓冲区中的键绑定的命令。
+* Minibuffer Windows::       在特殊的迷你缓冲区窗口上操作。
+* Minibuffer Contents::      此类命令如何访问迷你缓冲区文本。
+* Recursive Mini::           是否允许递归进入迷你缓冲区。
+* Inhibiting Interaction::   当无法进行交互时运行 Emacs。
+* Minibuffer Misc::          各种定制挂钩和变量。
+
+完成
+
+* Basic Completion::         用于完成字符串的低级函数。
+* Minibuffer Completion::    调用迷你缓冲区并完成。
+* Completion Commands::      执行完成操作的迷你缓冲区命令。
+* High-Level Completion::    方便的特殊情况完成（读取缓冲区名称、变量名称等）。
+* Reading File Names::       使用补全来读取文件名和 shell 命令。
+* Completion Variables::     控制完成行为的变量。
+* Programmed Completion::    编写自己的补全函数。
+* Completion in Buffers::    完成普通缓冲区中的文本。
+
+命令循环
+
+* Command Overview::     命令循环如何读取命令。
+* Defining Commands::    指定函数应如何读取参数。
+* Interactive Call::     调用命令，以便它读取参数。
+* Distinguish Interactive::      使命令区分交互式调用。
+* Command Loop Info::    由命令循环设置的变量供您检查。
+* Adjusting Point::      命令后点的调整。
+* Input Events::         当你阅读它时，输入看起来是什么样的。
+* Reading Input::        如何从键盘或鼠标读取输入事件。
+* Special Events::       事件立即单独处理。
+* Waiting::              等待用户输入或经过的时间。
+* Quitting::             @kbd{C-g} 如何工作。  如何抓住或推迟戒烟。
+* Prefix Command Arguments::     设置前缀参数的命令如何工作。
+* Recursive Editing::    输入递归编辑，以及为什么通常不应该这样做。
+* Disabling Commands::   命令循环如何处理禁用的命令。
+* Command History::      命令历史记录如何设置以及如何访问。
+* Keyboard Macros::      键盘宏是如何实现的。
+
+定义命令
+
+* Using Interactive::        @code{interactive} 的一般规则。
+* Interactive Codes::        以各种方式读取参数的标准字母代码。
+* Interactive Examples::     如何阅读交互式参数的示例。
+* Command Modes::            指定命令用于特定模式。
+* Generic Commands::         在命令选项中进行选择。
+
+
+输入事件
+
+* Keyboard Events::          普通字符——带有符号的按键。
+* Function Keys::            功能键——带有名称而不是符号的键。
+* Mouse Events::             鼠标事件概述。
+* Click Events::             按下并释放鼠标按钮。
+* Drag Events::              在释放按钮之前移动鼠标。
+* Button-Down Events::       按钮被按下但尚未释放。
+* Repeat Events::            双击或三次单击（或拖动或向下）。
+* Motion Events::            只需移动鼠标，无需按按钮。
+* Focus Events::             在帧之间移动鼠标。
+* Misc Events::              系统可以生成的其他事件。
+* Event Examples::           鼠标事件列表的示例。
+* Classifying Events::       查找事件符号中的修饰键。事件类型。
+* Accessing Mouse::          从鼠标事件中提取信息的函数。
+* Accessing Scroll::         从滚动条事件获取信息的函数。
+* Strings of Events::        将键盘字符事件放入字符串中的特殊注意事项。
+
+读取输入
+
+* Key Sequence Input::       如何读取一键序列。
+* Reading One Event::        如何仅读取一个事件。
+* Event Mod::                Emacs 如何在读取事件时对其进行修改。
+* Invoking the Input Method::    如何使用输入法读取事件。
+* Quoted Character Input::   要求用户指定一个字符。
+* Event Input Misc::         如何重新读取或丢弃输入事件。
+
+键位图
+
+* Key Sequences::            作为 Lisp 对象的按键序列。
+* Keymap Basics::            键映射的基本概念。
+* Format of Keymaps::        作为 Lisp 对象，键盘映射是什么样子的。
+* Creating Keymaps::         创建和复制键盘映射的功能。
+* Inheritance and Keymaps::  一个键盘映射如何继承另一键盘映射的绑定。
+* Prefix Keys::              使用键映射作为其定义来定义键。
+* Active Keymaps::           Emacs 如何在活动键盘映射中搜索键绑定。
+* Searching Keymaps::        搜索活动地图的伪 Lisp 总结。
+* Controlling Active Maps::  每个缓冲区都有一个本地键盘映射来覆盖标准（全局）绑定。次要模式也可以覆盖它们。
+* Key Lookup::               在一个键盘映射中查找某个键的绑定。
+* Functions for Key Lookup::     如何请求密钥查找。
+* Changing Key Bindings::    重新定义键映射中的键。
+* Low-Level Key Binding::    旧版键语法描述。
+* Remapping Commands::       键映射可以将一个命令转换为另一个命令。
+* Translation Keymaps::      用于翻译事件序列的键盘映射。
+* Key Binding Commands::     用于重新定义按键的交互式界面。
+* Scanning Keymaps::         查看所有键盘映射以获取打印帮助。
+* Menu Keymaps::             将菜单定义为键盘映射。
+
+菜单键映射
+
+* Defining Menus::           如何制作定义菜单的键盘映射。
+* Mouse Menus::              用户如何使用鼠标启动菜单。
+* Keyboard Menus::           用户如何使用键盘启动菜单。
+* Menu Example::             制作一个简单的菜单。
+* Menu Bar::                 如何自定义菜单栏。
+* Tool Bar::                 工具栏是一排图像。
+* Modifying Menus::          如何向菜单添加新项目。
+* Easy Menu::                用于定义菜单的便捷宏。
+
+定义菜单
+
+* Simple Menu Items::        一种简单的菜单键绑定。
+* Extended Menu Items::      更复杂的菜单项定义。
+* Menu Separators::          通过菜单绘制一条水平线。
+* Alias Menu Items::         在菜单项中使用命令别名。
+
+主要和次要模式
+
+* Hooks::               如何使用钩子；如何编写提供钩子的代码。
+* Major Modes::         定义主要模式。
+* Minor Modes::         定义次要模式。
+* Mode Line Format::    自定义模式行中显示的文本。
+* Imenu::               提供在缓冲区中进行的定义的菜单。
+* Outline Minor Mode::  大纲模式与其他主要模式一起使用。
+* Font Lock Mode::      模式如何根据语法突出显示文本。
+* Auto-Indentation::    如何教 Emacs 缩进主要模式。
+* Desktop Save Mode::   模式如何在 Emacs 会话之间保存缓冲区状态。
+
+挂钩
+
+* Running Hooks::       如何运行钩子。
+* Setting Hooks::       如何将函数挂在钩子上或将其删除。
+
+主要模式
+
+* Major Mode Conventions::   键映射等的编码约定
+* Auto Major Mode::          Emacs 如何自动选择主要模式。
+* Mode Help::                了解如何使用模式。
+* Derived Modes::            基于另一个主要模式定义一个新的主要模式。
+* Basic Major Modes::        其他模式通常派生自的模式。
+* Mode Hooks::               钩子在主要模式函数的末尾运行。
+* Tabulated List Mode::      包含表格数据的缓冲区的父模式。
+* Generic Modes::            定义一个简单的主要模式，支持注释语法和字体锁定模式。
+* Example Major Modes::      文本模式和 Lisp 模式。
+
+小调
+
+* Minor Mode Conventions::   编写次要模式的技巧。
+* Keymaps and Minor Modes::  次要模式如何拥有自己的键盘映射。
+* Defining Minor Modes::     用于定义次要模式的便捷工具。
+
+模式行格式
+
+* Mode Line Basics::         模式线控制的基本思想。
+* Mode Line Data::           控制模式行的数据结构。
+* Mode Line Top::            顶级变量，模式行格式。
+* Mode Line Variables::      该数据结构中使用的变量。
+* %-Constructs::             将信息放入模式行中。
+* Properties in Mode::       在模式行中使用文本属性。
+* Header Lines::             类似于模式线，但位于顶部。
+* Tab Lines::                标题行上方的一行。
+* Emulating Mode Line::      像模式行一样设置文本格式。
+
+字体锁定模式
+
+* Font Lock Basics::         自定义字体锁定概述。
+* Search-based Fontification::   基于正则表达式的字体化。
+* Customizing Keywords::     自定义基于搜索的字体。
+* Other Font Lock Variables::    额外的定制设施。
+* Levels of Font Lock::      每种模式都可以定义替代级别，以便用户可以选择更多或更少。
+* Precalculated Fontification::  生成缓冲区内容的 Lisp 程序还可以指定如何对其进行字体化。
+* Faces for Font Lock::      专门用于字体锁定的特殊面孔。
+* Syntactic Font Lock::      基于语法表的字体化。
+* Multiline Font Lock::      如何强制 Font Lock 正确突出显示多行结构。
+* Parser-based Font Lock::   使用解析数据进行字体化。
+
+多行字体锁定结构
+
+* Font Lock Multiline::      使用文本属性标记多行块。
+* Region to Refontify::      控制缓冲区更改后重新调整哪个区域。
+
+代码自动缩进
+
+* SMIE::                     一个头脑简单的缩进引擎。
+* Parser-based Indentation::  基于解析器的缩进引擎。
+
+头脑简单的缩进引擎
+
+* SMIE setup::               SMIE 设置和功能。
+* Operator Precedence Grammars::  一个非常简单的解析技术。
+* SMIE Grammar::             定义语言的语法。
+* SMIE Lexer::               定义标记。
+* SMIE Tricks::              解决解析器的限制。
+* SMIE Indentation::         指定缩进规则。
+* SMIE Indentation Helpers::  缩进规则的辅助函数。
+* SMIE Indentation Example::  缩进规则示例。
+* SMIE Customization::       自定义缩进。
+
+文档
+
+* Documentation Basics::     定义和存储文档字符串的位置。
+* Accessing Documentation::  Lisp 程序如何访问文档字符串。
+* Keys in Documentation::    替换当前的键绑定。
+* Text Quoting Style::       文档字符串和消息中的引号。
+* Describing Characters::    对非打印字符和按键序列进行可打印的描述。
+* Help Functions::           Emacs 使用的子例程帮助工具。
+
+文件
+
+* Visiting Files::           将文件读入 Emacs 缓冲区进行编辑。
+* Saving Buffers::           将更改的缓冲区写回到文件中。
+* Reading from Files::       将文件读入缓冲区而不访问。
+* Writing to Files::         从部分缓冲区写入新文件。
+* File Locks::               锁定和解锁文件，防止两个人同时编辑。
+* Information about Files::  测试文件的存在性、可访问性、大小。
+* Changing Files::           重命名文件、更改权限等
+* File Names::               分解和扩展文件名。
+* Contents of Directories::  获取目录中的文件列表。
+* Create/Delete Dirs::       创建和删除目录。
+* Magic File Names::         对某些文件名的特殊处理。
+* Format Conversion::        与各种文件格式之间的转换。
+
+访问文件
+
+* Visiting Functions::       访问常用的界面功能。
+* Subroutines of Visiting::  他们使用的较低级子例程。
+
+有关文件的信息
+
+* Testing Accessibility::    给定的文件可读吗？  可写吗？
+* Kinds of Files::           是目录吗？  符号链接？
+* Truenames::                消除文件名中的符号链接。
+* File Attributes::          文件大小、修改时间等。
+* Extended Attributes::      用于访问控制的扩展文件属性。
+* Locating Files::           如何在标准位置查找文件。
+
+文件名
+
+* File Name Components::     文件名的目录部分，以及其余部分。
+* Relative File Names::      某些文件名是相对于当前目录的。
+* Directory Names::          目录作为目录的名称不同于作为文件的名称。
+* File Name Expansion::      将相对文件名转换为绝对文件名。
+* Unique File Names::        生成临时文件的名称。
+* File Name Completion::     查找给定文件名的补全。
+* Standard File Names::      如果你的包使用固定的文件名，如何简单地处理各种操作系统。
+
+文件格式转换
+
+* Format Conversion Overview::    @code{insert-file-contents}和@code{write-region}。
+* Format Conversion Round-Trip::  使用@code{format-alist}。
+* Format Conversion Piecemeal::   指定非配对转换。
+
+备份和自动保存
+
+* Backup Files::             备份文件是如何制作的；他们的名字是如何选择的。
+* Auto-Saving::              自动保存文件是如何制作的；他们的名字是如何选择的。
+* Reverting::                @code{revert-buffer}，以及如何自定义它的功能。
+
+备份文件
+
+* Making Backups::           Emacs 如何以及何时制作备份文件。
+* Rename or Copy::           两种选择：重命名旧文件或复制它。
+* Numbered Backups::         为每个源文件保留多个备份。
+* Backup Names::             备份文件名是如何计算的；定制。
+
+缓冲器
+
+* Buffer Basics::            什么是缓冲区？
+* Current Buffer::           将缓冲区指定为当前缓冲区，以便基元访问其内容。
+* Buffer Names::             访问和更改缓冲区名称。
+* Buffer File Name::         缓冲区文件名指示访问的是哪个文件。
+* Buffer Modification::      如果需要保存缓冲区，则其值为@dfn{modified}。
+* Modification Time::        确定访问的文件是否在 Emacs 背后被更改。
+* Read Only Buffers::        不允许在只读缓冲区中修改文本。
+* Buffer List::              如何查看所有现有缓冲区。
+* Creating Buffers::         创建缓冲区的函数。
+* Killing Buffers::          缓冲区一直存在，直到被显式终止。
+* Indirect Buffers::         间接缓冲区与其他缓冲区共享文本。
+* Swapping Text::            在两个缓冲区之间交换文本。
+* Buffer Gap::               缓冲区中的间隙。
+
+视窗
+
+* Basic Windows::            使用 Windows 的基本信息。
+* Windows and Frames::       将窗口与其出现的框架相关联。
+* Selecting Windows::        所选窗口就是您要在其中进行编辑的窗口。
+* Window Sizes::             访问窗口的大小。
+* Resizing Windows::         更改窗口的大小。
+* Preserving Window Sizes::  保留窗口的大小。
+* Splitting Windows::        将一个窗口拆分为两个窗口。
+* Deleting Windows::         删除一个窗口会将其空间分配给其他窗口。
+* Recombining Windows::      分割和删除窗口时保留框架布局。
+* Resurrecting Windows::     恢复已删除的窗口。
+* Changing Window Layouts::   有序地调换窗户。
+* Cyclic Window Ordering::   在现有窗户周围移动。
+* Buffers and Windows::      每个窗口显示缓冲区的内容。
+* Switching Buffers::        用于切换到缓冲区的高级函数。
+* Displaying Buffers::       在合适的窗口中显示缓冲区。
+* Window History::           每个窗口都会记住其中显示的缓冲区。
+* Dedicated Windows::        如何避免在特定窗口中显示另一个缓冲区。
+* Quitting Windows::         如何恢复显示缓冲区之前的状态。
+* Side Windows::             框架侧面有特殊的窗户。
+* Atomic Windows::           保留部分窗口布局。
+* Window Point::             每个窗口都有自己的点位置。
+* Window Start and End::     缓冲区位置指示窗口中屏幕上显示的文本。
+* Textual Scrolling::        在窗口中上下移动文本。
+* Vertical Scrolling::       在窗口上上下移动内容。
+* Horizontal Scrolling::     将内容在窗口上向侧面移动。
+* Coordinates and Windows::  将坐标转换为窗口。
+* Mouse Window Auto-selection::  用鼠标自动选择窗口。
+* Window Configurations::    保存和恢复屏幕状态。
+* Window Parameters::        将附加信息与窗口相关联。
+* Window Hooks::             用于滚动、窗口大小更改、超过某个点重新显示或窗口配置更改的挂钩。
+
+显示缓冲区
+
+* Choosing Window::          如何选择一个窗口来显示缓冲区。
+* Buffer Display Action Functions::  支持缓冲区显示功能。
+* Buffer Display Action Alists::  用于微调缓冲区显示操作函数的列表。
+* Choosing Window Options::  影响缓冲区显示方式的额外选项。
+* Precedence of Action Functions::  解释缓冲区显示操作函数优先级的教程。
+* The Zen of Buffer Display::  如何避免缓冲区在窗口之间丢失。
+
+侧窗
+
+* Displaying Buffers in Side Windows::  用于在侧窗中显示缓冲区的操作函数。
+* Side Window Options and Functions::  进一步调整侧窗。
+* Frame Layouts with Side Windows::  设置带有侧窗的框架布局。
+
+镜框
+
+* Creating Frames::          创建附加框架。
+* Multiple Terminals::       在多个不同的设备上显示。
+* Frame Geometry::           框架的几何特性。
+* Frame Parameters::         控制框架大小、位置、字体等。
+* Terminal Parameters::      终端上所有帧通用的参数。
+* Frame Titles::             自动更新框架标题。
+* Deleting Frames::          帧持续到明确删除为止。
+* Finding All Frames::       如何检查所有现有框架。
+* Splitting and Merging Frames::  在框架之间传输窗口布局。
+* Minibuffers and Frames::   帧如何找到要使用的迷你缓冲区。
+* Input Focus::              指定选定的框架。
+* Visibility of Frames::     框架可能是可见的或不可见的，也可能是图标。
+* Raising and Lowering::     升高、降低和重新堆叠框架。
+* Frame Configurations::     保存所有帧的状态。
+* Child Frames::             使一个框架成为另一个框架的子框架。
+* Mouse Tracking::           获取表示鼠标何时移动的事件。
+* Mouse Position::           询问鼠标在哪里，或者移动它。
+* Pop-Up Menus::             显示菜单供用户选择。
+* Dialog Boxes::             显示一个框询问是或否。
+* Pointer Shape::            指定鼠标指针的形状。
+* Window System Selections:: 与其他 X 客户端之间传输文本。
+* Accessing Selections::     多种不同类型的选择。
+* Yanking Media::            拉取非纯文本的内容。
+* Drag and Drop::            拖放实现的内部结构。
+* Color Names::              获取颜色名称的定义。
+* Text Terminal Colors::     定义文本终端的颜色。
+* Resources::                从服务器获取资源值。
+* Display Feature Testing::  确定终端的功能。
+
+框架几何形状
+
+* Frame Layout::             框架的基本布局。
+* Frame Font::               框架的默认字体以及如何设置它。
+* Frame Position::           框架在其显示上的位置。
+* Frame Size::               指定和检索框架的大小。
+* Implied Frame Resizing::   隐含的框架大小调整以及如何防止它。
+
+机架参数
+
+* Parameter Access::         如何更改框架的参数。
+* Initial Parameters::       制作框架时指定框架参数。
+* Window Frame Parameters::  窗口系统的框架参数列表。
+* Geometry::                 解析几何规范。
+
+窗框参数
+
+* Basic Parameters::         基本参数。
+* Position Parameters::      框架在屏幕上的位置。
+* Size Parameters::          框架的尺寸。
+* Layout Parameters::        框架各部分的大小，以及启用或禁用某些部分。
+* Buffer Parameters::        哪些缓冲区已经或应该显示。
+* Frame Interaction Parameters::   与其他框架交互的参数。
+* Mouse Dragging Parameters::   用于使用鼠标调整帧大小和移动帧的参数。
+* Management Parameters::    与窗口管理器通信。
+* Cursor Parameters::        控制光标的外观。
+* Font and Color Parameters::  框架文本的字体和颜色。
+
+子框架
+
+* Child Frame Operations::   制作和研究子框架。
+* Child Frame Properties::   子框架的特殊属性。
+* Child Frame Peculiarities::  子框架的异常行为。
+
+职位
+
+* Point::                    进行编辑的特殊位置。
+* Motion::                   换点。
+* Excursions::               临时运动和缓冲区变化。
+* Narrowing::                将编辑限制为缓冲区的一部分。
+
+运动
+
+* Character Motion::         在人物方面移动。
+* Word Motion::              用言语来感动。
+* Buffer End Motion::        移动到缓冲区的开头或结尾。
+* Text Lines::               按照文本行移动。
+* Screen Lines::             按照显示的线条移动。
+* List Motion::              通过解析列表和 sexp 来移动。
+* Skipping Characters::      跳过属于特定集合的字符。
+
+标记
+
+* Overview of Markers::      标记的组成部分以及它如何重新定位。
+* Predicates on Markers::    测试一个对象是否是标记。
+* Creating Markers::         在某些地方制作空标记或标记。
+* Information from Markers:: 查找标记的缓冲区或字符位置。
+* Marker Insertion Types::   当您插入标记所指向的位置时，标记可以通过两种方式重新定位。
+* Moving Markers::           将标记移动到新的缓冲区或位置。
+* The Mark::                 如何用标记实现标记。
+* The Region::               如何访问该地区。
+
+文本
+
+* Near Point::               检查点附近的文本。
+* Buffer Contents::          以一般方式检查文本。
+* Comparing Text::           比较缓冲区的子字符串。
+* Insertion::                将新文本添加到缓冲区。
+* Commands for Insertion::   用于插入文本的用户级命令。
+* Deletion::                 从缓冲区中删除文本。
+* User-Level Deletion::      用于删除文本的用户级命令。
+* The Kill Ring::            有时会保存删除的文本以供以后使用。
+* Undo::                     撤消对缓冲区文本的更改。
+* Maintaining Undo::         如何启用和禁用撤消信息。如何控制保留多少信息。
+* Filling::                  显式填充函数。
+* Margins::                  如何指定填充命令的边距。
+* Adaptive Fill::            自适应填充模式从上下文中选择填充前缀。
+* Auto Filling::             如何实现自动填充模式来换行。
+* Sorting::                  对缓冲区的各个部分进行排序的函数。
+* Columns::                  计算水平位置并使用它们。
+* Indentation::              插入或调整缩进的功能。
+* Case Changes::             缓冲区各部分的大小写转换。
+* Text Properties::          将 Lisp 属性列表分配给文本字符。
+* Substitution::             替换出现的给定字符。
+* Registers::                寄存器是如何实现的。  访问存储在寄存器中的文本或位置。
+* Transposition::            交换缓冲区的两部分。
+* Decompression::            处理压缩数据。
+* Base 64::                  与 Base 64 编码之间的转换。
+* Checksum/Hash::            计算加密哈希值。
+* Suspicious Text::          确定字符串是否可疑。
+* GnuTLS Cryptography::      从 GnuTLS 导入的加密算法。
+* Database::                 与 SQL 数据库交互。
+* Parsing HTML/XML::         解析 HTML 和 XML。
+* Atomic Changes::           以原子方式安装多个缓冲区更改。
+* Change Hooks::             提供文本更改时要运行的函数。
+
+杀戮戒指
+
+* Kill Ring Concepts::       杀戮环中的文字是什么样的。
+* Kill Functions::           杀死文本的函数。
+* Yanking::                  猛拉是如何完成的。
+* Yank Commands::            访问 Kill Ring 的命令。
+* Low-Level Kill Ring::      用于杀环访问的函数和变量。
+* Internals of Kill Ring::   保存杀环数据的变量。
+
+缩进
+
+* Primitive Indent::         用于计算和插入缩进的函数。
+* Mode-Specific Indent::     自定义不同模式的缩进。
+* Region Indent::            缩进一个区域中的所有行。
+* Relative Indent::          根据前一行缩进当前行。
+* Indent Tabs::              可调节、类似打字机的制表位。
+* Motion by Indent::         移至第一个非空白字符。
+
+文本属性
+
+* Examining Properties::     查看一个角色的属性。
+* Changing Properties::      设置文本范围的属性。
+* Property Search::          搜索属性更改值的位置。
+* Special Properties::       具有特殊含义的特殊属性。
+* Format Properties::        用于表示文本格式的属性。
+* Sticky Properties::        插入的文本如何从相邻文本获取属性。
+* Lazy Properties::          仅当检查文本时才以惰性方式计算文本属性。
+* Clickable Text::           使用文本属性使文本区域在单击时执行某些操作。
+* Fields::                   @code{field} 属性定义缓冲区内的字段。
+* Not Intervals::            为什么文本属性不使用 Lisp 可见的文本间隔。
+
+解析 HTML 和 XML
+
+* Document Object Model::    访问、操作和搜索@acronym{DOM}。
+
+非@acronym{ASCII}字符
+
+* Text Representations::     Emacs 如何表示文本。
+* Disabling Multibyte::      控制是否使用多字节字符。
+* Converting Representations::   将单字节转换为多字节，反之亦然。
+* Selecting a Representation::   将字节序列视为单字节或多字节。
+* Character Codes::          单字节和多字节如何与单个字符的代码相关。
+* Character Properties::     定义其行为和处理方式的角色属性。
+* Character Sets::           可能的字符代码空间被划分为各种字符集。
+* Scanning Charsets::        缓冲区中使用哪些字符集？
+* Translation of Characters::    转换表用于转换。
+* Coding Systems::           编码系统是保存文件的转换。
+* Input Methods::            输入法允许用户输入各种非 ASCII 字符，无需特殊键盘。
+* Locales::                  与 POSIX 语言环境交互。
+
+编码系统
+
+* Coding System Basics::     基本概念。
+* Encoding and I/O::         文件 I/O 函数如何处理编码系统。
+* Lisp and Coding Systems::  对编码系统名称进行操作的函数。
+* User-Chosen Coding Systems::   要求用户选择编码系统。
+* Default Coding Systems::   控制默认选择。
+* Specifying Coding Systems::    为单个文件操作请求特定的编码系统。
+* Explicit Encoding::        无需执行 I/O 即可对文本进行编码或解码。
+* Terminal I/O Encoding::    对终端 I/O 使用编码。
+
+搜索和匹配
+
+* String Search::            搜索完全匹配。
+* Searching and Case::       不区分大小写或区分大小写的搜索。
+* Regular Expressions::      描述字符串的类别。
+* Regexp Search::            搜索正则表达式的匹配项。
+* POSIX Regexps::            以 POSIX 风格搜索最长的匹配。
+* Match Data::               在字符串或正则表达式搜索后找出文本的哪一部分匹配。
+* Search and Replace::       循环、搜索和替换的命令。
+* Standard Regexps::         用于查找句子、页面等的有用正则表达式
+
+正则表达式
+
+* Syntax of Regexps::        编写正则表达式的规则。
+* Regexp Example::           说明正则表达式语法。
+@ifnottex
+* Rx Notation::             An alternative, structured regexp notation.
+@end ifnottex
+* Regexp Functions::         用于操作正则表达式的函数。
+* Regexp Problems::          一些问题以及如何避免这些问题。
+
+正则表达式的语法
+
+* Regexp Special::           正则表达式中的特殊字符。
+* Char Classes::             正则表达式中使用的字符类。
+* Regexp Backslash::         正则表达式中的反斜杠序列。
+
+比赛数据
+
+* Replacing Match::          替换匹配的子字符串。
+* Simple Match Data::        访问匹配数据的单个项目，例如特定子表达式的开始位置。
+* Entire Match Data::        以列表形式一次性访问整个比赛数据。
+* Saving Match Data::        保存和恢复比赛数据。
+
+语法表
+
+* Syntax Basics::            语法表的基本概念。
+* Syntax Descriptors::       字符是如何分类的。
+* Syntax Table Functions::   如何创建、检查和更改语法表。
+* Syntax Properties::        使用文本属性覆盖语法。
+* Motion and Syntax::        使用某些语法移动字符。
+* Parsing Expressions::      使用语法表解析平衡表达式。
+* Syntax Table Internals::   语法表信息如何存储。
+* Categories::               另一种对字符语法进行分类的方法。
+
+解析表达式语法
+
+* PEX Definitions::          PEX规则的语法
+* Parsing Actions::          成功解析后运行操作。
+* Writing PEG Rules::        编写解析规则的提示。
+
+解析程序源码
+
+* Language Grammar::          加载树保姆语言语法。
+* Using Parser::              解析器简介。
+* Retrieving Nodes::          从语法树中检索节点。
+* Accessing Node Information::  访问节点信息。
+* Pattern Matching::          与查询模式的模式匹配。
+* Multiple Languages::        解析用多种语言编写的文本。
+* Tree-sitter Major Modes::   使用树守护者开发主要模式。
+* Tree-sitter C API::         比较 C API 和 Lisp API。
+
+语法描述符
+
+* Syntax Class Table::       语法类别表。
+* Syntax Flags::             每个角色可以拥有额外的标志。
+
+解析表达式
+
+* Motion via Parsing::       通过解析工作的运动函数。
+* Position Parse::           确定位置的句法状态。
+* Parser State::             Emacs 如何表示语法状态。
+* Low-Level Parsing::        跨指定区域进行解析。
+* Control Parsing::          影响解析的参数。
+
+缩写和缩写扩展
+
+* Abbrev Tables::            创建和使用缩写表。
+* Defining Abbrevs::         指定缩写及其扩展。
+* Abbrev Files::             将缩写保存在文件中。
+* Abbrev Expansion::         控制扩张；扩展子程序。
+* Standard Abbrev Tables::   各种主要模式使用的缩写表。
+* Abbrev Properties::        如何读取和设置缩写属性。哪些属性有哪些效果。
+* Abbrev Table Properties::  如何读取和设置缩写表属性。哪些属性有哪些效果。
+
+线程数
+
+* Basic Thread Functions::   基本线程函数。
+* Mutexes::                  互斥体允许对数据进行独占访问。
+* Condition Variables::      线程间事件。
+* The Thread List::          显示活动线程。
+
+流程
+
+* Subprocess Creation::      启动子进程的函数。
+* Shell Arguments::          引用和分区命令参数。
+* Synchronous Processes::    使用同步子流程的详细信息。
+* Asynchronous Processes::   启动异步子进程。
+* Deleting Processes::       消除异步子流程。
+* Process Information::      访问运行状态和其他属性。
+* Input to Processes::       将输入发送到异步子流程。
+* Signals to Processes::     停止、继续或中断异步子进程。
+* Output from Processes::    从异步子流程收集输出。
+* Sentinels::                当进程运行状态发生变化时，哨兵就会运行。
+* Query Before Exit::        是否查询退出是否会杀死进程。
+* System Processes::         访问系统上运行的其他进程。
+* Transaction Queues::       与子流程的基于事务的通信。
+* Network::                  打开网络连接。
+* Network Servers::          网络服务器让 Emacs 接受网络连接。
+* Datagrams::                UDP 网络连接。
+* Low-Level Network::        较低级别但更通用的功能，用于创建连接和服务器。
+* Misc Network::             网络连接的附加相关功能。
+* Serial Ports::             使用串行端口进行通信。
+* Byte Packing::             使用bindat 打包和解包二进制数据。
+
+接收进程的输出
+
+* Process Buffers::          默认情况下，输出放入缓冲区中。
+* Filter Functions::         过滤器函数接受过程的输出。
+* Decoding Output::          过滤器可以获取单字节或多字节字符串。
+* Accepting Output::         如何等待进程输出到达。
+
+低级网络访问
+
+* Network Processes::        使用@code{make-network-process}。
+* Network Options::          对网络连接的进一步控制。
+* Network Feature Testing::  确定哪些网络功能适用于您正在使用的计算机。
+
+字节数组的打包和解包
+
+* Bindat Types::             描述数据布局。
+* Bindat Functions::         进行拆箱和包装。
+* Bindat Computed Types::    高级数据布局规范。
+
+Emacs显示
+
+* Refresh Screen::           清除屏幕并重新绘制屏幕上的所有内容。
+* Forcing Redisplay::        强制重新显示。
+* Truncation::               折叠或换行长文本行。
+* The Echo Area::            在屏幕底部显示消息。
+* Warnings::                 向用户显示警告消息。
+* Invisible Text::           隐藏部分缓冲区文本。
+* Selective Display::        隐藏部分缓冲区文本（旧方法）。
+* Temporary Displays::       显示自动消失。
+* Overlays::                 使用叠加层突出显示缓冲区的某些部分。
+* Size of Displayed Text::   显示的文本有多大。
+* Line Height::              控制行的高度。
+* Faces::                    面定义了文本字符的图形样式：字体、颜色等。
+* Fringes::                  控制窗边。
+* Scroll Bars::              控制滚动条。
+* Window Dividers::          在视觉上分隔窗户。
+* Display Property::         启用特殊显示功能。
+* Images::                   在 Emacs 缓冲区中显示图像。
+* Buttons::                  向 Emacs 缓冲区添加可点击按钮。
+* Abstract Display::         Emacs 的对象集合小部件。
+* Blinking::                 Emacs 如何显示匹配的左括号。
+* Character Display::        Emacs 如何显示单个字符。
+* Beeping::                  向用户发出声音信号。
+* Window Systems::           正在使用哪个窗口系统。
+* Tooltips::                 Emacs 中的工具提示显示。
+* Bidirectional Display::    显示双向文字，例如阿拉伯语和波斯语。
+
+回声区
+
+* Displaying Messages::      在回显区域显式显示文本。
+* Progress::                 通知用户长时间操作的进度。
+* Logging Messages::         为用户记录回声区域消息。
+* Echo Area Customization::  控制回声区域。
+
+报告警告
+
+* Warning Basics::           警告概念和报告它们的功能。
+* Warning Variables::        变量程序绑定以自定义其警告。
+* Warning Options::          用户设置用于控制警告显示的变量。
+* Delayed Warnings::         将警告推迟到命令结束。
+
+叠加层
+
+* Managing Overlays::        创建和移动叠加层。
+* Overlay Properties::       如何读取和设置属性。哪些属性对屏幕显示有影响。
+* Finding Overlays::         正在搜索叠加。
+
+面孔
+
+* Face Attributes::          脸上有什么？
+* Defining Faces::           如何定义一张脸。
+* Attribute Functions::      检查和设置人脸属性的功能。
+* Displaying Faces::         Emacs 如何组合为角色指定的面孔。
+* Face Remapping::           将面孔重新映射到替代定义。
+* Face Functions::           如何定义和检查面孔。
+* Auto Faces::               用于自动面部分配的挂钩。
+* Basic Faces::              默认定义的面。
+* Font Selection::           寻找最适合脸部的可用字体。
+* Font Lookup::              查找可用字体的名称及其相关信息。
+* Fontsets::                 字体集是处理一系列字符集的字体的集合。
+* Low-Level Font::           字符显示字体的 Lisp 表示。
+
+流苏
+
+* Fringe Size/Pos::          指定放置窗边缘的位置。
+* Fringe Indicators::        在窗口边缘显示指示器图标。
+* Fringe Cursors::           在右边缘显示光标。
+* Fringe Bitmaps::           指定条纹指示器的位图。
+* Customizing Bitmaps::      指定要在边缘中使用的您自己的位图。
+* Overlay Arrow::            显示指示位置的箭头。
+
+@code{display} 属性
+
+* Replacing Specs::          显示替换文本的规格。
+* Specified Space::          显示具有指定宽度的一个空格。
+* Pixel Specification::      指定空间宽度或高度（以像素为单位）。
+* Other Display Specs::      显示图像；调整文本的高度、间距和其他属性。
+* Display Margins::          在正文旁边显示文本或图像。
+
+图片
+
+* Image Formats::            支持的图像格式。
+* Image Descriptors::        如何指定在 @code{:display} 中使用的图像。
+* XBM Images::               XBM 格式的特殊功能。
+* XPM Images::               XPM 格式的特殊功能。
+* ImageMagick Images::       通过 ImageMagick 提供的特殊功能。
+* Other Image Types::        支持各种其他格式。
+* Defining Images::          定义图像供以后使用的便捷方法。
+* Showing Images::           定义图像后，可以方便地显示图像。
+* Multi-Frame Images::       有些图像包含多个帧。
+* Image Cache::              图像显示的内部机制。
+
+按钮
+
+* Button Properties::        具有特殊含义的按钮属性。
+* Button Types::             定义按钮类的公共属性。
+* Making Buttons::           向 Emacs 缓冲区添加按钮。
+* Manipulating Buttons::     获取和设置按钮的属性。
+* Button Buffer Commands::   缓冲区范围的命令和按钮绑定。
+
+抽象展示
+
+* Abstract Display Functions::   Ewoc 包中的函数。
+* Abstract Display Example::     使用 Ewoc 的示例。
+
+字符显示
+
+* Usual Display::        显示字符的常用约定。
+* Display Tables::       显示表由什么组成。
+* Active Display Table::   Emacs 如何选择要使用的显示表。
+* Glyphs::               如何定义字形以及字形的含义。
+* Glyphless Chars::      如何绘制无字形字符。
+
+操作系统接口
+
+* Starting Up::              自定义 Emacs 启动处理。
+* Getting Out::              退出如何运作（永久或临时）。
+* System Environment::       区分系统的名称和类型。
+* User Identification::      查找用户的名称和用户 ID。
+* Time of Day::              获取当前时间。
+* Time Conversion::          时间戳形式之间的转换。
+* Time Parsing::             将时间戳转换为文本，反之亦然。
+* Processor Run Time::       获取 Emacs 使用的运行时。
+* Time Calculations::        加、减、比较时间等。
+* Timers::                   设置计时器以在特定时间调用函数。
+* Idle Timers::              设置一个计时器，当 Emacs 空闲一段时间后调用函数。
+* Terminal Input::           访问并记录终端输入。
+* Terminal Output::          控制和记录终端输出。
+* Sound Output::             在计算机扬声器上播放声音。
+* X11 Keysyms::              对 X Windows 的关键符号进行操作。
+* Batch Mode::               无需终端交互即可运行 Emacs。
+* Session Management::       使用 X 会话管理保存和恢复状态。
+* Desktop Notifications::    桌面通知。
+* File Notifications::       文件通知。
+* Dynamic Libraries::        按需加载支持库。
+* Security Considerations::  在不友好的环境中运行 Emacs。
+
+启动 Emacs
+
+* Startup Summary::          Emacs 在启动时执行的操作序列。
+* Init File::                有关读取 init 文件的详细信息。
+* Terminal-Specific::        如何读取特定于终端的 Lisp 文件。
+* Command-Line Arguments::   如何处理命令行参数以及如何自定义它们。
+
+退出 Emacs
+
+* Killing Emacs::            不可逆转地退出 Emacs。
+* Suspending Emacs::         可逆退出 Emacs。
+
+端子输入
+
+* Input Modes::              有关如何处理输入的选项。
+* Recording Input::          保存最近或所有输入事件的历史记录。
+
+准备 Lisp 代码以供分发
+
+* Packaging Basics::         Emacs Lisp 包的基本概念。
+* Simple Packages::          如何打包单个 .el 文件。
+* Multi-file Packages::      如何打包多个文件。
+* Package Archives::         维护包档案。
+* Archive Web Server::       连接到存档网络服务器。
+* Forwards-Compatibility::   支持旧版本的 Emacs。
+* Package Information::      有关内置包的信息。
+
+提示和惯例
+
+* Coding Conventions::       干净和健壮的程序的约定。
+* Key Binding Conventions::  哪些键应该由哪些程序绑定。
+* Programming Tips::         使 Emacs 代码能够顺利地融入 Emacs 中。
+* Compilation Tips::         使编译后的代码运行得更快。
+* Warning Tips::             关闭编译器警告。
+* Documentation Tips::       编写可读的文档字符串。
+* Documentation Group Tips::   编写有用的文档组。
+* Comment Tips::             撰写评论的约定。
+* Library Headers::          库包的标准标头。
+
+GNU Emacs 内部结构
+
+* Building Emacs::           被抛弃的Emacs是如何制作的。
+* Garbage Collection::       回收不再使用的 Lisp 对象的空间。
+* Stack-allocated Objects::  C 堆栈上的临时 cons 和字符串。
+* Memory Usage::             有关迄今为止制作的 Lisp 对象总大小的信息。
+* C Dialect::                Emacs 是用什么 C 变体编写的。
+* Writing Emacs Primitives::   为 Emacs 编写 C 代码。
+* Writing Dynamic Modules::    为 Emacs 编写可加载模块。
+* Object Internals::         缓冲区、窗口、进程的数据格式。
+* C Integer Types::          如何在 Emacs 中使用 C 整数类型。
+
+编写动态模块
+
+* Module Initialization::
+* Module Functions::
+* Module Values::
+* Module Misc::
+* Module Nonlocal::
+
+对象内部
+
+* Buffer Internals::         缓冲区结构的组件。
+* Window Internals::         窗口结构的组成部分。
+* Process Internals::        流程结构的组成部分。
+@end detailmenu
+@end menu
+
+@ifclear VOL2
+@include intro.texi
+@include objects.texi
+@include numbers.texi
+@include strings.texi
+
+@include lists.texi
+@include sequences.texi
+@include records.texi
+@include hash.texi
+@include symbols.texi
+@include eval.texi
+
+@include control.texi
+@include variables.texi
+@include functions.texi
+@include macros.texi
+
+@include customize.texi
+@include loading.texi
+@include compile.texi
+
+@c This includes edebug.texi.
+@include debugging.texi
+@include streams.texi
+@include minibuf.texi
+@include commands.texi
+
+@include keymaps.texi
+@include modes.texi
+@include help.texi
+@include files.texi
+
+@include backups.texi
+
+@end ifclear
+
+@c ================ Beginning of Volume 2 ================
+@ifclear VOL1
+
+@include buffers.texi
+@include windows.texi
+@include frames.texi
+
+@include positions.texi
+@include markers.texi
+@include text.texi
+@include nonascii.texi
+
+@include searching.texi
+@include syntax.texi
+@include peg.texi
+@include parsing.texi
+@include abbrevs.texi
+@include threads.texi
+@include processes.texi
+
+@include display.texi
+@include os.texi
+
+@include package.texi
+
+@c appendices
+
+@include anti.texi
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+@node GPL
+@appendix GNU 通用公共许可证
+@include gpl.texi
+@include tips.texi
+@include internals.texi
+@include errors.texi
+@include maps.texi
+@include hooks.texi
+
+@include index.texi
+
+@end ifclear
+
+@ignore
+@node New Symbols
+@unnumbered New Symbols Since the Previous Edition
+
+@printindex tp
+@end ignore
+
+@bye
+
+
+这些词可以防止上面的“局部变量”混淆 Emacs。

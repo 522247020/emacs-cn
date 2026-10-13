@@ -240,23 +240,35 @@ $HOME/.local/emacs-cn/bin/emacs -nw
 **Action 的拉取来源** 与 **发布/制品存储**。Gitea 上也能跑，但需要先部署
 `act_runner`，制品/Release 走 Gitea 自己的接口。
 
-## 中文手册（`C-h r`）
+## 中文手册（`C-h r` / `C-h i`）
 
-Emacs 手册正文（`doc/emacs/*.texi`）已用流水线机器翻译为中文，并随构建打包：
+官方 Texinfo 手册已用流水线机器翻译为中文，并随构建打包：
 
-- 译文位置：`l10n/manual-zh/*.texi`
+| 手册 | Info 名 | 源目录 |
+| --- | --- | --- |
+| Emacs 手册 | `(emacs)` | `doc/emacs` |
+| Elisp 参考手册 | `(elisp)` | `doc/lispref` |
+| Emacs Lisp 入门 | `(eintr)` | `doc/lispintro` |
+| Org 手册 | `(org)` | `doc/misc` |
+
+- 译文位置：`l10n/manual-zh/<手册>/*.texi`
 - 构建时 `ci/build-emacs.sh` 会自动调用 `ci/apply-manual-zh.sh` 把译文套用到
-  `src/doc/emacs/`，因此 `make install` 安装的 `emacs.info` 即为中文，
-  `C-h r`（或 `M-x info-emacs-manual`）打开的就是中文手册。
-- 重新生成：`python3 l10n/texi-translate.py`（Google 机翻，带断点续传缓存
-  `l10n/manual-cache.jsonl`）。
+  对应的 `src/doc/<手册>/`，因此 `make install` 安装的 Info 即为中文，
+  `C-h r` / `C-h i` 打开的就是中文手册。
+- 重新生成单本：
+  ```sh
+  python3 l10n/texi-translate.py --src src/doc/lispref --out l10n/manual-zh/lispref
+  python3 l10n/texi-translate.py --src src/doc/misc --out l10n/manual-zh/misc \
+      --only org.texi,doclicense.texi
+  ```
+  （Google 机翻，带断点续传缓存 `l10n/manual-cache.jsonl`）
 
 说明：
 
 - 机翻质量；术语可能与界面翻译略有出入。
 - 只翻正文/章节标题/菜单描述，保留所有 Texinfo 标记；**节点名保持英文**
-  以维持交叉引用（`@node`、`@xref`）。
-- 仅涵盖《Emacs 手册》（`doc/emacs`）；《Elisp 手册》等未包含。
+  以维持交叉引用。
+- 构建时有少量非致命的 `makeinfo` 警告。
 
 ## 更新 Emacs / Doom
 

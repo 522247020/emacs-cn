@@ -1,0 +1,191 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1993, 1999, 2001--2026 Free Software Foundation,
+@c Inc.
+@c See the file elisp.texi for copying conditions.
+@node Standard Errors
+@appendix 标准误
+@cindex standard errors
+
+以下是标准 Emacs 中更重要的错误符号的列表，按概念分组。  该列表包括每个符号的消息以及对错误如何发生的描述的交叉引用。
+
+每个错误符号都有一组父错误条件，即符号列表。  通常该列表包括错误符号本身和符号@code{error}。  有时，它包含附加符号，这些符号是中间分类，比 @code{error} 窄，但比单个错误符号宽。  例如，所有访问文件的错误都有条件@code{file-error}。  如果我们在这里不说某个错误符号有附加的错误条件，那就意味着它没有。
+
+作为一个特殊的例外，错误符号 @code{quit} 和 @code{minibuffer-quit} 没有条件 @code{error}，因为退出不被视为错误。
+
+这些错误符号大部分是在 C 中定义的（主要是@file{data.c}），但也有一些是在 Lisp 中定义的。  例如，文件 @file{userlock.el} 定义了 @code{file-locked} 和 @code{file-supersession} 错误。与 Emacs 一起分发的几个专用 Lisp 库定义了自己的错误符号。  我们并不试图在这里列出所有这些。
+
+@xref{Errors}，解释如何生成和处理错误。
+
+@table @code
+@item error
+消息是@samp{error}。  @xref{Errors}。
+
+@item quit
+消息是@samp{Quit}。  @xref{Quitting}。
+
+@item minibuffer-quit
+消息是@samp{Quit}。  这是@code{quit}的子类别。 @xref{Quitting}。
+
+@item args-out-of-range
+消息是@samp{Args out of range}。  当尝试访问超出序列、缓冲区或其他类似容器的对象范围的元素时，会发生这种情况。  @xref{Sequences Arrays Vectors}，参见@ref{Text}。
+
+@item arith-error
+消息是@samp{Arithmetic error}。  当尝试执行整数除以零时会发生这种情况。  @xref{Numeric Conversions}，参见@ref{Arithmetic Operations}。
+
+@item beginning-of-buffer
+消息是@samp{Beginning of buffer}。  @xref{Character Motion}。
+
+@item buffer-read-only
+消息是@samp{Buffer is read-only}。  @xref{Read Only Buffers}。
+
+@item circular-list
+消息是@samp{List contains a loop}。  当遇到圆形结构时会发生这种情况。  @xref{Circular Objects}。
+
+@item cl-assertion-failed
+消息是@samp{Assertion failed}。  当 @code{cl-assert} 宏测试失败时，就会发生这种情况。  @xref{Assertions,,, cl, Common Lisp Extensions}。
+
+@item coding-system-error
+消息是@samp{Invalid coding system}。  @xref{Lisp and Coding Systems}。
+
+@item cyclic-function-indirection
+消息是@samp{Symbol's chain of function indirections contains a loop}。  @xref{Function Indirection}。
+
+@item cyclic-variable-indirection
+消息是@samp{Symbol's chain of variable indirections contains a loop}。  @xref{Variable Aliases}。
+
+@item dbus-error
+消息是@samp{D-Bus error}。  @xref{Errors and Events,,, dbus, D-Bus integration in Emacs}。
+
+@item end-of-buffer
+消息是@samp{End of buffer}。  @xref{Character Motion}。
+
+@item end-of-file
+消息是@samp{End of file during parsing}。  请注意，这不是 @code{file-error} 的子类别，因为它属于 Lisp 阅读器，而不是文件 I/O@. @xref{Input Functions}。
+
+@item file-already-exists
+这是 @code{file-error} 的子类别。  @xref{Writing to Files}。
+
+@item permission-denied
+这是 @code{file-error} 的子类别，当操作系统由于某种原因不允许 Emacs 访问文件或目录时会发生这种情况。
+
+@item file-date-error
+这是 @code{file-error} 的子类别。  当@code{copy-file}尝试设置输出文件的最后修改时间但失败时，就会发生这种情况。  @xref{Changing Files}。
+
+@item file-error
+我们不会列出此错误及其子类别的错误字符串，因为当出现错误条件 @code{file-error} 时，错误消息通常仅从数据项构建。  因此，错误字符串不是很相关。  但是，这些错误符号确实具有 @code{error-message} 属性，如果未提供数据，则使用 @code{error-message} 属性 @emph{is}。  @xref{Files}。
+
+@item file-missing
+这是 @code{file-error} 的子类别。  当操作尝试对丢失的文件进行操作时，就会发生这种情况。  @xref{Changing Files}。
+
+@c jka-compr.el
+@item compression-error
+这是 @code{file-error} 的子类别，是由于处理压缩文件时出现问题而导致的。  @xref{How Programs Do Loading}。
+
+@c userlock.el
+@item file-locked
+这是 @code{file-error} 的子类别。  @xref{File Locks}。
+
+@c userlock.el
+@item file-supersession
+这是 @code{file-error} 的子类别。  @xref{Modification Time}。
+
+@c filenotify.el
+@item file-notify-error
+这是 @code{file-error} 的子类别。  当无法监视文件的更改时，就会发生这种情况。  @xref{File Notifications}。
+
+@item remote-file-error
+这是 @code{file-error} 的子类别，是由于访问远程文件时出现问题而导致的。  @xref{Remote Files,,, emacs, The GNU Emacs Manual}。  通常，当计时器、进程过滤器、进程哨兵或特殊事件通常尝试访问远程文件并与另一个远程文件操作发生冲突时，就会出现此错误。  一般来说，编写错误报告是个好主意。 @xref{Bugs,,, emacs, The GNU Emacs Manual}。
+
+@c net/ange-ftp.el
+@item ftp-error
+这是 @code{remote-file-error} 的子类别，是由于使用 ftp 访问远程文件时出现问题而导致的。  @xref{Remote Files,,, emacs, The GNU Emacs Manual}。
+
+@item invalid-function
+消息是@samp{Invalid function}。  @xref{Function Indirection}。
+
+@item invalid-read-syntax
+消息通常是@samp{Invalid read syntax}。  @xref{Printed Representation}。  当表达式后面有文本时，像 2⁣ 这样的命令也会引发此错误。  在这种情况下，消息是@samp{Trailing garbage following expression}。
+
+@item invalid-regexp
+消息是@samp{Invalid regexp}。  @xref{Regular Expressions}。
+
+@c simple.el
+@item mark-inactive
+消息是@samp{The mark is not active now}。  @xref{The Mark}。
+
+@item no-catch
+消息是@samp{No catch for tag}。  @xref{Catch and Throw}。
+
+@ignore
+@c Not actually used for anything?  Probably definition should be removed.
+@item protected-field
+The message is @samp{Attempt to modify a protected file}.
+@end ignore
+
+@item range-error
+消息是@code{Arithmetic range error}。
+
+@item overflow-error
+消息是@samp{Arithmetic overflow error}。  这是@code{range-error}的子类别。当整数超过 @code{integer-width} 限制时，可能会发生这种情况。 @xref{Integer Basics}。
+
+@item scan-error
+消息是@samp{Scan error}。  当某些语法解析函数发现无效语法或不匹配的括号时，就会发生这种情况。  通常会提出三个参数：人类可读的错误消息、无法移动的障碍物的起点以及障碍物的终点。  @xref{List Motion}，参见@ref{Parsing Expressions}。
+
+@item search-failed
+消息是@samp{Search failed}。  @xref{Searching and Matching}。
+
+@item setting-constant
+消息是@samp{Attempt to set a constant symbol}。  当尝试为 @code{nil}、@code{t}、@code{most-positive-fixnum}、@code{most-negative-fixnum} 和关键字符号赋值时，会发生这种情况。  当尝试为 @code{enable-multibyte-characters} 和其他一些由于某种原因不允许直接赋值的符号赋值时，也会发生这种情况。  @xref{Constant Variables}。
+
+@c simple.el
+@item text-read-only
+消息是@samp{Text is read-only}。  这是@code{buffer-read-only}的子类别。  @xref{Special Properties}。
+
+@item undefined-color
+消息是@samp{Undefined color}。  @xref{Color Names}。
+
+@item user-error
+该消息是空字符串。  @xref{Signaling Errors}。
+
+@item user-search-failed
+这类似于@samp{search-failed}，但不会像@samp{user-error}那样触发调试器。  @xref{Signaling Errors}，参见@ref{Searching and Matching}。  这用于在信息文件中搜索，请参阅@ref{Search Text,,,info,Info}。
+
+@item void-function
+消息是@samp{Symbol's function definition is void}。 @xref{Function Cells}。
+
+@item void-variable
+消息是@samp{Symbol's value as variable is void}。 @xref{Accessing Variables}。
+
+@item wrong-number-of-arguments
+消息是@samp{Wrong number of arguments}。  @xref{Argument List}。
+
+@item wrong-type-argument
+消息是@samp{Wrong type argument}。  @xref{Type Predicates}。
+
+@item unknown-image-type
+消息是@samp{Cannot determine image type}。  @xref{Images}。
+
+@item inhibited-interaction
+消息是@samp{User interaction while inhibited}。  当@code{inhibit-interaction}非@code{nil}并且调用用户交互函数（如@code{read-from-minibuffer}）时，会发出此错误信号。
+@end table
+
+@c The following seem to be unused now.
+@ignore
+  The following kinds of error, which are classified as special cases of
+@code{arith-error}, can occur on certain systems for invalid use of
+mathematical functions.  @xref{Math Functions}.
+
+@table @code
+@item domain-error
+The message is @samp{Arithmetic domain error}.
+
+@item singularity-error
+The message is @samp{Arithmetic singularity error}.  This is a
+subcategory of @code{domain-error}.
+
+@item underflow-error
+The message is @samp{Arithmetic underflow error}.  This is a
+subcategory of @code{domain-error}.
+@end table
+@end ignore

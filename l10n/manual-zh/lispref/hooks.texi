@@ -1,0 +1,275 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1993, 1998, 2001--2026 Free Software Foundation,
+@c Inc.
+@c See the file elisp.texi for copying conditions.
+@node Standard Hooks
+@appendix 标准挂钩
+@cindex standard hooks
+@cindex hook variables, list of
+
+以下是一些钩子变量的列表，这些变量可让您在适当的情况下提供从 Emacs 内调用的函数。
+
+大多数变量的名称都以 @samp{-hook} 结尾。  它们是@dfn{normal hooks}，通过@code{run-hooks} 运行。  这种钩子的值是一个函数列表；这些函数在不带参数的情况下调用，并且它们的值被完全忽略。  将新函数放在这样的钩子上的推荐方法是调用@code{add-hook}。 @xref{Hooks}，有关使用钩子的更多信息。
+
+名称以 @samp{-functions} 结尾的变量通常是 @dfn{abnormal hooks} （某些旧代码也可能使用已弃用的 @samp{-hooks} 后缀）。  它们的值是函数列表，但这些函数以特殊方式调用：它们要么是传递的参数，要么以某种方式使用它们的返回值。  名称以 @samp{-function} 结尾的变量具有单一函数作为其值。
+
+这不是一个详尽的列表，它只涵盖了更一般的钩子。例如，每个主要模式都定义一个名为 @samp{@var{modename}-mode-hook} 的钩子。  主模式命令以 @code{run-mode-hooks} 作为最后一件事来运行这个正常的钩子。 @xref{Mode Hooks}。  大多数次要模式也有模式挂钩。
+
+一项特殊功能允许您指定表达式来评估是否以及何时加载文件 (@pxref{Hooks for Loading})。  该功能并不完全是一个钩子，但起着类似的作用。
+
+@c We need to xref to where each hook is documented or else document it here.
+@c Add vindex for anything not indexed elsewhere.
+@c This list is in alphabetical order, grouped by topic.
+@c TODO It should probably be more thoroughly ordered by topic.
+
+@table @code
+@item activate-mark-hook
+@itemx deactivate-mark-hook
+@xref{The Mark}.
+
+@item after-change-functions
+@itemx before-change-functions
+@itemx first-change-hook
+@xref{Change Hooks}.
+
+@item after-change-major-mode-hook
+@itemx change-major-mode-after-body-hook
+@xref{Mode Hooks}.
+
+@item after-init-hook
+@itemx before-init-hook
+@itemx emacs-startup-hook
+@itemx window-setup-hook
+@xref{Init File}.
+
+@item after-insert-file-functions
+@itemx write-region-annotate-functions
+@itemx write-region-post-annotation-function
+@xref{Format Conversion}.
+
+@item after-make-frame-functions
+@itemx before-make-frame-hook
+@itemx server-after-make-frame-hook
+@xref{Creating Frames}.
+
+@c Not general enough?
+@ignore
+@item after-revert-hook
+@itemx before-revert-hook
+@itemx buffer-stale-function
+@itemx revert-buffer-function
+@itemx revert-buffer-insert-file-contents-function
+@xref{Reverting}.
+@end ignore
+
+@item after-save-hook
+@itemx before-save-hook
+@itemx write-contents-functions
+@itemx write-file-functions
+@xref{Saving Buffers}.
+
+@item after-setting-font-hook
+@vindex after-setting-font-hook
+框架字体更改后运行的挂钩。
+
+@item auto-save-hook
+@xref{Auto-Saving}.
+
+@item before-hack-local-variables-hook
+@itemx hack-local-variables-hook
+@xref{File Local Variables}.
+
+@item buffer-access-fontify-functions
+@xref{Lazy Properties}.
+
+@item buffer-list-update-hook
+@vindex buffer-list-update-hook
+当缓冲区列表更改时挂钩运行 (@pxref{Buffer List})。
+
+@item buffer-quit-function
+@vindex buffer-quit-function
+调用函数退出当前缓冲区。
+
+@item change-major-mode-hook
+@xref{Creating Buffer-Local}.
+
+@item comint-password-function
+此异常挂钩允许派生模式为底层命令解释器提供密码，而无需提示用户。
+
+@item command-line-functions
+@xref{Command-Line Arguments}.
+
+@item delayed-warnings-hook
+@vindex delayed-warnings-hook
+命令循环在 @code{post-command-hook} (q.v.) 之后不久运行。
+
+@item focus-in-hook
+@vindex focus-in-hook
+@itemx focus-out-hook
+@vindex focus-out-hook
+@xref{Input Focus}.
+
+@item delete-frame-functions
+@itemx after-delete-frame-functions
+@xref{Deleting Frames}.
+
+@item delete-terminal-functions
+@xref{Multiple Terminals}.
+
+@item pop-up-frame-function
+@itemx split-window-preferred-function
+@xref{Choosing Window Options}.
+
+@item echo-area-clear-hook
+@xref{Echo Area Customization}.
+
+@item find-file-hook
+@itemx find-file-not-found-functions
+@xref{Visiting Functions}.
+
+@item font-lock-extend-after-change-region-function
+@xref{Region to Refontify}.
+
+@item font-lock-extend-region-functions
+@xref{Multiline Font Lock}.
+
+@item font-lock-fontify-buffer-function
+@itemx font-lock-fontify-region-function
+@itemx font-lock-mark-block-function
+@itemx font-lock-unfontify-buffer-function
+@itemx font-lock-unfontify-region-function
+@xref{Other Font Lock Variables}.
+
+@item fontification-functions
+@xref{Auto Faces,, Automatic Face Assignment}.
+
+@item frame-auto-hide-function
+@xref{Quitting Windows}.
+
+@item quit-window-hook
+@xref{Quitting Windows}.
+
+@item kill-buffer-hook
+@itemx kill-buffer-query-functions
+@xref{Killing Buffers}.
+
+@item kill-emacs-hook
+@itemx kill-emacs-query-functions
+@xref{Killing Emacs}.
+
+@item menu-bar-update-hook
+@xref{Menu Bar}.
+
+@item minibuffer-setup-hook
+@itemx minibuffer-exit-hook
+@xref{Minibuffer Misc}.
+
+@item mouse-leave-buffer-hook
+@vindex mouse-leave-buffer-hook
+当用户在窗口中单击鼠标时挂钩运行。
+
+@item mouse-position-function
+@xref{Mouse Position}.
+
+@item prefix-command-echo-keystrokes-functions
+@vindex prefix-command-echo-keystrokes-functions
+由前缀命令（例如@kbd{C-u}）运行的异常钩子，它应该返回描述当前前缀状态的字符串。  例如，@kbd{C-u} 生成 @samp{C-u-} 和 @samp{C-u 1 2 3-}。  每个钩子函数都在不带参数的情况下调用，并且应该返回一个描述当前前缀状态的字符串，或者如果没有前缀状态则返回 @code{nil}。  @xref{Prefix Command Arguments}。
+
+@item prefix-command-preserve-state-hook
+@vindex prefix-command-preserve-state-hook
+当前缀命令需要通过将当前前缀命令状态传递给下一个命令来保留前缀时，挂钩运行。  例如，当用户键入 @kbd{C-u -} 或在 @kbd{C-u} 后跟一个数字时，@kbd{C-u} 需要将状态传递给下一个命令。
+
+@item pre-redisplay-functions
+钩子在每个窗口重新显示之前运行。  @xref{Forcing Redisplay}。
+
+@item post-command-hook
+@itemx pre-command-hook
+@xref{Command Overview}.
+
+@item post-gc-hook
+@xref{Garbage Collection}.
+
+@item post-self-insert-hook
+@xref{Keymaps and Minor Modes}.
+
+@ignore
+@item prog-mode-hook
+@itemx special-mode-hook
+@vindex special-mode-hook
+@xref{Basic Major Modes}.
+@end ignore
+
+@item suspend-hook
+@itemx suspend-resume-hook
+@itemx suspend-tty-functions
+@itemx resume-tty-functions
+@xref{Suspending Emacs}.
+
+@item syntax-begin-function
+@itemx syntax-propertize-extend-region-functions
+@itemx syntax-propertize-function
+@itemx font-lock-syntactic-face-function
+@xref{Syntactic Font Lock}.  @xref{Syntax Properties}.
+
+@item temp-buffer-setup-hook
+@itemx temp-buffer-show-function
+@itemx temp-buffer-show-hook
+@xref{Temporary Displays}.
+
+@item tty-setup-hook
+@xref{Terminal-Specific}.
+
+@item window-configuration-change-hook
+@itemx window-scroll-functions
+@itemx window-size-change-functions
+@xref{Window Hooks}.
+@end table
+
+@ignore
+Some -hook, -function, -functions from preloaded Lisp or C files that
+I thought did not need to be mentioned here:
+
+Lisp:
+after-load-functions
+after-set-visited-file-name-hook
+auto-coding-functions
+choose-completion-string-functions
+completing-read-function
+completion-at-point-functions
+completion-list-insert-choice-function
+deactivate-current-input-method-function
+describe-current-input-method-function
+font-lock-function
+menu-bar-select-buffer-function
+read-file-name-function
+replace-re-search-function
+replace-search-function
+yank-undo-function
+
+C hooks:
+kbd-macro-termination-hook
+signal-hook-function
+
+C functions:
+x-lost-selection-functions
+x-sent-selection-functions
+
+C function:
+auto-composition-function
+auto-fill-function
+command-error-function
+compose-chars-after-function
+composition-function-table
+input-method-function
+load-read-function
+load-source-file-function
+read-buffer-function
+ring-bell-function
+select-safe-coding-system-function
+set-auto-coding-function
+show-help-function
+signal-hook-function
+undo-outer-limit-function
+
+@end ignore

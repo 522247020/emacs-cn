@@ -1,0 +1,1621 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Sequences Arrays Vectors
+@chapter 序列、数组和向量
+@cindex sequence
+
+@dfn{sequence} 类型是另外两种 Lisp 类型的并集：列表和数组。  换句话说，任何列表都是序列，任何数组都是序列。  所有序列的共同属性是每个序列都是元素的有序集合。
+
+@dfn{array} 是一个固定长度的对象，其每个元素都有一个槽。  所有元素都可以在恒定时间内访问。  数组的四种类型是字符串、向量、字符表和布尔向量。
+
+列表是元素的序列，但它不是单个原始对象；它由 cons 单元组成，每个单元一个单元。  查找第 0 个元素需要遍历 1 个 cons 单元格，因此距离列表开头较远的元素需要更长的时间才能访问。但可以向列表添加元素或删除元素。
+
+下图展示了这些类型之间的关系：
+
+@example
+@group
+          _____________________________________________
+         |                                             |
+         |          Sequence                           |
+         |  ______   ________________________________  |
+         | |      | |                                | |
+         | | List | |             Array              | |
+         | |      | |    ________       ________     | |
+         | |______| |   |        |     |        |    | |
+         |          |   | Vector |     | String |    | |
+         |          |   |________|     |________|    | |
+         |          |  ____________   _____________  | |
+         |          | |            | |             | | |
+         |          | | Char-table | | Bool-vector | | |
+         |          | |____________| |_____________| | |
+         |          |________________________________| |
+         |_____________________________________________|
+@end group
+@end example
+
+@menu
+* Sequence Functions::     接受任何类型序列的函数。
+* Arrays::                 Emacs Lisp 中数组的特征。
+* Array Functions::        专门用于数组的函数。
+* Vectors::                Emacs Lisp 向量的特殊特征。
+* Vector Functions::       专门针对向量的函数。
+* Char-Tables::            如何使用字符表。
+* Bool-Vectors::           如何使用布尔向量。
+* Rings::                  管理固定大小的对象环。
+@end menu
+
+@node Sequence Functions
+@section 序列
+
+本节描述接受任何类型序列的函数。
+
+@defun sequencep object
+如果 1⁣ 是列表、向量、字符串、布尔向量或字符表，则此函数返回 @code{t}，否则返回 @code{nil}。  另请参见下文@code{seqp}。
+@end defun
+
+@defun length sequence
+@cindex string length
+@cindex list length
+@cindex vector length
+@cindex sequence length
+@cindex bool-vector length
+@cindex char-table length
+@anchor{Definition of length}
+该函数返回 @var{sequence} 中的元素数量。  如果参数不是序列或者是点列表，该函数会发出 @code{wrong-type-argument} 错误信号；如果参数是循环列表，它会发出 @code{circular-list} 错误信号。  对于字符表，返回的值始终比最大 Emacs 字符代码大 1。
+
+@xref{Definition of safe-length}，对应相关函数@code{safe-length}。
+
+@example
+@group
+(length '(1 2 3))
+    @result{} 3
+@end group
+@group
+(length ())
+    @result{} 0
+@end group
+@group
+(length "foobar")
+    @result{} 6
+@end group
+@group
+(length [1 2 3])
+    @result{} 3
+@end group
+@group
+(length (make-bool-vector 5 nil))
+    @result{} 5
+@end group
+@end example
+@end defun
+
+@noindent
+另请参见@ref{Text Representations}中的@code{string-bytes}。
+
+如果需要计算显示的字符串宽度，则应使用 @code{string-width} (@pxref{Size of Displayed Text})，而不是 @code{length}，因为 @code{length} 只计算字符数，但不考虑每个字符的显示宽度。
+
+@defun length< sequence length
+如果@var{sequence}短于@var{length}，则返回非@code{nil}。如果 @var{sequence} 是一个长列表，这可能比计算 @var{sequence} 的长度更有效。
+@end defun
+
+@defun length> sequence length
+如果@var{sequence}长于@var{length}，则返回非@code{nil}。
+@end defun
+
+@defun length= sequence length
+如果@var{sequence}的长度等于@var{length}，则返回非@code{nil}。
+@end defun
+
+@defun elt sequence index
+@anchor{Definition of elt}
+@cindex elements of sequences
+该函数返回由 @var{index} 索引的 @var{sequence} 的元素。  @var{index} 的合法值是从 0 到比 @var{sequence} 长度小 1 的整数。  如果 @var{sequence} 是一个列表，则超出范围的值的行为与 @code{nth} 相同。  @xref{Definition of nth}。  否则，超出范围的值会触发 @code{args-out-of-range} 错误。
+
+@example
+@group
+(elt [1 2 3 4] 2)
+     @result{} 3
+@end group
+@group
+(elt '(1 2 3 4) 2)
+     @result{} 3
+@end group
+@group
+;; @r{We use @code{string} to show clearly which character @code{elt} returns.}
+(string (elt "1234" 2))
+     @result{} "3"
+@end group
+@group
+(elt [1 2 3 4] 4)
+     @error{} Args out of range: [1 2 3 4], 4
+@end group
+@group
+(elt [1 2 3 4] -1)
+     @error{} Args out of range: [1 2 3 4], -1
+@end group
+@end example
+
+该函数概括了 @code{aref} (@pxref{Array Functions}) 和 @code{nth} (@pxref{Definition of nth})。
+@end defun
+
+@defun copy-sequence seqr
+@cindex copying sequences
+该函数返回 @var{seqr} 的副本，它应该是序列或记录。  副本与原始对象类型相同，并且具有相同顺序的相同元素。  但是，如果 1⁣ 为空，例如零长度的字符串或向量，则此函数返回的值可能不是副本，而是与 2⁣ 相同类型且相同的空对象。
+
+将新元素存储到副本中不会影响原始 @var{seqr}，反之亦然。  然而，副本的元素并不是副本；而是副本。它们与原始元素相同 (@code{eq})。  因此，通过副本发现的这些元素中所做的更改在原始版本中也可见。
+
+如果参数是具有文本属性的字符串，则副本中的属性列表本身就是副本，不与原始属性列表共享。  但是，属性的​​实际值是共享的。 @xref{Text Properties}。
+
+此函数不适用于点列表。  尝试复制循环列表可能会导致无限循环。
+
+另请参见@ref{Building Lists}中的@code{append}、@ref{Creating Strings}中的@code{concat}和@ref{Vector Functions}中的@code{vconcat}，了解复制序列的其他方法。
+
+@example
+@group
+(setq bar (list 1 2))
+     @result{} (1 2)
+@end group
+@group
+(setq x (vector 'foo bar))
+     @result{} [foo (1 2)]
+@end group
+@group
+(setq y (copy-sequence x))
+     @result{} [foo (1 2)]
+@end group
+
+@group
+(eq x y)
+     @result{} nil
+@end group
+@group
+(equal x y)
+     @result{} t
+@end group
+@group
+(eq (elt x 1) (elt y 1))
+     @result{} t
+@end group
+
+@group
+;; @r{Replacing an element of one sequence.}
+(aset x 0 'quux)
+x @result{} [quux (1 2)]
+y @result{} [foo (1 2)]
+@end group
+
+@group
+;; @r{Modifying the inside of a shared element.}
+(setcar (aref x 1) 69)
+x @result{} [quux (69 2)]
+y @result{} [foo (69 2)]
+@end group
+@end example
+@end defun
+
+@defun reverse sequence
+@cindex string reverse
+@cindex list reverse
+@cindex vector reverse
+@cindex sequence reverse
+该函数创建一个新序列，其元素是@var{sequence}的元素，但顺序相反。  原始参数 @var{sequence} 已更改 @emph{not}。  请注意，字符表不能反转。
+
+@example
+@group
+(setq x '(1 2 3 4))
+     @result{} (1 2 3 4)
+@end group
+@group
+(reverse x)
+     @result{} (4 3 2 1)
+x
+     @result{} (1 2 3 4)
+@end group
+@group
+(setq x [1 2 3 4])
+     @result{} [1 2 3 4]
+@end group
+@group
+(reverse x)
+     @result{} [4 3 2 1]
+x
+     @result{} [1 2 3 4]
+@end group
+@group
+(setq x "xyzzy")
+     @result{} "xyzzy"
+@end group
+@group
+(reverse x)
+     @result{} "yzzyx"
+x
+     @result{} "xyzzy"
+@end group
+@end example
+@end defun
+
+@defun nreverse sequence
+@cindex reversing a string
+@cindex reversing a list
+@cindex reversing a vector
+该函数反转 @var{sequence} 元素的顺序。与@code{reverse}不同的是，原始的@var{sequence}可以被修改。
+
+例如：
+
+@example
+@group
+(setq x (list 'a 'b 'c))
+     @result{} (a b c)
+@end group
+@group
+x
+     @result{} (a b c)
+(nreverse x)
+     @result{} (c b a)
+@end group
+@group
+;; @r{The cons cell that was first is now last.}
+x
+     @result{} (a)
+@end group
+@end example
+
+为了避免混淆，我们通常将 @code{nreverse} 的结果存储回保存原始列表的同一变量中：
+
+@example
+(setq x (nreverse x))
+@end example
+
+这是我们最喜欢的示例 @code{(a b c)} 中的 @code{nreverse}，以图形方式呈现：
+
+@smallexample
+@group
+@r{Original list head:}                       @r{Reversed list:}
+ -------------        -------------        ------------
+| car  | cdr  |      | car  | cdr  |      | car | cdr  |
+|   a  |  nil |<--   |   b  |   o  |<--   |   c |   o  |
+|      |      |   |  |      |   |  |   |  |     |   |  |
+ -------------    |   --------- | -    |   -------- | -
+                  |             |      |            |
+                   -------------        ------------
+@end group
+@end smallexample
+
+对于向量，它更简单，因为你不需要 setq：
+
+@example
+(setq x (copy-sequence [1 2 3 4]))
+     @result{} [1 2 3 4]
+(nreverse x)
+     @result{} [4 3 2 1]
+x
+     @result{} [4 3 2 1]
+@end example
+
+请注意，与 @code{reverse} 不同，此函数不适用于字符串。尽管您可以使用 @code{aset} 更改字符串数据，但强烈建议将字符串视为不可变，即使它们是可变的。 @xref{Mutability}。
+
+@end defun
+
+@defun sort sequence &rest keyword-args
+@cindex stable sort
+@cindex sorting lists
+@cindex sorting vectors
+该函数对 @var{sequence} 进行排序，它必须是列表或向量，并返回相同类型的排序序列。排序是稳定的，这意味着具有相同排序键的元素保持其相对顺序。  它采用以下可选关键字参数：
+
+@table @code
+@item :key @var{keyfunc}
+使用 @var{keyfunc}（一个从 @var{sequence} 获取单个元素并返回其键值的函数）来生成用于比较的键。  如果该参数不存在或者 @var{keyfunc} 是 @code{nil}，则假定 @code{identity}；也就是说，元素本身用作排序键。
+
+@item :lessp @var{predicate}
+使用 @var{predicate} 来排序密钥。  @var{predicate} 是一个函数，它接受两个排序键作为参数，如果第一个排序键出现在第二个排序键之前，则返回非 @code{nil}。  如果这个参数不存在或者@var{predicate}是@code{nil}，则使用@code{value<}，它适用于许多不同的Lisp类型，并且通常按升序排序（@pxref{definition of value<}，见下文）。
+
+为了一致性，任何谓词都必须遵守以下规则：
+@itemize @bullet
+@item
+它必须是@dfn{antisymmetric}：它不能同时将@var{a}排序在@var{b}之前并且将@var{b}排序在@var{a}之前。
+@item
+它必须是@dfn{transitive}：如果它在@var{b}之前订购@var{a}并且在@var{c}之前订购@var{b}，那么它也必须在@var{c}之前订购@var{a}。
+@end itemize
+
+@item :reverse @var{flag}
+如果@var{flag}非@code{nil}，则排序顺序相反。  使用默认的 @code{:lessp} 谓词，这意味着按降序排序。
+
+@item :in-place @var{flag}
+如果 @var{flag} 不是 @code{nil}，则 @var{sequence} 就地排序（破坏性地）并返回。  如果@code{nil}，或者如果未给出此参数，则返回输入的排序副本，并且@var{sequence}本身保持不变。  就地排序稍快一些，但原始序列会丢失。
+@end table
+
+如果默认行为不适合您的需求，通常提供新的 @code{:key} 函数比提供不同的 @code{:lessp} 谓词更容易、更快捷。  例如，考虑对这些字符串进行排序：
+
+@example
+@group
+(setq numbers '("one" "two" "three" "four" "five" "six"))
+(sort numbers)
+     @result{} ("five" "four" "one" "six" "three" "two")
+@end group
+@end example
+
+您可以通过提供不同的键函数来按长度对字符串进行排序：
+
+@example
+@group
+(sort numbers :key #'length)
+     @result{} ("one" "two" "six" "four" "five" "three")
+@end group
+@end example
+
+@noindent
+请注意，由于排序稳定性，相同长度的字符串如何保持其原始顺序。  现在假设您想按长度排序，但使用字符串内容来打破平局。  最简单的方法是指定一个键函数，将元素转换为以此方式排序的值。由于 @code{value<} 按字典顺序对复合对象（conses、列表、向量和记录）进行排序，因此您可以执行以下操作：
+
+@example
+@group
+(sort numbers :key (lambda (x) (cons (length x) x)))
+     @result{} ("one" "six" "two" "five" "four" "three")
+@end group
+@end example
+
+@noindent
+因为@code{(3 . "six")}排在@code{(3 . "two")}之前，依此类推。
+
+为了与以前版本的 Emacs 兼容，还可以使用固定的双参数形式调用 @code{sort} 函数：
+
+@example
+(@code{sort} @var{sequence} @var{predicate})
+@end example
+
+@noindent
+其中 @var{predicate} 是 @code{:lessp} 参数。  使用此表单时，排序始终就地完成。
+@end defun
+
+@xref{Sorting}，用于执行排序的更多函数。  请参阅@ref{Accessing Documentation}中的@code{documentation}，了解@code{sort}的有用示例。
+
+@cindex comparing values
+@cindex standard sorting order
+@anchor{definition of value<}
+@defun value< a b
+如果按照标准排序顺序 @var{a} 位于 @var{b} 之前，则该函数返回非 @code{nil}；这意味着当@var{b}出现在@var{a}之前，或者它们相等或无序时，它返回@code{nil}。
+
+参数 @var{a} 和 @var{b} 必须具有相同的类型。具体来说：
+
+@itemize @bullet
+@item
+使用 @code{<} (@pxref{definition of <}) 比较数字。
+@item
+字符串使用 @code{string-lessp} (@pxref{definition of string-lessp}) 进行比较，而符号则通过将其名称与字符串进行比较来进行比较。
+@item
+Conses、列表、向量和记录按字典顺序进行比较。  这意味着两个序列从左到右按元素进行比较，直到它们不同为止，然后结果是第一对不同元素上的 @code{value<} 。  如果一个序列先于另一个序列耗尽元素，则较短的序列会出现在较长的序列之前。
+@item
+首先按缓冲区比较标记，然后按位置比较。
+@item
+通过将名称作为字符串进行比较来比较缓冲区和进程。死缓冲区（其名称为@code{nil}）将在任何活动缓冲区之前进行比较。
+@item
+其他类型被认为是无序的，返回值为@code{nil}。
+@end itemize
+
+示例：
+@example
+(value< -4 3.5) @result{} t
+(value< "dog" "cat") @result{} nil
+(value< 'yip 'yip) @result{} nil
+(value< '(3 2) '(3 2 0)) @result{} t
+(value< [3 2 "a"] [3 2 "b"]) @result{} t
+@end example
+
+@noindent
+请注意，@code{nil} 被视为符号或空列表，具体取决于它的比较对象：
+
+@example
+(value< nil '(0)) @result{} t
+(value< 'nib nil) @result{} t
+@end example
+
+@noindent
+可比较的序列（列表、向量等）的长度没有限制，但如果用于比较循环或深度嵌套的数据结构，@code{value<}可能会失败并出现错误。
+@end defun
+
+@cindex sequence functions in seq
+@cindex seq library
+@cindex sequences, generalized
+@file{seq.el} 库提供以下附加序列操作宏和函数，前缀为 @code{seq-}。
+
+该库中定义的所有函数都没有副作用；即，它们不会修改您作为参数传递的任何序列（列表、向量或字符串）。  除非另有说明，结果是与输入类型相同的序列。  对于那些采用谓词的函数，这应该是一个参数的函数。
+
+@file{seq.el} 库可以扩展以处理其他类型的顺序数据结构。  为此，所有函数均使用 @code{cl-defgeneric} 定义。  @xref{Generic Functions}，了解有关使用 @code{cl-defgeneric} 添加扩展的更多详细信息。
+
+@defun seq-elt sequence index
+该函数返回指定@var{index}处@var{sequence}的元素，它是一个整数，其有效值范围是0到比@var{sequence}长度小1。  对于内置序列类型上的超出范围的值，@code{seq-elt} 的行为类似于 @code{elt}。详情请参阅@ref{Definition of elt}。
+
+@example
+@group
+(seq-elt [1 2 3 4] 2)
+@result{} 3
+@end group
+@end example
+
+@code{seq-elt} 返回可使用 @code{setf} (@pxref{Setting Generalized Variables}) 设置的位置。
+
+@example
+@group
+(setq vec [1 2 3 4])
+(setf (seq-elt vec 2) 5)
+vec
+@result{} [1 2 5 4]
+@end group
+@end example
+@end defun
+
+@defun seq-length sequence
+该函数返回 @var{sequence} 中的元素数量。  对于内置序列类型，@code{seq-length} 的行为类似于 @code{length}。 @xref{Definition of length}。
+@end defun
+
+@defun seqp object
+如果@var{object}是一个序列（列表或数组），或者通过@file{seq.el}泛型函数定义的任何其他类型的序列，则该函数返回非@code{nil}。  这是 @code{sequencep} 的可扩展变体。
+
+@example
+@group
+(seqp [1 2])
+@result{} t
+@end group
+@group
+(seqp 2)
+@result{} nil
+@end group
+@end example
+@end defun
+
+@defun seq-drop sequence n
+该函数返回 @var{sequence} 中除第一个 @var{n}（整数）元素之外的所有元素。  如果 @var{n} 为负数或零，则结果为 @var{sequence}。
+
+@example
+@group
+(seq-drop [1 2 3 4 5 6] 3)
+@result{} [4 5 6]
+@end group
+@group
+(seq-drop "hello world" -4)
+@result{} "hello world"
+@end group
+@end example
+@end defun
+
+@defun seq-take sequence n
+该函数返回 @var{sequence} 的前 @var{n} （整数）元素。  如果 @var{n} 为负数或零，则结果为 @code{nil}。
+
+@example
+@group
+(seq-take '(1 2 3 4) 3)
+@result{} (1 2 3)
+@end group
+@group
+(seq-take [1 2 3 4] 0)
+@result{} []
+@end group
+@end example
+@end defun
+
+@defun seq-take-while predicate sequence
+该函数按顺序返回 @var{sequence} 的成员，在第一个 @var{predicate} 返回 @code{nil} 之前停止。
+
+@example
+@group
+(seq-take-while (lambda (elt) (> elt 0)) '(1 2 3 -1 -2))
+@result{} (1 2 3)
+@end group
+@group
+(seq-take-while (lambda (elt) (> elt 0)) [-1 4 6])
+@result{} []
+@end group
+@end example
+@end defun
+
+@defun seq-drop-while predicate sequence
+该函数按顺序返回 @var{sequence} 的成员，从第一个 @var{predicate} 返回 @code{nil} 的成员开始。
+
+@example
+@group
+(seq-drop-while (lambda (elt) (> elt 0)) '(1 2 3 -1 -2))
+@result{} (-1 -2)
+@end group
+@group
+(seq-drop-while (lambda (elt) (< elt 0)) [1 4 6])
+@result{} [1 4 6]
+@end group
+@end example
+@end defun
+
+@defun seq-split sequence length
+该函数返回一个由（最多）长度 @var{length} 的 @var{sequence} 子序列组成的列表。  （如果@var{sequence}的长度不是@var{length}的倍数，则最终元素可能比@var{length}短。
+
+@example
+@group
+(seq-split [0 1 2 3 4] 2)
+@result{} ([0 1] [2 3] [4])
+@end group
+@end example
+@end defun
+
+@defun seq-do function sequence
+该函数依次将@var{function}应用于@var{sequence}的每个元素（可能是为了副作用），并返回@var{sequence}。
+@end defun
+
+@defun seq-map function sequence
+该函数返回将 @var{function} 应用于 @var{sequence} 的每个元素的结果。  返回值是一个列表。
+
+@example
+@group
+(seq-map #'1+ '(2 4 6))
+@result{} (3 5 7)
+@end group
+@group
+(seq-map #'symbol-name [foo bar])
+@result{} ("foo" "bar")
+@end group
+@end example
+@end defun
+
+@defun seq-map-indexed function sequence
+该函数返回将 @var{function} 应用于 @var{sequence} 的每个元素及其在 @var{seq} 中的索引的结果。  返回值是一个列表。
+
+@example
+@group
+(seq-map-indexed (lambda (elt idx)
+                   (list idx elt))
+                 '(a b c))
+@result{} ((0 a) (1 b) (2 c))
+@end group
+@end example
+@end defun
+
+@defun seq-mapn function &rest sequences
+该函数返回将 @var{function} 应用于 @var{sequences} 的每个元素的结果。  @var{function} 的元数 (@pxref{What Is a Function, subr-arity}) 必须与序列数匹配。映射在最短序列的末尾停止，返回值是一个列表。
+
+@example
+@group
+(seq-mapn #'+ '(2 4 6) '(20 40 60))
+@result{} (22 44 66)
+@end group
+@group
+(seq-mapn #'concat '("moskito" "bite") ["bee" "sting"])
+@result{} ("moskitobee" "bitesting")
+@end group
+@end example
+@end defun
+
+@defun seq-filter predicate sequence
+@cindex filtering sequences
+该函数返回 @var{sequence} 中 @var{predicate} 返回非 @code{nil} 的所有元素的列表。
+
+@example
+@group
+(seq-filter (lambda (elt) (> elt 0)) [1 -1 3 -3 5])
+@result{} (1 3 5)
+@end group
+@group
+(seq-filter (lambda (elt) (> elt 0)) '(-1 -3 -5))
+@result{} nil
+@end group
+@end example
+@end defun
+
+@defun seq-remove predicate sequence
+@cindex removing from sequences
+该函数返回@var{sequence}中所有元素的列表，其中@var{predicate}返回@code{nil}。
+
+@example
+@group
+(seq-remove (lambda (elt) (> elt 0)) [1 -1 3 -3 5])
+@result{} (-1 -3)
+@end group
+@group
+(seq-remove (lambda (elt) (< elt 0)) '(-1 -3 -5))
+@result{} nil
+@end group
+@end example
+@end defun
+
+@defun seq-remove-at-position sequence n
+@cindex removing from sequences
+此函数返回 @var{sequence} 的副本，其中（从零开始）索引 @var{n} 处的元素已被删除。  结果是与@var{sequence}类型相同的序列。
+
+@example
+@group
+(seq-remove-at-position [1 -1 3 -3 5] 0)
+@result{} [-1 3 -3 5]
+@end group
+@group
+(seq-remove-at-position [1 -1 3 -3 5] 3)
+@result{} [1 -1 3 5]
+@end group
+@end example
+@end defun
+
+@defun seq-keep function sequence
+该函数返回对 @var{sequence} 中的元素调用 @var{function} 的所有非 @code{nil} 结果的列表。
+
+@example
+@group
+(seq-keep #'cl-digit-char-p '(?6 ?a ?7))
+@result{} (6 7)
+@end group
+@end example
+
+@end defun
+
+@defun seq-reduce function sequence initial-value
+@cindex reducing sequences
+该函数返回使用 @var{initial-value} 和 @var{sequence} 的第一个元素调用 @var{function} 的结果，然后使用该结果和 @var{sequence} 的第二个元素调用 @var{function}，然后使用该结果和 @var{sequence} 的第三个元素，依此类推。 @var{function} 应该是一个有两个参数的函数。
+
+@var{function} 用两个参数调用。  @var{initial-value}（然后是累加值）用作第一个参数，@var{sequence} 中的元素用作第二个参数。
+
+如果@var{sequence}为空，则返回@var{initial-value}而不调用@var{function}。
+
+@example
+@group
+(seq-reduce #'+ [1 2 3 4] 0)
+@result{} 10
+@end group
+@group
+(seq-reduce #'+ '(1 2 3 4) 5)
+@result{} 15
+@end group
+@group
+(seq-reduce #'+ '() 3)
+@result{} 3
+@end group
+@end example
+@end defun
+
+@defun seq-some predicate sequence
+该函数返回通过依次将 1⁣ 应用于 2⁣ 的每个元素而返回的第一个非 0⁣ 值。
+
+@example
+@group
+(seq-some #'numberp ["abc" 1 nil])
+@result{} t
+@end group
+@group
+(seq-some #'numberp ["abc" "def"])
+@result{} nil
+@end group
+@group
+(seq-some #'null ["abc" 1 nil])
+@result{} t
+@end group
+@group
+(seq-some #'1+ [2 4 6])
+@result{} 3
+@end group
+@end example
+@end defun
+
+@defun seq-find predicate sequence &optional default
+该函数返回 @var{sequence} 中 @var{predicate} 返回非 @code{nil} 的第一个元素。  如果没有元素匹配@var{predicate}，则函数返回@var{default}。
+
+请注意，如果找到的元素与@var{default}相同，则该函数具有歧义，因为在这种情况下无法知道是否找到了元素。
+
+@example
+@group
+(seq-find #'numberp ["abc" 1 nil])
+@result{} 1
+@end group
+@group
+(seq-find #'numberp ["abc" "def"])
+@result{} nil
+@end group
+@end example
+@end defun
+
+@defun seq-every-p predicate sequence
+如果将 1⁣ 应用于 2⁣ 的每个元素都返回非 3⁣，则该函数返回非 @code{nil}。
+
+@example
+@group
+(seq-every-p #'numberp [2 4 6])
+@result{} t
+@end group
+@group
+(seq-every-p #'numberp [2 4 "6"])
+@result{} nil
+@end group
+@end example
+@end defun
+
+@defun seq-empty-p sequence
+如果 1⁣ 为空，则该函数返回非 0⁣。
+
+@example
+@group
+(seq-empty-p "not empty")
+@result{} nil
+@end group
+@group
+(seq-empty-p "")
+@result{} t
+@end group
+@end example
+@end defun
+
+@defun seq-count predicate sequence
+该函数返回 @var{sequence} 中 @var{predicate} 返回非 @code{nil} 的元素数量。
+
+@example
+(seq-count (lambda (elt) (> elt 0)) [-1 2 0 3 -2])
+@result{} 2
+@end example
+@end defun
+
+@cindex sorting sequences
+@defun seq-sort function sequence
+此函数返回根据 @var{function} 排序的 @var{sequence} 副本，@var{function} 是一个有两个参数的函数，如果第一个参数应在第二个参数之前排序，则返回非 @code{nil}。
+@end defun
+
+@defun seq-sort-by function predicate sequence
+此函数与 @code{seq-sort} 类似，但 @var{sequence} 的元素在排序之前通过对其应用 @var{function} 进行转换。  @var{function} 是一个参数的函数。
+
+@example
+(seq-sort-by #'seq-length #'> ["a" "ab" "abc"])
+@result{} ["abc" "ab" "a"]
+@end example
+@end defun
+
+
+@defun seq-contains-p sequence elt &optional function
+如果@var{sequence}中至少有一个元素等于@var{elt}，则该函数返回非@code{nil}。  如果可选参数@var{function}不是@code{nil}，则它是两个参数的函数，而不是默认的@code{equal}。
+
+@example
+@group
+(seq-contains-p '(symbol1 symbol2) 'symbol1)
+@result{} t
+@end group
+@group
+(seq-contains-p '(symbol1 symbol2) 'symbol3)
+@result{} nil
+@end group
+@end example
+
+@end defun
+
+@defun seq-set-equal-p sequence1 sequence2 &optional testfn
+该函数检查 @var{sequence1} 和 @var{sequence2} 是否包含相同的元素，无论顺序如何。  如果可选参数@var{testfn}不是@code{nil}，则它是两个参数的函数，而不是默认的@code{equal}。
+
+@example
+@group
+(seq-set-equal-p '(a b c) '(c b a))
+@result{} t
+@end group
+@group
+(seq-set-equal-p '(a b c) '(c b))
+@result{} nil
+@end group
+@group
+(seq-set-equal-p '("a" "b" "c") '("c" "b" "a"))
+@result{} t
+@end group
+@group
+(seq-set-equal-p '("a" "b" "c") '("c" "b" "a") #'eq)
+@result{} nil
+@end group
+@end example
+
+@end defun
+
+@defun seq-position sequence elt &optional function
+此函数返回 @var{sequence} 中等于 @var{elt} 的第一个元素的（从零开始的）索引。  如果可选参数@var{function}不是@code{nil}，则它是两个参数的函数，而不是默认的@code{equal}。
+
+@example
+@group
+(seq-position '(a b c) 'b)
+@result{} 1
+@end group
+@group
+(seq-position '(a b c) 'd)
+@result{} nil
+@end group
+@end example
+@end defun
+
+@defun seq-positions sequence elt &optional testfn
+此函数返回 @var{sequence} 中元素的（从零开始）索引列表，其中当传递元素和 @var{elt} 作为参数时，@var{testfn} 返回非 @code{nil}。 @var{testfn} 默认为 @code{equal}。
+
+@example
+@group
+(seq-positions '(a b c a d) 'a)
+@result{} (0 3)
+@end group
+@group
+(seq-positions '(a b c a d) 'z)
+@result{} nil
+@end group
+@group
+(seq-positions '(11 5 7 12 9 15) 10 #'>=)
+@result{} (0 3 5)
+@end group
+@end example
+@end defun
+
+@defun seq-uniq sequence &optional function
+该函数返回 @var{sequence} 的元素列表，其中重复项被删除。  如果可选参数@var{function}不是@code{nil}，则它是两个参数的函数，而不是默认的@code{equal}。
+
+@example
+@group
+(seq-uniq '(1 2 2 1 3))
+@result{} (1 2 3)
+@end group
+@group
+(seq-uniq '(1 2 2.0 1.0) #'=)
+@result{} (1 2)
+@end group
+@end example
+@end defun
+
+@defun seq-subseq sequence start &optional end
+@cindex sub-sequence
+该函数返回从@var{start}到@var{end}的@var{sequence}子集，两个都是整数（@var{end}默认为最后一个元素）。如果@var{start}或@var{end}为负数，则从@var{sequence}末尾开始计数。
+
+@example
+@group
+(seq-subseq '(1 2 3 4 5) 1)
+@result{} (2 3 4 5)
+@end group
+@group
+(seq-subseq '[1 2 3 4 5] 1 3)
+@result{} [2 3]
+@end group
+@group
+(seq-subseq '[1 2 3 4 5] -3 -1)
+@result{} [3 4]
+@end group
+@end example
+@end defun
+
+@defun seq-concatenate type &rest sequences
+该函数返回由@var{sequences}串联而成的@var{type}类型的序列。  @var{type}可以是：@code{vector}、@code{list}或@code{string}。
+
+@example
+@group
+(seq-concatenate 'list '(1 2) '(3 4) [5 6])
+@result{} (1 2 3 4 5 6)
+@end group
+@group
+(seq-concatenate 'string "Hello " "world")
+@result{} "Hello world"
+@end group
+@end example
+@end defun
+
+@defun seq-mapcat function sequence &optional type
+该函数返回将 @code{seq-concatenate} 应用到 @var{function} 到 @var{sequence} 的每个元素的结果。  结果是 @var{type} 类型的序列，或者如果 @var{type} 是 @code{nil} 则为列表。
+
+@example
+@group
+(seq-mapcat #'seq-reverse '((3 2 1) (6 5 4)))
+@result{} (1 2 3 4 5 6)
+@end group
+@end example
+@end defun
+
+@defun seq-partition sequence n
+该函数返回 @var{sequence} 的元素列表，这些元素被分组为长度为 @var{n} 的子序列。  最后一个序列包含的元素可能少于 2⁣。  @var{n} 必须是整数。  如果@var{n}是负整数或0，则返回值为@code{nil}。
+
+@example
+@group
+(seq-partition '(0 1 2 3 4 5 6 7) 3)
+@result{} ((0 1 2) (3 4 5) (6 7))
+@end group
+@end example
+@end defun
+
+@defun seq-union sequence1 sequence2 &optional function
+@cindex sequences, union of
+@cindex union of sequences
+此函数返回出现在 @var{sequence1} 或 @var{sequence2} 中的元素的列表。  返回列表的元素都是唯一的，从某种意义上说，没有两个元素比较相等。  如果可选参数 @var{function} 不是 @code{nil}，则它应该是用于比较元素的两个参数的函数，而不是默认的 @code{equal}。
+
+@example
+@group
+(seq-union [1 2 3] [3 5])
+@result{} (1 2 3 5)
+@end group
+@end example
+@end defun
+
+@defun seq-intersection sequence1 sequence2 &optional function
+@cindex sequences, intersection of
+@cindex intersection of sequences
+该函数返回 @var{sequence1} 的副本，其中未出现在 @var{sequence2} 中的元素已被删除。  如果可选参数@var{function}不是@code{nil}，则它是两个参数的函数，用于比较元素而不是默认的@code{equal}。
+
+@example
+@group
+(seq-intersection [2 3 4 5] [1 3 5 6 7])
+@result{} (3 5)
+@end group
+@end example
+@end defun
+
+
+@defun seq-difference sequence1 sequence2 &optional function
+该函数返回 @var{sequence1} 的副本，其中出现在 @var{sequence2} 中的元素已被删除。  如果可选参数@var{function}不是@code{nil}，则它是两个参数的函数，用于比较元素而不是默认的@code{equal}。
+
+@example
+@group
+(seq-difference '(2 3 4 5) [1 3 5 6 7])
+@result{} (2 4)
+@end group
+@end example
+@end defun
+
+@defun seq-group-by function sequence
+该函数将 @var{sequence} 的元素分成一个列表，其键是将 @var{function} 应用于 @var{sequence} 的每个元素的结果。  使用 @code{equal} 比较密钥。
+
+@example
+@group
+(seq-group-by #'integerp '(1 2.1 3 2 3.2))
+@result{} ((t 1 3 2) (nil 2.1 3.2))
+@end group
+@group
+(seq-group-by #'car '((a 1) (b 2) (a 3) (c 4)))
+@result{} ((b (b 2)) (a (a 1) (a 3)) (c (c 4)))
+@end group
+@end example
+@end defun
+
+@defun seq-into sequence type
+@cindex convert sequence to another type
+@cindex list to vector
+@cindex vector to list
+@cindex string to vector
+该函数将序列 @var{sequence} 转换为类型 @var{type} 的序列。  @var{type} 可以是以下符号之一：@code{vector}、@code{string} 或@code{list}。
+
+@example
+@group
+(seq-into [1 2 3] 'list)
+@result{} (1 2 3)
+@end group
+@group
+(seq-into nil 'vector)
+@result{} []
+@end group
+@group
+(seq-into "hello" 'vector)
+@result{} [104 101 108 108 111]
+@end group
+@end example
+@end defun
+
+@defun seq-min sequence
+@cindex minimum value of sequence
+@cindex sequence minimum
+该函数返回 @var{sequence} 的最小元素。  @var{sequence} 的元素必须是数字或标记 (@pxref{Markers})。
+
+@example
+@group
+(seq-min [3 1 2])
+@result{} 1
+@end group
+@group
+(seq-min "Hello")
+@result{} 72
+@end group
+@end example
+@end defun
+
+@defun seq-max sequence
+@cindex maximum value of sequence
+@cindex sequence maximum
+该函数返回 @var{sequence} 的最大元素。  @var{sequence} 的元素必须是数字或标记。
+
+@example
+@group
+(seq-max [1 3 2])
+@result{} 3
+@end group
+@group
+(seq-max "Hello")
+@result{} 111
+@end group
+@end example
+@end defun
+
+@defmac seq-doseq (var sequence) body@dots{}
+@cindex sequence iteration
+@cindex iteration over vector or string
+该宏类似于 @code{dolist} (@pxref{Iteration, dolist})，只不过 @var{sequence} 可以是列表、向量或字符串。  这主要对于副作用有用。
+@end defmac
+
+@anchor{seq-let}
+@defmac seq-let var-sequence val-sequence body@dots{}
+@cindex sequence destructuring
+该宏将@var{var-sequence}中定义的变量绑定到@var{val-sequence}对应元素的值。这被称为@dfn{destructuring binding}。  @var{var-sequence} 的元素本身可以包含序列，允许嵌套解构。
+
+@var{var-sequence} 序列还可以包含 @code{&rest} 标记，后跟要绑定到 @var{val-sequence} 其余部分的变量名称。
+
+@example
+@group
+(seq-let [first second] [1 2 3 4]
+  (list first second))
+@result{} (1 2)
+@end group
+@group
+(seq-let (_ a _ b) '(1 2 3 4)
+  (list a b))
+@result{} (2 4)
+@end group
+@group
+(seq-let [a [b [c]]] [1 [2 [3]]]
+  (list a b c))
+@result{} (1 2 3)
+@end group
+@group
+(seq-let [a b &rest others] [1 2 3 4]
+  others)
+@end group
+@result{} [3 4]
+@end example
+
+@code{pcase} 模式提供了解构绑定的替代工具，请参阅@ref{Destructuring with pcase Patterns}。
+@end defmac
+
+@defmac seq-setq var-sequence val-sequence
+@cindex sequence destructuring
+该宏的工作方式与 @code{seq-let} 类似，只不过值是通过 @code{setq} 分配给变量的，而不是像在 @code{let} 绑定中那样。
+
+@example
+@group
+(let ((a nil)
+      (b nil))
+  (seq-setq (_ a _ b) '(1 2 3 4))
+  (list a b))
+@result{} (2 4)
+@end group
+@end example
+@end defmac
+
+@defun seq-random-elt sequence
+该函数返回随机获取的 @var{sequence} 元素。
+
+@example
+@group
+(seq-random-elt [1 2 3 4])
+@result{} 3
+(seq-random-elt [1 2 3 4])
+@result{} 2
+(seq-random-elt [1 2 3 4])
+@result{} 4
+(seq-random-elt [1 2 3 4])
+@result{} 2
+(seq-random-elt [1 2 3 4])
+@result{} 1
+@end group
+@end example
+
+如果 0⁣ 为空，则该函数发出错误信号。
+@end defun
+
+@node Arrays
+@section 数组
+@cindex array
+
+@dfn{array} 对象具有容纳许多其他 Lisp 对象的槽，称为数组的元素。  数组的任何元素都可以在常数时间内访问。  相反，访问列表元素的时间与该元素在列表中的位置成正比。
+
+Emacs 定义了四种类型的数组，都是一维的： @dfn{strings} (@pxref{String Type})、@dfn{vectors} (@pxref{Vector Type})、@dfn{bool-vectors} (@pxref{Bool-Vector Type}) 和 @dfn{char-tables} (@pxref{Char-Table Type})。  向量和字符表可以保存任何类型的元素，但字符串只能保存字符，布尔向量只能保存@code{t}和@code{nil}。
+
+所有四种阵列都具有以下特征：
+
+@itemize @bullet
+@item
+数组的第一个元素的索引为零，第二个元素的索引为 1，依此类推。  这称为 @dfn{zero-origin} 索引。  例如，四个元素的数组具有索引 0、1、2、@w{and 3}。
+
+@item
+数组的长度一旦创建就固定了；您无法更改现有数组的长度。
+
+@item
+出于求值的目的，数组是一个常量——即，它求值为自身。
+
+@item
+数组的元素可以分别使用函数 @code{aref} 和 @code{aset} (@pxref{Array Functions}) 来引用或更改。
+@end itemize
+
+创建数组（字符表除外）时，必须指定其长度。  您不能指定字符表的长度，因为它是由字符代码的范围决定的。
+
+原则上，如果您想要文本字符数组，可以使用字符串或向量。  在实践中，我们总是为此类应用选择字符串，原因有四个：
+
+@itemize @bullet
+@item
+它们占据相同元素向量空间的四分之一。
+
+@item
+字符串的打印方式可以将内容更清晰地显示为文本。
+
+@item
+字符串可以保存文本属性。  @xref{Text Properties}。
+
+@item
+Emacs 的许多专门编辑和 I/O 工具只接受字符串。  例如，您不能像插入字符串那样将字符向量插入到缓冲区中。  @xref{Strings and Characters}。
+@end itemize
+
+相比之下，对于键盘输入字符数组（例如按键序列），向量可能是必要的，因为许多键盘输入字符超出了字符串适合的范围。  @xref{Key Sequence Input}。
+
+@node Array Functions
+@section 对数组进行操作的函数
+
+在本节中，我们将描述接受所有类型数组的函数。
+
+@defun arrayp object
+如果 1⁣ 是数组（即向量、字符串、布尔向量或字符表），则此函数返回 @code{t}。
+
+@example
+@group
+(arrayp [a])
+     @result{} t
+(arrayp "asdf")
+     @result{} t
+(arrayp (syntax-table))    ;; @r{A char-table.}
+     @result{} t
+@end group
+@end example
+@end defun
+
+@defun aref arr index
+@cindex array elements
+该函数返回数组或记录 @var{arr} 的第 @var{index} 个元素。  第一个元素的索引为零。
+
+@example
+@group
+(setq primes [2 3 5 7 11 13])
+     @result{} [2 3 5 7 11 13]
+(aref primes 4)
+     @result{} 11
+@end group
+@group
+(aref "abcdefg" 1)
+     @result{} 98           ; @r{@samp{b} is @acronym{ASCII} code 98.}
+@end group
+@end example
+
+另请参见 @ref{Sequence Functions} 中的函数 @code{elt}。
+@end defun
+
+@defun aset array index object
+该函数将@var{array}的第@var{index}元素设置为@var{object}。  它返回@var{object}。
+
+@example
+@group
+(setq w (vector 'foo 'bar 'baz))
+     @result{} [foo bar baz]
+(aset w 0 'fu)
+     @result{} fu
+w
+     @result{} [fu bar baz]
+@end group
+
+@group
+;; @r{@code{copy-sequence} copies the string to be modified later.}
+(setq x (copy-sequence "asdfasfd"))
+     @result{} "asdfasfd"
+(aset x 3 ?Z)
+     @result{} 90
+x
+     @result{} "asdZasfd"
+@end group
+@end example
+
+@var{array} 应该是可变的。  @xref{Mutability}。
+
+如果 @var{array} 是字符串且 @var{object} 不是字符，则会产生 @code{wrong-type-argument} 错误。  有关字符串突变的更多信息，@pxref{Modifying Strings}。
+@end defun
+
+@defun fillarray array object
+该函数用@var{object}填充数组@var{array}，使得@var{array}的每个元素都是@var{object}。  它返回@var{array}。
+
+@example
+@group
+(setq a (copy-sequence [a b c d e f g]))
+     @result{} [a b c d e f g]
+(fillarray a 0)
+     @result{} [0 0 0 0 0 0 0]
+a
+     @result{} [0 0 0 0 0 0 0]
+@end group
+@group
+(setq s (copy-sequence "When in the course"))
+     @result{} "When in the course"
+(fillarray s ?-)
+     @result{} "------------------"
+@end group
+@end example
+
+如果 @var{array} 是字符串且 @var{object} 不是字符，则会产生 @code{wrong-type-argument} 错误。
+@end defun
+
+通用序列函数 @code{copy-sequence} 和 @code{length} 对于已知为数组的对象通常很有用。  @xref{Sequence Functions}。
+
+@node Vectors
+@section 向量
+@cindex vector (type)
+
+@dfn{vector} 是一个通用数组，其元素可以是任何 Lisp 对象。  （相比之下，字符串的元素只能是字符。@xref{Strings and Characters}。）向量在 Emacs 中具有多种用途：作为键序列 (@pxref{Key Sequences})、作为符号查找表 (@pxref{Creating Symbols})、作为字节编译函数表示的一部分 (@pxref{Byte Compilation}) 等等。
+
+与其他数组一样，向量使用零源索引：第一个元素的索引为 0。
+
+向量打印时用方括号包围元素。因此，元素为符号 @code{a}、@code{b} 和 @code{a} 的向量被打印为 @code{[a b a]}。  您可以在 Lisp 输入中以相同的方式编写向量。
+
+向量，如字符串或数字，被视为求值常量：求值的结果是相同的向量。  这不会评估甚至检查向量的元素。 @xref{Self-Evaluating Forms}。  用方括号编写的向量不应通过 @code{aset} 或其他破坏性操作进行修改。  @xref{Mutability}。
+
+以下是说明这些原则的示例：
+
+@example
+@group
+(setq avector [1 two '(three) "four" [five]])
+     @result{} [1 two '(three) "four" [five]]
+(eval avector)
+     @result{} [1 two '(three) "four" [five]]
+(eq avector (eval avector))
+     @result{} t
+@end group
+@end example
+
+@node Vector Functions
+@section 向量函数
+
+以下是一些与向量相关的函数：
+
+@defun vectorp object
+如果 1⁣ 是向量，则该函数返回 0⁣。
+
+@example
+@group
+(vectorp [a])
+     @result{} t
+(vectorp "asdf")
+     @result{} nil
+@end group
+@end example
+@end defun
+
+@defun vector &rest objects
+该函数创建并返回一个向量，其元素是参数 @var{objects}。
+
+@example
+@group
+(vector 'foo 23 [bar baz] "rats")
+     @result{} [foo 23 [bar baz] "rats"]
+(vector)
+     @result{} []
+@end group
+@end example
+@end defun
+
+@defun make-vector length object
+该函数返回一个由 @var{length} 元素组成的新向量，每个元素都初始化为 @var{object}。
+
+@example
+@group
+(setq sleepy (make-vector 9 'Z))
+     @result{} [Z Z Z Z Z Z Z Z Z]
+@end group
+@end example
+@end defun
+
+@defun vconcat &rest sequences
+@cindex copying vectors
+该函数返回一个包含 @var{sequences} 的所有元素的新向量。  参数 @var{sequences} 可以是适当的列表、向量、字符串或布尔向量。  如果没有给出 @var{sequences}，则返回空向量。
+
+该值要么是空向量，要么是新构造的非空向量，与任何现有向量都不 @code{eq} 。
+
+@example
+@group
+(setq a (vconcat '(A B C) '(D E F)))
+     @result{} [A B C D E F]
+(eq a (vconcat a))
+     @result{} nil
+@end group
+@group
+(vconcat)
+     @result{} []
+(vconcat [A B C] "aa" '(foo (6 7)))
+     @result{} [A B C 97 97 foo (6 7)]
+@end group
+@end example
+
+@code{vconcat} 函数还允许字节码函数对象作为参数。  这是一个特殊功能，可以轻松访问字节码函数对象的全部内容。  @xref{Closure Objects}。
+
+对于其他串联函数，请参见@ref{Mapping Functions}中的@code{mapconcat}、@ref{Creating Strings}中的@code{concat}和@ref{Building Lists}中的@code{append}。
+@end defun
+
+@code{append} 函数还提供了一种将向量转换为具有相同元素的列表的方法：
+
+@example
+@group
+(setq avector [1 two (quote (three)) "four" [five]])
+     @result{} [1 two '(three) "four" [five]]
+(append avector nil)
+     @result{} (1 two '(three) "four" [five])
+@end group
+@end example
+
+@node Char-Tables
+@section 字符表
+@cindex char-tables
+@cindex extra slots of char-table
+
+字符表很像向量，只不过它是按字符代码索引的。  任何有效的字符代码（不带修饰符）都可以用作字符表中的索引。  与任何数组一样，您可以使用 @code{aref} 和 @code{aset} 访问字符表的元素。  此外，字符表可以有 @dfn{extra slots} 来保存与特定字符代码无关的附加数据。  与向量一样，字符表在求值时是常量，并且可以保存任何类型的元素。
+
+@cindex subtype of char-table
+每个字符表都有一个符号@dfn{subtype}，它有两个用途：
+
+@itemize @bullet
+@item
+子类型提供了一种简单的方法来判断字符表的用途。例如，显示表是以@code{display-table}为子类型的字符表，语法表是以@code{syntax-table}为子类型的字符表。  可以使用函数 @code{char-table-subtype} 查询子类型，如下所述。
+
+@cindex @code{char-table-extra-slots} (symbol property)
+@item
+子类型控制字符表中@dfn{extra slots}的数量。  该数字由子类型的 @code{char-table-extra-slots} 符号属性 (@pxref{Symbol Properties}) 指定，其值应为 0 到 10 之间的整数。如果子类型没有此类符号属性，则字符表没有额外的槽。
+@end itemize
+
+@cindex parent of char-table
+一个字符表可以有一个 @dfn{parent}，这是另一个字符表。  如果是这样，那么每当字符表为特定字符 @var{c} 指定 @code{nil} 时，它就会继承父级中指定的值。  换句话说，如果@var{char-table}本身指定了@code{nil}，则@code{(aref @var{char-table} @var{c})}返回@var{char-table}的父级的值。
+
+@cindex default value of char-table
+字符表也可以有 @dfn{default value}。  如果是这样，那么只要字符表没有指定任何其他非 2⁣ 值，@code{(aref @var{char-table} @var{c})}就会返回默认值。
+
+@defun make-char-table subtype &optional init
+返回一个新创建的字符表，其子类型为@var{subtype}（符号）。  每个元素都初始化为@var{init}，默认为@code{nil}。  创建字符表后，您无法更改该字符表的子类型。
+
+没有参数来指定字符表的长度，因为所有字符表都有空间容纳任何有效的字符代码作为索引。
+
+如果 @var{subtype} 具有 @code{char-table-extra-slots} 符号属性，则指定字符表中额外槽的数量。这应该是 0 到 10 之间的整数；否则，@code{make-char-table} 会引发错误。  如果 @var{subtype} 没有 @code{char-table-extra-slots} 符号属性 (@pxref{Property Lists})，则字符表没有额外的槽。
+@end defun
+
+@defun char-table-p object
+如果 1⁣ 是字符表，则该函数返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@defun char-table-subtype char-table
+该函数返回@var{char-table}的子类型符号。
+@end defun
+
+没有特殊的函数可以访问字符表中的默认值。为此，请使用@code{char-table-range}（见下文）。
+
+@defun char-table-parent char-table
+该函数返回@var{char-table}的父级。  父表始终是 @code{nil} 或另一个字符表。
+@end defun
+
+@defun set-char-table-parent char-table new-parent
+该函数将 @var{char-table} 的父级设置为 @var{new-parent}。
+@end defun
+
+@defun char-table-extra-slot char-table n
+该函数返回 @var{char-table} 的额外槽 @var{n}（从零开始）的内容。  字符表中额外槽的数量由其子类型决定。
+@end defun
+
+@defun set-char-table-extra-slot char-table n value
+该函数将@var{value}存储在@var{char-table}的额外槽@var{n}（从零开始）中。
+@end defun
+
+字符表可以为单个字符代码指定元素值；它还可以指定整个字符集的值。
+
+@defun char-table-range char-table range
+这将返回在 @var{char-table} 中为字符范围 @var{range} 指定的值。  以下是 @var{range} 的可能性：
+
+@table @asis
+@item @code{nil}
+指的是默认值。
+
+@item @var{char}
+指字符@var{char}的元素（假设@var{char}是有效的字符代码）。
+
+@item @code{(@var{from} . @var{to})}
+cons 单元格指包含范围 @samp{[@var{from}..@var{to}]} 内的所有字符。  在这种情况下，该函数返回 @var{from} 指定的字符的值。
+@end table
+@end defun
+
+@defun set-char-table-range char-table range value
+此函数设置 @var{char-table} 中字符范围 @var{range} 的值。  以下是 @var{range} 的可能性：
+
+@table @asis
+@item @code{nil}
+指的是默认值。
+
+@item @code{t}
+指整个字符代码范围。
+
+@item @var{char}
+指字符@var{char}的元素（假设@var{char}是有效的字符代码）。
+
+@item @code{(@var{from} . @var{to})}
+cons 单元格指包含范围 @samp{[@var{from}..@var{to}]} 内的所有字符。
+@end table
+@end defun
+
+@defun map-char-table function char-table
+该函数为 @var{char-table} 中具有非 @code{nil} 值的每个元素调用其参数 @var{function}。  对@var{function}的调用有两个参数：一个键和一个值。  键是 @code{char-table-range} 的可能的 @var{range} 参数——可以是有效字符，也可以是 cons 单元格 @code{(@var{from} . @var{to})}，指定共享相同值的字符范围。  该值是 @code{(char-table-range @var{char-table} @var{key})} 返回的值。
+
+总的来说，传递给@var{function}的键值对描述了@var{char-table}中存储的所有值。
+
+返回值始终为@code{nil}；为了使对 @code{map-char-table} 的调用有用，@var{function} 应该有副作用。例如，以下是如何检查语法表的元素：
+
+@example
+(let (accumulator)
+   (map-char-table
+    (lambda (key value)
+      (setq accumulator
+            (cons (list
+                   (if (consp key)
+                       (list (car key) (cdr key))
+                     key)
+                   value)
+                  accumulator)))
+    (syntax-table))
+   accumulator)
+@result{}
+(((2597602 4194303) (2)) ((2597523 2597601) (3))
+ ... (65379 (5 . 65378)) (65378 (4 . 65379)) (65377 (1))
+ ... (12 (0)) (11 (3)) (10 (12)) (9 (0)) ((0 8) (3)))
+@end example
+@end defun
+
+@node Bool-Vectors
+@section 布尔向量
+@cindex Bool-vectors
+
+布尔向量很像向量，只不过它只存储值 @code{t} 和 @code{nil}。  如果您尝试将任何非 @code{nil} 值存储到 bool 向量的元素中，则效果是将 @code{t} 存储在那里。  与所有数组一样，布尔向量索引从 0 开始，并且一旦创建布尔向量，长度就无法更改。布尔向量在求值时是常量。
+
+有几个函数专门用于布尔向量；除此之外，您可以使用用于其他类型数组的相同函数来操作它们。
+
+@defun make-bool-vector length initial
+返回一个由 @var{length} 元素组成的新布尔向量，每个元素都初始化为 @var{initial}。
+@end defun
+
+@defun bool-vector &rest objects
+该函数创建并返回一个布尔向量，其元素是参数@var{objects}。
+@end defun
+
+@defun bool-vector-p object
+如果@var{object}是布尔向量，则返回@code{t}，否则返回@code{nil}。
+@end defun
+
+还有一些布尔向量集合运算函数，如下所述：
+
+@defun bool-vector-exclusive-or a b &optional c
+返回布尔向量 @var{a} 和 @var{b} 的 @dfn{bitwise exclusive or}。如果给出可选参数@var{c}，则该操作的结果将存储到@var{c}。  所有参数都应该是相同长度的布尔向量。
+@end defun
+
+@defun bool-vector-union a b &optional c
+返回布尔向量 @var{a} 和 @var{b} 的 @dfn{bitwise or}。  如果给出可选参数@var{c}，则该操作的结果将存储到@var{c}。  所有参数都应该是相同长度的布尔向量。
+@end defun
+
+@defun bool-vector-intersection a b &optional c
+返回布尔向量 @var{a} 和 @var{b} 的 @dfn{bitwise and}。  如果给出可选参数@var{c}，则该操作的结果将存储到@var{c}。  所有参数都应该是相同长度的布尔向量。
+@end defun
+
+@defun bool-vector-set-difference a b &optional c
+返回布尔向量 @var{a} 和 @var{b} 的 @dfn{set difference}。  如果给出可选参数@var{c}，则该操作的结果将存储到@var{c}。  所有参数都应该是相同长度的布尔向量。
+@end defun
+
+@defun bool-vector-not a &optional b
+返回布尔向量@var{a}的@dfn{set complement}。  如果给出可选参数@var{b}，则该操作的结果将存储到@var{b}。  所有参数都应该是相同长度的布尔向量。
+@end defun
+
+@defun bool-vector-subsetp a b
+如果@var{a}中的每个@code{t}值也是@var{b}中的@code{t}，则返回@code{t}，否则返回@code{nil}。  所有参数都应该是相同长度的布尔向量。
+@end defun
+
+@defun bool-vector-count-consecutive a b i
+返回@var{a}中从@var{i}开始等于@var{b}的连续元素的数量。  @code{a} 是布尔向量，@var{b} 是@code{t} 或@code{nil}，@var{i} 是@code{a} 的索引。
+@end defun
+
+@defun bool-vector-count-population a
+返回布尔向量@var{a}中@code{t}的元素数量。
+@end defun
+
+打印形式将最多 8 个布尔值表示为一个字符：
+
+@example
+@group
+(bool-vector t nil t nil)
+     @result{} #&4"^E"
+(bool-vector)
+     @result{} #&0""
+@end group
+@end example
+
+您可以使用 @code{vconcat} 来像其他向量一样打印布尔向量：
+
+@example
+@group
+(vconcat (bool-vector nil t nil t))
+     @result{} [nil t nil t]
+@end group
+@end example
+
+这是创建、检查和更新布尔向量的另一个示例：
+
+@example
+(setq bv (make-bool-vector 5 t))
+     @result{} #&5"^_"
+(aref bv 1)
+     @result{} t
+(aset bv 3 nil)
+     @result{} nil
+bv
+     @result{} #&5"^W"
+@end example
+
+@noindent
+这些结果是有意义的，因为 control-_ 和 control-W 的二进制代码分别是 11111 和 10111。
+
+@node Rings
+@section 管理固定大小的对象环
+
+@cindex ring data structure
+@dfn{ring} 是一种固定大小的数据结构，支持插入、删除、旋转以及模索引引用和遍历。  @code{ring} 包实现了高效的环数据结构。  它提供本节中列出的功能。
+
+请注意，Emacs 中的几个环，例如kill环和mark环，实际上是作为简单列表实现的，@emph{not}使用@code{ring}包；因此以下功能对它们不起作用。
+
+@defun make-ring size
+这将返回一个能够容纳 @var{size} 对象的新环。 @var{size} 应该是一个整数。
+@end defun
+
+@defun ring-p object
+如果@var{object}是环，则返回@code{t}，否则返回@code{nil}。
+@end defun
+
+@defun ring-size ring
+这将返回 @var{ring} 的最大容量。
+@end defun
+
+@defun ring-length ring
+这将返回 @var{ring} 当前包含的对象数量。该值永远不会超过 @code{ring-size} 返回的值。
+@end defun
+
+@defun ring-elements ring
+这将返回 @var{ring} 中的对象列表，按顺序，最新的在前。
+@end defun
+
+@defun ring-copy ring
+这将返回一个新环，它是@var{ring}的副本。新环包含与 @var{ring} 相同的 (@code{eq}) 个对象。
+@end defun
+
+@defun ring-empty-p ring
+如果 1⁣ 为空，则返回 0⁣，否则返回 2⁣。
+@end defun
+
+环中最新的元素始终具有索引 0。较高的索引对应于较旧的元素。  指数以环长度为模计算。  索引 @minus{}1 对应于最旧的元素，@minus{}2 对应于次旧的元素，依此类推。
+
+@defun ring-ref ring index
+这将返回在索引 @var{index} 处找到的 @var{ring} 中的对象。 @var{index} 可以为负值或大于环长度。  如果 3⁣ 为空，则 4⁣ 发出错误信号。
+@end defun
+
+@defun ring-insert ring object
+这会将 @var{object} 插入到 @var{ring} 中，使其成为最新元素，并返回 @var{object}。
+
+如果环已满，则插入会删除最旧的元素，为新元素腾出空间。
+@end defun
+
+@defun ring-remove ring &optional index
+从 @var{ring} 中删除一个对象，并返回该对象。  参数 @var{index} 指定要删除的项目；如果是@code{nil}，则表示删除最旧的项。  如果 3⁣ 为空，则 4⁣ 发出错误信号。
+@end defun
+
+@defun ring-insert-at-beginning ring object
+这会将 @var{object} 插入到 @var{ring} 中，将其视为最旧的元素。  返回值并不重要。
+
+如果环已满，此函数将删除最新的元素，为插入的元素腾出空间。
+@end defun
+
+@defun ring-resize ring size
+将@var{ring}的大小设置为@var{size}。  如果新的尺寸较小，则丢弃环中最旧的项目。
+@end defun
+
+@cindex fifo data structure
+如果小心不要超过环大小，则可以将环用作先进先出队列。  例如：
+
+@lisp
+(let ((fifo (make-ring 5)))
+  (mapc (lambda (obj) (ring-insert fifo obj))
+        '(0 one "two"))
+  (list (ring-remove fifo) t
+        (ring-remove fifo) t
+        (ring-remove fifo)))
+     @result{} (0 t one t "two")
+@end lisp

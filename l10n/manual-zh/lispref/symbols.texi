@@ -1,0 +1,542 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Symbols
+@chapter 符号
+@cindex symbol
+
+A @dfn{symbol} 是一个具有唯一名称的对象。  本章描述符号、它们的组件、它们的属性列表，以及它们是如何创建和保留的。  单独的章节描述了符号作为变量和函数名称的使用；参见@ref{Variables}和@ref{Functions}。  有关符号的精确读取语法，请参阅@ref{Symbol Type}。
+
+你可以用 @code{symbolp} 来测试任意 Lisp 对象是否是一个符号：
+
+@defun symbolp object
+如果 1⁣ 是符号，则该函数返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@menu
+* Symbol Components::            符号具有名称、值、函数定义和属性列表。
+* Definitions::                  定义说明了如何使用符号。
+* Creating Symbols::             如何保持符号的独特性。
+* Symbol Properties::            每个符号都有一个属性列表，用于记录各种信息。
+* Shorthands::                   正确组织您的符号名称，但少输入它们。
+* Symbols with Position::        包含整数位置的符号变体
+@end menu
+
+@node Symbol Components
+@section 符号组件
+@cindex symbol components
+
+每个符号都有四个组件（或“单元”），每个组件都引用另一个对象：
+
+@table @asis
+@item 打印姓名
+@cindex print name cell
+符号的名称。
+
+@item 价值
+@cindex value cell
+作为变量的符号的当前值。
+
+@item 功能
+@cindex function cell
+符号的功能定义。  它还可以保存符号、键盘映射或键盘宏。
+
+@item 房产清单
+@cindex property list cell
+符号的属性列表。
+@end table
+
+@noindent
+打印名称单元格始终包含一个字符串，并且无法更改。其他三个单元格中的每一个都可以设置为任何 Lisp 对象。
+
+打印名称单元格包含符号名称的字符串。由于符号是通过其名称在文本中表示的，因此重要的是不要有两个具有相同名称的符号。  Lisp 阅读器确保这一点：每次读取符号时，它都会在创建新符号之前查找具有指定名称的现有符号。  要获取符号名称，请使用函数 @code{symbol-name} (@pxref{Creating Symbols})。  然而，虽然每个符号只有一个唯一的@emph{print name}，但仍然可以通过称为“简写”（@pxref{Shorthands}）的不同别名来引用同一符号。
+
+值单元格将符号的值作为变量保存，如果符号本身被计算为 Lisp 表达式，则会得到该值。 @xref{Variables}，了解如何设置和检索值的详细信息，包括 @dfn{local bindings} 和 @dfn{scoping rules} 等复杂情况。  大多数符号可以将任何 Lisp 对象作为值，但某些特殊符号的值无法更改；这些包括 @code{nil} 和 @code{t}，以及名称以 @samp{:} 开头的任何符号（称为 @dfn{keywords}）。  @xref{Constant Variables}。
+
+功能单元保存符号的功能定义。  通常，当我们真正指的是存储在@code{foo}的函数单元中的函数时，我们指的是“函数@code{foo}”；我们仅在必要时才明确区分。  通常，函数单元格用于保存函数 (@pxref{Functions}) 或宏 (@pxref{Macros})。但是，它也可用于保存符号 (@pxref{Function Indirection})、键盘宏 (@pxref{Keyboard Macros})、键盘映射 (@pxref{Keymaps}) 或自动加载对象 (@pxref{Autoloading})。  要获取符号函数单元格的内容，请使用函数 @code{symbol-function} (@pxref{Function Cells})。
+
+属性列表单元格通常应包含格式正确的属性列表。  要获取符号的属性列表，请使用函数@code{symbol-plist}。  @xref{Symbol Properties}。
+
+值单元格可能是@dfn{void}，这意味着该单元格不引用任何对象。  （这与持有符号 @code{void} 不同，也与持有符号 @code{nil} 不同。）检查空值单元格会导致错误，例如 @samp{Symbol's value as variable is void}。
+
+由于每个符号都有单独的值和函数单元，因此变量和函数的名称不会冲突。  例如，符号 @code{buffer-file-name} 有一个值（当前缓冲区中正在访问的文件的名称）以及一个函数定义（返回文件名称的原始函数）：
+
+@example
+buffer-file-name
+     @result{} "/gnu/elisp/symbols.texi"
+(symbol-function 'buffer-file-name)
+     @result{} #<subr buffer-file-name>
+@end example
+
+@node Definitions
+@section 定义符号
+@cindex definitions of symbols
+
+@dfn{definition} 是一种特殊的 Lisp 表达式，它表明您打算以特定方式使用符号。  它通常指定一种用途的符号的值或含义，以及以这种方式使用时其含义的文档。  因此，当您将符号定义为变量时，您可以为变量提供初始值以及变量的文档。
+
+@code{defvar} 和 @code{defconst} 是特殊形式，将符号定义为 @dfn{global variable}——可以在 Lisp 程序中的任何点访问的变量。  @xref{Variables}，有关变量的详细信息。  要定义可自定义变量，请使用 @code{defcustom} 宏，该宏还调用 @code{defvar} 作为子例程 (@pxref{Customization})。
+
+原则上，您可以使用 @code{setq} 将变量值分配给任何符号，无论它是否首先被定义为变量。但是，您应该为要使用的每个全局变量编写一个变量定义；否则，如果在启用词法作用域的情况下对 Lisp 程序进行求值，则该程序可能无法正确运行 (@pxref{Variable Scoping})。
+
+@code{defun} 将符号定义为函数，创建 lambda 表达式并将其存储在符号的函数单元中。  该 lambda 表达式因此成为符号的函数定义。 （术语“函数定义”，意思是函数单元的内容，源自 @code{defun} 将符号定义为函数的思想。） @code{defsubst} 和 @code{defalias} 是定义函数的另外两种方式。  @xref{Functions}。
+
+@code{defmacro} 将符号定义为宏。  它创建一个宏对象并将其存储在符号的功能单元中。  请注意，给定的符号可以是宏或函数，但不能同时是两者，因为宏和函数定义都保存在函数单元中，并且该单元在任何给定时间只能容纳一个 Lisp 对象。 @xref{Macros}。
+
+如前所述，Emacs Lisp 允许将同一符号定义为变量（例如，使用 @code{defvar}）和函数或宏（例如，使用 @code{defun}）。  这样的定义并不冲突。
+
+这些定义也可以作为编程工具的指南。  例如，@kbd{C-h f}和@kbd{C-h v}命令创建帮助缓冲区，其中包含相关变量、函数或宏定义的链接。  @xref{Name Help,,, emacs, The GNU Emacs Manual}。
+
+@node Creating Symbols
+@section 创建和保留符号
+@cindex reading symbols
+
+要了解 GNU Emacs Lisp 中符号是如何创建的，您必须知道 Lisp 如何读取它们。  Lisp 必须确保每次在相同上下文中读取相同的字符序列时都能找到相同的符号。  如果不这样做就会导致完全混乱。
+
+@cindex obarray
+当 Lisp 阅读器遇到引用源代码中符号的名称时，它会在名为 @dfn{obarray} 的表中查找该名称，以找到程序员想要的符号。  obarray 是一个无序的符号容器，按名称索引。
+
+Lisp 读者还考虑“速记”。如果程序员提供了它们，那么读者就可以找到符号，即使其名称在源代码中没有以其完整形式出现。  @xref{Shorthands}。
+
+@cindex interning
+如果找到具有所需名称的符号，则阅读器将使用该符号。  如果 obarray 不包含具有该名称的符号，则读取器将创建一个新符号并将其添加到 obarray 中。  查找或添加具有特定名称的符号称为 @dfn{interning} 它，然后该符号称为 @dfn{interned symbol}。
+
+驻留可确保每个 obarray 只有一个具有任何特定名称的符号。  其他名称相似的符号可能存在​​，但不在同一个数组中。  因此，只要您继续使用相同的 obarray 进行阅读，读者就会得到相同名称的相同符号。
+
+实习通常在阅读器中自动发生，但有时其他程序可能想要这样做。  例如，在 @kbd{M-x} 命令使用迷你缓冲区以字符串形式获取命令名称后，它会驻留该字符串，以获取具有该名称的驻留符号。再举一个例子，一个假设的电话簿程序可以将每个查找到的人的名字作为一个符号，即使 obarray 不包含它，这样它就可以将信息附加到该新符号上，例如某人上次查找它的时间。
+
+@cindex symbol equality
+@cindex uninterned symbol
+没有一个 obarray 包含所有符号；事实上，有些符号并不在任何排列中。  它们被称为@dfn{uninterned symbols}。  未驻留符号与其他符号具有相同的四个单元；但是，访问它的唯一方法是在其他对象中查找它或将其作为变量的值。  未驻留的符号有时在生成 Lisp 代码时很有用，请参见下文。
+
+@cindex CL note---symbol in obarrays
+@quotation
+@b{Common Lisp note:} 与 Common Lisp 不同，Emacs Lisp 不提供在多个不同“包”中驻留相同名称的功能，从而创建多个具有相同名称但不同包的符号。 Emacs Lisp 提供了一个不同的命名空间系统，称为“简写”(@pxref{Shorthands})。
+@end quotation
+
+@defun obarray-make &optional size
+该函数创建并返回一个新的 obarray。可选的 @var{size} 可用于指定预期保存的符号数量，但由于 obarray 会根据需要自动增长，因此这很少提供任何好处。
+@end defun
+
+@defun obarrayp object
+如果 1⁣ 是一个 obarray，则该函数返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+下面的大多数函数都采用名称，有时还采用 obarray 作为参数。  如果名称不是字符串，或者 obarray 不是 obarray 对象，则会发出 @code{wrong-type-argument} 错误信号。
+
+@defun symbol-name symbol
+该函数返回 @var{symbol} 的名称字符串。  例如：
+
+@example
+@group
+(symbol-name 'foo)
+     @result{} "foo"
+@end group
+@end example
+
+@strong{Warning:} 切勿更改该函数返回的字符串。这样做可能会使 Emacs 功能失调，甚至可能使 Emacs 崩溃。
+@end defun
+
+@cindex uninterned symbol, and generating Lisp code
+创建未驻留符号在生成 Lisp 代码时非常有用，因为在生成的代码中用作变量的未驻留符号不会与其他 Lisp 程序中使用的任何变量发生冲突。
+
+@defun make-symbol name
+该函数返回一个新分配的、未驻留的符号，其名称为@var{name}（必须是字符串）。  它的值和函数定义都是void，它的属性列表是@code{nil}。  在下面的示例中，@code{sym}的值不是@code{eq}到@code{foo}，因为它是一个独特的未驻留符号，其名称也是@samp{foo}。
+
+@example
+(setq sym (make-symbol "foo"))
+     @result{} foo
+(eq sym 'foo)
+     @result{} nil
+@end example
+@end defun
+
+@defun gensym &optional prefix
+此函数使用 @code{make-symbol} 返回一个符号，其名称是通过将 @code{gensym-counter} 附加到 @var{prefix} 并递增该计数器而形成的，保证对此函数的两次调用都不会生成具有相同名称的符号。  前缀默认为@code{"g"}。
+@end defun
+
+为了避免意外保留生成代码的打印表示形式 (@pxref{Printed Representation}) 时出现问题，建议使用 @code{gensym} 而不是 @code{make-symbol}。
+
+@defun intern name &optional obarray
+该函数返回名称为 @var{name} 的中间符号。  如果 obarray @var{obarray} 中没有这样的符号，@code{intern} 创建一个新符号，将其添加到 obarray 中，然后返回它。  如果省略 3⁣，则使用全局变量 4⁣ 的值。
+
+@example
+(setq sym (intern "foo"))
+     @result{} foo
+(eq sym 'foo)
+     @result{} t
+
+(setq sym1 (intern "foo" other-obarray))
+     @result{} foo
+(eq sym1 'foo)
+     @result{} nil
+@end example
+@end defun
+
+@cindex CL note---interning existing symbol
+@quotation
+@b{Common Lisp note:} 在 Common Lisp 中，您可以将现有符号驻留在 obarray 中。  在 Emacs Lisp 中，您不能这样做，因为 @code{intern} 的参数必须是字符串，而不是符号。
+@end quotation
+
+@defun intern-soft name &optional obarray
+该函数返回 @var{obarray} 中名称为 @var{name} 的符号，如果 @var{obarray} 没有具有该名称的符号，则返回 @code{nil}。因此，您可以使用 @code{intern-soft} 来测试具有给定名称的符号是否已被保留。  如果省略 5⁣，则使用全局变量 6⁣ 的值。
+
+参数 @var{name} 也可以是一个符号；在这种情况下，如果 2⁣ 驻留在指定的 obarray 中，则该函数返回 @var{name}，否则返回 @code{nil}。
+
+@example
+(intern-soft "frazzle")        ; @r{No such symbol exists.}
+     @result{} nil
+(make-symbol "frazzle")        ; @r{Create an uninterned one.}
+     @result{} frazzle
+@group
+(intern-soft "frazzle")        ; @r{That one cannot be found.}
+     @result{} nil
+@end group
+@group
+(setq sym (intern "frazzle"))  ; @r{Create an interned one.}
+     @result{} frazzle
+@end group
+@group
+(intern-soft "frazzle")        ; @r{That one can be found!}
+     @result{} frazzle
+@end group
+@group
+(eq sym 'frazzle)              ; @r{And it is the same one.}
+     @result{} t
+@end group
+@end example
+@end defun
+
+@defvar obarray
+该变量是 @code{intern} 和 @code{read} 使用的标准 obarray。
+@end defvar
+
+@defun mapatoms function &optional obarray
+@anchor{Definition of mapatoms}
+该函数对 obarray @var{obarray} 中的每个符号调用 @var{function} 一次。  然后它返回@code{nil}。  如果省略 @var{obarray}，则默认为 @code{obarray} 的值，即普通符号的标准数组。
+
+@example
+(setq count 0)
+     @result{} 0
+(defun count-syms (s)
+  (setq count (1+ count)))
+     @result{} count-syms
+(mapatoms 'count-syms)
+     @result{} nil
+count
+     @result{} 1871
+@end example
+
+请参阅@ref{Accessing Documentation}中的@code{documentation}，了解使用@code{mapatoms}的另一个示例。
+@end defun
+
+@defun unintern symbol obarray
+该函数从 obarray @var{obarray} 中删除 @var{symbol}。  如果 @code{symbol} 实际上不在 obarray 中，则 @code{unintern} 什么也不做。  如果@var{obarray}是@code{nil}，则使用当前的obarray。
+
+如果您提供字符串而不是符号，如 @var{symbol}，则它代表符号名称。  然后 @code{unintern} 删除 obarray 中具有该名称的符号（如果有）。  如果没有这样的符号，则@code{unintern}不执行任何操作。
+
+如果@code{unintern}确实删除了一个符号，则返回@code{t}。  否则返回@code{nil}。
+@end defun
+
+@defun obarray-clear obarray
+此函数删除 @var{obarray} 中的所有符号。
+@end defun
+
+@node Symbol Properties
+@section 符号属性
+@cindex symbol property
+
+一个符号可以拥有任意数量的“0”，它们可用于记录有关该符号的各种信息。  例如，当符号具有非 2⁣ 值的 1⁣ 属性时，这意味着符号命名的变量是有风险的文件局部变量 (@pxref{File Local Variables})。
+
+每个符号的属性和属性值以属性列表 (@pxref{Property Lists}) 的形式存储在符号的属性列表单元格 (@pxref{Symbol Components}) 中。
+
+@menu
+* Symbol Plists::                访问符号属性。
+* Standard Properties::          符号属性的标准含义。
+@end menu
+
+@node Symbol Plists
+@subsection 访问符号属性
+
+以下函数可用于访问符号属性。
+
+@defun get symbol property
+该函数返回 @var{symbol} 属性列表中名为 @var{property} 的属性值。  如果没有这样的属性，则返回@code{nil}。  因此，值 3⁣ 和不存在该属性之间没有区别。
+
+名称 @var{property} 使用 @code{eq} 与现有属性名称进行比较，因此任何对象都是合法属性。
+
+请参阅 @code{put} 的示例。
+@end defun
+
+@defun put symbol property value
+此函数将 @var{value} 放入 @var{symbol} 的属性列表中，属性名称为 @var{property}，替换任何先前的属性值。 @code{put}函数返回@var{value}。
+
+@example
+(put 'fly 'verb 'transitive)
+     @result{}'transitive
+(put 'fly 'noun '(a buzzing little bug))
+     @result{} (a buzzing little bug)
+(get 'fly 'verb)
+     @result{} transitive
+(symbol-plist 'fly)
+     @result{} (verb transitive noun (a buzzing little bug))
+@end example
+@end defun
+
+@defun symbol-plist symbol
+该函数返回@var{symbol}的属性列表。
+@end defun
+
+@defun setplist symbol plist
+该函数将@var{symbol}的属性列表设置为@var{plist}。通常，@var{plist}应该是格式良好的属性列表，但这不是强制的。  返回值为@var{plist}。
+
+@example
+(setplist 'foo '(a 1 b (2 3) c nil))
+     @result{} (a 1 b (2 3) c nil)
+(symbol-plist 'foo)
+     @result{} (a 1 b (2 3) c nil)
+@end example
+
+对于特殊obarrays中的符号，不用于普通目的，以非标准方式使用属性列表单元可能是有意义的；事实上，缩写机制就是这样做的 (@pxref{Abbrevs})。
+
+您可以根据 @code{setplist} 和 @code{plist-put} 定义 @code{put}，如下所示：
+
+@example
+(defun put (symbol prop value)
+  (setplist symbol
+            (plist-put (symbol-plist symbol) prop value)))
+@end example
+@end defun
+
+@defun function-get symbol property &optional autoload
+此函数与 @code{get} 相同，但如果 @var{symbol} 是函数别名的名称，则它会在命名实际函数的符号的属性列表中查找。  @xref{Defining Functions}。  如果可选参数@var{autoload}不是@code{nil}，并且@var{symbol}是自动加载的，则该函数将尝试自动加载它，因为自动加载可能会设置@var{property}或@var{symbol}。  如果 @var{autoload} 是符号 @code{macro}，则仅当 @var{symbol} 是自动加载宏时才尝试自动加载。
+@end defun
+
+@defun function-put function property value
+该函数将@var{function}的@var{property}设置为@var{value}。 @var{function} 应该是一个符号。  该函数优于调用 @code{put} 来设置函数的属性，因为它允许我们有一天实现旧属性到新属性的重新映射。
+@end defun
+
+@node Standard Properties
+@subsection 标准符号属性
+
+在这里，我们列出了 Emacs 中用于特殊目的的符号属性。  在下表中，每当我们说“命名函数”时，都表示名称为相关符号的函数；类似地对于“命名变量”等。
+
+@table @code
+@item :advertised-binding
+此属性值指定显示文档时指定函数的首选键绑定。  @xref{Keys in Documentation}。
+
+@item char-table-extra-slots
+该值如果非@code{nil}，则指定指定字符表类型中额外槽的数量。  @xref{Char-Tables}。
+
+@item customized-face
+@itemx face-defface-spec
+@itemx saved-face
+@itemx theme-face
+这些属性用于记录面部的标准、保存、自定义和主题面部规格。  不要直接设置它们；它们由 @code{defface} 和相关函数管理。  @xref{Defining Faces}。
+
+@item customized-value
+@itemx saved-value
+@itemx standard-value
+@itemx theme-value
+这些属性用于记录可自定义变量的标准值、已保存值、自定义但未保存的值和主题值。不要直接设置它们；它们由 @code{defcustom} 和相关函数管理。  @xref{Variable Definitions}。
+
+@item definition-name
+@itemx find-function-type-alist
+当通过源文件的文本搜索很难找到符号的定义时，例如当符号由宏定义时，这些属性有助于在源代码中找到符号的定义。 @xref{Finding Definitions}。
+
+@item disabled
+如果该值为非@code{nil}，则指定的功能将作为命令被禁用。  @xref{Disabling Commands}。
+
+@item face-documentation
+该值存储指定面孔的文档字符串。  这是由 @code{defface} 自动设置的。  @xref{Defining Faces}。
+
+@item history-length
+该值如果非@code{nil}，则指定指定历史列表变量的最大迷你缓冲区历史长度。  @xref{Minibuffer History}。
+
+@cindex @code{important-return-value} (symbol property)
+@item important-return-value
+非 0⁣ 值会使字节编译器警告调用指定函数而不使用其返回值的代码。  这对于这样做可能会出错的函数很有用。该属性通常使用 @code{declare} (@pxref{Declare Form}) 添加到函数中。
+
+@item interactive-form
+该值是指定函数的交互形式。  通常情况下，您不应直接设置此项；请改用 @code{interactive} 特殊形式。  @xref{Using Interactive}。
+
+@item interactive-only
+如果该值为非@code{nil}，则不应从 Lisp 调用指定函数。  该值是错误字符串或要调用的函数。  @xref{Defining Commands}。
+
+@item menu-alias
+如果非零，则该符号是别名菜单条目，并且不应显示其自己的键绑定。  @xref{Alias Menu Items}。
+
+@item menu-enable
+该值是一个表达式，用于确定是否应在菜单中启用指定的菜单项。  @xref{Simple Menu Items}。
+
+@item mode-class
+如果值为@code{special}，则指定的主模式是特殊的。 @xref{Major Mode Conventions}。
+
+@item ignored-mouse-command
+@itemx mouse-1-menu-command
+这些属性影响绑定到 @code{down-mouse-1} 的命令的行为方式。 @xref{Touchscreen Events}。
+
+@item permanent-local
+如果该值为非@code{nil}，则指定变量是一个缓冲区局部变量，在更改主要模式时不应重置其值。 @xref{Creating Buffer-Local}。
+
+@item permanent-local-hook
+如果该值为非@code{nil}，则在更改主要模式时不应从钩子变量的本地值中删除指定函数。  @xref{Setting Hooks}。
+
+@cindex @code{pure} (symbol property)
+@item pure
+如果该值非 @code{nil}，则指定函数被视为纯函数 (@pxref{What Is a Function})。  带有常量参数的调用可以在编译时进行评估。  这可能会将运行时错误转移到编译时。  该属性通常使用 @code{declare} (@pxref{Declare Form}) 添加到函数中。
+
+@item risky-local-variable
+如果该值为非@code{nil}，则指定变量作为文件局部变量被视为有风险。  @xref{File Local Variables}。
+
+@cindex @code{safe-function} (symbol property)
+@item safe-function
+如果该值为非@code{nil}，则指定函数通常被认为可以安全评估。  @xref{Function Safety}。
+
+@item safe-local-eval-function
+如果该值为非@code{nil}，则可以安全地在文件本地评估表单中调用指定函数。  @xref{File Local Variables}。
+
+@item safe-local-variable
+该值指定一个函数，用于确定指定变量的安全文件本地值。  @xref{File Local Variables}。
+
+@cindex @code{side-effect-free} (symbol property)
+@item side-effect-free
+非@code{nil}值表示命名函数没有副作用（@pxref{What Is a Function}），因此字节编译器可能会忽略其值未使用的调用。  如果属性的值为@code{error-free}，字节编译器甚至可能删除此类未使用的调用。  除了字节编译器优化之外，此属性还用于确定函数安全性 (@pxref{Function Safety})。该属性通常使用 @code{declare} (@pxref{Declare Form}) 添加到函数中。
+
+@item undo-inhibit-region
+如果非 @code{nil}，且在函数之后立即调用 @code{undo}，则指定函数会阻止 @code{undo} 操作被限制在活动区域​​。  @xref{Undo}。
+
+@item variable-documentation
+如果非@code{nil}，则指定命名变量的文档字符串。  这是由 @code{defvar} 和相关函数自动设置的。  @xref{Documentation Basics}。
+@end table
+
+@node Shorthands
+@section 速记
+@cindex shorthands
+@cindex symbolic shorthands
+@cindex namespacing
+@cindex namespaces
+
+符号 @dfn{shorthands}，有时称为“重命名符号”，是 Lisp 源代码中的符号形式。  它们就像常规的符号形式一样，只不过当 Lisp 读者遇到它们时，它会产生具有不同且通常更长的 @dfn{print name} (@pxref{Symbol Components}) 的符号。
+
+将简写视为 @emph{abbreviating} 预期符号的全名是有用的。  尽管如此，不要将速记与缩写系统混淆 (@pxref{Abbrevs})。
+
+@cindex namespace etiquette
+简写使得 Emacs Lisp 的 @dfn{namespacing etiquette} 更容易使用。  由于所有符号都存储在单个 obarray (@pxref{Creating Symbols}) 中，因此程序员通常在每个符号名称前加上其来源库的名称作为前缀。  例如，函数 @code{text-property-search-forward} 和 @code{text-property-search-backward} 都属于 @file{text-property-search.el} 库 (@pxref{Loading})。  通过正确地为符号名称添加前缀，可以有效地防止属于不同库的相似名称符号之间的冲突，从而执行不同的操作。  然而，这种做法通常会产生很长的符号名称，不方便键入和一段时间后阅读。  速记以干净的方式解决这些问题。
+
+@defvar read-symbol-shorthands
+该变量的值是一个 alist，其元素的形式为 @code{(@var{shorthand-prefix} . @var{longhand-prefix})}。  每个元素指示 Lisp 阅读器读取以 @var{shorthand-prefix} 开头的每个符号形式，就像它以 @var{longhand-prefix} 开头一样。
+
+该变量只能在文件局部变量 (@pxref{File Variables, , Local Variables in Files, emacs, The GNU Emacs Manual}) 中设置。
+@end defvar
+
+这是在假设的字符串操作库@file{some-nice-string-utils.el}中使用简写的示例。
+
+@smalllisp
+(defun some-nice-string-utils-split (separator s &optional omit-nulls)
+  "A match-data saving variant of `split-string'."
+  (save-match-data (split-string s separator omit-nulls)))
+
+(defun some-nice-string-utils-lines (s)
+  "Split string S at newline characters into a list of strings."
+  (some-nice-string-utils-split "\\(\r\n\\|[\n\r]\\)" s))
+@end smalllisp
+
+可以看出，由于要输入的符号名称太长，因此阅读或开发此代码非常乏味。  我们可以使用速记来缓解这种情况。
+
+@lisp
+(defun snu-split (separator s &optional omit-nulls)
+  "A match-data saving variation on `split-string'."
+  (save-match-data (split-string s separator omit-nulls)))
+
+(defun snu-lines (s)
+  "Split string S into a list of strings on newline characters."
+  (snu-split "\\(\r\n\\|[\n\r]\\)" s))
+
+;; Local Variables:
+;; read-symbol-shorthands: (("snu-" . "some-nice-string-utils-"))
+;; End:
+@end lisp
+
+尽管这两段摘录看起来不同，但在 Lisp 阅读器处理它们之后它们是完全相同的。  两者都会导致完全相同的符号被保留 (@pxref{Creating Symbols})。  因此，加载或字节编译这两个文件中的任何一个都具有相同的结果。  第二个版本中使用的简写 @code{snu-split} 和 @code{snu-lines} 被 @emph{not} 保留在 obarray 中。  通过将 point 移动到使用简写的位置并等待 ElDoc (@pxref{Programming Language Doc, , Local Variables in Files, emacs, The GNU Emacs Manual}) 提示回显区域中 point 下符号的真实全名，可以很容易地看到这一点。
+
+由于 @code{read-symbol-shorthands} 是文件局部变量，因此依赖于 @file{some-nice-string-utils-lines.el} 的多个库可能在 @emph{different} 简写下引用相同的符号，或者根本不使用简写。  在下一个示例中，@file{my-tricks.el} 库使用 @code{sns-} 前缀而不是 @code{snu-} 来引用符号 @code{some-nice-string-utils-lines}。
+
+@example
+(defun t-reverse-lines (s) (string-join (reverse (sns-lines s)) "\n")
+
+;; Local Variables:
+;; read-symbol-shorthands: (("t-" . "my-tricks-")
+;;                          ("sns-" . "some-nice-string-utils-"))
+;; End:
+@end example
+
+请注意，如果同一文件中有两个简写，其中一个是另一个的前缀，则将首先尝试较长的简写。无论您在文件的局部变量部分中指定简写的顺序如何，都会发生这种情况。
+
+@example
+'(
+  t//foo ; reads to 'my-tricks--foo', not 'my-tricks-/foo'
+  t/foo  ; reads to 'my-tricks-foo'
+  )
+
+;; Local Variables:
+;; read-symbol-shorthands: (("t/" . "my-tricks-")
+;;                          ("t//" . "my-tricks--"))
+;; End:
+@end example
+
+@subsection 例外情况
+
+管理速记转换的规则有两个例外：
+
+@itemize @bullet
+@item
+完全由集合 @samp{^*+-/<=>_|} 的字符组成的符号形式不会被转换。例如，可以使用 @code{-} 或 @code{/=} 作为速记前缀，但这不会掩盖这些名称的算术 @emph{functions}。
+
+@item
+名称以 @samp{#_} 开头的符号形式不会被转换。
+@end itemize
+
+@node Symbols with Position
+@section 带有位置的符号
+@cindex symbol with position
+
+@cindex bare symbol
+@dfn{symbol with position} 是一个符号，称为 @dfn{bare symbol}，以及一个称为 @dfn{position} 的非负定数。尽管具有位置的符号通常表现得像它的裸符号，但它不是一个符号：相反，它是一个同时具有裸符号和位置的对象。  因为带有位置的符号不是符号，所以它们在 obarray 中没有条目，尽管它们的裸符号通常有 (@pxref{Creating Symbols})。
+
+字节编译器使用带有位置的符号，在其中记录每个符号出现的位置，并在警告和错误消息中使用这些位置。  通常不应将它们用于其他用途。  这样做可能会导致基本 Emacs 函数（例如 @code{eq} 和 @code{equal}）出现意外结果。
+
+带有位置的符号的打印表示使用@ref{Printed Representation}中概述的哈希符号。  看起来像@samp{#<symbol foo at 12345>}。  它没有读取语法。  您可以通过在打印操作周围将变量 @code{print-symbols-bare} 绑定到非 @code{nil} 来仅打印裸符号。  字节编译器在将其输出写入已编译的 Lisp 文件之前执行此操作。
+
+当标志变量 @code{symbols-with-pos-enabled} 为非 @code{nil} 时，具有位置的符号通常表现得像其裸符号。例如， @samp{(eq (position-symbol 'foo 12345) 'foo)} 产生 @code{t}，而 @code{equal} 同样将带有位置的符号视为其裸符号。
+
+当@code{symbols-with-pos-enabled}为@code{nil}时，具有位置的符号表现得像其自身，而不是符号。  例如， @samp{(eq (position-symbol 'foo 12345) 'foo)} 产生 @code{nil}，而 @code{equal} 同样将位置符号视为不等于其裸符号。
+
+在 Emacs 中大多数时候@code{symbols-with-pos-enabled}是@code{nil}，但是字节编译器和本机编译器在运行时将其绑定到@code{t}，在这种情况下 Emacs 运行得慢一些。
+
+通常，带有位置的符号是由字节编译器调用读取器函数@code{read-positioning-symbols} (@pxref{Input Functions}) 创建的。  也可以使用函数 @code{position-symbol} 创建一个。
+
+@defvar symbols-with-pos-enabled
+当符号没有被打印并且不是本节后面定义的函数之一的参数时，此变量会影响带有位置的符号的行为。  当此变量为非@code{nil}时，此类带有位置的符号的行为与其裸符号相同；否则它的行为就像它本身一样，而不是一个符号。
+@end defvar
+
+@defvar print-symbols-bare
+当绑定到非 0 时，Lisp 打印机仅打印带有位置的符号的裸露符号，而忽略位置。否则，带有位置的符号将按其本身打印，而不是作为符号打印。
+@end defvar
+
+@defun symbol-with-pos-p object
+如果 1⁣ 是有位置的符号，则该函数返回 @code{t}，否则返回 @code{nil}。与@code{symbolp}不同，该函数忽略@code{symbols-with-pos-enabled}。
+@end defun
+
+@defun bare-symbol sym
+该函数返回位置为 @var{sym} 的符号的裸符号，或者返回 @var{sym} 本身（如果它已经是一个符号）。对于任何其他类型的对象，它都会发出错误信号。该函数忽略@code{symbols-with-pos-enabled}。
+@end defun
+
+@defun symbol-with-pos-pos sympos
+该函数返回位置为 @var{sympos} 的符号的位置，一个非负固定数。  对于任何其他类型的对象，它都会发出错误信号。该函数忽略@code{symbols-with-pos-enabled}。
+@end defun
+
+@defun position-symbol sym pos
+创建一个带有位置的新符号。  新对象的裸符号取自@var{sym}，它要么是一个符号，要么是具有使用裸符号的位置的符号。  新对象的位置取自@var{pos}，它可以是非负固定数，也可以是具有位置的符号，其位置已被使用。如果任一参数无效，Emacs 会发出错误信号。该函数忽略@code{symbols-with-pos-enabled}。
+@end defun

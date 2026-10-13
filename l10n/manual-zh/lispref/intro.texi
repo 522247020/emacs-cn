@@ -1,0 +1,371 @@
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1994, 2001--2026 Free Software Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+
+@node Introduction
+@chapter 介绍
+
+大多数 GNU Emacs 文本编辑器都是用名为 Emacs Lisp 的编程语言编写的。  您可以在 Emacs Lisp 中编写新代码并将其作为编辑器的扩展安装。  然而，Emacs Lisp 不仅仅是一种扩展语言；它还是一种扩展语言。它本身就是一种完整的计算机编程语言。  您可以像使用任何其他编程语言一样使用它。
+
+由于 Emacs Lisp 是为在编辑器中使用而设计的，因此它具有扫描和解析文本的特殊功能以及处理文件、缓冲区、显示、子进程等的功能。  Emacs Lisp 与编辑工具紧密集成；因此，编辑命令是也可以方便地从 Lisp 程序中调用的函数，而用于定制的参数是普通的 Lisp 变量。
+
+本手册试图对 Emacs Lisp 进行完整的描述。  有关 Emacs Lisp 的初学者介绍，请参阅由 Bob Chassell 撰写的@cite{An Introduction to Emacs Lisp Programming}，也由自由软件基金会出版。  本手册假定您非常熟悉如何使用 Emacs 进行编辑；有关基本信息，请参阅@cite{The GNU Emacs Manual}。
+
+一般来说，前面的章节描述了 Emacs Lisp 的功能，这些功能在许多编程语言中都有对应的功能，后面的章节描述了 Emacs Lisp 特有的功能或专门与编辑相关的功能。
+
+这是
+@iftex
+@ifset VERSION
+edition @value{VERSION} of
+@end ifset
+@end iftex
+@cite{GNU Emacs Lisp Reference Manual}，对应Emacs版本@value{EMACSVER}。
+
+@menu
+* Caveats::              缺陷和请求帮助。
+* Lisp History::         Emacs Lisp 是 Maclisp 的后代。
+* Conventions::          手册的格式如何。
+* Version Info::         正在运行哪个 Emacs 版本？
+* Acknowledgments::      本手册的作者、编辑和赞助者。
+@end menu
+
+@node Caveats
+@section 注意事项
+@cindex bugs in this manual
+
+本手册经历了多次草稿。  它几近完整，但并非完美无缺。  有一些主题没有涵盖，要么是因为我们认为它们是次要的（例如大多数单独的模式），要么是因为它们尚未编写。  因为我们无法完全处理它们，所以我们故意省略了一些部分。
+
+该手册所涵盖的内容应该完全正确，因此它所讲的任何内容都可以接受批评——从具体示例和描述性文本，到章节的顺序。  如果有些内容令人困惑，或者您发现必须查看来源或进行实验才能学习手册中未涵盖的内容，那么也许应该修复手册。  请告诉我们。
+
+@iftex
+  As you use this manual, we ask that you mark pages with corrections so
+you can later look them up and send them to us.  If you think of a simple,
+real-life example for a function or group of functions, please make an
+effort to write it up and send it in.  Please reference any comments to
+the chapter name, section name, and function name, as appropriate, since
+page numbers and chapter and section numbers will change and we may have
+trouble finding the text you are talking about.  Also state the version
+of the edition you are criticizing.
+@end iftex
+@ifnottex
+
+As you use this manual, we ask that you send corrections as soon as you
+find them.  If you think of a simple, real life example for a function
+or group of functions, please make an effort to write it up and send it
+in.  Please reference any comments to the node name and function or
+variable name, as appropriate.  Also state the number of the edition
+you are criticizing.
+@end ifnottex
+
+@cindex bugs
+@cindex suggestions
+请使用@kbd{M-x report-emacs-bug}发送评论和更正。欲了解更多详情，@xref{Bugs,, Reporting Bugs, emacs, The GNU Emacs Manual}。
+
+@node Lisp History
+@section 口齿不清的历史
+@cindex Lisp history
+
+Lisp（LISt 处理语言）最初于 20 世纪 50 年代末由麻省理工学院开发，用于人工智能研究。  Lisp 语言的强大功能使其也非常适合其他用途，例如编写编辑命令。
+
+@cindex Maclisp
+@cindex Common Lisp
+多年来，已经构建了数十种 Lisp 实现，每一种都有自己的特性。  其中许多人受到 Maclisp 的启发，Maclisp 是 20 世纪 60 年代在 MIT 的 MAC@. 项目中编写的。最终，Maclisp 后代的实现者聚集在一起，开发了 Lisp 系统的标准，称为 Common Lisp。  与此同时，麻省理工学院的 Gerry Sussman 和 Guy Steele 开发了一种简化但非常强大的 Lisp 方言，称为“Scheme”。
+
+GNU Emacs Lisp 很大程度上受到 Maclisp 的启发，也有一点受到 Common Lisp 的启发。  如果您了解 Common Lisp，您会发现许多相似之处。然而，Common Lisp 的许多功能已被省略或简化，以减少 GNU Emacs 的内存需求。有时，简化程度如此之大，以至于 Common Lisp 用户可能会感到非常困惑。  我们偶尔会指出 GNU Emacs Lisp 与 Common Lisp 的不同之处。  如果您不了解 Common Lisp，请不要担心；本手册是独立的。
+
+@pindex cl
+通过 @file{cl-lib} 库可以进行一定数量的 Common Lisp 模拟。  @xref{Top,, Overview, cl, Common Lisp Extensions}。
+
+Emacs Lisp 完全不受Scheme 的影响；但GNU项目有一个Scheme的实现，称为Guile。  我们在所有需要可扩展性的新 GNU 软件中都使用它。
+
+@node Conventions
+@section 惯例
+
+本节解释本手册中使用的符号约定。  您可能想跳过本节并稍后再参考。
+
+@menu
+* Some Terms::                本手册中使用的术语的解释。
+* nil and t::                 如何使用符号 @code{nil} 和 @code{t}。
+* Evaluation Notation::       我们用于评估示例的格式。
+* Printing Notation::         我们在示例打印文本时使用的格式。
+* Error Messages::            我们用于错误示例的格式。
+* Buffer Text Notation::      我们在示例中用于缓冲区内容的格式。
+* Format of Descriptions::    用于描述函数、变量等的符号。
+@end menu
+
+@node Some Terms
+@subsection 一些条款
+
+在本手册中，短语“Lisp 阅读器”和“Lisp 打印机”指的是 Lisp 中将 Lisp 对象的文本表示转换为实际 Lisp 对象的例程，反之亦然。  @xref{Printed Representation}，了解更多详情。  您，即阅读本手册的人，被视为程序员，并被称为“您”。  用户是使用 Lisp 程序（包括您编写的程序）的人。
+
+@cindex typographic conventions
+Lisp 代码示例的格式如下：@code{(list 1 2 3)}。表示元语法变量或所描述函数的参数的名称的格式如下：@var{first-number}。
+
+@node nil and t
+@subsection @code{nil} 和 @code{t}
+@cindex truth value
+@cindex boolean
+
+@cindex @code{nil}
+@cindex false
+在 Emacs Lisp 中，符号 @code{nil} 具有三个不同的含义：它是一个名为 @samp{nil} 的符号；它是一个名为 @samp{nil} 的符号；它是逻辑真值@var{false}；它是空列表——零个元素的列表。当用作变量时，@code{nil} 始终具有值 @code{nil}。
+
+对于 Lisp 读者而言，@samp{()} 和 @samp{nil} 是相同的：它们代表同一个对象，即符号 @code{nil}。  符号的不同书写方式完全是为了人类读者而设计的。  Lisp 阅读器读取 @samp{()} 或 @samp{nil} 后，无法确定哪种表示形式实际上是由程序员编写的。
+
+在本手册中，当我们希望强调它表示空列表时，我们写 @code{()}；当我们希望强调它表示真值 @var{false} 时，我们写 @code{nil}。  这也是在 Lisp 程序中使用的一个很好的约定。
+
+@example
+(cons 'foo ())                ; @r{Emphasize the empty list}
+(setq foo-flag nil)           ; @r{Emphasize the truth value @var{false}}
+@end example
+
+@cindex @code{t}
+@cindex true
+在期望真值的情况下，任何非 0⁣ 值都被视为 1⁣。  然而，@code{t}是表示真值@var{true}的首选方式。  当需要选择代表@var{true}的值，并且没有其他选择依据时，请使用@code{t}。  符号 @code{t} 始终具有值 @code{t}。
+
+在 Emacs Lisp 中，@code{nil} 和 @code{t} 是特殊符号，它们的值始终为自身。  这样您就不需要引用它们来将它们用作程序中的常量。  尝试更改它们的值会导致 @code{setting-constant} 错误。  @xref{Constant Variables}。
+
+@defun booleanp object
+如果@var{object}是两个规范布尔值之一：@code{t}或@code{nil}，则返回非@code{nil}。
+@end defun
+
+@node Evaluation Notation
+@subsection 评估符号
+@cindex evaluation notation
+@cindex documentation notation
+@cindex notation
+
+可以计算的 Lisp 表达式称为 @dfn{form}。计算一个表单总是会产生一个结果，它是一个 Lisp 对象。  在本手册的示例中，这用 @samp{@result{}} 表示：
+
+@example
+(car '(1 2))
+     @result{} 1
+@end example
+
+@noindent
+您可以将其解读为“@code{(car '(1 2))} 计算结果为 1”。
+
+当一个表单是一个宏调用时，它会扩展成一个新的表单供 Lisp 进行计算。  我们用 @samp{@expansion{}} 来展示展开的结果。  我们可能会或可能不会显示扩展表格的评估结果。
+
+@example
+(third '(a b c))
+     @expansion{} (car (cdr (cdr '(a b c))))
+     @result{} c
+@end example
+
+为了帮助描述一种形式，我们有时会展示另一种产生相同结果的形式。  两种形式的精确等价用 @samp{@equiv{}} 表示。
+
+@example
+(make-sparse-keymap) @equiv{} (list 'keymap)
+@end example
+
+@node Printing Notation
+@subsection 打印符号
+@cindex printing notation
+
+本手册中的许多示例在评估时都会打印文本。  如果您通过在示例的右括号后键入 @kbd{C-j} 来执行 Lisp 交互缓冲区（例如缓冲区 @file{*scratch*}）中的示例代码，则打印的文本将插入到缓冲区中。  如果您通过其他方式执行该示例（例如通过计算函数 @code{eval-region}），打印的文本将显示在回显区域中。
+
+本手册中的示例用 @samp{@print{}} 指示打印文本，无论该文本位于何处。  通过评估表单返回的值在单独的一行中带有 @samp{@result{}}。
+
+@example
+@group
+(progn (prin1 'foo) (princ "\n") (prin1 'bar))
+     @print{} foo
+     @print{} bar
+     @result{} bar
+@end group
+@end example
+
+@node Error Messages
+@subsection 错误信息
+@cindex error message notation
+
+一些示例表明存在错误。  这通常会在回显区域显示错误消息。  我们将错误消息显示在以 @samp{@error{}} 开头的行上。  请注意，@samp{@error{}} 本身不会出现在回波区域中。
+
+@example
+(+ 23 'x)
+@error{} Wrong type argument: number-or-marker-p, x
+@end example
+
+@node Buffer Text Notation
+@subsection 缓冲区文本表示法
+@cindex buffer text notation
+
+一些示例通过显示文本的前后版本来描述对缓冲区内容的修改。  这些示例在包含缓冲区名称的两行破折号之间显示了相关缓冲区的内容。  另外，@samp{@point{}}表示点的位置。  （当然，point 的符号不是缓冲区中文本的一部分；它表示 point 当前所在的位置 @emph{between} 两个字符。）
+
+@example
+---------- Buffer: foo ----------
+This is the @point{}contents of foo.
+---------- Buffer: foo ----------
+
+(insert "changed ")
+     @result{} nil
+---------- Buffer: foo ----------
+This is the changed @point{}contents of foo.
+---------- Buffer: foo ----------
+@end example
+
+@node Format of Descriptions
+@subsection 描述格式
+@cindex description format
+
+本手册中以统一的格式描述函数、变量、宏、命令、用户选项和特殊形式。  描述的第一行包含项目的名称，后跟其参数（如果有）。
+@ifnottex
+The category---function, variable, or whatever---appears at the
+beginning of the line.
+@end ifnottex
+@iftex
+The category---function, variable, or whatever---is printed next to the
+right margin.
+@end iftex
+描述在后续行中进行，有时还带有示例。
+
+@menu
+* A Sample Function Description::        虚函数 @code{foo} 的描述。
+* A Sample Variable Description::        虚变量的描述，
+@code{electric-future-map}.
+@end menu
+
+@node A Sample Function Description
+@subsubsection 函数描述示例
+@cindex function descriptions
+@cindex command descriptions
+@cindex macro descriptions
+@cindex special form descriptions
+
+在函数描述中，所描述的函数的名称首先出现。  在同一行中，后面跟着参数名称列表。  这些名称也用在描述正文中，代表参数的值。
+
+参数列表中出现关键字 @code{&optional} 表示可以省略后续参数（省略的参数默认为 @code{nil}）。  调用函数时不要写@code{&optional}。
+
+关键字 @code{&rest} （后面必须跟单个参数名称）表示后面可以有任意数量的参数。  @code{&rest} 后面的单个参数名称接收传递给函数的所有剩余参数的列表作为其值。调用函数时不要写@code{&rest}。
+
+这是虚函数 @code{foo} 的描述：
+
+@defun foo integer1 &optional integer2 &rest integers
+函数 @code{foo} 从 ​​@var{integer2} 中减去 @var{integer1}，然后将所有其余参数添加到结果中。  如果未提供 @var{integer2}，则默认使用数字 19。
+
+@example
+(foo 1 5 3 9)
+     @result{} 16
+(foo 5)
+     @result{} 14
+@end example
+
+@need 1500
+更一般地说，
+
+@example
+(foo @var{w} @var{x} @var{y}@dots{})
+@equiv{}
+(+ (- @var{x} @var{w}) @var{y}@dots{})
+@end example
+@end defun
+
+按照约定，名称包含类型名称（例如 @var{integer}、@var{integer1} 或 @var{buffer}）的任何参数都应属于该类型。  类型的复数形式（例如 @var{buffers}）通常表示该类型的对象列表。  名为 @var{object} 的参数可以是任何类型。  （对于 Emacs 对象类型列表，@pxref{Lisp Data Types}。）具有任何其他类型名称的参数（例如，@var{new-file}）是特定于该函数的；如果函数有文档字符串，则应在其中描述参数的类型 (@pxref{Documentation})。
+
+@xref{Lambda Expressions}，更完整地描述由 @code{&optional} 和 @code{&rest} 修改的参数。
+
+命令、宏和特殊形式描述具有相同的格式，但单词 @samp{Function} 分别替换为 @samp{Command}、@samp{Macro} 或 @samp{Special Form}。  命令只是可以交互调用的函数；宏处理参数的方式与函数不同（参数不被求值），但呈现方式相同。
+
+宏和特殊形式的描述使用更复杂的符号来指定可选和重复的参数，因为它们可以以更复杂的方式将参数列表分解为单独的参数。  @samp{@r{[}@var{optional-arg}@r{]}} 表示 @var{optional-arg} 是可选的，@samp{@var{repeated-args}@dots{}} 代表零个或多个参数。  当多个参数被分组为列表结构的附加级别时，使用括号。  这是一个例子：
+
+@defspec count-loop (var [from to [inc]]) body@dots{}
+这个假想的特殊形式实现了一个循环，该循环执行 @var{body} 形式，然后在每次迭代时递增变量 @var{var}。  在第一次迭代中，变量的值为 @var{from}；在后续迭代中，它会增加 1（如果给定的话，则增加 3⁣）。  如果@var{var}等于@var{to}，则循环在执行@var{body}之前退出。  这是一个例子：
+
+@example
+(count-loop (i 0 10)
+  (prin1 i) (princ " ")
+  (prin1 (aref vector i))
+  (terpri))
+@end example
+
+如果省略 @var{from} 和 @var{to}，则在循环开始之前 @var{var} 绑定到 @code{nil}，并且如果在迭代开始时 @var{var} 为非 @code{nil}，则循环退出。  这是一个例子：
+
+@example
+(count-loop (done)
+  (if (pending)
+      (fixit)
+    (setq done t)))
+@end example
+
+在这种特殊形式中，参数 @var{from} 和 @var{to} 是可选的，但必须都存在或都不存在。  如果它们存在，也可以选择指定 @var{inc}。  这些参数与参数 @var{var} 一起分组到一个列表中，以区别于 @var{body}，后者包括表单的所有剩余元素。
+@end defspec
+
+@node A Sample Variable Description
+@subsubsection 变量描述示例
+@cindex variable descriptions
+@cindex option descriptions
+
+@dfn{variable} 是一个可以是对象的 @dfn{bound} （或@dfn{set}）的名称。  绑定变量的对象称为 @dfn{value}；我们还说变量保存该值。尽管几乎所有变量都可以由用户设置，但某些变量是专门存在的，以便用户可以更改它们；这些被称为@dfn{user options}。  普通变量和用户选项使用类似于函数的格式进行描述，只是没有参数。
+
+这是虚构的 @code{electric-future-map} 变量的描述。
+
+@defvar electric-future-map
+该变量的值是 Electric Command Future 模式使用的完整键盘映射。  该图中的功能允许您编辑尚未考虑执行的命令。
+@end defvar
+
+用户选项描述具有相同的格式，但@samp{Variable} 替换为@samp{User Option}。
+
+@node Version Info
+@section 版本信息
+
+这些工具提供有关正在使用的 Emacs 版本的信息。
+
+@deffn Command emacs-version &optional here
+该函数返回一个描述正在运行的 Emacs 版本的字符串。  将此字符串包含在错误报告中很有用。
+
+@smallexample
+@group
+(emacs-version)
+  @result{} "GNU Emacs 26.1 (build 1, x86_64-unknown-linux-gnu,
+             GTK+ Version 3.16) of 2017-06-01"
+@end group
+@end smallexample
+
+如果@var{here}非@code{nil}，它将在缓冲区中的point之前插入文本，并返回@code{nil}。  当以交互方式调用此函数时，它会在回显区域中打印相同的信息，但给出前缀参数会使 @var{here} 非 @code{nil}。
+@end deffn
+
+@defvar emacs-build-time
+该变量的值表示 Emacs 的构建时间。  它使用@code{current-time} (@pxref{Time of Day}) 样式，如果信息不可用，则为@code{nil}。
+
+@example
+@group
+emacs-build-time
+     @result{} (25194 55894 8547 617000)
+@end group
+@end example
+（如果 Emacs 构建时 @code{current-time-list} 为 @code{nil}，则此时间戳为 @code{(1651169878008547617 . 1000000000)}。）
+@end defvar
+
+@defvar emacs-version
+该变量的值是正在运行的 Emacs 版本。  它是一个字符串，例如 @code{"26.1"}。  由三个数字组成的值（例如@code{"26.0.91"}）表示未发布的测试版本。 （在 Emacs 26.1 之前，字符串包含一个额外的最终组件，其中包含现在存储在 @code{emacs-build-number} 中的整数；例如 @code{"25.1.1"}。）
+@end defvar
+
+@defvar emacs-major-version
+Emacs 的主要版本号，为整数。  对于 Emacs 版本 23.1，该值为 23。
+@end defvar
+
+@defvar emacs-minor-version
+Emacs 的次版本号，为整数。  对于 Emacs 版本 23.1，该值为 1。
+@end defvar
+
+@defvar emacs-build-number
+每次在同一目录中构建 Emacs 时都会递增的整数（无需清理）。  这仅在开发 Emacs 时才有意义。
+@end defvar
+
+@defvar emacs-repository-version
+一个字符串，给出构建 Emacs 的存储库修订版本。  如果 Emacs 是在版本控制之外构建的，则该值为 @code{nil}。
+@end defvar
+
+@defvar emacs-repository-branch
+一个字符串，给出构建 Emacs 的存储库分支。在大多数情况下，这是@code{"master"}。  如果 Emacs 是在版本控制之外构建的，则该值为 @code{nil}。
+@end defvar
+
+@node Acknowledgments
+@section 致谢
+
+本手册最初由 Robert Krawitz、Bil Lewis、Dan LaLiberte、Richard@tie{}M 撰写。 GNU 手册小组的志愿者 Stallman 和 Chris Welty 持续了数年的努力。罗伯特@tie{}J。 Chassell 在由 Warren@tie{}A 安排的国防高级研究计划局 ARPA 第 6082 号命令的支持下帮助审查和编辑了该手册。 Computational Logic, Inc. Hunt, Jr.@:。其他章节由 Miles Bader、Lars Brinkhoff、Chong Yidong、Kenichi Handa、Lute Kamstra、Juri Linkov、Glenn Morris、Thien-Thi Nguyen、Dan Nicolaescu、Martin Rudalics、Kim F. Storm、Luc Teirlinck 和 Eli Zaretskii 等人撰写。
+
+修正由 Drew Adams、Juanma Barranquero、Karl Berry、Jim Blandy、Bard Bloom、Stephane Boucher、David Boyes、Alan Carroll、Richard Davis、Lawrence R. Dodd、Peter Doornbosch、David A. Duff、Chris Eich、Beverly Erlebacher、David Eckelkamp、Ralf Fassel、Eirik Fuller、Stephen Gildea、Bob Glickstein、Eric Hanchrow、Jesper 提供哈德、乔治·哈泽尔、内森·赫斯、伊达正幸、丹·雅各布森、杰克·基尔曼、鲍勃·奈顿、弗雷德里克·M·科兹、乔·拉门斯、格伦·M·刘易斯、K·理查德·马吉尔、布莱恩·马里克、罗兰·麦克格拉斯、斯特凡·莫尼尔、斯基普·蒙塔纳罗、约翰·加德纳·迈尔斯、托马斯·A·彼得森、弗朗西斯科·波托@`i、弗里德里希·普克尔塞姆、阿诺德D. Robbins、Raul Rockwell、Jason Rumney、Per Starb@"ack、Shinichirou Sugou、Kimmo Suominen、Edward Tharp、Bill Trost、Rickard Westman、Jean White、Eduard Wiebe、Matthew Wilding、Carl Witty、Dale Worley、Rusty Wright 和 David D. Zuhn。
+
+有关更完整的贡献者列表，请参阅 Emacs 源存储库中的相关更改日志条目。

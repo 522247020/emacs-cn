@@ -1,0 +1,786 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Buffers
+@chapter 缓冲器
+@cindex buffer
+
+@dfn{buffer} 是一个 Lisp 对象，包含要编辑的文本。  缓冲区用于保存正在访问的文件的内容；也可能存在未访问文件的缓冲区。  虽然多个缓冲区可能同时存在，但任何时候只有一个缓冲区被指定为“1”。  大多数编辑命令作用于当前缓冲区的内容。  每个缓冲区（包括当前缓冲区）可能会也可能不会显示在任何窗口中。
+
+@menu
+* Buffer Basics::        什么是缓冲区？
+* Current Buffer::       将缓冲区指定为当前缓冲区，以便基元访问其内容。
+* Buffer Names::         访问和更改缓冲区名称。
+* Buffer File Name::     缓冲区文件名指示访问的是哪个文件。
+* Buffer Modification::  如果需要保存缓冲区，则其值为@dfn{modified}。
+* Modification Time::    确定访问的文件是否在 Emacs 背后被更改。
+* Read Only Buffers::    不允许在只读缓冲区中修改文本。
+* Buffer List::          如何查看所有现有缓冲区。
+* Creating Buffers::     创建缓冲区的函数。
+* Killing Buffers::      缓冲区一直存在，直到被显式终止。
+* Indirect Buffers::     间接缓冲区与其他缓冲区共享文本。
+* Swapping Text::        在两个缓冲区之间交换文本。
+* Buffer Gap::           缓冲区中的间隙。
+@end menu
+
+@node Buffer Basics
+@section 缓冲区基础知识
+
+@ifnottex
+  A @dfn{buffer} is a Lisp object containing text to be edited.  Buffers
+are used to hold the contents of files that are being visited; there may
+also be buffers that are not visiting files.  Although several buffers
+normally exist, only one buffer is designated the @dfn{current
+buffer} at any time.  Most editing commands act on the contents of the
+current buffer.  Each buffer, including the current buffer, may or may
+not be displayed in any windows.
+@end ifnottex
+
+Emacs 编辑中的缓冲区是具有不同名称并保存可编辑文本的对象。  缓冲区对于 Lisp 程序来说是一种特殊的数据类型。  您可以将缓冲区的内容视为可以扩展的字符串；插入和删除可能发生在缓冲区的任何部分。  @xref{Text}。
+
+Lisp 缓冲区对象包含大量信息。  程序员可以通过变量直接访问其中一些信息，而其他信息只能通过专用函数访问。  例如，访问的文件名可以通过变量直接访问，而point的值只能通过原语函数访问。
+
+可直接访问的特定于缓冲区的信息存储在 @dfn{buffer-local} 变量绑定中，这些变量值仅在特定缓冲区中有效。  此功能允许每个缓冲区覆盖某些变量的值。  大多数主要模式都会以这种方式覆盖诸如 1⁣ 或 2⁣ 之类的变量。  有关缓冲区局部变量和与其相关的函数的更多信息，请参阅@ref{Buffer-Local Variables}。
+
+有关与访问缓冲区中的文件相关的函数和变量，请参阅@ref{Visiting Files}和@ref{Saving Buffers}。  有关窗口中缓冲区显示相关的函数和变量，请参见@ref{Buffers and Windows}。
+
+@defun bufferp object
+如果 1⁣ 是缓冲区，则该函数返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@node Current Buffer
+@section 当前缓冲区
+@cindex selecting a buffer
+@cindex changing to another buffer
+@cindex current buffer
+
+一般来说，Emacs 会话中有许多缓冲区。  在任何时候，其中之一都被指定为@dfn{current buffer}——大多数编辑发生的缓冲区。  大多数用于检查或更改文本的原语都在当前缓冲区 (@pxref{Text}) 上隐式运行。
+
+通常，所选窗口 (@pxref{Selecting Windows}) 中显示的缓冲区是当前缓冲区，但情况并非总是如此：Lisp 程序可以临时将任何缓冲区指定为当前缓冲区，以便对其内容进行操作，而无需更改屏幕上显示的内容。  指定当前缓冲区的最基本函数是@code{set-buffer}。
+
+@defun current-buffer
+该函数返回当前缓冲区。
+
+@example
+@group
+(current-buffer)
+     @result{} #<buffer buffers.texi>
+@end group
+@end example
+@end defun
+
+@defun set-buffer buffer-or-name
+该函数使@var{buffer-or-name}成为当前缓冲区。 @var{buffer-or-name} 必须是现有缓冲区或现有缓冲区的名称。  返回值是当前的缓冲区。
+
+该函数不会在任何窗口中显示缓冲区，因此用户不一定能看到缓冲区。  但 Lisp 程序现在可以在它上面运行。
+@end defun
+
+当编辑命令返回到编辑器命令循环时，Emacs 会自动在所选窗口 (@pxref{Selecting Windows}) 中显示的缓冲区上调用@code{set-buffer}。  这是为了防止混淆：它确保当 Emacs 读取命令时光标所在的缓冲区是该命令应用的缓冲区 (@pxref{Command Loop})。  因此，您不应该使用 @code{set-buffer} 明显地切换到不同的缓冲区；为此，请使用@ref{Switching Buffers}中描述的功能。
+
+当编写 Lisp 函数时，do @emph{not} 依赖命令循环的这种行为在操作后恢复当前缓冲区。编辑命令也可以作为 Lisp 函数被其他程序调用，而不仅仅是从命令循环中调用；如果子例程不更改当前缓冲区，这对调用者来说很方便（当然，除非这是子例程的目的）。
+
+要临时操作另一个缓冲区，请将 @code{set-buffer} 放入 @code{save-current-buffer} 形式中。  作为示例，这里是命令 @code{append-to-buffer} 的简化版本：
+
+@example
+@group
+(defun append-to-buffer (buffer start end)
+  "Append the text of the region to BUFFER."
+  (interactive "BAppend to buffer: \nr")
+  (let ((oldbuf (current-buffer)))
+    (save-current-buffer
+      (set-buffer (get-buffer-create buffer))
+      (insert-buffer-substring oldbuf start end))))
+@end group
+@end example
+
+@noindent
+在这里，我们绑定一个局部变量来记录当前缓冲区，然后 @code{save-current-buffer} 安排使其稍后再次成为当前缓冲区。接下来， @code{set-buffer} 使指定的缓冲区成为当前缓冲区，并且 @code{insert-buffer-substring} 将字符串从原始缓冲区复制到指定的（现在是当前的）缓冲区。
+
+或者，我们可以使用 @code{with-current-buffer} 宏：
+
+@example
+@group
+(defun append-to-buffer (buffer start end)
+  "Append the text of the region to BUFFER."
+  (interactive "BAppend to buffer: \nr")
+  (let ((oldbuf (current-buffer)))
+    (with-current-buffer (get-buffer-create buffer)
+      (insert-buffer-substring oldbuf start end))))
+@end group
+@end example
+
+在任何一种情况下，如果附加的缓冲区恰好显示在某个窗口中，则下一次重新显示将显示其文本如何更改。如果它没有显示在任何窗口中，您将不会立即在屏幕上看到更改。  该命令使缓冲区暂时变为当前缓冲区，但不会使其显示。
+
+如果您为也可能具有缓冲区本地绑定的变量进行本地绑定（使用 @code{let} 或函数参数），请确保相同的缓冲区在本地绑定范围的开头和结尾处都是当前的。  否则，您可能会将其绑定在一个缓冲区中，然后在另一个缓冲区中取消绑定！
+
+不要依赖使用 @code{set-buffer} 来更改当前缓冲区，因为如果在错误的缓冲区处于当前状态时发生退出，那么这将无法完成工作。  例如，在前面的示例中，这样做是错误的：
+
+@example
+@group
+  (let ((oldbuf (current-buffer)))
+    (set-buffer (get-buffer-create buffer))
+    (insert-buffer-substring oldbuf start end)
+    (set-buffer oldbuf))
+@end group
+@end example
+
+@noindent
+正如我们所做的那样，使用 @code{save-current-buffer} 或 @code{with-current-buffer} 可以正确处理退出、错误和 @code{throw} 以及普通评估。
+
+@defspec save-current-buffer body@dots{}
+@code{save-current-buffer}特殊形式保存当前缓冲区的标识，评估@var{body}形式，最后将该缓冲区恢复为当前缓冲区。  返回值是@var{body}中最后一个表单的值。  即使在通过 @code{throw} 异常退出或错误 (@pxref{Nonlocal Exits}) 的情况下，当前缓冲区也会恢复。
+
+如果在从@code{save-current-buffer}退出时曾经是当前的缓冲区已被杀死，那么它当然不会再次成为当前的。  相反，退出之前当前的缓冲区仍然是当前的。
+@end defspec
+
+@defmac with-current-buffer buffer-or-name body@dots{}
+@code{with-current-buffer}宏保存当前缓冲区的标识，使@var{buffer-or-name}成为当前缓冲区，评估@var{body}形式，最后恢复当前缓冲区。  @var{buffer-or-name} 必须指定现有缓冲区或现有缓冲区的名称。
+
+返回值是@var{body}中最后一个表单的值。  即使通过 @code{throw} 或错误 (@pxref{Nonlocal Exits}) 异常退出，当前缓冲区也会恢复。
+@end defmac
+
+@defmac with-temp-buffer body@dots{}
+@anchor{Definition of with-temp-buffer}
+@code{with-temp-buffer} 宏使用临时缓冲区作为当前缓冲区来计算 @var{body} 形式。  它保存当前缓冲区的标识，创建一个临时缓冲区并将其设为当前缓冲区，评估 2⁣ 形式，最后在杀死临时缓冲区的同时恢复先前的当前缓冲区。
+
+@cindex undo in temporary buffers
+@cindex @code{kill-buffer-hook} in temporary buffers
+@cindex @code{kill-buffer-query-functions} in temporary buffers
+@cindex @code{buffer-list-update-hook} in temporary buffers
+默认情况下，撤消信息 (@pxref{Undo}) 不会记录在该宏创建的缓冲区中（但 @var{body} 可以根据需要启用该信息）。  临时缓冲区也不运行钩子 @code{kill-buffer-hook}、@code{kill-buffer-query-functions} (@pxref{Killing Buffers}) 和 @code{buffer-list-update-hook} (@pxref{Buffer List})。
+
+返回值是@var{body}中最后一个表单的值。  您可以使用 @code{(buffer-string)} 作为最后一种形式返回临时缓冲区的内容。
+
+即使通过 @code{throw} 或错误 (@pxref{Nonlocal Exits}) 异常退出，当前缓冲区也会恢复。
+
+另请参见@ref{Definition of with-temp-file,, Writing to Files}中的@code{with-temp-file}。
+@end defmac
+
+@node Buffer Names
+@section 缓冲区名称
+@cindex buffer names
+
+每个缓冲区都有一个唯一的名称，它是一个字符串。  许多作用于缓冲区的函数都接受缓冲区或缓冲区名称作为参数。  任何称为 @var{buffer-or-name} 的参数都属于此类，如果它既不是字符串也不是缓冲区，则会发出错误信号。任何名为 @var{buffer} 的参数都必须是实际的缓冲区对象，而不是名称。
+
+@cindex hidden buffers
+@cindex buffers without undo information
+短暂且通常对用户不感兴趣的缓冲区的名称以空格开头，因此 @code{list-buffers} 和 @code{buffer-menu} 命令不会提及它们（但如果这样的缓冲区访问文件，则会提及 @strong{is}）。  以空格开头的名称最初也会禁用记录撤消信息；参见@ref{Undo}。
+
+@defun buffer-name &optional buffer
+此函数以字符串形式返回 @var{buffer} 的名称。 @var{buffer} 默认为当前缓冲区。
+
+如果@code{buffer-name}返回@code{nil}，则意味着@var{buffer}已被杀死。  @xref{Killing Buffers}。
+
+@example
+@group
+(buffer-name)
+     @result{} "buffers.texi"
+@end group
+
+@group
+(setq foo (get-buffer "temp"))
+     @result{} #<buffer temp>
+@end group
+@group
+(kill-buffer foo)
+     @result{} nil
+@end group
+@group
+(buffer-name foo)
+     @result{} nil
+@end group
+@group
+foo
+     @result{} #<killed buffer>
+@end group
+@end example
+@end defun
+
+@deffn Command rename-buffer newname &optional unique
+该函数将当前缓冲区重命名为@var{newname}。  如果 @var{newname} 不是字符串，则会发出错误信号。
+
+通常，如果 1⁣ 已在使用，则 0⁣ 会发出错误信号。  然而，如果@var{unique}不是@code{nil}，它会修改@var{newname}以创建一个未使用的名称。  交互式地，您可以使用数字前缀参数使 @var{unique} 非 @code{nil} 。 （这就是命令 @code{rename-uniquely} 的实现方式。）
+
+该函数返回实际指定给缓冲区的名称。
+@end deffn
+
+@defun get-buffer buffer-or-name
+该函数返回由@var{buffer-or-name}指定的缓冲区。如果 1⁣ 是字符串并且没有具有该名称的缓冲区，则值为 2⁣。  如果 3⁣ 是一个缓冲区，则按给定方式返回；这不是很有用，因此参数通常是一个名称。  例如：
+
+@example
+@group
+(setq b (get-buffer "lewis"))
+     @result{} #<buffer lewis>
+@end group
+@group
+(get-buffer b)
+     @result{} #<buffer lewis>
+@end group
+@group
+(get-buffer "Frazzle-nots")
+     @result{} nil
+@end group
+@end example
+
+另请参见 @ref{Creating Buffers} 中的函数 @code{get-buffer-create}。
+@end defun
+
+@defun generate-new-buffer-name starting-name &optional ignore
+该函数返回一个对于新缓冲区来说是唯一的名称——但不创建缓冲区。  它以 @var{starting-name} 开头，并通过在 @samp{<@dots{}>} 内附加一个数字来生成当前未用于任何缓冲区的名称。  它从 2 开始，并不断增加数字，直到它不是现有缓冲区的名称。
+
+如果可选的第二个参数@var{ignore}不​​是@code{nil}，它应该是一个字符串，一个潜在的缓冲区名称。  这意味着如果尝试了潜在的缓冲区，即使它是现有缓冲区的名称（通常会被拒绝），也要考虑其可接受。  因此，如果名为 @samp{foo}、@samp{foo<2>}、@samp{foo<3>} 和 @samp{foo<4>} 的缓冲区存在，
+
+@example
+(generate-new-buffer-name "foo")
+     @result{} "foo<5>"
+(generate-new-buffer-name "foo" "foo<3>")
+     @result{} "foo<3>"
+(generate-new-buffer-name "foo" "foo<6>")
+     @result{} "foo<5>"
+@end example
+
+参见@ref{Creating Buffers}中的相关函数@code{generate-new-buffer}。
+@end defun
+
+@defun buffer-last-name &optional buffer
+此函数返回 @var{buffer} 在被杀死之前或上次重命名之前的先前名称。  如果 nil 或省略，@var{buffer} 默认为当前缓冲区。
+@end defun
+
+@node Buffer File Name
+@section 缓冲区文件名
+@cindex visited file
+@cindex buffer file name
+@cindex file name of buffer
+
+@dfn{buffer file name} 是在该缓冲区中访问的文件的名称。  当缓冲区不访问文件时，其缓冲区文件名为@code{nil}。  大多数时候，缓冲区名称与缓冲区文件名的非目录部分相同，但缓冲区文件名和缓冲区名称是不同的，可以独立设置。 @xref{Visiting Files}。
+
+@defun buffer-file-name &optional buffer
+此函数返回 @var{buffer} 正在访问的文件的完全展开的绝对文件名。  如果 1⁣ 没有访问任何文件，则 2⁣ 返回 3⁣。  如果未提供 @var{buffer}，则默认为当前缓冲区。
+
+@example
+@group
+(buffer-file-name (other-buffer))
+     @result{} "/usr/user/lewis/manual/files.texi"
+@end group
+@end example
+@end defun
+
+@defvar buffer-file-name
+该缓冲区局部变量包含当前缓冲区中正在访问的文件的绝对名称，如果没有访问文件，则为@code{nil}。  它是一个永久局部变量，不受@code{kill-all-local-variables}影响。  该值与 2⁣ 函数返回的值相同。
+
+@example
+@group
+buffer-file-name
+     @result{} "/usr/user/lewis/manual/buffers.texi"
+@end group
+@end example
+
+在不执行各种其他操作的情况下更改此变量的值是有风险的。  通常最好使用@code{set-visited-file-name}（见下文）；其中完成的一些操作（例如更改缓冲区名称）并不是绝对必要的，但其他操作对于避免混淆 Emacs 来说是必不可少的。
+@end defvar
+
+@defvar buffer-file-truename
+该缓冲区局部变量保存当前缓冲区中访问的文件的缩写真实名称，如果没有访问文件，则保存 @code{nil} 。它是永久本地的，不受 @code{kill-all-local-variables} 的影响。  @xref{Truenames}和@ref{abbreviate-file-name}。
+@end defvar
+
+@defvar buffer-file-number
+该缓冲区局部变量保存当前缓冲区中访问的文件的 inode 号和设备标识符，如果没有访问文件或不存在的文件，则为 0。  它是永久本地的，不受 @code{kill-all-local-variables} 的影响。
+
+该值通常是 @code{(@var{inodenum} @var{device})} 形式的列表。  该元组在系统上可访问的所有文件中唯一标识该文件。  有关它们的更多信息，请参阅 @ref{File Attributes} 中的函数 @code{file-attributes}。
+
+如果 @code{buffer-file-name} 是符号链接的名称，则 @var{inodenum} 和 @var{device} 都指的是链接的递归目标。
+@end defvar
+
+@defun get-file-buffer filename
+该函数返回访问文件@var{filename}的缓冲区。  如果没有这样的缓冲区，则返回@code{nil}。  参数 @var{filename} 必须是字符串，它被扩展 (@pxref{File Name Expansion})，然后与所有活动缓冲区的访问文件名进行比较。  请注意，缓冲区的 @code{buffer-file-name} 必须与 @var{filename} 的扩展完全匹配。  此函数不会识别同一文件的其他名称。
+
+@example
+@group
+(get-file-buffer "buffers.texi")
+    @result{} #<buffer buffers.texi>
+@end group
+@end example
+
+在特殊情况下，可能有多个缓冲区访问同一文件名。  在这种情况下，该函数返回缓冲区列表中的第一个此类缓冲区。
+@end defun
+
+@defun find-buffer-visiting filename &optional predicate
+这类似于@code{get-file-buffer}，只不过它可以返回访问文件@emph{possibly under a different name}的任何缓冲区。  也就是说，缓冲区的@code{buffer-file-name}不需要与@var{filename}的扩展完全匹配，它只需要引用同一个文件。  如果@var{predicate}非@code{nil}，它应该是一个参数的函数，即访问@var{filename}的缓冲区。  仅当@var{predicate}返回非@code{nil}时，缓冲区才被视为合适的返回值。  如果找不到合适的缓冲区来返回，则@code{find-buffer-visiting}返回@code{nil}。
+@end defun
+
+@deffn Command set-visited-file-name filename &optional no-query along-with-file
+如果@var{filename}是非空字符串，该函数将当前缓冲区中访问的文件名更改为@var{filename}。  （如果缓冲区没有访问过的文件，则为它提供一个。） @emph{next time} 缓冲区被保存后，它将进入新指定的文件。
+
+该命令将缓冲区标记为已修改，因为它（据 Emacs 所知）不匹配 @var{filename} 的内容，即使它与之前访问的文件匹配。  它还会重命名缓冲区以对应于新文件名，除非新名称已在使用中。
+
+如果@var{filename}是@code{nil}或空字符串，则代表“没有访问过的文件”。  在这种情况下，@code{set-visited-file-name} 将缓冲区标记为没有访问过的文件，而不更改缓冲区的已修改标志。
+
+通常，此函数会要求用户确认是否已有缓冲区访问@var{filename}。  如果@var{no-query}不是@code{nil}，就无法提出这个问题。  如果已经有一个缓冲区访问 @var{filename}，并且用户确认或 @var{no-query} 不是 @code{nil}，则此函数通过在 @samp{<@dots{}>} 内附加一个数字到 @var{filename} 来使新缓冲区名称唯一。
+
+如果@var{along-with-file}非@code{nil}，则意味着假设之前访问的文件已重命名为@var{filename}。  在这种情况下，该命令不会更改缓冲区的修改标志，也不会更改缓冲区记录的最后文件修改时间（如@code{visited-file-modtime}（@pxref{Modification Time}）报告）。  如果@var{along-with-file}为@code{nil}，该函数会清除记录的最后文件修改时间，之后@code{visited-file-modtime}返回零。
+
+当交互调用函数@code{set-visited-file-name}时，它会提示在迷你缓冲区中输入@var{filename}。
+@end deffn
+
+@defvar list-buffers-directory
+对于没有访问过的文件名的缓冲区，此缓冲区局部变量指定要在缓冲区列表中显示的字符串，其中访问过的文件名将位于该列表中。  Dired 缓冲区使用此变量。
+@end defvar
+
+@node Buffer Modification
+@section 缓冲区修改
+@cindex buffer modification
+@cindex modification flag (of buffer)
+
+Emacs 为每个缓冲区保留一个名为 @dfn{modified flag} 的标志，以记录您是否更改了缓冲区的文本。  每当您更改缓冲区的内容时，此标志都会设置为@code{t}，并在保存时清除为@code{nil}。  因此，该标志显示是否有未保存的更改。  标志值通常显示在模式行 (@pxref{Mode Line Variables}) 中，并控制保存 (@pxref{Saving Buffers}) 和自动保存 (@pxref{Auto-Saving})。
+
+一些 Lisp 程序显式地设置该标志。  例如，函数@code{set-visited-file-name}将标志设置为@code{t}，因为文本与新访问的文件不匹配，即使它与之前访问的文件相比没有变化。
+
+修改缓冲区内容的函数在@ref{Text}中描述。
+
+@defun buffer-modified-p &optional buffer
+如果 1⁣ 自上次从文件读入或保存以来已被修改，则该函数返回非 @code{nil}，否则返回 @code{nil}。  如果 @var{buffer} 自上次修改后已自动保存，则此函数返回符号 @code{autosaved}。  如果@var{buffer}为@code{nil}或省略，则默认为当前缓冲区。
+@end defun
+
+@defun set-buffer-modified-p flag
+如果 @var{flag} 为非 @code{nil}，则此函数将当前缓冲区标记为已修改；如果标志为 @code{nil}，则此函数将当前缓冲区标记为未修改。
+
+调用此函数的另一个效果是导致无条件重新显示当前缓冲区的模式行。  事实上，函数 @code{force-mode-line-update} 的工作原理是这样的：
+
+@example
+@group
+(set-buffer-modified-p (buffer-modified-p))
+@end group
+@end example
+@end defun
+
+@defun restore-buffer-modified-p flag
+与@code{set-buffer-modified-p}类似，但不强制重新显示模式线。  该函数还允许@var{flag}的值为符号@code{autosaved}，它标记缓冲区已修改并在上次修改后自动保存。
+@end defun
+
+@deffn Command not-modified &optional arg
+该命令将当前缓冲区标记为未修改，并且不需要保存。  如果@var{arg}非@code{nil}，则将缓冲区标记为已修改，以便在下一个合适的场合保存它。交互地，@var{arg} 是前缀参数。
+
+不要在程序中使用此函数，因为它会在回显区域中打印一条消息；使用@code{set-buffer-modified-p}（上面）代替。
+@end deffn
+
+@defun buffer-modified-tick &optional buffer
+该函数返回@var{buffer}的修改计数。  这是一个计数器，每次修改缓冲区时都会递增。  如果@var{buffer}是@code{nil}（或省略），则使用当前缓冲区。
+@end defun
+
+@defun buffer-chars-modified-tick &optional buffer
+该函数返回@var{buffer}的字符更改修改计数。文本属性的更改使该计数器保持不变；然而，每次在缓冲区中插入或删除文本时，计数器都会重置为@code{buffer-modified-tick}返回的值。通过比较两个 @code{buffer-chars-modified-tick} 调用返回的值，您可以判断两次调用之间该缓冲区中是否发生了字符更改。  如果@var{buffer}是@code{nil}（或省略），则使用当前缓冲区。
+@end defun
+
+有时需要以不真正更改其文本的方式修改缓冲区，例如仅更改其文本属性。如果您的程序需要修改缓冲区而不触发任何对缓冲区修改做出反应的挂钩和功能，请使用 @code{with-silent-modifications} 宏。
+
+@defmac with-silent-modifications body@dots{}
+执行 @var{body} 假装它不修改缓冲区。  这包括检查缓冲区的文件是否被锁定（@pxref{File Locks}）、运行缓冲区修改挂钩（@pxref{Change Hooks}）等。请注意，如果@var{body}实际上修改了缓冲区文本（而不是其文本属性），则其撤消数据可能会损坏。
+@end defmac
+
+@node Modification Time
+@section 缓冲区修改时间
+@cindex comparing file modification time
+@cindex modification time of buffer
+
+假设您访问一个文件并在其缓冲区中进行更改，同时文件本身在磁盘上也发生了更改。  此时，保存缓冲区将覆盖文件中的更改。  有时这可能是您想要的，但通常它会丢失有价值的信息。  因此，Emacs 在保存文件之前使用下面描述的函数检查文件的修改时间。  （@xref{File Attributes}，了解如何检查文件的修改时间。）
+
+@defun verify-visited-file-modtime &optional buffer
+该函数将@var{buffer}（默认情况下，当前缓冲区）记录的其访问文件的修改时间与操作系统记录的文件的实际修改时间进行比较。  两者应该是相同的，除非自 Emacs 访问或保存该文件以来某个其他进程已写入该文件。
+
+如果最后一次实际修改时间与 Emacs 记录的修改时间相同，该函数返回 @code{t}，否则返回 @code{nil}。如果缓冲区没有记录上次修改时间，即 @code{visited-file-modtime} 将返回零，它也会返回@code{t}。
+
+对于不访问文件的缓冲区，它始终返回 @code{t}，即使 @code{visited-file-modtime} 返回非零值。  例如，对于重复的缓冲区，它总是返回@code{t}。  对于正在访问不存在且从未存在的文件的缓冲区，它返回@code{t}，而对于文件已被删除的文件访问缓冲区则返回@code{nil}。
+@end defun
+
+@defun clear-visited-file-modtime
+该函数清除当前缓冲区正在访问的文件的最后修改时间的记录。  因此，下次尝试保存此缓冲区时将不会抱怨文件修改时间存在差异。
+
+此函数在 @code{set-visited-file-name} 和其他特殊位置调用，在这些位置不应进行避免覆盖已更改文件的常规测试。
+@end defun
+
+@defun visited-file-modtime
+该函数返回当前缓冲区记录的最后一个文件修改时间，作为 Lisp 时间戳 (@pxref{Time of Day})。
+
+如果缓冲区没有记录最后修改时间，则该函数返回零。  例如，如果缓冲区没有访问文件或者时间已被 @code{clear-visited-file-modtime} 显式清除，就会发生这种情况。  但请注意，@code{visited-file-modtime} 也返回一些非文件缓冲区的时间戳。  例如，在列出目录的 Dired 缓冲区中，它返回 Dired 记录的该目录的最后修改时间。
+
+如果缓冲区正在访问不存在的文件，则该函数返回@minus{}1。
+@end defun
+
+@defun set-visited-file-modtime &optional time
+如果@var{time}不是@code{nil}，该函数将缓冲区的访问文件的最后修改时间的记录更新为@var{time}指定的值，否则更新为访问文件的最后修改时间。
+
+如果@var{time}既不是@code{nil}也不是@code{visited-file-modtime}返回的整数标志，它应该是一个Lisp时间值（@pxref{Time of Day}）。
+
+如果缓冲区未正常从文件读取，或者文件本身由于某些已知的良性原因而被更改，则此函数非常有用。
+@end defun
+
+@defun ask-user-about-supersession-threat filename
+当文件比缓冲区文本新时，此函数用于询问用户在尝试修改访问文件@var{filename}的缓冲区后如何继续。  Emacs 检测到这一点是因为磁盘上文件的修改时间比上次保存时间更新并且其内容已更改。这意味着其他程序可能已经更改了该文件。
+
+@kindex file-supersession
+根据用户的回答，该函数可能会正常返回，在这种情况下，缓冲区的修改会继续进行，或者它可能会用数据 @code{(@var{filename})} 发出 @code{file-supersession} 错误信号，在这种情况下，不允许建议的缓冲区修改。
+
+Emacs 在适当的场合会自动调用此函数。  它的存在是为了让您可以通过重新定义它来自定义 Emacs。标准定义请参见文件@file{userlock.el}。
+
+另请参阅@ref{File Locks}中的文件锁定机制。
+@end defun
+
+@node Read Only Buffers
+@section 只读缓冲区
+@cindex read-only buffer
+@cindex buffer, read-only
+
+如果缓冲区为@dfn{read-only}，则您无法更改其内容，尽管您可以通过滚动和缩小来更改内容视图。
+
+只读缓冲区在两种情况下使用：
+
+@itemize @bullet
+@item 
+访问写保护文件的缓冲区通常是只读的。
+
+这里，目的是告知用户，为了将缓冲区保存到文件中而编辑缓冲区可能是徒劳的或不合需要的。  尽管如此，想要更改缓冲区文本的用户可以在使用 @kbd{C-x C-q} 清除只读标志后执行此操作。
+
+@item 
+Dired 和 Rmail 等模式使缓冲区只读，当使用通常的编辑命令更改内容时可能会出现错误。
+
+这些模式的特殊命令将 @code{buffer-read-only} 绑定到 @code{nil}（与 @code{let}）或将 @code{inhibit-read-only} 绑定到 @code{t} 在它们自己更改文本的位置周围。
+@end itemize
+
+@defvar buffer-read-only
+此缓冲区局部变量指定缓冲区是否为只读。如果该变量为非@code{nil}，则缓冲区是只读的。  但是，仍然可以修改具有 @code{inhibit-read-only} 文本属性的字符。  @xref{Special Properties, inhibit-read-only}。
+@end defvar
+
+@defvar inhibit-read-only
+如果该变量为非@code{nil}，则只读缓冲区，并且根据实际值，部分或全部只读字符可能会被修改。  缓冲区中的只读字符是那些具有非 @code{nil} @code{read-only} 文本属性的字符。  @xref{Special Properties}，有关文本属性的更多信息。
+
+如果 @code{inhibit-read-only} 为 @code{t}，则所有 @code{read-only} 字符属性均无效。  如果 @code{inhibit-read-only} 是列表，则 @code{read-only} 字符属性如果是列表的成员则无效（与 @code{eq} 进行比较）。
+@end defvar
+
+@deffn Command read-only-mode &optional arg
+这是只读次要模式（缓冲区本地次要模式）的模式命令。  当该模式使能时，缓冲区中@code{buffer-read-only}为非@code{nil}；禁用时，缓冲区中的 @code{buffer-read-only} 为 @code{nil}。  调用约定与其他次要模式命令相同 (@pxref{Minor Mode Conventions})。
+
+这个次要模式主要用作 @code{buffer-read-only} 的包装器；与大多数次要模式不同，没有单独的 @code{read-only-mode} 变量。  即使禁用只读模式，具有非 @code{nil} @code{read-only} 文本属性的字符仍保持只读。  要暂时忽略所有只读状态，请绑定 @code{inhibit-read-only}，如上所述。
+
+启用只读模式时，如果选项 @code{view-read-only} 为非 @code{nil}，此模式命令也会启用查看模式。  @xref{Misc Buffer,,Miscellaneous Buffer Operations, emacs, The GNU Emacs Manual}。禁用只读模式时，如果启用了查看模式，则会禁用查看模式。
+@end deffn
+
+@defun barf-if-buffer-read-only &optional position
+如果当前缓冲区是只读的，则此函数会发出 @code{buffer-read-only} 错误信号。  如果 @var{position} 处的文本（默认为 point）设置了 @code{inhibit-read-only} 文本属性，则不会引发错误。
+
+@xref{Using Interactive}，如果当前缓冲区是只读的，则另一种方式发出错误信号。
+@end defun
+
+@node Buffer List
+@section 缓冲区列表
+@cindex buffer list
+@cindex listing all buffers
+
+@dfn{buffer list} 是所有活动缓冲区的列表。  该列表中缓冲区的顺序主要基于每个缓冲区最近在窗口中显示的时间。  有几个函数，特别是 @code{other-buffer}，使用了这种顺序。  为用户显示的缓冲区列表也遵循此顺序。
+
+创建缓冲区会将其添加到缓冲区列表的末尾，而终止缓冲区会将其从该列表中删除。  每当选择在窗口中显示缓冲区 (@pxref{Switching Buffers}) 或选择显示它的窗口 (@pxref{Selecting Windows}) 时，缓冲区就会移动到此列表的前面。  当缓冲区被隐藏时，它会移动到列表的末尾（参见下面的@code{bury-buffer}）。  Lisp 程序员没有可以直接操作缓冲区列表的函数。
+
+除了刚刚描述的基本缓冲区列表之外，Emacs 还为每个帧维护一个本地缓冲区列表，其中该帧中已显示（或已选择其窗口）的缓冲区排在第一位。  （此顺序记录在帧的@code{buffer-list}帧参数中；请参阅@ref{Buffer Parameters}。）从未在该帧中显示的缓冲区位于后面，根据基本缓冲区列表进行排序。
+
+@defun buffer-list &optional frame
+该函数返回缓冲区列表，包括所有缓冲区，甚至是名称以空格开头的缓冲区。  这些元素是实际的缓冲区，而不是它们的名称。
+
+如果@var{frame}是一个帧，则返回@var{frame}的本地缓冲区列表。如果@var{frame}为@code{nil}或省略，则使用基本缓冲区列表：缓冲区按最近显示或选择的顺序出现，无论它们显示在哪个帧上。
+
+@example
+@group
+(buffer-list)
+     @result{} (#<buffer buffers.texi>
+         #<buffer  *Minibuf-1*> #<buffer buffer.c>
+         #<buffer *Help*> #<buffer TAGS>)
+@end group
+
+@group
+;; @r{Note that the name of the minibuffer}
+;;   @r{begins with a space!}
+(mapcar #'buffer-name (buffer-list))
+    @result{} ("buffers.texi" " *Minibuf-1*"
+        "buffer.c" "*Help*" "TAGS")
+@end group
+@end example
+@end defun
+
+@code{buffer-list}返回的列表是专门构造的；它不是 Emacs 的内部数据结构，修改它不会影响缓冲区的顺序。  如果您想更改基本缓冲区列表中缓冲区的顺序，这里有一个简单的方法：
+
+@example
+(defun reorder-buffer-list (new-list)
+  (while new-list
+    (bury-buffer (car new-list))
+    (setq new-list (cdr new-list))))
+@end example
+
+使用此方法，您可以为列表指定任何顺序，但不会有丢失缓冲区或添加非有效实时缓冲区的危险。
+
+要更改特定帧缓冲区列表的顺序或值，请使用 @code{modify-frame-parameters} (@pxref{Parameter Access}) 设置该帧的 @code{buffer-list} 参数。
+
+@defun other-buffer &optional buffer visible-ok frame
+该函数返回缓冲区列表中除 0⁣ 之外的第一个缓冲区。  通常，这是出现在最近选择的窗口中的缓冲区（在帧 @var{frame} 或所选帧 @pxref{Input Focus} 中），除了 @var{buffer} 之外。  名称以空格开头的缓冲区根本不被考虑。
+
+如果未提供 @var{buffer} （或者它不是实时缓冲区），则 @code{other-buffer} 返回所选帧的本地缓冲区列表中的第一个缓冲区。  （如果@var{frame}非@code{nil}，则返回@var{frame}本地缓冲区列表中的第一个缓冲区。）
+
+如果 @var{frame} 具有非 @code{nil} @code{buffer-predicate} 参数，则 @code{other-buffer} 使用该谓词来决定要考虑哪些缓冲区。  它为每个缓冲区调用一次谓词，如果值为@code{nil}，则忽略该缓冲区。  @xref{Buffer Parameters}。
+
+如果@var{visible-ok}是@code{nil}，则@code{other-buffer}避免返回任何可见帧上任何窗口中可见的缓冲区，除非作为最后的手段。  如果@var{visible-ok}非@code{nil}，那么缓冲区是否显示在某处并不重要。
+
+如果不存在合适的缓冲区，则返回缓冲区@file{*scratch*}（并在必要时创建）。
+@end defun
+
+@defun last-buffer &optional buffer visible-ok frame
+该函数返回@var{frame}缓冲区列表中除@var{buffer}之外的最后一个缓冲区。  如果省略@var{frame}或@code{nil}，则使用所选帧的缓冲区列表。
+
+参数 @var{visible-ok} 的处理方式与 @code{other-buffer} 相同，见上文。  如果找不到合适的缓冲区，则返回缓冲区@file{*scratch*}。
+@end defun
+
+@deffn Command bury-buffer &optional buffer-or-name
+此命令将 @var{buffer-or-name} 放在缓冲区列表的末尾，而不更改列表中任何其他缓冲区的顺序。因此，该缓冲区成为 1⁣ 返回的最不理想的候选者。  参数可以是缓冲区本身，也可以是缓冲区的名称。
+
+该函数对每个帧的 @code{buffer-list} 参数以及基本缓冲区列表进行操作；因此，您埋入的缓冲区将在 @code{(buffer-list @var{frame})} 的值和 @code{(buffer-list)} 的值中排在最后。  此外，它还会将缓冲区放在所选窗口 (@pxref{Window History}) 的缓冲区列表的末尾，前提是它显示在该窗口中。
+
+如果@var{buffer-or-name}是@code{nil}或被省略，这意味着隐藏当前缓冲区。  此外，如果当前缓冲区显示在所选窗口 (@pxref{Selecting Windows}) 中，这将确保该窗口被删除或其中显示另一个缓冲区。  更准确地说，如果所选窗口是专用窗口 (@pxref{Dedicated Windows}) 并且其框架上还有其他窗口，则该窗口将被删除。  如果它是其框架上的唯一窗口，并且该框架不是其终端上的唯一框架，则通过调用 @code{frame-auto-hide-function} (@pxref{Quitting Windows}) 指定的函数来消除该框架。  否则，它调用 @code{switch-to-prev-buffer} (@pxref{Window History}) 在该窗口中显示另一个缓冲区。  如果 @var{buffer-or-name} 显示在其他窗口中，它仍然显示在那里。
+
+要替换显示缓冲区的所有窗口中的缓冲区，请使用@code{replace-buffer-in-windows}、@xref{Buffers and Windows}。
+@end deffn
+
+@deffn Command unbury-buffer
+该命令切换到所选帧的本地缓冲区列表中的最后一个缓冲区。  更准确地说，它调用函数 @code{switch-to-buffer} (@pxref{Switching Buffers})，在所选窗口中显示 @code{last-buffer} 返回的缓冲区（见上文）。
+@end deffn
+
+@defvar buffer-list-update-hook
+这是每当缓冲区列表发生变化时都会运行的正常挂钩。  （隐式）运行此钩子的函数是 @code{get-buffer-create} (@pxref{Creating Buffers})、@code{rename-buffer} (@pxref{Buffer Names})、@code{kill-buffer} (@pxref{Killing Buffers})、@code{bury-buffer}（见上文）和 @code{select-window} (@pxref{Selecting Windows})。  对于由 @code{get-buffer-create} 或 @code{generate-new-buffer} 使用非 @code{nil} 参数 @var{inhibit-buffer-hooks} 创建的内部或临时缓冲区，不会运行此挂钩。
+
+此钩子运行的函数应避免使用 @code{nil} @var{norecord} 参数调用 @code{select-window}，因为这可能会导致无限递归。
+@end defvar
+
+@defun buffer-match-p condition buffer-or-name &rest args
+该函数检查@code{buffer-or-name}指定的缓冲区是否满足指定的@var{condition}。  可选参数 @var{args} 被传递给 @var{condition} 中的谓词函数。  有效的 @var{condition} 可以是以下之一：
+@itemize @bullet{}
+@item 
+一个字符串，解释为正则表达式。  如果正则表达式与缓冲区名称匹配，则缓冲区满足条件。
+@item 
+一个谓词函数，如果缓冲区匹配，它应该返回非@code{nil}。  它以 @var{buffer-or-name} 作为第一个参数调用，后跟 @var{args}。
+@item 
+一个 cons-cell @code{(@var{oper} . @var{expr})} 其中 @var{oper} 是以下之一
+@table @code
+@item (not @var{cond})
+如果 @var{cond} 不满足 @code{buffer-match-p}（具有相同的缓冲区和 @code{args}），则满足。
+@item (or @var{conds}@dots{})
+如果@var{conds}中的@emph{any}条件满足@code{buffer-match-p}，并且具有相同的缓冲区和@code{args}，则满足。
+@item (and @var{conds}@dots{})
+如果 @emph{all} @var{conds} 中的条件满足 @code{buffer-match-p}，并且具有相同的缓冲区和 @code{args}，则满足。
+@item derived-mode
+如果缓冲区的主模式源自@var{expr}，则满足。 @var{expr} 的值可以是单个模式符号，也可以是函数 @code{provided-mode-derived-p} (@pxref{Derived Modes}) 接受的模式符号列表。请注意，如果在建立缓冲区的主要模式之前调用 @code{buffer-match-p}，则此条件可能无法报告匹配。
+@item major-mode
+如果缓冲区的主模式等于@var{expr}，则满足。  当两者都可以工作时，最好使用 @code{derived-mode} 代替。  请注意，如果在建立缓冲区的主要模式之前调用 2⁣，则此条件可能无法报告匹配。
+@item category
+仅当该函数被 @code{display-buffer} (@pxref{Buffer Display Action Alists}) 调用时，这才是相关的，并且如果调用 @code{display-buffer} 的操作 alist 在其 @var{action} 参数的值中包含 @w{@code{(category . @var{expr})}} ，则满足。  @xref{Buffer Display Action Alists}。
+@item this-command
+@vindex this-command@r{, a buffer display condition entry}
+仅当该函数被 @code{display-buffer} (@pxref{Buffer Display Action Alists}) 调用时，这也是相关的，并且当现在正在执行的命令等于 @var{expr} 时，或者如果 @var{expr} 是一个列表，当现在正在执行的命令是该列表的成员时，这一点才有意义。
+@end table
+@item t
+任何缓冲区都满足。  @code{""}（空字符串）或 @code{(and)}（空连词）的便捷替代方案。
+@end itemize
+@end defun
+
+@defun match-buffers condition &optional buffer-list &rest args
+该函数返回满足@var{condition}的所有缓冲区的列表。  如果没有缓冲区匹配，该函数返回@code{nil}。  参数@var{condition}如上面@code{buffer-match-p}中定义。  默认情况下，会考虑所有缓冲区，但这可以通过可选参数 @code{buffer-list} 进行限制，该参数应该是要考虑的缓冲区列表。剩余参数@var{args}将以与@code{buffer-match-p}相同的方式传递给@var{condition}。
+@end defun
+
+@node Creating Buffers
+@section 创建缓冲区
+@cindex creating buffers
+@cindex buffers, creating
+
+本节介绍创建缓冲区的两个原语。 @code{get-buffer-create} 如果找不到具有指定名称的现有缓冲区，则创建一个缓冲区； @code{generate-new-buffer} 总是创建一个新的缓冲区并给它一个唯一的名称。
+
+这两个函数都接受一个可选参数@var{inhibit-buffer-hooks}。如果它是非 @code{nil}，则它们创建的缓冲区不会运行钩子 @code{kill-buffer-hook}、@code{kill-buffer-query-functions} (@pxref{Killing Buffers}) 和 @code{buffer-list-update-hook} (@pxref{Buffer List})。  这可以避免减慢从未呈现给用户或传递给其他应用程序的内部或临时缓冲区的速度。
+
+其他可用于创建缓冲区的函数包括 @code{with-output-to-temp-buffer} (@pxref{Temporary Displays}) 和 @code{create-file-buffer} (@pxref{Visiting Files})。  启动子进程还可以创建缓冲区（@pxref{Processes}）。
+
+@defun get-buffer-create buffer-or-name &optional inhibit-buffer-hooks
+该函数返回一个名为 @var{buffer-or-name} 的缓冲区。  返回的缓冲区不会成为当前缓冲区——该函数不会更改当前缓冲区。
+
+@var{buffer-or-name} 必须是字符串或现有缓冲区。  如果它是一个字符串并且具有该名称的活动缓冲区已存在，则 @code{get-buffer-create} 返回该缓冲区。  如果不存在这样的缓冲区，它将创建一个新的缓冲区。  如果 2⁣ 是缓冲区而不是字符串，则即使它已死，也会按给定方式返回。
+
+@example
+@group
+(get-buffer-create "foo")
+     @result{} #<buffer foo>
+@end group
+@end example
+
+新创建的缓冲区的主要模式设置为基本模式。 （变量@code{major-mode}的默认值在更高级别处理；请参阅@ref{Auto Major Mode}。）如果名称以空格开头，则缓冲区最初会禁用撤消信息记录（@pxref{Undo}）。
+@end defun
+
+@defun generate-new-buffer name &optional inhibit-buffer-hooks
+此函数返回一个新创建的空缓冲区，但不会使其成为当前缓冲区。  缓冲区的名称是通过将 @var{name} 传递给函数 @code{generate-new-buffer-name} (@pxref{Buffer Names}) 生成的。  因此，如果没有名为 @var{name} 的缓冲区，则这就是新缓冲区的名称；如果使用该名称，则会将 @samp{<@var{n}>} 形式的后缀附加到 @var{name}，其中 @var{n} 是整数。
+
+如果 @var{name} 不是字符串，则会发出错误信号。
+
+@example
+@group
+(generate-new-buffer "bar")
+     @result{} #<buffer bar>
+@end group
+@group
+(generate-new-buffer "bar")
+     @result{} #<buffer bar<2>>
+@end group
+@group
+(generate-new-buffer "bar")
+     @result{} #<buffer bar<3>>
+@end group
+@end example
+
+新缓冲区的主要模式设置为基本模式。  变量@code{major-mode}的默认值在更高级别处理。 @xref{Auto Major Mode}。
+@end defun
+
+@node Killing Buffers
+@section 杀死缓冲区
+@cindex killing buffers
+@cindex buffers, killing
+
+@dfn{Killing a buffer} 使其名称对于 Emacs 来说是未知的，并使其占用的内存空间可供其他使用。
+
+只要有任何东西引用它，已被杀死的缓冲区的缓冲区对象就仍然存在，但它被特殊标记，以便您无法将其设为当前状态或显示它。  然而，被杀死的缓冲区仍保留其身份；如果你杀死两个不同的缓冲区，尽管它们都死了，但根据@code{eq}它们仍然是不同的。
+
+如果您终止窗口中当前或显示的缓冲区，Emacs 会自动选择或显示其他缓冲区。  这意味着杀死一个缓冲区可以改变当前的缓冲区。  因此，当您终止缓冲区时，您还应该采取与更改当前缓冲区相关的预防措施（除非您碰巧知道被终止的缓冲区不是当前的）。  @xref{Current Buffer}。
+
+如果您杀死一个缓冲区，该缓冲区是一个或多个间接缓冲区的基础缓冲区
+@iftex
+buffers,
+@end iftex
+@ifnottex
+buffers (@pxref{Indirect Buffers}),
+@end ifnottex
+间接缓冲区也会被自动终止。
+
+@cindex live buffer
+当且仅当缓冲区被杀死时，缓冲区的 @code{buffer-name} 才是 @code{nil}。  未被杀死的缓冲区称为 22 缓冲区。  要测试缓冲区是活动还是终止，请使用函数@code{buffer-live-p}（见下文）。
+
+@deffn Command kill-buffer &optional buffer-or-name
+该函数杀死缓冲区@var{buffer-or-name}，释放其所有内存以供其他用途或返回给操作系统。  如果@var{buffer-or-name}是@code{nil}或被省略，它会杀死当前缓冲区。
+
+任何将此缓冲区作为 @code{process-buffer} 的进程都会收到 @code{SIGHUP}（挂起）信号，这通常会导致它们终止。  @xref{Signals to Processes}。
+
+如果缓冲区正在访问文件并包含未保存的更改，@code{kill-buffer} 会在缓冲区被终止之前要求用户确认。即使没有交互调用，它也会执行此操作。  为了防止确认请求，请在调用@code{kill-buffer}之前清除修改标志。  @xref{Buffer Modification}。
+
+该函数调用 @code{replace-buffer-in-windows} 来清理当前显示要杀死的缓冲区的所有窗口。
+
+杀死已经死亡的缓冲区没有任何效果。
+
+如果该函数确实杀死了缓冲区，则返回@code{t}。  如果用户拒绝确认或者@var{buffer-or-name}已经死亡，它会返回@code{nil}。
+
+@smallexample
+(kill-buffer "foo.unchanged")
+     @result{} t
+(kill-buffer "foo.changed")
+
+---------- Buffer: Minibuffer ----------
+Buffer foo.changed modified; kill anyway? (yes or no) @kbd{yes}
+---------- Buffer: Minibuffer ----------
+
+     @result{} t
+@end smallexample
+@end deffn
+
+@defvar kill-buffer-query-functions
+在确认未保存的更改之前，@code{kill-buffer} 按出现顺序调用列表 @code{kill-buffer-query-functions} 中的函数，不带任何参数。  被杀死的缓冲区是调用它们时的当前缓冲区。  此功能的想法是这些功能将要求用户确认。  如果其中任何一个返回@code{nil}，则@code{kill-buffer}会延长缓冲区的寿命。
+
+对于由 @code{get-buffer-create} 或 @code{generate-new-buffer} 使用非 @code{nil} 参数 @var{inhibit-buffer-hooks} 创建的内部或临时缓冲区，不会运行此挂钩。
+@end defvar
+
+@defvar kill-buffer-hook
+这是一个正常的钩子，由 @code{kill-buffer} 在询问了所有要问的问题之后，在实际杀死缓冲区之前运行。当钩子函数运行时，要杀死的缓冲区是当前的。 @xref{Hooks}。  该变量是永久本地变量，因此不会通过更改主要模式来清除其本地绑定。
+
+对于由 @code{get-buffer-create} 或 @code{generate-new-buffer} 使用非 @code{nil} 参数 @var{inhibit-buffer-hooks} 创建的内部或临时缓冲区，不会运行此挂钩。
+@end defvar
+
+@defopt buffer-offer-save
+如果该变量在特定缓冲区中为非 @code{nil} ，则告诉 @code{save-buffers-kill-emacs} 提供保存该缓冲区的功能，就像它提供保存文件访问缓冲区一样。  如果调用 @code{save-some-buffers} 时将第二个可选参数设置为 @code{t}，它也会提供保存缓冲区的功能。  最后，如果该变量设置为符号 @code{always}，则 @code{save-buffers-kill-emacs} 和 @code{save-some-buffers} 都将始终提供保存。  @xref{Definition of save-some-buffers}。  当出于任何原因设置变量 @code{buffer-offer-save} 时，它会自动成为缓冲区本地变量。 @xref{Buffer-Local Variables}。
+@end defopt
+
+@defvar buffer-save-without-query
+如果该变量在特定缓冲区中非 @code{nil} ，则告诉 @code{save-buffers-kill-emacs} 和 @code{save-some-buffers} 保存此缓冲区（如果已修改），而无需询问用户。  当出于任何原因设置时，该变量会自动变为缓冲区本地变量。
+@end defvar
+
+@defun buffer-live-p object
+如果@var{object}是活动缓冲区（尚未被杀死的缓冲区），则该函数返回@code{t}，否则返回@code{nil}。
+@end defun
+
+@node Indirect Buffers
+@section 间接缓冲区
+@cindex indirect buffers
+@cindex base buffer
+
+@dfn{indirect buffer} 共享某个其他缓冲区的文本，称为间接缓冲区的 @dfn{base buffer}。  在某些方面，对于缓冲区而言，它类似于文件之间的符号链接。  基础缓冲区本身可能不是间接缓冲区。
+
+间接缓冲区的文本始终与其基本缓冲区的文本相同；通过编辑其中之一所做的更改会立即在另一个中可见。  这包括文本属性以及字符本身。
+
+在所有其他方面，间接缓冲区及其基础缓冲区是完全分开的。  它们具有不同的名称、独立的点值、独立的缩小、独立的标记和覆盖（尽管在任一缓冲区中插入或删除文本会重新定位两者的标记和覆盖）、独立的主要模式以及独立的缓冲区局部变量绑定。
+
+间接缓冲区无法访问文件，但其基本缓冲区可以。  如果您尝试保存间接缓冲区，实际上会保存基本缓冲区。
+
+终止间接缓冲区对其基本缓冲区没有影响。  终止基本缓冲区实际上会终止间接缓冲区，因为它不能再次成为当前缓冲区。
+
+@deffn Command make-indirect-buffer base-buffer name &optional clone inhibit-buffer-hooks
+这将创建并返回一个名为 @var{name} 的间接缓冲区，其基本缓冲区为 @var{base-buffer}。  参数@var{base-buffer}可以是实时缓冲区或现有缓冲区的名称（字符串）。  如果 3⁣ 是现有缓冲区的名称，则会发出错误信号。
+
+如果@var{clone}是非@code{nil}，则间接缓冲区最初共享@var{base-buffer}的状态，例如主模式、次模式、缓冲区局部变量等。  如果省略@var{clone}或@code{nil}，间接缓冲区的状态将设置为新缓冲区的默认状态。
+
+如果@var{base-buffer}是间接缓冲区，则其基础缓冲区将用作新缓冲区的基础。  此外，如果@var{clone}非@code{nil}，则初始状态是从实际基础缓冲区复制的，而不是从@var{base-buffer}复制的。
+
+@xref{Creating Buffers}，对应@var{inhibit-buffer-hooks}的含义。
+@end deffn
+
+@deffn Command clone-indirect-buffer newname display-flag &optional norecord
+此函数创建并返回一个新的间接缓冲区，该缓冲区共享当前缓冲区的基本缓冲区并复制当前缓冲区的其余属性。  （如果当前缓冲区不是间接缓冲区，则将其用作基本缓冲区。）
+
+如果 @var{display-flag} 是非 @code{nil}（在交互式调用中总是如此），则意味着通过调用 @code{pop-to-buffer} 显示新缓冲区。  如果@var{norecord}非@code{nil}，则意味着不将新缓冲区放在缓冲区列表的前面。
+@end deffn
+
+@defun buffer-base-buffer &optional buffer
+该函数返回@var{buffer}的基础缓冲区，默认为当前缓冲区。  如果 1⁣ 不是间接的，则值为 2⁣。  否则，该值是另一个缓冲区，它永远不是间接缓冲区。
+@end defun
+
+@node Swapping Text
+@section 在两个缓冲区之间交换文本
+@cindex swap text between buffers
+@cindex virtual buffers
+
+专用模式有时需要让用户从同一缓冲区访问几种截然不同类型的文本。  例如，除了让用户访问文本本身之外，您可能还需要显示缓冲区文本的摘要。
+
+这可以通过多个缓冲区（当用户编辑文本时保持同步）或缩小（@pxref{Narrowing}）来实现。  但这些替代方案有时可能会变得乏味或昂贵得令人望而却步，特别是如果每​​种类型的文本都需要昂贵的缓冲区全局操作才能提供正确的显示和编辑命令。
+
+Emacs 为此类模式提供了另一种工具：您可以使用 @code{buffer-swap-text} 在两个缓冲区之间快速交换缓冲区文本。  该函数非常快，因为它不移动任何文本，它仅更改缓冲区对象的内部数据结构以指向不同的文本块。  使用它，您可以假装一组两个或多个缓冲区实际上是一个虚拟缓冲区，它将所有单独缓冲区的内容保存在一起。
+
+@defun buffer-swap-text buffer
+该函数交换当前缓冲区的文本及其参数@var{buffer}的文本。  如果两个缓冲区之一是间接缓冲区 (@pxref{Indirect Buffers}) 或者是间接缓冲区的基本缓冲区，则会发出错误信号。
+
+与缓冲区文本相关的所有缓冲区属性也会交换：点和标记的位置、所有标记、覆盖、文本属性、撤消列表、@code{enable-multibyte-characters} 标志 (@pxref{Text Representations, enable-multibyte-characters}) 的值等。
+
+@strong{Warning:} 如果从 @code{save-excursion} 表单内调用此函数，则在离开表单时当前缓冲区将被设置为 @var{buffer}，因为 @code{save-excursion} 用于保存位置和缓冲区的标记也将被交换。
+@end defun
+
+如果您在文件访问缓冲区上使用@code{buffer-swap-text}，则应该设置一个挂钩来保存缓冲区的原始文本而不是它所交换的文本。  @code{write-region-annotate-functions} 就是为了这个目的而工作的。  您可能应该在缓冲区中将 @code{buffer-saved-size} 设置为 @minus{}2，这样交换的文本中的更改就不会干扰自动保存。
+
+@node Buffer Gap
+@section 缓冲间隙
+@cindex buffer gap
+
+Emacs 缓冲区是使用不可见的 @dfn{gap} 来实现的，以使插入和删除速度更快。  插入的作用是填补部分空白，而删除则增加空白。  当然，这意味着必须首先将间隙移动到插入或删除的位置。仅当您尝试插入或删除时，Emacs 才会移动间隙。  这就是为什么在先前在另一个较远的部分中进行编辑之后，在大缓冲区的一个部分中执行的第一个编辑命令有时会出现明显的延迟。
+
+这种机制是无形的，Lisp 代码永远不会受到间隙当前位置的影响，但这些函数可用于获取有关间隙状态的信息。
+
+@defun gap-position
+该函数返回当前缓冲区中的当前间隙位置。
+@end defun
+
+@defun gap-size
+该函数返回当前缓冲区的当前间隙大小。
+@end defun

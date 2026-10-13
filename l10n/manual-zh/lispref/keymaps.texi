@@ -1,0 +1,2113 @@
+@c -*- mode: texinfo -*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1994, 1998--2026 Free Software Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Keymaps
+@chapter 键位图
+@cindex keymap
+
+输入事件的命令绑定记录在名为 @dfn{keymaps} 的数据结构中。  键映射中的每个条目将一个单独的事件类型关联（或@dfn{binds}）到另一个键映射或命令。  当事件类型绑定到键盘映射时，该键盘映射用于查找下一个输入事件；这一直持续到找到命令为止。  整个过程称为@dfn{key lookup}。
+
+@menu
+* Keymap Basics::                键映射的基本概念。
+* Changing Key Bindings::        重新定义键映射中的键。
+* Format of Keymaps::            作为 Lisp 对象，键盘映射是什么样子的。
+* Creating Keymaps::             创建和复制键盘映射的功能。
+* Inheritance and Keymaps::      一个键盘映射如何继承另一键盘映射的绑定。
+* Prefix Keys::                  使用键映射作为其定义来定义键。
+* Active Keymaps::               Emacs 如何在活动键盘映射中搜索键绑定。
+* Searching Keymaps::            搜索活动地图的伪 Lisp 总结。
+* Controlling Active Maps::      每个缓冲区都有一个本地键盘映射来覆盖标准（全局）绑定。次要模式也可以覆盖它们。
+* Key Lookup::                   在一个键盘映射中查找某个键的绑定。
+* Functions for Key Lookup::     如何请求密钥查找。
+* Key Sequences::                作为 Lisp 对象的按键序列。
+* Low-Level Key Binding::        旧版键语法描述。
+* Remapping Commands::           键映射可以将一个命令转换为另一个命令。
+* Translation Keymaps::          用于翻译事件序列的键盘映射。
+* Key Binding Commands::         用于重新定义按键的交互式界面。
+* Scanning Keymaps::             查看所有键盘映射以获取打印帮助。
+* Menu Keymaps::                 将菜单定义为键盘映射。
+@end menu
+
+@node Keymap Basics
+@section 键位图基础知识
+@cindex key binding
+@cindex binding of a key
+@cindex complete key
+@cindex undefined key
+
+键映射是一种 Lisp 数据结构，它为各种按键序列指定 @dfn{key bindings}。
+
+单个键映射直接指定各个事件的定义。  当键序列由单个事件组成时，其在键映射中的绑定是键映射对该事件的定义。  较长键序列的绑定是通过迭代过程找到的：首先找到第一个事件的定义（其本身必须是键映射）；然后在该键映射中查找第二个事件的定义，依此类推，直到处理完键序列中的所有事件。
+
+如果键序列的绑定是键映射，我们将键序列称为 a @dfn{prefix key}。  否则，我们称其为 @dfn{complete key} （因为无法向其中添加更多事件）。  如果绑定是@code{nil}，我们称密钥为@dfn{undefined}。  前缀键的示例有 @kbd{C-c}、@kbd{C-x} 和 @kbd{C-x 4}。  定义的完整键的示例有 @kbd{X}、@key{RET} 和 @kbd{C-x 4 C-f}。  未定义的完整键的示例有 @kbd{C-x C-g} 和 @kbd{C-c 3}。  @xref{Prefix Keys}，了解更多详情。
+
+查找键序列绑定的规则假设中间绑定（为最后一个之前的事件找到）都是键盘映射；如果不是这样，事件序列就不能形成一个单元——它不是真正的一个关键序列。  换句话说，从任何有效键序列末尾删除一个或多个事件必须始终产生一个前缀键。  例如，@kbd{C-f C-n} 不是按键序列； @kbd{C-f} 不是前缀键，因此以 @kbd{C-f} 开头的较长序列不能是键序列。
+
+可能的多事件键序列集取决于前缀键的绑定；因此，对于不同的键盘映射，它可能会有所不同，并且会在绑定更改时发生变化。  但是，单事件序列始终是键序列，因为它的格式良好性不依赖于任何前缀键。
+
+在任何时候，几个主键映射都是@dfn{active}——也就是说，用于查找键绑定。  这些是 @dfn{global map}，由所有缓冲区共享； @dfn{local keymap}，通常与特定的主调模式相关；以及零个或多个@dfn{minor mode keymaps}，属于当前启用的次要模式。  （并非所有次要模式都有键盘映射。）本地键盘映射绑定会影响（即优先于）相应的全局绑定。  次要模式键盘映射会影响本地和全局键盘映射。  @xref{Active Keymaps}，了解详情。
+
+@node Changing Key Bindings
+@section 更改按键绑定
+@cindex changing key bindings
+@cindex rebinding
+
+重新绑定键的方法是更改​​其在键映射中的条目。  如果更改全局键盘映射中的绑定，则更改在所有缓冲区中都有效（尽管它对用本地绑定隐藏全局绑定的缓冲区没有直接影响）。  如果更改当前缓冲区的本地映射，通常会影响使用相同主要模式的所有缓冲区。 @code{keymap-global-set} 和 @code{keymap-local-set} 函数是这些操作的便捷接口 (@pxref{Key Binding Commands})。  您还可以使用@code{keymap-set}，一个更通用的函数；那么您必须明确指定要更改的地图。
+
+当为 Lisp 程序选择重新绑定的按键序列时，请遵循 Emacs 各种按键使用约定 (@pxref{Key Binding Conventions})。
+
+如果 @var{keymap} 不是键盘映射，或者 @var{key} 不是有效键，则以下函数会发出错误信号。
+
+@var{key} 是表示单个按键或一系列击键的字符串，并且必须满足@code{key-valid-p}。  击键由单个空格字符分隔。
+
+每个击键要么是单个字符，要么是事件的名称，用尖括号括起来。  此外，任何击键之前都可以有一个或多个修饰键。  最后，有限数量的字符具有特殊的简写语法。  以下是一些按键序列示例：
+
+@table @kbd
+@item f
+键@kbd{f}。
+
+@item S o m
+由 @kbd{S}、@kbd{o} 和 @kbd{m} 键组成的三键序列。
+
+@item C-c o
+两个按键序列：先按 @kbd{c} 键，再按控制修饰符，然后再按 @kbd{o} 键
+
+@item H-@key{LEFT}
+名为 @key{LEFT} 且带有 hyper 修饰符的键。
+
+@item M-@key{RET}
+带有元修饰符的 @key{RET} 或 @key{Return} 键。
+
+@item C-M-@key{SPC}
+@key{SPC} 键同时具有控制和元修饰符。
+@end table
+
+唯一具有特殊简写语法的键是 @kbd{NUL}、@kbd{RET}、@kbd{TAB}、@kbd{LFD}、@kbd{ESC}、@kbd{SPC} 和 @kbd{DEL}。
+
+修饰符必须按字母顺序指定：@samp{A-C-H-M-S-s}，即@samp{Alt-Control-Hyper-Meta-Shift-super}。
+
+@findex keymap-set
+@defun keymap-set keymap key binding
+该函数设置@var{keymap}中@var{key}的绑定。  参数 @var{key} 是一个必须满足 @code{key-valid-p} (@pxref{Key Sequences}) 的字符串。  参数 @var{binding} 可以是任何 Lisp 对象，但只有某些类型才有意义。  （有关有意义类型的列表，请参阅 @ref{Key Lookup}。）@code{keymap-set} 返回的值为 @var{binding}。
+
+@cindex invalid prefix key error
+@cindex key sequence error
+@var{key} 的每个前缀都必须是前缀键（即绑定到键映射）或未定义；否则会发出错误信号。  如果@var{key}的某些前缀未定义，则@code{keymap-set}将其定义为前缀键，以便@var{key}的其余部分可以按指定定义。
+
+如果 @var{keymap} 中之前没有 @var{key} 的绑定，则新绑定将添加到 @var{keymap} 的开头。  键盘映射中的绑定顺序对于键盘输入没有影响，但对于菜单键盘映射很重要 (@pxref{Menu Keymaps})。
+@end defun
+
+@findex keymap-unset
+@defun keymap-unset keymap key &optional remove
+该函数是@code{keymap-set}的逆函数，它取消设置@var{keymap}中@var{key}的绑定，这与设置@code{nil}的绑定相同。  为了完全删除绑定，请将@var{remove}指定为非@code{nil}。  仅当 @var{keymap} 有父键映射时，这才会产生影响：如果您只是取消设置子映射中的某个键，它仍然会隐藏父键映射中的相同键；使用 @var{remove} 代替将允许使用父键盘映射中的键。
+@end defun
+
+注意：将@code{keymap-unset}与@var{remove}非@code{nil}一起使用是为了让用户放入他们的init文件中； Emacs 包应该尽可能避免使用它，因为无论如何它们都可以完全控制自己的键盘映射，并且它们不应该更改其他包的键盘映射。
+
+此示例创建一个稀疏键盘映射并在其中进行许多绑定：
+
+@smallexample
+@group
+(setq map (make-sparse-keymap))
+    @result{} (keymap)
+@end group
+@group
+(keymap-set map "C-f" 'forward-char)
+    @result{} forward-char
+@end group
+@group
+map
+    @result{} (keymap (6 . forward-char))
+@end group
+
+@group
+;; @r{Build sparse submap for @kbd{C-x} and bind @kbd{f} in that.}
+(keymap-set map "C-x f" 'forward-word)
+    @result{} forward-word
+@end group
+@group
+map
+@result{} (keymap
+    (24 keymap                ; @kbd{C-x}
+        (102 . forward-word)) ;      @kbd{f}
+    (6 . forward-char))       ; @kbd{C-f}
+@end group
+
+@group
+;; @r{Bind @kbd{C-p} to the @code{ctl-x-map}.}
+(keymap-set map "C-p" ctl-x-map)
+;; @code{ctl-x-map}
+@result{} [nil @dots{} find-file @dots{} backward-kill-sentence]
+@end group
+
+@group
+;; @r{Bind @kbd{C-f} to @code{foo} in the @code{ctl-x-map}.}
+(keymap-set map "C-p C-f" 'foo)
+@result{} 'foo
+@end group
+@group
+map
+@result{} (keymap     ; @r{Note @code{foo} in @code{ctl-x-map}.}
+    (16 keymap [nil @dots{} foo @dots{} backward-kill-sentence])
+    (24 keymap
+        (102 . forward-word))
+    (6 . forward-char))
+@end group
+@end smallexample
+
+@noindent
+请注意，存储 @kbd{C-p C-f} 的新绑定实际上是通过更改 @code{ctl-x-map} 中的条目来实现的，这具有更改默认全局映射中 @kbd{C-p C-f} 和 @kbd{C-x C-f} 的绑定的效果。
+
+@code{keymap-set} 是在键映射中定义键的通用工具。  然而，在编写模式时，您经常需要一次绑定大量键，并且在所有键上使用 @code{keymap-set} 可能会很乏味且容易出错。  相反，您可以使用 @code{define-keymap}，它创建一个键盘映射并绑定多个键。  @xref{Creating Keymaps}，了解详情。
+
+函数 @code{substitute-key-definition} 扫描键盘映射以查找具有特定绑定的键，并使用不同的绑定重新绑定它们。  另一个更清晰且通常可以产生相同结果的功能是将一个命令重新映射到另一个命令（@pxref{Remapping Commands}）。
+
+@defun substitute-key-definition olddef newdef keymap &optional oldmap
+@cindex replace bindings
+对于 @var{keymap} 中绑定到 @var{olddef} 的任何键，此函数将 @var{olddef} 替换为 @var{newdef}。  换句话说，无论 @var{olddef} 出现在哪里，都会被 @var{newdef} 替换。  该函数返回@code{nil}。
+
+例如，如果您在具有标准绑定的 Emacs 中执行此操作，则会重新定义 @kbd{C-x C-f}：
+
+@smallexample
+@group
+(substitute-key-definition
+ 'find-file 'find-file-read-only (current-global-map))
+@end group
+@end smallexample
+
+如果@var{oldmap}不是@code{nil}，则会改变@code{substitute-key-definition}的行为：@var{oldmap}中的绑定确定要重新绑定哪些键。  重新绑定仍然发生在@var{keymap}，而不是@var{oldmap}。  因此，您可以在另一个映射的绑定控制下更改一个映射。  例如，
+
+@smallexample
+(substitute-key-definition
+  'delete-backward-char 'my-funny-delete
+  my-map global-map)
+@end smallexample
+
+@noindent
+对于全局绑定到标准删除命令的键，将特殊删除命令放入 @code{my-map} 中。
+
+以下是显示替换前后的键盘映射的示例：
+
+@smallexample
+@group
+(setq map (list 'keymap
+                (cons ?1 olddef-1)
+                (cons ?2 olddef-2)
+                (cons ?3 olddef-1)))
+@result{} (keymap (49 . olddef-1) (50 . olddef-2) (51 . olddef-1))
+@end group
+
+@group
+(substitute-key-definition 'olddef-1 'newdef map)
+@result{} nil
+@end group
+@group
+map
+@result{} (keymap (49 . newdef) (50 . olddef-2) (51 . newdef))
+@end group
+@end smallexample
+@end defun
+
+@defun suppress-keymap keymap &optional nodigits
+@cindex @code{self-insert-command} override
+此函数通过将 @code{self-insert-command} 重新映射到命令 @code{undefined} (@pxref{Remapping Commands}) 来更改完整键盘映射@var{keymap}的内容。  这具有取消定义所有打印字符的效果，从而使得普通的文本插入变得不可能。 @code{suppress-keymap} 返回@code{nil}。
+
+如果@var{nodigits}是@code{nil}，则@code{suppress-keymap}定义运行@code{digit-argument}的数字，@kbd{-}定义运行@code{negative-argument}的数字。  否则，它会使它们像其余的打印字符一样未定义。
+
+@cindex yank suppression
+@cindex @code{quoted-insert} suppression
+@code{suppress-keymap} 函数不会导致无法修改缓冲区，因为它不会抑制 @code{yank} 和 @code{quoted-insert} 等命令。  为了防止对缓冲区进行任何修改，请将其设置为只读 (@pxref{Read Only Buffers})。
+
+由于此函数修改 @var{keymap}，因此您通常会在新创建的键盘映射上使用它。  对用于其他目的的现有键盘映射进行操作可能会导致麻烦；例如，抑制 @code{global-map} 将使大多数 Emacs 无法使用。
+
+此函数可用于初始化不需要插入文本的主要模式的本地键盘映射。  但通常这样的模式应该从 @code{special-mode} (@pxref{Basic Major Modes}) 导出；那么它的键盘映射将自动继承已经被抑制的@code{special-mode-map}。  以下是 @code{special-mode-map} 的定义方式：
+
+@smallexample
+@group
+(defvar special-mode-map
+  (let ((map (make-sparse-keymap)))
+    (suppress-keymap map)
+    (keymap-set map "q" 'quit-window)
+    @dots{}
+    map))
+@end group
+@end smallexample
+@end defun
+
+@node Format of Keymaps
+@section 键映射的格式
+@cindex format of keymaps
+@cindex keymap format
+@cindex full keymap
+@cindex sparse keymap
+
+每个键盘映射都是一个列表，其@sc{car} 是符号@code{keymap}。  列表的其余元素定义键映射的键绑定。功能定义为键盘映射的符号也是键盘映射。  使用函数@code{keymapp}（见下文）来测试对象是否是键盘映射。
+
+键盘映射中可能会出现多种元素，位于其开头的符号 @code{keymap} 之后：
+
+@table @code
+@item (@var{type} .@: @var{binding})
+这为 @var{type} 类型的事件指定一个绑定。  每个普通绑定适用于特定 @dfn{event type} 的事件，该事件始终是字符或符号。  @xref{Classifying Events}。在这种绑定中，@var{binding} 是一个命令。
+
+@item (@var{type} @var{item-name} .@: @var{binding})
+这指定了一个绑定，它也是一个简单的菜单项，在菜单中显示为 @var{item-name}。  @xref{Simple Menu Items}。
+
+@item (@var{type} @var{item-name} @var{help-string} .@: @var{binding})
+这是一个简单的菜单项，带有帮助字符串@var{help-string}。
+
+@item (@var{type} menu-item .@: @var{details})
+这指定了一个绑定，它也是一个扩展菜单项。  这允许使用其他功能。  @xref{Extended Menu Items}。
+
+@item (t .@: @var{binding})
+@cindex default key binding
+这指定了 @dfn{default key binding}；任何不受键映射其他元素绑定的事件都被指定为 @var{binding} 作为其绑定。  默认绑定允许键映射绑定所有可能的事件类型，而无需枚举所有类型。  具有默认绑定的键盘映射完全屏蔽任何较低优先级的键盘映射，显式绑定到 @code{nil} 的事件除外（见下文）。
+
+@item @var{char-table}
+如果键映射的元素是字符表，则它被视为所有不带修饰符位 (@pxref{modifier bits}) 的字符事件的保存绑定：索引为 @var{c} 的元素是字符 @var{c} 的绑定。  这是记录大量绑定的紧凑方式。  具有此类字符表的键映射称为 @dfn{full keymap}。  其他键盘映射称为 @dfn{sparse keymaps}。
+
+@item @var{vector}
+这种元素类似于字符表：索引为@var{c}的元素是字符@var{c}的绑定。  由于可以通过这种方式绑定的字符范围受到向量大小的限制，并且向量创建会为从 0 开始的所有字符代码分配空间，因此除了创建菜单键映射 (@pxref{Menu Keymaps}) 之外，不应使用此格式，因为绑定本身并不重要。
+
+@item @var{string}
+@cindex keymap prompt string
+@cindex overall prompt string
+@cindex prompt string of keymap
+除了指定键绑定的元素之外，键映射还可以将字符串作为元素。  这称为 @dfn{overall prompt string}，可以将键盘映射用作菜单。 @xref{Defining Menus}。
+
+@item (keymap @dots{})
+如果键映射的元素本身就是键映射，则视为该内部键映射内联在外部键映射中。  这用于多重继承，例如在@code{make-composed-keymap}中。
+@end table
+
+当绑定为 @code{nil} 时，它不构成定义，但它确实优先于默认绑定或父键映射中的绑定。  另一方面，@code{nil} 的绑定会覆盖@emph{not} 较低优先级的键盘映射；因此，如果本地映射给出了 @code{nil} 的绑定，Emacs 将使用全局映射中的绑定。
+
+@cindex meta characters lookup
+键映射不直接记录元字符的绑定。相反，出于键查找的目的，元字符被视为两个字符的序列，第一个字符是@key{ESC}（或当前@code{meta-prefix-char}的值）。  因此，密钥@kbd{M-a}在内部表示为@kbd{@key{ESC} a}，并且其全局绑定位于@code{esc-map}（@pxref{Prefix Keys}）中的@kbd{a}的槽中。
+
+此转换仅适用于字符，不适用于功能键或其他输入事件；因此，@kbd{M-@key{end}}与@kbd{@key{ESC} @key{end}}无关。
+
+这里作为一个例子是 Lisp 模式的本地键盘映射，一个稀疏键盘映射。  它定义了 @key{DEL}、@kbd{C-c C-z}、@kbd{C-M-q} 和 @kbd{C-M-x} 的绑定（实际值还包含菜单绑定，为简洁起见，此处省略）。
+
+@example
+@group
+lisp-mode-map
+@result{}
+@end group
+@group
+(keymap
+ (3 keymap
+    ;; @kbd{C-c C-z}
+    (26 . run-lisp))
+@end group
+@group
+ (27 keymap
+     ;; @r{@kbd{C-M-x}, treated as @kbd{@key{ESC} C-x}}
+     (24 . lisp-send-defun))
+@end group
+@group
+ ;; @r{This part is inherited from @code{lisp-mode-shared-map}.}
+ keymap
+ ;; @key{DEL}
+ (127 . backward-delete-char-untabify)
+@end group
+@group
+ (27 keymap
+     ;; @r{@kbd{C-M-q}, treated as @kbd{@key{ESC} C-q}}
+     (17 . indent-sexp)))
+@end group
+@end example
+
+@defun keymapp object
+如果 1⁣ 是键盘映射，则此函数返回 @code{t}，否则返回 @code{nil}。  更准确地说，该函数测试 @sc{car} 为 @code{keymap} 的列表，或者函数定义满足 @code{keymapp} 的符号。
+
+@example
+@group
+(keymapp '(keymap))
+    @result{} t
+@end group
+@group
+(fset 'foo '(keymap))
+(keymapp 'foo)
+    @result{} t
+@end group
+@group
+(keymapp (current-global-map))
+    @result{} t
+@end group
+@end example
+@end defun
+
+@node Creating Keymaps
+@section 创建键盘映射
+@cindex creating keymaps
+
+这里我们描述创建键盘映射的功能。
+
+@defun make-sparse-keymap &optional prompt
+此函数创建并返回一个没有条目的新稀疏键盘映射。 （稀疏键盘映射是您通常想要的键盘映射类型。）与 @code{make-keymap} 不同，新键盘映射不包含字符表，并且不绑定任何事件。
+
+@example
+@group
+(make-sparse-keymap)
+    @result{} (keymap)
+@end group
+@end example
+
+如果您指定 @var{prompt}，它将成为键盘映射的整体提示字符串。  您应该仅为菜单键盘映射指定此项 (@pxref{Defining Menus})。  如果具有整体提示字符串的键盘映射处于活动状态以查找下一个输入事件，则它将始终显示鼠标菜单或键盘菜单。  不要为主要或次要模式的主地图指定整体提示字符串，因为这会导致命令循环每次都显示键盘菜单。
+@end defun
+
+@defun make-keymap &optional prompt
+此函数创建并返回一个新的完整键盘映射。  该键盘映射包含一个字符表 (@pxref{Char-Tables})，其中包含所有不带修饰符的字符的插槽。  新的键盘映射最初将所有这些字符绑定到@code{nil}，并且不绑定任何其他类型的事件。  参数@var{prompt}指定提示字符串，如@code{make-sparse-keymap}所示。
+
+@c This example seems kind of pointless, but I guess it serves
+@c to contrast the result with make-sparse-keymap above.
+@example
+@group
+(make-keymap)
+    @result{} (keymap #^[nil nil keymap nil nil nil @dots{}])
+@end group
+@end example
+
+当完整的键盘映射包含大量绑定时，它比稀疏的键盘映射更有效；对于少数人来说，稀疏的键盘映射更好。
+@end defun
+
+@defun define-keymap &key options... &rest pairs...
+您可以使用上述功能创建键盘映射，然后使用 @code{keymap-set} (@pxref{Changing Key Bindings}) 指定该映射中的键绑定。  然而，在编写模式时，您经常需要一次绑定大量键，并且对所有键使用 @code{keymap-set} 可能会很乏味且容易出错。  相反，您可以使用@code{define-keymap}，它创建一个键盘映射并绑定多个键。  这是一个非常基本的示例：
+
+@lisp
+(define-keymap
+  "n" #'forward-line
+  "f" #'previous-line
+  "C-c C-c" #'quit-window)
+@end lisp
+
+该函数创建一个新的稀疏键盘映射，定义 @var{pairs} 中的击键，并返回新的键盘映射。  如果 @var{pairs} 中存在重复的键绑定，则会发出错误信号。
+
+@var{pairs} 是交替键绑定和键定义的列表，由 @code{keymap-set} 接受。  此外，键可以是特殊符号@code{:menu}，在这种情况下，定义应该是@code{easy-menu-define} (@pxref{Easy Menu}) 接受的菜单定义。  以下是此用法的一个简短示例：
+
+@lisp
+(define-keymap :full t
+  "g" #'eww-reload
+  :menu '("Eww"
+          ["Exit" quit-window t]
+          ["Reload" eww-reload t]))
+@end lisp
+
+在键/定义对之前可以使用许多关键字来更改新键盘映射的功能。  如果 @code{define-keymap} 调用中缺少任何功能关键字，则该功能的默认值为 @code{nil}。  以下是可用功能关键字的列表：
+
+@table @code
+@item :full
+如果非@code{nil}，则创建一个字符表键映射（如@code{make-keymap}所示）而不是稀疏键映射（如@code{make-sparse-keymap} (@pxref{Creating Keymaps}) 所示）。稀疏键映射是默认值。
+
+@item :parent
+如果非 @code{nil}，则该值应该是用作父级的键盘映射 (@pxref{Inheritance and Keymaps})。
+
+@item :keymap
+如果非@code{nil}，则该值应该是键盘映射。  不是创建新的键盘映射，而是修改指定的键盘映射。
+
+@item :suppress
+如果非 @code{nil}，则键盘映射将被 @code{suppress-keymap} (@pxref{Changing Key Bindings}) 抑制。  默认情况下，数字和减号不受抑制，但如果值为 @code{nodigits}，则会像处理其他字符一样抑制数字和减号。
+
+@item :name
+如果非 @code{nil}，则该值应该是一个字符串，用作键盘映射的菜单（如果您将其用作带有 @code{x-popup-menu} (@pxref{Pop-Up Menus}) 的菜单）。
+
+@item :prefix
+如果非@code{nil}，则该值应该是用作前缀命令的符号（@pxref{Prefix Keys}）。  如果是这种情况，则@code{define-keymap} 返回此符号而不是地图本身。
+@end table
+
+@end defun
+
+@defmac defvar-keymap name &key options... &rest pairs...
+到目前为止，对键映射最常见的操作是将其绑定到变量。  这实际上是所有模式所做的——称为 0⁣ 的模式几乎总是有一个称为 1⁣ 的变量。
+
+该宏将@var{name}定义为变量，将@var{options}和@var{pairs}传递给@code{define-keymap}，并将结果用作变量的默认值。  如果 @var{pairs} 中存在重复的键绑定，则会发出错误信号。
+
+@var{options} 与 @code{define-keymap} 中的关键字非常相似。还有一个额外的 @code{:doc} 关键字，为定义的变量提供文档字符串。  这是一个例子：
+
+@lisp
+(defvar-keymap eww-textarea-map
+  :parent text-mode-map
+  :doc "Keymap for the eww text area."
+  "RET" #'forward-line
+  "TAB" #'shr-next-link)
+@end lisp
+
+@code{:prefix} 关键字可以采用附加值 @code{t}，它是使用 @var{name} 作为该选项值的缩写。 IE。而不是写作
+
+@lisp
+(defvar-keymap foo-map
+  :prefix 'foo-map
+  ...)
+@end lisp
+
+你可以写
+
+@lisp
+(defvar-keymap foo-map
+  :prefix t
+  ...)
+@end lisp
+
+@kindex :repeat
+@kindex repeat-mode
+@cindex repeatable key bindings
+键盘映射中的每个命令都可以标记为“可重复”，即 @: 可在 @code{repeat-mode} 中使用，通过在其上放置 @code{repeat-map} 属性，例如：
+
+@lisp
+(put 'undo 'repeat-map 'undo-repeat-map)
+@end lisp
+
+其中属性的值是 @code{repeat-mode} 要使用的映射。
+
+为了避免重复调用@code{put}，@code{defvar-keymap}还有一个@code{:repeat}关键字，可用于指定键盘映射中的哪些命令可供@code{repeat-mode}使用。  以下值可用：
+
+@table @code
+@item t
+这意味着键盘映射中的所有命令都是可重复的，并且是最常见的用法。
+
+@item (:enter (commands ...) :exit (commands ...)
+@itemx :continue (commands ...) :hints ((command . "hint") ...))
+这指定 @code{:enter} 列表中的命令进入 @code{repeat-mode}，而 @code{:exit} 列表中的命令退出重复模式。
+
+如果@code{:enter}列表为空，则映射中的所有命令都输入@code{repeat-mode}。  如果正在定义的映射中不存在某个命令，但该命令应具有 @code{repeat-map} 属性，则在此列表中指定一个或多个命令非常有用。
+
+如果@code{:exit}列表为空，则映射中没有命令退出@code{repeat-mode}。  如果定义的键盘映射包含不应具有 @code{repeat-map} 属性的命令，则在此列表中指定一个或多个命令非常有用。
+
+@code{:continue} 列表指定不应输入 @code{repeat-mode} 的命令。  这些命令应该只继续已经激活的重复序列。
+
+@code{:hints} 列表可以包含 cons 对，其中 @sc{car} 是命令，@sc{cdr} 是显示在回显区域中可重复键旁边的字符串。
+@end table
+
+为了使例如 @: @kbd{u} 重复 @code{undo} 命令，以下两节是等效的：
+
+@lisp
+(defvar-keymap undo-repeat-map
+  "u" #'undo)
+(put 'undo 'repeat-map 'undo-repeat-map)
+@end lisp
+
+和
+
+@lisp
+(defvar-keymap undo-repeat-map
+  :repeat t
+  "u" #'undo)
+@end lisp
+
+当地图中有很多命令且所有命令都应该可重复时，首选后者。
+@end defmac
+
+@defun copy-keymap keymap
+该函数返回@var{keymap}的副本。  这几乎是从来不需要的。  如果您想要一个类似于另一个键映射但有一些更改的键映射，则应该使用映射继承而不是复制。即，类似：
+
+@example
+@group
+(let ((map (make-sparse-keymap)))
+  (set-keymap-parent map <theirmap>)
+  (keymap-set map ...)
+  ...)
+@end group
+@end example
+
+当执行 @code{copy-keymap} 时，直接作为 @var{keymap} 中的绑定出现的任何键盘映射也会被递归复制，依此类推到任意数量的级别。  然而，当字符的定义是一个符号且其函数定义是一个键盘映射时，不会发生递归复制；相同的符号出现在新副本中。
+
+@example
+@group
+(setq map (copy-keymap (current-local-map)))
+@result{} (keymap
+@end group
+@group
+     ;; @r{(This implements meta characters.)}
+     (27 keymap
+         (83 . center-paragraph)
+         (115 . center-line))
+     (9 . tab-to-tab-stop))
+@end group
+
+@group
+(eq map (current-local-map))
+    @result{} nil
+@end group
+@group
+(equal map (current-local-map))
+    @result{} t
+@end group
+@end example
+@end defun
+
+@node Inheritance and Keymaps
+@section 继承和键盘映射
+@cindex keymap inheritance
+@cindex inheritance, keymap
+
+一个键盘映射可以继承另一个键盘映射的绑定，我们称之为 @dfn{parent keymap}。  这样的键盘映射如下所示：
+
+@example
+(keymap @var{elements}@dots{} . @var{parent-keymap})
+@end example
+
+@noindent
+效果是，此键映射继承了 @var{parent-keymap} 的所有绑定，无论查找键时它们是什么，但可以添加到它们或用 @var{elements} 覆盖它们。
+
+如果您使用 @code{keymap-set} 或其他键绑定函数更改 @var{parent-keymap} 中的绑定，则这些更改的绑定在继承键映射中可见，除非被 @var{elements} 所做的绑定遮蔽。  反之则不然：如果您使用 @code{keymap-set} 更改继承键盘映射中的绑定，这些更改将记录在 @var{elements} 中，但对 @var{parent-keymap} 没有影响。
+
+构建带有父级的键盘映射的正确方法是使用 @code{set-keymap-parent};如果您有直接用父级构造键盘映射的代码，请将程序转换为使用 @code{set-keymap-parent} 。
+
+@defun keymap-parent keymap
+这将返回 @var{keymap} 的父键盘映射。  如果 1⁣ 没有父级，则 2⁣ 返回 3⁣。
+@end defun
+
+@defun set-keymap-parent keymap parent
+这将 @var{keymap} 的父键映射设置为 @var{parent}，并返回 @var{parent}。  如果 @var{parent} 是 @code{nil}，则该函数根本不给 @var{keymap} 任何父级。
+
+如果 @var{keymap} 有子映射（前缀键的绑定），它们也会收到新的父键映射，反映 @var{parent} 为这些前缀键指定的内容。
+@end defun
+
+下面是一个示例，展示了如何创建继承于 @code{text-mode-map} 的键盘映射：
+
+@example
+(let ((map (make-sparse-keymap)))
+  (set-keymap-parent map text-mode-map)
+  map)
+@end example
+
+非稀疏键盘映射也可以有父级，但这不是很有用。  非稀疏键盘映射始终指定某些内容作为不带修饰符位的每个数字字符代码的绑定，即使它是 @code{nil}，因此这些字符的绑定永远不会从父键盘映射继承。
+
+@cindex keymap inheritance from multiple maps
+有时您想要制作一个继承多个映射的键盘映射。  您可以使用函数 @code{make-composed-keymap} 来实现此目的。
+
+@defun make-composed-keymap maps &optional parent
+该函数返回一个由现有键映射@var{maps}组成的新键映射，并且可以选择从父键映射@var{parent}继承。  @var{maps} 可以是单个键盘映射或多个键盘映射的列表。  当在生成的新映射中查找键时，Emacs 依次在每个 @var{maps} 中搜索，然后在 @var{parent} 中搜索，在第一个匹配处停止。  @var{maps} 中任一者中的 @code{nil} 绑定会覆盖 @var{parent} 中的任何绑定，但不会覆盖 @var{maps} 中任何其他者中的任何非 @code{nil} 绑定。
+@end defun
+
+@noindent For example, here is how Emacs sets the parent of
+@code{help-mode-map}，因此它继承自@code{button-buffer-map}和@code{special-mode-map}：
+
+@example
+(defvar-keymap help-mode-map
+  :parent (make-composed-keymap button-buffer-map
+                                special-mode-map)
+  ...)
+@end example
+
+
+@node Prefix Keys
+@section 前缀键
+@cindex prefix key
+
+A @dfn{prefix key} 是一个键序列，其绑定是键映射。  键映射定义如何处理扩展前缀键的键序列。例如，@kbd{C-x}是一个前缀键，它使用的键映射也存储在变量@code{ctl-x-map}中。  此键盘映射定义以 @kbd{C-x} 开头的键序列的绑定。
+
+一些标准 Emacs 前缀键使用的键映射也可以在 Lisp 变量中找到：
+
+@itemize @bullet
+@item
+@vindex esc-map
+@findex ESC-prefix
+@code{esc-map} 是 @key{ESC} 前缀键的全局键映射。  因此，所有元字符的全局定义实际上都可以在这里找到。该映射也是@code{ESC-prefix}的函数定义。
+
+@item
+@cindex @kbd{C-h}
+@code{help-map} 是 @kbd{C-h} 前缀键的全局键映射。
+
+@item
+@cindex @kbd{C-c}
+@vindex mode-specific-map
+@code{mode-specific-map} 是前缀键 @kbd{C-c} 的全局键映射。  该映射实际上是全局的，而不是特定于模式的，但它的名称在 @kbd{C-h b} (@code{display-bindings}) 的输出中提供了有关 @kbd{C-c} 的有用信息，因为此前缀键的主要用途是用于特定于模式的绑定。
+
+@item
+@cindex @kbd{C-x}
+@vindex ctl-x-map
+@findex Control-X-prefix
+@code{ctl-x-map} 是用于 @kbd{C-x} 前缀键的全局键映射。该映射可通过符号 @code{Control-X-prefix} 的功能单元找到。
+
+@item
+@cindex @kbd{C-x @key{RET}}
+@vindex mule-keymap
+@code{mule-keymap} 是用于 @kbd{C-x @key{RET}} 前缀键的全局键映射。
+
+@item
+@cindex @kbd{C-x 4}
+@vindex ctl-x-4-map
+@code{ctl-x-4-map} 是用于 @kbd{C-x 4} 前缀键的全局键映射。
+
+@item
+@cindex @kbd{C-x 5}
+@vindex ctl-x-5-map
+@code{ctl-x-5-map} 是用于 @kbd{C-x 5} 前缀键的全局键映射。
+
+@item
+@cindex @kbd{C-x 6}
+@vindex 2C-mode-map
+@code{2C-mode-map} 是用于 @kbd{C-x 6} 前缀键的全局键映射。
+
+@item
+@cindex @kbd{C-x t}
+@vindex tab-prefix-map
+@code{tab-prefix-map} 是用于 @kbd{C-x t} 前缀键的全局键映射。
+
+@item
+@cindex @kbd{C-x v}
+@vindex vc-prefix-map
+@code{vc-prefix-map} 是用于 @kbd{C-x v} 前缀键的全局键映射。
+
+@item
+@cindex @kbd{M-g}
+@vindex goto-map
+@code{goto-map} 是用于 @kbd{M-g} 前缀键的全局键映射。
+
+@item
+@cindex @kbd{M-s}
+@vindex search-map
+@code{search-map} 是用于 @kbd{M-s} 前缀键的全局键映射。
+
+@item
+其他 Emacs 前缀键是 @kbd{C-x @@}、@kbd{C-x a i}、@kbd{C-x @key{ESC}} 和 @kbd{@key{ESC} @key{ESC}}。  他们使用没有特殊名称的键盘映射。
+@end itemize
+
+前缀键的键映射绑定用于查找前缀键后面的事件。  （它可能是一个功能定义为键映射的符号。效果是相同的，但该符号用作前缀键的名称。）因此，@kbd{C-x} 的绑定是符号 @code{Control-X-prefix}，其功能单元保存 @kbd{C-x} 命令的键映射。  （相同的键映射也是@code{ctl-x-map}的值。）
+
+前缀键定义可以出现在任何活动键映射中。  @kbd{C-c}、@kbd{C-x}、@kbd{C-h} 和 @key{ESC} 作为前缀键的定义出现在全局映射中，因此这些前缀键始终可用。  主要和次要模式可以通过在本地映射或次要模式的映射中放置前缀键定义来将键重新定义为前缀。  @xref{Active Keymaps}。
+
+如果一个键在多个活动映射中被定义为前缀，那么它的各种定义实际上会合并：在次要模式键映射中定义的命令首先出现，然后是本地映射的前缀定义中的命令，然后是全局映射中的命令。
+
+在下面的示例中，我们将 @kbd{C-p} 作为本地键盘映射中的前缀键，这样 @kbd{C-p} 与 @kbd{C-x} 相同。  那么@kbd{C-p C-f}的绑定就是函数@code{find-file}，就像@kbd{C-x C-f}一样。  相比之下，在任何活动键映射中都找不到键序列@kbd{C-p 9}。
+
+@example
+@group
+(use-local-map (make-sparse-keymap))
+    @result{} nil
+@end group
+@group
+(keymap-local-set "C-p" ctl-x-map)
+    @result{} (keymap #^[nil nil keymap @dots{}
+@end group
+@group
+(keymap-lookup nil "C-p C-f")
+    @result{} find-file
+@end group
+@group
+(keymap-lookup nil "C-p 9")
+    @result{} nil
+@end group
+@end example
+
+@defun define-prefix-command symbol &optional mapvar prompt
+@cindex prefix command
+@anchor{Definition of define-prefix-command}
+该函数准备 @var{symbol} 用作前缀键的绑定：它创建一个稀疏键映射并将其存储为 @var{symbol} 的函数定义。  随后将键序列绑定到@var{symbol}将使该键序列成为前缀键。  返回值为@code{symbol}。
+
+该函数还将 @var{symbol} 设置为变量，并将键盘映射作为其值。  但如果 1⁣ 不是 2⁣，则会将 3⁣ 设置为变量。
+
+如果 @var{prompt} 不是 @code{nil}，则它将成为键盘映射的整体提示字符串。  应为菜单键盘映射提供提示字符串 (@pxref{Defining Menus})。
+@end defun
+
+@node Active Keymaps
+@section 活动键盘映射
+@cindex active keymap
+
+Emacs 包含许多键盘映射，但任何时候只有少数键盘映射是@dfn{active}。  当 Emacs 接收到用户输入时，它会转换输入事件 (@pxref{Translation Keymaps})，并在活动键盘映射中查找键绑定。
+
+通常，活动键映射是：(i) @code{keymap} 属性指定的键映射，(ii) 启用的次要模式的键映射，(iii) 当前缓冲区的本地键映射，以及 (iv) 全局键映射（按此顺序）。  Emacs 在所有这些键盘映射中搜索每个输入键序列。
+
+在这些常用的键盘映射中，优先级最高的键盘映射由 @code{keymap} 文本或覆盖属性（如果有）指定。  （对于鼠标输入事件，Emacs 使用事件位置而不是点；
+@iftex
+see the next section for details.)
+@end iftex
+@ifnottex
+@pxref{Searching Keymaps}.)
+@end ifnottex
+
+接下来优先的是由启用的次要模式指定的键盘映射。这些键盘映射（如果有）由变量 @code{emulation-mode-map-alists}、@code{minor-mode-overriding-map-alist} 和 @code{minor-mode-map-alist} 指定。  @xref{Controlling Active Maps}。
+
+@cindex local keymap
+接下来优先的是缓冲区的 @dfn{local keymap}，包含特定于缓冲区的键绑定。  迷你缓冲区还有一个本地键盘映射 (@pxref{Intro to Minibuffers})。  如果该点有 @code{local-map} 文本或覆盖属性，则指定要使用的本地键盘映射，以代替缓冲区的默认本地键盘映射。
+
+@cindex major mode keymap
+本地键盘映射通常由缓冲区的主要模式设置，并且具有相同主要模式的每个缓冲区共享相同的本地键盘映射。因此，如果您调用 @code{keymap-local-set} (@pxref{Key Binding Commands}) 来更改一个缓冲区中的本地键盘映射，这也会影响具有相同主要模式的其他缓冲区中的本地键盘映射。
+
+@cindex global keymap
+最后，@dfn{global keymap}包含无论当前缓冲区如何定义的键绑定，例如@kbd{C-f}。  它始终处于活动状态，并绑定到变量 @code{global-map}。
+
+除了上述常用的键盘映射之外，Emacs 还为程序提供了特殊的方法来激活其他键盘映射。  首先，变量 @code{overriding-local-map} 指定一个键映射来替换通常的活动键映射（全局键映射除外）。  其次，终端本地变量 @code{overriding-terminal-local-map} 指定优先于 @emph{all} 其他键映射（包括 @code{overriding-local-map}）的键映射；这通常用于模态/瞬态键绑定（函数@code{set-transient-map}为此提供了一个方便的接口）。  @xref{Controlling Active Maps}，了解详情。
+
+激活键盘映射并不是使用它们的唯一方法。  键映射还可以用于其他方式，例如用于翻译 @code{read-key-sequence} 内的事件。  @xref{Translation Keymaps}。
+
+@xref{Standard Keymaps}，查看一些标准键盘映射的列表。
+
+@defun current-active-maps &optional olp position
+这将返回当前情况下命令循环将使用的活动键盘映射列表来查找按键序列。通常它会忽略@code{overriding-local-map}和@code{overriding-terminal-local-map}，但如果@var{olp}是非@code{nil}，那么它会注意它们。  @var{position} 可以选择是 @code{event-start} 返回的事件位置或缓冲区位置，并且可以更改@code{keymap-lookup} (@pxref{Functions for Key Lookup, keymap-lookup}) 中所述的键盘映射。
+@end defun
+
+@node Searching Keymaps
+@section 搜索活动键盘映射
+@cindex searching active keymaps for keys
+
+以下是 Emacs 如何搜索活动键盘映射的伪 Lisp 总结：
+
+@lisp
+(or (if overriding-terminal-local-map
+        (@var{find-in} overriding-terminal-local-map))
+    (if overriding-local-map
+        (@var{find-in} overriding-local-map)
+      (or (@var{find-in} (get-char-property (point) 'keymap))
+          (@var{find-in-any} emulation-mode-map-alists)
+          (@var{find-in-any} minor-mode-overriding-map-alist)
+          (@var{find-in-any} minor-mode-map-alist)
+          (if (get-char-property (point) 'local-map)
+              (@var{find-in} (get-char-property (point) 'local-map))
+            (@var{find-in} (current-local-map)))))
+    (@var{find-in} (current-global-map)))
+@end lisp
+
+@noindent
+这里，@var{find-in}和@var{find-in-any}是伪函数，分别在一个键盘映射和键盘映射列表中搜索。  请注意，@code{set-transient-map} 函数通过设置@code{overriding-terminal-local-map} (@pxref{Controlling Active Maps}) 来工作。
+
+在上面的伪代码中，如果按键序列以鼠标事件 (@pxref{Mouse Events}) 开始，则使用该事件的位置而不是点，并且使用事件的缓冲区而不是当前缓冲区。特别是，这会影响 @code{keymap} 和 @code{local-map} 属性的查找方式。  如果鼠标事件发生在嵌入 @code{display}、@code{before-string} 或 @code{after-string} 属性 (@pxref{Special Properties}) 的字符串上，并且该字符串具有非 @code{nil} @code{keymap} 或 @code{local-map} 属性，则会覆盖基础缓冲区文本中的相应属性（即，忽略基础文本指定的属性）。
+
+当在活动键映射之一中找到键绑定并且该绑定是命令时，搜索结束——执行该命令。但是，如果绑定是带有值或字符串的符号，Emacs 会将输入键序列替换为变量的值或字符串，并重新开始搜索活动键映射。  @xref{Key Lookup}。
+
+最终找到的命令也可能被重新映射。 @xref{Remapping Commands}。
+
+@node Controlling Active Maps
+@section 控制活动键盘映射
+@cindex active keymap, controlling
+
+@defvar global-map
+该变量包含将 Emacs 键盘输入映射到命令的默认全局键盘映射。  全局键盘映射通常是这个键盘映射。  默认的全局键盘映射是将 @code{self-insert-command} 绑定到所有打印字符的完整键盘映射。
+
+更改全局键盘映射中的绑定是正常的做法，但您不应为此变量分配除其开始的键盘映射之外的任何值。
+@end defvar
+
+@defun current-global-map
+该函数返回当前的全局键盘映射。  这与 0⁣ 的值相同，除非您更改其中之一。返回值是引用，而不是副本；如果您使用 @code{keymap-set} 或其他函数，您将更改全局绑定。
+
+@example
+@group
+(current-global-map)
+@result{} (keymap [set-mark-command beginning-of-line @dots{}
+            delete-backward-char])
+@end group
+@end example
+@end defun
+
+@defun current-local-map
+此函数返回当前缓冲区的本地键盘映射，如果没有则返回 @code{nil}。  在以下示例中， @file{*scratch*} 缓冲区的键映射（使用 Lisp 交互模式）是一个稀疏键映射，其中 @key{ESC} 的条目 @acronym{ASCII} 代码 27 是另一个稀疏键映射。
+
+@example
+@group
+(current-local-map)
+@result{} (keymap
+    (10 . eval-print-last-sexp)
+    (9 . lisp-indent-line)
+    (127 . backward-delete-char-untabify)
+@end group
+@group
+    (27 keymap
+        (24 . eval-defun)
+        (17 . indent-sexp)))
+@end group
+@end example
+@end defun
+
+@code{current-local-map} 返回对本地键盘映射的引用，而不是其副本；如果您使用 @code{keymap-set} 或其他函数，您将改变本地绑定。
+
+@defun current-minor-mode-maps
+此函数返回当前启用的次要模式的键盘映射列表。
+@end defun
+
+@defun use-global-map keymap
+此函数使 @var{keymap} 成为新的当前全局键盘映射。  它返回@code{nil}。
+
+更改全局键盘映射是非常不寻常的。
+@end defun
+
+@defun use-local-map keymap
+该函数使 @var{keymap} 成为当前缓冲区的新本地键盘映射。  如果@var{keymap}是@code{nil}，则缓冲区没有本地键盘映射。  @code{use-local-map} 返回@code{nil}。  大多数主要模式命令都使用此功能。
+@end defun
+
+@defvar minor-mode-map-alist
+@anchor{Definition of minor-mode-map-alist}
+该变量是一个描述键盘映射的列表，根据某些变量的值，键盘映射可能会或可能不会处于活动状态。  它的元素如下所示：
+
+@example
+(@var{variable} . @var{keymap})
+@end example
+
+只要 1⁣ 具有非 2⁣ 值，键盘映射 @var{keymap} 就会处于活动状态。  通常，@var{variable} 是启用或禁用次要模式的变量。  @xref{Keymaps and Minor Modes}。
+
+请注意，@code{minor-mode-map-alist} 的元素与@code{minor-mode-alist} 的元素具有不同的结构。  映射必须是元素的 @sc{cdr}；以地图作为第二个元素的列表是不行的。  @sc{cdr} 可以是键盘映射（列表），也可以是功能定义为键盘映射的符号。
+
+当多个次要模式键盘映射处于活动状态时，@code{minor-mode-map-alist} 中较早的一个优先。  但是您应该设计次要模式，以便它们不会相互干扰。  如果你做得正确，顺序就不重要了。
+
+@xref{Keymaps and Minor Modes}，有关次要模式的更多信息。另请参见@code{minor-mode-key-binding} (@pxref{Functions for Key Lookup})。
+@end defvar
+
+@defvar minor-mode-overriding-map-alist
+此变量允许主要模式覆盖特定次要模式的键绑定。  该列表的元素类似于 @code{minor-mode-map-alist}: @code{(@var{variable} . @var{keymap})} 的元素。
+
+如果变量作为 @code{minor-mode-overriding-map-alist} 的元素出现，则该元素指定的映射完全替换为 @code{minor-mode-map-alist} 中为同一变量指定的任何映射。
+
+@code{minor-mode-overriding-map-alist} 在所有缓冲区中自动是缓冲区本地的。
+@end defvar
+
+@defvar overriding-local-map
+如果非@code{nil}，则此变量保存要使用的键映射，而不是缓冲区的本地键映射、任何文本属性或覆盖键映射以及任何次要模式键映射。  如果指定了此键盘映射，则会覆盖除当前全局映射之外的所有其他已处于活动状态的映射。
+@end defvar
+
+@defvar overriding-terminal-local-map
+如果非@code{nil}，则此变量保存要使用的键映射而不是@code{overriding-local-map}、缓冲区的本地键映射、文本属性或覆盖键映射以及所有次要模式键映射。
+
+该变量始终是当前终端的本地变量，并且不能是缓冲区本地的。  @xref{Multiple Terminals}。  它用于实现增量搜索模式。
+@end defvar
+
+@defvar overriding-local-map-menu-flag
+如果该变量为非@code{nil}，则@code{overriding-local-map}或@code{overriding-terminal-local-map}的值会影响菜单栏的显示。  默认值为@code{nil}，因此这些地图变量对菜单栏没有影响。
+
+请注意，这两个映射变量确实会影响使用菜单栏输入的按键序列的执行，即使它们不影响菜单栏显示。  因此，如果出现菜单栏按键序列，您应该在查找并执行该按键序列之前清除变量。无论如何，使用变量的模式通常都会这样做；通常，它们对不处理的事件的响应是“取消读取”并退出。
+@end defvar
+
+@defvar special-event-map
+该变量保存特殊事件的键盘映射。  如果某个事件类型在此键盘映射中具有绑定，那么它是特殊的，并且该事件的绑定直接由@code{read-event}运行。  @xref{Special Events}。
+@end defvar
+
+@defvar emulation-mode-map-alists
+该变量保存用于模拟模式的键盘映射列表列表。  它适用于使用多个次要模式键盘映射的模式或包。  每个元素都是一个键盘映射列表，其格式和含义与 @code{minor-mode-map-alist} 相同，或者是具有变量绑定的符号，该符号也是这样的列表。  每个列表中的活动键盘映射在 @code{minor-mode-map-alist} 和 @code{minor-mode-overriding-map-alist} 之前使用。
+@end defvar
+
+@cindex transient keymap
+@defun set-transient-map keymap &optional keep-pred on-exit message timeout
+此函数将 @var{keymap} 添加为 @dfn{transient} 键映射，对于一个（或多个）后续键，该键映射优先于其他键映射。
+
+通常，@var{keymap} 仅使用一次，以查找下一个键。如果可选参数@var{keep-pred}为@code{t}，则只要用户键入@var{keymap}中定义的键，地图就会保持活动状态；当用户键入不在@var{keymap}中的键时，瞬态键映射将被停用，并且继续对该键进行正常的键查找。
+
+@var{keep-pred} 参数也可以是一个函数。  在这种情况下，在运行每个命令之前，当 @var{keymap} 处于活动状态时，将不带参数调用该函数；如果 @var{keymap} 应保持活动状态，它应返回非 @code{nil}。
+
+可选参数@var{on-exit}，如果非@code{nil}，则指定在@var{keymap}停用后不带参数调用的函数。
+
+可选参数@var{message}指定激活瞬态映射后要显示的消息。  如果 1⁣ 是字符串，则它是消息的格式字符串，并且该字符串中的任何 2⁣ 说明符都将替换为瞬态映射中的键列表。 @var{message} 的任何其他非 @code{nil} 值都代表默认消息格式 @samp{Repeat with %k}。
+
+@vindex set-transient-map-timeout
+如果可选参数 @var{timeout} 不是 @code{nil}，则它应该是一个数字，指定在停用 @var{keymap} 之前等待多少秒的空闲时间。  变量 @code{set-transient-map-timeout} 的值（如果不是 @code{nil}）将覆盖此参数的值。
+
+此函数的工作原理是在变量 @code{overriding-terminal-local-map} 中添加和删除 @var{keymap}，该变量优先于所有其他活动键盘映射 (@pxref{Searching Keymaps})。
+@end defun
+
+@node Key Lookup
+@section 按键查找
+@cindex key lookup
+@cindex keymap entry
+
+@dfn{Key lookup} 是从给定的键映射中查找键序列的绑定的过程。  绑定的执行或使用不是键查找的一部分。
+
+按键查找仅使用按键序列中每个事件的事件类型；事件的其余部分将被忽略。  事实上，用于键查找的键序列可以仅指定鼠标事件的类型（符号）而不是整个事件（列表）。  @xref{Input Events}。  这样的按键序列不足以运行@code{command-execute}，但足以查找或重新绑定按键。
+
+当按键序列由多个事件组成时，按键查找按顺序处理事件：找到第一个事件的绑定，并且必须是键盘映射；然后在该键映射中找到第二个事件的绑定，依此类推，直到键序列中的所有事件都用完为止。  （如此找到的最后一个事件的绑定可能是也可能不是键映射。）因此，键查找的过程是根据用于在键映射中查找单个事件的更简单的过程来定义的。  如何完成此操作取决于与该键盘映射中的事件关联的对象类型。
+
+让我们使用术语 @dfn{keymap entry} 来描述通过在键盘映射中查找事件类型找到的值。  （这不包括菜单项的键映射元素中的项目字符串和其他额外元素，因为 @code{keymap-lookup} 和其他键查找函数不将它们包含在返回值中。）虽然任何 Lisp 对象都可以作为键映射条目存储在键映射中，但并非所有对象都对键查找有意义。  下面是有意义的键盘映射条目类型的表：
+
+@table @asis
+@item @code{nil}
+@cindex @code{nil} in keymap
+@code{nil} 表示到目前为止在查找中使用的事件形成了一个未定义的键。  当键盘映射根本没有提及事件类型并且没有默认绑定时，这相当于该事件类型的 @code{nil} 绑定。
+
+@item @var{command}
+@cindex command in keymap
+到目前为止，在查找中使用的事件形成了一个完整的键，@var{command} 是它的绑定。  @xref{What Is a Function}。
+
+@item @var{array}
+@cindex string in keymap
+数组（字符串或向量）是键盘宏。  到目前为止，在查找中使用的事件形成了一个完整的键，数组是它的绑定。  @xref{Keyboard Macros}，了解更多信息。
+
+@item @var{keymap}
+@cindex keymap in keymap
+到目前为止，在查找中使用的事件形成了一个前缀键。  在 @var{keymap} 中查找按键序列的下一个事件。
+
+@item @var{list}
+@cindex list in keymap
+列表的含义取决于它包含的内容：
+
+@itemize @bullet
+@item 
+如果 @var{list} 的 @sc{car} 是符号 @code{keymap}，则该列表是键盘映射，并且被视为键盘映射（见上文）。
+
+@item 
+@cindex @code{lambda} in keymap
+如果@var{list}的@sc{car}是@code{lambda}，则该列表是一个lambda表达式。  这被认为是一个函数，并且被如此对待（见上文）。  为了作为键绑定正确执行，该函数必须是一个命令——它必须具有 @code{interactive} 规范。  @xref{Defining Commands}。
+@end itemize
+
+@item @var{symbol}
+@cindex symbol in keymap
+使用@var{symbol}的函数定义代替@var{symbol}。  如果这也是一个符号，那么这个过程就会重复任意次。  最终，这应该生成一个键盘映射、命令或键盘宏的对象。
+
+请注意，键盘映射和键盘宏（字符串和向量）不是有效函数，因此以键盘映射、字符串或向量作为其函数定义的符号作为函数是无效的。  然而，它作为键绑定是有效的。  如果定义是键盘宏，则该符号也可作为 @code{command-execute} (@pxref{Interactive Call}) 的参数有效。
+
+@cindex @code{undefined} in keymap
+值得特别提及的是符号@code{undefined}：它表示将键视为未定义。  严格来说，key是定义好的，它的绑定就是命令@code{undefined}；但该命令执行的操作与未定义键自动执行的操作相同：它会响铃（通过调用 @code{ding}），但不会发出错误信号。
+
+@cindex preventing prefix key
+@code{undefined} 在本地键盘映射中使用来覆盖全局键绑定并使该键在本地未定义。  @code{nil} 的本地绑定将无法执行此操作，因为它不会覆盖全局绑定。
+
+@item @var{anything else}
+如果找到任何其他类型的对象，则到目前为止在查找中使用的事件形成完整的键，并且该对象是其绑定，但该绑定不能作为命令执行。
+@end table
+
+简而言之，键盘映射条目可以是键盘映射、命令、键盘宏、指向其中之一的符号或@code{nil}。
+
+@node Functions for Key Lookup
+@section 按键查找函数
+
+以下是与键查找相关的函数和变量。
+
+@defun keymap-lookup keymap key &optional accept-defaults no-remap position
+该函数返回@var{keymap}中@var{key}的定义。  本章中描述的所有其他查找键的函数都使用@code{keymap-lookup}。  以下是示例：
+
+@example
+@group
+(keymap-lookup (current-global-map) "C-x C-f")
+    @result{} find-file
+@end group
+@group
+(keymap-lookup (current-global-map) "C-x C-f 1 2 3 4 5")
+    @result{} 2
+@end group
+@end example
+
+如果根据 @var{keymap} 中指定的前缀键，字符串或向量 @var{key} 不是有效的键序列，则它一定太长，并且末尾有不适合单个键序列的额外事件。  那么该值是一个数字，即组成一个完整键的@var{key}前面的事件数。
+
+如果@var{accept-defaults}非@code{nil}，则@code{keymap-lookup}会考虑默认绑定以及@var{key}中特定事件的绑定。  否则，@code{keymap-lookup}仅报告特定序列@var{key}的绑定，忽略默认绑定，除非您明确询问它们。  （为此，请提供@code{t}作为@var{key}的元素；请参阅@ref{Format of Keymaps}。）
+
+如果@var{key}包含元字符（不是功能键），则该字符将隐式替换为两个字符序列：@code{meta-prefix-char}的值，后跟相应的非元字符。  因此，下面的第一个示例是通过转换为第二个示例来处理的。
+
+@example
+@group
+(keymap-lookup (current-global-map) "M-f")
+    @result{} forward-word
+@end group
+@group
+(keymap-lookup (current-global-map) "ESC f")
+    @result{} forward-word
+@end group
+@end example
+
+@var{keymap}参数可以是@code{nil}，意思是在当前键盘映射中查找@var{key}（由@code{current-active-maps}、@pxref{Active Keymaps}返回）；或者它可以是键盘映射或键盘映射列表，这意味着仅在指定的键盘映射中查找 @var{key}。
+
+与@code{read-key-sequence}不同，此函数不会以丢弃信息的方式修改指定事件（@pxref{Key Sequence Input}）。  特别是，它不会将字母转换为小写，也不会将拖动事件更改为单击。
+
+与正常的命令循环一样，@code{keymap-lookup} 将通过在当前键盘映射中查找命令来重新映射查找 @var{key} 所产生的命令。  但是，如果可选的第三个参数 @var{no-remap} 为非 @code{nil}，则 @code{keymap-lookup} 返回命令而不重新映射。
+
+如果可选参数@var{position}不​​是@code{nil}，它指定由@code{event-start}和@code{event-end}返回的鼠标位置，并且查找发生在与该位置关联的键盘映射中，而不是在@var{keymap}中。  @var{position} 也可以是数字或标记，在这种情况下，它被解释为缓冲区位置，并且该函数使用该位置而不是点的键盘映射属性。
+@end defun
+
+@deffn Command undefined
+在键盘映射中用于取消定义键。  它调用@code{ding}，但不会导致错误。
+@end deffn
+
+@defun keymap-local-lookup key &optional accept-defaults
+此函数返回当前本地键盘映射中 @var{key} 的绑定，如果未定义则返回 @code{nil} 。
+
+参数@var{accept-defaults}控制默认绑定的检查，如@code{keymap-lookup}（上面）所示。
+@end defun
+
+@defun keymap-global-lookup key &optional accept-defaults
+此函数返回当前全局键盘映射中命令 @var{key} 的绑定，如果未定义，则返回 @code{nil} 。
+
+参数@var{accept-defaults}控制默认绑定的检查，如@code{keymap-lookup}（上面）所示。
+@end defun
+
+@defun minor-mode-key-binding key &optional accept-defaults
+该函数返回 @var{key} 的所有活动次要模式绑定的列表。  更准确地说，它返回一个由@code{(@var{modename} . @var{binding})}组成的列表，其中@var{modename}是启用次要模式的变量，@var{binding}是@var{key}在该模式下的绑定。  如果@var{key}没有次要模式绑定，则值为@code{nil}。
+
+如果找到的第一个绑定不是前缀定义（键盘映射或定义为键盘映射的符号），则来自其他次要模式的所有后续绑定都将被忽略，因为它们将被完全隐藏。  同样，该列表省略了前缀绑定之后的非前缀绑定。
+
+参数@var{accept-defaults}控制默认绑定的检查，如@code{keymap-lookup}（上面）所示。
+@end defun
+
+@defopt meta-prefix-char
+@cindex @key{ESC}
+该变量是元前缀字符代码。  它用于将元字符转换为两个字符序列，以便可以在键盘映射中查找它。  为了获得有用的结果，该值应该是前缀事件 (@pxref{Prefix Keys})。  默认值为 27，这是 @key{ESC} 的 @acronym{ASCII} 代码。
+
+只要 @code{meta-prefix-char} 的值保持为 27，键查找就会将 @kbd{M-b} 转换为 @kbd{@key{ESC} b}，通常定义为 @code{backward-word} 命令。  但是，如果您将 @code{meta-prefix-char} 设置为 24（@kbd{C-x} 的代码），那么 Emacs 会将 @kbd{M-b} 转换为 @kbd{C-x b}，其标准绑定是 @code{switch-to-buffer} 命令。  （实际上不要这样做！）以下是将会发生的情况的说明：
+
+@smallexample
+@group
+meta-prefix-char                    ; @r{The default value.}
+     @result{} 27
+@end group
+@group
+(key-binding "\M-b")
+     @result{} backward-word
+@end group
+@group
+?\C-x                               ; @r{The print representation}
+     @result{} 24                          ;   @r{of a character.}
+@end group
+@group
+(setq meta-prefix-char 24)
+     @result{} 24
+@end group
+@group
+(key-binding "\M-b")
+     @result{} switch-to-buffer            ; @r{Now, typing @kbd{M-b} is}
+                                    ;   @r{like typing @kbd{C-x b}.}
+
+(setq meta-prefix-char 27)          ; @r{Avoid confusion!}
+     @result{} 27                          ; @r{Restore the default value!}
+@end group
+@end smallexample
+
+这种将一个事件转换为两个事件的情况仅适用于字符，不适用于其他类型的输入事件。  因此，功能键@kbd{M-@key{F1}}不会转换为@kbd{@key{ESC} @key{F1}}。
+@end defopt
+
+@node Key Sequences
+@section 关键序列
+@cindex key
+@cindex keystroke
+@cindex key sequence
+
+@dfn{key sequence}，简称为@dfn{key}，是形成一个单元的一个或多个输入事件的序列。  输入事件包括字符、功能键、鼠标操作或 Emacs 外部的系统事件，例如 @code{iconify-frame} (@pxref{Input Events})。键序列的 Emacs Lisp 表示是字符串或向量。  除非另有说明，任何接受键序列作为参数的 Emacs Lisp 函数都可以处理这两种表示形式。
+
+在字符串表示形式中，字母数字字符通常代表其自身；例如，@code{"a"}代表@kbd{a}，@code{"2"}代表@kbd{2}。  控制字符事件以子字符串@code{"\C-"}为前缀，元字符以@code{"\M-"}为前缀；例如，@code{"\C-x"}代表键@kbd{C-x}。此外，@key{TAB}、@key{RET}、@key{ESC}和@key{DEL}事件分别由@code{"\t"}、@code{"\r"}、@code{"\e"}和@code{"\d"}表示。  完整按键序列的字符串表示是组成事件的字符串表示的串联；因此，@code{"\C-xl"}代表按键序列@kbd{C-x l}。
+
+包含功能键、鼠标按钮事件、系统事件或非@acronym{ASCII}字符（例如@kbd{C-=}或@kbd{H-a}）的按键序列不能表示为字符串；它们必须表示为向量。
+
+在向量表示中，向量的每个元素以 Lisp 形式表示一个输入事件。  @xref{Input Events}。  例如，向量@code{[?\C-x ?l]}表示密钥序列@kbd{C-x l}。
+
+对于以字符串和向量表示形式编写的键序列的示例，@ref{Init Rebinding,,, emacs, The GNU Emacs Manual}。
+
+@defun kbd keyseq-text
+该函数将文本@var{keyseq-text}（字符串常量）转换为键序列（字符串或向量常量）。  @var{keyseq-text} 的内容应使用与 @kbd{C-x C-k @key{RET}} (@code{kmacro-edit-macro}) 命令调用的缓冲区中相同的语法；特别是，您必须用 @samp{<@dots{}>} 包围功能键名称。  @xref{Edit Keyboard Macro,,, emacs, The GNU Emacs Manual}。
+
+@example
+(kbd "C-x") @result{} "\C-x"
+(kbd "C-x C-f") @result{} "\C-x\C-f"
+(kbd "C-x 4 C-f") @result{} "\C-x4\C-f"
+(kbd "X") @result{} "X"
+(kbd "RET") @result{} "^M"
+(kbd "C-c SPC") @result{} "\C-c@ "
+(kbd "<f1> SPC") @result{} [f1 32]
+(kbd "C-M-<down>") @result{} [C-M-down]
+@end example
+
+@findex key-valid-p
+@code{kbd} 函数非常宽松，即使使用的语法不完全一致，它也会尝试返回一些合理的内容。  要检查语法是否实际上有效，请使用 @code{key-valid-p} 函数。
+@end defun
+
+@node Low-Level Key Binding
+@section 低级按键绑定
+@cindex low-level key bindings
+
+从历史上看，Emacs 支持多种不同的语法来定义键。  今天记录的绑定密钥的方法是使用 @code{key-valid-p} 支持的语法，这是 @code{keymap-set} 和 @code{keymap-lookup} 等所有函数都支持的语法。本节记录旧式语法和接口函数；它们不应该在新代码中使用。
+
+@cindex meta character key constants
+@cindex control character key constants
+@code{define-key}（以及用于重新绑定键的其他低级函数）了解键的许多不同语法。
+
+@table @asis
+@item 包含键列表的向量。
+您可以使用包含修饰符名称和一个基本事件（字符或功能键名称）的列表。  例如，@code{[(control ?a) (meta b)]}相当于@kbd{C-a M-b}，@code{[(hyper control left)]}相当于@kbd{C-H-left}。
+
+@item 带修饰符的字符串
+在内部，键序列通常使用用于 Shift、Control 和元修饰符 (@pxref{String Type}) 的特殊转义序列表示为字符串，但用户在重新绑定键时也可以使用这种表示形式。  像@code{"\M-x"}这样的字符串被读取为包含单个@kbd{M-x}，@code{"\C-f"}被读取为包含单个@kbd{C-f}，而@code{"\M-\C-x"}和@code{"\C-\M-x"}都被读取为包含单个@kbd{C-M-x}。
+
+@item 字符和关键符号的向量
+这是按键序列的另一种内部表示。  它支持比字符串表示更全面的修饰符，并且还支持功能键。  例如 @w{@samp{[?\C-\H-x home]}}，它代表 @w{@kbd{C-H-x @key{home}}} 键序列。 @xref{Character Type}。
+@end table
+
+@defun define-key keymap key binding &optional remove
+该函数类似于 @code{keymap-set} (@pxref{Changing Key Bindings})，但仅理解旧版按键语法。
+
+此外，该函数还有一个 @var{remove} 参数。  如果它是非@code{nil}，则定义将被删除。  这与将定义设置为 @code{nil} 几乎相同，但如果 @var{keymap} 有父级，并且 @var{key} 隐藏父级中的相同绑定，则会有所不同。  使用@var{remove}，后续查找将返回父级中的绑定，而使用@code{nil}定义，查找将返回@code{nil}。
+@end defun
+
+以下是其他旧版按键定义函数和命令，以及可在新代码中使用的等效现代函数。
+
+@deffn Command global-set-key key binding
+该函数将当前全局映射中@var{key}的绑定设置为@var{binding}。  请改用@code{keymap-global-set}。
+@end deffn
+
+@deffn Command global-unset-key key
+该函数从当前全局映射中删除@var{key}的绑定。  请改用@code{keymap-global-unset}。
+@end deffn
+
+@deffn Command local-set-key key binding
+该函数将当前本地键盘映射中@var{key}的绑定设置为@var{binding}。  请改用@code{keymap-local-set}。
+@end deffn
+
+@deffn Command local-unset-key key
+该函数从当前本地地图中删除@var{key}的绑定。  请改用@code{keymap-local-unset}。
+@end deffn
+
+@defun substitute-key-definition olddef newdef keymap &optional oldmap
+对于 @var{keymap} 中绑定到 @var{olddef} 的任何键，此函数将 @var{olddef} 替换为 @var{newdef}。  换句话说，无论 @var{olddef} 出现在哪里，都会被 @var{newdef} 替换。  该函数返回@code{nil}。  请改用@code{keymap-substitute}。
+@end defun
+
+@defun define-key-after map key binding &optional after
+在 @var{map} 中为 @var{key} 定义一个绑定，值为 @var{binding}，就像 @code{define-key} 一样，但将绑定放置在 @var{map} 中的事件绑定之后 @var{after}。  参数 @var{key} 的长度应为 1——只有一个元素的向量或字符串。  但@var{after}应该是单个事件类型——符号或字符，而不是序列。  新的绑定位于 @var{after} 的绑定之后。  如果 @var{after} 为 @code{t} 或被省略，则新绑定位于最后，位于键盘映射的末尾。  但是，新的绑定会添加在任何继承的键盘映射之前。  使用 @code{keymap-set-after} 代替此函数。
+@end defun
+
+@defun keyboard-translate from to
+该函数修改@code{keyboard-translate-table}以将字符代码@var{from}转换为字符代码@var{to}。  如果需要，它会创建键盘转换表。  使用 @code{key-translate} 代替。
+@end defun
+
+@defun key-binding key &optional accept-defaults no-remap position
+此函数根据当前活动键盘映射返回 @var{key} 的绑定。  如果 @var{key} 在键盘映射中未定义，结果为 @code{nil}。  参数 @var{accept-defaults} 控制默认绑定的检查，如 @code{lookup-key} (@pxref{Functions for Key Lookup}) 中所示。  如果@var{no-remap}非@code{nil}，则@code{key-binding}忽略命令重新映射（@pxref{Remapping Commands}）并返回直接为@var{key}指定的绑定。  可选参数@var{position}应该是缓冲区位置或事件位置，如@code{event-start}的值；它告诉函数查阅基于该@var{position}确定的地图。
+
+如果 @var{key} 不是字符串或向量，Emacs 会发出错误信号。
+
+使用 @code{keymap-lookup} 代替此函数。
+@end defun
+
+@defun lookup-key keymap key &optional accept-defaults
+该函数返回@var{keymap}中@var{key}的定义。  如果根据 @var{keymap} 中指定的前缀键，字符串或向量 @var{key} 不是有效的键序列，则它一定太长，并且末尾有不适合单个键序列的额外事件。  那么该值是一个数字，即组成一个完整键的@var{key}前面的事件数量。
+
+如果@var{accept-defaults}非@code{nil}，则@code{lookup-key}会考虑默认绑定以及@var{key}中特定事件的绑定。  否则，@code{lookup-key}仅报告特定序列@var{key}的绑定，忽略默认绑定，除非您明确询问它们。
+
+使用 @code{keymap-lookup} 代替此函数。
+@end defun
+
+@defun local-key-binding key &optional accept-defaults
+此函数返回当前本地键盘映射中 @var{key} 的绑定，如果未定义则返回 @code{nil} 。
+
+参数@var{accept-defaults}控制默认绑定的检查，如@code{lookup-key}（上面）所示。
+
+使用 @code{keymap-local-lookup} 代替此函数。
+@end defun
+
+@defun global-key-binding key &optional accept-defaults
+此函数返回当前全局键盘映射中命令 @var{key} 的绑定，如果未定义，则返回 @code{nil} 。
+
+参数@var{accept-defaults}控制默认绑定的检查，如@code{lookup-key}（上面）所示。
+
+使用 @code{keymap-global-lookup} 代替此函数。
+@end defun
+
+@defun event-convert-list list
+此函数将修饰符名称列表和基本事件类型转换为指定所有这些的事件类型。  基本事件类型必须是列表的最后一个元素。  例如，
+
+@example
+(event-convert-list '(control ?a))
+     @result{} 1
+(event-convert-list '(control meta ?a))
+     @result{} -134217727
+(event-convert-list '(control super f1))
+     @result{} C-s-f1
+@end example
+@end defun
+
+@node Remapping Commands
+@section 重新映射命令
+@cindex remapping commands
+
+一种特殊类型的键绑定可用于将一个命令转换为另一个命令，而无需引用绑定到原始命令的键序列。  要使用此功能，请为以虚拟事件 @code{remap} 开头的键序列进行键绑定，后跟要重新映射的命令名称；对于绑定，指定新定义（通常是命令名称，但也可能是键绑定的任何其他有效定义）。
+
+例如，假设我的模式提供了一个特殊命令@code{my-kill-line}，应该调用该命令而不是@code{kill-line}。  为了建立这一点，其模式键映射应包含以下重新映射：
+
+@smallexample
+(keymap-set my-mode-map "<remap> <kill-line>" 'my-kill-line)
+@end smallexample
+
+@noindent
+然后，每当 @code{my-mode-map} 处于活动状态时，如果用户键入 @kbd{C-k}（@code{kill-line} 的默认全局键序列），Emacs 将改为运行 @code{my-kill-line}。
+
+请注意，重新映射仅通过活动键盘映射进行；例如，在像 @code{ctl-x-map} 这样的前缀键映射中放置重新映射通常没有效果，因为此类键映射本身并不处于活动状态。此外，重新映射只能通过单个级别进行；在下面的示例中，
+
+@smallexample
+(keymap-set my-mode-map "<remap> <kill-line>" 'my-kill-line)
+(keymap-set my-mode-map "<remap> <my-kill-line>" 'my-other-kill-line)
+@end smallexample
+
+@noindent
+@code{kill-line} 被 @emph{not} 重新映射到 @code{my-other-kill-line}。相反，如果普通键绑定指定@code{kill-line}，它将被重新映射到@code{my-kill-line}；如果普通绑定指定@code{my-kill-line}，则它会重新映射到@code{my-other-kill-line}。
+
+要撤消命令的重新映射，请将其重新映射到@code{nil}；例如。，
+
+@smallexample
+(keymap-set my-mode-map "<remap> <kill-line>" nil)
+@end smallexample
+
+@defun command-remapping command &optional position keymaps
+给定当前活动键盘映射，此函数返回@var{command}（符号）的重新映射。  如果@var{command}未重新映射（这是通常的情况），或者不是符号，则该函数返回@code{nil}。  @code{position} 可以选择指定缓冲区位置或事件位置来确定要使用的键盘映射，如 @code{key-binding} 中所示。
+
+如果可选参数 @code{keymaps} 为非 @code{nil}，则它指定要搜索的键盘映射列表。如果 @code{position} 为非 @code{nil}，则忽略此参数。
+@end defun
+
+@node Translation Keymaps
+@section 用于翻译事件序列的键盘映射
+@cindex translation keymap
+@cindex keymaps for translating events
+
+当 @code{read-key-sequence} 函数读取按键序列 (@pxref{Key Sequence Input}) 时，它使用 @dfn{translation keymaps} 将某些事件序列转换为其他事件序列。  翻译键映射为 @code{input-decode-map}、@code{local-function-key-map} 和 @code{key-translation-map}（按优先级顺序）。
+
+翻译键映射与其他键映射具有相同的结构，但使用方式不同：它们指定在读取键序列时进行的转换，而不是完整键序列的绑定。  读取每个键序列时，会根据每个翻译键映射进行检查。  如果翻译键映射之一将@var{k}绑定到向量@var{v}，则每当@var{k}作为子序列@emph{anywhere}出现在按键序列中时，该子序列就会被@var{v}中的事件替换。
+
+例如，当按下键盘按键@key{PF1}时，VT100 终端发送@kbd{@key{ESC} O P}。  在此类终端上，Emacs 必须将该事件序列转换为单个事件 @code{pf1}。这是通过将@kbd{@key{ESC} O P}绑定到@code{input-decode-map}中的@code{[pf1]}来完成的。  因此，当您在终端上键入 @kbd{C-c @key{PF1}} 时，终端会发出字符序列 @kbd{C-c @key{ESC} O P}，而 @code{read-key-sequence} 将其转换回 @kbd{C-c @key{PF1}} 并将其作为向量 @code{[?\C-c pf1]} 返回。
+
+翻译键盘映射仅在 Emacs 解码键盘输入后生效（通过 @code{keyboard-coding-system} 指定的输入编码系统）。  @xref{Terminal I/O Encoding}。
+
+@defvar input-decode-map
+该变量保存一个键映射，描述普通字符终端上功能键发送的字符序列。
+
+@code{input-decode-map} 的值通常根据终端的 Terminfo 或 Termcap 条目自动设置，但有时需要来自特定于终端的 Lisp 文件的帮助。  Emacs 为许多常见终端提供了特定于终端的文件；它们的主要目的是使 @code{input-decode-map} 中的条目超出可从 Termcap 和 Terminfo 推断出的条目。  @xref{Terminal-Specific}。
+@end defvar
+
+@cindex function-key-map
+@defvar local-function-key-map
+该变量保存类似于 0⁣ 的键映射，不同之处在于它描述了应转换为通常首选的替代解释的键序列。  它适用于@code{input-decode-map}之后和@code{key-translation-map}之前。
+
+如果 @code{local-function-key-map} 中的条目与次要模式、本地或全局键盘映射中进行的绑定冲突，则它们将被忽略。  即，仅当原始按键序列不具有任何绑定时才应用重新映射。
+
+@code{local-function-key-map}继承自@code{function-key-map}。仅当您希望绑定应用于所有终端时才应更改后者，因此几乎总是首选使用前者。
+@end defvar
+
+@defvar key-translation-map
+该变量是另一个键盘映射，与@code{input-decode-map} 一样用于将输入事件转换为其他事件。  它与@code{input-decode-map}的不同之处在于，它是在@code{local-function-key-map}完成之后而不是之前开始工作；它通过@code{local-function-key-map}接收翻译结果。
+
+就像 @code{input-decode-map} 一样，但与 @code{local-function-key-map} 不同，无论输入键序列是否具有正常绑定，都会应用此键盘映射。  但请注意，实际的键绑定可能会对 @code{key-translation-map} 产生影响，即使它们被它覆盖。事实上，实际的按键绑定会覆盖@code{local-function-key-map}，因此可能会改变@code{key-translation-map}接收的按键序列。  显然，最好避免这种情况。
+
+@code{key-translation-map} 的目的是让用户将一个字符集映射到另一个字符集，包括通常绑定到 @code{self-insert-command} 的普通字符。
+@end defvar
+
+@cindex key translation function
+通过使用函数（而不是按键序列）作为按键的转换，您可以将 @code{input-decode-map}、@code{local-function-key-map} 和 @code{key-translation-map} 用于不仅仅是简单的别名。  然后调用该函数来计算该密钥的翻译。
+
+键转换函数接收一个参数，如果编辑器命令循环正在读取键序列，则该参数是在 @code{read-key-sequence}---或 @code{nil} 中指定的提示。  大多数情况下您可以忽略提示值。
+
+如果函数本身读取输入，它可能会改变随后的事件。  例如，以下是如何定义 @kbd{C-c h} 将后面的字符转换为 Hyper 字符：
+
+@example
+@group
+(defun hyperify (prompt)
+  (let ((e (read-event)))
+    (vector (if (numberp e)
+                (logior (ash 1 24) e)
+              (if (memq 'hyper (event-modifiers e))
+                  e
+                (add-event-modifier "H-" e))))))
+
+(defun add-event-modifier (string e)
+  (let ((symbol (if (symbolp e) e (car e))))
+    (setq symbol (intern (concat string
+                                 (symbol-name symbol))))
+    (if (symbolp e)
+        symbol
+      (cons symbol (cdr e)))))
+
+(keymap-set local-function-key-map "C-c h" 'hyperify)
+@end group
+@end example
+
+@cindex accessing events within a key translation function
+@vindex current-key-remap-sequence
+键转换函数可能希望根据包含非键事件 (@pxref{Input Events}) 的键序列中的事件参数来调整其行为。此信息可从变量 @code{current-key-remap-sequence} 获得，该变量绑定到围绕键转换函数调用进行转换的键子序列。
+
+@subsection 与普通键盘映射的交互
+
+当键序列绑定到命令时，或者当 Emacs 确定没有其他事件可以导致绑定到命令的序列时，将检测到键序列的结束。
+
+这意味着，虽然无论原始按键序列是否具有绑定，@code{input-decode-map}和@code{key-translation-map}都适用，但这种绑定的存在仍然可以阻止翻译的发生。例如，让我们回到上面的 VT100 示例，并将 @kbd{C-c @key{ESC}} 的绑定添加到全局映射；现在，当用户点击 @kbd{C-c @key{PF1}} 时，Emacs 将无法将 @kbd{C-c @key{ESC} O P} 解码为 @kbd{C-c @key{PF1}}，因为它将在 @kbd{C-c @key{ESC}} 之后停止读取键，而将 @kbd{O P} 留待以后使用。  这是为了防止用户真的按下了@kbd{C-c @key{ESC}}，在这种情况下，Emacs 不应该坐在那里等待下一个键来决定用户是否真的按下了@kbd{@key{ESC}} 还是@kbd{@key{PF1}}。
+
+因此，最好避免将命令绑定到键序列，其中键序列的末尾是键转换的前缀。  主要的有问题的后缀/前缀是@kbd{@key{ESC}}、@kbd{M-O}（实际上是@kbd{@key{ESC} O}）和@kbd{M-[}（实际上是@kbd{@key{ESC} [}）。
+
+@node Key Binding Commands
+@section 绑定按键命令
+
+本节介绍一些用于更改键绑定的便捷交互界面。  它们通过调用 @code{keymap-set} (@pxref{Changing Key Bindings}) 来工作。  在交互式使用中，这些命令提示输入参数 @var{key} 并期望用户输入有效的按键序列；它们还提示输入按键序列的 @var{binding}，并期望命令名称（即满足 @code{commandp}、@pxref{Interactive Call} 的符号）。  当从 Lisp 调用时，这些命令期望 @var{key} 是满足 @code{key-valid-p} (@pxref{Key Sequences}) 的字符串，@var{binding} 是在键盘映射中有意义的任何 Lisp 对象 (@pxref{Key Lookup})。
+
+人们经常在初始化文件（@pxref{Init File}）中使用@code{keymap-global-set}进行简单的定制。  例如，
+
+@smallexample
+(keymap-global-set "C-x C-\\" 'next-line)
+@end smallexample
+
+@noindent
+重新定义 @kbd{C-x C-\} 向下移动一行。
+
+@smallexample
+(keymap-global-set "M-<mouse-1>" 'mouse-set-point)
+@end smallexample
+
+@noindent
+重新定义第一个（最左边的）鼠标按钮，使用 Meta 键输入，以设置单击的位置。
+
+@cindex non-@acronym{ASCII} text in key bindings
+在要绑定的键的 Lisp 规范中使用非 @acronym{ASCII} 文本字符时要小心。  如果这些被读取为多字节文本，因为它们通常位于 Lisp 文件中 (@pxref{Loading Non-ASCII})，则您也必须以多字节形式键入键。  例如，如果您使用这个：
+
+@smallexample
+(keymap-global-set "@"o" 'my-function) ; bind o-umlaut
+@end smallexample
+
+@noindent
+并且您的语言环境是多字节 Latin-1，这些命令实际上将多字节字符与代码 246 绑定，而不是 Latin-1 终端发送的字节代码 246 (@kbd{M-v})。  为了使用此绑定，您需要教 Emacs 如何使用适当的输入法来解码键盘 (@pxref{Input Methods, , Input Methods, emacs, The GNU Emacs Manual})。
+
+@deffn Command keymap-global-set key binding
+该函数将当前全局映射中@var{key}的绑定设置为@var{binding}。
+
+@smallexample
+@group
+(keymap-global-set @var{key} @var{binding})
+@equiv{}
+(keymap-set (current-global-map) @var{key} @var{binding})
+@end group
+@end smallexample
+@end deffn
+
+@deffn Command keymap-global-unset key
+@cindex unbinding keys
+该函数从当前全局映射中删除@var{key}的绑定。
+
+此函数的一种用途是准备定义一个使用 @var{key} 作为前缀的较长密钥——如果 @var{key} 具有非前缀绑定，则不允许这样做。  例如：
+
+@smallexample
+@group
+(keymap-global-unset "C-l")
+    @result{} nil
+@end group
+@group
+(keymap-global-set "C-l C-l" 'redraw-display)
+    @result{} nil
+@end group
+@end smallexample
+@end deffn
+
+@deffn Command keymap-local-set key binding
+该函数将当前本地键盘映射中@var{key}的绑定设置为@var{binding}。
+
+@smallexample
+@group
+(keymap-local-set @var{key} @var{binding})
+@equiv{}
+(keymap-set (current-local-map) @var{key} @var{binding})
+@end group
+@end smallexample
+@end deffn
+
+@deffn Command keymap-local-unset key
+该函数从当前本地地图中删除@var{key}的绑定。
+@end deffn
+
+@node Scanning Keymaps
+@section 扫描键盘映射
+@cindex scanning keymaps
+@cindex keymaps, scanning
+
+本节介绍用于扫描所有当前键盘映射以打印帮助信息的功能。  要显示特定键盘映射中的绑定，您可以使用 @code{describe-keymap} 命令 (@pxref{Misc Help, , Other Help Commands, emacs, The GNU Emacs Manual})
+
+@defun accessible-keymaps keymap &optional prefix
+此函数返回从 @var{keymap} 可以到达（通过零个或多个前缀键）的所有键盘映射的列表。  该值是一个关联列表，其中元素的形式为 @code{(@var{key} .@: @var{map})}，其中 @var{key} 是前缀键，其在 @var{keymap} 中的定义为 @var{map}。
+
+alist 的元素经过排序，使得 @var{key} 的长度增加。  第一个元素始终为 @code{([] .@: @var{keymap})}，因为指定的键盘映射可以从其自身访问，且没有任何事件的前缀。
+
+如果给出@var{prefix}，它应该是一个前缀键序列；那么 @code{accessible-keymaps} 只包含前缀以 @var{prefix} 开头的子图。  这些元素看起来就像在 @code{(accessible-keymaps)} 的值中一样；唯一的区别是省略了一些元素。
+
+在下面的示例中，返回的 alist 表示键 @key{ESC}（显示为 @samp{^[}）是一个前缀键，其定义是稀疏键映射@code{(keymap (83 .@: center-paragraph) (115 .@: foo))}。
+
+@smallexample
+@group
+(accessible-keymaps (current-local-map))
+@result{}(([] keymap
+      (27 keymap   ; @r{Note this keymap for @key{ESC} is repeated below.}
+          (83 . center-paragraph)
+          (115 . center-line))
+      (9 . tab-to-tab-stop))
+@end group
+
+@group
+   ("^[" keymap
+    (83 . center-paragraph)
+    (115 . foo)))
+@end group
+@end smallexample
+
+在以下示例中，@kbd{C-h} 是一个前缀键，它使用以 @code{(keymap (118 . describe-variable)@dots{})} 开头的稀疏键映射。另一个前缀@kbd{C-x 4}使用键盘映射，它也是变量@code{ctl-x-4-map}的值。  事件 @code{mode-line} 是几个虚拟事件之一，用作窗口特殊部分中鼠标操作的前缀。
+
+@smallexample
+@group
+(accessible-keymaps (current-global-map))
+@result{} (([] keymap [set-mark-command beginning-of-line @dots{}
+                   delete-backward-char])
+@end group
+@group
+    ("^H" keymap (118 . describe-variable) @dots{}
+     (8 . help-for-help))
+@end group
+@group
+    ("^X" keymap [x-flush-mouse-queue @dots{}
+     backward-kill-sentence])
+@end group
+@group
+    ("^[" keymap [mark-sexp backward-sexp @dots{}
+     backward-kill-word])
+@end group
+    ("^X4" keymap (15 . display-buffer) @dots{})
+@group
+    ([mode-line] keymap
+     (S-mouse-2 . mouse-split-window-horizontally) @dots{}))
+@end group
+@end smallexample
+
+@noindent
+这些并不是您实际上会看到的所有键盘映射。
+@end defun
+
+@defun map-keymap function keymap
+函数@code{map-keymap}为@var{keymap}中的每个绑定调用@var{function}一次。  它传递两个参数：事件类型和绑定的值。  如果 @var{keymap} 有父级，则也包括父级的绑定。这是递归地工作的：如果父对象本身有一个父对象，那么祖父母的绑定也包括在内，依此类推。
+
+此函数是检查键盘映射中所有绑定的最简洁方法。
+@end defun
+
+@defun where-is-internal command &optional keymap firstonly noindirect no-remap
+该函数是 @code{where-is} 命令 (@pxref{Help, , Help, emacs,The GNU Emacs Manual}) 使用的子程序。  它返回绑定到一组键映射中的 @var{command} 的所有键序列（任意长度）的列表。
+
+参数@var{command}可以是任何对象；使用 @code{eq} 将其与所有键盘映射条目进行比较。
+
+如果 @var{keymap} 是 @code{nil}，则使用的映射是当前活动的键盘映射，忽略 @code{overriding-local-map}（即假装其值为 @code{nil}）。  如果 @var{keymap} 是键盘映射，则搜索的映射是 @var{keymap} 和全局键盘映射。  如果 @var{keymap} 是键盘映射列表，则仅搜索这些键盘映射。
+
+通常最好使用 @code{overriding-local-map} 作为 @var{keymap} 的表达式。  然后 @code{where-is-internal} 精确搜索活动的键盘映射。  要仅搜索全局映射，请将值 @code{(keymap)} （空键盘映射）传递为 @var{keymap}。
+
+如果@var{firstonly}是@code{non-ascii}，则该值是表示找到的第一个按键序列的单个向量，而不是所有可能的按键序列的列表。  如果 @var{firstonly} 为 @code{t}，则该值是第一个按键序列，但完全由 @acronym{ASCII} 字符（或 @acronym{ASCII} 字符的元变体）组成的按键序列优先于所有其他按键序列，并且返回值永远不能是菜单绑定。
+
+如果 @var{noindirect} 不是 @code{nil}，则 @code{where-is-internal} 不会在菜单项内部查找以查找其命令。  这使得搜索菜单项本身成为可能。
+
+第五个参数 @var{no-remap} 决定该函数如何处理命令重新映射 (@pxref{Remapping Commands})。  有两种情况值得关注：
+
+@table @asis
+@item 如果命令 @var{other-command} 重新映射到 @var{command}：
+如果 @var{no-remap} 是 @code{nil}，则找到 @var{other-command} 的绑定，并将它们视为 @var{command} 的绑定。  如果 4⁣ 不是 5⁣，则将向量 6⁣ 包含在可能的密钥序列列表中，而不是查找这些绑定。
+
+@item 如果 @var{command} 重新映射到 @var{other-command}：
+如果 @var{no-remap} 是 @code{nil}，则返回 @var{other-command} 的绑定，而不是 @var{command}。  如果@var{no-remap}非@code{nil}，则返回@var{command}的绑定，忽略它被重新映射的事实。
+@end table
+
+如果命令映射到像 @code{[some-event]} 这样的键绑定，并且 @code{some-event} 具有包含非 @code{nil} @code{non-key-event} 属性的符号 plist，则该绑定将被 @code{where-is-internal} 忽略。
+@end defun
+
+@deffn Command describe-bindings &optional prefix buffer-or-name
+此函数创建所有当前键绑定的列表，并将其显示在名为 @file{*Help*} 的缓冲区中。  文本按模式分组——首先是次要模式，然后是主要模式，最后是全局绑定。
+
+如果@var{prefix}非@code{nil}，则它应该是前缀键；那么该列表仅包含以 @var{prefix} 开头的键。
+
+当多个@acronym{ASCII}代码连续的字符具有相同的定义时，它们一起显示，如@samp{@var{firstchar}..@var{lastchar}}。  在这种情况下，您需要知道 @acronym{ASCII} 代码才能理解这意味着哪些字符。例如，在默认的全局地图中，字符@samp{@key{SPC} ..@: ~}由单行描述。  @key{SPC}为@acronym{ASCII} 32，@kbd{~}为@acronym{ASCII} 126，它们之间的字符包括所有正常打印字符（例如字母、数字、标点符号等@:）；所有这些字符都绑定到@code{self-insert-command}。
+
+如果@var{buffer-or-name}非@code{nil}，它应该是一个缓冲区或缓冲区名称。  然后 @code{describe-bindings} 列出该缓冲区的绑定，而不是当前缓冲区的绑定。
+@end deffn
+
+@node Menu Keymaps
+@section 菜单键映射
+@cindex menu keymaps
+
+键映射可以作为菜单操作，也可以定义键盘键和鼠标按钮的绑定。  菜单通常用鼠标启动，但也可以用键盘操作。  如果菜单键映射对于下一个输入事件处于活动状态，则会激活键盘菜单功能。
+
+@menu
+* Defining Menus::      如何制作定义菜单的键盘映射。
+* Mouse Menus::         用户如何使用鼠标启动菜单。
+* Keyboard Menus::      用户如何使用键盘启动菜单。
+* Menu Example::        制作一个简单的菜单。
+* Menu Bar::            如何自定义菜单栏。
+* Tool Bar::            工具栏是一排图像。
+* Modifying Menus::     如何向菜单添加新项目。
+* Easy Menu::       用于制作菜单的便捷宏。
+@end menu
+
+@node Defining Menus
+@subsection 定义菜单
+@cindex defining menus
+@cindex menu prompt string
+@cindex prompt string (of menu)
+@cindex menu item
+
+如果键盘映射具有 @dfn{overall prompt string}（它是作为键盘映射元素出现的字符串），则它充当菜单。 (@xref{Format of Keymaps}.) 该字符串应描述菜单命令的用途。  在某些情况下，Emacs 将整体提示字符串显示为菜单标题，具体取决于用于显示菜单的工具包（如果有）。@footnote{It is required for menus which do not use a toolkit, e.g., on a text terminal.} 键盘菜单也会显示整体提示字符串。
+
+使用提示字符串构建键盘映射的最简单方法是在调用 @code{make-keymap}、@code{make-sparse-keymap} (@pxref{Creating Keymaps}) 或 @code{define-prefix-command} (@pxref{Definition of define-prefix-command}) 时指定该字符串作为参数。  如果您不希望键盘映射作为菜单操作，请不要为其指定提示字符串。
+
+@defun keymap-prompt keymap
+该函数返回@var{keymap}的整体提示字符串，如果没有则返回@code{nil}。
+@end defun
+
+菜单项是键盘映射中的绑定。  每个绑定将一个事件类型与一个定义相关联，但事件类型对于菜单外观没有任何意义。  （通常我们使用伪事件，即键盘无法生成的符号，作为菜单项绑定的事件类型。）菜单完全根据键盘映射中与这些事件相对应的绑定生成。
+
+菜单中项目的顺序与键盘映射中绑定的顺序相同。  由于 @code{define-key} 将新绑定放在前面，因此如果您关心顺序，则应该从菜单底部开始定义菜单项并移动到顶部。  将项目添加到现有菜单时，可以使用 @code{keymap-set-after} (@pxref{Modifying Menus}) 指定其在菜单中的位置。
+
+@menu
+* Simple Menu Items::        一种简单的菜单键绑定。
+* Extended Menu Items::      更复杂的菜单项定义。
+* Menu Separators::          通过菜单绘制一条水平线。
+* Alias Menu Items::         在菜单项中使用命令别名。
+@end menu
+
+@node Simple Menu Items
+@subsubsection 简单的菜单项
+
+定义菜单项的更简单（也是原始）的方法是将某些事件类型（无论什么事件类型）绑定到如下绑定：
+
+@example
+(@var{item-string} . @var{real-binding})
+@end example
+
+@noindent
+@sc{car}、@var{item-string} 是要在菜单中显示的字符串。  它应该很短——最好是一到三个词。  它应该描述它所对应的命令的操作。  请注意，并非所有图形工具包都可以在菜单中显示非 @acronym{ASCII} 文本（它将适用于键盘菜单，并且在很大程度上适用于 GTK+ 工具包）。
+
+您还可以提供第二个字符串，称为帮助字符串，如下所示：
+
+@example
+(@var{item-string} @var{help} . @var{real-binding})
+@end example
+
+@noindent
+@var{help} 指定当鼠标位于该项目上时要显示的帮助回显字符串，其方式与 @code{help-echo} 文本属性 (@pxref{Help display}) 相同。
+
+就@code{define-key}而言，@var{item-string}和@var{help-string}是事件绑定的一部分。  然而，@code{lookup-key}仅返回@var{real-binding}，并且仅使用@var{real-binding}来执行该键。
+
+如果@var{real-binding}为@code{nil}，则@var{item-string}会出现在菜单中但无法选择。
+
+@cindex @code{menu-enable} (symbol property)
+如果 @var{real-binding} 是一个符号并且具有非 @code{nil} @code{menu-enable} 属性，则该属性是控制是否启用菜单项的表达式。  每次使用键盘映射显示菜单时，Emacs 都会计算表达式，并且仅当表达式的值非 @code{nil} 时才启用菜单项。  当菜单项被禁用时，它会以模糊的方式显示，并且无法选择。
+
+每次您查看菜单时，菜单栏不会重新计算启用了哪些项目。  这是因为 X 工具包预先需要整个菜单树。  要强制重新计算菜单栏，请调用 @code{force-mode-line-update} (@pxref{Mode Line Format})。
+
+@node Extended Menu Items
+@subsubsection 扩展菜单项
+@kindex menu-item
+@cindex extended menu item
+
+扩展格式菜单项是比简单格式更灵活、更简洁的替代方案。  您可以使用一个绑定来定义事件类型，该绑定是一个以符号 @code{menu-item} 开头的列表。对于不可选择的字符串，绑定如下所示：
+
+@example
+(menu-item @var{item-name})
+@end example
+
+@noindent
+以两个或多个破折号开头的字符串指定分隔线；见@ref{Menu Separators}。
+
+要定义一个可以选择的真实菜单项，扩展格式绑定如下所示：
+
+@example
+(menu-item @var{item-name} @var{real-binding}
+    . @var{item-property-list})
+@end example
+
+@noindent
+这里，@var{item-name}是一个计算结果为菜单项字符串的表达式。  因此，字符串不必是常量。
+
+第三个元素，@var{real-binding}，可以是要执行的命令（在这种情况下，您会得到一个普通的菜单项）。  它也可以是一个键盘映射，这将产生一个子菜单，并且 @var{item-name} 用作子菜单名称。  最后，它可以是@code{nil}，在这种情况下您将得到一个不可选择的菜单项。  这在创建分隔线等时非常有用。
+
+列表尾部@var{item-property-list}采用属性列表(@pxref{Property Lists})的形式，其中包含其他信息。
+
+以下是支持的属性表：
+
+@table @code
+@item :enable @var{form}
+@var{form} 的评估结果确定该项目是否启用（非 @code{nil} 表示是）。  如果该项目未启用，您将无法真正单击它。
+
+@item :visible @var{form}
+@var{form} 的计算结果决定了该项目是否应该实际出现在菜单中（非 @code{nil} 表示是）。  如果该项目未出现，则显示菜单，就好像该项目根本未定义一样。
+
+@item :help @var{help}
+该属性的值 @var{help} 指定当鼠标位于该项目上时要显示的帮助回显字符串。  它的显示方式与 @code{help-echo} 文本属性 (@pxref{Help display}) 相同。请注意，这必须是一个常量字符串，与文本和叠加层的 @code{help-echo} 属性不同。
+
+@item :button (@var{type} . @var{selected})
+此属性提供了一种定义单选按钮和切换按钮的方法。 @sc{car}、@var{type}表示：应该是@code{:toggle}或@code{:radio}。  @sc{cdr}、@var{selected}应该是一个形式；评估的结果表明当前是否选择了该按钮。
+
+@dfn{toggle} 是一个菜单项，根据 @var{selected} 的值标记为打开或关闭。  命令本身应该切换@var{selected}，如果是@code{nil}，则将其设置为@code{t}，如果是@code{t}，则将其设置为@code{nil}。  以下是如何定义切换 @code{debug-on-error} 标志的菜单项：
+
+@example
+(menu-item "Debug on Error" toggle-debug-on-error
+           :button (:toggle
+                    . (and (boundp 'debug-on-error)
+                           debug-on-error)))
+@end example
+
+@noindent
+这是有效的，因为 @code{toggle-debug-on-error} 被定义为切换变量 @code{debug-on-error} 的命令。
+
+@dfn{Radio buttons} 是一组菜单项，其中任何时候只有一个被选择。  应该有一个变量，其值表明任何时候都选择哪一个。  组中每个单选按钮的 @var{selected} 形式应检查变量是否具有选择该按钮的正确值。  单击按钮应设置变量，以便您单击的按钮被选中。
+
+@item :key-sequence @var{key-sequence}
+此属性指定将哪个键序列显示为等效键盘。在 Emacs 在菜单中显示 @var{key-sequence} 之前，它会验证 @var{key-sequence} 是否确实相当于此菜单项，因此只有在您指定正确的按键顺序时它才有效。为 @var{key-sequence} 指定 @code{nil} 相当于不存在 @code{:key-sequence} 属性。
+
+@item :keys @var{string}
+此属性指定 @var{string} 是显示为该菜单项的键盘等效项的字符串。  您可以在 @var{string} 中使用 @samp{\\[...]} 文档构造。
+
+该属性也可以是一个函数（将不带参数调用）。  该函数应该返回一个字符串。  每次计算菜单时都会调用此函数，因此使用需要大量时间计算的函数并不是一个好主意，并且应该期望从任何上下文中调用它。
+
+@item :filter @var{filter-fn}
+此属性提供了一种动态计算菜单项的方法。属性值@var{filter-fn}应该是一个参数的函数；当它被调用时，它的参数将为@var{real-binding}。  该函数应该返回要使用的绑定。
+
+Emacs 可以在重新显示或操作菜单数据结构时随时调用此函数，因此您应该编写它以便可以随时安全地调用它。
+
+@item :wrap @var{wrap-p}
+如果工具栏中的 @var{wrap-p} 不是 @code{nil}，则不会显示菜单项，而是导致后续项目显示在新行上。  当 Emacs 使用 GTK+ 或 Nextstep 工具包时，不支持此功能。
+@end table
+
+@node Menu Separators
+@subsubsection 菜单分隔符
+@cindex menu separators
+
+菜单分隔符是一种不显示任何文本的菜单项，而是用水平线将菜单分为多个子部分。菜单键盘映射中的分隔符如下所示：
+
+@example
+(menu-item @var{separator-type})
+@end example
+
+@noindent
+其中 @var{separator-type} 是一个以两个或多个破折号开头的字符串。
+
+在最简单的情况下，@var{separator-type} 仅由破折号组成。它指定默认的分隔符类型。  （为了兼容性，@code{""} 和 @code{-} 也算作分隔符。）
+
+@var{separator-type} 的某些其他值指定不同样式的分隔符。  这是其中的一个表格：
+
+@table @code
+@item "--no-line"
+@itemx "--space"
+额外的垂直空间，没有实际的线条。
+
+@item "--single-line"
+菜单前景色中的单行。
+
+@item "--double-line"
+菜单前景色中的双线。
+
+@item "--single-dashed-line"
+菜单前景色中的单条虚线。
+
+@item "--double-dashed-line"
+菜单前景色中的双虚线。
+
+@item "--shadow-etched-in"
+具有 3D 凹陷外观的单线。  这是默认使用的仅由破折号组成的分隔符。
+
+@item "--shadow-etched-out"
+具有 3D 凸起外观的单线。
+
+@item "--shadow-etched-in-dash"
+具有 3D 凹陷外观的单虚线。
+
+@item "--shadow-etched-out-dash"
+具有 3D 凸起外观的单虚线。
+
+@item "--shadow-double-etched-in"
+具有 3D 凹陷外观的两条线。
+
+@item "--shadow-double-etched-out"
+两条具有 3D 凸起外观的线条。
+
+@item "--shadow-double-etched-in-dash"
+具有 3D 凹陷外观的两条虚线。
+
+@item "--shadow-double-etched-out-dash"
+两条虚线，具有 3D 凸起外观。
+@end table
+
+您还可以以另一种样式给出这些名称，在双破折号后添加冒号，并将每个单破折号替换为后面单词的大写。  因此，@code{"--:singleLine"}等价于@code{"--single-line"}。
+
+您可以使用较长的形式来指定关键字，例如 @code{:enable} 和 @code{:visible} 作为菜单分隔符：
+
+@code{(menu-item @var{separator-type} nil . @var{item-property-list})}
+
+例如：
+
+@example
+(menu-item "--" nil :visible (boundp 'foo))
+@end example
+
+某些系统和显示工具包并不能真正处理所有这些分隔符类型。  如果您使用不受支持的类型，菜单将显示受支持的类似分隔符类型。
+
+@node Alias Menu Items
+@subsubsection 别名菜单项
+
+有时，制作使用相同命令但具有不同启用条件的菜单项很有用。  现在，在 Emacs 中执行此操作的最佳方法是使用扩展菜单项；在该功能存在之前，可以通过定义别名命令并在菜单项中使用它们来完成。  下面是一个为 @code{read-only-mode} 创建两个别名并为它们提供不同的启用条件的示例：
+
+@example
+(defalias 'make-read-only 'read-only-mode)
+(put 'make-read-only 'menu-enable '(not buffer-read-only))
+(defalias 'make-writable 'read-only-mode)
+(put 'make-writable 'menu-enable 'buffer-read-only)
+@end example
+
+@cindex @code{menu-alias} (symbol property)
+在菜单中使用别名时，显示真实命令名称的等效键绑定通常很有用，而不是别名（除了菜单本身之外，别名通常没有任何键绑定）。  要请求此操作，请为别名符号指定一个非 @code{nil} @code{menu-alias} 属性。  因此，
+
+@example
+(put 'make-read-only 'menu-alias t)
+(put 'make-writable 'menu-alias t)
+@end example
+
+@noindent
+导致@code{make-read-only}和@code{make-writable}的菜单项显示@code{read-only-mode}的键盘绑定。
+
+@node Mouse Menus
+@subsection 菜单和鼠标
+
+使菜单键映射生成菜单的常用方法是使其成为前缀键的定义。  （Lisp 程序可以显式弹出菜单并接收用户的选择——参见@ref{Pop-Up Menus}。）
+
+如果前缀键以鼠标事件结束，Emacs 会通过弹出可见菜单来处理菜单键盘映射，以便用户可以用鼠标进行选择。  当用户单击菜单项时，生成的事件是具有导致该菜单项的绑定的任何字符或符号。  （如果菜单具有多个级别或来自菜单栏，则菜单项可能会生成一系列事件。）
+
+通常最好使用按钮按下事件来触发菜单。  然后用户可以通过释放按钮来选择菜单项。
+
+@cindex submenu
+如果菜单键映射包含到嵌套键映射的绑定，则嵌套键映射指定 @dfn{submenu}。  将会有一个菜单项，由嵌套键盘映射的项目字符串标记，单击该项目会自动弹出指定的子菜单。  作为一个特殊的例外，如果菜单键映射包含单个嵌套键映射并且没有其他菜单项，则菜单将直接显示嵌套键映射的内容，而不是作为子菜单。
+
+但是，如果 Emacs 是在没有 X 工具包支持的情况下编译的，或者在文本终端上，则不支持子菜单。  每个嵌套键盘映射都显示为菜单项，但单击它不会自动弹出子菜单。  如果您希望模仿子菜单的效果，可以通过为嵌套键盘映射提供一个以 @samp{@@} 开头的项目字符串来实现。  这会导致 Emacs 使用单独的 @dfn{menu pane} 显示嵌套键盘映射； @samp{@@} 之后的项目字符串的其余部分是窗格标签。  如果 Emacs 是在没有 X 工具包支持的情况下编译的，或者如果菜单显示在文本终端上，则不会使用菜单窗格；在这种情况下，当显示菜单标签时，项目字符串开头的 @samp{@@} 将被省略，并且没有其他效果。
+
+@node Keyboard Menus
+@subsection 菜单和键盘
+
+当以键盘事件（字符或功能键）结尾的前缀键具有菜单键映射的定义时，该键映射作为键盘菜单运行；用户通过使用键盘选择菜单项来指定下一个事件。
+
+Emacs 在回显区域中显示键盘菜单，其中包含地图的整体提示字符串，后跟替代项（地图绑定的项目字符串）。  如果绑定不能一次全部适合，用户可以键入 @key{SPC} 查看下一行替代项。连续使用@key{SPC}最终会到达菜单末尾，然后循环到开头。  （变量 @code{menu-prompt-more-char} 指定用于此目的的字符；@key{SPC} 是默认值。）
+
+当用户从菜单中找到所需的替代字符时，他或她应该键入相应的字符——其绑定是该替代字符的字符。
+
+@defvar menu-prompt-more-char
+该变量指定用于要求查看菜单下一行的字符。  它的初始值为32，代码为@key{SPC}。
+@end defvar
+
+@node Menu Example
+@subsection 菜单示例
+@cindex menu definition example
+
+这是定义菜单键映射的完整示例。  它是菜单栏中@samp{Edit}菜单中@samp{Replace}子菜单的定义，它使用扩展菜单项格式（@pxref{Extended Menu Items}）。  首先我们创建键盘映射，并为其命名：
+
+@smallexample
+(defvar menu-bar-replace-menu (make-sparse-keymap "Replace"))
+@end smallexample
+
+@noindent
+接下来我们定义菜单项：
+
+@smallexample
+(define-key menu-bar-replace-menu [tags-repl-continue]
+  '(menu-item "Continue Replace" multifile-continue
+              :help "Continue last tags replace operation"))
+(define-key menu-bar-replace-menu [tags-repl]
+  '(menu-item "Replace in tagged files" tags-query-replace
+              :help "Interactively replace a regexp in all tagged files"))
+(define-key menu-bar-replace-menu [separator-replace-tags]
+  '(menu-item "--"))
+;; @r{@dots{}}
+@end smallexample
+
+@noindent
+注意绑定所针对的符号；它们出现在方括号内，按照定义的按键顺序。  在某些情况下，该符号与命令名称相同；有时情况有所不同。  这些符号被视为功能键，但它们并不是键盘上真正的功能键。  它们不会影响菜单本身的功能，但当用户从菜单中选择时，它们会在回显区域中回显，并且出现在 @code{where-is} 和 @code{apropos} 的输出中。
+
+本示例中的菜单旨在与鼠标一起使用。  如果菜单旨在与键盘一起使用，即，如果它绑定到以键盘事件结尾的键序列，则菜单项应绑定到可以使用键盘键入的字符或实际功能键。
+
+定义为 @code{("--")} 的绑定是分隔线。与真实的菜单项一样，分隔符有一个键符号，在本例中为@code{separator-replace-tags}。  如果一个菜单有两个分隔符，则它们必须有两个不同的键符号。
+
+以下是我们如何将此菜单显示为父菜单中的项目：
+
+@example
+(define-key menu-bar-edit-menu [replace]
+  (list 'menu-item "Replace" menu-bar-replace-menu))
+@end example
+
+@noindent
+请注意，这包含子菜单键映射，它是变量 @code{menu-bar-replace-menu} 的值，而不是符号 @code{menu-bar-replace-menu} 本身。  在父菜单项中使用该符号是没有意义的，因为 @code{menu-bar-replace-menu} 不是命令。
+
+如果您想将相同的替换菜单附加到鼠标单击，可以这样做：
+
+@example
+(define-key global-map [C-S-down-mouse-1]
+   menu-bar-replace-menu)
+@end example
+
+@node Menu Bar
+@subsection 菜单栏
+@cindex menu bar
+
+Emacs 通常在每个框架的顶部显示一个@dfn{menu bar}。 @xref{Menu Bars,,,emacs, The GNU Emacs Manual}。  菜单栏项是假功能键 @key{MENU-BAR} 的子命令，如活动键盘映射中所定义。
+
+要将项目添加到菜单栏，请创建一个您自己的假功能键（我们称之为 @var{key}），并为键序列 @code{[menu-bar @var{key}]} 进行绑定。  大多数情况下，绑定是菜单键盘映射，因此按下菜单栏项上的按钮会导致另一个菜单。
+
+当多个活动键盘映射为菜单栏定义相同的功能键时，该项目仅出现一次。  如果用户单击该菜单栏项，则会显示一个组合菜单，其中包含该项的所有子命令——全局子命令、本地子命令和次要模式子命令。
+
+在确定菜单栏内容时，通常会忽略变量@code{overriding-local-map}。  也就是说，菜单栏是根据 @code{overriding-local-map} 为 @code{nil} 时处于活动状态的键盘映射计算的。  @xref{Active Keymaps}。
+
+以下是设置菜单栏项目的示例：
+
+@example
+@group
+;; @r{Make a menu keymap (with a prompt string)}
+;; @r{and make it the menu bar item's definition.}
+(define-key global-map [menu-bar words]
+  (cons "Words" (make-sparse-keymap "Words")))
+@end group
+
+@group
+;; @r{Define specific subcommands in this menu.}
+(define-key global-map
+  [menu-bar words forward]
+  '("Forward word" . forward-word))
+@end group
+@group
+(define-key global-map
+  [menu-bar words backward]
+  '("Backward word" . backward-word))
+@end group
+@end example
+
+本地键盘映射可以通过使用 @code{undefined} 作为绑定重新绑定相同的假功能键来取消由全局键盘映射创建的菜单栏项。  例如，Dired 是这样抑制 @samp{Edit} 菜单栏项的：
+
+@example
+(define-key dired-mode-map [menu-bar edit] 'undefined)
+@end example
+
+@noindent
+这里，@code{edit}是由假功能键产生的符号，它被全局映射用于@samp{Edit}菜单栏项。  抑制全局菜单栏项目的主要原因是为特定于模式的项目重新获得空间。
+
+@defvar menu-bar-final-items
+通常，菜单栏显示全局项目，然后显示本地地图定义的项目。
+
+该变量包含一个假功能键列表，这些项目将显示在菜单栏的末尾而不是按正常顺序。  默认值为@code{(help-menu)}；因此， @samp{Help} 菜单项通常出现在菜单栏的末尾，位于本地菜单项之后。
+@end defvar
+
+@defvar menu-bar-update-hook
+在重新显示菜单栏之前，通过重新显示运行此正常挂钩以更新菜单栏内容。  您可以使用它来更新内容应有所不同的菜单。  由于这个钩子经常运行，我们建议您确保它调用的函数在通常情况下不会花费太多时间。
+@end defvar
+
+在每个菜单栏项旁边，Emacs 都会显示一个运行相同命令的键绑定（如果存在这样的键绑定）。  这为不知道键绑定的用户提供了方便的提示。  如果命令有多个绑定，Emacs 通常会显示它找到的第一个。  您可以通过为命令分配 @code{:advertised-binding} 符号属性来指定一个特定的键绑定。  @xref{Keys in Documentation}。
+
+@node Tool Bar
+@subsection 工具栏
+@cindex tool bar
+
+@dfn{tool bar} 是位于框架顶部、菜单栏正下方的一行可单击图标。  @xref{Tool Bars,,,emacs, The GNU Emacs Manual}。  Emacs 通常在图形显示器上显示工具栏。
+
+在每一帧上，帧参数 @code{tool-bar-lines} 控制为工具栏保留多少行的高度。  零值会抑制工具栏。  如果该值非零，并且@code{auto-resize-tool-bars}非@code{nil}，则工具栏会根据需要自动扩展和收缩以保存指定的内容。如果值为@code{grow-only}，工具栏会自动展开，但不会自动收缩。
+
+工具栏内容由附加到名为 0⁣ 的假功能键的菜单键映射控制（与菜单栏的控制方式非常相似）。  因此，您使用 @code{define-key} 定义一个工具栏项，如下所示：
+
+@example
+(define-key global-map [tool-bar @var{key}] @var{item})
+@end example
+
+@noindent
+其中@var{key}是一个假功能键，用于区分该项目与其他项目，@var{item}是菜单项键绑定（@pxref{Extended Menu Items}），它说明如何显示该项目及其行为。
+
+常用的菜单键盘映射项属性 @code{:visible}、@code{:enable}、@code{:button} 和 @code{:filter} 在工具栏绑定中很有用，并具有其正常含义。  项目中的@var{real-binding}必须是命令，而不是键盘映射；换句话说，将工具栏图标定义为前缀键是行不通的。
+
+@code{:help} 属性指定当鼠标位于该项目上时要显示的帮助回显字符串。  它的显示方式与 @code{help-echo} 文本属性 (@pxref{Help display}) 相同。
+
+此外，您应该使用 @code{:image} 属性；这是指定要在工具栏中显示的图像的方法：
+
+@table @code
+@item :image @var{image}
+@var{image} 是单个图像规范 (@pxref{Images}) 或四个图像规范的向量。  如果您使用四个向量，则根据情况使用其中之一：
+
+@table @asis
+@item 项目 0
+当启用并选择该项目时使用。
+@item 项目 1
+在启用和取消选择该项目时使用。
+@item 第2项
+当禁用并选择该项目时使用。
+@item 第3项
+当该项目被禁用和取消选择时使用。
+@end table
+@end table
+
+Emacs 的 GTK+ 和 NS 版本会忽略第 1 至 3 项，因为禁用和/或取消选择的图像是从第 0 项自动计算的。
+
+如果 @var{image} 是单个图像规范，Emacs 通过对图像应用边缘检测算法来绘制处于禁用状态的工具栏按钮。
+
+@code{:rtl} 属性指定用于从右到左语言的替代图像。  目前只有 GTK+ 版本的 Emacs 支持此功能。
+
+某些工具包在工具栏中同时显示图像和文本。  如果您想强制仅使用图像，请使用 @code{:vert-only} 非 @code{nil} 属性。
+
+与菜单栏一样，工具栏也可以显示分隔符 (@pxref{Menu Separators})。  不过，工具栏分隔符是垂直的而不是水平的，并且仅支持单一样式。  它们在工具栏键盘映射中由 @code{(menu-item "--")} 条目表示；工具栏分隔符不支持像 @code{:visible} 这样的属性。  分隔符在 GTK+ 和 Nextstep 工具栏中原生呈现；在其他情况下，它们使用垂直线的图像进行渲染。
+
+默认工具栏的定义是，对于命令符号具有 @code{mode-class} 属性为 @code{special} (@pxref{Major Mode Conventions}) 的主要模式，不会出现特定于编辑的项目。  主要模式可以通过在本地地图中绑定 @code{[tool-bar @var{foo}]} 来将项目添加到全局栏。  对于某些主要模式来说，完全替换默认的工具栏项目是有意义的，因为不能方便地容纳很多工具栏项目，并且默认绑定通过使用 @code{tool-bar-map} 的间接寻址使这变得容易。
+
+@defvar tool-bar-map
+默认情况下，全局映射绑定 @code{[tool-bar]} 如下：
+
+@example
+(keymap-global-set "<tool-bar>"
+                   '(menu-item "tool bar" ignore
+                               :filter tool-bar-make-keymap))
+@end example
+
+@noindent
+函数@code{tool-bar-make-keymap}又从变量@code{tool-bar-map}的值动态导出实际的工具栏图。  因此，您通常应该通过更改该地图来调整默认（全局）工具栏。  一些主要模式，例如信息模式，通过使 @code{tool-bar-map} 缓冲区本地化并将其设置为不同的键盘映射来完全取代全局工具栏。
+@end defvar
+
+有两个方便的函数用于定义工具栏项目，如下所示。
+
+@defun tool-bar-add-item icon def key &rest props
+该函数通过修改@code{tool-bar-map}向工具栏添加一个项目。  要使用的图像由 @var{icon} 定义，它是由 @code{find-image} 定位的 XPM、XBM 或 PBM 图像文件的基本名称。  给定值@samp{"exit"}，例如，@file{exit.xpm}、@file{exit.pbm}和@file{exit.xbm}将在彩色显示器上按该顺序搜索。  在单色显示器上，搜索顺序为 @samp{.pbm}、@samp{.xbm} 和 @samp{.xpm}。  要使用的绑定是命令 @var{def}，@var{key} 是前缀键映射中的假功能键符号。  其余参数 @var{props} 是要添加到菜单项规范的附加属性列表元素。
+
+要在某些本地地图中定义项目，请在该函数的调用周围将 @code{tool-bar-map} 与 @code{let} 绑定：
+@example
+(defvar foo-tool-bar-map
+  (let ((tool-bar-map (make-sparse-keymap)))
+    (tool-bar-add-item @dots{})
+    @dots{}
+    tool-bar-map))
+@end example
+@end defun
+
+@defun tool-bar-add-item-from-menu command icon &optional map &rest props
+此功能可以方便地定义与现有菜单栏绑定一致的工具栏项目。  在@var{map}（默认为@code{global-map}）的菜单栏中查找@var{command}的绑定，并进行修改以添加@var{icon}的图像规范，其查找方式与@code{tool-bar-add-item}相同。  然后将生成的绑定放置在 @code{tool-bar-map} 中，因此仅将此函数用于全局工具栏项。
+
+@var{map} 必须包含绑定到 @code{[menu-bar]} 的适当键盘映射。  其余参数 @var{props} 是要添加到菜单项规范的附加属性列表元素。
+@end defun
+
+@defun tool-bar-local-item-from-menu command icon in-map &optional from-map &rest props
+该函数用于制作非全局工具栏项目。  像@code{tool-bar-add-item-from-menu}一样使用它，除了@var{in-map}指定要在其中进行定义的局部映射。参数@var{from-map}类似于@code{tool-bar-add-item-from-menu}的@var{map}参数。
+@end defun
+
+@vindex secondary-tool-bar-map
+除了@code{tool-bar-map}中定义的工具栏项之外，Emacs 还支持显示键盘映射@code{secondary-tool-bar-map}中指定的附加行“辅助”工具栏项。如果工具栏位于框架的顶部，这些项目通常显示在 @code{tool-bar-map} 中定义的项目下方，但如果工具栏位于框架的底部 (@pxref{Layout Parameters})，则显示在这些项目的上方。如果工具栏位于框架的左侧或右侧，则不会显示这些项目。
+
+@defvar auto-resize-tool-bars
+如果此变量非 0⁣，工具栏会自动调整大小以显示所有定义的工具栏项目，但不大于框架高度的四分之一。
+
+如果值为@code{grow-only}，工具栏会自动展开，但不会自动收缩。  要收缩工具栏，用户必须通过输入 @kbd{C-l} 来重新绘制框架。
+
+如果 Emacs 是用 GTK+ 或 Nextstep 构建的，则工具栏只能显示一行，因此该变量无效。
+@end defvar
+
+@defvar auto-raise-tool-bar-buttons
+如果此变量非 @code{nil}，则当鼠标移到工具栏项目上时，它们会以凸起形式显示。
+@end defvar
+
+@defvar tool-bar-button-margin
+此变量指定在工具栏项目周围添加额外的边距。该值是一个整数，即像素数。  默认值为 4。
+@end defvar
+
+@defvar tool-bar-button-relief
+该变量指定工具栏项目的阴影宽度。该值是一个整数，即像素数。  默认值为 1。
+@end defvar
+
+@defvar tool-bar-border
+该变量指定工具栏区域下方绘制的边框的高度。  整数将高度指定为像素数。如果该值为@code{internal-border-width}（默认）或@code{border-width}之一，则工具栏边框高度对应于相应的框架参数。
+@end defvar
+
+您可以使用 Shift、Control、Meta 等修饰符定义单击工具栏项目的特殊含义。  您可以通过假功能键设置与原始项目相关的附加项目来实现此目的。  具体来说，附加项目应使用用于命名原始项目的相同假功能键的修改版本。
+
+因此，如果原始项目是这样定义的，
+
+@example
+(define-key global-map [tool-bar shell]
+  '(menu-item "Shell" shell
+              :image (image :type xpm :file "shell.xpm")))
+@end example
+
+@noindent
+那么这里是如何定义使用 Shift 修饰符单击同一工具栏图像：
+
+@example
+(define-key global-map [tool-bar S-shell] 'some-command)
+@end example
+
+@xref{Function Keys}，了解有关如何向功能键添加修饰符的更多信息。
+
+如果您有更改工具栏项目是否启用的功能，则此状态不一定会立即以可视方式更新。要强制重新计算工具栏，请调用 @code{force-mode-line-update} (@pxref{Mode Line Format})。
+
+@node Modifying Menus
+@subsection 修改菜单
+@cindex menu modification
+
+当您在现有菜单中插入新项目时，您可能希望将其放置在菜单现有项目中的特定位置。  如果您使用 @code{define-key} 添加项目，它通常会出现在菜单的前面。  要将其放在菜单中的其他位置，请使用 @code{keymap-set-after}：
+
+@defun keymap-set-after map key binding &optional after
+在 @var{map} 中为 @var{key} 定义一个绑定，值为 @var{binding}，就像 @code{keymap-set} (@pxref{Changing Key Bindings}) 一样，但将绑定定位在 @var{map} 中事件 @var{after} 的绑定之后。  参数 @var{key} 应表示单个菜单项或键，并且应满足 @code{key-valid-p} (@pxref{Key Sequences})。  @var{after} 应该是单个事件类型——符号或字符，而不是序列。  新的绑定位于 @var{after} 的绑定之后。  如果 @var{after} 是 @code{t} 或被省略，则新绑定位于最后，位于键盘映射的末尾。  但是，新的绑定会添加在任何继承的键盘映射之前。
+
+这是一个例子：
+
+@example
+(keymap-set-after my-menu "<drink>"
+  '("Drink" . drink-command) 'eat)
+@end example
+
+@noindent
+为假功能键 @key{DRINK} 进行绑定，并将其放在 @key{EAT} 绑定之后。
+
+以下是如何在 Shell 模式的 @samp{Signals} 菜单中的@code{break} 项目之后插入名为 @samp{Work} 的项目：
+
+@example
+(keymap-set-after shell-mode-map "<menu-bar> <signals> <work>"
+  '("Work" . work-command) 'break)
+@end example
+@end defun
+
+@node Easy Menu
+@subsection 简易菜单
+
+以下宏提供了定义弹出菜单和/或菜单栏菜单的便捷方法。
+
+@defmac easy-menu-define symbol maps doc menu
+该宏定义一个弹出菜单和/或菜单栏子菜单，其内容由@var{menu}给出。
+
+如果@var{symbol}非@code{nil}，它应该是一个符号；那么这个宏将@var{symbol}定义为弹出菜单的函数（@pxref{Pop-Up Menus}），并以@var{doc}作为其文档字符串。  它还将 @var{symbol} 定义为一个变量，其值为菜单。 @var{symbol} 不应被引用。
+
+无论 @var{symbol} 的值如何，如果 @var{maps} 是键盘映射，则菜单将添加到该键盘映射中，作为菜单栏 (@pxref{Menu Bar}) 的顶级菜单。  它也可以是键盘映射列表，在这种情况下，菜单将单独添加到每个键盘映射中。
+
+@var{menu} 的第一个元素必须是字符串，用作菜单标签。  它后面可以跟任意数量的以下关键字参数对：
+
+@table @code
+@item :filter @var{function}
+@var{function} 必须是一个函数，如果使用一个参数（其他菜单项的列表）调用该函数，则返回要在菜单中显示的实际项目。
+
+@item :visible @var{include}
+@var{include} 是一个表达式；如果它的计算结果为@code{nil}，则菜单将不可见。  @code{:included} 是@code{:visible} 的别名。
+
+@item :active @var{enable}
+@var{enable} 是一个表达式；如果其计算结果为@code{nil}，则菜单不可选。  @code{:enable} 是@code{:active} 的别名。
+@end table
+
+@var{menu} 中的其余元素是菜单项。
+
+菜单项可以是三个元素的向量@code{[@var{name} @var{callback} @var{enable}]}。  @var{name} 是菜单项名称（字符串）。  @var{callback} 是选择该项目时要运行的命令或要评估的表达式。  @var{enable} 是一个表达式；如果计算结果为@code{nil}，则该项目将无法选择。
+
+或者，菜单项可能具有以下形式：
+
+@smallexample
+   [ @var{name} @var{callback} [ @var{keyword} @var{arg} ]... ]
+@end smallexample
+
+@noindent
+其中@var{name}和@var{callback}具有与上述相同的含义，并且每个可选的@var{keyword}和@var{arg}对应该是以下之一：
+
+@table @code
+@item :keys @var{keys}
+@var{keys} 是一个字符串，显示为相当于菜单项的键盘。这通常是不需要的，因为键盘等效项是自动计算的。  @var{keys} 在显示之前用 @code{substitute-command-keys} 展开 (@pxref{Keys in Documentation})。
+
+@item :key-sequence @var{keys}
+@var{keys} 是一个提示，指示在命令绑定到多个键序列的情况下将哪个键序列显示为键盘等效项。如果 @var{keys} 未绑定到与此菜单项相同的命令，则它不起作用。
+
+@item :active @var{enable}
+@var{enable} 是一个表达式；如果它的计算结果为@code{nil}，则该项目将变得不可选择。  @code{:enable} 是@code{:active} 的别名。
+
+@item :visible @var{include}
+@var{include} 是一个表达式；如果它的计算结果为@code{nil}，则该项目将变得不可见。  @code{:included} 是@code{:visible} 的别名。
+
+@item :label @var{form}
+@var{form} 是一个表达式，通过计算来获取用作菜单项标签的值（默认为 @var{name}）。
+
+@item :suffix @var{form}
+@var{form} 是动态计算的表达式，其值与菜单项的标签连接。
+
+@item :style @var{style}
+@var{style} 是描述菜单项类型的符号；它应该是@code{toggle}（复选框），或@code{radio}（单选按钮），或其他任何东西（意味着普通的菜单项）。
+
+@item :selected @var{selected}
+@var{selected} 是一个表达式；只要表达式的值非 @code{nil} ，复选框或单选按钮就会被选中。
+
+@item :help @var{help}
+@var{help} 是描述菜单项的字符串。
+@end table
+
+或者，菜单项可以是字符串。  然后该字符串将作为不可选择的文本出现在菜单中。  由破折号组成的字符串显示为分隔符 (@pxref{Menu Separators})。
+
+或者，菜单项可以是与 @var{menu} 格式相同的列表。  这是一个子菜单。
+@end defmac
+
+以下是使用 @code{easy-menu-define} 定义菜单的示例，该菜单与 @ref{Menu Bar} 中的示例中定义的菜单类似：
+
+@example
+(easy-menu-define words-menu global-map
+  "Menu for word navigation commands."
+  '("Words"
+     ["Forward word" forward-word]
+     ["Backward word" backward-word]))
+@end example

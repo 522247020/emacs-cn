@@ -1,0 +1,224 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1999, 2001--2026 Free Software Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Hash Tables
+@chapter 哈希表
+@cindex hash tables
+@cindex lookup tables
+
+哈希表是一种非常快速的查找表，有点像 alist (@pxref{Association Lists})，它将键映射到相应的值。  它在以下方面与 alist 不同：
+
+@itemize @bullet
+@item 
+对于大型表来说，哈希表中的查找速度非常快——事实上，所需的时间基本上是表中存储的元素数量的@emph{independent}。  对于较小的表（几十个元素），alists 可能仍然更快，因为哈希表具有或多或少的恒定开销。
+
+@item 
+哈希表中的对应关系没有特定的顺序。
+
+@item 
+两个哈希表之间无法共享结构，而两个列表可以共享公共尾部。
+@end itemize
+
+Emacs Lisp 提供了通用哈希表数据类型，以及一系列对其进行操作的函数。  哈希表具有特殊的打印表示形式，由 @samp{#s} 后跟指定哈希表属性和内容的列表组成。 @xref{Creating Hash}。 （哈希符号，在没有读取表示的对象的打印表示中使用的初始 @samp{#} 字符，与哈希表无关。@xref{Printed Representation}。）
+
+Obarray 也是一种哈希表，但它们是不同类型的对象，仅用于记录内部符号 (@pxref{Creating Symbols})。
+
+@menu
+* Creating Hash::        创建哈希表的函数。
+* Hash Access::          读取和写入哈希表内容。
+* Defining Hash::        定义新的比较方法。
+* Other Hash::           各种各样的。
+@end menu
+
+@node Creating Hash
+@section 创建哈希表
+@cindex creating hash tables
+
+创建哈希表的主要函数是@code{make-hash-table}。
+
+@defun make-hash-table &rest keyword-args
+该函数根据指定的参数创建一个新的哈希表。  参数应由交替的关键字（特别识别的特定符号）和与其相对应的值组成。
+
+@code{make-hash-table} 中有几个关键字有意义，但您真正需要了解的唯一两个是 @code{:test} 和 @code{:weakness}。
+
+@table @code
+@item :test @var{test}
+这指定了该哈希表的键查找方法。  默认为@code{eql}； @code{eq} 和 @code{equal} 是其他选择：
+
+@table @code
+@item eql
+如果是 @code{equal}，即数字的键值相等并且都是整数或都是浮点数，则它们是相同的；否则，两个不同的对象永远不会相同。
+
+@item eq
+任何两个不同的 Lisp 对象作为键都是不同的。
+
+@item equal
+如果两个 Lisp 对象根据 @code{equal} 相等，则它们是相同的（作为键）。
+@end table
+
+您可以使用 @code{define-hash-table-test} (@pxref{Defining Hash}) 来定义 @var{test} 的其他可能性。
+
+@item :weakness @var{weak}
+哈希表的弱点指定哈希表中键或值的存在是否会使其免遭垃圾回收。
+
+值 @var{weak} 必须是 @code{nil}、@code{key}、@code{value}、@code{key-or-value}、@code{key-and-value} 或@code{t}（@code{key-and-value} 的别名）之一。  如果@var{weak}是@code{key}，那么哈希表不会阻止其键被作为垃圾收集（如果它们没有在其他地方被引用）；如果某个特定的键确实被收集，则相应的关联将从哈希表中删除。
+
+如果@var{weak}是@code{value}，那么哈希表不会阻止值被作为垃圾收集（如果它们没有在其他地方被引用）；如果确实收集了特定值，则会从哈希表中删除相应的关联。
+
+如果 @var{weak} 是 @code{key-and-value} 或 @code{t}，则键和值都必须处于活动状态才能保留关联。  因此，哈希表不会保护键或值免遭垃圾回收。如果其中任何一个被作为垃圾收集，就会删除关联。
+
+如果 @var{weak} 是 @code{key-or-value}，则键或值都可以保留关联。  因此，当关联的键和值都被作为垃圾收集时（如果不是来自弱哈希表的引用），关联就会从哈希表中删除。
+
+@var{weak} 的默认值是 @code{nil}，因此哈希表中引用的所有键和值都不会被垃圾回收。
+
+@item :size @var{size}
+这指定了您计划在哈希表中存储多少关联的提示。  如果您知道大概的数字，则可以通过这种方式指定它来提高效率，但由于哈希表内存是自动管理的，因此速度的提升很少显着。
+
+@end table
+@end defun
+
+您还可以使用哈希表的打印表示形式创建哈希表。  只要指定哈希表中的每个元素都具有有效的读取语法 (@pxref{Printed Representation})，Lisp 阅读器就可以读取此打印表示。  例如，下面指定一个哈希表，其中包含分别与 @code{val1} （符号）和 @code{300} （数字）关联的键 @code{key1} 和 @code{key2} （两个符号）。
+
+@example
+#s(hash-table data (key1 val1 key2 300))
+@end example
+
+但请注意，当在 Emacs Lisp 代码中使用它时，是否创建新的哈希表是不确定的。  如果要创建新的哈希表，则应始终使用@code{make-hash-table} (@pxref{Self-Evaluating Forms})。
+
+@noindent
+哈希表的打印表示由 @samp{#s} 后跟以 @samp{hash-table} 开头的列表组成。  列表的其余部分应包含零个或多个属性值对，指定哈希表的属性和初始内容。  属性和值按字面意思读取。  有效的属性名称为 @code{test}、@code{weakness} 和 @code{data}。  @code{data}属性应该是初始内容的键值对列表；其他属性与上面描述的匹配 @code{make-hash-table} 关键字（@code{:test} 和 @code{:weakness}）具有相同的含义。
+
+请注意，您不能指定初始内容包含没有读取语法的对象（例如缓冲区和帧）的哈希表。这些对象可以在创建后添加到哈希表中。
+
+@node Hash Access
+@section 哈希表访问
+@cindex accessing hash tables
+@cindex hash table access
+
+本节描述用于访问和存储哈希表中关联的函数。  一般来说，任何 Lisp 对象都可以用作哈希键，除非比较方法有限制。  任何 Lisp 对象也可以用作值。
+
+@defun gethash key table &optional default
+该函数在 @var{table} 中查找 @var{key}，如果 @var{key} 在 @var{table} 中没有关联，则返回其关联的 @var{value} 或 @var{default}。
+@end defun
+
+@defun puthash key value table
+该函数在@var{table}中输入@var{key}的关联，值为@var{value}。  如果 @var{key} 已在 @var{table} 中具有关联，则 @var{value} 替换旧的关联值。  该函数始终返回@var{value}。
+@end defun
+
+@defun remhash key table
+此函数从 @var{table} 中删除 @var{key} 的关联（如果存在）。  如果 2⁣ 没有关联，则 3⁣ 什么也不做。
+
+@b{Common Lisp note:} 在 Common Lisp 中，如果 @code{remhash} 实际上删除了关联，则返回非 @code{nil}，否则返回 @code{nil}。  在 Emacs Lisp 中，@code{remhash} 始终返回 @code{nil}。
+@end defun
+
+@defun clrhash table
+该函数删除哈希表@var{table}中的所有关联，使其变空。  这也称为 @dfn{clearing} 哈希表。  @code{clrhash} 返回空的@var{table}。
+@end defun
+
+@defun maphash function table
+@anchor{Definition of maphash}
+该函数为 @var{table} 中的每个关联调用 @var{function} 一次。  函数 @var{function} 应接受两个参数 — @var{table} 中列出的 @var{key} 及其关联的 @var{value}。  @code{maphash} 返回@code{nil}。
+
+@var{function}可以调用@code{puthash}为@var{key}设置新值，并可以调用@code{remhash}来删除@var{key}，但不应该添加、删除或修改@var{table}中的其他关联。
+@end defun
+
+@node Defining Hash
+@section 定义哈希比较
+@cindex hash code
+@cindex define hash comparisons
+
+您可以通过@code{define-hash-table-test}定义新的键查找方法。  为了使用此功能，您需要了解哈希表的工作原理以及 @dfn{hash code} 的含义。
+
+您可以在概念上将哈希表视为由许多槽组成的大型数组，每个槽都能够保存一个关联。  要查找键，@code{gethash} 首先根据键计算一个整数，即哈希码。它可以减少该整数以数组长度为模，以在数组中生成索引。  然后它会在该插槽中查找，如有必要，还会在附近的其他插槽中查找，看看是否找到了正在寻找的密钥。
+
+因此，要定义键查找的新方法，您需要指定一个用于根据键计算哈希码的函数，以及一个用于直接比较两个键的函数。  这两个函数应该一致：即如果两个键比较相等，则两个键的哈希码应该相同。  此外，由于这两个函数可以随时调用（例如由垃圾收集器），因此这些函数应该没有副作用并且应该快速返回，并且它们的行为应该仅取决于不改变的键的属性。
+
+@defun define-hash-table-test name test-fn hash-fn
+该函数定义了一个新的哈希表测试，名为@var{name}。
+
+以这种方式定义@var{name}后，您可以将其用作@code{make-hash-table}中的@var{test}参数。  执行此操作时，哈希表将使用 @var{test-fn} 比较键值，并使用 @var{hash-fn} 根据键值计算哈希码。
+
+函数 @var{test-fn} 应该接受两个参数、两个键，如果认为它们相同，则返回非 @code{nil} 。
+
+函数 @var{hash-fn} 应该接受一个参数，一个键，并返回一个整数，即该键的哈希码。  为了获得良好的结果，该函数应使用散列码的整个范围的固定数，包括负固定数。
+
+指定的函数存储在属性@code{hash-table-test}下的@var{name}属性列表中；属性值的形式为@code{(@var{test-fn} @var{hash-fn})}。
+@end defun
+
+@defun sxhash-equal obj
+该函数返回 Lisp 对象@var{obj} 的哈希码。这是一个整数，反映了 1⁣ 及其指向的其他 Lisp 对象的内容。
+
+如果两个对象@var{obj1}和@var{obj2}是@code{equal}，则@code{(sxhash-equal @var{obj1})}和@code{(sxhash-equal @var{obj2})}是相同的整数。
+
+如果两个对象不是 @code{equal}，则 @code{sxhash-equal} 返回的值通常不同，但并非总是不同。 @code{sxhash-equal} 被设计得相当快（因为它用于索引哈希表），因此它不会深度递归到嵌套结构中。  此外;偶尔，你会幸运地遇到两个看起来不同的简单物体，它们从 @code{sxhash-equal} 得到相同的结果。  因此，一般情况下，您不能使用 @code{sxhash-equal} 来检查对象是否已更改。
+
+@b{Common Lisp note:} 在 Common Lisp 中，类似的函数称为 @code{sxhash}。  Emacs 提供此名称作为 @code{sxhash-equal} 的兼容性别名。
+@end defun
+
+@defun sxhash-eq obj
+该函数返回 Lisp 对象@var{obj} 的哈希码。  其结果反映了 @var{obj} 的身份，但不反映其内容。
+
+如果两个对象@var{obj1}和@var{obj2}是@code{eq}，则@code{(sxhash-eq @var{obj1})}和@code{(sxhash-eq @var{obj2})}是相同的整数。
+@end defun
+
+@defun sxhash-eql obj
+该函数返回适合于 @code{eql} 比较的 Lisp 对象 @var{obj} 的哈希码。  换句话说，它反映了 2⁣ 的身份，但对象是 bignum 或 float 数的情况除外，在这种情况下，会为该值生成哈希码。
+
+如果两个对象@var{obj1}和@var{obj2}是@code{eql}，则@code{(sxhash-eql @var{obj1})}和@code{(sxhash-eql @var{obj2})}是相同的整数。
+@end defun
+
+此示例创建一个哈希表，其键是不区分大小写比较的字符串。
+
+@example
+(defun string-hash-ignore-case (a)
+  (sxhash-equal (upcase a)))
+
+(define-hash-table-test 'ignore-case
+  'string-equal-ignore-case 'string-hash-ignore-case)
+
+(make-hash-table :test 'ignore-case)
+@end example
+
+以下是如何定义相当于预定义测试值@code{equal}的哈希表测试。  键可以是任何 Lisp 对象，并且外观相同的对象被认为是相同的键。
+
+@example
+(define-hash-table-test 'contents-hash 'equal 'sxhash-equal)
+
+(make-hash-table :test 'contents-hash)
+@end example
+
+Lisp 程序应该 @emph{not} 依赖于在 Emacs 会话之间保留的哈希代码，因为哈希函数的实现使用对象存储的一些细节，这些细节可以在会话之间和不同体系结构之间发生变化。
+
+@node Other Hash
+@section 其他哈希表函数
+
+以下是一些用于处理哈希表的其他函数。
+
+@defun hash-table-p table
+如果 1⁣ 是哈希表对象，则返回非 0⁣。
+@end defun
+
+@defun copy-hash-table table
+该函数创建并返回 @var{table} 的副本。  仅复制表本身——键和值是共享的。
+@end defun
+
+@defun hash-table-count table
+该函数返回 @var{table} 中的实际条目数。
+@end defun
+
+@defun hash-table-contains-p key table
+如果@var{table}中存在@var{key}的关联，则返回非@code{nil}。
+@end defun
+
+@defun hash-table-test table
+这将返回创建 @var{table} 时给出的 @var{test} 值，以指定如何散列和比较键。  参见@code{make-hash-table} (@pxref{Creating Hash})。
+@end defun
+
+@defun hash-table-weakness table
+该函数返回为哈希表 @var{table} 指定的 @var{weak} 值。
+@end defun
+
+@defun hash-table-size table
+这将返回 @var{table} 的当前分配大小。  由于哈希表分配是自动管理的，因此很少有人对此感兴趣。
+@end defun

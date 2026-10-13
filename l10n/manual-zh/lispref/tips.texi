@@ -1,0 +1,814 @@
+@c -*- mode: texinfo; coding: utf-8 -*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1993, 1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Tips
+@appendix 提示和惯例
+@cindex tips for writing Lisp
+@cindex standards of coding style
+@cindex coding standards
+@cindex best practices
+
+本章不描述 Emacs Lisp 的其他功能。  相反，它提供了如何有效利用前几章中描述的功能的建议，并描述了 Emacs Lisp 程序员应遵循的约定。
+
+@findex checkdoc
+@findex checkdoc-current-buffer
+@findex checkdoc-file
+您可以在访问 Lisp 文件时运行命令 @kbd{M-x checkdoc @key{RET}} 自动检查下面描述的一些约定。  它无法检查所有约定，也不一定它给出的所有警告都与问题相对应，但值得检查所有这些。  或者，使用命令 @kbd{M-x checkdoc-current-buffer @key{RET}} 检查当前缓冲区中的约定，或者当您想以批处理模式检查文件时使用 @code{checkdoc-file}，例如，使用 @kbd{@w{M-x compile @key{RET}}} 运行的命令。
+
+@menu
+* Coding Conventions::         干净和健壮的程序的约定。
+* Key Binding Conventions::    哪些键应该由哪些程序绑定。
+* Programming Tips::           使 Emacs 代码能够顺利地融入 Emacs 中。
+* Compilation Tips::           使编译后的代码运行得更快。
+* Warning Tips::               关闭编译器警告。
+* Documentation Tips::         编写可读的文档字符串。
+* Documentation Group Tips::   编写有用的文档组。
+* Comment Tips::               撰写评论的约定。
+* Library Headers::            库包的标准标头。
+@end menu
+
+@node Coding Conventions
+@section Emacs Lisp 编码约定
+
+@cindex coding conventions in Emacs Lisp
+@cindex conventions for Emacs Lisp programs
+以下是在编写广泛使用的 Emacs Lisp 代码时应遵循的约定：
+
+@itemize @bullet
+@item 
+简单地加载包不应改变 Emacs 的编辑行为。包括用于启用和禁用该功能或​​调用该功能的一个或多个命令。
+
+对于任何包含自定义定义的文件，此约定都是强制性的。  如果修复此类文件以遵循此约定需要进行不兼容的更改，请继续进行不兼容的更改；不要推迟它。
+
+@item 
+您应该选择一个简短的单词来将您的程序与其他 Lisp 程序区分开来。  程序中所有全局符号的名称（即变量、常量和函数的名称）应以所选前缀开头。  使用连字符 @samp{-} 将前缀与名称的其余部分分隔开。  这种做法有助于避免名称冲突，因为 Emacs Lisp 中的所有全局变量共享相同的名称空间，并且所有函数共享另一个名称空间@footnote{The benefits of a Common Lisp-style package system are considered not to outweigh the costs.}。  如果该符号不打算被其他包使用，请使用两个连字符分隔前缀和名称。
+
+有时，对于供用户使用的命令名称，如果在包名称前缀之前添加一些单词会更方便。  例如，我们的约定是让命令列出名为 @samp{list-@var{something}} 的对象，例如，名为 @samp{frob} 的包可以有一个命令 @samp{list-frobs}，而其其他全局符号以 @samp{frob-} 开头。  此外，定义函数、变量等的结构如果以 @samp{define-} 开头，可能会工作得更好，因此可以将名称前缀放在名称后面。  然而，除了这些既定的情况之外，最好在前面加上您的姓名前缀。
+
+如果您编写了一个您认为应该以特定名称（例如 @code{twiddle-files}）添加到 Emacs 的函数，请不要在程序中以该名称调用它。  在程序中将其命名为 ⁣​​1⁣，然后发送邮件至 @samp{bug-gnu-emacs@@gnu.org}，建议我们将其添加到 Emacs 中。  如果我们这样做，我们就可以很容易地更改名称。
+
+如果一个前缀不够，您的包可以使用两个或三个替代的通用前缀，只要它们有意义即可。
+
+@item 
+我们建议在新代码中启用 @code{lexical-binding}，并转换现有的 Emacs Lisp 代码以启用 @code{lexical-binding}（如果尚未启用）。  @xref{Selecting Lisp Dialect}。
+
+@item 
+在每个单独的 Lisp 文件的末尾调用 @code{provide}。 @xref{Named Features}。
+
+@item 
+如果一个文件需要预先加载某些其他 Lisp 程序，那么文件开头的注释应该这么说。  另外，使用 @code{require} 确保它们已加载。 @xref{Named Features}。
+
+@item 
+如果文件@var{foo}使用另一个文件@var{bar}中定义的宏，但不使用@var{bar}中定义的任何函数或变量，则@var{foo}应包含以下表达式：
+
+@example
+(eval-when-compile (require '@var{bar}))
+@end example
+
+@noindent
+这告诉 Emacs 在字节编译 @var{foo} 之前加载 @var{bar}，以便宏定义在编译期间可用。  当@var{foo}的编译版本是@emph{used}时，使用@code{eval-when-compile}可以避免加载@var{bar}。  应在文件中首次使用宏之前调用它。  @xref{Compiling Macros}。
+
+@item 
+避免在运行时加载额外的库，除非确实需要它们。  如果您的文件在没有其他库的情况下根本无法工作，那么只需在顶层 @code{require} 该库即可完成它。  但是，如果您的文件包含多个独立的功能，并且只有一两个需要额外的库，那么请考虑将 @code{require} 语句放在相关函数内而不是放在顶层。  或者在需要时使用 @code{autoload} 语句加载额外的库。  这样，不使用文件这些方面的人就不需要加载额外的库。
+
+@item 
+如果您需要 Common Lisp 扩展，请使用 @code{cl-lib} 库而不是旧的 @code{cl} 库。  后一个库已弃用，并将在 Emacs 的未来版本中删除。
+
+@item 
+定义主模式时，请遵循主模式约定。  @xref{Major Mode Conventions}。
+
+@item 
+定义次要模式时，请遵循次要模式约定。  @xref{Minor Mode Conventions}。
+
+@item 
+如果函数的目的是告诉您某个条件是真还是假，请为该函数指定一个以 @samp{p} 结尾的名称（代表“谓词”）。  如果名字是一个单词，则只添加@samp{p}；如果名称是多个单词，请添加@samp{-p}。例如 @code{framep} 和 @code{frame-live-p}。  我们建议避免在布尔变量名称中使用此 @code{-p} 后缀，除非该变量绑定到谓词函数；相反，请使用 @code{-flag} 后缀或类似 @code{is-foo} 的名称。
+
+@item 
+如果变量的用途是存储单个函数，请为其指定以 @samp{-function} 结尾的名称。  如果变量的目的是存储函数列表（即变量是钩子），请遵循钩子的命名约定。  @xref{Hooks}。
+
+@item 
+@cindex unloading packages, preparing for
+使用 @code{unload-feature} 将撤消通常通过加载功能所做的更改（例如向钩子添加函数）。  但是，如果加载 @var{feature} 做了一些不寻常且更复杂的事情，您可以定义一个名为 @code{@var{feature}-unload-function} 的函数，并使其撤消任何此类特殊更改。  @code{unload-feature} 将自动运行此函数（如果存在）。  @xref{Unloading}。
+
+@item 
+为 Emacs 原语定义别名是一个坏主意。  通常您应该使用标准名称。  别名可能有用的情况是它有助于向后兼容或可移植性。
+
+@item 
+如果包需要定义别名或新函数以与其他版本的 Emacs 兼容，请使用包前缀来命名它，而不是使用它在其他版本中出现的原始名称。下面是 Gnus 的一个示例，它提供了许多此类兼容性问题的示例。
+
+@example
+(defalias 'gnus-point-at-bol
+  (if (fboundp 'point-at-bol)
+      'point-at-bol
+    'line-beginning-position))
+@end example
+
+@item 
+重新定义或建议 Emacs 原语不是一个好主意。  它可能会为特定程序做正确的事情，但不知道其他程序可能会因此而崩溃。
+
+@item 
+同样，让一个 Lisp 包建议另一个 Lisp 包中的函数 (@pxref{Advising Functions}) 也是一个坏主意。
+
+@item 
+避免在库和包中使用 @code{eval-after-load} 和 @code{with-eval-after-load} (@pxref{Hooks for Loading})。  此功能用于个人定制；在 Lisp 程序中使用它是不干净的，因为它以在另一个 Lisp 文件中不可见的方式修改了该文件的行为。  这是调试的障碍，就像建议其他包中的函数一样。
+
+@item 
+如果文件确实替换了 Emacs 的任何标准函数或库程序，则文件开头的显着注释应说明哪些函数被替换，以及替换的行为与原始函数有何不同。
+
+@item 
+定义函数或变量的结构应该是宏，而不是函数，并且它们的名称应该以 @samp{define-} 开头。宏应该接收要定义为第一个参数的名称。  这将帮助各种工具自动找到定义。  避免在宏本身中构造名称，因为这会使这些工具感到困惑。如果您的宏不能以这种方式编写，宏仍然可以通过将属性 @code{definition-name} 或 @code{find-function-type-alist} 放在名称上来帮助这些工具找到定义调用。 @xref{Finding Definitions}。
+
+@item 
+在其他一些系统中，有一个选择以 @samp{*} 开头和结尾的变量名称的约定。  我们在 Emacs Lisp 中不使用该约定，因此请不要在您的程序中使用它。  （Emacs 仅将此类名称用于特殊用途的缓冲区。）如果所有库都使用相同的约定，人们会发现 Emacs 更加连贯。
+
+@item 
+Emacs Lisp 源文件的默认文件编码系统是 UTF-8 (@pxref{Text Representations})。  在极少数情况下，您的程序包含 UTF-8 中的 @emph{not} 字符，您应该在源文件的 @samp{-*-} 行或局部变量列表中指定适当的编码系统。  @xref{File Variables, , Local Variables in Files, emacs, The GNU Emacs Manual}。
+
+@item 
+使用默认缩进参数缩进文件。
+
+@item 
+不要养成在行中单独放置右括号的习惯； Lisp 程序员发现这令人不安。
+
+@item 
+如果您分发副本，请在文件上附上版权声明和复制许可声明。  @xref{Library Headers}。
+
+@item 
+对于保存（或返回）文件或目录名的函数，请避免在其名称中使用 @code{path}，而更喜欢使用 @code{file}、@code{file-name} 或 @code{directory} 代替，因为 Emacs 遵循 GNU 约定，仅将术语 @emph{path} 用于搜索路径，即目录名称列表。
+
+@end itemize
+
+@node Key Binding Conventions
+@section 键绑定约定
+@cindex key binding, conventions for
+@cindex conventions for key bindings
+
+@itemize @bullet
+@item 
+@cindex mouse-2
+@cindex references, following
+许多特殊的主要模式，如 Dired、Info、Compilation 和 Occur，旨在处理包含 @dfn{hyper-links} 的只读文本。这样的主要模式应该重新定义 @kbd{mouse-2} 和 @key{RET} 以跟踪链接。  它还应该设置@code{follow-link}条件，以便链接遵循@code{mouse-1-click-follows-link}。 @xref{Clickable Text}。  @xref{Buttons}，一种实现此类可点击链接的简单方法。
+
+@item 
+@cindex reserved keys
+@cindex keys, reserved
+不要在 Lisp 程序中将 @kbd{C-c @var{letter}} 定义为键。由 @kbd{C-c} 和字母（大写或小写；@acronym{ASCII} 或非 @acronym{ASCII}）组成的序列保留给用户；它们是为用户保留的@strong{only}序列，所以不要阻止它们。
+
+更改所有 Emacs 主要模式以遵守此约定是一项艰巨的工作；放弃这一约定将使这项工作付诸东流，并给用户带来不便。  请遵守。
+
+@item 
+不带修饰键的功能键 @key{F5} 至 @key{F9} 也保留供用户定义。
+
+@item 
+由 @kbd{C-c} 后跟控制字符或数字组成的序列保留用于主要模式。
+
+@item 
+由 @kbd{C-c} 后跟 @kbd{@{}, @kbd{@}}、@kbd{<}、@kbd{>}、@kbd{:} 或 @kbd{;} 组成的序列也保留用于主要模式。
+
+@item 
+由 @kbd{C-c} 后跟任何其他 @acronym{ASCII} 标点符号或符号字符组成的序列被分配给次模式。  在主要模式中使用它们并不是绝对禁止的，但如果您这样做，主要模式绑定可能会不时地被次要模式所掩盖。
+
+@item 
+不要将 @kbd{C-h} 绑定在任何前缀字符（包括 @kbd{C-c}）之后。  如果您不绑定@kbd{C-h}，它会自动用作帮助字符，用于列出前缀字符的子命令。
+
+@item 
+不要绑定以 @key{ESC} 结尾的按键序列，除非紧随另一个 @key{ESC}。  （也就是说，可以绑定以@kbd{@key{ESC} @key{ESC}}结尾的序列。）
+
+此规则的原因是，在任何上下文中对 @key{ESC} 进行非前缀绑定都会阻止将转义序列识别为该上下文中的功能键。
+
+@item 
+同样，不要绑定以 @kbd{C-g} 结尾的按键序列，因为这通常用于取消按键序列。
+
+@item 
+任何类似于用户可以进入和离开的临时模式或状态的内容都应该定义 @kbd{@key{ESC} @key{ESC}} 或 @kbd{@key{ESC} @key{ESC} @key{ESC}} 作为退出方式。
+
+对于接受普通 Emacs 命令的状态，或者更一般地说，对于 @key{ESC} 后跟功能键或箭头键可能有意义的任何类型的状态，则不得定义 @kbd{@key{ESC} @key{ESC}}，因为这将妨碍识别 @key{ESC} 之后的转义序列。  在这些状态下，您应该将@kbd{@key{ESC} @key{ESC} @key{ESC}}定义为逃生方式。  否则，定义 @kbd{@key{ESC} @key{ESC}} 来代替。
+@end itemize
+
+@node Programming Tips
+@section Emacs 编程技巧
+@cindex programming conventions
+@cindex conventions for Emacs programming
+
+遵循这些约定将使您的程序在运行时更适合 Emacs。
+
+@itemize @bullet
+@item 
+不要在程序中使用@code{next-line}或@code{previous-line}；几乎总是，@code{forward-line} 更方便，也更可预测和稳健。  @xref{Text Lines}。
+
+@item 
+不要调用设置标记的函数，除非设置标记是程序的预期功能之一。  标记是用户级功能，因此除了为用户的利益提供值之外，更改标记是不正确的。  @xref{The Mark}。
+
+特别是，不要使用以下任何函数：
+
+@itemize @bullet
+@item 
+@code{beginning-of-buffer}, @code{end-of-buffer}
+@item 
+@code{replace-string}, @code{replace-regexp}
+@item 
+@code{insert-file}, @code{insert-buffer}
+@end itemize
+
+如果您只想移动点，或替换某个字符串，或插入文件或缓冲区的内容，而没有任何其他供交互式用户使用的功能，则可以用一两行简单的 Lisp 代码替换这些功能。
+
+@item 
+使用列表而不是向量，除非有特殊原因需要使用向量。  Lisp 比向量有更多的操作列表的工具，并且使用列表通常更方便。
+
+如果不需要插入或删除元素（只有列表允许），向量对于大小很大并且以随机顺序访问（不是从前到后搜索）的表来说是有利的。
+
+@item 
+在回显区域显示消息的推荐方法是使用 @code{message} 函数，而不是 @code{princ}。  @xref{The Echo Area}。
+
+@item 
+当遇到错误情况时，调用函数@code{error}（或@code{signal}）。  函数 @code{error} 不返回。 @xref{Signaling Errors}。
+
+不要使用@code{message}、@code{throw}、@code{sleep-for}或@code{beep}报告错误。
+
+@item 
+错误消息应以大写字母开头，但不应以句点或其他标点符号结尾。
+
+即使 @code{debug-on-error} 是 @code{nil}，有时告诉用户错误源自何处也是有用的。  在这种情况下，可以在错误消息前面添加一个小写 Lisp 符号。  例如，错误消息“无效输入”可以扩展为“某些功能：无效输入”。
+
+@item 
+在迷你缓冲区中使用 @code{yes-or-no-p} 或 @code{y-or-n-p} 提出的问题应以大写字母开头，并以 @samp{?} 结尾。
+
+@item 
+当您在迷你缓冲区提示中提到默认值时，请将其和单词 @samp{default} 放在括号内。它应该看起来像这样：
+
+@example
+Enter the answer (default 42):
+@end example
+
+@item 
+在 @code{interactive} 中，如果您使用 Lisp 表达式生成参数列表，请不要尝试为区域或位置参数提供正确的默认值。  相反，如果未指定这些参数，请为这些参数提供 @code{nil}，并让函数体在参数为 @code{nil} 时计算默认值。  例如，这样写：
+
+@example
+(defun foo (pos)
+  (interactive
+   (list (if @var{specified} @var{specified-pos})))
+  (unless pos (setq pos @var{default-pos}))
+  ...)
+@end example
+
+@noindent
+而不是这个：
+
+@example
+(defun foo (pos)
+  (interactive
+   (list (if @var{specified} @var{specified-pos}
+             @var{default-pos})))
+  ...)
+@end example
+
+@noindent
+这样，重复该命令将根据当前情况重新计算这些默认值。
+
+当您使用交互式规范 @samp{d}、@samp{m} 和 @samp{r} 时，您不需要采取此类预防措施，因为它们做了特殊安排，在重复命令时重新计算参数值。
+
+@item 
+许多需要很长时间执行的命令在开始时会显示一条类似 @samp{Operating...} 的消息，并在完成时将其更改为 @samp{Operating...done}。  请保持这些消息的风格统一：省略号周围有@emph{no}空格，以及@samp{done}之后有@emph{no}句点。  @xref{Progress}，一种生成此类消息的简单方法。
+
+@item 
+尽量避免使用递归编辑。  相反，请执行 Rmail @kbd{e} 命令的操作：使用新的本地键盘映射，其中包含定义为切换回旧本地键盘映射的命令。  或者干脆切换到另一个缓冲区并让用户随意切换回来。  @xref{Recursive Editing}。
+@end itemize
+
+@node Compilation Tips
+@section 加快编译代码速度的技巧
+@cindex execution speed
+@cindex speedups
+@cindex tips for faster Lisp code
+
+以下是提高字节编译 Lisp 程序执行速度的方法。
+
+@itemize @bullet
+@item 
+分析你的程序，找出时间都花在哪里了。 @xref{Profiling}。
+
+@item 
+尽可能使用迭代而不是递归。即使一个已编译函数正在调用另一个已编译函数，Emacs Lisp 中的函数调用也会很慢。
+
+@item 
+使用原始列表搜索函数 @code{memq}、@code{member}、@code{assq} 或 @code{assoc} 甚至比显式迭代更快。  重新排列数据结构以便可以使用这些原始搜索函数之一是值得的。
+
+@item 
+某些内置函数在字节编译代码中进行特殊处理，从而避免了普通函数调用的需要。  最好使用这些函数而不是替代函数。  要查看编​​译器是否专门处理函数，请检查其 @code{byte-compile} 属性。  如果该属性是非@code{nil}，则该函数将被特殊处理。
+
+例如，以下输入将显示 @code{aref} 是专门编译的 (@pxref{Array Functions})：
+
+@example
+@group
+(get 'aref 'byte-compile)
+     @result{} byte-compile-two-args
+@end group
+@end example
+
+@noindent
+请注意，在这种情况下（以及许多其他情况），您必须首先加载 @file{bytecomp} 库，它定义了 @code{byte-compile} 属性。
+
+@item 
+如果调用一个小函数占用了程序运行时间的很大一部分，则使该函数内联。  这消除了函数调用开销。  由于使函数内联会降低更改程序的灵活性，因此不要这样做，除非它在速度足够慢的情况下提供了明显的加速，以至于用户关心速度。  @xref{Inline Functions}。
+@end itemize
+
+@node Warning Tips
+@section 避免编译器警告的技巧
+@cindex byte compiler warnings, how to avoid
+@cindex warnings from byte compiler
+
+@itemize @bullet
+@item 
+尝试通过为这些变量添加虚拟 @code{defvar} 定义来避免编译器对未定义的自由变量发出警告，如下所示：
+
+@example
+(defvar foo)
+@end example
+
+这样的定义除了告诉编译器不要警告该文件中变量 @code{foo} 的使用之外没有任何作用。
+
+@item 
+同样，为了避免编译器对您知道已定义 @emph{will} 的未定义函数发出警告，请使用 @code{declare-function} 语句 (@pxref{Declaring Functions})。
+
+@item 
+如果您使用某个文件中的许多函数、宏和变量，您可以为该包添加 @code{require} (@pxref{Named Features, require}) 以避免出现编译警告，如下所示：
+
+@example
+(require 'foo)
+@end example
+
+@noindent
+如果您只需要某个文件中的宏，则可以仅在编译时需要它 (@pxref{Eval During Compile})。  例如，
+
+@example
+(eval-when-compile
+  (require 'foo))
+@end example
+
+@item 
+如果您在一个函数中绑定变量，并在另一个函数中使用它或设置它，则编译器会针对后一个函数发出警告，除非该变量具有定义。  但是如果变量有短名称，添加定义就会不干净，因为 Lisp 包不应该定义短变量名称。  正确的做法是重命名此变量，以用于包中其他函数和变量的名称前缀开头。
+
+@item 
+当你想要做一些通常是错误的事情但你知道在你的使用中不是错误时，避免警告的最后手段就是将其放在@code{with-no-warnings}内。  @xref{Compiler Errors}。
+@end itemize
+
+@node Documentation Tips
+@section 文档字符串的提示
+@cindex documentation strings, conventions and tips
+@cindex tips for documentation strings
+@cindex conventions for documentation strings
+
+@findex checkdoc-minor-mode
+以下是编写文档字符串的一些技巧和约定。  您可以通过运行命令@kbd{M-x checkdoc-minor-mode}来检查其中许多约定。
+
+@itemize @bullet
+@item 
+供用户了解的每个命令、函数或变量都应该有一个文档字符串。
+
+@item 
+Lisp 程序的内部变量或子例程也可能有一个文档字符串。  文档字符串在运行的 Emacs 中占用的空间非常小。
+
+@item 
+设置文档字符串的格式，使其适合 80 列屏幕上的 Emacs 窗口。  大多数行的宽度最好不超过 60 个字符。  第一行的宽度不应超过 74 个字符，否则在 @code{apropos} 的输出中看起来会很糟糕。
+
+@vindex emacs-lisp-docstring-fill-column
+如果看起来不错，您可以填充文本。  Emacs Lisp 模式将文档字符串填充到 @code{emacs-lisp-docstring-fill-column} 指定的宽度。  但是，有时可以通过仔细调整换行符来使文档字符串更具可读性。  如果文档字符串很长，则在各部分之间使用空行。
+
+@item 
+文档字符串的第一行应由一个或两个完整的句子组成，这些句子独立作为摘要。  @kbd{M-x apropos} 仅显示第一行，如果该行的内容不独立，结果看起来很糟糕。  特别是，第一行以大写字母开始，以句点结束。
+
+对于函数，第一行应简要回答问题“这个函数做什么？”对于变量，第一行应简要回答问题“这个值意味着什么？”最好以对函数或变量的用户和调用者有意义的方式回答这些问题。  特别是， do @emph{not} 通过枚举其代码的操作来告诉函数做什么；相反，描述这些操作的作用和函数的契约。
+
+不要将文档字符串限制为一行；根据需要使用尽可能多的行来解释如何使用函数或变量的详细信息。  正文的其余部分也请使用完整的句子。
+
+@item 
+当用户尝试使用禁用的命令时，Emacs 仅显示其文档字符串的第一段——直到第一个空行的所有内容。  如果您愿意，您可以选择在第一个空行之前包含哪些信息，以使此显示有用。
+
+@item 
+第一行应该提及函数的所有重要参数（特别是强制参数），并且应该按照它们在函数调用中编写的顺序提及它们。  如果函数有很多参数，那么在第一行中提及所有参数是不可行的；在这种情况下，第一行应该提及前几个参数，包括最重要的参数。
+
+@item 
+当函数的文档字符串提到该函数的参数值时，请使用大写字母的参数名称，就好像它是该值的名称一样。  因此，函数 @code{eval} 的文档字符串将其第一个参数称为 @samp{FORM}，因为实际参数名称是 @code{form}：
+
+@example
+Evaluate FORM and return its value.
+@end example
+
+还要用大写字母编写元语法变量，例如当您将列表或向量分解为子单元时，其中一些可能会有所不同。  以下示例中的@samp{KEY}和@samp{VALUE}说明了这种做法：
+
+@example
+The argument TABLE should be an alist whose elements
+have the form (KEY . VALUE).  Here, KEY is ...
+@end example
+
+@item 
+当您在文档字符串中提及 Lisp 符号时，切勿更改其大小写。  如果符号的名称是@code{foo}，请写“foo”，而不是“Foo”（这是一个不同的符号）。
+
+这可能看起来与编写函数参数值的策略相矛盾，但实际上并没有矛盾；参数 @emph{value} 与函数用来保存值的 @emph{symbol} 不同。
+
+如果这会在句子的开头放置一个小写字母并且让您烦恼，请重写该句子，使该符号不在其开头。
+
+@item 
+不要以空格开始或结束文档字符串。
+
+@item 
+@strong{Do not} 缩进文档字符串的后续行，以便文本在源代码中与第一行的文本对齐。  这在源代码中看起来不错，但当用户查看文档时看起来很奇怪。  请记住，起始双引号之前的缩进不是字符串的一部分！
+
+@cindex quoting apostrophe and grave accent in doc strings
+@cindex apostrophe, quoting in documentation strings
+@cindex grave accent, quoting in documentation strings
+@cindex escaping apostrophe and grave accent in doc strings
+@item 
+当文档应显示 ASCII 撇号或重音符号时，请在文档字符串文字中使用 @samp{\\='} 或 @samp{\\=`} 以便按原样显示字符。
+
+@item 
+在文档字符串中，不要引用不是 Lisp 符号的表达式，因为这些表达式可以代表它们自己。  例如，写 @samp{Return the list (NAME TYPE RANGE) ...}@: 而不是 @samp{Return the list `(NAME TYPE RANGE)' ...}@: 或 @samp{Return the list \\='(NAME TYPE RANGE) ...}。
+
+@anchor{Docstring hyperlinks}
+@item 
+@cindex curly quotes
+@cindex curved quotes
+当文档字符串引用 Lisp 符号时，请按打印方式编写（通常表示小写），前面带有重音符号 @samp{`}，后面带有撇号 @samp{'}。  有两个例外：写 @code{t} 和 @code{nil} 时不带标点符号。  例如：
+
+@example
+CODE can be `lambda', nil, or t.
+@end example
+
+请注意，当 Emacs 显示这些文档字符串时，如果显示器支持显示这些字符，Emacs 通常会将 @samp{`}（重音符号）显示为 @samp{‘}（左单引号），将 @samp{'}（撇号）显示为 @samp{’}（右单引号）。 @xref{Keys in Documentation}。  （本节的某些先前版本建议直接在文档字符串中使用非@acronym{ASCII}单引号，但现在不鼓励这样做，因为这会导致在不支持显示这些字符的终端上显示损坏的帮助字符串。）
+
+@cindex hyperlinks in documentation strings
+当文档字符串使用单引号符号名称（如果该符号具有函数或变量定义）时，帮助模式会自动创建超链接。  您无需执行任何特殊操作即可使用此功能。  然而，当一个符号同时具有函数定义和变量定义，并且您只想引用其中之一时，您可以通过在符号名称前紧接着写入单词 @samp{variable}、@samp{option}、@samp{function} 或 @samp{command} 之一来指定哪一个。  （在识别这些指示词时，大小写没有区别。）例如，如果您写
+
+@example
+This function sets the variable `buffer-file-name'.
+@end example
+
+@noindent
+那么超链接将仅引用 @code{buffer-file-name} 的变量文档，而不是其函数文档。
+
+如果符号具有函数定义和/或变量定义，但这些与您正在记录的符号的使用无关，则可以在符号名称之前写入单词 @samp{symbol} 或 @samp{program} 以防止创建任何超链接。  例如，
+
+@example
+If the argument KIND-OF-RESULT is the symbol `list',
+this function returns a list of all the objects
+that satisfy the criterion.
+@end example
+
+@noindent
+不创建指向函数 @code{list} 的文档的超链接（与此处无关）。
+
+或者，您可以在符号前面加上 @samp{\\+} 以防止将其标记为超链接。  例子：
+
+@example
+If the value of KIND-OF-RESULT is \\+`list',
+this function returns a list of all the objects
+that satisfy the criterion.
+@end example
+
+通常，如果没有变量文档，则不会为变量创建超链接。  您可以通过在这些变量前面添加单词 @samp{variable} 或 @samp{option} 之一来强制为这些变量建立超链接。
+
+仅当面名称前面或后面带有单词 @samp{face} 时，才会创建面的超链接。  在这种情况下，即使符号也被定义为变量或函数，也只会显示面文档。
+
+要创建到 Info 文档的超链接，请编写 Info 节点（或锚点）的单引号名称，前面加上 @samp{info node}、@samp{Info node}、@samp{info anchor} 或 @samp{Info anchor}。  信息文件名默认为@samp{emacs}。  例如，
+
+@smallexample
+See Info node `Font Lock' and Info node `(elisp)Font Lock Basics'.
+@end smallexample
+
+要创建指向手册页的超链接，请编写手册页的单引号名称，前面加上 @samp{Man page}、@samp{man page} 或 @samp{man page for}。  例如，
+
+@smallexample
+See the man page `chmod(1)' for details.
+@end smallexample
+
+@noindent
+信息文档始终优于手册页，因此请务必链接到可用的信息手册。  例如，GNU Coreutils 手册中记录了 @command{chmod}，因此最好链接到该手册而不是手册页。
+
+要链接到自定义组，请编写该组的单引号名称，前面加上 @samp{customization group}（每个单词中的第一个字符不区分大小写）。  例如，
+
+@smallexample
+See the customization group `whitespace' for details.
+@end smallexample
+
+最后，要创建 URL 的超链接，请编写单引号 URL，前面加上 @samp{URL}。  例如，
+
+@smallexample
+The GNU project website has more information (see URL
+`https://www.gnu.org/').
+@end smallexample
+
+@item 
+不要直接在文档字符串中写入按键序列。  相反，使用 @samp{\\[@dots{}]} 结构来代表它们。  例如，不要写 @samp{C-f}，而是写结构 @samp{\\[forward-char]}。  当 Emacs 显示文档字符串时，它会替换当前绑定到 @code{forward-char} 的任何键。 （这通常是@samp{C-f}，但如果用户移动了键绑定，它可能是其他字符。）@xref{Keys in Documentation}。
+
+@item 
+在主要模式的文档字符串中，您将需要引用该模式的本地映射的键绑定，而不是全局映射。因此，请在文档字符串中使用一次构造 @samp{\\<@dots{}>} 来指定要使用的键映射。  在第一次使用 @samp{\\[@dots{}]} 之前执行此操作，而不是在句子中间执行此操作（因为如果未加载地图，则对地图的引用将被替换为表示地图当前未定义的句子）。  @samp{\\<@dots{}>} 内的文本应该是包含主要模式的本地键盘映射的变量的名称。
+
+每次使用 @samp{\\[@dots{}]} 都会稍微减慢文档字符串的显示速度。  如果您使用很多它们，这些微小的速度减慢将会累积起来，并且可能变得明显，尤其是在速度较慢的系统上。  所以我们的建议是不要过度使用它们；例如，尽量避免在同一文档字符串中使用多个对同一命令的引用。
+
+@item 
+为了保持一致性，将函数文档字符串的第一句中的动词表述为命令式——例如，使用“Return the cons of A and B.@:”而不是“Returns the cons of A and B@.”通常，对第一段的其余部分也这样做看起来不错。  如果每个句子都是指示性的并且有适当的主题，那么后续段落通常看起来会更好。
+
+@item 
+作为是或否谓词的函数的文档字符串应该以诸如“Return t if”之类的单词开头，以明确指示什么构成真理。  “return”一词避免以小写“t”开始句子，这可能会分散注意力。
+
+@item 
+使用主动语态（而不是被动语态）和现在时（而不是将来时）编写文档字符串。  例如，使用“返回包含 A 和 B 的列表。@:”而不是“将返回包含 A 和 B 的列表。”
+
+@item 
+避免不必要地使用“原因”一词（或其等同词）。不要写“使 Emacs 以粗体显示文本”，而只写“以粗体显示文本”。
+
+@item 
+避免使用“iff”（一个数学术语，意思是“当且仅当”），因为许多人不熟悉它并误认为是拼写错误。  在大多数情况下，只要用“if”就可以清楚地表达含义。  否则，尝试找到传达含义的替代措辞。
+
+@item 
+尽量避免使用缩写，例如“e.g”（代表“for example”）、“i.e.”（代表“that is”）、“no.”（代表“number”）、“cf.”（代表“compare”/“seealso”）和“w.r.t.”（代表“相对于”）。  扩展版本几乎总是更清晰、更容易阅读。@footnote{We do use these occasionally, but try not to overdo it.}
+
+@item 
+当命令仅在特定模式或情况下有意义时，请在文档字符串中提及。  例如，@code{dired-find-file}的文档是：
+
+@example
+In Dired, visit the file or directory named on this line.
+@end example
+
+@item 
+当您定义代表用户可能想要设置的选项的变量时，请使用@code{defcustom}。  @xref{Defining Variables}。
+
+@item 
+作为是或否标志的变量的文档字符串应以诸如“非零意味着”之类的单词开头，以明确所有非@code{nil}值都是等效的，并明确指示@code{nil}和非@code{nil}的含义。
+
+@item 
+如果文档字符串中的一行以左括号开头，请考虑在左括号之前写一个反斜杠，如下所示：
+
+@example
+The argument FOO can be either a number
+\(a buffer position) or a string (a file name).
+@end example
+
+这避免了早于 27.1 的 Emacs 版本中的错误，其中 @samp{(} 被视为 defun 的开始 (@pxref{Defuns,, Defuns, emacs, The GNU Emacs Manual})。如果您预计不会有人使用较旧的 Emacs 版本编辑您的代码，则无需此解决方法。
+@end itemize
+
+@node Documentation Group Tips
+@section 给文档组的提示
+@cindex documentation groups, tips
+@cindex tips for documentation groups
+
+@cindex documentation groups, compatibility
+自 Emacs 28 起提供的文档组对于基于各种分组 (@pxref{Documentation Groups}) 记录 Lisp 包的功能非常有用。  本节提供了一些关于如何在 Lisp 包中定义文档组的提示，以便不同 Emacs 版本的用户可以同样良好地使用这些组。
+
+@itemize @bullet
+@item 
+要跨不同 Emacs 版本为您自己的 Lisp 包定义文档组，您可以使用如下所示的样板模板，以使您的包编译和加载时不会出现错误：
+
+@smallexample
+@group
+;;; well-doc.el --- a well-documented package -*- lexical-binding: t; -*-
+
+@dots{} package header and contents @dots{}
+@end group
+
+@group
+;; Explicitly require shortdoc for Emacs 28, which does not have an
+;; autoload for macro `define-short-documentation-group'.  And for
+;; Emacs 30, so that we can redefine `shortdoc--check' later.
+(require 'shortdoc nil t)
+
+(eval-when-compile
+
+  ;; Default macro `define-short-documentation-group' for Emacs 27
+  ;; and older, which do not have the shortdoc feature at all.
+  (unless (fboundp 'define-short-documentation-group)
+    (defmacro define-short-documentation-group (&rest _)))
+
+  ;; Disable too rigid shortdoc checks for Emacs 30, which let it
+  ;; error out on newer shortdoc keywords.
+  (when (eq emacs-major-version 30)
+    (fset 'shortdoc--check #'ignore)))
+@end group
+
+@group
+(define-short-documentation-group well-doc
+  @dots{})
+
+;;; well-doc.el ends here
+@end group
+@end smallexample
+
+@findex define-short-documentation-group
+如果您不打算支持上面提到的某些 Emacs 版本，您可以安全地从模板中省略相应的表单。如果您打算仅支持 Emacs 31 及更高版本，则不需要上述任何内容，只需使用 @code{define-short-documentation-group} 即可。
+
+@item 
+@cindex documentation group keywords, compatibility
+较新的 Emacs 版本可能会引入较新的文档组功能和关键字。  然而，这些功能或关键字永远不会破坏旧版 Emacs 中文档组的显示。  假设您使用假设的组关键字@code{:super-pretty-print}，该关键字在未来的 Emacs 版本中可用，就像在您的 Lisp 包中@file{well-doc.el} 中一样：
+
+@smallexample
+@group
+(define-short-documentation-group well-doc
+  (well-doc-foo
+   :eval (well-doc-foo)
+   :super-pretty-print t))
+@end group
+@end smallexample
+
+未来的 Emacs 版本据说会超级漂亮地打印函数 @code{well-doc-foo} 的示例。  较旧的 Emacs 版本将默默地忽略关键字 @code{:super-pretty-print} 并根据其常规显示规则显示示例。
+@end itemize
+
+@node Comment Tips
+@section 撰写评论的技巧
+@cindex comments, Lisp convention for
+@cindex conventions for Lisp comments
+
+我们推荐以下约定以征求意见：
+
+@table @samp
+@item ;
+以单个分号 @samp{;} 开头的注释都应与源代码右侧的同一列对齐。  此类注释通常解释该行的代码如何完成其​​工作。例如：
+
+@smallexample
+@group
+(setq base-version-list                 ; There was a base
+      (assoc (substring fn 0 start-vn)  ; version to which
+             file-version-assoc-list))  ; this looks like
+                                        ; a subversion.
+@end group
+@end smallexample
+
+@item ;;
+以两个分号 @samp{;;} 开头的注释应与代码对齐到相同的缩进级别。  此类注释通常描述以下几行的目的或此时程序的状态。  例如：
+
+@smallexample
+@group
+(prog1 (setq auto-fill-function
+             @dots{}
+             @dots{}
+  ;; Update mode line.
+  (force-mode-line-update)))
+@end group
+@end smallexample
+
+我们通常还使用两个分号来注释函数之外的内容。
+
+@smallexample
+@group
+;; This Lisp code is run in Emacs when it is to operate as
+;; a server for other processes.
+@end group
+@end smallexample
+
+如果函数没有文档字符串，则应该在函数之前有一个两个分号的注释，解释该函数的作用以及如何正确调用它。  准确解释每个参数的含义以及函数如何解释其可能的值。  不过，最好将此类注释转换为文档字符串。
+
+@item ;;;
+
+以三个（或更多）分号 @samp{;;;} 开头的注释应从左边距开始。  我们将它们用于应被大纲次要模式视为标题的注释。  默认情况下，以至少三个分号（后跟一个空格和一个非空白字符）开头的注释被视为节标题，以两个或更少分号开头的注释则不被视为节标题。
+
+（从历史上看，三个分号注释也曾用于注释函数内的行，但不鼓励这种使用，而只使用两个分号。这也适用于注释整个函数；这样做时也使用两个分号。）
+
+三个分号用于顶级部分，四个分号用于子部分，五个分号用于子子部分，依此类推。
+
+通常，库至少有四个顶级部分。  例如，当所有这些部分的主体都被隐藏时：
+
+@smallexample
+@group
+;;; backquote.el --- implement the ` Lisp construct...
+;;; Commentary:...
+;;; Code:...
+;;; backquote.el ends here
+@end group
+@end smallexample
+
+（从某种意义上说，最后一行不是节标题，因为它后面绝不能跟任何文本；毕竟它标志着文件的结尾。）
+
+对于较长的库，建议将代码分成多个部分。  这可以通过将 @samp{Code:} 部分拆分为多个子部分来完成。  尽管这是长期以来唯一推荐的方法，但许多人选择使用多个顶级代码部分。  您可以选择任何一种风格。
+
+使用多个顶级代码节的优点是可以避免引入额外的嵌套级别，但这也意味着名为 @samp{Code} 的节不包含所有代码，这很尴尬。  为了避免这种情况，您不应该在该部分中放置任何代码；这样它就可以被视为分隔符而不是节标题。
+
+最后，我们建议您不要以冒号或任何其他标点符号结束标题。  由于历史原因，@samp{Code:} 和 @samp{Commentary:} 标题以冒号结尾，但我们建议您不要对其他标题执行相同的操作。
+
+@end table
+
+@noindent
+一般来说，@kbd{M-;} (@code{comment-dwim}) 命令会自动启动适当类型的注释；或将现有注释缩进到正确的位置，具体取决于分号的数量。 @xref{Comments,, Manipulating Comments, emacs, The GNU Emacs Manual}。
+
+@node Library Headers
+@section Emacs 库的常规标头
+@cindex header comments
+@cindex library header comments
+@cindex conventions for library header comments
+
+Emacs 有在 Lisp 库中使用特殊注释的约定，将它们分成几个部分并提供诸如是谁编写的信息。  对这些项目使用标准格式可以使工具（和人员）更轻松地提取相关信息。  本节从一个示例开始解释这些约定：
+
+@smallexample
+@group
+;;; foo.el --- Support for the Foo programming language  -*- lexical-binding: t; -*-
+
+;; Copyright (C) 2010-2026 Your Name
+@end group
+
+;; Author: Your Name <yourname@@example.com>
+;; Maintainer: Someone Else <someone@@example.com>
+;; Created: 14 Jul 2010
+@group
+;; Keywords: languages
+;; URL: https://example.com/foo
+
+;; This file is not part of GNU Emacs.
+
+;; This file is free software@dots{}
+@dots{}
+;; along with this file.  If not, see <https://www.gnu.org/licenses/>.
+@end group
+@end smallexample
+
+第一行应采用以下格式：
+
+@example
+;;; @var{filename} --- @var{description}  -*- lexical-binding: t; -*-
+@end example
+
+@noindent
+描述应包含在一行中。  如果文件需要在@samp{-*-}规范中设置更多变量，请将其添加到@code{lexical-binding}之后。  如果这会使第一行太长，请在文件末尾使用局部变量部分。
+
+版权声明通常会列出您的姓名（如果您编写了该文件）。如果您的雇主对您的作品主张版权，您可能需要列出他们。  不要说版权所有者是自由软件基金会（或者该文件是 GNU Emacs 的一部分），除非您的文件已被 Emacs 发行版或 GNU ELPA 接受。有关版权和许可声明形式的更多信息，请参阅@uref{https://www.gnu.org/licenses/gpl-howto.html, the guide on the GNU website}。
+
+版权声明之后是几行 @dfn{header comment} 行，每行都以 @samp{;; @var{header-name}:} 开头。  下面是 @var{header-name} 的常规可能性表：
+
+@table @samp
+@item Author
+此标头至少说明了该库的主要作者的姓名和电子邮件地址。  如果有多个作者，请将他们列在以 @code{;;} 和制表符或至少两个空格开头的连续行中。我们建议添加联系电子邮件地址，格式为 @samp{<@dots{}>}。  例如：
+
+@smallexample
+@group
+;; Author: Your Name <yourname@@example.com>
+;;      Someone Else <someone@@example.com>
+;;      Another Person <another@@example.com>
+@end group
+@end smallexample
+
+@item Maintainer
+该标头与作者标头的格式相同。  它列出了当前维护该文件的人员（响应错误报告等）。
+
+如果没有Maintainer 标头，则Author 标头中的人员被假定为维护者。  Emacs 中的某些文件使用 @samp{emacs-devel@@gnu.org} 表示维护者，这意味着作者不再对该文件负责，并且它作为 Emacs 的一部分进行维护。
+
+@item Created
+此可选行给出了文件的原始创建日期，仅供历史参考。
+
+@item Version
+如果您想记录单个 Lisp 程序的版本号，请将它们放在这一行中。  与 Emacs 一起分发的 Lisp 文件通常没有 @samp{Version} 标头，因为 Emacs 本身的版本号具有相同的目的。  如果您要分发多个文件的集合，我们建议不要在每个文件中写入版本，而只在主文件中写入版本。
+
+@item Keywords
+@vindex checkdoc-package-keywords-flag
+@findex checkdoc-package-keywords
+此行列出了 @code{finder-by-keyword} 帮助命令的关键字。请使用该命令查看有意义的关键字列表。  命令@kbd{M-x checkdoc-package-keywords @key{RET}}将查找并显示@code{finder-known-keywords}中没有的任何关键字。  如果您设置变量 @code{checkdoc-package-keywords-flag} 非 @code{nil}，checkdoc 命令将在其检查中包含关键字验证。
+
+人们在按主题查找内容时将通过此字段找到您的包。  要分隔关键字，可以使用空格、逗号或两者都使用。
+
+这个字段的名称很不幸，因为人们经常认为它是编写描述其包的任意关键字的地方，而不仅仅是相关的 Finder 关键字。
+
+@item URL
+这一行指出了图书馆的网站。  @samp{Homepage} 是 @samp{URL} 的已弃用替代品。
+
+@item Package-Version
+如果@samp{Version}不适合包管理器使用，那么包可以定义@samp{Package-Version}；它将被使用。如果@samp{Version}是RCS id或@code{version-to-list}无法解析的其他内容，这会很方便。  @xref{Packaging Basics}。
+
+@item Package-Requires
+如果存在，它会命名当前包正常运行所依赖的包。  @xref{Packaging Basics}。  包管理器在下载时（以确保下载完整的包集）和激活时（以确保仅在其所有依赖项均已激活包时才激活包）使用它。
+
+它的格式是单行上的列表列表。  每个子列表的@code{car}是一个包的名称，作为一个符号。  每个子列表的@code{cadr}是最小可接受的版本号，作为可以被@code{version-to-list}解析的字符串。  缺少版本的条目（即，只是一个符号的条目，或一个元素的子列表）相当于版本“0”的条目。  例如：
+
+@smallexample
+;; Package-Requires: ((gnus "1.0") (bubbles "2.7.2") cl-lib (seq))
+@end smallexample
+
+不需要支持早于 Emacs 27 的 Emacs 版本的软件包可以将 @samp{Package-Requires} 标头拆分为多行，如下所示：
+
+@smallexample
+@group
+;; Package-Requires: ((emacs "27.1")
+;;                    (compat "29.1.4.1"))
+@end group
+@end smallexample
+
+@noindent
+请注意，使用这种格式，您仍然需要在与 @samp{Package-Requires} 同一行开始列表。
+
+包代码自动定义一个名为 @samp{emacs} 的包，其中包含当前运行的 Emacs 的版本号。  这可用于要求软件包具有最低版本的 Emacs。
+@end table
+
+几乎每个 Lisp 库都应该有 @samp{Author} 和 @samp{Keywords} 标题注释行。  如果其他合适，请使用它们。  您还可以在标题行中放入其他标题名称——它们没有标准含义，因此不会造成任何损害。
+
+我们使用附加的风格化注释来细分库文件的内容。  这些应该用空行与其他任何内容分开。  这是其中的一个表格：
+
+@cindex commentary, in a Lisp library
+@table @samp
+@item ;;; Commentary:
+这开始是解释库如何工作的介绍性评论。它应该紧接在复制权限之后，并以下述注释行之一终止：@samp{Change Log}、@samp{History} 或 @samp{Code}。  该文本由 Finder 包使用，因此在该上下文中应该有意义。
+
+@item ;;; Change Log:
+这将开始记录一段时间内文件更改的可选日志。  不要在本节中放置太多信息——最好将详细日志保存在版本控制系统中（如 Emacs 那样）或单独的 @file{ChangeLog} 文件中。  @samp{History} 是 @samp{Change Log} 的替代方案。
+
+@item ;;; Code:
+这开始了程序的实际代码。
+
+@item ;;; @var{filename} ends here
+这是@dfn{footer line}；它出现在文件的最后。其目的是使人们能够检测由于缺少页脚行而被截断的文件版本。
+@end table

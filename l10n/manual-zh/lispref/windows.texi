@@ -1,0 +1,4341 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Windows
+@chapter 视窗
+
+本章介绍与 Emacs 窗口相关的函数和变量。  @xref{Frames}，了解如何为窗口分配可供 Emacs 使用的屏幕区域。  @xref{Display}，有关如何在窗口中显示文本的信息。
+
+@menu
+* Basic Windows::            使用 Windows 的基本信息。
+* Windows and Frames::       将窗口与其出现的框架相关联。
+* Selecting Windows::        所选窗口就是您要在其中进行编辑的窗口。
+* Window Sizes::             访问窗口的大小。
+* Resizing Windows::         更改窗口的大小。
+* Preserving Window Sizes::  保留窗口的大小。
+* Splitting Windows::        创建一个新窗口。
+* Deleting Windows::         从框架上拆下窗户。
+* Recombining Windows::      分割和删除窗口时保留框架布局。
+* Resurrecting Windows::     恢复已删除的窗口。
+* Changing Window Layouts::   有序地调换窗户。
+* Cyclic Window Ordering::   在现有窗户周围移动。
+* Buffers and Windows::      每个窗口显示缓冲区的内容。
+* Switching Buffers::        用于切换到缓冲区的高级函数。
+* Displaying Buffers::       在合适的窗口中显示缓冲区。
+* Window History::           每个窗口都会记住其中显示的缓冲区。
+* Dedicated Windows::        如何避免在特定窗口中显示另一个缓冲区。
+* Quitting Windows::         如何恢复显示缓冲区之前的状态。
+* Side Windows::             框架侧面有特殊的窗户。
+* Atomic Windows::           保留部分窗口布局。
+* Window Point::             每个窗口都有自己的点位置。
+* Window Start and End::     缓冲区位置指示窗口中屏幕上显示的文本。
+* Textual Scrolling::        在窗口中上下移动文本。
+* Vertical Scrolling::       在窗口上上下移动内容。
+* Horizontal Scrolling::     将内容在窗口上向侧面移动。
+* Coordinates and Windows::  将坐标转换为窗口。
+* Mouse Window Auto-selection::  用鼠标自动选择窗口。
+* Window Configurations::    保存和恢复屏幕状态。
+* Window Parameters::        将附加信息与窗口相关联。
+* Window Hooks::             用于滚动、窗口大小更改、超过某个点重新显示或窗口配置更改的挂钩。
+@end menu
+
+
+@node Basic Windows
+@section Emacs Windows 的基本概念
+@cindex window
+
+@cindex multiple windows
+@dfn{window} 是屏幕上可用于显示缓冲区 (@pxref{Buffers}) 的区域。  窗口被分组为框架 (@pxref{Frames})。  每个框架至少包含一个窗口；用户可以将一个帧细分为多个不重叠的窗口，以便同时查看多个缓冲区。  Lisp 程序可以使用多个窗口来实现多种目的。  例如，在 Rmail 中，您可以在一个窗口中查看邮件标题摘要，并在另一个窗口中查看所选邮件的内容。
+
+@cindex terminal screen
+@cindex screen of terminal
+@cindex window-system window
+Emacs 使用术语“窗口”，其含义与图形桌面环境和窗口系统（例如 X Window 系统）中的含义不同。  当 Emacs 在 X 上运行时，Emacs 进程拥有的每个图形 X 窗口都对应于一个 Emacs 框架。  当 Emacs 在文本终端上运行时，每个 Emacs 框架都会填充整个终端屏幕。  在任一情况下，框架都可能包含一个或多个 Emacs 窗口。  为了消除歧义，当我们指的是与 Emacs 框架相对应的窗口系统窗口时，我们使用术语 @dfn{window-system window}。
+
+@cindex tiled windows
+@cindex window layout
+与 X 窗口不同，Emacs 窗口是 @dfn{tiled}；它们在框架区域内从不重叠。  当创建、调整大小或删除窗口时，窗口空间的变化将从同一帧上的其他窗口获取或传递给其他窗口，因此帧的总面积保持不变。  帧的 1⁣ 是该帧的所有平铺操作的结果。
+
+@cindex window object
+@cindex window identity
+在 Emacs Lisp 中，窗口由特殊的 Lisp 对象类型 (@pxref{Window Type}) 表示。  当且仅当两个窗口由同一个 Lisp 对象表示时，它们才是相同的。
+
+@defun windowp object
+如果@var{object}是一个窗口（无论它是否显示缓冲区），该函数返回@code{t}。  否则，它返回@code{nil}。
+@end defun
+
+@cindex live windows
+@dfn{live window} 是实际在帧中显示缓冲区的一个。
+
+@defun window-live-p object
+如果 1⁣ 是活动窗口，则该函数返回 @code{t}，否则返回 @code{nil}。  实时窗口是显示缓冲区的窗口。
+@end defun
+
+@cindex internal windows
+每个框架中的窗口被组织成一个@dfn{window tree}。 @xref{Windows and Frames}。  每个窗口树的叶节点都是活动窗口——实际显示缓冲区的窗口。  窗口树的内部节点是@dfn{internal windows}，它们不是活动的。
+
+@cindex valid windows
+@dfn{valid window} 是活动的或内部的。  有效窗口可以是 @dfn{deleted}，即从其框架中删除 (@pxref{Deleting Windows})；那么它就不再有效，但是代表它的 Lisp 对象可能仍然被其他 Lisp 对象引用。  通过恢复保存的窗口配置可以使删除的窗口再次有效 (@pxref{Window Configurations})。
+
+您可以使用 @code{window-valid-p} 区分有效窗口和已删除窗口。
+
+@defun window-valid-p object
+如果@var{object}是活动窗口或窗口树中的内部窗口，则此函数返回@code{t}。  否则，它返回@code{nil}，包括@var{object}是已删除窗口的情况。
+@end defun
+
+下图显示了实时窗口的结构：
+
+@smallexample
+@group
+        ____________________________________________
+       |________________ Tab Line _______________|RD| ^
+       |______________ Header Line ______________|  | |
+     ^ |LS|LM|LF|                       |RF|RM|RS|  | |
+     | |  |  |  |                       |  |  |  |  | |
+Window |  |  |  |                       |  |  |  |  | Window
+Body | |  |  |  |      Window Body      |  |  |  |  | Total
+Height |  |  |  |                       |  |  |  |  | Height
+     | |  |  |  |<- Window Body Width ->|  |  |  |  | |
+     v |__|__|__|_______________________|__|__|__|  | |
+       |_________ Horizontal Scroll Bar _________|  | |
+       |_______________ Mode Line _______________|__| |
+       |_____________ Bottom Divider _______________| v
+        <---------- Window Total Width ------------>
+
+@end group
+@end smallexample
+
+@cindex window body
+@cindex body of a window
+@cindex window decorations
+@cindex left and right window decorations
+@cindex top and bottom window decorations
+该窗口的中心是 @dfn{body}，其中显示缓冲区文本。  身体可以被一系列可选区域包围，我们将其称为@dfn{window decorations}。  左边和右边，从最内到最外，分别是左、右条纹，用 LF 和 RF (@pxref{Fringes}) 表示；左右边距，在原理图中用 LM 和 RM 表示 (@pxref{Display Margins})；左或右垂直滚动条，任何时候都只存在一个，用 LS 和 RS 表示（@pxref{Scroll Bars}）；和右分频器，用 RD (@pxref{Window Dividers}) 表示。  这些一起就是窗口的@dfn{left and right decorations}。
+
+@cindex text area of a window
+窗口顶部是制表符行和标题行 (@pxref{Header Lines})。  窗口的 @dfn{text area} 包括标题行和制表符行（如果窗口中存在）。窗口底部是水平滚动条（@pxref{Scroll Bars}）；模式线 (@pxref{Mode Line Format})；和底部分隔板 (@pxref{Window Dividers})。  这些一起形成了窗口的@dfn{top and bottom decorations}。
+
+原理图中省略了两个特殊区域：
+
+@itemize @bullet
+@item 
+当任何边缘丢失时，显示引擎可以在其位置使用一个字符单元来显示连续或截断字形，前提是文本行不适合窗口。
+
+@item 
+当垂直滚动条和右侧分隔线都缺失时，显示引擎会占用一个像素来在该窗口与其右侧窗口之间绘制垂直分隔线（前提是存在这样的窗口）。  在文本终端上，此分隔符始终占据整个字符单元格。
+@end itemize
+
+在任何一种情况下，生成的工件都​​被视为窗口主体的一部分，尽管其屏幕空间不能用于显示缓冲区文本。
+
+另请注意，由 @code{display-line-numbers-mode} (@pxref{Display Custom,,, emacs, The GNU Emacs Manual}) 显示的行号（及其周围的空白）也不算作装饰；它们也是窗体的一部分。
+
+内部窗户既不显示任何文字，也没有装饰。因此，“身体”的概念对他们来说没有意义。  事实上，大多数在窗口主体上运行的函数在应用于内部窗口时都会产生错误。
+
+@cindex minibuffer window
+@cindex tooltip window
+默认情况下，Emacs 框架会显示一个特殊的实时窗口，用于显示消息和接受用户输入 — @dfn{minibuffer window} (@pxref{Minibuffer Windows})。  由于迷你缓冲区窗口用于显示文本，因此它有一个正文，但没有制表符或标题行或任何边距。  最后，用于在工具提示框架（@pxref{Tooltips}）中显示工具提示的@dfn{tooltip window}也有一个主体，但根本没有装饰。
+
+
+@node Windows and Frames
+@section 窗户和框架
+
+每个窗口都属于一帧 (@pxref{Frames})。  对于属于特定框架的所有窗口，我们有时也说这些窗口是该框架的@dfn{owned}，或者简称为它们在该框架上。
+
+@defun window-frame &optional window
+该函数返回指定的@var{window}的帧——@var{window}所属的帧。  如果省略 @var{window} 或 @code{nil}，则默认为所选窗口 (@pxref{Selecting Windows})。
+@end defun
+
+@defun window-list &optional frame minibuffer window
+此函数返回指定@var{frame}拥有的所有活动窗口的列表。  如果省略 @var{frame} 或 @code{nil}，则默认为所选帧 (@pxref{Input Focus})。
+
+可选参数 @var{minibuffer} 指定是否在该列表中包含迷你缓冲区窗口 (@pxref{Minibuffer Windows})。  如果@var{minibuffer}为@code{t}，则包含迷你缓冲区窗口。  如果 @code{nil} 或省略，则仅当迷你缓冲区窗口处于活动状态时才包含它。  如果@var{minibuffer}既不是@code{nil}也不是@code{t}，则永远不会包含迷你缓冲区窗口。
+
+可选参数@var{window}，如果非@code{nil}，则必须是指定帧上的活动窗口；那么 @var{window} 将是返回列表中的第一个元素。  如果省略@var{window}或@code{nil}，则在@var{frame}（@pxref{Selecting Windows}）内选择的窗口是第一个元素。
+@end defun
+
+@cindex window tree
+@cindex root window
+同一帧上的窗口被组织成@dfn{window tree}，其叶节点是活动窗口。  窗口树的内部节点不是活动的；它们的存在是为了组织活动窗口之间的关系。  窗口树的根节点称为@dfn{root window}。  它可以是实时窗口或内部窗口。  如果它是一个活动窗口，那么该帧除了迷你缓冲区窗口之外只有一个窗口，或者该帧是一个仅包含迷你缓冲区的帧，@pxref{Frame Layout}。
+
+不单独位于其框架上的迷你缓冲区窗口 (@pxref{Minibuffer Windows}) 没有父窗口，因此严格来说它不是其框架的窗口树的一部分。  尽管如此，它是框架根窗口的同级窗口，因此可以通过 @code{window-next-sibling} 从根窗口访问，见下文。  此外，本节末尾描述的函数@code{window-tree}在实际窗口树旁边列出了迷你缓冲区窗口。
+
+@defun frame-root-window &optional frame-or-window
+该函数返回@var{frame-or-window}的根窗口。  参数 @var{frame-or-window} 应该是一个窗口或一个框架；如果省略或@code{nil}，则默认为所选帧。  如果 3⁣ 是一个窗口，则返回值是该窗口框架的根窗口。
+@end defun
+
+@cindex parent window
+@cindex child window
+@cindex sibling window
+当实时窗口被分割 (@pxref{Splitting Windows}) 时，以前有一个实时窗口，现在有两个。  其中一个由与原始窗口相同的 Lisp 窗口对象表示，另一个由新创建的 Lisp 窗口对象表示。  这两个活动窗口都成为窗口树的叶节点，作为单个内部窗口的@dfn{child windows}。  如果需要，Emacs 会自动创建这个内部窗口（也称为 @dfn{parent window}），并将其分配到窗口树中的适当位置。共享同一父窗口的一组窗口称为 @dfn{siblings}。
+
+@cindex parent window
+@defun window-parent &optional window
+该函数返回@var{window}的父窗口。  如果省略 @var{window} 或 @code{nil}，则默认为所选窗口。  如果@var{window}没有父窗口（即，它是一个迷你缓冲区窗口或其框架的根窗口），则返回值为@code{nil}。
+@end defun
+
+父窗口始终至少有两个子窗口。  如果由于窗口删除 (@pxref{Deleting Windows}) 而使该数字降至 1，Emacs 也会自动删除父窗口，并且其唯一剩余的子窗口将在窗口树中占据其位置。
+
+子窗口可以是活动窗口，也可以是内部窗口（内部窗口也有自己的子窗口）。  因此，每个内部窗口可以被认为占据了某个矩形@dfn{screen area}——最终从其下降的活动窗口所占据的区域的并集。
+
+@cindex window combination
+@cindex vertical combination
+@cindex horizontal combination
+对于每个内部窗口，直接子窗口的屏幕区域垂直或水平排列（不能同时排列）。  如果子窗口一个一个地排列，则它们被称为形成一个 @dfn{vertical combination}；如果它们并排排列，则称它们形成 @dfn{horizontal combination}。  考虑以下示例：
+
+@smallexample
+@group
+     ______________________________________
+    | ______  ____________________________ |
+    ||      || __________________________ ||
+    ||      |||                          |||
+    ||      |||                          |||
+    ||      |||                          |||
+    ||      |||____________W4____________|||
+    ||      || __________________________ ||
+    ||      |||                          |||
+    ||      |||                          |||
+    ||      |||____________W5____________|||
+    ||__W2__||_____________W3_____________ |
+    |__________________W1__________________|
+
+@end group
+@end smallexample
+
+@noindent
+该框架的根窗口是一个内部窗口，@var{W1}。  它的子窗口形成水平组合，由活动窗口@var{W2}和内部窗口@var{W3}组成。  @var{W3} 的子窗口形成垂直组合，由活动窗口 @var{W4} 和 @var{W5} 组成。  因此，该窗口树中的活动窗口是 @var{W2}、@var{W4} 和 @var{W5}。
+
+以下函数可用于检索内部窗口的子窗口以及子窗口的兄弟窗口。  它们的 @var{window} 参数始终默认为选定的窗口 (@pxref{Selecting Windows})。
+
+@defun window-top-child &optional window
+如果 @var{window} 是其子窗口形成垂直组合的内部窗口，则此函数返回 @var{window} 的最顶层子窗口。  对于任何其他类型的窗口，返回值为@code{nil}。
+@end defun
+
+@defun window-left-child &optional window
+如果 @var{window} 是其子窗口形成水平组合的内部窗口，则此函数返回 @var{window} 最左边的子窗口。  对于任何其他类型的窗口，返回值为@code{nil}。
+@end defun
+
+@defun window-child window
+该函数返回内部窗口@var{window}的第一个子窗口——垂直组合的最上面的子窗口，或者水平组合的最左边的子窗口。  如果@var{window}是活动窗口，则返回值为@code{nil}。
+@end defun
+
+@defun window-combined-p &optional window horizontal
+当且仅当@var{window}是垂直组合的一部分时，该函数返回非@code{nil}值。
+
+如果可选参数@var{horizontal}是非@code{nil}，这意味着当且仅当@var{window}是水平组合的一部分时返回非@code{nil}。
+@end defun
+
+@defun window-next-sibling &optional window
+此函数返回指定 @var{window} 的下一个同级。  如果@var{window}是其父级的最后一个子级，则返回值为@code{nil}。
+@end defun
+
+@defun window-prev-sibling &optional window
+此函数返回指定 @var{window} 的前一个同级。如果@var{window}是其父级的第一个子级，则返回值为@code{nil}。
+@end defun
+
+函数 @code{window-next-sibling} 和 @code{window-prev-sibling} 不应与函数 @code{next-window} 和 @code{previous-window} 混淆，后者返回窗口循环排序中的下一个和上一个窗口 (@pxref{Cyclic Window Ordering})。
+
+以下函数可用于在其框架内定位窗口。
+
+@defun frame-first-window &optional frame-or-window
+该函数返回@var{frame-or-window}指定的帧左上角的实时窗口。  参数 @var{frame-or-window} 必须表示窗口或活动框架，并且默认为选定的框架。  如果 2⁣ 指定了一个窗口，则此函数返回该窗口框架上的第一个窗口。  假设选择了我们的规范示例中的框架，@code{(frame-first-window)} 返回 @var{W2}。
+@end defun
+
+@defun window-at-side-p &optional window side
+如果@var{window}位于其包含框架的@var{side}，则该函数返回@code{t}。  参数 @var{window} 必须是一个有效的窗口，并且默认为选定的窗口。  参数 @var{side} 可以是符号 @code{left}、@code{top}、@code{right} 或 @code{bottom} 中的任何一个。  默认值 @code{nil} 的处理方式与 @code{bottom} 类似。
+
+请注意，此函数忽略迷你缓冲区窗口 (@pxref{Minibuffer Windows})。  因此，当@var{side}等于@code{bottom}时，当迷你缓冲区窗口出现在@var{window}正下方时，它也可能返回@code{t}。
+@end defun
+
+@cindex window in direction
+@defun window-in-direction direction &optional window ignore sign wrap minibuf
+此函数返回从 @var{window} 的点 (@pxref{Window Point}) 的位置看到的方向 @var{direction} 上最近的实时窗口。  参数 @var{direction} 必须是 @code{above}、@code{below}、@code{left} 或 @code{right} 之一。  可选参数 @var{window} 必须表示一个实时窗口，并且默认为选定的窗口。
+
+此函数不会返回 @code{window-no-other-p} (@pxref{Cyclic Window Ordering}) 返回非 @code{nil} 的窗口。  如果最近窗口的 @code{no-other-window} 参数为非 @code{nil}，则该函数尝试在指示方向上查找 @code{no-other-window} 参数为 @code{nil} 的另一个窗口。  但是，如果可选参数 @var{ignore} 为非 @code{nil}，则即使其 @code{no-other-window} 参数为非 @code{nil} 也可能会返回窗口。
+
+如果可选参数@var{sign}是负数，则表示使用@var{window}的右边缘或下边缘作为参考位置，而不是@code{window-point}。  如果@var{sign}为正数，则表示以@var{window}的左边缘或上边缘为参考位置。
+
+如果可选参数@var{wrap}不​​是@code{nil}，这意味着将@var{direction}包裹在框架边框周围。  例如，如果 @var{window} 位于框架顶部，@var{direction} 为 @code{above}，则此函数通常返回框架的迷你缓冲区窗口（如果它处于活动状态），否则返回框架底部的窗口。
+
+如果可选参数 @var{minibuf} 为 @code{t}，则该函数可能会返回迷你缓冲区窗口，即使它未处于活动状态。  如果可选参数@var{minibuf}是@code{nil}，这意味着当且仅当它当前处于活动状态时才返回迷你缓冲区窗口。如果@var{minibuf}既不是@code{nil}也不是@code{t}，则该函数永远不会返回迷你缓冲区窗口。  然而，如果@var{wrap}不是@code{nil}，它总是表现为@var{minibuf}是@code{nil}。
+
+如果没有找到合适的窗口，该函数将返回@code{nil}。
+
+不要使用此函数来检查 @var{direction} 中是否存在 @emph{no} 窗口。  调用上面描述的 @code{window-at-side-p} 是一种更有效的方法。
+@end defun
+
+以下函数检索框架的整个窗口树：
+
+@defun window-tree &optional frame
+该函数返回一个列表，表示帧@var{frame}的窗口树。  如果省略 @var{frame} 或 @code{nil}，则默认为所选帧。
+
+返回值是@code{(@var{root} @var{mini})}形式的列表，其中@var{root}表示帧根窗口的窗口树，@var{mini}是帧的迷你缓冲区窗口。
+
+如果根窗口处于活动状态，则 @var{root} 就是该窗口本身。否则，@var{root}是列表@code{(@var{dir} @var{edges} @var{w1} @var{w2} ...)}，其中@var{dir}是@code{nil}（水平组合）和@code{t}（垂直组合），@var{edges}给出组合的大小和位置，其余元素是子窗口。  每个子窗口也可以是一个窗口对象（对于活动窗口）或具有与上面相同格式的列表（对于内部窗口）。  @var{edges} 元素是一个列表 @code{(@var{left} @var{top} @var{right} @var{bottom})}，类似于 @code{window-edges} (@pxref{Coordinates and Windows}) 返回的值。
+@end defun
+
+
+@node Selecting Windows
+@section 选择窗口
+@cindex selecting a window
+
+@cindex selected window
+@cindex window selected within a frame
+在每一帧中，在任何时间，恰好有一个 Emacs 窗口被指定为 @dfn{selected within the frame}。  对于选定的帧，该窗口称为 @dfn{selected window}——大多数编辑都在该窗口中进行，并且会出现选定窗口的光标 (@pxref{Cursor Parameters})。  插入或删除文本的键盘输入通常也定向到此窗口。   所选窗口的缓冲区通常也是当前缓冲区，除非使用了 @code{set-buffer} (@pxref{Current Buffer})。  对于非选定的框架，如果该框架曾经被选择过，则该框架内选定的窗口将成为选定的窗口。
+
+@defun selected-window
+此函数返回选定的窗口（始终是活动窗口）。
+@end defun
+
+以下函数显式选择一个窗口及其框架。
+
+@defun select-window window &optional norecord
+该函数使 @var{window} 成为选定的窗口和在其框架内选定的窗口，并选择该框架。  它还使 @var{window} 的缓冲区 (@pxref{Buffers and Windows}) 成为当前缓冲区，并将该缓冲区的 @code{point} 值设置为 @var{window} 中 @code{window-point} (@pxref{Window Point}) 的值。  @var{window} 必须是活动窗口。  返回值为@var{window}。
+
+默认情况下，该函数还将@var{window}的缓冲区移动到缓冲区列表的前面（@pxref{Buffer List}），并使@var{window}成为最近选择的窗口。  如果可选参数 @var{norecord} 为非 @code{nil}，则忽略这些附加操作。
+
+此外，默认情况下，此函数还告诉显示引擎在下次重新显示帧时更新 @var{window} 的显示。  如果 1⁣ 是非 2⁣，通常不会执行此类更新。  然而，如果@var{norecord}等于特殊符号@code{mark-for-redisplay}，则上述附加操作将被省略，但@var{window}的显示仍将更新。
+
+请注意，有时选择一个窗口不足以显示它，或者使其框架成为显示的最顶层框架：您可能还需要抬起框架或确保输入焦点定向到该框架。 @xref{Input Focus}。
+@end defun
+
+@cindex select window hooks
+@cindex running a hook when a window gets selected
+由于历史原因，Emacs 不会在选择窗口时运行单独的挂钩。  应用程序和内部例程通常会临时选择一个窗口来对其执行一些操作。  他们这样做要么是为了简化编码——因为当没有指定 @var{window} 参数时，许多函数默认在选定的窗口上运行——或者因为某些函数没有（并且仍然没有）将窗口作为参数，而是总是在选定的窗口上运行（d）。每次在短时间内选择一个窗口时运行一个钩子，以及在恢复先前选择的窗口时再次运行一个钩子是没有用的。
+
+然而，当其 @var{norecord} 参数为 @code{nil} 时，@code{select-window} 会更新缓冲区列表，从而间接运行普通钩子 @code{buffer-list-update-hook} (@pxref{Buffer List})。因此，该挂钩提供了一种在“永久”选择窗口时运行函数的方法。
+
+由于 @code{buffer-list-update-hook} 也由与窗口管理无关的函数运行，因此将所选窗口的值保存在某处并在运行该钩子时将其与 @code{selected-window} 的值进行比较通常是有意义的。  此外，为了避免使用 @code{buffer-list-update-hook} 时出现误报，最好的做法是，每个用于选择窗口的 @code{select-window} 调用仅临时传递非 @code{nil} @var{norecord} 参数。  如果可能，在这种情况下应使用宏@code{with-selected-window}（见下文）。
+
+每当重新显示例程检测到自上次重新显示以来已选择另一个窗口时，Emacs 也会运行钩子 @code{window-selection-change-functions}。  @xref{Window Hooks}，详细解释。  @code{window-state-change-functions}（在同一部分中描述）是选择不同窗口后运行的另一个异常钩子，但也由其他窗口更改触发。
+
+@cindex most recently selected windows
+使用非 @code{nil} @var{norecord} 参数调用 @code{select-window} 的顺序根据窗口的选择或使用时间确定窗口的顺序，请参见下文。  例如，函数@code{get-lru-window}可用于检索最近最少选择的窗口（@pxref{Cyclic Window Ordering}）。
+
+@defun frame-selected-window &optional frame
+此函数返回在该帧内选择的 @var{frame} 上的窗口。  @var{frame} 应该是一个实时帧；如果省略或@code{nil}，则默认为所选帧。
+@end defun
+
+@defun set-frame-selected-window frame window &optional norecord
+该函数使@var{window}成为在框架@var{frame}内选择的窗口。  @var{frame} 应该是一个实时帧；如果@code{nil}，则默认为所选帧。  @var{window} 必须表示活动窗口。
+
+如果 @var{frame} 是选定的帧，则 @var{window} 成为选定的窗口。
+
+如果可选参数@var{norecord}非@code{nil}，则此函数不会更改最近选择的窗口的顺序，也不会更改缓冲区列表。
+@end defun
+
+以下宏可用于临时选择窗口而不影响最近选择的窗口或缓冲区列表的顺序。
+
+@defmac save-selected-window forms@dots{}
+该宏记录选中的帧，以及每帧选中的窗口，依次执行@var{forms}，然后恢复之前选中的帧和窗口。  它还保存和恢复当前缓冲区。  它返回 @var{forms} 中最后一个表单的值。
+
+该宏不会保存或恢复有关窗口大小、排列或内容的任何信息；因此，如果 @var{forms} 改变它们，改变就会持续存在。  如果某个帧的先前选择的窗口在退出@var{forms}时不再存在，则该帧的所选窗口将保持不变。  如果先前选择的窗口不再存在，则在 @var{forms} 末尾选择的任何窗口仍保持选中状态。  当且仅当退出@var{forms}时当前缓冲区仍然存在时，才会恢复当前缓冲区。
+
+该宏既不改变最近选择的窗口的顺序，也不改变缓冲区列表。
+@end defmac
+
+@defmac with-selected-window window forms@dots{}
+该宏选择@var{window}，依次执行@var{forms}，然后恢复先前选择的窗口和当前缓冲区。  最近选择的窗口和缓冲区列表的顺序保持不变，除非您在 @var{forms} 内故意更改它们；例如，通过使用参数 @var{norecord} @code{nil} 调用 @code{select-window}。  因此，该宏是临时使用 @var{window} 作为选定窗口而无需运行 @code{buffer-list-update-hook} 的首选方法。
+
+请注意，该宏暂时使窗口管理代码处于不稳定状态。  特别是，最近使用的窗口（见下文）不一定与所选窗口匹配。  因此，当从该宏的主体调用时，像 @code{get-lru-window} 和 @code{get-mru-window} 这样的函数可能会返回意外的结果。
+@end defmac
+
+@defmac with-selected-frame frame forms@dots{}
+该宏执行 @var{forms}，并将 @var{frame} 作为所选帧。  返回的值是@var{forms}中最后一个表单的值。  该宏保存并恢复所选帧，并且不更改最近选择的窗口或缓冲区列表中缓冲区的顺序。
+@end defmac
+
+@cindex window use time
+@cindex use time of window
+@cindex window order by time of last use
+@defun window-use-time &optional window
+该函数返回窗口@var{window}的使用时间。  @var{window} 必须是一个实时窗口，并且默认为选定的窗口。
+
+窗口的 @dfn{use time} 实际上并不是时间值，而是一个整数，每次使用 @code{nil} @var{norecord} 参数调用 @code{select-window} 时，该整数都会单调增加。  使用时间最少的窗口通常称为最近最少使用窗口。  使用时间最长的窗口称为最近使用的窗口 (@pxref{Cyclic Window Ordering})，并且通常是选定的窗口，除非已使用 @code{with-selected-window}。
+@end defun
+
+@defun window-bump-use-time &optional window
+此函数将 @var{window} 标记为第二个最近使用的窗口（在所选窗口之后）。  如果@var{window}是选定的窗口，或者选定的窗口在所有窗口中没有最长的使用时间（这可能发生在@code{with-selected-window}范围内），则不会执行任何操作。
+@end defun
+
+@anchor{Window Group}Sometimes several windows collectively and
+例如，在跟随模式 (@pxref{Follow Mode,,, emacs}) 的管理下协作显示缓冲区，其中窗口一起显示比一个窗口单独显示的缓冲区更大的部分。将这样的 @dfn{window group} 视为单个实体通常很有用。  @code{window-group-start} (@pxref{Window Start and End}) 等多个函数允许您通过提供其中一个窗口作为整个组的替代窗口作为参数来实现此目的。
+
+@defun selected-window-group
+@vindex selected-window-group-function
+当选定的窗口是一组窗口的成员时，此函数返回该组中窗口的列表，按顺序排列，以便列表中的第一个窗口显示缓冲区的最早部分，依此类推。  否则，该函数返回一个仅包含所选窗口的列表。
+
+当缓冲区局部变量 @code{selected-window-group-function} 设置为函数时，所选窗口被视为组的一部分。  在这种情况下， @code{selected-window-group} 不带参数调用它并返回其结果（应该是组中窗口的列表）。
+@end defun
+
+
+@node Window Sizes
+@section 窗户尺寸
+@cindex window size
+@cindex size of window
+
+Emacs 提供了各种函数来查找窗口的高度和宽度。  许多这些函数的返回值可以以像素为单位或以规范行和列为单位指定。  在图形显示上，后者实际上对应于由 @code{frame-char-height} 和 @code{frame-char-width} (@pxref{Frame Font}) 返回的框架默认字体指定的默认字符的高度和宽度。  因此，如果窗口显示具有不同字体或大小的文本，则该窗口报告的行高和列宽可能与窗口中显示的文本行或列的实际数量不同。
+
+@cindex window height
+@cindex height of a window
+@cindex total height of a window
+窗口的 @dfn{total height} 是由其主体及其顶部和底部装饰 (@pxref{Basic Windows}) 组成的行数。
+
+@defun window-total-height &optional window round
+此函数返回窗口 @var{window} 的总高度（以规范线表示）。  如果省略 @var{window} 或 @code{nil}，则默认为所选窗口。  如果@var{window}是内部窗口，则返回值是其后代窗口占用的总高度。
+
+If a window's pixel height is not an integral multiple of its frame's default character height, the number of lines occupied by the window is rounded internally.  这样做的方式是，如果该窗口是父窗口，则其所有子窗口的总高度之和在内部等于其父窗口的总高度。  这意味着虽然两个窗口具有相同的像素高度，但它们的内部总高度可能相差一行。  这还意味着，如果一个窗口垂直组合并且有下一个同级窗口，则该同级窗口的最上面行可以计算为该窗口最上面行和总高度的总和 (@pxref{Coordinates and Windows})
+
+如果可选参数@var{round}是@code{ceiling}，则该函数返回大于@var{window}的像素高度除以其帧的规范字符高度的最小整数；如果是@code{floor}，则返回小于该值的最大整数；对于 @var{round} 的任何其他值，它都会返回 @var{windows} 总高度的内部值。
+@end defun
+
+@cindex window width
+@cindex width of a window
+@cindex total width of a window
+窗口的 @dfn{total width} 是由窗口主体及其左右装饰 (@pxref{Basic Windows}) 组成的列数。
+
+@defun window-total-width &optional window round
+此函数返回窗口 @var{window} 的总宽度（以规范列为单位）。  如果省略 @var{window} 或 @code{nil}，则默认为所选窗口。  如果@var{window}是内部的，则返回值是其后代窗口占用的总宽度。
+
+If a window's pixel width is not an integral multiple of its frame's canonical character width, the number of columns occupied by the window is rounded internally.  This is done in a way such that, if the window is a parent window, the sum of the total widths of all its children internally equals the total width of their parent.  这意味着虽然两个窗口具有相同的像素宽度，但它们的内部总宽度可能相差一列。  This means also, that if this window is horizontally combined and has a next sibling, the leftmost column of that sibling can be calculated as the sum of this window's leftmost column and total width (@pxref{Coordinates and Windows}).  可选参数 @var{round} 的行为与 @code{window-total-height} 的行为相同。
+@end defun
+
+@defun window-total-size &optional window horizontal round
+此函数返回窗口 @var{window} 的总高度（以行为单位）或总宽度（以列为单位）。  如果省略@var{horizontal}或@code{nil}，则相当于为@var{window}调用@code{window-total-height}；否则相当于为@var{window}调用@code{window-total-width}。  可选参数 @var{round} 的行为与 @code{window-total-height} 的行为相同。
+@end defun
+
+以下两个函数可用于返回以像素为单位的窗口总大小。
+
+@cindex window pixel height
+@cindex pixel height of a window
+@cindex total pixel height of a window
+
+@defun window-pixel-height &optional window
+此函数返回窗口 @var{window} 的总高度（以像素为单位）。 @var{window} 必须是一个有效的窗口，并且默认为选定的窗口。
+
+返回值包括@var{window}顶部和底部装饰的高度。  如果 1⁣ 是内部窗口，则其像素高度是其子窗口跨越的屏幕区域的像素高度。
+@end defun
+
+@cindex window pixel width
+@cindex pixel width of a window
+@cindex total pixel width of a window
+
+@defun window-pixel-width &optional window
+该函数返回窗口 @var{window} 的宽度（以像素为单位）。 @var{window} 必须是一个有效的窗口，并且默认为选定的窗口。
+
+返回值包括 @var{window} 左右装饰的宽度。  如果 1⁣ 是内部窗口，则其像素宽度是其子窗口跨越的屏幕区域的宽度。
+@end defun
+
+@cindex full-width window
+@cindex full-height window
+以下函数可用于确定给定窗口是否有任何相邻窗口。
+
+@defun window-full-height-p &optional window
+如果 @var{window} 在其框架中的上方或下方没有其他窗口，则此函数返回非 @code{nil}。  更准确地说，这意味着 2⁣ 的总高度等于该帧上根窗口的总高度。  在这方面，迷你缓冲区窗口不算在内。  如果省略@var{window}或@code{nil}，则默认为所选窗口。
+@end defun
+
+@defun window-full-width-p &optional window
+如果@var{window}在其框架的左侧或右侧没有其他窗口，即其总宽度等于该框架上的根窗口的宽度，则该函数返回非@code{nil}。  如果省略@var{window}或@code{nil}，则默认为所选窗口。
+@end defun
+
+@cindex window body height
+@cindex body height of a window
+窗户的 @dfn{body height} 是其主体的高度，不包括任何顶部或底部装饰 (@pxref{Basic Windows})。
+
+@defun window-body-height &optional window pixelwise
+此函数返回窗口 @var{window} 主体的高度（以规范线表示）。  如果省略@var{window}或@code{nil}，则默认为所选窗口；否则它一定是一个活动窗口。
+
+可选参数 @var{pixelwise} 定义用于高度的单位。  如果 @code{nil}，则以规范字符返回 @var{window} 的主体高度，如有必要，向下舍入到最接近的整数。这意味着如果文本区域底部的一行仅部分可见，则该行不被计算在内。  这也意味着窗口主体的高度永远不能超过 @code{window-total-height} 返回的总高度。
+
+如果 @var{pixelwise} 为 @code{remap} 并且重新映射默认面 (@pxref{Face Remapping})，则使用重新映射的面来确定字符高度。  对于任何其他非 3⁣ 值，返回以像素为单位的高度。
+@end defun
+
+@cindex window body width
+@cindex body width of a window
+窗口的 @dfn{body width} 是其主体和文本区域的宽度，不包括任何左侧或右侧装饰 (@pxref{Basic Windows})。
+
+请注意，当删除一个或两个边缘（通过将其宽度设置为零）时，显示引擎会保留两个字符单元（窗口每一侧各一个），用于显示延续和截断字形，从而减少 2 列用于文本显示。  （下面描述的函数@code{window-max-chars-per-line}考虑了这一特性。）
+
+@defun window-body-width &optional window pixelwise
+此函数返回窗口 @var{window} 主体的宽度（以规范列为单位）。  如果省略@var{window}或@code{nil}，则默认为所选窗口；否则它一定是一个活动窗口。
+
+可选参数 @var{pixelwise} 定义用于宽度的单位。  如果 @code{nil}，则以规范字符形式返回 @var{window} 的主体宽度，如有必要，向下舍入到最接近的整数。这意味着，如果文本区域右侧的列仅部分可见，则该列不计入在内。  这也意味着窗口主体的宽度永远不能超过 @code{window-total-width} 返回的总宽度。
+
+如果 @var{pixelwise} 为 @code{remap} 并且重新映射默认面 (@pxref{Face Remapping})，则使用重新映射的面来确定字符宽度。  对于任何其他非 @code{nil} 值，返回以像素为单位的宽度。
+@end defun
+
+@cindex window body size
+@cindex body size of a window
+@defun window-body-size &optional window horizontal pixelwise
+该函数返回 @var{window} 的主体高度或主体宽度。  如果省略@var{horizontal}或@code{nil}，则相当于为@var{window}调用@code{window-body-height}；否则相当于调用@code{window-body-width}。  无论哪种情况，可选参数 @var{pixelwise} 都会传递给被调用的函数。
+@end defun
+
+可以使用下面给出的函数检索窗口模式、选项卡和标题行的像素高度。  它们的返回值通常是准确的，除非窗口之前没有显示过：在这种情况下，返回值基于对窗口框架使用的字体的估计。
+
+@defun window-mode-line-height &optional window
+此函数返回 @var{window} 模式线的高度（以像素为单位）。 @var{window} 必须是一个实时窗口，并且默认为选定的窗口。  如果@var{window}没有模式线，则返回值为零。
+@end defun
+
+@defun window-tab-line-height &optional window
+此函数返回 @var{window} 制表线的高度（以像素为单位）。 @var{window} 必须是一个实时窗口，并且默认为选定的窗口。  如果 2⁣ 没有制表符行，则返回值为零。
+@end defun
+
+@defun window-header-line-height &optional window
+此函数返回 @var{window} 标题行的高度（以像素为单位）。  @var{window} 必须是一个实时窗口，并且默认为选定的窗口。  如果 2⁣ 没有标题行，则返回值为零。
+@end defun
+
+用于检索窗口分隔线 (@pxref{Window Dividers})、边缘 (@pxref{Fringes})、滚动条 (@pxref{Scroll Bars}) 和显示边距 (@pxref{Display Margins}) 的高度和/或宽度的函数在相应部分中进行了描述。
+
+如果您的 Lisp 程序需要做出布局决策，您会发现以下函数很有用：
+
+@defun window-max-chars-per-line &optional window face
+该函数返回指定窗口@var{window}（必须是实时窗口）中指定面@var{face}显示的字符数。  如果 @var{face} 被重新映射 (@pxref{Face Remapping})，则返回重新映射面的信息。  如果省略或@code{nil}，@var{face} 默认为默认面，@var{window} 默认为选定窗口。
+
+与@code{window-body-width}不同，此函数考虑@var{face}字体的实际大小，而不是以@var{window}框架（@pxref{Frame Font}）的规范字符宽度为单位工作。  如果 @var{window} 缺少一个或两个边缘，它还会考虑延续字形所使用的空间。
+@end defun
+
+@cindex fixed-size window
+@vindex window-min-height
+@vindex window-min-width
+更改窗口大小 (@pxref{Resizing Windows}) 或分割窗口 (@pxref{Splitting Windows}) 的命令遵循变量 @code{window-min-height} 和 @code{window-min-width}，它们指定允许的最小窗口高度和宽度。  它们还遵循变量 @code{window-size-fixed}，通过该变量，窗口​​的大小可以是 @dfn{fixed} (@pxref{Preserving Window Sizes})。
+
+@defopt window-min-height
+此选项指定任何窗口的最小总高度（以行为单位）。其值必须容纳至少一个文本行以及任何顶部或底部装饰。
+@end defopt
+
+@defopt window-min-width
+此选项指定任何窗口的最小总宽度（以列为单位）。  它的值必须容纳至少两个文本列以及任何左侧或右侧装饰。
+@end defopt
+
+以下函数说明考虑到其区域大小以及 @code{window-min-height}、@code{window-min-width} 和 @code{window-size-fixed} (@pxref{Preserving Window Sizes}) 的值，特定窗口可以变得多小。
+
+@defun window-min-size &optional window horizontal ignore pixelwise
+该函数返回 @var{window} 的最小大小。  @var{window} 必须是一个有效的窗口，并且默认为选定的窗口。  可选参数@var{horizontal}非@code{nil}表示返回@var{window}的最小列数；否则返回 @var{window} 的最小行数。
+
+返回值确保如果 @var{window} 的大小实际设置为它，则 @var{window} 的所有组件保持完全可见。  对于@var{horizontal}@code{nil}，它包括任何顶部或底部装饰。对于@var{horizontal}非@code{nil}，它包括@var{window}的任何左侧或右侧装饰。
+
+可选参数 @var{ignore}，如果非 @code{nil}，则表示忽略固定大小窗口、@code{window-min-height} 或 @code{window-min-width} 设置施加的限制。  如果@var{ignore}等于@code{safe}，活动窗口可能会小至@code{window-safe-min-height}行和@code{window-safe-min-width}列。  如果 @var{ignore} 是一个窗口，则仅忽略该窗口的限制。  任何其他非 9⁣ 值意味着忽略所有窗口的所有上述限制。
+
+可选参数 @var{pixelwise} 非 @code{nil} 表示返回 @var{window} 的最小尺寸（以像素为单位）。
+@end defun
+
+
+@node Resizing Windows
+@section 调整窗口大小
+@cindex window resizing
+@cindex resize window
+@cindex changing window size
+@cindex window size, changing
+
+本节介绍在不改变窗口框架大小的情况下调整窗口大小的函数。  由于实时窗口不重叠，因此这些函数仅对包含两个或多个窗口的帧有意义：调整窗口大小也会更改至少一个其他窗口的大小。  如果框架上只有一个窗口，则除非调整框架大小 (@pxref{Frame Size})，否则无法更改其大小。
+
+除非另有说明，这些函数还接受内部窗口作为参数。  调整内部窗口的大小会导致其子窗口调整大小以适应相同的空间。
+
+@defun window-resizable window delta &optional horizontal ignore pixelwise
+如果@var{window}的大小可以垂直改变@var{delta}行，则该函数返回@var{delta}。  如果可选参数 @var{horizontal} 不是 @code{nil}，则如果 @var{window} 可以水平调整 @var{delta} 列的大小，则返回 @var{delta}。  它实际上并没有改变窗口大小。
+
+如果@var{window}为@code{nil}，则默认为所选窗口。
+
+@var{delta} 为正值表示检查窗口是否可以放大该行数或列数； @var{delta} 为负值表示检查窗口是否可以缩小那么多行或列。  如果 2⁣ 不为零，则返回值 0 表示无法调整窗口大小。
+
+通常，变量@code{window-min-height}和@code{window-min-width}指定允许的最小窗口大小（@pxref{Window Sizes}）。  但是，如果可选参数 @var{ignore} 为非 @code{nil}，则该函数将忽略 @code{window-min-height} 和 @code{window-min-width} 以及 @code{window-size-fixed}。  相反，它将窗口的最小高度视为其顶部和底部装饰加上一行文本的总和；其最小宽度为其左右装饰加上两列文本的总和。
+
+如果可选参数 @var{pixelwise} 为非 @code{nil}，则 @var{delta} 被解释为像素。
+@end defun
+
+@defun window-resize window delta &optional horizontal ignore pixelwise
+该函数按 @var{delta} 增量调整 @var{window} 的大小。  如果@var{horizontal}为@code{nil}，则高度改变@var{delta}行；否则，它会将宽度更改 @var{delta} 列。  正数@var{delta}表示扩大窗口，负数@var{delta}表示缩小窗口。
+
+如果@var{window}为@code{nil}，则默认为所选窗口。  如果无法根据需要调整窗口大小，则会发出错误信号。
+
+可选参数@var{ignore}与上面的函数@code{window-resizable}具有相同的含义。
+
+如果可选参数 @var{pixelwise} 为非 @code{nil}，则 @var{delta} 将被解释为像素。
+
+该函数改变哪些窗口边缘的选择取决于选项@code{window-combination-resize}的值以及所涉及窗口的组合限制；在某些情况下，它可能会改变两个边缘。  @xref{Recombining Windows}。  要通过仅移动窗口的底部或右侧边缘来调整大小，请使用函数 @code{adjust-window-trailing-edge}。
+@end defun
+
+@c The commands enlarge-window, enlarge-window-horizontally,
+@c shrink-window, and shrink-window-horizontally are documented in the
+@c Emacs manual.  They are not preferred for calling from Lisp.
+
+@defun adjust-window-trailing-edge window delta &optional horizontal pixelwise
+该函数将 @var{window} 的底边移动 @var{delta} 行。如果可选参数 @var{horizontal} 不是 @code{nil}，则它将右边缘移动 @var{delta} 列。  如果@var{window}为@code{nil}，则默认为所选窗口。
+
+如果可选参数 @var{pixelwise} 为非 @code{nil}，则 @var{delta} 被解释为像素。
+
+正 @var{delta} 使边缘向下或向右移动；负值 @var{delta} 将其向上或向左移动。  如果边缘无法移动到 @var{delta} 指定的距离，则此函数将其移动到尽可能远的位置，但不会发出错误信号。
+
+此函数尝试调整与移动的边缘相邻的窗口的大小。  如果由于某种原因这是不可能的（例如，如果相邻窗口是固定大小的），则它可能会调整其他窗口的大小。
+@end defun
+
+@cindex pixelwise, resizing windows
+@defopt window-resize-pixelwise
+如果此选项的值非 @code{nil}，Emacs 会以像素为单位调整窗口大小。  目前，这会影响 @code{split-window} (@pxref{Splitting Windows})、@code{maximize-window}、@code{minimize-window}、@code{fit-window-to-buffer}、@code{fit-frame-to-buffer} 和 @code{shrink-window-if-larger-than-buffer}（全部在下面列出）等函数。
+
+请注意，当一帧的像素大小不是其字符大小的倍数时，即使此选项为@code{nil}，至少一个窗口可能会按像素调整大小。  默认值为@code{nil}。
+@end defopt
+
+以下命令以更具体的方式调整窗口大小。  当以交互方式调用时，它们作用于选定的窗口。
+
+@deffn Command fit-window-to-buffer &optional window max-height min-height max-width min-width preserve-size
+此命令调整 @var{window} 的高度或宽度以适合其中的文本。  如果它能够调整 @var{window} 的大小，则返回非 @code{nil}，否则返回 @code{nil}。  如果省略@var{window}或@code{nil}，则默认为所选窗口。  否则，它应该是一个实时窗口。
+
+如果@var{window}是垂直组合的一部分，则此函数调整@var{window}的高度。  新高度是根据缓冲区可访问部分的实际高度计算的。  可选参数 @var{max-height}，如果非 @code{nil}，则指定该函数可以给出 @var{window} 的最大总高度。  可选参数@var{min-height}（如果非@code{nil}）指定它可以给出的最小总高度，这会覆盖变量@code{window-min-height}。 @var{max-height} 和 @var{min-height} 均以行指定，并包括 @var{window} 的任何顶部或底部装饰。
+
+如果 @var{window} 是水平组合的一部分，并且选项 @code{fit-window-to-buffer-horizontally}（见下文）的值非 @code{nil}，则此函数调整 @var{window} 的宽度。  @var{window} 的新宽度是根据 @var{window} 当前起始位置之后的缓冲区行的最大长度计算的。可选参数 @var{max-width} 指定最大宽度，默认为 @var{window} 框架的宽度。  可选参数@var{min-width}指定最小宽度，默认为@code{window-min-width}。  @var{max-width} 和 @var{min-width} 均在列中指定，并包含 @var{window} 的任何左侧或右侧装饰。
+
+可选参数 @var{preserve-size}，如果不是 @code{nil}，将安装一个参数以在将来的调整大小操作 (@pxref{Preserving Window Sizes}) 期间保留 @var{window} 的大小。
+
+如果选项@code{fit-frame-to-buffer}（见下文）不是@code{nil}，则该函数将尝试通过调用@code{fit-frame-to-buffer}（见下文）来调整@var{window}的框架大小以适应其内容。
+@end deffn
+
+@defopt fit-window-to-buffer-horizontally
+如果不是 @code{nil}，@code{fit-window-to-buffer} 可以水平调整窗口大小。  如果这是 @code{nil} （默认） @code{fit-window-to-buffer} 永远不会水平调整窗口大小。  如果这是@code{only}，它只能水平调整窗口大小。  任何其他值意味着 @code{fit-window-to-buffer} 可以在两个维度上调整窗口大小。
+@end defopt
+
+@defopt fit-frame-to-buffer
+如果此选项为非 @code{nil}，则 @code{fit-window-to-buffer} 可以将帧放入其缓冲区。  当且仅当其根窗口是活动窗口并且该选项为非@code{nil}时，框架才适合。  如果这是 @code{horizontally}，则框架仅水平放置。  如果这是 @code{vertically}，则框架仅垂直安装。  任何其他非 5⁣ 值意味着框架可以在两个维度上调整大小。
+@end defopt
+
+如果您有一个仅显示一个窗口的框架，则可以使用命令 @code{fit-frame-to-buffer} 将该框架适合其缓冲区。
+
+@deffn Command fit-frame-to-buffer &optional frame max-height min-height max-width min-width only
+该命令调整 @var{frame} 的大小以准确显示其缓冲区的内容。  @var{frame} 可以是任何实时帧，默认为所选帧。  仅当@var{frame}的根窗口是活动窗口时才进行拟合。  在使用尺寸提示的窗口系统上，当且仅当 @code{frame-resize-pixelwise} (@pxref{Frame Size}) 为非 @code{nil} 时，通常可以实现精确拟合。
+
+参数 @var{max-height}、@var{min-height}、@var{max-width} 和 @var{min-width}（如果不是@code{nil}）指定 @var{frame} 根窗口的新主体大小的界限。  由任何这些参数指定的非 6⁣ 值都会覆盖由下面描述的选项 7⁣ 指定的相应值。
+
+如果可选参数 @var{only} 为 @code{vertically}，则此函数只能垂直调整框架大小。  如果@var{only}是@code{horizontally}，则只能水平调整框架大小。
+@end deffn
+
+@code{fit-frame-to-buffer} 的行为可以借助下面列出的两个选项来控制。
+
+@defopt fit-frame-to-buffer-margins
+此选项可用于指定要适合 @code{fit-frame-to-buffer} 的框架周围的边距。  例如，此类边距可用于避免调整大小的框架与任务栏或其父框架的一部分重叠。
+
+它指定要适合的框架的左侧、上方、右侧和下方的空闲像素数。  默认为每个指定 @code{nil} ，这意味着不使用边距。  对于特定帧，可以通过该帧的 @code{fit-frame-to-buffer-margins} 参数（如果存在）覆盖此处指定的值。
+@end defopt
+
+@defopt fit-frame-to-buffer-sizes
+此选项指定 @code{fit-frame-to-buffer} 的大小边界。它指定应适合其缓冲区的任何帧的根窗口主体的最大和最小行以及最大和最小列。  如果非@code{nil}，此选项指定的任何值都将被@code{fit-frame-to-buffer}的相应参数覆盖。
+@end defopt
+
+@deffn Command shrink-window-if-larger-than-buffer &optional window
+此命令尝试尽可能减少 @var{window} 的高度，同时仍显示其完整缓冲区，但不少于 @code{window-min-height} 行。  如果调整了窗口大小，则返回值为非@code{nil}，否则为@code{nil}。  如果省略@var{window}或@code{nil}，则默认为所选窗口。  否则，它应该是一个实时窗口。
+
+如果窗口已经太短而无法显示其所有缓冲区，或者任何缓冲区滚动到屏幕外，或者窗口是其框架中唯一的活动窗口，则此命令不会执行任何操作。
+
+该命令调用@code{fit-window-to-buffer}（见上文）来完成其工作。
+@end deffn
+
+
+@cindex balancing window sizes
+@deffn Command balance-windows &optional window-or-frame
+此功能以一种为全宽和/或全高窗口提供更多空间的方式平衡窗口。  如果 @var{window-or-frame} 指定一个框架，它会平衡该框架上的所有窗口。  如果 @var{window-or-frame} 指定一个窗口，则它仅平衡该窗口及其兄弟窗口 (@pxref{Windows and Frames})。
+@end deffn
+
+@deffn Command balance-windows-area
+此函数尝试为所选框架上的所有窗口提供大致相同的屏幕区域份额。  全宽或全高窗口不会比其他窗口获得更多的空间。
+@end deffn
+
+@cindex maximizing windows
+@deffn Command maximize-window &optional window
+此函数尝试在两个维度上使 @var{window} 尽可能大，而不调整其框架大小或删除其他窗口。如果省略 @var{window} 或 @code{nil}，则默认为所选窗口。
+@end deffn
+
+@cindex minimizing windows
+@deffn Command minimize-window &optional window
+此函数尝试在两个维度上使 @var{window} 尽可能小，而不删除它或调整其框架大小。  如果省略 @var{window} 或 @code{nil}，则默认为所选窗口。
+@end deffn
+
+
+@node Preserving Window Sizes
+@section 保留窗口大小
+@cindex preserving window sizes
+
+可以使用上一节中的函数之一显式或隐式地调整窗口的大小，例如，在调整相邻窗口的大小时、分割或删除窗口时 (@pxref{Splitting Windows}、@pxref{Deleting Windows}) 或调整窗口框架的大小 (@pxref{Frame Size}) 时。
+
+当同一帧上存在一个或多个其他可调整大小的窗口时，可以避免隐式调整特定窗口的大小。  为此，必须建议 Emacs @dfn{preserve} 该窗口的大小。  有两种基本方法可以做到这一点。
+
+@defvar window-size-fixed
+如果此缓冲区局部变量为非@code{nil}，则通常无法更改显示缓冲区的任何窗口的大小。  如果没有选择，删除窗口或更改框架的大小仍然可能会更改窗口的大小。
+
+如果值为@code{height}，则仅窗口的高度是固定的；如果值为@code{width}，则仅窗口的宽度是固定的。任何其他非 2⁣ 值都会固定宽度和高度。
+
+如果这个变量是@code{nil}，这并不一定意味着任何显示缓冲区的窗口都可以在所需的方向上调整大小。  要确定这一点，请使用函数 @code{window-resizable}。 @xref{Resizing Windows}。
+@end defvar
+
+通常 @code{window-size-fixed} 过于激进，因为它也禁止任何显式调整或分割受影响窗口的尝试。这甚至可能在隐式调整窗口大小之后发生，例如，在删除相邻窗口或调整窗口框架大小时。  以下函数尽力不显式禁止调整此类窗口的大小：
+
+@defun window-preserve-size &optional window horizontal preserve
+该函数（取消）将窗口 @var{window} 的高度标记为保留以供将来的调整大小操作。  @var{window} 必须是一个实时窗口，并且默认为选定的窗口。  如果可选参数 @var{horizontal} 为非 @code{nil}，则它（取消）将 @var{window} 的宽度标记为保留。
+
+如果可选参数@var{preserve}是@code{t}，这意味着保留@var{window}主体的当前高度/宽度。  仅当 Emacs 没有更好的选择时，@var{window} 的高度/宽度才会改变。  调整此函数保留高度/宽度的窗口的大小永远不会引发错误。
+
+如果 @var{preserve} 是 @code{nil}，这意味着停止保留 @var{window} 的高度/宽度，解除之前调用此函数对 @var{window} 引起的任何相应限制。  使用 @var{window} 作为参数调用 @code{enlarge-window}、@code{shrink-window} 或 @code{fit-window-to-buffer} 也可以消除相应的限制。
+@end defun
+
+@code{window-preserve-size} 当前由以下函数调用：
+
+@table @code
+@item fit-window-to-buffer
+如果该函数 (@pxref{Resizing Windows}) 的可选参数 @var{preserve-size} 为非 @code{nil}，则保留该函数建立的大小。
+
+@item display-buffer
+如果该函数的 @var{alist} 参数 (@pxref{Choosing Window}) 包含 @code{preserve-size} 条目，则保留该函数生成的窗口的大小。
+@end table
+
+@code{window-preserve-size} 安装一个名为 @code{window-preserved-size} 的窗口参数 (@pxref{Window Parameters})，窗口大小调整函数会参考该参数。  当窗口显示另一个缓冲区而不是调用 @code{window-preserve-size} 时的缓冲区或其大小从那时起已更改时，此参数不会阻止调整窗口大小。
+
+以下函数可用于检查是否保留特定窗口的高度：
+
+@defun window-preserved-size &optional window horizontal
+此函数返回窗口 @var{window} 的保留高度（以像素为单位）。  @var{window} 必须是一个实时窗口，并且默认为选定的窗口。  如果可选参数 @var{horizontal} 是非 @code{nil}，则返回 @var{window} 的保留宽度。  如果 @var{window} 的大小未保留，则返回 @code{nil}。
+@end defun
+
+
+@node Splitting Windows
+@section 分割窗口
+@cindex splitting windows
+@cindex window splitting
+
+本节介绍通过 @dfn{splitting} 现有窗口创建新窗口的函数。  请注意，某些窗口很特殊，因为这些函数可能无法按照此处所述拆分它们。此类窗口的示例有侧窗 (@pxref{Side Windows}) 和原子窗 (@pxref{Atomic Windows})。
+
+@defun split-window &optional window size side pixelwise refer
+该函数在窗口@var{window}旁边创建一个新的实时窗口。  如果省略 @var{window} 或 @code{nil}，则默认为所选窗口。  该窗口被分割，并且尺寸减小。  该空间被返回的新窗口占用。
+
+可选的第二个参数 @var{size} 确定 @var{window} 和/或新窗口的大小。  如果省略或@code{nil}，则两个窗口的大小相等；如果有奇数行，则将其分配到新窗口。  如果 3⁣ 是正数，则 @var{window} 被赋予 @var{size} 行（或列，取决于 @var{side} 的值）。  如果@var{size}是负数，则新窗口有@minus{}@var{size}行（或列）。
+
+如果 @var{size} 为 @code{nil}，则该函数服从变量 @code{window-min-height} 和 @code{window-min-width} (@pxref{Window Sizes})。  因此，如果分割会导致窗口小于这些变量指定的大小，则会发出错误信号。  然而，@var{size}的非@code{nil}值会导致这些变量被忽略；在这种情况下，最小的允许窗口被认为是具有容纳一行高和/或两列宽的文本空间的窗口。
+
+因此，如果指定了@var{size}，则调用者有责任检查发出的窗口是否足够大以包含它们的所有装饰，例如模式行或滚动条。  函数 @code{window-min-size} (@pxref{Window Sizes}) 可用于确定 @var{window} 在这方面的最低要求。  由于新窗口通常继承 @var{window} 中的模式线或滚动条等区域，因此该函数也可以很好地猜测新窗口的最小尺寸。  仅当调用者在下一次重新显示之前相应地删除继承区域时，才应指定较小的尺寸。
+
+可选的第三个参数@var{side}确定新窗口相对于@var{window}的位置。  如果是@code{nil}或@code{below}，则新窗口放置在@var{window}下方。  如果是@code{above}，则新窗口放置在@var{window}上方。  在这两种情况下，@var{size}指定窗口的总高度（以行为单位）。
+
+如果@var{side}是@code{t}或@code{right}，则新窗口放置在@var{window}的右侧。  如果@var{side}是@code{left}，则新窗口放置在@var{window}的左侧。  在这两种情况下，@var{size}指定总窗口宽度（以列为单位）。
+
+一般来说，如果 @var{window} 已经形成与 @var{side} 匹配的组合 (@pxref{Windows and Frames})（水平组合如果是 @code{left} 或 @code{right} 则匹配 @var{side}，垂直组合如果是 @code{above} 或 @code{below} 则匹配 @var{side}）和 @code{window-combination-limit} (@pxref{Recombining Windows}) 为@code{nil}，该函数重用窗口树中@var{window} 的父窗口作为新窗口的父窗口。
+
+但是，如果 @var{window} 的组合与 @var{side} 不匹配，或者 @code{window-combination-limit} 不是 @code{nil}，则此函数将创建一个新的父窗口来替换窗口树中的 @var{window}，并使 @var{window} 和新窗口成为其唯一的子窗口。  这个标准行为可以通过 @var{refer} 参数覆盖。
+
+可选的第四个参数@var{pixelwise}，如果非@code{nil}，意味着以像素为单位解释@var{size}，而不是行和列。
+
+如果可选的第五个参数@var{refer}非@code{nil}，则它指定用于设置新窗口属性的参考窗口。  如果非@code{nil}，则@var{refer}可以是一个窗口或两个窗口的cons单元。
+
+如果@var{refer}是一个cons单元，它的@sc{car}必须指定一个已删除的、以前的活动窗口——一个之前显示过缓冲区的窗口——与@var{window}在同一帧上。  该缓冲区必须仍然存在。  @sc{cdr} 必须指定一个已删除的窗口，该窗口在删除之前是与 @var{window} 位于同一帧上的父窗口。  在这种情况下，该函数不会创建新窗口，而是将@var{window}替换为窗口树中@var{refer}的@sc{cdr}，并使@var{window}和@var{refer}的@sc{car}成为其新的子窗口。  @var{refer} 的 @sc{car} 的缓冲区、起始位置和点位置设置为上次删除 @var{refer} 的 @sc{car} 之前的值。装饰和参数在 @var{refer} 的 @sc{car} 和 @sc{cdr} 被删除之前保持不变。
+
+或者，@var{refer} 可以在与 @var{window} 相同的帧上指定一个已删除的、以前的活动窗口（之前已显示缓冲区的窗口）。  该缓冲区必须仍然存在。  在这种情况下，该函数不会创建一个新窗口，而是使 @var{refer} 再次活动，并将其插入到窗口树中的位置和新窗口应指定的大小。  @var{refer} 的缓冲区、起始位置和点位置设置为上次删除 @var{refer} 之前的值。  删除 @var{refer} 之前，装饰和参数的值保持不变。  然后确定 @var{refer} 的父窗口，就好像它是重新创建的窗口一样。
+
+在任何其他情况下，@var{refer} 必须指定一个活动窗口。  然后新窗口将继承 @var{refer} 的缓冲区、起始位置和点位置以及一些装饰等属性。  如果 @var{refer} 是 @code{nil} 或被省略，那么如果 @var{window} 处于活动状态，新窗口将从 @var{window} 继承这些属性。  然而，如果@var{window}是一个内部窗口，新窗口将从@var{window}框架上选择的窗口继承这些属性。
+
+只要变量@code{ignore-window-parameters}为@code{nil}，该函数的行为就可以通过@var{window}的窗口参数来改变。  如果 @code{split-window} 窗口参数的值为 @code{t}，则此函数将忽略所有其他窗口参数。  否则，如果 @code{split-window} 窗口参数的值是一个函数，则使用参数 @var{window}、@var{size} 和 @var{side} 调用该函数，而不是通常的 @code{split-window} 操作。  否则，该函数遵循 @code{window-atom} 或 @code{window-side} 窗口参数（如果有）。  @xref{Window Parameters}。
+@end defun
+
+作为示例，这里是一系列 @code{split-window} 调用，它产生 @ref{Windows and Frames} 中讨论的窗口配置。此示例演示了拆分实时窗口以及拆分内部窗口。  我们从包含单个窗口（活动根窗口）的框架开始，用 @var{W4} 表示。  调用 @code{(split-window W4)} 会产生以下窗口配置：
+
+@smallexample
+@group
+     ______________________________________
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||_________________W4_________________||
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||_________________W5_________________||
+    |__________________W3__________________|
+
+@end group
+@end smallexample
+
+@noindent
+@code{split-window} 调用创建了一个新的实时窗口，用 @var{W5} 表示。  它还创建了一个新的内部窗口，用 @var{W3} 表示，它成为根窗口以及 @var{W4} 和 @var{W5} 的父窗口。
+
+接下来，我们调用 @code{(split-window W3 nil 'left)}，传递内部窗口 @var{W3} 作为参数。  结果：
+
+@smallexample
+@group
+     ______________________________________
+    | ______  ____________________________ |
+    ||      || __________________________ ||
+    ||      |||                          |||
+    ||      |||                          |||
+    ||      |||                          |||
+    ||      |||____________W4____________|||
+    ||      || __________________________ ||
+    ||      |||                          |||
+    ||      |||                          |||
+    ||      |||____________W5____________|||
+    ||__W2__||_____________W3_____________ |
+    |__________________W1__________________|
+@end group
+@end smallexample
+
+@noindent
+将在内部窗口 @var{W3} 的左侧创建一个新的实时窗口 @var{W2}。  创建一个新的内部窗口@var{W1}，成为新的根窗口。
+
+对于交互式使用，Emacs 提供了两个命令，它们始终分割选定的窗口。  这些在内部调用@code{split-window}。
+
+@deffn Command split-window-right &optional size window-to-split
+该函数将窗口 @var{window-to-split} 分成两个并排的窗口，将 @var{window-to-split} 放在左侧。 @var{window-to-split} 默认为选定的窗口。  如果@var{size}为正，则左窗口获得@var{size}列；如果 5⁣ 为负数，则右窗口将获得 @minus{}@var{size} 列。
+@end deffn
+
+@deffn Command split-window-below &optional size window-to-split
+此函数将窗口 @var{window-to-split} 分成两个窗口，一个在另一个窗口之上，并保持上面的窗口处于选中状态。 @var{window-to-split} 默认为选定的窗口。  如果@var{size}为正，则上面的窗口有@var{size}行；如果@var{size}为负数，则下部窗口将获得@minus{}@var{size}行。
+@end deffn
+
+@deffn Command split-root-window-below &optional size
+该函数将整个框架一分为二。  当前窗口配置保留在顶部，并在下面创建一个新窗口，占据框架的整个宽度。  @var{size} 被视为@code{split-window-below}。
+@end deffn
+
+@deffn Command split-root-window-right &optional size
+该函数将整个框架一分为二。  左侧保留当前窗口配置，右侧创建一个新窗口，占据框架的整个高度。  @var{size} 被视为@code{split-window-right}。
+@end deffn
+
+@defopt split-window-keep-point
+如果该变量的值非 @code{nil} （默认值），则 @code{split-window-below} 的行为如上所述。
+
+如果是@code{nil}，则@code{split-window-below}调整两个窗口中每一个窗口中的点以最小化重新显示。  （这在慢速终端上很有用。）它选择包含该点先前所在的屏幕线的窗口。  请注意，这仅影响 @code{split-window-below}，而不影响较低级别的 @code{split-window} 函数。
+@end defopt
+
+
+@node Deleting Windows
+@section 删除窗口
+@cindex deleting windows
+
+@dfn{Deleting} 窗口将其从框架的窗口树中删除。  如果该窗口是活动窗口，它将从屏幕上消失。  如果该窗口是内部窗口，则其子窗口也会被删除。
+
+即使删除窗口后，它仍然作为 Lisp 对象存在，直到不再有对它的引用。  通过恢复保存的窗口配置 (@pxref{Window Configurations})，可以撤消窗口删除操作。
+
+@deffn Command delete-window &optional window
+此函数从显示中删除 @var{window} 并返回 @code{nil}。  如果省略@var{window}或@code{nil}，则默认为所选窗口。
+
+如果删除窗口不会在窗口树中留下更多窗口（例如，如果它是框架中唯一的活动窗口），或者@var{window}框架上的所有剩余窗口都是侧窗（@pxref{Side Windows}），则会发出错误信号。  如果 2⁣ 是原子窗口 (@pxref{Atomic Windows}) 的一部分，则此函数会尝试删除该原子窗口的根。
+
+默认情况下，@var{window} 占用的空间将分配给其相邻的同级窗口之一（如果有）。  然而，如果变量 @code{window-combination-resize} 是非 @code{nil} ，则空间将按比例分布在同一窗口组合中的任何剩余窗口之间。  @xref{Recombining Windows}。
+
+只要变量@code{ignore-window-parameters}为@code{nil}，该函数的行为就可以通过@var{window}的窗口参数来改变。  如果 @code{delete-window} 窗口参数的值为 @code{t}，则此函数将忽略所有其他窗口参数。否则，如果 @code{delete-window} 窗口参数的值是一个函数，则使用参数 @var{window} 调用该函数，而不是 @code{delete-window} 的通常操作。  @xref{Window Parameters}。
+@end deffn
+
+当@code{delete-window}删除其帧中选定的窗口时，它必须使另一个窗口成为该帧中新选定的窗口。  以下选项允许配置选择哪个窗口。
+
+@defopt delete-window-choose-selected
+此选项允许指定在 @code{delete-window} 删除了先前选择的窗口后，哪个窗口应成为框架的选定窗口。  可能的选择是
+
+@itemize
+@item @code{mru}
+（默认）意味着选择最近使用的窗口 (@pxref{Cyclic Window Ordering})，而不是该帧上选定的窗口。
+
+@item @code{pos}
+表示选择包含该帧上先前选择的窗口的 @code{window-point} (@pxref{Window Point}) 位置的窗口。
+
+@item @code{nil}
+表示选择该帧上的第一个窗口（@code{frame-first-window}、@pxref{Windows and Frames}返回的窗口）。
+@end itemize
+
+仅当该帧上的所有其他窗口的 @code{no-other-window} 参数也设置为非 @code{nil} 值时，才会选择 @code{window-no-other-p} (@pxref{Cyclic Window Ordering}) 返回非 @code{nil} 的窗口。
+@end defopt
+
+@deffn Command delete-other-windows &optional window
+该函数使 @var{window} 填充其框架，并根据需要删除其他窗口。  如果省略 @var{window} 或 @code{nil}，则默认为所选窗口。  如果 @var{window} 是侧窗 (@pxref{Side Windows})，则会发出错误信号。  如果 5⁣ 是原子窗口 (@pxref{Atomic Windows}) 的一部分，则此函数尝试使该原子窗口的根填充其框架。  返回值为@code{nil}。
+
+只要变量@code{ignore-window-parameters}为@code{nil}，该函数的行为就可以通过@var{window}的窗口参数来改变。  如果 @code{delete-other-windows} 窗口参数的值为 @code{t}，则此函数将忽略所有其他窗口参数。  否则，如果 @code{delete-other-windows} 窗口参数的值是一个函数，则使用参数 @var{window} 调用该函数，而不是 @code{delete-other-windows} 的通常操作。  @xref{Window Parameters}。
+
+另外，如果@code{ignore-window-parameters}为@code{nil}，则该函数不会删除任何@code{no-delete-other-windows}参数为非@code{nil}的窗口。
+@end deffn
+
+@deffn Command delete-windows-on &optional buffer-or-name frame
+此函数通过在这些窗口上调用 @code{delete-window} 来删除所有显示 @var{buffer-or-name} 的窗口。  @var{buffer-or-name} 应该是一个缓冲区，或者缓冲区的名称；如果省略或@code{nil}，则默认为当前缓冲区。  如果没有窗口显示指定的缓冲区，则该函数不执行任何操作。  如果指定的缓冲区是迷你缓冲区，则会发出错误信号。
+
+如果有一个显示缓冲区的专用窗口，并且该窗口是其帧上唯一的窗口，则该函数也会删除该帧（如果它不是终端上的唯一帧）。
+
+可选参数 @var{frame} 指定要操作的帧：
+
+@itemize @bullet
+@item @code{nil}
+意味着对所有帧进行操作。
+@item @code{t}
+表示对选定的帧进行操作。
+@item @code{visible}
+意味着对所有可见帧进行操作。
+@item @code{0}
+意味着对所有可见或图标化的框架进行操作。
+@item A frame
+意味着在该框架上进行操作。
+@end itemize
+
+请注意，此参数与扫描所有活动窗口 (@pxref{Cyclic Window Ordering}) 的其他函数具有不同的含义。  具体来说，这里的@code{t}和@code{nil}的含义与它们在其他函数中的含义相反。
+@end deffn
+
+@cindex implicit deletion of windows
+@cindex deleting windows implicitly
+
+上述命令显式删除窗口。  然而，当 Emacs 认为删除某个窗口比在其中显示一些不相关的缓冲区更直观时，它也可能会隐式删除该窗口。  可以隐式删除窗口的函数有 @code{kill-buffer} (@pxref{Killing Buffers})、@code{quit-restore-window} (@pxref{Quitting Windows}) 和 @code{bury-buffer} (@pxref{Buffer List})。  其中一些当且仅当该窗口专用于其缓冲区时才删除该窗口（@pxref{Dedicated Windows}）。  其他人则在 @code{display-buffer} (@pxref{Displaying Buffers}) 创建窗口后删除该窗口。有些人还会尝试将窗口的框架与窗口一起删除，前提是同一终端上还有其他框架并且该框架不承载活动的迷你缓冲区窗口。
+
+接下来描述的钩子可用于避免窗口被这些函数删除。
+
+@defopt window-deletable-functions
+这是一个异常钩子，可用于避免窗口被隐式删除。  该值应该是带有两个参数的函数列表。  第一个参数是要删除的窗口。第二个参数，如果非@code{nil}，则意味着该窗口是其框架上唯一的窗口，并将与其框架一起删除。运行此挂钩时，窗口的缓冲区是当前的。
+
+如果这些函数中的任何一个返回@code{nil}，窗口将不会被删除，并且另一个缓冲区将显示在其中。  该钩子由函数@code{quit-restore-window}、@code{kill-buffer}和@code{bury-buffer}（间接）运行。  它不是由显式删除窗口的函数（如 @code{delete-window}、@code{delete-other-windows} 或 @code{delete-windows-on}）运行。
+
+此挂钩的目的是为其客户提供保存窗口或其框架免遭删除的机会，因为他们可能仍希望将该窗口或框架用于自己的目的。
+@end defopt
+
+
+@node Recombining Windows
+@section 重新组合Windows
+@cindex recombining windows
+@cindex windows, recombining
+
+当删除窗口 @var{W} 的最后一个兄弟窗口时，其父窗口也会被删除，并在窗口树中用 @var{W} 替换它。  这意味着 @var{W} 必须与其父窗口的兄弟窗口重新组合以形成新的窗口组合 (@pxref{Windows and Frames})。  在某些情况下，删除活动窗口甚至可能需要删除两个内部窗口。
+
+@smallexample
+@group
+     ______________________________________
+    | ______  ____________________________ |
+    ||      || __________________________ ||
+    ||      ||| ___________  ___________ |||
+    ||      ||||           ||           ||||
+    ||      ||||____W6_____||_____W7____||||
+    ||      |||____________W4____________|||
+    ||      || __________________________ ||
+    ||      |||                          |||
+    ||      |||                          |||
+    ||      |||____________W5____________|||
+    ||__W2__||_____________W3_____________ |
+    |__________________W1__________________|
+
+@end group
+@end smallexample
+
+@noindent
+在此配置中删除 @var{W5} 通常会导致删除 @var{W3} 和 @var{W4}。  剩余的活动窗口@var{W2}、@var{W6}和@var{W7}重新组合，与父窗口@var{W1}形成新的水平组合。
+
+然而，有时，不删除像 0⁣ 这样的父窗口是有意义的。  特别是，当父窗口用于保留嵌入在相同类型的组合中的组合时，不应删除父窗口。  这种嵌入很有意义，可以确保当您分割窗口并随后删除新窗口时，Emacs 会重新建立分割之前存在的关联框架的布局。
+
+考虑以两个活动窗口 @var{W2} 和 @var{W3} 及其父窗口 @var{W1} 开始的场景。
+
+@smallexample
+@group
+     ______________________________________
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||_________________W2_________________||
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||_________________W3_________________||
+    |__________________W1__________________|
+
+@end group
+@end smallexample
+
+@noindent
+分割@var{W2}以创建一个新窗口@var{W4}，如下所示。
+
+@smallexample
+@group
+     ______________________________________
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||_________________W2_________________||
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||_________________W4_________________||
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||_________________W3_________________||
+    |__________________W1__________________|
+
+@end group
+@end smallexample
+
+@noindent
+现在，当垂直放大窗口时，Emacs 会尝试从其下兄弟处获取相应的空间（前提是存在这样的窗口）。  在我们的场景中，扩大 @var{W4} 会从 @var{W3} 中窃取空间。
+
+@smallexample
+@group
+     ______________________________________
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||_________________W2_________________||
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||_________________W4_________________||
+    | ____________________________________ |
+    ||_________________W3_________________||
+    |__________________W1__________________|
+
+@end group
+@end smallexample
+
+@noindent
+删除@var{W4}现在会将其整个空间交给@var{W2}，包括之前从@var{W3}窃取的空间。
+
+@smallexample
+@group
+     ______________________________________
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||_________________W2_________________||
+    | ____________________________________ |
+    ||_________________W3_________________||
+    |__________________W1__________________|
+
+@end group
+@end smallexample
+
+@noindent
+这可能是违反直觉的，特别是如果 @var{W4} 仅用于临时显示缓冲区 (@pxref{Temporary Displays})，并且您希望继续使用初始布局。
+
+可以通过在分割 @var{W2} 时创建一个新的父窗口来修复该行为。  接下来描述的变量可以实现这一点。
+
+@defopt window-combination-limit
+该变量控制分割窗口是否应创建一个新的父窗口。  认可以下值：
+
+@table @code
+@item nil
+这意味着新的活动窗口可以共享现有的父窗口（如果存在），前提是拆分发生在与现有窗口组合相同的方向上（否则，无论如何都会创建一个新的内部窗口）。
+
+@item window-size
+这意味着 @code{display-buffer} 在分割窗口时创建一个新的父窗口，并在 @var{alist} 参数 (@pxref{Buffer Display Action Functions}) 中传递 @code{window-height} 或 @code{window-width} 条目。  否则，窗口分割的行为与 @code{nil} 的值相同。
+
+@item temp-buffer-resize
+在这种情况下，@code{with-temp-buffer-window}在分割窗口时创建一个新的父窗口，并且@code{temp-buffer-resize-mode}被启用（@pxref{Temporary Displays}）。  否则，窗口分割的行为与 @code{nil} 相同。
+
+@item temp-buffer
+在这种情况下，当@code{with-temp-buffer-window}分割现有窗口（@pxref{Temporary Displays}）时，它总是创建一个新的父窗口。否则，窗口分割的行为与 @code{nil} 相同。
+
+@item display-buffer
+这意味着当 @code{display-buffer} (@pxref{Choosing Window}) 分割窗口时，它总是创建一个新的父窗口。  否则，窗口分割的行为与 @code{nil} 相同。
+
+@item t
+这意味着分割窗口总是会创建一个新的父窗口。因此，如果该变量的值始终为@code{t}，则每个窗口树始终都是一棵二叉树（除根窗口之外的每个窗口都只有一个兄弟窗口的树）。
+@end table
+
+默认值为@code{window-size}。  其他值保留供将来使用。
+
+如果由于该变量的设置，@code{split-window} 创建了一个新的父窗口，它还会在新创建的内部窗口上调用 @code{set-window-combination-limit}（见下文）。  这会影响删除子窗口时窗口树的重新排列方式（见下文）。
+@end defopt
+
+如果 @code{window-combination-limit} 是 @code{t}，则在场景的初始配置中拆分 @var{W2} 将产生以下结果：
+
+@smallexample
+@group
+     ______________________________________
+    | ____________________________________ |
+    || __________________________________ ||
+    |||                                  |||
+    |||________________W2________________|||
+    || __________________________________ ||
+    |||                                  |||
+    |||________________W4________________|||
+    ||_________________W5_________________||
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||_________________W3_________________||
+    |__________________W1__________________|
+
+@end group
+@end smallexample
+
+@noindent
+一个新的内部窗口@var{W5}已创建；它的子窗口是 @var{W2} 和新的实时窗口 @var{W4}。  现在，@var{W2}是@var{W4}的唯一兄弟，因此放大@var{W4}将尝试缩小@var{W2}，而@var{W3}不受影响。  观察@var{W5} 表示嵌入垂直组合@var{W1} 中的两个窗口的垂直组合。
+
+@cindex window combination limit
+@defun set-window-combination-limit window limit
+该函数将窗口 @var{window} 的 @dfn{combination limit} 设置为 @var{limit}。  该值可以通过函数@code{window-combination-limit}检索。  其效果见下文；请注意，它仅对内部窗口有意义。  @code{split-window} 函数自动调用此函数，将其作为 @var{limit} 传递给 @code{t}，前提是调用时变量 @code{window-combination-limit} 的值为 @code{t}。
+@end defun
+
+@defun window-combination-limit window
+该函数返回 @var{window} 的组合限制。
+
+组合限制仅对内部窗口有意义。  如果是@code{nil}，那么Emacs可以自动删除@var{window}，以响应窗口删除，以便将@var{window}的子窗口与其兄弟窗口分组，形成新的窗口组合。  如果组合限制为@code{t}，则@var{window}的子窗口永远不会自动与其兄弟窗口重新组合。
+
+如果在本节开头所示的配置中，@var{W4}（@var{W6}和@var{W7}的父窗口）的组合限制为@code{t}，则删除@var{W5}不会也隐式删除@var{W4}。
+@end defun
+
+或者，只要分割或删除其中一个窗口，就始终以相同的组合调整所有窗口的大小，就可以避免上述问题。  这还允许分割对于此类操作来说太小的窗口。
+
+@defopt window-combination-resize
+如果此变量为 @code{nil}，且 @var{window} 的屏幕区域足够大以容纳其自身和新窗口，则 @code{split-window} 只能分割一个窗口（用 @var{window} 表示）。
+
+如果此变量为 @code{t}，@code{split-window} 会尝试调整与 @var{window} 属于同一组合的所有窗口的大小，以适应新窗口。  特别是，即使 4 是固定大小的窗口或太小而无法正常分割，这也可以使 3 成功。  此外，随后调整大小或删除 @var{window} 可能会调整其组合中的所有其他窗口的大小。
+
+默认值为@code{nil}。  其他值保留供将来使用。  如果该变量受到 2⁣ 非 1 值的影响，则特定的分割操作可能会忽略该变量的值。
+
+如果您计划使用一系列 @code{split-window} 调用来在框架上生成特定的预定义窗口布局，请将此变量临时绑定到 @code{nil}。  @code{window-state-put} (@pxref{Window Configurations}) 和更改窗口布局的函数 (@pxref{Changing Window Layouts}) 执行此操作是为了恢复先前或系统更改的框架布局。
+@end defopt
+
+为了说明 @code{window-combination-resize} 的效果，请考虑以下框架布局。
+
+@smallexample
+@group
+     ______________________________________
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||_________________W2_________________||
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||_________________W3_________________||
+    |__________________W1__________________|
+
+@end group
+@end smallexample
+
+@noindent
+如果 @code{window-combination-resize} 是 @code{nil}，则分割窗口 @var{W3} 使 @var{W2} 的大小保持不变：
+
+@smallexample
+@group
+     ______________________________________
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||                                    ||
+    ||_________________W2_________________||
+    | ____________________________________ |
+    ||                                    ||
+    ||_________________W3_________________||
+    | ____________________________________ |
+    ||                                    ||
+    ||_________________W4_________________||
+    |__________________W1__________________|
+
+@end group
+@end smallexample
+
+@noindent
+如果 @code{window-combination-resize} 是 @code{t}，则分割 @var{W3} 会使所有三个活动窗口的高度大致相同：
+
+@smallexample
+@group
+     ______________________________________
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||_________________W2_________________||
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||_________________W3_________________||
+    | ____________________________________ |
+    ||                                    ||
+    ||                                    ||
+    ||_________________W4_________________||
+    |__________________W1__________________|
+
+@end group
+@end smallexample
+
+@noindent
+删除任意活动窗口 @var{W2}、@var{W3} 或 @var{W4} 都会将其空间按比例分配到剩余的两个活动窗口中。
+
+以下两个函数允许明确地为多个相邻窗口创建一个新的父窗口并撤消该操作。
+
+@cindex combining windows
+@defun combine-windows first last
+该函数组合了从@var{first}到@var{last}（含）的窗口。  @var{first}和@var{last}必须是同一组合中的有效窗口，即具有相同父窗口的窗口。  如果 @var{first} 和 @var{last} 都没有前一个兄弟窗口，也没有下一个兄弟窗口，则返回该父窗口。  否则，它会创建一个新的父窗口，其第一个子窗口变为@var{first}，最后一个子窗口变为@var{last}，将该父窗口插入窗口树中，代替以@var{first}开始并以@var{last}结束的窗口，并返回新的父窗口。
+
+此函数对于将同一父窗口的多个兄弟窗口作为一个整体进行操作非常有用。  考虑三个并排对齐的同级窗口 @var{w1}、@var{w2} 和 @var{w3}。  要创建位于 @var{w1} 和 @var{w2} 以下但不低于 @var{w3} 的窗口，请首先使用此函数组合 @var{w1} 和 @var{w2}，然后拆分它返回的窗口。  您还可以在 @code{combine-windows} 的返回值上调用 @code{window-state-get} (@pxref{Window Configurations}) 来获取 @var{w1} 和 @var{w2} 的组合状态。
+@end defun
+
+@cindex uncombining windows
+@defun uncombine-window window
+该函数取消指定的 @var{window} 的组合。  @var{window} 应该是一个内部窗口，其父窗口是相同类型的内部窗口。  这意味着 2⁣ 及其父窗口应该是水平或垂直窗口组合。  如果是这种情况，该函数使@var{window}的子窗口成为@var{window}父窗口的子窗口，并返回@code{t}。否则，它将保持@var{window}框架的当前配置不变并返回@code{nil}。
+
+该函数对于撤销 @code{combine-windows} 的影响很有用。例如，要计算两个相邻窗口@var{w1}和@var{w2}的状态，请按以下步骤操作：首先，以@var{w1}和@var{w2}为参数调用@code{combine-windows}，并将结果存储在@var{w}中。  然后使用参数 @var{w} 调用 @code{window-state-get}。  最后，以@var{w}为参数调用@code{uncombine-window}，以获取调用@code{combine-windows}之前存在的窗口配置。
+@end defun
+
+
+@node Resurrecting Windows
+@section 复活Windows
+@cindex resurrecting deleted windows
+@cindex restoring deleted windows
+
+窗口被删除（@pxref{Deleting Windows}）后，即使某些 Lisp 变量仍然引用该窗口，需要有效窗口作为参数的函数也不能再使用它。  当对窗口的最后一个引用不再存在时，窗口的 Lisp 对象最终将被垃圾收集器回收 (@pxref{Garbage Collection})。
+
+有两种方法可以恢复对象尚未被收集器回收的已删除窗口：第一种方法是在已保存的窗口配置 (@pxref{Window Configurations}) 中保留对该窗口的引用，然后使用该配置作为参数调用 @code{set-window-configuration}。  第二个是在变量中保留对该窗口的引用或对其进行绑定，然后将该引用用作 @code{split-window} (@pxref{Splitting Windows}) 中的 @var{refer} 参数。
+
+这两者之间的主要区别在于 @code{set-window-configuration} 恢复删除窗口之前存在的框架布局。  另一方面，@code{split-window} 方法允许布局的任意变化。
+
+考虑以下示例，该示例从包含显示缓冲区@file{*scratch*}的单个窗口的帧开始：
+
+@example
+@group
+(let* ((old (selected-window))
+       (new (split-window old nil 'right))
+       overlay)
+  (with-current-buffer (get-buffer-create "*Messages*")
+    (set-window-buffer new (current-buffer))
+    (setq overlay (make-overlay (point-min) (point-max)))
+    (overlay-put overlay 'face 'highlight)
+    (overlay-put overlay 'window new)
+    (message "new %s parent %s" new (window-parent new))
+    (sit-for 3))
+  (delete-window new)
+  (setq new (split-window old nil 'left))
+  (set-window-buffer new (get-buffer-create "*Messages*"))
+  (format "new %s parent %s" new (window-parent new)))
+@end group
+@end example
+
+当您在 @file{*scratch*} 中运行该代码时，它将首先拆分显示 @file{*scratch*} 的窗口，以在右侧的新窗口中显示 @file{*Messages*}。  它还设置了一个带有 window 属性的覆盖层，以突出显示新窗口中 @file{*Messages*} 的文本，并显示一条消息，显示新窗口及其在窗口树中的父窗口。  然后，它删除新窗口并在 @file{*scratch*} 窗口左侧重新启动它，再次显示一条消息，显示新窗口及其在窗口树中的父窗口。
+
+请注意，将 @file{*Messages*} 窗口移动到左侧后，新窗口及其父窗口都发生了变化。  此外，突出显示也会消失，因为在左侧重新创建新窗口时，为右侧新窗口设置的所有属性都会丢失。
+
+以下代码使用 @code{split-window} 的 @var{refer} 参数代替。
+
+@example
+@group
+(let* ((old (selected-window))
+       (new (split-window old nil 'right))
+       overlay)
+  (with-current-buffer (get-buffer-create "*Messages*")
+    (set-window-buffer new (current-buffer))
+    (setq overlay (make-overlay (point-min) (point-max)))
+    (overlay-put overlay 'face 'highlight)
+    (overlay-put overlay 'window new)
+    (message "new %s parent %s" new (window-parent new))
+    (sit-for 3))
+  (delete-window new)
+  (split-window old nil 'left nil new)
+  (format "new %s parent %s" new (window-parent new)))
+@end group
+@end example
+
+请注意，复活窗口的所有属性（例如其装饰、参数以及任何带有窗口属性的覆盖）都会被保留，就好像该窗口从未被删除一样。  唯一改变的是它在窗口树中的位置，以及其父窗口的 @code{window-left-child} 返回的值以及窗口及其兄弟窗口的 @code{window-prev-sibling} 和 @code{window-next-sibling} 返回的值。
+
+以下代码通过 @var{refer} 参数将右侧的新窗口及其父窗口传递给 @code{split-window}。
+
+@example
+@group
+(let* ((old (selected-window))
+       (new (split-window old nil 'right))
+       (parent (window-parent new))
+       overlay)
+  (with-current-buffer (get-buffer-create "*Messages*")
+    (set-window-buffer new (current-buffer))
+    (setq overlay (make-overlay (point-min) (point-max)))
+    (overlay-put overlay 'face 'highlight)
+    (overlay-put overlay 'window new)
+    (message "new %s parent %s" new (window-parent new))
+    (sit-for 3))
+  (delete-window new)
+  (split-window old nil 'left nil (cons new parent))
+  (format "new %s parent %s" new (window-parent new)))
+@end group
+@end example
+
+请注意，父窗口已与新窗口一起复活。
+
+复活死窗口对于在应该执行此操作的操作中保留窗口的身份非常有用，例如在框架上移动窗口或暂时隐藏它们。  此类窗口的任何属性（例如其装饰、之前显示的缓冲区、该缓冲区在窗口中的起始位置和点位置、窗口的专用状态或其光标类型）均保持不变，无需从头开始重新创建它们。  对于内部窗口，该窗口的组合限制值被保留，这意味着该窗口可以像以前一样重新组合（@pxref{Recombining Windows}）。
+
+
+@node Changing Window Layouts
+@section 更改窗口布局
+
+有时，更改窗口的布局以使两个或多个窗口占据彼此的位置可能很有用。  本节中描述的命令以有序的方式执行此操作。  从概念上讲，这些命令影响框架上窗口的矩形子集。通常，它们既不影响帧的迷你缓冲区窗口的位置，也不影响其任何侧窗口的位置 (@pxref{Side Windows})。
+
+所有这些命令的共同点是，它们通过首先删除窗口并随后在新位置复活它们（@pxref{Resurrecting Windows}）来保留窗口的身份。  不会丢失任何窗口，也不会添加或复制任何窗口。  在可能的情况下，这些命令尝试保留窗口的相对大小以及所有其他非几何属性（包括参数）。  如果要更改其位置的窗口是原子的或固定大小的，这些命令将发出错误信号。  下面描述的选项@code{transpose-dedicated-windows}决定专用窗口是否可以改变它们的位置。
+
+本节中描述的所有函数的 @var{window} 参数必须指定有效的父窗口 (@pxref{Windows and Frames})。  如果是@code{nil}，则代表所选框架的主窗口（@pxref{Side Windows}）。  交互式地，前缀参数意味着对所选窗口的父窗口进行操作。  在下面给出的示例中，除非另有说明，否则我们将始终假设显示的窗口构成其框架的主窗口，并且@var{window}参数为@code{nil}。
+
+@cindex rotate window layout
+前两个命令@dfn{rotate a window layout}顺时针或逆时针。
+
+@deffn Command window-layout-rotate-clockwise &optional window
+此命令将窗口布局顺时针旋转 90 度。  想象一下具有三个活动窗口@var{A}、@var{B} 和@var{C} 的布局，如下左图所示。  然后这个命令将产生右侧的布局。
+
+@smallexample
+@group
+     ___________       ___________
+    |           |     |     |     |
+    |     A     |     |  B  |     |
+    |___________| --> |_____|  A  |
+    |     |     |     |     |     |
+    |  B  |  C  |     |  C  |     |
+    |_____|_____|     |_____|_____|
+
+@end group
+@end smallexample
+@end deffn
+
+@deffn Command window-layout-rotate-anticlockwise &optional window
+这类似于 0⁣，但会沿相反方向旋转布局，如下面的示例所示。
+
+@smallexample
+@group
+     ___________       ___________
+    |           |     |     |     |
+    |     A     |     |     |  C  |
+    |___________| --> |  A  |_____|
+    |     |     |     |     |     |
+    |  B  |  C  |     |     |  B  |
+    |_____|_____|     |_____|_____|
+
+@end group
+@end smallexample
+@end deffn
+
+@cindex flip window layout
+接下来的两个命令@dfn{flip the window layout}——围绕假想的水平或垂直轴旋转它。  如果要翻转的窗口数量是奇数，则中间的窗口保持在原来的位置。
+
+@deffn Command window-layout-flip-topdown &optional window
+此命令翻转窗口，使底部的窗口变成顶部的窗口，反之亦然，如下例所示。
+
+@smallexample
+@group
+     ___________       ___________
+    |           |     |     |     |
+    |     A     |     |  B  |  C  |
+    |___________| --> |_____|_____|
+    |     |     |     |           |
+    |  B  |  C  |     |     A     |
+    |_____|_____|     |___________|
+
+@end group
+@end smallexample
+@end deffn
+
+@deffn Command window-layout-flip-leftright &optional window
+此命令重新排列窗口，使右侧的窗口成为左侧的窗口，反之亦然。
+
+@smallexample
+@group
+     ___________        ___________
+    |           |     |           |
+    |     A     |     |     A     |
+    |___________| --> |___________|
+    |     |     |     |     |     |
+    |  B  |  C  |     |  C  |  B  |
+    |_____|_____|     |_____|_____|
+
+@end group
+@end smallexample
+@end deffn
+
+下一个命令可用于@dfn{transpose windows}——将水平分割更改为垂直分割，反之亦然。
+@cindex transposing windows
+
+@deffn Command window-layout-transpose &optional window
+此命令重新组织窗口，使每个水平分割变成垂直分割，反之亦然。
+
+@smallexample
+@group
+     ___________       ___________
+    |           |     |     |     |
+    |     A     |     |     |  B  |
+    |___________| --> |  A  |_____|
+    |     |     |     |     |     |
+    |  B  |  C  |     |     |  C  |
+    |_____|_____|     |_____|_____|
+
+@end group
+@end smallexample
+@end deffn
+
+@cindex rotating windows
+最后两个命令可用于在现有布局中设置@dfn{rotate windows}。  它们就像旋转布局但保持布局的底层结构不变的命令。  真正改变的是现有布局中窗口的位置。  发生这种情况的方式是，在 @var{window} 帧上的窗口循环排序 (@pxref{Cyclic Window Ordering}) 中，以前被任何窗口占用的空间将被其前面的窗口（如果 @var{reverse} 为非 @code{nil} 则在其后）占用。
+
+@deffn Command rotate-windows &optional window reverse
+该命令按循环顺序旋转 @var{window} 的子窗口。可选参数 @var{reverse} 表示以相反的循环顺序向后旋转窗口。
+
+@smallexample
+@group
+     ___________        ___________
+    |           |      |           |
+    |     A     |      |     C     |
+    |___________| -->  |___________|
+    |     |     |      |     |     |
+    |  B  |  C  |      |  A  |  B  |
+    |_____|_____|      |_____|_____|
+
+@end group
+@end smallexample
+@end deffn
+
+@deffn Command rotate-windows-back &optional window
+该命令按循环顺序向后旋转 @var{window} 的子窗口。
+
+@smallexample
+@group
+     ___________        ___________
+    |           |      |           |
+    |     A     |      |     B     |
+    |___________| -->  |___________|
+    |     |     |      |     |     |
+    |  B  |  C  |      |  C  |  A  |
+    |_____|_____|      |_____|_____|
+
+@end group
+@end smallexample
+@end deffn
+
+上述所有命令均受以下选项的约束。
+
+@defopt transpose-dedicated-windows
+如果这是 @code{nil}，则本节中描述的函数在遇到专用窗口 (@pxref{Dedicated Windows}) 时将报告错误。  如果这是@code{t}，它们会像处理非专用窗口一样处理专用窗口。
+@end defopt
+
+最后两个命令受以下选项的约束。
+
+@defopt rotate-windows-change-selected
+如果这是 @code{nil}，则所选窗口将不受 @code{rotate-windows} 和 @code{rotate-windows-back} 的影响。  如果这是 @code{t}（默认值），则所选窗口将更改为在调用任何这些命令之前所选窗口位置处出现的窗口。
+@end defopt
+
+
+@node Cyclic Window Ordering
+@section Windows 的循环排序
+@cindex cyclic ordering of windows
+@cindex ordering of windows, cyclic
+@cindex window ordering, cyclic
+
+当您使用命令 @w{@kbd{C-x o}} (@code{other-window}) 选择其他窗口时，它会按特定顺序在实时窗口中移动。对于任何给定的窗口配置，此顺序永远不会改变。  它被称为@dfn{cyclic ordering of windows}。
+
+顺序由每个帧的窗口树的深度优先遍历确定，检索作为树的叶节点的活动窗口 (@pxref{Windows and Frames})。  如果迷你缓冲区处于活动状态，则也会包含迷你缓冲区窗口。  排序是循环的，因此序列中的最后一个窗口后面跟着第一个窗口。
+
+@defun next-window &optional window minibuf all-frames
+@cindex minibuffer window, and @code{next-window}
+该函数返回一个实时窗口，即窗口循环排序中 @var{window} 之后的窗口。  @var{window} 应该是一个实时窗口；如果省略或@code{nil}，则默认为选定的窗口。
+
+可选参数 @var{minibuf} 指定迷你缓冲区窗口是否应包含在循环排序中。  通常，当@var{minibuf}为@code{nil}时，仅当迷你缓冲区窗口当前处于活动状态时才包含该窗口；这与@w{@kbd{C-x o}}的行为相匹配。  （请注意，只要迷你缓冲区正在使用，迷你缓冲区窗口就处于活动状态；请参阅@ref{Minibuffers}）。
+
+如果@var{minibuf}是@code{t}，则循环排序包括所有迷你缓冲区窗口。  如果@var{minibuf}既不是@code{t}也不是@code{nil}，则即使迷你缓冲区窗口处于活动状态，也不包括它们。
+
+可选参数 @var{all-frames} 指定要考虑的帧：
+
+@itemize @bullet
+@item @code{nil}
+意味着考虑 @var{window} 框架上的窗口。  如果考虑迷你缓冲区窗口（由 @var{minibuf} 参数指定），则也会考虑共享迷你缓冲区窗口的帧。
+
+@item @code{t}
+意味着考虑所有现有框架上的窗户。
+
+@item @code{visible}
+意味着考虑所有可见框架上的窗口。
+
+@item 0
+意味着考虑所有可见或图标化框架上的窗口。
+
+@item A frame
+意味着考虑该特定框架上的窗口。
+
+@item Anything else
+意味着只考虑 @var{window} 框架上的窗口，而不考虑其他窗口。
+@end itemize
+
+如果考虑多于一帧，则通过附加这些帧的排序来获得循环排序，其顺序与所有活动帧的列表相同(@pxref{Finding All Frames})。
+@end defun
+
+@defun previous-window &optional window minibuf all-frames
+该函数返回一个活动窗口，即窗口循环排序中位于 @var{window} 之前的窗口。  其他参数的处理方式与@code{next-window}类似。
+@end defun
+
+@deffn Command other-window count &optional all-frames
+该函数选择一个实时窗口，将所选窗口中的一个 @var{count} 放置在窗口的循环排序中。  如果@var{count}是正数，则向前跳过@var{count}个窗口；如果@var{count}为负，则向后跳过@minus{}@var{count}窗口；如果 6⁣ 为零，则只需重新选择所选窗口。  当交互调用时，@var{count} 是数字前缀参数。
+
+可选参数 @var{all-frames} 与 @code{next-window} 具有相同的含义，就像 @code{next-window} 的 @code{nil} @var{minibuf} 参数一样。  当交互调用时，@var{all-frames}始终为@code{nil}，因此只能选择所选帧上的窗口。
+
+如果所选窗口的 @code{other-window} 参数是一个函数，并且 @code{ignore-window-parameters} 是 @code{nil}，则将使用参数 @var{count} 和 @var{all-frames} 调用该函数，而不是该函数的正常操作。
+
+否则，该函数不会选择函数@code{window-no-other-p}（见下文）返回@code{nil}的窗口。
+@end deffn
+
+@defun window-no-other-p &optional window
+如果 @var{window} 不应该被 @code{other-window} 等命令或 @code{get-lru-window} 等函数用作“其他”窗口，则该函数返回非 @code{nil}（见下文）。  当删除选定的窗口 (@pxref{Deleting Windows}) 并且必须选择新的选定窗口时也会调用它。
+
+更准确地说，如果 @var{window} 的 @code{no-other-window} 参数为非 @code{nil} 并且 @code{ignore-window-parameters} 为 @code{nil}，则该函数返回非 @code{nil}。  在任何其他情况下它都会返回@code{nil}。
+
+请注意，如果此函数返回@code{nil}，这并不一定意味着可以选择@var{window}。  例如，工具提示窗口 (@pxref{Basic Windows}) 的 @code{no-other-window} 参数默认设置为 @code{t}，但无法选择。
+@end defun
+
+@defun walk-windows fun &optional minibuf all-frames
+该函数以窗口作为参数，为每个活动窗口调用函数 @var{fun} 一次。
+
+它遵循窗口的循环顺序。  可选参数@var{minibuf}和@var{all-frames}指定包含的窗口集；这些与 @code{next-window} 中的参数相同。  如果 @var{all-frames} 指定了一个帧，则第一个走过的窗口是该帧上的第一个窗口（由 @code{frame-first-window} 返回的窗口），而不一定是选定的窗口。
+
+如果 @var{fun} 通过分割或删除窗口来更改窗口配置，这不会改变在第一次调用 @var{fun} 之前确定的走过的窗口集。
+@end defun
+
+@defun one-window-p &optional no-mini all-frames
+如果所选窗口是唯一的活动窗口，则此函数返回 @code{t}，否则返回 @code{nil}。
+
+如果迷你缓冲区窗口处于活动状态，通常会考虑它（因此该函数返回@code{nil}）。  但是，如果可选参数 @var{no-mini} 不是 @code{nil}，则即使迷你缓冲区窗口处于活动状态，也会被忽略。  可选参数 @var{all-frames} 与 @code{next-window} 具有相同的含义。
+@end defun
+
+@cindex finding windows
+以下函数返回一个满足某些条件的窗口，但不选择它：
+
+@cindex least recently used window
+@defun get-lru-window &optional all-frames dedicated not-selected no-other
+该函数返回一个活动窗口，该窗口启发式地是最近最少使用的窗口。  @dfn{least recently used window} 是最近最少选择的窗口——使用时间小于所有其他活动窗口 (@pxref{Selecting Windows}) 的使用时间的窗口。  可选参数 @var{all-frames} 与 @code{next-window} 具有相同的含义。
+
+如果存在任何全角窗口，则仅考虑这些窗口。  迷你缓冲区窗口永远不是候选者。  专用窗口 (@pxref{Dedicated Windows}) 永远不是候选窗口，除非可选参数 @var{dedicated} 是非 @code{nil}。  选定的窗口永远不会返回，除非它是唯一的候选窗口。  但是，如果可选参数 @var{not-selected} 为非 @code{nil}，则该函数在这种情况下返回 @code{nil}。  可选参数@var{no-other}，如果非@code{nil}，则意味着永远不会返回@code{window-no-other-p}（@pxref{Cyclic Window Ordering}）返回非@code{nil}的窗口。
+@end defun
+
+@cindex most recently used window
+@defun get-mru-window &optional all-frames dedicated not-selected no-other
+该函数类似于 @code{get-lru-window}，但它返回最近使用的窗口。  @dfn{most recently used window} 是最近选择的窗口——使用时间超过所有其他活动窗口 (@pxref{Selecting Windows}) 的使用时间的窗口。  参数的含义与@code{get-lru-window} 相同。
+
+由于实际上最近使用的窗口始终是选定的窗口，因此仅使用非 @code{nil} @var{not-selected} 参数调用此函数通常是有意义的。
+@end defun
+
+@cindex largest window
+@defun get-largest-window &optional all-frames dedicated not-selected no-other
+此函数返回具有最大面积（高度乘以宽度）的窗口。  如果有两个相同大小的候选窗口，则它优先选择从所选窗口开始的窗口循环排序中第一个出现的候选窗口。  参数的含义与 @code{get-lru-window} 相同。
+@end defun
+
+@cindex window that satisfies a predicate
+@cindex conditional selection of windows
+@defun get-window-with-predicate predicate &optional minibuf all-frames default
+该函数按照窗口的循环顺序依次为每个窗口调用函数@var{predicate}，并将窗口作为参数传递给它。  如果谓词对于任何窗口返回非@code{nil}，则该函数停止并返回该窗口。  如果没有找到这样的窗口，则返回值为@var{default}（默认为@code{nil}）。
+
+可选参数@var{minibuf}和@var{all-frames}指定要搜索的窗口，并且与@code{next-window}中的含义相同。
+@end defun
+
+
+@node Buffers and Windows
+@section 缓冲区和窗口
+@cindex examining windows
+@cindex windows, controlling precisely
+@cindex buffers, controlled in windows
+
+本节描述用于检查和设置窗口内容的低级函数。  @xref{Switching Buffers}，用于在窗口中显示特定缓冲区的高级函数。
+
+@defun window-buffer &optional window
+该函数返回@var{window}正在显示的缓冲区。  如果省略 @var{window} 或 @code{nil}，则默认为所选窗口。  如果@var{window}是内部窗口，则该函数返回@code{nil}。
+@end defun
+
+@defun set-window-buffer window buffer-or-name &optional keep-margins
+该函数使@var{window}显示@var{buffer-or-name}。 @var{window} 应该是一个实时窗口；如果@code{nil}，则默认为所选窗口。  @var{buffer-or-name} 应该是一个缓冲区，或者是现有缓冲区的名称。  此函数不会更改选择的窗口，也不会直接更改当前的缓冲区（@pxref{Current Buffer}）。  它的返回值为@code{nil}。
+
+如果 @var{window} 是 @dfn{strongly dedicated} 到缓冲区，并且 @var{buffer-or-name} 未指定该缓冲区，则此函数会发出错误信号。  @xref{Dedicated Windows}。
+
+默认情况下，该函数根据指定缓冲区中的局部变量重置 @var{window} 的位置、显示边距、边缘宽度和滚动条设置。  但是，如果可选参数 @var{keep-margins} 不是 @code{nil}，则它会单独保留 @var{window} 的显示边距、边缘和滚动条设置。
+
+编写应用程序时，通常应该使用@code{display-buffer}（@pxref{Choosing Window}）或@ref{Switching Buffers}中描述的高级函数，而不是直接调用@code{set-window-buffer}。
+
+它运行@code{window-scroll-functions}，然后运行@code{window-configuration-change-hook}。  @xref{Window Hooks}。
+@end defun
+
+@defvar buffer-display-count
+该缓冲区局部变量记录缓冲区在窗口中显示的次数。  每次为缓冲区调用 @code{set-window-buffer} 时，它都会递增。
+@end defvar
+
+@defvar buffer-display-time
+该缓冲区局部变量记录缓冲区最后在窗口中显示的时间。  如果缓冲区从未显示过，则该值为@code{nil}。  每次为缓冲区调用 @code{set-window-buffer} 时都会更新它，并使用 @code{current-time} (@pxref{Time of Day}) 返回的值。
+@end defvar
+
+@defun get-buffer-window &optional buffer-or-name all-frames
+此函数返回从选定窗口 (@pxref{Cyclic Window Ordering}) 开始的窗口循环排序中显示@var{buffer-or-name} 的第一个窗口。  如果不存在这样的窗口，则返回值为@code{nil}。
+
+@var{buffer-or-name} 应该是一个缓冲区或缓冲区的名称；如果省略或@code{nil}，则默认为当前缓冲区。  可选参数 @var{all-frames} 指定要考虑的窗口：
+
+@itemize @bullet
+@item
+@code{t} 表示考虑所有现有框架上的窗口。
+@item
+@code{visible} 表示考虑所有可见帧上的窗口。
+@item
+0 表示考虑所有可见或图标化框架上的窗口。
+@item
+框架意味着仅考虑该框架上的窗口。
+@item
+任何其他值都意味着考虑所选帧上的窗口。
+@end itemize
+
+请注意，这些含义与 @code{next-window} (@pxref{Cyclic Window Ordering}) 的 @var{all-frames} 参数的含义略有不同。  在 Emacs 的未来版本中可能会更改此函数以消除这种差异。
+@end defun
+
+以下函数可以判断特定窗口的缓冲区是否共享其他缓冲区的文本 (@pxref{Indirect Buffers})。
+
+@defun window-indirect-buffer-p &optional window buffer-or-name
+如果 1⁣ 与 2⁣ 间接相关，则该函数返回非 0⁣。  @var{window} 必须是实时窗口，并且默认为所选窗口。  @var{buffer-or-name} 可以是缓冲区或现有缓冲区的名称，默认为当前缓冲区。
+
+如果满足以下条件之一，则@var{window} 与@var{buffer-or-name} 间接相关：
+
+@itemize @bullet
+@item
+@var{buffer-or-name} 指定间接缓冲区，@var{window} 的缓冲区是其基础缓冲区。
+
+@item
+@var{window} 的缓冲区是间接缓冲区，其基本缓冲区是@var{buffer-or-name} 指定的缓冲区。
+
+@item
+@var{window}的缓冲区和@var{buffer-or-name}指定的缓冲区都是共享相同基础缓冲区的间接缓冲区。
+@end itemize
+
+如果以上都不成立，则返回@code{nil}。
+@end defun
+
+@defun get-buffer-window-list &optional buffer-or-name minibuf all-frames indirect
+此函数返回当前显示 @var{buffer-or-name} 的所有窗口的列表。  @var{buffer-or-name} 应该是一个缓冲区或现有缓冲区的名称。  如果省略或@code{nil}，则默认为当前缓冲区。  如果当前选定的窗口显示@var{buffer-or-name}，则它将是此函数返回的列表中的第一个。
+
+参数 @var{minibuf} 和 @var{all-frames} 与函数 @code{next-window} (@pxref{Cyclic Window Ordering}) 中的含义相同。  请注意，@var{all-frames} 参数的@emph{not} 的行为与@code{get-buffer-window} 中的行为完全相同。
+
+可选参数@var{indirect}非@code{nil}表示将与@var{buffer-or-name}间接相关的所有窗口的列表附加到显示@var{buffer-or-name}的窗口列表，即@code{window-indirect-buffer-p}（见上文）以@var{buffer-or-name}指定的窗口和缓冲区作为参数返回非@code{nil}的窗口。
+@end defun
+
+@deffn Command replace-buffer-in-windows &optional buffer-or-name
+此命令在所有显示它的窗口中将 @var{buffer-or-name} 替换为其他缓冲区。  @var{buffer-or-name} 应该是一个缓冲区，或者是现有缓冲区的名称；如果省略或@code{nil}，则默认为当前缓冲区。
+
+每个窗口中的替换缓冲区通常通过 @code{switch-to-prev-buffer} (@pxref{Window History}) 选择。  除了侧窗 (@pxref{Side Windows}) 之外，如果可能，任何显示 @var{buffer-or-name} 的专用窗口都会被删除 (@pxref{Dedicated Windows})。  如果这样的窗口是其框架上的唯一窗口，并且同一终端上还有其他框架，则该框架也会被删除。  如果专用窗口是其终端上唯一帧上的唯一窗口，则缓冲区无论如何都会被替换。
+
+该函数的主要目的是决定如何处理缓冲区即将被@code{kill-buffer}（@pxref{Killing Buffers}）杀死的窗口。  但是，它还会从所有窗口（包括仅由窗口配置引用的死窗口）的上一个和下一个缓冲区 (@pxref{Window History}) 列表中删除@var{buffer-or-name}指定的缓冲区，并删除引用该缓冲区的任何 @code{quit-restore} 或 @code{quit-restore-prev} 参数 (@pxref{Window Parameters})。
+
+此函数不会替换任何显示它的迷你缓冲区窗口中由 @var{buffer-or-name} 指定的缓冲区，也不会删除迷你缓冲区窗口或迷你缓冲区帧。  但是，它会从所有迷你缓冲区窗口的前一个和下一个缓冲区列表中删除该缓冲区。
+@end deffn
+
+默认情况下，@code{replace-buffer-in-windows}仅删除专用于其缓冲区的窗口，并忽略其所处理窗口的任何@code{quit-restore}或@code{quit-restore-prev}参数。  以下选项对于规避这些限制很有用。
+
+@defopt kill-buffer-quit-windows
+如果此选项为@code{nil}，则@code{kill-buffer}（以及@code{replace-buffer-in-windows}）可能仅删除专用于即将被杀死的缓冲区的窗口。  如果这是非@code{nil}，@code{replace-buffer-in-windows}有@code{quit-restore-window}（@pxref{Quitting Windows}）处理任何这样的窗口。  该函数可能会删除这样的窗口，即使它不专用于其缓冲区。  此外，当无法删除窗口并且必须在其中显示另一个缓冲区时，@code{delete-windows-on} 将使用 @code{quit-restore-window} 作为后备。
+@end defopt
+
+
+@node Switching Buffers
+@section 切换到窗口中的缓冲区
+@cindex switching to a buffer
+
+本节描述在某些窗口中切换到指定缓冲区的高级函数。  一般来说，“切换到缓冲区”意味着 (1) 在某个窗口中显示缓冲区，(2) 使该窗口成为选定窗口（及其帧作为选定帧），以及 (3) 使缓冲区成为当前缓冲区。
+
+@emph{not} 使用这些函数使缓冲区暂时成为当前缓冲区，以便 Lisp 程序可以访问或修改它。  它们有副作用，例如更改窗口历史记录 (@pxref{Window History})，如果以这种方式使用，这会让用户感到惊讶。  如果您想让缓冲区成为当前缓冲区以在 Lisp 中对其进行修改，请使用 @code{with-current-buffer}、@code{save-current-buffer} 或 @code{set-buffer}。  @xref{Current Buffer}。
+
+@deffn Command switch-to-buffer buffer-or-name &optional norecord force-same-window
+此命令尝试在所选窗口中显示 @var{buffer-or-name} 并使其成为当前缓冲区。  它经常以交互方式使用（作为 @kbd{C-x b} 的绑定），以及在 Lisp 程序中使用。  返回值是切换到的缓冲区。
+
+如果@var{buffer-or-name}是@code{nil}，则默认为@code{other-buffer}（@pxref{Buffer List}）返回的缓冲区。  如果 4⁣ 是一个字符串，不是任何现有缓冲区的名称，则该函数将创建一个具有该名称的新缓冲区；新缓冲区的主要模式由变量@code{major-mode} (@pxref{Major Modes}) 确定。
+
+通常，指定的缓冲区放在缓冲区列表的前面——全局缓冲区列表和所选帧的缓冲区列表（@pxref{Buffer List}）。  但是，如果可选参数 @var{norecord} 为非 @code{nil}，则不会执行此操作。
+
+有时，所选窗口可能不适合显示缓冲区。  如果所选窗口是迷你缓冲区窗口，或者所选窗口强烈专用于其缓冲区 (@pxref{Dedicated Windows})，则会发生这种情况。  在这种情况下，该命令通常会尝试通过调用 @code{pop-to-buffer} （见下文）在其他窗口中显示缓冲区。
+
+如果可选参数 @var{force-same-window} 为非 @code{nil} 并且所选窗口不适合显示缓冲区，则该函数在非交互调用时始终会发出错误信号。  在交互式使用中，如果所选窗口是迷你缓冲区窗口，该函数将尝试使用其他窗口。  如果所选窗口强烈专用于其缓冲区，则可以使用接下来描述的选项@code{switch-to-buffer-in-dedicated-window}继续。
+@end deffn
+
+@defopt switch-to-buffer-in-dedicated-window
+该选项，如果非 @code{nil} ，允许 @code{switch-to-buffer} 在交互调用时继续进行，并且所选窗口强烈专用于其缓冲区。
+
+尊重以下价值观：
+
+@table @code
+@item nil
+不允许在非交互式使用中进行切换并发出错误信号。
+
+@item prompt
+提示用户是否允许切换。
+
+@item pop
+调用 @code{pop-to-buffer} 继续。
+
+@item t
+将所选窗口标记为非专用窗口并继续。
+@end table
+
+该选项不影响@code{switch-to-buffer}的非交互式调用。
+@end defopt
+
+默认情况下，@code{switch-to-buffer}尝试保留@code{window-point}。  可以使用以下选项调整此行为。
+
+@defopt switch-to-buffer-preserve-window-point
+如果此变量为 @code{nil}，则 @code{switch-to-buffer} 在该缓冲区的 @code{point} 的位置显示由 @var{buffer-or-name} 指定的缓冲区。  如果此变量为@code{already-displayed}，则它会尝试在所选窗口中的先前位置显示缓冲区，前提是该缓冲区当前显示在任何可见或图标化帧上的某个其他窗口中。  如果此变量为 @code{t}，则 @code{switch-to-buffer} 无条件地尝试在所选窗口中的先前位置显示缓冲区。
+
+如果缓冲区已显示在所选窗口中或以前从未出现在其中，或者如果 @code{switch-to-buffer} 调用 @code{pop-to-buffer} 来显示缓冲区，则忽略此变量。
+@end defopt
+
+@defopt switch-to-buffer-obey-display-actions
+如果此变量为非 @code{nil}，则 @code{switch-to-buffer} 遵循 @code{display-buffer-overriding-action}、@code{display-buffer-alist} (@pxref{Buffer Display Action Functions}) 和其他缓冲区显示相关变量 (@pxref{Buffer Display Action Alists}) 指定的显示操作。
+@end defopt
+
+接下来的两个命令与@code{switch-to-buffer}类似，除了所描述的功能之外。
+
+@deffn Command switch-to-buffer-other-window buffer-or-name &optional norecord
+该函数在所选窗口以外的其他窗口中显示@var{buffer-or-name}指定的缓冲区。  它在内部使用函数@code{pop-to-buffer}（见下文）。
+
+如果选定的窗口已经显示指定的缓冲区，它将继续这样做，但仍然会发现另一个窗口也显示它。
+
+@var{buffer-or-name} 和 @var{norecord} 参数与 @code{switch-to-buffer} 中的含义相同。
+@end deffn
+
+@deffn Command switch-to-buffer-other-frame buffer-or-name &optional norecord
+该函数在新帧中显示@var{buffer-or-name}指定的缓冲区。  它在内部使用函数@code{pop-to-buffer}（见下文）。
+
+如果指定的缓冲区已显示在另一个窗口中，则在当前终端上的任何帧中，将切换到该窗口而不是创建新帧。  然而，选定的窗口永远不会用于此目的。
+
+@var{buffer-or-name} 和 @var{norecord} 参数与 @code{switch-to-buffer} 中的含义相同。
+@end deffn
+
+上述命令使用函数@code{pop-to-buffer}，可以灵活地在某个窗口中显示缓冲区并选择该窗口进行编辑。  反过来，@code{pop-to-buffer} 使用@code{display-buffer} 来显示缓冲区。  因此，所有影响 @code{display-buffer} 的变量也会影响它。  @xref{Choosing Window}，用于@code{display-buffer}的文档。
+
+@deffn Command pop-to-buffer buffer-or-name &optional action norecord
+该函数使@var{buffer-or-name}成为当前缓冲区并将其显示在某个窗口中，最好不是当前选定的窗口。  然后它选择显示窗口。  如果该窗口位于不同的图形框架上，则如果可能的话，该框架将获得输入焦点 (@pxref{Input Focus})。
+
+如果@var{buffer-or-name}是@code{nil}，则默认为@code{other-buffer}（@pxref{Buffer List}）返回的缓冲区。  如果 4⁣ 是一个字符串，不是任何现有缓冲区的名称，则该函数将创建一个具有该名称的新缓冲区；新缓冲区的主要模式由变量@code{major-mode} (@pxref{Major Modes}) 确定。  在任何情况下，即使没有找到合适的窗口来显示该缓冲区，该缓冲区也会成为当前缓冲区并返回。
+
+如果@var{action}非@code{nil}，它应该是一个显示动作传递给@code{display-buffer}（@pxref{Choosing Window}）。或者，非 4⁣、非列表值意味着弹出到所选窗口以外的窗口 — 即使缓冲区已显示在所选窗口中。
+
+与 @code{switch-to-buffer} 类似，此函数更新缓冲区列表，除非 @var{norecord} 为非 @code{nil}。
+@end deffn
+
+
+@node Displaying Buffers
+@section 在合适的窗口中显示缓冲区
+@cindex buffer display
+@cindex displaying a buffer
+
+本节介绍 Emacs 用于查找或创建用于显示指定缓冲区的窗口的低级函数。  这些函数的共同主力是@code{display-buffer}，它最终处理所有传入的缓冲区显示请求（@pxref{Choosing Window}）。
+
+@code{display-buffer} 将寻找合适窗口的任务委托给所谓的操作函数 (@pxref{Buffer Display Action Functions})。  首先，@code{display-buffer}编译一个所谓的动作列表——一个特殊的关联列表，动作函数可以使用它来微调它们的行为。  然后它将该列表传递给它调用的每个操作函数 (@pxref{Buffer Display Action Alists})。
+
+@code{display-buffer} 的行为是高度可定制的。  要了解如何在实践中使用自定义，您可能希望研究说明 @code{display-buffer} 用于调用操作函数 (@pxref{Precedence of Action Functions}) 的优先顺序的示例。  为了避免调用 @code{display-buffer} 的 Lisp 程序与用户对其行为的自定义之间发生冲突，遵循本节最后部分 (@pxref{The Zen of Buffer Display}) 中概述的一些准则可能是有意义的。
+
+@menu
+* Choosing Window::          如何选择一个窗口来显示缓冲区。
+* Buffer Display Action Functions::  支持缓冲区显示功能。
+* Buffer Display Action Alists::  用于微调缓冲区显示的列表。
+* Choosing Window Options::  影响缓冲区显示方式的额外选项。
+* Precedence of Action Functions::  解释动作函数优先级的示例。
+* The Zen of Buffer Display::  如何避免缓冲区在窗口之间丢失。
+@end menu
+
+
+@node Choosing Window
+@subsection 选择显示缓冲区的窗口
+
+命令@code{display-buffer}灵活选择显示窗口，并在该窗口中显示指定的缓冲区。  可以通过键绑定 @kbd{C-x 4 C-o} 以交互方式调用它。  它还被许多函数和命令用作子例程，包括 @code{switch-to-buffer} 和 @code{pop-to-buffer} (@pxref{Switching Buffers})。
+
+@cindex buffer display display action
+@cindex display action
+该命令执行几个复杂的步骤来查找要显示的窗口。这些步骤通过 @dfn{display actions} 进行描述，其形式为 @code{(@var{functions} . @var{alist})}。这里，@var{functions}要么是单个函数，要么是函数列表，称为“动作函数”（@pxref{Buffer Display Action Functions}）； @var{alist} 是关联列表，称为“动作列表”(@pxref{Buffer Display Action Alists})。 @xref{The Zen of Buffer Display}，用于显示操作的示例。
+
+动作函数接受两个参数：要显示的缓冲区和动作列表。  它尝试在某个窗口中显示缓冲区，根据自己的标准选择或创建一个窗口。  如果成功，则返回窗口；否则，返回@code{nil}。
+
+@code{display-buffer} 的工作原理是组合来自多个源的显示操作，并依次调用操作函数，直到其中一个成功显示缓冲区并返回非 @code{nil} 值。
+
+@deffn Command display-buffer buffer-or-name &optional action frame
+该命令使 @var{buffer-or-name} 出现在某个窗口中，而不选择该窗口或使缓冲区成为当前缓冲区。  参数 @var{buffer-or-name} 必须是缓冲区或现有缓冲区的名称。  返回值是选择显示缓冲区的窗口，如果没有找到合适的窗口，则返回 2⁣。
+
+可选参数@var{action}，如果不是@code{nil}，通常应该是一个显示动作（如上所述）。  @code{display-buffer} 通过合并来自以下来源的显示操作（按优先级从高到低的顺序）来构建操作函数列表和操作列表：
+
+@itemize
+@item
+变量@code{display-buffer-overriding-action}。
+
+@item
+用户选项@code{display-buffer-alist}。
+
+@item
+@var{action} 参数。
+
+@item
+用户选项@code{display-buffer-base-action}。
+
+@item
+常数@code{display-buffer-fallback-action}。
+@end itemize
+
+@noindent
+实际上，这意味着 @code{display-buffer} 构建由这些显示操作指定的所有操作函数的列表。  该列表的第一个元素是由 @code{display-buffer-overriding-action} 指定的第一个动作函数（如果有）。  它的最后一个元素是@code{display-buffer-pop-up-frame}——由@code{display-buffer-fallback-action}指定的最后一个动作函数。  重复项不会从此列表中删除——因此在一次调用 @code{display-buffer} 期间，同一个操作函数可能会被多次调用。
+
+@code{display-buffer} 依次调用此列表指定的操作函数，将缓冲区作为第一个参数传递，将组合操作列表作为第二个参数传递，直到其中一个函数返回非 @code{nil}。  @xref{Precedence of Action Functions}，例如@code{display-buffer}如何处理不同来源指定的显示动作。
+
+请注意，第二个参数始终是由上面指定的源指定的 @emph{all} 操作列表条目的列表。  因此，该列表的第一个元素是由 @code{display-buffer-overriding-action} 指定的第一个操作列表条目（如果有）。  它的最后一个元素是@code{display-buffer-base-action}的最后一个列表条目（如果有）（@code{display-buffer-fallback-action}的动作列表为空）。
+
+另请注意，组合操作列表可能包含重复的条目以及具有不同值的相同键的条目。  通常，操作函数总是使用它们找到的键的第一个关联。  因此，动作函数使用的关联不一定是指定该动作函数的显示动作提供的关联，
+
+参数 @var{action} 也可以有非 @code{nil}、非列表值。  这具有特殊的含义，即缓冲区应该显示在所选窗口以外的窗口中，即使所选窗口已经在显示它。  如果使用前缀参数交互调用，@var{action} 是 @code{t}。  Lisp 程序应该始终提供一个列表值。
+
+可选参数@var{frame}（如果非@code{nil}）指定在确定缓冲区是否已显示时要检查哪些帧。它相当于将元素@w{@code{(reusable-frames . @var{frame})}}添加到@var{action}（@pxref{Buffer Display Action Alists}）的动作列表中。  @var{frame} 参数是出于兼容性原因而提供的，Lisp 程序不应使用它。
+@end deffn
+
+@defvar display-buffer-overriding-action
+该变量的值应该是一个显示操作，@code{display-buffer} 将其视为最高优先级。  默认值为空显示操作，即@w{@code{(nil . nil)}}。
+@end defvar
+
+@defopt display-buffer-alist
+该选项的值是一个映射条件到显示操作的列表。  每个条件都传递到 @code{buffer-match-p} (@pxref{Buffer List})，同时缓冲区名称和 @var{action} 参数传递到 @code{display-buffer}。  如果它返回非@code{nil}值，则@code{display-buffer}使用相应的显示操作来显示缓冲区。  注意：如果您使用 @code{derived-mode} 或 @code{major-mode} 作为条件，并且在设置缓冲区的主要模式之前调用 @code{display-buffer}，@code{buffer-match-p} 可能无法报告匹配。
+
+如果 @code{display-buffer} 的调用者在其 @var{action} 参数中传递一个类别作为符号，那么您可以在 @code{display-buffer-alist} 中使用相同的类别来匹配具有不同名称的缓冲区，例如：
+
+@example
+@group
+(add-to-list 'display-buffer-alist
+             '((category . comint)
+               (display-buffer-same-window)
+               (inhibit-same-window . nil)))
+
+(display-buffer (get-buffer-create "*my-shell*")
+                '(nil (category . comint)))
+@end group
+@end example
+
+@noindent
+@xref{Buffer List, @code{buffer-match-p}}.
+
+无论显示的缓冲区的名称如何，调用者都将类别定义为符号@code{comint}。  然后 @code{display-buffer-alist} 为所有显示相同类别的缓冲区匹配该类别。这避免了构造与缓冲区名称匹配的复杂正则表达式的需要。
+
+您还可以匹配现在正在执行的命令。  当不同的命令显示具有相同名称的缓冲区，但您希望不同命令的缓冲区以不同的方式显示时，这非常有用。  例如：
+
+@example
+@group
+(add-to-list 'display-buffer-alist
+             '((and "^\\*vc-diff\\*"
+                    (not (this-command . vc-root-diff)))
+	       nil
+	       (post-command-select-window . nil)))
+@end group
+@end example
+
+这意味着显示 VC diff 的窗口（例如由 @kbd{C-x v =} (@code{vc-diff}, @pxref{Old Revisions,,, emacs, the Emacs Manual}) 生成的窗口）不会保持选中状态，除了显示由 @kbd{C-x v D} (@code{vc-root-diff}) 生成的缓冲区的窗口（它们保持选中状态）。
+@end defopt
+
+@defopt display-buffer-base-action
+该选项的值应该是一个显示动作。  此选项可用于定义调用 @code{display-buffer} 的标准显示操作。
+@end defopt
+
+@defvr Constant display-buffer-fallback-action
+如果没有给出其他显示操作，此显示操作指定 @code{display-buffer} 的回退行为。
+@end defvr
+
+
+@node Buffer Display Action Functions
+@subsection 缓冲区显示的动作函数
+@cindex buffer display action function
+@cindex action function, for buffer display
+
+@dfn{action function} 是一个函数 @code{display-buffer} 调用，用于选择一个窗口来显示缓冲区。  动作函数有两个参数：@var{buffer}，要显示的缓冲区，以及@var{alist}，动作列表 (@pxref{Buffer Display Action Alists})。  如果成功，他们应该返回一个显示 @var{buffer} 的窗口，如果失败，则返回显示 @code{nil} 的窗口。
+
+Emacs 中定义了以下基本操作函数。
+
+@defun display-buffer-same-window buffer alist
+此函数尝试在所选窗口中显示 @var{buffer}。如果所选窗口是迷你缓冲区窗口或专用于另一个缓冲区 (@pxref{Dedicated Windows})，则会失败。  如果 @var{alist} 有非 @code{nil} @code{inhibit-same-window} 条目，它也会失败。
+@end defun
+
+@defun display-buffer-reuse-window buffer alist
+此函数尝试通过查找已显示 @var{buffer} 的窗口来显示它。  所选框架上的窗口优先于其他框架上的窗口。
+
+如果 @var{alist} 具有非 @code{nil} @code{inhibit-same-window} 条目，则所选窗口不符合重用条件。  可以在 @code{reusable-frames} 操作列表条目的帮助下指定搜索已显示 @var{buffer} 的窗口的框架集。  如果 @var{alist} 不包含 @code{reusable-frames} 条目，则此函数仅搜索选定的帧。
+
+如果此函数选择另一个框架上的窗口，它会使该框架可见，并且除非 @var{alist} 包含 @code{inhibit-switch-frame} 条目，否则会在必要时提升该框架。
+
+如果 @var{alist} 有一个非 @code{nil} @code{reuse-indirect} 条目，并且没有找到显示 @var{buffer} 的窗口，则此函数尝试查找与 @var{buffer} 间接相关的窗口 — 对于该窗口，@code{window-indirect-buffer-p} (@pxref{Buffers and Windows}) 以窗口和 @var{buffer} 作为参数返回非 @code{nil}。  如果找到这样的窗口，并且 10⁣ 条目的 9⁣ 等于符号 @code{buffer}，则它不会用 @var{buffer} 替换该窗口的缓冲区，而是返回该窗口及其旧缓冲区。  否则，它将 @var{buffer} 放入该窗口并返回该窗口。
+@end defun
+
+@defun display-buffer-reuse-mode-window buffer alist
+此函数尝试通过查找在给定模式下显示缓冲区的窗口来显示 @var{buffer}。
+
+如果 @var{alist} 包含 @code{mode} 条目，则其值指定主模式（符号）或主模式列表。  如果@var{alist}不包含@code{mode}条目，则使用当前的@var{buffer}主模式。  如果窗口显示的缓冲区的模式源自由此指定的模式之一，则该窗口是候选窗口。
+
+与 4⁣ 一样，该行为也由 @code{inhibit-same-window}、@code{reusable-frames} 和 @code{inhibit-switch-frame} 的 @var{alist} 条目控制。
+@end defun
+
+@defun display-buffer-pop-up-window buffer alist
+此函数尝试通过分割最大或最近最少使用的窗口（通常位于所选帧上）来显示 @var{buffer}。它实际上是通过调用 @code{split-window-preferred-function} (@pxref{Choosing Window Options}) 指定的函数来执行分割的。
+
+新窗口的大小可以通过在 @var{alist} 中提供 @code{window-height} 和 @code{window-width} 条目来调整。如果 @var{alist} 包含 @code{preserve-size} 条目，Emacs 还将尝试在将来的调整大小操作期间保留新窗口的大小 (@pxref{Preserving Window Sizes})。
+
+如果没有窗口可以分割，则此功能失败。  通常，发生这种情况是因为没有足够大的窗口来允许分割。将 @code{split-height-threshold} 或 @code{split-width-threshold} 设置为较低的值可能会有所帮助。  当所选帧具有 @code{unsplittable} 帧参数时，分割也会失败； @pxref{Buffer Parameters}。
+@end defun
+
+@defun display-buffer-in-previous-window buffer alist
+此函数尝试在先前显示的窗口中显示 @var{buffer}。
+
+如果 @var{alist} 包含非 @code{nil} @code{inhibit-same-window} 条目，则所选窗口不符合使用条件。  仅当专用窗口已显示 @var{buffer} 时才可用。  如果@var{alist}包含@code{previous-window}条目，则该条目指定的窗口可用，即使它以前从未显示过@var{buffer}。
+
+如果 @var{alist} 包含 @code{reusable-frames} 条目 (@pxref{Buffer Display Action Alists})，则其值决定在哪些帧中搜索合适的窗口。  如果 @var{alist} 不包含 @code{reusable-frames} 条目，且 @code{display-buffer-reuse-frames} 和 @code{pop-up-frames} 均为 @code{nil}，则此函数仅搜索所选帧；如果这些变量中的任何一个不是@code{nil}，它将搜索当前终端上的所有帧。
+
+如果根据这些规则有多个窗口符合可用条件，则该函数将按以下优先顺序进行选择：
+
+@itemize @bullet
+@item
+由任何 @code{previous-window} @var{alist} 条目指定的窗口，前提是它不是选定的窗口。
+
+@item
+之前显示 @var{buffer} 的窗口，前提是它不是选定的窗口。
+
+@item
+选定的窗口，如果它由 @code{previous-window} @var{alist} 条目指定或之前显示过 @var{buffer}。
+@end itemize
+@end defun
+
+@defun display-buffer-use-some-window buffer alist
+此函数尝试通过选择现有窗口并在该窗口中显示缓冲区来显示 @var{buffer}。  它首先尝试在 @code{lru-frames} @var{alist} 条目指定的任何帧上查找最近未使用过的窗口 (@pxref{Cyclic Window Ordering})，如果不存在此类条目，则回退到所选帧。  它还更喜欢满足 @code{window-min-width} 和 @code{window-min-height} @var{alist} 条目指定的约束的窗口；如果未找到 @code{window-min-width} 条目，则首选全角窗口。  最后，它不会返回使用时间高于@var{alist}提供的任何@code{lru-time}条目指定的窗口。
+
+如果没有找到最近使用较少的窗口，该函数将尝试使用其他窗口，最好是某个可见框架上的大窗口。  如果所有窗口都专用于其他缓冲区 (@pxref{Dedicated Windows})，则可能会失败。
+
+上面描述了当 @code{some-window} @var{alist} 条目为 @code{lru} 或 @code{nil}（默认值）时的行为。  另一个可能的值是@code{mru}。  例如，如果将@code{display-buffer-base-action}自定义为@w{@code{(nil . ((some-window . mru)))}}，则此函数将优先选择最近使用的窗口。  这将尝试在同一窗口中连续调用 @code{display-buffer} 来显示多个缓冲区。  考虑三个或更多窗口的配置，其中用户想要在未选择的窗口中一个接一个地查阅分布在多个缓冲区中的查询结果。  使用 @code{lru} 策略，Emacs 可能会不断选择另一个窗口，因为最近最少使用的窗口会随着每​​次调用 @code{display-buffer-use-some-window} 而变化。使用@code{mru}策略，选择的窗口将始终保持不变，从而产生可预测的用户体验。
+@end defun
+
+@defun display-buffer-use-least-recent-window buffer alist
+该函数与@code{display-buffer-use-some-window}类似，但会更加努力地不使用最近使用过的窗口。  特别是，它不使用选定的窗口。  此外，它会首先尝试重用已经显示@var{buffer}的窗口，仅根据该窗口的使用时间来决定是否应该使用显示另一个缓冲区的窗口，如果没有找到可用的窗口，则弹出一个新窗口。
+
+最后，此函数将增加其返回的任何窗口的使用时间 (@pxref{Selecting Windows})，以避免进一步的调用将使用该窗口来显示另一个缓冲区。  想要连续显示多个缓冲区的应用程序可以通过提供一个 @code{lru-time} @var{alist} 条目来帮助此功能，该条目最初设置为所选窗口的使用时间值。  此函数的每次调用都会将返回的窗口的使用时间提高到高于该值的值，并且后续调用将禁止此函数使用它之前返回的窗口。
+@end defun
+
+@defun display-buffer-in-direction buffer alist
+此函数尝试在 @var{alist} 指定的位置显示 @var{buffer}。  为此，@var{alist} 应包含一个 @code{direction} 条目，其值为 @code{left}、@code{above}（或 @code{up}）、@code{right} 和 @code{below}（或 @code{down}）之一。  其他值通常解释为 @code{below}。
+
+如果@var{alist}还包含@code{window}条目，则其值指定参考窗口。  该值可以是特殊符号，例如 @code{main} 代表所选框架的主窗口 (@pxref{Side Window Options and Functions}) 或 @code{root} 代表所选框架的根窗口 (@pxref{Windows and Frames})。  它还可以指定任意有效窗口。  任何其他值（或完全省略 @code{window} 条目）表示使用所选窗口作为参考窗口。
+
+该函数首先尝试重用指定方向上已显示 @var{buffer} 的窗口。  如果不存在这样的窗口，它会尝试分割参考窗口，以便在指定方向上生成一个新窗口。  如果也失败，它将尝试在现有窗口中按指定方向显示 @var{buffer}。  在任何一种情况下，所选窗口都将出现在 @code{direction} 条目指定的参考窗口的一侧，与参考窗口至少共享一个边缘。
+
+如果参考窗口处于活动状态，则所选窗口将与其共享的边缘始终与 @code{direction} 条目指定的边缘相反。  例如，如果 @code{direction} 条目的值为 @code{left}，则所选窗口的右边缘坐标 (@pxref{Coordinates and Windows}) 将等于参考窗口的左边缘坐标。
+
+如果参考窗口是内部窗口，则重用窗口必须与其共享由 @code{direction} 条目指定的边缘。  因此，例如，如果参考窗口是帧的根窗口并且@code{direction}条目的值为@code{left}，则重用窗口必须位于帧的左侧。  这意味着所选窗口的左边缘坐标与参考窗口的左边缘坐标相同。
+
+然而，将通过分割参考窗口来创建新窗口，使得所选窗口将与参考窗口共享相对的边缘。  在我们的示例中，将使用新的实时窗口和参考窗口作为其子窗口来创建一个新的根窗口。  所选窗口的右边缘坐标将等于参考窗口的左边缘坐标。  它的左边缘坐标将等于框架的新根窗口的左边缘坐标。
+
+@code{direction} 条目的四个特殊值允许隐式指定所选帧的主窗口作为参考窗口：@code{leftmost}、@code{top}、@code{rightmost} 和@code{bottom}。  这意味着，例如，可以指定 @w{@code{(direction . leftmost)}}，而不是 @w{@code{(direction . left) (window . main)}}。  在这种情况下，现有的 @code{window} @var{alist} 条目将被忽略。
+@end defun
+
+@defun display-buffer-below-selected buffer alist
+此函数尝试在所选窗口下方的窗口中显示 @var{buffer}。  如果所选窗口下方有一个窗口并且该窗口已显示 @var{buffer}，则它将重用该窗口。
+
+如果没有这样的窗口，该函数会尝试通过分割所选窗口来创建一个新窗口，并在那里显示@var{buffer}。  如果 @var{alist} 包含合适的 @code{window-height} 或 @code{window-width} 条目，它还会尝试调整窗口的大小，请参见上文。
+
+如果分割所选窗口失败，并且所选窗口下方有一个非专用窗口显示其他缓冲区，则此函数会尝试使用该窗口来显示 @var{buffer}。
+
+如果 @var{alist} 包含 @code{window-min-height} 条目，则此函数确保所使用的窗口至少等于或可以变得至少与该条目的值指定的一样高。  请注意，这只是一个保证。  为了实际调整所使用的窗口大小，@var{alist}还必须提供适当的@code{window-height}条目。
+@end defun
+
+@defun display-buffer-at-bottom buffer alist
+此函数尝试在所选帧底部的窗口中显示 @var{buffer}。
+
+这要么尝试分割框架底部的窗口或框架的主窗口，要么重用所选框架底部的现有窗口。
+@end defun
+
+@defun display-buffer-pop-up-frame buffer alist
+此函数创建一个新框架，并在该框架的窗口中显示缓冲区。  它实际上是通过调用@code{pop-up-frame-function} (@pxref{Choosing Window Options}) 中指定的函数来执行帧创建的。  如果@var{alist}包含@code{pop-up-frame-parameters}条目，则关联的值将添加到新创建的框架的参数中。
+@end defun
+
+@defun display-buffer-full-frame buffer alist
+此函数显示当前帧上的缓冲区，删除所有其他窗口，以便它占据整个帧。
+@end defun
+
+@defun display-buffer-in-child-frame buffer alist
+此函数尝试在所选帧的子帧 (@pxref{Child Frames}) 中显示 @var{buffer}，方法是重用现有子帧或创建一个新子帧。  如果@var{alist}有一个非@code{nil}@code{child-frame-parameters}条目，则相应的值是给出新帧的帧参数列表。  默认情况下提供指定所选帧的 @code{parent-frame} 参数。  如果子框架应成为另一个框架的子框架，则必须将相应的条目添加到@var{alist}。
+
+子框架的外观很大程度上取决于通过@var{alist}提供的参数。  建议至少使用比率来指定子框架的大小 (@pxref{Size Parameters}) 和位置 (@pxref{Position Parameters})，并添加 @code{keep-ratio} 参数 (@pxref{Frame Interaction Parameters})，以确保子框架保持可见。  对于应考虑的其他参数，请参阅@ref{Child Frames}。
+@end defun
+
+@defun display-buffer-use-some-frame buffer alist
+此函数尝试通过查找满足谓词的帧（默认情况下除所选帧之外的任何帧）来显示 @var{buffer}。
+
+如果此函数选择另一个框架上的窗口，它会使该框架可见，并且除非 @var{alist} 包含 @code{inhibit-switch-frame} 条目，否则会在必要时提升该框架。
+
+如果 @var{alist} 有一个非 @code{nil} @code{frame-predicate} 条目，则其值是一个采用一个参数（帧）的函数，如果该帧是候选帧，则返回非 @code{nil} ；此函数替换默认谓词。
+
+如果 @var{alist} 有非 @code{nil} @code{inhibit-same-window} 条目，则不使用所选窗口；因此，如果所选框架只有一个窗口，则不会使用它。
+@end defun
+
+@defun display-buffer-in-new-tab buffer alist
+此函数尝试在新选项卡中显示 @var{buffer}。
+
+如果 @var{alist} 包含非 @code{nil} @code{tab-name} 条目（可能是字符串或函数），则缓冲区将显示在具有该名称的新选项卡中。  如果 @code{tab-name} 条目是一个函数，则使用两个参数（@var{buffer} 和 @var{alist}）调用它，并且应返回选项卡名称。
+
+如果省略 @code{tab-name} 条目或 @code{nil}，则会创建一个没有显式名称的新选项卡。
+
+如果 @var{alist} 包含非 @code{nil} @code{tab-group} 条目，则定义选项卡组，覆盖用户选项 @code{tab-bar-new-tab-group}。  该条目也可以是一个字符串或一个函数，其调用方式与 @code{tab-name} 相同。
+@end defun
+
+@defun display-buffer-in-tab buffer alist
+此函数尝试在新选项卡或现有选项卡中显示 @var{buffer}。
+
+如果 @var{alist} 包含非 @code{nil} @code{reusable-frames} 条目，则在其值指示的帧中搜索已显示缓冲区的现有选项卡。  @code{reusable-frames} 的可能值为：
+
+@itemize @bullet
+@item @code{t}
+意味着考虑所有现有的框架。
+@item @code{visible}
+意味着考虑所有可见帧。
+@item 0
+表示考虑当前终端上的所有帧。
+@item A frame
+意味着仅考虑该框架。
+@item Any other non-@code{nil} value
+意味着考虑选定的框架。
+@item @code{nil}
+表示不搜索任何帧（相当于省略该条目）。  请注意，这与缓冲区显示操作列表中 @code{reusable-frames} 条目的值 @code{nil} 的典型含义不同。
+@end itemize
+
+如果 @var{alist} 包含非 @code{nil} @code{ignore-current-tab} 条目，则在搜索可重用选项卡时将跳过当前选项卡。  否则，如果当前选项卡已显示缓冲区，则优先使用当前选项卡。
+
+如果显示缓冲区的窗口位于任何可重用选项卡中，则选择该选项卡和窗口。
+
+如果没有找到这样的窗口，则缓冲区将根据 @var{alist} 条目 @code{tab-name} （可以是字符串或函数）显示在新的或现有的选项卡中。  如果具有该名称的选项卡已存在，则选择该选项卡，否则将创建具有该名称的新选项卡。  如果 @code{tab-name} 条目是一个函数，则使用两个参数（@var{buffer} 和 @var{alist}）调用它，并且应返回选项卡名称。  如果省略 @code{tab-name} 条目或@code{nil}，则会创建一个没有显式名称的新选项卡。
+
+如果创建了新选项卡并且 @var{alist} 包含非 @code{nil} @code{tab-group} 条目，则这会定义选项卡组，并覆盖用户选项 @code{tab-bar-new-tab-group}。  该条目也可以是一个字符串或一个函数，其调用方式与 @code{tab-name} 相同。
+@end defun
+
+@defun display-buffer-no-window buffer alist
+如果 @var{alist} 有非 @code{nil} @code{allow-no-window} 条目，则此函数不会显示 @var{buffer} 并返回符号 @code{fail}。  这是动作函数返回 @code{nil} 或显示 @var{buffer} 的窗口这一惯例的唯一例外。  如果@var{alist}没有这样的@code{allow-no-window}条目，则该函数返回@code{nil}。
+
+如果此函数返回 @code{fail}，@code{display-buffer} 将跳过执行任何进一步的显示操作并立即返回 @code{nil}。  如果此函数返回 @code{nil}，@code{display-buffer} 将继续执行下一个显示操作（如果有）。
+
+假设当@code{display-buffer}的调用者指定非@code{nil}@code{allow-no-window}条目时，它也能够处理@code{nil}返回值。
+@end defun
+
+另外两个动作函数在其适当的部分中进行了描述——@code{display-buffer-in-side-window} (@pxref{Displaying Buffers in Side Windows}) 和@code{display-buffer-in-atom-window} (@pxref{Atomic Windows})。
+
+
+@node Buffer Display Action Alists
+@subsection 缓冲区显示的操作列表
+@cindex buffer display action alist
+@cindex action alist for buffer display
+
+@dfn{action alist} 是一个关联列表，将动作函数识别的预定义符号映射到这些函数应该相应解释的值。  在每次调用中，@code{display-buffer} 构造一个新的、可能为空的操作列表，并将整个列表传递给它调用的任何操作函数。
+
+按照设计，动作函数可以自由地解释动作列表条目。  事实上，像 @code{allow-no-window} 或 @code{previous-window} 这样的条目仅对一个或几个动作函数有意义，而被其他函数忽略。  其他条目，如@code{inhibit-same-window}或@code{window-parameters}，应该受到大多数操作函数的尊重，包括由应用程序和外部包提供的那些函数。
+
+在上一小节中，我们详细描述了各个操作函数如何解释它们所关心的操作列表条目。  在这里，我们根据其符号给出了所有已知动作列表条目的参考列表，以及它们的值和识别它们的动作函数（@pxref{Buffer Display Action Functions}）。  在整个列表中，术语“缓冲区”指的是应该显示的缓冲区@code{display-buffer}，“值”指的是条目的值。
+
+@table @code
+@vindex inhibit-same-window@r{, a buffer display action alist entry}
+@item inhibit-same-window
+如果该值为非@code{nil}，则表明所选窗口不得用于显示缓冲区。  所有（重新）使用现有窗口的操作函数都应遵守此条目。
+
+@vindex previous-window@r{, a buffer display action alist entry}
+@item previous-window
+该值必须指定先前可能已显示缓冲区的窗口。  @code{display-buffer-in-previous-window} 将优先考虑这样的窗口，只要它仍然处于活动状态并且不专用于另一个缓冲区。
+
+@vindex mode@r{, a buffer display action alist entry}
+@item mode
+该值是主要模式或主要模式列表。只要此条目指定的值与窗口缓冲区的主要模式匹配，@code{display-buffer-reuse-mode-window} 就可以重用该窗口。  其他操作函数会忽略此类条目。
+
+@vindex frame-predicate@r{, a buffer display action alist entry}
+@item frame-predicate
+该值必须是一个带有一个参数（一帧）的函数，如果该帧是显示缓冲区的候选帧，则应该返回非@code{nil}。  该条目由 @code{display-buffer-use-some-frame} 使用。
+
+@vindex reusable-frames@r{, a buffer display action alist entry}
+@item reusable-frames
+该值指定用于搜索可以重用的窗口的帧集，因为它已经显示了缓冲区。  可以设置如下：
+
+@itemize @bullet
+@item
+@code{nil} 表示仅考虑所选帧上的窗口。 （实际上，最后使用的帧不是仅包含迷你缓冲区的帧。）
+@item
+@code{visible} 表示考虑所有可见帧上的窗口。
+@item
+0 表示考虑所有可见或图标化框架上的窗口。
+@item
+框架意味着仅考虑该框架上的窗口。
+@item
+@code{t} 表示考虑所有帧上的窗口。  （请注意，这个值很少是正确的使用方式——它也可能返回一个工具提示框架。）
+@end itemize
+
+请注意，@code{nil} 的含义与 @code{next-window} (@pxref{Cyclic Window Ordering}) 的 @var{all-frames} 参数的含义略有不同。
+
+其主要客户端是@code{display-buffer-reuse-window}，但尝试重用窗口的所有其他操作函数也会受到影响。  @code{display-buffer-in-previous-window} 在搜索先前在另一帧上显示缓冲区的窗口时参考它。
+
+动作函数 @code{display-buffer-in-tab} 搜索由该条目标识的框架的选项卡，并对值 @code{nil} 进行不同的解释。
+
+@vindex inhibit-switch-frame@r{, a buffer display action alist entry}
+@item inhibit-switch-frame
+如果 @code{display-buffer} 选择的窗口显示在那里，非 @code{nil} 值会阻止另一个框架被升起或选择。  受此影响的主要是@code{display-buffer-use-some-frame}和@code{display-buffer-reuse-window}。  理想情况下，@code{display-buffer-pop-up-frame} 也应该受到影响，但不能保证窗口管理器会遵守。
+
+@vindex window-parameters@r{, a buffer display action alist entry}
+@item window-parameters
+该值指定窗口参数列表以给出所选窗口。  所有选择窗口的操作函数都应该处理该条目。
+
+@vindex window-min-width@r{, a buffer display action alist entry}
+@item window-min-width
+该值指定所用窗口的最小宽度（以规范框架列为单位）。  特殊值 @code{full-width} 表示所选窗口应该是其框架中左侧或右侧没有其他窗口的窗口。
+
+当前，@code{display-buffer-use-some-window} 和 @code{display-buffer-use-least-recent-window} 遵守此条目，它们会尽力避免返回不满足该条目的最近较少使用的窗口。
+
+请注意，单独提供此类条目并不一定会使窗口与其值指定的宽度一样。  要实际调整现有窗口的大小或使新窗口的宽度与此条目的值指定的宽度相同，还应提供指定该值的 @code{window-width} 条目。  然而，这样的 1⁣ 条目可以指定完全不同的值，或者要求窗口宽度适合其缓冲区的宽度，在这种情况下 22 条目提供保证的窗口最小宽度。
+
+@vindex window-min-height@r{, a buffer display action alist entry}
+@item window-min-height
+该值指定所用窗口的最小高度（以规范框架线为单位）。  特殊值 @code{full-height} 表示所选窗口应该是全高窗口，在其框架中其上方或下方没有其他窗口。
+
+当前，@code{display-buffer-below-selected} 遵守此条目，它不使用低于此条目指定的高度的窗口。  @code{display-buffer-use-some-window} 和 @code{display-buffer-use-least-recent-window} 也很荣幸，如果不满足此约束，它们会尽力避免返回最近较少使用的窗口。
+
+请注意，单独提供此类条目并不一定会使窗口达到其值指定的高度。  要实际调整现有窗口的大小或使新窗口达到该值指定的高度，还应该提供指定该值的 @code{window-height} 条目。  然而，这样的 @code{window-height} 条目可以指定完全不同的值，或者要求窗口高度适合其缓冲区的高度，在这种情况下， @code{window-min-height} 条目提供所用窗口的保证最小高度。
+
+@vindex window-height@r{, a buffer display action alist entry}
+@item window-height
+该值指定是否以及如何调整所选窗口的高度，可以是以下之一：
+
+@itemize @bullet
+@item
+@code{nil} 表示不考虑所选窗口的高度。
+
+@item
+整数指定所选窗口所需的总高度（以行为单位）。
+
+@item
+浮点数指定所选窗口所需总高度相对于其框架根窗口总高度的分数。
+
+@item
+一个 cons 单元格，其 @sc{car} 为 @code{body-lines} 且 @sc{cdr} 为整数，指定所选窗口主体的框架线高度。
+
+@item
+如果该值指定一个函数，则使用一个参数（所选窗口）调用该函数。  该函数应该是调整窗口的高度；它的返回值被忽略。  合适的函数是@code{fit-window-to-buffer}和@code{shrink-window-if-larger-than-buffer}，参见@ref{Resizing Windows}。
+@end itemize
+
+按照惯例，仅当所选窗口是垂直组合 (@pxref{Windows and Frames}) 的一部分时，才会调整所选窗口的高度，以避免更改其他不相关窗口的高度。  此外，仅应在此列表正下方指定的某些条件下处理此条目。
+
+@vindex window-width@r{, a buffer display action alist entry}
+@item window-width
+该条目类似于前面描述的 @code{window-height} 条目，但用于调整所选窗口的宽度。  该值可以是以下之一：
+
+@itemize @bullet
+@item
+@code{nil} 表示保留所选窗口的宽度。
+
+@item
+一个整数指定所选窗口所需的总宽度（以列为单位）。
+
+@item
+浮点数指定所选窗口所需总宽度相对于框架根窗口总宽度的分数。
+
+@item
+一个 cons 单元格，其 @sc{car} 为 @code{body-columns} 且 @sc{cdr} 为整数，指定框架列中所选窗口主体的宽度。
+
+@item
+如果该值指定一个函数，则使用一个参数（所选窗口）调用该函数。  该函数应该调整窗口的宽度；它的返回值被忽略。
+@end itemize
+
+@vindex window-size@r{, a buffer display action alist entry}
+@item window-size
+该条目是前两个条目的组合，可用于调整所选窗口的高度 @emph{and} 宽度。  由于窗口只能在一个方向上调整大小，而不会影响其他窗口，因此 @code{window-size} 仅对设置单独出现在框架上的窗口的大小有效。  该值可以是以下之一：
+
+@itemize @bullet
+@item
+@code{nil} 表示保留所选窗口的大小。
+
+@item
+两个整数组成的 cons 单元格指定所选窗口所需的总宽度和高度（以行和列为单位）。  其作用是相应地调整框架的大小。
+
+@item
+一个 cons 单元，其 @sc{car} 等于 @code{body-chars} 并且其 @sc{cdr} 是两个整数的 cons 单元——框架列和行中所选窗口的所需主体宽度和高度。  其作用是相应地调整框架的大小。
+
+@item
+如果该值指定一个函数，则使用一个参数（所选窗口）调用该函数。  该函数应该调整窗口框架的大小；它的返回值被忽略。
+@end itemize
+
+仅应在此列表正下方指定的某些条件下处理此条目。
+
+@vindex dedicated@r{, a buffer display action alist entry}
+@item dedicated
+如果非@code{nil}，这样的条目告诉@code{display-buffer}将其创建的任何窗口标记为专用于其缓冲区（@pxref{Dedicated Windows}）。  它通过调用 @code{set-window-dedicated-p} 来实现这一点，其中所选窗口作为第一个参数，条目的值作为第二个参数。侧窗默认专用于值 @code{side} (@pxref{Side Window Options and Functions})。  重用的窗口不会被标记为专用，无论它们之前是否已经显示过缓冲区。  如果专用于其缓冲区的窗口被重新用于再次显示相同的缓冲区，则其专用标志将被保留。
+
+@vindex preserve-size@r{, a buffer display action alist entry}
+@item preserve-size
+如果非 @code{nil} 这样的条目告诉 Emacs 保留所选窗口的大小 (@pxref{Preserving Window Sizes})。  该值应为 @w{@code{(t . nil)}} 以保留窗口的宽度，为 @w{@code{(nil . t)}} 以保留其高度，或为 @w{@code{(t . t)}} 以保留其宽度和高度。  仅应在此列表之后指定的某些条件下处理此条目。
+
+@vindex lru-frames@r{, a buffer display action alist entry}
+@item lru-frames
+该值指定用于搜索可用于显示缓冲区的窗口的帧集。  当试图找到最近较少使用的显示其他缓冲区的窗口时，@code{display-buffer-use-some-window}和@code{display-buffer-use-least-recent-window}会尊重它。  其值与上述 @code{reusable-frames} 条目相同。
+
+@vindex lru-time@r{, a buffer display action alist entry}
+@item lru-time
+该值应该指定使用时间 (@pxref{Selecting Windows})。当尝试查找显示其他缓冲区的最近较少使用的窗口时，@code{display-buffer-use-some-window} 和 @code{display-buffer-use-least-recent-window} 会遵循此条目。  如果一个窗口的使用时间高于该选项指定的值，这些动作函数将不会考虑这样的窗口来显示缓冲区。
+
+@vindex bump-use-time@r{, a buffer display action alist entry}
+@item bump-use-time
+如果非 @code{nil}，这样的条目将导致 @code{display-buffer} 增加其使用的窗口的使用时间 (@pxref{Selecting Windows})。这应该避免以后通过诸如 3⁣ 和 @code{display-buffer-use-least-recent-window} 之类的操作函数使用此窗口来显示另一个缓冲区。
+
+使用此条目和使用操作函数 @code{display-buffer-use-least-recent-window} 之间存在细微差别。  调用后者意味着仅增加函数用于显示缓冲区的窗口的使用时间。  这里描述的条目将导致@code{display-buffer}增加用于显示缓冲区的@emph{any}窗口的使用时间。
+
+@vindex pop-up-frame-parameters@r{, a buffer display action alist entry}
+@item pop-up-frame-parameters
+该值指定帧参数列表以提供新帧（如果创建了）。  @code{display-buffer-pop-up-frame} 是它唯一的收件人。
+
+@vindex pop-up-frames@r{, a buffer display action alist entry}
+@item pop-up-frames
+该值控制@code{display-buffer}是否可以通过创建新帧来显示缓冲区。  它与 @code{pop-up-frames} 变量具有相同的含义，并且在存在时优先于它。  其主要目的是覆盖用户希望保留在所选帧中的特定缓冲区的非 2⁣ 变量值。
+
+@vindex parent-frame@r{, a buffer display action alist entry}
+@item parent-frame
+该值指定当缓冲区显示在子帧上时要使用的父帧。  该条目仅由@code{display-buffer-in-child-frame} 使用。
+
+@vindex child-frame-parameters@r{, a buffer display action alist entry}
+@item child-frame-parameters
+该值指定在子帧上显示缓冲区时要使用的帧参数列表。  该条目仅由@code{display-buffer-in-child-frame} 使用。
+
+@vindex side@r{, a buffer display action alist entry}
+@item side
+该值表示应创建显示缓冲区的新窗口的框架或窗口的一侧。  @code{display-buffer-in-side-window} 使用此条目来指示应放置新侧窗的框架一侧 (@pxref{Displaying Buffers in Side Windows})。  @code{display-buffer-in-atom-window} 也使用它来指示新窗口应位于现有窗口的一侧 (@pxref{Atomic Windows})。
+
+@vindex slot@r{, a buffer display action alist entry}
+@item slot
+如果非@code{nil}，则该值指定应显示缓冲区的侧窗槽。  该条目仅由@code{display-buffer-in-side-window} 使用。
+
+@vindex direction@r{, a buffer display action alist entry}
+@item direction
+该值指定一个方向，与 @code{window} 条目一起，允许 @code{display-buffer-in-direction} 确定显示缓冲区的窗口位置。
+
+@vindex window@r{, a buffer display action alist entry}
+@item window
+该值指定一个窗口，该窗口在某种程度上与 @code{display-buffer} 选择的窗口相关。  当前@code{display-buffer-in-atom-window} 使用此条目来指示应在哪一侧创建新窗口的窗口。  @code{display-buffer-in-direction} 也使用它来指定结果窗口应出现在哪一侧的参考窗口。
+
+@vindex allow-no-window@r{, a buffer display action alist entry}
+@item allow-no-window
+如果该值非 @code{nil}，则 @code{display-buffer} 不一定必须显示缓冲区，并且调用者准备接受这一点。  此条目不适用于用户自定义，因为不能保证 @code{display-buffer} 的任意调用者能够处理没有窗口显示缓冲区的情况。  @code{display-buffer-no-window} 是唯一关心此条目的操作函数。
+
+@vindex some-window@r{, a buffer display action alist entry}
+@item some-window
+如果值为 @code{nil} 或 @code{lru}，则 @code{display-buffer-use-some-window} 优先选择最近最少使用的窗口，同时避免选择非全宽窗口和另一帧上的窗口。  如果值为@code{mru}，则优先选择最近使用的窗口，不考虑所选窗口以及除所选帧之外的任何帧上的窗口。  如果该值是一个函数，则使用两个参数调用它：一个缓冲区和一个列表，并且应该返回显示缓冲区的窗口。
+
+@vindex body-function@r{, a buffer display action alist entry}
+@item body-function
+该值必须是一个带有一个参数的函数（一个显示的窗口）。此函数可用于用一些内容填充显示的窗口主体，这些内容可能取决于显示窗口的尺寸。它被称为 @emph{after} 显示缓冲区，并且 @emph{before} 应用条目 @code{window-height}、@code{window-width} 和 @code{preserve-size} 可以调整窗口大小以适合插入的内容。
+
+@vindex post-command-select-window@r{, a buffer display action alist entry}
+@item post-command-select-window
+如果该值非 @code{nil}，则在运行钩子 @code{post-command-hook} (@pxref{Command Overview}) 执行当前命令后选择@code{display-buffer}显示的缓冲区。如果值为@code{nil}，则取消选择@code{pop-to-buffer}等函数选择的缓冲区，并且无论此命令中之后选择了哪些窗口，调用该函数之前选择的窗口都将保持选择状态。
+
+@vindex category@r{, a buffer display action alist entry}
+@item category
+如果 @code{display-buffer} 的调用者在其 @var{action} 参数中传递列表条目 @w{@code{(category . @var{symbol})}} ，那么您可以通过在 @code{display-buffer-alist} 条目的条件部分中使用相同的类别符号来匹配显示的缓冲区。  @xref{Buffer List, @code{buffer-match-p}}。  因此，如果 Lisp 程序在调用 @code{display-buffer} 时使用特定的 @var{symbol} 作为类别，则用户可以通过在 @code{display-buffer-alist} 中包含此类条目来自定义这些缓冲区的显示方式。
+
+@vindex tab-name@r{, a buffer display action alist entry}
+@item tab-name
+该值命名应在其中显示缓冲区的选项卡。  该条目由 @code{display-buffer-in-new-tab} 和（有条件地）由 @code{display-buffer-in-tab} 使用。
+
+@vindex tab-group@r{, a buffer display action alist entry}
+@vindex tab-bar-new-tab-group@r{, override for buffer display actions}
+@item tab-group
+该值命名创建新选项卡时要使用的选项卡组，覆盖用户选项@code{tab-bar-new-tab-group}。  该条目由 @code{display-buffer-in-new-tab} 和 @code{display-buffer-in-tab} 使用。
+@end table
+
+按照约定，条目 @code{window-height}、@code{window-width} 和 @code{preserve-size} 在设置所选窗口的缓冲区之后应用，并且当且仅当该窗口之前从未显示过另一个缓冲区时。  更准确地说，后者意味着该窗口必须是由当前 @code{display-buffer} 调用创建的，或者该窗口是由 @code{display-buffer} 先前创建的以显示缓冲区，并且在当前调用 @code{display-buffer} 重用该窗口之前从未用于显示另一个缓冲区。
+
+如果未指定 @code{window-height}、@code{window-width} 或 @code{window-size} 条目，则当缓冲区是临时且已启用 @code{temp-buffer-resize-mode} 时，窗口仍可能自动调整大小，@ref{Temporary Displays}。  在这种情况下，@code{window-height}、@code{window-width} 或 @code{window-size} 条目的 @sc{cdr} 可用于抑制或覆盖特定缓冲区的 @code{temp-buffer-resize-mode} 的默认行为或调用 @code{display-buffer}。
+
+@node Choosing Window Options
+@subsection 显示缓冲区的附加选项
+
+缓冲区显示操作 (@pxref{Choosing Window}) 的行为可以通过以下用户选项进一步修改。
+
+@defopt pop-up-windows
+如果该变量的值非@code{nil}，则允许@code{display-buffer}分割现有窗口以创建新窗口来显示。这是默认值。
+
+提供此变量只是为了向后兼容。  @code{display-buffer} 通过 @code{display-buffer-fallback-action} 中的特殊机制遵守它，当该选项的值为非 @code{nil} 时，它调用动作函数 @code{display-buffer-pop-up-window} (@pxref{Buffer Display Action Functions})。  @code{display-buffer-pop-up-window}本身不咨询它，用户可以直接在@code{display-buffer-alist}等中指定。
+@end defopt
+
+@defopt split-window-preferred-function
+该变量指定一个用于分割窗口的函数，以便创建一个新窗口来显示缓冲区。  @code{display-buffer-pop-up-window} 操作函数使用它来实际分割窗口。
+
+该值必须是一个函数，该函数接受一个参数（一个窗口），并返回一个新窗口（将用于显示所需的缓冲区）或@code{nil}（这意味着分割失败）。  默认值为 @code{split-window-sensibly}，接下来将对此进行记录。
+@end defopt
+
+@defun split-window-sensibly &optional window
+该函数尝试分割 @var{window} 并返回新创建的窗口。  如果@var{window}无法拆分，则返回@code{nil}。  如果省略@var{window}或@code{nil}，则默认为所选窗口。
+
+该函数遵循确定何时可以分割窗口的通常规则（@pxref{Splitting Windows}）。  它首先尝试垂直分割，将新窗口放置在下方，受到@code{split-height-threshold}（见下文）施加的限制，或者水平分割，将新窗口放置在右侧，除了任何其他限制外，还受到@code{split-width-threshold}的限制。它是首先尝试垂直分割还是水平分割取决于用户选项@code{split-window-preferred-direction}的值。如果沿第一个维度分裂失败，它会尝试沿另一个维度分裂。  如果这也失败，并且该窗口是其框架上的唯一窗口，则该函数再次尝试分割并将新窗口放置在下面，而忽略@code{split-height-threshold}。  如果也失败，该函数将放弃并返回@code{nil}。
+@end defun
+
+@defopt split-height-threshold
+该变量指定是否允许 @code{split-window-sensibly} 分割窗口并将新窗口放置在下面。  如果它是一个整数，则意味着仅当原始窗口至少有那么多行时才进行分割。  如果是@code{nil}，就表示不这样分裂。
+@end defopt
+
+@defopt split-width-threshold
+该变量指定是否允许 @code{split-window-sensibly} 分割窗口并将新窗口放置在右侧。  如果该值为整数，则意味着仅当原始窗口至少具有那么多列时才进行拆分。  如果值为@code{nil}，则表示不这样分割。
+@end defopt
+
+@defopt split-window-preferred-direction
+如果窗口可以垂直和水平分割（由 @code{split-height-threshold} 和 @code{split-width-threshold} 的值确定），则此变量确定 @code{split-window-sensibly} 尝试分割窗口的第一个维度。  默认值为@code{longest}，这意味着如果窗口框架的高度大于或等于其宽度，则垂直分割，否则水平分割。  值 @code{vertical} 和 @code{horizontal} 指定尝试第一次分割的方向。
+@end defopt
+
+@defopt even-window-sizes
+该变量（如果非 0）会导致 1（1）在重用现有窗口时调整窗口大小，并且该窗口与所选窗口相邻。
+
+如果其值为@code{width-only}，则仅当重用窗口位于所选窗口的左侧或右侧且所选窗口比重用窗口宽时，大小才会均匀。  如果其值为@code{height-only}，则仅当重用窗口位于所选窗口上方或下方且所选窗口高于重用窗口时，尺寸才会均匀。任何其他非 2⁣ 值意味着在任何这些情况下的大小都是均匀的，前提是所选窗口在它们的组合意义上大于重用的窗口。
+@end defopt
+
+@defopt pop-up-frames
+如果该变量的值为非@code{nil}，则意味着@code{display-buffer}可以通过创建新帧来显示缓冲区。  默认值为@code{nil}。
+
+非 @code{nil} 值还意味着当 @code{display-buffer} 正在查找已显示 @var{buffer-or-name} 的窗口时，它可以搜索任何可见或图标化的帧，而不仅仅是所选帧。
+
+@code{display-buffer} 的 @var{alist} 中同名的条目优先于该变量。
+
+提供该变量主要是为了向后兼容。  @code{display-buffer} 通过 @code{display-buffer-fallback-action} 中的特殊机制遵守它，如果值为非 @code{nil}，则调用动作函数 @code{display-buffer-pop-up-frame} (@pxref{Buffer Display Action Functions})。  （这是在尝试分割窗口之前完成的。）@code{display-buffer-pop-up-frame}本身不参考该变量，用户可以直接在@code{display-buffer-alist}等中指定。
+@end defopt
+
+@defopt pop-up-frame-function
+该变量指定一个用于创建新帧的函数，以便创建一个用于显示缓冲区的新窗口。  它由 @code{display-buffer-pop-up-frame} 动作函数使用。
+
+该值应该是一个不带参数并返回一个框架的函数，如果无法创建框架，则返回 @code{nil}。  默认值是一个使用@code{pop-up-frame-alist}指定的参数创建框架的函数（见下文）。
+@end defopt
+
+@defopt pop-up-frame-alist
+该变量保存帧参数列表 (@pxref{Frame Parameters})，@code{pop-up-frame-function} 指定的函数使用该列表来创建新帧。  默认值为@code{nil}。
+
+提供此选项只是为了向后兼容。  请注意，当@code{display-buffer-pop-up-frame}调用@code{pop-up-frame-function}指定的函数时，它将所有@code{pop-up-frame-parameters}动作列表条目的值添加到@code{pop-up-frame-alist}，以便动作列表条目指定的值有效地覆盖@code{pop-up-frame-alist}的任何相应值。
+
+因此，用户应该在 @code{display-buffer-alist} 中设置 @code{pop-up-frame-parameters} 操作列表条目，而不是自定义 @code{pop-up-frame-alist}。  只有这样才能保证用户指定的参数值覆盖 @code{display-buffer} 的调用者指定的参数值。
+@end defopt
+
+@code{display-buffer} 的设计中付出了很多努力，以保持与使用旧选项（如 @code{pop-up-windows}、@code{pop-up-frames}、@code{pop-up-frame-alist}、@code{same-window-buffer-names} 和 @code{same-window-regexps}）的代码的兼容性。  Lisp 程序和用户应避免使用这些选项。  上面我们已经警告不要定制@code{pop-up-frame-alist}。  在这里，我们描述如何将其余选项转换为使用显示操作。
+
+@table @code
+@item pop-up-windows
+@vindex pop-up-windows@r{, replacement for}
+该变量默认为@code{t}。  与其将其自定义为 @code{nil} 并告诉 @code{display-buffer} 不该做什么，不如在 @code{display-buffer-base-action} 中列出它应该尝试的操作函数，例如：
+
+@example
+@group
+(setopt
+ display-buffer-base-action
+ '((display-buffer-reuse-window display-buffer-same-window
+    display-buffer-in-previous-window
+    display-buffer-use-some-window)))
+@end group
+@end example
+
+@item pop-up-frames
+@vindex pop-up-frames@r{, replacement for}
+您可以自定义 @code{display-buffer-base-action}，而不是将此变量自定义为 @code{t}，例如，如下所示：
+
+@example
+@group
+(setopt display-buffer-base-action '(nil (pop-up-frames . t)))
+@end group
+@end example
+
+@item same-window-buffer-names
+@itemx same-window-regexps
+@vindex same-window-buffer-names@r{, replacement for}
+@vindex same-window-regexps@r{, replacement for}
+不要向这些选项之一添加缓冲区名称或正则表达式，而是使用指定操作函数 @code{display-buffer-same-window} 的缓冲区条目 @code{display-buffer-alist} 。
+
+@example
+@group
+(setopt
+ display-buffer-alist
+ (cons '("\\*foo\\*" (display-buffer-same-window))
+        display-buffer-alist))
+@end group
+@end example
+@end table
+
+
+@node Precedence of Action Functions
+@subsection 动作函数的优先级
+@cindex precedence of buffer display action functions
+@cindex execution order of buffer display action functions
+@cindex buffer display action functions, precedence
+
+从过去的小节中我们已经知道必须为@code{display-buffer}提供许多显示操作（@pxref{Choosing Window}）才能显示缓冲区。  在完全未自定义的 Emacs 中，这些操作由 @code{display-buffer-fallback-action} 按以下优先顺序指定：重用窗口、在同一框架上弹出一个新窗口、使用先前显示缓冲区的窗口、使用某个窗口并弹出一个新框架。  （请注意，由 @code{display-buffer-fallback-action} 命名的其余操作在未定制的 Emacs 中无效）。
+
+考虑以下形式：
+
+@example
+(display-buffer (get-buffer-create "*foo*"))
+@end example
+
+@noindent
+在未定制的 Emacs 会话的缓冲区 @file{*scratch*} 中评估此表单通常无法重用已显示 @file{*foo*} 的窗口，但会成功弹出一个新窗口。再次评估相同的表单现在不会导致任何可见的变化---@code{display-buffer}重用了已经显示@file{*foo*}的窗口，因为该操作是适用的，并且在所有适用的操作中具有最高的优先级。
+
+如果所选框架上没有足够的空间，则弹出新窗口将失败。  在未定制的 Emacs 中，当框架上已经有两个窗口时，它通常会失败。  例如，如果您现在输入 @w{@kbd{C-x 1}} 后跟 @w{@kbd{C-x 2}} 并再次计算表单，@file{*foo*} 应该显示在下部窗口中 ---@code{display-buffer} 刚刚使用了“some”窗口。  如果在输入 @w{@kbd{C-x 2}} 之前输入了 @w{@kbd{C-x o}}，@file{*foo*} 将会显示在上方窗口中，因为“某些”窗口代表“最近最少使用”窗口，并且所选窗口最近最少使用当且仅当它单独位于其框架上时。
+
+假设您没有输入 @w{@kbd{C-x o}} 并且 @file{*foo*} 显示在下部窗口中。  输入 @w{@kbd{C-x o}} 到达那里，然后输入 @w{@kbd{C-x left}} 并再次评估表单。  这应该在同一个较低的窗口中显示@file{*foo*}，因为该窗口之前已经显示过@file{*foo*}，因此被选择而不是其他窗口。
+
+到目前为止，我们只观察到了未定制的 Emacs 会话中的默认行为。  要了解如何自定义此行为，让我们考虑选项 @code{display-buffer-base-action}。  它提供了非常粗略的自定义，从概念上讲，它会影响 @emph{any} 缓冲区的显示。  它可用于通过重新排序或添加不存在但更适合用户编辑实践的操作来补充 @code{display-buffer-fallback-action} 提供的操作。   但是，它还可以用于以更深刻的方式更改默认行为。
+
+让我们考虑一个通常更喜欢在另一帧上显示缓冲区的用户。  此类用户可能会提供以下定制：
+
+@example
+@group
+(setopt
+ display-buffer-base-action
+ '((display-buffer-reuse-window display-buffer-pop-up-frame)
+   (reusable-frames . 0)))
+@end group
+@end example
+
+@noindent
+此设置将导致 @code{display-buffer} 首先尝试在可见或图标化框架上查找显示缓冲区的窗口，如果不存在此类框架，则弹出一个新框架。  您可以通过在显示 @file{*scratch*} 的窗口中键入 @w{@kbd{C-x 1}} 并评估我们的规范 @code{display-buffer} 形式，在图形系统上观察此行为。  这通常会创建（并给予焦点）一个新框架，其根窗口显示 @file{*foo*}。  图标化该框架并再次评估规范形式：@code{display-buffer}将在新框架上重用窗口（通常会抬起框架并为其提供焦点）。
+
+仅当创建新框架失败时，@code{display-buffer}才会应用@code{display-buffer-fallback-action}提供的操作，这意味着再次尝试重用窗口、弹出新窗口等。  以下形式提供了一种导致框架创建失败的简单方法：
+
+@example
+@group
+(let ((pop-up-frame-function 'ignore))
+  (display-buffer (get-buffer-create "*foo*")))
+@end group
+@end example
+
+@noindent
+在观察到它无法创建新框架并使用后备操作后，我们会立即忘记该表单。
+
+请注意，@code{display-buffer-reuse-window} 在 @code{display-buffer-base-action} 的定制中显得多余，因为它已经是 @code{display-buffer-fallback-action} 的一部分，无论如何都应该在那里尝试。  然而，这会失败，因为由于@code{display-buffer-base-action}优先于@code{display-buffer-fallback-action}，那时@code{display-buffer-pop-up-frame}已经赢得了比赛。事实上，这个：
+
+@example
+@group
+(setopt
+ display-buffer-base-action
+ '(display-buffer-pop-up-frame (reusable-frames . 0)))
+@end group
+@end example
+
+@noindent
+会导致 @code{display-buffer} 到 @emph{always} 弹出一个新框架，这可能不是我们的用户想要的。
+
+到目前为止，我们仅展示了@emph{users}如何自定义@code{display-buffer}的默认行为。  现在让我们看看@emph{applications}如何改变@code{display-buffer}的进程。规范的方法是使用 @code{display-buffer} 的 @var{action} 参数或调用它的函数，例如 @code{pop-to-buffer} (@pxref{Switching Buffers})。
+
+假设应用程序希望最好在所选窗口下方显示 @file{*foo*} （以立即吸引用户对新窗口的注意），或者如果失败，则显示在框架底部的窗口中。  它可以通过这样的调用来做到这一点：
+
+@example
+@group
+(display-buffer
+ (get-buffer-create "*foo*")
+ '((display-buffer-below-selected display-buffer-at-bottom)))
+@end group
+@end example
+
+@noindent
+为了了解这个新的、修改后的表单如何工作，请删除任何显示 @file{*foo*} 的框架，在显示 @file{*scratch*} 的窗口中键入 @w{@kbd{C-x 1}}，然后键入 @w{@kbd{C-x 2}}，然后评估该表单。 @code{display-buffer} 应该分割上面的窗口，并在新窗口中显示@file{*foo*}。  或者，如果在 @w{@kbd{C-x 2}} 之后输入 @w{@kbd{C-x o}}，@code{display-buffer} 将会在底部分割窗口。
+
+现在假设，在评估新表单之前，您已使所选窗口尽可能小，例如，通过评估该窗口中的表单 @code{(fit-window-to-buffer)} 。  在这种情况下，@code{display-buffer} 将无法分割所选窗口，而是会分割框架的根窗口，从而有效地在框架底部显示 @file{*foo*}。
+
+在任何一种情况下，第二次评估新表单都应该重用已经显示 @file{*foo*} 的窗口，因为 @var{action} 参数提供的两个函数都尝试首先重用这样的窗口。
+
+通过设置 @var{action} 参数，应用程序可以有效地否决 @code{display-buffer-base-action} 的任何自定义。  我们的用户现在可以接受应用程序的选择，或者通过自定义选项 @code{display-buffer-alist} 来加倍，如下所示：
+
+@example
+@group
+(setopt
+ display-buffer-alist
+ '(("\\*foo\\*"
+    (display-buffer-reuse-window display-buffer-pop-up-frame))))
+@end group
+@end example
+
+@noindent
+在任何地方都不显示 @file{*foo*} 的配置中尝试使用上面经过修改的新形式，将在单独的框架上显示 @file{*foo*}，完全忽略 @code{display-buffer} 的 @var{action} 参数。
+
+请注意，我们并不关心在 @code{display-buffer-alist} 规范中指定 @code{reusable-frames} 操作列表条目。 @code{display-buffer} 总是采用它找到的第一个——在我们的例子中是由 @code{display-buffer-base-action} 指定的那个。  如果我们想使用不同的规范，例如，从可重用列表中排除显示 @file{*foo*} 的图标化框架，我们必须单独指定：
+
+@example
+@group
+(setopt
+ display-buffer-alist
+ '(("\\*foo\\*"
+    (display-buffer-reuse-window display-buffer-pop-up-frame)
+    (reusable-frames . visible))))
+@end group
+@end example
+
+@noindent
+如果您尝试这样做，您会注意到，仅当该帧可见时，重复尝试显示 @file{*foo*} 才会成功重用该帧。
+
+上面的例子可以得出这样的结论：用户自定义 @code{display-buffer-alist} 的唯一目的是推翻应用程序选择的 @var{action} 参数。  这样的结论是错误的。  @code{display-buffer-alist} 是用户以首选方式指导特定缓冲区显示过程的标准选项，无论显示是否也由 @var{action} 参数引导。
+
+然而，我们可以合理地得出结论，定制@code{display-buffer-alist}与定制@code{display-buffer-base-action}有两个主要方面的不同：它更强大，因为它覆盖了@code{display-buffer}的@var{action}参数，并且它使您能够显式指定受影响的缓冲区。  事实上，显示其他缓冲区不会受到 @file{*foo*} 自定义的任何影响。  例如，
+
+@example
+(display-buffer (get-buffer-create "*bar*"))
+@end example
+
+@noindent
+继续仅受 @code{display-buffer-base-action} 和 @code{display-buffer-fallback-action} 设置的控制。
+
+我们可以在这里停止我们的例子，但 Lisp 程序仍然有一张王牌，它们可以用它来推翻 @code{display-buffer-alist} 的任何定制。  这是变量 @code{display-buffer-overriding-action}，他们可以将其绑定在 @code{display-buffer} 调用周围，如下所示：
+
+@example
+@group
+(let ((display-buffer-overriding-action
+       '((display-buffer-same-window))))
+  (display-buffer
+   (get-buffer-create "*foo*")
+   '((display-buffer-below-selected display-buffer-at-bottom))))
+@end group
+@end example
+
+@noindent
+无论 @var{action} 参数和任何用户自定义如何，评估此表单通常都会在所选窗口中显示 @file{*foo*}。  （通常，应用程序不会费心去提供 @var{action} 参数。这里它只是用来说明它被覆盖的事实。）
+
+查看操作函数列表 @code{display-buffer} 会尝试使用我们在此处提供的自定义显示@file{*foo*}，这可能是说明性的。  该列表（包括解释谁添加了此元素和后续元素的注释）是：
+
+@example
+@group
+(display-buffer-same-window  ;; `display-buffer-overriding-action'
+ display-buffer-reuse-window ;; `display-buffer-alist'
+ display-buffer-pop-up-frame
+ display-buffer-below-selected ;; ACTION argument
+ display-buffer-at-bottom
+ display-buffer-reuse-window ;; `display-buffer-base-action'
+ display-buffer-pop-up-frame
+ display-buffer--maybe-same-window ;; `display-buffer-fallback-action'
+ display-buffer-reuse-window
+ display-buffer--maybe-pop-up-frame-or-window
+ display-buffer-in-previous-window
+ display-buffer-use-some-window
+ display-buffer-pop-up-frame)
+@end group
+@end example
+
+@noindent
+请注意，在此处列出的内部函数中，@code{display-buffer--maybe-same-window} 实际上被忽略，而 @code{display-buffer--maybe-pop-up-frame-or-window} 实际上运行 @code{display-buffer-pop-up-window}。
+
+每个函数调用中传递的操作列表是：
+
+@example
+@group
+((reusable-frames . visible)
+ (reusable-frames . 0))
+@end group
+@end example
+
+@noindent
+这表明我们已经使用了上面@code{display-buffer-alist}的第二个规范，覆盖了@code{display-buffer-base-action}提供的规范。  假设我们的用户将其写为
+
+@example
+@group
+(setopt
+ display-buffer-alist
+ '(("\\*foo\\*"
+    (display-buffer-reuse-window display-buffer-pop-up-frame)
+    (inhibit-same-window . t)
+    (reusable-frames . visible))))
+@end group
+@end example
+
+@noindent
+在这种情况下，@code{inhibit-same-window}列表条目将成功使@code{display-buffer-overriding-action}中的@code{display-buffer-same-window}规范无效，并且@code{display-buffer}将在另一帧上显示@file{*foo*}。  为了使 @code{display-buffer-overriding-action} 在这方面更加稳健，应用程序还必须指定适当的 @code{inhibit-same-window} 条目，例如，如下所示：
+
+@example
+@group
+(let ((display-buffer-overriding-action
+       '(display-buffer-same-window (inhibit-same-window . nil))))
+  (display-buffer (get-buffer-create "*foo*")))
+@end group
+@end example
+
+@noindent
+最后一个示例表明，虽然动作函数的优先顺序是固定的，如@ref{Choosing Window}中所述，但由按该顺序排名较低的显示动作指定的动作列表条目可以影响排名较高的显示动作的执行。
+
+
+@node The Zen of Buffer Display
+@subsection 缓冲区显示的禅宗
+@cindex guidelines for buffer display
+@cindex writing buffer display actions
+@cindex buffer display conventions
+
+在最简单的形式中，框架始终容纳一个可用于显示缓冲区的窗口。  因此，总是最后一次调用 @code{display-buffer} 才能成功地将其缓冲区放置在那里。
+
+由于使用这样的框架不太实用，因此 Emacs 默认情况下允许通过框架大小的默认值以及 @code{split-height-threshold} 和 @code{split-width-threshold} 选项控制更复杂的框架布局。  显示帧上尚未显示的缓冲区，然后分割该帧上的单个窗口或（重新）使用其两个窗口之一。
+
+一旦用户自定义这些阈值之一或手动更改框架的布局，默认行为就会被放弃。  当使用非 @code{nil} @var{action} 参数调用 @code{display-buffer} 或用户自定义前一小节中提到的选项之一时，也会放弃默认行为。  由于过多的适用显示操作和由此产生的框架布局，很快掌握@code{display-buffer}可能会成为一种令人沮丧的体验。
+
+然而，避免使用缓冲区显示功能并依靠分割和删除窗口隐喻也不是一个好主意。缓冲区显示函数为 Lisp 程序和用户提供了一个框架来协调他们的不同需求；不存在用于分割和删除窗口的类似框架。  缓冲区显示功能还允许在稍后从帧中删除缓冲区时至少部分恢复帧的布局（@pxref{Quitting Windows}）。
+
+下面我们将给出一些指导方针来弥补上述的挫败感，从而避免在框架窗口之间真正丢失缓冲区。
+
+@table @asis
+@item 毫无压力地编写显示动作
+编写显示动作可能很痛苦，因为必须将动作函数和动作列表放在一个巨大的列表中。  （历史原因阻止我们让@code{display-buffer}支持这些单独的论点。）记住一些基本形式可能会有所帮助，如下所列：
+
+@example
+'(nil (inhibit-same-window . t))
+@end example
+
+@noindent
+仅指定操作列表条目，不指定操作函数。  它的唯一目的是禁止其他地方指定的 @code{display-buffer-same-window} 函数在同一窗口中显示缓冲区，另请参见上一小节的最后一个示例。
+
+@example
+'(display-buffer-below-selected)
+@end example
+
+@noindent
+另一方面，指定一个动作函数和一个空的动作列表。  为了结合上述两个规范的效果，可以写出以下形式
+
+@example
+'(display-buffer-below-selected (inhibit-same-window . t))
+@end example
+
+@noindent
+添加另一个动作函数可以写
+
+@example
+@group
+'((display-buffer-below-selected display-buffer-at-bottom)
+  (inhibit-same-window . t))
+@end group
+@end example
+
+@noindent
+并添加另一个 alist 条目，可以这样写
+
+@example
+@group
+'((display-buffer-below-selected display-buffer-at-bottom)
+  (inhibit-same-window . t)
+  (window-height . fit-window-to-buffer))
+@end group
+@end example
+
+@noindent
+最后一种形式可以通过以下方式用作 @code{display-buffer} 的 @var{action} 参数：
+
+@example
+@group
+(display-buffer
+ (get-buffer-create "*foo*")
+ '((display-buffer-below-selected display-buffer-at-bottom)
+   (inhibit-same-window . t)
+   (window-height . fit-window-to-buffer)))
+@end group
+@end example
+
+@noindent
+在 @code{display-buffer-alist} 的自定义中，它将按如下方式使用：
+
+@example
+@group
+(setopt
+ display-buffer-alist
+ '(("\\*foo\\*"
+    (display-buffer-below-selected display-buffer-at-bottom)
+    (inhibit-same-window . t)
+    (window-height . fit-window-to-buffer))))
+@end group
+@end example
+
+@noindent
+要为第二个缓冲区添加自定义，可以编写：
+
+@example
+@group
+(setopt
+ display-buffer-alist
+ '(("\\*foo\\*"
+    (display-buffer-below-selected display-buffer-at-bottom)
+    (inhibit-same-window . t)
+    (window-height . fit-window-to-buffer))
+   ("\\*bar\\*"
+    (display-buffer-reuse-window display-buffer-pop-up-frame)
+    (reusable-frames . visible))))
+@end group
+@end example
+
+@item 互相尊重
+@code{display-buffer-alist} 和 @code{display-buffer-base-action} 是用户选项——Lisp 程序绝不能设置或重新绑定它们。另一方面，@code{display-buffer-overriding-action} 是为很少使用该选项的应用程序保留的，如果使用它，则要格外小心。
+
+@code{display-buffer} 的旧实现经常导致用户和应用程序争夺@code{pop-up-frames} 和 @code{pop-up-windows} (@pxref{Choosing Window Options}) 等用户选项的设置。  这是重新设计 @code{display-buffer} 的主要原因之一——提供一个清晰的框架，指定应允许用户和应用程序执行哪些操作。
+
+Lisp 程序必须做好准备，用户自定义可能会导致缓冲区以意外的方式显示。  他们永远不应该在随后的行为中假设缓冲区已按照他们在 @code{display-buffer} 的 @var{action} 参数中要求的方式精确显示。
+
+用户不应该对任意缓冲区的显示方式施加太多和太严格的限制。  否则，他们将面临失去为特定目的显示缓冲区的特性的风险。假设编写了一个 Lisp 程序来并排比较两个窗口中缓冲区的不同版本。  If the customization of @code{display-buffer-alist} prescribes that any such buffer should be always shown in or below the selected window, the program will have a hard time to set up the desired window configuration via @code{display-buffer}.
+
+要指定显示任意缓冲区的首选项，用户应自定义 @code{display-buffer-base-action}。  上一小节给出了喜欢使用多个框架的用户如何执行此操作的示例。  @code{display-buffer-alist} 应保留用于以特定方式显示特定缓冲区。
+
+@item 考虑重用已显示缓冲区的窗口
+
+
+因此，@code{display-buffer-reuse-window} 是一个应尽可能经常使用的操作函数，无论是在@var{action} 参数还是自定义中。  An @code{inhibit-same-window} entry in the @var{action} argument usually takes care of the most common case where reusing a window showing the buffer should be avoided---that where the window in question is the selected one.
+
+@item 将焦点吸引到所选窗口
+This is a no-brainer for people working with multiple frames---the frame showing the buffer will automatically raise and get focus unless an @code{inhibit-switch-frame} entry forbids it.  对于单帧用户来说，这项任务可能要困难得多。  特别是，@code{display-buffer-pop-up-window}和@code{display-buffer-use-some-window}在这方面可能变得突兀。  他们分割或使用看似任意的（通常是最大的或最近最少使用的）窗口，分散用户的注意力。
+
+Some Lisp programs therefore try to choose a window at the bottom of the frame, for example, in order to display the buffer in vicinity of the minibuffer window where the user is expected to answer a question related to the new window.  对于非输入相关的操作 @code{display-buffer-below-selected} 可能更可取，因为所选窗口通常已经引起了用户的注意。
+
+@item 注意选择了哪个窗口
+许多应用程序从使用非 @code{nil} @var{norecord} 参数的 @code{with-selected-window} 或 @code{select-window} 调用产生的窗口偏移内调用 @code{display-buffer}。  This is almost always a bad idea because the window selected within such an excursion is usually not the window selected in the configuration presented to the user.
+
+例如，如果用户添加了 @code{inhibit-same-window} 列表条目，则该条目将避免在偏移范围内选择的窗口，而不是在结果配置中选择的窗口。  即使没有添加这样的条目，所产生的行为也可能会很奇怪。  在包含一个活动窗口的框架中，评估以下形式
+
+@example
+@group
+(progn
+  (split-window)
+  (display-buffer "*Messages*"))
+@end group
+@end example
+
+@noindent
+将显示一个窗口，其底部显示 @file{*Messages*} 缓冲区，并保持选中另一个窗口。  评估下一个表格
+
+@example
+@group
+(with-selected-window (split-window)
+  (display-buffer "*Messages*"))
+@end group
+@end example
+
+@noindent
+将在顶部的窗口中显示@file{*Messages*}并选择它，这通常不是@code{display-buffer}应该做的事情。
+
+另一方面，在评估以下形式时
+
+@example
+@group
+(progn
+  (split-window)
+  (pop-to-buffer "*Messages*"))
+@end group
+@end example
+
+@noindent
+将正确选择@file{*Messages*}缓冲区，下一个表格
+
+@example
+@group
+(progn
+  (split-window)
+  (with-selected-window (selected-window)
+    (pop-to-buffer "*Messages*")))
+@end group
+@end example
+
+@noindent
+不会。
+
+
+
+因此，依赖于使用窗口偏移的应用程序应尝试推迟 @code{display-buffer} 调用，直到偏移终止之后。
+@end table
+
+@node Window History
+@section 窗口历史记录
+@cindex window history
+
+每个窗口都会在列表中记住它之前显示的缓冲区以及从中删除这些缓冲区的顺序。例如，@code{replace-buffer-in-windows} (@pxref{Buffers and Windows}) 以及退出窗口 (@pxref{Quitting Windows}) 时会使用此历史记录。  该列表由 Emacs 自动维护，但您可以使用以下函数显式检查或更改它：
+
+@defun window-prev-buffers &optional window
+该函数返回一个列表，指定 @var{window} 的先前内容。  可选参数 @var{window} 应该是一个实时窗口，并且默认为选定的窗口。
+
+
+
+
+
+通常，当元素的缓冲区被杀死时，元素就会从此列表中删除。  然而，在极少数情况下，元素可能在其缓冲区被杀死后幸存下来。  因此，在处理此函数的返回值时，最好始终检查缓冲区的活动性。
+@end defun
+
+@defun set-window-prev-buffers window prev-buffers
+该函数将@var{window}之前的缓冲区设置为@var{prev-buffers}的值。  参数 @var{window} 必须是一个实时窗口，并且默认为选定的窗口。  参数@var{prev-buffers}应该是与@code{window-prev-buffers}返回的形式相同的列表。
+@end defun
+
+此外，每个窗口维护一个@dfn{next buffers}列表，它是由@code{switch-to-prev-buffer}重新显示的缓冲区列表（见下文）。  该列表主要由 @code{switch-to-prev-buffer} 和 @code{switch-to-next-buffer} 用于选择要切换到的缓冲区。
+
+@defun window-next-buffers &optional window
+该函数返回最近通过 @code{switch-to-prev-buffer} 在 @var{window} 中重新显示的缓冲区列表。  @var{window} 参数必须表示活动窗口或 @code{nil} （表示选定的窗口）。
+@end defun
+
+@defun set-window-next-buffers window next-buffers
+该函数将@var{window}的下一个缓冲区列表设置为@var{next-buffers}。  @var{window} 参数应该是实时窗口或 @code{nil} （表示选定的窗口）。  参数 @var{next-buffers} 应该是缓冲区列表。
+@end defun
+
+以下命令可用于循环遍历全局缓冲区列表，与@code{bury-buffer}和@code{unbury-buffer}非常相似。  然而，它们根据指定窗口的历史列表循环，而不是全局缓冲区列表。  此外，它们还恢复特定于窗口的窗口起始位置和点位置，并且可以显示缓冲区，即使它已经显示在另一个窗口中。  特别是，@code{switch-to-prev-buffer}命令由@code{replace-buffer-in-windows}、@code{bury-buffer}和@code{quit-window}使用来查找窗口的替换缓冲区。
+
+@deffn Command switch-to-prev-buffer &optional window bury-or-kill
+该命令显示 @var{window} 中的前一个缓冲区。  参数 @var{window} 应该是实时窗口或 @code{nil} （表示选定的窗口）。  If the optional argument @var{bury-or-kill} is non-@code{nil}, this means that the buffer currently shown in @var{window} is about to be buried or killed and consequently should not be switched to in future invocations of this command.
+
+前一个缓冲区通常是在 @var{window} 中当前显示的缓冲区之前显示的缓冲区。  However, a buffer that has been buried or killed, or has been already shown by a recent invocation of @code{switch-to-prev-buffer}, does not qualify as previous buffer.
+
+如果重复调用此命令已经显示了先前在 @var{window} 中显示的所有缓冲区，则进一步的调用将显示 (@pxref{Buffer List}) 上出现的帧 @var{window} 的缓冲区列表中的缓冲区。
+
+下面描述的选项@code{switch-to-prev-buffer-skip}可用于禁止切换到某些缓冲区，例如切换到已在另一个窗口中显示的缓冲区。  此外，如果 1⁣ 的帧具有 2⁣ 参数 (@pxref{Buffer Parameters})，则该谓词可能会禁止切换到某些缓冲区。
+@end deffn
+
+@deffn Command switch-to-next-buffer &optional window
+该命令切换到@var{window}中的下一个缓冲区，从而撤消@var{window}中最后一个@code{switch-to-prev-buffer}命令的效果。  参数 @var{window} 必须是一个实时窗口，并且默认为选定的窗口。
+
+如果最近没有对 @code{switch-to-prev-buffer} 的调用可以撤消，则此函数会尝试显示 (@pxref{Buffer List}) 上出现的帧 @var{window} 的缓冲区列表中的缓冲区。
+
+@var{window} 框架的选项@code{switch-to-prev-buffer-skip} 和@code{buffer-predicate} (@pxref{Buffer Parameters}) 影响此命令，就像它们对@code{switch-to-prev-buffer} 的影响一样。
+@end deffn
+
+默认情况下，@code{switch-to-prev-buffer}和@code{switch-to-next-buffer}可以切换到已在另一个窗口中显示的缓冲区。  以下选项可用于覆盖此行为。
+
+@defopt switch-to-prev-buffer-skip
+如果这个变量是@code{nil}，@code{switch-to-prev-buffer}可以切换到任何缓冲区，包括那些已经在其他窗口中显示的缓冲区。
+
+如果该变量非 @code{nil}，@code{switch-to-prev-buffer} 将避免切换到某些缓冲区。  可以使用以下值：
+
+@itemize @bullet
+@item 
+@code{this} 表示不切换到托管窗口 @code{switch-to-prev-buffer} 所作用的帧上显示的缓冲区。
+
+@item 
+@code{visible} 表示不切换到任何可见帧上显示的缓冲区。
+
+@item 
+0（数字零）表示不切换到任何可见或图标化帧上显示的缓冲区。
+
+@item 
+@code{t} 表示不切换到任何实时帧上显示的缓冲区。
+
+@item 
+一个带有三个参数的函数——@code{switch-to-prev-buffer}的@var{window}参数、要切换到的缓冲区@code{switch-to-prev-buffer}以及@code{switch-to-prev-buffer}的@var{bury-or-kill}参数。  如果该函数返回非 @code{nil}，@code{switch-to-prev-buffer} 将避免切换到第二个参数指定的缓冲区。
+@end itemize
+
+命令 @code{switch-to-next-buffer} 以类似的方式遵循此选项。  如果此选项指定一个函数，@code{switch-to-next-buffer} 将使用第三个参数始终@code{nil} 调用该函数。
+
+请注意，由于 @code{switch-to-prev-buffer} 也由 @code{bury-buffer}、@code{replace-buffer-in-windows} 和 @code{quit-restore-window} 调用，因此自定义此选项也可能会影响 Emacs 在窗口退出或缓冲区被隐藏或杀死时的行为。
+
+另请注意，在某些情况下 @code{switch-to-prev-buffer} 和 @code{switch-to-next-buffer} 可能会忽略此选项，例如，当只剩下一个缓冲区时，这些函数可以切换到。
+@end defopt
+
+@defopt switch-to-prev-buffer-skip-regexp
+该用户选项应该是正则表达式或正则表达式列表。  名称与这些正则表达式之一匹配的缓冲区将被 @code{switch-to-prev-buffer} 和 @code{switch-to-next-buffer} 忽略（除非没有其他缓冲区可切换到）。
+@end defopt
+
+@node Dedicated Windows
+@section 专用窗口
+@cindex dedicated window
+
+通过将这些窗口标记为其缓冲区的 @dfn{dedicated} ，可以告诉用于显示缓冲区的函数不要使用特定窗口。 @code{display-buffer} (@pxref{Choosing Window}) 从不使用专用窗口来显示其中的另一个缓冲区。  当 @var{dedicated} 参数非 @code{nil} 时，@code{get-lru-window} 和 @code{get-largest-window} (@pxref{Cyclic Window Ordering}) 不会将专用窗口视为候选窗口。  @code{set-window-buffer} (@pxref{Buffers and Windows}) 相对于专用窗口的行为略有不同，请参见下文。
+
+当它们操作的窗口是专用的时，应该从窗口中删除缓冲区或从框架中删除窗口的函数可能会表现得特别。我们将区分四种基本情况，即（1）该窗口不是其框架上的唯一窗口，（2）该窗口是其框架上的唯一窗口，但同一终端左侧有其他框架，（3）该窗口是同一终端上唯一框架上的唯一窗口，以及（4）奉献值是@code{side}（@pxref{Displaying Buffers in Side Windows}）。
+
+特别是，@code{delete-windows-on}（@pxref{Deleting Windows}）通过删除关联的帧来处理情况（2），并通过在该帧的唯一窗口中显示另一个缓冲区来处理情况（3）和（4）。  当缓冲区被终止时调用函数 @code{replace-buffer-in-windows} (@pxref{Buffers and Windows})，在情况 (1) 中删除窗口，否则行为类似于 @code{delete-windows-on}。
+
+当 @code{bury-buffer} (@pxref{Buffer List}) 对所选窗口（显示应隐藏的缓冲区）进行操作时，它通过调用 @code{frame-auto-hide-function} (@pxref{Quitting Windows}) 处理所选帧来处理情况 (2)。  其他两种情况的处理方式与@code{replace-buffer-in-windows}相同。
+
+@defun window-dedicated-p &optional window
+如果 1⁣ 专用于其缓冲区，则该函数返回非 @code{nil}，否则返回 @code{nil}。  更准确地说，返回值是最后一次调用 @code{set-window-dedicated-p} 为 @var{window} 分配的值，或者 @code{nil}（如果从未以 @var{window} 作为参数调用该函数）。  @var{window} 的默认值是选定的窗口。
+@end defun
+
+@findex toggle-window-dedicated
+@defun set-window-dedicated-p window flag
+如果 1⁣ 是非 2⁣，则该函数将 0⁣ 标记为专用于其缓冲区，否则标记为非专用。您可以交互地使用 @kbd{C-x w d} (@code{toggle-window-dedicated}) 命令执行相同操作。
+
+作为一种特殊情况，如果 @var{flag} 是 @code{t}，则 @var{window} 变为 @dfn{strongly} 专用于其缓冲区。  当它作用的窗口强烈专用于其缓冲区并且尚未显示要求显示的缓冲区时，@code{set-window-buffer} 会发出错误信号。  其他函数不会将 @code{t} 与任何非 @code{nil} 值区别对待。
+@end defun
+
+您还可以通过提供合适的 @code{dedicated} 操作列表条目 (@pxref{Buffer Display Action Alists}) 告诉 @code{display-buffer} 将其创建的窗口标记为专用于其缓冲区。
+
+@node Quitting Windows
+@section 退出Windows
+@cindex quitting windows
+
+在命令使用@code{display-buffer}在屏幕上放置缓冲区后，用户可以决定隐藏它并返回到 Emacs 显示的先前配置。  我们称之为@dfn{quitting the window}。  方法是调用@code{quit-window}，而@code{display-buffer}使用的窗口是选定的窗口。
+
+恢复显示的先前配置的正确方法取决于对现在出现缓冲区的窗口所做的操作。删除该窗口，或者删除其框架，或者只是在该窗口中显示另一个缓冲区可能是正确的。  一个复杂的情况是，自显示该缓冲区的行为以来，用户可能已经更改了窗口配置，并且撤消用户明确请求的更改是不合需要的。
+
+为了使 @code{quit-window} 能够做正确的事情，@code{display-buffer} 将有关其所做操作的信息保存在窗口的 @code{quit-restore} 参数 (@pxref{Window Parameters}) 中。
+
+@deffn Command quit-window &optional kill window
+该命令退出@var{window}并隐藏其缓冲区。  （它也可能杀死缓冲区，受@code{quit-window-kill-buffer}的限制，见下文。）参数@var{window}必须是一个实时窗口，并且默认为选定的窗口。  使用前缀参数@var{kill}非@code{nil}，它会杀死缓冲区而不是埋葬它。
+
+@vindex quit-window-hook
+函数@code{quit-window}首先运行@code{quit-window-hook}。然后它调用函数@code{quit-restore-window}（如下所述）来完成这项艰苦的工作。
+@end deffn
+
+以下选项告诉@code{quit-window}当@var{kill}参数为@code{nil}时，是否应该杀死或埋葬@var{window}的缓冲区。
+
+@defopt quit-window-kill-buffer
+该变量控制 @code{quit-window} 是否终止其 @var{window} 参数的缓冲区。  如果值为 @code{nil}（默认值），则仅当 @var{kill} 参数非 @code{nil} 时，@code{quit-window} 才会终止 @var{window} 的缓冲区。  如果这是 @code{t}，@code{quit-window} 将尝试杀死 @var{window} 的缓冲区，无论 @var{kill} 参数的值如何。  否则，这应该是主要模式的列表；如果 @var{window} 的缓冲区的主模式是此列表的成员或派生自此列表的成员，则无论 @var{kill} 的值如何，@code{quit-window} 都会杀死 @var{window} 的缓冲区。在任何其他情况下，仅当 15⁣ 为非 16⁣ 时，@code{quit-window} 才会终止缓冲区，否则将其埋葬。
+@end defopt
+
+您可以通过调用 @code{quit-restore-window} 而不是 @code{quit-window} 来获得更多控制。
+
+@defun quit-restore-window &optional window bury-or-kill
+该函数在退出后处理 @var{window} 及其缓冲区。  可选参数 @var{window} 必须是一个实时窗口，并且默认为选定的窗口。  该函数考虑了 @var{window} 的 @code{quit-restore} 参数。
+
+可选参数 @var{bury-or-kill} 指定如何处理 @var{window} 的缓冲区。  以下值是有意义的：
+
+@table @code
+@item nil
+这意味着不以任何特定方式处理缓冲区。  因此，如果 @var{window} 未被删除，调用 @code{switch-to-prev-buffer} 通常会再次显示缓冲区。
+
+@item append
+这意味着如果 @var{window} 未被删除，其缓冲区将移动到 @var{window} 的先前缓冲区列表 (@pxref{Window History}) 的末尾，因此未来对 @code{switch-to-prev-buffer} 的调用不太可能切换到它。  此外，它将缓冲区移动到帧缓冲区列表的末尾 (@pxref{Buffer List})。
+
+@item bury
+这意味着如果 @var{window} 未被删除，则其缓冲区将从 @var{window} 的先前缓冲区列表中删除。  此外，它将缓冲区移动到帧缓冲区列表的末尾。  这是防止 2⁣ 再次切换到该缓冲区的最可靠方法，而不是杀死该缓冲区。
+
+@item kill
+这意味着杀死@var{window}的缓冲区。
+
+@item killing
+这与 @code{kill} 一样处理，但假设 @var{window} 的缓冲区在其他地方被杀死。  该值由 @code{replace-buffer-in-windows} 和 @code{quit-windows-on} 使用。
+
+@item burying
+这与 @code{bury} 一样处理，但假设 @var{window} 的缓冲区被埋在其他地方。  该值由 @code{quit-windows-on} 使用。
+@end table
+
+参数 @var{bury-or-kill} 还指定当 @var{window} 是其框架上唯一的窗口，并且该框架的终端上还有其他框架时，应删除 @var{window} 时如何处理 @var{window} 的框架。  如果@var{bury-or-kill}等于@code{kill}，则表示删除该帧。  否则，框架的命运是通过调用@code{frame-auto-hide-function}（见下文）并以该框架作为唯一参数来确定的。
+@end defun
+
+窗口的 @code{quit-restore} 和 @code{quit-restore-prev} 参数 (@pxref{Window Parameters}) 引导 @code{quit-restore-window} 处理其 @var{window} 参数。  如果这样的参数不存在或@code{nil}，这通常意味着该窗口是由@code{split-window-below}或@code{split-window-right}（@pxref{Split Window,,, emacs, The GNU Emacs Manual}）之类的命令创建的，并且@code{quit-restore-window}仅在窗口专用于其缓冲区时才会删除该窗口。
+
+如果非@code{nil}，则任何此类参数都是四个元素的列表：
+
+@lisp
+(@var{method} @var{obuffer} @var{owindow} @var{this-buffer})
+@end lisp
+
+第一个元素@var{method}是四个符号@code{window}、@code{frame}、@code{same}和@code{other}之一。 @code{frame}和@code{window}控制如何删除@var{window}，而@code{same}和@code{other}控制在其中显示其他缓冲区。
+
+具体来说，@code{window}表示该窗口是由@code{display-buffer}专门创建的； @code{frame}表示已经创建了一个单独的框架； @code{same}，窗口只显示过这个缓冲区； @code{other}，窗口之前显示了另一个缓冲区。
+
+第二个元素 @var{obuffer} 是符号 @code{window} 或 @code{frame} 之一，或者是以下形式的列表
+
+@lisp
+(@var{prev-buffer} @var{prev-window-start} @var{prev-window-point} @var{height})
+@end lisp
+
+@noindent
+它表示哪个缓冲区之前显示在 @var{window} 中，该缓冲区当时的窗口起点 (@pxref{Window Start and End}) 和窗口点 (@pxref{Window Point}) 位置，以及当时 @var{window} 的高度。  如果退出 @var{window} 时 @var{prev-buffer} 仍然存在，则退出窗口可能会重新使用 @var{window} 显示 @var{prev-buffer}。
+
+第三个元素@var{owindow}是在显示完成之前选择的窗口。  如果退出删除了@var{window}，它会尝试选择@var{owindow}。
+
+第四个元素@var{this-buffer}是缓冲区，其显示设置@code{quit-restore}参数。  当且仅当它仍然显示该缓冲区时，退出 @var{window} 才会使用该参数存储的信息。
+
+如果 (1) @var{method} 是 @code{window} 或 @code{frame}，(2) 窗口没有先前显示的缓冲区的历史记录，并且 (3) @var{this-buffer} 等于当前在 @var{window} 中显示的缓冲区，则 @code{quit-restore-window} 尝试删除其 @var{window}。  如果@var{window}是原子窗口（@pxref{Atomic Windows}）的一部分，它将尝试删除该原子窗口的根。  无论哪种情况，它都会尝试避免在无法删除 @var{window} 时发出错误信号。
+
+如果 @var{obuffer} 是一个列表，并且 @var{prev-buffer} 仍然存在，则退出时会根据 @var{obuffer} 的其余元素在 @var{window} 中显示 @var{prev-buffer}。  这包括如果临时调整窗口大小以显示 @var{this-buffer}，则将窗口大小调整为 @var{height}。
+
+否则，如果 @var{window} 之前用于显示其他缓冲区 (@pxref{Window History})，则将显示该历史记录中的最新缓冲区。
+
+从概念上讲，@code{quit-restore}参数用于撤消特定窗口的第一个缓冲区显示操作。  @code{quit-restore-prev} 参数用于撤消特定窗口的一行此类操作中的最后一个缓冲区显示操作。通过显示该窗口中先前显示的缓冲区，可以撤消在其间发生的该窗口的任何缓冲区显示操作。
+
+当窗口由它创建或没有非 @code{nil} @code{quit-restore} 参数时，@code{display-buffer} 设置它使用的任何窗口的 @code{quit-restore} 参数。  如果窗口已有一个 @code{quit-restore} 参数，则 @code{display-buffer} 添加一个 @code{quit-restore-prev} 参数，其 @var{method} 元素为 @code{same} 或 @code{other}。  在任何一种情况下，如果窗口已经有 @code{quit-restore-prev} 或 @code{quit-restore} 参数，它可能会更新该参数的内容。
+
+@code{quit-restore-window} 现在首先尝试为其窗口找到合适的 @code{quit-restore-prev} 参数，告诉其要显示哪个缓冲区。  如果找不到，它将寻找合适的 @code{quit-restore} 参数来删除窗口或在其中显示另一个缓冲区。
+
+一旦使用了这些参数之一，@code{quit-restore-window}会将其重置为@code{nil}。  未使用的参数将被保留。  当这些参数引用即将被终止的缓冲区时，这些参数中的任何一个也会被 @code{replace-buffer-in-windows} (@pxref{Buffers and Windows}) 重置，无论是作为 @var{prev-buffer} 指定的缓冲区还是作为 @var{this-buffer} 指定的缓冲区。
+
+对这些参数的所有操作都应该保留以下不变式：如果窗口具有非 @code{nil} @code{quit-restore-prev} 参数，则它也具有非 @code{nil} @code{quit-restore} 参数。
+
+以下选项允许 @code{quit-restore-window} 更积极地删除其窗口。
+
+@defopt quit-restore-window-no-switch
+如果此选项为@code{nil}，则@code{quit-restore-window}将始终调用@code{switch-to-prev-buffer}，除非窗口已由@code{display-buffer}创建。  如果这是 @code{t}，@code{quit-restore-window} 将尽力仅切换到该窗口中先前显示的缓冲区。如果这是符号@code{skip-first}，当且仅该窗口具有至少两个先前的缓冲区时，它将切换到先前的缓冲区。
+
+在任何一种情况下，如果 @code{quit-restore-window} 不切换到前一个缓冲区，它将尝试删除窗口（可能还有它的框架）。  另请注意，如果窗口是专用的，@code{quit-restore-window}通常也不会切换到其中的前一个缓冲区。
+@end defopt
+
+@ignore
+@c FIXME: Should we document display-buffer-reuse-window?
+If we document display-buffer-record-window, it should be with @defun.
+And maybe not here.
+
+
+Typically, the display routines run by @code{display-buffer} will set
+the @code{quit-restore} window parameter correctly.  You can also set
+it manually, using the following code for displaying @var{buffer} in
+@var{window}:
+
+@example
+@group
+(display-buffer-record-window type window buffer)
+
+(set-window-buffer window buffer)
+
+(set-window-prev-buffers window nil)
+@end group
+@end example
+
+Setting the window history to @code{nil} ensures that a future call to
+@code{quit-window} can delete the window altogether.
+@end ignore
+
+以下选项指定一个函数，用于在退出该窗口时对包含一个窗口的框架执行正确的操作。
+
+@defopt frame-auto-hide-function
+调用该选项指定的函数来自动隐藏帧。  该函数使用一个参数调用——一个框架。
+
+当选定的窗口是专用的并显示要隐藏的缓冲区时，此处指定的函数由@code{bury-buffer} (@pxref{Buffer List}) 调用。  当要退出的窗口的框架是专门为显示该窗口的缓冲区而创建的，并且缓冲区没有被杀死时，@code{quit-restore-window}（见上文）也会调用它。
+
+默认是调用@code{iconify-frame} (@pxref{Visibility of Frames})。  或者，您可以指定 @code{delete-frame} (@pxref{Deleting Frames}) 从显示中删除框架，@code{make-frame-invisible} 使框架不可见，@code{ignore} 使框架保持不变，或可以将框架作为其唯一参数的任何其他函数。
+
+请注意，仅当指定的帧仅包含一个活动窗口并且同一终端上至少有一个其他帧时，才会调用此选项指定的函数。
+
+对于特定帧，此处指定的值可能会被该帧的 @code{auto-hide-function} 帧参数 (@pxref{Frame Interaction Parameters}) 覆盖。
+@end defopt
+
+@node Side Windows
+@section 侧窗
+@cindex side windows
+@cindex main window
+@cindex main window of a frame
+
+侧窗是位于框架根窗口 (@pxref{Windows and Frames}) 四个边中任意一侧的特殊窗口。  实际上，这意味着框架的根窗口的区域被细分为主窗口和围绕该主窗口的多个侧窗口。  主窗口要么是“普通”活动窗口，要么指定包含所有普通窗口的区域。
+
+在最简单的使用形式中，侧窗允许始终在帧的同一区域中显示特定的缓冲区。  因此，它们可以被视为由 @code{display-buffer-at-bottom} (@pxref{Buffer Display Action Functions}) 提供的概念到框架其余边的推广。  然而，通过适当的定制，侧窗也可用于提供类似于所谓的集成开发环境（IDE）中的框架布局。
+
+@menu
+* Displaying Buffers in Side Windows::  用于在侧窗中显示缓冲区的操作函数。
+* Side Window Options and Functions::  进一步调整侧窗。
+* Frame Layouts with Side Windows::  设置带有侧窗的框架布局。
+@end menu
+
+
+@node Displaying Buffers in Side Windows
+@subsection 在侧窗中显示缓冲区
+
+以下@code{display-buffer} (@pxref{Buffer Display Action Functions}) 的操作函数创建或重用侧窗口来显示指定的缓冲区。
+
+@defun display-buffer-in-side-window buffer alist
+此功能在所选帧的侧窗中显示 @var{buffer}。  如果找不到或创建没有这样的窗口，它返回用于显示 @var{buffer}、@code{nil} 的窗口。
+
+@var{alist} 是与@code{display-buffer} 一样的符号和值的关联列表。  @var{alist} 中的以下符号对于该功能是特殊的：
+
+@table @code
+@item side
+表示窗户应位于框架的一侧。  有效值为 @code{left}、@code{top}、@code{right} 和 @code{bottom}。  如果未指定，则窗口位于框架的底部。
+
+@item slot
+表示指定侧放置窗口的槽位。  值为零表示优先将窗口定位在指定边的中间。  负值表示使用中间槽之前（即上方或左侧）的槽。  正值表示使用中间插槽后面（即下方或右侧）的插槽。  因此，特定一侧的所有窗口均按其 @code{slot} 值排序。  如果未指定，则窗口位于指定边的中间。
+
+@item dedicated
+专用标志 (@pxref{Dedicated Windows}) 对于侧窗来说具有稍微不同的含义。  创建侧窗口时，该标志被设置为值 @code{side} 以防止 @code{display-buffer} 在其他操作函数中使用该窗口。  它的值在调用 @code{quit-window}、@code{kill-buffer}、@code{previous-buffer} 和 @code{next-buffer} 时保持不变。
+
+特别是，这些命令将避免在侧窗口中显示以前未在该窗口中显示过的缓冲区。他们还将避免让普通的非侧窗口显示已在侧窗口中显示的缓冲区。  当应用程序在显示缓冲区后重置该缓冲区的局部变量时，后一条规则会出现一个值得注意的例外。  要覆盖这些规则并始终删除具有 @code{quit-window} 或 @code{kill-buffer} 的侧窗，并最终阻止使用 @code{previous-buffer} 和 @code{next-buffer}，请将此值设置为 @code{t} 或通过 @code{display-buffer-mark-dedicated} 指定一个值。
+@end table
+
+如果为两个或多个不同的缓冲区指定同一侧的相同插槽，则最后显示的缓冲区将显示在相应的窗口中。因此，时隙可用于在缓冲区之间共享相同的侧窗。
+
+此函数安装 @code{window-side} 和 @code{window-slot} 参数 (@pxref{Window Parameters}) 并使它们持久化。  它不会安装任何其他窗口参数，除非它们是通过 @var{alist} 中的 @code{window-parameters} 条目显式提供的。
+@end defun
+
+默认情况下，侧窗无法通过@code{split-window} (@pxref{Splitting Windows}) 进行分割。  此外，除非明确指定侧窗为该操作的目标，否则任何缓冲区显示操作 (@pxref{Buffer Display Action Functions}) 都不会重用或分割侧窗。  另请注意，@code{delete-other-windows} 不能使侧窗成为其框架上的唯一窗户 (@pxref{Deleting Windows})。
+
+
+@node Side Window Options and Functions
+@subsection 侧窗选项和功能
+
+以下选项提供了对侧窗放置的额外控制。
+
+@defopt window-sides-vertical
+如果非@code{nil}，则框架左侧和右侧的侧窗占据框架的整个高度。  否则，框架顶部和底部的侧窗将占据框架的整个宽度。
+@end defopt
+
+@defopt window-sides-slots
+此选项指定框架每侧的侧窗最大数量。  该值是一个由四个元素组成的列表，指定每个框架的左侧、顶部、右侧和底部（按此顺序）的侧窗槽数量。  如果一个元素是数字，则表示对应边最多显示多少个窗口。  如果一个元素是@code{nil}，则意味着该侧的槽数没有限制。
+
+如果任何指定值为零，则不能在相应的一侧创建窗口。  在这种情况下，@code{display-buffer-in-side-window}不会发出错误信号，但会返回@code{nil}。  如果指定值只是禁止创建附加侧窗口，则该侧最合适的窗口将被重用，并且可能会相应更改其 @code{window-slot} 参数。
+@end defopt
+
+@defopt window-sides-reversed
+此选项指定顶部/底部侧窗是否应以相反的顺序显示。  当该值为@code{nil}时，框架顶部和底部的侧窗总是随着插槽值的增加从左到右绘制。  当为@code{t}时，绘制顺序相反，框架顶部和底部的侧窗从右向左绘制，槽值逐渐增加。
+
+当该值为@code{bidi}时，当且仅当在该帧的主窗口区域内最近选择的窗口中显示的缓冲区中@code{bidi-paragraph-direction}（@pxref{Bidirectional Display}）的值为@code{right-to-left}时，绘制顺序才会反转。有时该窗口可能很难找到，因此可以使用启发式方法来避免在选择另一个窗口时无意中更改绘制顺序。
+
+框架左侧或右侧侧窗的布局不受此变量值的影响。
+@end defopt
+
+当框架有侧窗时，以下函数返回该框架的主窗口。
+
+@defun window-main-window &optional frame
+该函数返回指定@var{frame}的主窗口。  可选参数 @var{frame} 必须是实时帧，并且默认为所选帧。
+
+如果@var{frame}没有侧窗，则返回@var{frame}的根窗口。  否则，它返回一个内部非侧窗口，使得@var{frame}上的所有其他非侧窗口都从它下降，或者返回@var{frame}的单个活动非侧窗口。  请注意，无法通过@code{delete-window}删除框架的主窗口。
+@end defun
+
+以下命令可以方便地切换指定框架上所有侧窗的外观。
+
+@deffn Command window-toggle-side-windows &optional frame
+此命令在指定的 @var{frame} 上切换侧窗。  可选参数 @var{frame} 必须是实时帧，并且默认为所选帧。
+
+如果@var{frame}至少有一个侧窗，此命令会将@var{frame}根窗口的状态保存在@var{frame}的@code{window-state}框架参数中，并随后删除@var{frame}上的所有侧窗。
+
+如果 @var{frame} 没有侧窗，但有 @code{window-state} 参数，则此命令使用该参数的值来恢复 @var{frame} 上的侧窗，而仅保留 @var{frame} 的主窗口。
+
+如果 @var{frame} 没有侧窗且未找到其保存的状态，则会发出错误信号。
+@end deffn
+
+
+@node Frame Layouts with Side Windows
+@subsection 带侧窗的框架布局
+
+侧窗可用于创建更复杂的框架布局，例如集成开发环境 (IDE) 提供的框架布局。  在这种布局中，主窗口区域是进行正常编辑活动的地方。  侧窗并不是为通常意义上的编辑而设计的。  相反，它们应该显示与当前编辑活动互补的信息，例如文件列表、标签或缓冲区、帮助信息、搜索或 grep 结果或 shell 输出。
+
+这种框架的布局可能如下所示：
+
+@smallexample
+@group
+     ___________________________________
+    |          *Buffer List*            |
+    |___________________________________|
+    |     |                       |     |
+    |  *  |                       |  *  |
+    |  d  |                       |  T  |
+    |  i  |                       |  a  |
+    |  r  |   Main Window Area    |  g  |
+    |  e  |                       |  s  |
+    |  d  |                       |  *  |
+    |  *  |                       |     |
+    |_____|_______________________|_____|
+    | *help*/*grep*/  |  *shell*/       |
+    | *Completions*   |  *compilation*  |
+    |_________________|_________________|
+    |             Echo Area             |
+    |___________________________________|
+
+
+@end group
+@end smallexample
+
+以下示例说明了如何将窗口参数 (@pxref{Window Parameters}) 与 @code{display-buffer-in-side-window} (@pxref{Displaying Buffers in Side Windows}) 一起使用来设置用于生成上面概述的框架布局的代码。
+
+@example
+@group
+(defvar parameters
+  '(window-parameters . ((no-other-window . t)
+                         (no-delete-other-windows . t))))
+
+(setq fit-window-to-buffer-horizontally t)
+(setq window-resize-pixelwise t)
+
+(setq
+ display-buffer-alist
+ `(("\\*Buffer List\\*" display-buffer-in-side-window
+    (side . top) (slot . 0) (window-height . fit-window-to-buffer)
+    (preserve-size . (nil . t)) ,parameters)
+   ("\\*Tags List\\*" display-buffer-in-side-window
+    (side . right) (slot . 0) (window-width . fit-window-to-buffer)
+    (preserve-size . (t . nil)) ,parameters)
+   ("\\*\\(?:help\\|grep\\|Completions\\)\\*"
+    display-buffer-in-side-window
+    (side . bottom) (slot . -1) (preserve-size . (nil . t))
+    ,parameters)
+   ("\\*\\(?:shell\\|compilation\\)\\*" display-buffer-in-side-window
+    (side . bottom) (slot . 1) (preserve-size . (nil . t))
+    ,parameters)))
+@end group
+@end example
+
+这为具有固定名称的缓冲区指定了 @code{display-buffer-alist} 条目 (@pxref{Choosing Window})。  特别是，它要求在框架顶部显示可调节高度的 @file{*Buffer List*}，在框架右侧显示可调节宽度的 @file{*Tags List*}。它还要求 @file{*help*}、@file{*grep*} 和 @file{*Completions*} 缓冲区共享框架左下侧的窗口，并且 @file{*shell*} 和 @file{*compilation*} 缓冲区出现在​​框架右下侧的窗口中。
+
+请注意，选项 @code{fit-window-to-buffer-horizontally} 必须具有非 @code{nil} 值才能允许窗口水平调整。  还添加了要求保留框架顶部和底部侧窗高度以及框架左侧或右侧侧窗宽度的条目。  为了确保最大化框架时侧窗保持其各自的尺寸，变量 2⁣ 设置为非 3⁣ 值。 @xref{Resizing Windows}。
+
+最后一种形式还通过为每个窗口安装 @code{no-other-window} 参数来确保创建的侧窗都无法通过 @w{@kbd{C-x o}} 访问。  此外，它还通过为每个窗口安装 @code{no-delete-other-windows} 参数来确保不会通过 @w{@kbd{C-x 1}} 删除侧窗。
+
+由于 @code{dired} 缓冲区没有固定名称，因此我们使用特殊函数 @code{dired-default-directory-on-left} 来在帧的左侧显示精简目录缓冲区。
+
+@example
+@group
+(defun dired-default-directory-on-left ()
+  "Display `default-directory' in side window on left, hiding details."
+  (interactive)
+  (let ((buffer (dired-noselect default-directory)))
+    (with-current-buffer buffer (dired-hide-details-mode t))
+    (display-buffer-in-side-window
+     buffer `((side . left) (slot . 0)
+              (window-width . fit-window-to-buffer)
+              (preserve-size . (t . nil)) ,parameters))))
+@end group
+@end example
+
+评估前面的表格并以任意顺序键入 @w{@kbd{M-x list-buffers}}、@kbd{C-h f}、@kbd{M-x shell}、@w{@kbd{M-x list-tags}} 和 @kbd{M-x dired-default-directory-on-left} 现在应该会重现上面绘制的框架布局。
+
+
+@node Atomic Windows
+@section 原子窗口
+@cindex atomic windows
+
+原子窗口是至少两个活动窗口的矩形组合。  他们有以下鲜明的特点：
+
+@itemize @bullet
+@item
+函数 @code{split-window} (@pxref{Splitting Windows}) 当应用于原子窗口的组成部分时，将尝试在原子窗口之外创建新窗口。
+
+@item
+函数 @code{delete-window} (@pxref{Deleting Windows}) 当应用于原子窗口的组成部分时，将尝试删除整个原子窗口。
+
+@item
+函数 @code{delete-other-windows} (@pxref{Deleting Windows}) 当应用于原子窗口的组成部分时，将尝试使原子窗口填充其框架或主窗口 (@pxref{Side Windows})。
+@end itemize
+
+这意味着改变窗口结构的基本函数组将原子窗口视为活动窗口，从而保留了原子窗口的内部结构。
+
+原子窗口对于构建和保留窗口布局非常有用，只有当所有涉及的缓冲区以特定方式同时显示时才有意义，例如显示文件修订版之间的差异或不同语言或标记中的相同文本时。  它们还可以用于在窗口两侧的栏中永久显示与特定窗口相关的信息。
+
+@cindex root window of atomic window
+原子窗口是在保留的@code{window-atom}窗口参数（@pxref{Window Parameters}）和称为原子窗口根窗口的内部窗口（@pxref{Basic Windows}）的帮助下实现的。  属于同一原子窗口的所有窗口都将此根窗口作为其共同祖先，并被分配一个非 @code{nil} @code{window-atom} 参数。
+
+以下函数返回指定窗口所属的原子窗口的根：
+
+@defun window-atom-root &optional window
+该函数返回原子窗口 @var{window} 的根。  指定的@var{window}必须是有效的窗口，并且默认为选定的窗口。  如果 3⁣ 不是原子窗口的一部分，则返回 2⁣。
+@end defun
+
+制作新原子窗口的最简单方法是采用现有的内部窗口并应用以下函数：
+
+@defun window-make-atom window
+该函数将 @var{window} 转换为原子窗口。  指定的@var{window}必须是内部窗口。  该函数所做的只是将 @var{window} 的每个后代的 @code{window-atom} 参数设置为 @code{t}。
+@end defun
+
+要从现有的实时窗口创建新的原子窗口或将新窗口添加到现有的原子窗口，可以使用以下缓冲区显示操作函数（@pxref{Buffer Display Action Functions}）：
+
+@defun display-buffer-in-atom-window buffer alist
+此函数尝试在新窗口中显示@var{buffer}，该新窗口将与现有窗口组合形成原子窗口。  如果现有窗口已经是原子窗口的一部分，它将新窗口添加到该原子窗口。
+
+指定的@var{alist}是符号和值的关联列表。以下符号具有特殊含义：
+
+@table @code
+@item window
+该元素的值指定新窗口应与其组合的现有窗口。  如果它指定一个内部窗口，则该窗口的所有子窗口也将成为原子窗口的一部分。  如果未指定窗口，则新窗口将成为所选窗口的同级窗口。  如果窗口处于活动状态且其 @code{window-atom} 参数尚未设置，则现有窗口的 @code{window-atom} 参数设置为 @code{main}。
+
+@item side
+该元素的值表示新窗口应位于现有窗口的一侧。  有效值为 @code{below}、@code{right}、@code{above} 和 @code{left}。  默认值为@code{below}。  新窗口的@code{window-atom}参数设置为该值。
+@end table
+
+返回值是新窗口，当创建该窗口失败时，@code{nil}。
+@end defun
+
+请注意，只要@code{window-atom}参数的值是非@code{nil}，它并不重要。  @code{display-buffer-in-atom-window} 分配的值仅允许在应用该函数后轻松检索原始窗口和新窗口。另请注意，@code{window-atom} 参数是@code{display-buffer-in-atom-window} 分配的唯一窗口参数。  更多参数必须由应用程序通过 @var{alist} 中的 @code{window-parameters} 条目显式设置。
+
+当原子窗口的其中一个组成部分被删除时，原子窗口将自动停止存在。  要手动溶解原子窗口，请重置其组成部分的 @code{window-atom} 参数——原子窗口的根及其所有后代。
+
+以下代码片段在应用于单窗口框架时，首先分割所选窗口，并使所选窗口和新窗口成为原子窗口的组成部分，并以其父窗口为根。  然后，它在框架底部的新窗口中显示缓冲区@file{*Messages*}，并使该新窗口成为刚刚创建的原子窗口的一部分。
+
+@example
+@group
+(let ((window (split-window-right)))
+  (window-make-atom (window-parent window))
+  (display-buffer-in-atom-window
+   (get-buffer-create "*Messages*")
+   `((window . ,(window-parent window)) (window-height . 5))))
+@end group
+@end example
+
+此时，在该框架的任何窗口中键入 @w{@kbd{C-x 2}} 都会在框架底部生成一个新窗口。  输入 @w{@kbd{C-x 3}} 会将新窗口放置在框架的右侧。  无论哪种情况，在原子窗口的任何窗口中输入 now @w{@kbd{C-x 1}} 都只会删除新窗口。  在原子窗口的任何窗口中键入 @w{@kbd{C-x 0}} 将使该新窗口填充框架。
+
+
+@node Window Point
+@section 窗口和点
+@cindex window position
+@cindex window point
+@cindex position in window
+@cindex point in window
+
+每个窗口都有自己的点 (@pxref{Point}) 值，即@dfn{window point}，与显示相同缓冲区的其他窗口的点值无关。  当有多个窗口显示一个缓冲区时，这非常有用。
+
+@itemize @bullet
+@item
+窗口的点是在窗口第一次创建时确定的；它从缓冲区的点（再次，@pxref{Point}）初始化，或者从显示相同缓冲区的另一个窗口的窗口点（如果存在）初始化。
+
+@item
+选择窗口会根据窗口点的值设置点。取消选择窗口会将窗口的点设置为其中显示的缓冲区的缓冲点。  因此，当您在显示给定缓冲区的窗口之间切换时，所选窗口的窗口点值在缓冲区中有效，而其他窗口的窗口点值则为这些窗口存储。
+
+@item
+只要选定的窗口显示当前缓冲区，窗口的点和缓冲区的点总是一起移动；他们保持平等。
+
+@item
+许多 Emacs 函数会临时选择一个窗口以便对其内容进行操作。  这将将该窗口缓冲区的缓冲区点 (@pxref{Point}) 移动到该窗口的窗口点的位置，但在终止临时选择时不会将缓冲区的点恢复到其先前的位置。  这意味着，当同一个缓冲区同时显示在多个窗口中时，其缓冲点可能会以不可预测的方式更改为任何这些窗口的窗口点，这是重新显示、调用 @code{with-selected-window} (@pxref{Selecting Windows}) 或运行 @code{window-configuration-change-hook} (@pxref{Window Hooks}) 等操作的副作用。
+@end itemize
+
+@cindex cursor
+Emacs 默认情况下将光标显示为矩形块，在每个窗口中该窗口点的位置处。  当用户切换到窗口中的另一个缓冲区时，Emacs 将该窗口的光标移动到该缓冲区中的点。  如果点的确切位置隐藏在某些显示元素（例如显示字符串或图像）后面，则 Emacs 会在该显示元素之前或之后立即显示光标。
+
+@defun window-point &optional window
+该函数返回 @var{window} 的窗口点。对于未选定的窗口，如果选择了该窗口，则这是（在该窗口的缓冲区中）具有的值点。  @var{window} 的默认值是选定的窗口。
+
+当@var{window}是选定的窗口时，返回的值是该窗口缓冲区中的点的值。  严格来说，在任何 @code{save-excursion} 形式之外返回 point 的顶级值会更正确。  但这个价值很难找到。
+@end defun
+
+@defun set-window-point window position
+该函数将 @var{window} 中的点定位在 @var{window} 缓冲区中的位置 @var{position} 处。  它返回@var{position}。
+
+如果选择 @var{window}，则只会在 @var{window} 的缓冲区中执行 @code{goto-char} 操作。
+@end defun
+
+@defvar window-point-insertion-type
+该变量指定 @code{window-point} 的标记插入类型 (@pxref{Marker Insertion Types})。  默认值为 @code{nil}，因此 @code{window-point} 将保留在插入的文本后面。
+@end defvar
+
+@defun set-window-cursor-type window type
+该函数设置@var{window}的光标形状。  此设置优先于 @code{cursor-type} 变量，并且 @var{type} 与该变量的值具有相同的格式。  @xref{Cursor Parameters}。  如果@var{window}为@code{nil}，则表示为所选窗口设置光标类型。
+
+新窗口的初始值为@code{t}，表示尊重@code{cursor-type}的缓冲区本地值。  此函数设置的值在@var{window}中所示的缓冲区中保持不变，因此@code{set-window-buffer}不会重置它。  @xref{Buffers and Windows}。
+@end defun
+
+@defun window-cursor-type &optional window
+该函数返回@var{window}的光标类型，默认为所选窗口。
+@end defun
+
+@defun window-cursor-info &optional window
+该函数返回@var{window}光标的信息，默认为所选窗口。
+
+函数返回的值是 @w{@code{[@var{type} @var{x} @var{y} @var{width} @var{height} @var{ascent}]}} 形式的向量。  以下是该向量的每个组成部分的描述：
+
+@table @var
+@item type
+光标的类型，符号。  这与 @code{window-cursor-type} 返回的值相同。
+
+@item x
+@itemx y
+光标左上角相对于 @var{window} 文本区域左上角的像素坐标。
+
+@item width
+@itemx height
+光标的像素尺寸。
+
+@item ascent
+光标延伸到基线上方的像素数。
+@end table
+
+如果@var{window}当前未显示光标，则此函数返回@code{nil}。
+
+返回向量中除第一个元素之外的任何元素都可能是@code{-1}，这意味着实际值当前不可用。
+@end defun
+
+@node Window Start and End
+@section 窗口开始和结束位置
+@cindex window start position
+@cindex display-start position
+
+每个窗口都维护一个标记，用于跟踪缓冲区位置，该位置指定缓冲区显示应从何处开始。  该位置称为窗口的 @dfn{display-start} 位置（或简称为 @dfn{start}）。  该位置之后的字符是出现在窗口左上角的字符。  它通常（但并非不可避免）位于文本行的开头。
+
+切换窗口或缓冲区后，以及在其他一些情况下，如果窗口开头位于行的中间，Emacs 会将窗口开头调整为行的开头。  这可以防止某些操作使窗口从一行中无意义的点开始。  此功能可能会干扰通过使用 Lisp 模式命令执行某些 Lisp 代码来测试某些 Lisp 代码，因为它们会触发此重新调整。  要测试此类代码，请将其放入命令中并将命令绑​​定到键。
+
+@defun window-start &optional window
+@cindex window top line
+该函数返回窗口@var{window}的显示开始位置。  如果@var{window}是@code{nil}，则使用选定的窗口。
+
+当您创建窗口或在其中显示不同的缓冲区时，显示开始位置将设置为最近用于同一缓冲区的显示开始位置，或者如果缓冲区没有任何显示开始位置，则设置为@code{point-min}。
+
+重新显示会更新窗口开始位置（如果自上次重新显示以来您没有明确指定它）——以确保点出现在屏幕上。  除了重新显示之外，没有什么会自动改变窗口开始位置；如果您移动点，则在下一次重新显示之前，不要期望窗口起始位置会相应改变。
+@end defun
+
+@defun window-group-start &optional window
+@vindex window-group-start-function
+此函数与 @code{window-start} 类似，不同之处在于，当 @var{window} 是一组窗口 (@pxref{Window Group}) 的一部分时，@code{window-group-start} 返回整个组的起始位置。  当缓冲区局部变量 @code{window-group-start-function} 设置为函数时，此条件成立。  在本例中，@code{window-group-start} 使用单个参数 @var{window} 调用该函数，然后返回其结果。
+@end defun
+
+@cindex window end position
+@cindex last visible position in a window
+@defun window-end &optional window update
+该函数返回其缓冲区显示在 @var{window} 结束的位置。  @var{window} 的默认值是选定的窗口。
+
+简单地更改缓冲区文本或移动点不会更新 @code{window-end} 返回的值。  仅当 Emacs 重新显示并且重新显示完成而不被抢占时，该值才会更新。
+
+如果 @var{window} 的最后一次重新显示被抢占，并且没有完成，Emacs 不知道该窗口中显示结束的位置。在这种情况下，该函数返回@code{nil}。
+
+如果 @var{update} 为非 @code{nil}，则 @code{window-end} 始终根据当前 @code{window-start} 值返回显示结束位置的最新值。  如果该位置之前保存的值仍然有效，则 @code{window-end} 返回该值；否则它会通过扫描缓冲区文本来计算正确的值。
+
+即使 @var{update} 不是 @code{nil}，如果点已移出屏幕，@code{window-end} 也不会尝试滚动显示，就像真正的重新显示那样。  它不会改变 @code{window-start} 值。  实际上，如果不需要滚动，它会报告显示文本的结束位置。  请注意，它返回的位置可能只是部分可见。
+@end defun
+
+@vindex window-group-end-function
+@defun window-group-end &optional window update
+该函数与 @code{window-end} 类似，只不过当 @var{window} 是一组窗口 (@pxref{Window Group}) 的一部分时，@code{window-group-end} 返回整个组的结束位置。当缓冲区局部变量 @code{window-group-end-function} 设置为函数时，此条件成立。  在本例中，@code{window-group-end} 使用两个参数 @var{window} 和 @var{update} 调用该函数，然后返回其结果。  参数 @var{update} 与 @code{window-end} 具有相同的含义。
+@end defun
+
+@defun set-window-start window position &optional noforce
+该函数将@var{window}缓冲区中@var{window}的显示开始位置设置为@var{position}。  它返回@var{position}。
+
+显示例程坚持在显示缓冲区时点的位置可见。  通常，它们根据其内部逻辑选择显示起始位置（并在必要时滚动窗口）以使点可见。  但是，如果您使用 @code{nil} 代表 @var{noforce} 指定此函数的起始位置，则意味着您希望显示从 @var{position} 开始，即使这会使点的位置离开屏幕。  如果这确实使点离开屏幕，显示例程会尝试将点移动到窗口中线的左边距。
+
+例如，如果点 @w{is 1} 并且您设置窗口的起点 @w{to 37}（下一行的起点），点将位于窗口顶部上方。  如果重新显示时仍为 1，显示例程将自动移动点。  这是一个例子：
+
+@example
+@group
+;; @r{Here is what @samp{foo} looks like before executing}
+;;   @r{the @code{set-window-start} expression.}
+@end group
+
+@group
+---------- Buffer: foo ----------
+@point{}This is the contents of buffer foo.
+2
+3
+4
+5
+6
+---------- Buffer: foo ----------
+@end group
+
+@group
+(set-window-start
+ (selected-window)
+ (save-excursion
+   (goto-char 1)
+   (forward-line 1)
+   (point)))
+@result{} 37
+@end group
+
+@group
+;; @r{Here is what @samp{foo} looks like after executing}
+;;   @r{the @code{set-window-start} expression.}
+---------- Buffer: foo ----------
+2
+3
+@point{}4
+5
+6
+---------- Buffer: foo ----------
+@end group
+@end example
+
+如果尝试使点可见（即，在完全可见的屏幕行中）失败，则显示例程将忽略所请求的窗口起始位置并无论如何计算一个新的位置。  因此，为了获得可靠的结果，调用此函数的 Lisp 程序应始终将点移动到显示从 @var{position} 开始的窗口内。
+
+如果 @var{noforce} 是非 @code{nil}，并且 @var{position} 会在下一次重新显示时将点放置在屏幕之外，则重新显示会计算一个与点配合良好的新窗口起始位置，因此不使用 @var{position}。
+@end defun
+
+@vindex set-window-group-start-function
+@defun set-window-group-start window position &optional noforce
+该函数类似于 0⁣，只不过当 1⁣ 是一组窗口 (@pxref{Window Group}) 的一部分时，@code{set-window-group-start} 设置整个组的开始位置。  当缓冲区局部变量 @code{set-window-group-start-function} 设置为函数时，此条件成立。  在本例中，@code{set-window-group-start} 使用三个参数 @var{window}、@var{position} 和 @var{noforce} 调用该函数，然后返回其结果。  该函数中的参数@var{position}和@var{noforce}与@code{set-window-start}中的含义相同。
+@end defun
+
+@defun pos-visible-in-window-p &optional position window partially
+如果@var{position} 位于@var{window} 屏幕上当前可见的文本范围内，则此函数返回非@code{nil}。  如果 @var{position} 垂直滚动到视图之外，则返回 @code{nil}。  除非@var{partially} 是非@code{nil}，否则部分被遮挡的位置不被视为可见。  参数@var{position}默认为@var{window}中点的当前位置； @var{window} 默认为选定的窗口。  如果 @var{position} 是 @code{t}，则意味着检查 @var{window} 中最后一个屏幕行的第一个可见位置，或缓冲区结束位置，以先到者为准。
+
+该函数仅考虑垂直滚动。  如果@var{position}仅因为@var{window}已水平滚动而在视图之外，则@code{pos-visible-in-window-p}无论如何都会返回非@code{nil}。 @xref{Horizontal Scrolling}。
+
+如果@var{position}可见，如果@var{partially}是@code{nil}，则@code{pos-visible-in-window-p}返回@code{t}；如果@var{partially}不是@code{nil}，并且@var{position}后面的字符完全可见，则返回@code{(@var{x} @var{y})}形式的列表，其中@var{x}和@var{y}是相对于窗口左上角的像素坐标；否则，它返回@code{(@var{x} @var{y} @var{rtop} @var{rbot} @var{rowh} @var{vpos})}形式的扩展列表，其中@var{rtop}和@var{rbot}指定@var{position}行顶部和底部的窗口外像素数，@var{rowh}指定该行的可见高度，@var{vpos}指定该行的垂直位置（从零开始的行号）。
+
+这是一个例子：
+
+@example
+@group
+;; @r{If point is off the screen now, recenter it now.}
+(or (pos-visible-in-window-p
+     (point) (selected-window))
+    (recenter 0))
+@end group
+@end example
+@end defun
+
+@vindex pos-visible-in-window-group-p-function
+@defun pos-visible-in-window-group-p &optional position window partially
+此函数与 @code{pos-visible-in-window-p} 类似，只不过当 @var{window} 是一组窗口 (@pxref{Window Group}) 的一部分时，@code{pos-visible-in-window-group-p} 测试 @var{pos} 在整个组中的可见性，而不仅仅是在单个 @var{window} 中。  当缓冲区局部变量 @code{pos-visible-in-window-group-p-function} 设置为函数时，此条件成立。在本例中，@code{pos-visible-in-window-group-p} 使用三个参数 @var{position}、@var{window} 和 @var{partially} 调用该函数，然后返回其结果。  参数@var{position}和@var{partially}与@code{pos-visible-in-window-p}具有相同的含义。
+@end defun
+
+@defun window-line-height &optional line window
+该函数返回@var{window}中文本行@var{line}的高度。  如果@var{line}是@code{header-line}或@code{mode-line}之一，则@code{window-line-height}返回有关窗口相应行的信息。  否则，@var{line} 是从 0 开始的文本行号。负数从窗口末尾开始计数。  @var{line} 的默认值是 @var{window} 中的当前行； @var{window} 的默认值是选定的窗口。
+
+如果显示不是最新的，@code{window-line-height} 返回@code{nil}。  在这种情况下，可以使用@code{pos-visible-in-window-p}来获取相关信息。
+
+如果没有对应于指定的@var{line}的行，则@code{window-line-height}返回@code{nil}。  否则，它返回一个列表 @code{(@var{height} @var{vpos} @var{ypos} @var{offbot})}，其中 @var{height} 是该行可见部分的高度（以像素为单位），@var{vpos} 和 @var{ypos} 是该行相对于第一个文本行顶部的行和像素的垂直位置，而 @var{offbot} 是文本行底部的窗口外像素数。  如果（第一个）文本行顶部有窗外像素，则 @var{ypos} 为负。
+@end defun
+
+@node Textual Scrolling
+@section 文本滚动
+@cindex textual scrolling
+@cindex scrolling textually
+
+@dfn{Textual scrolling} 表示在窗口中向上或向下移动文本。  它通过更改窗口的显示开始位置来工作。  它还可以更改 @code{window-point} 的值以保持屏幕上的点 (@pxref{Window Point})。
+
+基本的文本滚动功能是@code{scroll-up}（向前滚动）和@code{scroll-down}（向后滚动）。  在这些函数名称中，“up”和“down”指的是缓冲区文本相对于窗口的运动方向。  想象一下，文本写在一长卷纸上，滚动命令使纸张上下移动。  因此，如果您正在查看缓冲区的中间并重复调用@code{scroll-down}，您最终将看到缓冲区的开头。
+
+不幸的是，这有时会引起混乱，因为有些人倾向于以相反的约定来思考：他们想象窗口在保留在原处的文本上移动，因此“向下”命令会将您带到缓冲区的末尾。  此约定与这样的命令绑定到现代键盘上名为 @key{PageDown} 的键这一事实是一致的。
+@ignore
+We have not switched to this convention as that is likely to break
+existing Emacs Lisp code.
+@end ignore
+
+如果当前缓冲区不是所选窗口中显示的缓冲区，则文本滚动函数（@code{scroll-other-window} 除外）会产生不可预测的结果。  @xref{Current Buffer}。
+
+如果窗口包含高于窗口高度的行（例如存在大图像），则滚动函数将调整窗口的垂直滚动位置以滚动部分可见的行。  Lisp 调用者可以通过将变量 @code{auto-window-vscroll} 绑定到 @code{nil} (@pxref{Vertical Scrolling}) 来禁用此功能。
+
+@deffn Command scroll-up &optional count
+此功能在所选窗口中向前滚动 @var{count} 行。
+
+如果 0⁣ 为负数，则向后滚动。  如果@var{count}为@code{nil}（或省略），则滚动距离比窗口主体的高度小@code{next-screen-context-lines}行。
+
+如果所选窗口无法进一步滚动，则此功能会发出错误信号。  否则，它返回@code{nil}。
+@end deffn
+
+@deffn Command scroll-down &optional count
+此功能在所选窗口中向后滚动 @var{count} 行。
+
+如果 @var{count} 为负数，则向前滚动。  在其他方面，它的行为与 @code{scroll-up} 相同。
+@end deffn
+
+@deffn Command scroll-up-command &optional count
+这与 @code{scroll-up} 的行为类似，除了如果所选窗口无法进一步滚动并且变量 @code{scroll-error-top-bottom} 的值为 @code{t} 时，它会尝试移至缓冲区的末尾。  如果点已经存在，则表示有错误。
+@end deffn
+
+@deffn Command scroll-down-command &optional count
+这与 @code{scroll-down} 的行为类似，只不过如果所选窗口无法进一步滚动并且变量 @code{scroll-error-top-bottom} 的值为 @code{t}，则它会尝试移至缓冲区的开头。  如果点已经存在，则表示有错误。
+@end deffn
+
+@deffn Command scroll-other-window &optional count
+此函数将另一个窗口中的文本向上滚动 @var{count} 行。  @var{count} 或 @code{nil} 的负值按照 @code{scroll-up} 的方式处理。
+
+您可以通过将变量 @code{other-window-scroll-buffer} 设置为缓冲区来指定要滚动的缓冲区。  如果该缓冲区尚未显示，@code{scroll-other-window} 会将其显示在某个窗口中。
+
+当选定的窗口是迷你缓冲区时，下一个窗口通常是紧邻其上方的最左边的窗口。  当选择迷你缓冲区时，您可以通过设置变量 @code{minibuffer-scroll-window} 来指定要滚动的不同窗口。  当选择任何其他窗口时，此变量无效。  当它为非@code{nil}并且选择了迷你缓冲区时，它优先于@code{other-window-scroll-buffer}。  @xref{Definition of minibuffer-scroll-window}。
+@end deffn
+
+@deffn Command scroll-other-window-down &optional count
+此函数将另一个窗口中的文本向下滚动 @var{count} 行。  @var{count} 或 @code{nil} 的负值按照 @code{scroll-down} 的方式处理。  在其他方面，它的行为与 @code{scroll-other-window} 相同。
+@end deffn
+
+@defvar other-window-scroll-buffer
+如果此变量非 @code{nil}，则它告诉 @code{scroll-other-window} 要滚动哪个缓冲区的窗口。
+@end defvar
+
+@defopt scroll-margin
+该选项指定滚动边距的大小——点与窗口顶部或底部之间的最小行数。  每当点进入窗口顶部或底部的这么多行时，重新显示会自动滚动文本（如果可能），以将点移出边缘，更靠近窗口的中心。
+@end defopt
+
+@defopt maximum-scroll-margin
+该变量将 @code{scroll-margin} 的有效值限制为当前窗口行高的一小部分。  例如，如果当前窗口有 20 行且 @code{maximum-scroll-margin} 为 0.1，则无论 @code{scroll-margin} 有多大，滚动边距都不会大于 2 行。
+
+@code{maximum-scroll-margin} 本身的最大值为 0.5，允许设置较大的边距以将光标保持在窗口的中线（如果窗口有偶数行，则为两条中线）。  如果将其设置为更大的值（或除 0.0 到 0.5 之间的浮点数以外的任何值），则将使用默认值 0.25。
+@end defopt
+
+@defopt scroll-conservatively
+此变量控制当点移出屏幕（或进入滚动边距）时如何自动完成滚动。  如果该值为正整数 @var{n}，则重新显示会将文本在任一方向上滚动到 @var{n} 行（如果这会将点带回到正确的视图中）。  这种行为称为@dfn{conservative scrolling}。否则，滚动会在其他变量（例如 @code{scroll-up-aggressively} 和 @code{scroll-down-aggressively}）的控制下以通常的方式发生。
+
+默认值为零，这意味着保守滚动永远不会发生。
+@end defopt
+
+@defopt scroll-down-aggressively
+该变量的值应该是 @code{nil} 或 0 到 1 之间的分数 @var{f}。如果它是分数，则指定向下滚动时在屏幕上放置点的位置。  更准确地说，当窗口因为点位于窗口起点之上而向下滚动时，会选择新的开始位置来放置点 @var{f} 距离顶部窗口高度的一部分。  @var{f} 越大，滚动越积极。
+
+@code{nil} 的值相当于 0.5，因为它的作用是针对中心点。  当以任何方式设置时，该变量会自动成为缓冲区本地变量。
+@end defopt
+
+@defopt scroll-up-aggressively
+同样，对于向上滚动。  值@var{f}指定点应放置在距窗口底部多远的位置；因此，与 1⁣ 一样，值越大滚动越剧烈。
+@end defopt
+
+@defopt scroll-step
+该变量是 @code{scroll-conservatively} 的旧变体。区别在于，如果其值为 @var{n}，则仅允许滚动精确的 @var{n} 行，而不是更小的数字。  此功能不适用于 @code{scroll-margin}。  默认值为零。
+@end defopt
+
+@cindex @code{scroll-command} property
+@defopt scroll-preserve-screen-position
+如果此选项为 @code{t}，则每当滚动命令将 point 移出窗口时，Emacs 都会尝试调整 point 以将光标保持在窗口中旧的垂直位置，而不是窗口边缘。
+
+如果该值非 @code{nil} 且不是 @code{t}，Emacs 会调整 point 以将光标保持在相同的垂直位置，即使滚动命令没有将 point 移出窗口。
+
+此选项影响所有具有非 @code{nil} @code{scroll-command} 符号属性的滚动命令。
+@end defopt
+
+@defopt next-screen-context-lines
+该变量的值是全屏滚动时要保留的连续行数。  例如，参数为 1⁣ 的 0⁣ 会滚动，以便窗口底部的这么多行出现在顶部。  默认值为@code{2}。
+@end defopt
+
+@defopt scroll-error-top-bottom
+如果此选项为 @code{nil}（默认值），则 @code{scroll-up-command} 和 @code{scroll-down-command} 在无法再滚动时仅发出错误信号。
+
+如果值为@code{t}，这些命令会将点移动到缓冲区的开头或结尾（取决于滚动方向）；仅当点已经位于该位置时，它们才会发出错误信号。
+@end defopt
+
+@deffn Command recenter &optional count redisplay
+@cindex centering point
+此功能滚动所选窗口中的文本，以便点显示在窗口内指定的垂直位置。  它不会相对于文本移动点。
+
+如果@var{count}是非负数，则将包含点@var{count}的线从窗口顶部向下放置。  如果@var{count}是负数，则从窗口底部向上计数，因此@minus{}1代表窗口中最后一个可用的行。
+
+如果@var{count}是@code{nil}（或非@code{nil}列表），则@code{recenter}将包含点的行放在窗口的中间。  如果@var{count}是@code{nil}并且@var{redisplay}不是@code{nil}，则该函数可以根据@code{recenter-redisplay}的值重绘框架。  因此，省略第二个参数可以用来抵消 9⁣ 为非 10⁣ 的影响。  交互式调用将非 @code{nil} 传递为 @var{redisplay}。
+
+当 @code{recenter} 被交互调用时，@var{count} 是原始前缀参数。  因此，输入 @kbd{C-u} 作为前缀会将 @var{count} 设置为非 @code{nil} 列表，而输入 @kbd{C-u 4} 将 @var{count} 设置为 4，这会将当前行定位为距顶部四行。
+
+当参数为零时，@code{recenter} 将当前行定位在窗口的顶部。  命令 @code{recenter-top-bottom} 提供了一种更方便的方法来实现此目的。
+@end deffn
+
+@vindex recenter-window-group-function
+@defun recenter-window-group &optional count
+此功能与 @code{recenter} 类似，不同之处在于，当所选窗口是一组窗口 (@pxref{Window Group}) 的一部分时，@code{recenter-window-group} 滚动整个组。  当缓冲区局部变量 @code{recenter-window-group-function} 设置为函数时，此条件成立。  在本例中，@code{recenter-window-group} 使用参数 @var{count} 调用该函数，然后返回其结果。  参数 @var{count} 与 @code{recenter} 具有相同的含义，但相对于整个窗口组。
+@end defun
+
+@defopt recenter-redisplay
+如果此变量为非 @code{nil}，则使用 @code{nil} @var{count} 参数和非 @code{nil} @var{redisplay} 参数调用 @code{recenter} 会重绘框架。  默认值是@code{tty}，这意味着仅重绘该帧（如果它是 tty 帧）。
+@end defopt
+
+@deffn Command recenter-top-bottom &optional count
+该命令是 @kbd{C-l} 的默认绑定，其作用类似于 @code{recenter}，除非不带参数调用。  在这种情况下，连续调用根据变量 @code{recenter-positions} 定义的循环顺序放置点。
+@end deffn
+
+@defopt recenter-positions
+该变量控制 @code{recenter-top-bottom} 在不带参数调用时的行为。  默认值为@code{(middle top bottom)}，这意味着连续调用不带参数的@code{recenter-top-bottom}会在将点放置在窗口的中间、顶部和底部之间循环。
+@end defopt
+
+
+@node Vertical Scrolling
+@section 垂直分数滚动
+@cindex vertical fractional scrolling
+@cindex vertical scroll position
+
+@dfn{Vertical fractional scrolling} 表示将窗口中的文本向上或向下移动指定的行倍数或分数。  例如，Emacs 在比窗口高的图像和屏幕行上使用它。  每个窗口都有一个 @dfn{vertical scroll position}，它是一个永远不会小于零的数字。  它指定显示窗口内容时将其提升多远。  提升窗口内容通常会使某些行的全部或部分从顶部消失，而其他一些行的全部或部分出现在底部。  通常的值为零。
+
+垂直滚动位置以正常行高（默认字体的高度）为单位进行测量。  因此，如果该值为 0.5，则意味着窗口内容将向上滚动正常行高的一半。  如果是 3.3，则意味着窗口内容向上滚动超过正常行高的三倍。
+
+垂直滚动覆盖一行的哪一部分或多少行，取决于行包含的内容。  值 0.5 可以滚动屏幕上高度非常短的线，而值 3.3 可以滚动高线或图像的一部分。
+
+@defun window-vscroll &optional window pixels-p
+该函数返回@var{window}的当前垂直滚动位置。  @var{window} 的默认值是选定的窗口。如果@var{pixels-p}非@code{nil}，则返回值以像素为单位，而不是以正常线高为单位。
+
+@example
+@group
+(window-vscroll)
+     @result{} 0
+@end group
+@end example
+@end defun
+
+@defun set-window-vscroll window lines &optional pixels-p preserve-vscroll-p
+该函数将@var{window}的垂直滚动位置设置为@var{lines}。  如果 2⁣ 为 3⁣，则使用所选窗口。  参数 @var{lines} 应为零或正数；如果不是，则视为零。
+
+
+实际的垂直滚动位置必须始终对应于整数个像素，因此您指定的值将相应地舍入。
+
+返回值是此舍入的结果。
+
+@example
+@group
+(set-window-vscroll (selected-window) 1.2)
+     @result{} 1.13
+@end group
+@end example
+
+如果@var{pixels-p}非@code{nil}，则@var{lines}指定像素数。  在这种情况下，返回值为@var{lines}。
+
+通常，当调整迷你窗口大小 (@pxref{Minibuffer Windows}) 时，垂直滚动不会对@code{minibuffer-scroll-window} 或所选窗口以外的窗口生效。  当 @var{preserve-vscroll-p} 参数为非 @code{nil} 时，此“冻结”行为被禁用，这意味着照常设置 vscroll。
+@end defun
+
+@defvar auto-window-vscroll
+如果此变量为非 @code{nil}，@code{line-move}、@code{scroll-up} 和 @code{scroll-down} 函数将自动修改垂直滚动位置，以滚动高于窗口高度的显示行，例如存在大图像时。
+@end defvar
+
+@node Horizontal Scrolling
+@section 水平滚动
+@cindex horizontal scrolling
+
+@dfn{Horizontal scrolling} 表示将窗口中的图像向左或向右移动正常字符宽度的指定倍数。  每个窗口都有一个 @dfn{horizontal scroll position}，它是一个永远不会小于零的数字。  它指定内容向左移动多远。向左移动窗口内容通常会使某些字符的全部或部分从左侧消失，而其他一些字符的全部或部分出现在右侧。  通常的值为零。
+
+水平滚动位置以正常字符宽度为单位测量，即默认字体中的空间宽度。  因此，如果该值为 5，则意味着窗口内容向左滚动正常字符宽度的 5 倍。  实际上有多少个字符从左侧消失取决于它们的宽度，并且可能因行而异。
+
+因为我们在内循环中从一侧到另一侧读取，在外循环中从上到下读取，所以水平滚动的效果不像文本或垂直滚动​​的效果。  文本滚动涉及选择要显示的一部分文本，垂直滚动则连续移动窗口内容；但水平滚动会导致 @emph{each line} 的一部分超出屏幕。
+
+通常，水平滚动不起作用；那么最左边的列位于窗口的左边缘。  在这种状态下，向右滚动是没有意义的，因为边缘左侧没有数据可供其显示；所以这是不允许的。  允许向左滚动；它将第一列文本滚动到窗口边缘之外，并可以显示右侧之前被截断的其他列。  一旦窗口具有非零的向左水平滚动量，您就可以将其滚动回右侧，但仅限于将净水平滚动减少到零。  向左滚动的距离没有限制，但最终所有文本都会从左边缘消失。
+
+@vindex auto-hscroll-mode
+如果设置了@code{auto-hscroll-mode}，则重新显示会根据需要自动更改窗口的水平滚动，以确保该点始终可见。  但是，您仍然可以显式设置水平滚动值。  您指定的值用作自动滚动的下限，即自动滚动不会将窗口滚动到小于指定列的列。
+
+@code{auto-hscroll-mode}默认值为@code{t}；将其设置为 @code{current-line} 会激活自动水平滚动的一种变体，其中只有显示光标的行水平滚动以使点可见，窗口的其余部分要么不滚动，要么处于 @code{scroll-left} 和 @code{scroll-right} 设置的最小滚动量，请参见下文。
+
+@deffn Command scroll-left &optional count set-minimum
+此函数将所选窗口 @var{count} 列向左滚动（如果 @var{count} 为负则向右滚动）。  @var{count} 的默认值是窗口宽度减 2。
+
+返回值是更改后有效的向左水平滚动的总量——就像@code{window-hscroll}（如下）返回的值一样。
+
+请注意，基本方向为从右到左 (@pxref{Bidirectional Display}) 的段落中的文本会沿相反方向移动：例如，当使用正值 @var{count} 调用 @code{scroll-left} 时，它会向右移动。
+
+一旦您将窗口滚动到尽可能远的位置，回到其向左总滚动为零的正常位置，尝试再向右滚动将不会有任何效果。
+
+如果@var{set-minimum}非@code{nil}，则新的滚动量成为自动滚动的下限；也就是说，自动滚动不会将窗口滚动到小于该函数返回值的列。  交互式调用将非@code{nil}传递给@var{set-minimum}。
+@end deffn
+
+@deffn Command scroll-right &optional count set-minimum
+此函数将所选窗口 @var{count} 列向右滚动（如果 @var{count} 为负数，则向左滚动）。  @var{count} 的默认值是窗口宽度减 2。除了滚动方向之外，其工作方式与 @code{scroll-left} 类似。
+@end deffn
+
+@defun window-hscroll &optional window
+此函数返回 @var{window} 的总向左水平滚动量——@var{window} 中的文本向左滚动超过左边距的列数。  （在从右到左的段落中，该值是向右滚动的总量。） @var{window} 的默认值是选定的窗口。
+
+返回值永远不会是负数。  当 @var{window} 中没有完成水平滚动时，它为零（通常是这种情况）。
+
+
+@example
+@group
+(window-hscroll)
+     @result{} 0
+@end group
+@group
+(scroll-left 5)
+     @result{} 5
+@end group
+@group
+(window-hscroll)
+     @result{} 5
+@end group
+@end example
+@end defun
+
+@defun set-window-hscroll window columns
+该函数设置@var{window}的水平滚动。  @var{columns} 的值指定滚动量，以距左边距（从右到左段落中的右边距）为单位的列数。  参数 @var{columns} 应为零或正数；如果不是，则视为零。  目前不支持 @var{columns} 的小数值。
+
+请注意，如果您通过以简单的方式评估使用 @kbd{M-:} 的调用来测试它，@code{set-window-hscroll} 可能看起来不起作用。  发生的情况是，该函数设置水平滚动值并返回，但随后重新显示调整水平滚动以使点可见，这会覆盖该函数所做的事情。  如果在 point 距离左边距足够远以使其保持可见的情况下调用该函数，则可以观察该函数的效果。
+
+返回的值为@var{columns}。
+
+@example
+@group
+(set-window-hscroll (selected-window) 10)
+     @result{} 10
+@end group
+@end example
+@end defun
+
+以下是如何确定给定位置 @var{position} 是否由于水平滚动而离开屏幕：
+
+@c FIXME: Maybe hscroll-on-screen-p is a better name?
+@example
+@group
+(defun hscroll-on-screen (window position)
+  (save-excursion
+    (goto-char position)
+    (and
+     (>= (- (current-column) (window-hscroll window)) 0)
+     (< (- (current-column) (window-hscroll window))
+        (window-width window)))))
+@end group
+@end example
+
+
+@node Coordinates and Windows
+@section 坐标和窗口
+@cindex frame-relative coordinate
+@cindex coordinate, relative to frame
+@cindex window position
+
+本节介绍报告窗口位置和窗口内位置的函数。  这些函数中的大多数报告相对于窗口框架的本机位置 (@pxref{Frame Geometry}) 处的原点的位置。某些函数报告相对于窗口框架显示原点的位置。  无论如何，原点的坐标为 (0, 0)，X 和 Y 坐标分别向右和向下增加。
+
+对于以下函数，X 和 Y 坐标以整数字符单位报告，即分别为行数和列数。  在图形显示上，每个“行”和“列”对应于框架的默认字体（@pxref{Frame Font}）指定的默认字符的高度和宽度。
+
+@defun window-edges &optional window body absolute pixelwise
+该函数返回 @var{window} 的边缘坐标列表。如果省略 @var{window} 或 @code{nil}，则默认为所选窗口。
+
+返回值的形式为@code{(@var{left} @var{top} @var{right} @var{bottom})}。  这些列表元素分别是窗口占据的最左边一列的X坐标、最上面一行的Y坐标、最右边一列右边一列的X坐标以及从最下面一行往下一行的Y坐标。
+
+请注意，这些是窗户的实际外边缘，包括其任何装饰。  在文本终端上，如果窗口的右侧有一个相邻窗口，则其右边缘包括该窗口与其相邻窗口之间的分隔线。
+
+如果可选参数@var{body}是@code{nil}，这意味着返回对应于@var{window}总大小的边。 @var{body}非@code{nil}表示返回@var{window}主体的边缘。  如果 @var{body} 不是 @code{nil}，则 @var{window} 必须指定活动窗口。
+
+如果可选参数 @var{absolute} 是 @code{nil}，这意味着返回相对于 @var{window} 框架的原始位置的边。 @var{absolute}非@code{nil}表示返回相对于@var{window}显示原点(0, 0)的坐标。  在非图形系统上这个参数没有效果。
+
+如果可选参数 @var{pixelwise} 为 @code{nil}，这意味着根据 @var{window} 框架 (@pxref{Frame Font}) 的默认字符宽度和高度返回坐标，如有必要，则进行四舍五入。  @var{pixelwise}非@code{nil}表示返回像素坐标。  请注意，@var{right} 和 @var{bottom} 指定的像素紧邻这些边缘之外。  如果 @var{absolute} 是非 @code{nil}，则 @var{pixelwise} 也隐含地非 @code{nil}。
+@end defun
+
+@defun window-body-edges &optional window
+该函数返回 @var{window} 主体 (@pxref{Window Sizes}) 的边缘。  调用@code{(window-body-edges window)}相当于调用@code{(window-edges window t)}，见上文。
+@end defun
+
+@comment The following two functions are confusing and hardly used.
+@ignore
+@defun window-left-column &optional window
+This function returns the leftmost column of @var{window}.  This value
+equals the @var{left} entry in the list returned by @code{(window-edges
+window)} minus the number of columns occupied by the internal border of
+@var{window}'s frame.
+@end defun
+
+@defun window-top-line &optional window
+This function returns the topmost row of @var{window}.  This value is
+equal to the @var{top} entry in the list returned by @code{(window-edges
+window)} minus the number of lines occupied by the internal border of
+@var{window}'s frame.
+@end defun
+@end ignore
+
+以下函数可用于将一组相对于框架的坐标与窗口相关联：
+
+@defun window-at x y &optional frame
+此函数返回相对于 @var{frame} (@pxref{Frame Geometry}) 的原始位置的以默认字符大小 (@pxref{Frame Font}) 给出的坐标 @var{x} 和 @var{y} 处的实时窗口。
+
+如果该位置没有窗口，则返回值为@code{nil}。如果省略 @var{frame} 或 @code{nil}，则默认为所选帧。
+@end defun
+
+@defun coordinates-in-window-p coordinates window
+该函数检查窗口@var{window}是否占据框架相对坐标@var{coordinates}，如果是，则检查是窗口的哪一部分。  @var{window} 应该是一个实时窗口。
+
+@var{coordinates} 应该是 @code{(@var{x} . @var{y})} 形式的 cons 单元，其中 @var{x} 和 @var{y} 以相对于 @var{window} 框架的原始位置 (@pxref{Frame Geometry}) 的默认字符大小 (@pxref{Frame Font}) 给出。
+
+如果指定位置没有窗口，则返回值为 @code{nil} 。  否则，返回值为以下之一：
+
+@table @code
+@item (@var{relx} . @var{rely})
+坐标在@var{window}内。  数字@var{relx}和@var{rely}是指定位置的等效窗口相对坐标，从窗口左上角的0开始计数。
+
+@item mode-line
+坐标位于 @var{window} 的模式线中。
+
+@item header-line
+坐标位于 @var{window} 的标题行中。
+
+@item tab-line
+坐标位于 @var{window} 的选项卡行中。
+
+@item right-divider
+坐标位于将 @var{window} 与右侧窗口分开的分隔线中。
+
+@item bottom-divider
+坐标位于将 @var{window} 与下方窗口分隔开的分隔线中。
+
+@item vertical-line
+坐标位于 0⁣ 与其右侧邻居之间的垂直线上。  仅当窗口没有滚动条时才会出现此值；出于这些目的，滚动条中的位置被视为在窗口之外。
+
+@item left-fringe
+@itemx right-fringe
+坐标位于窗口的左边缘或右边缘。
+
+@item left-margin
+@itemx right-margin
+坐标位于窗口的左边距或右边距。
+
+@item nil
+坐标不在@var{window} 的任何部分。
+@end table
+
+函数 @code{coordinates-in-window-p} 不需要框架作为参数，因为它始终使用 @var{window} 所在的框架。
+@end defun
+
+以下函数返回以像素为单位的窗口位置，而不是字符单位。  虽然它们主要用于图形显示，但也可以在文本终端上调用，其中每个文本字符的屏幕区域被视为一个像素。
+
+@defun window-pixel-edges &optional window
+该函数返回 @var{window} 边缘的像素坐标列表。  调用 @code{(window-pixel-edges window)} 相当于调用 @code{(window-edges window nil nil t)}，见上文。
+@end defun
+
+@comment The following two functions are confusing and hardly used.
+@ignore
+@defun window-pixel-left &optional window
+This function returns the left pixel edge of window @var{window}.  This
+value equals the @var{left} entry in the list returned by
+@code{(window-pixel-edges window)} minus the number of pixels occupied
+by the internal border of @var{window}'s frame.  @var{window} must be a
+valid window and defaults to the selected one.
+@end defun
+
+@defun window-pixel-top &optional window
+This function returns the top pixel edge of window @var{window}.  This
+value is equal to the @var{top} entry in the list returned by
+@code{(window-pixel-edges window)} minus the number of pixels occupied
+by the internal border of @var{window}'s frame.  @var{window} must be a
+valid window and defaults to the selected one.
+@end defun
+@end ignore
+
+@defun window-body-pixel-edges &optional window
+该函数返回 @var{window} 主体的像素边缘。  调用 @code{(window-body-pixel-edges window)} 相当于调用 @code{(window-edges window t nil t)}，见上文。
+@end defun
+
+以下函数返回相对于显示屏原点而不是框架原点的窗口位置（以像素为单位）：
+
+@defun window-absolute-pixel-edges &optional window
+该函数返回 @var{window} 相对于 @var{window} 帧显示的原点 (0, 0) 的像素坐标。  调用@code{(window-absolute-pixel-edges)}相当于调用@code{(window-edges window nil t t)}，见上文。
+@end defun
+
+@defun window-absolute-body-pixel-edges &optional window
+该函数返回 @var{window} 主体相对于 @var{window} 帧显示 (0, 0) 处的原点的像素坐标。调用@code{(window-absolute-body-pixel-edges window)}相当于调用@code{(window-edges window t t t)}，见上文。
+
+与@code{set-mouse-absolute-pixel-position}结合使用，该函数可用于将鼠标指针移动到某个窗口中可见的任意缓冲区位置：
+
+@example
+@group
+(let ((edges (window-absolute-body-pixel-edges))
+      (position (pos-visible-in-window-p nil nil t)))
+  (set-mouse-absolute-pixel-position
+   (+ (nth 0 edges) (nth 0 position))
+   (+ (nth 1 edges) (nth 1 position))))
+@end group
+@end example
+
+在图形终端上，这种形式将鼠标光标“扭曲”到所选窗口点处的字形的左上角。  以这种方式计算的位置也可用于在此处显示工具提示窗口。
+@end defun
+
+以下函数返回窗口中可见的缓冲区位置的屏幕坐标：
+
+@defun window-absolute-pixel-position &optional position window
+如果缓冲区位置@var{position}在窗口@var{window}中可见，则此函数返回@var{position}处字形的左上角/左上角的显示坐标。  返回值是该角的 X 和 Y 坐标的 cons，相对于 @var{window} 显示的 (0, 0) 处的原点。  如果@var{position}在@var{window}中不可见，则返回@code{nil}。
+
+@var{window} 必须是实时窗口，并且默认为所选窗口。  @var{position} 默认为 @var{window} 的 @code{window-point} 的值。
+
+这意味着为了将鼠标指针移动到所选窗口中的点位置，只需编写：
+
+@example
+@group
+(let ((position (window-absolute-pixel-position)))
+  (set-mouse-absolute-pixel-position
+   (car position) (cdr position)))
+@end group
+@end example
+@end defun
+
+以下函数返回可以内接在窗口中且不覆盖该窗口中显示的文本的最大矩形。
+
+@defun window-largest-empty-rectangle &optional window count min-width min-height positions left
+该函数计算可以内接于指定 @var{window} 文本区域的最大空矩形的尺寸。 @var{window} 必须是一个实时窗口，并且默认为选定的窗口。
+
+返回值是可以内切到 @var{window} 文本区域的空白空间（不显示任何文本的空间）的最大矩形的宽度以及起始和结束 y 坐标的三倍。  该函数不返回 x 坐标——假定任何此类矩形都以 1⁣ 文本区域的右边缘结束。  如果找不到空白空间，则返回值为@code{nil}。
+
+可选参数@var{count}（如果非@code{nil}）指定要返回的矩形的最大数量。  这意味着返回值是指定矩形的三元组列表，其中最大的矩形在前。  @var{count} 也可以是 cons 单元格，其 car 指定要返回的矩形数量，其 @sc{cdr}（如果非 @code{nil}）则声明所有返回的矩形必须是不相交的。
+
+可选参数 @var{min-width} 和 @var{min-height}（如果非 @code{nil}）指定返回的任何矩形的最小宽度和高度。
+
+可选参数 @var{positions}，如果非 @code{nil}，是一个 cons 单元，其 @sc{car} 指定最上面的像素位置，其 @sc{cdr} 指定必须被返回的任何矩形覆盖的最下面的像素位置。这些位置从 @var{window} 文本区域的开头开始测量。
+
+可选参数@var{left}，如果非@code{nil}，则表示返回适合显示从右到左文本的缓冲区的值。  在这种情况下，假定返回的任何矩形都从 2⁣ 文本区域的左边缘开始。
+
+请注意，此函数必须通过 @code{window-lines-pixel-dimensions} (@pxref{Size of Displayed Text}) 检索 @var{window} 字形矩阵每行的尺寸。  因此，当 4⁣ 的当前字形矩阵不是最新时，该函数也可能返回 @code{nil}。
+@end defun
+
+
+@node Mouse Window Auto-selection
+@section 鼠标窗口自动选择
+@cindex window auto-selection
+@cindex auto-selection of window
+以下选项可以自动选择鼠标指针下的窗口。  这实现了类似于窗口管理器的策略，只要鼠标指针进入其窗口系统窗口（@pxref{Input Focus}，@pxref{Focus Events}），窗口管理器就会将焦点集中到框架（从而触发其后续选择）。
+
+@defopt mouse-autoselect-window
+如果该变量非@code{nil}，Emacs 将尝试自动选择鼠标指针下的窗口。  以下值是有意义的：
+
+@table @asis
+@item 正数
+这指定了自动选择触发之前的延迟（以秒为单位）。当鼠标在整个延迟期间停留在鼠标指针下方的窗口中时，将选择该窗口。
+
+@item 负数
+负数与正数具有类似的效果，但仅当鼠标指针在该数字的绝对值的整个持续时间内停留在窗口中并且停止移动后，才会选择鼠标指针下方的窗口。
+
+@item 其他价值
+任何其他非 0⁣ 值表示鼠标指针进入窗口后立即选择该窗口。
+@end table
+
+无论哪种情况，鼠标指针都必须进入窗口的文本区域才能触发其选择。  从概念上讲，拖动窗口的滚动条滑块或模式线不应导致其自动选择。
+
+仅当迷你缓冲区窗口处于活动状态时，鼠标自动选择才会选择该窗口，并且绝不会取消选择活动的迷你缓冲区窗口。
+@end defopt
+
+鼠标自动选择可用于模拟焦点遵循子框架 (@pxref{Child Frames}) 的鼠标策略，这些子框架通常不被窗口管理器跟踪。  这需要将 @code{focus-follows-mouse} (@pxref{Input Focus}) 的值设置为非 @code{nil} 值。  如果 @code{focus-follows-mouse} 的值为 @code{auto-raise}，则用鼠标输入子框架将自动将其提升到该框架父框架的所有其他子框架之上。
+
+
+@node Window Configurations
+@section 窗口配置
+@cindex window configurations
+@cindex saving window information
+
+@dfn{window configuration}记录了一帧的整个布局——所有窗口，它们的大小，它们的装饰，它们包含哪些缓冲区，这些缓冲区如何滚动，以及它们的point值，它还包括@code{minibuffer-scroll-window}的值。  作为一个特殊的例外，窗口配置不会记录当前缓冲区所选窗口中的点值。
+
+您可以通过恢复以前保存的窗口配置来恢复整个框架布局。  如果要记录所有框架的布局而不是仅记录一个框架，请使用框架配置而不是窗口配置。  @xref{Frame Configurations}。
+
+@defun current-window-configuration &optional frame
+该函数返回一个代表 @var{frame} 当前窗口配置的新对象。  @var{frame} 的默认值是选定的帧。  变量@code{window-persistent-parameters}指定该函数保存哪些窗口参数（如果有）。 @xref{Window Parameters}。
+@end defun
+
+@defun set-window-configuration configuration &optional dont-set-frame dont-set-miniwindow
+对于为其创建 @var{configuration} 的帧，此函数将恢复由 @var{configuration} 指定的窗口和缓冲区的配置，无论该帧是否被选择。  参数 @var{configuration} 必须是 @code{current-window-configuration} 之前为该帧返回的值。  通常，该函数还会选择配置中记录的帧，但如果@var{dont-set-frame}不是@code{nil}，则会选择在函数开始时已选择的帧。
+
+通常该函数会恢复保存的迷你缓冲区（如果有），但如果@var{dont-set-miniwindow}非-@code{nil}，则函数开始时的当前迷你缓冲区（如果有）保留在迷你窗口中。
+
+如果保存 @var{configuration} 的帧已失效，则该函数所做的只是恢复变量 @code{minibuffer-scroll-window} 的值并调整 @code{minibuffer-selected-window} 返回的值。  在这种情况下，函数返回 @code{nil}。  否则，它返回@code{t}。
+
+当该函数尝试恢复在记录 @var{configuration} 后缓冲区被杀死的窗口时，该函数会查阅变量 @code{window-restore-killed-buffer-windows}（见下文）。
+
+以下是使用此函数获得与 @code{save-window-excursion} 相同效果的方法：
+
+@example
+@group
+(let ((config (current-window-configuration)))
+  (unwind-protect
+      (progn (split-window-below nil)
+             @dots{})
+    (set-window-configuration config)))
+@end group
+@end example
+@end defun
+
+@defmac save-window-excursion forms@dots{}
+该宏记录所选帧的窗口配置，依次执行@var{forms}，然后恢复之前的窗口配置。  返回值是@var{forms}中最终形式的值。
+
+大多数 Lisp 代码不应该使用这个宏； @code{save-selected-window} 通常就足够了。  特别是，该宏无法可靠地阻止@var{forms}中的代码打开新窗口，因为新窗口可能在其他帧（@pxref{Choosing Window}）中打开，而@code{save-window-excursion}仅保存和恢复当前帧上的窗口配置。
+@end defmac
+
+@defun window-configuration-p object
+如果 1⁣ 是窗口配置，则该函数返回 0⁣。
+@end defun
+
+@defun window-configuration-equal-p config1 config2
+该函数表示两个窗口配置是否具有相同的窗口布局，但忽略 point 的值和保存的滚动位置——即使这些方面不同，它也可以返回@code{t}。
+@end defun
+
+@defun window-configuration-frame config
+该函数返回为其进行窗口配置 @var{config} 的帧。
+@end defun
+
+查看窗口配置内部的其他原语是有意义的，但没有实现，因为我们不需要它们。  有关 Windows 配置的更多操作，请参阅文件 @file{winner.el}。
+
+@code{current-window-configuration} 返回的对象与 Emacs 进程一起消亡。  为了将窗口配置存储在磁盘上并在另一个 Emacs 会话中读回它，您可以使用下面描述的函数。  这些函数对于将帧的状态克隆到任意活动窗口中也很有用（@code{set-window-configuration}有效地将帧的窗口克隆到该帧的根窗口中）。
+
+@cindex window state
+@defun window-state-get &optional window writable
+该函数以 Lisp 对象的形式返回 @var{window} 的状态。  参数 @var{window} 必须是有效窗口，并且默认为所选框架的根窗口。
+
+如果可选参数@var{writable}是非@code{nil}，这意味着不使用标记来采样位置，如@code{window-point}或@code{window-start}。  当状态将被写入磁盘并在另一个会话中读回时，该参数应该为非⁣4​​⁣。
+
+@var{writable} 和变量 @code{window-persistent-parameters} 一起指定该函数保存哪些窗口参数。  如果 @var{writable} 为 @code{nil}，则默认保存 @code{clone-of} 参数。  @xref{Window Parameters}。
+
+@vindex window-state-normalize-buffer-name
+将@code{window-state-normalize-buffer-name}绑定到非@code{nil}，通过删除其前缀和后缀来标准化@file{uniquify}管理下的缓冲区名称。  这有助于跨 Emacs 会话恢复窗口缓冲区。  @xref{Uniquify,,, emacs, The GNU Emacs Manual}。
+@end defun
+
+@code{window-state-get} 返回的值可以在同一会话中用于克隆窗口（见下文）。  它还可以写入磁盘并在另一个会话中读回。  无论哪种情况，都可以使用以下函数来恢复窗口的状态。
+
+@defun window-state-put state &optional window ignore
+该函数将窗口状态@var{state}放入@var{window}。  参数 2⁣ 应该是先前调用 @code{window-state-get} 返回的窗口状态，请参见上文。  可选参数 @var{window} 可以是实时窗口或内部窗口 (@pxref{Windows and Frames})。  如果@var{window}不是实时窗口，则在将@var{state}放入其中之前，它将被在同一帧上创建的新实时窗口替换。  如果@var{window}是@code{nil}，它将窗口状态放入一个新窗口中。
+
+该函数分配已存储在@var{state}中的所有窗口参数。  默认情况下，这是 @code{clone-of} 参数，前提是 @var{state} 是通过使用参数 @var{writable} @code{nil} 调用 @code{window-state-get} 获得的。  @xref{Window Parameters}。
+
+当该函数尝试恢复在记录 @var{state} 后缓冲区被杀死的窗口时，该函数会查阅变量 @code{window-restore-killed-buffer-windows}（见下文）。
+
+如果可选参数@var{ignore}是非@code{nil}，则意味着忽略最小窗口大小和固定大小限制。  如果@var{ignore}是@code{safe}，这意味着窗口可以小到一行和/或两列。
+@end defun
+
+@cindex window clone
+@cindex clone of window
+在窗口状态的上下文中， @dfn{clone of a window} 是一个窗口，它与用于生成它的状态的窗口具有相同的装饰和内容，但实际上由另一个窗口对象表示。  因此它不具有与原始窗口相同的身份。  对原始窗口或克隆窗口进行操作不会以任何方式影响另一个窗口。
+
+请注意，虽然@code{set-window-configuration}总是恢复它放回框架中的窗口的身份，但@code{window-state-put}从不这样做。  另请注意，虽然 @code{window-state-get} 克隆现有窗口，但这些克隆还不是有效的窗口。  它们仅在 @code{window-state-put} 将它们放入实时帧后才有效。
+
+默认情况下，当@code{set-window-configuration}和@code{window-state-put}发现窗口的缓冲区因相应的配置或状态已被记录而被杀死时，可能会从恢复的配置或状态中删除窗口。  接下来描述的变量可用于微调该行为。
+
+@cindex restoring windows whose buffers have been killed
+@defvar window-restore-killed-buffer-windows
+该变量指定 @code{set-window-configuration} 和 @code{window-state-put} 应如何处理自记录相应配置或状态后缓冲区已被终止的窗口。  任何这样的窗口都可能是活动的——在这种情况下它显示一些其他缓冲区——或者在调用这些函数之一时是死的。  通常，如果窗口处于活动状态，@code{set-window-configuration} 会保留该窗口，而 @code{window-state-put} 会删除它。
+
+以下值可用于覆盖@code{set-window-configuration}情况下死窗口的默认行为以及@code{window-state-put}情况下死窗口和活动窗口的默认行为。
+
+@table @asis
+@item @code{t}
+该值意味着无条件恢复窗口并在其中显示一些其他缓冲区。
+
+@item @code{delete}
+这意味着无条件地尝试删除窗口。
+
+@item @code{dedicated}
+这意味着当且仅当该窗口专用于其缓冲区时才尝试删除该窗口。
+
+@item @code{nil}
+这是默认值，这意味着当且仅当窗口专用于其缓冲区时，@code{set-window-configuration}才会尝试删除该窗口，而@code{window-state-put}将无条件地尝试删除它。
+
+@item 一个函数
+这意味着恢复窗口并在其中显示一些其他缓冲区，就像值是 0 一样，并将该窗口的条目添加到列表中，该列表稍后将作为第二个参数传递给该函数。
+@end table
+
+如果无法删除某个窗口（通常是因为它是其帧上的最后一个窗口），@code{set-window-configuration} 和 @code{window-state-put} 将在其中显示另一个缓冲区。
+
+如果此变量的值是一个函数，则该函数应采用三个参数。  第一个参数指定其窗口已恢复的框架。  如果窗口由 @code{set-window-configuration} 恢复，则第三个参数为符号 @code{configuration}；如果窗口由 @code{window-state-put} 恢复，则第三个参数为符号 @code{state}。
+
+第二个参数指定 @emph{all} 窗口的条目列表，这些窗口的先前缓冲区在 @code{set-window-configuration} 或 @code{window-state-put} 尝试恢复它们时已被发现已死亡（不包括迷你缓冲区窗口）。  这意味着该函数还可以删除 @code{set-window-configuration} 发现的实时窗口。
+
+作为第二个参数传递给函数的列表中的每个条目本身都是一个包含六个值的列表：发现其缓冲区已失效的窗口、失效缓冲区或其名称、该窗口中缓冲区的窗口起始位置 (@pxref{Window Start and End}) 和窗口点 (@pxref{Window Point})、之前由 @code{window-dedicated-p} 报告的窗口的专用状态以及如果发现窗口处于活动状态则为 @code{t} 的标志@code{set-window-configuration} 和 @code{nil} 否则。
+@end defvar
+
+函数@code{window-state-get}和@code{window-state-put}还允许交换两个实时窗口的内容。  下面的函数正是这样做的：
+
+@deffn Command window-swap-states &optional window-1 window-2 size
+此命令交换两个实时窗口@var{window-1}和@var{window-2}的状态。  @var{window-1} 必须指定一个实时窗口并默认为选定的窗口。  @var{window-2} 必须指定一个实时窗口，并且默认为窗口循环排序中@var{window-1} 之后的窗口，不包括迷你缓冲区窗口并包括所有可见帧上的实时窗口。
+
+可选参数 @var{size} 非 @code{nil} 表示尝试交换 @var{window-1} 和 @var{window-2} 的大小。  值 @code{height} 表示仅交换高度，值 @code{width} 表示仅交换宽度，而 @code{t} 表示如果可能的话，同时交换宽度和高度。  此函数不会调整框架的大小。
+@end deffn
+
+
+@node Window Parameters
+@section 窗口参数
+@cindex window parameters
+
+本节描述可用于将附加信息与窗口关联的窗口参数。
+
+@defun window-parameter window parameter
+该函数返回 @var{window} 的 @var{parameter} 值。  @var{window} 的默认值是选定的窗口。  如果@var{window}没有设置@var{parameter}，则该函数返回@code{nil}。
+@end defun
+
+@defun window-parameters &optional window
+该函数返回 @var{window} 的所有参数及其值。 @var{window} 的默认值是选定的窗口。  返回值是@code{nil}，或者是一个关联列表，其元素的形式为@code{(@var{parameter} . @var{value})}。
+@end defun
+
+@defun set-window-parameter window parameter value
+该函数将@var{window}的@var{parameter}值设置为@var{value}并返回@var{value}。  @var{window} 的默认值是选定的窗口。
+@end defun
+
+默认情况下，保存和恢复窗口配置或窗口状态（@pxref{Window Configurations}）的函数不关心窗口参数。  这意味着当您更改 @code{save-window-excursion} 体内的参数值时，该宏退出时不会恢复之前的值。  这也意味着当您通过 @code{window-state-put} 恢复之前由 @code{window-state-get} 保存的窗口状态时，所有克隆窗口的参数都会重置为 @code{nil}。  以下变量允许您覆盖标准行为：
+
+@cindex persistent window parameters
+@defvar window-persistent-parameters
+该变量是一个列表，指定哪些参数由 @code{current-window-configuration} 和 @code{window-state-get} 保存，并随后由 @code{set-window-configuration} 和 @code{window-state-put} 恢复。  @xref{Window Configurations}。
+
+该列表中每个条目的 @sc{car} 是指定参数的符号。  @sc{cdr} 应该是以下之一：
+
+@table @asis
+@item @code{nil}
+该值意味着该参数既不被 @code{window-state-get} 也不被 @code{current-window-configuration} 保存。
+
+@item @code{t}
+该值指定参数由 @code{current-window-configuration} 保存，（假设其 @var{writable} 参数为 @code{nil}）由 @code{window-state-get} 保存。
+
+@item @code{writable}
+这意味着参数由@code{current-window-configuration}和@code{window-state-get}无条件保存。  该值不应用于其值不具有读取语法的参数。  否则，在另一个会话中调用 @code{window-state-put} 可能会失败并出现 @code{invalid-read-syntax} 错误。
+@end table
+@end defvar
+
+某些函数（特别是 @code{delete-window}、@code{delete-other-windows} 和 @code{split-window}）在其 @var{window} 参数指定的窗口具有名称与函数名称相同的参数时可能会表现特殊。  您可以通过将以下变量绑定到非 4⁣ 值来覆盖此类特殊行为：
+
+@defvar ignore-window-parameters
+如果该变量为非@code{nil}，则某些标准函数不会处理窗口参数。  目前受此影响的函数有 @code{split-window}、@code{delete-window}、@code{delete-other-windows} 和 @code{other-window}。
+
+应用程序可以在调用这些函数时将此变量绑定到非 0 值。  如果这样做，应用程序将完全负责在退出该函数时正确分配所有涉及的窗口的参数。
+@end defvar
+
+窗口管理代码当前使用以下参数：
+
+@table @code
+@item delete-window
+@vindex delete-window@r{, a window parameter}
+该参数影响@code{delete-window} (@pxref{Deleting Windows}) 的执行。
+
+@item delete-other-windows
+@vindex delete-other-windows@r{, a window parameter}
+该参数影响@code{delete-other-windows} (@pxref{Deleting Windows}) 的执行。
+
+@item no-delete-other-windows
+@vindex no-delete-other-windows@r{, a window parameter}
+此参数将窗口标记为不可通过 @code{delete-other-windows} (@pxref{Deleting Windows}) 删除。
+
+@item split-window
+@vindex split-window@r{, a window parameter}
+该参数影响@code{split-window} (@pxref{Splitting Windows}) 的执行。
+
+@item other-window
+@vindex other-window@r{, a window parameter}
+该参数影响@code{other-window} (@pxref{Cyclic Window Ordering}) 的执行。
+
+@item no-other-window
+@vindex no-other-window@r{, a window parameter}
+此参数将窗口标记为不可通过 @code{other-window} (@pxref{Cyclic Window Ordering}) 选择。  工具提示窗口默认为 @code{t} (@pxref{Basic Windows})。  使用@code{window-no-other-p} (@pxref{Cyclic Window Ordering}) 检查它是否适用于特定窗口。
+
+@item clone-of
+@vindex clone-of@r{, a window parameter}
+该参数指定从哪个窗口克隆该窗口。默认情况下它是持久的，因此由 @code{window-state-get} 保存并由 @code{window-state-put} (@pxref{Window Configurations}) 安装。
+
+@item window-preserved-size
+@vindex window-preserved-size@r{, a window parameter}
+此参数指定缓冲区、方向（其中 @code{nil} 表示垂直，@code{t} 表示水平）以及大小（以像素为单位）。  如果此窗口显示指定的缓冲区，并且其在指示方向上的大小等于此参数指定的大小，则 Emacs 将尝试保留此窗口在指示方向上的大小。  该参数由函数@code{window-preserve-size} (@pxref{Preserving Window Sizes}) 安装和更新。
+
+@item quit-restore
+@item quit-restore-prev
+@vindex quit-restore@r{, a window parameter}
+@vindex quit-restore-prev@r{, a window parameter}
+这些参数由缓冲区显示函数 (@pxref{Choosing Window}) 安装，并由 @code{quit-restore-window} (@pxref{Quitting Windows}) 查阅。  它们是四个元素的列表，详细信息请参见@ref{Quitting Windows}中@code{quit-restore-window}的描述。
+
+@item window-side
+@itemx window-slot
+@vindex window-side@r{, a window parameter}
+@vindex window-slot@r{, a window parameter}
+这些参数在内部用于实现侧窗 (@pxref{Side Windows})。
+
+@item window-atom
+@vindex window-atom@r{, a window parameter}
+该参数在内部用于实现原子窗口，请参见@ref{Atomic Windows}。
+
+@item mode-line-format
+@vindex mode-line-format@r{, a window parameter}
+每当显示此窗口时，此参数都会替换此窗口缓冲区的缓冲区局部变量 @code{mode-line-format} (@pxref{Mode Line Basics}) 的值。  符号@code{none}表示抑制该窗口的模式行的显示。  显示此缓冲区的其他窗口上的模式行的显示和内容不受影响。
+
+@item header-line-format
+@vindex header-line-format@r{, a window parameter}
+每当显示此窗口时，此参数都会替换此窗口缓冲区的缓冲区局部变量 @code{header-line-format} (@pxref{Mode Line Basics}) 的值。  符号@code{none}表示禁止显示该窗口的标题行。  显示此缓冲区的其他窗口上标题行的显示和内容不受影响。
+
+@item tab-line-format
+@vindex tab-line-format@r{, a window parameter}
+每当显示此窗口时，此参数都会替换此窗口缓冲区的缓冲区局部变量 @code{tab-line-format} (@pxref{Mode Line Basics}) 的值。  符号@code{none}表示禁止显示该窗口的制表符行。  显示此缓冲区的其他窗口上的选项卡行的显示和内容不受影响。
+
+@item min-margins
+@vindex min-margins@r{, a window parameter}
+此参数的值是一个 cons 单元格，其 @sc{car} 和 @sc{cdr}（如果非 @code{nil}）指定此窗口左右边距的最小值（以列为单位）(@pxref{Display Margins})。如果存在，Emacs 将使用这些值而不是实际的边距宽度来确定窗口是否可以水平分割或缩小。
+
+Emacs 在分割窗口或调整窗口大小后绝不会自动调整窗口的边距。  设置此参数的任何应用程序都有责任调整此窗口的边距以及由于拆分而​​继承此窗口边距的任何新窗口的边距。 @code{window-configuration-change-hook} 和 @code{window-size-change-functions} (@pxref{Window Hooks}) 都应用于此目的。
+
+此参数是在 Emacs 版本 25.1 中引入的，以支持使用大边距将缓冲区文本在窗口内居中的应用程序，并且应仅由这些应用程序谨慎使用。  在 Emacs 的未来版本中，它可能会被改进的解决方案所取代。
+@end table
+
+
+@node Window Hooks
+@section 用于窗口滚动和更改的挂钩
+@cindex hooks for window operations
+
+本节描述 Lisp 程序如何在窗口滚动或发生其他窗口修改后采取行动。  我们首先考虑窗口显示其缓冲区的不同部分的情况。
+
+@defvar window-scroll-functions
+该变量保存 Emacs 在重新显示滚动窗口之前应调用的函数列表。  在窗口中显示不同的缓冲区以及创建新窗口也调用这些函数。
+
+该变量不是普通的钩子，因为每个函数都是用两个参数调用的：窗口及其新的显示开始位置。在调用时，参数窗口的显示开始位置已设置为其新值，并且窗口中要显示的缓冲区设置为当前缓冲区。
+
+使用 @code{window-end} (@pxref{Window Start and End}) 时必须小心这些函数；如果您需要最新值，则必须使用 @var{update} 参数来确保获得它。
+
+@strong{Warning:} 不要使用此功能来改变窗口滚动的方式。  它不是为此而设计的，这样的用途可能行不通。
+@end defvar
+
+此外，您可以使用 @code{jit-lock-register} 注册 Font Lock 字体化函数，只要由于窗口滚动或其大小更改而导致缓冲区的一部分（重新）字体化，就会调用该函数。  @xref{Other Font Lock Variables}。
+
+@cindex window change functions
+本节的其余部分介绍了六个钩子，如果检测到窗口发生显着的非滚动变化，则在重新显示期间调用这些钩子。  为了简单起见，这些钩子和它们调用的函数将统称为@dfn{window change functions}。  与任何钩子一样，安装钩子时，可以通过 @code{add-hook} (@pxref{Setting Hooks}) 的 @var{local} 参数全局或本地缓冲区设置这些钩子。
+
+@cindex window buffer change
+第一个钩子在检测到 @dfn{window buffer change} 后运行，这意味着创建、删除了窗口或分配了另一个缓冲区。
+
+@defvar window-buffer-change-functions
+该变量指定当窗口缓冲区发生更改时重新显示期间调用的函数。  该值应该是带有一个参数的函数列表。
+
+当且仅当自上次重新显示以来该窗口已添加或更改其缓冲区时，才会为显示相应缓冲区的每个窗口调用本地缓冲区指定的函数。  请注意，对于此类窗口，函数可能会运行两次：一次针对上次重新显示时窗口中显示的缓冲区（假设缓冲区仍然有效），一次针对当前窗口中显示的缓冲区。  在任何一种情况下，窗口都会作为参数传递，并且相应的缓冲区会暂时成为当前缓冲区。
+
+如果您使用的是此挂钩的缓冲区本地版本，您可能需要区分缓冲区已从窗口中删除的情况和缓冲区现在显示在该窗口中的情况。  如果 @var{window} 表示传递给此钩子上的函数的窗口参数，则要检测从 @var{window} 中删除缓冲区的情况，请使用以下习惯用法
+
+@example
+(eq (window-old-buffer @var{window}) (current-buffer))
+@end example
+
+@noindent
+while 检测缓冲区现在是否显示在 @var{window} 使用
+
+@example
+(eq (window-buffer @var{window}) (current-buffer))
+@end example
+
+@noindent
+反而。
+
+如果自上次运行窗口更改函数以来，该帧上至少有一个窗口被添加、删除或分配了另一个缓冲区，则为该帧调用由默认值指定的函数。在这种情况下，框架作为参数传递。
+@end defvar
+
+@cindex window size change
+当检测到 @dfn{window size change} 时，将运行第二个钩子，这意味着创建了一个窗口、分配了另一个缓冲区或更改了其总大小或其文本区域的大小。
+
+@defvar window-size-change-functions
+该变量指定窗口大小发生更改时重新显示期间调用的函数。  该值应该是带有一个参数的函数列表。
+
+如果自上次运行窗口更改函数以来，已添加或分配了另一个缓冲区或更改了其总大小或主体大小，则为显示相应缓冲区的任何窗口调用本地缓冲区指定的函数。  在这种情况下，窗口作为参数传递，并且相应的缓冲区暂时变为当前缓冲区。
+
+如果自上次运行窗口更改函数以来，该帧上至少有一个窗口已添加或分配了另一个缓冲区或更改了其总大小或主体大小，则为该帧调用由默认值指定的函数。  在这种情况下，框架作为参数传递。
+@end defvar
+
+@cindex window selection change
+当 @dfn{window selection change} 自上次重新显示以来选择了另一个窗口时，将运行第三个挂钩。
+
+@defvar window-selection-change-functions
+该变量指定当所选窗口或框架的所选窗口发生更改时重新显示期间调用的函数。  该值应该是带有一个参数的函数列表。
+
+如果自上次运行窗口更改函数以来已选择或取消选择该窗口（在所有窗口中或其框架上的所有窗口中），则为显示相应缓冲区的任何窗口调用本地缓冲区指定的函数。  在这种情况下，窗口作为参数传递，并且相应的缓冲区暂时变为当前缓冲区。
+
+如果已选择或取消选择该框架，或者自上次运行窗口更改函数以来该框架的选定窗口已更改，则为该框架调用由默认值指定的函数。  在这种情况下，框架作为参数传递。
+@end defvar
+
+@cindex window state change
+当检测到 @dfn{window state change} 时，将运行第四个挂钩，这意味着至少发生了前面三个窗口更改之一。
+
+@defvar window-state-change-functions
+此变量指定当窗口缓冲区或大小发生更改或选定窗口或框架的选定窗口发生更改时重新显示期间调用的函数。  该值应该是带有一个参数的函数列表。
+
+如果自上次运行窗口更改函数以来，已添加或分配了另一个缓冲区、更改了其总大小或主体大小或已选择或取消选择（在所有窗口中或其框架上的所有窗口中），则为显示相应缓冲区的任何窗口调用本地缓冲区指定的函数。  在这种情况下，窗口作为参数传递，并且相应的缓冲区暂时变为当前缓冲区。
+
+如果自上次运行窗口更改函数以来，该帧上至少有一个窗口已被添加、删除或分配了另一个缓冲区，更改了其总大小或正文大小，或者该帧已被选择或取消选择，或者该帧的选定窗口已更改，则为该帧调用由默认值指定的函数。  在这种情况下，框架作为参数传递。
+
+当自上次重新显示以来设置了该帧的窗口状态更改标志（见下文）时，也会为该帧运行由默认值指定的函数。
+@end defvar
+
+@cindex window configuration change
+当检测到 @dfn{window configuration change} 时，将运行第五个钩子，这意味着缓冲区或窗口大小发生了变化。  它与前面的四个钩子的不同之处在于它的运行方式。
+
+@defvar window-configuration-change-hook
+该变量指定当缓冲区或窗口大小发生更改时重新显示期间调用的函数。  该值应该是不带参数的函数列表。
+
+如果自上次运行窗口更改函数以来，该帧上至少有一个窗口被添加、删除或分配了另一个缓冲区或更改了其总大小或主体大小，则为显示相应缓冲区的任何窗口调用本地缓冲区指定的函数。  每次调用都会在窗口中执行，该窗口显示临时选择的缓冲区及其当前缓冲区。
+
+如果自上次运行窗口更改函数以来，该帧上至少有一个窗口被添加、删除或分配了另一个缓冲区或更改了其总大小或主体大小，则为该帧调用由默认值指定的函数。  每次调用都是在临时选择的帧和所选窗口的缓冲区为当前的情况下执行的。
+@end defvar
+
+最后，Emacs 运行一个普通的钩子来概括 @code{window-state-change-functions} 的行为。
+
+@defvar window-state-change-hook
+该变量的默认值指定在检测到窗口状态更改或已在至少一帧上设置窗口状态更改标志时重新显示期间调用的函数。  该值应该是不带参数的函数列表。
+
+仅当应用程序想要对自上次重新显示以来两个或多个帧上发生的（或已收到信号的）变化做出反应时，才应在该挂钩上放置一个函数。  在所有其他情况下，应首选将函数放在 @code{window-state-change-functions} 上。
+@end defvar
+
+在每个帧的重新显示期间，窗口改变函数被调用，如下：首先，任何缓冲区本地窗口缓冲区改变函数、窗口大小改变函数、选定窗口改变和窗口状态改变函数按此顺序被调用。  接下来，以相同的顺序调用这些函数的默认值。  然后调用任何缓冲区本地窗口配置更改函数，然后调用由这些函数的默认值指定的函数。  最后，运行 @code{window-state-change-hook} 上的函数。
+
+仅当之前为特定帧注册了相应的更改时，才会针对该帧运行窗口更改函数。  此类更改包括创建或删除窗口或为窗口分配另一个缓冲区或大小。  请注意，即使已注册此类更改，这并不意味着运行上述任何挂钩。  例如，如果在窗口偏移 (@pxref{Window Configurations}) 范围内注册了更改，则仅当运行更改函数时该偏移仍然存在时，才会触发窗口更改函数的调用。  如果提前退出，则仅当通过该偏移范围之外的更改注册时才会运行挂钩。
+
+@cindex window state change flag
+如果设置了帧的 @dfn{window state change flag} ，则将导致 @code{window-state-change-functions} （针对该帧）和 @code{window-state-change-hook} 的默认值在下一次重新显示期间运行，无论该帧是否实际发生窗口状态更改。  在这些钩子上运行任何函数后，每个帧的标志都会重置。  应用程序可以使用以下函数设置该标志并检查其值。
+
+@defun set-frame-window-state-change &optional frame arg
+如果 1⁣ 为非 2⁣，则此函数设置 0⁣ 的窗口状态更改标志，否则重置它。  @var{frame} 必须是实时帧并且默认为所选帧。
+@end defun
+
+@defun frame-window-state-change &optional frame
+如果设置了@var{frame}的窗口状态更改标志，则该函数返回@code{t}，否则返回@code{nil}。  @var{frame} 必须是实时帧并且默认为所选帧。
+@end defun
+
+运行窗口更改函数时，可以调用接下来描述的函数，以更深入地了解自上次重新显示以来特定窗口或框架发生的更改。  所有这些函数都将实时窗口作为单个可选参数，默认为选定的窗口。
+
+@defun window-old-buffer &optional window
+该函数返回上次为 1⁣ 的帧运行窗口更改函数时 @var{window} 中显示的缓冲区。  如果它返回@code{nil}，则@var{window}要么是一个内部窗口，要么是在那之后创建的。  如果它返回@code{t}，则@var{window}当时未显示，但随后已从先前保存的窗口配置中恢复。  否则，返回值是当时@var{window}所示的缓冲区。  作为一种特殊情况，如果 @var{window} 已被删除，则该函数返回当时显示的最后一个缓冲区 @var{window}。  @var{window} 可以是任何窗口，默认为选定的窗口。
+@end defun
+
+@defun window-old-pixel-width &optional window
+此函数返回上次窗口更改函数在其帧上发现 @var{window} 的 @var{window} 的总像素宽度。  如果 @var{window} 之后被创建，则它为零。
+@end defun
+
+@defun window-old-pixel-height &optional window
+此函数返回上次窗口更改函数在其帧上发现 @var{window} 的 @var{window} 的总像素高度。如果 @var{window} 之后被创建，则它为零。
+@end defun
+
+@defun window-old-body-pixel-width &optional window
+该函数返回上次窗口更改函数在其帧上发现 @var{window} 时@var{window}文本区域的像素宽度。  如果 @var{window} 之后被创建，则它为零。
+@end defun
+
+@defun window-old-body-pixel-height &optional window
+该函数返回上次窗口更改函数在其框架上发现 @var{window} 时@var{window}文本区域的像素高度。  如果 @var{window} 之后被创建，则它为零。
+@end defun
+
+为了找出上次运行窗口更改函数时选择了哪个窗口或框架，可以使用以下函数：
+
+@defun frame-old-selected-window &optional frame
+该函数返回上次运行窗口更改函数时所选的@var{frame}窗口。  如果省略或 @code{nil} @var{frame} 默认为选定的帧。
+@end defun
+
+@defun old-selected-window
+此函数返回上次运行窗口更改函数时选定的窗口。
+@end defun
+
+@defun old-selected-frame
+此函数返回上次运行窗口更改函数时选定的帧。
+@end defun
+
+请注意，窗口更改函数不提供有关自上次运行以来哪些窗口已被删除的信息。  如有必要，应用程序应记住在该缓冲区的局部变量中显示特定缓冲区的任何窗口，并在检测到窗口缓冲区更改时运行的任何挂钩的默认值运行的函数中更新它。
+
+将函数添加到窗口更改函数时应考虑以下注意事项：
+
+@itemize @bullet
+@item
+有些操作不会触发窗口更改函数的调用。其中包括在迷你缓冲区窗口中显示另一个缓冲区或工具提示窗口的任何更改。
+
+@item
+窗口更改函数不应创建或删除窗口或更改任何窗口的缓冲区、大小或选择状态，因为不能保证有关此类更改的信息将传播到其他窗口更改函数。  如果有的话，任何此类更改都应该仅由默认值 @code{window-state-change-hook} 列出的最后一个函数执行。
+
+@item
+运行窗口更改函数时可以使用@code{save-window-excursion}、@code{with-selected-window} 或@code{with-current-buffer} 等宏。
+
+@item
+运行窗口更改功能不会保存和恢复比赛数据。除非运行@code{window-configuration-change-hook}，否则它不会保存或恢复选定的窗口或帧或当前缓冲区。
+
+@item
+任何触发窗口更改功能运行的重新显示都可能被中止。  如果在窗口更改函数运行完成之前发生中止，则它们将以先前的值再次运行，也就是说，就好像尚未执行重新显示一样。  如果稍后中止，它们将使用新值运行，也就是说，就像实际执行了重新显示一样。
+@end itemize

@@ -1,0 +1,769 @@
+@c -*- mode: texinfo; coding: utf-8 -*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--2026 Free Software Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Positions
+@chapter 职位
+@cindex position (in buffer)
+@cindex buffer position
+
+@dfn{position} 是缓冲区文本中字符的索引。更准确地说，位置标识两个字符之间的位置（或第一个字符之前，或最后一个字符之后），因此我们可以谈论给定位置之前或之后的字符。  然而，我们经常提到“在”某个位置的字符，意思是该位置之后的字符。
+
+位置通常表示为从 1 开始的整数，但也可以表示为 @dfn{markers}——插入或删除文本时自动重新定位的特殊对象，以便它们与周围的字符保持在一起。  期望参数为位置（整数）但接受标记作为替代的函数，通常会忽略标记指向哪个缓冲区；它们将标记转换为整数，并使用该整数，就像您将整数作为参数传递一样，即使标记指向错误的缓冲区。  指向任何地方的标记无法转换为整数；使用它而不是整数会导致错误。 @xref{Markers}。
+
+另请参见字段功能 (@pxref{Fields})，它提供了许多光标移动命令使用的功能。
+
+@menu
+* Point::          进行编辑的特殊位置。
+* Motion::         换点。
+* Excursions::     临时运动和缓冲区变化。
+* Narrowing::      将编辑限制为缓冲区的一部分。
+@end menu
+
+@node Point
+@section 观点
+@cindex point
+
+@dfn{Point} 是许多编辑命令使用的特殊缓冲区位置，包括自插入键入的字符和文本插入功能。  其他命令在文本中移动点以允许在不同位置进行编辑和插入。
+
+与其他位置一样，点指定两个字符之间（或第一个字符之前，或最后一个字符之后）的位置，而不是特定字符。  通常终端将光标显示在紧随点之后的字符上； point 实际上位于光标所在的字符之前。
+
+@cindex point with narrowing
+point 的值是一个不小于 1 的数字，并且不大于缓冲区大小加 1。如果缩小有效 (@pxref{Narrowing})，则 point 被限制在缓冲区的可访问部分内（可能在缓冲区的一端）。
+
+@cindex buffer point
+正在运行的 Emacs 会话有一个 point 的单个实例。@footnote{For some historical background, see @url{https://lists.gnu.org/archive/html/emacs-devel/2026-01/msg00229.html}.} 我们通过只说“point”而不是“the point”来区分它。  同时，每个缓冲区都有自己的值@emph{for}点，该值独立于其他缓冲区的点值：@dfn{buffer point}。  点和缓冲区点之间的关系是，当缓冲区变为当前缓冲区 (@pxref{Current Buffer}) 时，点（唯一的点）将设置为该缓冲区的点。  从概念上讲，当缓冲区不再是当前缓冲区时，首先将其缓冲区点设置为稍后恢复的点（实际实现更复杂）。
+
+每个窗口还有一个点值 @dfn{window point}，它独立于显示相同缓冲区的其他窗口的点值。  这就是为什么在显示相同缓冲区的不同窗口中光标可能出现在不同位置的原因。  当缓冲区仅出现在一个窗口中时，其缓冲区点和该窗口点通常具有相同的值，因此缓冲区点和窗口点之间的区别很少重要。  @xref{Window Point}，了解更多详情。
+
+@defun point
+@cindex current buffer position
+该函数以整数形式返回当前缓冲区中的点的值。
+
+@need 700
+@example
+@group
+(point)
+     @result{} 175
+@end group
+@end example
+@end defun
+
+@defun point-min
+该函数返回当前缓冲区中point的最小可访问值。  通常为 1，但如果缩小有效，则它是缩小到的区域的开始位置。 （@xref{Narrowing}。）
+@end defun
+
+@defun point-max
+该函数返回当前缓冲区中point的最大可访问值。  这是 @code{(1+ (buffer-size))}，除非缩小已生效，在这种情况下，它是缩小到的区域末端的位置。  （@xref{Narrowing}。）
+@end defun
+
+@defun buffer-end flag
+如果 1⁣ 大于 0，则该函数返回 @code{(point-max)}，否则返回 @code{(point-min)}。  参数 @var{flag} 必须是一个数字。
+@end defun
+
+@defun buffer-size &optional buffer
+该函数返回当前缓冲区中的字符总数。  在没有任何缩小 (@pxref{Narrowing}) 的情况下，@code{point-max} 返回比该值大一的值。
+
+如果您指定缓冲区 @var{buffer}，则该值是 @var{buffer} 的大小。
+
+@example
+@group
+(buffer-size)
+     @result{} 35
+@end group
+@group
+(point-max)
+     @result{} 36
+@end group
+@end example
+@end defun
+
+@node Motion
+@section 运动
+@cindex motion by chars, words, lines, lists
+
+运动函数会更改 point 的值，无论是相对于 point 的当前值，相对于缓冲区的开头或结尾，还是相对于所选窗口的边缘。  @xref{Point}。
+
+@menu
+* Character Motion::        在人物方面移动。
+* Word Motion::             用言语来感动。
+* Buffer End Motion::       移动到缓冲区的开头或结尾。
+* Text Lines::              按照文本行移动。
+* Screen Lines::            按照显示的线条移动。
+* List Motion::             通过解析列表和 sexp 来移动。
+* Skipping Characters::     跳过属于特定集合的字符。
+@end menu
+
+@node Character Motion
+@subsection 角色动作
+
+这些函数根据字符计数移动点。 @code{goto-char} 是基本基元；其他函数都使用它。
+
+@deffn Command goto-char position
+该函数将当前缓冲区中的点设置为值@var{position}。
+@c This behavior used to be documented until 2013/08.
+@ignore
+If @var{position} is less than 1, it moves point to the beginning of
+the buffer.  If @var{position} is greater than the length of the
+buffer, it moves point to the end.
+@end ignore
+
+如果缩小生效，@var{position}仍从缓冲区的开头开始计数，但点不能超出可访问部分。  如果 1⁣ 超出范围，则 2⁣ 将点移动到可访问部分的开头或结尾。
+
+当以交互方式调用此函数时，@var{position} 是数字前缀参数（如果提供）；否则从迷你缓冲区中读取。
+
+@code{goto-char} 返回@var{position}。
+@end deffn
+
+@deffn Command forward-char &optional count
+@c @kindex beginning-of-buffer
+@c @kindex end-of-buffer
+该函数将点 @var{count} 向前移动到缓冲区的末尾（如果 @var{count} 为负数，则向后移动到缓冲区的开头）。  如果 @var{count} 为 @code{nil}，则默认为 1。
+
+如果试图移动超过缓冲区的开头或结尾（或者当缩小生效时可访问部分的限制），它会用错误符号 @code{beginning-of-buffer} 或 @code{end-of-buffer} 发出错误信号。
+
+在交互式调用中，@var{count} 是数字前缀参数。
+@end deffn
+
+@deffn Command backward-char &optional count
+这就像 @code{forward-char} 一样，只是它朝相反的方向移动。
+@end deffn
+
+@node Word Motion
+@subsection 言语运动
+
+下面描述的解析单词的函数使用语法表和 @code{char-script-table} 来决定给定字符是否是单词的一部分。  @xref{Syntax Tables}，参见@ref{Character Properties}。
+
+@deffn Command forward-word &optional count
+该函数将点向前移动 @var{count} 个字（如果 @var{count} 为负则向后移动）。  如果省略 @var{count} 或 @code{nil}，则默认为 1。在交互式调用中，@var{count} 由数字前缀参数指定。
+
+“移动一个单词”是指移动到点穿过一个单词组成字符（表示单词的开头），然后继续移动直到单词结束。  默认情况下，开始和结束单词的字符（称为 @dfn{word boundaries}）由当前缓冲区的语法表 (@pxref{Syntax Class Table}) 定义，但模式可以通过设置合适的 @code{find-word-boundary-function-table} 来覆盖它，如下所述。  属于不同脚本的字符（由@code{char-script-table}定义）也定义了单词边界（@pxref{Character Properties}）。  在任何情况下，此函数都无法将点移动到缓冲区可访问部分的边界之外，或跨过字段边界 (@pxref{Fields})。  字段边界最常见的情况是迷你缓冲区中提示的结尾。
+
+如果可以移动 @var{count} 个字，而不会被缓冲区边界或字段边界提前停止，则该值为 @code{t}。  否则，返回值为@code{nil}并且点停止在缓冲区边界或字段边界处。
+
+如果@code{inhibit-field-text-motion} 为非@code{nil}，则该函数忽略场边界。
+
+@end deffn
+
+@deffn Command backward-word &optional count
+这个函数就像@code{forward-word}一样，只不过它向后移动，直到遇到单词的前面，而不是向前移动。
+@end deffn
+
+@defopt words-include-escapes
+该变量影响 @code{forward-word} 和 @code{backward-word} 的行为以及使用它们的所有内容。  如果它是非@code{nil}，则转义和字符引用语法类中的字符将被视为单词的一部分。  否则，他们就不会。
+@end defopt
+
+@defvar inhibit-field-text-motion
+如果该变量为非 @code{nil}，则某些运动函数（包括 @code{forward-word}、@code{forward-sentence} 和 @code{forward-paragraph}）会忽略场边界。
+@end defvar
+
+@defvar find-word-boundary-function-table
+该变量影响 @code{forward-word} 和 @code{backward-word} 的行为以及使用它们的所有内容。  它的值是一个用于搜索字边界的函数的字符表 (@pxref{Char-Tables})。  如果一个字符在此表中具有非 @code{nil} 条目，那么当单词以该字符开头或结尾时，将使用 2 个参数调用相应的函数：@var{pos} 和 @var{limit}。该函数应返回另一个单词边界的位置。具体来说，如果@var{pos}小于@var{limit}，则@var{pos}位于单词的开头，函数应返回单词最后一个字符之后的位置；否则，@var{pos} 位于单词的最后一个字符，并且该函数应返回该单词的第一个字符的位置。
+@end defvar
+
+@defun forward-word-strictly &optional count
+该函数类似于@code{forward-word}，但不受@code{find-word-boundary-function-table}影响。  当通过设置该表的模式（例如 @code{subword-mode}）修改单词移动时，不应该改变行为的 Lisp 程序应该使用此函数而不是 @code{forward-word}。
+@end defun
+
+@defun backward-word-strictly &optional count
+该函数类似于@code{backward-word}，但不受@code{find-word-boundary-function-table}影响。  与 @code{forward-word-strictly} 一样，当按单词移动仅考虑语法表时，请使用此函数而不是 @code{backward-word}。
+@end defun
+
+@node Buffer End Motion
+@subsection 移动到缓冲区末尾
+@cindex move to beginning or end of buffer
+
+要将指针移动到缓冲区的开头，请编写：
+
+@example
+@group
+(goto-char (point-min))
+@end group
+@end example
+
+@noindent
+同样，要移动到缓冲区的末尾，请使用：
+
+@example
+@group
+(goto-char (point-max))
+@end group
+@end example
+
+以下是用户用来执行这些操作的两个命令。  此处记录它们是为了警告您不要在 Lisp 程序中使用它们，因为它们会在回显区域中设置标记并显示消息。
+
+@deffn Command beginning-of-buffer &optional n
+此函数将点移动到缓冲区的开头（或可访问部分的限制，当缩小生效时），在前一个位置设置标记（除了在瞬态标记模式下，如果标记已经处于活动状态，则不会设置标记。）
+
+如果@var{n}非@code{nil}，则它将点@var{n}放置在距离缓冲区可访问部分开头十分之一的位置。  在交互式调用中，@var{n} 是数字前缀参数（如果提供）；否则 @var{n} 默认为 @code{nil}。
+
+@strong{Warning:} 不要在 Lisp 程序中使用此函数！
+@end deffn
+
+@deffn Command end-of-buffer &optional n
+此函数将点移动到缓冲区的末尾（或可访问部分的限制，当缩小生效时），将标记设置在前一个位置（除了在瞬态标记模式下，当标记已处于活动状态时）。  如果@var{n}非@code{nil}，则它将点@var{n}放在距缓冲区可访问部分末尾的十分之一处。
+
+在交互式调用中，@var{n} 是数字前缀参数（如果提供）；否则 @var{n} 默认为 @code{nil}。
+
+@strong{Warning:} 不要在 Lisp 程序中使用此函数！
+@end deffn
+
+@node Text Lines
+@subsection 通过文本行进行运动
+@cindex lines
+@cindex logical lines, moving by
+@cindex physical lines, moving by
+
+文本行是缓冲区中由换行符分隔的部分，它们被视为前一行的一部分。  第一个文本行从缓冲区的开头开始，最后一个文本行在缓冲区的末尾结束，无论最后一个字符是否是换行符。将缓冲区划分为文本行不受窗口宽度、显示中的行延续或制表符和控制字符显示方式的影响。
+
+@deffn Command beginning-of-line &optional count
+该函数将指针移动到当前行的开头。  如果参数为 @var{count} 而不是 @code{nil} 或 1，它将向前移动 @var{count}@minus{}1 行，然后到该行的开头。
+
+此函数不会将点移动到田界边界 (@pxref{Fields})，除非这样做会超出边界移动到另一条线；因此，如果 1⁣ 为 2⁣ 或 1，并且点从田界开始，则点不会移动。  要忽略字段边界，请将 @code{inhibit-field-text-motion} 绑定到 @code{t}，或使用 @code{forward-line} 函数。  例如，@code{(forward-line 0)} 与 @code{(beginning-of-line)} 执行相同的操作，只是它忽略字段边界。
+
+如果此函数到达缓冲区的末尾（或可访问部分的末尾，如果缩小有效），则它将指向那里。  没有发出错误信号。
+@end deffn
+
+@defun line-beginning-position &optional count
+返回 @code{(beginning-of-line @var{count})} 将移动到的位置。
+@end defun
+
+@deffn Command end-of-line &optional count
+该函数将点移动到当前行的末尾。  如果参数@var{count}不​​是@code{nil}或1，它向前移动@var{count}@minus{}1行，然后到行尾。
+
+此函数不会将点移动到田界边界 (@pxref{Fields})，除非这样做会超出边界移动到另一条线；因此，如果 1⁣ 为 2⁣ 或 1，并且点从田界开始，则点不会移动。  要忽略字段边界，请将 @code{inhibit-field-text-motion} 绑定到 @code{t}。
+
+如果此函数到达缓冲区的末尾（或可访问部分的末尾，如果缩小有效），则它将指向那里。  没有发出错误信号。
+@end deffn
+
+@defun line-end-position &optional count
+返回 @code{(end-of-line @var{count})} 将移动到的位置。
+@end defun
+
+@defun pos-bol &optional count
+与 @code{line-beginning-position} 类似，但忽略字段（并且效率更高）。
+@end defun
+
+@defun pos-eol &optional count
+与 @code{line-end-position} 类似，但忽略字段（并且效率更高）。
+@end defun
+
+@deffn Command forward-line &optional count
+@cindex beginning of line
+该函数将点向前移动 @var{count} 行，到下一行的开头。  如果 1⁣ 为负，则将点 2⁣@var{count} 向后移动到该行之前的行的开头。  如果 4⁣ 为零，则将指针移动到当前行的开头。  如果@var{count}是@code{nil}，那就意味着1。
+
+如果 @code{forward-line} 在找到那么多行之前遇到缓冲区（或可访问部分）的开头或结尾，它将在那里设置点。  没有发出错误信号。
+
+@code{forward-line} 返回 @var{count} 与实际移动的行数之间的差值。  如果您尝试从只有三行的缓冲区的开头向下移动五行，则 point 将在最后一行的末尾停止，并且值将为 2。作为一个显式例外，如果最后一个可访问的行非空，但没有换行符（例如，如果缓冲区结束时没有换行符），则该函数将 point 设置为该行的末尾，并且函数返回的值将该行计为成功移动的一行。
+
+在交互式调用中，@var{count} 是数字前缀参数。
+@end deffn
+
+@defun count-lines start end &optional ignore-invisible-lines
+@cindex lines in region
+@anchor{Definition of count-lines}
+该函数返回当前缓冲区中位置 @var{start} 和 @var{end} 之间的行数。  如果 @var{start} 和 @var{end} 相等，则返回 0。否则，即使 @var{start} 和 @var{end} 在同一行，它也至少返回 1。  这是因为，单独考虑时，它们之间的文本必须至少包含一行，除非它为空。
+
+如果可选的⁣​​0⁣非@code{nil}，则不可见线将不包含在计数中。
+@end defun
+
+@deffn Command count-words start end
+@cindex words in region
+该函数返回当前缓冲区中位置 @var{start} 和 @var{end} 之间的字数。
+
+该函数也可以交互调用。  在这种情况下，它会打印一条消息，报告缓冲区中或该区域（如果该区域处于活动状态）中的行数、字数和字符数。
+@end deffn
+
+@defun line-number-at-pos &optional pos absolute
+@cindex line number
+该函数返回当前缓冲区中与缓冲区位置@var{pos}对应的行号。  如果 1⁣ 为 2⁣ 或省略，则使用当前缓冲区位置。  如果@var{absolute}是@code{nil}，默认情况下，计数从@code{(point-min)}开始，因此该值指的是（可能缩小的）缓冲区的可访问部分的内容。  如果@var{absolute}非@code{nil}，则忽略任何缩小并返回绝对行号。
+@end defun
+
+@ignore
+@c ================
+The @code{previous-line} and @code{next-line} commands are functions
+that should not be used in programs.  They are for users and are
+mentioned here only for completeness.
+
+@deffn Command previous-line count
+@cindex goal column
+This function moves point up @var{count} lines (down if @var{count}
+is negative).  In moving, it attempts to keep point in the @dfn{goal column}
+(normally the same column that it was at the beginning of the move).
+
+If there is no character in the target line exactly under the current
+column, point is positioned after the character in that line which
+spans this column, or at the end of the line if it is not long enough.
+
+If it attempts to move beyond the top or bottom of the buffer (or clipped
+region), then point is positioned in the goal column in the top or
+bottom line.  No error is signaled.
+
+In an interactive call, @var{count} will be the numeric
+prefix argument.
+
+The command @code{set-goal-column} can be used to create a semipermanent
+goal column to which this command always moves.  Then it does not try to
+move vertically.
+
+If you are thinking of using this in a Lisp program, consider using
+@code{forward-line} with a negative argument instead.  It is usually easier
+to use and more reliable (no dependence on goal column, etc.).
+@end deffn
+
+@deffn Command next-line count
+This function moves point down @var{count} lines (up if @var{count}
+is negative).  In moving, it attempts to keep point in the goal column
+(normally the same column that it was at the beginning of the move).
+
+If there is no character in the target line exactly under the current
+column, point is positioned after the character in that line which
+spans this column, or at the end of the line if it is not long enough.
+
+If it attempts to move beyond the top or bottom of the buffer (or clipped
+region), then point is positioned in the goal column in the top or
+bottom line.  No error is signaled.
+
+In the case where the @var{count} is 1, and point is on the last
+line of the buffer (or clipped region), a new empty line is inserted at the
+end of the buffer (or clipped region) and point moved there.
+
+In an interactive call, @var{count} will be the numeric
+prefix argument.
+
+The command @code{set-goal-column} can be used to create a semipermanent
+goal column to which this command always moves.  Then it does not try to
+move vertically.
+
+If you are thinking of using this in a Lisp program, consider using
+@code{forward-line} instead.  It is usually easier
+to use and more reliable (no dependence on goal column, etc.).
+@end deffn
+
+@c ================
+@end ignore
+
+另请参阅 @ref{Near Point} 中的函数 @code{bolp} 和 @code{eolp}。这些函数并不移动点，而是测试它是否已经位于行的开头或结尾。
+
+@node Screen Lines
+@subsection 屏幕线运动
+@cindex screen lines, moving by
+@cindex visual lines, moving by
+
+上一节中的行函数计算文本行数，仅由换行符分隔。  相比之下，这些函数对屏幕行进行计数，屏幕行是由文本在屏幕上显示的方式定义的。  如果文本行足够短以适应所选窗口的宽度，则该文本行是单屏幕行，否则它可能会占用多条屏幕行。
+
+在某些情况下，文本行在屏幕上被截断，而不是继续到其他屏幕行上。  在这些情况下，@code{vertical-motion} 移动点的方式与@code{forward-line} 非常相似。 @xref{Truncation}。
+
+由于给定字符串的宽度取决于控制某些字符外观的标志，因此对于给定的文本片段，@code{vertical-motion} 的行为有所不同，具体取决于其所在的缓冲区，甚至取决于所选的窗口（因为窗口之间的宽度、截断标志和显示表可能有所不同）。  @xref{Usual Display}。
+
+这些功能扫描文本以确定屏幕线中断的位置，因此所花费的时间与扫描的距离成正比。
+@ignore
+If you intend to use them heavily, Emacs provides caches which may
+improve the performance of your code.  @xref{Truncation, cache-long-scans}.
+@end ignore
+
+@defun vertical-motion count &optional window cur-col
+该函数将点从包含点的屏幕行向下移动到屏幕行@var{count}屏幕行的开头。  如果 1⁣ 为负，则向上移动。  如果 2⁣ 为零，则点移动到当前屏幕行的视觉起点。
+
+@var{count} 参数可以是 cons 单元 @w{@code{(@var{cols} . @var{lines})}}，而不是整数。  然后，该函数移动 @var{lines} 屏幕线，如上面@var{count}所述，并从该屏幕线的视觉起点放置点 @var{cols} 列。 @var{cols} 的值可以是浮点数，并以帧的规范字符宽度 (@pxref{Frame Font}) 为单位进行解释；当目标屏幕线使用可变字体时，这允许指定点的精确水平位置。  请注意，@var{cols} 是从@emph{visual} 行的开头开始计数的；如果窗口水平滚动 (@pxref{Horizontal Scrolling})，则 point 将结束的列除了文本滚动的列数之外，如果目标行是连续行，则其最左边的列被视为第 0 列（与面向列的函数@pxref{Columns}不同）。
+
+返回值是点移动过的屏幕行数。  如果到达缓冲区的开头或结尾，则该值的绝对值可能小于@var{count}。
+
+窗口@var{window}用于获取宽度、水平滚动、显示表格等参数。  但@code{vertical-motion}始终在当前缓冲区上操作，即使@var{window}当前显示一些其他缓冲区。
+
+可选参数 @var{cur-col} 指定调用函数时的当前列。  这是点相对于窗口的水平坐标，以框架默认面的字体宽度为单位进行测量。  提供它可以加快函数的速度，尤其是在很长的行中，因为函数不必返回缓冲区来确定当前列。  请注意，@var{cur-col} 也是从该行的视觉起点开始计数。
+@end defun
+
+@defun count-screen-lines &optional beg end count-final-newline window
+此函数返回文本中从 @var{beg} 到 @var{end} 的屏幕行数。  由于行连续、显示表等原因，屏幕行数可能与实际行数不同。如果@var{beg}和@var{end}为@code{nil}或省略，则它们默认为缓冲区可访问部分的开头和结尾。
+
+如果该区域以换行符结尾，则除非可选的第三个参数 @var{count-final-newline} 为非 @code{nil}，否则该区域将被忽略。
+
+可选的第四个参数@var{window}指定获取宽度、水平滚动等参数的窗口。默认情况下使用所选窗口的参数。
+
+与@code{vertical-motion} 一样，@code{count-screen-lines} 始终使用当前缓冲区，无论@var{window} 中显示哪个缓冲区。  这使得在任何缓冲区中使用 @code{count-screen-lines} 成为可能，无论它当前是否显示在某个窗口中。
+@end defun
+
+@deffn Command move-to-window-line count
+此功能相对于所选窗口中当前显示的文本移动点。  它将点从窗口顶部移动到屏幕线@var{count}屏幕线的开头；零表示最上面的行。  如果 1⁣ 为负，则指定距离底部 2⁣ 行的位置（如果缓冲区在指定的屏幕位置上方结束，则指定缓冲区的最后一行）；因此，@minus{}1 的@var{count} 指定窗口的最后一个完全可见的屏幕行。
+
+如果@var{count}是@code{nil}，则点移动到窗口中间的行的开头。  如果 2⁣ 的绝对值大于窗口的大小，则点将移动到窗口足够高时出现在该屏幕线上的位置。这可能会导致下一次重新显示滚动以将该位置显示到屏幕上。
+
+在交互式调用中，@var{count} 是数字前缀参数。
+
+返回的值是相对于窗口顶行的点已移动到的屏幕行号。
+@end deffn
+
+@vindex move-to-window-group-line-function
+@defun move-to-window-group-line count
+此函数类似于 0⁣，不同之处在于，当所选窗口是一组窗口 (@pxref{Window Group}) 的一部分时，@code{move-to-window-group-line} 将移动到相对于整个组（而不仅仅是单个窗口）的位置。  当缓冲区局部变量 @code{move-to-window-group-line-function} 设置为函数时，此条件成立。  在本例中，@code{move-to-window-group-line} 使用参数 @var{count} 调用该函数，然后返回其结果。
+@end defun
+
+@defun compute-motion from frompos to topos width offsets window
+该函数扫描当前缓冲区，计算屏幕位置。它从位置@var{from}（假设位于屏幕坐标@var{frompos}）向前扫描缓冲区，到位置@var{to}或坐标@var{topos}（以先到者为准）。  它返回结束缓冲区位置和屏幕坐标。
+
+坐标参数@var{frompos}和@var{topos}是@code{(@var{hpos} . @var{vpos})}形式的cons单元。
+
+参数@var{width}是可用于显示文本的列数；这会影响连续线的处理。  @code{nil}表示窗口中实际可用文本列的数量，相当于@code{(window-width window)}返回的值。
+
+参数@var{offsets}要么是@code{nil}，要么是@code{(@var{hscroll} . @var{tab-offset})}形式的cons单元。  这里@var{hscroll}是没有显示在左边距的列数；大多数调用者通过调用 @code{window-hscroll} 来获得此信息。  同时，@var{tab-offset}是屏幕上的列号与缓冲区中的列号之间的偏移量。  当前面的屏幕线的宽度加起来不等于 @code{tab-width} 的倍数时，这在连续行中可以是非零。  在非连续行中它始终为零。
+
+窗口@var{window}仅用于指定要使用的显示表。  无论 @var{window} 中显示哪个缓冲区，@code{compute-motion} 始终对当前缓冲区进行操作。
+
+返回值是一个包含五个元素的列表：
+
+@example
+(@var{pos} @var{hpos} @var{vpos} @var{prevhpos} @var{contin})
+@end example
+
+@noindent
+这里@var{pos}是扫描停止的缓冲区位置，@var{vpos}是垂直屏幕位置，@var{hpos}是水平屏幕位置。
+
+结果 @var{prevhpos} 是从 @var{pos} 向后一个字符的水平位置。  如果最后一行在前一个字符之后（或之内）继续，则结果 @var{contin} 为 @code{t}。
+
+例如，要查找某个窗口的屏幕行@var{line}的第@var{col}列的缓冲区位置，请将窗口的显示起始位置作为@var{from}传递，将窗口的左上角坐标作为@var{frompos}传递。将缓冲区的 @code{(point-max)} 作为 @var{to} 传递，以将扫描限制到缓冲区可访问部分的末尾，并将 @var{line} 和 @var{col} 作为 @var{topos} 传递。  这是执行此操作的函数：
+
+@example
+(defun coordinates-of-position (col line)
+  (car (compute-motion (window-start)
+                       '(0 . 0)
+                       (point-max)
+                       (cons col line)
+                       (window-width)
+                       (cons (window-hscroll) 0)
+                       (selected-window))))
+@end example
+
+当您使用@code{compute-motion}作为迷你缓冲区时，您需要使用@code{minibuffer-prompt-width}来获取第一屏幕行开头的水平位置。  @xref{Minibuffer Contents}。
+@end defun
+
+@node List Motion
+@subsection 超越平衡的表达
+@cindex sexp motion
+@cindex Lisp expression motion
+@cindex list motion
+@cindex balanced parenthesis motion
+
+这里有几个与平衡括号表达式相关的函数（在 Emacs 中也称为 @dfn{sexps} ，与在它们之间移动有关）。  语法表控制这些函数如何解释各种字符；参见@ref{Syntax Tables}。  @xref{Parsing Expressions}，用于扫描 sexp 或部分 sexp 的较低级别原语。  对于用户级命令，请参阅@ref{Parentheses,, Commands for Editing with Parentheses, emacs, The GNU Emacs Manual}。
+
+@deffn Command forward-list &optional arg
+该函数向前移动 @var{arg}（默认 1）个平衡的括号组。  （其他语法实体，例如单词或成对的字符串引号将被忽略。）
+@end deffn
+
+@deffn Command backward-list &optional arg
+该函数向后移动 @var{arg}（默认 1）个平衡的括号组。  （其他语法实体，例如单词或成对的字符串引号将被忽略。）
+@end deffn
+
+@deffn Command up-list &optional arg escape-strings no-syntax-crossing
+该函数向前移出 @var{arg}（默认 1）层括号。  消极的论点意味着向后移动，但仍然到一个不那么深的地方。  如果@var{escape-strings}不是@code{nil}（因为它是交互的），也移出封闭的字符串。  如果@var{no-syntax-crossing}不是@code{nil}（因为它是交互式的），则更愿意打破任何封闭的字符串，而不是移动到跨越多个字符串的列表的开头。  出错时，点的位置未指定。
+@end deffn
+
+@deffn Command backward-up-list &optional arg escape-strings no-syntax-crossing
+这个函数就像@code{up-list}一样，但有一个否定的参数。
+@end deffn
+
+@deffn Command down-list &optional arg
+该函数向前移动到 @var{arg}（默认 1）级括号。  否定参数意味着向后移动，但仍然在括号中更深入（@minus{}@var{arg} 级别）。
+@end deffn
+
+@deffn Command forward-sexp &optional arg
+该函数向前移动 @var{arg}（默认 1）个平衡表达式。平衡表达式包括用括号分隔的表达式和其他类型的表达式，例如单词和字符串常量。 @xref{Parsing Expressions}。  例如，
+
+@example
+@group
+---------- Buffer: foo ----------
+(concat@point{} "foo " (car x) y z)
+---------- Buffer: foo ----------
+@end group
+
+@group
+(forward-sexp 3)
+     @result{} nil
+
+---------- Buffer: foo ----------
+(concat "foo " (car x) y@point{} z)
+---------- Buffer: foo ----------
+@end group
+@end example
+
+@vindex forward-sexp-function
+@code{forward-sexp} 调用作为变量 @code{forward-sexp-function} 值的函数（如果它不是 @code{nil}）来完成实际工作，向其传递与调用命令时使用的参数相同的参数。  主要模式可以定义自己的函数，用于根据模式移动平衡表达式，并将此变量设置为该函数。
+@end deffn
+
+@deffn Command backward-sexp &optional arg
+该函数向后移动 @var{arg}（默认 1）个平衡表达式。
+@end deffn
+
+@deffn Command beginning-of-defun &optional arg
+该函数返回到 defun 的第 0 个开头。  如果 1⁣ 为负，则实际上向前移动，但它仍然移动到 defun 的开头，而不是移动到 defun 的结尾。  @var{arg} 默认为 1。
+@end deffn
+
+@deffn Command end-of-defun &optional arg
+该函数向前移动到 defun 的第 @var{arg} 端。  如果 1⁣ 为负，则实际上向后移动，但它仍然移至 defun 的末尾，而不是移至 defun 的开头。  @var{arg} 默认为 1。
+@end deffn
+
+@defopt defun-prompt-regexp
+如果非 0⁣，则此缓冲区局部变量包含一个正则表达式，该表达式指定在启动 defun 的左括号之前可以出现哪些文本。  也就是说，defun 开始于以该正则表达式的匹配项开头的行，后跟具有开括号语法的字符。
+@end defopt
+
+@cindex \( in strings
+@defopt open-paren-in-column-0-is-defun-start
+如果该变量的值非 0，则第 0 列中的左括号被视为 defun 的开始。  如果是@code{nil}，则第 0 列中的左括号没有特殊含义。默认值为@code{t}。  如果字符串文字恰好在第 0 列中有括号，请使用反斜杠对其进行转义以避免误报。
+@end defopt
+
+@defvar beginning-of-defun-function
+如果非@code{nil}，则该变量保存一个用于查找 defun 开头的函数。  函数 @code{beginning-of-defun} 调用此函数而不是使用其正常方法，并向其传递可选参数。  如果参数是非 @code{nil} ，则函数应该向后移动那么多函数，就像 @code{beginning-of-defun} 一样。
+@end defvar
+
+@defvar end-of-defun-function
+如果非@code{nil}，则该变量保存一个用于查找 defun 结尾的函数。  函数 @code{end-of-defun} 调用此函数而不是使用其正常方法。
+@end defvar
+
+@cindex motion using tree-sitter
+@cindex navigation by defun, using tree-sitter
+@findex treesit-beginning-of-defun
+@findex treesit-end-of-defun
+如果 Emacs 是使用 tree-sitter 编译的，它可以使用 tree-sitter 解析器信息来跨语法结构移动。  由于什么被认为是 defun 因语言而异，所以主要模式应该设置 @code{treesit-defun-type-regexp} 来确定。  然后，该模式可以通过使用@code{treesit-beginning-of-defun}和@code{treesit-end-of-defun}免费获得navigation-by-defun功能。
+
+@defvar treesit-defun-type-regexp
+该变量确定哪些节点被 Emacs 视为 defuns。它可以是与 defun 节点类型匹配的正则表达式。  （对于“节点”和“节点类型”，@pxref{Parsing Program Source}。）
+
+例如，@code{python-mode}将此变量设置为与@samp{function_definition}或@samp{class_definition}匹配的正则表达式。
+
+有时，并非所有由正则表达式匹配的节点都是有效的 defun。因此，这个变量也可以是@w{(@var{regexp} . @var{pred})}形式的cons单元，其中@var{pred}应该是一个以节点作为参数的函数，如果节点是有效的defun，则返回非@code{nil}，如果节点无效，则返回@code{nil}。
+@end defvar
+
+@defvar treesit-defun-tactic
+该变量决定 Emacs 如何处理嵌套 defun。  如果值为 @code{top-level}，导航功能仅在顶级 defun 之间移动。  如果值为 @code{nested}，导航函数会识别嵌套 defun。
+@end defvar
+
+@findex treesit-forward-sentence
+@findex forward-sentence
+@findex backward-sentence
+@vindex forward-sentence-function
+@cindex sentence, in program source files
+@cindex navigation by sentence, using tree-sitter
+作为变量 @code{forward-sentence-function} 值的函数确定如何在称为 @dfn{sentences} 的语法结构之间移动。  主要模式可以将自己的函数分配给该变量，以自定义 @code{forward-sentence} 命令的行为。  如果 Emacs 是使用 tree-sitter 编译的，它可以使用 tree-sitter 解析器信息来跨语法结构移动。  由于不同的语言到底什么被认为是一个句子，所以主要模式应该设置 @code{treesit-thing-settings} 来确定。  然后@code{forward-sentence-function}将设置为@code{treesit-forward-sentence}，并且该模式将通过使用@code{forward-sentence}和@code{backward-sentence}(@pxref{Moving by Sentences,,, emacs, The extensible self-documenting text editor})免费获得按句子导航功能。
+
+@findex treesit-forward-sexp
+@findex forward-sexp@r{, and tree-sitter}
+@findex backward-sexp@r{, and tree-sitter}
+如果 Emacs 是使用 tree-sitter 编译的，它可以使用 tree-sitter 解析器信息来跨语法结构移动。  由于什么被认为是 sexp 因语言而异，所以主要模式应该设置 @code{treesit-thing-settings} 来确定。  然后@code{forward-sexp-function}将设置为@code{treesit-forward-sexp}，并且该模式可以通过使用@code{forward-sexp}和@code{backward-sexp}(@pxref{Expressions, ,, emacs, The extensible self-documenting text editor})免费获得按性别导航功能。
+
+@node Skipping Characters
+@subsection 跳过字符
+@cindex skipping characters
+
+以下两个函数在指定的字符集上移动点。  例如，它们经常用于跳过空格。  相关函数请参见@ref{Motion and Syntax}。
+
+如果缓冲区是多字节，这些函数将设置的字符串转换为多字节；如果缓冲区是单字节，则它们将其转换为单字节，就像搜索函数所做的那样 (@pxref{Searching and Matching})。
+
+@defun skip-chars-forward character-set &optional limit
+该函数向前移动当前缓冲区中的点，跳过给定的字符集。  它检查点后面的字符，如果字符匹配@var{character-set}，则前进点。  这将继续下去，直到到达不匹配的字符。  该函数返回移动的字符数。
+
+参数 @var{character-set} 是一个字符串，类似于正则表达式中 @samp{[@dots{}]} 的内部，只不过 @samp{]} 不终止它，并且 @samp{\} 引用 @samp{^}、@samp{-} 或 @samp{\}。因此， @code{"a-zA-Z"} 跳过所有字母，在第一个非字母之前停止，而 @code{"^a-zA-Z"} 跳过在第一个字母之前停止的非字母 (@pxref{Regular Expressions})。  也可以使用字符类，例如 @code{"[:alnum:]"} (@pxref{Char Classes})。
+
+如果提供 @var{limit} （它必须是数字或标记），它指定缓冲区中该点可以跳到的最大位置。  点将停止在@var{limit} 处或之前。
+
+在以下示例中，点最初位于 @samp{T} 的正前方。  评估表单后，点位于该行的末尾（在 @samp{hat} 的 @samp{t} 和换行符之间）。  该函数会跳过所有字母和空格，但不会跳过换行符。
+
+@example
+@group
+---------- Buffer: foo ----------
+I read "@point{}The cat in the hat
+comes back" twice.
+---------- Buffer: foo ----------
+@end group
+
+@group
+(skip-chars-forward "a-zA-Z ")
+     @result{} 18
+
+---------- Buffer: foo ----------
+I read "The cat in the hat@point{}
+comes back" twice.
+---------- Buffer: foo ----------
+@end group
+@end example
+@end defun
+
+@defun skip-chars-backward character-set &optional limit
+该函数向后移动点，跳过与 @var{character-set} 匹配的字符，直到 @var{limit}。  除了运动方向不同之外，它与@code{skip-chars-forward} 类似。
+
+返回值表示行驶的距离。  它是一个零或更小的整数。
+@end defun
+
+@node Excursions
+@section 短途旅行
+@cindex excursion
+
+在程序的局部部分内临时移动点通常很有用。  这称为 @dfn{excursion}，它是通过 @code{save-excursion} 特殊形式完成的。  该构造会记住当前缓冲区的初始标识及其点值，并在偏移完成后恢复它们。  它是在程序的一个部分内移动点并避免影响程序的其余部分的标准方法，并且在 Emacs 的 Lisp 源代码中使用了数千次。
+
+如果您只需要保存和恢复当前缓冲区的标识，请使用 @code{save-current-buffer} 或 @code{with-current-buffer} 代替 (@pxref{Current Buffer})。  如果您需要保存或恢复窗口配置，请参阅@ref{Window Configurations}和@ref{Frame Configurations}中描述的表格。 @c 框架组？
+
+@defspec save-excursion body@dots{}
+@cindex point excursion
+这种特殊形式保存了当前缓冲区的标识和其中的点值，评估@var{body}，最后恢复缓冲区及其保存的点值。  即使通过 @code{throw} 或错误 (@pxref{Nonlocal Exits}) 异常退出，两个保存的值也会恢复。
+
+@code{save-excursion} 返回的值是 @var{body} 中最后一个形式的结果，如果没有给出主体形式，则返回 @code{nil} 的结果。
+@end defspec
+
+因为@code{save-excursion}只保存偏移开始时当前缓冲区的点，所以在偏移期间对其他缓冲区中的点所做的任何更改都将在之后保持有效。  这经常会导致意想不到的后果，因此如果您在偏移期间调用 @code{set-buffer}，字节编译器会发出警告：
+
+@example
+Warning: Use ‘with-current-buffer’ rather than
+         save-excursion+set-buffer
+@end example
+
+@noindent
+为了避免此类问题，您应该仅在设置所需的当前缓冲区后调用@code{save-excursion}，如下例所示：
+
+@example
+@group
+(defun append-string-to-buffer (string buffer)
+  "Append STRING to the end of BUFFER."
+  (with-current-buffer buffer
+    (save-excursion
+      (goto-char (point-max))
+      (insert string))))
+@end group
+@end example
+
+@cindex window excursions
+同样，@code{save-excursion} 不会恢复由@code{switch-to-buffer} 等函数更改的窗口缓冲区对应关系。
+
+@strong{Warning:} 与已保存点值相邻的普通文本插入会重新定位已保存的值，就​​像重新定位所有标记一样。  更准确地说，保存的值是插入类型为@code{nil}的标记。  @xref{Marker Insertion Types}。  因此，当恢复保存的点值时，它通常出现在插入的文本之前。
+
+@defmac save-mark-and-excursion body@dots{}
+@cindex mark excursion
+@cindex point excursion
+该宏类似于@code{save-excursion}，但也保存和恢复标记位置和@code{mark-active}。  这个宏的作用与 Emacs 25.1 之前的 @code{save-excursion} 的作用相同。
+@end defmac
+
+@node Narrowing
+@section 缩小范围
+@cindex narrowing
+@cindex restriction (in a buffer)
+@cindex accessible portion (of a buffer)
+
+@dfn{Narrowing} 表示将 Emacs 编辑命令可寻址的文本限制为缓冲区中有限的字符范围。  保持可寻址的文本称为缓冲区的 @dfn{accessible portion}。
+
+缩小是用两个缓冲区位置指定的，这两个缓冲区位置成为可访问部分的开始和结束。  对于大多数编辑命令和基元，这些位置替换缓冲区的开头和结尾的值。  当缩小生效时，不会显示可访问部分之外的任何文本，并且点无法移到可访问部分之外。  请注意，缩小不会改变实际的缓冲区位置 (@pxref{Point})；它仅确定哪些位置被视为缓冲区的可访问部分。大多数函数拒绝对可访问部分之外的文本进行操作。
+
+保存缓冲区的命令不受缩小的影响；无论任何缩小，它们都会保存整个缓冲区。
+
+如果您需要在单个缓冲区中显示几种截然不同类型的文本，请考虑使用@ref{Swapping Text}中描述的替代工具。
+
+@deffn Command narrow-to-region start end
+该函数将当前缓冲区的可访问部分设置为从 @var{start} 开始，到 @var{end} 结束。  两个参数都应该是字符位置。
+
+在交互式调用中，@var{start}和@var{end}设置为当前区域的边界（点和标记，最小的在前）。
+
+然而，当通过 @code{with-restriction} 使用标签参数设置缩小范围时（见下文），@code{narrow-to-region} 只能在该缩小范围内使用。  如果@var{start}或@var{end}超出这些限制，则使用@code{with-restriction}设置的相应限制。  要访问缓冲区的其他部分，请使用具有相同标签的@code{without-restriction}。
+@end deffn
+
+@deffn Command narrow-to-page &optional move-count
+此函数将当前缓冲区的可访问部分设置为仅包含当前页面。  可选的第一个参数@var{move-count}非@code{nil}表示向前或向后移动@var{move-count}页，然后缩小到一页。  变量 @code{page-delimiter} 指定页面开始和结束的位置 (@pxref{Standard Regexps})。
+
+在交互式调用中，@var{move-count} 设置为数字前缀参数。
+@end deffn
+
+@deffn Command widen
+@cindex widening
+此函数取消当前缓冲区中的任何缩小，以便可以访问整个内容。  这称为@dfn{widening}。它相当于以下表达式：
+
+@example
+(narrow-to-region 1 (1+ (buffer-size)))
+@end example
+
+然而，当@code{with-restriction}使用标签参数设置缩小时（见下文），@code{with-restriction}设置的限制将被恢复，而不是取消缩小。  要访问缓冲区的其他部分，请使用具有相同标签的@code{without-restriction}。
+@end deffn
+
+@defun buffer-narrowed-p
+如果缓冲区变窄，则该函数返回非 @code{nil} ，否则返回 @code{nil} 。
+@end defun
+
+@defspec save-restriction body@dots{}
+这种特殊形式保存可访问部分的当前边界，评估 @var{body} 形式，并最终恢复保存的边界，从而恢复先前有效的缩小（或不存在）的相同状态。  即使通过 @code{throw} 或错误 (@pxref{Nonlocal Exits}) 异常退出，缩小状态也会恢复。因此，这种构造是暂时缩小缓冲区范围的干净方法。
+
+此构造还保存并恢复由 @code{with-restriction} 使用标签参数设置的缩小范围（见下文）。
+
+@code{save-restriction} 返回的值是 @var{body} 中最后一个形式返回的值，如果没有给出主体形式，则返回 @code{nil} 。
+
+@c Wordy to avoid overfull hbox.  --rjc 16mar92
+@strong{Caution:} 使用 @code{save-restriction} 结构时很容易出错。  在尝试之前请阅读此处的完整说明。
+
+如果@var{body}更改了当前缓冲区，@code{save-restriction}仍会恢复对原始缓冲区（保存其限制的缓冲区）的限制，但不会恢复当前缓冲区的标识。
+
+@code{save-restriction} 恢复@emph{not} 点；为此使用 @code{save-excursion} 。  如果同时使用 @code{save-restriction} 和 @code{save-excursion}，@code{save-excursion} 应先出现（即在外侧）。  否则，点的价值将恢复，但临时收窄仍然有效。  如果旧的积分值超出了临时缩小的范围，则无法准确恢复它。
+
+这是正确使用 @code{save-restriction} 的简单示例：
+
+@example
+@group
+---------- Buffer: foo ----------
+This is the contents of foo
+This is the contents of foo
+This is the contents of foo@point{}
+---------- Buffer: foo ----------
+@end group
+
+@group
+(save-excursion
+  (save-restriction
+    (goto-char 1)
+    (forward-line 2)
+    (narrow-to-region 1 (point))
+    (goto-char (point-min))
+    (replace-string "foo" "bar")))
+
+---------- Buffer: foo ----------
+This is the contents of bar
+This is the contents of bar
+This is the contents of foo@point{}
+---------- Buffer: foo ----------
+@end group
+@end example
+@end defspec
+
+@defspec with-restriction start end [:label label] body
+这种特殊形式保存缓冲区可访问部分的当前边界，将可访问部分设置为从 @var{start} 开始，到 @var{end} 结束，评估 @var{body} 形式，并恢复保存的边界。  在这种情况下，它相当于
+
+@example
+(save-restriction
+  (narrow-to-region start end)
+  body)
+@end example
+
+@cindex labeled narrowing
+@cindex labeled restriction
+当存在可选参数 @var{label}（评估该参数以获得要使用的标签并且必须产生非 @code{nil} 值）时，缩小范围为 @dfn{labeled}。  带标记的缩小范围与未标记的缩小范围在以下几个方面有所不同：
+
+@itemize @bullet
+@item 
+在评估@var{body}形式时，@code{narrow-to-region}和@code{widen}只能在@var{start}和@var{end}限制内使用。
+
+@item 
+要解除 @code{with-restriction} 引入的限制并访问缓冲区的其他部分，请使用 @code{without-restriction} 和相同的 @var{label} 参数。  （访问缓冲区其他部分的另一种方法是使用间接缓冲区 (@pxref{Indirect Buffers})。）
+
+@item 
+带标签的缩窄部分可以嵌套。
+
+@item 
+带标签的缩小只能在 Lisp 程序中使用：它们在显示上永远不可见，并且永远不会干扰用户设置的缩小。
+@end itemize
+
+如果您将 @code{with-restriction} 与可选的 @var{label} 参数一起使用，我们建议在使用它的函数的文档字符串中记录 @var{label}，以便您的代码调用的其他 Lisp 程序可以在需要时解除标记缩小。
+@end defspec
+
+@defspec without-restriction [:label label] body
+这种特殊形式保存缓冲区可访问部分的当前边界，加宽缓冲区，评估 @var{body} 形式，并恢复保存的边界。  在这种情况下，它相当于
+
+@example
+(save-restriction
+  (widen)
+  body)
+@end example
+
+当可选参数 @var{label} 存在时，由具有相同 @var{label} 参数的 @code{with-restriction} 设置的缩小范围被解除。
+@end defspec

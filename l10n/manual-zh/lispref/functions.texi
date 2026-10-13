@@ -1,0 +1,1973 @@
+@c -*- mode: texinfo -*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Functions
+@chapter 功能
+
+Lisp 程序主要由 Lisp 函数组成。  本章解释什么是函数、它们如何接受参数以及如何定义它们。
+
+@menu
+* What Is a Function::           Lisp 函数与@:原语；术语。
+* Lambda Expressions::           函数如何表达为 Lisp 对象。
+* Function Names::               符号可以用作函数的名称。
+* Defining Functions::           用于定义函数的 Lisp 表达式。
+* Calling Functions::            如何使用现有功能。
+* Mapping Functions::            将函数应用于列表的每个元素等。
+* Anonymous Functions::          Lambda 表达式是没有名称的函数。
+* Generic Functions::            多态性，Emacs 风格。
+* Function Cells::               访问或设置符号的函数定义。
+* Closures::                     包含词法环境的函数。
+* OClosures::                    带有元数据的函数对象。
+* Advising Functions::           添加到函数的定义中。
+* Obsolete Functions::           声明函数已过时。
+* Inline Functions::             编译器将内联扩展的函数。
+* Declare Form::                 添加有关函数的附加信息。
+* Declaring Functions::          告诉编译器定义了一个函数。
+* Function Safety::              确定函数调用是否安全。
+* Related Topics::               对特定 Lisp 原语的交叉引用，这些原语对函数的工作方式有特殊影响。
+@end menu
+
+@node What Is a Function
+@section 什么是函数？
+
+@cindex return value
+@cindex value of function
+@cindex argument
+@cindex pure function
+一般意义上，函数是在给定称为 0⁣ 的输入值的情况下执行计算的规则。  计算的结果称为函数的@dfn{value}或@dfn{return value}。  计算也可能产生副作用，例如变量值或数据结构内容的持久变化 (@pxref{Definition of side effect})。  @dfn{pure function} 是一个函数，除了没有副作用之外，对于相同的参数组合始终返回相同的值，而不管机器类型或系统状态等外部因素如何。
+
+在大多数计算机语言中，每个函数都有一个名称。  但在 Lisp 中，最严格意义上的函数没有名称：它是一个可以 @emph{optionally} 与用作函数名称的符号（例如 @code{car}）相关联的对象。  @xref{Function Names}。  当函数被赋予名称时，我们通常也将该符号称为“函数”（例如，我们引用“函数@code{car}”）。在本手册中，函数名称和函数对象本身之间的区别通常并不重要，但我们会注意到相关的地方。
+
+某些类似函数的对象，称为 @dfn{special forms} 和 @dfn{macros}，也接受参数来执行计算。然而，如下所述，这些在 Emacs Lisp 中不被视为函数。
+
+以下是函数和类函数对象的重要术语：
+
+@table @dfn
+@item 拉姆达表达式
+用 Lisp 编写的函数（严格意义上，即函数对象）。  这些将在下一节中描述。
+@ifnottex
+@xref{Lambda Expressions}.
+@end ifnottex
+
+@item 原始
+@cindex primitive
+@cindex subr
+@cindex built-in function
+可从 Lisp 调用但实际上用 C@. 原语编写的函数也称为 @dfn{built-in functions} 或 @dfn{subrs}。示例包括 @code{car} 和 @code{append} 等函数。  此外，所有特殊形式（见下文）也被视为基元。
+
+通常，函数被实现为原语，因为它是 Lisp 的基本部分（例如，@code{car}），或者因为它为操作系统服务提供了低级接口，或者因为它需要快速运行。  与 Lisp 中定义的函数不同，原语只能通过更改 C 源代码并重新编译 Emacs 来修改或添加。  @xref{Writing Emacs Primitives}。
+
+@item 特殊形式
+类似于函数的原语，但不以通常的方式评估其所有参数。  它可能仅评估某些参数，或者可能以不寻常的顺序评估它们，或者多次评估它们。示例包括 @code{if}、@code{and} 和 @code{while}。 @xref{Special Forms}。
+
+@item 宏
+@cindex macro
+Lisp 中定义的构造，它与函数的不同之处在于它将 Lisp 表达式转换为要计算的另一个表达式，而不是原始表达式。  宏使 Lisp 程序员能够做特殊形式可以做的事情。 @xref{Macros}。
+
+@item 命令
+@cindex command
+可以通过 @code{command-execute} 原语调用的对象，通常是由于用户在该命令中键入按键序列 @dfn{bound}。  @xref{Interactive Call}。  命令通常是一个函数；如果函数是用 Lisp 编写的，则在函数定义中以 @code{interactive} 形式将其制成命令 (@pxref{Defining Commands})。  作为函数的命令也可以从 Lisp 表达式中调用，就像其他函数一样。
+
+键盘宏（字符串和向量）也是命令，尽管它们不是函数。  @xref{Keyboard Macros}。  如果一个符号的功能单元包含一个命令（@pxref{Symbol Components}），我们就说它是一个命令；这样的 @dfn{named command} 可以用 @kbd{M-x} 调用。
+
+@item 关闭
+与 lambda 表达式非常相似的函数对象，只不过它还包含词法变量绑定的环境。 @xref{Closures}。
+
+@item 字节码函数
+已由字节编译器编译的函数。 @xref{Closure Type}。
+
+@item 自动加载对象
+@cindex autoload object
+实际函数的占位符。  如果调用了 autoload 对象，Emacs 会加载包含真实函数定义的文件，然后调用真实函数。  @xref{Autoload}。
+@end table
+
+您可以使用函数 @code{functionp} 来测试对象是否是函数：
+
+@defun functionp object
+如果@var{object}是任何类型的函数，则该函数返回@code{t}，即可以传递给@code{funcall}。  请注意，对于函数名称的符号，@code{functionp} 返回 @code{t}，对于宏或特殊形式的符号，@code{nil} 返回。
+
+如果@var{object}不是函数，则该函数通常返回@code{nil}。  然而，函数对象的表示很复杂，并且出于效率原因，在极少数情况下，即使 @var{object} 不是函数，该函数也可以返回 @code{t}。
+@end defun
+
+还可以找出任意函数需要多少个参数：
+
+@defun func-arity function
+此函数提供有关指定 @var{function} 的参数列表的信息。  返回值是 @w{@code{(@var{min} . @var{max})}} 形式的 cons 单元格，其中 @var{min} 是参数的最小数量，@var{max} 是参数的最大数量，或者对于具有 @code{&rest} 参数的函数，使用符号 @code{many} ；如果 @var{function} 是特殊形式，则使用符号 @code{unevalled}。
+
+请注意，在某些情况下，此函数可能会返回不准确的结果，例如：
+
+@itemize @minus
+@item 
+使用 @code{apply-partially} (@pxref{Calling Functions, apply-partially}) 定义的函数。
+
+@item 
+建议使用 @code{advice-add} (@pxref{Advising Named Functions}) 的函数。
+
+@item 
+作为其代码的一部分动态确定参数列表的函数。
+@end itemize
+
+@end defun
+
+@noindent
+与@code{functionp}不同，接下来的函数@emph{not}将符号视为其函数定义。
+
+@defun subrp object
+如果 1⁣ 是内置函数（即 Lisp 原语），则该函数返回 0⁣。
+
+@example
+@group
+(subrp 'message)            ; @r{@code{message} is a symbol,}
+     @result{} nil                 ;   @r{not a subr object.}
+@end group
+@group
+(subrp (symbol-function 'message))
+     @result{} t
+@end group
+@end example
+@end defun
+
+@defun byte-code-function-p object
+如果 1⁣ 是字节码函数，则该函数返回 0⁣。  例如：
+
+@example
+@group
+(byte-code-function-p (symbol-function 'next-line))
+     @result{} t
+@end group
+@end example
+@end defun
+
+@defun compiled-function-p object
+如果@var{object}是一个不是Lisp源代码形式而是机器代码或字节代码形式的函数对象，则该函数返回@code{t}。  更具体地说，如果函数是内置函数（又名@:``原始''，@pxref{What Is a Function}），或字节编译（@pxref{Byte Compilation}），或本机编译（@pxref{Native Compilation}），或从动态模块加载的函数（@pxref{Dynamic Modules}），则返回@code{t}。
+@end defun
+
+@defun interpreted-function-p object
+如果 1⁣ 是解释函数，则该函数返回 0⁣。
+@end defun
+
+@defun closurep object
+如果@var{object}是一个闭包（闭包是一种特殊类型的函数对象），则该函数返回@code{t}。  目前，闭包用于所有字节码函数和所有解释函数。
+@end defun
+
+@defun subr-arity subr
+这与 @code{func-arity} 类似，但仅适用于内置函数并且没有符号间接。  它表示非内置函数的错误。  我们建议使用 @code{func-arity} 代替。
+@end defun
+
+@defun cl-functionp object
+此函数类似于 @code{functionp}，但它对于列表和符号返回 @code{nil}。
+@end defun
+
+@findex subr-primitive-p
+@defun primitive-function-p object
+如果 1⁣ 是用 C 编写的内置原语 (@pxref{Primitive Function Type})，则此函数返回 @code{t}。  请注意，特殊形式被明确排除，因为它们不是函数。  如果您还需要识别特殊形式，请使用@code{subr-primitive-p}。
+@end defun
+
+
+@node Lambda Expressions
+@section 拉姆达表达式
+@cindex lambda expression
+
+lambda 表达式是用 Lisp 编写的函数对象。  这是一个例子：
+
+@example
+(lambda (x)
+  "Return the hyperbolic cosine of X."
+  (* 0.5 (+ (exp x) (exp (- x)))))
+@end example
+
+@noindent
+在 Emacs Lisp 中，这样的列表是一个有效的表达式，其计算结果为函数对象。
+
+lambda 表达式本身没有名称；它是一个@dfn{anonymous function}。  尽管 lambda 表达式可以这样使用 (@pxref{Anonymous Functions})，但它们更常见的是与符号关联以构成@dfn{named functions} (@pxref{Function Names})。在详细介绍这些细节之前，以下小节介绍了 lambda 表达式的组成部分及其用途。
+
+@menu
+* Lambda Components::            lambda 表达式的各个部分。
+* Simple Lambda::                一个简单的例子。
+* Argument List::                参数列表的详细信息和特殊功能。
+* Function Documentation::       如何将文档放入函数中。
+@end menu
+
+@node Lambda Components
+@subsection Lambda 表达式的组成部分
+
+lambda 表达式是一个如下所示的列表：
+
+@example
+(lambda (@var{arg-variables}@dots{})
+  [@var{documentation-string}]
+  [@var{interactive-declaration}]
+  @var{body-forms}@dots{})
+@end example
+
+@cindex lambda list
+lambda 表达式的第一个元素始终是符号 @code{lambda}。  这表明该列表代表一个函数。  函数被定义为以 @code{lambda} 开头的原因是，用于其他用途的其他列表不会意外地作为函数有效。
+
+第二个元素是符号列表——参数变量名称 (@pxref{Argument List})。这称为@dfn{lambda list}。  当调用 Lisp 函数时，参数值会与 lambda 列表中的变量进行匹配，这些变量会与所提供的值进行本地绑定。 @xref{Local Variables}。
+
+文档字符串是一个 Lisp 字符串对象，放置在函数定义中，用于描述 Emacs 帮助工具的函数。  @xref{Function Documentation}。
+
+交互式声明是 @code{(interactive @var{code-string})} 形式的列表。  这声明了如果交互使用该函数如何提供参数。  具有此声明的函数称为 @dfn{commands}；可以使用 @kbd{M-x} 调用它们或绑定到键。不打算以这种方式调用的函数不应具有交互式声明。  @xref{Defining Commands}，了解如何编写交互式声明。
+
+@cindex body of function
+其余元素是函数的 @dfn{body}：执行函数工作的 Lisp 代码（或者，正如 Lisp 程序员所说，“要评估的 Lisp 形式列表”）。  函数返回的值是主体最后一个元素的返回值。
+
+@node Simple Lambda
+@subsection 一个简单的 Lambda 表达式示例
+
+考虑以下示例：
+
+@example
+(lambda (a b c) (+ a b c))
+@end example
+
+@noindent
+我们可以通过将其传递给 @code{funcall} 来调用该函数，如下所示：
+
+@example
+@group
+(funcall (lambda (a b c) (+ a b c))
+         1 2 3)
+@end group
+@end example
+
+@noindent
+此调用使用变量 @code{a} 绑定到 1、@code{b} 绑定到 2、@code{c} 绑定到 3 来计算 lambda 表达式的主体。主体的评估将这三个数字相加，产生结果 6；因此，对该函数的调用返回值 6。
+
+请注意，参数可以是其他函数调用的结果，如下例所示：
+
+@example
+@group
+(funcall (lambda (a b c) (+ a b c))
+         1 (* 2 3) (- 5 4))
+@end group
+@end example
+
+@noindent
+这将从左到右计算参数 @code{1}、@code{(* 2 3)} 和 @code{(- 5 4)}。  然后，它将 lambda 表达式应用于参数值 1、6 和 1，以生成值 8。
+
+正如这些示例所示，您可以使用以 lambda 表达式作为 @sc{car} 的表单来创建局部变量并为其赋予值。  在 Lisp 的旧时代，这种技术是绑定和初始化局部变量的唯一方法。  但现在，使用特殊形式 @code{let} 来达到此目的（@pxref{Local Variables}）会更清楚。 Lambda 表达式主要用作匿名函数，作为参数传递给其他函数 (@pxref{Anonymous Functions})，或存储为符号函数定义以生成命名函数 (@pxref{Function Names})。
+
+@node Argument List
+@subsection 参数列表的特点
+@kindex wrong-number-of-arguments
+@cindex argument binding
+@cindex binding arguments
+@cindex argument lists, features
+
+我们的简单示例函数 @code{(lambda (a b c) (+ a b c))} 指定了三个参数变量，因此必须使用三个参数来调用它：如果您尝试仅使用两个参数或四个参数来调用它，则会收到 @code{wrong-number-of-arguments} 错误 (@pxref{Errors})。
+
+编写允许省略某些参数的函数通常很方便。  例如，函数 @code{substring} 接受三个参数——字符串、起始索引和结束索引——但如果省略第三个参数，则默认为字符串的 @var{length}。  对于某些函数来说，接受无限数量的参数也很方便，就像函数 @code{list} 和 @code{+} 所做的那样。
+
+@cindex optional arguments
+@cindex rest arguments
+@kindex &optional
+@kindex &rest
+要指定调用函数时可以省略的可选参数，只需在可选参数之前包含关键字 @code{&optional} 即可。  要指定零个或多个额外参数的列表，请在最后一个参数之前包含关键字 @code{&rest}。
+
+因此，参数列表的完整语法如下：
+
+@example
+@group
+(@var{required-vars}@dots{}
+ @r{[}&optional @r{[}@var{optional-vars}@dots{}@r{]}@r{]}
+ @r{[}&rest @var{rest-var}@r{]})
+@end group
+@end example
+
+@noindent
+方括号表示 @code{&optional} 和 @code{&rest} 子句以及它们后面的变量是可选的。
+
+对函数的调用需要每个 @var{required-vars} 一个实际参数。  可能有零个或多个 @var{optional-vars} 的实际参数，并且不能有除此之外的任何实际参数，除非 lambda 列表使用 @code{&rest}。  在这种情况下，可能会有任意数量的额外实际参数。
+
+如果可选变量和剩余变量的实际参数被省略，那么它们总是默认为@code{nil}。  该函数无法区分 @code{nil} 的显式参数和省略的参数。  然而，函数体可以自由地将 2⁣ 视为其他有意义值的缩写。这就是@code{substring}所做的； @code{nil} 作为 @code{substring} 的第三个参数表示使用提供的字符串的长度。
+
+@cindex CL note---default optional arg
+@quotation
+@b{Common Lisp note:} Common Lisp 允许函数指定省略可选参数时使用的默认值； Emacs Lisp 始终使用 @code{nil}。  Emacs Lisp 不支持 @code{supplied-p} 变量来告诉您参数是否已显式传递。
+@end quotation
+
+例如，参数列表如下所示：
+
+@example
+(a b &optional c d &rest e)
+@end example
+
+@noindent
+将 @code{a} 和 @code{b} 绑定到前两个实际参数，这是必需的。  如果提供一个或两个以上参数，则 @code{c} 和 @code{d} 分别绑定到它们；前四个之后的所有参数都被收集到一个列表中，并且 @code{e} 绑定到该列表。因此，如果只有两个参数，@code{c}、@code{d} 和 @code{e} 为 @code{nil}；如果有两个或三个参数，@code{d}和@code{e}是@code{nil}；如果四个或更少的参数，@code{e} 是 @code{nil}。  请注意，为 15⁣ 提供的显式 @code{nil} 参数正好有五个参数，将导致 @code{nil} 参数作为包含一个元素 @code{(nil)} 的列表传递，与 @code{e} 的任何其他单个值一样。
+
+没有办法在可选参数后面添加必需参数——这没有意义。  要了解为什么一定如此，假设示例中的 @code{c} 是可选的，而 @code{d} 是必需的。假设给出三个实际参数；第三个参数是哪个变量？  它会用于@var{c}，还是@var{d}？  人们可以争论这两种可能性。  同样，在 @code{&rest} 参数之后再添加任何参数（无论是必需的还是可选的）都是没有意义的。
+
+以下是参数列表和正确调用的一些示例：
+
+@example
+(funcall (lambda (n) (1+ n))        ; @r{One required:}
+         1)                         ; @r{requires exactly one argument.}
+     @result{} 2
+(funcall (lambda (n &optional n1)   ; @r{One required and one optional:}
+           (if n1 (+ n n1) (1+ n))) ; @r{1 or 2 arguments.}
+         1 2)
+     @result{} 3
+(funcall (lambda (n &rest ns)       ; @r{One required and one rest:}
+           (+ n (apply '+ ns)))     ; @r{1 or more arguments.}
+         1 2 3 4 5)
+     @result{} 15
+@end example
+
+@node Function Documentation
+@subsection 文档函数字符串
+@cindex documentation string of function
+@cindex function's documentation string
+
+lambda 表达式可以选择在 lambda 列表后面添加 @dfn{documentation string}。  该字符串不影响函数的执行；它是一种注释，而是一种系统化的注释，实际上出现在 Lisp 世界中，并且可以被 Emacs 帮助工具使用。  @xref{Documentation}，了解如何访问文档字符串。
+
+最好为程序中的所有函数提供文档字符串，即使是那些仅从程序内部调用的函数。  文档字符串就像注释一样，只不过它们更容易访问。
+
+文档字符串的第一行应该独立存在，因为 @code{apropos} 仅显示第一行。  它应该由一两个完整的句子组成，总结函数的用途。
+
+文档字符串的开头通常在源文件中缩进，但由于这些空格位于起始双引号之前，因此它们不是字符串的一部分。  有些人习惯于缩进字符串的任何附加行，以便文本在程序源代码中对齐。  @emph{That is a mistake.} 以下行的缩进位于字符串内部；在源代码中看起来不错的内容在通过帮助命令显示时会显得很丑。
+
+文档字符串后面必须始终跟有至少一个 Lisp 表达式；否则，它根本不是文档字符串，而是主体的单个表达式并用作返回值。当函数没有返回有意义的值时，标准做法是通过在文档字符串后面添加它来返回 @code{nil}。
+
+文档字符串的最后一行可以指定与实际函数参数不同的调用约定。  像这样写文字：
+
+@example
+\(fn @var{arglist})
+@end example
+
+@noindent
+在行的开头跟随一个空行，在文档字符串中后面没有换行符。  （@samp{\} 用于避免混淆 Emacs 运动命令。）以这种方式指定的调用约定出现在帮助消息中，而不是从函数的实际参数派生的调用约定。
+
+此功能对于宏定义特别有用，因为宏定义中编写的参数通常与用户对宏调用各部分的思考方式不对应。
+
+如果您想弃用调用约定并支持您通过上述规范宣传的调用约定，请不要使用此功能。相反，请使用 @code{advertised-calling-convention} 声明 (@pxref{Declare Form}) 或 @code{set-advertised-calling-convention} (@pxref{Obsolete Functions})，因为这两个声明会导致字节编译器在编译使用已弃用的调用约定的 Lisp 程序时发出警告消息。
+
+@ifnottex
+The @code{(fn)} feature is typically used in the following situations:
+
+@itemize @minus
+@item To spell out arguments and their purposes in a macro or a function.  Example:
+
+@example
+(defmacro lambda (&rest cdr)
+  "@dots{}
+\(fn ARGS [DOCSTRING] [INTERACTIVE] BODY)"@dots{})
+@end example
+
+@item To provide a more detailed description and names of arguments.  Example:
+
+@example
+(defmacro macroexp--accumulate (var+list &rest body)
+  "@dots{}
+\(fn (VAR LIST) BODY@dots{})"
+  (declare (indent 1))
+  (let ((var (car var+list))
+	  (list (cadr var+list))
+@dots{})))
+@end example
+
+@item To better explain the purpose of a @code{defalias}.  Example:
+
+@example
+(defalias 'abbrev-get 'get
+  "@dots{}
+\(fn ABBREV PROP)")
+@end example
+@end itemize
+@end ifnottex
+
+@cindex computed documentation string
+@kindex :documentation
+文档字符串通常是静态的，但有时可能需要动态生成它们。  在某些情况下，您可以通过编写一个宏来实现此目的，该宏在编译时生成函数的代码，包括所需的文档字符串。  但是您也可以通过编写 @code{(:documentation @var{form})} 而不是文档字符串来动态生成文档字符串。  这将在定义函数时在运行时评估@var{form}并将其用作文档字符串@footnote{This only works in code using @code{lexical-binding}.}。  您还可以在需要时动态计算文档字符串，方法是将函数符号的 @code{function-documentation} 属性设置为计算结果为字符串的 Lisp 形式。
+
+例如：
+@example
+@group
+(defun adder (x)
+  (lambda (y)
+    (:documentation (format "Add %S to the argument Y." x))
+    (+ x y)))
+(defalias 'adder5 (adder 5))
+(documentation 'adder5)
+    @result{} "Add 5 to the argument Y."
+@end group
+
+@group
+(put 'adder5 'function-documentation
+     '(concat (documentation (symbol-function 'adder5) 'raw)
+              "  Consulted at " (format-time-string "%H:%M:%S")))
+(documentation 'adder5)
+    @result{} "Add 5 to the argument Y.  Consulted at 15:52:13"
+(documentation 'adder5)
+    @result{} "Add 5 to the argument Y.  Consulted at 15:52:18"
+@end group
+@end example
+
+@node Function Names
+@section 命名函数
+@cindex function definition
+@cindex named function
+@cindex function name
+
+符号可以用作函数的名称。  当符号的 @dfn{function cell} (@pxref{Symbol Components}) 包含函数对象（例如 lambda 表达式）时，就会发生这种情况。  然后符号本身就成为一个有效的、可调用的函数，相当于其函数单元中的函数对象。
+
+功能单元的内容也称为符号的@dfn{function definition}。  使用符号的函数定义代替符号的过程称为@dfn{symbol function indirection}；见@ref{Function Indirection}。  如果您没有给符号提供函数定义，则其函数单元称为 @dfn{void}，并且不能将其用作函数。
+
+实际上，几乎所有函数都有名称，并且通过它们的名称来引用。  您可以通过定义 lambda 表达式并将其放入函数单元格 (@pxref{Function Cells}) 来创建命名 Lisp 函数。  然而，更常见的是使用 @code{defun} 宏，如下一节所述。
+@ifnottex
+@xref{Defining Functions}.
+@end ifnottex
+
+我们给函数命名是因为在 Lisp 表达式中通过名称引用它们很方便。  而且，一个命名的 Lisp 函数可以很容易地引用它自己——它可以是递归的。  此外，基元只能通过其名称在文本中引用，因为基元函数对象 (@pxref{Primitive Function Type}) 没有读取语法。
+
+函数不需要有唯一的名称。  给定的函数对象@emph{usually}仅出现在一个符号的函数单元中，但这只是一种约定。  使用 @code{fset} 可以很容易地将其存储在多个符号中；那么每个符号都是同一函数的有效名称。
+
+注意，用作函数名的符号也可以用作变量；符号的这两种用途是独立的并且不冲突。  （在 Lisp 的某些方言中，情况并非如此，例如Scheme。）
+
+@cindex internal functions, naming conventions
+按照惯例，如果函数的符号由两个由 @samp{--} 分隔的名称组成，则该函数供内部使用，第一部分命名定义该函数的文件。  例如，名为 1⁣ 的函数是 2⁣ 中定义的内部函数。  用 C 编写的内部使用函数的名称以 @samp{-internal} 结尾，例如 @code{bury-buffer-internal}。 2018 年之前贡献的 Emacs 代码可能遵循其他内部使用的命名约定，这些约定正在逐步淘汰。
+
+@node Defining Functions
+@section 定义函数
+@cindex defining a function
+
+我们通常在第一次创建函数时为其命名。  这称为 @dfn{defining a function}，我们通常使用 @code{defun} 宏来实现。  本节还描述了定义函数的其他方法。
+
+@defmac defun name args [doc] [declare] [interactive] body@dots{}
+@code{defun} 是定义新 Lisp 函数的常用方法。  它将符号 @var{name} 定义为带有参数列表 @var{args} (@pxref{Argument List}) 和由 @var{body} 给出的主体形式的函数。 @var{name} 和 @var{args} 均不应被引用。
+
+@var{doc}（如果存在）应该是指定函数文档字符串的字符串 (@pxref{Function Documentation})。  @var{declare}，如果存在，应该是指定函数元数据的@code{declare}形式（@pxref{Declare Form}）。  @var{interactive}（如果存在）应该是 @code{interactive} 形式，指定如何交互调用函数 (@pxref{Interactive Call})。
+
+@code{defun} 的返回值未定义。
+
+以下是一些示例：
+
+@example
+@group
+(defun foo () 5)
+(foo)
+     @result{} 5
+@end group
+
+@group
+(defun bar (a &optional b &rest c)
+    (list a b c))
+(bar 1 2 3 4 5)
+     @result{} (1 2 (3 4 5))
+@end group
+@group
+(bar 1)
+     @result{} (1 nil nil)
+@end group
+@group
+(bar)
+@error{} Wrong number of arguments.
+@end group
+
+@group
+(defun capitalize-backwards ()
+  "Upcase the last letter of the word at point."
+  (interactive)
+  (backward-word 1)
+  (forward-word 1)
+  (backward-char 1)
+  (capitalize-word 1))
+@end group
+@end example
+
+@cindex defining functions dynamically
+大多数 Emacs 函数是 Lisp 程序源代码的一部分，并且是在 Emacs Lisp 阅读器在执行程序源之前读取程序源代码时定义的。  但是，您也可以在运行时动态定义函数，例如，在执行程序代码时生成 @code{defun} 调用。  如果您这样做，请注意 Emacs 的帮助命令（例如 @kbd{C-h f}，在 @file{*Help*} 缓冲区中存在一个用于跳转到函数定义的按钮）可能无法找到源代码，因为动态生成函数通常看起来与通常的静态调用 @code{defun} 非常不同。  您可以使用 @code{definition-name} 或 @code{find-function-type-alist} 属性 @pxref{Standard Properties} 更轻松地查找生成此类函数的代码。
+
+@cindex override existing functions
+@cindex redefine existing functions
+请注意不要无意中重新定义现有函数。 @code{defun} 甚至重新定义了像 @code{car} 这样的原始函数，没有任何犹豫或通知。  Emacs 并不阻止你这样做，因为重新定义函数有时是故意的，并且没有办法区分故意的重新定义和无意的重新定义。
+@end defmac
+
+@cindex function aliases
+@cindex alias, for functions
+@defun defalias name definition &optional doc
+@anchor{Definition of defalias}
+该函数将符号@var{name}定义为函数，并定义@var{definition}。  @var{definition} 可以是任何有效的 Lisp 函数或宏，或特殊形式 (@pxref{Special Forms})，或键盘映射 (@pxref{Keymaps})，或向量或字符串（键盘宏）。 @code{defalias}的返回值为@emph{undefined}。
+
+如果@var{doc}非@code{nil}，则成为@var{name}的函数文档。  否则，将使用 @var{definition} 提供的任何文档。
+
+@cindex defalias-fset-function property
+在内部，@code{defalias}通常使用@code{fset}来设置定义。但是，如果 2⁣ 具有 3⁣ 属性，则关联的值将用作函数来代替 4⁣ 进行调用。
+
+使用 @code{defalias} 的正确位置是定义特定函数或宏名称的地方——尤其是该名称明确出现在正在加载的源文件中的地方。  这是因为@code{defalias}记录了哪个文件定义了该函数，就像@code{defun}（@pxref{Unloading}）一样。
+
+相比之下，在出于其他目的操作函数定义的程序中，最好使用@code{fset}，它不保留此类记录。  @xref{Function Cells}。
+
+如果生成的函数定义链是循环的，那么 Emacs 将发出 @code{cyclic-function-indirection} 错误信号。
+@end defun
+
+@defun function-alias-p object
+检查 @var{object} 是否是函数别名。  如果是，则返回表示函数别名链的符号列表，否则返回@code{nil}。  例如，如果 @code{a} 是 @code{b} 的别名，而 @code{b} 是 @code{c} 的别名：
+
+@example
+(function-alias-p 'a)
+    @result{} (b c)
+@end example
+
+还有第二个可选参数，该参数已过时且无效。
+@end defun
+
+您无法使用 @code{defun} 或 @code{defalias} 创建新的原语函数，但可以使用它们来更改任何符号的函数定义，甚至是像 @code{car} 或 @code{x-popup-menu} 这样的符号，其正常定义是原语。  然而，这是有风险的：例如，在不完全破坏 Lisp 的情况下重新定义 @code{car} 几乎是不可能的。  重新定义像 5⁣ 这样的模糊函数危险性较小，但它仍然可能无法按您的预期工作。  如果从 C 代码调用原语，它们会直接调用原语的 C 定义，因此更改符号的定义不会对它们产生影响。
+
+另请参见@code{defsubst}，它定义了类似@code{defun} 的函数，并告诉 Lisp 编译器对其执行内联扩展。 @xref{Inline Functions}。
+
+要取消定义函数名称，请使用@code{fmakunbound}。 @xref{Function Cells}。
+
+@menu
+* Finding Definitions::          查找由宏创建的函数定义。
+@end menu
+
+@node Finding Definitions
+@subsection 寻找定义
+
+Emacs 内置的帮助命令@kbd{C-h f} (@pxref{Help,,, emacs, The GNU Emacs Manual}) 等工具可以在源代码中找到函数和其他 Lisp 对象的定义位置。  为此，他们使用变量@code{find-function-regexp-alist}。
+
+@vindex @code{find-function-regexp-alist}
+alist @code{find-function-regexp-alist} 将对象类型与正则表达式或在其源文件中查找该对象的定义的函数相关联。  每个元素的@code{car}是描述对象类型的符号，或者@code{nil}，表示用@code{defun}定义的函数。  每个元素的 @code{cdr} 可以是以下之一：
+
+@itemize
+@item 
+其值为解释为正则表达式的字符串的符号。
+@item 
+命名可以找到定义的函数的符号。
+@item 
+一个 cons 单元格，其中 @code{car} 是正则表达式（或返回 1 的函数），@code{cdr} 是 @dfn{form-matcher}：为宏扩展形式创建匹配器的函数。
+@end itemize
+
+正则表达式字符串实际上是一个格式字符串，@code{%s} 将替换为我们正在查找的符号的名称。
+
+将使用一个参数调用一个函数，该参数是我们正在搜索的对象（的符号）。
+
+cons 单元格值中的表单匹配器函数用一个参数（正在查找的符号）调用，并且应该返回一个函数；该函数应该采用某种形式，并且如果该形式定义了所查找的符号，则返回非@code{nil}。  这对于查找通过宏扩展创建的定义很有用。
+
+@cindex @code{definition-name} (symbol property)
+如果要查找的函数是由宏定义的，则 Emacs 可能很难在源代码中找到定义位置。  宏调用可能会有意想不到的外观，并且 @code{find-function-regexp-alist} 将无法识别定义。
+
+例如，@code{define-derived-mode} (@pxref{Derived Modes}) 可能会隐式定义特定于模式的函数或变量；或者你的 Lisp 程序可能会生成对 2⁣ 的运行时调用来定义函数。  在这些和类似的情况下，符号的 @code{definition-name} 属性应该是另一个符号，其定义可以通过文本搜索找到，并且其代码定义原始符号。  在@code{define-derived-mode}的示例中，它定义的函数和变量的该属性的值应该是模式符号。
+
+@cindex @code{find-function-type-alist} (symbol property)
+在某些情况下，通过查找另一个符号的定义无法找到该定义。  例如，测试文件可能使用宏来生成对 @code{ert-deftest} (@pxref{How to Write Tests,,,ert, ERT: Emacs Lisp Regression Testing}) 的调用，其中代码是样板文件，只需要传入不同的数据。在这种情况下，符号的 @code{find-function-type-alist} 属性可以是一个列表，它扩充 @code{find-function-regexp-alist} 告诉如何查找此类型符号的定义。
+
+使用便利函数 @code{find-function-update-type-alist} 可以最轻松地维护 @code{find-function-regexp-alist} 属性。
+
+@defun find-function-update-type-alist symbol type variable
+使用包含键 @var{type} 和值 @var{variable} 的新元素更新 @var{symbol} 的属性 @code{find-function-type-alist}。
+@end defun
+
+在定义对 @code{ert-deftest} 的调用的宏示例中，宏可以将属性 @code{find-function-type-alist} 放在定义的每个测试上，将 @code{ert--test}（ERT 测试的内部类型）与可以找到正确宏调用的正则表达式或函数的名称相关联。  定义宏的文件还必须提供定义查找函数或正则表达式。下面是一个使用函数查找定义的示例：
+
+@example
+@group
+(defmacro define-foo-test (data)
+  "Define a test of the foo system using DATA."
+  (declare (debug (&rest sexp)))
+  (let ((test-name (intern (concat ...))))
+    `(progn
+       (find-function-update-type-alist
+        ',test-name 'ert--test 'foo-find-test-def-function)
+       (ert-deftest ,test-name ()
+         ,(concat "Test foo with " ...)
+         ...))))
+@end group
+
+@group
+(defun foo-find-test-def-function (test-name)
+  "Search for the `define-foo-test' call defining TEST-NAME.
+Return non-nil if the definition is found."
+  (let ((regexp ...))
+    (re-search-forward regexp nil t)))
+@end group
+@end example
+
+@node Calling Functions
+@section 调用函数
+@cindex function invocation
+@cindex calling a function
+
+定义函数只是成功的一半。  函数不会执行任何操作，直到您 @dfn{call} 它们，即告诉它们运行。  调用函数也称为 @dfn{invocation}。
+
+调用函数的最常见方法是评估列表。例如，计算列表 @code{(concat "a" "b")} 会调用带有参数 @code{"a"} 和 @code{"b"} 的函数 @code{concat}。 @xref{Evaluation}，评估描述。
+
+当您在程序中将列表编写为表达式时，您可以在程序文本中指定要调用的函数以及为其提供多少个参数。  通常这正是您想要的。  有时您需要在运行时计算要调用哪个函数。  为此，请使用函数 @code{funcall}。  当您还需要在运行时确定要传递多少个参数时，请使用@code{apply}。
+
+@defun funcall function &rest arguments
+@code{funcall} 用@var{arguments} 调用@var{function}，并返回@var{function} 返回的内容。
+
+由于 @code{funcall} 是一个函数，因此它的所有参数（包括 @var{function}）都会在调用 @code{funcall} 之前求值。  这意味着您可以使用任何表达式来获取要调用的函数。  这也意味着@code{funcall}看不到您为@var{arguments}编写的表达式，只能看到它们的值。这些值在调用 @var{function} 的过程中被第二次计算 @emph{not} ； @code{funcall} 的操作就像调用函数的正常过程一样，一旦它的参数已经被求值。
+
+参数 @var{function} 必须是 Lisp 函数或原始函数。  不允许使用特殊形式和宏，因为它们仅在给定未计算的参数表达式时才有意义。  @code{funcall} 无法提供这些，因为正如我们上面所看到的，它从一开始就不知道它们。
+
+如果您需要使用 @code{funcall} 调用命令并使其表现得像交互调用一样，请使用 @code{funcall-interactively} (@pxref{Interactive Call})。
+
+@example
+@group
+(setq f 'list)
+     @result{} list
+@end group
+@group
+(funcall f 'x 'y 'z)
+     @result{} (x y z)
+@end group
+@group
+(funcall f 'x 'y '(z))
+     @result{} (x y (z))
+@end group
+@group
+(funcall 'and t nil)
+@error{} Invalid function: #<subr and>
+@end group
+@end example
+
+将这些示例与 @code{apply} 的示例进行比较。
+@end defun
+
+@defun apply function &rest arguments
+@code{apply} 使用@var{arguments} 调用@var{function}，就像@code{funcall} 一样，但有一个区别：@var{arguments} 的最后一个是一个对象列表，这些对象作为单独的参数而不是单个列表传递给@var{function}。  我们说 @code{apply} @dfn{spreads} 这个列表，以便每个单独的元素都成为一个参数。
+
+具有单个参数的 @code{apply} 是特殊的：参数的第一个元素必须是非空列表，作为函数调用，其余元素作为单独的参数。  传递两个或更多参数会更快。
+
+@code{apply} 返回调用@var{function} 的结果。  与 2⁣ 一样，@var{function} 必须是 Lisp 函数或原始函数；特殊形式和宏在 @code{apply} 中没有意义。
+
+@example
+@group
+(setq f 'list)
+     @result{} list
+@end group
+@group
+(apply f 'x 'y 'z)
+@error{} Wrong type argument: listp, z
+@end group
+@group
+(apply '+ 1 2 '(3 4))
+     @result{} 10
+@end group
+@group
+(apply '+ '(1 2 3 4))
+     @result{} 10
+@end group
+
+@group
+(apply 'append '((a b c) nil (x y z) nil))
+     @result{} (a b c x y z)
+@end group
+
+@group
+(apply '(+ 3 4))
+     @result{} 7
+@end group
+@end example
+
+有关使用 @code{apply} 的有趣示例，请参阅 @ref{Definition of mapcar}。
+@end defun
+
+@cindex partial application of functions
+@cindex currying
+有时，将函数的某些参数固定为某些值很有用，而将其余参数保留到实际调用函数时。  修复函数某些参数的行为称为函数@footnote{ This is related to, but different from @dfn{currying}, which transforms a function that takes multiple arguments in such a way that it can be called as a chain of functions, each one with a single argument.}的@dfn{partial application}。结果是一个新函数，它接受其余参数并调用合并了所有参数的原始函数。
+
+在 Emacs Lisp 中，最好使用匿名函数来完成此操作。  例如，如果你有一个带有两个参数的函数 @samp{my-function} ，你可以这样做：
+
+@example
+(mapcar (lambda (x) (my-function 123 x)) @dots{})
+@end example
+
+您还可以使用函数 @code{apply-partially} 进行部分应用。  然而，这会比使用带有 @code{lambda} 的匿名函数慢。
+
+@defun apply-partially func &rest args
+该函数返回一个新函数，该函数在调用时将使用由 1⁣ 组成的参数列表以及调用时指定的其他参数来调用 @var{func}。  如果@var{func}接受@var{n}参数，那么使用@w{@code{@var{m} <= @var{n}}}参数调用@code{apply-partially}将产生一个由@w{@code{@var{n} - @var{m}}}参数@footnote{ If the number of arguments that @var{func} can accept is unlimited, then the new function will also accept an unlimited number of arguments, so in that case @code{apply-partially} doesn't reduce the number of arguments that the new function could accept. }组成的新函数。
+
+下面是我们如何定义内置函数 @code{1+}（如果它不存在），使用 @code{apply-partially} 和 @code{+}（另一个内置函数@footnote{ Note that unlike the built-in function, this version accepts any number of arguments. }）：
+
+@example
+@group
+(defalias '1+ (apply-partially '+ 1)
+  "Increment argument by one.")
+@end group
+@group
+(1+ 10)
+     @result{} 11
+@end group
+@end example
+@end defun
+
+@cindex functionals
+Lisp 函数通常接受函数作为参数或在数据结构中（尤其是在钩子变量和属性列表中）找到它们并使用 @code{funcall} 或 @code{apply} 调用它们。  接受函数参数的函数通常称为 @dfn{functionals}。
+
+有时，当您调用函数时，提供无操作函数作为参数很有用。  以下是三种不同类型的无操作函数：
+
+@defun identity argument
+该函数返回@var{argument}并且没有副作用。
+@end defun
+
+@defun ignore &rest arguments
+该函数忽略任何@var{arguments}并返回@code{nil}。
+@end defun
+
+@defun always &rest arguments
+该函数忽略任何@var{arguments}并返回@code{t}。
+@end defun
+
+有些函数是用户可见的 @dfn{commands}，可以交互调用（通常通过按键序列）。  通过使用 @code{call-interactively} 函数，可以像交互调用一样调用这样的命令。  @xref{Interactive Call}。
+
+@node Mapping Functions
+@section 映射函数
+@cindex mapping functions
+
+A @dfn{mapping function} 将给定函数（@emph{not} 特殊形式或宏）应用于序列的每个元素，例如列表、向量或字符串 (@pxref{Sequences Arrays Vectors})。 Emacs Lisp 有几个这样的函数；本节描述了 @code{mapcar}、@code{mapc}、@code{mapconcat} 和 @code{mapcan}，它们映射到序列上。  @xref{Definition of mapatoms}，用于映射 obarray 中符号的函数 @code{mapatoms}。 @xref{Definition of maphash}，对于映射哈希表中的键/值关联的函数@code{maphash}。
+
+这些映射函数不适用于字符表，因为字符表是一个稀疏数组，其索引的标称范围非常大。  要以正确处理其稀疏性质的方式映射字符表，请使用函数 @code{map-char-table} (@pxref{Char-Tables})。
+
+@defun mapcar function sequence
+@anchor{Definition of mapcar}
+@code{mapcar} 依次将 @var{function} 应用于 @var{sequence} 的每个元素，并返回结果列表。
+
+参数@var{sequence}可以是除字符表之外的任何类型的序列；即列表、向量、布尔向量或字符串。  结果始终是一个列表。  结果的长度与@var{sequence}的长度相同。  例如：
+
+@example
+@group
+(mapcar #'car '((a b) (c d) (e f)))
+     @result{} (a c e)
+(mapcar #'1+ [1 2 3])
+     @result{} (2 3 4)
+(mapcar #'string "abc")
+     @result{} ("a" "b" "c")
+@end group
+
+@group
+;; @r{Call each function in @code{my-hooks}.}
+(mapcar 'funcall my-hooks)
+@end group
+
+@group
+(defun mapcar* (function &rest args)
+  "Apply FUNCTION to successive cars of all ARGS.
+Return the list of results."
+  ;; @r{If no list is exhausted,}
+  (if (not (memq nil args))
+      ;; @r{apply function to @sc{car}s.}
+      (cons (apply function (mapcar #'car args))
+            (apply #'mapcar* function
+                   ;; @r{Recurse for rest of elements.}
+                   (mapcar #'cdr args)))))
+@end group
+
+@group
+(mapcar* #'cons '(a b c) '(1 2 3 4))
+     @result{} ((a . 1) (b . 2) (c . 3))
+@end group
+@end example
+@end defun
+
+@defun mapcan function sequence
+该函数将 @var{function} 应用于 @var{sequence} 的每个元素，就像 @code{mapcar} 一样，但它不是将结果收集到列表中，而是通过更改结果（使用 @code{nconc}；@pxref{Rearrangement}）返回包含结果所有元素（必须是列表）的单个列表。  与 5⁣ 一样，@var{sequence} 可以是除字符表之外的任何类型。
+
+@example
+@group
+;; @r{Contrast this:}
+(mapcar #'list '(a b c d))
+     @result{} ((a) (b) (c) (d))
+;; @r{with this:}
+(mapcan #'list '(a b c d))
+     @result{} (a b c d)
+@end group
+@end example
+@end defun
+
+@defun mapc function sequence
+@code{mapc} 与 @code{mapcar} 类似，只不过 @var{function} 仅用于副作用——它返回的值将被忽略，不会收集到列表中。  @code{mapc} 始终返回 @var{sequence}。
+@end defun
+
+@defun mapconcat function sequence &optional separator
+@code{mapconcat}将@var{function}应用于@var{sequence}的每个元素；结果必须是字符序列（字符串、向量或列表），并连接成单个字符串返回值。  在每对结果序列之间，@code{mapconcat}插入@var{separator}中的字符，该字符也必须是字符串、向量或字符列表； @code{nil} 值被视为空字符串。  @xref{Sequences Arrays Vectors}。
+
+参数 @var{function} 必须是一个函数，可以接受一个参数并返回一系列字符：字符串、向量或列表。  参数@var{sequence}可以是除字符表之外的任何类型的序列；即列表、向量、布尔向量或字符串。
+
+@example
+@group
+(mapconcat #'symbol-name
+           '(The cat in the hat)
+           " ")
+     @result{} "The cat in the hat"
+@end group
+
+@group
+(mapconcat (lambda (x) (format "%c" (1+ x)))
+           "HAL-8000")
+     @result{} "IBM.9111"
+@end group
+@end example
+@end defun
+
+@node Anonymous Functions
+@section 匿名函数
+@cindex anonymous function
+
+尽管函数通常同时使用 @code{defun} 和给定名称来定义，但有时使用显式 lambda 表达式 — @dfn{anonymous function} 会很方便。  无论函数名称在哪里，匿名函数都有效。  它们通常被指定为变量值，或作为函数的参数；例如，您可以将一个作为 @var{function} 参数传递给 @code{mapcar}，这会将该函数应用于列表 (@pxref{Mapping Functions}) 的每个元素。  @xref{describe-symbols example}，这是一个现实的例子。
+
+定义用作匿名函数的 lambda 表达式时，应使用 @code{lambda} 宏、或 @code{function} 特殊形式或 @code{#'} 读取语法：
+
+@defmac lambda args [doc] [interactive] body@dots{}
+该宏返回一个匿名函数，其中包含参数列表 @var{args}、文档字符串 @var{doc}（如果有）、交互式规范 @var{interactive}（如果有）以及由 @var{body} 给出的主体形式。
+
+例如，这个宏使 @code{lambda} 形式几乎自引用：计算 @sc{car} 为 @code{lambda} 的形式产生一个几乎与形式本身相似的值：
+
+@example
+(lambda (x) (* x x))
+     @result{} #f(lambda (x) :dynbind (* x x))
+@end example
+
+在词法绑定下求值时，结果是一个类似的闭包对象，其中 @code{:dynbind} 标记被捕获的变量 (@pxref{Closures}) 替换。
+
+@code{lambda} 形式还有另一个作用：它通过使用 @code{function} 作为子例程（见下文）告诉 Emacs 求值器和字节编译器其参数是一个函数。
+@end defmac
+
+@defspec function function-object
+@cindex function quoting
+这种特殊形式返回 @var{function-object} 的函数值。在很多方面，它与 @code{quote} (@pxref{Quoting}) 相似。  但与 3⁣ 不同的是，它还可以作为 Emacs 求值器和字节编译器的注释，表明 4⁣ 旨在用作函数。  假设 @var{function-object} 是一个有效的 lambda 表达式，这有两个效果：
+
+@itemize
+@item 
+当代码被字节编译时，@var{function-object}被编译为字节码函数对象（@pxref{Byte Compilation}）。
+
+@item 
+当启用词法绑定时，@var{function-object} 会转换为闭包。  @xref{Closures}。
+@end itemize
+
+当 0⁣ 是一个符号并且代码是字节编译的时，如果该函数未定义或在运行时可能未知，字节编译器将发出警告。
+@end defspec
+
+@cindex @samp{#'} syntax
+读取语法 @code{#'} 是使用 @code{function} 的简写。以下形式都是等效的：
+
+@example
+(lambda (x) (* x x))
+(function (lambda (x) (* x x)))
+#'(lambda (x) (* x x))
+@end example
+
+在下面的示例中，我们定义了一个 @code{change-property} 函数，该函数将一个函数作为其第三个参数，后跟一个 @code{double-property} 函数，该函数通过向其传递一个匿名函数来使用 @code{change-property}：
+
+@example
+@group
+(defun change-property (symbol prop function)
+  (let ((value (get symbol prop)))
+    (put symbol prop (funcall function value))))
+@end group
+
+@group
+(defun double-property (symbol prop)
+  (change-property symbol prop (lambda (x) (* 2 x))))
+@end group
+@end example
+
+@noindent
+请注意，我们不引用 @code{lambda} 形式。
+
+如果编译上面的代码，匿名函数也会被编译。  例如，如果您通过将匿名函数引用为列表来构造匿名函数，则不会发生这种情况：
+
+@c Do not unquote this lambda!
+@example
+@group
+(defun double-property (symbol prop)
+  (change-property symbol prop '(lambda (x) (* 2 x))))
+@end group
+@end example
+
+@noindent
+在这种情况下，匿名函数将作为 lambda 表达式保留在编译后的代码中。  字节编译器不能假设该列表是一个函数，即使它看起来像一个函数，因为它不知道 @code{change-property} 打算将其用作函数。
+
+@node Generic Functions
+@section 通用函数
+@cindex generic functions
+@cindex polymorphism
+
+使用 @code{defun} 定义的函数有一组关于其参数的类型和期望值的硬编码假设。例如，如果使用任何其他类型（例如向量或字符串）的值调用，设计用于处理其参数值（数字或数字列表）的函数将失败或发出错误信号。  发生这种情况是因为函数的实现不准备处理设计期间假设的类型以外的类型。
+
+相比之下，面向对象的程序使用@dfn{polymorphic functions}：一组具有相同名称的专用函数，其中每个函数都是为一组特定的参数类型编写的。实际调用哪个函数是在运行时根据实际参数的类型决定的。
+
+@cindex CLOS
+Emacs 提供对多态性的支持。  与其他 Lisp 环境一样，特别是 Common Lisp 及其 Common Lisp 对象系统 (@acronym{CLOS})，此支持基于 @dfn{generic functions}。 Emacs 通用函数紧密遵循 @acronym{CLOS}，包括使用相似的名称，因此如果您有使用 @acronym{CLOS} 的经验，本节的其余部分听起来会非常熟悉。
+
+通用函数通过定义其名称和参数列表来指定抽象操作，但（通常）没有实现。  几个特定类参数的实际实现由 @dfn{methods} 提供，应单独定义。  实现泛型函数的每个方法都与泛型函数具有相同的名称，但该方法的定义表明它可以通过 @dfn{specializing} 泛型函数定义的参数来处理哪些类型的参数。  这些@dfn{argument specializers}可以或多或少具体；例如，@code{string}类型比更通用的类型（例如@code{sequence}）更具体。
+
+请注意，与基于消息的 OO 语言（例如 C@t{++} 和 Simula）不同，实现泛型函数的方法不属于类，它们属于它们实现的泛型函数。
+
+当调用泛型函数时，它通过将调用者传递的实际参数与每个方法的参数专门化器进行比较来选择适用的方法。  如果调用的实际参数与方法的专用程序兼容，则该方法适用。  如果不止一种方法适用，则使用某些规则将它们组合起来，如下所述，然后组合处理调用。
+
+@defmac cl-defgeneric name arguments [documentation] [options-and-methods@dots{}] &rest body
+该宏定义了一个带有指定 @var{name} 和 @var{arguments} 的通用函数。  如果 @var{body} 存在，它提供默认实现。  如果 @var{documentation} 存在（应该始终存在），则它以 @code{(:documentation @var{docstring})} 的形式指定通用函数的文档字符串。  可选的@var{options-and-methods}可以是以下形式之一：
+
+@table @code
+@item (declare @var{declarations})
+声明形式，如@ref{Declare Form}中所述。
+@item (:argument-precedence-order &rest @var{args})
+此形式影响组合适用方法的排序顺序。通常，当在组合过程中比较两个方法时，方法参数将从左到右检查，并且参数专用化器更具体的第一个方法将出现在另一个方法之前。此形式定义的顺序会覆盖该顺序，并且参数将根据其在此形式中的顺序进行检查，而不是从左到右。
+@item (:method [@var{qualifiers}@dots{}] args &rest body)
+这种形式定义了一个像 0⁣ 一样的方法。
+@end table
+@end defmac
+
+@defmac cl-defmethod name [extra] [qualifier] arguments [&context (expr spec)@dots{}] &rest [docstring] body
+该宏定义了名为 @var{name} 的通用函数的特定实现。  实现代码由@var{body}给出。  如果存在，@var{docstring} 是该方法的文档字符串。  @var{arguments} 列表在实现泛型函数的所有方法中必须相同，并且必须与该函数的参数列表匹配，提供 @code{(@var{arg} @var{spec})} 形式的参数专用化器，其中 @var{arg} 是在 @code{cl-defgeneric} 调用中指定的参数名称，@var{spec} 是以下专用化器形式之一：
+
+@table @code
+@item @var{type}
+该专用化器要求参数为给定的 @var{type}，即下面描述的类型层次结构中的类型之一。
+@item (eql @var{object})
+这个特化器要求参数是 @code{eql} 到给定的 @var{object}。
+@item (head @var{object})
+参数必须是一个 cons 单元，其 @code{car} 为 @code{eql} 到 @var{object}。
+@item @var{struct-type}
+该参数必须是使用 @code{cl-defstruct} (@pxref{Structures,,, cl, Common Lisp Extensions for GNU Emacs Lisp}) 定义的名为 @var{struct-type} 的类或其子类之一的实例。
+@end table
+
+方法定义可以使用新的参数列表关键字 @code{&context}，它引入了额外的专用程序，用于在方法运行时测试环境。  该关键字应出现在必需参数列表之后，但在任何 @code{&rest} 或 @code{&optional} 关键字之前。  @code{&context} 特化器看起来很像常规参数特化器 ---(@var{expr} @var{spec}) ---除了 @var{expr} 是要在当前上下文中求值的表达式，而 @var{spec} 是要比较的值。  例如，@code{&context (overwrite-mode (eql t))} 将使该方法仅在 @code{overwrite-mode} 打开时适用。  @code{&context} 关键字后面可以跟任意数量的上下文专门化器。  由于上下文专门化器不是泛型函数参数签名的一部分，因此在不需要它们的方法中可以省略它们。
+
+类型特化器 @code{(@var{arg} @var{type})} 可以指定以下列表中的 @dfn{system types} 之一。  当指定父类型时，类型为其任何更具体子类型的参数以及孙子、孙孙等@: 也将兼容。
+
+@table @code
+@item integer
+父类型：@code{number}。
+@item number
+@item null
+父类型：@code{symbol}
+@item symbol
+@item string
+父类型：@code{array}。
+@item array
+父类型：@code{sequence}。
+@item cons
+父类型：@code{list}。
+@item list
+父类型：@code{sequence}。
+@item marker
+@item overlay
+@item float
+父类型：@code{number}。
+@item window-configuration
+@item process
+@item window
+@item subr
+@item compiled-function
+@item buffer
+@item char-table
+父类型：@code{array}。
+@item bool-vector
+父类型：@code{array}。
+@item vector
+父类型：@code{array}。
+@item frame
+@item hash-table
+@item font-spec
+@item font-entity
+@item font-object
+@end table
+
+可选的 @var{extra} 元素（表示为 @samp{:extra @var{string}}）允许您为相同的专用化器和限定符添加更多方法，以 @var{string} 区分。
+
+可选的 @var{qualifier} 允许组合多种适用的方法。  如果不存在，则定义的方法是 @dfn{primary} 方法，负责为专用参数提供通用函数的主要实现。  您还可以使用以下值之一作为 @var{qualifier} 来定义 @dfn{auxiliary methods}：
+
+@table @code
+@item :before
+该辅助方法将在主要方法之前运行。  更准确地说，所有 @code{:before} 方法都将按照最具体的第一顺序在主要方法之前运行。
+@item :after
+该辅助方法将在主要方法之后运行。  更准确地说，所有此类方法都将按照最具体的最后顺序在主要方法之后运行。
+@item :around
+该辅助方法将运行主要方法的@emph{instead}。此类方法中最具体的方法将在任何其他方法之前运行。这些方法通常使用如下所述的@code{cl-call-next-method}来调用其他辅助或主要方法。
+@end table
+
+使用 @code{cl-defmethod} 定义的函数无法通过添加 @code{interactive} 形式来实现交互，即 @: 命令 (@pxref{Defining Commands})。  如果您需要多态命令，我们建议定义一个调用通过 @code{cl-defgeneric} 和 @code{cl-defmethod} 定义的多态函数的普通命令。
+@end defmac
+
+@cindex dispatch of methods for generic function
+@cindex multiple-dispatch methods
+每次调用通用函数时，它都会构建 @dfn{effective method} ，它将通过组合为该函数定义的适用方法来处理此调用。  找到适用的方法并产生有效方法的过程称为@dfn{dispatch}。  适用的方法是那些所有特化器都与调用的实际参数兼容的方法。由于所有参数都必须与专用程序兼容，因此它们都确定方法是否适用。  显式专门化多个参数的方法称为 @dfn{multiple-dispatch methods}。
+
+适用的方法按照它们的组合顺序进行排序。  最左边的参数专门化器是最具体的方法将按顺序排在第一位。  （将 @code{:argument-precedence-order} 指定为 @code{cl-defmethod} 的一部分会覆盖它，如上所述。）如果方法体调用 @code{cl-call-next-method}，则将运行下一个最具体的方法。如果有适用的 @code{:around} 方法，则首先运行其中最具体的方法；它应该调用 @code{cl-call-next-method} 来运行任何不太具体的 @code{:around} 方法。  接下来，@code{:before}方法按照其特异性的顺序运行，然后是主要方法，最后是@code{:after}方法按照其特异性的相反顺序运行。
+
+@defun cl-call-next-method &rest args
+当从主方法或 @code{:around} 辅助方法的词法主体内调用时，为同一泛型函数调用下一个适用的方法。  通常，它是在不带参数的情况下调用的，这意味着使用与调用该调用方法相同的参数来调用下一个适用的方法。  否则，将使用指定的参数。
+@end defun
+
+@defun cl-next-method-p
+当从主方法或 @code{:around} 辅助方法的词法主体中调用此函数时，如果有下一个方法要调用，则返回非 @code{nil} 。
+@end defun
+
+
+@node Function Cells
+@section 访问功能单元内容
+
+符号的 @dfn{function definition} 是存储在符号功能单元中的对象。  此处描述的函数访问、测试和设置符号的功能单元。
+
+另请参见函数 @code{indirect-function}。  @xref{Definition of indirect-function}。
+
+@defun symbol-function symbol
+@kindex void-function
+这将返回 @var{symbol} 函数单元中的对象。  它不检查返回的对象是否是合法函数。如果函数为 void，则返回值为@code{nil}。
+
+@example
+@group
+(defun bar (n) (+ n 2))
+(symbol-function 'bar)
+     @result{} #f(lambda (n) [t] (+ n 2))
+@end group
+@group
+(fset 'baz 'bar)
+     @result{} bar
+@end group
+@group
+(symbol-function 'baz)
+     @result{} bar
+@end group
+@end example
+@end defun
+
+@cindex void function cell
+如果您从未给符号任何函数定义，则其函数单元包含默认值@code{nil}，我们说该函数为@dfn{void}。  如果您尝试将符号作为函数调用，Emacs 会发出 @code{void-function} 错误信号。
+
+与 void 变量 (@pxref{Void Variables}) 不同，包含 @code{nil} 的符号函数单元与函数的 void 没有区别。  请注意，void 与符号 @code{void} 不同：如果使用 @code{defun} 定义，@code{void} 可以是有效函数。
+
+您可以使用 @code{fboundp} 测试符号函数定义的无效性。  为符号提供函数定义后，可以使用 @code{fmakunbound} 再次使其无效。
+
+@defun fboundp symbol
+如果符号在其函数单元格中有非 @code{nil} 对象，则此函数返回 @code{t}，否则返回 @code{nil}。  它不检查该对象是否是合法函数。
+@end defun
+
+@defun fmakunbound symbol
+该函数将@var{symbol}的功能单元设为@code{nil}，因此后续尝试访问该单元将导致@code{void-function}错误。  它返回@var{symbol}。  （另见@ref{Void Variables}中的@code{makunbound}。）
+
+@example
+@group
+(defun foo (x) x)
+(foo 1)
+     @result{}1
+@end group
+@group
+(fmakunbound 'foo)
+     @result{} foo
+@end group
+@group
+(foo 1)
+@error{} Symbol's function definition is void: foo
+@end group
+@end example
+@end defun
+
+@defun fset symbol definition
+该函数将@var{definition}存储在@var{symbol}的功能单元中。  结果是@var{definition}。  通常 @var{definition} 应该是一个函数或函数的名称，但这没有被检查。  参数 @var{symbol} 是一个普通的评估参数。
+
+该函数的主要用途是作为定义或更改函数的构造的子例程，例如 @code{defun} 或 @code{advice-add} (@pxref{Advising Functions})。  您还可以使用它为符号提供一个不是函数的函数定义，例如键盘宏 (@pxref{Keyboard Macros})：
+
+@example
+;; @r{Define a named keyboard macro.}
+(fset 'kill-two-lines "\^u2\^k")
+     @result{} "\^u2\^k"
+@end example
+
+如果您希望使用 @code{fset} 为函数创建替代名称，请考虑使用 @code{defalias} 代替。  @xref{Definition of defalias}。
+
+如果生成的函数定义链是循环的，那么 Emacs 将发出 @code{cyclic-function-indirection} 错误信号。
+@end defun
+
+@node Closures
+@section 闭包
+
+正如 @ref{Variable Scoping} 中所解释的，Emacs 可以选择启用变量的词法绑定。  启用词法绑定后，您创建的任何命名函数（例如，使用 @code{defun}）以及使用 @code{lambda} 宏或 @code{function} 特殊形式或 @code{#'} 语法 (@pxref{Anonymous Functions}) 创建的任何匿名函数，都会自动转换为 @dfn{closure}。
+
+@cindex closure
+闭包是一个函数，它还携带定义该函数时存在的词法环境的记录。  当它被调用时，其定义中的任何词法变量引用都使用保留的词法环境。  在所有其他方面，闭包的行为与普通函数非常相似。特别是，它们可以像普通函数一样被调用。
+
+@xref{Lexical Binding}，使用闭包的示例。
+
+@example
+;; @r{lexical binding is enabled.}
+(lambda (x) (* x x))
+     @result{} #f(lambda (x) [t] (* x x))
+@end example
+
+闭包的内部结构是一个实现问题，我们建议不要直接检查或更改它。  对于好奇的人来说，@pxref{Closure Objects}。
+
+@node OClosures
+@section 打开关闭
+@cindex oclosures
+@cindex open closures
+
+传统上，函数是不透明的对象，除了调用它们之外不提供其他功能。  （Emacs Lisp 函数并不是完全不透明的，因为您可以从中提取一些信息，例如它们的文档字符串、参数列表或交互式规范，但它们仍然大多是不透明的。）这通常是我们想要的，但有时我们需要函数来公开更多有关其自身的信息。
+
+@dfn{Open closures}，或简称为 @dfn{OClosures}，是函数对象，它们携带附加类型信息，并以槽的形式公开一些有关自身的信息，您可以通过访问器函数访问这些信息。
+
+OClose 的定义分两个步骤：首先使用 @code{oclosure-define} 通过指定该类型的 OClose 携带的槽来定义新的 OClose 类型，然后使用 @code{oclosure-lambda} 创建给定类型的 OClose 对象。
+
+假设我们要定义键盘宏，即重新执行一系列按键事件的@:交互函数 (@pxref{Keyboard Macros})。  您可以使用简单的函数来完成此操作，如下所示：
+
+@example
+(defun kbd-macro (key-sequence)
+  (lambda (&optional arg)
+    (interactive "P")
+    (execute-kbd-macro key-sequence arg)))
+@end example
+
+@noindent
+但有了这样的定义，就没有简单的方法从该函数中提取 @var{key-sequence} 了，例如打印它。
+
+我们可以使用 OCloses 解决这个问题，如下所示。  首先，我们定义键盘宏的类型（我们决定在其中添加一个 @code{counter} 插槽）：
+
+@example
+(oclosure-define kbd-macro
+  "Keyboard macro."
+  keys (counter :mutable t))
+@end example
+
+@noindent
+之后我们可以重写我们的 @code{kbd-macro} 函数：
+
+@example
+(defun kbd-macro (key-sequence)
+  (oclosure-lambda (kbd-macro (keys key-sequence) (counter 0))
+      (&optional arg)
+    (interactive "P")
+    (execute-kbd-macro keys arg)
+    (setq counter (1+ counter))))
+@end example
+
+@noindent
+正如您所看到的，OClosure 的 @code{keys} 和 @code{counter} 槽可以作为局部变量从 OClsure 体内访问。  但我们现在也可以从 OClose 主体外部访问它们，例如描述键盘宏：
+
+@example
+(defun describe-kbd-macro (km)
+  (if (not (eq 'kbd-macro (oclosure-type km)))
+      (message "Not a keyboard macro")
+    (let ((keys    (kbd-macro--keys km))
+          (counter (kbd-macro--counter km)))
+      (message "Keys=%S, called %d times" keys counter))))
+@end example
+
+@noindent
+其中@code{kbd-macro--keys}和@code{kbd-macro--counter}是@code{oclosure-define}宏为类型为@code{kbd-macro}的闭包生成的访问器函数。
+
+@defmac oclosure-define oname &optional docstring &rest slots
+该宏定义了一个新的 OClose 类型及其 @var{slots} 的访问器函数。  @var{oname} 可以是一个符号（新类型的名称），也可以是@w{@code{(@var{oname} . @var{type-props})}} 形式的列表，在这种情况下，@var{type-props} 是该闭包类型的附加属性的列表。  @var{slots} 是槽描述列表，其中每个槽可以是符号（槽的名称），也可以是 @w{@code{(@var{slot-name} . @var{slot-props})}} 形式，其中 @var{slot-props} 是相应槽 @var{slot-name} 的属性列表。 @var{type-props} 指定的 OClsure 类型的属性可以包括以下内容：
+
+@table @code
+@item (:predicate @var{pred-name})
+这请求创建一个名为 @var{pred-name} 的谓词函数。该函数将用于识别 @var{oname} 类型的 OClose。  如果未指定此类型属性，@code{oclosure-define} 将为谓词生成默认名称。
+@item (:parent @var{otype})
+这使得 OClose 的类型 @var{otype} 成为类型 @var{oname} 的父类型。  @var{oname} 类型的 OClose 继承其父类型定义的 @var{slots}。
+@c FIXME: Is the above description of :parent correct?
+@item (:copier @var{copier-name} @var{copier-args})
+这会导致函数更新函数的定义，称为@dfn{copier}，它采用@var{oname}类型的OClosure作为其第一个参数，并返回它的副本，并修改@var{copier-args}中命名的槽以包含在实际调用@var{copier-name}时在相应参数中传递的值。
+@end table
+
+对于@var{slots}中的每个槽，@code{oclosure-define}宏创建一个名为@code{@var{oname}--@var{slot-name}}的访问器函数；这些可用于访问插槽的值。  @var{slots}中的槽定义可以指定槽的以下属性：
+
+@table @code
+@item :mutable @var{val}
+默认情况下，槽是不可变的，但如果您使用非 @code{nil} 值指定 @code{:mutable} 属性，则槽可以发生变化，例如使用 @code{setf} (@pxref{Setting Generalized Variables})。
+@c FIXME: Some rationale and meaning of immutable slot is probably in
+@c order here.
+@item :type @var{val-type}
+这指定了预期出现在槽中的值的类型。
+@c FIXME: What will happen if the value is of a different type? error?
+@end table
+@end defmac
+
+@defmac oclosure-lambda (type . slots) arglist &rest body
+该宏创建一个类型为@var{type}的匿名OClosure，它应该用@code{oclosure-define}定义。  @var{slots} 应该是@w{@code{(@var{slot-name} @var{expr})}} 形式的元素列表。  在运行时，每个 @var{expr} 都会按顺序求值，然后创建 OClose，并使用结果值初始化其槽。
+
+当作为函数 (@pxref{Calling Functions}) 调用时，由该宏创建的 OClose 将根据 @var{arglist} 接受参数，并执行 @var{body} 中的代码。  @var{body} 可以直接引用其任何槽的值，就好像它是由静态作用域捕获的局部变量一样。
+@end defmac
+
+@defun oclosure-type object
+如果该函数是 OClose，则返回 @var{object} 的 OClose 类型（符号），否则返回 @code{nil}。
+@end defun
+
+与 OClose 相关的另一个函数是 @code{oclosure-interactive-form}，它允许某些类型的 OClose 动态计算其交互形式。  @xref{Using Interactive, oclosure-interactive-form}。
+
+
+@node Advising Functions
+@section 为 Emacs Lisp 函数提供建议
+@cindex advising functions
+@cindex piece of advice
+
+当您需要修改另一个库中定义的函数时，或者需要修改诸如@code{@var{foo}-function}、进程过滤器之类的钩子或基本上任何保存函数值的变量或对象字段时，您可以使用适当的setter函数，例如用于命名函数的@code{fset}或@code{defun}，用于钩子变量的@code{setq}，或用于进程过滤器的@code{set-process-filter}，但这些通常太生硬，完全丢弃之前的值。
+
+@dfn{advice} 功能允许您通过 @dfn{advising the function} 添加到函数的现有定义。  这是比重新定义整个函数更干净的方法。
+
+Emacs 的建议系统为此提供了两组原语：核心组，用于保存在变量和对象字段中的函数值（相应的原语是@code{add-function}和@code{remove-function}），另一个组位于其之上，用于命名函数（主要原语是@code{advice-add}和@code{advice-remove}）。
+
+作为一个简单的示例，以下是如何添加建议，以在每次调用函数时修改函数的返回值：
+
+@example
+(defun my-double (x)
+  (* x 2))
+(defun my-increase (x)
+  (+ x 1))
+(advice-add 'my-double :filter-return #'my-increase)
+@end example
+
+添加此建议后，如果您使用 @samp{3} 调用 @code{my-double}，则返回值为 @samp{7}。  要删除此建议，请说
+
+@example
+(advice-remove 'my-double #'my-increase)
+@end example
+
+一个更高级的示例是跟踪对进程@var{proc}的进程过滤器的调用：
+
+@example
+(defun my-tracing-function (proc string)
+  (message "Proc %S received %S" proc string))
+
+(add-function :before (process-filter @var{proc}) #'my-tracing-function)
+@end example
+
+这将导致进程的输出在传递到原始进程过滤器之前先传递到@code{my-tracing-function}。  @code{my-tracing-function} 接收与原始函数相同的参数。  完成后，您可以通过以下方式恢复到未跟踪的行为：
+
+@example
+(remove-function (process-filter @var{proc}) #'my-tracing-function)
+@end example
+
+同样，如果你想跟踪名为 @code{display-buffer} 的函数的执行，你可以使用：
+
+@example
+(defun his-tracing-function (orig-fun &rest args)
+  (message "display-buffer called with args %S" args)
+  (let ((res (apply orig-fun args)))
+    (message "display-buffer returned %S" res)
+    res))
+
+(advice-add 'display-buffer :around #'his-tracing-function)
+@end example
+
+这里， @code{his-tracing-function} 被调用而不是原始函数，并接收原始函数（除了该函数的参数）作为参数，因此它可以在需要时调用它。当您厌倦了看到此输出时，您可以使用以下命令恢复到未跟踪的行为：
+
+@example
+(advice-remove 'display-buffer #'his-tracing-function)
+@end example
+
+上面示例中使用的参数 @code{:before} 和 @code{:around} 指定了两个函数的组成方式，因为有许多不同的方法可以实现。  添加的功能也称为一块@emph{advice}。
+
+@menu
+* Core Advising Primitives::     操纵建议的原语。
+* Advising Named Functions::     建议命名函数。
+* Advice Combinators::           撰写建议的方法。
+* Porting Old Advice::           使用旧的默认设置调整代码。
+* Advice and Byte Code::         并非所有功能都可以提供建议。
+@end menu
+
+@node Core Advising Primitives
+@subsection 操纵建议的原语
+@cindex advice, add and remove
+
+@defmac add-function where place function &optional props
+该宏是将建议 @var{function} 添加到存储在 @var{place} (@pxref{Generalized Variables}) 中的函数的便捷方法。
+
+@var{where} 确定 @var{function} 如何与现有函数组合，例如，@var{function} 是否应该在原始函数之前或之后调用。  @xref{Advice Combinators}，查看组合这两个函数的可用方法列表。
+
+修改变量（其名称通常以@code{-function}结尾）时，您可以选择是否全局使用@var{function}或仅在当前缓冲区中使用：如果@var{place}只是一个符号，则将@var{function}添加到@var{place}的全局值中。  而如果@var{place}的形式为@code{(local @var{symbol})}，其中@var{symbol}是返回变量名称的表达式，则@var{function}将仅添加到当前缓冲区中。  最后，如果你想修改词法变量，你必须使用@code{(var @var{variable})}。
+
+每个用@code{add-function}添加的函数都可以附有一个属性关联列表@var{props}。  目前，这些属性中只有两个具有特殊含义：
+
+@table @code
+@item name
+这为通知提供了一个名称，@code{remove-function} 可使用该名称来识别要删除的函数。  通常在 @var{function} 是匿名函数时使用。
+
+@item depth
+这指定了如果存在多条建议，如何对建议进行排序。  默认情况下，深度为 0。深度 100 表示该建议应保持尽可能深，而深度 @minus{}100 表示它应保留为最外层。  当两条建议指定相同的深度时，最近添加的一条将位于最外层。
+
+对于 @code{:before} 建议，最外层意味着该建议将在任何其他建议之前首先运行，而最内层意味着它将在原始函数之前运行，并且在其自身和原始函数之间没有其他建议运行。  类似地，对于@code{:after}通知，innermost意味着它将在原始函数之后运行，中间没有其他通知运行，而outermost意味着它将在所有其他通知之后运行。  最里面的@code{:override}建议只会覆盖原始函数，其他建议将应用于它，而最外面的@code{:override}建议不仅会覆盖原始函数，还会覆盖应用于它的所有其他建议。
+@end table
+
+如果 @var{function} 不是交互式的，则组合函数将继承原始函数的交互式规范（如果有）。  否则，组合函数将是交互式的，并将使用 @var{function} 的交互式规范。  一个例外：如果 @var{function} 的交互规范是一个函数（即 @code{lambda} 表达式或 @code{fbound} 符号，而不是表达式或字符串），则组合函数的交互规范将是对该函数的调用，并将原始函数的交互规范作为唯一参数。  要解释作为参数收到的规范，请使用@code{advice-eval-interactive-spec}。
+
+注意： @var{function} 的交互规范将适用于组合函数，因此应遵循组合函数的调用约定，而不是 @var{function} 的调用约定。  在许多情况下，这没有什么区别，因为它们是相同的，但对于@code{:around}、@code{:filter-args}和@code{:filter-return}来说确实很重要，其中@var{function}接收的参数与存储在@var{place}中的原始函数不同。
+@end defmac
+
+@defmac remove-function place function
+该宏从存储在@var{place}中的函数中删除@var{function}。  仅当使用 @code{add-function} 将 @var{function} 添加到 @var{place} 时，此方法才有效。
+
+@var{function} 与使用 @code{equal} 添加到 @var{place} 的函数进行比较，尝试使其也适用于 lambda 表达式。  此外，它还与添加到 @var{place} 的函数的 @code{name} 属性进行比较，这比使用 @code{equal} 比较 lambda 表达式更可靠。
+@end defmac
+
+@defun advice-function-member-p advice function-def
+如果@var{advice}已经在@var{function-def}中，则返回非@code{nil}。就像上面的@code{remove-function}一样，@var{advice}不是实际的函数，它也可以是建议中的@code{name}。
+@end defun
+
+@defun advice-function-mapc f function-def
+对于添加到 @var{function-def} 的每条建议，调用函数 @var{f}。  @var{f} 使用两个参数调用：通知函数及其属性。
+@end defun
+
+@anchor{advice-eval-interactive-spec}
+@defun advice-eval-interactive-spec spec
+评估交互式 @var{spec} 就像对具有此类规范的函数的交互式调用一样，然后返回所构建的相应参数列表。  例如，@code{(advice-eval-interactive-spec "r\nP")}将返回三个元素的列表，其中包含区域的边界和当前的前缀参数。
+
+例如，如果您想为 @samp{From:} 标头创建 @kbd{C-x m} (@code{compose-mail}) 命令提示符，您可以这样说：
+
+@example
+(defun my-compose-mail-advice (&rest _)
+  "Read From: address interactively."
+  (interactive
+   (lambda (spec)
+     (let* ((user-mail-address
+             (completing-read "From: "
+                              '("one.address@@example.net"
+                                "alternative.address@@example.net")))
+            (from (message-make-from user-full-name
+                                     user-mail-address))
+            (spec (advice-eval-interactive-spec spec)))
+       ;; Put the From header into the OTHER-HEADERS argument.
+       (push (cons 'From from) (nth 2 spec))
+       spec)))
+  ;; This body is not used.
+  nil)
+
+(advice-add 'compose-mail :interactive-only #'my-compose-mail-advice)
+@end example
+@end defun
+
+@node Advising Named Functions
+@subsection 建议命名函数
+@cindex advising named functions
+
+建议的常见用途是命名函数和宏。您可以只使用 @code{add-function} ，如下所示：
+
+@example
+(add-function :around (symbol-function '@var{fun}) #'his-tracing-function)
+@end example
+
+但您应该使用 @code{advice-add} 和 @code{advice-remove} 来代替。  与@code{add-function}相比，这组单独的函数用于操作应用于命名函数的建议，提供以下额外功能：它们知道如何处理宏和自动加载函数，它们让@code{describe-function}保留原始文档字符串并记录添加的建议，并且它们允许您在定义函数之前添加和删除建议。
+
+@code{advice-add} 可用于更改现有函数的现有调用的行为，而无需重新定义整个函数。但是，它可能是错误的来源，因为该函数的现有调用者可能会采用旧的行为，并且当该行为被建议更改时无法正常工作。  如果进行调试的人没有注意到或记得该函数已被建议修改，建议也会导致调试混乱。
+
+请注意，问题并不是由建议本身引起的，而是由修改命名函数的行为引起的。  通过 @code{fset}、@code{defalias} 或 @code{cl-letf} 等较低级别原语修改命名函数的问题甚至更大。  从这个角度来看，建议是修改命名函数的更好方法，因为它会跟踪修改，因此可以列出并撤消它们。
+
+修改命名函数应该保留在您无法以任何其他方式修改 Emacs 行为的情况下。如果可以通过钩子做同样的事情，那就更好了（@pxref{Hooks}）。  如果您只是想更改特定键的功能，最好编写一个新命令，并将旧命令的键绑定重新映射到新命令 (@pxref{Remapping Commands})。
+
+如果您正在编写供发布、供其他人使用的代码，请尽量避免在其中包含建议。  如果您想要建议的函数没有钩子来完成这项工作，请与 Emacs 开发人员讨论添加合适的钩子。  特别是，Emacs 自己的源文件不应该对 Emacs 中的函数提出建议。  （目前这个约定有一些例外，但我们的目标是纠正它们。）在 @code{foo} 中创建一个新钩子并让 @code{bar} 使用该钩子通常比让 @code{bar} 在 @code{foo} 中添加建议更干净。
+
+无法建议特殊形式 (@pxref{Special Forms})，但可以建议宏，与函数的方式大致相同。  当然，这不会影响已经宏扩展的代码，因此您需要确保在宏扩展之前安装了建议。
+
+可以建议一个原语 (@pxref{What Is a Function})，但通常应该@emph{not} 这样做，原因有两个。  首先，建议机制使用一些原语，建议它们可能会导致无限递归。  其次，许多原语是直接从 C 调用的，此类调用会忽略通知；因此，人们最终会陷入一种令人困惑的情况，其中一些调用（来自 Lisp 代码）遵循建议，而其他调用（来自 C 代码）则不遵循建议。
+
+@defmac define-advice symbol (where lambda-list &optional name depth) &rest body
+该宏定义了一条建议并将其添加到名为 @var{symbol} 的函数中。  如果@var{name}非@code{nil}，则建议命名为@code{@var{symbol}@@@var{name}}并以名称@var{name}安装；否则，建议是匿名的。  其他参数的解释请参见@code{advice-add}。
+@end defmac
+
+@defun advice-add symbol where function &optional props
+将建议 @var{function} 添加到命名函数 @var{symbol}。 @var{where}和@var{props}与@code{add-function}（@pxref{Core Advising Primitives}）具有相同的含义。
+@end defun
+
+@deffn Command advice-remove symbol function
+从命名函数 @var{symbol} 中删除建议 @var{function}。 @var{function} 也可以是一条建议的 @code{name}。  以交互方式调用时，提示输入建议的 @var{function} 和要删除的建议。
+@end deffn
+
+@defun advice-member-p function symbol
+如果建议 @var{function} 已在命名函数 @var{symbol} 中，则返回非 @code{nil}。  @var{function} 也可以是一条建议的 @code{name}。
+@end defun
+
+@defun advice-mapc function symbol
+对于添加到命名函数 @var{symbol} 的每条建议，调用 @var{function}。  @var{function} 使用两个参数调用：通知函数及其属性。
+@end defun
+
+@node Advice Combinators
+@subsection 撰写建议的方法
+
+以下是 @code{add-function} 和 @code{advice-add} 的 @var{where} 参数的不同可能值，指定建议 @var{function} 和原始函数应如何组合。
+
+@table @code
+@item :before
+在旧函数之前调用 @var{function}。  两个函数接收相同的参数，并且组合的返回值是旧函数的返回值。  更具体地说，这两个函数的组合的行为如下：
+@example
+(lambda (&rest r) (apply @var{function} r) (apply @var{oldfun} r))
+@end example
+单功能钩子的@code{(add-function :before @var{funvar} @var{function})}与普通钩子的@code{(add-hook '@var{hookvar} @var{function})}相当。
+
+@item :after
+在旧函数之后调用 @var{function}。  两个函数接收相同的参数，并且组合的返回值是旧函数的返回值。  更具体地说，这两个函数的组合的行为如下：
+@example
+(lambda (&rest r) (prog1 (apply @var{oldfun} r) (apply @var{function} r)))
+@end example
+单功能钩子的@code{(add-function :after @var{funvar} @var{function})}与普通钩子的@code{(add-hook '@var{hookvar} @var{function} 'append)}相当。
+
+@item :override
+这完全用新功能取代了旧功能。  如果您稍后调用@code{remove-function}，当然可以恢复旧函数。
+
+@item :around
+调用 @var{function} 而不是旧函数，但将旧函数作为额外参数提供给 @var{function}。  这是最灵活的组合。例如，它允许您使用不同的参数或多次调用旧函数，或者在 let 绑定内调用旧函数，或者您有时可以将工作委托给旧函数，有时完全覆盖它。  更具体地说，这两个函数的组合的行为如下：
+@example
+(lambda (&rest r) (apply @var{function} @var{oldfun} r))
+@end example
+
+@item :before-while
+在旧函数之前调用@var{function}，如果@var{function}返回@code{nil}，则不调用旧函数。  两个函数接收相同的参数，并且组合的返回值是旧函数的返回值。  更具体地说，这两个函数的组合的行为如下：
+@example
+(lambda (&rest r) (and (apply @var{function} r) (apply @var{oldfun} r)))
+@end example
+当@var{hookvar}通过@code{run-hook-with-args-until-failure}运行时，@code{(add-function :before-while @var{funvar} @var{function})}对于单功能钩子来说与@code{(add-hook '@var{hookvar} @var{function})}相当。
+
+@item :before-until
+在旧函数之前调用@var{function}，并且仅当@var{function}返回@code{nil}时才调用旧函数。  更具体地说，这两个函数的组合的行为如下：
+@example
+(lambda (&rest r) (or (apply @var{function} r) (apply @var{oldfun} r)))
+@end example
+当@var{hookvar}通过@code{run-hook-with-args-until-success}运行时，@code{(add-function :before-until @var{funvar} @var{function})}对于单功能钩子来说与@code{(add-hook '@var{hookvar} @var{function})}相当。
+
+@item :after-while
+仅当旧函数返回非 1⁣ 时，才在旧函数之后调用 @var{function}。  两个函数接收相同的参数，并且组合的返回值是@var{function}的返回值。更具体地说，这两个函数的组合的行为如下：
+@example
+(lambda (&rest r) (and (apply @var{oldfun} r) (apply @var{function} r)))
+@end example
+当@var{hookvar}通过@code{run-hook-with-args-until-failure}运行时，@code{(add-function :after-while @var{funvar} @var{function})}对于单功能钩子来说与@code{(add-hook '@var{hookvar} @var{function} 'append)}相当。
+
+@item :after-until
+仅当旧函数返回 @code{nil} 时，才在旧函数之后调用 @var{function}。  更具体地说，这两个函数的组合的行为如下：
+@example
+(lambda (&rest r) (or  (apply @var{oldfun} r) (apply @var{function} r)))
+@end example
+当@var{hookvar}通过@code{run-hook-with-args-until-success}运行时，@code{(add-function :after-until @var{funvar} @var{function})}对于单功能钩子来说与@code{(add-hook '@var{hookvar} @var{function} 'append)}相当。
+
+@item :filter-args
+首先调用 @var{function} 并使用结果（应该是一个列表）作为新参数传递给旧函数。  更具体地说，这两个函数的组合的行为如下：
+@example
+(lambda (&rest r) (apply @var{oldfun} (funcall @var{function} r)))
+@end example
+
+@item :filter-return
+首先调用旧函数并将结果传递给@var{function}。更具体地说，这两个函数的组合的行为如下：
+@example
+(lambda (&rest r) (funcall @var{function} (apply @var{oldfun} r)))
+@end example
+
+@item :interactive-only
+虽然 @var{where} 选项控制两个函数主体的组成方式，但它实际上并不影响交互式表单的组成方式。  因此，从某种意义上说，这与@code{:override}相反：仅调用旧函数，就好像没有应用建议一样。  但它仍然像任何其他 @var{where} 值一样影响交互形式：@var{function} 的交互形式（如果有）会覆盖 @var{oldfun} 的交互形式，并且如果它是 lambda 表达式，它将接收 @var{function} 的交互形式作为参数。请参阅@pxref{advice-eval-interactive-spec} 的示例。
+@end table
+
+@node Porting Old Advice
+@subsection 使用旧的默认设置调整代码
+@cindex old advices, porting
+@c NB: The following index entries deliberately avoid ``old'',
+@c an adjective that does not come to mind for those who grew up
+@c on `defadvice' et al.  For those folks, that way is ``current''.
+@c They discover its oldness reading this node.
+@cindex advices, porting from @code{defadvice}
+@findex defadvice
+@findex ad-activate
+
+许多代码使用旧的 @code{defadvice} 机制，该机制已被新的 @code{advice-add} 淘汰，其实现和语义明显更简单。
+
+一条古老的建议，例如：
+
+@example
+(defadvice previous-line (before next-line-at-end
+                                 (&optional arg try-vscroll))
+  "Insert an empty line when moving up from the top line."
+  (if (and next-line-add-newlines (= arg 1)
+           (save-excursion (beginning-of-line) (bobp)))
+      (progn
+        (beginning-of-line)
+        (newline))))
+@end example
+
+可以在新的建议机制中翻译成一个简单的函数：
+
+@example
+(defun previous-line--next-line-at-end (&optional arg try-vscroll)
+  "Insert an empty line when moving up from the top line."
+  (if (and next-line-add-newlines (= arg 1)
+           (save-excursion (beginning-of-line) (bobp)))
+      (progn
+        (beginning-of-line)
+        (newline))))
+@end example
+
+显然，这实际上并没有修改@code{previous-line}。  为此，需要使用旧的建议：
+@example
+(ad-activate 'previous-line)
+@end example
+而新的建议机制需要：
+@example
+(advice-add 'previous-line :before #'previous-line--next-line-at-end)
+@end example
+
+请注意，@code{ad-activate}具有全局效果：它激活了为该指定函数启用的所有建议。  如果您只想激活或停用特定块，则需要使用 @code{ad-enable-advice} 和 @code{ad-disable-advice} @emph{enable} 或 @emph{disable} 它。新机制消除了这种区别。
+
+周围的建议，例如：
+
+@example
+(defadvice foo (around foo-around)
+  "Ignore case in `foo'."
+  (let ((case-fold-search t))
+    ad-do-it))
+(ad-activate 'foo)
+@end example
+
+可以翻译成：
+
+@example
+(defun foo--foo-around (orig-fun &rest args)
+  "Ignore case in `foo'."
+  (let ((case-fold-search t))
+    (apply orig-fun args)))
+(advice-add 'foo :around #'foo--foo-around)
+@end example
+
+关于建议的@emph{class}，请注意，新的@code{:before}并不完全等同于旧的@code{before}，因为在旧的建议中，您可以修改函数的参数（例如，使用@code{ad-set-arg}），这会影响原始函数看到的参数值，而在新的@code{:before}中，通过建议中的@code{setq}修改参数没有效果关于原始函数看到的参数。当移植依赖于此行为的 @code{before} 建议时，您需要将其转换为新的 @code{:around} 或 @code{:filter-args} 建议。
+
+同样，旧的 @code{after} 建议可以通过更改 @code{ad-return-value} 来修改返回值，而新的 @code{:after} 建议则不能，因此在移植此类旧的 @code{after} 建议时，您需要将其转换为新的 @code{:around} 或 @code{:filter-return} 建议。
+
+@c This is its own node because we link to it from *Help* buffers.
+@node Advice and Byte Code
+@subsection 建议和字节代码
+@cindex compiler macros, advising
+@cindex @code{byte-compile} and  @code{byte-optimize}, advising
+
+并非所有功能都能得到可靠的建议。  字节编译器可能会选择用一系列不调用您有兴趣更改的函数的指令来替换对函数的调用。
+
+这通常是由于以下三种机制之一而发生的：
+
+@table @asis
+@item @code{byte-compile}属性
+如果函数的符号具有 @code{byte-compile} 属性，则将使用该属性而不是符号的函数定义。 @xref{Compilation Functions}。
+
+@item @code{byte-optimize}属性
+如果函数的符号具有 @code{byte-optimize} 属性，则字节编译器可能会重写函数参数，或决定完全使用不同的函数。
+
+@item @code{compiler-macro} 声明表格
+函数在其定义中可以有一个特殊的 @code{compiler-macro} @code{declare} 形式 (@pxref{Declare Form})，它定义了编译函数时要调用的 @dfn{expander}。  然后，扩展器可能会导致生成的字节码不调用原始函数。
+@end table
+
+@node Obsolete Functions
+@section 声明函数已过时
+@cindex obsolete functions
+
+您可以将命名函数标记为@dfn{obsolete}，这意味着它可能在将来的某个时候被删除。  这会导致 Emacs 在字节编译包含该函数的代码时以及显示该函数的文档时警告该函数已过时。  在所有其他方面，过时函数的行为与任何其他函数一样。
+
+将函数标记为过时的最简单方法是在函数的 @code{defun} 定义中放置 @code{(declare (obsolete @dots{}))} 形式。  @xref{Declare Form}。  或者，您可以使用 @code{make-obsolete} 函数，如下所述。
+
+宏 (@pxref{Macros}) 也可以用 @code{make-obsolete} 标记为废弃；这与函数具有相同的效果。  函数或宏的别名也可以标记为已过时；这使得别名本身过时，而不是它解析为的函数或宏过时。
+
+@defun make-obsolete obsolete-name current-name when
+此函数将 @var{obsolete-name} 标记为已过时。 @var{obsolete-name} 应该是命名函数或宏的符号，或者是函数或宏的别名。
+
+如果 @var{current-name} 是一个符号，则警告消息会提示使用 @var{current-name} 而不是 @var{obsolete-name}。  @var{current-name} 不需要是 @var{obsolete-name} 的别名；它可以是具有相似功能的不同函数。  @var{current-name}也可以是字符串，作为警告信息。  该消息应以小写字母开头，并以句点结束。  它也可以是 @code{nil}，在这种情况下，警告消息不提供其他详细信息。
+
+参数 @var{when} 应该是一个字符串，指示该函数首次废弃的时间，例如日期或版本号。
+@end defun
+
+@defmac define-obsolete-function-alias obsolete-name current-name when &optional doc
+这个方便的宏将函数 @var{obsolete-name} 标记为过时，并将其定义为函数 @var{current-name} 的别名。它相当于以下内容：
+
+@example
+(defalias @var{obsolete-name} @var{current-name} @var{doc})
+(make-obsolete @var{obsolete-name} @var{current-name} @var{when})
+@end example
+@end defmac
+
+此外，您可以将函数的特定调用约定标记为已过时：
+
+@defun set-advertised-calling-convention function signature when
+该函数将参数列表 @var{signature} 指定为调用 @var{function} 的正确方法。  这会导致 Emacs 字节编译器在遇到以任何其他方式调用 @var{function} 的 Emacs Lisp 程序时发出警告（但是，它仍然允许对代码进行字节编译）。  @var{when} 应该是一个字符串，指示变量首次废弃的时间（通常是版本号字符串）。
+
+例如，在旧版本的 Emacs 中，@code{sit-for} 函数接受三个参数，如下所示
+
+@example
+  (sit-for seconds milliseconds nodisp)
+@end example
+
+在过渡期间，该函数接受这三个参数，但声明此旧的调用约定已弃用，如下所示：
+
+@example
+(set-advertised-calling-convention
+  'sit-for '(seconds &optional nodisp) "22.1")
+@end example
+
+@noindent
+使用此函数的替代方法是 @code{advertised-calling-convention} @code{declare} 规范，请参阅 @ref{Declare Form}。
+@end defun
+
+@node Inline Functions
+@section 内联函数
+@cindex inline functions
+
+@dfn{inline function} 是一个与普通函数一样工作的函数，除了一件事：当您对函数 (@pxref{Byte Compilation}) 的调用进行字节编译时，函数的定义将扩展到调用者中。
+
+定义内联函数的简单方法是编写 @code{defsubst} 而不是 @code{defun}。  定义的其余部分看起来一样，但使用 @code{defsubst} 表示使其内联以进行字节编译。
+
+@defmac defsubst name args [doc] [declare] [interactive] body@dots{}
+该宏定义了一个内联函数。  它的语法与@code{defun} (@pxref{Defining Functions}) 完全相同。
+@end defmac
+
+使函数内联通常会使其函数调用运行得更快。但它也有缺点。  一方面，它降低了灵活性；另一方面，它也降低了灵活性。如果您更改函数的定义，则已内联的调用仍使用旧定义，直到您重新编译它们为止。
+
+另一个缺点是，内联大型函数会增加文件和内存中编译代码的大小。  由于内联函数的速度优势对于小函数来说是最大的，因此通常不应该使大函数内联。
+
+此外，内联函数在调试、跟踪和建议方面表现不佳 (@pxref{Advising Functions})。  由于易于调试和重新定义函数的灵活性是 Emacs 的重要特性，因此您不应该内联函数，即使它很小，除非它的速度确实至关重要，并且您已经对代码进行了计时以验证使用 @code{defun} 是否确实存在性能问题。
+
+定义内联函数后，稍后可以在同一文件中执行其内联扩展，就像宏一样。
+
+可以使用 @code{defmacro} 定义宏来扩展为内联函数执行的相同代码 (@pxref{Macros})。  但该宏仅限于在表达式中直接使用——不能使用 @code{apply}、@code{mapcar} 等调用宏。  此外，将普通函数转换为宏也需要一些工作。  将其转换为内联函数很容易；只需将 @code{defun} 替换为 @code{defsubst} 即可。  由于内联函数的每个参数只计算一次，因此您不必担心函数体使用参数的次数，就像处理宏一样。
+
+或者，您可以通过提供将函数内联为编译器宏 (@pxref{Declare Form}) 的代码来定义函数。  以下宏使这成为可能。
+
+@c FIXME: Can define-inline use the interactive spec?
+@defmac define-inline name args [doc] [declare] body@dots{}
+通过提供内联代码来定义函数@var{name}，作为编译器宏。  该函数将接受参数列表 @var{args} 并具有指定的 @var{body}。
+
+如果存在，@var{doc} 应该是函数的文档字符串 (@pxref{Function Documentation})； @var{declare}（如果存在）应该是 @code{declare} 形式 (@pxref{Declare Form})，指定函数的元数据。  除了通常的声明之外，当非 @code{nil} @var{NOINLINE} 阻止 Emacs 内联定义的函数时，@var{declare} 还可以包含 @code{(noinline @var{NOINLINE})}。
+@end defmac
+
+通过 @code{define-inline} 定义的函数相对于 @code{defsubst} 或 @code{defmacro} 定义的宏有几个优点：
+
+@itemize @minus
+@item 
+它们可以传递给@code{mapcar} (@pxref{Mapping Functions})。
+
+@item 
+他们更有效率。
+
+@item 
+它们可以用作 @dfn{place forms} 来存储值 (@pxref{Generalized Variables})。
+
+@item 
+它们的行为方式比 0⁣ (@pxref{Argument Lists,,, cl, Common Lisp Extensions for GNU Emacs Lisp}) 更可预测。
+@end itemize
+
+与 @code{defmacro} 一样，内联于 @code{define-inline} 的函数从调用点继承动态或词法的作用域规则。  @xref{Variable Scoping}。
+
+以下宏应该用在 @code{define-inline} 定义的函数体内。
+
+@defmac inline-quote expression
+为@code{define-inline}引用@var{expression}。  这与反引号 (@pxref{Backquote}) 类似，但引用代码并且仅接受 @code{,}，而不是 @code{,@@}。
+@end defmac
+
+@defmac inline-letevals (bindings@dots{}) body@dots{}
+这提供了一种方便的方法来确保内联函数的参数仅计算一次，以及创建局部变量。
+
+它类似于 @code{let} (@pxref{Local Variables})：它设置由 @var{bindings} 指定的局部变量，然后使用这些有效的绑定来计算 @var{body}。
+
+@var{bindings} 的每个元素应该是一个符号或@w{@code{(@var{var} @var{expr})}} 形式的列表；结果是评估 @var{expr} 并将 @var{var} 绑定到结果。  然而，当@var{bindings}的元素只是一个符号@var{var}时，@var{var}的计算结果会重新绑定到@var{var}（这与@code{let}的工作方式完全不同）。
+
+@var{bindings} 的尾部可以是 @code{nil} 也可以是一个包含参数列表的符号，在这种情况下，每个参数都会被求值，并且该符号会绑定到结果列表。
+@end defmac
+
+@defmac inline-const-p expression
+如果 @var{expression} 的值已知，则返回非 @code{nil}。
+@end defmac
+
+@defmac inline-const-val expression
+返回 @var{expression} 的值。
+@end defmac
+
+@defmac inline-error format &rest args
+发出错误信号，根据 @var{format} 格式化 @var{args}。
+@end defmac
+
+这是使用 @code{define-inline} 的示例：
+
+@lisp
+(define-inline myaccessor (obj)
+  (inline-letevals (obj)
+    (inline-quote (if (foo-p ,obj) (aref (cdr ,obj) 3) (aref ,obj 2)))))
+@end lisp
+
+@noindent
+这相当于
+
+@lisp
+(defsubst myaccessor (obj)
+  (if (foo-p obj) (aref (cdr obj) 3) (aref obj 2)))
+@end lisp
+
+@node Declare Form
+@section @code{declare} 形式
+@findex declare
+
+@code{declare} 是一个特殊的宏，可用于向函数或宏添加元属性：例如，将其标记为过时，或者在 Emacs Lisp 模式下为其形式提供特殊的 @key{TAB} 缩进约定。
+
+@anchor{Definition of declare}
+@defmac declare specs@dots{}
+该宏忽略其参数并计算为@code{nil}；它没有运行时效果。  但是，当 @code{declare} 形式出现在 @code{defun} 或 @code{defsubst} 函数定义 (@pxref{Defining Functions}) 或 @code{defmacro} 宏定义 (@pxref{Defining Macros}) 的 @var{declare} 参数中时，它会将 @var{specs} 指定的属性附加到函数或宏。  这项工作是由@code{defun}、@code{defsubst}、@code{defmacro}专门完成的。
+
+@var{specs} 中的每个元素应采用 @code{(@var{property} @var{args}@dots{})} 的形式，且不应加引号。  这些具有以下效果：
+
+@table @code
+@cindex @code{advertised-calling-convention} (@code{declare} spec)
+@item (advertised-calling-convention @var{signature} @var{when})
+这就像调用 @code{set-advertised-calling-convention} (@pxref{Obsolete Functions})； @var{signature} 指定用于调用函数或宏的正确参数列表，@var{when} 应该是一个字符串，指示旧参数列表首次废弃的时间。
+
+@item (debug @var{edebug-form-spec})
+这仅对宏有效。  使用 Edebug 单步执行宏时，请使用 @var{edebug-form-spec}。  @xref{Instrumenting Macro Calls}。
+
+@item (doc-string @var{n})
+在定义函数或宏时使用它，该函数或宏本身将用于定义函数、宏或变量等实体。  它指示第 0 个参数（如果有）应被视为文档字符串。
+
+@item (indent @var{indent-spec})
+根据 @var{indent-spec} 缩进对此函数或宏的调用。这通常用于宏，但也适用于函数。 @xref{Indenting Macros}。
+
+@cindex @code{autoload-macro} (@code{declare} spec)
+@item (autoload-macro @var{value})
+这在定义宏时使用。  如果@var{value}为@samp{expand}，则在自动加载注释之后对宏的任何调用将首先在自动加载生成期间展开。  此声明用作硬编码宏列表的替代方法，以在 @code{loaddefs-generate--make-autoload} 中扩展。  @xref{Autoload}。
+
+@item (interactive-only @var{value})
+将函数的 @code{interactive-only} 属性设置为 @var{value}。 @xref{The interactive-only property}。
+
+@cindex @code{obsolete} (@code{declare} spec)
+@item (obsolete @var{current-name} @var{when})
+将函数或宏标记为已过时，类似于调用 @code{make-obsolete} (@pxref{Obsolete Functions})。  @var{current-name} 应该是一个符号（在这种情况下，警告消息会提示使用该符号）、字符串（指定警告消息）或 @code{nil} （在这种情况下，警告消息不会提供额外的详细信息）。  @var{when} 应该是一个字符串，指示函数或宏首次废弃的时间。
+
+@cindex compiler macro
+@item (compiler-macro @var{expander})
+这只能用于函数，并告诉编译器使用 @var{expander} 作为优化函数。  当遇到对 @code{(@var{function} @var{args}@dots{})} 形式的函数调用时，宏扩展器将使用该形式以及 @var{args}@dots{} 调用 @var{expander}，并且 @var{expander} 可以返回一个新的表达式来代替函数调用，也可以仅返回未更改的形式，以指示函数调用应该保持不变。
+
+当 @var{expander} 是 lambda 形式时，应使用单个参数编写（即采用 @code{(lambda (@var{arg}) @var{body})} 形式），因为函数的形式参数会自动添加到 lambda 的参数列表中。
+
+@item (gv-expander @var{expander})
+将 @var{expander} 声明为将宏（或函数）调用处理为广义变量的函数，与 @code{gv-define-expander} 类似。 @var{expander} 可以是一个符号，也可以是 @code{(lambda (@var{arg}) @var{body})} 的形式，在这种情况下，该函数还可以访问宏（或函数）的参数。
+
+@item (gv-setter @var{setter})
+将 @var{setter} 声明为处理对宏（或函数）的调用作为广义变量的函数。  @var{setter} 可以是一个符号，在这种情况下，它将被传递到 @code{gv-define-simple-setter}，或者它可以是 @code{(lambda (@var{arg}) @var{body})} 的形式，在这种情况下，该函数将另外可以访问宏（或函数）的参数，并将被传递到 @code{gv-define-setter}。
+
+@item (completion @var{completion-predicate})
+将@var{completion-predicate}声明为函数，以确定在要求@kbd{M-x}中完成时是否在函数列表中包含函数的符号。  仅当@code{read-extended-command-predicate}定制为@code{command-completion-default-include-p}时才会调用该谓词函数；默认情况下，@code{read-extended-command-predicate} 的值为 nil (@pxref{Interactive Call, execute-extended-command})。  谓词 @var{completion-predicate} 使用两个参数调用：函数的符号和当前缓冲区。
+
+@item (modes @var{modes})
+指定该命令仅适用于指定的@var{modes}。  @xref{Command Modes}。
+
+@item (interactive-args @var{arg} ...)
+指定应为 @code{repeat-command} 存储的参数。每个 @var{arg} 都采用 @code{@var{argument-name} @var{form}} 形式。
+
+@item (pure @var{val})
+如果@var{val}非@code{nil}，则该函数为@dfn{pure} (@pxref{What Is a Function})。  这与函数符号 (@pxref{Standard Properties}) 的 @code{pure} 属性相同。
+
+@item (side-effect-free @var{val})
+如果@var{val}非@code{nil}，则该函数没有副作用，因此字节编译器可以忽略其值被忽略的调用。  这与函数符号 @pxref{Standard Properties} 的 @code{side-effect-free} 属性相同。
+
+@item (important-return-value @var{val})
+如果@var{val}非@code{nil}，字节编译器将警告对该函数的调用不使用返回值。  这与函数符号 @pxref{Standard Properties} 的 @code{important-return-value} 属性相同。
+
+@item (speed @var{n})
+指定对此函数的本机编译有效的 @code{native-comp-speed} 值 (@pxref{Native-Compilation Variables})。这允许对用于为函数发出的本机代码的优化级别进行函数级控制。  特别是，如果@var{n}是@minus{}1，函数的本机编译将生成字节码而不是函数的本机代码。
+
+@item (safety @var{n})
+指定对此函数有效的 @code{compilation-safety} 值。  这允许对功能 (@pxref{Native-Compilation Variables}) 发出的代码所使用的安全级别进行功能级别控制。
+
+@cindex function type declaration
+@cindex inferred type of function
+@item (ftype @var{type} &optional @var{function})
+声明 @var{type} 为该函数的类型。  @code{describe-function} 使用此类型进行文档编写，本机编译器 (@pxref{Native Compilation}) 使用此类型来优化代码生成和推断类型。  不正确的类型声明可能会导致本机编译的代码崩溃（见下文）。  具有类型声明的函数由 @kbd{C-h C-f} 显示为具有 @dfn{declared type}，而没有类型声明的函数则由 @dfn{inferred type} 表示。
+
+@var{type} 是 @w{@code{(function (@var{arg-1-type} @dots{} @var{arg-n-type}) RETURN-TYPE)}} 形式的 @dfn{type specifier} (@pxref{Type Specifiers})。  参数类型可以与 @code{&optional} 和 @code{&rest} 交错以反映函数的调用约定 (@pxref{Argument List})。
+
+@var{function} 如果存在，则应该是正在定义的函数的名称。
+
+下面是在 @code{declare} 中使用 @code{ftype} 定义函数 @code{positive-p} 的示例，该函数采用 @var{number} 类型的参数并返回 @var{boolean}：
+
+@lisp
+@group
+(defun positive-p (x)
+  (declare (ftype (function (number) boolean)))
+  (when (> x 0)
+    t))
+@end group
+@end lisp
+
+类似地，这定义了一个函数 @code{cons-or-number}，它采用 @var{cons} 或 @var{number} 类型的第一个参数、@var{string} 类型的第二个可选参数，并返回符号 @code{is-cons} 或 @code{is-number} 之一：
+
+@lisp
+@group
+(defun cons-or-number (x &optional err-msg)
+  (declare (ftype (function ((or cons number) &optional string)
+			    (member is-cons is-number))))
+  (if (consp x)
+      'is-cons
+    (if (numberp x)
+	'is-number
+      (error (or err-msg "Unexpected input")))))
+@end group
+@end lisp
+
+有关其他类型的说明，请参阅@ref{Lisp Data Types})。
+
+声明类型不正确的函数会导致未定义的行为。如果这样的函数是在 @code{compilation-safety} 设置为零 (@pxref{compilation-safety}) 的情况下进行本机编译的，则可能会导致错误执行，甚至在加载编译代码时 Emacs 崩溃。重新定义或建议类型声明函数必须保留原始签名以避免这些问题。
+
+@item no-font-lock-keyword
+这仅对宏有效。  具有此声明的宏将通过 font-lock (@pxref{Font Lock Mode}) 突出显示为普通函数，而不是专门作为宏。
+@end table
+
+@end defmac
+
+@node Declaring Functions
+@section 告诉编译器函数已定义
+@cindex function declaration
+@cindex declaring functions
+@findex declare-function
+
+对文件进行字节编译通常会产生有关编译器不知道的函数的警告 (@pxref{Compiler Errors})。  有时这表明存在真正的问题，但通常有问题的函数是在其他文件中定义的，如果运行该代码，这些文件将被加载。  例如，字节编译@file{simple.el}用于警告：
+
+@example
+simple.el:8727:1:Warning: the function `shell-mode' is not known to be
+    defined.
+@end example
+
+事实上，@code{shell-mode}仅在调用@code{shell-mode}之前执行@code{(require 'shell)}的函数中使用，因此@code{shell-mode}将在运行时正确定义。  当您知道此类警告并不表示真正的问题时，最好抑制该警告。  这使得新的警告可能意味着真正的问题更加明显。  您可以使用 @code{declare-function} 来完成此操作。
+
+您需要做的就是在第一次使用相关函数之前添加一个 @code{declare-function} 语句：
+
+@example
+(declare-function shell-mode "shell" ())
+@end example
+
+这表示 @code{shell-mode} 是在 @file{shell.el} 中定义的（@samp{.el} 可以省略）。  编译器理所当然地认为该文件确实定义了该函数，并且不进行检查。
+
+可选的第三个参数指定 @code{shell-mode} 的参数列表。  在这种情况下，它不接受任何参数（@code{nil} 与不指定值不同）。  在其他情况下，这可能类似于 @code{(file &optional overwrite)}。您不必指定参数列表，但如果指定，字节编译器可以检查调用是否与声明匹配。
+
+@defmac declare-function function file &optional arglist fileonly
+告诉字节编译器假设 @var{function} 是在文件 @var{file} 中定义的。  可选的第三个参数@var{arglist}可以是@code{t}（表示参数列表未指定），也可以是与@code{defun}样式相同的形式参数列表（包括括号）。  省略的@var{arglist}默认为@code{t}，而不是@code{nil}；这是省略参数的非典型行为，这意味着要提供第四个而不是第三个参数，必须为第三个参数占位符指定 @code{t} 而不是通常的 @code{nil}。  可选的第四个参数@var{fileonly}非@code{nil}意味着仅检查@var{file}是否存在，而不是它实际定义了@var{function}。
+@end defmac
+
+@findex check-declare-file
+@findex check-declare-directory
+要验证这些函数是否确实在 @code{declare-function} 指定的位置声明，请使用 @code{check-declare-file} 检查一个源文件中的所有 @code{declare-function} 调用，或使用 @code{check-declare-directory} 检查某个目录中及其下的所有文件。
+
+这些命令使用 @code{locate-library} 查找应该包含函数定义的文件；如果找不到文件，它们会相对于包含 @code{declare-function} 调用的文件的目录扩展定义文件名。
+
+您还可以通过指定以 @samp{.c} 或 @samp{.m} 结尾的文件名来表示函数是原语。  仅当您调用仅在某些系统上定义的原语时，这才有用。  大多数原语总是被定义的，所以它们永远不会给你警告。
+
+有时，文件会选择使用外部包中的函数。如果在 @code{declare-function} 语句中的文件名前面加上 @samp{ext:}，那么将检查是否找到，否则跳过，不会出现错误。
+
+有一些 @samp{check-declare} 不理解的函数定义（例如，@code{defstruct} 和一些其他宏）。  在这种情况下，您可以将非 @code{nil} @var{fileonly} 参数传递给 @code{declare-function}，这意味着仅检查文件是否存在，而不是它实际定义了函数。  请注意，要执行此操作而不必指定参数列表，您应该将 @var{arglist} 参数设置为 @code{t} （因为 @code{nil} 表示空参数列表，而不是未指定的参数列表）。
+
+@node Function Safety
+@section 确定函数是否可以安全调用
+@cindex function safety
+@cindex safety of functions
+
+一些主要模式，例如SES，调用存储在用户文件中的函数。  （@xref{Top, Simple Emacs Spreadsheet,,ses}，有关 SES@. 的更多信息）用户文件的来源有时很差——您可以从刚认识的人那里获取电子表格，也可以通过电子邮件从从未见过的人那里获取电子表格。  因此，在确定其安全之前，调用源代码存储在用户文件中的函数是有风险的。
+
+@defun unsafep form &optional unsafep-vars
+如果 @var{form} 是 @dfn{safe} Lisp 表达式，则返回 @code{nil}，或者返回一个描述其不安全原因的列表。  参数 @var{unsafep-vars} 是已知此时具有临时绑定的符号列表；主要用于内部递归调用。  当前缓冲区是一个隐式参数，它提供了缓冲区本地绑定的列表。
+@end defun
+
+由于快速而简单，@code{unsafep} 进行了非常简单的分析，并拒绝了许多实际上安全的 Lisp 表达式。  尚无 @code{unsafep} 对于不安全表达式返回 @code{nil} 的已知情况。  然而，安全的 Lisp 表达式可以返回具有 @code{display} 属性的字符串，其中包含要在字符串插入缓冲区后执行的关联 Lisp 表达式。此关联表达式可能是恶意的。  为了安全起见，您必须先从用户代码计算的所有字符串中删除属性，然后再将它们插入缓冲区。
+
+@ignore
+What is a safe Lisp expression?  Basically, it's an expression that
+calls only built-in functions with no side effects (or only innocuous
+ones).  Innocuous side effects include displaying messages and
+altering non-risky buffer-local variables (but not global variables).
+
+@table @dfn
+@item Safe expression
+@itemize
+@item
+An atom or quoted thing.
+@item
+A call to a safe function (see below), if all its arguments are
+safe expressions.
+@item
+One of the special forms @code{and}, @code{catch}, @code{cond},
+@code{if}, @code{or}, @code{prog1}, @code{prog2}, @code{progn},
+@code{while}, and @code{unwind-protect}], if all its arguments are
+safe.
+@item
+A form that creates temporary bindings (@code{condition-case},
+@code{dolist}, @code{dotimes}, @code{lambda}, @code{let}, or
+@code{let*}), if all args are safe and the symbols to be bound are not
+explicitly risky (@pxref{File Local Variables}).
+@item
+An assignment using @code{add-to-list}, @code{setq}, @code{push}, or
+@code{pop}, if all args are safe and the symbols to be assigned are
+not explicitly risky and they already have temporary or buffer-local
+bindings.
+@item
+One of [apply, mapc, mapcar, mapconcat] if the first argument is a
+safe explicit lambda and the other args are safe expressions.
+@end itemize
+
+@item Safe function
+@itemize
+@item
+A lambda containing safe expressions.
+@item
+A symbol on the list @code{safe-functions}, so the user says it's safe.
+@item
+A symbol with a non-@code{nil} @code{side-effect-free} property.
+@item
+A symbol with a non-@code{nil} @code{safe-function} property.  The
+value @code{t} indicates a function that is safe but has innocuous
+side effects.  Other values will someday indicate functions with
+classes of side effects that are not always safe.
+@end itemize
+
+The @code{side-effect-free} and @code{safe-function} properties are
+provided for built-in functions and for low-level functions and macros
+defined in @file{subr.el}.  You can assign these properties for the
+functions you write.
+@end table
+@end ignore
+
+@node Related Topics
+@section 与函数相关的其他主题
+
+下面是几个函数的表，这些函数执行与函数调用和函数定义相关的操作。  它们在其他地方有记录，但我们在这里提供交叉引用。
+
+@table @code
+@item apply
+@xref{Calling Functions}.
+
+@item autoload
+@xref{Autoload}.
+
+@item call-interactively
+@xref{Interactive Call}.
+
+@item called-interactively-p
+@xref{Distinguish Interactive}.
+
+@item commandp
+@xref{Interactive Call}.
+
+@item documentation
+@xref{Accessing Documentation}.
+
+@item eval
+@xref{Eval}.
+
+@item funcall
+@xref{Calling Functions}.
+
+@item function
+@xref{Anonymous Functions}.
+
+@item ignore
+@xref{Calling Functions}.
+
+@item indirect-function
+@xref{Function Indirection}.
+
+@item interactive
+@xref{Using Interactive}.
+
+@item interactive-p
+@xref{Distinguish Interactive}.
+
+@item mapatoms
+@xref{Creating Symbols}.
+
+@item mapcar
+@xref{Mapping Functions}.
+
+@item map-char-table
+@xref{Char-Tables}.
+
+@item mapconcat
+@xref{Mapping Functions}.
+
+@item undefined
+@xref{Functions for Key Lookup}.
+@end table

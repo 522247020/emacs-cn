@@ -1,0 +1,1907 @@
+@c -*- mode: texinfo; coding: utf-8 -*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--2026 Free Software Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Control Structures
+@chapter 控制结构
+@cindex special forms for control structures
+@cindex forms for control structures
+@cindex control structures
+
+Lisp 程序由一组 @dfn{expressions} 或 @dfn{forms} (@pxref{Forms}) 组成。  我们通过将这些形式括在 @dfn{control structures} 中来控制它们的执行顺序。  控制结构是特殊的形式，它控制何时、是否或多少次执行它们所包含的形式。
+
+@cindex textual order
+最简单的执行顺序是顺序执行：首先形成@var{a}，然后形成@var{b}，依此类推。  当您在函数体中或在 Lisp 代码文件的顶层连续编写多个表单时，就会发生这种情况——表单按照写入的顺序执行。  我们称之为@dfn{textual order}。  例如，如果函数体由两种形式 @var{a} 和 @var{b} 组成，则函数的求值首先求值 @var{a}，然后求值 @var{b}。  @var{b} 的计算结果成为函数的值。
+
+显式控制结构使得除顺序之外的执行顺序成为可能。
+
+Emacs Lisp 提供了多种控制结构，包括其他种类的排序、条件、迭代和（受控）跳转——所有这些都在下面讨论。  内置控制结构是特殊形式，因为它们的子形式不一定被求值或不按顺序求值。  您可以使用宏来定义自己的控制结构构造 (@pxref{Macros})。
+
+@menu
+* Sequencing::                   按文本顺序进行评估。
+* Conditionals::                 @code{if}, @code{cond}, @code{when}, @code{unless}.
+* Combining Conditions::         @code{and}、@code{or}、@code{not}，还有朋友们。
+* Pattern-Matching Conditional::   如何使用@code{pcase}和朋友。
+* Iteration::                    @code{while} 循环。
+* Generators::                   通用序列和协程。
+* Nonlocal Exits::               跳出序列。
+* Conditional Compilation::      像 C 的 #if 一样的功能。
+@end menu
+
+@node Sequencing
+@section 测序
+@cindex sequencing
+@cindex sequential execution
+@cindex forms for sequential execution
+
+按照表单出现的顺序评估表单是控制权从一种表单传递到另一种表单的最常见方式。  在某些情况下，例如在函数体中，这会自动发生。  在其他地方，您必须使用控制结构构造来执行此操作：@code{progn}，Lisp 最简单的控制构造。
+
+@code{progn} 特殊形式如下所示：
+
+@example
+@group
+(progn @var{a} @var{b} @var{c} @dots{})
+@end group
+@end example
+
+@noindent
+它表示按顺序执行形式 @var{a}、@var{b}、@var{c} 等。  这些形式称为 @code{progn} 形式的 @dfn{body} 。主体中最后一个形式的值成为整个@code{progn}的值。  @code{(progn)} 返回@code{nil}。
+
+@cindex implicit @code{progn}
+在 Lisp 的早期，@code{progn} 是连续执行两个或多个形式并使用最后一个形式的值的唯一方法。但程序员发现他们经常需要在函数体中使用@code{progn}，而（当时）只允许一种形式。  因此，函数的主体被制成隐式的 @code{progn}：允许多种形式，就像实际的 @code{progn} 的主体一样。许多其他控制结构同样包含隐式 @code{progn}。结果，@code{progn} 不再像多年前那样被使用。现在最常需要在 @code{unwind-protect}、@code{and}、@code{or} 或 @code{if} 的 @var{then} 部分中。
+
+@defspec progn forms@dots{}
+这种特殊形式按文本顺序评估所有 @var{forms}，返回最终形式的结果。
+
+@example
+@group
+(progn (print "The first form")
+       (print "The second form")
+       (print "The third form"))
+     @print{} "The first form"
+     @print{} "The second form"
+     @print{} "The third form"
+@result{} "The third form"
+@end group
+@end example
+@end defspec
+
+另外两个构造同样评估一系列形式，但返回不同的值：
+
+@defspec prog1 form1 forms@dots{}
+这种特殊形式按文本顺序计算 @var{form1} 和所有 @var{forms}，返回 @var{form1} 的结果。
+
+@example
+@group
+(prog1 (print "The first form")
+       (print "The second form")
+       (print "The third form"))
+     @print{} "The first form"
+     @print{} "The second form"
+     @print{} "The third form"
+@result{} "The first form"
+@end group
+@end example
+
+以下是从变量 @code{x} 中的列表中删除第一个元素，然后返回前一个元素的值的方法：
+
+@example
+(prog1 (car x) (setq x (cdr x)))
+@end example
+@end defspec
+
+@defspec prog2 form1 form2 forms@dots{}
+这种特殊形式按文本顺序计算 @var{form1}、@var{form2} 以及所有后续 @var{forms}，并返回 @var{form2} 的结果。
+
+@example
+@group
+(prog2 (print "The first form")
+       (print "The second form")
+       (print "The third form"))
+     @print{} "The first form"
+     @print{} "The second form"
+     @print{} "The third form"
+@result{} "The second form"
+@end group
+@end example
+@end defspec
+
+@node Conditionals
+@section 条件句
+@cindex conditional evaluation
+@cindex forms, conditional
+
+条件控制结构在替代方案中进行选择。  Emacs Lisp 有五种条件形式： @code{if}，与其他语言非常相似； @code{when}和@code{unless}，它们是@code{if}的变体； @code{cond}，这是一个广义的 case 语句；和@code{pcase}，它是@code{cond}（@pxref{Pattern-Matching Conditional}）的推广。
+
+@defspec if condition then-form else-forms@dots{}
+@code{if} 根据 @var{condition} 的值在 @var{then-form} 和 @var{else-forms} 之间进行选择。  如果计算的 @var{condition} 为非 @code{nil}，则计算 @var{then-form} 并返回结果。否则，按文本顺序计算 7 ，并返回最后一个的值。  （@code{if} 的 @var{else} 部分是隐式 @code{progn}.@xref{Sequencing} 的示例。）
+
+如果 @var{condition} 的值为 @code{nil}，且未给出 @var{else-forms}，则 @code{if} 返回 @code{nil}。
+
+@code{if} 是一种特殊形式，因为未选择的分支永远不会被评估——它会被忽略。  因此，在这个例子中， @code{true} 不会被打印，因为 @code{print} 从未被调用：
+
+@example
+@group
+(if nil
+    (print 'true)
+  'very-false)
+@result{} very-false
+@end group
+@end example
+@end defspec
+
+@defmac when condition then-forms@dots{}
+这是 @code{if} 的变体，其中没有 @var{else-forms}，并且可能有几个 @var{then-forms}。  尤其，
+
+@example
+(when @var{condition} @var{a} @var{b} @var{c})
+@end example
+
+@noindent
+完全等价于
+
+@example
+(if @var{condition} (progn @var{a} @var{b} @var{c}) nil)
+@end example
+@end defmac
+
+@defmac unless condition forms@dots{}
+这是 @code{if} 的变体，其中没有 @var{then-form}：
+
+@example
+(unless @var{condition} @var{a} @var{b} @var{c})
+@end example
+
+@noindent
+完全等价于
+
+@example
+(if @var{condition} nil
+   @var{a} @var{b} @var{c})
+@end example
+@end defmac
+
+@defspec cond clause@dots{}
+@code{cond} 在任意数量的备选方案中进行选择。  @code{cond} 中的每个 @var{clause} 必须是一个列表。  该列表的@sc{car}是@var{condition}；其余元素（如果有）为@var{body-forms}。  因此，一个子句看起来像这样：
+
+@example
+(@var{condition} @var{body-forms}@dots{})
+@end example
+
+@code{cond} 通过评估每个子句的 @var{condition} 来按文本顺序尝试子句。  如果@var{condition}的值为非@code{nil}，则该子句成功；然后@code{cond}评估其@var{body-forms}，并返回@var{body-forms}的最后一个值。任何剩余的子句都将被忽略。
+
+如果 @var{condition} 的值为 @code{nil}，则该子句失败，因此 @code{cond} 移至下一个子句，尝试其 @var{condition}。
+
+子句也可能如下所示：
+
+@example
+(@var{condition})
+@end example
+
+@noindent
+然后，如果测试时 @var{condition} 为非 @code{nil}，则 @code{cond} 形式返回 @var{condition} 的值。
+
+如果每个 @var{condition} 的计算结果为 @code{nil}，因此每个子句都失败，则 @code{cond} 返回 @code{nil}。
+
+以下示例有四个子句，分别测试 @code{x} 的值是数字、字符串、缓冲区和符号的情况：
+
+@example
+@group
+(cond ((numberp x) x)
+      ((stringp x) x)
+      ((bufferp x)
+       (setq temporary-hack x) ; @r{multiple body-forms}
+       (buffer-name x))        ; @r{in one clause}
+      ((symbolp x) (symbol-value x)))
+@end group
+@end example
+
+通常，当前面的子句都没有成功时，我们希望执行最后一个子句。  为此，我们使用 @code{t} 作为最后一个子句的 @var{condition}，如下所示：@code{(t @var{body-forms})}。  形式 @code{t} 的计算结果为 @code{t}，它永远不会是 @code{nil}，因此只要 @code{cond} 能够到达它，这个子句就永远不会失败。  例如：
+
+@example
+@group
+(setq a 5)
+(cond ((eq a 'hack) 'foo)
+      (t "default"))
+@result{} "default"
+@end group
+@end example
+
+@noindent
+如果 2⁣ 的值为 3⁣，则此 @code{cond} 表达式返回 @code{foo}，否则返回字符串 @code{"default"}。
+@end defspec
+
+任何条件结构都可以用 @code{cond} 或 @code{if} 来表达。  因此，它们之间的选择是风格问题。例如：
+
+@example
+@group
+(if @var{a} @var{b} @var{c})
+@equiv{}
+(cond (@var{a} @var{b}) (t @var{c}))
+@end group
+@end example
+
+结合使用条件来绑定变量可以很方便。  通常的情况是，您计算一个值，然后如果该值非 0⁣ 则想要对该值执行某些操作。  最简单的方法就是直接写，例如：
+
+@example
+(let ((result1 (do-computation)))
+  (when result1
+    (let ((result2 (do-more result1)))
+      (when result2
+        (do-something result2)))))
+@end example
+
+由于这是一种非常常见的模式，Emacs 提供了许多宏来使其更容易且更具可读性。  上面的内容可以写成下面的形式：
+
+@example
+(when-let* ((result1 (do-computation))
+            (result2 (do-more result1)))
+  (do-something result2))
+@end example
+
+该主题有多种变体，如下所述。
+
+@defmac if-let* varlist then-form else-forms...
+评估 @var{varlist} 中的每个绑定，如果绑定值为 @code{nil} 则停止。  如果全部都是非@code{nil}，则返回@var{then-form}的值，否则返回@var{else-forms}中的最后一种形式。
+
+@code{varlist} 的每个元素具有 @w{@code{(@var{symbol} @var{value-form})}} 的形式：计算 @var{value-form} 且 @var{symbol} 局部绑定到结果。  绑定是连续的，如 @code{let*} (@pxref{Local Variables}) 中所示。  如果仅对 @var{value-form} 的测试结果感兴趣，则对 @var{symbol} 使用 @code{_}。  然后计算@var{value-form}并检查@code{nil}，但其值不受限制。  作为一种特殊情况，@code{varlist} 的条目可能只是@code{@var{symbol}} 的形式，这意味着检查@code{nil} 符号的当前绑定。
+@end defmac
+
+@defmac when-let* varlist then-forms...
+评估 @var{varlist} 中的每个绑定，如果绑定值为 @code{nil} 则停止。  如果都不是@code{nil}，则返回@var{then-forms}中最后一个形式的值。
+
+@var{varlist} 具有与 @code{if-let*} 相同的形式： @code{varlist} 的每个元素具有@w{@code{(@var{symbol} @var{value-form})}} 的形式，其中 @var{value-form} 被求值，@var{symbol} 局部绑定到结果。  绑定是连续的，如 @code{let*} (@pxref{Local Variables}) 中所示。  如果仅对 @var{value-form} 的测试结果感兴趣，则对 @var{symbol} 使用 @code{_}。  然后计算@var{value-form}并检查@code{nil}，但其值不受限制。  作为一种特殊情况，@code{varlist}的条目可能只是@code{@var{symbol}}的形式，这意味着检查@code{nil}符号的当前绑定。
+@end defmac
+
+@defmac and-let* varlist then-forms...
+评估 @var{varlist} 中的每个绑定，如果绑定值为 @code{nil} 则停止。  如果全部都是非@code{nil}，则返回@var{then-forms}中最后一个形式的值，或者，如果没有@var{then-forms}，则返回最后一个绑定的值。
+
+@var{varlist} 具有与 @code{if-let*} 相同的形式： @code{varlist} 的每个元素具有@w{@code{(@var{symbol} @var{value-form})}} 的形式，其中 @var{value-form} 被求值，@var{symbol} 局部绑定到结果。  绑定是连续的，如 @code{let*} (@pxref{Local Variables}) 中所示。  如果仅对 @var{value-form} 的测试结果感兴趣，则对 @var{symbol} 使用 @code{_}。  然后计算@var{value-form}并检查@code{nil}，但其值不受限制。  作为一种特殊情况，@code{varlist}的条目可能只是@code{@var{symbol}}的形式，这意味着检查@code{nil}符号的当前绑定。
+@end defmac
+
+一些 Lisp 程序员遵循这样的约定： @code{and} 和 @code{and-let*} 用于评估返回值的形式，而 @code{when} 和 @code{when-let*} 则用于评估副作用并忽略返回值的形式。
+
+作为风格问题，最好不要使用这些宏来绑定始终为非 0 的值。  例如，假设 @code{foo-p} 和 @code{bar-p} 可能返回 @code{nil}，在这种情况下代码不应继续。  而不是
+
+@example
+(when-let* ((foo-val (foo-p))
+            (num (+ 2 foo-val))
+            (bar-val (bar-p num)))
+  ...)
+@end example
+
+@noindent
+考虑使用
+
+@example
+(when-let* ((foo-val (foo-p)))
+  (let ((num (+ 2 foo-val))
+    (when-let* ((bar-val (bar-p num)))
+      ...)))
+@end example
+
+@noindent
+因为这更清楚地表明，代码的执行取决于@code{foo-val}和@code{bar-val}非@code{nil}，但不直接以@code{num}为条件，而且永远不可能是@code{nil}。
+
+没有 @code{cond-let*} 宏，因为将 @code{if-let*}、@code{when-let*} 和 @code{and-let*} 共享的结构扩展到 @code{cond} 的情况并不简单。@footnote{The problem is that there are multiple ways to do it that are all useful but not compatible.  In addition, the resulting macro is complicated, and so tricky to learn how to read and write.} 但是，您可以使用 @code{cond*} 宏的 @code{bind-and*} 子句 (@pxref{cond* Macro}) 来实现类似的功能：
+
+@example
+(cond* ((bind-and* (result1 (do-computation))
+                   (result2 (do-more result1)))
+        (do-something result2))
+       ...)
+@end example
+
+存在一个类似的宏来运行循环，直到一个绑定的计算结果为@code{nil}：
+
+@defmac while-let spec then-forms...
+依次评估 @var{spec} 中的每个绑定，如果绑定值为 @code{nil} 则停止。  如果都非@code{nil}，则执行@var{then-forms}，然后重复循环。  请注意，重复循环时，会重新评估 5 中的 4 并重新建立绑定。
+
+@var{varlist} 具有与 @code{if-let*} 相同的形式： @code{varlist} 的每个元素具有@w{@code{(@var{symbol} @var{value-form})}} 的形式，其中 @var{value-form} 被求值，@var{symbol} 局部绑定到结果。  绑定是连续的，如 @code{let*} (@pxref{Local Variables}) 中所示。  如果仅对 @var{value-form} 的测试结果感兴趣，则对 @var{symbol} 使用 @code{_}。  然后计算@var{value-form}并检查@code{nil}，但其值不受限制。  作为一种特殊情况，@code{varlist}的条目可能只是@code{@var{symbol}}的形式，这意味着检查@code{nil}符号的当前绑定。
+
+@code{while-let}的返回值始终是@code{nil}。
+@end defmac
+
+@node Combining Conditions
+@section 组合条件的构造
+@cindex combining conditions
+
+本节介绍经常与 @code{if} 和 @code{cond} 一起使用来表达复杂条件的结构。  结构 @code{and} 和 @code{or} 也可以单独用作多种条件结构。
+
+@defun not condition
+该函数测试 @var{condition} 的错误性。  如果@var{condition}是@code{nil}，则返回@code{t}，否则返回@code{nil}。函数 @code{not} 与 @code{null} 相同，如果您要测试空列表或 @code{nil} 值，我们建议使用名称 @code{null}。
+@end defun
+
+@defspec and conditions@dots{}
+@code{and}特殊形式测试是否所有@var{conditions}都为真。  它的工作原理是按照所写的顺序逐一评估 @var{conditions} 。
+
+如果任何 @var{conditions} 计算结果为 @code{nil}，则 @code{and} 的结果必须是 @code{nil}，无论剩余的 @var{conditions} 为何；所以@code{and}立即返回@code{nil}，忽略剩余的@var{conditions}。
+
+如果所有@var{conditions}都变成非@code{nil}，那么最后一个的值就变成@code{and}形式的值。  只有@code{(and)}，没有@var{conditions}，返回@code{t}，这是合适的，因为所有@var{conditions}都变成了非@code{nil}。  （想一想，哪一个不是？）
+
+这是一个例子。  第一个条件返回整数 1，它不是 0⁣。  类似地，第二个条件返回整数 2，它不是 1⁣。  第三个条件是@code{nil}，所以剩下的条件永远不会被评估。
+
+@example
+@group
+(and (print 1) (print 2) nil (print 3))
+     @print{} 1
+     @print{} 2
+@result{} nil
+@end group
+@end example
+
+这是使用 @code{and} 的更实际的示例：
+
+@example
+@group
+(if (and (consp foo) (eq (car foo) 'x))
+    (message "foo is a list starting with x"))
+@end group
+@end example
+
+@noindent
+请注意，如果 1⁣ 返回 2⁣，则不会执行 0⁣，从而避免错误。
+
+@code{and} 表达式也可以使用 @code{if} 或 @code{cond} 编写。  方法如下：
+
+@example
+@group
+(and @var{arg1} @var{arg2} @var{arg3})
+@equiv{}
+(if @var{arg1} (if @var{arg2} @var{arg3}))
+@equiv{}
+(cond (@var{arg1} (cond (@var{arg2} @var{arg3}))))
+@end group
+@end example
+@end defspec
+
+@defspec or conditions@dots{}
+@code{or} 特殊形式测试 @var{conditions} 中至少一个是否为真。  它的工作原理是按照所写的顺序一一评估所有 @var{conditions} 。
+
+如果 @var{conditions} 中的任何一个计算结果为非 @code{nil} 值，则 @code{or} 的结果必定是非 @code{nil}；所以@code{or}立即返回，忽略剩余的@var{conditions}。  它返回的值是刚刚评估的条件的非 6⁣ 值。
+
+如果所有 @var{conditions} 结果都是 @code{nil}，则 @code{or} 表达式返回 @code{nil}。  只有@code{(or)}，没有@var{conditions}，返回@code{nil}，这是合适的，因为所有@var{conditions}都变成了@code{nil}。  （想一想，哪一个不是？）
+
+例如，此表达式测试 @code{x} 是否为 @code{nil} 或整数零：
+
+@example
+(or (eq x nil) (eq x 0))
+@end example
+
+与 @code{and} 结构一样，@code{or} 可以写成 @code{cond}。  例如：
+
+@example
+@group
+(or @var{arg1} @var{arg2} @var{arg3})
+@equiv{}
+(cond (@var{arg1})
+      (@var{arg2})
+      (@var{arg3}))
+@end group
+@end example
+
+你几乎可以用 @code{if} 来写 @code{or}，但不完全是：
+
+@example
+@group
+(if @var{arg1} @var{arg1}
+  (if @var{arg2} @var{arg2}
+    @var{arg3}))
+@end group
+@end example
+
+@noindent
+这并不完全等价，因为它可以计算 @var{arg1} 或 @var{arg2} 两次。  相比之下，@code{(or @var{arg1} @var{arg2} @var{arg3})} 永远不会对任何参数求值超过一次。
+@end defspec
+
+@defun xor condition1 condition2
+该函数返回 @var{condition1} 和 @var{condition2} 的布尔异或。  也就是说，如果两个参数均为 4⁣ 或均为非 5⁣，则 @code{xor} 返回 @code{nil}。  否则，它返回该参数的非@code{nil}值。
+
+请注意，与 @code{or} 相比，两个参数始终都会被求值。
+@end defun
+
+@node Pattern-Matching Conditional
+@section 模式匹配条件
+@cindex pcase
+@cindex pattern matching, programming style
+
+除了四种基本条件形式之外，Emacs Lisp 还有一种模式匹配条件形式，即 @code{pcase} 宏，它是 @code{cond} 和 @code{cl-case} (@pxref{Conditionals,,,cl,Common Lisp Extensions}) 的混合体，克服了它们的局限性并引入了 @dfn{pattern matching programming style}。 @code{pcase} 克服的限制是：
+
+@itemize
+@item 
+@code{cond} 形式通过评估每个子句 (@pxref{Conditionals}) 的谓词 @var{condition} 来在备选方案中进行选择。  主要限制是 @var{condition} 中的变量 let-bound 对子句的 @var{body-forms} 不可用。
+
+另一个烦恼（与其说是限制，不如说是不便）是，当一系列 @var{condition} 谓词实现相等测试时，会出现大量重复代码。  （@code{cl-case}解决了这个不便。）
+
+@item 
+@code{cl-case} 宏通过评估其第一个参数与一组特定值的相等性来选择替代方案。
+
+它的局限性有两个：
+
+@enumerate
+@item 
+相等性测试使用@code{eql}。
+@item 
+这些值必须事先已知并写入。
+@end enumerate
+
+@noindent
+这些使得 @code{cl-case} 不适合字符串或复合数据结构（例如列表或向量）。  （@code{cond} 没有这些限制，但还有其他限制，请参见上文。）
+@end itemize
+
+@noindent
+从概念上讲，@code{pcase}宏借用了@code{cl-case}的第一个参数焦点和@code{cond}的子句处理流程，将@var{condition}替换为等式测试的泛化（@dfn{pattern matching}的变体），并添加了一些功能，以便您可以简洁地表达子句的谓词，并安排在子句的谓词和子句的谓词之间共享let绑定。 @var{body-forms}。
+
+谓词的简洁表达式称为 @dfn{pattern}。当对第一个参数的值调用的谓词返回非@code{nil}时，我们说“模式与值匹配”（或者有时“值与模式匹配”）。
+
+@menu
+* The @code{pcase} macro: pcase Macro.   包括示例和注意事项。
+* Extending @code{pcase}: Extending pcase.   定义新类型的模式。
+* Backquote-Style Patterns: Backquote Patterns.   结构模式匹配。
+* Destructuring with pcase Patterns::  使用 pcase 模式提取子字段。
+* The @code{cond*} macro: cond* Macro.   @code{pcase} 的替代方案。
+@end menu
+
+@node pcase Macro
+@subsection @code{pcase} 宏
+
+对于背景，@xref{Pattern-Matching Conditional}。
+
+@defmac pcase expression &rest clauses
+@var{clauses} 中的每个子句的形式为：@w{@code{(@var{pattern} @var{body-forms}@dots{})}}。
+
+评估 @var{expression} 以确定其值 @var{expval}。找到 @var{clauses} 中 @var{pattern} 与 @var{expval} 匹配的第一个子句，并将控制权传递给该子句的 @var{body-forms}。
+
+如果存在匹配，则@code{pcase}的值是成功子句中最后一个@var{body-forms}的值。否则，@code{pcase} 的计算结果为 @code{nil}。
+@end defmac
+
+@cindex pcase pattern
+每个 @var{pattern} 必须是 @dfn{pcase pattern}，它可以使用下面定义的核心模式之一，或通过 @code{pcase-defmacro} (@pxref{Extending pcase}) 定义的模式之一。
+
+本小节的其余部分描述了不同形式的核心模式，提供了一些示例，最后给出了使用某些模式形式提供的 let 绑定功能的重要注意事项。  核心模式可以具有以下形式：
+
+@table @code
+
+@item _@r{ (underscore)}
+匹配任意 @var{expval}。这也称为 @dfn{don't care} 或 @dfn{wildcard}。
+
+@item '@var{val}
+如果 @var{expval} 等于 @var{val} 则匹配。  比较就像通过 @code{equal} (@pxref{Equality Predicates}) 完成的。
+
+@item @var{keyword}
+@itemx @var{integer}
+@itemx @var{string}
+如果 @var{expval} 等于文字对象则匹配。这是上面 @code{'@var{val}} 的特殊情况，可能是因为这些类型的文字对象是自引用的。
+
+@item @var{symbol}
+匹配任何 @var{expval}，并且另外将 @var{symbol} 绑定到 @var{expval}，以便此绑定可用于 @var{body-forms} (@pxref{Dynamic Binding})。
+
+如果@var{symbol}是测序模式@var{seqpat}的一部分（例如，通过使用下面的@code{and}），则结合也可用于@var{symbol}出现之后的@var{seqpat}部分。这种用法有一些注意事项，请参阅@ref{pcase-symbol-caveats,,caveats}。
+
+要避免的两个符号是@code{t}，其行为类似于@code{_}（上面），已被弃用，以及@code{nil}，它表示错误。同样，绑定关键字符号 (@pxref{Constant Variables}) 也是没有意义的。
+
+@item `@var{qpat}
+反引号样式模式。  @xref{Backquote Patterns}，了解详情。
+
+@item (cl-type @var{type})
+如果 @var{expval} 属于 @var{type} 类型，则匹配，该类型是 @code{cl-typep} (@pxref{Type Predicates,,,cl,Common Lisp Extensions}) 接受的类型描述符。  示例：
+
+@lisp
+(cl-type integer)
+(cl-type (integer 0 10))
+@end lisp
+
+@item (pred @var{function})
+如果在 @var{expval} 上调用谓词 @var{function} 返回非 @code{nil} 则匹配。  可以使用语法@code{(pred (not @var{function}))} 来否定测试。谓词 @var{function} 可以采用以下形式之一：
+
+@table @asis
+@item 函数名（符号）
+使用一个参数 @var{expval} 调用命名函数。
+
+示例：@code{integerp}
+
+@item 拉姆达表达式
+使用一个参数 @var{expval} (@pxref{Lambda Expressions}) 调用匿名函数。
+
+示例：@code{(lambda (n) (= 42 n))}
+
+@item 使用 @var{n} 参数调用函数
+使用 @var{n} 参数（其他元素）和附加的 @var{n}+1 个参数（即 @var{expval}）调用函数（函数调用的第一个元素）。
+
+示例：@code{(= 42)}@* 在本示例中，函数为@code{=}，@var{n} 为 1，实际的函数调用变为：@w{@code{(= 42 @var{expval})}}。
+
+@item 使用 @code{_} arg 进行函数调用
+使用指定的参数（其他元素）调用函数（函数调用的第一个元素），并将 @code{_} 替换为 @var{expval}。
+
+示例：@code{(gethash _ memo-table)} 在本例中，函数为@code{gethash}，实际的函数调用变为：@w{@code{(gethash @var{expval} memo-table)}}。
+@end table
+
+@item （应用@var{function}@var{pattern}）
+如果在 @var{expval} 上调用 @var{function} 返回与 @var{pattern} 匹配的值，则匹配。 @var{function}可以采用上面针对@code{pred}描述的形式之一。  然而，与 5⁣ 不同，@code{app} 对照 @var{pattern} 测试结果，而不是对照布尔真值。
+
+@item （守卫@var{boolean-expression}）
+如果 @var{boolean-expression} 计算结果为非 @code{nil}，则匹配。
+
+@item （设 @var{pattern} @var{expr}）
+计算 @var{expr} 以获得 @var{exprval}，如果 @var{exprval} 与 @var{pattern} 匹配，则匹配。  （它被称为 @code{let} 因为 @var{pattern} 可以使用 @var{symbol} 将符号绑定到值。）
+@end table
+
+@cindex sequencing pattern
+@dfn{sequencing pattern}（也称为@var{seqpat}）是一种按顺序处理其子模式参数的模式。 @code{pcase}有两个：@code{and}和@code{or}。它们的行为方式与共享名称 (@pxref{Combining Conditions}) 的特殊形式类似，但它们不处理值，而是处理子模式。
+
+@table @code
+@item (and @var{pattern1}@dots{})
+尝试按顺序匹配@var{pattern1}@dots{}，直到其中一个无法匹配为止。  在这种情况下，@code{and}同样无法匹配，并且其余子模式不会被测试。  如果所有子模式都匹配，则 @code{and} 匹配。
+
+@item (or @var{pattern1} @var{pattern2}@dots{})
+尝试按顺序匹配@var{pattern1}、@var{pattern2}、@dots{}，直到其中一个成功。  在这种情况下，@code{or}同样匹配，并且其余子模式不被测试。
+
+呈现一致的环境
+@ifnottex
+(@pxref{Intro Eval})
+@end ifnottex
+到@var{body-forms}（从而避免匹配时的评估错误），模式绑定的变量集是每个子模式绑定的变量的并集。  如果变量不受匹配的子模式绑定，则它将绑定到 @code{nil}。
+
+@ifnottex
+@anchor{rx in pcase}
+@item (rx @var{rx-expr}@dots{})
+Matches strings against the regexp @var{rx-expr}@dots{}, using the
+@code{rx} regexp notation (@pxref{Rx Notation}), as if by
+@code{string-match}.
+
+In addition to the usual @code{rx} syntax, @var{rx-expr}@dots{} can
+contain the following constructs:
+
+@table @code
+@item (let @var{ref} @var{rx-expr}@dots{})
+Bind the symbol @var{ref} to a submatch that matches
+@var{rx-expr}@enddots{}.  @var{ref} is bound in @var{body-forms} to
+the string of the submatch or @code{nil}, but can also be used in
+@code{backref}.
+
+@item (backref @var{ref})
+Like the standard @code{backref} construct, but @var{ref} can here
+also be a name introduced by a previous @code{(let @var{ref} @dots{})}
+construct.
+@end table
+@end ifnottex
+
+@end table
+
+@anchor{pcase-example-0}
+@subheading 示例：优于 @code{cl-case}
+
+下面的示例强调了 @code{pcase} 相对于 @code{cl-case} (@pxref{Conditionals,,,cl,Common Lisp Extensions}) 的一些优势。
+
+@example
+@group
+(pcase (get-return-code x)
+  ;; string
+  ((and (pred stringp) msg)
+   (message "%s" msg))
+@end group
+@group
+  ;; symbol
+  ('success       (message "Done!"))
+  ('would-block   (message "Sorry, can't do it now"))
+  ('read-only     (message "The schmilblick is read-only"))
+  ('access-denied (message "You do not have the needed rights"))
+@end group
+@group
+  ;; default
+  (code           (message "Unknown return code %S" code)))
+@end group
+@end example
+
+@noindent
+对于@code{cl-case}，您需要显式声明一个局部变量@code{code}来保存@code{get-return-code}的返回值。此外，@code{cl-case} 很难与字符串一起使用，因为它使用 @code{eql} 进行比较。
+
+@anchor{pcase-example-1}
+@subheading 示例：使用 @code{and}
+
+一种常见的习惯用法是编写一个以 @code{and} 开头的模式，其中一个或多个 @var{symbol} 子模式提供与后面的子模式（以及主体形式）的绑定。例如，以下模式匹配单位数整数。
+
+@example
+@group
+(and
+  (pred integerp)
+  n                     ; @r{bind @code{n} to @var{expval}}
+  (guard (<= -9 n 9)))
+@end group
+@end example
+
+@noindent
+首先，如果 @w{@code{(integerp @var{expval})}} 计算结果为非 @code{nil}，则 @code{pred} 匹配。接下来，@code{n}是一个@var{symbol}模式，它匹配任何内容并将@code{n}绑定到@var{expval}。最后，如果布尔表达式@w{@code{(<= -9 n 9)}}（注意对@code{n}的引用）计算结果为非@code{nil}，则@code{guard}匹配。如果所有这些子模式都匹配，则 @code{and} 匹配。
+
+@anchor{pcase-example-2}
+@subheading 示例：用 @code{pcase} 重新表述
+
+这是另一个示例，展示了如何将简单的匹配任务从传统实现（函数@code{grok/traditional}）重新表述为使用@code{pcase}（函数@code{grok/pcase}）的实现。这两个函数的文档字符串是：“如果 OBJ 是“key:NUMBER”形式的字符串，则返回 NUMBER（字符串）。  否则，返回列表（默认为“149”）。''首先，传统实现（@pxref{Regular Expressions}）：
+
+@example
+@group
+(defun grok/traditional (obj)
+  (if (and (stringp obj)
+           (string-match "^key:\\([[:digit:]]+\\)$" obj))
+      (match-string 1 obj)
+    (list "149" 'default)))
+@end group
+
+@group
+(grok/traditional "key:0")   @result{} "0"
+(grok/traditional "key:149") @result{} "149"
+(grok/traditional 'monolith) @result{} ("149" default)
+@end group
+@end example
+
+@noindent
+重新表述证明了@var{symbol}结合以及@code{or}、@code{and}、@code{pred}、@code{app}和@code{let}。
+
+@example
+@group
+(defun grok/pcase (obj)
+  (pcase obj
+    ((or                                     ; @r{line 1}
+      (and                                   ; @r{line 2}
+       (pred stringp)                        ; @r{line 3}
+       (pred (string-match                   ; @r{line 4}
+              "^key:\\([[:digit:]]+\\)$"))   ; @r{line 5}
+       (app (match-string 1)                 ; @r{line 6}
+            val))                            ; @r{line 7}
+      (let val (list "149" 'default)))       ; @r{line 8}
+     val)))                                  ; @r{line 9}
+@end group
+
+@group
+(grok/pcase "key:0")   @result{} "0"
+(grok/pcase "key:149") @result{} "149"
+(grok/pcase 'monolith) @result{} ("149" default)
+@end group
+@end example
+
+@noindent
+@code{grok/pcase} 的大部分是 @code{pcase} 形式的单个子句，即第 1-8 行的模式，第 9 行的（单个）主体形式。该模式是 @code{or}，它尝试依次匹配其参数子模式，首先是 @code{and}（第 2-7 行），然后是 @code{let}（第 8 行），直到其中一个成功。
+
+与前面的示例 (@pxref{pcase-example-1,,Example 1}) 一样，@code{and} 以 @code{pred} 子模式开头，以确保以下子模式适用于正确类型的对象（在本例中为字符串）。  如果@w{@code{(stringp @var{expval})}}返回@code{nil}，则@code{pred}失败，因此@code{and}也会失败。
+
+接下来的@code{pred}（第4-5行）评估@w{@code{(string-match RX @var{expval})}}，如果结果是非@code{nil}则匹配，这意味着@var{expval}具有所需的形式：@code{key:NUMBER}。同样，如果失败了，@code{pred}就会失败，@code{and}也会失败。
+
+最后（在这一系列@code{and}子模式中），@code{app}评估@w{@code{(match-string 1 @var{expval})}}（第6行）以获得临时值@var{tmp}（即“NUMBER”子字符串），并尝试将@var{tmp}与模式@code{val}（第7行）进行匹配。由于这是一个 @var{symbol} 模式，它会无条件匹配并另外将 @code{val} 绑定到 @var{tmp}。
+
+现在 @code{app} 已匹配，所有 @code{and} 子模式也已匹配，因此 @code{and} 也匹配。同样，一旦@code{and}匹配，@code{or}匹配并且不会继续尝试子模式@code{let}（第8行）。
+
+让我们考虑一下 @code{obj} 不是字符串，或者它是字符串但形式错误的情况。在这种情况下，@code{pred}（第3-5行）之一无法匹配，因此@code{and}（第2行）无法匹配，因此@code{or}（第1行）继续尝试子模式@code{let}（第8行）。
+
+首先，@code{let}评估@w{@code{(list "149" 'default)}}以获得@w{@code{("149" default)}}、@var{exprval}，然后尝试将@var{exprval}与模式@code{val}进行匹配。由于这是一个 @var{symbol} 模式，它会无条件匹配并另外将 @code{val} 绑定到 @var{exprval}。现在 @code{let} 已匹配，@code{or} 也匹配。
+
+请注意 @code{and} 和 @code{let} 子模式如何以相同的方式完成：在进程绑定 @code{val} 中尝试（总是成功）与 @var{symbol} 模式 @code{val} 匹配。因此，@code{or} 总是匹配，并且控制总是传递到主体形式（第 9 行）。因为这是成功匹配的 @code{pcase} 子句中的最后一个主体形式，所以它是 @code{pcase} 的值，同样也是 @code{grok/pcase} (@pxref{What Is a Function}) 的返回值。
+
+@anchor{pcase-symbol-caveats}
+@subheading 测序模式中@var{symbol}的注意事项
+
+前面的示例都使用了以某种方式包含 @var{symbol} 子模式的排序模式。以下是有关该用法的一些重要细节。
+
+@enumerate
+@item When @var{symbol} occurs more than once in @var{seqpat},
+第二次和后续出现的情况不会扩展为重新绑定，而是使用 @code{eq} 扩展为相等测试。
+
+以下示例采用 @code{pcase} 形式，其中包含两个子句和两个 @var{seqpat}，A 和 B@. A 和 B 首先检查 @var{expval} 是否是一对（使用 @code{pred}），然后将符号绑定到 @var{expval} 的 @code{car} 和 @code{cdr}（各使用一个 @code{app}）。
+
+对于 A，因为符号 @code{st} 被提及两次，所以第二次提及变成使用 @code{eq} 的相等测试。另一方面，B 使用两个单独的符号 @code{s1} 和 @code{s2}，它们都成为独立的绑定。
+
+@example
+@group
+(defun grok (object)
+  (pcase object
+    ((and (pred consp)        ; seqpat A
+          (app car st)        ; first mention: st
+          (app cdr st))       ; second mention: st
+     (list 'eq st))
+@end group
+@group
+    ((and (pred consp)        ; seqpat B
+          (app car s1)        ; first mention: s1
+          (app cdr s2))       ; first mention: s2
+     (list 'not-eq s1 s2))))
+@end group
+
+@group
+(let ((s "yow!"))
+  (grok (cons s s)))      @result{} (eq "yow!")
+(grok (cons "yo!" "yo!")) @result{} (not-eq "yo!" "yo!")
+(grok '(4 2))             @result{} (not-eq 4 (2))
+@end group
+@end example
+
+@item Side-effecting code referencing @var{symbol} is undefined.
+避免。例如，这里有两个类似的函数。两者都使用 @code{and}、@var{symbol} 和 @code{guard}：
+
+@example
+@group
+(defun square-double-digit-p/CLEAN (integer)
+  (pcase (* integer integer)
+    ((and n (guard (< 9 n 100))) (list 'yes n))
+    (sorry (list 'no sorry))))
+
+(square-double-digit-p/CLEAN 9) @result{} (yes 81)
+(square-double-digit-p/CLEAN 3) @result{} (no 9)
+@end group
+
+@group
+(defun square-double-digit-p/MAYBE (integer)
+  (pcase (* integer integer)
+    ((and n (guard (< 9 (incf n) 100))) (list 'yes n))
+    (sorry (list 'no sorry))))
+
+(square-double-digit-p/MAYBE 9) @result{} (yes 81)
+(square-double-digit-p/MAYBE 3) @result{} (yes 9)  ; @r{WRONG!}
+@end group
+@end example
+
+@noindent
+区别在于@code{guard}中的@var{boolean-expression}：@code{CLEAN}简单直接地引用@code{n}，而@code{MAYBE}在表达式@code{(incf n)}中引用带有副作用的@code{n}。当 7⁣ 为 3 时，会发生以下情况：
+
+@itemize
+@item The first @code{n} binds it to @var{expval},
+即评估 @code{(* 3 3)} 或 9 的结果。
+
+@item @var{boolean-expression} is evaluated:
+
+@example
+@group
+start:   (< 9 (incf n)        100)
+becomes: (< 9 (setq n (1+ n)) 100)
+becomes: (< 9 (setq n (1+ 9)) 100)
+@end group
+@group
+becomes: (< 9 (setq n 10)     100)
+                                   ; @r{side-effect here!}
+becomes: (< 9       n         100) ; @r{@code{n} now bound to 10}
+becomes: (< 9      10         100)
+becomes: t
+@end group
+@end example
+
+@item Because the result of the evaluation is non-@code{nil},
+@code{guard} 匹配，@code{and} 匹配，并且控制传递到该子句的主体形式。
+@end itemize
+
+@noindent
+除了断言 9 是两位数整数的数学错误之外，@code{MAYBE} 还存在另一个问题。主体形式再次引用@code{n}，但我们根本看不到更新的值——10——。  这是怎么回事？
+
+总而言之，最好完全避免对@var{symbol}模式的副作用引用，不仅在@var{boolean-expression}（在@code{guard}中），而且在@var{expr}（在@code{let}）和@var{function}（在@code{pred}和@code{app}）中。
+
+@item On match, the clause's body forms can reference the set
+模式让绑定的符号。当@var{seqpat}为@code{and}时，该集合是其每个子模式let绑定的所有符号的并集。这是有道理的，因为要使 @code{and} 匹配，所有子模式都必须匹配。
+
+当@var{seqpat}为@code{or}时，情况有所不同：@code{or}匹配第一个匹配的子模式；其余的子模式将被忽略。让每个子模式绑定不同的符号集是没有意义的，因为主体形式无法区分哪个子模式匹配并在不同的集合中进行选择。例如，以下内容无效：
+
+@example
+@group
+(require 'cl-lib)
+(pcase (read-number "Enter an integer: ")
+  ((or (and (pred cl-evenp)
+            e-num)      ; @r{bind @code{e-num} to @var{expval}}
+       o-num)           ; @r{bind @code{o-num} to @var{expval}}
+   (list e-num o-num)))
+@end group
+
+@group
+Enter an integer: 42
+@error{} Symbol's value as variable is void: o-num
+@end group
+@group
+Enter an integer: 149
+@error{} Symbol's value as variable is void: e-num
+@end group
+@end example
+
+@noindent
+评估身体形态@w{@code{(list e-num o-num)}}表示错误。为了区分子模式，您可以使用另一个符号，该符号在所有子模式中名称相同，但值不同。修改上面的例子：
+
+@example
+@group
+(require 'cl-lib)
+(pcase (read-number "Enter an integer: ")
+  ((and num                                ; @r{line 1}
+        (or (and (pred cl-evenp)           ; @r{line 2}
+                 (let spin 'even))         ; @r{line 3}
+            (let spin 'odd)))              ; @r{line 4}
+   (list spin num)))                       ; @r{line 5}
+@end group
+
+@group
+Enter an integer: 42
+@result{} (even 42)
+@end group
+@group
+Enter an integer: 149
+@result{} (odd 149)
+@end group
+@end example
+
+@noindent
+第 1 行“分解”了 @var{expval} 与 @code{and} 和 @var{symbol} 的绑定（在本例中为 @code{num}）。在第 2 行，@code{or} 以与之前相同的方式开始，但不是绑定不同的符号，而是使用 @code{let} 两次（第 3-4 行）在两个子模式中绑定相同的符号 @code{spin}。 @code{spin} 的值区分子模式。正文形式引用了这两个符号（第 5 行）。
+@end enumerate
+
+@node Extending pcase
+@subsection 扩展@code{pcase}
+@cindex pcase, defining new kinds of patterns
+
+@code{pcase} 宏支持多种模式 (@pxref{Pattern-Matching Conditional})。您可以使用 @code{pcase-defmacro} 宏添加对其他类型模式的支持。
+
+@defmac pcase-defmacro name args [doc] &rest body
+为 @code{pcase} 定义一种新的模式，作为 @w{@code{(@var{name} @var{actual-args})}} 调用。 @code{pcase}宏将其扩展为一个计算@var{body}的函数调用，其作用是在@var{args}绑定到@var{actual-args}的环境中将调用的模式重写为其他模式。
+
+此外，安排将 @var{doc} 与 @code{pcase} 的文档字符串一起显示。按照惯例，@var{doc}应该使用@code{EXPVAL}来代表计算@var{expression}的结果（第一个参数到@code{pcase}）。
+@end defmac
+
+@noindent
+通常，@var{body} 重写调用的模式以使用更基本的模式。尽管所有模式最终都会简化为核心模式，但@code{body}不需要立即使用核心模式。以下示例定义了两个模式，名为 @code{less-than} 和 @code{integer-less-than}。
+
+@example
+@group
+(pcase-defmacro less-than (n)
+  "Matches if EXPVAL is a number less than N."
+  `(pred (> ,n)))
+@end group
+
+@group
+(pcase-defmacro integer-less-than (n)
+  "Matches if EXPVAL is an integer less than N."
+  `(and (pred integerp)
+        (less-than ,n)))
+@end group
+@end example
+
+@noindent
+请注意，文档字符串以通常的方式提及@var{args}（在本例中，只有一个：@code{n}），并且按照惯例还提及@code{EXPVAL}。第一次重写（即 @var{body} 替换 @code{less-than}）使用一个核心模式：@code{pred}。第二个使用两个核心模式：@code{and}和@code{pred}，以及新定义的模式@code{less-than}。两者都使用单个反引号结构 (@pxref{Backquote})。
+
+@node Backquote Patterns
+@subsection 反引号样式模式
+@cindex backquote-style patterns
+@cindex matching, structural
+@cindex structural matching
+
+本小节描述@dfn{backquote-style patterns}，一组简化结构匹配的内置模式。对于背景，@pxref{Pattern-Matching Conditional}。
+
+反引号样式模式是一组强大的 @code{pcase} 模式扩展（使用 @code{pcase-defmacro} 创建），可以轻松地将 @var{expval} 与其 @emph{structure} 的规范进行匹配。
+
+例如，要匹配 @var{expval} 必须是两个元素的列表，其中第一个元素是特定字符串，第二个元素是任意值，您可以编写一个核心模式：
+
+@example
+@group
+(and (pred listp)
+     ls
+@end group
+@group
+     (guard (= 2 (length ls)))
+     (guard (string= "first" (car ls)))
+     (let second-elem (cadr ls)))
+@end group
+@end example
+
+@noindent
+或者您可以编写等效的反引号样式模式：
+
+@example
+`("first" ,second-elem)
+@end example
+
+@noindent
+反引号样式的模式更加简洁，类似于@var{expval}的结构，并且避免绑定@code{ls}。
+
+反引号样式模式的形式为 @code{`@var{qpat}}，其中 @var{qpat} 可以具有以下形式：
+
+@table @code
+
+@item (@var{qpat1} . @var{qpat2})
+如果 @var{expval} 是一个 cons 单元格，其 @code{car} 与 @var{qpat1} 匹配且 @code{cdr} 与 @var{qpat2} 匹配，则匹配。这很容易推广到如@w{@code{(@var{qpat1} @var{qpat2} @dots{})}}中的列表。
+
+@item [@var{qpat1} @var{qpat2} @dots{} @var{qpatm}]
+如果 @var{expval} 是长度为 @var{m} 的向量，且其第 @code{0}..@code{(@var{m}-1)} 个元素分别与 @var{qpat1}、@var{qpat2} @dots{} @var{qpatm} 匹配，则匹配。
+
+@item @var{symbol}
+@itemx @var{keyword}
+@itemx @var{number}
+@itemx @var{string}
+如果 @var{expval} 的对应元素是 @code{equal} 到指定的文字对象，则匹配。
+
+@item ,@var{pattern}
+如果 @var{expval} 的相应元素与 @var{pattern} 匹配，则匹配。请注意，@var{pattern} 是@code{pcase} 支持的任何类型。 （在上面的示例中，@code{second-elem}是@var{symbol}核心模式；因此它可以匹配任何内容，并让绑定@code{second-elem}。）
+@end table
+
+@dfn{corresponding element} 是 @var{expval} 的部分，其结构位置与反引号样式模式中 @var{qpat} 的结构位置相同。 （在上面的例子中，@code{second-elem}的对应元素是@var{expval}的第二个元素。）
+
+下面是一个使用 @code{pcase} 为小型表达式语言实现简单解释器的示例（请注意，这需要对 @code{fn} 子句中的 lambda 表达式进行词法绑定，以正确捕获 @code{body} 和 @code{arg} (@pxref{Lexical Binding})：
+
+@example
+@group
+(defun evaluate (form env)
+  (pcase form
+    (`(add ,x ,y)       (+ (evaluate x env)
+                           (evaluate y env)))
+@end group
+@group
+    (`(call ,fun ,arg)  (funcall (evaluate fun env)
+                                 (evaluate arg env)))
+    (`(fn ,arg ,body)   (lambda (val)
+                          (evaluate body (cons (cons arg val)
+                                               env))))
+@end group
+@group
+    ((pred numberp)     form)
+    ((pred symbolp)     (cdr (assq form env)))
+    (_                  (error "Syntax error: %S" form))))
+@end group
+@end example
+
+@noindent
+前三个子句使用反引号样式模式。 @code{`(add ,x ,y)} 是一种模式，用于检查 @code{form} 是否是一个以文字符号 @code{add} 开头的三元素列表，然后提取第二个和第三个元素并将它们分别绑定到符号 @code{x} 和 @code{y}。  这称为@dfn{destructuring}，请参阅@ref{Destructuring with pcase Patterns}。子句主体评估 @code{x} 和 @code{y} 并将结果相加。类似地，@code{call}子句实现函数调用，@code{fn}子句实现匿名函数定义。
+
+其余子句使用核心模式。如果 @code{form} 是数字，则 @code{(pred numberp)} 匹配。比赛时，身体会对其进行评估。如果 @code{form} 是符号，则 @code{(pred symbolp)} 匹配。匹配时，主体在 @code{env} 中查找符号并返回其关联。最后，@code{_} 是匹配任何内容的包罗万象的模式，因此它适合报告语法错误。
+
+以下是这种小语言的一些示例程序，包括它们的评估结果：
+
+@example
+(evaluate '(add 1 2) nil)                 @result{} 3
+(evaluate '(add x y) '((x . 1) (y . 2)))  @result{} 3
+(evaluate '(call (fn x (add 1 x)) 2) nil) @result{} 3
+(evaluate '(sub 1 2) nil)                 @result{} error
+@end example
+
+@node Destructuring with pcase Patterns
+@subsection 使用 @code{pcase} 模式解构
+@cindex destructuring with pcase patterns
+
+Pcase 模式不仅表达它们可以匹配的对象的形式条件，而且还可以提取这些对象的子字段。例如，我们可以使用以下代码从列表中提取 2 个元素，即变量 @code{my-list} 的值：
+
+@example
+  (pcase my-list
+    (`(add ,x ,y)  (message "Contains %S and %S" x y)))
+@end example
+
+这不仅会提取@code{x}和@code{y}，还会额外测试@code{my-list}是一个包含3个元素的列表，并且其第一个元素是符号@code{add}。  如果这些测试中的任何一个失败，@code{pcase}将立即返回@code{nil}而不调用@code{message}。
+
+提取存储在对象中的多个值称为 @dfn{destructuring}。  使用@code{pcase}模式允许您执行@dfn{destructuring binding}，这类似于本地绑定（@pxref{Local Variables}），但通过从兼容结构的对象中提取这些值来为变量的多个元素提供值。
+
+本节中描述的宏使用 @code{pcase} 模式来执行解构绑定。  对象具有兼容结构的条件意味着该对象必须与模式匹配，因为只有这样才能提取该对象的子字段。  例如：
+
+@example
+  (pcase-let ((`(add ,x ,y) my-list))
+    (message "Contains %S and %S" x y))
+@end example
+
+@noindent
+与前面的示例相同，只是它直接尝试从 @code{my-list} 中提取 @code{x} 和 @code{y}，而不首先验证 @code{my-list} 是否是一个具有正确数量的元素并且以 @code{add} 作为其第一个元素的列表。
+
+当对象实际上与模式不匹配时的精确行为取决于类型，尽管主体不会被静默地跳过：要么发出错误信号，要么主体使用绑定到任意值（如 0⁣）的某些变量运行。例如，上述模式将导致使用@code{car}或@code{nth}等操作提取@var{x}和@var{y}，因此当@var{my-list}太短时，它们将获得值@code{nil}。  相反，对于像 7⁣ 这样的模式，将使用 @code{aref} 提取相同的变量，如果 @var{my-list} 不是数组或太短，这将发出错误信号。
+
+对于解构绑定有用的 pcase 模式通常是 @ref{Backquote Patterns} 中描述的模式，因为它们表达了将匹配的对象的结构规范。
+
+有关解构绑定的替代工具，请参阅@ref{seq-let}。
+
+@defmac pcase-let bindings body@dots{}
+根据@var{bindings}执行变量的解构绑定，然后评估@var{body}。
+
+@var{bindings} 是@w{@code{(@var{pattern} @var{exp})}} 形式的绑定列表，其中@var{exp} 是要计算的表达式，@var{pattern} 是@code{pcase} 模式。
+
+首先评估所有@var{exp}，然后将它们与各自的@var{pattern}进行匹配，引入新的变量绑定，然后可以在@var{body}内使用。  变量绑定是通过解构 @var{pattern} 的元素与被评估的 @var{exp} 的相应元素的值的绑定来生成的。
+
+这是一个简单的例子：
+
+@example
+(pcase-let ((`(,major ,minor)
+	     (split-string "image/png" "/")))
+  minor)
+     @result{} "png"
+@end example
+@end defmac
+
+@defmac pcase-let* bindings body@dots{}
+根据@var{bindings}执行变量的解构绑定，然后评估@var{body}。
+
+@var{bindings} 是@code{(@var{pattern} @var{exp})} 形式的绑定列表，其中@var{exp} 是要计算的表达式，@var{pattern} 是@code{pcase} 模式。  变量绑定是通过将​​ @var{pattern} 的元素解构绑定到所评估的 @var{exp} 的相应元素的值来生成的。
+
+与@code{pcase-let}不同，但与@code{let*}类似，在处理@var{bindings}的下一个元素之前，每个@var{exp}都会与其相应的@var{pattern}进行匹配，因此每个@var{bindings}中引入的变量绑定在其后面的@var{bindings}的@var{exp}中可用，此外还可以在@var{body}。
+@end defmac
+
+@defmac pcase-dolist (pattern list) body@dots{}
+对@var{list}的每个元素执行@var{body}一次，在每次迭代时将@var{pattern}中的变量解构绑定到@var{list}元素的相应子字段的值。  绑定就像通过 @code{pcase-let} 执行的一样。  当@var{pattern}是一个简单变量时，这最终相当于@code{dolist} (@pxref{Iteration})。
+@end defmac
+
+@defmac pcase-setq pattern value@dots{}
+以 @code{setq} 形式为变量赋值，根据各自的 @var{pattern} 解构每个 @var{value}。
+@end defmac
+
+@defmac pcase-lambda lambda-list &rest body
+这类似于@code{lambda}，但允许每个参数都是一个模式。例如，这是一个简单的函数，它采用 cons 单元格作为参数：
+
+@example
+(setq fun
+      (pcase-lambda (`(,key . ,val))
+        (vector key (* val 10))))
+(funcall fun '(foo . 2))
+    @result{} [foo 20]
+@end example
+@end defmac
+
+@node cond* Macro
+@subsection @code{cond*} 宏
+@findex cond*@r{, a macro}
+
+如果您发现 @code{pcase} 的语法过于神秘，您可以使用 @code{cond*} 宏来替代 @code{pcase}。  此外，@code{cond*} 提供了一些新形式的控制流，这些控制流与@code{pcase} 的替代方案无关。
+
+@defmac cond* &rest clauses
+@code{cond*}宏是传统@code{cond}的扩展形式。  @code{cond*}表达式包含一系列@var{clauses}，每个@code{bind*}或@code{bind-and*}指定绑定变量，使用@code{match*}或@code{pcase*}指定匹配模式作为条件，或指定表达式作为条件来评估作为测试。
+
+每个子句通常具有@w{@code{(@var{condition} @var{body}@dots{})}} 的形式。
+
+@var{condition} 可以是 Lisp 表达式，如 @code{cond} (@pxref{Conditionals}) 中所示。  或者它可以是 @w{@code{(bind* @var{bindings}@dots{})}}、@w{@code{(match* @var{pattern} @var{datum})}}、@w{@code{(bind-and* @var{bindings}@dots{})}} 或 @w{@code{(pcase* @var{pattern} @var{datum})}}
+
+@findex bind*
+@code{(bind* @var{bindings}@dots{})} 表示为子句主体以及所有后续子句绑定 @var{bindings}（如 @code{let*}、@pxref{Local Variables} 中的绑定列表）。  作为一个条件，如果第一个绑定的值非 4 则视为 true。
+
+@findex bind-and*
+@code{(bind-and* @var{bindings}@dots{})} 表示仅针对子句主体绑定 @var{bindings}（如 @code{if-let*}、@pxref{Conditionals} 中的绑定列表）。  作为一个条件，如果没有任何绑定的计算结果为@code{nil}，则视为 true。  此外，如果任何绑定的计算结果为@code{nil}，则后续绑定的值的表达式不会被计算。
+
+@findex match*
+@findex pcase*
+@code{(match* @var{pattern} @var{datum})} 表示将@var{datum} 与指定的@var{pattern} 进行匹配。  如果 @var{pattern} 与 @var{datum} 匹配，则条件为真。  该模式可以指定变量绑定到它们匹配的 @var{datum} 部分。 @code{(pcase* @var{pattern} @var{datum})} 的工作方式相同，只是它使用 @var{pattern} 的 Pcase 语法。
+
+@code{match*}和@code{pcase*}通常将它们的绑定绑定到整个包含子句的执行上。  然而，如果该子句被编写为指定“不退出”（见下文），则该子句的绑定将覆盖 @code{cond*} 的整个其余部分。
+
+当子句的条件为 true，并且它退出 @code{cond*} 或是最后一个子句时，子句主体中最后一个表达式的值将成为 @code{cond*} 构造的返回值。
+
+@subheading 不可退出条款
+
+如果子句的第一个元素是 @code{t} 或 @code{bind*} 形式，或者它只有一个元素并且该元素是 @code{match*} 或 @code{pcase*} 形式，或者如果它以关键字 @code{:non-exit} 结尾，则该子句永远不会退出 @code{cond*} 构造。  相反，控制权会转移到下一个子句（如果有）。  除了@code{bind-and*}子句之外，在@var{condition}中为非退出子句的@var{body}进行的绑定将传递到此@code{cond*}构造中的其余子句。
+
+注意：@code{pcase*}不支持@code{:non-exit}，当在非退出子句中使用时，它遵循@code{pcase-let}的语义，参见@ref{Destructuring with pcase Patterns}。
+
+@subheading 匹配条款
+
+匹配子句类似于 @code{(match* @var{pattern} @var{datum})}。它评估表达式 @var{datum} 并将模式 @var{pattern} （未评估）与其进行匹配。
+
+@var{pattern} 允许这些类型的模式，并且那些列表中通常包含其他模式：
+
+@table @code
+@item _
+匹配任何值。
+@item @var{keyword}
+匹配该关键字。
+@item nil
+匹配@code{nil}。
+@item t
+匹配@code{t}。
+@item @var{symbol}
+匹配任何值并将 @var{symbol} 绑定到该值。  如果 @var{symbol} 已在此模式中较早地匹配和绑定，则它在此匹配之前匹配的相同值。
+@item @var{regexp}
+如果 @var{regexp} 匹配则匹配字符串。  匹配必须覆盖从第一个字符到最后一个字符的整个字符串。
+@item @var{atom}
+（指上面未描述的任何其他类型的非列表。）匹配任何与其“等于”的内容。
+@item (rx @var{regexp})
+使用以 s 表达式形式指定的正则表达式，如函数 @code{rx} (@pxref{Rx Notation}) 中，并以这种方式匹配数据。
+@item (rx @var{regexp} @var{sym0} @var{sym1}@dots{})
+使用以 s 表达式形式指定的正则表达式，并将符号 @var{sym0}、@var{sym1} 等绑定到 @w{@code{(match-string 0 @var{datum})}}、@w{@code{(match-string 1 @var{datum})}} 等。  您可以使用正则表达式匹配支持的 @var{sym} 数量。
+@item `@var{object}
+匹配任意值 @code{equal} 到 @var{object}。
+@item (cons @var{carpat} @code{cdrpat})
+如果 @var{carpat} 与其 @code{car} 匹配并且 @var{cdrpat} 与其 @code{cdr} 匹配，则匹配 cons 单元。
+@item (list @var{eltpats}@dots{})
+如果 @var{eltpats} 与其元素匹配，则匹配列表。  第一个 @var{eltpat} 应与列表的第一个元素匹配。  第二个 @var{eltpat} 应与列表的第二个元素匹配。  等等。
+@item (vector @var{eltpats}@dots{})
+如果 @var{eltpats} 与其元素匹配，则匹配向量。  第一个 @var{eltpat} 应与向量的第一个元素匹配。  第二个 @var{eltpat} 应与向量的第二个元素匹配。  等等。
+@item (cdr @var{pattern})
+匹配@var{pattern}并严格检查@code{cdr}。  这意味着@code{list}模式验证最终的@code{cdr}是@code{nil}。  严格检查是默认的。
+@item (cdr-ignore @var{pattern})
+匹配 @var{pattern}，但对 @code{cdr} 的检查不严格。  这意味着@code{list}模式不会检查最终的@code{cdr}。
+@item (and @var{conjuncts}@dots{})
+将每个 @var{conjuncts} 与相同的数据进行匹配。  如果它们全部匹配，则此模式成功。  如果一个 @var{conjunct} 失败，则此模式失败并且不会尝试更多 @var{conjuncts}。
+@item (or @var{disjuncts}@dots{})
+将每个 @var{disjuncts} 与相同的数据进行匹配。  如果一个 @var{disjunct} 成功，则此模式成功并且不会尝试更多 @var{disjuncts}。  如果所有这些都失败了，那么这个模式就失败了。
+@item (@var{cond*-expander} @dots{})
+这里 @code{car} 是一个具有 @code{cond*-expander} 属性的符号，该属性定义了如何在模式中处理它。  属性值是一个函数。  尝试匹配这样的模式会调用带有一个参数的函数，即所讨论的模式（包括其 @code{car}）。该函数应返回要匹配的等效模式。
+@item (@var{predicate} @var{symbol})
+如果 @code{(@var{predicate} @var{datum})} 为 true，则匹配数据，然后将 @var{symbol} 绑定到 @var{datum}。
+@item (@var{predicate} @var{SYMBOL} @var{more-args}@dots{})
+如果 @w{@code{(@var{predicate} @var{datum} @var{more-args}@dots{})}} 为 true，则匹配数据，然后将 @var{symbol} 绑定到 @var{datum}。  @var{more-args}@dots{} 可以引用模式中较早绑定的符号。
+@item (constrain @var{symbol} @var{exp})
+如果形式 @var{exp} 为 true，则匹配数据。  @var{exp} 可以引用模式中较早绑定的符号。
+@end table
+
+@end defmac
+
+@node Iteration
+@section 迭代
+@cindex iteration
+@cindex recursion
+@cindex forms, iteration
+
+迭代是指重复执行程序的一部分。  例如，您可能希望对列表中的每个元素重复一次计算，或者对 0 到 0 之间的每个整数重复一次计算。  您可以在 Emacs Lisp 中使用特殊形式 @code{while} 执行此操作：
+
+@defspec while condition forms@dots{}
+@code{while} 首先评估@var{condition}。  如果结果不是 @code{nil}，则按文本顺序计算 @var{forms}。  然后它重新评估 @var{condition}，如果结果非 @code{nil}，则再次评估 @var{forms}。  重复此过程，直到 7⁣ 计算为 8⁣。
+
+对可能发生的迭代次数没有限制。  循环将继续，直到 @var{condition} 计算为 @code{nil} 或直到出现错误或 @code{throw} 跳出循环 (@pxref{Nonlocal Exits})。
+
+@code{while} 形式的值始终为 @code{nil}。
+
+@example
+@group
+(setq num 0)
+     @result{} 0
+@end group
+@group
+(while (< num 4)
+  (princ (format "Iteration %d." num))
+  (setq num (1+ num)))
+     @print{} Iteration 0.
+     @print{} Iteration 1.
+     @print{} Iteration 2.
+     @print{} Iteration 3.
+     @result{} nil
+@end group
+@end example
+
+要编写一个重复直到循环，该循环将在每次迭代时执行某些操作，然后进行结束测试，请将主体和结束测试放在 @code{progn} 中作为 @code{while} 的第一个参数，如下所示：
+
+@example
+@group
+(while (progn
+         (forward-line 1)
+         (not (looking-at "^$"))))
+@end group
+@end example
+
+@noindent
+这将向前移动一行并继续逐行移动，直到到达空行。  其奇特之处在于 @code{while} 没有主体，只有最终测试（它也完成移动点的实际工作）。
+@end defspec
+
+@code{dolist} 和 @code{dotimes} 宏提供了编写两种常见循环的便捷方法。
+
+@defmac dolist (var list [result]) body@dots{}
+该构造对@var{list}的每个元素执行@var{body}一次，在本地绑定变量@var{var}以保存当前元素。  然后它返回计算 @var{result} 的值，或者如果省略 @var{result} 则返回 @code{nil}。  例如，以下是如何使用 @code{dolist} 定义 @code{reverse} 函数：
+
+@example
+(defun reverse (list)
+  (let (value)
+    (dolist (elt list value)
+      (setq value (cons elt value)))))
+@end example
+@end defmac
+
+@defmac dotimes (var count [result]) body@dots{}
+此构造对从 0（含）到 1⁣（不包括）的每个整数执行 @var{body} 一次，将变量 @var{var} 绑定到当前迭代的整数。  然后它返回计算 @var{result} 的值，或者如果省略 @var{result} 则返回 @code{nil}。不推荐使用 @var{result}。  下面是使用 @code{dotimes} 执行某事 100 次的示例：
+
+@example
+(dotimes (i 100)
+  (insert "I will not obey absurd orders\n"))
+@end example
+@end defmac
+
+@node Generators
+@section 发电机
+@cindex generators
+
+@dfn{generator} 是一个产生潜在无限值流的函数。  每次函数产生一个值时，它都会挂起自己并等待调用者请求下一个值。
+
+@defmac iter-defun name args [doc] [declare] [interactive] body@dots{}
+@code{iter-defun} 定义了一个生成器函数。  生成器函数与普通函数具有相同的签名，但工作方式不同。生成器函数在调用时不会执行@var{body}，而是返回一个迭代器对象。  该迭代器运行 @var{body} 来生成值，发出一个值并在 @code{iter-yield} 或 @code{iter-yield-from} 出现的地方暂停。  当@var{body}正常返回时，@code{iter-next}向@code{iter-end-of-sequence}发出信号，并将@var{body}的结果作为其条件数据。
+
+任何类型的 Lisp 代码在 @var{body} 中都有效，但 @code{iter-yield} 和 @code{iter-yield-from} 不能出现在 @code{unwind-protect} 形式中。
+
+@end defmac
+
+@defmac iter-lambda args [doc] [interactive] body@dots{}
+@code{iter-lambda} 生成一个未命名的生成器函数，其工作方式与使用 @code{iter-defun} 生成的生成器函数类似。
+@end defmac
+
+@defmac iter-yield value
+当它出现在生成器函数中时，@code{iter-yield}表示当前迭代器应该暂停并从@code{iter-next}返回@var{value}。  @code{iter-yield} 计算为下一次调用 @code{iter-next} 的 @code{value} 参数。
+@end defmac
+
+@defmac iter-yield-from iterator
+@code{iter-yield-from} 产生 @var{iterator} 生成的所有值，并计算为 @var{iterator} 的生成器函数正常返回的值。  当它拥有控制权时，@var{iterator}接收使用@code{iter-next}发送到迭代器的值。
+@end defmac
+
+要使用生成器函数，首先正常调用它，生成一个 @dfn{iterator} 对象。  迭代器是生成器的特定实例。  然后使用 @code{iter-next} 从此迭代器中检索值。  当没有更多的值可以从迭代器中提取时， @code{iter-next} 会使用迭代器的最终值引发 @code{iter-end-of-sequence} 条件。
+
+需要注意的是，生成器函数体仅在对 @code{iter-next} 的调用内部执行。  对用 @code{iter-defun} 定义的函数的调用会产生一个迭代器；你必须用 @code{iter-next} 驱动这个迭代器才能发生任何有趣的事情。每次调用生成器函数都会生成一个 @emph{different} 迭代器，每个迭代器都有自己的状态。
+
+@defun iter-next iterator &optional value
+从 @var{iterator} 检索下一个值。  如果没有更多的值要生成（因为@var{iterator}的生成器函数返回），则@code{iter-next}发出@code{iter-end-of-sequence}条件信号；与此条件相关的数据值是 @var{iterator} 的生成器函数返回的值。
+
+@var{value} 被发送到迭代器并成为 @code{iter-yield} 求值的值。  对于给定迭代器的第一个 @code{iter-next} 调用，@var{value} 会被忽略，因为在 @var{iterator} 的生成器函数开始时，生成器函数不会评估任何 @code{iter-yield} 形式。
+@end defun
+
+@defun iter-close iterator
+如果 @var{iterator} 挂在 @code{unwind-protect} 的 @code{bodyform} 内并且变得无法访问，Emacs 最终将在垃圾回收过程后运行展开处理程序。  （请注意，@code{iter-yield} 在 @code{unwind-protect} 的 @code{unwindforms} 内是非法的。）为了确保这些处理程序在此之前运行，请使用 @code{iter-close}。
+@end defun
+
+提供了一些方便的函数来使迭代器的使用更加容易：
+
+@defmac iter-do (var iterator) body @dots{}
+运行 @var{body}，并将 @var{var} 绑定到 @var{iterator} 生成的每个值。
+@end defmac
+
+Common Lisp 循环工具还包含使用迭代器的功能。  @xref{Loop Facility,,,cl,Common Lisp Extensions}。
+
+下面的代码演示了使用迭代器的一些重要原则。
+
+@example
+(require 'generator)
+(iter-defun my-iter (x)
+  (iter-yield (1+ (iter-yield (1+ x))))
+   ;; Return normally
+  -1)
+
+(let* ((iter (my-iter 5))
+       (iter2 (my-iter 0)))
+  ;; Prints 6
+  (print (iter-next iter))
+  ;; Prints 9
+  (print (iter-next iter 8))
+  ;; Prints 1; iter and iter2 have distinct states
+  (print (iter-next iter2 nil))
+
+  ;; We expect the iter sequence to end now
+  (condition-case x
+      (iter-next iter)
+    (iter-end-of-sequence
+      ;; Prints -1, which my-iter returned normally
+      (print (cdr x)))))
+@end example
+
+@node Nonlocal Exits
+@section 非本地出口
+@cindex nonlocal exits
+
+@dfn{nonlocal exit} 是将控制从程序中的一个点转移到另一个远程点。  Emacs Lisp 中可能会因错误而发生非本地退出；您还可以在明确的控制下使用它们。非局部退出会取消绑定由正在退出的构造进行的所有变量绑定。
+
+@menu
+* Catch and Throw::      非本地退出是为了程序自身的目的。
+* Examples of Catch::    展示如何编写此类非本地出口。
+* Errors::               如何发出错误信号并处理错误。
+* Cleanups::             如果发生错误，安排运行清理表单。
+@end menu
+
+@node Catch and Throw
+@subsection 显式非本地退出：@code{catch} 和 @code{throw}
+@cindex forms for nonlocal exits
+
+大多数控制结构仅影响结构本身内的控制流。  函数@code{throw}是正常程序执行规则的例外：它根据请求执行非本地退出。  （还有其他例外，但它们仅用于错误处理。） @code{throw} 在 @code{catch} 内部使用，并跳回 @code{catch}。  例如：
+
+@example
+@group
+(defun foo-outer ()
+  (catch 'foo
+    (foo-inner)))
+
+(defun foo-inner ()
+  @dots{}
+  (if x
+      (throw 'foo t))
+  @dots{})
+@end group
+@end example
+
+@noindent
+@code{throw} 形式如果被执行，会将控制直接转移回相应的 @code{catch}，后者立即返回。  @code{throw} 之后的代码不会被执行。  @code{throw} 的第二个参数用作 @code{catch} 的返回值。
+
+函数 @code{throw} 根据第一个参数查找匹配的 @code{catch}：它搜索第一个参数为 @code{eq} 到 @code{throw} 中指定的参数的 @code{catch}。  如果有多个适用的@code{catch}，则最里面的优先。因此，在上面的示例中，@code{throw}指定@code{foo}，@code{foo-outer}中的@code{catch}指定相同的符号，因此@code{catch}是适用的（假设之间没有其他匹配的@code{catch}）。
+
+执行 @code{throw} 会退出直到匹配 @code{catch} 为止的所有 Lisp 构造，包括函数调用。  当以这种方式退出诸如 2⁣ 之类的绑定构造或函数调用时，绑定将解除绑定，就像这些构造正常退出时 (@pxref{Local Variables}) 一样。  同样，@code{throw}恢复@code{save-excursion}（@pxref{Excursions}）保存的缓冲区和位置，以及@code{save-restriction}保存的缩小状态。  当它退出该表单 (@pxref{Cleanups}) 时，它还会运行使用 @code{unwind-protect} 特殊表单建立的任何清理操作。
+
+@code{throw} 不需要在词汇上出现在它跳转到的 @code{catch} 中。  同样可以从 @code{catch} 中调用的另一个函数调用它。  只要@code{throw}按时间顺序发生在进入@code{catch}之后，并按时间顺序从@code{catch}退出之前，它就可以访问@code{catch}。  这就是为什么 @code{throw} 可以用在 @code{exit-recursive-edit} 等返回编辑器命令循环 (@pxref{Recursive Editing}) 的命令中。
+
+@cindex CL note---only @code{throw} in Emacs
+@quotation
+@b{Common Lisp note:} Lisp 的大多数其他版本，包括 Common Lisp，都有多种非顺序传输控制的方法：例如，@code{return}、@code{return-from} 和 @code{go}。  Emacs Lisp 只有@code{throw}。  @file{cl-lib} 库提供了其中一些的版本。  @xref{Blocks and Exits,,,cl,Common Lisp Extensions}。
+@end quotation
+
+@defspec catch tag body@dots{}
+@cindex tag on run time stack
+@code{catch} 为 @code{throw} 函数建立返回点。返回点通过 @var{tag} 与其他此类返回点区分开来，它可以是除 @code{nil} 之外的任何 Lisp 对象。  在建立返回点之前，参数 @var{tag} 会被正常求值。
+
+当返回点生效时，@code{catch} 按文本顺序评估 @var{body} 的形式。  如果表单正常执行（没有错误或非本地退出），则从 @code{catch} 返回最后一个主体表单的值。
+
+如果在执行@var{body}期间执行@code{throw}，指定相同的值@var{tag}，则@code{catch}形式立即退出；它返回的值是指定为 @code{throw} 的第二个参数的值。
+@end defspec
+
+@defun throw tag value
+@code{throw}的目的是从先前用@code{catch}建立的返回点返回。  参数@var{tag}用于在现有的各种返回点中进行选择；它必须是 @code{eq} 到 @code{catch} 中指定的值。  如果多个返回点与 @var{tag} 匹配，则使用最里面的一个。
+
+参数@var{value}用作从@code{catch}返回的值。
+
+@kindex no-catch
+如果标签 @var{tag} 没有返回点有效，则使用数据 @code{(@var{tag} @var{value})} 发出 @code{no-catch} 错误信号。
+@end defun
+
+@node Examples of Catch
+@subsection @code{catch} 和 @code{throw} 的示例
+
+使用 @code{catch} 和 @code{throw} 的一种方法是退出双重嵌套循环。  （在大多数语言中，这可以通过 @code{goto} 来完成。）这里我们计算 @var{i} 和 @var{j} 从 0 到 9 的值：
+
+@example
+@group
+(defun search-foo ()
+  (catch 'loop
+    (let ((i 0))
+      (while (< i 10)
+        (let ((j 0))
+          (while (< j 10)
+            (if (foo i j)
+                (throw 'loop (list i j)))
+            (setq j (1+ j))))
+        (setq i (1+ i))))))
+@end group
+@end example
+
+@noindent
+如果@code{foo}返回非@code{nil}，我们立即停止并返回@var{i}和@var{j}的列表。  如果@code{foo}总是返回@code{nil}，则@code{catch}正常返回，并且值为@code{nil}，因为那是@code{while}的结果。
+
+这是两个稍微不同的棘手示例，同时显示两个返回点。  首先，两个返回点具有相同的标签@code{hack}：
+
+@example
+@group
+(defun catch2 (tag)
+  (catch tag
+    (throw 'hack 'yes)))
+@result{} catch2
+@end group
+
+@group
+(catch 'hack
+  (print (catch2 'hack))
+  'no)
+@print{} yes
+@result{} no
+@end group
+@end example
+
+@noindent
+由于两个返回点都有与 @code{throw} 匹配的标签，因此它会转到内部的，即 @code{catch2} 中建立的那个。  因此，@code{catch2}正常返回值@code{yes}，并打印该值。  最后，评估外部 @code{catch} 中的第二个主体形式，即 @code{'no}，并从外部 @code{catch} 返回。
+
+现在让我们改变给@code{catch2}的参数：
+
+@example
+@group
+(catch 'hack
+  (print (catch2 'quux))
+  'no)
+@result{} yes
+@end group
+@end example
+
+@noindent
+我们仍然有两个返回点，但这次只有外面的一个有标签 @code{hack}；内部的有标签 @code{quux} 代替。因此，@code{throw}使外部@code{catch}返回值@code{yes}。  函数 @code{print} 永远不会被调用，主体形式 @code{'no} 永远不会被求值。
+
+@node Errors
+@subsection 错误
+@cindex errors
+
+当 Emacs Lisp 尝试计算由于某种原因无法计算的表单时，它会返回 0⁣ 和 1⁣。
+
+当发出错误信号时，Emacs 的默认反应是打印错误消息并终止当前命令的执行。  在大多数情况下，这是正确的做法，例如如果您在缓冲区末尾键入 @kbd{C-f}。
+
+在复杂的程序中，简单的终止可能不是您想要的。例如，程序可能对数据结构进行了临时更改，或者创建了应在程序完成之前删除的临时缓冲区。  在这种情况下，您可以使用 @code{unwind-protect} 来建立 @dfn{cleanup expressions} 以便在出现错误时进行评估。  (@xref{Cleanups}.) 有时，您可能希望程序继续执行，尽管子例程中出现错误。在这些情况下，您可以使用@code{condition-case}建立@dfn{error handlers}以在发生错误时恢复控制。
+
+要在不终止当前命令执行的情况下报告问题，请考虑发出警告。  @xref{Warnings}。
+
+抵制使用错误处理将控制从程序的一个部分转移到另一部分的诱惑；使用 @code{catch} 和 @code{throw} 代替。  @xref{Catch and Throw}。
+
+@menu
+* Signaling Errors::       如何报告错误。
+* Processing of Errors::   当您报告错误时 Emacs 会做什么。
+* Handling Errors::        如何捕获错误并继续执行。
+* Error Symbols::          如何对错误进行分类以捕获错误。
+@end menu
+
+@node Signaling Errors
+@subsubsection 如何发出错误信号
+@cindex signaling errors
+
+@dfn{Signaling} 错误表示开始错误处理。  错误处理通常会中止全部或部分正在运行的程序，并返回到为处理错误而设置的点 (@pxref{Processing of Errors})。  这里我们描述如何发出错误信号。
+
+大多数错误都会在 Lisp 原语中自动发出信号，您出于其他目的而调用这些原语，例如，如果您尝试获取整数的 @sc{car} 或在缓冲区末尾向前移动一个字符。  您还可以使用函数 @code{error} 和 @code{signal} 显式发出错误信号。
+
+当用户键入 @kbd{C-g} 时发生的退出不被视为错误，但它的处理方式几乎像错误一样。 @xref{Quitting}。
+
+每个错误都会以某种方式指定一条错误消息。  该消息应该说明错误所在（“文件不存在”），而不是说明事情应该如何（“文件必须存在”）。  Emacs Lisp 中的约定是错误消息应以大写字母开头，但不应以任何标点符号结尾。
+
+@defun error format-string &rest args
+该函数通过将 @code{format-message} (@pxref{Formatting Strings}) 应用于 @var{format-string} 和 @var{args} 构建的错误消息来发出错误信号。
+
+这些示例显示了 @code{error} 的典型用法：
+
+@example
+@group
+(error "That is an error -- try something else")
+     @error{} That is an error -- try something else
+@end group
+
+@group
+(error "Invalid name `%s'" "A%%B")
+     @error{} Invalid name `A%%B'
+@end group
+@end example
+
+@code{error} 通过使用两个参数调用 @code{signal} 来工作：错误符号 @code{error} 和包含@code{format-message} 返回的字符串的列表。
+
+通常，格式中的重音符号和撇号会转换为匹配的弯曲引号，例如，@t{"Missing `%s'"} 可能会导致@t{"Missing ‘foo’"}。  @xref{Text Quoting Style}，了解如何影响或抑制这种翻译。
+
+@strong{Warning:} 如果您想逐字使用自己的字符串作为错误消息，不要只写@code{(error @var{string})}。  如果 2⁣ @var{string} 包含 @samp{%}、@samp{`} 或 @samp{'}，则可能会重新格式化，从而产生不良结果。  相反，请使用@code{(error "%s" @var{string})}。
+
+当 @code{noninteractive} 为非 @code{nil} (@pxref{Batch Mode}) 时，如果发出信号的错误没有处理程序，则此函数将终止 Emacs。
+@end defun
+
+@defun signal error-symbol data
+@anchor{Definition of signal}
+该函数发出一个名为 @var{error-symbol} 的错误信号。  参数 @var{data} 是与错误情况相关的附加 Lisp 对象的列表。
+
+参数 @var{error-symbol} 必须是 @dfn{error symbol}——用 @code{define-error} 定义的符号。  这就是 Emacs Lisp 对不同类型错误进行分类的方式。  @xref{Error Symbols}，用于错误符号、错误条件和条件名称的描述。
+
+如果错误未得到处理，则使用这两个参数来打印错误消息。  通常，此错误消息由 @var{error-symbol} 的 @code{error-message} 属性提供。  如果 @var{data} 不是 @code{nil}，则后跟一个冒号和逗号分隔的 @var{data} 未计算元素列表。  对于@code{error}，错误消息是@var{data}的@sc{car}（必须是字符串）。 @code{file-error} 的子类别经过特殊处理。
+
+@var{data} 中对象的数量和重要性取决于@var{error-symbol}。  例如，对于 @code{wrong-type-argument} 错误，列表中应该有两个对象：一个描述预期类型的​​谓词，以及一个不适合该类型的对象。
+
+@var{error-symbol} 和 @var{data} 都可用于处理错误的任何错误处理程序：@code{condition-case} 将局部变量绑定到@code{(@var{error-symbol} .@: @var{data})} (@pxref{Handling Errors}) 形式的列表。
+
+函数@code{signal}永远不会返回。
+@c (though in older Emacs versions it sometimes could).
+如果错误 @var{error-symbol} 没有处理程序，并且 @code{noninteractive} 是非 @code{nil} (@pxref{Batch Mode})，则该函数最终会终止 Emacs。
+
+@example
+@group
+(signal 'wrong-number-of-arguments '(x y))
+     @error{} Wrong number of arguments: x, y
+@end group
+
+@group
+(signal 'no-such-error '("My unknown error condition"))
+     @error{} peculiar error: "My unknown error condition"
+@end group
+@end example
+@end defun
+
+@cindex user errors, signaling
+@defun user-error format-string &rest args
+该函数的行为与 @code{error} 完全相同，只是它使用错误符号 @code{user-error} 而不是 @code{error}。  顾名思义，这是为了报告用户方面的错误，而不是代码本身的错误。  例如，如果您尝试使用命令 @code{Info-history-back} (@kbd{l}) 向后移动到信息浏览历史记录的开头之外，Emacs 会发出 @code{user-error} 信号。  即使 @code{debug-on-error} 不是 @code{nil}，此类错误也不会导致进入调试器。 @xref{Error Debugging}。
+@end defun
+
+@cindex CL note---no continuable errors
+@quotation
+@b{Common Lisp note:} Emacs Lisp 与 Common Lisp 中的持续错误概念完全不同。
+@end quotation
+
+@node Processing of Errors
+@subsubsection Emacs 如何处理错误
+@cindex processing of errors
+
+当 Lisp 程序发出错误信号时，它会调用函数 @code{signal}，该函数会搜索活动的 @dfn{handler} 来查找错误。  处理程序是一系列 Lisp 表达式，指定在 Lisp 程序的一部分发生错误时执行。  如果错误有适用的处理程序，则执行该处理程序，并按照该处理程序恢复控制。  处理程序在建立它的@code{condition-case}环境中执行； @code{condition-case} 中调用的所有函数都已退出，并且处理程序无法返回到它们。
+
+如果没有适用的错误处理程序，它将终止当前命令，刷新所有挂起的未处理输入事件 (@pxref{Input Events})@footnote{ Pending input is discarded because the user could have typed something in advance under the assumption that execution will proceed without errors, so keeping these input events would cause unintended consequences, like inserting stray characters into an unrelated buffer or execution of some unintended command. }，并将控制返回到编辑器命令循环。 （命令循环有一个针对各种错误的隐式处理程序。）然后，命令循环的处理程序使用错误符号和关联数据来打印错误消息。  您可以使用变量 @code{command-error-function} 来控制如何完成此操作：
+
+@defvar command-error-function
+该变量如果非 0，则指定一个函数，用于处理将控制权返回到 Emacs 命令循环的错误。  该函数应采用三个参数： @var{data}，与 @code{condition-case} 绑定到其变量的形式相同的列表； @var{context}，描述错误发生情况的字符串，或者（更常见）@code{nil}；以及@var{caller}，调用发出错误信号的原语的 Lisp 函数。
+@end defvar
+
+@cindex @code{debug-on-error} use
+没有显式处理程序的错误可能会调用 Lisp 调试器 (@pxref{Invoking the Debugger})。  如果变量 @code{debug-on-error} (@pxref{Error Debugging}) 为非 @code{nil}，则启用调试器。  与错误处理程序不同，调试器在错误环境中运行，因此您可以精确地检查变量值，就像错误发生时一样。  在批处理模式 (@pxref{Batch Mode}) 下，Emacs 进程通常会以非零退出状态退出。
+
+@node Handling Errors
+@subsubsection 编写代码来处理错误
+@cindex error handler
+@cindex handling errors
+@cindex handle Lisp errors
+@cindex forms for handling errors
+
+发出错误信号的通常效果是终止正在运行的命令并立即返回到 Emacs 编辑器命令循环。您可以通过使用特殊形式@code{condition-case}建立错误处理程序来捕获程序中发生的错误。  一个简单的例子如下所示：
+
+@example
+@group
+(condition-case nil
+    (delete-file filename)
+  (error nil))
+@end group
+@end example
+
+@noindent
+这将删除名为 @var{filename} 的文件，捕获任何错误并在发生错误时返回 @code{nil}。  （对于像这样的简单情况，您可以使用宏 @code{ignore-errors}；请参见下文。）
+
+@code{condition-case} 构造通常用于捕获可预测的错误，例如在调用 @code{insert-file-contents} 时无法打开文件。  它还用于捕获完全不可预测的错误，例如当程序评估从用户读取的表达式时。
+
+@code{condition-case} 的第二个参数称为 @dfn{protected form}。  （在上面的示例中，受保护的表单是对@code{delete-file}的调用。）错误处理程序在该表单开始执行时生效，并在该表单返回时停用。它们在整个干预时间内仍然有效。  特别是，它们在执行此形式调用的函数期间、在其子例程中等期间有效。  这是一件好事，因为严格来说，错误只能由受保护形式调用的 Lisp 原语（包括 @code{signal} 和 @code{error}）发出信号，而不是由受保护形式本身发出信号。
+
+受保护形式之后的参数是处理程序。  每个处理程序都会列出一个或多个@dfn{condition names}（它们是符号）来指定它将处理哪些错误。  发出错误信号时指定的错误符号还定义了条件名称列表。  如果处理程序有任何共同的条件名称，则处理程序将应用于错误。  在上面的示例中，有一个处理程序，它指定一个条件名称@code{error}，它涵盖了所有错误。
+
+搜索适用的处理程序会检查所有已建立的处理程序，从最近建立的处理程序开始。  因此，如果两个嵌套的 @code{condition-case} 形式提供处理相同的错误，则两个嵌套的形式将处理它。
+
+如果错误由某种 @code{condition-case} 形式处理，这通常会阻止调试器运行，即使 @code{debug-on-error} 表示此错误应该调用调试器。
+
+如果您希望能够调试 @code{condition-case} 捕获的错误，请将变量 @code{debug-on-signal} 设置为非 @code{nil} 值。  您还可以通过在条件中写入 @code{debug} 来指定特定处理程序应让调试器首先运行，如下所示：
+
+@example
+@group
+(condition-case nil
+    (delete-file filename)
+  ((debug error) nil))
+@end group
+@end example
+
+@noindent
+这里@code{debug}的作用只是防止@code{condition-case}抑制对调试器的调用。  仅当 2⁣ 和其他常用过滤机制认为应该调用调试器时，任何给定的错误才会调用调试器。  @xref{Error Debugging}。
+
+@defmac condition-case-unless-debug var protected-form handlers@dots{}
+宏 @code{condition-case-unless-debug} 提供了另一种处理此类表单调试的方法。  它的行为与 1⁣ 完全相同，除非变量 2⁣ 不是 3⁣，在这种情况下，它会导致 Emacs 在执行任何适用的处理程序之前进入调试器。  （当调试器退出时，适用的处理程序（如果有）仍将运行。）
+@end defmac
+
+一旦 Emacs 决定某个处理程序处理错误，它就会将控制权返回给该处理程序。  为此，Emacs 取消绑定由正在退出的绑定结构创建的所有变量绑定，并执行所有正在退出的 @code{unwind-protect} 形式的清理。  一旦控制到达处理程序，处理程序的主体就会正常执行。
+
+执行处理程序主体后，执行从 @code{condition-case} 形式返回。  由于受保护的表单在执行处理程序之前完全退出，因此处理程序无法在错误点恢复执行，也无法检查在受保护的表单中进行的变量绑定。  它所能做的就是清理并继续。
+
+错误信号和处理与 @code{throw} 和 @code{catch} (@pxref{Catch and Throw}) 有一些相似之处，但它们是完全独立的设施。  @code{catch} 无法捕获错误，并且 @code{throw} 无法由错误处理程序处理（尽管在没有合适的 @code{catch} 时使用 @code{throw} 会发出可以处理的错误信号）。
+
+@defspec condition-case var protected-form handlers@dots{}
+这种特殊形式围绕 @var{protected-form} 的执行建立错误处理程序 @var{handlers}。  如果 @var{protected-form} 执行时没有错误，则它返回的值将成为 @code{condition-case} 形式的值（在没有成功处理程序的情况下；见下文）。在这种情况下，@code{condition-case} 不起作用。  当@var{protected-form}期间发生错误时，@code{condition-case}形式会有所不同。
+
+每个@var{handlers}都是@code{(@var{conditions} @var{body}@dots{})}形式的列表。  这里@var{conditions}是要处理的错误条件名称，或条件名称列表（可以包含@code{debug}以允许调试器在处理程序之前运行）。  条件名称 @code{t} 匹配任何条件。  @var{body} 是当该处理程序处理错误时要执行的一个或多个 Lisp 表达式。  以下是处理程序的示例：
+
+@example
+@group
+(error nil)
+
+(arith-error (message "Division by zero"))
+
+((arith-error file-error)
+ (message
+  "Either division by zero or failure to open a file"))
+@end group
+@end example
+
+发生的每个错误都有一个 @dfn{error symbol} 来描述它是什么类型的错误，并且还描述了一个条件名称列表 (@pxref{Error Symbols})。  Emacs 在所有活动的 @code{condition-case} 表单中搜索指定一个或多个条件名称的处理程序；最里面的匹配 @code{condition-case} 处理错误。  在此 @code{condition-case} 中，第一个适用的处理程序处理错误。
+
+执行完处理程序主体后，@code{condition-case}正常返回，使用处理程序主体中最后一个表单的值作为整体值。
+
+@cindex error description
+参数 @var{var} 是一个变量。  @code{condition-case} 在执行 @var{protected-form} 时不会绑定此变量，仅在处理错误时才绑定。  此时，它将 @var{var} 本地绑定到 @dfn{error descriptor}，有时也称为错误描述，这是一个给出错误详细信息的列表。错误描述符的形式为@code{(@var{error-symbol} . @var{data})}。  处理程序可以参考此列表来决定要做什么。  例如，如果错误是打开文件失败，则文件名是@var{data}的第二个元素——错误描述符的第三个元素。
+
+如果@var{var}是@code{nil}，则意味着没有变量被绑定。  那么错误符号和相关数据对于处理程序来说是不可用的。
+
+@cindex success handler
+作为一种特殊情况，@var{handlers} 之一可以是 @code{(:success @var{body}@dots{})} 形式的列表，其中当该表达式无错误终止时，@var{body} 与 @var{var}（如果非 @code{nil}）绑定到 @var{protected-form} 的返回值一起执行。
+
+@cindex rethrow a signal
+有时需要重新抛出由 @code{condition-case} 捕获的信号，以便某些外层处理程序捕获。  具体做法如下：
+
+@example
+  (signal err)
+@end example
+
+@noindent
+其中@code{err}是错误描述符变量，是@code{condition-case}的第一个参数，您要重新抛出其错误条件。 @xref{Definition of signal}。
+@end defspec
+
+@defun error-type error
+该函数返回错误描述符@var{error}的错误符号。
+@end defun
+
+@defun error-slot-value error pos
+该函数返回错误描述符@var{error}的字段号@var{pos}中的值。  这些字段从 1 开始编号。例如，对于 @code{wrong-type-argument} 类型的错误，@code{(error-slot-value @var{error} 2)} 返回类型测试失败的对象，@code{(error-slot-value @var{error} 1)} 返回失败的谓词。
+@end defun
+
+@defun error-message-string error-descriptor
+该函数返回给定错误描述符的错误消息字符串。  如果您想通过打印该错误的常用错误消息来处理错误，它会很有用。  @xref{Definition of signal}。
+@end defun
+
+@cindex @code{arith-error} example
+下面是使用 @code{condition-case} 处理除以零导致的错误的示例。  处理程序显示错误消息（但不发出蜂鸣声），然后返回一个非常大的数字。
+
+@example
+@group
+(defun safe-divide (dividend divisor)
+  (condition-case err
+      ;; @r{Protected form.}
+      (/ dividend divisor)
+@end group
+@group
+    ;; @r{The handler.}
+    (arith-error                        ; @r{Condition.}
+     ;; @r{Display the usual message for this error.}
+     (message "%s" (error-message-string err))
+     1000000)))
+@result{} safe-divide
+@end group
+
+@group
+(safe-divide 5 0)
+     @print{} Arithmetic error: (arith-error)
+@result{} 1000000
+@end group
+@end example
+
+@noindent
+该处理程序指定条件名称@code{arith-error}，以便它仅处理除零错误。  其他类型的错误将不会被处理（通过这个@code{condition-case}）。  因此：
+
+@example
+@group
+(safe-divide nil 3)
+     @error{} Wrong type argument: number-or-marker-p, nil
+@end group
+@end example
+
+这是一个捕获各种错误的@code{condition-case}，包括来自@code{error}的错误：
+
+@example
+@group
+(setq baz 34)
+     @result{} 34
+@end group
+
+@group
+(condition-case err
+    (if (eq baz 35)
+        t
+      ;; @r{This is a call to the function @code{error}.}
+      (error "Rats!  The variable %s was %s, not 35" 'baz baz))
+  ;; @r{This is the handler; it is not a form.}
+  (error (princ (format "The error was: %s" err))
+         2))
+@print{} The error was: (error "Rats!  The variable baz was 34, not 35")
+@result{} 2
+@end group
+@end example
+
+@defmac ignore-errors body@dots{}
+该构造执行@var{body}，忽略执行期间发生的任何错误。  如果执行没有错误，@code{ignore-errors}返回@var{body}中最后一个表格的值；否则，它返回@code{nil}。
+
+这是本小节开头的示例，使用 @code{ignore-errors} 重写：
+
+@example
+@group
+  (ignore-errors
+   (delete-file filename))
+@end group
+@end example
+@end defmac
+
+@defmac ignore-error condition body@dots{}
+该宏类似于@code{ignore-errors}，但只会忽略指定的特定错误条件。
+
+@example
+  (ignore-error end-of-file
+    (read ""))
+@end example
+
+@var{condition} 也可以是错误条件列表。
+@end defmac
+
+@defmac with-demoted-errors format body@dots{}
+这个宏就像 @code{ignore-errors} 的温和版本。  它不是完全抑制错误，而是将错误转换为消息。它使用字符串 @var{format} 来格式化消息。 @var{format} 应包含单个 @samp{%} 序列；例如，@code{"Error: %S"}。  在预计不会发出错误信号的代码周围使用@code{with-demoted-errors}，但如果确实发生错误，则应该具有鲁棒性。  请注意，该宏使用 @code{condition-case-unless-debug} 而不是 @code{condition-case}。
+@end defmac
+
+有时，我们想要捕获一些错误并记录有关错误发生条件的一些信息，例如完整的回溯或当前缓冲区。  遗憾的是，此类信息在 @code{condition-case} 的处理程序中不可用，因为在运行该处理程序之前堆栈已展开，因此处理程序在 @code{condition-case} 的动态上下文中运行，而不是在发出错误信号的位置运行。  对于这些情况，您可以使用以下表格：
+
+@defmac handler-bind handlers body@dots{}
+这种特殊形式运行@var{body}，如果执行没有错误，则它返回的值将成为@code{handler-bind}形式的值。  在这种情况下，@code{handler-bind} 不起作用。
+
+@var{handlers} 应该是 @code{(@var{conditions} @var{handler})} 形式的元素列表，其中 @var{conditions} 是要处理的错误条件名称，或者条件名称列表，@var{handler} 应该是其计算应返回函数的形式。与@code{condition-case}一样，条件名称是符号。
+
+在运行 @var{body} 之前，@code{handler-bind} 评估所有 @var{handler} 表单，并将这些处理程序安装为在评估 @var{body} 期间处于活动状态。  当发出错误信号时，Emacs 会在所有活动的 @code{condition-case} 和 @code{handler-bind} 表单中搜索指定一个或多个这些条件名称的处理程序。  当最里面的匹配处理程序是由 @code{handler-bind} 安装的处理程序时，@var{handler} 函数将使用包含错误描述符的单个参数来调用。
+
+与 @code{condition-case} 发生的情况相反，@var{handler} 是在发生错误的动态上下文中调用的。  这意味着它的执行不会取消任何变量绑定或运行 @code{unwind-protect} 的任何清理，因此所有这些动态绑定仍然有效。  有一个例外：运行 @var{handler} 函数时，发出错误信号的代码和 @code{handler-bind} 之间的所有错误处理程序都会暂时挂起，这意味着当发出错误信号时，Emacs 将仅搜索 @var{handler} 函数内部或当前 @code{handler-bind} 外部的活动 @code{condition-case} 和 @code{handler-bind} 形式。  另请注意，词法绑定变量 (@pxref{Lexical Binding}) 不受影响，因为它们没有动态范围。
+
+与任何普通函数一样，@var{handler} 可以非本地退出（通常通过 @code{throw}），也可以正常返回。如果@var{handler}正常返回，则意味着处理程序@emph{declined}将处理错误，并且将从中断处继续搜索错误处理程序。
+
+例如，如果我们想要记录执行特定代码段期间发生的所有错误以及发出错误信号时当前的缓冲区，但又不影响该代码的行为，我们可以这样做：
+
+@example
+@group
+(handler-bind
+    ((error
+      (lambda (err)
+        (push (cons err (current-buffer)) my-log-of-errors))))
+  @var{body-forms}@dots{})
+@end group
+@end example
+
+这只会记录那些未在@var{body-forms}@dots{}内部捕获的错误，换句话说，从@var{body-forms}@dots{}“逃逸”的错误，并且不会阻止这些错误传递到周围的@code{condition-case}处理程序（或@code{handler-bind}处理程序），因为上述处理程序正常返回。
+
+我们还可以使用 @code{handler-bind} 将错误替换为另一个错误，如下面的代码所示，它将执行 @var{body-forms}@dots{} 期间发生的所有类型 @code{user-error} 的错误转换为普通的 @code{error}：
+
+@example
+@group
+(handler-bind
+    ((user-error
+      (lambda (err)
+        (signal 'error (cdr err)))))
+  @var{body-forms}@dots{})
+@end group
+@end example
+
+我们可以用 @code{condition-case} 得到几乎相同的结果：
+
+@example
+@group
+(condition-case err
+    (progn @var{body-forms}@dots{})
+  (user-error (signal 'error (cdr err))))
+@end group
+@end example
+
+@noindent
+但不同之处在于，当我们在 @code{handler-bind} 中（重新）发出新错误信号时，原始错误的动态环境仍然处于活动状态，这意味着如果我们此时进入调试器，它将向我们显示完整的回溯，包括我们发出原始错误信号的点：
+
+@example
+@group
+Debugger entered--Lisp error: (error "Oops")
+  signal(error ("Oops"))
+  #f(lambda (err) [t] (signal 'error (cdr err)))((user-error "Oops"))
+  user-error("Oops")
+  @dots{}
+  eval((handler-bind ((user-error (lambda (err) @dots{}
+@end group
+@end example
+
+@end defmac
+
+@node Error Symbols
+@subsubsection 错误符号和条件名称
+@cindex error symbol
+@cindex error name
+@cindex condition name
+@cindex user-defined error
+@kindex error-conditions
+@kindex define-error
+
+当您发出错误信号时，您可以指定 @dfn{error symbol} 来指定您想要的错误类型。  每个错误都有一个且仅有一个错误符号来对其进行分类。  这是 Emacs Lisp 语言定义的最好的错误分类。
+
+这些狭窄的分类被分组为更广泛的类别的层次结构，称为 @dfn{error conditions}，由 @dfn{condition names} 标识。  最窄的此类属于错误符号本身：每个错误符号也是一个条件名称。  还有更广泛的类的条件名称，直到条件名称@code{error}，它接受各种错误（但不包括@code{quit}）。因此，每个错误都有一个或多个条件名称：@code{error}，错误符号（如果与@code{error} 不同），也许还有一些中间分类。
+
+@defun define-error name message &optional parent
+为了使符号成为错误符号，必须用 @code{define-error} 定义它，它采用父条件（默认为 @code{error}）。该父级定义了此类错误所属的条件。父代的传递集始终包含错误符号本身和符号 @code{error}。  因为退出不被视为错误，所以@code{quit}的父集合就是@code{(quit)}。
+@end defun
+
+@cindex peculiar error
+除了其父级之外，错误符号还有一个 @var{message} ，它是在发出错误信号但未处理错误时要打印的字符串。  如果该消息无效，则使用错误消息@samp{peculiar error}。 @xref{Definition of signal}。
+
+在内部，父集合存储在错误符号的 @code{error-conditions} 属性中，消息存储在错误符号的 @code{error-message} 属性中。
+
+以下是我们如何定义新的错误符号@code{new-error}：
+
+@example
+@group
+(define-error 'new-error "A new error" 'my-own-errors)
+@end group
+@end example
+
+@noindent
+这个错误有几个条件名称： @code{new-error}，最窄的分类； @code{my-own-errors}，我们认为这是一个更广泛的分类；以及 @code{my-own-errors} 的所有条件，其中应包括 @code{error}，这是所有条件中最宽的。
+
+错误字符串应以大写字母开头，但不应以句点结尾。  这是为了与 Emacs 的其余部分保持一致。
+
+当然，Emacs 永远不会自己发出 @code{new-error} 信号；只有在代码中显式调用 @code{signal} (@pxref{Definition of signal}) 才能执行此操作：
+
+@example
+@group
+(signal 'new-error '(x y))
+     @error{} A new error: x, y
+@end group
+@end example
+
+此错误可以通过其任何条件名称来处理。此示例处理 @code{new-error} 以及类 @code{my-own-errors} 中的任何其他错误：
+
+@example
+@group
+(condition-case foo
+    (bar nil t)
+  (my-own-errors nil))
+@end group
+@end example
+
+错误分类的重要方式是根据其条件名称——用于将错误与处理程序相匹配的名称。  错误符号仅作为指定预期错误消息和条件名称列表的便捷方式。  给 @code{signal} 一个条件名称列表而不是一个错误符号会很麻烦。
+
+相比之下，仅使用没有条件名称的错误符号会严重降低 @code{condition-case} 的功效。  当您编写错误处理程序时，条件名称使您可以按不同的通用级别对错误进行分类。  单独使用错误符号将消除除最窄级别之外的所有分类。
+
+@defun error-type-p symbol
+如果 1⁣ 是有效的错误条件名称，则此函数返回非 0⁣。
+@end defun
+
+@defun error-has-type-p error condition
+该函数测试@var{condition}是否是错误描述符@var{error}的错误符号的父代。如果错误描述符@var{error}的类型属于条件名称@var{condition}，则返回非@code{nil}。
+@end defun
+
+@xref{Standard Errors}，查看主要错误符号及其条件的列表。
+
+@node Cleanups
+@subsection 清理非本地出口
+@cindex nonlocal exits, cleaning up
+@cindex forms for cleanup
+
+每当您临时将数据结构置于不一致状态时，@code{unwind-protect}构造都是必不可少的；它允许您在发生错误或抛出时使数据再次一致。  （另一个更具体的清理结构，仅用于缓冲区内容的更改，是原子更改组；@ref{Atomic Changes}。）
+
+@defspec unwind-protect body-form cleanup-forms@dots{}
+@cindex cleanup forms
+@cindex protected forms
+@cindex error cleanup
+@cindex unwinding
+@code{unwind-protect} 执行 @var{body-form} 并保证如果控制离开 @var{body-form}，则将评估 @var{cleanup-forms}，无论情况如何发生。  @var{body-form}可能正常完成，或者执行@code{unwind-protect}中的@code{throw}，或者导致错误；在所有情况下，都会评估 @var{cleanup-forms}。
+
+如果@var{body-form}正常完成，@code{unwind-protect}在评估@var{cleanup-forms}之后返回@var{body-form}的值。如果@var{body-form}未完成，则@code{unwind-protect}不会返回正常意义上的任何值。
+
+只有@var{body-form}受到@code{unwind-protect}的保护。  如果 @var{cleanup-forms} 中的任何一个本身非本地退出（通过 @code{throw} 或错误），@code{unwind-protect} @emph{not} 保证评估其余的。  如果 @var{cleanup-forms} 之一的故障可能会造成麻烦，则在该形式周围使用另一个 @code{unwind-protect} 来保护它。
+@end defspec
+
+例如，这里我们创建一个不可见的缓冲区临时使用，并确保在完成之前杀死它：
+
+@example
+@group
+(let ((buffer (get-buffer-create " *temp*")))
+  (with-current-buffer buffer
+    (unwind-protect
+        @var{body-form}
+      (kill-buffer buffer))))
+@end group
+@end example
+
+@noindent
+您可能认为我们也可以写成@code{(kill-buffer (current-buffer))}并省去变量@code{buffer}。然而，如果@var{body-form}在切换到不同的缓冲区后恰好出现错误，上面所示的方法会更安全！  （或者，您可以在 @var{body-form} 周围写一个 @code{save-current-buffer}，以确保临时缓冲区及时再次变为当前缓冲区以杀死它。）
+
+Emacs 包含一个名为 @code{with-temp-buffer} 的标准宏，它或多或少地扩展为上面所示的代码 (@pxref{Definition of with-temp-buffer,, Current Buffer})。  本手册中定义的几个宏都以这种方式使用@code{unwind-protect}。
+
+@findex ftp-login
+下面是一个源自 FTP 包的实际示例。  它创建一个进程 (@pxref{Processes}) 来尝试建立与远程计算机的连接。  由于函数 @code{ftp-login} 非常容易受到函数编写者无法预见的许多问题的影响，因此它受到一种形式的保护，以确保在发生故障时删除进程。  否则，Emacs 可能会充满无用的子进程。
+
+@example
+@group
+(let ((win nil))
+  (unwind-protect
+      (progn
+        (setq process (ftp-setup-buffer host file))
+        (if (setq win (ftp-login process host user password))
+            (message "Logged in")
+          (error "Ftp login failed")))
+    (or win (and process (delete-process process)))))
+@end group
+@end example
+
+这个例子有一个小错误：如果用户输入@kbd{C-g}退出，并且退出在函数@code{ftp-setup-buffer}返回之后但在设置变量@code{process}之前立即发生，则进程不会被终止。  没有简单的方法来修复这个错误，但至少它的可能性很小。
+
+@node Conditional Compilation
+@section 条件编译
+
+有时您希望仅在满足特定条件时才编译特定代码。  在维护 Emacs 软件包时尤其如此；为了使包与旧版本的 Emacs 兼容，您可能需要使用在当前版本的 Emacs 中已过时的函数或变量。
+
+您可以仅使用条件形式在运行时选择旧形式或新形式，但这往往会输出有关过时函数/变量的烦人警告消息。  对于这种情况，宏 @code{static-if} 会派上用场。  它按照特殊形式@code{if} (@pxref{Conditionals}) 进行图案化。
+
+要在旧版本的 Emacs 中使用此功能，请将 Emacs 源文件 @file{lisp/subr.el} 中的 @code{static-if} 源代码复制到您的包中。
+
+@defmac static-if condition then-form else-forms...
+在宏展开时测试@var{condition}。  如果其值为非@code{nil}，则将宏扩展为@var{then-form}，否则将其扩展为包含在@code{progn}中的@var{else-forms}。  @var{else-forms} 可能为空。
+@end defmac
+
+@defmac static-when condition body...
+在宏展开时测试@var{condition}。  如果其值为非 @code{nil} ，则扩展宏以顺序计算所有 @var{body} 形式并返回最后一个的值，如果没有则返回 @code{nil} 。
+@end defmac
+
+@defmac static-unless condition body...
+在宏展开时测试@var{condition}。  如果其值为 @code{nil}，则展开宏以按顺序计算所有 @var{body} 形式并返回最后一个的值，如果没有则返回 @code{nil}。
+
+以下是在 CC 模式下使用它的示例，该模式可防止在较新版本的 Emacs 中编译 @code{defadvice} 形式：
+@example
+@group
+(static-if (boundp 'comment-line-break-function)
+    (progn)
+  (defvar c-inside-line-break-advice nil)
+  (defadvice indent-new-comment-line (around c-line-break-advice
+                                             activate preactivate)
+    "Call `c-indent-new-comment-line' if in CC Mode."
+    (if (or c-inside-line-break-advice
+            (not c-buffer-is-cc-mode))
+        ad-do-it
+      (let ((c-inside-line-break-advice t))
+        (c-indent-new-comment-line (ad-get-arg 0))))))
+@end group
+@end example
+@end defmac

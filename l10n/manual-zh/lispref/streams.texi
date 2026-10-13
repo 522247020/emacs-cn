@@ -1,0 +1,792 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1994, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Read and Print
+@chapter 读取和打印 Lisp 对象
+
+@dfn{Printing} 和 @dfn{reading} 是将 Lisp 对象转换为文本形式的操作，反之亦然。  它们使用@ref{Lisp Data Types}中描述的打印表示和读取语法。
+
+本章介绍用于读取和打印的 Lisp 函数。它还描述了@dfn{streams}，它指定从哪里获取文本（如果阅读）或将文本放在哪里（如果打印）。
+
+@menu
+* Streams Intro::      流、读取和打印概述。
+* Input Streams::      可用作输入流的各种数据类型。
+* Input Functions::    从文本中读取 Lisp 对象的函数。
+* Output Streams::     可用作输出流的各种数据类型。
+* Output Functions::   将 Lisp 对象打印为文本的函数。
+* Output Variables::   控制打印函数功能的变量。
+* Output Overrides::   覆盖输出变量。
+@end menu
+
+@node Streams Intro
+@section 阅读和打印简介
+@cindex Lisp reader
+@cindex printing
+@cindex reading
+
+@dfn{Reading} Lisp 对象意味着解析文本形式的 Lisp 表达式并生成相应的 Lisp 对象。  这就是 Lisp 程序从 Lisp 代码文件进入 Lisp 的方式。  我们将文本称为对象的 @dfn{read syntax}。  例如，文本 @samp{(a .@: 5)} 是 cons 单元格的读取语法，其 @sc{car} 为 @code{a} 且 @sc{cdr} 为数字 5。
+
+@dfn{Printing} Lisp 对象意味着生成表示该对象的文本——将对象转换为其 @dfn{printed representation} (@pxref{Printed Representation})。  打印上述 cons 单元格会生成文本 @samp{(a .@: 5)}。
+
+读取和打印或多或少是相反的操作：打印读取给定文本片段所产生的对象通常会产生相同的文本，而读取打印对象所产生的文本通常会产生相似的对象。  例如，打印符号 @code{foo} 会生成文本 @samp{foo}，读取该文本将返回符号 @code{foo}。  打印元素为 @code{a} 和 @code{b} 的列表会生成文本 @samp{(a b)}，读取该文本会生成一个包含元素 @code{a} 和 @code{b} 的列表（但不是同一个列表）。
+
+然而，这两个操作并不完全相反。异常有以下三种情况：
+
+@itemize @bullet
+@item 
+打印可能会产生无法阅读的文本。  例如，缓冲区、窗口、框架、子进程和标记打印为以 @samp{#} 开头的文本；如果您尝试阅读此文本，则会出现错误。  无法读取这些数据类型。
+
+@item 
+一个对象可以有多个文本表示。  例如，@samp{1}和@samp{01}表示相同的整数，@samp{(a b)}和@samp{(a .@: (b))}表示相同的列表。  阅读可以接受任何选择，但印刷必须选择其中之一。
+
+@item 
+注释可以出现在对象读取序列中间的某些点，而不影响读取结果。
+@end itemize
+
+@node Input Streams
+@section 输入流
+@cindex stream (for reading)
+@cindex input stream
+
+大多数用于读取文本的 Lisp 函数都采用 @dfn{input stream} 作为参数。  输入流指定从何处或如何获取要读取的文本的字符。  以下是可能的输入流类型：
+
+@table @asis
+@item @var{buffer}
+@cindex buffer input stream
+输入字符从 @var{buffer} 读取，从点之后的字符开始。  点随着字符的读取而前进。
+
+@item @var{marker}
+@cindex marker input stream
+输入字符从 @var{marker} 所在的缓冲区中读取，从标记后面的字符开始。  标记位置随着字符的读取而前进。  当流是标记时，缓冲区中的点值不起作用。
+
+@item @var{string}
+@cindex string input stream
+输入字符取自@var{string}，从字符串中的第一个字符开始，并使用所需数量的字符。
+
+@item @var{function}
+@cindex function input stream
+输入字符由@var{function}生成，它必须支持两种调用：
+
+@itemize @bullet
+@item 
+当不带参数调用它时，它应该返回下一个字符。
+
+@item 
+当使用一个参数（总是一个字符）调用它时，@var{function}应该保存该参数并安排在下一次调用时返回它。这称为 @dfn{unreading} 字符；当 Lisp 读者过多地读取一个字符并希望将其放回原来的位置时，就会发生这种情况。  在这种情况下，@var{function} 返回什么值没有区别。
+@end itemize
+
+@item @code{t}
+@cindex @code{t} input stream
+@code{t} 用作流意味着从迷你缓冲区读取输入。  事实上，迷你缓冲区被调用一次，用户给出的文本被制作成一个字符串，然后用作输入流。  如果 Emacs 以批处理模式运行 (@pxref{Batch Mode})，则使用标准输入而不是迷你缓冲区。  例如，
+@example
+(message "%s" (read t))
+@end example
+将以批处理模式从标准输入读取 Lisp 表达式并将结果打印到标准输出。
+
+@item @code{nil}
+@cindex @code{nil} input stream
+@code{nil} 作为输入流提供意味着使用 @code{standard-input} 的值；该值是 @dfn{default input stream}，并且必须是非 @code{nil} 输入流。
+
+@item @var{symbol}
+作为输入流的符号相当于符号的函数定义（如果有）。
+@end table
+
+下面是从缓冲区流中读取数据的示例，显示了点之前和之后的位置：
+
+@example
+@group
+---------- Buffer: foo ----------
+This@point{} is the contents of foo.
+---------- Buffer: foo ----------
+@end group
+
+@group
+(read (get-buffer "foo"))
+     @result{} is
+@end group
+@group
+(read (get-buffer "foo"))
+     @result{} the
+@end group
+
+@group
+---------- Buffer: foo ----------
+This is the@point{} contents of foo.
+---------- Buffer: foo ----------
+@end group
+@end example
+
+@noindent
+请注意，第一次读取会跳过一个空格。  阅读时会跳过重要文本之前的任何数量的空白。
+
+下面是从作为标记的流中读取的示例，该标记最初位于所示缓冲区的开头。  读取的值是符号@code{This}。
+
+@example
+@group
+
+---------- Buffer: foo ----------
+This is the contents of foo.
+---------- Buffer: foo ----------
+@end group
+
+@group
+(setq m (set-marker (make-marker) 1 (get-buffer "foo")))
+     @result{} #<marker at 1 in foo>
+@end group
+@group
+(read m)
+     @result{} This
+@end group
+@group
+m
+     @result{} #<marker at 5 in foo>   ;; @r{Before the first space.}
+@end group
+@end example
+
+这里我们读取字符串的内容：
+
+@example
+@group
+(read "(When in) the course")
+     @result{} (When in)
+@end group
+@end example
+
+以下示例从迷你缓冲区中读取数据。  提示符为：@w{@samp{Lisp expression: }}。  （这始终是您从流中读取时使用的提示@code{t}。）用户的输入显示在提示之后。
+
+@example
+@group
+(read t)
+     @result{} 23
+---------- Buffer: Minibuffer ----------
+Lisp expression: @kbd{23 @key{RET}}
+---------- Buffer: Minibuffer ----------
+@end group
+@end example
+
+最后，这是一个名为 @code{useless-stream} 的函数流示例。  在使用流之前，我们将变量 @code{useless-list} 初始化为字符列表。  然后，每次调用函数 @code{useless-stream} 都会获取列表中的下一个字符，或者通过将其添加到列表的前面来取消读取该字符。
+
+@example
+@group
+(setq useless-list (append "XY()" nil))
+     @result{} (88 89 40 41)
+@end group
+
+@group
+(defun useless-stream (&optional unread)
+  (if unread
+      (setq useless-list (cons unread useless-list))
+    (prog1 (car useless-list)
+           (setq useless-list (cdr useless-list)))))
+     @result{} useless-stream
+@end group
+@end example
+
+@noindent
+现在我们使用这样构建的流来读取：
+
+@example
+@group
+(read 'useless-stream)
+     @result{} XY
+@end group
+
+@group
+useless-list
+     @result{} (40 41)
+@end group
+@end example
+
+@noindent
+请注意，左括号和右括号保留在列表中。  Lisp 阅读器遇到左括号，决定结束输入，并取消读取它。  此时再次尝试从流中读取将读取@samp{()}并返回@code{nil}。
+
+@node Input Functions
+@section 输入功能
+
+本节介绍与阅读相关的 Lisp 函数和变量。
+
+在下面的函数中，@var{stream}代表输入流（请参阅上一节）。  如果@var{stream}为@code{nil}或省略，则默认为@code{standard-input}的值。
+
+@kindex end-of-file
+如果读取遇到未终止的列表、向量或字符串，则会发出 @code{end-of-file} 错误信号。
+
+@defun read &optional stream
+该函数从 @var{stream} 读取一个文本 Lisp 表达式，并将其作为 Lisp 对象返回。  这是基本的 Lisp 输入函数。
+@end defun
+
+@defun read-from-string string &optional start end
+@cindex string to object
+该函数从 @var{string} 中的文本中读取第一个文本 Lisp 表达式。  它返回一个 cons 单元，其 1⁣ 是该表达式，其 2⁣ 是一个整数，给出字符串中下一个剩余字符的位置（即第一个未读取的字符）。
+
+如果提供了@var{start}，则从字符串中的索引@var{start}开始读取（其中第一个字符位于索引0）。  如果指定 @var{end}，则读取将被迫在该索引之前停止，就好像字符串的其余部分不存在一样。
+
+例如：
+
+@example
+@group
+(read-from-string "(setq x 55) (setq y 5)")
+     @result{} ((setq x 55) . 11)
+@end group
+@group
+(read-from-string "\"A short string\"")
+     @result{} ("A short string" . 16)
+@end group
+
+@group
+;; @r{Read starting at the first character.}
+(read-from-string "(list 112)" 0)
+     @result{} ((list 112) . 10)
+@end group
+@group
+;; @r{Read starting at the second character.}
+(read-from-string "(list 112)" 1)
+     @result{} (list . 5)
+@end group
+@group
+;; @r{Read starting at the seventh character,}
+;;   @r{and stopping at the ninth.}
+(read-from-string "(list 112)" 6 8)
+     @result{} (11 . 8)
+@end group
+@end example
+@end defun
+
+@defun read-positioning-symbols &optional stream
+该函数从@var{stream}读取一个文本表达式，就像@code{read}一样，但另外将读取的符号定位到@var{stream}中它们出现的位置。  只有符号 @code{nil} 没有定位，这是出于效率原因。 @xref{Symbols with Position}。  该函数由字节编译器使用。
+@end defun
+
+@defvar standard-input
+该变量保存默认输入流——当@var{stream}参数为@code{nil}时@code{read}使用的流。默认为@code{t}，表示使用迷你缓冲区。
+@end defvar
+
+@defvar read-circle
+如果非@code{nil}，则该变量可以读取循环和共享结构。  @xref{Circular Objects}。  它的默认值为@code{t}。
+@end defvar
+
+@cindex binary I/O in batch mode
+当以批处理模式从 Emacs 进程的标准输入/输出流读取或写入时，有时需要确保逐字读取/写入任何任意二进制数据，和/或不执行换行符与 CR-LF 对之间的转换。  此问题在 POSIX 主机上不存在，仅在 MS-Windows 和 MS-DOS 上存在@. 以下函数允许您控制 Emacs 进程的任何标准流的 I/O 模式。
+
+@defun set-binary-mode stream mode
+将 @var{stream} 切换为二进制或文本 I/O 模式。  如果@var{mode}非@code{nil}，则切换到二进制模式，否则切换到文本模式。 @var{stream} 的值可以是 @code{stdin}、@code{stdout} 或 @code{stderr} 之一。  作为副作用，该函数会刷新 @var{stream} 的所有待处理输出数据，并返回 @var{stream} 的 I/O 模式的先前值。  在 POSIX 主机上，它总是返回一个非 9⁣ 值，并且除了刷新挂起的输出之外不执行任何操作。
+@end defun
+
+@defun readablep object
+@cindex readable syntax
+该谓词表示 @var{object} 是否具有 @dfn{readable syntax}，即它可以被写出，然后由 Emacs Lisp 阅读器读回。  如果不能，该函数返回@code{nil}；如果可以，该函数返回@var{object}的打印表示（通过@code{prin1}、@pxref{Output Functions}）。
+@end defun
+
+@node Output Streams
+@section 输出流
+@cindex stream (for printing)
+@cindex output stream
+
+输出流指定如何处理打印产生的字符。  大多数打印函数接受输出流作为可选参数。  以下是可能的输出流类型：
+
+@table @asis
+@item @var{buffer}
+@cindex buffer output stream
+输出字符被插入到 @var{buffer} 处。点随着字符的插入而前进。
+
+@item @var{marker}
+@cindex marker output stream
+输出字符被插入到 @var{marker} 指向的缓冲区中的标记位置。  标记位置随着字符的插入而前进。  当流是标记时，缓冲区中的点的值对打印没有影响，并且这种打印不会移动点（除非标记指向点的位置或之前，像往常一样，点会随周围的文本前进）。
+
+@item @var{function}
+@cindex function output stream
+输出字符被传递给@var{function}，它负责将它们存储起来。  它以单个字符作为参数调用，调用次数与要输出的字符数相同，并负责将字符存储在您想要放置的位置。
+
+@item @code{t}
+@cindex @code{t} output stream
+输出字符显示在回显区域中。  如果 Emacs 以批处理模式 (@pxref{Batch Mode}) 运行，则输出将写入标准输出描述符。
+
+@item @code{nil}
+@cindex @code{nil} output stream
+@code{nil}指定为输出流意味着使用@code{standard-output}变量的值；该值是 @dfn{default output stream}，并且不能是 @code{nil}。
+
+@item @var{symbol}
+作为输出流的符号相当于符号的函数定义（如果有）。
+@end table
+
+许多有效的输出流作为输入流也是有效的。  因此，输入流和输出流之间的差异更多地取决于如何使用 Lisp 对象，而不是不同类型的对象。
+
+这是用作输出流的缓冲区的示例。  点最初位于如 @samp{the} 中 @samp{h} 之前所示的位置。  最后，点位于同一个 @samp{h} 的正前方。
+
+@cindex print example
+@example
+@group
+---------- Buffer: foo ----------
+This is t@point{}he contents of foo.
+---------- Buffer: foo ----------
+@end group
+
+(print "This is the output" (get-buffer "foo"))
+     @result{} "This is the output"
+
+@group
+---------- Buffer: foo ----------
+This is t
+"This is the output"
+@point{}he contents of foo.
+---------- Buffer: foo ----------
+@end group
+@end example
+
+现在我们展示如何使用标记作为输出流。  最初，标记位于缓冲区 @code{foo} 中，位于单词 @samp{the} 中的 @samp{t} 和 @samp{h} 之间。  最后，标记已前进到插入的文本上方，以便它保持位于相同的 @samp{h} 之前。请注意，以通常方式显示的点的位置没有任何影响。
+
+@example
+@group
+---------- Buffer: foo ----------
+This is the @point{}output
+---------- Buffer: foo ----------
+@end group
+
+@group
+(setq m (copy-marker 10))
+     @result{} #<marker at 10 in foo>
+@end group
+
+@group
+(print "More output for foo." m)
+     @result{} "More output for foo."
+@end group
+
+@group
+---------- Buffer: foo ----------
+This is t
+"More output for foo."
+he @point{}output
+---------- Buffer: foo ----------
+@end group
+
+@group
+m
+     @result{} #<marker at 34 in foo>
+@end group
+@end example
+
+以下示例显示了回显区域的输出：
+
+@example
+@group
+(print "Echo Area output" t)
+     @result{} "Echo Area output"
+---------- Echo Area ----------
+"Echo Area output"
+---------- Echo Area ----------
+@end group
+@end example
+
+最后，我们展示了如何使用函数作为输出流。  函数@code{eat-output}获取给定的每个字符并将其组合到列表@code{last-output}（@pxref{Building Lists}）的前面。  最后，列表包含所有输出的字符，但顺序相反。
+
+@example
+@group
+(setq last-output nil)
+     @result{} nil
+@end group
+
+@group
+(defun eat-output (c)
+  (setq last-output (cons c last-output)))
+     @result{} eat-output
+@end group
+
+@group
+(print "This is the output" #'eat-output)
+     @result{} "This is the output"
+@end group
+
+@group
+last-output
+     @result{} (10 34 116 117 112 116 117 111 32 101 104
+    116 32 115 105 32 115 105 104 84 34 10)
+@end group
+@end example
+
+@noindent
+现在我们可以通过反转列表来将输出按正确的顺序排列：
+
+@example
+@group
+(concat (nreverse last-output))
+     @result{} "
+\"This is the output\"
+"
+@end group
+@end example
+
+@noindent
+调用 @code{concat} 会将列表转换为字符串，以便您可以更清楚地看到其内容。
+
+@cindex @code{stderr} stream, use for debugging
+@anchor{external-debugging-output}
+@defun external-debugging-output character
+调试时此函数可用作输出流。  它将 @var{character} 写入标准错误流。
+
+例如
+@example
+@group
+(print "This is the output" #'external-debugging-output)
+@print{} This is the output
+@result{} "This is the output"
+@end group
+@end example
+@end defun
+
+@node Output Functions
+@section 输出功能
+
+本节介绍用于打印 Lisp 对象的 Lisp 函数——将对象转换为其打印表示形式。
+
+@cindex @samp{"} in printing
+@cindex @samp{\} in printing
+@cindex quoting characters in printing
+@cindex escape characters in printing
+一些 Emacs 打印功能会在必要时向输出添加引号字符，以便可以正确读取。  使用的引用字符是 @samp{"} 和 @samp{\}；它们区分字符串和符号，并防止读取时将字符串和符号中的标点字符作为分隔符。  @xref{Printed Representation}，了解完整详细信息。  您可以通过选择打印功能来指定引用或不引用。
+
+如果要将文本读回 Lisp，那么您应该使用引号字符进行打印以避免歧义。  同样，如果目的是为 Lisp 程序员清楚地描述 Lisp 对象。  然而，如果输出的目的是为了让人类看起来更漂亮，那么通常最好不引用而打印。
+
+Lisp 对象可以引用自身。  以正常方式打印自引用对象将需要无限量的文本，并且该尝试可能会导致无限递归。  Emacs 检测到这种递归并打印 @samp{#@var{level}} 而不是递归打印已经打印的对象。  例如，这里@samp{#0}表示对当前打印操作的级别0的对象的递归引用：
+
+@example
+(setq foo (list nil))
+     @result{} (nil)
+(setcar foo foo)
+     @result{} (#0)
+@end example
+
+在下面的函数中，@var{stream}代表输出流。 （有关输出流的描述，请参阅上一节。还有 @xref{external-debugging-output}，一个用于调试的有用流值。）如果 @var{stream} 为 @code{nil} 或省略，则默认为 @code{standard-output} 的值。
+
+@defun print object &optional stream
+@cindex Lisp printer
+@code{print} 功能是一种便捷的打印方式。  它输出 @var{object} 到 @var{stream} 的打印表示，并在 @var{object} 之前打印一个换行符，在其之后打印另一个换行符。  使用引号字符。  @code{print} 返回@var{object}。  例如：
+
+@example
+@group
+(progn (print 'The\ cat\ in)
+       (print "the hat")
+       (print " came back"))
+     @print{}
+     @print{} The\ cat\ in
+     @print{}
+     @print{} "the hat"
+     @print{}
+     @print{} " came back"
+     @result{} " came back"
+@end group
+@end example
+@end defun
+
+@defun prin1 object &optional stream overrides
+该函数输出 @var{object} 到 @var{stream} 的打印表示。  它不像@code{print}那样打印换行符来分隔输出，但它确实像@code{print}一样使用引号字符。  它返回@var{object}。
+
+@example
+@group
+(progn (prin1 'The\ cat\ in)
+       (prin1 "the hat")
+       (prin1 " came back"))
+     @print{} The\ cat\ in"the hat"" came back"
+     @result{} " came back"
+@end group
+@end example
+
+如果@var{overrides}不是@code{nil}，它应该是@code{t}（告诉@code{prin1}使用所有打印机相关变量的默认值），或者是设置列表。  @xref{Output Overrides}，了解详情。
+@end defun
+
+@defun princ object &optional stream
+该函数输出 @var{object} 到 @var{stream} 的打印表示。  它返回@var{object}。
+
+此函数旨在生成人们可读的输出，而不是 @code{read} 可读的输出，因此它不会插入引号字符，也不会在字符串内容周围放置双引号。  它不会在调用之间添加任何间隔。
+
+@example
+@group
+(progn
+  (princ 'The\ cat)
+  (princ " in the \"hat\""))
+     @print{} The cat in the "hat"
+     @result{} " in the \"hat\""
+@end group
+@end example
+@end defun
+
+@defun terpri &optional stream ensure
+@cindex newline in print
+该函数向 @var{stream} 输出换行符。  该名称代表“终止打印”。  如果 1⁣ 不是 2⁣ 如果 3⁣ 已经位于行的开头，则不会打印换行符。  请注意，在这种情况下 @var{stream} 不能是函数，如果是函数，则会发出错误信号。  如果打印换行符，该函数返回@code{t}。
+@end defun
+
+@defun write-char character &optional stream
+该函数输出@var{character}到@var{stream}。  它返回@var{character}。
+@end defun
+
+@defun flush-standard-output
+如果您有基于 Emacs 的批处理脚本将输出发送到终端，则每当您向 @code{standard-output} 写入换行符时，Emacs 都会自动显示输​​出。  此函数允许您刷新到@code{standard-output}，而无需先发送换行符，这使您能够显示不完整的行。
+@end defun
+
+@defun prin1-to-string object &optional noescape overrides
+@cindex object to string
+此函数返回一个字符串，其中包含 @code{prin1} 将为同一参数打印的文本。
+
+@example
+@group
+(prin1-to-string 'foo)
+     @result{} "foo"
+@end group
+@group
+(prin1-to-string (mark-marker))
+     @result{} "#<marker at 2773 in strings.texi>"
+@end group
+@end example
+
+如果@var{overrides}不是@code{nil}，它应该是@code{t}（告诉@code{prin1}使用所有打印机相关变量的默认值），或者是设置列表。  @xref{Output Overrides}，了解详情。
+
+如果@var{noescape}非@code{nil}，则禁止在输出中使用引号字符。  （Emacs 版本 19 及更高版本支持此参数。）
+
+@example
+@group
+(prin1-to-string "foo")
+     @result{} "\"foo\""
+@end group
+@group
+(prin1-to-string "foo" t)
+     @result{} "foo"
+@end group
+@end example
+
+请参阅@ref{Formatting Strings}中的@code{format}，了解获取 Lisp 对象作为字符串的打印表示的其他方法。
+@end defun
+
+@defmac with-output-to-string body@dots{}
+该宏执行 @var{body} 形式，并将 @code{standard-output} 设置为将输出馈送到字符串中。  然后它返回该字符串。
+
+例如，如果当前缓冲区名称是@samp{foo}，
+
+@example
+(with-output-to-string
+  (princ "The buffer is ")
+  (princ (buffer-name)))
+@end example
+
+@noindent
+返回@code{"The buffer is foo"}。
+@end defmac
+
+@cindex pretty-printer
+@defun pp object &optional stream
+该函数将@var{object}输出到@var{stream}，就像@code{prin1}一样，但以更漂亮的方式进行。  也就是说，它将缩进并填充对象以使其更易于人类阅读。
+@end defun
+
+如果您需要在批处理模式下使用二进制 I/O，例如，使用本节中描述的函数写出任意二进制数据或避免在非 POSIX 主机上转换换行符，请参阅@ref{Input Functions, set-binary-mode}。
+
+@node Output Variables
+@section 影响输出的变量
+@cindex output-controlling variables
+
+@defvar standard-output
+该变量的值是默认输出流——当@var{stream}参数为@code{nil}时打印函数使用的流。默认为@code{t}，表示显示在回显区域。
+@end defvar
+
+@defvar print-quoted
+如果这是非@code{nil}，则意味着使用缩写的阅读器语法打印引用的形式，例如，@code{(quote foo)}打印为@code{'foo}，@code{(function foo)}打印为@code{#'foo}。  默认值为@code{t}。
+@end defvar
+
+@defvar print-escape-newlines
+@cindex @samp{\n} in print
+@cindex escape characters
+如果此变量非 @code{nil}，则字符串中的换行符将打印为 @samp{\n}，换页符将打印为 @samp{\f}。通常这些字符被打印为实际的换行符和换页符。
+
+该变量影响使用引号打印的打印函数 @code{prin1} 和 @code{print}。  它不影响@code{princ}。  这是使用 @code{prin1} 的示例：
+
+@example
+@group
+(prin1 "a\nb")
+     @print{} "a
+     @print{} b"
+     @result{} "a
+b"
+@end group
+
+@group
+(let ((print-escape-newlines t))
+  (prin1 "a\nb"))
+     @print{} "a\nb"
+     @result{} "a
+b"
+@end group
+@end example
+
+@noindent
+在第二个表达式中，@code{print-escape-newlines}的本地绑定在调用@code{prin1}期间有效，但在打印结果期间无效。
+@end defvar
+
+@defvar print-escape-control-characters
+如果此变量为非 @code{nil}，则字符串中的控制字符将由打印函数 @code{prin1} 和 @code{print} 以反斜杠序列的形式打印，并用引号进行打印。  如果此变量和 @code{print-escape-newlines} 都是非 @code{nil}，则换行符和换页时后者优先。
+@end defvar
+
+@defvar print-escape-nonascii
+如果此变量为非 @code{nil}，则字符串中的单字节非 @acronym{ASCII} 字符将由使用引号打印的打印函数 @code{prin1} 和 @code{print} 无条件打印为反斜杠序列。
+
+当输出流是多字节缓冲区或指向一个的标记时，这些函数还对单字节非 0⁣ 字符使用反斜杠序列，无论该变量的值如何。
+@end defvar
+
+@defvar print-escape-multibyte
+如果此变量为非 @code{nil}，则字符串中的多字节非 @acronym{ASCII} 字符将由使用引号打印的打印函数 @code{prin1} 和 @code{print} 无条件地打印为反斜杠序列。
+
+当输出流是单字节缓冲区或指向单字节缓冲区的标记时，这些函数还对多字节非 0⁣ 字符使用反斜杠序列，无论该变量的值如何。
+@end defvar
+
+@defvar print-charset-text-property
+该变量控制打印字符串时“charset”文本属性的打印。  该值应为 @code{nil}、@code{t} 或 @code{default}。
+
+如果值为 @code{nil}，则永远不会打印 @code{charset} 文本属性。  如果@code{t}，则始终打印它们。
+
+如果值为 @code{default}，则仅在存在“意外”@code{charset} 属性时打印 @code{charset} 文本属性。  对于 ascii 字符，所有字符集都被视为“预期”。否则，字符的预期 @code{charset} 属性由 @code{char-charset} 给出。
+@end defvar
+
+@defvar print-length
+@cindex printing limits
+该变量的值是在任何列表、向量或布尔向量中打印的最大元素数。  如果要打印的对象包含的元素多于此数量，则会用省略号缩写。
+
+如果值为 @code{nil} （默认值），则没有限制。
+
+@example
+@group
+(setq print-length 2)
+     @result{} 2
+@end group
+@group
+(print '(1 2 3 4 5))
+     @print{} (1 2 ...)
+     @result{} (1 2 ...)
+@end group
+@end example
+@end defvar
+
+@defvar print-level
+该变量的值是打印时圆括号和中括号的最大嵌套深度。  深度超过此限制的任何列表或向量都会用省略号缩写。  值 0⁣（默认值）表示没有限制。
+@end defvar
+
+@defopt eval-expression-print-length
+@defoptx eval-expression-print-level
+这些是 @code{eval-expression} 使用的 @code{print-length} 和 @code{print-level} 的值，因此间接地被许多交互式评估命令 (@pxref{Lisp Eval,, Evaluating Emacs Lisp Expressions, emacs, The GNU Emacs Manual}) 使用。
+@end defopt
+
+这些变量用于检测和报告循环和共享结构：
+
+@defvar print-circle
+如果非@code{nil}，则该变量可以检测打印中的圆形和共享结构。  @xref{Circular Objects}。
+@end defvar
+
+@defvar print-unreadable-function
+默认情况下，Emacs 将不可读的对象打印为 @samp{#<...>"}。  例如：
+
+@example
+(prin1-to-string (make-marker))
+     @result{} "#<marker in no buffer>"
+@end example
+
+如果这个变量是非@code{nil}，它应该是一个将被调用来处理这些对象的打印的函数。  该函数将使用两个参数调用：对象和打印函数使用的 @var{noescape} 标志 (@pxref{Output Functions})。
+
+该函数应该返回 @code{nil} （照常打印对象）、字符串（将被打印）或任何其他对象（不打印对象）。  例如：
+
+@example
+(let ((print-unreadable-function
+       (lambda (object escape) "hello")))
+  (prin1-to-string (make-marker)))
+     @result{} "hello"
+@end example
+@end defvar
+
+@defvar print-gensym
+如果非@code{nil}，则该变量可以检测打印中未保留的符号 (@pxref{Creating Symbols})。  启用此功能后，未驻留的符号将打印带有前缀 @samp{#:}，它告诉 Lisp 阅读器生成一个未驻留的符号。
+@end defvar
+
+@defvar print-continuous-numbering
+如果非@code{nil}，则意味着数字在打印调用中连续。这会影响 @samp{#@var{n}=} 标签和 @samp{#@var{m}#} 参考打印的数字。不要使用 @code{setq} 设置此变量；您应该只将它临时绑定到 @code{t} 和 @code{let}。  当您这样做时，您还应该将 @code{print-number-table} 绑定到 @code{nil}。
+@end defvar
+
+@defvar print-number-table
+该变量保存一个由打印内部使用的向量来实现 @code{print-circle} 功能。  除了在绑定 @code{print-continuous-numbering} 时将其绑定到 @code{nil} 之外，您不应该使用它。
+@end defvar
+
+@defvar float-output-format
+该变量指定如何打印浮点数。  默认值为@code{nil}，表示使用表示数字的最短输出而不丢失信息。
+
+为了更精确地控制输出格式，您可以在该变量中放置一个字符串。  该字符串应包含要在 C 函数 @code{sprintf} 中使用的 @samp{%} 规范。  有关可以使用的内容的更多限制，请参阅变量的文档字符串。
+@end defvar
+
+@defvar print-integers-as-characters
+当此变量为非@code{nil}时，将使用 Lisp 字符语法 (@pxref{Basic Char Syntax}) 打印表示图形基本字符的整数。  其他数字按通常方式打印。例如，列表 @code{(4 65 -1 10)} 将打印为 @samp{(4 ?A -1 ?\n)}。
+
+更准确地说，以字符语法打印的值是表示属于 Unicode 一般类别字母、数字、标点符号、符号和专用 (@pxref{Character Properties}) 的字符，以及具有自己的转义语法（例如换行符）的控制字符。
+@end defvar
+
+@defopt pp-default-function
+该用户变量指定 @code{pp} 使用的函数来美化其输出。  默认情况下，它使用 @code{pp-fill} 试图在速度和生成适合 @code{fill-column} 的自然外观输出之间取得良好的平衡。  之前的默认值是@code{pp-28}，它往往速度更快，但生成的输出看起来不太自然且不太紧凑。
+@end defopt
+
+@node Output Overrides
+@section 覆盖输出变量
+@cindex overrides, in output functions
+@cindex output variables, overriding
+
+上一节 (@pxref{Output Variables}) 列出了控制 Emacs Lisp 打印机如何格式化输出数据的众多变量。  这些通常可供用户更改，但有时您希望以默认格式输出数据，或以其他方式覆盖用户设置。  例如，如果您将 Emacs Lisp 数据存储在文件中，您不希望通过 @code{print-length} 设置来缩短该数据。
+
+因此 @code{prin1} 和 @code{prin1-to-string} 函数有一个可选的 @var{overrides} 参数。  该参数可以是 @code{t} （这意味着所有打印变量应重置为默认值），也可以是某些变量的设置列表。列表中的每个元素可以是 @code{t} （这意味着“重置为默认值”，通常是列表的第一个元素），也可以是一对，其中 @code{car} 是代表输出变量的符号，其 @code{cdr} 是该变量的值。
+
+例如，这仅使用默认值进行打印：
+
+@lisp
+(prin1 object nil t)
+@end lisp
+
+这使用当前打印设置打印 @var{object}，但将 @code{print-length} 的值覆盖为 5：
+
+@lisp
+(prin1 object nil '((length . 5)))
+@end lisp
+
+最后，仅使用默认设置打印 @var{object}，但 @code{print-length} 绑定到 5：
+
+@lisp
+(prin1 object nil '(t (length . 5)))
+@end lisp
+
+下面是可以使用的符号列表以及它们映射到哪些变量：
+
+@table @code
+@item length
+这会覆盖@code{print-length}。
+@item level
+这会覆盖@code{print-level}。
+@item circle
+这会覆盖@code{print-circle}。
+@item quoted
+这会覆盖@code{print-quoted}。
+@item escape-newlines
+这会覆盖@code{print-escape-newlines}。
+@item escape-control-characters
+这会覆盖@code{print-escape-control-characters}。
+@item escape-nonascii
+这会覆盖@code{print-escape-nonascii}。
+@item escape-multibyte
+这会覆盖@code{print-escape-multibyte}。
+@item charset-text-property
+这会覆盖@code{print-charset-text-property}。
+@item unreadable-function
+这会覆盖@code{print-unreadable-function}。
+@item gensym
+这会覆盖@code{print-gensym}。
+@item continuous-numbering
+这会覆盖@code{print-continuous-numbering}。
+@item number-table
+这会覆盖@code{print-number-table}。
+@item float-format
+这会覆盖@code{float-output-format}。
+@item integers-as-characters
+这会覆盖@code{print-integers-as-characters}。
+@item symbols-bare
+这会覆盖@code{print-symbols-bare}。
+@end table
+
+将来，可能会提供更多不直接映射到变量的覆盖，但只能通过此参数使用。

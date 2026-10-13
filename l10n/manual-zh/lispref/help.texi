@@ -1,0 +1,686 @@
+@c -*- mode: texinfo; coding: utf-8 -*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Documentation
+@chapter 文档
+@cindex documentation strings
+
+GNU Emacs 有方便的内置帮助工具，其中大多数从与函数和变量相关的文档字符串中获取信息。  本章介绍如何访问 Lisp 程序中的文档字符串。
+
+文档字符串的内容应遵循某些约定。  特别是，它的第一行应该是一个完整的句子（或两个完整的句子），简要描述函数或变量的作用。  @xref{Documentation Tips}，了解如何编写良好的文档字符串。
+
+请注意，Emacs 的文档字符串与 Emacs 手册不同。  手册有自己的源文件，用 Texinfo 语言编写；文档字符串在它们所应用的函数和变量的定义中指定。  文档字符串的集合不足以作为手册，因为好的手册不是以这种方式组织的；它是按照讨论主题进行组织的。
+
+有关显示文档字符串的命令，请参阅@ref{Help, , Help, emacs, The GNU Emacs Manual}。
+
+@menu
+* Documentation Basics::       定义和存储文档字符串的位置。
+* Accessing Documentation::    Lisp 程序如何访问文档字符串。
+* Keys in Documentation::      替换当前的键绑定。
+* Text Quoting Style::         文档字符串和消息中的引号。
+* Describing Characters::      对非打印字符和按键序列进行可打印的描述。
+* Help Functions::             Emacs 使用的子例程帮助工具。
+* Documentation Groups::       按组列出函数。
+@end menu
+
+@node Documentation Basics
+@section 文档基础知识
+@cindex documentation conventions
+@cindex writing a documentation string
+@cindex string, writing a doc string
+
+文档字符串是使用 Lisp 字符串语法编写的，文本周围有双引号字符。  事实上，它是一个真正的 Lisp 字符串。  当字符串出现在函数或变量定义中的正确位置时，它就充当函数或变量的文档。
+
+@cindex @code{function-documentation} property
+在函数定义（@code{lambda} 或 @code{defun} 形式）中，文档字符串在参数列表之后指定，并且通常直接存储在函数对象中。  @xref{Function Documentation}。  您还可以将函数文档放在函数名称 (@pxref{Accessing Documentation}) 的 @code{function-documentation} 属性中。
+
+@cindex @code{variable-documentation} (symbol property)
+在变量定义（@code{defvar} 形式）中，文档字符串在初始值之后指定。  @xref{Defining Variables}。  该字符串存储在变量的 @code{variable-documentation} 属性中。
+
+@cindex @file{DOC} (documentation) file
+有时，Emacs 不会将文档字符串保留在内存中。这样的情况有两种。  首先，为了节省内存，原始函数 (@pxref{What Is a Function}) 和内置变量的文档保存在名为 @file{DOC} 的文件中，该文件位于 @code{doc-directory} (@pxref{Accessing Documentation}) 指定的目录中。  其次，当从字节编译文件加载函数或变量时，Emacs 会避免加载其文档字符串 (@pxref{Docs and Compilation})。  在这两种情况下，Emacs 仅在需要时才从文件中查找文档字符串，例如当用户为函数调用 @kbd{C-h f} (@code{describe-function}) 时。
+
+文档字符串可以包含特殊的@dfn{key substitution sequences}，指的是仅当用户查看文档时才会查找的键绑定。  即使用户重新排列默认键绑定，这也允许帮助命令显示正确的键。  @xref{Keys in Documentation}。
+
+在自动加载命令 (@pxref{Autoload}) 的文档字符串中，这些键替换序列具有额外的特殊效果：它们导致命令上的 @kbd{C-h f} 触发自动加载。  （这是正确设置 @file{*Help*} 缓冲区中的超链接所必需的。）
+
+@node Accessing Documentation
+@section 访问文档字符串
+@cindex accessing documentation strings
+
+@defun documentation-property symbol property &optional verbatim
+该函数返回属性@var{property}下@var{symbol}属性列表中记录的文档字符串。  它最常用于查找变量的文档字符串，其中@var{property}是@code{variable-documentation}。  但是，它也可用于查找其他类型的文档，例如自定义组的文档（但对于函数文档，请使用下面的 @code{documentation} 函数）。
+
+如果属性值引用存储在 @file{DOC} 文件或字节编译文件中的文档字符串，则此函数查找该字符串并返回它。
+
+如果属性值不是 @code{nil}，不是字符串，并且不引用文件中的文本，则将其计算为 Lisp 表达式以获取字符串。
+
+最后，该函数通过 @code{substitute-command-keys} 传递字符串来替换键绑定 (@pxref{Keys in Documentation})。  如果@var{verbatim}非@code{nil}，它会跳过此步骤。
+
+@smallexample
+@group
+(documentation-property 'command-line-processed
+   'variable-documentation)
+     @result{} "Non-nil once command line has been processed"
+@end group
+@group
+(symbol-plist 'command-line-processed)
+     @result{} (variable-documentation 188902)
+@end group
+@group
+(documentation-property 'emacs 'group-documentation)
+     @result{} "Customization of the One True Editor."
+@end group
+@end smallexample
+@end defun
+
+@defun documentation function &optional verbatim
+该函数返回@var{function}的文档字符串。  它处理宏、命名键盘宏、特殊形式以及普通函数。
+
+如果 @var{function} 是一个符号，该函数首先查找该符号的 @code{function-documentation} 属性；如果它具有非 2⁣ 值，则文档来自该值（如果该值不是字符串，则对其进行求值）。
+
+如果 @var{function} 不是符号，或者它没有 @code{function-documentation} 属性，则 @code{documentation} 从实际函数定义中提取文档字符串，并在需要时从文件中读取它。
+
+最后，除非@var{verbatim}非@code{nil}，否则该函数调用@code{substitute-command-keys}。  结果是要返回的文档字符串。
+
+如果 2⁣ 没有函数定义，则 0⁣ 函数会发出 1⁣ 错误信号。  但是，如果函数定义没有文档字符串也没关系。  在这种情况下，@code{documentation} 返回@code{nil}。
+@end defun
+
+@defun function-documentation function
+@code{documentation} 使用通用函数从函数对象中提取原始文档字符串。  您可以通过添加相应的方法来指定如何获取特定函数类型的文档字符串。
+@end defun
+
+@defun face-documentation face
+该函数将 @var{face} 的文档字符串作为面返回。
+@end defun
+
+以下是使用 @code{documentation} 和 @code{documentation-property} 这两个函数来显示 @file{*Help*} 缓冲区中多个符号的文档字符串的示例。
+
+@anchor{describe-symbols example}
+@smallexample
+@group
+(defun describe-symbols (pattern)
+  "Describe the Emacs Lisp symbols matching PATTERN.
+All symbols that have PATTERN in their name are described
+in the *Help* buffer."
+  (interactive "sDescribe symbols matching: ")
+  (let ((describe-func
+         (lambda (s)
+@end group
+@group
+           ;; @r{Print description of symbol.}
+           (if (fboundp s)             ; @r{It is a function.}
+               (princ
+                (format "%s\t%s\n%s\n\n" s
+                  (if (commandp s)
+                      (let ((keys (where-is-internal s)))
+                        (if keys
+                            (concat
+                             "Keys: "
+                             (mapconcat 'key-description
+                                        keys " "))
+                          "Keys: none"))
+                    "Function")
+@end group
+@group
+                  (or (documentation s)
+                      "not documented"))))
+
+           (if (boundp s)              ; @r{It is a variable.}
+@end group
+@group
+               (princ
+                (format "%s\t%s\n%s\n\n" s
+                  (if (custom-variable-p s)
+                      "Option " "Variable")
+@end group
+@group
+                  (or (documentation-property
+                        s 'variable-documentation)
+                      "not documented"))))))
+        sym-list)
+@end group
+
+@group
+    ;; @r{Build a list of symbols that match pattern.}
+    (mapatoms (lambda (sym)
+                (if (string-match pattern (symbol-name sym))
+                    (setq sym-list (cons sym sym-list)))))
+@end group
+
+@group
+    ;; @r{Display the data.}
+    (help-setup-xref (list 'describe-symbols pattern)
+                 (called-interactively-p 'interactive))
+    (with-help-window (help-buffer)
+      (mapcar describe-func (sort sym-list)))))
+@end group
+@end smallexample
+
+@code{describe-symbols} 函数的工作方式与 @code{apropos} 类似，但提供更多信息。
+
+@smallexample
+@group
+(describe-symbols "goal")
+
+---------- Buffer: *Help* ----------
+goal-column     Option
+Semipermanent goal column for vertical motion, as set by @dots{}
+@end group
+@c Do not blithely break or fill these lines.
+@c That makes them incorrect.
+
+@group
+minibuffer-temporary-goal-position      Variable
+not documented
+@end group
+
+@group
+set-goal-column Keys: C-x C-n
+Set the current horizontal position as a goal for C-n and C-p.
+@end group
+@c DO NOT put a blank line here!  That is factually inaccurate!
+@group
+Those commands will move to this position in the line moved to
+rather than trying to keep the same horizontal position.
+With a non-nil argument ARG, clears out the goal column
+so that C-n and C-p resume vertical motion.
+The goal column is stored in the variable `goal-column'.
+
+(fn ARG)
+@end group
+
+@group
+temporary-goal-column   Variable
+Current goal column for vertical motion.
+It is the column where point was at the start of the current run
+of vertical motion commands.
+
+When moving by visual lines via the function `line-move-visual', it is a cons
+cell (COL . HSCROLL), where COL is the x-position, in pixels,
+divided by the default column width, and HSCROLL is the number of
+columns by which window is scrolled from left margin.
+
+When the `track-eol' feature is doing its job, the value is
+`most-positive-fixnum'.
+---------- Buffer: *Help* ----------
+@end group
+@end smallexample
+
+@anchor{Definition of Snarf-documentation}
+@defun Snarf-documentation filename
+该函数在构建 Emacs 时使用，就在可运行的 Emacs 被转储之前。  它查找存储在文件@var{filename}中的文档字符串的位置，并将这些位置记录到内存中的函数定义和变量属性列表中。 @xref{Building Emacs}。
+
+Emacs 从 @file{emacs/etc} 目录读取文件 @var{filename}。当稍后执行转储的 Emacs 时，将在目录@code{doc-directory} 中查找相同的文件。  通常@var{filename}是@code{"DOC"}。
+@end defun
+
+@defvar doc-directory
+该变量保存目录的名称，该目录应包含文件@code{"DOC"}，该文件包含内置函数和变量的文档字符串。
+
+在大多数情况下，这与 @code{data-directory} 相同。  当您从构建 Emacs 的目录运行而不实际安装它时，它们可能会有所不同。  @xref{Definition of data-directory}。
+@end defvar
+
+@node Keys in Documentation
+@section 替换文档中的按键绑定
+@cindex documentation, keys in
+@cindex keys in documentation strings
+@cindex substituting keys in documentation
+@cindex key substitution sequence
+
+当文档字符串引用按键序列时，它们应该使用当前的实际按键绑定。  他们可以使用下面描述的某些特殊文本序列来做到这一点。  以通常的方式访问文档字符串会用当前的键绑定信息替换这些特殊序列。  这是通过调用 @code{substitute-command-keys} 来实现的。  您也可以自己调用该函数。
+
+以下是特殊序列及其含义的列表：
+
+@table @code
+@item \[@var{command}]
+代表将调用 @var{command} 的按键序列，如果 @var{command} 没有按键绑定，则调用 @samp{M-x @var{command}}。
+
+@item \@{@var{mapvar}@}
+代表键盘映射的摘要，它是变量@var{mapvar}的值。  使用@code{describe-bindings}进行总结。摘要通常会排除菜单绑定，但如果 @code{substitute-command-keys} 的 @var{include-menus} 参数为非 @code{nil}，则将包含菜单绑定。
+
+@item \<@var{mapvar}>
+代表没有文本本身。  它仅用于副作用：它将 @var{mapvar} 的值指定为本文档字符串中任何后续 @samp{\[@var{command}]} 序列的键盘映射。
+
+@item \`@var{KEYSEQ}'
+代表按键序列@var{KEYSEQ}，它将使用相同的面作为命令替换。  仅当按键序列没有相应的命令时才应使用此功能，例如直接使用 @code{read-key-sequence} 读取它时。  根据@code{key-valid-p}，它必须是有效的按键序列。  它也可以与命令名称一起使用，例如 @samp{\`M-x foo'}，您希望将其字体化为键盘序列，但您希望禁止将其翻译为像 @samp{\[foo]} 那样的按键序列。
+
+@item `
+（重音）代表左引号。这会根据 @code{text-quoting-style} 的值生成左单引号、撇号或重音符号。 @xref{Text Quoting Style}。
+
+@item '
+（撇号）代表正确的引用。这会根据 @code{text-quoting-style} 的值生成右单引号或撇号。
+
+@item \=
+引用以下字符并被丢弃；因此，@samp{\=`}将@samp{`}放入输出，@samp{\=\[}将@samp{\[}放入输出，@samp{\=\=}将@samp{\=}放入输出。
+
+@item \+
+这表明紧随其后的符号不应在 @file{*Help*} 缓冲区中标记为链接。
+@end table
+
+@strong{Please note:} 在 Emacs Lisp 中写入字符串时，每个 @samp{\} 必须加倍 (@pxref{Syntax for Strings})。
+
+@defun substitute-command-keys string &optional no-face include-menus
+@vindex help-key-binding@r{ (face)}
+该函数扫描 @var{string} 查找上述特殊序列，并用它们所代表的内容替换它们，以字符串形式返回结果。这允许显示准确引用用户自己的自定义键绑定的文档。  默认情况下，键绑定被赋予一个特殊的面@code{help-key-binding}，但如果可选参数@var{no-face}非-@code{nil}，则该函数不会将此面添加到生成的字符串中。
+
+@cindex advertised binding
+@cindex @code{:advertised-binding} (symbol property)
+如果命令有多个绑定，则此函数通常使用它找到的第一个绑定。  您可以通过为命令分配 @code{:advertised-binding} 符号属性来指定一个特定的键绑定，如下所示：
+
+@smallexample
+(put 'undo :advertised-binding [?\C-/])
+@end smallexample
+
+@noindent
+@code{:advertised-binding} 属性还会影响菜单项 (@pxref{Menu Bar}) 中显示的绑定。  如果该属性指定了该命令实际上不具有的键绑定，则该属性将被忽略。
+@end defun
+
+以下是特殊序列的示例：
+
+@smallexample
+@group
+(substitute-command-keys
+   "To abort recursive edit, type `\\[abort-recursive-edit]'.")
+@result{} "To abort recursive edit, type ‘C-]’."
+@end group
+
+@group
+(substitute-command-keys
+   "The keys that are defined for the minibuffer here are:
+  \\@{minibuffer-local-must-match-map@}")
+@result{} "The keys that are defined for the minibuffer here are:
+@end group
+
+?               minibuffer-completion-help
+SPC             minibuffer-complete-word
+TAB             minibuffer-complete
+C-j             minibuffer-complete-and-exit
+RET             minibuffer-complete-and-exit
+C-g             abort-recursive-edit
+"
+
+The keymap description will normally exclude menu items, but if
+@var{include-menus} is non-@code{nil}, include them.
+
+@group
+(substitute-command-keys
+   "To abort a recursive edit from the minibuffer, type \
+`\\<minibuffer-local-must-match-map>\\[abort-recursive-edit]'.")
+@result{} "To abort a recursive edit from the minibuffer, type ‘C-g’."
+@end group
+@end smallexample
+
+@defun substitute-quotes string
+此函数的工作方式类似于 @code{substitute-command-keys}，但仅替换引号字符。
+@end defun
+
+文档字符串中的文本还有其他特殊约定——例如，您可以参考本手册的函数、变量和章节。  @xref{Documentation Tips}，了解详情。
+
+@node Text Quoting Style
+@section 文字引用风格
+
+通常，重音符号和撇号在文档字符串和诊断消息中会被特殊处理，并转换为匹配的单引号（也称为“弯引号”）。  例如，文档字符串 @t{"Alias for `foo'."} 和函数调用 @code{(message "Alias for `foo'.")} 都转换为 @t{"Alias for ‘foo’."}。  不太常见的是，Emacs 将重音符号和撇号显示为它们本身，或仅显示为撇号（例如，@t{"Alias for 'foo'."}）。应编写文档字符串和消息格式，以便它们可以与任何这些样式一起良好地显示。  例如，文档字符串 @t{"Alias for 'foo'."} 可能不是您想要的，因为它可以显示为 @t{"Alias for ’foo’."}，这是一种不寻常的英语样式。
+
+有时，无论文本引用样式如何，您可能需要在不翻译的情况下显示重音符号或撇号。  在文档字符串中，您可以通过转义来做到这一点。  例如，在文档字符串 @t{"\\=`(a ,(sin 0)) ==> (a 0.0)"} 中，重音符号旨在表示 Lisp 代码，因此无论引用样式如何，它都会被转义并显示为本身。  在调用 @code{message} 或 @code{error} 时，您可以通过使用格式 @t{"%s"} 以及调用 @code{format} 的参数来避免转换。  例如，@code{(message "%s" (format "`(a ,(sin %S)) ==> (a %S)" x (sin x)))} 显示一条以重音开头的消息，无论文本引用样式如何。
+
+@defopt text-quoting-style
+@cindex curved quotes
+@cindex curly quotes
+该用户选项的值是一个符号，指定 Emacs 在帮助和消息的措辞中应使用单引号的样式。  如果选项的值为 @code{curve}，则样式为带有弯曲单引号的 @t{‘like this’}。  如果值为 @code{straight}，则样式为带有直撇号的 @t{'like this'}。  如果值为 @code{grave}，则不翻译引号，样式为 @t{`like this'}，带有重音符号和撇号，这是 Emacs 版本 25 之前的标准样式。如果弯曲单引号似乎可显示，则默认值 @code{nil} 的作用类似于 @code{curve}，否则类似于 @code{grave}。
+
+此选项对于存在弯曲引号问题的平台非常有用。  您可以根据个人喜好自由定制。
+@end defopt
+
+@defun text-quoting-style
+您不应该直接读取变量 @code{text-quoting-style} 的值。  相反，在上述 @code{nil} 情况下，使用具有相同名称的此函数来动态计算当前终端上的正确引用样式。
+@end defun
+
+@node Describing Characters
+@section 帮助消息的描述字符
+@cindex describe characters and events
+
+这些函数将事件、按键序列或字符转换为文本描述。  这些描述对于在消息中包含任意文本字符或按键序列非常有用，因为它们将非打印字符和空白字符转换为打印字符序列。  非空白打印字符的描述是字符本身。
+
+@defun key-description sequence &optional prefix
+@cindex Emacs event standard notation
+该函数返回一个字符串，其中包含 @var{sequence} 中输入事件的 Emacs 标准符号。  如果@var{prefix}非@code{nil}，则它是导致@var{sequence}的输入事件序列，并包含在返回值中。  两个参数都可以是字符串、向量或列表。  @xref{Input Events}，有关有效事件的更多信息。
+
+@smallexample
+@group
+(key-description [?\M-3 delete])
+     @result{} "M-3 <delete>"
+@end group
+@group
+(key-description [delete] "\M-3")
+     @result{} "M-3 <delete>"
+@end group
+@end smallexample
+
+另请参见下面 @code{single-key-description} 的示例。
+@end defun
+
+@defun single-key-description event &optional no-angles
+@cindex event printing
+@cindex character printing
+@cindex control character printing
+@cindex meta character printing
+该函数返回一个以键盘输入的标准 Emacs 表示法描述 @var{event} 的字符串。  普通打印字符显示为本身，但控制字符会变成以@samp{C-}开头的字符串，元字符会变成以@samp{M-}开头的字符串，空格、制表符等会显示为@samp{SPC}、@samp{TAB}等。功能键符号会出现在尖括号@samp{<@dots{}>}内。  作为列表的事件在尖括号内的列表的@sc{car}中显示为符号名称。
+
+如果可选参数@var{no-angles}非@code{nil}，则功能键和事件符号周围的尖括号被省略；这是为了与不使用括号的旧版本 Emacs 兼容。
+
+@smallexample
+@group
+(single-key-description ?\C-x)
+     @result{} "C-x"
+@end group
+@group
+(key-description "\C-x \M-y \n \t \r \f123")
+     @result{} "C-x SPC M-y SPC C-j SPC TAB SPC RET SPC C-l 1 2 3"
+@end group
+@group
+(single-key-description 'delete)
+     @result{} "<delete>"
+@end group
+@group
+(single-key-description 'C-mouse-1)
+     @result{} "C-<mouse-1>"
+@end group
+@group
+(single-key-description 'C-mouse-1 t)
+     @result{} "C-mouse-1"
+@end group
+@end smallexample
+@end defun
+
+@defun text-char-description character
+此函数返回一个字符串，以标准 Emacs 表示法描述可出现在文本中的字符的 @var{character} — 类似于 @code{single-key-description}，但参数必须是通过 @code{characterp} 测试 (@pxref{Character Codes}) 的有效字符代码。  该函数生成带有前导插入符号的控制字符的描述（这是 Emacs 通常在缓冲区中显示控制字符的方式）。带有修饰符位的字符将导致此函数发出错误信号（带有 Control 修饰符的 @acronym{ASCII} 字符是一个例外，它们表示为控制字符）。
+
+@smallexample
+@group
+(text-char-description ?\C-c)
+     @result{} "^C"
+@end group
+@group
+(text-char-description ?\M-m)
+     @error{} Wrong type argument: characterp, 134217837
+@end group
+@end smallexample
+@end defun
+
+@deffn Command read-kbd-macro string &optional need-vector
+该函数主要用于操作键盘宏，但也可以用作 @code{key-description} 的粗略反转。  您可以使用包含键描述的字符串来调用它，并用空格分隔；它返回包含相应事件的字符串或向量。 （这可能是也可能不是单个有效的按键序列，具体取决于您使用的事件；@pxref{Key Sequences}。）如果 @var{need-vector} 是非@code{nil}，则返回值始终是一个向量。
+@end deffn
+
+@node Help Functions
+@section 帮助功能
+@cindex help functions
+
+Emacs 提供了各种内置帮助功能，用户可以通过前缀 @kbd{C-h} 的子命令来访问所有功能。  有关它们的更多信息，请参阅@ref{Help, , Help, emacs, The GNU Emacs Manual}。  这里我们描述了相同信息的一些程序级接口。
+
+@deffn Command apropos pattern &optional do-all
+此函数查找名称包含 apropos 模式@var{pattern} 匹配的所有有意义的符号。  apropos 模式可以是要匹配的单词、以空格分隔的单词列表（其中至少两个必须匹配），也可以是正则表达式（如果出现任何特殊的正则表达式字符）。  如果符号具有函数、变量或面的定义，或者具有属性，则该符号是有意义的。
+
+该函数返回一个元素列表，如下所示：
+
+@example
+(@var{symbol} @var{score} @var{function-doc} @var{variable-doc}
+ @var{plist-doc} @var{widget-doc} @var{face-doc} @var{group-doc})
+@end example
+
+这里，@var{score}是一个整数度量，衡量符号作为匹配的重要性。  其余每个元素都是一个文档字符串，或 @code{nil}，对于 @var{symbol} 作为函数、变量等。
+
+它还在名为 @file{*Apropos*} 的缓冲区中显示符号，每个符号都有取自其文档字符串开头的一行描述。
+
+如果 @var{do-all} 不是 @code{nil}，或者用户选项 @code{apropos-do-all} 不是 @code{nil}，则 @code{apropos} 还会显示找到的函数的按键绑定；它还显示了 @emph{all} 内部符号，而不仅仅是有意义的符号（并且它也在返回值中列出了它们）。
+@end deffn
+
+@defvar help-map
+该变量的值是帮助键 @kbd{C-h} 后面的字符的本地键盘映射。
+@end defvar
+
+@deffn {Prefix Command} help-command
+该符号不是函数；它的功能定义单元格包含称为 @code{help-map} 的键盘映射。  它在@file{help.el}中定义如下：
+
+@smallexample
+@group
+(keymap-set global-map (key-description (string help-char)) 'help-command)
+(fset 'help-command help-map)
+@end group
+@end smallexample
+@end deffn
+
+@defopt help-char
+该变量的值是帮助字符——Emacs 将其识别为表示“帮助”的字符。  默认情况下，其值为 8，代表 @kbd{C-h}。  当 Emacs 读取此字符时，如果 1⁣ 是非 2⁣ Lisp 表达式，它将计算该表达式，如果它是字符串，则将结果显示在窗口中。
+
+通常@code{help-form}的值为@code{nil}。  那么帮助字符在命令输入级别没有特殊含义，并且它以正常方式成为键序列的一部分。  @kbd{C-h} 的标准键绑定是多个通用帮助功能的前缀键。
+
+前缀键之后的帮助字符也很特殊。  如果它没有绑定作为前缀键的子命令，它将运行@code{describe-prefix-bindings}，它显示前缀键的所有子命令的列表。
+@end defopt
+
+@defopt help-event-list
+该变量的值是充当替代帮助字符的事件类型列表。  这些事件的处理方式与@code{help-char}指定的事件一样。
+@end defopt
+
+@defvar help-form
+如果此变量为非 @code{nil}，则其值是每当读取字符 @code{help-char} 时计算的形式。  如果评估表单生成一个字符串，则显示该字符串。
+
+调用 @code{read-event}、@code{read-char-choice}、@code{read-char}、@code{read-char-from-minibuffer} 或 @code{y-or-n-p} 的命令可能应该在输入时将 @code{help-form} 绑定到非 @code{nil} 表达式。  （当@kbd{C-h}有其他含义时，你不应该这样做。）计算这个表达式应该产生一个字符串，解释输入的用途以及如何正确输入它。
+
+进入迷你缓冲区会将此变量绑定到 @code{minibuffer-help-form} (@pxref{Definition of minibuffer-help-form}) 的值。
+@end defvar
+
+@defvar prefix-help-command
+该变量包含一个打印前缀键帮助的函数。  当用户键入前缀键后跟帮助字符时，将调用该函数，并且帮助字符在该前缀之后没有绑定。  该变量的默认值为@code{describe-prefix-bindings}。
+@end defvar
+
+@deffn Command describe-prefix-bindings
+该函数调用 @code{describe-bindings} 显示最近按键序列的前缀键的所有子命令列表。  所描述的前缀由该按键序列中除最后一个事件之外的所有事件组成。  （最后一个事件大概是帮助字符。）
+@end deffn
+
+以下两个功能适用于想要提供帮助而不放弃控制的模式，例如电动模式。它们的名称以 @samp{Helper} 开头，以区别于普通的帮助函数。
+
+@deffn Command Helper-describe-bindings
+此命令会弹出一个窗口，显示帮助缓冲区，其中包含本地和全局键盘映射中的所有键绑定的列表。它通过调用 @code{describe-bindings} 来工作。
+@end deffn
+
+@deffn Command Helper-help
+该命令提供当前模式的帮助。  它在迷你缓冲区中提示用户消息 @samp{Help (Type ? for further options)}，然后提供帮助以找出键绑定是什么以及该模式的用途。  它返回@code{nil}。
+
+@vindex Helper-help-map
+这可以通过更改地图@code{Helper-help-map}来定制。
+@end deffn
+
+@defvar data-directory
+@anchor{Definition of data-directory}
+该变量保存 Emacs 查找 Emacs 附带的某些文档和文本文件的目录名称。
+@end defvar
+
+@defun help-buffer
+该函数返回帮助缓冲区的名称，通常为@file{*Help*}；如果这样的缓冲区不存在，则首先创建它。
+@end defun
+
+@vindex help-window-select
+@defmac with-help-window buffer-or-name body@dots{}
+该宏像@code{with-output-to-temp-buffer} (@pxref{Temporary Displays}) 一样计算@var{body}，将其形式产生的任何输出插入到@var{buffer-or-name}指定的缓冲区中，该缓冲区可以是缓冲区或缓冲区的名称。  （通常，@var{buffer-or-name}是函数@code{help-buffer}返回的值。）该宏将指定的缓冲区置于帮助模式，并显示一条消息，告诉用户如何退出并滚动帮助窗口。  如果用户选项 @code{help-window-select} 的当前值已相应设置，它将选择帮助窗口。  它返回 @var{body} 中的最后一个值。
+@end defmac
+
+@defun help-setup-xref item interactive-p
+此函数更新 @file{*Help*} 缓冲区中的交叉引用数据，用于在用户单击 @samp{Back} 或 @samp{Forward} 按钮时重新生成帮助信息。  大多数使用 @file{*Help*} 缓冲区的命令应在清除缓冲区之前调用此函数。  @var{item} 参数应采用 @code{(@var{function} . @var{args})} 形式，其中 @var{function} 是一个使用参数列表 @var{args} 调用的函数，以重新生成帮助缓冲区。如果交互调用调用命令，则@var{interactive-p}参数为非@code{nil}；在这种情况下，@file{*Help*}缓冲区的@samp{Back}按钮的项目堆栈将被清除。
+@end defun
+
+@xref{describe-symbols example}，例如使用 @code{help-buffer}、@code{with-help-window} 和 @code{help-setup-xref}。
+
+@defmac make-help-screen fname help-line help-text help-map
+该宏定义了一个名为 @var{fname} 的帮助命令，它的作用就像一个前缀键，显示它提供的子命令列表。
+
+当被调用时，@var{fname}在窗口中显示@var{help-text}，然后根据@var{help-map}读取并执行按键序列。  字符串 @var{help-text} 应描述 @var{help-map} 中可用的绑定。
+
+命令@var{fname}被定义为通过滚动@var{help-text}的显示来处理一些事件本身。  当 2⁣ 读取这些特殊事件之一时，它会进行滚动，然后读取另一个事件。  当它读取到的事件不是这几个事件之一并且在 @var{help-map} 中有绑定时，它会执行该键的绑定，然后返回。
+
+参数 @var{help-line} 应该是 @var{help-map} 中替代方案的单行摘要。  在当前版本的 Emacs 中，仅当您将选项 @code{three-step-help} 设置为 @code{t} 时才使用此参数。
+
+该宏用在命令 @code{help-for-help} 中，它是 @kbd{C-h C-h} 的绑定。
+@end defmac
+
+@defopt three-step-help
+如果此变量非 @code{nil}，则用 @code{make-help-screen} 定义的命令首先在回显区域中显示其 @var{help-line} 字符串，仅当用户再次键入帮助字符时才显示较长的 @var{help-text} 字符串。
+@end defopt
+
+
+@node Documentation Groups
+@section 文档组
+@cindex documentation groups
+@cindex groups of functions
+@cindex function groups
+@cindex shortdoc groups
+
+Emacs 可以根据不同的分组列出函数。  例如，@code{string-trim}和@code{mapconcat}是“字符串”函数，因此@kbd{M-x shortdoc RET string RET}将概述这些以及其他对字符串进行操作的函数。
+
+文档组是使用 @code{define-short-documentation-group} 宏创建的。  @xref{Documentation Group Tips}，如何编写良好的文档组。
+
+@defmac define-short-documentation-group group &rest functions
+将 @var{group} 定义为一组函数，并提供使用这些函数的简短摘要。  可选参数 @var{functions} 是一个列表，其元素的形式为：
+
+@lisp
+(@var{func} [@var{keyword} @var{val}]@dots{})
+@end lisp
+
+@cindex documentation group keywords
+可以识别以下关键字：
+
+@table @code
+
+@item :eval
+该值应该是评估时没有副作用的形式。该表格将通过打印 @code{prin1} (@pxref{Output Functions}) 来在文档中使用。  但是，如果表单是一个字符串，它将按原样插入，然后该字符串将被 @code{read} 生成该表单。  无论如何，都会对表格进行评估，并使用结果。  例如：
+
+@example
+:eval (concat "foo" "bar" "zot")
+:eval "(make-string 5 ?x)"
+@end example
+
+@noindent
+将导致：
+
+@example
+(concat "foo" "bar" "zot")
+@result{} "foobarzot"
+(make-string 5 ?x)
+@result{} "xxxxx"
+@end example
+
+（这里允许 Lisp 形式和字符串的原因是，在少数需要某种形式表示的情况下，可以控制打印。在这个例子中，如果 @samp{?x} 没有包含在字符串中，它就会被打印为 @samp{120}。）
+
+@item :no-eval
+
+这与 @code{:eval} 类似，只不过不会对表单进行求值。在这些情况下，应包含某种 @code{:result} 元素（见下文）。
+
+@example
+:no-eval (file-symlink-p "/tmp/foo")
+:eg-result t
+@end example
+
+@item :no-eval*
+与 @code{:no-eval} 类似，但始终插入 @samp{[it depends]} 作为结果。  例如：
+
+@example
+:no-eval* (buffer-string)
+@end example
+
+@noindent
+将导致：
+
+@example
+(buffer-string)
+@click{} [it depends]
+@end example
+
+@item :no-value
+与 @code{:no-eval} 类似，但当相关函数没有明确定义的返回值时使用，并且仅用于副作用。
+
+@item :result
+用于输出非评估示例表单的结果。
+
+@example
+:no-eval (setcar list 'c)
+:result c
+@end example
+
+@item :eg-result
+用于从非评估示例表单输出示例结果。例如：
+
+@example
+:no-eval (looking-at "f[0-9]")
+:eg-result t
+@end example
+
+@noindent
+将导致：
+
+@example
+(looking-at "f[0-9]")
+eg. @click{} t
+@end example
+
+@item :result-string
+@itemx :eg-result-string
+这两个分别与@code{:result}和@code{:eg-result}相同，但按原样插入。  当结果不可读或应该具有特定形式时，这很有用：
+
+@example
+:no-eval (find-file "/tmp/foo")
+:eg-result-string "#<buffer foo>"
+:no-eval (default-file-modes)
+:eg-result-string "#o755"
+@end example
+
+@item :no-manual
+表示该功能未在手册中记录。
+
+@item :args
+默认情况下，显示函数的实际参数列表。  如果 @code{:args} 存在，则使用它们。
+
+@example
+:args (regexp string)
+@end example
+
+@end table
+
+这是一个非常简短的例子：
+
+@lisp
+(define-short-documentation-group string
+  "Creating Strings"
+  (substring
+   :eval (substring "foobar" 0 3)
+   :eval (substring "foobar" 3))
+  (concat
+   :eval (concat "foo" "bar" "zot")))
+@end lisp
+
+第一个参数是要定义的组的名称，然后跟随任意数量的函数描述。
+
+@end defmac
+
+一个函数可以属于任意数量的文档组。
+
+除了功能描述之外，列表还可以包含字符串元素，这些元素用于将文档组划分为多个部分。
+
+@defun shortdoc-add-function group section elem
+Lisp 包可以使用此函数将函数添加到组中。  每个@var{elem}应该是一个函数描述，如上所述。 @var{group} 是函数组，@var{section} 是将函数插入到函数组中的哪个部分。
+
+如果 @var{group} 不存在，则会创建它。  如果@var{section}不存在，它将被添加到函数组的末尾。
+@end defun
+
+您还可以查询shortdoc组中定义的函数的使用示例。
+
+@defun shortdoc-function-examples function
+此函数返回 @var{function} 的所有短文档示例。  返回值是一个包含@w{@code{(@var{group} . @var{examples})}}形式的列表，其中@var{group}是@var{function}出现的文档组，@var{examples}是一个字符串，其中包含@var{group}中定义的@var{function}的使用示例。
+
+如果 @var{function} 不是函数或者没有任何短文档示例，则 @code{shortdoc-function-examples} 返回 @code{nil}。
+@end defun
+
+@vindex help-fns-describe-function-functions
+@defun shortdoc-help-fns-examples-function function
+该函数查询注册的短文档组，并将给定 Emacs Lisp @var{function} 的使用示例插入到当前缓冲区中。  它适合添加到 @code{help-fns-describe-function-functions} 钩子，在这种情况下，当请求函数的文档时，使用函数的短文档示例将显示在 @file{*Help*} 缓冲区中。
+@end defun

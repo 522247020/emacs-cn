@@ -1,0 +1,1747 @@
+@c -*- mode: texinfo -*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 2021--2026 Free Software Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Parsing Program Source
+@chapter 解析程序源码
+@cindex parsing program source
+
+@cindex syntax tree, from parsing program source
+Emacs 提供了多种方法来解析程序源文本并生成 @dfn{syntax tree}。  在语法树中，文本不再被视为一维字符流，而是结构化的节点树，其中每个节点代表一段文本。  因此，语法树可以实现有趣的功能，例如精确的字体化、缩进、导航、结构化编辑等。
+
+Emacs 有一个简单的工具来解析平衡表达式 (@pxref{Parsing Expressions})。  还有用于通用导航和缩进的 SMIE 库 (@pxref{SMIE})。
+
+除此之外，如果编译了对 @uref{https://tree-sitter.github.io/tree-sitter, the tree-sitter library} 的支持，Emacs 还提供与 @uref{https://tree-sitter.github.io/tree-sitter, the tree-sitter library} 的集成。tree-sitter 库实现了增量解析器，并支持多种编程语言。
+
+@defun treesit-available-p
+如果树守护者功能可用于当前 Emacs 会话，则此函数返回非@code{nil}。
+@end defun
+
+为了能够使用树托管库解析程序源并访问程序的语法树，Lisp 程序需要加载语言语法库，并为该语言和当前缓冲区创建解析器。  之后，Lisp 程序可以向解析器查询语法树的特定节点。  然后，它可以访问有关每个节点的各种信息，并使用强大的模式匹配语法搜索节点。  本章解释了如何完成这一切，以及 Lisp 程序如何使用混合多种编程语言的源文件。
+
+@menu
+* Language Grammar::          加载树保姆语言语法。
+* Using Parser::              解析器简介。
+* Retrieving Nodes::          从语法树中检索节点。
+* Accessing Node Information::  访问节点信息。
+* Pattern Matching::          与查询模式的模式匹配。
+* User-defined Things::       用户定义的“事物”和导航。
+* Multiple Languages::        解析用多种语言编写的文本。
+* Tree-sitter Major Modes::   使用树守护者开发主要模式。
+* Tree-sitter C API::         比较 C API 和 Lisp API。
+@end menu
+
+@node Language Grammar
+@section 树保姆语言语法
+@cindex language grammar, for tree-sitter
+
+@heading 加载语言语法
+@cindex loading language grammar for tree-sitter
+
+@cindex language argument, for tree-sitter
+Tree-sitter 依靠语言语法来解析该语言的文本。  在 Emacs 中，语言语法由符号表示。例如，C 语言语法表示为符号 @code{c}，并且 @code{c} 可以作为 @var{language} 参数传递给树守护者函数。
+
+@vindex treesit-extra-load-path
+@vindex treesit-load-language-error
+Tree-sitter 语言语法作为动态库分发。为了在 Emacs 中使用语言语法，您需要确保系统上安装了动态库。  Emacs 按以下顺序在多个位置查找语言语法：
+
+@itemize @bullet
+@item 
+首先，在变量@code{treesit-extra-load-path}指定的目录列表中；
+@item 
+然后，在@code{user-emacs-directory}指定的目录的@file{tree-sitter}子目录中（@pxref{Init File}）；
+@item 
+最后，在系统动态库的默认位置。
+@end itemize
+
+在每个目录中，Emacs 都会查找文件扩展名由变量 @code{dynamic-library-suffixes} 指定的文件。
+
+如果 Emacs 找不到该库或加载该库时出现问题，Emacs 会发出 @code{treesit-load-language-error} 错误信号。  该信号的数据可以是以下之一：
+
+@table @code
+@item (not-found @var{error-msg} @dots{})
+这意味着Emacs找不到语言语法库。
+@item (symbol-error @var{error-msg})
+这意味着 Emacs 无法在库中找到每个语言语法库应该导出的预期函数。
+@item (version-mismatch @var{error-msg})
+这意味着语言语法库的版本与tree-sitter库的版本不兼容。
+@end table
+
+@noindent
+在所有这些情况下，@var{error-msg} 可能会提供有关故障的其他详细信息。
+
+@defun treesit-language-available-p language &optional detail
+如果 @var{language} 的语言语法存在并且可以加载，则该函数返回非 @code{nil}。
+
+如果@var{detail}非@code{nil}，当@var{language}可用时返回@code{(t . nil)}，当@var{language}不可用时返回@code{(nil . @var{data})}。  @var{data}是@code{treesit-load-language-error}的信号数据。
+@end defun
+
+@vindex treesit-load-name-override-list
+按照约定，@var{language} 的动态库文件名是@file{libtree-sitter-@var{language}.@var{ext}}，其中@var{ext} 是动态库的系统特定扩展名。  同样按照惯例，该库提供的函数名为 @code{tree_sitter_@var{language}}。  如果语言语法库不遵循此约定，您应该添加一个条目
+
+@example
+(@var{language} @var{library-base-name} @var{function-name})
+@end example
+
+到变量@code{treesit-load-name-override-list}中的列表，其中@var{library-base-name}是动态库文件名的基名（通常是@file{libtree-sitter-@var{language}}），@var{function-name}是库提供的函数（通常是@code{tree_sitter_@var{language}}）。  例如，
+
+@example
+(cool-lang "libtree-sitter-coool" "tree_sitter_cooool")
+@end example
+
+@noindent
+对于一种认为自己太“酷”而无法遵守约定的语言来说。
+
+@cindex language grammar version, compatibility
+@defun treesit-library-abi-version &optional min-compatible
+该函数返回tree-sitter库支持的语言语法应用程序二进制接口（@acronym{ABI}）的版本。  默认情况下，它返回库支持的最新 ABI 版本，但如果 @var{min-compatible} 不是 @code{nil}，则返回库仍然可以支持的最旧的 ABI 版本。  语言语法库必须为tree-sitter库支持的最旧版本和最新版本之间的ABI版本构建，否则库将无法加载它们。
+@end defun
+
+@defun treesit-language-abi-version language
+该函数返回 Emacs 为 1⁣ 加载的语言语法库的 @acronym{ABI} 版本。  如果@var{language}不可用，该函数返回@code{nil}。
+@end defun
+
+@vindex treesit-language-display-name-alist
+@defun treesit-language-display-name language
+此函数将 @var{language} 转换为适当的显示名称。例如，它将@code{ruby}翻译为“Ruby”，将@code{cpp}翻译为“C++”。
+
+大多数语言都有“常规”名称，它们的显示名称只是首字母大写的符号名称。  对于具有“不规则”名称的语言，@var{treesit-language-display-name-alist} 将语言符号映射到其显示名称。
+
+如果主要模式包使用具有“不规则”名称的语言，则它们应该在加载时添加到 @var{treesit-language-display-name-alist} 的映射。
+@end defun
+
+@heading 具体语法树
+@cindex syntax tree, concrete
+
+语法树是解析器生成的。  在语法树中，每个节点代表一段文本，并通过父子关系相互连接。  例如，如果源文本是
+
+@example
+1 + 2
+@end example
+
+@noindent
+它的语法树可以是
+
+@example
+@group
+                  +--------------+
+                  | root "1 + 2" |
+                  +--------------+
+                         |
+        +--------------------------------+
+        |       expression "1 + 2"       |
+        +--------------------------------+
+           |             |            |
++------------+   +--------------+   +------------+
+| number "1" |   | operator "+" |   | number "2" |
++------------+   +--------------+   +------------+
+@end group
+@end example
+
+我们还可以将其表示为 s 表达式：
+
+@example
+(root (expression (number) (operator) (number)))
+@end example
+
+@subheading 节点类型
+@cindex node types, in a syntax tree
+
+@cindex type of node, tree-sitter
+@anchor{tree-sitter node type}
+@cindex named node, tree-sitter
+@anchor{tree-sitter named node}
+@cindex anonymous node, tree-sitter
+@code{root}、@code{expression}、@code{number} 和 @code{operator} 等名称指定节点的 @dfn{type}。  但是，并非语法树中的所有节点都有类型。  没有类型的节点称为 @dfn{anonymous nodes}，有类型的节点为 @dfn{named nodes}。  匿名节点是具有固定拼写的标记，包括像括号@samp{]}这样的标点符号，以及像@code{return}这样的关键字。
+
+@subheading 字段名称
+
+@cindex field name, tree-sitter
+@cindex tree-sitter node field name
+@anchor{tree-sitter node field name}
+为了使语法树更容易分析，许多语言语法将@dfn{field names}分配给子节点。  例如，一个 @code{function_definition} 节点可以有一个 @code{declarator} 和一个 @code{body}：
+
+@example
+@group
+(function_definition
+ declarator: (declaration)
+ body: (compound_statement))
+@end group
+@end example
+
+@heading 探索语法树
+@cindex explore tree-sitter syntax tree
+@cindex inspection of tree-sitter parse tree nodes
+
+为了帮助理解语言的语法和调试使用语法树的 Lisp 程序，Emacs 提供了“探索”模式，该模式实时显示当前缓冲区中源代码的语法树。  Emacs 还带有“检查模式”，它显示模式行中某个点的节点信息。
+
+@findex treesit-explorer-switch-parser
+@deffn Command treesit-explore
+该命令会弹出一个窗口，显示当前缓冲区中源代码的语法树。  选择源缓冲区中的文本会突出显示语法树显示中的相应节点。  单击语法树中的节点会突出显示源缓冲区中的相应文本。
+
+要切换到另一个解析器，请使用@code{treesit-explorer-switch-parser}。
+@end deffn
+
+@deffn Command treesit-inspect-mode
+该次模式在模式行上显示 @emph{starts} 所在的节点。  例如，模式行可以显示
+
+@example
+@var{parent} @var{field}: (@var{node} (@var{child} (@dots{})))
+@end example
+
+@noindent
+其中@var{node}、@var{child}等是从点开始的节点。 @var{parent} 是@var{node} 的父级。  @var{node} 以粗体显示。  @var{field-name}s 是 @var{node} 和 @var{child} 等的字段名称。
+
+如果没有节点从 point 开始，即 point 位于节点的中间，则模式线显示跨越 point 的最早节点及其直接父节点。
+
+此次要模式不会自行创建解析器。  它使用 @code{(treesit-parser-list)} (@pxref{Using Parser}) 中的第一个解析器。
+@end deffn
+
+@heading 阅读语法定义
+@cindex reading grammar definition, tree-sitter
+
+语言语法的作者定义了编程语言的@dfn{grammar}，它决定了解析器如何从程序文本构建具体的语法树。  为了有效地使用语法树，您需要查阅@dfn{grammar file}。
+
+语法文件通常位于语言语法项目存储库中的@file{grammar.js}。  语言语法主页的链接可以在 @uref{https://tree-sitter.github.io/tree-sitter, tree-sitter's homepage} 上找到。
+
+语法定义是用 JavaScript 编写的。  例如，匹配 @code{function_definition} 节点的规则可能如下所示
+
+@example
+@group
+function_definition: $ => seq(
+  $.declaration_specifiers,
+  field('declarator', $.declaration),
+  field('body', $.compound_statement)
+)
+@end group
+@end example
+
+@noindent
+这些规则由带有单个参数@var{$}的函数表示，代表整个语法。  该函数本身是由其他函数构造的： @code{seq} 函数将一系列子函数组合在一起； @code{field} 函数用字段名称注释子项。  如果我们用所谓的 @dfn{Backus-Naur Form} (@acronym{BNF}) 语法编写上面的定义，它看起来像
+
+@example
+@group
+function_definition :=
+  <declaration_specifiers> <declaration> <compound_statement>
+@end group
+@end example
+
+@noindent
+解析器返回的节点看起来像
+
+@example
+@group
+(function_definition
+  (declaration_specifier)
+  declarator: (declaration)
+  body: (compound_statement))
+@end group
+@end example
+
+下面是可以在语法定义中看到的函数列表。每个函数都将其他规则作为参数并返回一个新规则。
+
+@table @code
+@item seq(@var{rule1}, @var{rule2}, @dots{})
+一个接一个地匹配每条规则。
+@item choice(@var{rule1}, @var{rule2}, @dots{})
+匹配其参数中的规则之一。
+@item repeat(@var{rule})
+匹配 @var{rule} @emph{zero or more} 次。这就像正则表达式中的 @samp{*} 运算符。
+@item repeat1(@var{rule})
+匹配 @var{rule} @emph{one or more} 次。这就像正则表达式中的 @samp{+} 运算符。
+@item optional(@var{rule})
+匹配 @var{rule} @emph{zero or one} 次。这就像正则表达式中的 @samp{?} 运算符。
+@item field(@var{name}, @var{rule})
+将字段名称 @var{name} 分配给 @var{rule} 匹配的子节点。
+@item alias(@var{rule}, @var{alias})
+使@var{rule}匹配的节点在解析器生成的语法树中显示为@var{alias}。  例如，
+
+@example
+alias(preprocessor_call_exp, call_expression)
+@end example
+
+@noindent
+使任何与@code{preprocessor_call_exp}匹配的节点显示为@code{call_expression}。
+@end table
+
+以下是对于阅读语言语法而言不太重要的语法函数。
+
+@table @code
+@item token(@var{rule})
+标记 @var{rule} 以生成单个叶节点。  也就是说，不是生成父节点及其下的各个子节点，而是将所有内容组合成单个叶节点。  @xref{Retrieving Nodes}。
+@item token.immediate(@var{rule})
+通常，语法规则会忽略前面的空格；这会将 @var{rule} 更改为仅当前面没有空格时才匹配。
+@item prec(@var{n}, @var{rule})
+给予 @var{rule} level-@var{n} 优先级。
+@item prec.left([@var{n},] @var{rule})
+将 @var{rule} 标记为左关联，可以选择级别 @var{n}。
+@item prec.right([@var{n},] @var{rule})
+将 @var{rule} 标记为右关联，可选择使用级别 @var{n}。
+@item prec.dynamic(@var{n}, @var{rule})
+这类似于 @code{prec}，但优先级是在运行时应用的。
+@end table
+
+树保姆项目的文档有@uref{https://tree-sitter.github.io/tree-sitter/creating-parsers, more about writing a grammar}。  请特别阅读“语法 DSL”部分。
+
+@node Using Parser
+@section 使用 Tree-sitter 解析器
+@cindex tree-sitter parser, using
+
+本节介绍如何创建和配置树托管解析器。  在 Emacs 中，每个树驻留解析器都与一个缓冲区关联。  当用户编辑缓冲区时，相关的解析器和语法树会自动保持最新。
+
+@defvar treesit-max-buffer-size
+该变量包含可以激活树守护者的缓冲​​区的最大大小。  主要模式在决定是否启用树守护者功能时应检查此值。
+@end defvar
+
+@defvar treesit-languages-require-line-column-tracking
+默认情况下，Emacs 不会跟踪缓冲区中位置的行号和列号。  然而，一些语言语法利用行和列信息进行解析。  如果这些语言的解析器是在缓冲区中创建的，Emacs 将打开行和列跟踪并将这些信息报告给这些解析器。  一旦缓冲区开始跟踪行和列，它就永远不会停止这样做。  一旦将解析器创建为跟踪/非跟踪行和列，无论该变量如何更改，它都会保持这种状态。
+
+该变量是需要行和列跟踪的语言列表。  绝大多数语言不需要行和列信息。  到目前为止，只有 Haskell 需要它。
+
+@findex treesit-tracking-line-column-p
+@findex treesit-parser-tracking-line-column-p
+用户可以使用 @code{treesit-tracking-line-column-p} 和 @code{treesit-parser-tracking-line-column-p} 分别检查缓冲区或解析器是否正在跟踪行和列。
+@end defvar
+
+@cindex creating tree-sitter parsers
+@cindex tree-sitter parser, creating
+@defun treesit-parser-create language &optional buffer no-reuse tag
+使用 @var{tag} 为指定的 @var{buffer} 和 @var{language} (@pxref{Language Grammar}) 创建解析器。  如果省略@var{buffer}或@code{nil}，则代表当前缓冲区。
+
+默认情况下，如果 @var{buffer} 中已存在 @var{language} 和 @var{tag} 的解析器，则此函数会重用解析器，但如果 @var{no-reuse} 为非 @code{nil}，则此函数始终创建一个新解析器。
+
+@var{tag}可以是除@code{t}之外的任何符号，默认为@code{nil}。  不同的解析器可以具有相同的标签。
+@end defun
+
+@findex treesit-parser-buffer
+@findex treesit-parser-language
+@findex treesit-parser-embed-level
+@findex treesit-parser-p
+给定一个解析器，我们可以查询有关它的信息：@code{treesit-parser-buffer}返回与解析器关联的缓冲区，@code{treesit-parser-language}返回解析器使用的语言。  解析器的标签可以通过 @code{treesit-parser-tag} 检索。  每个解析器还可以选择携带一个嵌入级别，该嵌入级别可以通过 @code{treesit-parser-set-embed-level} 设置并通过 @code{treesit-parser-embed-level} 检索（有关嵌入级别的更多信息，请参阅@ref{parser-embed-level}）。  最后，@code{treesit-parser-p} 告诉您对象是否是树守护者解析器。
+
+不需要显式地解析缓冲区，因为解析是自动且惰性地完成的。  解析器仅在 Lisp 程序查询其语法树中的节点时进行解析。  因此，当解析器第一次创建时，它不会解析缓冲区；而是解析缓冲区。它会等待，直到 Lisp 程序第一次查询节点。  类似地，当缓冲区中发生某些更改时，解析器不会立即重新解析。
+
+@vindex treesit-buffer-too-large
+当解析器进行解析时，它会检查缓冲区的大小。 Tree-sitter 只能处理不大于 4GB@. 的缓冲区，如果大小超过该大小，Emacs 会发出 @code{treesit-buffer-too-large} 错误信号，信号数据为缓冲区大小。
+
+创建解析器后，Emacs 会自动将其添加到内部解析器列表中。  每次对缓冲区进行更改时，Emacs 都会更新此列表中的解析器，以便它们可以增量更新其语法树。
+
+@defun treesit-parser-list &optional buffer language tag
+该函数返回 @var{buffer} 的解析器列表，并通过 @var{language} 和 @var{tag} 进行过滤。  如果@var{buffer}为@code{nil}或省略，则默认为当前缓冲区。
+
+如果@var{language}非@var{nil}，则仅包含该语言的解析器，并且仅包含具有@var{tag}的解析器。  @var{tag} 默认为 @code{nil}。  如果 @var{tag} 是 @code{t}，则将解析器包含在返回的列表中，无论其标签如何。
+@end defun
+
+@defun treesit-parser-delete parser
+该函数删除@var{parser}。
+@end defun
+
+@cindex tree-sitter narrowing
+@anchor{tree-sitter narrowing}
+通常，解析器“看到”整个缓冲区，但是当缓冲区变窄（@pxref{Narrowing}）时，解析器将只能看到缓冲区的可访问部分。  据解析器所知，隐藏区域已被删除。  当缓冲区稍后加宽时，解析器认为文本插入在开头和结尾。  尽管解析器尊重缩小，但模式不应该使用缩小作为处理多语言缓冲区的手段；相反，设置解析器应运行的范围。  @xref{Multiple Languages}。
+
+因为解析器解析是惰性的，所以当用户或 Lisp 程序缩小缓冲区时，解析器不会立即受到影响；只要模式在缓冲区缩小时不查询节点，解析器就不会注意到缩小。
+
+@cindex tree-sitter parse string
+@cindex parse string, tree-sitter
+除了为缓冲区创建解析器之外，Lisp 程序还可以解析字符串。  与缓冲区不同，解析字符串是一次性操作，并且无法更新结果。
+
+@defun treesit-parse-string string language
+该函数使用@var{language}解析@var{string}，并返回生成的语法树的根节点。  @emph{Do not} 在循环中使用此函数：这是一个旨在一次性使用的便利函数，并且尚未优化；对于繁重的工作负载，请改用临时缓冲区。
+@end defun
+
+@heading 收到解析树更改的通知
+@cindex update callback, for tree-sitter parse-tree
+@cindex after-change notifier, for tree-sitter parse-tree
+@cindex tree-sitter parse-tree, update and after-change callback
+@cindex notifiers, tree-sitter
+
+Lisp 程序可能希望收到受增量解析影响的文本的通知。  例如，插入评论结束标记会将该标记之前的文本转换为评论。  尽管文本没有被直接编辑，但仍被视为“更改”。
+
+Emacs 允许 Lisp 程序为此类更改注册回调函数（又名@: @dfn{notifiers}）。  通知器函数有两个参数：@var{ranges} 和 @var{parser}。  @var{ranges} 是 @w{@code{(@var{start} . @var{end})}} 形式的 cons 单元格列表，其中 @var{start} 和 @var{end} 标记范围的开始和结束位置。  @var{parser} 是发出通知的解析器。
+
+每次解析器重新解析缓冲区时，它都会比较新旧解析树，计算节点已更改的范围，并将范围传递给通知器函数。  请注意，初始解析也被视为“更改”，因此在初始解析时调用通知函数，范围是整个缓冲区。
+
+@defun treesit-parser-add-notifier parser function
+该函数将 @var{function} 添加到 @var{parser} 的更改后通知函数列表中。  @var{function} 必须是函数符号，而不是 lambda 函数 (@pxref{Anonymous Functions})。
+@end defun
+
+@defun treesit-parser-remove-notifier parser function
+该函数从 @var{parser} 的更改后通知函数列表中删除 @var{function}。  @var{function} 必须是函数符号，而不是 lambda 函数。
+@end defun
+
+@defun treesit-parser-notifiers parser
+该函数返回 @var{parser} 的通知函数列表。
+@end defun
+
+Lisp 程序还可以选择强制解析器重新解析并使用 @code{treesit-parser-changed-regions} 立即获取更改的区域。
+
+@defun treesit-parser-changed-regions parser
+该函数强制 @var{parser} 重新解析，并返回受影响的区域：@w{@code{(@var{start} . @var{end})}} 的列表。  如果解析器没有任何新内容需要重新解析，或者受影响的区域为空，则此函数返回@code{nil}。
+@end defun
+
+
+@heading 用另一种语言替换解析器
+@cindex remap language grammar, tree-sitter
+@cindex replace language grammar, tree-sitter
+@cindex replace parser language, tree-sitter
+@cindex extended grammar, tree-sitter
+
+有时，语言 B 的语法是另一种语言 A 语法的严格超集。那么，为语言 B 重用语言 A 的配置（字体锁定规则、缩进规则等）就有意义了。为此，@var{treesit-language-remap-alist} 允许用户将语言 A 重新映射到语言 B。
+
+@defvar treesit-language-remap-alist
+该变量的值应该是 @w{@code{(@var{language-a} . @var{language-b})}} 的列表。  当 alist 中存在这样的对时，为 @var{language-a} 创建解析器实际上为 @var{language-b} 创建解析器。  通过扩展，任何创建节点或查询 @var{language-a} 的内容都将被重定向为使用 @var{language-b} 。  这个映射是完全透明的，创建的解析器将报告使用@var{language-b}，并且该解析器创建的节点也是如此。
+
+具体来说，@code{treesit-parser-create}创建的解析器将报告使用为其提供的任何@var{language}。  例如，如果语言 @code{cpp} 映射到 @code{cuda}：
+
+@example
+@group
+(setq treesit-language-remap-alist '((cpp . cuda)))
+
+(treesit-parser-language (treesit-parser-create 'cpp))
+  @result{} 'cpp
+
+(treesit-parser-language (treesit-parser-create 'cuda))
+  @result{} 'cuda
+@end group
+@end example
+
+尽管两个解析器实际上都是 @code{cuda} 解析器。
+@end defvar
+
+@node Retrieving Nodes
+@section 检索节点
+@cindex retrieve node, tree-sitter
+@cindex tree-sitter, find node
+@cindex get node, tree-sitter
+
+@cindex terminology, for tree-sitter functions
+以下是我们在记录树守护者函数时使用的一些术语和约定。
+
+语法树中的节点跨越缓冲区中程序文本的某些部分。  如果一个节点比另一个节点分别跨越较小或较大的缓冲区文本部分，则我们说该节点比另一个节点“更小”或“更大”。  由于树中较深（“较低”）的节点是树中“较高”节点的子节点，因此较低的节点将始终小于节点层次结构中较高的节点。  语法树中较高的节点包含一个或多个较小的节点作为其子节点，因此跨越缓冲区文本的较大部分。
+
+当函数找不到节点时，它返回@code{nil}。  为了方便起见，所有采用节点作为参数并返回节点的函数也接受 @code{nil} 的节点参数，在这种情况下仅返回 @code{nil}。
+
+@vindex treesit-node-outdated
+当关联的缓冲区被修改时，节点不会自动更新，并且一旦检索节点就无法更新。使用过时的节点会发出 @code{treesit-node-outdated} 错误信号。
+
+@cindex printed representation, of treesit nodes
+树保姆节点的打印表示使用@ref{Printed Representation}中描述的哈希符号。  它看起来像@w{@samp{#<treesit-node @var{type} in @var{pos1}-@var{pos2}>}}，其中@var{type}是节点的类型（来自缓冲区使用的tree-sitter语法），@var{pos1}和@var{pos2}是节点跨度的缓冲区位置。  树托管节点没有读取语法。
+
+@heading 从语法树中检索节点
+@cindex retrieving tree-sitter nodes
+@cindex syntax tree, retrieving nodes
+
+@cindex leaf node, of tree-sitter parse tree
+@cindex tree-sitter parse tree, leaf node
+@defun treesit-node-at pos &optional parser-or-lang named
+该函数返回缓冲区位置 @var{pos} 处的 @dfn{leaf} 节点。叶节点是没有任何子节点的节点。
+
+该函数尝试返回跨度覆盖@var{pos}的节点：节点的起始位置小于或等于@var{pos}，节点的结束位置大于或等于@var{pos}。
+
+如果没有叶节点的跨度覆盖@var{pos}（例如，@var{pos}位于两个叶节点之间的空白中），则该函数返回@var{pos}之后的第一个叶节点。
+
+最后，如果@var{pos}之后没有叶子节点，则返回@var{pos}之前的第一个叶子节点。
+
+如果 0⁣ 是解析器对象，则该函数使用该解析器；如果 1⁣ 是一种语言，则该函数使用当前缓冲区中该语言的第一个解析器，如果不存在则创建一个；如果@var{parser-or-lang}是@code{nil}，该函数尝试通过调用@code{treesit-language-at}（@pxref{Multiple Languages}）来猜测@var{pos}处的语言。
+
+如果该函数找不到合适的节点返回，则返回@code{nil}。
+
+如果 @var{named} 不是 @code{nil}，则此函数仅查找命名节点 (@pxref{tree-sitter named node, named node})。
+
+例子：
+
+@example
+@group
+;; Find the node at point in a C parser's syntax tree.
+(treesit-node-at (point) 'c)
+  @result{} #<treesit-node primitive_type in 23-27>
+@end group
+@end example
+@end defun
+
+@defun treesit-node-on beg end &optional parser-or-lang named
+此函数返回覆盖 @var{beg} 和 @var{end} 之间的缓冲区文本区域的 @emph{smallest} 节点。  换句话说，节点的开始位置在@var{beg}之前或位置，节点的结束位置在@var{end}位置或之后。
+
+@emph{Beware:} 在不在任何顶级构造（函数定义等@:）内的空行上调用此函数很可能会给出根节点，因为根节点是覆盖该空行的最小节点。  大多数时候，您想使用 @code{treesit-node-at} 来代替。
+
+如果 0⁣ 是解析器对象，则该函数使用该解析器；如果 1⁣ 是一种语言，则该函数使用当前缓冲区中该语言的第一个解析器，如果不存在则创建一个；如果@var{parser-or-lang}是@code{nil}，该函数尝试通过调用@code{treesit-language-at}来猜测@var{beg}处的语言。
+
+如果 @var{named} 不是 @code{nil}，则此函数仅查找命名节点 (@pxref{tree-sitter named node, named node})。
+@end defun
+
+@defun treesit-parser-root-node parser
+该函数返回@var{parser}生成的语法树的根节点。
+@end defun
+
+@defun treesit-buffer-root-node &optional language
+该函数在当前缓冲区中查找 @var{language} 的第一个解析器，如果不存在则创建一个，并返回该解析器生成的根节点。  如果 @var{language} 被省略，它将使用解析器列表中的第一个解析器。  如果找不到合适的解析器，则返回@code{nil}。
+@end defun
+
+给定一个节点，Lisp 程序可以从该节点开始检索其他节点，或者查询有关该节点的信息。
+
+@heading 从其他节点检索节点
+@cindex syntax tree nodes, retrieving from other nodes
+
+@subheading 按血缘关系
+@cindex kinship, syntax tree nodes
+@cindex nodes, by kinship
+@cindex syntax tree nodes, by kinship
+
+@defun treesit-node-parent node
+该函数返回 @var{node} 的直接父级。
+
+如果 @var{node} 在解析树中的深度超过 1000 层，则返回值未定义。  目前它返回@code{nil}，但将来可能会改变。
+@end defun
+
+@defun treesit-node-child node n &optional named
+该函数返回 @var{node} 的第 @var{n} 个子节点。  如果 2⁣ 不是 3⁣，则仅计算命名节点 (@pxref{tree-sitter named node, named node})。
+
+例如，在表示字符串 @code{"text"} 的节点中，有三个子节点：左引号 @code{"}、字符串文本 @code{text} 和右引号 @code{"}。  在这些节点中，第一个子节点是左引号@code{"}，第一个命名的子节点是字符串文本。
+
+如果没有第 1 个子节点，则此函数返回 0。 @var{n} 可以为负数，例如 @minus{}1 代表最后一个孩子。
+@end defun
+
+@defun treesit-node-children node &optional named
+此函数以列表形式返回 @var{node} 的所有子级。  如果@var{named}非@code{nil}，则仅检索命名节点。
+@end defun
+
+@defun treesit-node-next-sibling node &optional named
+该函数查找 @var{node} 的下一个同级。  如果@var{named}非@code{nil}，它会找到下一个指定的同级。
+@end defun
+
+@defun treesit-node-prev-sibling node &optional named
+该函数查找 @var{node} 的前一个同级。  如果@var{named} 不是@code{nil}，它会查找前一个指定的同级。
+@end defun
+
+@subheading 按字段名称
+@cindex nodes, by field name
+@cindex syntax tree nodes, by field name
+
+为了使语法树更易于分析，许多语言语法将@dfn{field names}分配给子节点（@pxref{tree-sitter node field name, field name}）。  例如，@code{function_definition}节点可以有一个@code{declarator}子节点和一个@code{body}子节点。
+
+@defun treesit-node-child-by-field-name node field-name
+该函数查找 @var{node} 的子级，其字段名为 @var{field-name}，一个字符串。
+
+@example
+@group
+;; Get the child that has "body" as its field name.
+(treesit-node-child-by-field-name node "body")
+  @result{} #<treesit-node compound_statement in 45-89>
+@end group
+@end example
+@end defun
+
+@subheading 按职位
+@cindex nodes, by position
+@cindex syntax tree nodes, by position
+
+@defun treesit-node-first-child-for-pos node pos &optional named
+该函数查找@var{node}的第一个超出缓冲区位置@var{pos}的子元素。  “超出”意味着子节点的末尾大于或等于@var{pos}。  此函数仅查找 @var{node} 的直接子代，而不查找其孙子代。  如果@var{named}非@code{nil}，它会查找第一个命名的子节点（@pxref{tree-sitter named node, named node}）。
+@end defun
+
+@defun treesit-node-descendant-for-range node beg end &optional named
+此函数查找 @var{node} 的 @emph{smallest} 后代节点，该节点跨越位置 @var{beg} 和 @var{end} 之间的文本区域。  它类似于@code{treesit-node-at}。  如果@var{named}非@code{nil}，它会查找最小的命名子节点。
+@end defun
+
+@heading 搜索节点
+
+@defun treesit-search-subtree node predicate &optional backward all depth
+该函数遍历@var{node}的子树（包括@var{node}本身），寻找@var{predicate}返回非@code{nil}的节点。  @var{predicate} 是一个与每个节点的类型相匹配的正则表达式，或者是一个谓词函数，它接受一个节点并在节点匹配时返回非 @code{nil}。  @var{predicate} 也可以是事物符号或事物定义 (@pxref{User-defined Things})。  使用未定义的东西不会引发错误，该函数只是返回@code{nil}。
+
+该函数返回第一个匹配的节点，如果没有匹配@var{predicate}，则返回@code{nil}。
+
+默认情况下，该函数仅遍历命名节点，但如果@var{all}为非@code{nil}，则会遍历所有节点。  如果@var{backward}非@code{nil}，则向后遍历（即，在向下遍历树时，它首先访问最后一个子节点）。  如果@var{depth}不是@code{nil}，它必须是一个将树遍历限制为树下那么多层的数字。  如果 @var{depth} 为 @code{nil}，则默认为 1000。
+@end defun
+
+@defun treesit-search-forward start predicate &optional backward all
+与@code{treesit-search-subtree}一样，该函数也遍历解析树并将每个节点与@var{predicate}匹配（@var{start}除外），其中@var{predicate}可以是正则表达式或谓词函数。  @var{predicate} 也可以是事物符号或事物定义 (@pxref{User-defined Things})。  使用未定义的东西不会引发错误，该函数只是返回@code{nil}。
+
+对于像下面这样的树，其中 @var{start} 被标记为 @samp{S}，该函数按照从 1 到 12 的编号进行遍历：
+
+@example
+@group
+              12
+              |
+     S--------3----------11
+     |        |          |
+o--o-+--o  1--+--2    6--+-----10
+|  |                  |        |
+o  o                +-+-+   +--+--+
+                    |   |   |  |  |
+                    4   5   7  8  9
+@end group
+@end example
+
+请注意，该函数不会遍历@var{start}的子树，并且它总是先遍历叶节点，然后再向上移动。
+
+与 @code{treesit-search-subtree} 一样，此函数默认仅搜索命名节点，但如果 @var{all} 为非 @code{nil}，则会搜索所有节点。  如果@var{backward}非@code{nil}，则向后搜索。
+
+当@code{treesit-search-subtree}遍历节点的子树时，该函数从节点@var{start}开始，并按照缓冲区位置顺序遍历其之后的每个节点，即起始位置大于@var{start}结束位置的节点。
+
+在上图所示的树中，@code{treesit-search-subtree}遍历节点@samp{S}（@var{start}）和标有@code{o}的节点，而该函数遍历标有数字的节点。  此函数对于回答诸如“缓冲区中满足某些条件的@var{start}之后的第一个节点是什么？”之类的问题很有用。
+@end defun
+
+@defun treesit-search-forward-goto node predicate &optional start backward all
+该函数将指针移动到缓冲区中与@var{predicate}匹配的@var{node}之后的下一个节点的开头或结尾。  如果@var{start}非@code{nil}，则在节点的开头而不是结尾处停止。
+
+该函数保证它返回的匹配节点在缓冲区位置方面取得进展：返回节点的开始/结束位置始终大于@var{node}的位置。
+
+参数@var{predicate}、@var{backward}和@var{all}与@code{treesit-search-forward}中的相同。
+@end defun
+
+@defun treesit-induce-sparse-tree root predicate &optional process-fn depth
+该函数从 @var{root} 的子树创建一棵稀疏树。
+
+它获取@var{root}下的子树，并对其进行梳理，以便仅留下与@var{predicate}匹配的节点。  与之前的函数一样，@var{predicate} 可以是与每个节点类型匹配的正则表达式字符串，也可以是接受节点并在匹配时返回非 @code{nil} 的函数。  @var{predicate} 也可以是事物符号或事物定义 (@pxref{User-defined Things})。  使用未定义的东西不会引发错误，该函数只是返回@code{nil}。
+
+例如，给定左侧的子树由数字和字母组成，如果 @var{predicate} 是“仅字母”，则返回的树是右侧的树。
+
+@example
+@group
+    a                 a              a
+    |                 |              |
++---+---+         +---+---+      +---+---+
+|   |   |         |   |   |      |   |   |
+b   1   2         b   |   |      b   c   d
+    |   |     =>      |   |  =>      |
+    c   +--+          c   +          e
+    |   |  |          |   |
+ +--+   d  4       +--+   d
+ |  |              |
+ e  5              e
+@end group
+@end example
+
+如果@var{process-fn}非@code{nil}，则该函数不会返回匹配的节点，而是将每个节点传递给@var{process-fn}并使用返回值。  如果非@code{nil}，则@var{depth}限制从@var{root}下降的级别数。  如果 @var{depth} 为 @code{nil}，则默认为 1000。
+
+返回的树中的每个节点看起来都像 @w{@code{(@var{tree-sitter-node} . (@var{child} @dots{}))}}。  如果@var{root} 与@var{predicate} 不匹配，则该树根的@var{tree-sitter-node} 将为@code{nil}。  如果没有节点匹配@var{predicate}，则函数返回@code{nil}。
+@end defun
+
+@heading 更多便利功能
+
+@defun treesit-node-get node instructions
+这是一个将多个节点访问器函数链接在一起的便利函数。  例如，要获取 @var{node} 的父母的下一个兄弟姐妹的第二个孩子的文本：
+
+@example
+@group
+(treesit-node-get node
+   '((parent 1)
+    (sibling 1 nil)
+    (child 1 nil)
+    (text nil)))
+@end group
+@end example
+
+@var{instruction} 是@w{@code{(@var{fn} @var{arg}...)}} 形式的指令列表。  支持以下@var{fn}：
+
+@table @code
+@item (child @var{idx} @var{named})
+获取第 @var{idx} 个孩子。
+
+@item (parent @var{n})
+去找父辈@var{n}次。
+
+@item (field-name)
+获取当前节点的字段名。
+
+@item (type)
+获取当前节点的类型。
+
+@item (text @var{no-property})
+获取当前节点的文本。
+
+@item (children @var{named})
+获取儿童名单。
+
+@item (sibling @var{step} @var{named})
+获取第 n 个上一个/下一个兄弟节点，负 @var{step} 表示上一个兄弟节点，正值表示下一个兄弟节点。
+@end table
+
+请注意，像 @var{named} 和 @var{no-property} 这样的参数不能被省略，这与它们原来的函数不同。
+@end defun
+
+@defun treesit-filter-child node predicate &optional named
+该函数查找 @var{node} 满足 @var{predicate} 的直接子节点。
+
+@var{predicate} 函数将节点作为参数，并应返回非 @code{nil} 来指示应保留该节点。  如果@var{named}非@code{nil}，则此函数仅检查命名节点。
+@end defun
+
+@defun treesit-parent-until node predicate &optional include-node
+该函数重复查找@var{node}的父级，并返回满足@var{predicate}的父级。  @var{predicate} 可以是一个以节点为参数并返回 @code{t} 或 @code{nil} 的函数，也可以是匹配节点类型名称的正则表达式，或者是 @code{treesit-thing-settings} 中描述的其他有效谓词。  如果没有父级满足@var{predicates}，则该函数返回@code{nil}。
+
+通常，此函数仅查看 @var{node} 的父级，而不查看 @var{node} 本身。  但如果@var{include-node}非@code{nil}，且@var{node}满足@var{predicate}，则该函数返回@var{node}。
+@end defun
+
+@defun treesit-parent-while node predicate
+该函数从 @var{node} 开始沿树向上，只要节点满足 @var{predicate}（该函数以节点作为参数），就会一直这样做。  也就是说，该函数返回仍然满足@var{predicate}的@var{node}的最高父级。  请注意，如果 @var{node} 满足 @var{predicate} 但其直接父级不满足，则返回 @var{node} 本身。
+@end defun
+
+@defun treesit-node-top-level node &optional predicate include-node
+该函数返回 @var{node} 的最高父级，其类型与 @var{node} 相同。  如果不存在这样的父级，则返回@code{nil}。  因此这个函数对于测试@var{node}是否是顶级也很有用。
+
+如果 @var{predicate} 是 @code{nil}，则该函数使用 @var{node} 的类型来查找父级。  如果@var{predicate}非@code{nil}，则该函数搜索满足@var{predicate}的父级。  如果@var{include-node}非@code{nil}，且@var{node}满足@var{predicate}，则该函数返回@var{node}。
+@end defun
+
+@node Accessing Node Information
+@section 访问节点信息
+@cindex information of node, syntax trees
+@cindex syntax trees, node information
+
+@heading 节点基本信息
+
+每个节点都与一个解析器关联，并且该解析器与一个缓冲区关联。  以下函数检索它们。
+
+@defun treesit-node-parser node
+该函数返回 @var{node} 的关联解析器。
+@end defun
+
+@defun treesit-node-buffer node
+该函数返回 @var{node} 的解析器的关联缓冲区。
+@end defun
+
+@defun treesit-node-language node
+该函数返回 @var{node} 的解析器的关联语言。
+@end defun
+
+每个节点代表缓冲区中文本的一部分。  下面的函数查找有关该文本的相关信息。
+
+@defun treesit-node-start node
+返回@var{node}的起始位置。
+@end defun
+
+@defun treesit-node-end node
+返回@var{node}的结束位置。
+@end defun
+
+@defun treesit-node-text node &optional object
+以字符串形式返回 @var{node} 表示的缓冲区文本。  （如果通过解析字符串检索 @var{node}，则它将是该字符串中的文本。）
+@end defun
+
+@cindex predicates for syntax tree nodes
+以下是树上节点的一些谓词：
+
+@defun treesit-node-p object
+检查@var{object}是否是tree-sitter语法节点。
+@end defun
+
+@cindex compare tree-sitter syntax nodes
+@cindex tree-sitter nodes, comparing
+@defun treesit-node-eq node1 node2
+检查@var{node1}和@var{node2}是否引用tree-sitter语法树中的同一节点。  该函数使用与@code{equal}相同的等价度量。  您还可以使用 @code{equal} (@pxref{Equality Predicates}) 比较节点。
+@end defun
+
+@heading 物业信息
+
+一般来说，具体语法树中的节点分为两类：@dfn{named nodes}和@dfn{anonymous nodes}。  节点是命名的还是匿名的由语言语法决定（@pxref{tree-sitter named node, named node}）。
+
+@cindex tree-sitter missing node
+@cindex missing node, tree-sitter
+除了命名或匿名之外，节点还可以具有其他属性。节点可能“缺失”：解析器插入此类节点是为了从某些类型的语法错误中恢复，即根据语法，某些东西可能应该存在，但实际上并不存在。当源代码尚未达到其最终形式时，这可能会在编辑程序源代码期间发生。
+
+@cindex tree-sitter extra node
+@cindex extra node, tree-sitter
+节点可以是“额外的”：这样的节点代表诸如注释之类的东西，可以出现在文本中的任何位置。
+
+@cindex tree-sitter outdated node
+@cindex outdated node, tree-sitter
+如果节点的解析器在创建节点后至少重新解析过一次，则该节点可能“过时”。
+
+@cindex tree-sitter node that has error
+@cindex has error, tree-sitter node
+如果节点跨越的文本包含语法错误，则该节点“有错误”。  可能是节点本身有错误，或其后代之一有错误。
+
+@cindex tree-sitter, live parsing node
+@cindex live node, tree-sitter
+如果一个节点的解析器未被删除，则该节点被视为@dfn{live}，并且它所属的缓冲区是活动缓冲区（@pxref{Killing Buffers}）。
+
+@defun treesit-node-check node property
+如果@var{node}具有指定的@var{property}，则该函数返回非@code{nil}。  @var{property} 可以是@code{named}、@code{missing}、@code{extra}、@code{outdated}、@code{has-error} 或@code{live}。
+@end defun
+
+@defun treesit-node-type node
+命名节点具有“类型”(@pxref{tree-sitter node type, node type})。例如，命名节点可以是 @code{string_literal} 节点，其中 @code{string_literal} 是其类型。  匿名节点的类型只是该节点所代表的文本；例如，@samp{,}节点的类型就是@samp{,}。
+
+该函数以字符串形式返回 @var{node} 的类型。
+@end defun
+
+@heading 作为孩子或父母的信息
+
+@defun treesit-node-index node &optional named
+该函数返回 @var{node} 的索引作为其父节点的子节点。  如果@var{named}非@code{nil}，则仅计算命名节点（@pxref{tree-sitter named node, named node}）。
+@end defun
+
+@defun treesit-node-field-name node
+父节点的子节点可以有一个字段名称 (@pxref{tree-sitter node field name, field name})。  此函数返回 @var{node} 的字段名称作为其父级的子级。
+@end defun
+
+@defun treesit-node-field-name-for-child node n
+此函数返回 @var{node} 的第 @var{n} 个子级的字段名称。  如果没有第 3 个子级，或者第 4 个子级没有字段名称，则返回 2。
+
+请注意，@var{n} 计算命名和匿名子级，而 @var{n} 可以为负数，例如，@minus{}1 表示最后一个子级。
+@end defun
+
+@defun treesit-node-child-count node &optional named
+该函数返回 @var{node} 的子元素数量。  如果 @var{named} 不是 @code{nil}，则仅计算命名子级 (@pxref{tree-sitter named node, named node})。
+@end defun
+
+@heading 便利功能
+
+@defun treesit-node-enclosed-p smaller larger &optional strict
+如果@var{smaller}包含在@var{larger}中，则该函数返回非@code{nil}。  @var{smaller} 和 @var{larger} 可以是 cons @code{(@var{beg} . @var{end})} 或节点。
+
+如果 @var{larger} 的开始 <= @var{smaller} 的开始且 @var{larger} 的结束 <= @var{smaller} 的结束，则返回非 @code{nil}。
+
+如果 @var{strict} 是 @code{t}，则用 < 而不是 <= 进行比较。
+
+如果@var{strict}是@code{partial}，则当至少一侧严格包围时，考虑@var{larger}包围@var{smaller}。
+@end defun
+
+@node Pattern Matching
+@section 模式匹配树保姆节点
+@cindex pattern matching with tree-sitter nodes
+
+@cindex capturing, tree-sitter node
+Tree-sitter 让 Lisp 程序使用小型声明性语言来匹配模式。  该模式匹配由两个步骤组成：首先，tree-sitter 将 @dfn{pattern} 与语法树中的节点进行匹配，然后将 @dfn{captures} 与该模式匹配的特定节点进行匹配并返回捕获的节点。
+
+我们首先描述如何编写最基本的查询模式以及如何捕获模式中的节点，然后描述模式匹配函数，最后描述更高级的模式语法。
+
+@heading 基本查询语法
+
+@cindex tree-sitter query pattern syntax
+@cindex pattern syntax, tree-sitter query
+@cindex query, tree-sitter
+一个@dfn{query}由多个@dfn{patterns}组成。  每个模式都是与语法节点中的某个节点匹配的 s 表达式。  模式的形式为@w{@code{(@var{type} (@var{child}@dots{}))}}。
+
+例如，匹配包含 @code{number_literal} 子节点的 @code{binary_expression} 节点的模式如下所示
+
+@example
+(binary_expression (number_literal))
+@end example
+
+对于使用上面查询模式的 @dfn{capture} 节点，请在要捕获的节点模式后附加 @code{@@@var{capture-name}}。  例如，
+
+@example
+(binary_expression (number_literal) @@number-in-exp)
+@end example
+
+@noindent
+捕获位于 @code{binary_expression} 节点内且捕获名称为 @code{number-in-exp} 的 @code{number_literal} 节点。
+
+我们也可以捕获 @code{binary_expression} 节点，例如捕获名称 @code{biexp}：
+
+@example
+(binary_expression
+ (number_literal) @@number-in-exp) @@biexp
+@end example
+
+@heading 查询功能
+
+@cindex query functions, tree-sitter
+现在我们可以介绍@dfn{query functions}。
+
+@defun treesit-query-capture node query &optional beg end node-only grouped
+该函数匹配@var{node}内@var{query}中的模式。  参数 @var{query} 可以是 s 表达式、字符串或已编译的查询对象。  现在，我们关注 s-表达式语法；本节末尾描述了字符串语法和编译查询。
+
+参数@var{node}也可以是解析器或语言符号。  解析器意味着使用其根节点，语言符号意味着在当前缓冲区中查找或创建该语言的解析器，并使用根节点。
+
+该函数返回列表中所有捕获的节点，其中元素的形式为@w{@code{(@var{capture_name} . @var{node})}}。  如果 1⁣ 不是 2⁣，则返回 3⁣ 的列表。  默认情况下，会搜索@var{node}的整个文本，但如果@var{beg}和@var{end}都不是@code{nil}，则它们指定此函数应匹配节点的缓冲区文本区域。  捕获跨度与 @var{beg} 和 @var{end} 之间的区域重叠的任何匹配节点；它不必完全包含在该地区内。
+
+如果@var{grouped}非@code{nil}，则此函数返回捕获节点列表的分组列表。  分组由@var{query}决定。 @var{query} 中模式的相同匹配中的捕获被分组在一起。
+
+@vindex treesit-query-error
+@findex treesit-query-validate
+如果 @var{query} 格式错误，此函数会引发 @code{treesit-query-error} 错误。  信号数据包含特定错误的描述。  您可以使用 @code{treesit-query-validate} 来验证和调试查询。
+@end defun
+
+例如，假设 @var{node} 的文本是 @code{1 + 2}，@var{query} 是
+
+@example
+@group
+(setq query
+      '((binary_expression
+         (number_literal) @@number-in-exp) @@biexp)
+@end group
+@end example
+
+匹配该查询将返回
+
+@example
+@group
+(treesit-query-capture node query)
+    @result{} ((biexp . @var{<node for "1 + 2">})
+       (number-in-exp . @var{<node for "1">})
+       (number-in-exp . @var{<node for "2">}))
+@end group
+@end example
+
+如前所述，@var{query} 可以包含多个模式。例如，它可以有两个顶级模式：
+
+@example
+@group
+(setq query
+      '((binary_expression) @@biexp
+        (number_literal) @@number)
+@end group
+@end example
+
+@defun treesit-query-string string query language
+该函数将@var{string}解析为@var{language}，将其根节点与@var{query}匹配，并返回结果。
+@end defun
+
+@heading 更多查询语法
+
+除了节点类型和捕获名称之外，tree-sitter 的模式语法还可以表达匿名节点、字段名称、通配符、量化、分组、交替、锚点和谓词。
+
+@subheading 匿名节点
+
+匿名节点是逐字写入的，并用引号括起来。  模式匹配（并捕获）关键字 @code{return} 将是
+
+@example
+"return" @@keyword
+@end example
+
+@subheading 外卡
+
+在模式中，@samp{(_)} 匹配任何命名节点，@samp{_} 匹配任何命名或匿名节点。  例如，要捕获 @code{binary_expression} 节点的任何命名子节点，模式将是
+
+@example
+(binary_expression (_) @@in-biexp)
+@end example
+
+@subheading 字段名称
+
+可以捕获具有特定字段名称的子节点。在下面的模式中，@code{declarator}和@code{body}是字段名称，由后面的冒号指示。
+
+@example
+@group
+(function_definition
+  declarator: (_) @@func-declarator
+  body: (_) @@func-body)
+@end group
+@end example
+
+也可以捕获没有特定字段的节点，例如没有 @code{body} 字段的 @code{function_definition}：
+
+@example
+(function_definition !body) @@func-no-body
+@end example
+
+@subheading 量化节点
+
+@cindex quantify node, tree-sitter
+Tree-sitter 识别量化运算符 @samp{:*}、@samp{:+} 和 @samp{:?}。  它们的含义与正则表达式中的含义相同：@samp{:*} 匹配前面的模式零次或多次，@samp{:+} 匹配一次或多次，@samp{:?} 匹配零次或一次。
+
+例如，以下模式匹配具有 @emph{zero or more} @code{long} 关键字的 @code{type_declaration} 节点。
+
+@example
+(type_declaration "long" :*) @@long-type
+@end example
+
+以下模式匹配可能有也可能没有 @code{long} 关键字的类型声明：
+
+@example
+(type_declaration "long" :?) @@long-type
+@end example
+
+@subheading 分组
+
+与正则表达式中的组类似，我们可以将模式捆绑到组中并对它们应用量化运算符。  例如，要表达以逗号分隔的标识符列表，可以编写
+
+@example
+(identifier) ("," (identifier)) :*
+@end example
+
+@subheading 交替
+
+同样，与正则表达式类似，我们可以在模式中表达“匹配这些模式中的任何一个”。  语法是模式的向量。例如，要捕获 C 中的一些关键字，模式将是
+
+@example
+@group
+[
+  "return"
+  "break"
+  "if"
+  "else"
+] @@keyword
+@end group
+@end example
+
+@subheading 锚
+
+锚运算符 @code{:anchor} 可用于强制并置，即强制两个事物直接相邻。  这两个“事物”可以是两个节点，或者一个子节点及其父节点的末尾。例如，要捕获第一个子项、最后一个子项或两个相邻的子项：
+
+@example
+@group
+;; Anchor the child with the end of its parent.
+(compound_expression (_) @@last-child :anchor)
+@end group
+
+@group
+;; Anchor the child with the beginning of its parent.
+(compound_expression :anchor (_) @@first-child)
+@end group
+
+@group
+;; Anchor two adjacent children.
+(compound_expression
+ (_) @@prev-child
+ :anchor
+ (_) @@next-child)
+@end group
+@end example
+
+请注意，并置的执行会忽略任何匿名节点。
+
+@subheading 谓词
+
+可以向模式添加谓词约束。  例如，使用以下模式：
+
+@example
+@group
+(
+ (array :anchor (_) @@first (_) @@last :anchor)
+ (:eq? @@first @@last)
+)
+@end group
+@end example
+
+@noindent
+tree-sitter 仅匹配第一个元素等于最后一个元素的数组。  要将谓词附加到模式，我们需要将它们分组在一起。  目前有三个谓词：@code{:eq?}、@code{:match?} 和@code{:pred?}。
+
+@deffn Predicate :eq? arg1 arg2
+如果 @var{arg1} 等于 @var{arg2} 则匹配。  参数可以是字符串或捕获名称。  捕获名称表示捕获的节点在缓冲区中跨越的文本。  请注意，这更像 Elisp 中的 @code{equal}，但 @code{eq?} 是 Tree-sitter 使用的约定。  以前我们支持 @code{:equal} 谓词，但现在它已被视为已弃用。
+@end deffn
+
+@deffn Predicate :match? capture-name regexp
+如果 @var{capture-name} 的节点在缓冲区中跨越的文本与以字符串文字形式给出的正则表达式 @var{regexp} 匹配，则匹配。匹配区分大小写。  参数的顺序并不重要。  以前我们支持 @code{:match} 谓词，但现在它已被视为已弃用。
+@end deffn
+
+@deffn Predicate :pred? fn &rest nodes
+如果函数 @var{fn} 在将 @var{nodes} 中的每个节点作为参数传递时返回非 @code{nil}，则匹配。  该函数运行时将当前缓冲区设置为正在查询的节点的缓冲区。  使用此谓词时要非常小心，因为在紧密循环中使用它可能会很昂贵。  以前我们支持 @code{:pred} 谓词，但现在它被认为已弃用。
+@end deffn
+
+请注意，谓词只能引用以相同模式出现的捕获名称。  事实上，在其他模式中引用捕获名称没有什么意义。
+
+@heading 字符串模式
+
+@cindex tree-sitter patterns as strings
+@cindex patterns, tree-sitter, in string form
+除了 s 表达式之外，Emacs 还允许通过将它们写为字符串来使用树守护者的本机查询语法。  它很大程度上类似于 s-表达式语法。  例如，以下查询
+
+@example
+@group
+(treesit-query-capture
+ node '((addition_expression
+         left: (_) @@left
+         "+" @@plus-sign
+         right: (_) @@right) @@addition
+
+         ["return" "break"] @@keyword))
+@end group
+@end example
+
+@noindent
+相当于
+
+@example
+@group
+(treesit-query-capture
+ node "(addition_expression
+        left: (_) @@left
+        \"+\" @@plus-sign
+        right: (_) @@right) @@addition
+
+        [\"return\" \"break\"] @@keyword")
+@end group
+@end example
+
+大多数模式可以直接写为字符串内的 s 表达式。只有其中少数需要修改：
+
+@itemize
+@item
+锚@code{:anchor} 写为@samp{.}。
+@item
+@samp{:?} 写为@samp{?}。
+@item
+@samp{:*} 写为@samp{*}。
+@item
+@samp{:+} 写为@samp{+}。
+@item
+@code{:eq?}、@code{:match?} 和@code{:pred?} 分别写为@code{#eq?}、@code{#match?} 和@code{#pred?}。  一般来说，谓词将 @samp{:} 更改为 @samp{#}。
+@end itemize
+
+例如，
+
+@example
+@group
+'((
+   (compound_expression :anchor (_) @@first (_) :* @@rest)
+   (:match? "love" @@first)
+   ))
+@end group
+@end example
+
+@noindent
+以字符串形式写为
+
+@example
+@group
+"(
+  (compound_expression . (_) @@first (_)* @@rest)
+  (#match? \"love\" @@first)
+  )"
+@end group
+@end example
+
+@heading 编译查询
+
+@cindex compiling tree-sitter queries
+@cindex queries, compiling
+如果要重复使用某个查询，尤其是在紧密循环中，则编译该查询非常重要，因为已编译的查询比未编译的查询要快得多。  已编译的查询可以在接受查询的任何地方使用。
+
+@defun treesit-query-compile language query &optional eager
+该函数将 @var{language} 的 @var{query} 编译为已编译的查询对象并返回它。
+
+如果 @var{query} 格式错误，此函数会引发 @code{treesit-query-error} 错误。  信号数据包含特定错误的描述。  您可以使用 @code{treesit-query-validate} 来验证和调试查询。
+
+默认情况下，Emacs 会延迟编译 @var{query}，这意味着 @var{query} 在使用之前不会被真正编译。  要立即编译 @var{query}，请为 @var{eager} 传递非 @code{nil}。
+
+@findex treesit-query-eagerly-compiled-p
+要区分已实际编译的查询和尚未编译的查询，请使用 @code{treesit-query-eagerly-compiled-p}。
+
+如果@var{query}格式错误或无法加载语言，则此函数会向@code{treesit-query-error}发出信号。  显然，只有当@var{eager}非@code{nil}时才会发生这种情况，否则Emacs实际上不会编译@var{query}。
+@end defun
+
+@findex treesit-query-language
+@findex treesit-query-source
+@findex treesit-query-expand
+@findex treesit-pattern-expand
+@findex treesit-query-valid-p
+还有一些用于查询的附加函数： @code{treesit-query-language} 返回查询的语言； @code{treesit-query-source} 返回已编译查询的原始字符串或 sexp 源查询； @code{treesit-query-valid-p} 检查查询是否有效； @code{treesit-query-expand} 将 s-表达式查询转换为字符串格式；和 @code{treesit-pattern-expand} 转换模式。
+
+@findex treesit-query-first-valid
+树保姆语法随着时间的推移而变化。  为了支持语法的多个可能版本，Lisp 程序可以使用 @code{treesit-query-first-valid} 来选择要使用的正确查询。  例如，如果语法在一个版本中有一个 @code{(defun)} 节点，后来将其重命名为 ⁣​​2⁣，则 Lisp 程序可以使用
+
+@example
+@group
+(treesit-query-first-valid 'lang
+  '((defun) @@defun)
+  '((function_definition) @@defun))
+@end group
+@end example
+
+支持两个版本的语法。
+
+有关更多详细信息，请考虑阅读 tree-sitter 项目有关模式匹配的文档。  该文档可以在 @uref{https://tree-sitter.github.io/tree-sitter/using-parsers#pattern-matching-with-queries} 找到。
+
+@node User-defined Things
+@section 用户定义的“事物”和导航
+@cindex user-defined things, with tree-sitter parsing
+
+根据缓冲区中使用的树驻留语法定义的节点类型，能够识别并找到缓冲区中的某些@dfn{things}（例如函数和类定义、语句、代码块、字符串、注释等）通常很有用。  Emacs 允许 Lisp 程序定义哪种树节点对应于每个“事物”。这可以实现一些方便的功能，例如跳转到下一个函数、在该位置标记代码块、调换两个函数参数等。
+
+Emacs 中的“things”功能独立于 Tree-sitter 的模式匹配功能（@pxref{Pattern Matching}），并且功能相对较弱，但更适合根据 Tree-sitter 解析树导航和遍历缓冲区文本。
+
+@findex treesit-thing-definition
+@findex treesit-thing-defined-p
+您可以使用 @var{treesit-thing-settings} 定义事物，使用 @code{treesit-thing-definition} 检索已定义事物的谓词，并使用 @code{treesit-thing-defined-p} 测试事物是否定义。
+
+@defvar treesit-thing-settings
+这是缓冲区中使用的语法支持的每种语言的事物定义列表；它应该由缓冲区的主要模式定义（默认值为@code{nil}）。  每个条目的键是一个语言符号（例如，C 为 @code{c}，C@t{++} 为 @code{cpp} 等），值是 @w{@code{(@var{thing} @var{pred})}} 形式的事物定义列表，其中 @var{thing} 是表示事物的符号，@var{pred} 指定哪种类型的树守护者节点被视为此 @var{thing}。
+
+@cindex @code{sexp}, treesit-defined thing
+@cindex @code{list}, treesit-defined thing
+用于定义 @var{thing} 的符号可以是对主模式有意义的任何符号：@code{defun}、@code{defclass}、@code{sentence}、@code{comment}、@code{string} 等。为了支持基于树的导航命令 (@pxref{List Motion})，该模式应定义两个内容：@code{list} 和 @code{sexp}。
+
+@var{pred} 可以是与节点类型匹配的正则表达式字符串；它可以是一个以节点为参数并返回一个布尔值的函数，该布尔值指示该节点是否符合事物的资格；或者它可以是 cons @w{@code{(@var{regexp} . @var{fn})}}，它是正则表达式 @var{regexp} 和函数 @var{fn} 的组合——节点必须匹配 @var{regexp} 并满足 @var{fn} 才有资格成为事物。
+
+@var{pred} 也可以递归定义。  它可以是 @w{@code{(or @var{pred}@dots{})}}，这意味着满足 @var{pred} 中的任何一个都可以使该节点成为事物。  它可以是 @w{@code{(and @var{pred}@dots{})}}，这意味着满足所有 @var{pred} 条件即可将该节点定义为事物。  它可以是 @w{@code{(not @var{pred})}}，这意味着不满足 @var{pred} 则该节点合格。
+
+最后，@var{pred}可以引用此列表中定义的其他@var{thing}。  例如， @w{@code{(or sexp sentence)}} 定义了 @code{sexp} 事物或 @code{sentence} 事物，如列表中其他一些规则所定义。
+
+@cindex @code{named}, treesit-defined thing
+@cindex @code{anonymous}, treesit-defined thing
+有两个预定义的谓词：@code{named} 和 @code{anonymous}，它们分别限定树守护者语法的命名节点和匿名节点。  它们可以与 @code{and} 组合来缩小匹配范围。
+
+以下是 C 和 C@t{++} @code{treesit-thing-settings} 的示例：
+
+@example
+@group
+((c
+  (defun "function_definition")
+  (sexp (not "[](),[@{@}]"))
+  (comment "comment")
+  (string "raw_string_literal")
+  (text (or comment string)))
+@end group
+@group
+ (cpp
+  (defun ("function_definition" . cpp-ts-mode-defun-valid-p))
+  (defclass "class_specifier")
+  (comment "comment")))
+@end group
+@end example
+
+@noindent
+请注意，此示例是出于教学目的而修改的，并不完全是基于树保姆的 C 和 C@t{++} 模式定义事物的方式。
+@end defvar
+
+Emacs 内置函数已经使用了一些事物定义。如果主模式定义了命令@code{treesit-forward-sexp}，则使用@code{sexp}定义（@pxref{List Motion}）； @code{treesit-forward-list}、@code{treesit-down-list}、@code{treesit-up-list}、@code{treesit-show-paren-data} 使用 @code{list} 定义（其符号 @code{list} 具有符号属性 @code{treesit-thing-symbol}，以避免与同名函数产生歧义）； @code{treesit-forward-sentence} 使用@code{sentence} 定义。像 @code{treesit-end-of-defun} 这样的 Defun 运动函数使用 @code{defun} 定义（为了向后兼容，@code{defun} 定义被 @var{treesit-defun-type-regexp} 覆盖）。  主要模式还可以定义 @code{comment}、@code{string} 和 @code{text} 事物（以匹配注释和字符串）。
+
+本节的其余部分列出了一些利用事物定义的函数。  除了下面的函数之外，其他地方列出的其他一些函数也利用了 thing 特性，例如树遍历函数，如 @code{treesit-search-forward}、@code{treesit-induce-sparse-tree} 等 @xref{Retrieving Nodes}。
+
+@defun treesit-node-match-p node thing &optional ignore-missing
+该函数检查@var{node}是否代表@var{thing}。
+
+如果@var{node}代表@var{thing}，则返回非@code{nil}，否则返回@code{nil}。  为了方便起见，如果@code{node}是@code{nil}，这个函数只返回@code{nil}。
+
+@var{thing} 可以是一个事物符号，如 @code{defun}，也可以只是定义事物的谓词，如 @code{"function_definition"} 或 @w{@code{(or comment string)}}。
+
+默认情况下，如果 @var{thing} 未定义或格式错误，则此函数会发出 @code{treesit-invalid-predicate} 错误信号。  如果@var{ignore-missing}是@code{t}，当@var{thing}未定义时，该函数不会发出错误信号，只返回@code{nil}；但如果 6⁣ 是一个格式错误的谓词，它仍然会发出错误信号。
+@end defun
+
+下面的函数负责查找事物并在它们之间移动，并且它们必须处理缓冲区有时包含多个相邻或嵌套解析器的事实。  默认情况下，这些函数试图提供帮助，并在每个相关的解析器中进行搜索，从最具体（最深嵌入）到最不具体。  Lisp 程序在使用这些函数作为其他函数的构建块时应谨慎并评估是否需要这种行为；如果没有，则显式传递解析器或语言。
+
+@defun treesit-thing-prev position thing &optional parser
+该函数返回当前缓冲区中@var{position}之前的第一个节点，即指定的@var{thing}。  如果不存在这样的节点，则返回@code{nil}。
+
+保证如果返回一个节点，该节点的结束位置小于或等于@var{position}。  换句话说，这个函数永远不会返回包含 @var{position} 的节点。
+
+同样，@var{thing} 可以是符号也可以是谓词。
+
+如果@var{parser}非@code{nil}，则仅使用该解析器的解析树。否则尝试每个解析器覆盖点，从最具体（最深嵌入）到最不具体。  如果 @var{position} 处有多个具有相同嵌入级别 (@pxref{parser-embed-level}) 的解析器，则首先尝试哪个解析器是未定义的。  如果 4⁣ 是语言符号，则该函数将其尝试的解析器限制为该语言的解析器。
+@end defun
+
+@defun treesit-thing-next position thing &optional parser
+该函数与@code{treesit-thing-prev}类似，只是它返回第一个节点@emph{after}@var{position}，即@var{thing}。  它还保证如果返回一个节点，则该节点的起始位置大于或等于@var{position}。  @var{parser} 参数与@code{treesit-thing-prev} 中的相同。
+@end defun
+
+@defun treesit-navigate-thing position arg side thing &optional tactic
+该函数基于 @code{treesit-thing-prev} 和 @code{treesit-thing-next} 构建，并提供导航命令有用的功能。  它返回从 @var{position} 移过 @var{thing} 的 @var{arg} 实例后的位置。  如果没有足够的内容可供导航，则返回零。  该函数不移动点。
+
+正的 @var{arg} 意味着向前移动许多 @var{thing} 的实例；负@var{arg}表示向后移动。  如果@var{side}是@code{beg}，则该函数返回@var{thing}的开头位置；如果是@code{end}，则返回@var{thing}末尾的位置。
+
+与@code{treesit-thing-prev}一样，@var{thing}可以是@code{treesit-thing-settings}中定义的事物符号或谓词，而@var{parser}可以是@code{nil}、解析器或语言符号。就像在该函数中一样，@var{parser}决定搜索哪些解析器或语言。  当有多个可用的解析器时，此函数会尝试每个解析器，直到成功为止。
+
+@var{tactic} 决定该函数如何在事物之间移动。  它可以是 @code{nested}、@code{top-level}、@code{restricted}、@code{parent-first} 或 @code{nil}。  @code{nested} 或 @code{nil} 表示正常的嵌套导航：首先尝试跨同级导航；如果当前级别中没有任何兄弟姐妹，则移至父级，然后是其兄弟姐妹，依此类推。  @code{top-level} 表示仅导航顶级事物并忽略嵌套事物。  @code{restricted} 表示运动被限制在包围 @var{position} 的物体内（如果存在这样的物体）。  此策略对于想要停止在当前嵌套级别而不向上移动的命令非常有用。  @var{parent-first} 表示如果有父级，则移至父级；如果没有父母，则搬到兄弟姐妹那里。
+@end defun
+
+@defun treesit-thing-at position thing &optional strict parser
+该函数返回 @var{thing} 并包含 @var{position} 的最小节点；如果没有这样的节点，则返回@code{nil}。
+
+返回的节点必须包含@var{position}，即其起始位置小于或等于@var{position}，并且其结束位置大于或等于@var{position}。
+
+如果@var{strict}非@code{nil}，则该函数使用严格比较，即起始位置必须严格小于@var{position}，结束位置必须严格大于@var{position}。
+
+@var{thing} 可以是@code{treesit-thing-settings} 中定义的事物符号，也可以是谓词。
+
+如果@var{parser}非零，则仅使用该解析器的解析树。否则尝试每个解析器覆盖点，从最具体（最深嵌入）到最不具体。  如果 @var{position} 处有多个具有相同嵌入级别 (@pxref{parser-embed-level}) 的解析器，则首先尝试哪个解析器是未定义的。  @var{parser}也可以是语言符号。
+@end defun
+
+@findex treesit-beginning-of-thing
+@findex treesit-end-of-thing
+@findex treesit-thing-at-point
+还有一些方便的包装函数。 @code{treesit-beginning-of-thing} 将 point 移动到事物的开头，@code{treesit-end-of-thing} 移动到事物的结尾，@code{treesit-thing-at-point} 返回 point 处的事物。
+
+还有一些 defun 命令专门使用 @code{defun} 定义（作为 @code{treesit-defun-type-regexp} 的后备），例如 @code{treesit-beginning-of-defun}、@code{treesit-end-of-defun} 和 @code{treesit-defun-at-point}。  此外，这些函数使用@code{treesit-defun-tactic}作为导航策略。  其他部分对它们进行了更详细的描述 (@pxref{Tree-sitter Major Modes})。
+
+@node Multiple Languages
+@section 解析多种语言的文本
+@cindex multiple languages, parsing with tree-sitter
+@cindex parsing multiple languages with tree-sitter
+有时，一种编程语言的源代码可能包含其他语言的片段； @acronym{HTML} + @acronym{CSS} + JavaScript 就是一个例子。  在这种情况下，用不同语言编写的文本段需要分配不同的解析器。  传统上，这是通过使用缩小来实现的。  虽然树守护者使用缩小（@pxref{tree-sitter narrowing, narrowing}），但推荐的方法是指定解析器将在其中运行的缓冲区文本区域（即范围）。  本节介绍用于设置和获取解析器范围的函数。
+
+@cindex primary parser
+一般来说，当有多种语言在起作用时，就会有一种“主要”或“宿主”语言。  该语言的解析器——@dfn{primary parser}，解析整个缓冲区。  其他语言的解析器是“嵌入式”或“访客”解析器，它们仅在部分缓冲区上工作。  主解析器的解析树通常用于确定嵌入式解析器运行的范围。
+
+@vindex treesit-primary-parser
+主要模式应在调用 @code{treesit-major-mode-setup} 之前将 @code{treesit-primary-parser} 设置为主解析器，以便 Emacs 可以正确配置主解析器以实现字体锁定和其他功能。
+
+Lisp 程序应该在缓冲区中使用解析器之前调用 @code{treesit-update-ranges} 确保每个解析器的范围是正确的，并调用 @code{treesit-language-at} 找出负责某个位置文本的语言。  这两个功能不能单独工作；他们需要主要模式来设置 @code{treesit-range-settings} 和可选的 @code{treesit-language-at-point-function}，以完成实际工作。这些函数和变量将在本节末尾进行更详细的解释。
+
+简而言之，多语言主要模式应该在调用@code{treesit-major-mode-setup}之前设置@code{treesit-primary-parser}、@code{treesit-range-settings}以及可选的@code{treesit-language-at-point-function}。
+
+@heading 获取和设置范围
+
+@defun treesit-parser-set-included-ranges parser ranges
+该函数设置 @var{parser} 对 @var{ranges} 进行操作。  @var{parser} 只会读取指定范围的文本。  @var{ranges} 中的每个范围都是@w{@code{(@var{beg} . @var{end})}} 形式的一对。
+
+@var{ranges} 中的范围必须按顺序排列且不得重叠。也就是说，用伪代码来说：
+
+@example
+@group
+(cl-loop for idx from 1 to (1- (length ranges))
+         for prev = (nth (1- idx) ranges)
+         for next = (nth idx ranges)
+         should (<= (car prev) (cdr prev)
+                    (car next) (cdr next)))
+@end group
+@end example
+
+@vindex treesit-range-invalid
+如果 @var{ranges} 违反了此约束，或者出现其他问题，则此函数会发出 @code{treesit-range-invalid} 错误信号。信号数据包含特定的错误消息和我们尝试设置的范围。
+
+此功能还可用于禁用范围。  如果@var{ranges}是@code{nil}，则解析器设置为解析整个缓冲区。
+
+例子：
+
+@example
+@group
+(treesit-parser-set-included-ranges
+ parser '((1 . 9) (16 . 24) (24 . 25)))
+@end group
+@end example
+@end defun
+
+@defun treesit-parser-included-ranges parser
+此函数返回为 @var{parser} 设置的范围。  返回值与@code{treesit-parser-included-ranges}的@var{ranges}参数相同：@w{@code{(@var{beg} . @var{end})}}形式的cons单元列表。  如果@var{parser}没有任何范围，则返回值为@code{nil}。
+
+@example
+@group
+(treesit-parser-included-ranges parser)
+    @result{} ((1 . 9) (16 . 24) (24 . 25))
+@end group
+@end example
+@end defun
+
+@defun treesit-query-range source query &optional beg end
+该函数将 @var{source} 与 @var{query} 匹配并返回捕获节点的范围。  返回值是 @w{@code{(@var{beg} . @var{end})}} 形式的 cons 单元格列表，其中 @var{beg} 和 @var{end} 指定文本区域的开头和结尾。
+
+为了方便起见，@var{source}可以是语言符号、解析器或节点。  如果它是一个语言符号，则该函数匹配使用该语言的第一个解析器的根节点；如果是解析器，则该函数在该解析器的根节点中匹配；如果是一个节点，则该函数在该节点中匹配。
+
+参数 @var{query} 是用于捕获节点 (@pxref{Pattern Matching}) 的查询。  捕获名称并不重要。  参数@var{beg}和@var{end}，如果两者都非@code{nil}，则限制此函数查询的范围。
+
+与其他查询函数一样，如果 @var{query} 格式错误，此函数会引发 @code{treesit-query-error} 错误。
+@end defun
+
+@heading Lisp 程序支持多种语言
+
+一般的 Lisp 程序调用以下两个函数就足够了，以支持混合多种语言的程序源。
+
+@defun treesit-update-ranges &optional beg end
+此函数更新缓冲区中解析器的范围。  它确保解析器的范围根据@code{treesit-range-settings}正确设置在@var{beg}和@var{end}之间。  如果省略，@var{beg} 默认为缓冲区的开头，@var{end} 默认为缓冲区的结尾。
+
+例如，字体化函数在查询区域中的节点之前使用此函数。
+@end defun
+
+@defun treesit-language-at pos
+该函数返回缓冲区位置@var{pos}处文本的语言。  在底层，它调用 @code{treesit-language-at-point-function} 并返回其返回值。如果@code{treesit-language-at-point-function}是@code{nil}，则该函数返回@code{treesit-parsers-at}返回的解析器中嵌入级别（@pxref{parser-embed-level}）最深解析器的语言。  如果该缓冲区位置没有解析器，则返回@code{nil}。
+@end defun
+
+@heading 主要模式支持多种语言
+
+@cindex host language, tree-sitter
+@cindex tree-sitter host and embedded languages
+@cindex embedded language, tree-sitter
+通常，在一组可以混合在一起的语言中，有一个@dfn{host language}和一个或多个@dfn{embedded languages}。  Lisp 程序通常首先使用宿主语言的解析器解析整个文档，检索一些信息，使用该信息设置嵌入语言的范围，然后解析嵌入语言。
+
+以包含 @acronym{HTML}、@acronym{CSS} 和 JavaScript 的缓冲区为例。  Lisp 程序首先使用 @acronym{HTML} 解析器解析整个缓冲区，然后在解析器中查询 @code{style_element} 和 @code{script_element} 节点，它们分别对应于 @acronym{CSS} 和 JavaScript 文本。  然后它将 @acronym{CSS} 和 JavaScript 解析器的范围设置为其相应节点跨越的范围。
+
+给定一个简单的 @acronym{HTML} 文档：
+
+@example
+@group
+<html>
+  <script>1 + 2</script>
+  <style>body @{ color: "blue"; @}</style>
+</html>
+@end group
+@end example
+
+@noindent
+Lisp 程序将首先使用 @acronym{HTML} 解析器进行解析，然后为 @acronym{CSS} 和 JavaScript 解析器设置范围：
+
+@example
+@group
+;; Create parsers.
+(setq html (treesit-parser-create 'html))
+(setq css (treesit-parser-create 'css))
+(setq js (treesit-parser-create 'javascript))
+@end group
+
+@group
+;; Set CSS ranges.
+(setq css-range
+      (treesit-query-range
+       'html
+       '((style_element (raw_text) @@capture))))
+(treesit-parser-set-included-ranges css css-range)
+@end group
+
+@group
+;; Set JavaScript ranges.
+(setq js-range
+      (treesit-query-range
+       'html
+       '((script_element (raw_text) @@capture))))
+(treesit-parser-set-included-ranges js js-range)
+@end group
+@end example
+
+Emacs 在 @code{treesit-update-ranges} 中自动执行此过程。  多语言主要模式应该设置@code{treesit-range-settings}，以便@code{treesit-update-ranges}知道如何自动执行此过程。  主要模式应使用辅助函数 @code{treesit-range-rules} 生成可分配给 @code{treesit-range-settings} 的值。  以下示例中的设置直接转换为上面所示的操作。
+
+@example
+@group
+(setq treesit-range-settings
+      (treesit-range-rules
+       :embed 'javascript
+       :host 'html
+       '((script_element (raw_text) @@capture))
+@end group
+@group
+       :embed 'css
+       :host 'html
+       '((style_element (raw_text) @@capture))))
+@end group
+
+@group
+;; Major modes with multiple languages can optionally set
+;; `treesit-language-at-point-function' (which see).
+(setq treesit-language-at-point-function
+      (lambda (pos)
+        (let* ((node (treesit-node-at pos 'html))
+               (parent (treesit-node-parent node)))
+          (cond
+           ((and node parent
+                 (equal (treesit-node-type node) "raw_text")
+                 (equal (treesit-node-type parent) "script_element"))
+            'javascript)
+           ((and node parent
+                 (equal (treesit-node-type node) "raw_text")
+                 (equal (treesit-node-type parent) "style_element"))
+            'css)
+           (t 'html)))))
+@end group
+@end example
+
+@defun treesit-range-rules &rest query-specs
+该函数用于设置@code{treesit-range-settings}。  它负责编译查询和其他后处理，并输出 @code{treesit-range-settings} 可以具有的值。
+
+它需要一系列@var{query-spec}，其中每个@var{query-spec}是一个@var{query}，前面有零个或多个@var{keyword}/@var{value}对。  每个 @var{query} 都是字符串、s 表达式、编译形式或函数的树保护查询。
+
+@code{treesit-update-ranges} 使用 @var{query} 来确定如何设置嵌入式语言解析器的范围。  它在主机语言解析器中查询@var{query}，计算捕获的节点跨越的范围，并将这些范围应用于嵌入式语言解析器。
+
+如果 @var{query} 是树托管查询，则其前面应有两个 @var{keyword}/@var{value} 对，其中 @code{:embed} 关键字指定嵌入语言，@code{:host} 关键字指定宿主语言。  捕获的节点决定了嵌入解析器的范围。  捕获名称并不重要，但以下划线开头的名称将被忽略，并且 @code{@@language} 捕获名称将被保留。
+
+如果嵌入式语言是动态的，那么 @code{:embed} 可以指定函数而不是静态语言。  该函数获取使用 @code{@@language} 捕获名称捕获的节点。  必须注意 2⁣ 捕获和范围捕获位于同一匹配组中。  该函数应该返回一个语言符号，如果找不到有效的语言，则返回 nil。
+
+如果给查询一个 @code{:offset} 关键字，其值为一对数字，则每个捕获的范围都会被这些数字偏移。  例如，偏移量 1⁣ 会将 2⁣ 的捕获范围更新为 3⁣。  这可用于排除诸如周围分隔符之类的内容，使其不包含在嵌入式解析器覆盖的范围内。
+
+默认情况下，解析器将其范围视为连续体，而不是将它们视为单独的独立段。  因此，如果嵌入的范围是语义上独立的段，则它们应该由本地解析器处理，如下所述。
+
+@cindex local parser
+如果给查询赋予@code{:local}关键字，其值为@code{t}，则该查询设置的范围有一个专用的本地解析器；否则该范围与同一语言的其他范围共享一个解析器。
+
+设置为某个范围的本地解析器可以通过 @code{treesit-local-parsers-at} 和 @code{treesit-local-parsers-on} 检索。
+
+Emacs 对待本地嵌入式解析器和非本地嵌入式解析器的方式截然不同：
+
+@itemize @bullet
+@item
+本地解析器由 Emacs 管理。  Emacs 在需要时创建新的本地解析器，在不需要时删除它们。  非本地解析器必须由主要模式创建，并且 Emacs 仅在存在时才使用它们。
+
+@item
+由于本地解析器可以由 Emacs 自由创建，因此它们适合递归嵌套的嵌入式解析器，其中嵌入级别可以是任意深度。  另一方面，由于主要模式创建的非本地解析器，它们只能处理固定数量的嵌入级别。
+@end itemize
+
+@anchor{parser-embed-level}
+@cindex embed level, tree-sitter
+顶级解析器的嵌入级别为 0 或省略，第一级嵌入解析器的嵌入级别为 1，依此类推。  对于本地解析器，每个嵌入级别都会创建一个新的解析器；对于非本地解析器，由于 Emacs 无法自由创建非本地解析器，因此它会尝试在正确的嵌入级别找到可用的解析器；如果不存在，Emacs 就会放弃。
+
+如果给查询一个 @code{:range-fn} 关键字，其值为函数，Emacs 使用该函数来计算用于嵌入式解析器的范围。  该函数将捕获的节点和 @code{:offset} 关键字给出的偏移量作为参数，并返回范围列表，其中每个范围都是起始位置和结束位置的 cons。  对于本地解析器，每个@var{query}创建一个本地解析器，并且由@code{:range-fn}设置的范围应用于该解析器；对于非本地解析器，该嵌入级别中的所有范围（包括由@code{:range-fn}创建的范围）都连接在一起并应用于同一个解析器。
+
+如果 @var{query} 是一个函数，则它不需要任何 @var{keyword} 和 @var{value} 对。  它应该是一个接受 2 个参数 @var{start} 和 @var{end} 的函数，并在 @var{start} 和 @var{end} 之间的区域中设置当前缓冲区中解析器的范围。  该函数可以在包含 @var{start} 和 @var{end} 之间的区域的较大区域中设置范围。
+@end defun
+
+@defvar treesit-range-settings
+该变量有助于 @code{treesit-update-ranges} 更新缓冲区中解析器的范围。  它是 @var{setting} 的列表，其中 @var{setting} 的确切格式被认为是内部的。  您应该使用 @code{treesit-range-rules} 生成该变量可以具有的值。
+
+@c Because the format is internal, we don't document them here.  Though
+@c we do have it explained in the docstring.  We also expose the fact
+@c that it is a list of settings, so one could combine two of them with
+@c append.
+@end defvar
+
+
+@defvar treesit-language-at-point-function
+该变量的值应该是一个函数，它采用单个参数 @var{pos}（缓冲区位置），并返回 @var{pos} 处缓冲区文本的语言。  该变量由 @code{treesit-language-at} 使用。
+@end defvar
+
+@defun treesit-parsers-at &optional pos language with-host only
+该函数返回当前缓冲区中@var{pos}处的所有解析器。 @var{pos} 默认为点。  返回的解析器按嵌入级别递减排序。
+
+如果@var{language}非@code{nil}，则仅返回该语言的解析器。
+
+如果@var{with-host}不是@code{nil}，则返回@w{@code{(@var{parser} . @var{host-parser})}}的列表，其中@var{host-parser}是创建@var{parser}的主机解析器。
+
+如果@var{only}非@code{nil}，则返回包括主解析器在内的所有解析器。
+
+参数 @var{only} 可以是一个符号列表，用于指定返回值中包含哪些解析器。
+
+如果@var{only}包含符号@code{local}，则包含本地解析器。本地解析器仅解析由具有非 @code{nil} @code{treesit-parser-local-p} 属性的覆盖标记的有限区域。
+
+如果@var{only}包含符号@code{global}，则包括除主解析器之外的非本地解析器。
+
+如果@var{only}包含符号“primary”，则包含主解析器。
+@end defun
+
+@defun treesit-local-parsers-at &optional pos language with-host
+该函数返回当前缓冲区中@var{pos}处的所有本地解析器。  @var{pos} 默认为点。
+
+本地解析器仅解析由具有非 @code{nil} @code{treesit-parser-local-p} 属性的覆盖标记的有限区域。如果@var{language}非@code{nil}，则仅返回该语言的解析器。
+@end defun
+
+@defun treesit-local-parsers-on &optional beg end language with-host
+该函数与@code{treesit-local-parsers-at}相同，但它返回@var{beg}和@var{end}之间范围内的本地解析器，而不是at点。
+
+@var{beg} 和 @var{end} 默认为缓冲区的整个可访问部分。
+@end defun
+
+@node Tree-sitter Major Modes
+@section 与护树人一起开发主要模式
+@cindex major mode, developing with tree-sitter
+
+本节介绍了为主要模式开发树守护者集成的一些一般准则。
+
+支持树保姆功能的主要模式应大致遵循以下模式：
+
+@example
+@group
+(define-derived-mode woomy-mode prog-mode "Woomy"
+  "A mode for Woomy programming language."
+  (when (treesit-ready-p 'woomy)
+    (setq-local treesit-variables ...)
+    ...
+    (treesit-major-mode-setup)))
+@end group
+@end example
+
+如果不满足启用树守护者的条件，@code{treesit-ready-p} 会自动发出警告。
+
+如果树守护者主要模式与其“本机”对应项共享设置，则可以创建一个包含通用设置的“基本模式”，如下所示：
+
+@example
+@group
+(define-derived-mode woomy--base-mode prog-mode "Woomy"
+  "An internal mode for Woomy programming language."
+  (common-setup)
+  ...)
+@end group
+
+@group
+(define-derived-mode woomy-mode woomy--base-mode "Woomy"
+  "A mode for Woomy programming language."
+  (native-setup)
+  ...)
+@end group
+
+@group
+(define-derived-mode woomy-ts-mode woomy--base-mode "Woomy"
+  "A mode for Woomy programming language."
+  (when (treesit-ready-p 'woomy)
+    (setq-local treesit-variables ...)
+    ...
+    (treesit-major-mode-setup)))
+@end group
+@end example
+
+@defun treesit-ready-p language &optional quiet
+该函数检查激活树守护者的条件。  它检查 Emacs 是否是使用 Tree-sitter 构建的、缓冲区的大小是否太大以至于 Tree-sitter 无法处理，以及 @var{language} 的语法是否在系统上可用 (@pxref{Language Grammar})。
+
+如果树守护者无法激活，此功能会发出警告。  如果@var{quiet}为@code{message}，则警告转为消息；如果 @var{quiet} 为 @code{t}，则不会显示任何警告或消息。
+
+如果满足所有必要条件，该函数返回非@code{nil}；否则返回@code{nil}。
+@end defun
+
+@defun treesit-major-mode-setup
+此功能激活主要模式的一些树守护者功能。
+
+目前，它设置了以下功能：
+@itemize
+@item
+如果@code{treesit-font-lock-settings} (@pxref{Parser-based Font Lock}) 是非@code{nil}，则设置字体化。
+
+@item
+如果 @code{treesit-simple-indent-rules} 或 @code{treesit-indent-function} (@pxref{Parser-based Indentation}) 为非 @code{nil}，则会设置缩进。
+
+@item
+如果@code{treesit-defun-type-regexp}非@code{nil}，则为@code{beginning-of-defun}和@code{end-of-defun}设置导航功能。  @xref{List Motion}。
+
+@item
+如果@code{treesit-defun-name-function}非@code{nil}，它会设置@code{add-log-current-defun}使用的add-log函数。
+
+@item
+如果 @code{treesit-simple-imenu-settings} (@pxref{Imenu}) 为非 @code{nil}，则设置 Imenu。
+
+@item
+如果@code{treesit-outline-predicate} (@pxref{Outline Minor Mode}) 为非@code{nil}，则设置轮廓次要模式。
+
+@item
+如果在@code{treesit-thing-settings} (@pxref{User-defined Things}) 中定义@code{sexp} 和/或@code{sentence}，则可以通过定义@code{forward-sexp-function} 和@code{forward-sentence-function} 等变量来分别按性别和句子移动导航命令。
+@end itemize
+@end defun
+
+有关这些内置树木保护功能的更多信息，@pxref{Parser-based Font Lock}、@pxref{Parser-based Indentation} 和 @pxref{List Motion}。
+
+用于支持在主要模式下混合多种语言，@pxref{Multiple Languages}。
+
+除了 @code{beginning-of-defun} 和 @code{end-of-defun} 之外，Emacs 还提供了一些用于处理 defun 的附加函数： @code{treesit-defun-at-point} 返回当前点的 defun 节点，@code{treesit-defun-name} 返回 defun 节点的名称。
+
+@c FIXME: Cross-reference to treesit-defun-tactic once we have it in
+@c the user manual.
+@defun treesit-defun-at-point
+该函数返回该点的 defun 节点，如果没有找到，则返回 @code{nil}。  它遵循 @code{treesit-defun-tactic}：如果它的值为 @code{top-level}，则该函数返回顶级 defun，如果它的值为 @code{nested}，则返回直接封闭的 defun。
+
+该功能需要 @code{treesit-defun-type-regexp} 才能工作。  如果是@code{nil}，则该函数仅返回@code{nil}。
+@end defun
+
+@defun treesit-defun-name node
+该函数返回@var{node}的默认名称。  如果@var{node}没有defun名称，或者@var{node}不是defun节点，或者@var{node}是@code{nil}，则返回@code{nil}。
+
+根据语言和主要模式，defun 名称是函数名称、类名称、结构名称等名称。
+
+如果 @code{treesit-defun-name-function} 是 @code{nil}，则该函数始终返回 @code{nil}。
+@end defun
+
+@defvar treesit-defun-name-function
+如果非@code{nil}，则该变量的值应该是一个以节点作为参数调用的函数，并返回节点的 defun 名称。  该函数应具有与 @code{treesit-defun-name} 相同的语义：如果该节点不是 defun 节点，或者该节点是 defun 节点但没有名称，或者该节点是 @code{nil}，则应返回 @code{nil}。
+@end defvar
+
+@node Tree-sitter C API
+@section 树保姆 C API 对应
+
+Emacs 的 Tree-Sitter 集成并未公开 Tree-Sitter 的 C API@. 提供的所有功能@. 缺少的功能包括：
+
+@itemize
+@item
+创建树形光标并用它导航语法树。
+@item
+为解析器设置超时和取消标志。
+@item
+设置解析器的记录器。
+@item
+将语法树的 @acronym{DOT} 图打印到文件中。
+@item
+复制和修改语法树。  （Emacs 不公开树对象。）
+@item
+使用（行，列）坐标作为位置。
+@item
+使用更改更新节点。  （在 Emacs 中，检索一个新节点而不是更新现有节点。）
+@item
+查询语言语法的静态。
+@end itemize
+
+此外，Emacs 对 C API 进行了一些更改，使 API 更加方便和惯用：
+
+@itemize
+@item
+Emacs Lisp API 不使用字节位置，而是使用字符位置。
+@item
+空节点将转换为 @code{nil}。
+@end itemize
+
+以下是所有 C API 函数与其 Lisp 对应函数之间的对应关系。  有时，一个 Lisp 函数对应多个 C 函数，而许多 C 函数没有对应的 Lisp 函数。
+
+@example
+ts_parser_new                           treesit-parser-create
+ts_parser_delete
+ts_parser_set_language
+ts_parser_language                      treesit-parser-language
+ts_parser_set_included_ranges           treesit-parser-set-included-ranges
+ts_parser_included_ranges               treesit-parser-included-ranges
+ts_parser_parse
+ts_parser_parse_string                  treesit-parse-string
+ts_parser_parse_string_encoding
+ts_parser_reset
+ts_parser_set_timeout_micros
+ts_parser_timeout_micros
+ts_parser_set_cancellation_flag
+ts_parser_cancellation_flag
+ts_parser_set_logger
+ts_parser_logger
+ts_parser_print_dot_graphs
+ts_tree_copy
+ts_tree_delete
+ts_tree_root_node
+ts_tree_language
+ts_tree_edit
+ts_tree_get_changed_ranges
+ts_tree_print_dot_graph
+ts_node_type                            treesit-node-type
+ts_node_symbol
+ts_node_start_byte                      treesit-node-start
+ts_node_start_point
+ts_node_end_byte                        treesit-node-end
+ts_node_end_point
+ts_node_string                          treesit-node-string
+ts_node_is_null
+ts_node_is_named                        treesit-node-check
+ts_node_is_missing                      treesit-node-check
+ts_node_is_extra                        treesit-node-check
+ts_node_has_changes
+ts_node_has_error                       treesit-node-check
+ts_node_parent                          treesit-node-parent
+ts_node_child                           treesit-node-child
+ts_node_field_name_for_child            treesit-node-field-name-for-child
+ts_node_child_count                     treesit-node-child-count
+ts_node_named_child                     treesit-node-child
+ts_node_named_child_count               treesit-node-child-count
+ts_node_child_by_field_name             treesit-node-child-by-field-name
+ts_node_child_by_field_id
+ts_node_next_sibling                    treesit-node-next-sibling
+ts_node_prev_sibling                    treesit-node-prev-sibling
+ts_node_next_named_sibling              treesit-node-next-sibling
+ts_node_prev_named_sibling              treesit-node-prev-sibling
+ts_node_first_child_for_byte            treesit-node-first-child-for-pos
+ts_node_first_named_child_for_byte      treesit-node-first-child-for-pos
+ts_node_descendant_for_byte_range       treesit-node-descendant-for-range
+ts_node_descendant_for_point_range
+ts_node_named_descendant_for_byte_range treesit-node-descendant-for-range
+ts_node_named_descendant_for_point_range
+ts_node_edit
+ts_node_eq                              treesit-node-eq
+ts_tree_cursor_new
+ts_tree_cursor_delete
+ts_tree_cursor_reset
+ts_tree_cursor_current_node
+ts_tree_cursor_current_field_name
+ts_tree_cursor_current_field_id
+ts_tree_cursor_goto_parent
+ts_tree_cursor_goto_next_sibling
+ts_tree_cursor_goto_first_child
+ts_tree_cursor_goto_first_child_for_byte
+ts_tree_cursor_goto_first_child_for_point
+ts_tree_cursor_copy
+ts_query_new
+ts_query_delete
+ts_query_pattern_count
+ts_query_capture_count
+ts_query_string_count
+ts_query_start_byte_for_pattern
+ts_query_predicates_for_pattern
+ts_query_step_is_definite
+ts_query_capture_name_for_id
+ts_query_string_value_for_id
+ts_query_disable_capture
+ts_query_disable_pattern
+ts_query_cursor_new
+ts_query_cursor_delete
+ts_query_cursor_exec                    treesit-query-capture
+ts_query_cursor_did_exceed_match_limit
+ts_query_cursor_match_limit
+ts_query_cursor_set_match_limit
+ts_query_cursor_set_byte_range
+ts_query_cursor_set_point_range
+ts_query_cursor_next_match
+ts_query_cursor_remove_match
+ts_query_cursor_next_capture
+ts_language_symbol_count
+ts_language_symbol_name
+ts_language_symbol_for_name
+ts_language_field_count
+ts_language_field_name_for_id
+ts_language_field_id_for_name
+ts_language_symbol_type
+ts_language_version
+@end example

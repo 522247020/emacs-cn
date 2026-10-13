@@ -1,0 +1,71 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 2017--2026 Free Software Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Records
+@chapter 记录
+@cindex records
+
+记录的目的是允许程序员创建具有 Emacs 中未内置的新类型的对象。  它们用作 @code{cl-defstruct} 和 @code{defclass} 实例的底层表示。
+
+从内部来看，记录对象很像向量；可以使用@code{aref}访问其插槽，并可以使用@code{copy-sequence}复制它。  但是，第一个槽用于保存 @code{type-of} 返回的类型。  此外，在当前的实现中，记录最多可以有 4096 个槽，而向量可以更大。  与数组一样，记录使用零源索引：第一个槽的索引为 0。
+
+类型槽应该是一个符号或类型描述符。  如果是类型描述符，则返回命名其类型的符号； @ref{Type Descriptors}。  任何其他类型的对象均按原样返回。
+
+记录的打印表示是 @samp{#s} 后跟指定内容的列表。  第一个列表元素必须是记录类型。  以下元素是记录槽。
+
+为了避免与其他类型名称发生冲突，定义新记录类型的 Lisp 程序通常应使用引入这些记录类型的包的命名约定作为类型名称。  请注意，在加载定义记录类型的包时，可能不知道可能发生冲突的类型的名称；它们可以在未来的某个时间点加载。
+
+记录被视为评估常数：评估它的结果是相同的记录。  这不会评估甚至检查插槽。  @xref{Self-Evaluating Forms}。
+
+@menu
+* Record Functions::         记录功能。
+* Backward Compatibility::   cl-defstruct 的兼容性。
+@end menu
+
+@node Record Functions
+@section 记录功能
+
+@defun recordp object
+如果 1⁣ 是一条记录，则该函数返回 0⁣。
+
+@example
+@group
+(recordp #s(a))
+     @result{} t
+@end group
+@end example
+@end defun
+
+@defun record type &rest objects
+该函数创建并返回一条类型为 @var{type} 的记录，剩余槽位为其余参数 @var{objects}。
+
+@example
+@group
+(record 'foo 23 [bar baz] "rats")
+     @result{} #s(foo 23 [bar baz] "rats")
+@end group
+@end example
+@end defun
+
+@defun make-record type length object
+该函数返回一个类型为 @var{type} 的新记录和 @var{length} 个槽，每个槽都初始化为 @var{object}。
+
+@example
+@group
+(setq sleepy (make-record 'foo 9 'Z))
+     @result{} #s(foo Z Z Z Z Z Z Z Z Z)
+@end group
+@end example
+@end defun
+
+要复制由记录、向量和常量（列表）组成的树，请使用 @code{copy-tree} 及其可选的第二个参数非 @code{nil}。 @xref{Building Lists, copy-tree}。
+
+@node Backward Compatibility
+@section 向后兼容性
+
+使用不使用记录的旧版本 @code{cl-defstruct} 编译的代码在新 Emacs 中使用时可能会遇到问题。为了缓解这个问题，Emacs 会检测何时使用旧的 @code{cl-defstruct}，并启用 @code{type-of} 处理旧结构对象的模式，就好像它们是记录一样。
+
+@defun cl-old-struct-compat-mode arg
+如果 0⁣ 为正，则启用与旧式结构的向后兼容性。
+@end defun

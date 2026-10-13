@@ -1,0 +1,776 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Syntax Tables
+@chapter 语法表
+@cindex parsing buffer text
+@cindex syntax table
+@cindex text parsing
+
+A @dfn{syntax table} 指定缓冲区中每个字符的语法角色。  它可用于确定单词、符号和其他句法结构的开始和结束位置。  许多 Emacs 工具都使用此信息，包括字体锁定模式 (@pxref{Font Lock Mode}) 和各种复杂的移动命令 (@pxref{Motion})。
+
+@menu
+* Basics: Syntax Basics.      语法表的基本概念。
+* Syntax Descriptors::        字符是如何分类的。
+* Syntax Table Functions::    如何创建、检查和更改语法表。
+* Syntax Properties::         使用文本属性覆盖语法。
+* Motion and Syntax::         使用某些语法移动字符。
+* Parsing Expressions::       使用语法表解析平衡表达式。
+* Syntax Table Internals::    语法表信息如何存储。
+* Categories::                另一种对字符语法进行分类的方法。
+@end menu
+
+@node Syntax Basics
+@section 语法表概念
+
+语法表是一种数据结构，可用于查找每个字符的 @dfn{syntax class} 和其他语法属性。 Lisp 程序使用语法表来扫描和移动文本。
+
+在内部，语法表是一个字符表（@pxref{Char-Tables}）。索引@var{c}处的元素描述了代码为@var{c}的字符；它的值是一个 cons 单元格，它指定相关字符的语法。  @xref{Syntax Table Internals}，了解详情。但是，您通常应该使用@ref{Syntax Table Functions}中描述的高级函数@code{char-syntax}和@code{modify-syntax-entry}，而不是使用@code{aset}和@code{aref}来修改和检查语法表内容。
+
+@defun syntax-table-p object
+如果 1⁣ 是语法表，则该函数返回 0⁣。
+@end defun
+
+每个缓冲区都有自己的主要模式，每个主要模式对各种字符的语法类都有自己的想法。  例如，在 Lisp 模式中，字符 @samp{;} 开始注释，但在 C 模式中，它终止语句。  为了支持这些变化，语法表对于每个缓冲区来说都是本地的。  通常，每个主要模式都有自己的语法表，它安装在使用该模式的所有缓冲区中。例如，变量 1⁣ 保存 Emacs Lisp 模式使用的语法表，而 2⁣ 保存 C 模式使用的语法表。更改主要模式的语法表会更改该模式的所有缓冲区以及随后放入该模式的任何缓冲区中的语法。  有时，几种相似的模式共享一个语法表。 @xref{Example Major Modes}，有关如何设置语法表的示例。
+
+@cindex standard syntax table
+@cindex inheritance, syntax table
+一个语法表可以从另一个语法表中获取@dfn{inherit}，这称为它的@dfn{parent syntax table}。  语法表可以通过给某些字符“继承”语法类来保留未指定的语法类；然后，这样的字符获取由父语法表 (@pxref{Syntax Class Table}) 指定的语法类。  Emacs 定义了一个@dfn{standard syntax table}，它是默认的父语法表，也是 Fundamental 模式使用的语法表。
+
+@defun standard-syntax-table
+该函数返回标准语法表，即Fundamental模式下使用的语法表。
+@end defun
+
+Emacs Lisp 阅读器不使用语法表，它有自己的内置语法规则，无法更改。  （一些 Lisp 系统提供了重新定义读取语法的方法，但为了简单起见，我们决定在 Emacs Lisp 中保留此功能。）
+
+@node Syntax Descriptors
+@section 语法描述符
+@cindex syntax class
+
+字符的 @dfn{syntax class} 描述了它的语法角色。每个语法表指定每个字符的语法类别。  一个语法表中的字符类别与其在任何其他表中的类别之间没有必然关系。
+
+每个语法类都由一个助记符指定，当您需要指定一个类时，该助记符充当类的名称。通常，该指示符字符是经常分配给该类的字符；然而，它作为指示符的含义是不变的，并且与该字符当前具有的语法无关。  因此，@samp{\}作为指示符始终代表转义字符语法，无论@samp{\}字符在当前语法表中是否实际上具有该语法。
+@ifnottex
+@xref{Syntax Class Table}, for a list of syntax classes and their
+designator characters.
+@end ifnottex
+
+@cindex syntax descriptor
+@dfn{syntax descriptor} 是一个 Lisp 字符串，描述字符的语法类和其他语法属性。  当您想要修改字符的语法时，可以通过调用函数 @code{modify-syntax-entry} 并传递语法描述符作为其参数之一 (@pxref{Syntax Table Functions}) 来完成。
+
+语法描述符中的第一个字符必须是语法类指示符字符。  第二个字符（如果存在）指定匹配字符（例如，在 Lisp 中，@samp{(} 的匹配字符是@samp{)}）；空格表示没有匹配的字符。  然后是指定附加语法属性的字符 (@pxref{Syntax Flags})。
+
+如果不需要匹配字符或标志，则仅一个字符（指定语法类）就足够了。
+
+例如，C 模式中字符 @samp{*} 的语法描述符是@code{". 23"}（即标点符号、未使用的匹配字符槽、注释起始符的第二个字符、注释结束符的第一个字符），@samp{/} 的条目是@samp{@w{. 14}}（即标点符号、未使用的匹配字符槽、注释起始符的第一个字符、注释起始符的第二个字符）。评论者）。
+
+Emacs 还定义了@dfn{raw syntax descriptors}，用于描述较低级别的语法类。  @xref{Syntax Table Internals}。
+
+@menu
+* Syntax Class Table::       语法类别表。
+* Syntax Flags::             每个角色可以拥有额外的标志。
+@end menu
+
+@node Syntax Class Table
+@subsection 语法类表
+@cindex syntax class table
+
+下面是语法类、指定它们的字符、它们的含义以及它们的使用示例的表。
+
+@table @asis
+@item 空白字符：@samp{@ } 或 @samp{-}
+将符号和单词彼此分开的字符。通常，空白字符没有其他语法意义，并且多个空白字符在语法上等同于单个空白字符。  空格、制表符和换页符在几乎所有主要模式中都被归类为空白。
+
+该语法类可以由 @w{@samp{@ }} 或 @samp{-} 指定。  两个指示符是等效的。
+
+@item 单词成分：@samp{w}
+人类语言中单词的一部分。  这些通常用在程序中的变量和命令名称中。  所有大写和小写字母以及数字通常都是单词的组成部分。
+
+@item 符号构成：@samp{_}
+变量和命令名称中使用的额外字符以及单词组成部分。  示例包括 Lisp 模式中的字符 @samp{$&*+-_<>}，尽管它们不是英语单词的一部分，但它们可能是符号名称的一部分。  在标准 C 中，符号中唯一有效的非单词组成字符是下划线 (@samp{_})。
+
+@item 标点符号：@samp{.}
+在人类语言中用作标点符号的字符，或在编程语言中用于将符号彼此分隔开的字符。  某些编程语言模式（例如 Emacs Lisp 模式）在此类中没有字符，因为不是符号或单词成分的少数字符都有其他用途。  其他编程语言模式（例如 C 模式）使用标点符号语法作为运算符。
+
+@item 左括号字符：@samp{(}
+@itemx 右括号字符：@samp{)}
+以不同的对形式使用的字符来包围句子或表达式。  这样的分组以左括号字符开始并以结束字符结束。  每个左括号字符与特定的右括号字符匹配，反之亦然。  通常，当您插入右括号时，Emacs 会立即指示匹配的左括号。  @xref{Blinking}。
+
+在人类语言和 C 代码中，括号对是 @samp{()}、@samp{[]} 和 @samp{@{@}}。  在 Emacs Lisp 中，列表和向量的分隔符（@samp{()} 和 @samp{[]}）被归类为括号字符。
+
+@item 字符串引号：@samp{"}
+用于分隔字符串常量的字符。  相同的字符串引号字符出现在字符串的开头和结尾。  此类带引号的字符串不能嵌套。
+
+Emacs 的解析工具将字符串视为单个标记。字符串中字符的通常语法含义被抑制。
+
+Lisp 模式有两个字符串引号字符：双引号 (@samp{"}) 和竖线 (@samp{|})。  @samp{|} 不在 Emacs Lisp 中使用，但在 Common Lisp 中使用。  C 也有两个字符串引号字符：用于字符串的双引号和用于字符常量的撇号 (@samp{'})。
+
+人类文本没有字符串引号字符。  我们不希望引号关闭引文中其他字符的常用语法属性。
+
+@item 转义语法字符：@samp{\}
+开始转义序列的字符，例如在字符串和字符常量中使用的字符。  字符 @samp{\} 在 C 和 Lisp 中都属于此类。  （在 C 中，它仅在字符串内部使用，但事实证明在整个 C 代码中以这种方式处理它不会造成任何麻烦。）
+
+如果@code{words-include-escapes}非@code{nil}，则此类中的字符算作单词的一部分。  @xref{Word Motion}。
+
+@item 人物名言：@samp{/}
+用于引用以下字符的字符，使其失去其正常的语法含义。  这与转义字符不同，因为只有紧随其后的字符才会受到影响。
+
+如果@code{words-include-escapes}非@code{nil}，则此类中的字符算作单词的一部分。  @xref{Word Motion}。
+
+该类用于 @TeX{} 模式下的反斜杠。
+
+@item 配对分隔符：@samp{$}
+与字符串引号字符类似，只不过不抑制分隔符之间的字符的语法属性。  目前只有@TeX{}模式使用成对分隔符——进入和离开数学模式的@samp{$}。
+
+@item 表达式前缀：@samp{'}
+用于语法运算符的字符，如果它们出现在一个运算符旁边，则被视为表达式的一部分。  在 Lisp 模式中，这些字符包括撇号、@samp{'}（用于引用）、逗号、@samp{,}（在宏中使用）和 @samp{#}（在某些数据类型的读取语法中使用）。
+
+@item 评论起始者：@samp{<}
+@itemx 评论结束者：@samp{>}
+@cindex comment syntax
+各种语言中用于分隔注释的字符。  人类文本没有注释字符。  在 Lisp 中，分号 (@samp{;}) 开始注释，换行符或换页结束。
+
+@item 继承标准语法：@samp{@@}
+该语法类没有指定特定的语法。  它说要在父语法表中查找该字符的语法。
+
+@item 通用注释分隔符：@samp{!}
+（此语法类也称为“comment-fence”。）开始或结束特殊类型注释的字符。  @emph{Any} 通用注释分隔符与 @emph{any} 通用注释分隔符匹配，但它们不能匹配注释开头或注释结尾；通用注释分隔符只能相互匹配。
+
+该语法类主要用于与 @code{syntax-table} 文本属性 (@pxref{Syntax Properties}) 一起使用。  您可以将任何范围的字符标记为形成注释，方法是将范围 @code{syntax-table} 属性的第一个和最后一个字符指定为通用注释分隔符。
+
+@item 通用字符串分隔符：@samp{|}
+（此语法类也称为“string-fence”。）开始或结束字符串的字符。  此类与字符串引用类的不同之处在于 @emph{any} 通用字符串分隔符可以匹配任何其他通用字符串分隔符；但它们与普通字符串引号字符不匹配。
+
+该语法类主要用于与 @code{syntax-table} 文本属性 (@pxref{Syntax Properties}) 一起使用。  您可以将任何范围的字符标记为形成字符串常量，方法是将范围 @code{syntax-table} 属性的第一个和最后一个字符指定为通用字符串分隔符。
+@end table
+
+@node Syntax Flags
+@subsection 语法标志
+@cindex syntax flags
+
+除了类之外，语法表中的字符条目也可以指定标志。  有八种可能的标志，由字符 @samp{1}、@samp{2}、@samp{3}、@samp{4}、@samp{b}、@samp{c}、@samp{n} 和 @samp{p} 表示。
+
+除 0⁣ 之外的所有标志都用于描述注释分隔符。  数字标志用于由 2 个字符组成的注释分隔符。  它们表明，除了与其字符类关联的语法属性之外，字符还可以 @emph{also} 成为注释序列的一部分。  这些标志独立于类，并且彼此独立，因为 C 模式中的 @samp{*} 是标点符号字符，@emph{and} 注释开始序列的第二个字符 (@samp{/*})，@emph{and} 注释结束序列的第一个字符 (@samp{*/})。  标志 @samp{b}、@samp{c} 和 @samp{n} 用于限定相应的注释分隔符。
+
+下面是字符 @var{c} 的可能标志及其含义的表格：
+
+@itemize @bullet
+@item 
+@samp{1} 表示 @var{c} 是两个字符注释开始序列的开始。
+
+@item 
+@samp{2} 表示 @var{c} 是该序列的第二个字符。
+
+@item 
+@samp{3} 表示 @var{c} 是两个字符注释结束序列的开始。
+
+@item 
+@samp{4} 表示 @var{c} 是该序列的第二个字符。
+
+@item 
+@samp{b} 表示 @var{c} 作为注释分隔符，属于替代“b”注释样式。  对于双字符注释起始符，此标志仅在第二个字符上有效，而对于 2 字符注释结束符，它仅在第一个字符上有效。
+
+@item 
+@samp{c} 表示@var{c} 作为注释分隔符，属于替代“c”注释样式。  对于两个字符的注释分隔符，任一字符上的 @samp{c} 都会使其成为“c”样式。
+
+@item 
+注释分隔符上的@samp{n}指定这种注释可以嵌套。  在这样的评论中，只有相同风格的评论才会被识别。  对于两个字符的注释分隔符，任一字符上的 @samp{n} 都使其可嵌套。
+
+@cindex comment style
+Emacs 在任何一个语法表中同时支持多种注释样式。  注释样式是一组标志 @samp{b}、@samp{c} 和 @samp{n}，因此最多可以有 8 种不同的注释样式，每种样式都由其标志集命名。  每个注释分隔符都有一个样式，并且只匹配相同样式的注释分隔符。  因此，如果注释以样式“bn”的注释开始序列开始，它将扩展到样式“bn”的下一个匹配的注释结束序列。  当标志集既没有设置标志@samp{b}也没有设置标志@samp{c}时，生成的样式称为“a”样式。
+
+C++ 适当的注释语法设置可以如下：
+
+@table @asis
+@item @samp{/}
+@samp{124}
+@item @samp{*}
+@samp{23b}
+@item 换行符
+@samp{>}
+@end table
+
+这定义了四个注释分隔序列：
+
+@table @asis
+@item @samp{/*}
+这是“b”样式的注释开始序列，因为第二个字符 @samp{*} 具有 @samp{b} 标志。
+
+@item @samp{//}
+这是“a”样式的注释开始序列，因为第二个字符 @samp{/} 没有 @samp{b} 标志。
+
+@item @samp{*/}
+这是“b”样式的注释结束序列，因为第一个字符 @samp{*} 具有 @samp{b} 标志。
+
+@item 换行符
+这是“a”样式的注释结束序列，因为换行符没有 @samp{b} 标志。
+@end table
+
+@item 
+@samp{p} 标识 Lisp 语法的附加前缀字符。这些字符出现在表达式之间时将被视为空格。  当它们出现在表达式中时，将根据其通常的语法类进行处理。
+
+函数 @code{backward-prefix-chars} 向后移动这些字符，以及主要语法类为前缀 (@samp{'}) 的字符。  @xref{Motion and Syntax}。
+@end itemize
+
+@node Syntax Table Functions
+@section 语法表函数
+
+在本节中，我们将描述用于创建、访问和更改语法表的函数。
+
+@defun make-syntax-table &optional table
+该函数创建一个新的语法表。  如果@var{table}非@code{nil}，则新语法表的父级为@var{table}；否则，父级是标准语法表。
+
+在新的语法表中，所有字符最初都被赋予“继承”（@samp{@@}）语法类，即它们的语法是从父表（@pxref{Syntax Class Table}）继承的。
+@end defun
+
+@defun copy-syntax-table &optional table
+该函数构造 @var{table} 的副本并返回它。  如果省略@var{table}或@code{nil}，则返回标准语法表的副本。  否则，如果 3⁣ 不是语法表，则会发出错误信号。
+@end defun
+
+@deffn Command modify-syntax-entry char syntax-descriptor  &optional table
+@cindex syntax entry, setting
+该函数根据@var{syntax-descriptor}设置@var{char}的语法条目。  @var{char} 必须是一个字符，或者是@code{(@var{min} . @var{max})} 形式的 cons 单元格；在后一种情况下，该函数设置 @var{min} 和 @var{max} 之间（含）范围内的所有字符的语法条目。
+
+仅更改@var{table}的语法，默认为当前缓冲区的语法表，而不是任何其他语法表。
+
+参数@var{syntax-descriptor}是一个语法描述符，即一个字符串，其第一个字符是语法类指示符，其第二个和后续字符可选地指定匹配字符和语法标志。  @xref{Syntax Descriptors}。  如果 2⁣ 不是有效的语法描述符，则会发出错误信号。
+
+该函数始终返回@code{nil}。  表中该字符的旧语法信息将被丢弃。
+
+@example
+@group
+@exdent @r{Examples:}
+
+;; @r{Put the space character in class whitespace.}
+(modify-syntax-entry ?\s " ")
+     @result{} nil
+@end group
+
+@group
+;; @r{Make @samp{$} an open parenthesis character,}
+;;   @r{with @samp{^} as its matching close.}
+(modify-syntax-entry ?$ "(^")
+     @result{} nil
+@end group
+
+@group
+;; @r{Make @samp{^} a close parenthesis character,}
+;;   @r{with @samp{$} as its matching open.}
+(modify-syntax-entry ?^ ")$")
+     @result{} nil
+@end group
+
+@group
+;; @r{Make @samp{/} a punctuation character,}
+;;   @r{the first character of a start-comment sequence,}
+;;   @r{and the second character of an end-comment sequence.}
+;;   @r{This is used in C mode.}
+(modify-syntax-entry ?/ ". 14")
+     @result{} nil
+@end group
+@end example
+@end deffn
+
+@defun char-syntax character
+此函数返回 @var{character} 的语法类，由其指示符 (@pxref{Syntax Class Table}) 表示。  这将返回 @emph{only} 类，而不是其匹配字符或语法标志。
+
+以下示例适用于 C 模式。  （我们使用 @code{string} 是为了更容易看到 @code{char-syntax} 返回的字符。）
+
+@example
+@group
+;; Space characters have whitespace syntax class.
+(string (char-syntax ?\s))
+     @result{} " "
+@end group
+
+@group
+;; Forward slash characters have punctuation syntax.
+;; Note that this @code{char-syntax} call does not reveal
+;; that it is also part of comment-start and -end sequences.
+(string (char-syntax ?/))
+     @result{} "."
+@end group
+
+@group
+;; Open parenthesis characters have open parenthesis syntax.
+;; Note that this @code{char-syntax} call does not reveal that
+;; it has a matching character, @samp{)}.
+(string (char-syntax ?\())
+     @result{} "("
+@end group
+@end example
+
+@end defun
+
+@defun set-syntax-table table
+该函数使 @var{table} 成为当前缓冲区的语法表。它返回@var{table}。
+@end defun
+
+@defun syntax-table
+该函数返回当前语法表，即当前缓冲区的表。
+@end defun
+
+@deffn Command describe-syntax &optional buffer
+该命令在帮助缓冲区中显示@var{buffer}（默认情况下，当前缓冲区）的语法表内容。
+@end deffn
+
+@defmac with-syntax-table table body@dots{}
+该宏使用 @var{table} 作为当前语法表来执行 @var{body}。  在恢复旧的当前语法表后，它返回@var{body}中最后一个形式的值。
+
+由于每个缓冲区都有自己的当前语法表，因此我们应该使其更精确：@code{with-syntax-table} 临时更改宏执行开始时当前缓冲区的当前语法表。  其他缓冲区不受影响。
+@end defmac
+
+@node Syntax Properties
+@section 语法属性
+@kindex syntax-table @r{(text property)}
+
+当语法表不够灵活，无法指定语言的语法时，您可以通过应用 @code{syntax-table} 文本属性来覆盖缓冲区中出现的特定字符的语法表。  @xref{Text Properties}，了解如何应用文本属性。
+
+@code{syntax-table} text 属性的有效值为：
+
+@table @asis
+@item @var{syntax-table}
+如果属性值是语法表，则使用该表而不是当前缓冲区的语法表来确定基础文本字符的语法。
+
+@item @code{(@var{syntax-code} . @var{matching-char})}
+这种格式的 cons 单元是原始语法描述符 (@pxref{Syntax Table Internals})，它直接指定底层文本字符的语法类。
+
+@item @code{nil}
+如果属性为@code{nil}，则字符的语法按照通常的方式从当前语法表中确定。
+@end table
+
+@defvar parse-sexp-lookup-properties
+如果这是非@code{nil}，则语法扫描功能与@code{forward-sexp}一样，注意@code{syntax-table}文本属性。  否则，它们仅使用当前语法表。
+@end defvar
+
+@defvar syntax-propertize-function
+该变量（如果非 @code{nil}）应存储一个函数，用于将 @code{syntax-table} 属性应用于指定的文本片段。  它旨在由主要模式使用来安装以某种适合模式的方式应用 @code{syntax-table} 属性的函数。
+
+该函数由 @code{syntax-ppss} (@pxref{Position Parse}) 和句法字体化期间的字体锁定模式 (@pxref{Syntactic Font Lock}) 调用。  它是用两个参数 @var{start} 和 @var{end} 调用的，它们是它应该作用的文本的开始和结束位置。  允许在@var{start}和@var{end}界定的区域内任意移动点；这样的动议不需要使用@code{save-excursion}（@pxref{Excursions}）。  也允许在@var{end}之前的任何位置调用@code{syntax-ppss}，但如果 Lisp 程序在某个位置调用@code{syntax-ppss}，然后在某个较早的位置修改缓冲区，那么该程序有责任调用@code{syntax-ppss-flush-cache}从缓存中刷新现在过时的信息。
+
+@strong{Caution:} 当此变量为非 @code{nil} 时，Emacs 会任意删除 @code{syntax-table} 文本属性，并依赖 @code{syntax-propertize-function} 重新应用它们。  因此，如果使用此功能，该函数必须应用主模式使用的 @strong{all} @code{syntax-table} 文本属性。  特别是，从 CC 模式派生的模式不得使用此变量，因为 CC 模式使用其他方式来应用和删除这些文本属性。
+@end defvar
+
+@defvar syntax-propertize-extend-region-functions
+这个异常钩子是在调用@code{syntax-propertize-function}之前由语法解析代码运行的。  它的作用是帮助找到安全的起始和结束缓冲区位置以传递给@code{syntax-propertize-function}。  例如，主要模式可以向该钩子添加一个函数来识别多行语法结构，并确保边界不会落在其中的中间。
+
+此挂钩中的每个函数都应接受两个参数：@var{start} 和 @var{end}。  如果不需要调整，它应该返回两个调整后的缓冲区位置 @code{(@var{new-start} . @var{new-end})} 或 @code{nil} 的 cons 单元。  钩子函数依次重复运行，直到全部返回@code{nil}。
+@end defvar
+
+@node Motion and Syntax
+@section 动作和句法
+@cindex moving across syntax classes
+@cindex skipping characters of certain syntax
+
+本节介绍用于在具有特定语法类的字符之间移动的函数。
+
+@defun skip-syntax-forward syntaxes &optional limit
+该函数将点向前移动到具有@var{syntaxes}（语法类字符的字符串）中提到的语法类的字符。  当遇到缓冲区末尾或位置 1（如果指定）或不应该跳过的字符时，它会停止。
+
+如果@var{syntaxes}以@samp{^}开头，则该函数会跳过@var{syntaxes}中语法为@emph{not}的字符。
+
+返回值是行驶的距离，是一个非负整数。
+@end defun
+
+@defun skip-syntax-backward syntaxes &optional limit
+该函数将点向后移动到@var{syntaxes}中提到的语法类的字符。  当它遇到缓冲区的开头，或位置 @var{limit} （如果指定）或不应该跳过的字符时，它会停止。
+
+如果@var{syntaxes}以@samp{^}开头，则该函数会跳过@var{syntaxes}中语法为@emph{not}的字符。
+
+返回值表示行驶的距离。  它是一个零或更小的整数。
+@end defun
+
+@defun backward-prefix-chars
+此函数使用表达式前缀语法将点向后移动任意数量的字符。  这包括表达式前缀语法类中的字符以及带有 @samp{p} 标志的字符。
+@end defun
+
+@node Parsing Expressions
+@section 解析表达式
+@cindex parsing expressions
+@cindex scanning expressions
+
+本节介绍解析和扫描平衡表达式的函数。  按照 Lisp 的术语，我们将此类表达式称为 @dfn{sexps}，尽管这些函数可以作用于 Lisp 以外的语言。  基本上，sexp 是平衡的括号分组、字符串或符号（即，其语法是单词成分或符号成分的字​​符序列）。  但是，表达式前缀语法类 (@pxref{Syntax Class Table}) 中的字符如果出现在其旁边，则被视为 sexp 的一部分。
+
+语法表控制字符的解释，因此这些函数在 Lisp 模式下可用于 Lisp 表达式，在 C 模式下可用于 C 表达式。  @xref{List Motion}，用于方便地在平衡表达式上移动的高级函数。
+
+字符的语法控制它如何更改解析器的状态，而不是描述状态本身。  例如，字符串定界符在字符串内和代码内之间切换解析器状态，但字符的语法并不直接说明它们是否在字符串内。  例如（请注意，15 是通用字符串分隔符的语法代码），
+
+@example
+(put-text-property 1 9 'syntax-table '(15 . nil))
+@end example
+
+@noindent
+并不告诉 Emacs 当前缓冲区的前八个字符是字符串，而是告诉 Emacs 它们都是字符串分隔符。  因此，Emacs 将它们视为四个连续的空字符串常量。
+
+@menu
+* Motion via Parsing::        通过解析工作的运动函数。
+* Position Parse::            确定位置的句法状态。
+* Parser State::              Emacs 如何表示语法状态。
+* Low-Level Parsing::         跨指定区域进行解析。
+* Control Parsing::           影响解析的参数。
+@end menu
+
+@node Motion via Parsing
+@subsection 基于解析的动作命令
+@cindex motion based on parsing
+
+本节介绍基于解析表达式进行操作的简单点运动函数。
+
+@defun scan-lists from count depth
+该函数从位置 @var{from} 向前扫描 @var{count} 平衡括号分组。  它返回扫描停止的位置。  如果 2⁣ 为负，则扫描向后移动。
+
+如果@var{depth}非零，则将起始位置视为@var{depth}括号深。  扫描仪在缓冲区中向前或向后移动，直到深度变为零@var{count}次。因此， @var{depth} 的正值具有从起始位置移出 @var{depth} 级括号的效果，而负 @var{depth} 则具有更深移动 @var{-depth} 级括号的效果。
+
+如果 @code{parse-sexp-ignore-comments} 为非 @code{nil}，则扫描将忽略注释。
+
+如果扫描在扫描完@var{count}括号分组之前到达缓冲区可访问部分的开头或结尾，则如果该点的深度为零，则返回值为@code{nil}；如果深度非零，则会发出 2⁣ 错误信号。
+@end defun
+
+@defun scan-sexps from count
+该函数从位置@var{from}向前扫描@var{count} sexps。它返回扫描停止的位置。  如果 2⁣ 为负，则扫描向后移动。
+
+如果 @code{parse-sexp-ignore-comments} 为非 @code{nil}，则扫描将忽略注释。
+
+如果扫描在括号分组的中间到达缓冲区（可访问部分）的开头或结尾，则会发出错误信号。  如果在计数用完之前到达分组之间的开头或结尾，则返回@code{nil}。
+@end defun
+
+@defun forward-comment count
+此函数将点向前移动 @var{count} 完整注释（即，包括起始分隔符和终止分隔符（如果有））以及途中遇到的任何空格。  如果 1⁣ 为负，则向后移动。  如果它遇到除注释或空格以外的任何内容，它就会停止，并在停止的地方留下点。  这包括（例如）在前进时找到评论的结尾并期待评论的开头。该功能也会在移动完指定数量的完整注释后立即停止。  如果按预期找到 @var{count} 注释，且注释之间除了空格之外没有任何内容，则返回 @code{t}；否则返回@code{nil}。
+
+该函数无法判断它遍历的注释是否嵌入在字符串中。  如果它们看起来像评论，它会将它们视为评论。
+
+要前进到点后面的所有注释和空格，请使用 @code{(forward-comment (buffer-size))}。  @code{(buffer-size)} 是一个很好的参数，因为缓冲区中的注释数量不能超过那么多。
+@end defun
+
+@node Position Parse
+@subsection 查找位置的解析状态
+@cindex parse state for a position
+
+对于语法分析，例如缩进，通常有用的是计算与给定缓冲区位置相对应的语法状态。  这个函数可以很方便地做到这一点。
+
+@defun syntax-ppss &optional pos
+该函数返回解析器状态，解析器将到达从缓冲区可见部分的开头开始的位置@var{pos}。
+@iftex
+See the next section
+@end iftex
+@ifnottex
+@xref{Parser State},
+@end ifnottex
+有关解析器状态的描述。
+
+返回值与调用低级解析函数 @code{parse-partial-sexp} 从缓冲区可见部分的开头解析到 @var{pos} (@pxref{Low-Level Parsing}) 相同。  然而，@code{syntax-ppss} 使用缓存来加速计算。  由于此优化，返回的解析器状态中的第二个值（先前的完整子表达式）和第六个值（最小括号深度）没有意义。
+
+该函数有一个副作用：它为 @code{syntax-ppss-flush-cache} 添加了一个缓冲区本地条目到 @code{before-change-functions} (@pxref{Change Hooks})（见下文）。  当缓冲区被修改时，该条目使缓存保持一致。  但是，如果在 @code{before-change-functions} 暂时被 let 绑定时调用 @code{syntax-ppss}，或者如果在不运行钩子的情况下修改缓冲区（例如使用 @code{inhibit-modification-hooks} 时），则缓存可能不会更新。  在这些情况下，有必要显式调用@code{syntax-ppss-flush-cache}。
+@end defun
+
+@defun syntax-ppss-flush-cache beg &rest ignored-args
+该函数从位置 @var{beg} 开始刷新 @code{syntax-ppss} 使用的缓存。  其余参数 @var{ignored-args} 将被忽略；该函数接受它们，以便可以直接在 @code{before-change-functions} (@pxref{Change Hooks}) 等挂钩上使用。
+@end defun
+
+@node Parser State
+@subsection 解析器状态
+@cindex parser state
+
+@dfn{parser state} 是（当前）十一个元素的列表，描述句法解析器在使用 @code{parse-partial-sexp} (@pxref{Low-Level Parsing}) 解析缓冲区中指定起点和指定终点之间的文本后的状态。解析函数，例如 @code{syntax-ppss}
+@ifnottex
+(@pxref{Position Parse})
+@end ifnottex
+还返回解析器状态作为值。  @code{parse-partial-sexp} 可以接受解析器状态作为参数，以恢复解析。
+
+以下是解析器状态元素的含义：
+
+@enumerate 0
+@item 
+括号中的深度，从 0 开始计数。 @strong{Warning:} 如果解析器的起点和终点之间的右括号多于左括号，则该深度可能为负数。
+
+@item 
+@cindex innermost containing parentheses
+包含停止点的最里面括号分组的开始字符位置； @code{nil} 如果没有。
+
+@item 
+@cindex previous complete subexpression
+最后一个完整子表达式终止的起始字符位置； @code{nil} 如果没有。
+
+@item 
+@cindex inside string
+如果在字符串内部，则为非@code{nil}。  更准确地说，这是将终止字符串的字符，或者如果通用字符串分隔符应终止它，则为 @code{t}。
+
+@item 
+@cindex inside comment
+@code{t} 如果位于不可嵌套注释内（任何注释样式；@pxref{Syntax Flags}）；或注释嵌套级别（如果在可以嵌套的注释内）。
+
+@item 
+@cindex quote character
+@code{t} 如果终点位于引号字符之后。
+
+@item 
+本次扫描期间遇到的最小括号深度。
+
+@item 
+什么样的评论是活跃的：@code{nil}如果不在评论中或在风格@samp{a}的评论中； 1 为风格 @samp{b} 的评论； 2 对于样式 @samp{c} 的注释；和 @code{syntax-table} 表示应以通用注释分隔符结尾的注释。
+
+@item 
+字符串或注释的起始位置。  在评论内，这是评论开始的位置；在字符串内部，这是字符串开始的位置。  当在字符串和注释之外时，该元素为@code{nil}。
+
+@item 
+当前左括号的位置列表，从最外层开始。
+
+@item 
+当扫描的最后一个缓冲区位置是两个字符构造（注释分隔符或转义/字符引用字符对）的（潜在）第一个字符时，该位置的 @var{syntax-code} (@pxref{Syntax Table Internals})。  否则@code{nil}。
+@end enumerate
+
+在将其作为参数传递给 @code{parse-partial-sexp} 以继续解析的状态下，元素 1、2 和 6 将被忽略。  元素 9 和 10 主要由解析器代码在内部使用。
+
+使用这些函数可以从解析器状态获得一些额外的有用信息：
+
+@defun syntax-ppss-toplevel-pos state
+该函数从解析器状态 @var{state} 中提取解析中扫描的最后一个位置，该位置位于语法结构的顶层。  “在顶层”是指在任何括号、注释或字符串之外。
+
+如果@var{state}表示已到达顶级位置的解析，则该值为@code{nil}。
+@end defun
+
+@defun syntax-ppss-context state
+如果返回 @var{state} 的扫描结束位置在字符串中，则返回 @code{string}；如果返回 @code{comment} 在注释中，则返回 @code{comment}。否则返回@code{nil}。
+@end defun
+
+@node Low-Level Parsing
+@subsection 低级解析
+
+使用表达式解析器的最基本方法是告诉它以某种状态从给定位置开始，解析到指定的结束位置。
+
+@defun parse-partial-sexp start limit &optional target-depth stop-before state stop-comment
+该函数从@var{start}开始解析当前缓冲区中的sexp，而不是扫描过去的@var{limit}。  它停在位置 2⁣ 或当满足下面描述的某些条件时，并将指向解析停止的位置。  它返回解析器状态
+@ifinfo
+(@pxref{Parser State})
+@end ifinfo
+描述解析在停止点的状态。
+
+@cindex parenthesis depth
+如果第三个参数@var{target-depth}非-@code{nil}，则当括号中的深度等于@var{target-depth}时解析停止。深度从 0 开始，或者从 @var{state} 中给出的任何值开始。
+
+如果第四个参数 @var{stop-before} 不是 @code{nil}，则当遇到任何以 sexp 开头的字符时，解析就会停止。  如果@var{stop-comment}非@code{nil}，则解析在未嵌套注释开始后停止。  如果@var{stop-comment}是符号@code{syntax-table}，则解析在非嵌套注释或字符串开始后或非嵌套注释或字符串结束后停止，以先到者为准。
+
+如果@var{state}是@code{nil}，则假设@var{start}位于括号结构的顶层，例如函数定义的开头。  或者，您可能希望在结构的中间恢复解析。  为此，您必须提供一个 @var{state} 参数来描述解析的初始状态。  之前调用 @code{parse-partial-sexp} 返回的值就可以了。
+@end defun
+
+@node Control Parsing
+@subsection 控制解析的参数
+@cindex parsing, control parameters
+
+@defvar multibyte-syntax-as-symbol
+如果此变量为非 @code{nil}，则 @code{scan-sexps} 会将所有非 @acronym{ASCII} 字符视为符号成分，无论语法表对它们的说明如何。  （但是，@code{syntax-table }文本属性仍然可以覆盖语法。）
+@end defvar
+
+@defopt parse-sexp-ignore-comments
+@cindex skipping comments
+如果该值为非 @code{nil}，则注释将被本节中的函数以及 @code{forward-sexp}、@code{scan-lists} 和 @code{scan-sexps} 视为空格。
+@end defopt
+
+@code{parse-partial-sexp} 的行为也受到 @code{parse-sexp-lookup-properties} (@pxref{Syntax Properties}) 的影响。
+
+@defvar comment-end-can-be-escaped
+如果此缓冲区局部变量为非@code{nil}，则通常终止注释的单个字符在转义该字符时不会这样做。  这用于 C 和 C++ 模式，其中以 @samp{//} 开头的行注释可以通过使用 @samp{\} 转义换行符继续到下一行。
+@end defvar
+
+您可以使用 @code{forward-comment} 向前或向后移动一条或多条评论。
+
+@node Syntax Table Internals
+@section 语法表内部结构
+@cindex syntax table internals
+
+语法表被实现为字符表 (@pxref{Char-Tables})，但大多数 Lisp 程序并不直接使用它们的元素。语法表不将语法数据存储为语法描述符 (@pxref{Syntax Descriptors})；它们使用本节中记录的内部格式。  此内部格式也可以指定为语法属性 (@pxref{Syntax Properties})。
+
+@cindex syntax code
+@cindex raw syntax descriptor
+语法表中的每个条目都是一个@dfn{raw syntax descriptor}：一个@code{(@var{syntax-code} . @var{matching-char})}形式的cons单元。  @var{syntax-code} 是一个整数，根据下表对语法类和语法标志进行编码。  @var{matching-char}，如果非@code{nil}，则指定匹配字符（类似于语法描述符中的第二个字符）。
+
+@cindex syntax tables (accessing elements of)
+使用@code{aref} (@pxref{Array Functions}) 获取字符的原始语法描述符，例如@w{@code{(aref (syntax-table) ch)}}。
+
+以下是各个语法类对应的语法代码：
+
+@multitable @columnfractions .2 .3 .2 .3
+@item 
+@i{Code} @tab @i{Class} @tab @i{Code} @tab @i{Class}
+@item 
+0 @tab 空格 @tab 8 @tab 成对分隔符
+@item 
+1 @tab 标点符号 @tab 9 @tab 转义
+@item 
+2 @tab 单词 @tab 10 @tab 字符引用
+@item 
+3 @tab 符号 @tab 11 @tab 注释开始
+@item 
+4 @tab 左括号 @tab 12 @tab 注释结束
+@item 
+5 @tab 右括号 @tab 13 @tab 继承
+@item 
+6 @tab 表达式前缀 @tab 14 @tab 通用注释
+@item 
+7 @tab 字符串引号 @tab 15 @tab 通用字符串
+@end multitable
+
+@noindent
+例如，在标准语法表中，@samp{(} 的条目是@code{(4 . 41)}。  41 是@samp{)} 的字符代码。
+
+语法标志以较高位进行编码，从最低有效位开始 16 位。  该表给出了对应于每个语法标志的 2 的幂。
+
+@multitable @columnfractions .15 .3 .15 .3
+@item 
+@i{Prefix} @tab @i{Flag} @tab @i{Prefix} @tab @i{Flag}
+@item 
+@samp{1} @tab @code{(ash 1 16)} @tab @samp{p} @tab @code{(ash 1 20)}
+@item 
+@samp{2} @tab @code{(ash 1 17)} @tab @samp{b} @tab @code{(ash 1 21)}
+@item 
+@samp{3} @tab @code{(ash 1 18)} @tab @samp{n} @tab @code{(ash 1 22)}
+@item 
+@samp{4} @tab @code{(ash 1 19)} @tab @samp{c} @tab @code{(ash 1 23)}
+@end multitable
+
+@defun string-to-syntax desc
+给定语法描述符@var{desc}（字符串），该函数返回相应的原始语法描述符。
+@end defun
+
+@defun syntax-class-to-char syntax
+给定一个原始语法描述符@var{syntax}（一个整数），该函数返回相应的语法描述符（一个字符）。
+@end defun
+
+@defun syntax-after pos
+该函数返回缓冲区中位置@var{pos}之后的字符的原始语法描述符，同时考虑语法属性和语法表。  如果@var{pos}位于缓冲区可访问部分（@pxref{Narrowing, accessible portion}）之外，则返回值为@code{nil}。
+@end defun
+
+@defun syntax-class syntax
+该函数返回原始语法描述符@var{syntax}的语法代码。  更准确地说，它采用原始语法描述符的 @var{syntax-code} 组件，屏蔽记录语法标志的高 16 位，并返回结果整数。
+
+如果@var{syntax}为@code{nil}，则返回值为@code{nil}。  这使得表达式
+
+@example
+(syntax-class (syntax-after pos))
+@end example
+
+@noindent
+如果 @code{pos} 位于缓冲区的可访问部分之外，则计算结果为 @code{nil}，不会抛出错误或返回不正确的代码。
+@end defun
+
+@node Categories
+@section 类别
+@cindex categories of characters
+@cindex character categories
+
+@dfn{Categories} 提供了一种按语法对字符进行分类的替代方法。  您可以根据需要定义多个类别，然后将每个角色独立分配到一个或多个类别。  与语法类不同，类别不是相互排斥的；一个角色属于多个类别是很正常的。
+
+@cindex category table
+每个缓冲区都有一个 @dfn{category table} 记录定义了哪些类别以及哪些字符属于每个类别。  每个类别表都定义了自己的类别，但通常这些类别是通过从标准类别表复制来初始化的，以便标准类别在所有模式下都可用。
+
+每个类别都有一个名称，该名称是 @w{@samp{ }} 到 @samp{~} 范围内的 @acronym{ASCII} 打印字符。  当您使用 @code{define-category} 定义类别时，您可以指定类别的名称。
+
+@cindex category set
+类别表实际上是一个字符表（@pxref{Char-Tables}）。类别表中索引 @var{c} 的元素是 @dfn{category set}——一个布尔向量——指示字符 @var{c} 属于哪个类别。  在这个类别集中，如果索引@var{cat}处的元素是@code{t}，则意味着类别@var{cat}是该集合的成员，并且该字符@var{c}属于类别@var{cat}。
+
+对于接下来的三个函数，可选参数 @var{table} 默认为当前缓冲区的类别表。
+
+@defun define-category char docstring &optional table
+此函数为类别表 @var{table} 定义一个新类别，其名称为 @var{char} 和文档 @var{docstring}。
+
+下面是一个为具有强从右到左方向性 (@pxref{Bidirectional Display}) 的字符定义新类别并在特殊类别表中使用它的示例。  为了获取有关字符方向性的信息，示例代码使用 @samp{bidi-class} Unicode 属性 (@pxref{Character Properties, bidi-class})。
+
+@example
+(defvar special-category-table-for-bidi
+  ;;     Make an empty category-table.
+  (let ((category-table (make-category-table))
+        ;; Create a char-table which gives the 'bidi-class' Unicode
+        ;; property for each character.
+        (uniprop-table
+         (unicode-property-table-internal 'bidi-class)))
+    (define-category ?R "Characters of bidi-class R, AL, or RLO"
+                     category-table)
+    ;; Modify the category entry of each character whose
+    ;; 'bidi-class' Unicode property is R, AL, or RLO --
+    ;; these have a right-to-left directionality.
+    (map-char-table
+     (lambda (key val)
+       (if (memq val '(R AL RLO))
+           (modify-category-entry key ?R category-table)))
+     uniprop-table)
+    category-table))
+@end example
+@end defun
+
+@defun category-docstring category &optional table
+该函数返回类别表@var{table}中类别@var{category}的文档字符串。
+
+@example
+(category-docstring ?a)
+     @result{} "ASCII"
+(category-docstring ?l)
+     @result{} "Latin"
+@end example
+@end defun
+
+@defun get-unused-category &optional table
+该函数返回当前未在 @var{table} 中定义的类别名称（字符）。  如果@var{table}中使用了所有可能的类别，则返回@code{nil}。
+@end defun
+
+@defun category-table
+该函数返回当前缓冲区的类别表。
+@end defun
+
+@defun category-table-p object
+如果@var{object}是类别表，则该函数返回@code{t}，否则返回@code{nil}。
+@end defun
+
+@defun standard-category-table
+该函数返回标准类别表。
+@end defun
+
+@defun copy-category-table &optional table
+该函数构造 @var{table} 的副本并返回它。  如果未提供@var{table}（或为@code{nil}），则返回标准类别表的副本。  否则，如果 @var{table} 不是类别表，则会发出错误信号。
+@end defun
+
+@defun set-category-table table
+该函数使 @var{table} 成为当前缓冲区的类别表。  它返回@var{table}。
+@end defun
+
+@defun make-category-table
+这将创建并返回一个空的类别表。  在空类别表中，没有分配任何类别，并且没有字符属于任何类别。
+@end defun
+
+@defun make-category-set categories
+该函数返回一个新的类别集——一个布尔向量——其初始内容是字符串@var{categories}中列出的类别。  @var{categories}的元素应该是类别名称；新的类别集对于每个类别都有@code{t}，对于所有其他类别有@code{nil}。
+
+@example
+(make-category-set "al")
+     @result{} #&128"\0\0\0\0\0\0\0\0\0\0\0\0\2\20\0\0"
+@end example
+@end defun
+
+@defun char-category-set char
+该函数返回当前缓冲区类别表中字符@var{char}的类别集。  这是记录字符 @var{char} 属于哪个类别的布尔向量。  函数@code{char-category-set}不分配存储空间，因为它返回与类别表中存在的相同的布尔向量。
+
+@example
+(char-category-set ?a)
+     @result{} #&128"\0\0\0\0\0\0\0\0\0\0\0\0\2\20\0\0"
+@end example
+@end defun
+
+@defun category-set-mnemonics category-set
+此函数将类别集 @var{category-set} 转换为包含指定属于该集合成员的类别的字符的字符串。
+
+@example
+(category-set-mnemonics (char-category-set ?a))
+     @result{} "al"
+@end example
+@end defun
+
+@defun modify-category-entry char category &optional table reset
+该函数修改类别表@var{table}中@var{char}的类别集（默认为当前缓冲区的类别表）。  @var{char} 可以是一个字符，也可以是@code{(@var{min} . @var{max})} 形式的 cons 单元格；在后一种情况下，该函数会修改 @var{min} 和 @var{max} 之间（含）范围内的所有字符的类别集。
+
+通常，它通过添加 @var{category} 来修改类别集。但如果@var{reset}不是@code{nil}，那么它会删除@var{category}。
+@end defun
+
+@deffn Command describe-categories &optional buffer-or-name
+该函数描述当前类别表中的类别规范。  它将描述插入缓冲区，然后显示该缓冲区。  如果@var{buffer-or-name}非@code{nil}，则它描述该缓冲区的类别表。
+@end deffn

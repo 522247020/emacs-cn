@@ -1,0 +1,659 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1994, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Debugging
+@chapter 调试 Lisp 程序
+@cindex debugging lisp programs
+
+有多种方法可以查找和调查 Emacs Lisp 程序中的问题。
+
+@itemize @bullet
+@item 
+如果运行程序时出现问题，可以使用内置的 Emacs Lisp 调试器 (@pxref{Debugger}) 暂停 Lisp 求值器，并检查和/或更改其内部状态。
+
+@item 
+您可以使用 Edebug，它是 Emacs Lisp 的源代码级调试器。 @xref{Edebug}。
+
+@item 
+@cindex tracing Lisp programs
+您可以使用 @file{trace.el} 包提供的跟踪工具来跟踪问题中涉及的函数的执行。  该包提供了函数 @code{trace-function-foreground} 和 @code{trace-function-background} 用于跟踪函数调用，以及 @code{trace-values} 用于将所选变量的值添加到跟踪中。  有关详细信息，请参阅@file{trace.el}中这些设施的文档。
+
+@item 
+如果语法问题导致 Lisp 甚至无法读取程序，您可以使用 Lisp 编辑命令找到它。
+
+@item 
+您可以查看字节编译器在编译程序时产生的错误和警告消息。  @xref{Compiler Errors}。
+
+@item 
+您可以使用Testcover包对程序进行覆盖率测试。
+
+@item 
+您可以使用 ERT 包为程序编写回归测试。 @xref{Top,the ERT manual,, ert, ERT: Emacs Lisp Regression Testing}。
+
+@item 
+您可以分析该程序以获得有关如何提高其效率的提示。 @xref{Profiling}。
+@end itemize
+
+用于调试输入和输出问题的其他有用工具是 dribble 文件 (@pxref{Terminal Input}) 和 @code{open-termscript} 函数 (@pxref{Terminal Output})。
+
+@menu
+* Debugger::             Emacs Lisp 评估器的调试器。
+* Edebug::               源代码级 Emacs Lisp 调试器。
+* Syntax Errors::        如何查找语法错误。
+* Test Coverage::        确保您已测试代码中的所有分支。
+* Profiling::            测量代码使用的资源。
+@end menu
+
+@node Debugger
+@section Lisp 调试器
+@cindex debugger for Emacs Lisp
+@cindex Lisp debugger
+@cindex break
+
+普通的@dfn{Lisp debugger}提供暂停评估表单的能力。  当计算暂停时（通常称为 @dfn{break} 的状态），您可以检查运行时堆栈、检查局部或全局变量的值，或更改这些值。由于中断是递归编辑，因此 Emacs 的所有常用编辑功能都可用；您甚至可以运行将递归进入调试器的程序。  @xref{Recursive Editing}。
+
+@menu
+* Error Debugging::        发生错误时进入调试器。
+* Debugging Redisplay::    从重新显示错误中获取回溯。
+* Infinite Loops::         停止并调试不退出的程序。
+* Function Debugging::     当调用某个函数时输入它。
+* Variable Debugging::     修改变量时输入它。
+* Explicit Debug::         在程序中的某个点输入它。
+* Using Debugger::         调试器做什么。
+* Backtraces::             您在调试器中看到的内容。
+* Debugger Commands::      在调试器中使用的命令。
+* Invoking the Debugger::  如何调用函数@code{debug}。
+* Internals of Debugger::  调试器的子例程和全局变量。
+@end menu
+
+@node Error Debugging
+@subsection 出现错误时进入调试器
+@cindex error debugging
+@cindex debugging errors
+
+进入调试器的最重要时间是 Lisp 错误发生时。  这使您可以调查错误的直接原因。
+
+然而，进入调试器并不是错误的正常结果。  许多命令在调用不当时都会发出 Lisp 错误信号，而在普通编辑过程中，每次发生这种情况时都需要进入调试器，非常不方便。  因此，如果您希望错误进入调试器，请将变量 @code{debug-on-error} 设置为非 @code{nil}。 （命令@code{toggle-debug-on-error}提供了一种简单的方法来做到这一点。）
+
+请注意，由于技术原因，您无法使用本小节中定义的工具来调试重新显示代码调用的 Lisp 错误。  @xref{Debugging Redisplay}，寻求帮助。
+
+@defopt debug-on-error
+此变量确定在发出错误信号但未处理错误时是否调用调试器。  如果 @code{debug-on-error} 为 @code{t}，则所有类型的错误都会调用调试器，除了 @code{debug-ignored-errors} 中列出的错误（见下文）。  如果是@code{nil}，则没有人调用调试器。
+
+该值也可以是错误条件列表 (@pxref{Signaling Errors})。  然后，仅针对此列表中的错误情况调用调试器（@code{debug-ignored-errors} 中列出的那些情况除外）。例如，如果将 @code{debug-on-error} 设置为列表 @code{(void-variable)}，则仅针对无值变量的错误调用调试器。
+
+请注意，在某些情况下 @code{eval-expression-debug-on-error} 会覆盖此变量；见下文。
+
+当此变量为非 0 时，Emacs 不会围绕进程过滤器函数和标记创建错误处理程序。  因此，这些函数中的错误也会调用调试器。  @xref{Processes}。
+@end defopt
+
+@defopt debug-ignored-errors
+该变量指定不应进入调试器的错误，无论 @code{debug-on-error} 的值如何。  它的值是错误条件符号和/或正则表达式的列表。  如果错误具有任何这些条件符号，或者错误消息与任何正则表达式匹配，则该错误不会进入调试器。
+
+这个变量的正常值包括@code{user-error}，以及一些在编辑过程中经常发生但很少由 Lisp 程序中的错误引起的错误。  然而，“很少”并不等于“从不”；而是“很少”。如果您的程序因与此列表匹配的错误而失败，您可以尝试更改此列表以调试错误。  最简单的方法通常是将@code{debug-ignored-errors}设置为@code{nil}。
+@end defopt
+
+@defopt eval-expression-debug-on-error
+如果此变量具有非 @code{nil} 值（默认值），则运行命令 @code{eval-expression} 会导致 @code{debug-on-error} 临时绑定到 @code{t}。  @xref{Lisp Eval,, Evaluating Emacs Lisp Expressions, emacs, The GNU Emacs Manual}。
+
+如果@code{eval-expression-debug-on-error}为@code{nil}，则@code{debug-on-error}的值在@code{eval-expression}期间不会改变。
+@end defopt
+
+@defopt debug-on-signal
+通常，@code{condition-case} 捕获的错误永远不会调用调试器。  @code{condition-case} 在调试器有机会之前就有机会处理错误。
+
+如果将 @code{debug-on-signal} 更改为非 @code{nil} 值，则无论 @code{condition-case} 是否存在，调试器都会第一次发现每个错误。  （要调用调试器，错误仍必须满足@code{debug-on-error}和@code{debug-ignored-errors}指定的标准。）
+
+@cindex emacsclient, getting a backtrace
+@cindex backtrace from emacsclient's @option{--eval}
+例如，设置此变量对于从 emacsclient 的 @option{--eval} 选项评估的代码中获取回溯非常有用。  如果 emacsclient 计算的 Lisp 代码在该变量为非 1⁣ 时发出错误信号，则回溯将在正在运行的 Emacs 中弹出。
+
+@strong{Warning:} 将此变量设置为非 @code{nil} 可能会产生烦人的效果。  Emacs 的各个部分在正常事务过程中都会捕获错误，而您甚至可能没有意识到错误发生在那里。  如果您需要调试包含在 @code{condition-case} 中的代码，请考虑使用 @code{condition-case-unless-debug} (@pxref{Handling Errors})。
+@end defopt
+
+@defopt debug-on-event
+如果将 @code{debug-on-event} 设置为特殊事件 (@pxref{Special Events})，Emacs 将在收到此事件后立即尝试进入调试器，绕过 @code{special-event-map}。  目前，唯一支持的值对应于信号 @code{SIGUSR1} 和 @code{SIGUSR2}（这是默认值）。  当设置 @code{inhibit-quit} 并且 Emacs 没有其他响应时，这会很有帮助。
+@end defopt
+
+@cindex message, finding what causes a particular message
+@defvar debug-on-message
+如果将 @code{debug-on-message} 设置为正则表达式，则 Emacs 在回显区域显示匹配消息时将进入调试器。  例如，当尝试查找特定消息的原因时，这可能很有用。
+@end defvar
+
+@defvar debug-allow-recursive-debug
+您可以使用 @key{e} 命令评估 @samp{*Backtrace*} 缓冲区中当前堆栈帧中的表单，在调试时，您可以使用 @key{e} 和 @key{C-x C-e} 命令执行类似的操作。  默认情况下，这些命令会禁止调试器（因为此时（重新）进入调试器通常会使您退出所在的调试上下文）。  将 @code{debug-allow-recursive-debug} 设置为非 @code{nil} 值，以允许这些命令递归地进入调试器。
+@end defvar
+
+要调试加载 init 文件期间发生的错误，请使用选项 @samp{--debug-init}。  这会在加载 init 文件时将 @code{debug-on-error} 绑定到 @code{t}，并绕过通常捕获 init 文件中错误的 @code{condition-case}。
+
+@node Debugging Redisplay
+@subsection 调试重新显示错误
+@cindex redisplay errors
+@cindex debugging redisplay errors
+
+当重新显示调用的 Lisp 代码中发生错误时，由于技术原因，Emacs 的常用调试机制将无法使用。  本小节描述如何从此类错误中获取回溯，这对调试它应该很有帮助。
+
+这些说明适用于使用的 Lisp 形式，例如，在 @code{:eval} 模式行构造 (@pxref{Mode Line Data}) 中，以及从 redisplay 调用的所有钩子中，例如：
+
+@itemize
+@item 
+@code{fontification-functions} (@pxref{Auto Faces}).
+@item 
+@code{window-scroll-functions} (@pxref{Window Hooks}).
+@end itemize
+
+请注意，如果从重新显示调用的挂钩函数中出现错误，则错误处理可能会从挂钩中删除该函数。  因此，您需要以某种方式重新初始化该钩子，也许使用@code{add-hook}，以便能够重放该错误。
+
+要在这些情况下生成回溯，请将变量 @code{backtrace-on-redisplay-error} 设置为非 @code{nil}。  当错误发生时，Emacs 会将回溯转储到缓冲区@file{*Redisplay-trace*}，但不会自动将其显示在窗口中。  这是为了避免不必要地破坏您正在调试的重新显示。  因此，您需要使用 @code{switch-to-buffer-other-frame} @key{C-x 5 b} 等命令自行显示缓冲区。
+
+@defvar backtrace-on-redisplay-error
+将此变量设置为非@code{nil}，以便在从 redisplay 调用的任何 Lisp 中发生错误时生成回溯。
+@end defvar
+
+@node Infinite Loops
+@subsection 调试无限循环
+@cindex infinite loops
+@cindex loops, infinite
+@cindex quitting from infinite loop
+@cindex stopping an infinite loop
+
+当程序无限循环并且无法返回时，您的第一个问题就是停止循环。  在大多数操作系统上，您可以使用 @kbd{C-g} 执行此操作，这会导致 @dfn{quit}。  @xref{Quitting}。
+
+普通退出不会提供有关程序循环原因的信息。  要获取更多信息，您可以将变量 @code{debug-on-quit} 设置为非 @code{nil}。  一旦调试器在无限循环中间运行，您就可以使用单步命令从调试器继续。  如果您单步执行整个循环，您可能会获得足够的信息来解决问题。
+
+使用 @kbd{C-g} 退出不被视为错误，并且 @code{debug-on-error} 对 @kbd{C-g} 的处理没有影响。同样，@code{debug-on-quit} 对错误没有影响。
+
+@defopt debug-on-quit
+该变量确定当 @code{quit} 发出信号但未处理时是否调用调试器。  如果 @code{debug-on-quit} 不是 @code{nil}，则每当您退出（即键入 @kbd{C-g}）时都会调用调试器。  如果 @code{debug-on-quit} 是 @code{nil}（默认值），则退出时不会调用调试器。
+@end defopt
+
+@node Function Debugging
+@subsection 在函数调用时进入调试器
+@cindex function call debugging
+@cindex debugging specific functions
+
+要调查程序中间发生的问题，一种有用的技术是每当调用某个函数时就进入调试器。  您可以对出现问题的函数执行此操作，然后单步执行该函数，或者您可以对问题发生前不久调用的函数执行此操作，快速单步执行对该函数的调用，然后单步执行其调用者。
+
+@deffn Command debug-on-entry function-name
+每次调用此函数时，都会请求 @var{function-name} 调用调试器。
+
+定义为 Lisp 代码的任何函数或宏都可以设置为在进入时中断，无论它是解释代码还是编译代码。如果函数是命令，则当从 Lisp 调用以及交互调用时（读取参数之后），它将进入调试器。  您还可以通过这种方式为基元函数（即用 C 编写的函数）设置 debug-on-entry，但它仅在从 Lisp 代码调用基元时才会生效。  特殊形式不允许进行输入调试。
+
+当以交互方式调用@code{debug-on-entry}时，它会提示在迷你缓冲区中输入@var{function-name}。  如果该函数已设置为在进入时调用调试器，则 @code{debug-on-entry} 不执行任何操作。 @code{debug-on-entry} 始终返回 @var{function-name}。
+
+下面通过一个例子来说明这个函数的使用：
+
+@example
+@group
+(defun fact (n)
+  (if (zerop n) 1
+      (* n (fact (1- n)))))
+     @result{} fact
+@end group
+@group
+(debug-on-entry 'fact)
+     @result{} fact
+@end group
+@group
+(fact 3)
+@end group
+
+@group
+------ Buffer: *Backtrace* ------
+Debugger entered--entering a function:
+* fact(3)
+  eval((fact 3))
+  eval-last-sexp-1(nil)
+  eval-last-sexp(nil)
+  call-interactively(eval-last-sexp)
+------ Buffer: *Backtrace* ------
+@end group
+
+@end example
+@end deffn
+
+@deffn Command cancel-debug-on-entry &optional function-name
+此函数消除 @code{debug-on-entry} 对 @var{function-name} 的影响。  当以交互方式调用时，它会提示在迷你缓冲区中输入 @var{function-name}。  如果省略@var{function-name}或@code{nil}，则会取消所有函数的进入中断。调用 @code{cancel-debug-on-entry} 对当前未设置为在进入时中断的函数没有任何作用。
+@end deffn
+
+@node Variable Debugging
+@subsection 修改变量时进入调试器
+@cindex variable write debugging
+@cindex debugging changes to variables
+
+有时函数的问题是由于变量设置错误造成的。  将调试器设置为在变量更改时触发是查找设置来源的快速方法。
+
+@deffn Command debug-on-variable-change variable
+该函数安排每当 @var{variable} 被修改时调用调试器。
+
+它是使用观察点机制实现的，因此它继承了相同的特征和限制：@var{variable}的所有别名将被一起监视，只能监视动态变量，并且不会检测变量引用的对象的更改。  详情请参阅@ref{Watching Variables}。
+@end deffn
+
+@deffn Command cancel-debug-on-variable-change &optional variable
+此函数消除 @code{debug-on-variable-change} 对 @var{variable} 的影响。  当以交互方式调用时，它会提示在迷你缓冲区中输入 @var{variable}。  如果省略@var{variable}或@code{nil}，则会取消所有变量的更改中断。  调用 @code{cancel-debug-on-variable-change} 对当前未设置为在更改时中断的变量没有任何作用。
+@end deffn
+
+
+@node Explicit Debug
+@subsection 显式进入调试器
+@cindex debugger, explicit entry
+@cindex force entry to debugger
+
+@cindex @code{eval-defun}, and explicit entry to debugger
+您可以通过在程序中的某个点写入表达式 @code{(debug)} 来调用调试器。  为此，请访问源文件，在适当的位置插入文本 @samp{(debug)}，然后输入 @kbd{C-M-x}（@code{eval-defun}，Lisp 模式键绑定）。  @strong{Warning:} 如果您这样做是为了临时调试目的，请务必在保存文件之前撤消此插入！
+
+插入 @samp{(debug)} 的位置必须是可以计算附加形式且忽略其值的位置。  （如果不忽略 1⁣ 的值，它将改变程序的执行！）最常见的合适位置是 @code{progn} 或隐式 @code{progn} (@pxref{Sequencing}) 内部。
+
+如果您不知道要在源代码中的确切位置放置调试语句，但希望在显示特定消息时显示回溯，则可以将 @code{debug-on-message} 设置为与所需消息匹配的正则表达式。
+
+@node Using Debugger
+@subsection 使用调试器
+
+当进入调试器时，它会在一个窗口中显示先前选择的缓冲区，并在另一个窗口中显示名为 @file{*Backtrace*} 的缓冲区。  回溯缓冲区对于当前正在进行的 Lisp 函数执行的每一级都包含一行。  该缓冲区的开头是一条消息，描述调用调试器的原因（例如错误消息和关联数据，如果它是由于错误而调用的）。
+
+@vindex debugger-bury-or-kill
+回溯缓冲区是只读的，并使用一种特殊的主要模式，即调试器模式，其中字母被定义为调试器命令。  常用的 Emacs 编辑命令可用；因此，您可以切换窗口来检查发生错误时正在编辑的缓冲区、切换缓冲区、访问文件或执行任何其他类型的编辑。  但是，调试器是递归编辑级别 (@pxref{Recursive Editing})，完成后最好返回回溯缓冲区并退出调试器（使用 @kbd{q} 命令）。  退出调试器会退出递归编辑并隐藏回溯缓冲区。  （您可以通过设置变量 @code{debugger-bury-or-kill} 来自定义 @kbd{q} 命令对回溯缓冲区执行的操作。例如，如果您希望杀死缓冲区而不是埋葬它，请将其设置为 @code{kill}。有关更多可能性，请参阅变量的文档。）
+
+当进入调试器时，@code{debug-on-error}变量根据@code{eval-expression-debug-on-error}临时设置。  如果后一个变量是非@code{nil}，则@code{debug-on-error}将暂时设置为@code{t}。  但是，调试时发生的进一步错误不会（默认情况下）触发另一个调试器，因为 @code{inhibit-debugger} 也将绑定到非 @code{nil}。
+
+调试器本身必须以字节编译的方式运行，因为它对 Lisp 解释器的状态做出假设。  如果调试器以解释方式运行，则这些假设是错误的。
+
+@node Backtraces
+@subsection 回溯
+@cindex backtrace buffer
+
+调试器模式源自 Backtrace 模式，Edebug 和 ERT@.（@pxref{Edebug} 和 @ref{Top,the ERT manual,, ert, ERT: Emacs Lisp Regression Testing}）也用于显示回溯。
+
+@cindex stack frame
+回溯缓冲区显示正在执行的函数及其参数值。  创建回溯缓冲区时，它会在一行（可能很长）上显示每个堆栈帧。  （堆栈帧是 Lisp 解释器记录有关函数的特定调用的信息的地方。）最近调用的函数将位于顶部。
+
+@cindex current stack frame
+在回溯中，您可以通过将点移动到描述该帧的行来指定堆栈帧。  线点位于的帧被认为是@dfn{current frame}。
+
+如果函数名称带有下划线，则意味着 Emacs 知道其源代码所在的位置。  您可以用鼠标单击该名称，或移动到该名称并输入 @key{RET}，以访问源代码。  您还可以在点位于不带下划线的函数或变量的任何名称上时键入@key{RET}，以查看帮助缓冲区中该符号的帮助信息（如果存在）。  绑定到 3⁣ 的 @code{xref-find-definitions} 命令也可以用于回溯 (@pxref{Looking Up Identifiers,,,emacs, The GNU Emacs Manual}) 中的任何标识符。
+
+在回溯中，长列表的尾部和长字符串、向量或结构的末尾以及深度嵌套的对象将打印为带下划线的“...”。  您可以用鼠标单击“...”，或在点位于其上时键入 @key{RET}，以显示对象的隐藏部分。  要控制缩写的数量，请自定义 @code{backtrace-line-length}。
+
+以下是用于导航和查看回溯的命令列表：
+
+@table @kbd
+@item v
+切换当前堆栈帧的局部变量的显示。
+
+@item p
+移至帧的开头，或移至上一帧的开头。
+
+@item n
+移至下一帧的开头。
+
+@item +
+在顶级 Lisp 表单中添加换行符和缩进，以使其更具可读性。
+
+@item -
+将顶层 Lisp 表单折叠回一行。
+
+@item #
+切换 @code{print-circle} 为该点的框架。
+
+@item :
+切换 @code{print-gensym} 为该点的框架。
+
+@item .
+展开在该点的框架中所有以“...”缩写的形式。
+
+@end table
+
+@node Debugger Commands
+@subsection 调试器命令
+@cindex debugger command list
+
+除了常见的 Emacs 命令和上一节中描述的 Backtrace 模式命令之外，调试器缓冲区（在调试器模式下）还提供特殊命令。  调试器命令最重要的用途是单步调试代码，以便您可以了解控制流的情况。  调试器可以单步执行解释函数的控制结构，但不能在字节编译函数中执行此操作。  如果您想单步执行字节编译函数，请将其替换为同一函数的解释定义。  （为此，请访问该函数的源代码并在其定义中键入 @kbd{C-M-x}。）您无法使用 Lisp 调试器单步调试原始函数。
+
+一些调试器命令在当前帧上运行。  如果帧以星号开头，则意味着退出该帧将再次调用调试器。  这对于检查函数的返回值很有用。
+
+@c FIXME: Add @findex for the following commands?  --xfq
+以下是调试器模式命令的列表：
+
+@table @kbd
+@item c
+退出调试器并继续执行。  这将恢复程序的执行，就好像从未进入调试器一样（除了在调试器内部更改变量值或数据结构所引起的任何副作用之外）。
+
+@item d
+继续执行，但在下次调用任何 Lisp 函数时进入调试器。  这使您可以逐步浏览表达式的子表达式，查看子表达式计算的值以及它们还执行哪些操作。
+
+以这种方式进入调试器的函数调用所创建的堆栈帧将被自动标记，以便在退出该帧时再次调用调试器。  您可以使用@kbd{u}命令取消该标志。
+
+@item b
+标记当前帧，以便在退出该帧时进入调试器。  以这种方式标记的帧在回溯缓冲区中用星号标记。
+
+@item u
+当前帧退出时不进入调试器。  这会取消该帧上的 @kbd{b} 命令。  可见的效果是从回溯缓冲区中的行中删除星号。
+
+@item j
+标记当前帧，如 @kbd{b}。  然后像@kbd{c}一样继续执行，但暂时禁用@code{debug-on-entry}设置的所有函数的进入中断。
+
+@vindex debug-allow-recursive-debug
+@item e
+读取迷你缓冲区中的 Lisp 表达式，对其求值（使用相关的词法环境，如果适用），然后在回显区域中打印该值。  作为其操作的一部分，调试器会更改某些重要变量和当前缓冲区； @kbd{e} 暂时从调试器外部恢复它们的值，以便您可以检查和更改它们。  这使得调试器更加透明。  相比之下，@kbd{M-:} 在调试器中没有做任何特殊的事情；它向您显示调试器中的变量值。  默认情况下，此命令会在求值期间抑制调试器，以便求值表达式中的错误不会在现有错误之上添加新错误。将 @code{debug-allow-recursive-debug} 用户选项设置为非 @code{nil} 值以覆盖此值。
+
+@item R
+与@kbd{e}类似，但还将评估结果保存在缓冲区@file{*Debugger-record*}中。
+
+@item q
+终止正在调试的程序；返回顶级 Emacs 命令执行。
+
+如果由于 @kbd{C-g} 进入调试器，但您确实想退出而不是调试，请使用 @kbd{q} 命令。
+
+@item r
+从调试器返回一个值。  该值是通过使用迷你缓冲区读取表达式并对其求值来计算的。
+
+当由于退出 Lisp 调用帧而调用调试器时，@kbd{r} 命令非常有用（根据 @kbd{b} 的请求或通过使用 @kbd{d} 进入帧）；那么 @kbd{r} 命令中指定的值将用作该帧的值。  如果您调用 @code{debug} 并使用其返回值，它也很有用。  否则，@kbd{r}与@kbd{c}具有相同的效果，并且指定的返回值并不重要。
+
+当由于错误而进入调试器时，您不能使用@kbd{r}。
+
+@item l
+显示调用时将调用调试器的函数列表。这是通过 @code{debug-on-entry} 设置为在输入时中断的函数列表。
+
+@end table
+
+@node Invoking the Debugger
+@subsection 调用调试器
+@cindex invoking lisp debugger
+
+在这里，我们详细描述了用于调用调试器的函数@code{debug}。
+
+@deffn Command debug &rest debugger-args
+该函数进入调试器。  在交互式会话中，它切换到名为 @file{*Backtrace*} 的缓冲区（如果它是调试器的第二个递归条目，则为 @file{*Backtrace*<2>} 等），并用有关 Lisp 函数调用堆栈的信息填充它。  然后它进入递归编辑，在调试器模式下显示回溯缓冲区。  在批处理模式下（更一般地，当 @code{noninteractive} 为非 @code{nil}、@pxref{Batch Mode} 时），此函数显示标准错误流上的 Lisp 回溯。将@code{backtrace-on-error-noninteractive}绑定到@code{nil}会抑制批处理模式下的回溯，请参见下文。
+
+调试器模式@kbd{c}、@kbd{d}、@kbd{j}和@kbd{r}命令退出递归编辑；然后@code{debug}切换回前一个缓冲区并返回到称为@code{debug}的内容。  这是函数 @code{debug} 返回其调用者的唯一方法。
+
+@var{debugger-args} 的用途是 @code{debug} 将其其余参数显示在 @file{*Backtrace*} 缓冲区的顶部，以便用户可以看到它们。  除了下面描述的情况之外，这是使用这些参数的 @emph{only} 方式。
+
+然而，@code{debug}的第一个参数的某些值具有特殊意义。  （通常，这些值仅由 Emacs 内部使用，而不是由调用 @code{debug} 的程序员使用。）以下是这些特殊值的表格：
+
+@table @code
+@item lambda
+@cindex @code{lambda} in debug
+第一个参数 @code{lambda} 意味着 @code{debug} 被调用，因为当 @code{debug-on-next-call} 为非 @code{nil} 时进入函数。  调试器将 @samp{Debugger entered--entering a function:} 显示为缓冲区顶部的一行文本。
+
+@item debug
+@code{debug} 作为第一个参数意味着 @code{debug} 被调用，因为进入了一个设置为在入口处调试的函数。  调试器显示字符串 @samp{Debugger entered--entering a function:}，就像 @code{lambda} 的情况一样。  它还标记该函数的堆栈帧，以便在退出时调用调试器。
+
+@item t
+当第一个参数为@code{t}时，这表示由于当@code{debug-on-next-call}为非@code{nil}时评估函数调用形式而调用@code{debug}。  调试器将 @samp{Debugger entered--beginning evaluation of function call form:} 显示为缓冲区中的顶行。
+
+@item exit
+当第一个参数为@code{exit}时，它表示先前标记为在退出时调用调试器的堆栈帧的退出。  在这种情况下，给予@code{debug}的第二个参数是从帧返回的值。  调试器在缓冲区的顶行显示 @samp{Debugger entered--returning value:}，后跟返回的值。
+
+@item error
+@cindex @code{error} in debug
+当第一个参数为 @code{error} 时，调试器通过显示 @samp{Debugger entered--Lisp error:} 后跟所发出的错误信号和 @code{signal} 的任何参数来指示正在输入该参数，因为发出了错误信号或 @code{quit} 信号但未处理。例如，
+
+@example
+@group
+(let ((debug-on-error t))
+  (/ 1 0))
+@end group
+
+@group
+------ Buffer: *Backtrace* ------
+Debugger entered--Lisp error: (arith-error)
+  /(1 0)
+...
+------ Buffer: *Backtrace* ------
+@end group
+@end example
+
+如果发出错误信号，则变量 @code{debug-on-error} 可能是非 @code{nil}。  如果 @code{quit} 被发出信号，那么变量 @code{debug-on-quit} 可能是非 @code{nil}。
+
+@item nil
+当您想显式进入调试器时，请使用 @code{nil} 作为 @var{debugger-args} 中的第一个。  @var{debugger-args} 的其余部分打印在缓冲区的顶行。  您可以使用此功能来显示消息——例如，提醒自己调用 @code{debug} 的条件。
+@end table
+@end deffn
+
+@defvar backtrace-on-error-noninteractive
+如果此变量为非@code{nil}，默认情况下，以批处理模式进入调试器会显示 Lisp 函数调用的回溯。  将变量绑定到 @code{nil} 值会抑制回溯并仅显示错误消息。
+@end defvar
+
+@node Internals of Debugger
+@subsection 调试器的内部结构
+
+本节描述调试器内部使用的函数和变量。
+
+@defvar debugger
+该变量的值是调用调试器的函数。  它的值必须是任意数量参数的函数，或者更典型的是函数的名称。  该函数应该调用某种调试器。  变量的默认值为@code{debug}。
+
+Lisp 传递给函数的第一个参数表明了它被调用的原因。  参数约定在 @code{debug} (@pxref{Invoking the Debugger}) 的描述中有详细说明。
+@end defvar
+
+@defun backtrace
+@cindex run time stack
+@cindex call stack
+该函数打印当前活动的 Lisp 函数调用的跟踪。该迹线与 @code{debug} 在 @file{*Backtrace*} 缓冲区中显示的迹线相同。  返回值始终为@code{nil}。
+
+在下面的示例中，Lisp 表达式显式调用 @code{backtrace}。  这会将回溯打印到流 @code{standard-output}，在本例中，它是缓冲区 @samp{backtrace-output}。
+
+回溯的每一行代表一个函数调用。  该行显示了函数，后跟函数参数值的列表（如果它们都是已知的）；如果仍在计算它们，则该行由一个列表组成，其中包含该函数及其未计算的参数。  长列表或深层嵌套结构可能会被省略。
+
+@smallexample
+@group
+(with-output-to-temp-buffer "backtrace-output"
+  (let ((var 1))
+    (save-excursion
+      (setq var (eval '(progn
+                         (1+ var)
+                         (list 'testing (backtrace))))))))
+
+     @result{} (testing nil)
+@end group
+
+@group
+----------- Buffer: backtrace-output ------------
+  backtrace()
+  (list 'testing (backtrace))
+@end group
+  (progn ...)
+  eval((progn (1+ var) (list 'testing (backtrace))))
+  (setq ...)
+  (save-excursion ...)
+  (let ...)
+  (with-output-to-temp-buffer ...)
+  eval((with-output-to-temp-buffer ...))
+  eval-last-sexp-1(nil)
+@group
+  eval-last-sexp(nil)
+  call-interactively(eval-last-sexp)
+----------- Buffer: backtrace-output ------------
+@end group
+@end smallexample
+@end defun
+
+@defopt debugger-stack-frame-as-list
+如果该变量为非@code{nil}，则回溯的每个堆栈帧都会显示为列表。  这样做的目的是提高回溯的可读性，但代价是特殊形式在视觉上不再与常规函数调用不同。
+
+对于@code{debugger-stack-frame-as-list}非@code{nil}，上面的示例如下所示：
+
+@smallexample
+@group
+----------- Buffer: backtrace-output ------------
+  (backtrace)
+  (list 'testing (backtrace))
+@end group
+  (progn ...)
+  (eval (progn (1+ var) (list 'testing (backtrace))))
+  (setq ...)
+  (save-excursion ...)
+  (let ...)
+  (with-output-to-temp-buffer ...)
+  (eval (with-output-to-temp-buffer ...))
+  (eval-last-sexp-1 nil)
+@group
+  (eval-last-sexp nil)
+  (call-interactively eval-last-sexp)
+----------- Buffer: backtrace-output ------------
+@end group
+@end smallexample
+@end defopt
+
+@defvar debug-on-next-call
+@cindex @code{eval}, and debugging
+@cindex @code{apply}, and debugging
+@cindex @code{funcall}, and debugging
+如果此变量为非@code{nil}，则表示在下一个@code{eval}、@code{apply} 或@code{funcall} 之前调用调试器。  进入调试器将 @code{debug-on-next-call} 设置为 @code{nil}。
+
+调试器中的 @kbd{d} 命令通过设置此变量来工作。
+@end defvar
+
+@defun backtrace-debug level flag
+该函数设置堆栈帧@var{level}级别的堆栈退出时调试标志，并为其赋予值@var{flag}。  如果@var{flag}不是@code{nil}，这将导致该帧稍后退出时进入调试器。  即使是通过该帧的非本地退出也会进入调试器。
+
+该函数仅供调试器使用。
+@end defun
+
+@defvar command-debug-status
+该变量记录当前交互命令的调试状态。  每次以交互方式调用命令时，该变量都会绑定到 @code{nil}。  调试器可以设置此变量，以便在同一命令调用期间为将来的调试器调用留下信息。
+
+使用此变量而不是普通全局变量的优点是数据永远不会延续到后续命令调用。
+
+该变量已过时，将在未来版本中删除。
+@end defvar
+
+@defun backtrace-frame frame-number &optional base
+函数 @code{backtrace-frame} 旨在用于 Lisp 调试器。  它返回有关堆栈帧 @var{frame-number} 级别向下发生的计算的信息。
+
+如果该框架尚未评估参数，或者是特殊形式，则值为@code{(nil @var{function} @var{arg-forms}@dots{})}。
+
+如果该框架已评估其参数并已调用其函数，则返回值为@code{(t @var{function} @var{arg-values}@dots{})}。
+
+在返回值中，@var{function} 是作为计算列表的 @sc{car} 提供的值，或者在宏调用的情况下是 @code{lambda} 表达式。  如果函数有 @code{&rest} 参数，则表示为列表 @var{arg-values} 的尾部。
+
+如果指定 @var{base}，则 @var{frame-number} 相对于 @var{function} 为 @var{base} 的最顶层帧进行计数。
+
+如果 @var{frame-number} 超出范围，@code{backtrace-frame} 返回 @code{nil}。
+@end defun
+
+@defun mapbacktrace function &optional base
+函数 @code{mapbacktrace} 对回溯中的每个帧调用 @var{function} 一次，从函数为 @var{base} 的第一帧开始（如果省略 @var{base} 或 @code{nil}，则从顶部开始）。
+
+@var{function} 使用四个参数调用：@var{evald}、@var{func}、@var{args} 和 @var{flags}。
+
+如果框架尚未评估其参数或者是特殊形式，则 @var{evald} 是 @code{nil} 且 @var{args} 是形式列表。
+
+如果框架已评估其参数并已调用其函数，则 @var{evald} 为 @code{t} 且 @var{args} 为值列表。 @var{flags} 是当前帧的属性 plist：当前，唯一支持的属性是 @code{:debug-on-exit}，如果设置了堆栈帧的 @code{debug-on-exit} 标志，则为 @code{t}。
+@end defun
+
+@include edebug.texi
+
+@node Syntax Errors
+@section 调试无效的 Lisp 语法
+@cindex debugging invalid Lisp syntax
+
+Lisp 阅读器报告无效语法，但无法说出真正的问题在哪里。  例如，计算表达式时的错误@samp{End of file during parsing}表示过多的左括号（或方括号）。  读者在文件末尾检测到这种不平衡，但无法弄清楚右括号应该在哪里。  同样，@samp{Invalid read syntax: ")"}表示多余的右括号或缺少的左括号，但没有说明缺少的括号所属的位置。  那么，如何找到需要改变的内容呢？
+
+如果问题不仅仅是括号不平衡，一个有用的技术是在每个 defun 的开头尝试 @kbd{C-M-e} (@code{end-of-defun}, @pxref{Moving by Defuns,,,emacs, The GNU Emacs Manual}) ，看看它是否到达该 defun 似乎结束的地方。  如果没有，则 defun 存在问题。
+
+@cindex unbalanced parentheses
+@cindex parenthesis mismatch, debugging
+然而，不匹配的括号是 Lisp 中最常见的语法错误，我们可以针对这些情况提供进一步的建议。  （此外，仅在启用 Show Paren 模式的情况下在代码中移动点可能会发现不匹配。）
+
+@menu
+* Excess Open::      如何找到虚假的开括号或丢失的闭括号。
+* Excess Close::     如何找到虚假的闭括号或丢失的开括号。
+@end menu
+
+@node Excess Open
+@subsection 过多的左括号
+@cindex excess open parentheses
+
+第一步是找到不平衡的defun。  如果有多余的左括号，执行此操作的方法是转到文件末尾并输入 @kbd{C-u C-M-u} (@code{backward-up-list}, @pxref{Moving by Parens,,,emacs, The GNU Emacs Manual})。  这会将您移至第一个不平衡的 defun 的开头。
+
+下一步是准确确定问题所在。  除了研究程序之外，没有办法确定这一点，但现有的缩进通常是括号应该在哪里的线索。  使用此线索的最简单方法是使用 @kbd{C-M-q} (@code{indent-pp-sexp}, @pxref{Multi-line Indent,,,emacs, The GNU Emacs Manual}) 重新缩进并查看发生了什么移动。  @strong{But don't do this yet!} 首先继续阅读。
+
+在执行此操作之前，请确保 defun 有足够的右括号。否则，@kbd{C-M-q} 将收到错误，或者将重新缩进文件的所有其余部分，直到结束。  因此，移至 defun 的末尾并在此处插入一个右括号。  不要使用 @kbd{C-M-e} (@code{end-of-defun}) 移动到那里，因为在 defun 平衡之前，这也将无法工作。
+
+现在您可以转到 defun 的开头并输入 @kbd{C-M-q}。通常，从某个点到函数末尾的所有行都会向右移动。  在该点附近可能缺少一个右括号，或者一个多余的左括号。  （但是，不要假设这是真的；研究代码以确保。）一旦发现差异，请用 @kbd{C-_} (@code{undo}) 撤消 @kbd{C-M-q}，因为旧的缩进可能适合预期的括号。
+
+当您认为问题已解决后，请再次使用@kbd{C-M-q}。  如果旧的缩进实际上符合括号的预期嵌套，并且您已放回这些括号，则 @kbd{C-M-q} 不应更改任何内容。
+
+@node Excess Close
+@subsection 过多的右括号
+@cindex excess close parentheses
+
+要处理多余的右括号，请首先转到文件的开头，然后输入 @kbd{C-u -1 C-M-u}（@code{backward-up-list}，参数为 @minus{}1）以查找第一个不平衡 defun 的末尾。
+
+然后通过在该 defun 的开头键入 @kbd{C-M-f} (@code{forward-sexp}, @pxref{Expressions,,,emacs, The GNU Emacs Manual}) 找到实际匹配的右括号。  这会让你远离 defun 应该结束的地方。  您可能会在该附近发现一个虚假的右括号。
+
+如果此时您没有发现问题，那么接下来要做的就是在 defun 的开头键入 @kbd{C-M-q} (@code{indent-pp-sexp})。一系列线可能会向左移动；如果是这样，则缺少的左括号或虚假的右括号可能位于这些行的第一行附近。  （但是，不要假设这是真的；研究代码以确保。）一旦发现差异，请用 @kbd{C-_} (@code{undo}) 撤消 @kbd{C-M-q}，因为旧的缩进可能适合预期的括号。
+
+当您认为问题已解决后，请再次使用@kbd{C-M-q}。  如果旧的缩进实际上符合括号的预期嵌套，并且您已放回这些括号，则 @kbd{C-M-q} 不应更改任何内容。
+
+@node Test Coverage
+@section 测试覆盖率
+@cindex coverage testing
+
+@findex testcover-start
+@findex testcover-mark-all
+@findex testcover-next-mark
+您可以通过加载 @code{testcover} 库并使用命令 @kbd{M-x testcover-start @key{RET} @var{file} @key{RET}} 来检测代码来对 Lisp 代码文件进行覆盖率测试。  然后通过调用一次或多次来测试您的代码。  然后使用命令 @kbd{M-x testcover-mark-all} 在代码上显示彩色突出显示，以显示覆盖率不足的地方。  命令@kbd{M-x testcover-next-mark}会将点向前移动到下一个突出显示的位置。
+
+通常，红色突出显示表示表单从未被完全评估；棕色突出显示意味着它始终评估为相同的值（意味着几乎没有对结果进行的测试）。  但是，对于无法完成评估的形式，例如 @code{error}，红色突出显示将被跳过。  对于预计始终评估为相同值的形式（例如 @code{(setq x 14)}），会跳过棕色突出显示。
+
+对于困难的情况，您可以在代码中添加不执行任何操作的宏，以向测试覆盖率工具提供建议。
+
+@defmac 1value form
+评估 @var{form} 并返回其值，但通知覆盖测试 @var{form} 的值应始终相同。
+@end defmac
+
+@defmac noreturn form
+评估@var{form}，通知覆盖测试@var{form}永远不应该返回。  如果它确实返回，您会收到运行时错误。
+@end defmac
+
+Edebug 还具有覆盖率测试功能 (@pxref{Coverage Testing})。  这些功能部分相互重复，将它们组合起来会更清晰。
+
+
+@node Profiling
+@section 分析
+@cindex profiling
+@cindex profile
+@cindex performance analysis
+@cindex measuring resource usage
+@cindex memory usage
+
+如果您的程序工作正常，但速度不够快，并且您想让它运行得更快或更高效，那么首先要做的就是 @dfn{profile} 您的代码，以便您知道它在哪里花费了大部分执行时间。  如果您发现某个特定函数占用了执行时间的很大一部分，那么您可以开始寻找优化该部分的方法。
+
+@findex profiler-start
+@findex profiler-report
+@findex profiler-stop
+Emacs 对此有内置支持。  要开始分析，请输入 @w{@kbd{M-x profiler-start}}。  您可以选择定期采样 CPU 使用情况 (@code{cpu})、分配内存时采样 (@code{memory})，或同时采样两者。  然后运行您想要加速的代码。  之后，输入 @kbd{M-x profiler-report} 显示您选择分析的每种类型（CPU 和内存）采样的 CPU 使用情况的摘要缓冲区。  报告缓冲区的名称包括生成报告的时间，因此您可以稍后生成另一个报告，而无需删除以前的结果。  完成分析后，输入@kbd{M-x profiler-stop}（与分析相关的开销很小，因此我们不建议将其保持活动状态，除非您实际运行要检查的代码时）。
+
+分析器报告缓冲区在每一行上显示一个被调用的函数，前面是自分析开始以来它使用的 CPU 资源的绝对数量和百分比。  如果给定行的函数名称左侧有 @samp{+} 符号，您可以通过键入 @kbd{@key{RET}} 展开该行，以便查看更高级别函数调用的函数。  使用前缀参数 (@kbd{C-u @key{RET}}) 查看函数下方的整个调用树。  再次按@kbd{@key{RET}}将折叠回原始状态。
+
+@findex profiler-report-find-entry
+@findex profiler-report-describe-entry
+@findex profiler-find-profile
+@findex profiler-find-profile-other-window
+@findex profiler-report-compare-profile
+按 @kbd{j} (@code{profiler-report-find-entry}) 或 @kbd{mouse-2} 跳转到该点函数的定义。  按 @kbd{d} (@code{profiler-report-describe-entry}) 查看函数的文档。  您可以使用 @kbd{C-x C-w} (@code{profiler-report-write-profile}) 将配置文件保存到文件，并使用 @w{@kbd{M-x profiler-find-profile}} 或 @w{@kbd{M-x profiler-find-profile-other-window}} 读取保存的配置文件。  您可以使用 @kbd{=} (@code{profiler-report-compare-profile}) 比较两个配置文件。
+
+@c FIXME reversed calltree?
+
+@cindex @file{elp.el}
+@cindex timing programs
+@file{elp} 库提供了一种替代方法，当您提前知道要分析哪个 Lisp 函数时，该方法非常有用。使用该库，您首先将 @code{elp-function-list} 设置为函数符号列表——这些是您想要分析的函数。  然后输入 @w{@kbd{M-x elp-instrument-list @key{RET} nil @key{RET}}} 来安排分析这些函数。  运行要分析的代码后，调用 @w{@kbd{M-x elp-results}} 显示当前结果。  有关更详细的说明，请参阅文件@file{elp.el}。  这种方法仅限于分析用 Lisp 编写的函数，它无法分析 Emacs 原语。
+
+@cindex @file{benchmark.el}
+@cindex benchmarking
+您可以使用 @file{benchmark} 库测量评估单个 Emacs Lisp 表单所需的时间。  请参阅函数 @code{benchmark-call} 以及@file{benchmark.el} 中的宏 @code{benchmark-run}、@code{benchmark-run-compiled} 和 @code{benchmark-progn}。  您还可以使用 @code{benchmark} 命令以交互方式计时表单。
+
+@c Not worth putting in the printed manual.
+@ifnottex
+@cindex --enable-profiling option of configure
+To profile Emacs at the level of its C code, you can build it using the
+@option{--enable-profiling} option of @command{configure}.  When Emacs
+exits, it generates a file @file{gmon.out} that you can examine using
+the @command{gprof} utility.  This feature is mainly useful for
+debugging Emacs.  It actually stops the Lisp-level @kbd{M-x
+profiler-@dots{}} commands described above from working.
+@end ifnottex

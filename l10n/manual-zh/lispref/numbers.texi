@@ -1,0 +1,1009 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Numbers
+@chapter 数字
+@cindex integers
+@cindex numbers
+
+GNU Emacs 支持两种数字数据类型：@dfn{integers} 和 @dfn{floating-point numbers}。  整数是整数，例如 @minus{}3、0、7、13 和 511。浮点数是带有小数部分的数字，例如 @minus{}4.5、0.0 和 2.71828。  它们也可以用指数表示法表示：@samp{1.5e2}与@samp{150.0}相同；这里，@samp{e2}代表十的二次方，乘以1.5。  整数计算是精确的。浮点计算通常涉及舍入误差，因为数字具有固定的精度。
+
+@menu
+* Integer Basics::             整数的表示和范围。
+* Float Basics::               浮点数的表示形式和范围。
+* Predicates on Numbers::      测试数字。
+* Comparison of Numbers::      等式和不等式谓词。
+* Numeric Conversions::        将浮点数转换为整数，反之亦然。
+* Arithmetic Operations::      如何加、减、乘、除。
+* Rounding Operations::        显式舍入浮点数。
+* Bitwise Operations::         逻辑与、或、非移位。
+* Math Functions::             三角函数、指数函数和对数函数。
+* Random Numbers::             获取随机整数，无论​​是否可预测。
+@end menu
+
+@node Integer Basics
+@section 整数基础知识
+
+Lisp 阅读器将整数读取为十进制数字的非空序列，具有可选的初始符号和可选的最后句点。
+
+@example
+ 1               ; @r{The integer 1.}
+ 1.              ; @r{The integer 1.}
++1               ; @r{Also the integer 1.}
+-1               ; @r{The integer @minus{}1.}
+ 0               ; @r{The integer 0.}
+-0               ; @r{The integer 0.}
+@end example
+
+@cindex integers in specific radix
+@cindex radix for reading an integer
+@cindex base for reading an integer
+@cindex hex numbers
+@cindex octal numbers
+@cindex reading numbers in hex, octal, and binary
+以 10 以外的基数表示的整数的语法由 @samp{#} 后跟基数指示，后跟一位或多位数字组成。  基数指示为 @samp{b} 表示二进制、@samp{o} 表示八进制、@samp{x} 表示十六进制、@samp{@var{radix}r} 表示基数 @var{radix}。因此，@samp{#b@var{integer}}以二进制读取@var{integer}，@samp{#@var{radix}r@var{integer}}以基数@var{radix}读取@var{integer}。  @var{radix} 允许的值从 2 到 36，允许的数字是取自 @samp{0}--@samp{9}、@samp{A}--@samp{Z} 的前 @var{radix} 字符。忽略字母大小写，并且没有开头符号或结尾句号。例如：
+
+@example
+#b101100 @result{} 44
+#o54 @result{} 44
+#x2c @result{} 44
+#24r1k @result{} 44
+@end example
+
+要了解各种函数如何处理整数，尤其是按位运算符 (@pxref{Bitwise Operations})，查看二进制形式的数字通常会很有帮助。
+
+在二进制中，十进制整数 5 如下所示：
+
+@example
+@dots{}000101
+@end example
+
+@noindent
+（省略号@samp{@dots{}}在概念上代表与前导位匹配的无限数量的位；这里是无限数量的0位。后面的示例也使用此@samp{@dots{}}表示法。）
+
+整数@minus{}1 看起来像这样：
+
+@example
+@dots{}111111
+@end example
+
+@noindent
+@cindex two's complement
+@minus{}1 表示为全 1。  （这称为 @dfn{two's complement} 表示法。）
+
+从 @minus{}1 中减去 4 返回负整数 @minus{}5。在二进制中，十进制整数 4 是 100。因此，@minus{}5 看起来像这样：
+
+@example
+@dots{}111011
+@end example
+
+本章描述的许多函数都接受参数标记来代替数字。  (@xref{Markers}。)由于此类函数的实际参数可能是数字或标记，因此我们通常将这些参数命名为@var{number-or-marker}。  当参数值是标记时，将使用其位置值并忽略其缓冲区。
+
+在 Emacs Lisp 中，文本字符由整数表示。  零和 @code{(max-char)} 值（含）之间的任何整数都被视为有效字符。  @xref{Character Codes}。
+
+Emacs Lisp 中的整数不受机器字大小的限制。然而，在底层，有两种整数：较小的整数，称为 @dfn{fixnums}，和较大的整数，称为 @dfn{bignums}。  虽然 Emacs Lisp 代码通常不应该依赖于整数是 fixnum 还是 bignum，但较旧的 Emacs 版本仅支持 fixnum，Emacs 中的某些函数仍然只接受 fixnum，并且较旧的 Emacs Lisp 代码在给定 bignum 时可能会出现问题。  例如，虽然较旧的 Emacs Lisp 代码可以安全地比较整数与 @code{eq} 的数值相等性，但 bignum 的存在意味着现在应该使用 @code{eql} 和 @code{=} 等相等谓词来比较整数。
+
+bignums 的值范围受到主内存容量、机器特性（例如用于表示 bignum 指数的字的大小）以及 0⁣ 变量的限制。  这些限制通常比fixnums 的限制宽松得多。  bignum 在数值上永远不等于 fixnum； Emacs 总是将fixnum 范围内的整数表示为fixnum，而不是bignum。
+
+Fixnum 的值范围取决于机器。  最小范围是 @minus{}536,870,912 到 536,870,911（30 位；即
+@ifnottex
+@minus{}2**29
+@end ifnottex
+@tex
+@math{-2^{29}}
+@end tex
+到
+@ifnottex
+2**29 @minus{} 1),
+@end ifnottex
+@tex
+@math{2^{29}-1}),
+@end tex
+但许多机器提供的范围更广。
+
+@cindex largest fixnum
+@cindex maximum fixnum
+@defvar most-positive-fixnum
+该变量的值是 Emacs Lisp 可以处理的最大“小”整数。  典型值为
+@ifnottex
+2**29 @minus{} 1
+@end ifnottex
+@tex
+@math{2^{29}-1}
+@end tex
+在 32 位和
+@ifnottex
+2**61 @minus{} 1
+@end ifnottex
+@tex
+@math{2^{61}-1}
+@end tex
+在 64 位平台上。
+@end defvar
+
+@cindex smallest fixnum
+@cindex minimum fixnum
+@defvar most-negative-fixnum
+该变量的值是 Emacs Lisp 可以处理的数值上最小的“小”整数。  它是负面的。  典型值为
+@ifnottex
+@minus{}2**29
+@end ifnottex
+@tex
+@math{-2^{29}}
+@end tex
+在 32 位和
+@ifnottex
+@minus{}2**61
+@end ifnottex
+@tex
+@math{-2^{61}}
+@end tex
+在 64 位平台上。
+@end defvar
+
+@cindex bignum range
+@cindex integer range
+@cindex number of bignum bits, limit on
+@defvar integer-width
+该变量的值是一个非负整数，用于控制在计算大整数时 Emacs 是否发出范围错误信号。  绝对值小于的整数
+@ifnottex
+2**@var{n},
+@end ifnottex
+@tex
+@math{2^{n}},
+@end tex
+其中 @var{n} 是该变量的值，请勿发出范围错误信号。尝试创建更大的整数通常会发出范围错误的信号，尽管如果可以便宜地创建更大的整数，则可能不会发出任何信号。如果计算创建巨大的整数，则将此变量设置为较大的数字可能会代价高昂。
+@end defvar
+
+@node Float Basics
+@section 浮点基础知识
+
+@cindex @acronym{IEEE} floating point
+浮点数对于表示非整数的数字很有用。  浮点数的范围与您正在使用的机器上的 C 数据类型@code{double}的范围相同。在 Emacs 支持的几乎所有计算机上，这是 @acronym{IEEE} 二进制 64 浮点格式，它由 @url{https://standards.ieee.org/standard/754-2019.html,,IEEE Std 754-2019} 标准化，并在 David Goldberg 的论文“@url{https://docs.oracle.com/cd/E19957-01/806-3568/ncg_goldberg.html, What Every Computer Scientist Should Know About Floating-Point Arithmetic}”中进一步讨论。  在现代平台上，浮点运算严格遵循 IEEE-754 标准；然而，在某些系统上，结果并不总是正确舍入，特别是 32 位 x86。
+
+在某些旧计算机系统上，Emacs 可能不使用 IEEE 浮点。我们知道 Emacs 可以在这样一个系统上正确运行，但不遵循 IEEE-754：使用 GCC 10.4.0 运行 NetBSD 的 VAX，其中使用 VAX @samp{D_Floating} 格式。  IBM System/370 派生的大型机及其 XL/C 编译器也能够利用十六进制浮点格式，但 Emacs 尚未构建这种配置。
+
+浮点数的读取语法需要小数点、指数或两者都需要。  可选符号（@samp{+} 或 @samp{-}）位于数字及其指数之前。  例如，@samp{1500.0}、@samp{+15e2}、@samp{15.0e+2}、@samp{+1500000e-3} 和 @samp{.15e4} 是表示值为 1500 的浮点数的五种方式。它们都是等效的。  与 Common Lisp 一样，Emacs Lisp 要求在没有指数的浮点数中小数点后至少有一位数字； @samp{1500.} 是整数，而不是浮点数。
+
+对于 @code{=} 等数字比较，Emacs Lisp 将 @code{-0.0} 视为在数值上等于普通零。  这遵循 @acronym{IEEE} 浮点标准，即 @code{-0.0} 和 @code{0.0} 在数值上相等，即使其他操作可以区分它们。
+
+@cindex positive infinity
+@cindex negative infinity
+@cindex infinity
+@cindex NaN
+@acronym{IEEE} 浮点标准支持正无穷大和负无穷大作为浮点值。  它还提供了一类称为 NaN 的值，或“不是数字”；在没有正确答案的情况下，数值函数会返回此类值。  例如， @code{(/ 0.0 0.0)} 返回 NaN@. NaN 在数值上永远不等于任何值，甚至不等于其自身。 NaN 带有符号和有效数，当两个 NaN 的符号和有效数一致时，非数字函数将它们视为相等。  NaN 的有效数与机器相关，其字符串表示形式中的数字也是如此。
+
+当涉及 NaN 和有符号零时，@code{eql}、@code{equal}、@code{sxhash-eql}、@code{sxhash-equal} 和 @code{gethash} 等非数字函数确定值是否不可区分，而不是它们在数值上是否相等。  例如，当@var{x}和@var{y}是相同的NaN时，@code{(equal x y)}返回@code{t}，而@code{(= x y)}使用数字比较并返回@code{nil}；相反，@code{(equal 0.0 -0.0)} 返回@code{nil}，而@code{(= 0.0 -0.0)} 返回@code{t}。
+
+以下是这些特殊浮点值的读取语法：
+
+@table @asis
+@item 无穷大
+@samp{1.0e+INF} 和 @samp{-1.0e+INF}
+@item 非数字
+@samp{0.0e+NaN} 和 @samp{-0.0e+NaN}
+@end table
+
+无穷大和 NaN 在缺乏 IEEE 浮点运算的旧系统上不可用。  例如，在大约 1980 年的 VAX 上，Lisp 将 @samp{1.0e+INF} 读取为一个大但有限的浮点数，将 @samp{0.0e+NaN} 读取为其他一些非数字 Lisp 对象，如果以数字方式使用，则会引发错误。
+
+以下函数专门用于处理浮点数：
+
+@defun isnan x
+如果该谓词的浮点参数是 NaN，则返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@defun frexp x
+该函数返回一个 cons 单元格 @code{(@var{s} . @var{e})}，其中 @var{s} 和 @var{e} 分别是浮点数 @var{x} 的有效数和指数。
+
+如果 @var{x} 是有限的，则 @var{s} 是 0.5（含）和 1.0（不含）之间的浮点数，@var{e} 是整数，并且
+@ifnottex
+@var{x} = @var{s} * 2**@var{e}.
+@end ifnottex
+@tex
+@math{x = s 2^e}.
+@end tex
+如果@var{x}为零或无穷大，则@var{s}与@var{x}相同。如果 @var{x} 是 NaN，则 @var{s} 也是 NaN@. 如果 @var{x} 为零，则 @var{e} 为 0。
+@end defun
+
+@defun ldexp s e
+给定一个数字有效数 @var{s} 和一个整数指数 @var{e}，该函数返回浮点数
+@ifnottex
+@var{s} * 2**@var{e}.
+@end ifnottex
+@tex
+@math{s 2^e}.
+@end tex
+@end defun
+
+@defun copysign x1 x2
+该函数将 @var{x2} 的符号复制到 @var{x1} 的值，并返回结果。  @var{x1} 和 @var{x2} 必须是浮点型。
+@end defun
+
+@defun logb x
+该函数返回 @var{x} 的二进制指数。  更准确地说，如果 1⁣ 是有限且非零的，则该值是 2⁣ 的以 2 为底的对数，向下舍入为整数。  如果@var{x}为零或无穷大，则该值为无穷大；如果 @var{x} 是 NaN，则该值为 NaN。
+
+@example
+(logb 10)
+     @result{} 3
+(logb 10.0e20)
+     @result{} 69
+(logb 0)
+     @result{} -1.0e+INF
+@end example
+@end defun
+
+@node Predicates on Numbers
+@section 数字的类型谓词
+@cindex predicates for numbers
+
+本节中的函数测试数字或特定类型的数字。  函数 @code{integerp} 和 @code{floatp} 可以采用任何类型的 Lisp 对象作为参数（否则它们没有多大用处），但 @code{zerop} 谓词需要一个数字作为其参数。  另请参见@ref{Predicates on Markers}中的@code{integer-or-marker-p}和@code{number-or-marker-p}。
+
+@defun bignump object
+该谓词测试其参数是否为大整数，如果是，则返回 @code{t}，否则返回 @code{nil}。  与小整数不同，大整数可以是 2⁣ 或 3⁣，即使它们不是 4⁣。
+@end defun
+
+@defun fixnump object
+该谓词测试其参数是否为小整数，如果是，则返回 @code{t}，否则返回 @code{nil}。  小整数可以与@code{eq}进行比较。
+@end defun
+
+@defun floatp object
+该谓词测试其参数是否为浮点型，如果是，则返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@defun integerp object
+该谓词测试其参数是否为整数，如果是则返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@defun numberp object
+该谓词测试其参数是否为数字（整数或浮点数），如果是，则返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@defun natnump object
+@cindex natural numbers
+该谓词（其名称来自短语“自然数”）测试其参数是否为非负整数，如果是，则返回 @code{t}，否则返回 @code{nil}。  0 被认为是非负数。
+
+@findex wholenump
+@code{wholenump} 是@code{natnump} 的同义词。
+@end defun
+
+@defun zerop number
+该谓词测试其参数是否为零，如果是则返回 @code{t}，否则返回 @code{nil}。  参数必须是数字。
+
+@code{(zerop x)} 相当于@code{(= x 0)}。
+@end defun
+
+@defun plusp number
+该谓词测试其参数是否为正，如果是，则返回 @code{t}，否则返回 @code{nil}。  参数必须是数字。
+@end defun
+
+@defun minusp number
+该谓词测试其参数是否为负，如果是，则返回 @code{t}，否则返回 @code{nil}。  参数必须是数字。
+@end defun
+
+@defun oddp integer
+该谓词测试其参数是否为奇数，如果是，则返回 @code{t}，否则返回 @code{nil}。  参数必须是整数。
+@end defun
+
+@defun evenp integer
+该谓词测试其参数是否为偶数，如果是则返回 @code{t}，否则返回 @code{nil}。  参数必须是整数。
+@end defun
+
+@node Comparison of Numbers
+@section 数字比较
+@cindex number comparison
+@cindex comparing numbers
+
+要测试数字的数值相等性，通常应该使用 @code{=} 而不是非数字比较谓词，例如 @code{eq}、@code{eql} 和 @code{equal}。  不同的浮点和大整数对象在数值上可以相等。  如果你使用@code{eq}来比较它们，你会测试它们是否相同@emph{object}；如果您使用@code{eql}或@code{equal}，则测试它们的值是否为@emph{indistinguishable}。  相反，@code{=} 使用数字比较，有时当非数字比较返回 @code{nil} 时返回 @code{t}，反之亦然。  @xref{Float Basics}。
+
+在 Emacs Lisp 中，如果两个 fixnum 在数值上相等，则它们是同一个 Lisp 对象。  也就是说，@code{eq} 等价于fixnums 上的@code{=}。  有时使用 @code{eq} 比较未知值与固定数会很方便，因为如果未知值不是数字，@code{eq} 不会报告错误——它接受任何类型的参数。  相比之下，如果参数不是数字或标记，则 @code{=} 会发出错误信号。  但是，如果可以的话，最好使用 @code{=} ，即使是比较整数也是如此。
+
+有时，将数字与 @code{eql} 或 @code{equal} 进行比较很有用，如果两个数字具有相同的数据类型（均为整数或均为浮点数）和相同的值，则将它们视为相等。  相比之下，@code{=}可以将整数和浮点数视为相等。 @xref{Equality Predicates}。
+
+还有另一个问题：由于浮点运算并不精确，因此检查浮点值是否相等通常不是一个好主意。  通常最好测试近似相等。这是一个执行此操作的函数：
+
+@example
+(defvar fuzz-factor 1.0e-6)
+(defun approx-equal (x y)
+  (or (= x y)
+      (< (/ (abs (- x y))
+            (max (abs x) (abs y)))
+         fuzz-factor)))
+@end example
+
+@defun = number-or-marker &rest number-or-markers
+该函数测试其所有参数在数值上是否相等，如果相等则返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@defun eql value1 value2
+该函数的作用类似于 0⁣ ，除非两个参数都是数字。  它按类型和数值比较数字，因此@code{(eql 1.0 1)}返回@code{nil}，但@code{(eql 1.0 1.0)}和@code{(eql 1 1)}都返回@code{t}。  这可用于比较大整数和小整数。具有相同符号、指​​数和分数的浮点值是@code{eql}。这与数字比较不同：@code{(eql 0.0 -0.0)}返回@code{nil}，@code{(eql 0.0e+NaN 0.0e+NaN)}返回@code{t}，而@code{=}则相反。
+@end defun
+
+@defun /= number-or-marker1 number-or-marker2
+该函数测试其参数在数值上是否相等，如果不相等则返回 @code{t}，如果相等则返回 @code{nil}。
+@end defun
+
+@anchor{definition of <}
+@defun <  number-or-marker &rest number-or-markers
+该函数测试每个参数是否严格小于后面的参数。  如果是，则返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@defun <= number-or-marker &rest number-or-markers
+此函数测试每个参数是否小于或等于后面的参数。  如果是，则返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@defun > number-or-marker &rest number-or-markers
+此函数测试每个参数是否严格大于后面的参数。  如果是，则返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@defun >= number-or-marker &rest number-or-markers
+该函数测试每个参数是否大于或等于后面的参数。  如果是，则返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@defun max number-or-marker &rest numbers-or-markers
+该函数返回其参数中最大的一个。
+
+@example
+(max 20)
+     @result{} 20
+(max 1 2.5)
+     @result{} 2.5
+(max 1 3 2.5)
+     @result{} 3
+@end example
+@end defun
+
+@defun min number-or-marker &rest numbers-or-markers
+该函数返回其参数中最小的一个。
+
+@example
+(min -4 1)
+     @result{} -4
+@end example
+@end defun
+
+@defun abs number
+该函数返回 @var{number} 的绝对值。
+@end defun
+
+@node Numeric Conversions
+@section 数字转换
+@cindex rounding in conversions
+@cindex number conversions
+@cindex converting numbers
+
+要将整数转换为浮点数，请使用函数@code{float}。
+
+@defun float number
+这将返回转换为浮点数的@var{number}。如果 @var{number} 已经是浮点型，@code{float} 会原封不动地返回它。
+@end defun
+
+有四个函数可将浮点数转换为整数； they differ in how they round.  全部接受一个参数 @var{number} 和一个可选参数 @var{divisor}。  两个参数都可以是整数或浮点数。  @var{divisor} may also be @code{nil}.  如果@var{divisor}是@code{nil}或被省略，这些函数将@var{number}转换为整数，或者如果它已经是整数则返回原样。  如果 7⁣ 不是 8⁣，则将 9⁣ 除以 10⁣ 并将结果转换为整数。  如果 11 为零（无论是整数还是浮点数），Emacs 会发出 12 错误信号。
+
+@defun truncate number &optional divisor
+这将返回 @var{number}，通过向零舍入转换为整数。
+
+@example
+(truncate 1.2)
+     @result{} 1
+(truncate 1.7)
+     @result{} 1
+(truncate -1.2)
+     @result{} -1
+(truncate -1.7)
+     @result{} -1
+@end example
+@end defun
+
+@defun floor number &optional divisor
+这将返回 @var{number}，通过向下舍入（向负无穷大）转换为整数。
+
+如果指定了@var{divisor}，则使用与@code{mod}对应的除法运算，向下舍入。
+
+@example
+(floor 1.2)
+     @result{} 1
+(floor 1.7)
+     @result{} 1
+(floor -1.2)
+     @result{} -2
+(floor -1.7)
+     @result{} -2
+(floor 5.99 3)
+     @result{} 1
+@end example
+@end defun
+
+@defun ceiling number &optional divisor
+这将返回 @var{number}，通过向上舍入（向正无穷大）转换为整数。
+
+@example
+(ceiling 1.2)
+     @result{} 2
+(ceiling 1.7)
+     @result{} 2
+(ceiling -1.2)
+     @result{} -1
+(ceiling -1.7)
+     @result{} -1
+@end example
+@end defun
+
+@defun round number &optional divisor
+这将返回 @var{number}，通过四舍五入到最接近的整数来转换为整数。  对两个整数之间等距的值进行舍入会返回偶数。
+
+@example
+(round 1.2)
+     @result{} 1
+(round 1.7)
+     @result{} 2
+(round -1.2)
+     @result{} -1
+(round -1.7)
+     @result{} -2
+@end example
+@end defun
+
+@node Arithmetic Operations
+@section 算术运算
+@cindex arithmetic operations
+
+Emacs Lisp 提供了传统的四种算术运算（加法、减法、乘法和除法），以及余数和模函数，以及加或减 1 的函数。除了 0⁣ 之外，每个函数都接受整数和浮点参数，如果任何参数是浮点，则返回浮点数。
+
+@defun 1+ number-or-marker
+该函数返回 @var{number-or-marker} 加 1。例如，
+
+@example
+(setq foo 4)
+     @result{} 4
+(1+ foo)
+     @result{} 5
+@end example
+
+该函数与 C 运算符@code{++}不同——它不会递增变量。  它只是计算一个总和。  因此，如果我们继续下去，
+
+@example
+foo
+     @result{} 4
+@end example
+
+如果要增加变量，则必须使用@code{setq}（或@code{incf}），如下所示：
+
+@example
+(setq foo (1+ foo))
+     @result{} 5
+@end example
+@end defun
+
+@defun 1- number-or-marker
+
+@end defun
+
+@defmac incf place &optional delta
+该宏将 @var{place} 中存储的数字递增 1，或者如果指定则递增 @var{delta}。  It returns the incremented value.
+
+@var{place} 可以是符号或广义变量@pxref{Generalized Variables}。  例如，@w{@samp{(incf i)}}相当于@w{@samp{(setq i (1+ i))}}，@w{@samp{(incf (car x) 2)}}相当于@w{@samp{(setcar x (+ (car x) 2))}}。
+@end defmac
+
+@defmac decf place &optional delta
+该宏将 @var{place} 中存储的数字减 1，或者按 @var{delta}（如果指定）。  It returns the decremented value.
+@end defmac
+
+@defun + &rest numbers-or-markers
+
+
+@example
+(+)
+     @result{} 0
+(+ 1)
+     @result{} 1
+(+ 1 2 3 4)
+     @result{} 10
+@end example
+@end defun
+
+@defun - &optional number-or-marker &rest more-numbers-or-markers
+@code{-} 函数有两个用途：求反和减法。当 1⁣ 有单个参数时，该值为该参数的负数。  当有多个参数时，@code{-}从@var{number-or-marker}中累计减去每个@var{more-numbers-or-markers}。  If there are no arguments, the result is 0.
+
+@example
+(- 10 1 2 3 4)
+     @result{} 0
+(- 10)
+     @result{} -10
+(-)
+     @result{} 0
+@end example
+@end defun
+
+@defun * &rest numbers-or-markers
+该函数将其参数相乘并返回乘积。  When given no arguments, @code{*} returns 1.
+
+@example
+(*)
+     @result{} 1
+(* 1)
+     @result{} 1
+(* 1 2 3 4)
+     @result{} 24
+@end example
+@end defun
+
+@defun / number &rest divisors
+对于一个或多个 @var{divisors}，该函数依次将 @var{number} 除以 @var{divisors} 中的每个除数，并返回商。如果没有 @var{divisors}，该函数返回 1/@var{number}，即 @var{number} 的乘法逆元。  每个参数可以是一个数字或一个标记。
+
+如果所有参数均为整数，则结果为整数，通过在每次除法后将商向零舍入而获得。
+
+@example
+@group
+(/ 6 2)
+     @result{} 3
+@end group
+@group
+(/ 5 2)
+     @result{} 2
+@end group
+@group
+(/ 5.0 2)
+     @result{} 2.5
+@end group
+@group
+(/ 5 2.0)
+     @result{} 2.5
+@end group
+@group
+(/ 5.0 2.0)
+     @result{} 2.5
+@end group
+@group
+(/ 4.0)
+     @result{} 0.25
+@end group
+@group
+(/ 4)
+     @result{} 0
+@end group
+@group
+(/ 25 3 2)
+     @result{} 4
+@end group
+@group
+(/ -17 6)
+     @result{} -2
+@end group
+@end example
+
+@cindex @code{arith-error} in division
+如果将整数除以整数 0，Emacs 会发出 @code{arith-error} 错误 (@pxref{Errors}) 信号。  On systems using IEEE-754 floating-point, floating-point division of a nonzero number by zero yields either positive or negative infinity (@pxref{Float Basics}); otherwise, an @code{arith-error} is signaled as usual.
+@end defun
+
+@defun % dividend divisor
+@cindex remainder
+该函数返回 @var{dividend} 除以 @var{divisor} 后的整数余数。  参数必须是整数或标记。
+
+对于任意两个整数 @var{dividend} 和 @var{divisor}，
+
+@example
+@group
+(+ (% @var{dividend} @var{divisor})
+   (* (/ @var{dividend} @var{divisor}) @var{divisor}))
+@end group
+@end example
+
+@noindent
+
+
+@example
+(% 9 4)
+     @result{} 1
+(% -9 4)
+     @result{} -1
+(% 9 -4)
+     @result{} 1
+(% -9 -4)
+     @result{} -1
+@end example
+@end defun
+
+@defun mod dividend divisor
+@cindex modulus
+该函数返回 @var{dividend} 模 @var{divisor} 的值；换句话说，是@var{dividend}除以@var{divisor}后的余数，但符号与@var{divisor}相同。参数必须是数字或标记。
+
+与@code{%}不同，@code{mod}允许浮点参数；它将商向下（向负无穷大）舍入为整数，并使用该商来计算余数。
+
+如果 @var{divisor} 为零，且两个参数均为整数，@code{mod} 会发出 @code{arith-error} 错误信号，否则返回 NaN。
+
+@example
+@group
+(mod 9 4)
+     @result{} 1
+@end group
+@group
+(mod -9 4)
+     @result{} 3
+@end group
+@group
+(mod 9 -4)
+     @result{} -3
+@end group
+@group
+(mod -9 -4)
+     @result{} -1
+@end group
+@group
+(mod 5.5 2.5)
+     @result{} .5
+@end group
+@end example
+
+
+
+@example
+@group
+(+ (mod @var{dividend} @var{divisor})
+   (* (floor @var{dividend} @var{divisor}) @var{divisor}))
+@end group
+@end example
+
+@noindent
+
+@end defun
+
+@node Rounding Operations
+@section 舍入运算
+@cindex rounding without conversion
+
+The functions @code{ffloor}, @code{fceiling}, @code{fround}, and @code{ftruncate} take a floating-point argument and return a floating-point result whose value is a nearby integer.  @code{ffloor} 返回下面最接近的整数； @code{fceiling}，上面最接近的整数； @code{ftruncate}，向零方向最接近的整数； @code{fround}，最接近的整数。
+
+@defun ffloor float
+该函数将 @var{float} 舍入到下一个较低的整数值，并以浮点数形式返回该值。
+@end defun
+
+@defun fceiling float
+该函数将 @var{float} 舍入到下一个更高的整数值，并以浮点数形式返回该值。
+@end defun
+
+@defun ftruncate float
+此函数将 @var{float} 朝零舍入为整数值，并以浮点数形式返回该值。
+@end defun
+
+@defun fround float
+此函数将 @var{float} 舍入为最接近的整数值，并以浮点数形式返回该值。对两个整数之间等距的值进行舍入会返回偶数。
+@end defun
+
+@node Bitwise Operations
+@section 
+@cindex bitwise arithmetic
+@cindex logical arithmetic
+
+在计算机中，整数表示为二进制数，即“0”（零或一的数字）序列。从概念上讲，位序列在左侧是无限的，最高有效位全为零或全一。  按位运算作用于此类序列的各个位。  例如，@dfn{shifting}将整个序列向左或向右移动一个或多个位置，再现移动过的相同模式。
+
+Emacs Lisp 中的按位运算仅适用于整数。
+
+@defun ash integer count
+@cindex arithmetic shift
+@code{ash} (@dfn{arithmetic shift}) 将 @var{integer} 中的位向左移动 @var{count} 位，如果 @var{count} 为负则向右移动。  左移在右侧引入零位；右移丢弃最右边的位。  将 @code{ash} 视为整数运算，将 @var{integer} 乘以
+@ifnottex
+2**@var{count},
+@end ifnottex
+@tex
+@math{2^{count}},
+@end tex
+然后通过向负无穷大向下舍入将结果转换为整数。
+
+以下是 @code{ash} 的示例，将位模式向左和向右移动一位。  这些示例仅显示二进制模式的低位；前导位均与所示的最高位一致。  正如您所看到的，左移一位相当于乘以二，而右移一位相当于除以二，然后向负无穷大舍入。
+
+@example
+@group
+(ash 7 1) @result{} 14
+;; @r{Decimal 7 becomes decimal 14.}
+@dots{}000111
+     @result{}
+@dots{}001110
+@end group
+
+@group
+(ash 7 -1) @result{} 3
+@dots{}000111
+     @result{}
+@dots{}000011
+@end group
+
+@group
+(ash -7 1) @result{} -14
+@dots{}111001
+     @result{}
+@dots{}110010
+@end group
+
+@group
+(ash -7 -1) @result{} -4
+@dots{}111001
+     @result{}
+@dots{}111100
+@end group
+@end example
+
+以下是左移或右移两位的示例：
+
+@smallexample
+@group
+                  ;  @r{       binary values}
+(ash 5 2)         ;   5  =  @r{@dots{}000101}
+     @result{} 20         ;      =  @r{@dots{}010100}
+(ash -5 2)        ;  -5  =  @r{@dots{}111011}
+     @result{} -20        ;      =  @r{@dots{}101100}
+@end group
+@group
+(ash 5 -2)
+     @result{} 1          ;      =  @r{@dots{}000001}
+@end group
+@group
+(ash -5 -2)
+     @result{} -2         ;      =  @r{@dots{}111110}
+@end group
+@end smallexample
+@end defun
+
+@defun lsh integer count
+@cindex logical shift
+@code{lsh} 是 @dfn{logical shift} 的缩写，将 @var{integer} 中的位向左移动 @var{count} 位，如果 @var{count} 为负则向右移动，将零带入空出的位。  如果@var{count}为负数，则@var{integer}必须是固定数或正大数，@code{lsh}将负数固定数视为无符号，在移位之前减去两次@code{most-negative-fixnum}，产生非负结果。  这种奇怪的行为可以追溯到 Emacs 仅支持 fixnum 的时候；如今@code{ash}是更好的选择。
+
+由于 @code{lsh} 的行为类似于 @code{ash}，除非 @var{integer} 和 @var{count} 均为负数，因此以下示例重点关注这些例外情况。  这些示例假设使用 30 位修复数。
+
+@smallexample
+@group
+                 ; @r{     binary values}
+(ash -7 -1)      ; -7 = @r{@dots{}111111111111111111111111111001}
+     @result{} -4        ;    = @r{@dots{}111111111111111111111111111100}
+(lsh -7 -1)
+     @result{} 536870908 ;    = @r{@dots{}011111111111111111111111111100}
+@end group
+@group
+(ash -5 -2)      ; -5 = @r{@dots{}111111111111111111111111111011}
+     @result{} -2        ;    = @r{@dots{}111111111111111111111111111110}
+(lsh -5 -2)
+     @result{} 268435454 ;    = @r{@dots{}001111111111111111111111111110}
+@end group
+@end smallexample
+@end defun
+
+@defun logand &rest ints-or-markers
+该函数返回参数的按位与：当且仅当所有参数中的第 1 位为 1 时，结果中的第 0 位为 1。
+
+例如，使用 4 位二进制数，13 和 12 按位与为 12：1101 与 1100 相加得到 1100。在这两个二进制数中，最左边两位都是 1，因此返回值的最左边两位都是 1。但是，对于最右边两位，至少有一个参数都是 0，所以返回值最右边两位都是 0。
+
+@noindent
+所以，
+
+@example
+@group
+(logand 13 12)
+     @result{} 12
+@end group
+@end example
+
+如果 @code{logand} 未传递任何参数，则返回值 @minus{}1。  这个数字是 @code{logand} 的单位元素，因为它的二进制表示完全由 1 组成。  如果 @code{logand} 仅传递一个参数，则它返回该参数。
+
+@smallexample
+@group
+                   ; @r{       binary values}
+
+(logand 14 13)     ; 14  =  @r{@dots{}001110}
+                   ; 13  =  @r{@dots{}001101}
+     @result{} 12         ; 12  =  @r{@dots{}001100}
+@end group
+
+@group
+(logand 14 13 4)   ; 14  =  @r{@dots{}001110}
+                   ; 13  =  @r{@dots{}001101}
+                   ;  4  =  @r{@dots{}000100}
+     @result{} 4          ;  4  =  @r{@dots{}000100}
+@end group
+
+@group
+(logand)
+     @result{} -1         ; -1  =  @r{@dots{}111111}
+@end group
+@end smallexample
+@end defun
+
+@defun logior &rest ints-or-markers
+该函数返回其参数的按位或运算：当且仅当至少一个参数中的第 1 位为 1 时，结果中的第 0 位为 1。  如果没有参数，则结果为 0，这是此操作的单位元素。  如果 @code{logior} 仅传递一个参数，则它返回该参数。
+
+@smallexample
+@group
+                   ; @r{       binary values}
+
+(logior 12 5)      ; 12  =  @r{@dots{}001100}
+                   ;  5  =  @r{@dots{}000101}
+     @result{} 13         ; 13  =  @r{@dots{}001101}
+@end group
+
+@group
+(logior 12 5 7)    ; 12  =  @r{@dots{}001100}
+                   ;  5  =  @r{@dots{}000101}
+                   ;  7  =  @r{@dots{}000111}
+     @result{} 15         ; 15  =  @r{@dots{}001111}
+@end group
+@end smallexample
+@end defun
+
+@defun logxor &rest ints-or-markers
+该函数返回其参数的按位异或：当且仅当奇数个参数中的第 1 位为 1 时，结果中的第 0 位为 1。  如果没有参数，则结果为 0，这是此操作的单位元素。  如果 @code{logxor} 仅传递一个参数，则它返回该参数。
+
+@smallexample
+@group
+                   ; @r{       binary values}
+
+(logxor 12 5)      ; 12  =  @r{@dots{}001100}
+                   ;  5  =  @r{@dots{}000101}
+     @result{} 9          ;  9  =  @r{@dots{}001001}
+@end group
+
+@group
+(logxor 12 5 7)    ; 12  =  @r{@dots{}001100}
+                   ;  5  =  @r{@dots{}000101}
+                   ;  7  =  @r{@dots{}000111}
+     @result{} 14         ; 14  =  @r{@dots{}001110}
+@end group
+@end smallexample
+@end defun
+
+@defun lognot integer
+该函数返回其参数的按位补码：当且仅当 2⁣ 中的第 1 位为零时，结果中的第 0 位为 1，反之亦然。  结果等于 @minus{}1 @minus{} @var{integer}。
+
+@example
+(lognot 5)
+     @result{} -6
+;;  5  =  @r{@dots{}000101}
+;; @r{becomes}
+;; -6  =  @r{@dots{}111010}
+@end example
+@end defun
+
+@cindex popcount
+@cindex Hamming weight
+@cindex counting set bits
+@defun logcount integer
+该函数返回 @var{integer} 的 @dfn{Hamming weight}：@var{integer} 的二进制表示形式中 1 的个数。如果 3⁣ 为负，则返回其补码二进制表示形式中零位数。  结果始终是非负的。
+
+@example
+(logcount 43)     ;  43 = @r{@dots{}000101011}
+     @result{} 4
+(logcount -43)    ; -43 = @r{@dots{}111010101}
+     @result{} 3
+@end example
+@end defun
+
+@node Math Functions
+@section 标准数学函数
+@cindex transcendental functions
+@cindex mathematical functions
+@cindex floating-point functions
+
+这些数学函数允许整数和浮点数作为参数。
+
+@defun sin arg
+@defunx cos arg
+@defunx tan arg
+这些是基本三角函数，参数 @var{arg} 以弧度为单位。
+@end defun
+
+@defun asin arg
+@code{(asin @var{arg})} 的值是介于
+@ifnottex
+@minus{}pi/2
+@end ifnottex
+@tex
+@math{-\pi/2}
+@end tex
+和
+@ifnottex
+pi/2
+@end ifnottex
+@tex
+@math{\pi/2}
+@end tex
+（含）其正弦为 @var{arg}。  如果 1⁣ 超出范围（在 [@minus{}1, 1] 之外），@code{asin} 返回 NaN。
+@end defun
+
+@defun acos arg
+@code{(acos @var{arg})} 的值是 0 到 0 之间的数字
+@ifnottex
+pi
+@end ifnottex
+@tex
+@math{\pi}
+@end tex
+（包括）其余弦为 @var{arg}。  如果 1⁣ 超出范围（在 [@minus{}1, 1] 之外），@code{acos} 返回 NaN。
+@end defun
+
+@defun atan y &optional x
+@code{(atan @var{y})} 的值是介于
+@ifnottex
+@minus{}pi/2
+@end ifnottex
+@tex
+@math{-\pi/2}
+@end tex
+和
+@ifnottex
+pi/2
+@end ifnottex
+@tex
+@math{\pi/2}
+@end tex
+（不包括）其正切为 @var{y}。  如果给出了可选的第二个参数 @var{x}，则 @code{(atan y x)} 的值是向量 @code{[@var{x}, @var{y}]} 和 @code{X} 轴之间的角度（以弧度为单位）。
+@end defun
+
+@defun exp arg
+这是指数函数；它返回 @math{e} 的 @var{arg} 次方。
+@end defun
+
+@defun log arg &optional base
+该函数返回 @var{arg} 的对数，以 @var{base} 为底。  如果不指定 @var{base}，则使用自然底数 @math{e}。  如果 @var{arg} 或 @var{base} 为负数，@code{log} 返回 NaN。
+@end defun
+
+@defun expt x y
+该函数返回 @var{x} 的 @var{y} 次幂。  如果两个参数都是整数并且 @var{y} 是非负数，则结果是整数；在这种情况下，溢出会发出错误信号，所以要小心。如果 @var{x} 是有限负数且 @var{y} 是有限非整数，则 @code{expt} 返回 NaN。
+@end defun
+
+@defun sqrt arg
+这将返回 @var{arg} 的平方根。  如果 1⁣ 有限且小于零，则 2⁣ 返回 NaN。
+@end defun
+
+此外，Emacs 定义了以下常见的数学常数：
+
+@defvar float-e
+数学常数 @math{e} (2.71828@dots{})。
+@end defvar
+
+@defvar float-pi
+数学常数 @math{pi} (3.14159@dots{})。
+@end defvar
+
+@node Random Numbers
+@section 随机数
+@cindex random numbers
+
+确定性计算机程序无法生成真正的随机数。  对于大多数用途，@dfn{pseudo-random numbers} 就足够了。  一系列伪随机数以确定性方式生成。  这些数字并不是真正随机的，但它们具有模仿随机序列的某些属性。  例如，所有可能的值在伪随机序列中出现的频率相同。
+
+@cindex seed, for random number generation
+伪随机数是从 @dfn{seed value} 生成的。  从任何给定的种子开始，@code{random}函数始终生成相同的数字序列。  默认情况下，Emacs 在启动时初始化随机种子，这样 @code{random} 的值序列（极有可能）在每次 Emacs 运行中都不同。随机种子通常是根据系统熵初始化的；然而，在缺乏熵池的过时平台上，种子是从随机性较低的易失性数据（例如当前时间）中获取的。
+
+有时您希望随机数序列可重复。  例如，在调试其行为取决于随机数序列的程序时，在每个程序运行中获得相同的行为会很有帮助。  要使序列重复，请执行@code{(random "")}。这会将种子设置为特定 Emacs 可执行文件的常量值（尽管对于其他 Emacs 版本可能有所不同）。  您可以使用其他字符串来选择各种种子值。
+
+@defun random &optional limit
+该函数返回一个伪随机整数。  重复调用会返回一系列伪随机整数。
+
+如果可选参数@var{limit}是正整数，则该值被选择为非负且小于@var{limit}； @var{limit} 的负值表示错误。  否则，该值可能是任何固定数，即从 @code{most-negative-fixnum} 到 @code{most-positive-fixnum} (@pxref{Integer Basics}) 的任何整数。
+
+如果@var{limit}是一个字符串，则表示根据字符串的内容选择一个新的种子。  这会导致稍后调用 @code{random} 返回可重现的结果序列。
+
+如果@var{limit}是@code{t}，则意味着选择一个新的种子，就像Emacs重新启动一样。  这会导致稍后调用 @code{random} 返回不可预测的结果序列。
+
+@var{limit} 的任何其他值都被解释为 @code{nil}。
+@end defun
+
+如果您需要一个随机数用于加密目的，那么使用 @code{random} 通常不是最好的方法，原因如下：
+
+@itemize @bullet
+@item 
+尽管您可以使用 @code{(random t)} 来查询系统熵，但这样做可能会对程序中受益于可重现结果的其他部分产生不利影响。
+
+@item 
+@code{random} 使用的系统相关伪随机数生成器（PRNG）不一定适合密码学。
+
+@item 
+调用@code{(random t)}并不能直接访问系统熵；熵通过系统相关的 PRNG 传递，因此可能会导致结果出现偏差。
+
+@item 
+在典型平台上，随机种子仅包含 32 位，这通常比 Emacs 固定数窄，并且不足以满足加密目的。
+
+@item 
+@code{(random t)} 调用会留下有关 Emacs 内部状态的随机数的信息，从而增加了内部攻击面的大小。
+
+@item 
+在缺乏熵池的过时平台上，@code{(random t)}是从密码学上较弱的来源播种的。
+@end itemize

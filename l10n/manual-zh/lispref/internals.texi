@@ -1,0 +1,1782 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1993, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node GNU Emacs Internals
+@appendix GNU Emacs 内部结构
+
+本章介绍如何转储可运行的 Emacs 可执行文件以及其中预加载的 Lisp 库、如何分配存储空间以及 C 程序员可能感兴趣的 GNU Emacs 的一些内部方面。
+
+@menu
+* Building Emacs::       被抛弃的Emacs是如何制作的。
+* Garbage Collection::   回收不再使用的 Lisp 对象的空间。
+* Stack-allocated Objects::     C 堆栈上的临时 cons 和字符串。
+* Memory Usage::         有关迄今为止制作的 Lisp 对象总大小的信息。
+* C Dialect::            Emacs 是用什么 C 变体编写的。
+* Writing Emacs Primitives::    为 Emacs 编写 C 代码。
+* Writing Dynamic Modules::     为 Emacs 编写可加载模块。
+* Object Internals::     缓冲区、窗口、进程的数据格式。
+* C Integer Types::      如何在 Emacs 中使用 C 整数类型。
+@end menu
+
+@node Building Emacs
+@section 构建 Emacs
+@cindex building Emacs
+@pindex temacs
+
+本节介绍构建 Emacs 可执行文件所涉及的步骤。  您无需了解这些材料即可构建和安装 Emacs，因为 makefile 会自动完成所有这些操作。  此信息与 Emacs 开发人员相关。
+
+构建 Emacs 需要 GNU Make 3.81 或更高版本。
+
+编译@file{src}目录中的C源文件会生成一个名为@file{temacs}的可执行文件，也称为@dfn{bare impure Emacs}。  它包含 Emacs Lisp 解释器和 I/O 例程，但不包含编辑命令。
+
+@cindex @file{loadup.el}
+命令 @w{@command{temacs -l loadup}} 将运行 @file{temacs} 并指示它加载 @file{loadup.el}。  @code{loadup} 库加载额外的 Lisp 库，这些库设置了正常的 Emacs 编辑环境。  执行此步骤后，Emacs 可执行文件不再是@dfn{bare}。
+
+@cindex dumping Emacs
+@cindex @option{--temacs} option, and dumping method
+由于加载标准 Lisp 文件需要一些时间，因此 @file{temacs} 可执行文件通常不会由用户直接运行。相反，构建 Emacs 的最后步骤之一运行命令 @w{@samp{temacs -batch -l loadup --temacs=@var{dump-method}}}。  特殊选项@option{--temacs}告诉@command{temacs}如何记录所有标准预加载的Lisp函数和变量，这样当你随后运行Emacs时，它会启动得更快。  @option{--temacs} 选项需要一个参数 @var{dump-method}，它可以是以下之一：
+
+@table @samp
+@item pdump
+@cindex dump file
+将预加载的 Lisp 数据记录在 @dfn{dump file} 中。  此方法会生成一个额外的数据文件，Emacs 将在启动时加载该文件。  生成的转储文件通常称为 @file{emacs.pdmp}，并安装在 Emacs @code{exec-directory} (@pxref{Help Functions}) 中。  这种方法是最优选的一种，因为它不需要 Emacs 采用任何特殊的内存分配技术，这可能会妨碍现代系统使用的各种内存布局技术来增强安全性和隐私性。
+
+@item pbootstrap
+@cindex bootstrapping Emacs
+与 @samp{pdump} 类似，但在 @dfn{bootstrapping} Emacs 中使用，当时没有以前的 Emacs 二进制文件且没有 @file{*.elc} 字节编译的 Lisp 文件可用。  在这种情况下，生成的转储文件通常命名为 ⁣​​3⁣。
+@end table
+
+@cindex preloaded Lisp files
+@vindex preloaded-file-list
+转储的 @file{emacs} 可执行文件（也称为 @dfn{pure} Emacs）是已安装的可执行文件。  如果使用便携式转储程序来构建 Emacs，则 @file{emacs} 可执行文件实际上是 @file{temacs} 的精确副本，并且还会安装相应的 @file{emacs.pdmp} 文件。  变量 @code{preloaded-file-list} 存储转储文件或转储的 Emacs 可执行文件中记录的预加载 Lisp 文件的列表。  如果您将 Emacs 移植到新的操作系统，并且无法实现任何类型的转储，则 Emacs 每次启动时都必须加载@file{loadup.el}。
+
+@cindex build details
+@cindex deterministic build
+@cindex @option{--disable-build-details} option to @command{configure}
+默认情况下，转储的 @file{emacs} 可执行文件会记录构建时间和主机名等详细信息。  使用 @command{configure} 的 @option{--disable-build-details} 选项来抑制这些细节，以便从相同的源构建和安装 Emacs 两次更有可能产生相同的 Emacs 副本。
+
+@cindex @file{site-load.el}
+您可以通过编写加载它们的名为 @file{site-load.el} 的库来指定要预加载的其他文件。  然而，随着机器变得更快，预加载附加文件的优势就会减弱。  在现代机器上，通常不建议这样做。
+
+@file{loadup.el} 读取 @file{site-load.el} 后，它通过调用 @code{Snarf-documentation} (@pxref{Definition of Snarf-documentation,, Accessing Documentation}) 在存储它们的文件 @file{etc/DOC} 中查找原始函数和预加载函数（和变量）的文档字符串。
+
+@cindex @file{site-init.el}
+@cindex preloading additional functions and variables
+您可以指定其他 Lisp 表达式在转储之前执行，方法是将它们放入名为 @file{site-init.el} 的库中。  找到文档字符串后执行该文件。
+
+如果您想要预加载函数或变量定义，可以使用三种方法来执行此操作，并在随后运行 Emacs 时使它们的文档字符串可访问：
+
+@itemize @bullet
+@item
+安排在生成@file{etc/DOC}文件时扫描这些文件，并使用@file{site-load.el}加载它们。
+
+@item
+使用 @file{site-init.el} 加载文件，然后在安装 Emacs 时将文件复制到 Lisp 文件的安装目录中。
+
+@item
+在每个文件中为 @code{byte-compile-dynamic-docstrings} 指定一个 @code{nil} 值作为局部变量，并使用 @file{site-load.el} 或 @file{site-init.el} 加载它们。  （此方法的缺点是文档字符串始终占用 Emacs 中的空间。）
+@end itemize
+
+@cindex change @code{load-path} at configure time
+@cindex @option{--enable-locallisppath} option to @command{configure}
+不建议在 @file{site-load.el} 或 @file{site-init.el} 中放入任何会改变用户在普通未修改的 Emacs 中期望的任何功能的内容。  如果您认为必须覆盖站点的正常功能，请使用@file{default.el} 进行操作，以便用户可以根据需要覆盖您的更改。  @xref{Startup Summary}。请注意，如果 @file{site-load.el} 或 @file{site-init.el} 更改 @code{load-path}，则转储后更改将丢失。 @xref{Library Search}。  要对 @code{load-path} 进行永久更改，请使用 @command{configure} 的 @option{--enable-locallisppath} 选项。
+
+在可以预加载的包中，有时有必要（或有用）延迟某些评估，直到 Emacs 随后启动。  绝大多数此类情况与可自定义变量的值有关。  例如，@code{tutorial-directory}是@file{startup.el}中定义的变量，它是预加载的。  默认值是基于@code{data-directory}设置的。  该变量需要在 Emacs 启动时访问 @code{data-directory} 的值，而不是在转储时访问，因为 Emacs 可执行文件自转储后可能已安装在不同的位置。
+
+@defun custom-initialize-delay symbol value
+该函数将 @var{symbol} 的初始化延迟到下一次 Emacs 启动。  通常，您可以通过将其指定为可自定义变量的 @code{:initialize} 属性来使用此函数。  （参数 @var{value} 未使用，仅为了与 Custom 期望的形式兼容而提供。）
+@end defun
+
+万一您需要比 @code{custom-initialize-delay} 提供的更通用的功能，您可以使用 @code{before-init-hook} (@pxref{Startup Summary})。
+
+@defun dump-emacs-portable to-file &optional track-referrers
+该函数使用 @code{pdump} 方法将 Emacs 的当前状态转储到转储文件 @var{to-file} 中。  通常，转储文件名为 @file{@var{emacs-name}.dmp}，其中 @var{emacs-name} 是 Emacs 可执行文件的名称。  可选参数 @var{track-referrers}（如果不是 @code{nil}）会导致便携式转储程序保留附加信息，以帮助追踪 @code{pdump} 方法尚不支持的对象类型的来源。
+
+尽管可移植转储程序代码可以在许多平台上运行，但它生成的转储文件是不可移植的——它们只能由转储它们的 Emacs 可执行文件加载。
+
+如果您想在已转储的 Emacs 中使用此函数，则必须使用 @samp{-batch} 选项运行 Emacs。
+
+@vindex after-pdump-load-hook
+如果您在转储的 Emacs 中包含 @samp{.el} 文件，并且 @samp{.el} 文件包含通常在加载时运行的代码，则转储后 Emacs 启动时该代码将不会运行。  为了帮助解决该问题，您可以将函数放在 @code{after-pdump-load-hook} 挂钩上。  该钩子在启动 Emacs 时运行。
+@end defun
+
+@defun pdumper-stats
+如果当前 Emacs 会话从转储文件恢复其状态，则此函数返回有关转储文件的信息以及恢复 Emacs 状态所需的时间。  该值是一个列表@w{@code{((dumped-with-pdumper . t) (load-time . @var{time}) (dump-file-name . @var{file}))}}，其中@var{file}是转储文件的名称，@var{time}是从转储文件恢复状态所需的时间（以秒为单位）。如果当前会话不是从转储文件恢复的，则该值为@code{nil}。
+@end defun
+
+@node Garbage Collection
+@section 垃圾收集
+
+@cindex memory allocation
+当程序创建列表或用户定义新函数（例如通过加载库）时，该数据将放置在普通存储中。如果正常存储空间不足，Emacs 会要求操作系统分配更多内存。  不同类型的 Lisp 对象，例如符号、cons 单元、小向量、标记等，被隔离在内存中不同的块中。  （大向量、长字符串、缓冲区和某些其他相当大的编辑类型被分配在单独的块中，每个对象一个；小字符串打包到 8k 字节的块中，小向量打包到 4k 字节的块中）。
+
+@cindex vector-like objects, storage
+@cindex storage of vector-like Lisp objects
+除了基本向量之外，许多对象（例如标记、叠加层和缓冲区）都像向量一样进行管理。  相应的 C 数据结构包括 @code{union vectorlike_header} 字段，其 @code{size} 成员包含 @code{enum pvec_type} 枚举的子类型，以及有关该结构包含多少个 @code{Lisp_Object} 字段以及其余数据大小的信息。  计算对象的内存占用量需要此信息，并由向量分配代码在迭代向量块时使用。
+
+@cindex garbage collection
+使用一些存储一段时间，然后通过（例如）杀死缓冲区或删除指向对象的最后一个指针来释放它是很常见的。  Emacs 提供了 @dfn{garbage collector} 来回收这个废弃的存储空间。  本质上，垃圾收集器的工作方式是查找并标记 Lisp 程序仍可访问的所有 Lisp 对象。  首先，它假设所有符号、它们的值和关联的函数定义以及堆栈上当前的任何数据都是可访问的。  任何可以通过其他可访问对象间接访问的对象也是可访问的，但此计算是“保守”完成的，因此它可能会稍微高估可访问的对象数量。
+
+当标记完成后，所有尚未标记的对象都是垃圾。  无论 Lisp 程序或用户做什么，都不可能引用它们，因为不再有办法访问它们。  他们的空间也可以被重复利用，因为没有人会错过他​​们。  垃圾收集器的第二（清除）阶段安排重用它们。  （但由于标记是“保守地”完成的，因此并非所有未使用的对象都保证被任何一次扫描垃圾收集。）
+
+@c ??? Maybe add something describing weak hash tables here?
+
+@cindex free list
+扫描阶段将未使用的 cons 单元放入@dfn{free list}以供将来分配；对于符号和标记也是如此。  它压缩了可访问的字符串，使它们占用更少的 8k 块；然后它释放其他 8k 块。  来自矢量块的无法到达的矢量被合并以创建尽可能大的自由区域；如果空闲区域跨越完整的 4k 块，则该块将被释放。  否则，空闲区域被记录在空闲列表数组中，其中每个条目对应于相同大小的区域的空闲列表。  大向量、缓冲区和其他大对象是单独分配和释放的。
+
+@cindex CL note---allocate more storage
+@quotation
+@b{Common Lisp note:} 与其他 Lisp 不同，当空闲列表为空时，GNU Emacs Lisp 不会调用垃圾收集器。  相反，它只是请求操作系统分配更多存储空间，然后继续处理，直到使用了 1 个字节为止。
+
+这意味着您可以通过在 Lisp 程序的某个部分之前显式调用垃圾收集器来确保垃圾收集器不会在该部分运行（前提是程序的该部分不使用太多空间来强制进行第二次垃圾收集）。
+@end quotation
+
+@defun garbage-collect-heapsize
+该函数返回当前内存使用情况的信息。返回值是一个列表，其中包含有关正在使用的空间量的信息，其中每个条目的形式为@samp{(@var{name} @var{size} @var{used})}或@samp{(@var{name} @var{size} @var{used} @var{free})}。  在条目中，@var{name} 是描述该条目代表的对象类型的符号，@var{size} 是每个对象使用的字节数，@var{used} 是在堆中找到的活动对象的数量，可选的 @var{free} 是那些不活动但 Emacs 保留以供将来分配的对象的数量。  所以总体结果是：
+
+@example
+((@code{conses} @var{cons-size} @var{used-conses} @var{free-conses})
+ (@code{symbols} @var{symbol-size} @var{used-symbols} @var{free-symbols})
+ (@code{strings} @var{string-size} @var{used-strings} @var{free-strings})
+ (@code{string-bytes} @var{byte-size} @var{used-bytes})
+ (@code{vectors} @var{vector-size} @var{used-vectors})
+ (@code{vector-slots} @var{slot-size} @var{used-slots} @var{free-slots})
+ (@code{floats} @var{float-size} @var{used-floats} @var{free-floats})
+ (@code{intervals} @var{interval-size} @var{used-intervals} @var{free-intervals})
+ (@code{buffers} @var{buffer-size} @var{used-buffers})
+ (@code{heap} @var{unit-size} @var{total-size} @var{free-size}))
+@end example
+
+这是一个例子：
+
+@example
+(garbage-collect)
+      @result{} ((conses 16 49126 8058) (symbols 48 14607 0)
+                 (strings 32 2942 2607)
+                 (string-bytes 1 78607) (vectors 16 7247)
+                 (vector-slots 8 341609 29474) (floats 8 71 102)
+                 (intervals 56 27 26) (buffers 944 8)
+                 (heap 1024 11715 2678))
+@end example
+
+下表解释了每个元素。  请注意，最后一个 @code{heap} 条目是可选的，并且仅当底层 @code{malloc} 实现提供 @code{mallinfo} 函数时才出现。
+
+@table @var
+@item cons-size
+cons 单元的内部尺寸，即 @code{sizeof (struct Lisp_Cons)}。
+
+@item used-conses
+正在使用的 con 单元的数量。
+
+@item free-conses
+已从操作系统获取空间但当前未使用的 cons 单元的数量。
+
+@item symbol-size
+符号的内部大小，即 @code{sizeof (struct Lisp_Symbol)}。
+
+@item used-symbols
+使用的符号数量。
+
+@item free-symbols
+已从操作系统获取空间但当前未使用的符号数量。
+
+@item string-size
+字符串头的内部大小，即@code{sizeof (struct Lisp_String)}。
+
+@item used-strings
+正在使用的字符串标头的数量。
+
+@item free-strings
+已从操作系统获取空间但当前未使用的字符串标头的数量。
+
+@item byte-size
+这是为了方便而使用的，等于@code{sizeof (char)}。
+
+@item used-bytes
+所有字符串数据的总大小（以字节为单位）。
+
+@item vector-size
+长度为 1 的向量的大小（以字节为单位），包括其标头。
+
+@item used-vectors
+从向量块分配的向量头的数量。
+
+@item slot-size
+向量槽的内部大小，始终等于@code{sizeof (Lisp_Object)}。
+
+@item used-slots
+所有使用的向量中的槽数。插槽计数可能包括矢量标头的部分或全部开销，具体取决于平台。
+
+@item free-slots
+所有向量块中的空闲槽数。
+
+@item float-size
+浮点对象的内部大小，即 @code{sizeof (struct Lisp_Float)}。 （不要将其与本机平台@code{float}或@code{double}混淆。）
+
+@item used-floats
+使用中的浮点数。
+
+@item free-floats
+已从操作系统获取空间但当前未使用的浮点数量。
+
+@item interval-size
+区间对象的内部大小，即 @code{sizeof (struct interval)}。
+
+@item used-intervals
+使用的间隔数。
+
+@item free-intervals
+已从操作系统获取空间但当前未使用的间隔数。
+
+@item buffer-size
+缓冲区的内部大小，即 @code{sizeof (struct buffer)}。 （不要与 @code{buffer-size} 函数返回的值混淆。）
+
+@item used-buffers
+正在使用的缓冲区对象的数量。  这包括对用户不可见的被杀死的缓冲区，即 @code{all_buffers} 列表中的所有缓冲区。
+
+@item unit-size
+堆空间测量单位，始终等于 1024 字节。
+
+@item total-size
+总堆大小，以 @var{unit-size} 为单位。
+
+@item free-size
+当前未使用的堆空间，以 @var{unit-size} 为单位。
+@end table
+@end defun
+
+@deffn Command garbage-collect
+此命令运行垃圾收集，并返回有关正在使用的空间量的信息。  （如果自上次垃圾回收以来使用了超过 @code{gc-cons-threshold} 字节的 Lisp 数据，垃圾回收也可能自发发生。）
+
+@code{garbage-collect} 返回与上面所示的 @code{garbage-collect-heapsize} 相同的列表。
+@end deffn
+
+@defopt garbage-collection-messages
+如果此变量为非@code{nil}，Emacs 将在垃圾回收开始和结束时显示一条消息。  默认值为@code{nil}。
+@end defopt
+
+@defvar post-gc-hook
+这是在垃圾收集结束时运行的正常挂钩。钩子函数运行时垃圾收集会被禁止，因此编写它们时要小心。
+@end defvar
+
+@defopt gc-cons-threshold
+该变量的值是在一次垃圾回收之后必须为 Lisp 对象分配的存储字节数，以便触发另一次垃圾回收。  您可以使用 @code{garbage-collect} 返回的结果来获取有关特定对象类型的大小的信息；分配给缓冲区内容的空间不计算在内。
+
+初始阈值是@code{GC_DEFAULT_THRESHOLD}，在@file{alloc.c}中定义。  由于它是以 @code{word_size} 单位定义的，因此默认 32 位配置的值为 400,000，64 位配置和使用 @option{--with-wide-int} 选项配置的 32 位构建的值为 800,000。  如果指定较大的值，垃圾收集的频率就会降低。  这减少了垃圾收集所花费的时间（因此 Lisp 程序在很少发生的垃圾收集周期之间运行得更快），但增加了总内存使用量。  当运行创建大量 Lisp 数据的程序时，您可能需要执行此操作，特别是当您需要它运行得更快时。但是，我们建议不要长时间增加阈值，并且建议您永远不要将其设置得高于程序在合理时间内运行所需的值。  使用高于必要的阈值可能会导致更高的系统范围内存压力，并且还会使每个垃圾收集周期花费更多时间，因此应该避免。
+
+您可以通过指定较小的值（低至 0⁣ 的 1/10）来提高收集频率。  小于此最小值的值将仅在后续垃圾收集之前保持有效，此时 @code{garbage-collect} 会将阈值设置回最小值。
+@end defopt
+
+@defopt gc-cons-percentage
+此变量的值指定垃圾回收发生之前的 consing 量，作为当前堆大小的一部分。该标准和@code{gc-cons-threshold}并行应用，并且仅当满足两个标准时才会发生垃圾收集。
+
+随着堆大小的增加，执行垃圾收集的时间也会增加。  因此，可能需要按比例减少执行这些操作的频率。
+
+在交互式会话和转储 Emacs (@pxref{Building Emacs}) 时，初始百分比值为 0.1，在非交互式（又名@:“批处理”）会话中为 1.0。
+
+与 0⁣ 一样，请勿将其放大到不必要的程度，并且切勿长时间放大。
+@end defopt
+
+通过 @code{gc-cons-threshold} 和 @code{gc-cons-percentage} 对垃圾收集器的控制只是近似的。  尽管 Emacs 会定期检查阈值耗尽，但出于效率原因，它不会在每次对堆或@code{gc-cons-threshold} 或 @code{gc-cons-percentage} 进行更改后立即执行此操作，因此耗尽阈值不会立即触发垃圾收集。  此外，为了提高阈值计算的效率，Emacs 近似计算堆大小，它计算堆中当前可访问对象使用的字节数。
+
+@code{garbage-collect} 返回的值描述了 Lisp 数据使用的内存量，按数据类型细分。  相比之下，函数 @code{memory-limit} 提供有关 Emacs 当前使用的内存总量的信息。
+
+@defun memory-limit
+此函数返回 Emacs 当前使用的虚拟内存字节总数除以 1024 的估计值。您可以使用它来大致了解您的操作如何影响内存使用。
+@end defun
+
+@defvar memory-full
+如果 Emacs 几乎没有 Lisp 对象的内存，则该变量为 @code{t}，否则为 @code{nil}。
+@end defvar
+
+@defun memory-use-counts
+这将返回一个数字列表，用于计算在此 Emacs 会话中创建的对象的数量。  每个计数器都会针对某种类型的对象递增。  有关详细信息，请参阅文档字符串。
+@end defun
+
+@defun memory-info
+此函数返回系统总内存量以及其中有多少是可用的。  在不受支持的系统上，该值可能是@code{nil}。
+
+如果@code{default-directory}指向远程主机，则返回该主机的内存信息。
+@end defun
+
+@defvar gcs-done
+该变量包含迄今为止在此 Emacs 会话中完成的垃圾收集总数。
+@end defvar
+
+@defvar gc-elapsed
+该变量包含此 Emacs 会话中到目前为止垃圾回收期间已用时间的总秒数（浮点数）。
+@end defvar
+
+@defun memory-report
+有时，查看 Emacs 在何处使用内存（在各种变量、缓冲区和缓存中）可能很有用。  该命令将打开一个新的缓冲区（称为 @samp{"*Memory Report*"}），除了列出“最大”缓冲区和变量之外，它还会提供概述。
+
+这里的所有数据都是近似的，因为实际上没有一致的方法来计算变量的大小。  例如，两个变量可能共享数据结构的一部分，这将被计算两次，但该命令仍然可以提供有关 Emacs 的哪些部分正在使用内存的有用的高级概述。
+@end defun
+
+@node Stack-allocated Objects
+@section 堆栈分配的对象
+
+@cindex stack allocated Lisp objects
+@cindex Lisp objects, stack-allocated
+上面描述的垃圾收集器用于管理 Lisp 程序中可见的数据，以及 Lisp 解释器内部使用的大部分数据。  有时，使用解释器的 C 堆栈分配临时内部对象可能很有用。  这可以提高性能，因为堆栈分配通常比使用堆内存分配和垃圾收集器释放更快。  缺点是，在释放此类对象后使用它们会导致未定义的行为，因此应仔细考虑使用并使用@code{GC_CHECK_MARKED_OBJECTS}功能仔细调试（请参阅@file{src/alloc.c}）。  特别是，堆栈分配的对象永远不应该对用户 Lisp 代码可见。
+
+目前，cons 单元格和字符串可以通过这种方式分配。  这是通过 @code{AUTO_CONS} 和 @code{AUTO_STRING} 等 C 宏实现的，它们定义了具有块生命周期的命名 @code{Lisp_Object}。  这些对象不会被垃圾收集器释放；相反，它们具有自动存储持续时间，即它们像局部变量一样被分配，并在定义对象的 C 块执行结束时自动释放。
+
+出于性能原因，堆栈分配的字符串仅限于 @acronym{ASCII} 字符，并且其中许多字符串是不可变的，即，对它们调用 @code{ASET} 会产生未定义的行为。
+
+@node Memory Usage
+@section 内存使用情况
+@cindex memory usage
+
+这些函数和变量提供有关 Emacs 已完成的内存分配总量的信息（按数据类型细分）。请注意这些值与 @code{garbage-collect} 返回的值之间的差异；这些计数当前存在的对象，但这些计数所有分配的数量或大小，包括那些已被释放的对象。
+
+@defvar cons-cells-consed
+到目前为止已在此 Emacs 会话中分配的 cons 单元总数。
+@end defvar
+
+@defvar floats-consed
+到目前为止已在此 Emacs 会话中分配的浮点总数。
+@end defvar
+
+@defvar vector-cells-consed
+到目前为止已在此 Emacs 会话中分配的向量单元总数。这包括类似矢量的对象，例如标记和叠加层，以及用户不可见的某些对象。
+@end defvar
+
+@defvar symbols-consed
+到目前为止已在此 Emacs 会话中分配的符号总数。
+@end defvar
+
+@defvar string-chars-consed
+到目前为止已在此会话中分配的字符串字符总数。
+@end defvar
+
+@defvar intervals-consed
+到目前为止已在此 Emacs 会话中分配的间隔总数。
+@end defvar
+
+@defvar strings-consed
+到目前为止已在此 Emacs 会话中分配的字符串总数。
+@end defvar
+
+@node C Dialect
+@section C方言
+@cindex C programming language
+
+Emacs 的 C 部分可移植到 C99 或更高版本：未经检查，通常在配置时不会使用更高版本的 C 功能，例如 @samp{<stdckdint.h>} 和 @samp{[[noreturn]]}，并且 Emacs 构建过程在必要时提供替代实现。  后来的一些功能，例如匿名结构和联合，太难模仿，因此完全避免使用它们。
+
+在未来的某个时刻，基本 C 方言无疑会更改为晚于 C99 的语言。
+
+@node Writing Emacs Primitives
+@section 编写 Emacs 原语
+@cindex primitive function internals
+@cindex writing Emacs primitives
+
+Lisp 原语是在 C@. 中实现的 Lisp 函数。连接 C 函数以便 Lisp 可以调用它的细节由一些 C 宏处理。  真正理解如何编写新的 C 代码的唯一方法是阅读源代码，但我们可以在这里解释一些事情。
+
+特殊形式的一个例子是从@file{eval.c}定义@code{or}。  （普通函数将具有相同的总体外观。）
+
+@smallexample
+@group
+DEFUN ("or", For, Sor, 0, UNEVALLED, 0,
+       doc: /* Eval args until one of them yields non-nil,
+then return that value.
+The remaining args are not evalled at all.
+If all args return nil, return nil.
+@end group
+@group
+usage: (or CONDITIONS...)  */)
+  (Lisp_Object args)
+@{
+  Lisp_Object val = Qnil;
+@end group
+
+@group
+  while (CONSP (args))
+    @{
+      val = eval_sub (XCAR (args));
+      if (!NILP (val))
+        break;
+      args = XCDR (args);
+      maybe_quit ();
+    @}
+@end group
+
+@group
+  return val;
+@}
+@end group
+@end smallexample
+
+@cindex @code{DEFUN}, C macro to define Lisp primitives
+让我们从 @code{DEFUN} 宏的参数的精确解释开始。  这是他们的模板：
+
+@example
+DEFUN (@var{lname}, @var{fname}, @var{sname}, @var{min}, @var{max}, @var{interactive}, @var{doc})
+@end example
+
+@table @var
+@item lname
+这是定义为函数名称的 Lisp 符号的名称；在上面的例子中，它是@code{or}。
+
+@item fname
+这是该函数的 C 函数名称。  这是 C 代码中用于调用函数的名称。  按照惯例，该名称在 Lisp 名称前面添加了 @samp{F}，Lisp 名称中的所有破折号 (@samp{-}) 都更改为下划线。  因此，要从 C 代码调用此函数，请调用 @code{For}。
+
+@item sname
+这是一个 C 变量名称，用于保存代表 Lisp 中函数的 subr 对象的数据的结构。  该结构将 Lisp 符号名称传递给初始化例程，初始化例程将创建符号并将 subr 对象存储为其定义。  按照惯例，该名称始终为 @var{fname}，其中 @samp{F} 替换为 @samp{S}。
+
+@item min
+这是该函数所需的最小参数数。  函数 @code{or} 允许最少零个参数。
+
+@item max
+如果有固定的最大值，则这是该函数接受的最大参数数。  或者，它可以是 @code{UNEVALLED}，表示接收未求值参数的特殊形式，或 @code{MANY}，表示无限数量的求值参数（相当于 @code{&rest}）。  @code{UNEVALLED}和@code{MANY}都是宏。  如果@var{max}是一个数字，它必须大于@var{min}但小于8。
+
+@cindex interactive specification in primitives
+@item interactive
+这是一个交互式规范，一个字符串可以用作 Lisp 函数中 @code{interactive} 的参数 (@pxref{Using Interactive})。  在@code{or}的情况下，它是@code{0}（空指针），表明@code{or}无法交互调用。  值 5⁣ 表示交互调用时不应接收任何参数的函数。如果该值以 @samp{"(} 开头，则该字符串将被评估为 Lisp 形式。  例如：
+
+@example
+@group
+DEFUN ("foo", Ffoo, Sfoo, 0, 3,
+       "(list (read-char-by-name \"Insert character: \")\
+              (prefix-numeric-value current-prefix-arg)\
+              t)",
+       doc: /* @dots{} */)
+@end group
+@end example
+
+@item doc
+这是文档字符串。  它使用 C 注释语法而不是 C 字符串语法，因为注释语法不需要任何特殊内容即可包含多行。  @samp{doc:} 标识后面的注释作为文档字符串。  注释开始和结束的 @samp{/*} 和 @samp{*/} 分隔符不是文档字符串的一部分。
+
+如果文档字符串的最后一行以关键字 @samp{usage:} 开头，则该行的其余部分将被视为出于文档目的的参数列表。  这样，您可以在文档字符串中使用与 C 代码中使用的参数名称不同的参数名称。如果函数有无限数量的参数，则需要 @samp{usage:}。
+
+一些原语有多个定义，每个平台一个（例如，@code{x-create-frame}）。  在这种情况下，不是在每个定义中编写相同的文档字符串，而是只有一个定义具有实际文档。  其他的占位符以 @samp{SKIP} 开头，解析 @file{DOC} 文件的函数会忽略这些占位符。
+
+Lisp 代码中文档字符串的所有常用规则 (@pxref{Documentation Tips}) 也适用于 C 代码文档字符串。
+
+文档字符串后面可以跟有实现原语的 C 函数的 C 函数属性列表，如下所示：
+
+@example
+@group
+DEFUN ("bar", Fbar, Sbar, 0, UNEVALLED, 0
+       doc: /* @dots{} */
+       attributes: @var{attr1} @var{attr2} @dots{})
+@end group
+@end example
+
+@noindent
+您可以一个接一个地指定多个属性。目前，仅识别以下属性：
+
+@table @code
+@item noreturn
+将 C 函数声明为永不返回的函数。  这对应于 C23 的 @code{[[noreturn]]}、C11 的 @code{_Noreturn} 和 GCC 的 @w{@code{__attribute__ ((__noreturn__))}} (@pxref{Function Attributes,,, gcc, Using the GNU Compiler Collection})。  （在内部，Emacs 自己的 C 代码使用@code{_Noreturn}，因为它可以在不支持它的 C 平台上定义为宏。）
+
+@item const
+声明该函数不检查除参数之外的任何值，并且除了返回值之外没有任何影响。  这对应于 C23 的 @code{[[unsequenced]]} 和 GCC 的 @w{@code{__attribute__ ((__const__))}}。
+
+@item noinline
+这对应于 GCC 的 @w{@code{__attribute__ ((__noinline__))}} 属性，它阻止函数被考虑内联。  例如，这可能是需要的，以抵消链接时优化对基于堆栈的变量的影响。
+@end table
+
+@end table
+
+调用 @code{DEFUN} 宏后，必须编写 C 函数的参数列表，包括参数的类型。  如果原语接受固定最大数量的 Lisp 参数，则每个 Lisp 参数必须有一个 C 参数，并且每个参数的类型必须为 @code{Lisp_Object}。  （用于创建 @code{Lisp_Object} 类型值的各种宏和函数在文件 @file{lisp.h} 中声明。）如果原语是特殊形式，则它必须接受包含其未计算的 Lisp 参数的 Lisp 列表作为 @code{Lisp_Object} 类型的单个参数。  如果原语对计算的 Lisp 参数数量没有上限，则它必须恰好有两个 C 参数：第一个是 Lisp 参数的数量，第二个是包含其值的块的地址。它们分别具有类型 @code{ptrdiff_t} 和 @w{@code{Lisp_Object *}}。  由于@code{Lisp_Object}可以保存任何数据类型的任何Lisp对象，因此您只能在运行时确定实际的数据类型；因此，如果您希望原语​​仅接受某种类型的参数，则必须使用合适的谓词 (@pxref{Type Predicates}) 显式检查该类型。
+@cindex type checking internals
+
+@cindex garbage collection protection
+@cindex protect C variables from garbage collection
+在函数 @code{For} 本身内，局部变量 @code{args} 指的是由 Emacs 的堆栈标记垃圾收集器控制的对象。  尽管垃圾收集器不会回收可从 C @code{Lisp_Object} 堆栈变量访问的对象，但它可能会移动对象的某些组件，例如字符串的内容或缓冲区的文本。  因此，访问这些组件的函数必须注意在执行 Lisp 求值后重新获取它们的地址。  这意味着代码不应保留指向字符串内容或缓冲区文本的 C 指针，而应保留缓冲区或字符串位置，并在执行 Lisp 求值后从该位置重新计算 C 指针。  Lisp 计算可以通过直接或间接调用 @code{eval_sub} 或 @code{Feval} 进行。
+
+@cindex @code{maybe_quit}, use in Lisp primitives
+请注意循环内对 @code{maybe_quit} 的调用：该函数检查用户是否按下了 @kbd{C-g}，如果是，则中止处理。  您应该在任何可能需要大量迭代的循环中执行此操作；在这种情况下，参数列表可能会很长。  这提高了 Emacs 的响应能力并改善了用户体验。
+
+不得对静态或全局变量使用 C 初始值设定项，除非在转储 Emacs 后从未写入这些变量。  这些带有初始值设定项的变量被分配在由于转储 Emacs 而变为只读的内存区域（在某些操作系统上）。
+
+@cindex @code{defsubr}, Lisp symbol for a primitive
+定义 C 函数不足以使 Lisp 原语可用；还需要定义 C 函数。您还必须为原语创建 Lisp 符号，并在其函数单元中存储合适的 subr 对象。  代码如下所示：
+
+@example
+defsubr (&@var{sname});
+@end example
+
+@noindent
+这里 @var{sname} 是用作 @code{DEFUN} 第三个参数的名称。
+
+如果将新原语添加到已定义 Lisp 原语的文件中，请找到名为 @code{syms_of_@var{something}} 的函数（靠近文件末尾），并在其中添加对 @code{defsubr} 的调用。  如果该文件没有此功能，或者您创建了一个新文件，请向其中添加 @code{syms_of_@var{filename}}（例如 @code{syms_of_myfile}）。  然后在 @file{emacs.c} 中找到调用所有这些函数的位置，并在那里添加对 @code{syms_of_@var{filename}} 的调用。
+
+@anchor{Defining Lisp variables in C}
+@vindex byte-boolean-vars
+@cindex defining Lisp variables in C
+@cindex @code{DEFVAR_INT}, @code{DEFVAR_LISP}, @code{DEFVAR_BOOL}, @code{DEFSYM}
+函数 @code{syms_of_@var{filename}} 也是定义任何作为 Lisp 变量可见的 C 变量的地方。 @code{DEFVAR_LISP} 使@code{Lisp_Object} 类型的 C 变量在 Lisp 中可见。  @code{DEFVAR_INT} 使类型 @code{int} 的 C 变量在 Lisp 中可见，其值始终为整数。 @code{DEFVAR_BOOL} 使类型为 @code{int} 的 C 变量在 Lisp 中可见，其值为 @code{t} 或 @code{nil}。  请注意，用 @code{DEFVAR_BOOL} 定义的变量会自动添加到字节编译器使用的列表 @code{byte-boolean-vars} 中。
+
+这些宏都需要三个参数：
+
+@table @code
+@item lname
+Lisp 程序要使用的变量的名称。
+@item vname
+C 源代码中变量的名称。
+@item doc
+变量的文档，作为 C 注释。  @xref{Documentation Basics}，了解更多详情。
+@end table
+
+按照约定，当定义“原生”类型的变量（@code{int} 和 @code{bool}）时，C 变量的名称是 Lisp 变量的名称，其中 @code{-} 替换为 @code{_}。  当变量的类型为 @code{Lisp_Object} 时，惯例是在 C 变量名称前加上 @code{V} 前缀。  这是一个例子：
+
+@smallexample
+DEFVAR_INT ("my-int-variable", my_int_variable,
+           doc: /* An integer variable.  */);
+
+DEFVAR_LISP ("my-lisp-variable", Vmy_lisp_variable,
+           doc: /* A Lisp variable.  */);
+@end smallexample
+
+在 Lisp 中，有些情况你需要引用符号本身而不是该符号的值。  其中一种情况是临时覆盖变量的值，这在 Lisp 中是通过 @code{let} 完成的。  在 C 源代码中，这是通过定义相应的常量符号并使用 @code{specbind} 来完成的。  按照惯例，@code{Qmy_lisp_variable} 对应于@code{Vmy_lisp_variable}；要定义它，请使用 @code{DEFSYM} 宏。
+
+@smallexample
+DEFSYM (Qmy_lisp_variable, "my-lisp-variable");
+@end smallexample
+
+执行实际绑定：
+
+@smallexample
+specbind (Qmy_lisp_variable, Qt);
+@end smallexample
+
+在 Lisp 中，符号有时需要加引号。  为了在 C 中达到相同的效果，您再次使用相应的常量符号 @code{Qmy_lisp_variable}。  例如，在 Lisp 中创建缓冲区局部变量 (@pxref{Buffer-Local Variables}) 时，您可以编写：
+
+@smallexample
+(make-variable-buffer-local 'my-lisp-variable)
+@end smallexample
+
+在 C 语言中，相应的代码将 @code{Fmake_variable_buffer_local} 与 @code{DEFSYM} 结合使用：
+
+@smallexample
+DEFSYM (Qmy_lisp_variable, "my-lisp-variable");
+Fmake_variable_buffer_local (Qmy_lisp_variable);
+@end smallexample
+
+@cindex defining customization variables in C
+如果您想让 C 中定义的 Lisp 变量的行为类似于使用 @code{defcustom} 声明的变量，请向 @file{cus-start.el} 添加适当的条目。  @xref{Variable Definitions}，有关要使用的格式的描述。
+
+@cindex @code{staticpro}, protection from GC
+如果直接定义类型为 @code{Lisp_Object} 的文件范围 C 变量，则必须通过在 @code{syms_of_@var{filename}} 中调用 @code{staticpro} 来保护它免受垃圾回收，如下所示：
+
+@example
+staticpro (&@var{variable});
+@end example
+
+这是另一个示例函数，具有更复杂的参数。这来自@file{window.c}中的代码，它演示了如何使用宏和函数来操作 Lisp 对象。
+
+@smallexample
+@group
+DEFUN ("coordinates-in-window-p", Fcoordinates_in_window_p,
+       Scoordinates_in_window_p, 2, 2, 0,
+       doc: /* Return non-nil if COORDINATES are in WINDOW.
+  @dots{}
+@end group
+@group
+  or `right-margin' is returned.  */)
+  (register Lisp_Object coordinates, Lisp_Object window)
+@{
+  struct window *w;
+  struct frame *f;
+  int x, y;
+  Lisp_Object lx, ly;
+@end group
+
+@group
+  w = decode_live_window (window);
+  f = XFRAME (w->frame);
+  CHECK_CONS (coordinates);
+  lx = Fcar (coordinates);
+  ly = Fcdr (coordinates);
+  CHECK_NUMBER (lx);
+  CHECK_NUMBER (ly);
+  x = FRAME_PIXEL_X_FROM_CANON_X (f, lx) + FRAME_INTERNAL_BORDER_WIDTH (f);
+  y = FRAME_PIXEL_Y_FROM_CANON_Y (f, ly) + FRAME_INTERNAL_BORDER_WIDTH (f);
+@end group
+
+@group
+  switch (coordinates_in_window (w, x, y))
+    @{
+    case ON_NOTHING:            /* NOT in window at all.  */
+      return Qnil;
+@end group
+
+    @dots{}
+
+@group
+    case ON_MODE_LINE:          /* In mode line of window.  */
+      return Qmode_line;
+@end group
+
+    @dots{}
+
+@group
+    case ON_SCROLL_BAR:         /* On scroll-bar of window.  */
+      /* Historically we are supposed to return nil in this case.  */
+      return Qnil;
+@end group
+
+@group
+    default:
+      emacs_abort ();
+    @}
+@}
+@end group
+@end smallexample
+
+请注意，C 代码不能通过名称调用函数，除非它们是在 C@. 中定义的。调用 Lisp 编写的函数的方法是使用@code{Ffuncall}，它体现了 Lisp 函数@code{funcall}。  由于 Lisp 函数 @code{funcall} 接受无限数量的参数，因此在 C 中它需要两个：Lisp 级参数的数量，以及包含它们值的一维数组。  第一个 Lisp 级参数是要调用的 Lisp 函数，其余的是要传递给它的参数。
+
+C 宏 @code{calln} 是调用 Lisp 函数而无需指定参数数量的便捷方法。  它通过调用 @code{Ffuncall} 来工作。
+
+@file{eval.c} 是一个非常适合查看示例的文件； @file{lisp.h} 包含一些重要宏和函数的定义。
+
+如果您定义一个无副作用或纯函数，请分别为其指定非 @code{nil} @code{side-effect-free} 或 @code{pure} 属性 (@pxref{Standard Properties})。  请参阅@samp{byte-opt.el}中定义的列表。
+
+@node Writing Dynamic Modules
+@section 编写动态加载的模块
+@cindex writing emacs modules
+@cindex dynamic modules, writing
+
+@cindex module @acronym{API}
+本节介绍 Emacs 模块 @acronym{API} 以及如何使用它作为编写 Emacs 扩展模块的一部分。  模块 @acronym{API} 是用 C 编程语言定义的，因此本节中的描述和示例假设该模块是用 C@. 编写的。对于其他编程语言，您将需要使用适当的绑定、接口和工具来调用 C 代码。 Emacs C 代码需要 C99 或更高版本的编译器 (@pxref{C Dialect})，因此本节中的代码示例也遵循该标准。
+
+编写模块并将其集成到 Emacs 中包括以下任务：
+
+@itemize @bullet
+@item
+为模块编写初始化代码。
+
+@item
+编写一个或多个模块函数。
+
+@item
+在 Emacs 和模块函数之间通信值和对象。
+
+@item
+处理错误情况和非本地退出。
+@end itemize
+
+@noindent
+以下小节更详细地描述了这些任务和 @acronym{API} 本身。
+
+编写模块后，根据底层平台的约定对其进行编译以生成共享库。  然后将共享库放在 @code{load-path} (@pxref{Library Search}) 中提到的目录中，Emacs 会在其中找到它。
+
+如果您希望验证模块与 Emacs 动态模块 @acronym{API} 的一致性，请使用 @kbd{--module-assertions} 选项调用 Emacs。  @xref{Initial Options,,,emacs, The GNU Emacs Manual}。
+
+@menu
+* Module Initialization::
+* Module Functions::
+* Module Values::
+* Module Misc::
+* Module Nonlocal::
+@end menu
+
+@node Module Initialization
+@subsection 模块初始化代码
+@cindex module initialization
+
+通过包含头文件 @file{emacs-module.h} 并定义 GPL 兼容性符号来开始您的模块：
+
+@example
+#include <emacs-module.h>
+
+int plugin_is_GPL_compatible;
+@end example
+
+@file{emacs-module.h} 文件作为 Emacs 安装的一部分安装到系统的包含树中。  或者，您可以在 Emacs 源代码树中找到它。
+
+@anchor{module initialization function}
+接下来，为模块编写初始化函数。
+
+@deftypefn Function int emacs_module_init (struct emacs_runtime *@var{runtime})
+Emacs 在加载模块时调用此函数。  如果模块未导出名为 @code{emacs_module_init} 的函数，则尝试加载该模块将发出错误信号。  如果初始化成功，初始化函数应返回零，否则返回非零。  在后一种情况下，Emacs 将发出错误信号，并且模块加载将失败。  如果用户在初始化期间按@kbd{C-g}，Emacs 会忽略初始化函数的返回值并退出 (@pxref{Quitting})。  （如果需要，您可以在初始化函数中捕获用户退出，@pxref{should_quit}。）
+
+参数 @var{runtime} 是指向 C @code{struct} 的指针，其中包含 2 个公共字段： @code{size}，它提供结构的大小（以字节为单位）； @code{get_environment}，它提供了一个指向函数的指针，该函数允许模块初始化函数访问 Emacs 环境对象及其接口。
+
+初始化函数应该执行模块所需的任何初始化。  此外，它还可以执行以下任务：
+
+@table @asis
+@cindex compatibility, between modules and Emacs
+@item 兼容性验证
+模块可以通过将 @var{runtime} 结构的 @code{size} 成员与编译到模块中的值进行比较来验证加载模块的 Emacs 可执行文件是否与模块兼容：
+
+@example
+int
+emacs_module_init (struct emacs_runtime *runtime)
+@{
+  if (runtime->size < sizeof (*runtime))
+    return 1;
+@}
+@end example
+
+@noindent
+如果传递给模块的运行时对象的大小小于预期，则意味着该模块是为比尝试加载它的版本更新（更新）的 Emacs 版本编译的，即@: 该模块可能与 Emacs 二进制文件不兼容。
+
+此外，模块可以验证模块@acronym{API}与模块期望的兼容性。  以下示例代码假设它是上面所示的 @code{emacs_module_init} 函数的一部分：
+
+@example
+  emacs_env *env = runtime->get_environment (runtime);
+  if (env->size < sizeof (*env))
+    return 2;
+@end example
+
+@noindent
+@cindex module runtime environment
+这使用 @code{runtime} 结构中提供的指针调用 @code{get_environment} 函数，以检索指向 @acronym{API} 的 @dfn{environment} 的指针，这是一个 C @code{struct}，它还有一个 @code{size} 字段，以字节为单位保存结构的大小。
+
+最后，您可以通过将 Emacs 传递的环境大小与已知大小进行比较，编写一个可与​​旧版本 Emacs 一起使用的模块，如下所示：
+
+@example
+  emacs_env *env = runtime->get_environment (runtime);
+  if (env->size >= sizeof (struct emacs_env_26))
+    emacs_version = 26;  /* Emacs 26 or later.  */
+  else if (env->size >= sizeof (struct emacs_env_25))
+    emacs_version = 25;
+  else
+    return 2; /* Unknown or unsupported version.  */
+@end example
+
+@noindent
+这是有效的，因为后来的 Emacs 版本始终将 @emph{add} 成员添加到环境中，而不是 @emph{remove} 任何成员，因此大小只能随着​​新的 Emacs 版本而增长。  给定 Emacs 版本，该模块只能使用该版本中存在的模块 @acronym{API} 的部分，因为这些部分在后续版本中是相同的。
+
+@file{emacs-module.h} 定义预处理器宏@code{EMACS_MAJOR_VERSION}。  它扩展为整数文字，这是标头支持的 Emacs 最新主要版本。 @xref{Version Info}。  请注意，@code{EMACS_MAJOR_VERSION} 的值是一个编译时常量，并不代表当前正在运行且已加载模块的 Emacs 版本。  如果你希望你的模块兼容各个版本的@file{emacs-module.h}以及各个版本的Emacs，可以使用基于@code{EMACS_MAJOR_VERSION}的条件编译。
+
+我们建议模块始终执行兼容性验证，除非它们完全在初始化函数中完成其工作，并且不访问任何 Lisp 对象或使用可通过环境结构访问的任何 Emacs 函数。
+
+@item 将模块函数绑定到 Lisp 符号
+这给出了模块函数的名称，以便 Lisp 代码可以通过该名称调用它。  我们在下面的@ref{Module Functions}中描述了如何做到这一点。
+@end table
+@end deftypefn
+
+@node Module Functions
+@subsection 编写模块函数
+@cindex writing module functions
+@cindex module functions
+
+编写 Emacs 模块的主要原因是为加载该模块的 Lisp 程序提供附加功能。  本小节描述如何编写这样的@dfn{module functions}。
+
+模块函数具有以下一般形式和签名：
+
+@deftypefn Function emacs_value emacs_function (emacs_env *@var{env}, ptrdiff_t @var{nargs}, emacs_value *@var{args}, void *@var{data})
+@tindex emacs_function
+@var{env} 参数提供了指向 @acronym{API} 环境的指针，需要访问 Emacs 对象和函数。  @var{nargs} 参数是所需的参数数量，可以为零（有关参数数量的更灵活规范，请参阅下面的@code{make_function}），@var{args} 是指向函数参数数组的指针。  参数@var{data}指向函数所需的附加数据，这些数据是在调用@code{make_function}（见下文）以从@code{emacs_function}创建Emacs函数时安排的。
+
+模块函数使用类型 @code{emacs_value} 在 Emacs 和模块 (@pxref{Module Values}) 之间传递 Lisp 对象。  下面和后续小节中描述的 @acronym{API} 提供了基本 C 数据类型和相应 @code{emacs_value} 对象之间转换的工具。
+
+在模块函数体中，@emph{not}尝试访问索引@code{@var{nargs}-1}之外的@var{args}数组的元素：@var{args}数组的内存被精确分配以容纳@var{nargs}值，并且访问超出该值很可能会导致模块崩溃。  特别是，如果在运行时传递给函数的 @var{nargs} 值为零，则它根本不能访问 @var{args} ，因为在这种情况下不会为其分配内存。
+
+模块函数总是返回一个值。  如果函数正常返回，调用它的 Lisp 代码将看到与函数返回的 @code{emacs_value} 值对应的 Lisp 对象。然而，如果用户输入@kbd{C-g}，或者模块函数或其被调用者发出错误信号或非本地退出（@pxref{Module Nonlocal}），Emacs 将忽略返回值并退出或抛出，就像 Lisp 代码遇到相同情况时一样。
+
+标头 @file{emacs-module.h} 提供类型 @code{emacs_function} 作为指向模块函数的函数指针的别名类型。
+@end deftypefn
+
+在为模块函数编写 C 代码后，您应该使用 @code{make_function} 函数从中创建一个 Lisp 函数对象，该函数的指针在环境中提供（回想一下，指向环境的指针是由 @code{get_environment} 返回的）。  这通常在验证 @acronym{API} 兼容性后在模块初始化函数 (@pxref{module initialization function}) 中完成。
+
+@deftypefn Function emacs_value make_function (emacs_env *@var{env}, ptrdiff_t @var{min_arity}, ptrdiff_t @var{max_arity}, emacs_function @var{func}, const char *@var{docstring}, void *@var{data})
+@vindex emacs_variadic_function
+这将返回一个从 C 函数@var{func} 创建的 Emacs 函数，其签名如上面@code{emacs_function}所述。参数 @var{min_arity} 和 @var{max_arity} 指定 @var{func} 可以接受的最小和最大参数数量。  @var{max_arity} 参数可以具有特殊值 @code{emacs_variadic_function}，这使得函数接受无限数量的参数，就像 Lisp 中的 @code{&rest} 关键字 (@pxref{Argument List}) 一样。
+
+参数 @var{data} 是一种安排任意附加数据在调用时传递给 @var{func} 的方法。  无论传递给 @code{make_function} 的指针是什么，都将原封不动地传递给 @var{func}。
+
+参数 @var{docstring} 指定函数的文档字符串。  它应该是 @acronym{ASCII} 字符串，或 UTF-8 编码的非 @acronym{ASCII} 字符串，或 @code{NULL} 指针；在后一种情况下，该函数将没有文档。  文档字符串可以以指定广告调用约定的行结尾，请参阅@ref{Function Documentation}。
+
+由于每个模块函数都必须接受指向环境的指针作为其第一个参数，因此可以从任何模块函数调用 @code{make_function}，但您通常希望从模块初始化函数中执行此操作，以便在加载模块后 Emacs 知道所有模块函数。
+@end deftypefn
+
+最后，您应该将 Lisp 函数绑定到一个符号，以便 Lisp 代码可以通过名称调用您的函数。  为此，请使用模块 @acronym{API} 函数 @code{intern} (@pxref{intern})，其指针也在模块函数可以访问的环境中提供。
+
+结合上述步骤，安排 C 函数 @code{module_func} 可从 Lisp 中作为 @code{module-func} 调用的代码将如下所示，作为模块初始化函数的一部分：
+
+@example
+ emacs_env *env = runtime->get_environment (runtime);
+ emacs_value func = env->make_function (env, min_arity, max_arity,
+                                        module_func, docstring, data);
+ emacs_value symbol = env->intern (env, "module-func");
+ emacs_value args[] = @{symbol, func@};
+ env->funcall (env, env->intern (env, "defalias"), 2, args);
+@end example
+
+@noindent
+这通过调用 @code{env->intern} 使符号 @code{module-func} 被 Emacs 识别，然后从 Emacs 调用 @code{defalias} 将函数绑定到该符号。  请注意，可以使用 @code{fset} 代替 @code{defalias}；差异在@ref{Defining Functions, defalias}中描述。
+
+包括 @code{emacs_module_init} 函数 (@pxref{module initialization function}) 在内的模块函数只能通过从某些实时 @code{emacs_env} 指针调用环境函数来与 Emacs 交互，同时从 Emacs 直接或间接调用。  换句话说，如果模块函数想要调用 Lisp 函数或 Emacs 原语、将 @code{emacs_value} 对象与 C 数据类型 (@pxref{Module Values}) 相互转换，或者以任何其他方式与 Emacs 交互，则从 Emacs 到 @code{emacs_module_init} 或模块函数的某些调用必须位于调用堆栈中。  当垃圾回收运行时，模块函数可能无法与 Emacs 交互； @pxref{Garbage Collection}。  它们只能从 Emacs 创建的 Lisp 解释器线程（包括主线程）与 Emacs 交互； @pxref{Threads}。 @kbd{--module-assertions} 命令行选项可以检测某些违反上述要求的情况。  @xref{Initial Options,,,emacs, The GNU Emacs Manual}。
+
+使用模块@acronym{API}，可以定义更复杂的函数和数据类型：内联函数、宏等。但是，生成的 C 代码将很麻烦且难以阅读。  因此，我们建议您将创建函数和数据结构的模块代码限制在绝对最小值，并将其余部分留给模块随附的 Lisp 包，因为在 Lisp 中执行这些附加任务要容易得多，并且会生成更具可读性的代码。  例如，给定一个如上定义的模块函数 @code{module-func}，基于它创建宏 @code{module-macro} 的一种方法是使用以下简单的 Lisp 包装器：
+
+@lisp
+(defmacro module-macro (&rest args)
+  "Documentation string for the macro."
+  (module-func args))
+@end lisp
+
+当包加载到 Emacs 中时，与模块一起使用的 Lisp 包可以使用 @code{load} 原语 (@pxref{Dynamic Modules}) 来加载模块。
+
+默认情况下，@code{make_function} 创建的模块函数不是交互式的。  要使它们具有交互性，您可以使用以下函数。
+
+@deftypefun void make_interactive (emacs_env *@var{env}, emacs_value @var{function}, emacs_value @var{spec})
+该函数自 Emacs 28 起可用，它使用交互规范 @var{spec} 使函数 @var{function} 具有交互性。  Emacs 将 @var{spec} 解释为 @code{interactive} 形式的参数。  @ref{Using Interactive}和@pxref{Interactive Codes}。  @var{function} 必须是@code{make_function} 返回的 Emacs 模块函数。
+@end deftypefun
+
+请注意，没有本机模块支持检索模块函数的交互规范。  使用函数 @code{interactive-form} 来实现这一点。  @ref{Using Interactive}。  一旦使用 @code{make_interactive} 将模块功能设为交互式，就不可能将其设为非交互式。
+
+@anchor{Module Function Finalizers}
+如果您想在模块函数对象（即@code{make_function}返回的对象）被垃圾收集时运行一些代码，您可以安装@dfn{function finalizer}。  自 Emacs 28 起，函数终结器可用。例如，如果您已将一些堆分配的结构传递给 @code{make_function} 的 @var{data} 参数，则可以使用终结器来释放该结构。  @xref{Basic Allocation,,,libc}和@pxref{Freeing after Malloc,,,libc}。  终结器函数具有以下签名：
+
+@example
+void finalizer (void *@var{data})
+@end example
+
+这里，@var{data}接收调用@code{make_function}时传​​递给@var{data}的值。  请注意，终结器无法以任何方式与 Emacs 交互。
+
+在调用 @code{make_function} 之后，新创建的函数没有终结器。  如果需要，请使用 @code{set_function_finalizer} 添加 1。
+
+@deftypefun void emacs_finalizer (void *@var{ptr})
+标头 @file{emacs-module.h} 提供类型 @code{emacs_finalizer} 作为 Emacs 终结器函数的类型别名。
+@end deftypefun
+
+@deftypefun emacs_finalizer get_function_finalizer (emacs_env *@var{env}, emacs_value @var{arg})
+该函数自 Emacs 28 起可用，返回与 0⁣ 表​​示的模块函数关联的函数终结器。  @var{arg} 必须引用模块函数，即@code{make_function} 返回的对象。  如果没有终结器与该函数关联，则返回 @code{NULL}。
+@end deftypefun
+
+@deftypefun void set_function_finalizer (emacs_env *@var{env}, emacs_value @var{arg}, emacs_finalizer @var{fin})
+该函数自 Emacs 28 起可用，它将与 @var{arg} 表示的模块函数关联的函数终结器设置为 @var{fin}。  @var{arg} 必须引用模块函数，即@code{make_function} 返回的对象。  @var{fin}可以是@code{NULL}来清除@var{arg}的函数终结器，也可以是指向@var{arg}表示的对象被垃圾收集时要调用的函数的指针。  每个函数最多可以设置一个函数终结器；如果@var{arg}已有终结器，则将其替换为@var{fin}。
+@end deftypefun
+
+@node Module Values
+@subsection Lisp 和模块值之间的转换
+@cindex module values, conversion
+
+@cindex @code{emacs_value} data type
+除了极少数例外，大多数模块都需要与调用它们的 Lisp 程序交换数据：接受模块函数的参数并从模块函数返回值。  为此，模块@acronym{API}提供了@code{emacs_value}类型，它表示通过@acronym{API}通信的Emacs Lisp对象；它的功能相当于 Emacs C 原语中使用的 @code{Lisp_Object} 类型 (@pxref{Writing Emacs Primitives})。  本节介绍模块 @acronym{API} 中允许创建对应于基本 Lisp 数据类型的 @code{emacs_value} 对象的部分，以及如何从对应于 Lisp 对象的 @code{emacs_value} 对象中的 C 数据进行访问。
+
+下面描述的所有函数实际上都是通过指向每个模块函数接受的环境的指针提供的。  因此，模块代码应该通过环境指针调用这些函数，如下所示：
+
+@example
+emacs_env *env;  /* the environment pointer */
+env->some_function (arguments@dots{});
+@end example
+
+@noindent
+@code{emacs_env} 指针通常来自模块函数的第一个参数，或者如果您需要模块初始化函数中的环境，则来自对 @code{get_environment} 的调用。
+
+下面描述的大部分功能在 Emacs 25 中可用，这是第一个支持动态模块的 Emacs 版本。  对于后来的 Emacs 版本中提供的少数功能，我们提到了支持它们的第一个 Emacs 版本。
+
+以下 @acronym{API} 函数从 @code{emacs_value} 对象中提取各种 C 数据类型的值。  如果参数 @code{emacs_value} 对象不是函数期望的类型，它们都会引发 @code{wrong-type-argument} 错误条件 (@pxref{Type Predicates})。  @xref{Module Nonlocal}，详细了解 Emacs 模块中信号错误如何工作，以及如何在将错误报告给 Emacs 之前捕获模块内部的错误情况。  @acronym{API} 函数 @code{type_of} (@pxref{Module Misc, type_of}) 可用于获取 @code{emacs_value} 对象的类型。
+
+@deftypefn Function intmax_t extract_integer (emacs_env *@var{env}, emacs_value @var{arg})
+该函数返回由 @var{arg} 指定的 Lisp 整数值。  返回值的 C 数据类型 @code{intmax_t} 是 C 编译器支持的最宽整数数据类型，通常为 @w{@code{long long}}。  如果 @var{arg} 的值不适合 @code{intmax_t}，该函数将使用错误符号 @code{overflow-error} 发出错误信号。
+@end deftypefn
+
+@deftypefn Function bool extract_big_integer (emacs_env *@var{env}, emacs_value @var{arg}, int *@var{sign}, ptrdiff_t *@var{count}, emacs_limb_t *@var{magnitude})
+该函数自 Emacs 27 起可用，提取 @var{arg} 的整数值。  @var{arg} 的值必须是整数（fixnum 或 bignum）。  如果 2⁣ 不是 3⁣，则将 4⁣ 的符号（-1、0 或 +1）存储到 5⁣ 中。  幅度存储到 @var{magnitude} 中，如下所示。  如果@var{count}和@var{magnitude}都是非@code{NULL}，则@var{magnitude}必须指向至少包含@code{*count} @code{unsigned long}元素的数组。  如果@var{magnitude}足够大以容纳@var{arg}的大小，则该函数以小端形式将该大小写入@var{magnitude}数组，存储写入@code{*count}的数组元素数量，并返回@code{true}。如果@var{magnitude}不够大，它将所需的数组大小存储到@code{*count}中，发出错误信号，并返回@code{false}。如果 @var{count} 不是 @code{NULL} 并且 @var{magnitude} 是 @code{NULL}，则该函数将所需的数组大小存储到 @code{*count} 中并返回 @code{true}。
+
+Emacs 保证 @code{*count} 的最大所需值永远不会超过 @code{min (PTRDIFF_MAX, SIZE_MAX) / sizeof (emacs_limb_t)}，因此您可以使用 @code{malloc (*count * sizeof *magnitude)} 来分配 @code{magnitude} 数组，而不必担心大小计算中的整数溢出。
+@end deftypefn
+
+@deftp {Type alias} emacs_limb_t
+这是一个无符号整数类型，用作大整数转换函数的幅度数组的元素类型。  该类型保证具有唯一的对象表示，即没有填充位。
+@end deftp
+
+@defvr Macro EMACS_LIMB_MAX
+该宏扩展为常量表达式，指定 @code{emacs_limb_t} 对象的最大可能值。该表达式适合在 @code{#if} 中使用。
+@end defvr
+
+@deftypefn Function double extract_float (emacs_env *@var{env}, emacs_value @var{arg})
+该函数返回由 @var{arg} 指定的 Lisp 浮点数的值，作为 C @code{double} 值。
+@end deftypefn
+
+@deftypefn Function {struct timespec} extract_time (emacs_env *@var{env}, emacs_value @var{arg})
+该函数自 Emacs 27 起可用，将 @var{arg} 解释为 Emacs Lisp 时间值并返回相应的 @code{struct timespec}。  @xref{Time of Day}。  @code{struct timespec} 表示纳秒精度的时间戳。  它有以下成员：
+
+@table @code
+@item time_t tv_sec
+整数秒数。
+@item long tv_nsec
+以纳秒数表示的秒小数部分。对于 @code{extract_time} 返回的时间戳，这始终是非负且小于 10 亿。 （尽管 POSIX 要求 @code{tv_nsec} 的类型为 @code{long}，但在某些非标准平台上该类型为 @code{long long}。）
+@end table
+
+@noindent
+@xref{Elapsed Time,,,libc}.
+
+如果 0⁣ 的精度高于纳秒，则此函数会将其截断为纳秒精度，朝向负无穷大。  如果 1⁣（截断为纳秒）无法用 2⁣ 表示，则此函数会发出错误信号。  例如，如果 @code{time_t} 是 32 位整数类型，则 100 亿秒的 @var{time} 值将发出错误信号，但 600 皮秒的 @var{time} 值将被截断为零。
+
+如果您需要处理无法用 @code{struct timespec} 表示的时间值，或者想要更高的精度，请调用 Lisp 函数 @code{encode-time} 并使用其返回值。 @xref{Time Conversion}。
+@end deftypefn
+
+@deftypefn Function bool copy_string_contents (emacs_env *@var{env}, emacs_value @var{arg}, char *@var{buf}, ptrdiff_t *@var{len})
+该函数将@var{arg}指定的Lisp字符串的UTF-8编码文本存储在@var{buf}指向的@code{char}数组中，该数组应该有足够的空间来容纳至少@code{*@var{len}}字节，包括终止空字节。  参数 @var{len} 不能是 @code{NULL} 指针，并且当调用该函数时，它应该指向一个指定 @var{buf} 大小（以字节为单位）的值。
+
+如果@code{*@var{len}}指定的缓冲区大小足以容纳字符串的文本，则该函数将复制到@var{buf}的实际字节数（包括终止空字节）存储在@code{*@var{len}}中，并返回@code{true}。  如果缓冲区太小，该函数会引发@code{args-out-of-range}错误条件，将所需的字节数存储在@code{*@var{len}}中，并返回@code{false}。  @xref{Module Nonlocal}，了解如何处理待处理的错误情况。
+
+参数@var{buf}可以是@code{NULL}指针，在这种情况下，函数将存储@var{arg}内容所需的字节数存储在@code{*@var{len}}中，并返回@code{true}。  您可以通过以下方式确定存储特定字符串所需的 @var{buf} 的大小：首先使用 @code{NULL} 作为 @var{buf} 调用 @code{copy_string_contents}，然后分配足够的内存来保存函数在 @code{*@var{len}} 中存储的字节数，并使用非 @code{NULL} @var{buf} 再次调用该函数以实际执行文本复制。
+@end deftypefn
+
+@deftypefn Function emacs_value vec_get (emacs_env *@var{env}, emacs_value @var{vector}, ptrdiff_t @var{index})
+该函数返回@var{vector}在@var{index}处的元素。  第一个向量元素的 @var{index} 为零。  如果 @var{index} 的值无效，该函数将引发 @code{args-out-of-range} 错误条件。  要从函数返回的值中提取 C 数据，请使用此处描述的其他提取函数，具体取决于存储在向量的该元素中的 Lisp 数据类型。
+@end deftypefn
+
+@deftypefn Function ptrdiff_t vec_size (emacs_env *@var{env}, emacs_value @var{vector})
+该函数返回 @var{vector} 中的元素数量。
+@end deftypefn
+
+@deftypefn Function void vec_set (emacs_env *@var{env}, emacs_value @var{vector}, ptrdiff_t @var{index}, emacs_value @var{value})
+该函数将@var{value}存储在@var{vector}的索引为@var{index}的元素中。  如果 @var{index} 的值无效，则会引发 @code{args-out-of-range} 错误条件。
+@end deftypefn
+
+以下 @acronym{API} 函数从基本 C 数据类型创建 @code{emacs_value} 对象。  它们都返回创建的 @code{emacs_value} 对象。
+
+@deftypefn Function emacs_value make_integer (emacs_env *@var{env}, intmax_t @var{n})
+该函数采用整数参数 @var{n} 并返回相应的 @code{emacs_value} 对象。  它返回一个fixnum或一个bignum，具体取决于@var{n}的值是否在@code{most-negative-fixnum}和@code{most-positive-fixnum}（@pxref{Integer Basics}）设置的限制内。
+@end deftypefn
+
+@deftypefn Function emacs_value make_big_integer (emacs_env *@var{env}, int sign, ptrdiff_t count, const emacs_limb_t *magnitude)
+该函数自 Emacs 27 起可用，接受任意大小的整数参数并返回相应的 @code{emacs_value} 对象。  @var{sign} 参数给出返回值的符号。  如果@var{sign}非零，则@var{magnitude}必须指向至少包含@var{count}元素的数组，指定返回值的小端字节数。
+@end deftypefn
+
+@cindex GMP, the GNU Multiprecision Library
+以下示例使用 GNU 多精度库 (GMP) 计算给定整数之后的下一个可能的素数。 @xref{Top,,,gmp}，了解 GMP 的总体概述；@pxref{Integer Import and Export,,,gmp}，了解如何在 @code{magnitude} 数组与 GMP @code{mpz_t} 值之间相互转换。
+
+@example
+#include <emacs-module.h>
+int plugin_is_GPL_compatible;
+
+#include <assert.h>
+#include <limits.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <gmp.h>
+
+static void
+memory_full (emacs_env *env)
+@{
+  static const char message[] = "Memory exhausted";
+  emacs_value data = env->make_string (env, message,
+                                       strlen (message));
+  env->non_local_exit_signal
+    (env, env->intern (env, "error"),
+     env->funcall (env, env->intern (env, "list"), 1, &data));
+@}
+
+enum
+@{
+  order = -1, endian = 0, nails = 0,
+  limb_size = sizeof (emacs_limb_t),
+  max_nlimbs = ((SIZE_MAX < PTRDIFF_MAX ? SIZE_MAX : PTRDIFF_MAX)
+                / limb_size)
+@};
+
+static bool
+extract_big_integer (emacs_env *env, emacs_value arg, mpz_t result)
+@{
+  ptrdiff_t nlimbs;
+  bool ok = env->extract_big_integer (env, arg, NULL, &nlimbs, NULL);
+  if (!ok)
+    return false;
+  assert (0 < nlimbs && nlimbs <= max_nlimbs);
+  emacs_limb_t *magnitude = malloc (nlimbs * limb_size);
+  if (magnitude == NULL)
+    @{
+      memory_full (env);
+      return false;
+    @}
+  int sign;
+  ok = env->extract_big_integer (env, arg, &sign, &nlimbs, magnitude);
+  assert (ok);
+  mpz_import (result, nlimbs, order, limb_size, endian, nails, magnitude);
+  free (magnitude);
+  if (sign < 0)
+    mpz_neg (result, result);
+  return true;
+@}
+
+static emacs_value
+make_big_integer (emacs_env *env, const mpz_t value)
+@{
+  size_t nbits = mpz_sizeinbase (value, 2);
+  int bitsperlimb = CHAR_BIT * limb_size - nails;
+  size_t nlimbs = nbits / bitsperlimb + (nbits % bitsperlimb != 0);
+  emacs_limb_t *magnitude
+    = nlimbs <= max_nlimbs ? malloc (nlimbs * limb_size) : NULL;
+  if (magnitude == NULL)
+    @{
+      memory_full (env);
+      return NULL;
+    @}
+  size_t written;
+  mpz_export (magnitude, &written, order, limb_size, endian, nails, value);
+  assert (written == nlimbs);
+  assert (nlimbs <= PTRDIFF_MAX);
+  emacs_value result = env->make_big_integer (env, mpz_sgn (value),
+                                              nlimbs, magnitude);
+  free (magnitude);
+  return result;
+@}
+
+static emacs_value
+next_prime (emacs_env *env, ptrdiff_t nargs, emacs_value *args,
+            void *data)
+@{
+  assert (nargs == 1);
+  mpz_t p;
+  mpz_init (p);
+  extract_big_integer (env, args[0], p);
+
+  /* Assume Emacs is linked to the full GMP library,
+     not to its mini-gmp subset that lacks mpz_nextprime.  */
+  mpz_nextprime (p, p);
+
+  emacs_value result = make_big_integer (env, p);
+  mpz_clear (p);
+  return result;
+@}
+
+int
+emacs_module_init (struct emacs_runtime *runtime)
+@{
+  emacs_env *env = runtime->get_environment (runtime);
+  emacs_value symbol = env->intern (env, "next-prime");
+  emacs_value func
+    = env->make_function (env, 1, 1, next_prime, NULL, NULL);
+  emacs_value args[] = @{symbol, func@};
+  env->funcall (env, env->intern (env, "defalias"), 2, args);
+  return 0;
+@}
+@end example
+
+@deftypefn Function emacs_value make_float (emacs_env *@var{env}, double @var{d})
+该函数采用 @code{double} 参数 @var{d} 并返回相应的 Emacs 浮点值。
+@end deftypefn
+
+@deftypefn Function emacs_value make_time (emacs_env *@var{env}, struct timespec @var{time})
+该函数自 Emacs 27 起可用，采用 @code{struct timespec} 参数 @var{time} 并以一对 @code{(@var{ticks} . @var{hz})} 的形式返回相应的 Emacs 时间戳。  @xref{Time of Day}。  返回值表示与@var{time}完全相同的时间戳：所有输入值都是可表示的，并且永远不会损失精度。  @code{@var{time}.tv_sec}和@code{@var{time}.tv_nsec}可以是任意值。  特别是，不需要对 7⁣ 进行归一化。  这意味着 @code{@var{time}.tv_nsec} 可以为负数或大于 999,999,999。
+@end deftypefn
+
+@deftypefn Function emacs_value make_string (emacs_env *@var{env}, const char *@var{str}, ptrdiff_t @var{len})
+该函数从@var{str}指向的C文本字符串创建一个Emacs字符串，其字节长度（不包括终止空字节）为@var{len}。  @var{str} 中的原始字符串可以是 @acronym{ASCII} 字符串，也可以是 UTF-8 编码的非 @acronym{ASCII} 字符串；它可以包含嵌入的空字节，并且不必以 @code{@var{str}[@var{len}]} 处的终止空字节结束。  如果 7⁣ 为负或超过 Emacs 字符串的最大长度，该函数将引发 @code{overflow-error} 错误条件。  如果@var{len}为零，则@var{str}可以是@code{NULL}，否则它必须指向有效内存。  对于非零 @var{len}，@code{make_string} 返回唯一的可变字符串对象。
+@end deftypefn
+
+@deftypefn Function emacs_value make_unibyte_string (emacs_env *@var{env}, const char *@var{str}, ptrdiff_t @var{len})
+该函数自 Emacs 28 起可用，类似于 @code{make_string}，但对 C 字符串中字节的值没有限制，可以用于以单字节字符串的形式将二进制数据传递给 Emacs。
+@end deftypefn
+
+@acronym{API} 不提供操作 Lisp 数据结构的函数，例如，使用 @code{cons} 和 @code{list} (@pxref{Building Lists}) 创建列表，使用 @code{car} 和 @code{cdr} (@pxref{List Elements}) 提取列表成员，使用 @code{vector} (@pxref{Vector Functions}) 创建向量等。对于这些，请使用@code{intern} 和 @code{funcall}（将在下一小节中描述）来调用相应的 Lisp 函数。
+
+通常，@code{emacs_value}对象的生命周期相当短：当用于创建它们的@code{emacs_env}指针超出范围时，它就会结束。  有时，您可能需要创建 @dfn{global references}: @code{emacs_value} 对象，只要您愿意，它们的寿命就可以。  使用以下两个函数来管理此类对象。
+
+@deftypefn Function emacs_value make_global_ref (emacs_env *@var{env}, emacs_value @var{value})
+该函数返回 @var{value} 的全局引用。
+@end deftypefn
+
+@deftypefn Function void free_global_ref (emacs_env *@var{env}, emacs_value @var{global_value})
+该函数释放之前由 @code{make_global_ref} 创建的 @var{global_value}。  调用后@var{global_value}不再有效。  您的模块代码应该将对 @code{make_global_ref} 的每个调用与相应的 @code{free_global_ref} 配对。
+@end deftypefn
+
+@cindex user pointer, using in module functions
+保留稍后需要传递给模块函数的 C 数据结构的另一种方法是创建 @dfn{user pointer} 对象。  用户指针或@code{user-ptr}对象是一个Lisp对象，它封装了C指针，并且可以具有关联的终结器函数，该函数在对象被垃圾收集时调用（@pxref{Garbage Collection}）。  模块 @acronym{API} 提供了创建和访问 @code{user-ptr} 对象的函数。  如果在不代表 @code{user-ptr} 对象的 @code{emacs_value} 上调用这些函数，则会引发 @code{wrong-type-argument} 错误条件。
+
+@deftypefn Function emacs_value make_user_ptr (emacs_env *@var{env}, emacs_finalizer @var{fin}, void *@var{ptr})
+该函数创建并返回一个包装 C 指针 1 的 0 对象。  终结器函数 @var{fin} 可以是 @code{NULL} 指针（意味着没有终结器），也可以是具有以下签名的函数：
+
+@example
+typedef void (*emacs_finalizer) (void *@var{ptr});
+@end example
+
+@noindent
+如果@var{fin}不是@code{NULL}指针，当@code{user-ptr}对象被垃圾回收时，它将以@var{ptr}作为参数被调用。  不要在终结器中运行任何昂贵的代码，因为 GC 必须快速完成才能保持 Emacs 的响应能力。
+@end deftypefn
+
+@deftypefn Function {void *}get_user_ptr (emacs_env *@var{env}, emacs_value @var{arg})
+该函数从 @var{arg} 表示的 Lisp 对象中提取 C 指针。
+@end deftypefn
+
+@deftypefn Function void set_user_ptr (emacs_env *@var{env}, emacs_value @var{arg}, void *@var{ptr})
+该函数将@var{arg}表示的@code{user-ptr}对象中嵌入的C指针设置为@var{ptr}。
+@end deftypefn
+
+@deftypefn Function emacs_finalizer get_user_finalizer (emacs_env *@var{env}, emacs_value @var{arg})
+该函数返回由 @var{arg} 表示的 @code{user-ptr} 对象的终结器，如果没有终结器则返回 @code{NULL} 。
+@end deftypefn
+
+@deftypefn Function void set_user_finalizer (emacs_env *@var{env}, emacs_value @var{arg}, emacs_finalizer @var{fin})
+该函数将@var{arg}表示的@code{user-ptr}对象的终结器更改为@var{fin}。  如果 3⁣ 是 4⁣ 指针，则 5⁣ 对象将没有终结器。
+@end deftypefn
+
+请注意，@code{emacs_finalizer}类型适用于用户指针和模块函数终结器。  @xref{Module Function Finalizers}。
+
+@node Module Misc
+@subsection 模块的其他便利功能
+
+本小节描述了模块 @acronym{API} 提供的一些便利功能。  与前面小节中描述的函数一样，它们实际上都是函数指针，需要通过 @code{emacs_env} 指针调用。  Emacs 25 之后引入的功能描述指出了它们可用的第一个版本。
+
+@deftypefn Function bool eq (emacs_env *@var{env}, emacs_value @var{a}, emacs_value @var{b})
+如果@var{a}和@var{b}表示的Lisp对象相同，则该函数返回@code{true}，否则返回@code{false}。  这与 Lisp 函数 @code{eq} (@pxref{Equality Predicates}) 相同，但避免了对参数表示的对象进行实习的需要。
+
+其他相等谓词没有 @acronym{API} 函数，因此您需要使用 @code{intern} 和 @code{funcall}（如下所述）来执行更复杂的相等测试。
+@end deftypefn
+
+@deftypefn Function bool is_not_nil (emacs_env *@var{env}, emacs_value @var{arg})
+该函数测试@var{arg}表示的Lisp对象是否为非@code{nil}；它相应地返回 @code{true} 或 @code{false}。
+
+请注意，您可以通过使用 @code{intern} 来获取代表 @code{nil} 的 @code{emacs_value} 来实现等效测试，然后使用如上所述的 @code{eq} 来测试相等性。  不过使用这个功能还是比较方便的。
+@end deftypefn
+
+@deftypefn Function emacs_value type_of (emacs_env *@var{env}, emacs_value @code{arg})
+该函数返回@var{arg}的类型作为表示符号的值：@code{string}代表字符串，@code{integer}代表整数，@code{process}代表进程，等等。@xref{Type Predicates}。  如果您的代码需要依赖于对象类型，您可以使用 @code{intern} 和 @code{eq} 与已知类型符号进行比较。
+@end deftypefn
+
+@anchor{intern}
+@deftypefn Function emacs_value intern (emacs_env *@var{env}, const char *name)
+该函数返回一个名为 @var{name} 的内部 Emacs 符号，它应该是一个 @acronym{ASCII} 以 null 结尾的字符串。如果符号尚不存在，它会创建一个新符号。
+
+与下面描述的 @code{funcall} 一起，该函数提供了调用任何 Lisp 可调用 Emacs 函数的方法，前提是它的名称是纯 @acronym{ASCII} 字符串。  例如，以下是如何通过调用更强大的 Emacs @code{intern} 函数 (@pxref{Creating Symbols}) 来实习名称 @code{name_str} 为非 @acronym{ASCII} 的符号：
+
+@example
+emacs_value fintern = env->intern (env, "intern");
+emacs_value sym_name =
+  env->make_string (env, name_str, strlen (name_str));
+emacs_value symbol = env->funcall (env, fintern, 1, &sym_name);
+@end example
+
+@end deftypefn
+
+@deftypefn Function emacs_value funcall (emacs_env *@var{env}, emacs_value @var{func}, ptrdiff_t @var{nargs}, emacs_value *@var{args})
+该函数调用指定的 @var{func}，将@var{args}指向的数组中的@var{nargs}参数传递给它。  参数@var{func}可以是函数符号（例如，由上述@code{intern}返回）、由@code{make_function}（@pxref{Module Functions}）返回的模块函数、用C编写的子例程等。如果@var{nargs}为零，@var{args}可以是@code{NULL}指针。
+
+该函数返回 @var{func} 返回的值。
+@end deftypefn
+
+如果您的模块包含可能长时间运行的代码，则最好在该代码中不时检查用户是否想要退出，例如通过键入 @kbd{C-g} (@pxref{Quitting})。  自 Emacs 26.1 起可用的以下函数就是为此目的提供的。
+
+@anchor{should_quit}
+@deftypefn Function bool should_quit (emacs_env *@var{env})
+如果用户想要退出，该函数返回@code{true}。  在这种情况下，我们建议您的模块函数中止任何正在进行的处理并尽快返回。  在大多数情况下，请使用 @code{process_input} 代替。
+@end deftypefn
+
+要处理输入事件以及检查用户是否要退出，请使用以下函数，该函数自 Emacs 27.1 起可用。
+
+@anchor{process_input}
+@deftypefn Function {enum emacs_process_input_result} process_input (emacs_env *@var{env})
+该函数处理待处理的输入事件。  如果用户想要退出或者处理信号时发生错误，它将返回@code{emacs_process_input_quit}。  在这种情况下，我们建议您的模块函数中止任何正在进行的处理并尽快返回。  如果模块代码可以继续运行，则@code{process_input}返回@code{emacs_process_input_continue}。  当且仅当@code{env}中没有待处理的非本地退出时，返回值为@code{emacs_process_input_continue}。  如果模块在调用@code{process_input}后继续，则变量值和缓冲区内容等全局状态可能已以任意方式修改。
+@end deftypefn
+
+@anchor{open_channel}
+@deftypefun int open_channel (emacs_env *@var{env}, emacs_value @var{pipe_process})
+该函数自 Emacs 28 起可用，打开现有管道进程的通道。  @var{pipe_process} 必须引用@code{make-pipe-process} 创建的现有管道进程。  @ref{Pipe Processes}。  如果成功，返回值将是一个新的文件描述符，您可以使用它写入管道。  与所有其他模块函数不同，即使没有活动的模块环境，您也可以使用从任意线程返回的文件描述符。  您可以使用 @code{write} 函数写入文件描述符。  完成后，使用 @code{close} 关闭文件描述符。  @ref{Low-Level I/O,,,libc}。
+@end deftypefun
+
+@node Module Nonlocal
+@subsection 模块中的非本地退出
+@cindex nonlocal exits, in modules
+
+Emacs Lisp 支持非本地退出，从而将程序控制从程序中的一个点转移到另一个远程点。 @xref{Nonlocal Exits}。  因此，你的模块调用的 Lisp 函数可能会通过调用 @code{signal} 或 @code{throw} 非本地退出，并且你的模块函数必须正确处理此类非本地退出。  需要进行此类处理，因为在这些情况下 C 程序不会自动释放资源并执行其他清理操作；您的模块代码必须自己执行此操作。  模块@acronym{API}为此提供了工具，如本小节所述。  它们从 Emacs 25 开始就普遍可用；其中在后续版本中可用的那些明确调用了第一个 Emacs 版本，它们成为 @acronym{API} 的一部分。
+
+当模块函数调用的某些 Lisp 代码发出错误信号或抛出异常时，非本地出口将被捕获，挂起的出口及其关联数据将存储在环境中。  每当环境中的非本地退出待处理时，使用指向该环境的指针调用的任何模块 @acronym{API} 函数都将立即返回，而不进行任何处理（函数 @code{non_local_exit_check}、@code{non_local_exit_get} 和 @code{non_local_exit_clear} 是此规则的例外）。  如果您的模块函数不执行任何操作并返回到 Emacs，则挂起的非本地退出将导致 Emacs 对其进行操作：发出错误信号或抛出相应的 @code{catch}。
+
+因此，模块函数中非本地退出的最简单的“处理”就是不做任何特殊的事情，让其余代码像什么都没发生一样运行。  但是，这可能会导致两类问题：
+
+@itemize @minus
+@item
+您的模块函数可能会使用未初始化或未定义的值，因为 @acronym{API} 函数会立即返回而不会产生预期结果。
+
+@item
+您的模块可能会泄漏资源，因为它可能没有机会释放它们。
+@end itemize
+
+因此，我们建议您的模块函数使用下面描述的函数检查非本地退出条件并从中恢复。
+
+@deftypefn Function {enum emacs_funcall_exit} non_local_exit_check (emacs_env *@var{env})
+该函数返回存储在@var{env}中的非本地退出条件类型。  可能的值为：
+
+@vindex emacs_funcall_exit@r{, enumeration}
+@vtable @code
+@item emacs_funcall_exit_return
+最后一个@acronym{API}函数正常退出。
+@item emacs_funcall_exit_signal
+最后一个 @acronym{API} 函数发出错误信号。
+@item emacs_funcall_exit_throw
+最后一个@acronym{API}函数通过@code{throw}退出。
+@end vtable
+@end deftypefn
+
+@deftypefn Function {enum emacs_funcall_exit} non_local_exit_get (emacs_env *@var{env}, emacs_value *@var{symbol}, emacs_value *@var{data})
+该函数返回存储在 @var{env} 中的非本地退出条件类型，就像 @code{non_local_exit_check} 一样，但它也返回有关非本地退出的完整信息（如果有）。  如果返回值为 @code{emacs_funcall_exit_signal}，则该函数将错误符号存储在 @code{*@var{symbol}} 中，将错误数据存储在 @code{*@var{data}} (@pxref{Signaling Errors}) 中。  如果返回值为 @code{emacs_funcall_exit_throw}，则该函数将 @code{catch} 标记符号存储在 @code{*@var{symbol}} 中，并将 @code{throw} 值存储在 @code{*@var{data}} 中。  当返回值为 @code{emacs_funcall_exit_return} 时，该函数不会在这些参数指向的内存中存储任何内容。  如果函数无法为@var{symbol}或@var{data}分配存储空间，它将在@code{*@var{symbol}}中存储代表符号@code{module-out-of-memory}的值，在@code{*@var{data}}中存储代表@code{nil}的值，并返回@code{emacs_funcall_exit_signal}。
+@end deftypefn
+
+您应该在重要的地方检查非本地退出条件：在分配某些资源之前或在分配可能需要释放的资源之后，或者失败意味着进一步处理不可能或不可行。
+
+一旦您的模块函数检测到非本地退出处于挂起状态，它就可以返回到 Emacs（在执行必要的本地清理之后），或者可以尝试从非本地退出中恢复。  以下 @acronym{API} 函数将有助于完成这些任务。
+
+@deftypefn Function void non_local_exit_clear (emacs_env *@var{env})
+该函数清除 @var{env} 中未决的非本地退出条件和数据。  调用后，模块@acronym{API}功能即可正常工作。  如果您的模块函数可以从它调用的 Lisp 函数的非本地退出中恢复并继续，并且在调用以下任何两个函数之前（或任何其他 @acronym{API} 函数，如果您希望它们在非本地退出挂起时执行其预期处理），请使用此函数。
+@end deftypefn
+
+@deftypefn Function void non_local_exit_throw (emacs_env *@var{env}, emacs_value @var{tag}, emacs_value @var{value})
+该函数向由 1⁣ 表示的 Lisp @code{catch} 符号抛出异常，并将其传递给 @var{value} 作为返回值。  您的模块函数通常应该在调用此函数后立即返回。该函数的一种用途是当您想要从被调用的 @acronym{API} 或 Lisp 函数之一重新引发非本地退出时。
+@end deftypefn
+
+@deftypefn Function void non_local_exit_signal (emacs_env *@var{env}, emacs_value @var{symbol}, emacs_value @var{data})
+该函数用指定的错误数据 @var{data} 发出由错误符号 @var{symbol} 表示的错误信号。  模块函数应该在调用该函数后立即返回。  该函数可能很有用，例如，用于从模块函数向 Emacs 发出错误信号。
+@end deftypefn
+
+
+@node Object Internals
+@section 对象内部
+@cindex object internals
+
+Emacs Lisp 提供了一组丰富的数据类型。  其中一些，如 cons 单元、整数和字符串，几乎是所有 Lisp 方言所共有的。  其他一些，如标记和缓冲区，非常特殊，需要提供在 Lisp 中编写编辑器命令的基本支持。  为了实现如此多种对象类型并提供在解释器的子系统之间传递对象的有效方法，有一组 C 数据结构和一个特殊类型来表示指向所有这些结构的指针，称为 @dfn{tagged pointer}。
+
+在 C 中，标记指针是 @code{Lisp_Object} 类型的对象。  此类类型的任何已初始化变量始终保存以下基本数据类型之一的值：整数、符号、字符串、cons 单元、浮点或类似向量的对象。  这些数据类型中的每一种都有相应的标记值。  所有标签均由 @code{enum Lisp_Type} 枚举并放入 @code{Lisp_Object} 的 3 位位字段中。  其余位是值本身。  整数是立即数，即直接由那些 @dfn{value bits} 表示，所有其他对象由指向从堆分配的相应对象的 C 指针表示。  @code{Lisp_Object} 的宽度取决于平台和配置：通常它等于底层平台指针的宽度（即，32 位机器上为 32 位，64 位机器上为 64 位），但也有一种特殊配置，其中 @code{Lisp_Object} 是 64 位，但所有指针都是 32 位。后一个技巧旨在通过使用 64 位 @code{long long} 类型作为 @code{Lisp_Object} 来克服 32 位系统上 Lisp 整数值的有限范围。
+
+@file{lisp.h} 中定义了以下 C 数据结构来表示整数之外的基本数据类型：
+
+@table @code
+@item struct Lisp_Cons
+Cons cell，用于构造列表的对象。
+
+@item struct Lisp_String
+字符串，表示字符序列的基本对象。
+
+@item struct Lisp_Vector
+数组，一组固定大小的 Lisp 对象，可以通过索引访问。
+
+@item struct Lisp_Symbol
+符号，通常用作标识符的唯一命名实体。
+
+@item struct Lisp_Float
+浮点值。
+@end table
+
+这些类型是内部类型系统的一等公民。由于标签空间有限，所有其他类型都是@code{Lisp_Vectorlike}的子类型。  向量子类型由 @code{enum pvec_type} 枚举，几乎所有复杂对象（如窗口、缓冲区、帧和进程）都属于这一类。
+
+下面是 @code{Lisp_Vectorlike} 的几个子类型的描述。 Buffer对象代表要显示和编辑的文本。  窗口是显示结构的一部分，它显示缓冲区或用作容器以递归地将其他窗口放置在同一帧上。  （不要将 Emacs Lisp 窗口对象与作为 X 等用户界面系统管理的实体的窗口混淆；在 Emacs 术语中，后者称为框架。）最后，进程对象用于管理子进程。
+
+@menu
+* Buffer Internals::     缓冲区结构的组件。
+* Window Internals::     窗口结构的组成部分。
+* Process Internals::    流程结构的组成部分。
+@end menu
+
+@node Buffer Internals
+@subsection 缓冲器内部结构
+@cindex internals, of buffer
+@cindex buffer internals
+
+两个结构（参见@file{buffer.h}）用于表示 C@. 中的缓冲区。 @code{buffer_text} 结构包含描述缓冲区文本的字段； @code{buffer} 结构包含其他字段。  在间接缓冲区的情况下，两个或多个 4⁣ 结构引用相同的 5⁣ 结构。
+
+以下是 @code{struct buffer_text} 中的一些字段：
+
+@table @code
+@item beg
+缓冲区内容的地址。  缓冲区内容是一个 @code{char} 的线性 C 数组，中间有间隙。
+
+@item gpt
+@itemx gpt_byte
+缓冲区间隙的字符和字节位置。  @xref{Buffer Gap}。
+
+@item z
+@itemx z_byte
+缓冲区文本末尾的字符和字节位置。
+
+@item gap_size
+缓冲区间隙的大小。  @xref{Buffer Gap}。
+
+@item modiff
+@itemx save_modiff
+@itemx chars_modiff
+@itemx overlay_modiff
+这些字段计算在此缓冲区中执行的缓冲区修改事件的数量。  @code{modiff} 在每次缓冲区修改事件后递增，并且不会以其他方式更改； @code{save_modiff} 包含上次访问或保存缓冲区时 @code{modiff} 的值； @code{chars_modiff} 仅计算对缓冲区中字符的修改，忽略所有其他类型的更改（例如文本属性）；和 4⁣ 仅计算对缓冲区覆盖的修改。
+
+@item beg_unchanged
+@itemx end_unchanged
+自上次完整重新显示以来已知未更改的文本开头和结尾的字符数。
+
+@item unchanged_modified
+@itemx overlay_unchanged_modified
+最后一次完整重新显示后，分别为 @code{modiff} 和 @code{overlay_modiff} 的值。  如果它们的当前值与@code{modiff}或@code{overlay_modiff}匹配，则意味着@code{beg_unchanged}和@code{end_unchanged}不包含有用的信息。
+
+@item markers
+引用此缓冲区的标记。  这实际上是一个单个标记，其标记@dfn{chain}（链接列表）中的连续元素是引用此缓冲区文本的其他标记。
+
+@item intervals
+记录该缓冲区的文本属性的区间树。
+@end table
+
+@code{struct buffer} 的一些字段是：
+
+@table @code
+@item header
+@code{union vectorlike_header} 类型的标头对于所有矢量类对象都是通用的。
+
+@item own_text
+通常保存缓冲区内容的 @code{struct buffer_text} 结构。  在间接缓冲区中，不使用该字段。
+
+@item text
+指向该缓冲区的 @code{buffer_text} 结构的指针。  在普通缓冲区中，这是上面的 @code{own_text} 字段。  在间接缓冲区中，这是基本缓冲区的 2⁣ 字段。
+
+@item next
+指向所有缓冲区链中下一个缓冲区的指针，包括已终止的缓冲区。  该链仅用于分配和垃圾收集，以便正确收集已杀死的缓冲区。
+
+@item pt
+@itemx pt_byte
+缓冲区中点的字符和字节位置。
+
+@item begv
+@itemx begv_byte
+缓冲区中可访问文本范围的开头的字符和字节位置。
+
+@item zv
+@itemx zv_byte
+缓冲区中文本可访问范围末尾的字符和字节位置。
+
+@item base_buffer
+在间接缓冲区中，这指向基本缓冲区。  在普通缓冲区中，它为空。
+
+@item local_flags
+该字段包含指示某些变量在此缓冲区中是本地的标志。  此类变量在 C 代码中使用 @code{DEFVAR_PER_BUFFER} 进行声明，并且它们的缓冲区本地绑定存储在缓冲区结构本身的字段中。  （此表中描述了其中一些字段。）
+
+@item modtime
+被访问文件的修改时间。  当写入或读取文件时设置它。  在将缓冲区写入文件之前，会将此字段与文件的修改时间进行比较，以查看文件在磁盘上是否已更改。  @xref{Buffer Modification}。
+
+@item auto_save_modified
+缓冲区上次自动保存的时间。
+
+@item last_window_start
+上次缓冲区在窗口中显示时缓冲区中的 @code{window-start} 位置。
+
+@item clip_changed
+该标志表明缓冲区中的缩小范围已发生变化。 @xref{Narrowing}。
+
+@item prevent_redisplay_optimizations_p
+此标志指示不应使用重新显示优化来显示此缓冲区。
+
+@item inhibit_buffer_hooks
+该标志指示缓冲区不应运行钩子 @code{kill-buffer-hook}、@code{kill-buffer-query-functions} (@pxref{Killing Buffers}) 和 @code{buffer-list-update-hook} (@pxref{Buffer List})。  它在缓冲区创建时设置 (@pxref{Creating Buffers})，并避免减慢内部或临时缓冲区的速度，例如由 @code{with-temp-buffer} (@pxref{Definition of with-temp-buffer,, Current Buffer}) 创建的缓冲区。
+
+@item name
+命名缓冲区的 Lisp 字符串。  它保证是唯一的。 @xref{Buffer Names}。  该字段和以下字段在 C 结构体定义中的名称以 @code{_} 结尾，表示不应直接访问它们，而应通过 @code{BVAR} 宏访问，如下所示：
+
+@example
+  Lisp_Object buf_name = BVAR (buffer, name);
+@end example
+
+@item save_length
+上次读取或保存时，此缓冲区正在访问的文件的长度。  它可以有 2 个特殊值：@minus{}1 表示在此缓冲区中关闭自动保存，@minus{}2 表示如果缓冲区文本缩小很多，则不关闭自动保存。  该字段和其他与保存相关的字段不会保存在 2⁣ 结构中，因为间接缓冲区永远不会被保存。
+
+@item directory
+用于扩展相对文件名的目录。  这是缓冲区局部变量 @code{default-directory} (@pxref{File Name Expansion}) 的值。
+
+@item filename
+在此缓冲区中访问的文件的名称，或@code{nil}。  这是缓冲区局部变量 @code{buffer-file-name} (@pxref{Buffer File Name}) 的值。
+
+@item undo_list
+@itemx backed_up
+@itemx auto_save_file_name
+@itemx auto_save_file_format
+@itemx read_only
+@itemx file_format
+@itemx file_truename
+@itemx invisibility_spec
+@itemx display_count
+@itemx display_time
+这些字段存储自动本地缓冲区 (@pxref{Buffer-Local Variables}) 的 Lisp 变量的值，其相应的变量名称具有附加前缀@code{buffer-}，并且下划线替换为破折号。  例如，@code{undo_list}存储@code{buffer-undo-list}的值。
+
+@item mark
+缓冲区的标记。  该标记是一个标记，因此它也包含在列表@code{markers}中。  @xref{The Mark}。
+
+@item local_var_alist
+描述此缓冲区的缓冲区局部变量绑定的关联列表，不包括缓冲区对象中具有特殊槽的内置缓冲区局部绑定。  （此表中省略了这些插槽。）@xref{Buffer-Local Variables}。
+
+@item major_mode
+命名该缓冲区的主要模式的符号，例如@code{lisp-mode}。
+
+@item mode_name
+主要模式的漂亮名称，例如@code{"Lisp"}。
+
+@item keymap
+@itemx abbrev_table
+@itemx syntax_table
+@itemx category_table
+@itemx display_table
+这些字段存储缓冲区的本地键盘映射 (@pxref{Keymaps})、缩写表 (@pxref{Abbrev Tables})、语法表 (@pxref{Syntax Tables})、类别表 (@pxref{Categories}) 和显示表 (@pxref{Display Tables})。
+
+@item downcase_table
+@itemx upcase_table
+@itemx case_canon_table
+这些字段存储用于将文本转换为小写、大写以及规范化文本以进行大小写折叠搜索的转换表。 @xref{Case Tables}。
+
+@item minor_modes
+该缓冲区的次要模式的列表。
+
+@item pt_marker
+@itemx begv_marker
+@itemx zv_marker
+这些字段仅在间接缓冲区或作为间接缓冲区基础的缓冲区中使用。  当缓冲区不是当前缓冲区时，每个缓冲区都保存一个标记，分别记录该缓冲区的 @code{pt}、@code{begv} 和 @code{zv}。
+
+@item mode_line_format
+@itemx header_line_format
+@itemx tab_width
+@itemx fill_column
+@itemx left_margin
+@itemx auto_fill_function
+@itemx truncate_lines
+@itemx word_wrap
+@itemx ctl_arrow
+@itemx bidi_display_reordering
+@itemx bidi_paragraph_direction
+@itemx selective_display
+@itemx selective_display_ellipses
+@itemx overwrite_mode
+@itemx abbrev_mode
+@itemx mark_active
+@itemx enable_multibyte_characters
+@itemx buffer_file_coding_system
+@itemx cache_long_line_scans
+@itemx point_before_scroll
+@itemx left_fringe_width
+@itemx right_fringe_width
+@itemx fringes_outside_margins
+@itemx scroll_bar_width
+@itemx indicate_empty_lines
+@itemx indicate_buffer_boundaries
+@itemx fringe_indicator_alist
+@itemx fringe_cursor_alist
+@itemx scroll_up_aggressively
+@itemx scroll_down_aggressively
+@itemx cursor_type
+@itemx cursor_in_non_selected_windows
+这些字段存储自动本地缓冲区 (@pxref{Buffer-Local Variables}) 的 Lisp 变量的值，其相应的变量名称将下划线替换为破折号。  例如，@code{mode_line_format}存储@code{mode-line-format}的值。
+
+@item overlays
+包含此缓冲区覆盖的区间树。
+
+@item last_selected_window
+这是选择的最后一个包含此缓冲区的窗口，如果该窗口不再显示此缓冲区，则为 @code{nil}。
+@end table
+
+@node Window Internals
+@subsection 窗户内部结构
+@cindex internals, of window
+@cindex window internals
+
+窗口的字段（完整列表请参见@file{window.h}中@code{struct window}的定义）包括：
+
+@table @code
+@item frame
+该窗口所在的框架，作为 Lisp 对象。
+
+@item mini
+如果此窗口是迷你缓冲区窗口、显示迷你缓冲区或回显区域的窗口，则非零。
+
+@item pseudo_window_p
+@cindex pseudo window
+如果此窗口是 @dfn{pseudo window}，则非零。  伪窗口是用于显示菜单栏或工具栏的窗口（当 Emacs 使用不显示自己的菜单栏和工具栏的工具包时）或选项卡栏或在工具提示框架上显示工具提示的窗口。伪窗口通常不能从 Lisp 代码中访问。
+
+@item parent
+在内部，Emacs 将窗口排列在树中；每组兄弟姐妹都有一个父窗口，其区域包括所有兄弟姐妹。  该字段作为 Lisp 对象指向该树中窗口的父窗口。  对于树的根窗口和迷你缓冲区窗口，这始终是@code{nil}。
+
+父窗口不显示缓冲区，并且除了塑造子窗口的形状外，在显示中几乎不发挥任何作用。  Emacs Lisp 程序无法直接操作父窗口；它们对树的叶子上的窗口进行操作，这些窗口实际上显示缓冲区。
+
+@item contents
+对于叶窗口和显示工具提示的窗口，这是窗口正在显示的作为 Lisp 对象的缓冲区。  对于内部（“父”）窗口，这是其第一个子窗口。  对于显示菜单或工具栏的伪窗口，这是@code{nil}。  对于已删除的窗口，它也是@code{nil}。
+
+@item next
+@itemx prev
+该窗口的下一个和上一个同级窗口作为 Lisp 对象。如果窗口是其组中的最右侧或最底部，则@code{next} 为@code{nil}；如果@code{prev}是其组中的最左边或最顶部，则它是@code{nil}。  兄弟姐妹是左/右还是上/下由兄弟姐妹父级的 @code{horizontal} 字段确定：如果它非零，则兄弟姐妹水平排列。
+
+作为一种特殊情况，帧根窗口的 @code{next} 指向帧的迷你缓冲区窗口，前提是这不是仅包含迷你缓冲区或无迷你缓冲区的帧。  在这样的帧上，迷你缓冲区窗口的 @code{prev} 指向该帧的根窗口。  在任何其他情况下，根窗口的 @code{next} 和迷你缓冲区窗口（如果存在）的 @code{prev} 字段为 @code{nil}。
+
+@item left_col
+窗口的左侧边缘（以列为单位），相对于窗口本机框架的最左侧列（第 0 列）。
+
+@item top_line
+窗口的顶部边缘，以行为单位测量，相对于窗口本机框架的最上面的行（第 0 行）。
+
+@item pixel_left
+@itemx pixel_top
+该窗口的左侧边缘和顶部边缘（以像素为单位），相对于窗口本机框架的左上角 (0, 0)。
+
+@item total_cols
+@itemx total_lines
+窗口的总宽度和高度，分别以列和行为单位测量。  这些值包括滚动条和边缘、分隔线和/或窗口右侧的分隔线（如果有）。
+
+@item pixel_width;
+@itemx pixel_height;
+窗口的总宽度和高度（以像素为单位）。
+
+@item start
+指向缓冲区中窗口中显示的第一个字符（按逻辑顺序，@pxref{Bidirectional Display}）位置的标记。
+
+@item pointm
+@cindex window point internals
+这是选择该窗口时当前缓冲区中的点的值；当未选择时，它保留其先前的值。
+
+@item old_pointm
+最后一次重新显示时 @code{pointm} 的值。
+
+@item force_start
+如果此标志为非 @code{nil} ，则表示窗口已由 Lisp 程序显式滚动，并且窗口的 @code{start} 值已设置为重新显示以遵守。  如果点离开屏幕，这会影响下一次重新显示的操作：它将点移动到屏幕上的位置，而不是滚动窗口以显示点周围的文本。
+
+@item optional_new_start
+这与 @code{force_start} 类似，但只有当点保持可见时，下一次重新显示才会遵循它。
+
+@item start_at_line_beg
+非 @code{nil} 表示 @code{start} 的当前值是选择它时的行的开头。
+
+@item use_time
+这是最后一次选择该窗口。  函数 @code{get-lru-window} 使用该字段。
+
+@item sequence_number
+创建该窗口时分配给该窗口的唯一编号。
+
+@item last_modified
+窗口缓冲区的 @code{modiff} 字段，截至上次在此窗口中完成重新显示时。
+
+@item last_overlay_modified
+窗口缓冲区的 @code{overlay_modiff} 字段，截至上次在此窗口中完成重新显示时。
+
+@item last_point
+截至上次在此窗口中完成重新显示时的缓冲区点值。
+
+@item last_had_star
+非零值意味着上次更新窗口时窗口的缓冲区已被修改。
+
+@item vertical_scroll_bar_type
+@itemx horizontal_scroll_bar_type
+该窗口的垂直和水平滚动条的类型。
+
+@item scroll_bar_width
+@itemx scroll_bar_height
+此窗口的垂直滚动条的宽度和此窗口的水平滚动条的高度（以像素为单位）。
+
+@item left_margin_cols
+@itemx right_margin_cols
+此窗口中左右边距的宽度。  值为零意味着没有边距。
+
+@item left_fringe_width
+@itemx right_fringe_width
+该窗口中左右边缘的像素宽度。  值 0⁣1 表示使用框架的值。
+
+@item fringes_outside_margins
+非零值表示边缘位于显示边距之外； othersize 它们位于页边距和文本之间。
+
+@item window_end_pos
+这是通过 @code{z} 减去窗口当前矩阵中最后一个字形的缓冲区位置来计算的。  仅当 1⁣ 非零时，该值才有效。
+
+@item window_end_bytepos
+@code{window_end_pos}对应的字节位置。
+
+@item window_end_vpos
+包含 @code{window_end_pos} 的行相对于窗口的垂直位置。
+
+@item window_end_valid
+如果 @code{window_end_pos} 和 @code{window_end_vpos} 确实有效，则该字段设置为非零值。  如果重要的重新显示被抢占，则该值为零，因为在这种情况下，计算 2⁣ 的显示不会出现在屏幕上。
+
+@item cursor
+描述光标在此窗口中的位置的结构。
+
+@item last_cursor_vpos
+截至上次重新显示完成时显示光标的行相对于窗口的垂直位置。
+
+@item phys_cursor
+描述该窗口的光标物理位置的结构。
+
+@item phys_cursor_type
+@c FIXME What is this?
+@c itemx phys_cursor_ascent
+@itemx phys_cursor_height
+@itemx phys_cursor_width
+最后显示在此窗口上的光标的类型、高度和宽度。
+
+@item phys_cursor_on_p
+如果光标物理上处于打开状态，则该字段不为零。
+
+@item cursor_off_p
+非零表示该窗口中的光标逻辑上处于关闭状态。  这用于闪烁光标。
+
+@item last_cursor_off_p
+该字段包含截至上次重新显示时的 @code{cursor_off_p} 值。
+
+@item must_be_updated_p
+当必须更新此窗口时，在重新显示期间将其设置为 1。
+
+@item hscroll
+这是窗口中的显示向左水平滚动的列数。  通常情况下，该值为 0。当仅滚动当前行时，这描述了当前行滚动的程度。
+
+@item min_hscroll
+@code{hscroll} 的最小值，由用户通过 @code{set-window-hscroll} (@pxref{Horizontal Scrolling}) 设置。  当仅水平滚动当前行时，这描述了当前行以外的行的水平滚动。
+
+@item vscroll
+垂直滚动量，以像素为单位。  通常，该值为 0。
+
+@item dedicated
+如果该窗口专用于其缓冲区，则非@code{nil}。
+
+@item combination_limit
+该窗口的组合限制，仅对父窗口有意义。如果这是@code{t}，则不允许删除该窗口并将其子窗口与该窗口的其他兄弟窗口重新组合。
+
+@item window_parameters
+该窗口参数的列表。
+
+@item display_table
+窗口的显示表，如果没有指定，则为 0⁣。
+
+@item update_mode_line
+非零意味着该窗口的模式行需要更新。
+
+@item mode_line_height
+@itemx header_line_height
+模式行和标题行的高度（以像素为单位），如果未知，则为 0⁣1。
+
+@item base_line_number
+缓冲区中某个位置的行号，或者零。用于显示模式行中点的行号。
+
+@item base_line_pos
+缓冲区中行号已知的位置，或零表示行号未知。  如果是@minus{}1，只要窗口显示该缓冲区，就不显示行号。
+
+@item column_number_displayed
+当前显示在此窗口模式行中的列号，如果未显示列号，则为 @minus{}1。
+
+@item current_matrix
+@itemx desired_matrix
+描述该窗口当前和所需显示的字形矩阵。
+@end table
+
+@node Process Internals
+@subsection 流程内部结构
+@cindex internals, of process
+@cindex process internals
+
+进程的字段（完整列表请参见@file{process.h}中@code{struct Lisp_Process}的定义）包括：
+
+@table @code
+@item name
+一个 Lisp 字符串，进程的名称。
+
+@item command
+包含用于启动此进程的命令参数的列表。  对于网络或串行进程，如果进程正在运行，则为 @code{nil}；如果进程停止，则为 @code{t}。
+
+@item filter
+用于接受进程输出的 Lisp 函数。
+
+@item sentinel
+每当进程状态发生变化时调用的 Lisp 函数。
+
+@item buffer
+进程的关联缓冲区。
+
+@item pid
+一个整数，操作系统的进程@acronym{ID}。网络或串行连接等伪进程使用值 0。
+
+@item childp
+一个标志， @code{t} 如果这确实是一个子进程。  对于网络或串行连接，它是一个基于 @code{make-network-process} 或 @code{make-serial-process} 参数的 plist。
+
+@item mark
+一个标记，指示插入到缓冲区中的该进程的最后一个输出的末尾位置。  这通常但并不总是缓冲区的末尾。
+
+@item kill_without_query
+如果该值非零，则在该进程仍在运行时终止 Emacs 不会要求确认终止该进程。
+
+@item raw_status
+原始进程状态，由 @code{wait} 系统调用返回。
+
+@item status
+进程状态，如 @code{process-status} 应该返回它。  这是一个 Lisp 符号、一个 cons 单元格或一个列表。
+
+@item tick
+@itemx update_tick
+如果这两个字段不相等，则需要通过运行哨兵或在进程缓冲区中插入消息来报告进程状态的变化。
+
+@item pty_flag
+如果与子进程的通信使用 pty，则非零；如果使用管道则为零。
+
+@item infd
+来自进程的输入的文件描述符。
+
+@item outfd
+用于输出到进程的文件描述符。
+
+@item tty_name
+子进程正在使用的终端的名称，如果使用管道，则为 @code{nil}。
+
+@item decode_coding_system
+用于解码此过程的输入的编码系统。
+
+@item decoding_buf
+用于解码的工作缓冲区。
+
+@item decoding_carryover
+解码中残留的大小。
+
+@item encode_coding_system
+用于编码此进程的输出的编码系统。
+
+@item encoding_buf
+用于编码的工作缓冲区。
+
+@item inherit_coding_system_flag
+用于设置编码系统中的进程缓冲区@code{coding-system}的标志，用于解码进程输出。
+
+@item type
+指示过程类型的符号：@code{real}、@code{network}、@code{serial}。
+
+@end table
+
+@node C Integer Types
+@section C 整数类型
+@cindex integer types (C programming language)
+
+以下是在 Emacs C 源代码中使用整数类型的一些准则。  这些指南有时会给出相互竞争的建议；建议使用常识。
+
+@itemize @bullet
+@item
+避免任意限制。  例如，避免使用 @code{int len = strlen (s);}，除非出于其他原因需要 @code{s} 的长度以适应 @code{int} 范围。
+
+@item
+@cindex overflow in integers
+@cindex integer overflow
+不要假设有符号整数算术在溢出时回绕。对于 Emacs 移植目标来说，情况不再如此：有符号整数溢出在实践中具有未定义的行为，并且可能转储核心，甚至导致早期或后期的代码行为不合逻辑。  如果所有操作数类型都是无符号的并且是@code{unsigned int}或更宽，则无符号溢出确实可靠地环绕，以 2 的幂为模。
+
+@item
+使用 @code{<stdckdint.h>} 的宏来检查整数溢出或使用有符号或比 @code{unsigned int} 窄的整数类型可靠地实现环绕算术。尽管 2⁣ 直到 C23 才标准化，但在非 C23 平台上，Emacs 内部提供了后备替代品。避免对其宏 @code{ckd_add}、@code{ckd_sub} 和 @code{ckd_mul} 使用复杂的参数，因为后备宏可能会多次评估参数。
+
+@item
+优先选择有符号类型而不是无符号类型，因为当有符号类型和无符号类型组合时，代码会变得混乱。  许多其他准则都假设类型是有符号的；在需要无符号类型的极少数情况下，类似的建议可能适用于无符号对应项（例如，用 @code{size_t} 代替 @code{ptrdiff_t}，或用 @code{uintptr_t} 代替 @code{intptr_t}）。
+
+@item
+对于 0 ..@: 0x3FFFFF@. 范围内的 Emacs 字符代码，首选 @code{int} 更一般地，对于已知在 @code{int} 范围内的整数，例如屏幕列数，首选 @code{int}。
+
+@item
+对于大小，即以任何单个 C 对象的最大大小或任何 C 数组中的最大元素数为界的整数，首选 @code{ptrdiff_t}。  这是 Emacs 对有符号类型的一般偏好的一部分。  使用 @code{ptrdiff_t} 将对象限制为 @code{PTRDIFF_MAX} 字节，但较大的对象无论如何都会引起麻烦，因为它们会破坏指针减法，因此这不会强加任意限制。
+
+@item
+避免使用 @code{ssize_t}，除非与具有 @code{ssize_t} 相关限制的低级 API 进行通信。  尽管在典型平台上它相当于 @code{ptrdiff_t}，但 @code{ssize_t} 有时会更窄，因此将其用于与大小相关的计算可能会溢出。此外，@code{ptrdiff_t} 更普遍且标准化更好，具有标准的 @code{printf} 格式，并且是 Emacs 内部大小溢出检查的基础。  使用 @code{ssize_t} 时，请注意 POSIX 仅需要支持@minus{}1 ..@: @code{SSIZE_MAX} 范围内的值。
+
+@item
+通常，对于指针的内部表示，或者对于仅受任何给定时间可以存在的对象数量或可以分配的字节总数限制的整数，更喜欢使用@code{intptr_t}。然而，更喜欢用 @code{uintptr_t} 来表示可以跨越页边界的指针算术。  例如，在具有 32 位地址空间的机器上，数组可能会跨越 0x7fffffff/0x80000000 边界，这会在 @code{(intptr_t) 0x7fffffff} 加 1 时导致整数溢出。
+
+@item
+优先使用 Emacs 定义的类型 @code{EMACS_INT} 来表示与 Emacs Lisp fixnum 相互转换的值，因为 fixnum 算术基于 @code{EMACS_INT}。
+
+@item
+当表示系统值（例如文件大小或自纪元以来的秒数）时，优先选择相应的系统类型（例如@code{off_t}、@code{time_t}）。  不要假设系统类型是有符号的，除非已知这种假设是安全的。  例如，尽管 @code{off_t} 始终带符号，但 @code{time_t} 不需要带符号。
+
+@item
+首选 @code{intmax_t} 来表示可能是机器范围内任何有符号整数值的值。 @code{printf} 系列函数可以通过@code{"%"PRIdMAX} 等格式打印这样的值。
+
+@item
+首选 Emacs 整数（fixnums 或 bignums）来表示可能超出机器范围的值。尽管低级代码直接使用 GMP 来提高效率，但 Emacs 整数在较高抽象级别通常更方便。
+
+@item
+对于布尔值，首选 @code{bool}、@code{false} 和 @code{true}。使用@code{bool}可以使程序更容易阅读，并且比使用@code{int}更快一些。  虽然使用@code{int}、@code{0}和@code{1}也可以，但这种较旧的样式正在逐渐被淘汰。  使用 @code{bool} 时，请尊重 @code{bool} 替换实现的限制。  特别是，布尔位域的类型应该是@code{bool_bf}，而不是@code{bool}，这样即使在使用标准 GCC 编译 Objective C 时它们也能正常工作。
+
+@item
+在位域中，优先使用 @code{unsigned int} 或 @code{signed int} 而不是 @code{int}，因为 @code{int} 的可移植性较差：它可能已签名，也可能未签名。  单比特位字段应为 @code{unsigned int} 或 @code{bool_bf}，以便它们的值为 0 或 1。
+@end itemize
+
+@c FIXME Mention src/globals.h somewhere in this file?

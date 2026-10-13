@@ -1,0 +1,1004 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1997--2026 Free Software Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Customization
+@chapter 自定义设置
+
+@cindex customization item
+Emacs 用户可以使用“定制”界面来定制变量和界面，而无需编写 Lisp 代码。  @xref{Easy Customization,,, emacs, The GNU Emacs Manual}。  本章介绍如何定义用户可以通过自定义界面进行交互的@dfn{customization items}。
+
+定制项目包括可定制的变量，这些变量是用
+@ifinfo
+@code{defcustom}宏（@pxref{Variable Definitions}）；
+@end ifinfo
+@ifnotinfo
+@code{defcustom}宏；
+@end ifnotinfo
+可定制的面，用@code{defface}定义（在@ref{Defining Faces}中单独描述）；和@dfn{customization groups}，定义为
+@ifinfo
+@code{defgroup} (@pxref{Group Definitions}),
+@end ifinfo
+@ifnotinfo
+@code{defgroup},
+@end ifnotinfo
+它们充当相关定制项目组的容器。
+
+@menu
+* Common Keywords::          各种自定义声明的通用关键字参数。
+* Group Definitions::        编写自定义组定义。
+* Variable Definitions::     声明用户选项。
+* Customization Types::      指定用户选项的类型。
+* Applying Customizations::  应用自定义设置的功能。
+* Custom Themes::            编写自定义主题。
+@end menu
+
+@node Common Keywords
+@section 常用项目关键词
+
+@cindex customization keywords
+我们将在接下来的几节中描述的自定义声明——@code{defcustom}、@code{defgroup}等——都接受关键字参数（@pxref{Constant Variables}）来指定各种信息。  本节介绍适用于所有类型的自定义声明的关键字。
+
+除 0⁣ 之外，所有这些关键字都可以在给定项目中多次使用。  关键字的每次使用都有独立的效果。关键字 @code{:tag} 是一个例外，因为任何给定的项目只能显示一个名称。
+
+@table @code
+@item :tag @var{label}
+@kindex tag@r{, customization keyword}
+使用 @var{label}（字符串）代替项目名称，在自定义菜单和缓冲区中标记项目。  @strong{Don't use a tag which is substantially different from the item's real name; that would cause confusion.}
+
+@kindex group@r{, customization keyword}
+@item :group @var{group}
+将此自定义项放入组@var{group}。  如果自定义项中缺少此关键字，它将被放置在上次定义的同一组中（在当前文件中）。
+
+当您在@code{defgroup}中使用@code{:group}时，它会使新组成为@var{group}的子组。
+
+如果多次使用此关键字，则可以将单个项目放入多个组中。  显示任何这些组都会显示此项目。  请不要过度这样做，因为结果会很烦人。
+
+@item :link @var{link-data}
+@kindex link@r{, customization keyword}
+在该项目的文档字符串后包含外部链接。这是一个包含引用其他一些文档的按钮的句子。
+
+对于 @var{link-data}，您可以使用多种替代方案：
+
+@table @code
+@item (custom-manual @var{info-node})
+链接到信息节点； @var{info-node} 是一个指定节点名称的字符串，如 @code{"(emacs)Top"} 所示。  该链接在自定义缓冲区中显示为 @samp{[Manual]} 并在 @var{info-node} 上进入内置信息阅读器。
+
+@item (info-link @var{info-node})
+与 @code{custom-manual} 类似，不同之处在于该链接以信息节点名称出现在自定义缓冲区中。
+
+@item (url-link @var{url})
+链接到网页； @var{url} 是指定@acronym{URL} 的字符串。  该链接在自定义缓冲区中显示为@var{url}，并调用@code{browse-url-browser-function}指定的WWW浏览器。
+
+@item (emacs-commentary-link @var{library})
+链接到图书馆的评论部分； @var{library} 是指定库名称的字符串。  @xref{Library Headers}。
+
+@item (emacs-library-link @var{library})
+链接到 Emacs Lisp 库文件； @var{library} 是指定库名称的字符串。
+
+@item (file-link @var{file})
+链接到文件； @var{file} 是一个字符串，指定当用户调用此链接时要使用 @code{find-file} 访问的文件的名称。
+
+@item (function-link @var{function})
+链接到函数的文档； @var{function} 是一个字符串，指定当用户调用此链接时用 @code{describe-function} 描述的函数名称。
+
+@item (variable-link @var{variable})
+链接到变量的文档； @var{variable} 是一个字符串，指定当用户调用此链接时用 @code{describe-variable} 描述的变量名称。
+
+@item (face-link @var{face})
+链接到人脸文档； @var{face} 是一个字符串，指定当用户调用此链接时要使用 @code{describe-face} 描述的脸部名称。
+
+@item (custom-group-link @var{group})
+链接到另一个自定义组。  调用它会为 @var{group} 创建一个新的自定义缓冲区。
+@end table
+
+您可以通过在 @var{link-data} 的第一个元素后面添加 @code{:tag @var{name}} 来指定要在自定义缓冲区中使用的文本；例如，@code{(info-link :tag "foo" "(emacs)Top")} 建立指向 Emacs 手册的链接，该手册在缓冲区中显示为 @samp{foo}。
+
+您可以多次使用此关键字来添加多个链接。
+
+@item :load @var{file}
+@kindex load@r{, customization keyword}
+在显示此自定义项 (@pxref{Loading}) 之前加载文件 @var{file}（字符串）。  仅当文件尚未加载时，才使用 @code{load} 完成加载。
+
+@item :require @var{feature}
+@kindex require@r{, customization keyword}
+当您保存的自定义设置了此项的值时，执行@code{(require '@var{feature})}。  @var{feature} 应该是一个符号。
+
+使用 @code{:require} 最常见的原因是当变量启用诸如次要模式之类的功能时，并且除非加载实现该模式的代码，否则仅设置该变量不会产生任何效果。
+
+@item :version @var{version}
+@kindex version@r{, customization keyword}
+该关键字指定该项目是在 Emacs 版本 @var{version} 中首次引入的，或者其默认值在该版本中已更改。  值 @var{version} 必须是字符串。
+
+@item :package-version '(@var{package} . @var{version})
+@kindex package-version@r{, customization keyword}
+该关键字指定该项目首次在 @var{package} 版本 @var{version} 中引入，或者其含义或默认值在该版本中已更改。  该关键字优先于@code{:version}。
+
+@var{package} 应该是包的正式名称，作为符号（例如，@code{MH-E}）。  @var{version} 应该是一个字符串。  如果包 @var{package} 作为 Emacs 的一部分发布，@var{package} 和 @var{version} 应出现在 @code{customize-package-emacs-version-alist} 的值中。
+@end table
+
+作为 Emacs 一部分分发的使用 @code{:package-version} 关键字的软件包还必须更新 @code{customize-package-emacs-version-alist} 变量。
+
+@defvar customize-package-emacs-version-alist
+此列表提供与 @code{:package-version} 关键字中列出的软件包版本关联的 Emacs 版本的映射。  其要素是：
+
+@example
+(@var{package} (@var{pversion} . @var{eversion})@dots{})
+@end example
+
+对于每个 @var{package}（这是一个符号），有一个或多个元素包含包版本 @var{pversion} 以及关联的 Emacs 版本 @var{eversion}。  这些版本是字符串。例如，MH-E 软件包使用以下内容更新此列表：
+
+@c Must be small else too wide.
+@c FIXME obviously this is out of date (in the code).
+@smallexample
+(add-to-list 'customize-package-emacs-version-alist
+             '(MH-E ("6.0" . "22.1") ("6.1" . "22.1") ("7.0" . "22.1")
+                    ("7.1" . "22.1") ("7.2" . "22.1") ("7.3" . "22.1")
+                    ("7.4" . "22.1") ("8.0" . "22.1")))
+@end smallexample
+
+@var{package} 的值必须是唯一的，并且需要与 @code{:package-version} 关键字中出现的 @var{package} 值匹配。  由于用户可能会在错误消息中看到该值，因此一个不错的选择是包的正式名称，例如 MH-E 或 Gnus。
+@end defvar
+
+@node Group Definitions
+@section 定义自定义组
+@cindex define customization group
+@cindex customization groups, defining
+
+每个 Emacs Lisp 包都应该有一个主自定义组，其中包含包中的所有选项、界面和其他组。如果包装中的选项和面数较少，请仅使用一组并将所有内容放入其中。  当选项和界面超过二十个时，您应该将它们分成子组，并将子组放在包的主自定义组下。  可以将一些选项和界面与子组一起放在包的主组中。
+
+包的主要或唯一组应该是一个或多个标准自定义组的成员。  （要显示完整列表，请使用 @kbd{M-x customize}。）选择其中一个或多个（但不要太多），然后使用 @code{:group} 关键字将您的组添加到每个组中。
+
+声明新自定义组的方法是使用@code{defgroup}。
+
+@defmac defgroup group members doc [keyword value]@dots{}
+将 @var{group} 声明为包含 @var{members} 的自定义组。不要引用符号 @var{group}。  参数 @var{doc} 指定该组的文档字符串。
+
+参数 @var{members} 是一个列表，指定要成为组成员的初始自定义项集。  但是，大多数情况下 @var{members} 是 @code{nil}，并且在定义这些成员时可以使用 @code{:group} 关键字来指定组的成员。
+
+如果您想通过@var{members}指定组成员，则每个元素应具有@code{(@var{name} @var{widget})}的形式。  这里 @var{name} 是一个符号，@var{widget} 是用于编辑该符号的小部件类型。有用的小部件有 @code{custom-variable}（代表变量）、@code{custom-face}（代表面）和 @code{custom-group}（代表组）。
+
+当您在 Emacs 中引入新组时，请在 @code{defgroup}; 中使用 @code{:version} 关键字；那么您无需将其用于组中的各个成员。
+
+除了常用关键字（@pxref{Common Keywords}）之外，还可以在@code{defgroup}中使用该关键字：
+
+@table @code
+@item :prefix @var{prefix}
+@kindex prefix@r{, @code{defgroup} keyword}
+如果组中某个项目的名称以 @var{prefix} 开头，并且可自定义变量 @code{custom-unlispify-remove-prefixes} 为非 @code{nil}，则该项目的标签将省略 @var{prefix}。  一个组可以有任意数量的前缀。
+@end table
+
+@cindex @code{custom-group} property
+组的变量、面和子组存储在组符号的 @code{custom-group} 属性中。  @xref{Symbol Plists}。  该属性的值是一个对的列表，其中 @code{car} 是变量或面或子群的符号，而 @code{cdr} 是相应符号 @code{custom-variable}、@code{custom-face} 或 @code{custom-group} 之一。
+@end defmac
+
+@defopt custom-unlispify-remove-prefixes
+如果此变量为非 @code{nil}，则每当用户自定义组时，标记名称中都会省略由组的 @code{:prefix} 关键字指定的前缀。
+
+默认值为@code{nil}，即禁用前缀丢弃功能。  这是因为丢弃前缀通常会导致选项和面孔的名称混淆。
+@end defopt
+
+@node Variable Definitions
+@section 定义自定义变量
+@cindex define customization options
+@cindex customizable variables, how to define
+@cindex user options, how to define
+
+@dfn{Customizable variables}，也称为@dfn{user options}，是全局Lisp变量，其值可以通过Customize接口设置。  与使用 @code{defvar} (@pxref{Defining Variables}) 定义的其他全局变量不同，可自定义变量是使用 @code{defcustom} 宏定义的。  除了将@code{defvar}作为子例程调用之外，@code{defcustom}还说明变量应如何在自定义界面中显示、允许采用的值等。
+
+@defmac defcustom option standard doc [keyword value]@dots{}
+该宏将 @var{option} 声明为用户选项（即可自定义变量）。  你不应该引用@var{option}。
+
+参数 @var{standard} 是一个表达式，指定 @var{option} 的标准值。  计算 @code{defcustom} 形式会计算 @var{standard}，但不一定将选项绑定到该值。  如果@var{option}已经有默认值，则保持不变。  如果用户已保存@var{option}的自定义值，则用户的自定义值将安装为默认值。  否则，计算 @var{standard} 的结果将被设置为默认值。
+
+与 @code{defvar} 一样，该宏将 @code{option} 标记为特殊变量，这意味着它应该始终动态绑定。  如果 @var{option} 已经进行了词法绑定，则该词法绑定将保持有效，直到绑定构造退出。  @xref{Variable Scoping}。
+
+表达式 0⁣ 也可以在其他各种时间进行计算——每当定制工具需要知道 1⁣ 的标准值时。  因此，请务必使用随时进行评估的无害表达式。
+
+参数 @var{doc} 指定变量的文档字符串。
+
+如果 @code{defcustom} 未指定任何 @code{:group}，则将使用同一文件中使用 @code{defgroup} 定义的最后一个组。  这样，大多数@code{defcustom}不需要显式的@code{:group}。
+
+@cindex @code{eval-defun}, and @code{defcustom} forms
+当您在 Emacs Lisp 模式 (@code{eval-defun}) 中使用 @kbd{C-M-x} 计算 @code{defcustom} 形式时，@code{eval-defun} 的一个特殊功能会安排无条件设置变量，而不测试其值是否为 void。  （相同的功能适用于@code{defvar}、@pxref{Defining Variables}。）在已定义的默认自定义上使用@code{eval-defun} 会调用@code{:set} 函数（请参见下文）（如果存在）。
+
+如果将 @code{defcustom} 放入预加载的 Emacs Lisp 文件 (@pxref{Building Emacs}) 中，则在转储时安装的标准值可能不正确，例如，因为它所依赖的另一个变量尚未分配正确的值。  在这种情况下，请在 Emacs 启动后使用@code{custom-reevaluate-setting}（如下所述）重新评估标准值。
+@end defmac
+
+除了@ref{Common Keywords}中列出的关键字之外，该宏还接受以下关键字：
+
+@table @code
+@item :type @var{type}
+使用 @var{type} 作为此选项的数据类型。  它指定哪些值是合法的，以及如何显示该值 (@pxref{Customization Types})。  每个 @code{defcustom} 都应该为此关键字指定一个值。
+
+@kindex options@r{, @code{defcustom} keyword}
+@item :options @var{value-list}
+指定在此选项中使用的合理值列表。  用户不仅限于使用这些值，而是将它们作为方便的替代方案提供。
+
+这仅对某些类型有意义，目前包括 @code{hook}、@code{plist} 和 @code{alist}。  有关如何使用 @code{:options} 的说明，请参阅各个类型的定义。
+
+使用不同的 1⁣ 值重新计算 0⁣ 形式不会清除先前计算添加的值，或通过调用 2⁣ 添加的值（见下文）。
+
+@kindex set@r{, @code{defcustom} keyword}
+@item :set @var{setfunction}
+使用自定义界面时，指定 @var{setfunction} 作为更改此选项值的方式。  函数 @var{setfunction} 应采用两个或三个参数、一个符号（选项名称）、新值和一个可选的 @var{buffer-local} 指示符。 @var{setfunction} 应该采取一切必要措施来正确更新此选项的值（这可能并不意味着简单地将选项设置为 Lisp 变量）；但最好不要破坏性地修改其值参数。  如果可选的⁣​​4⁣非零，则新值应在本地设置缓冲区，并且不影响其全局值或默认值。  @var{setfunction} 的默认值为 @code{set-default-toplevel-value}。
+
+如果定义了，当在 Emacs Lisp 模式下使用 2⁣ 计算 1⁣ 形式时以及通过 44 宏 (@pxref{Setting Variables, setopt}) 更改 3⁣ 的值时，@var{setfunction} 也会被调用。
+
+如果指定此关键字，变量的文档字符串应描述如何在手写 Lisp 代码中完成相同的工作，可以通过直接调用 @var{setfunction} 或使用 @code{setopt} 或 @code{setopt-local}。
+
+@kindex get@r{, @code{defcustom} keyword}
+@item :get @var{getfunction}
+指定 @var{getfunction} 作为提取该选项值的方式。  函数 @var{getfunction} 应该接受一个参数，一个符号，并且应该返回任何自定义应该用作该符号的当前值的值（不必是符号的 Lisp 值）。  默认值为@code{default-toplevel-value}。
+
+您必须真正了解 Custom 的工作原理才能正确使用 @code{:get}。  它适用于在 Custom 中被视为变量但实际上并未存储在 Lisp 变量中的值。  为真正存储在 Lisp 变量中的值指定 @var{getfunction} 几乎肯定是错误的。
+
+@kindex initialize@r{, @code{defcustom} keyword}
+@item :initialize @var{function}
+@var{function} 应该是一个函数，用于在计算 @code{defcustom} 时初始化变量。  它应该有两个参数：选项名称（符号）和值。  以下是一些旨在以这种方式使用的预定义函数：
+
+@table @code
+@item custom-initialize-set
+使用变量的 @code{:set} 函数来初始化该变量，但如果它已经是非 void，则不要重新初始化它。
+
+@item custom-initialize-default
+与 @code{custom-initialize-set} 类似，但使用函数 @code{set-default-toplevel-value} 来设置变量，而不是变量的 @code{:set} 函数。  这是其 @code{:set} 函数启用或禁用次要模式的变量的通常选择；通过此选择，定义变量将不会调用次要模式函数，但自定义变量将会调用。
+
+@item custom-initialize-reset
+始终使用 @code{:set} 函数来初始化变量。  如果变量已经是非 void，请使用当前值（由 2⁣ 方法返回）调用 @code{:set} 函数来重置它。这是默认的 @code{:initialize} 函数。
+
+@item custom-initialize-changed
+如果变量已设置或已自定义，请使用 @code{:set} 函数初始化该变量；否则，只需使用@code{set-default-toplevel-value}。
+
+@item custom-initialize-after-file-load
+该函数的行为类似于@code{custom-initialize-set}，但它将实际的初始化延迟到加载包含的文件之后。这对于打破 setter 是（或使用）需要在变量之后定义的函数的常见依赖关系很有用，例如当全局次要模式具有非 @code{nil} @code{:init-value} 时。
+
+@item custom-initialize-delay
+该函数的行为类似于 @code{custom-initialize-set}，但它将实际初始化延迟到下一次 Emacs 启动。  当确保在运行时上下文（可能位于不同的系统或编程环境）中执行初始化非常重要时，应在预加载的 Lisp 文件（构建 Emacs 时加载）中使用此方法。  @xref{Building Emacs, custom-initialize-delay}。
+@end table
+
+@kindex local@r{, @code{defcustom} keyword}
+@item :local @var{value}
+如果@var{value}是@code{t}，则将@var{option}标记为自动缓冲区本地；如果值为 @code{permanent}，则还将 @var{option}s @code{permanent-local} 属性设置为 @code{t}。  最后，如果值为 @code{permanent-only}，则将 @var{option}s @code{permanent-local} 属性设置为 @code{t}，而不将其标记为自动缓冲区本地。 @xref{Creating Buffer-Local}。
+
+@kindex risky@r{, @code{defcustom} keyword}
+@item :risky @var{value}
+将变量的 @code{risky-local-variable} 属性设置为 @var{value} (@pxref{File Local Variables})。
+
+@kindex safe@r{, @code{defcustom} keyword}
+@item :safe @var{function}
+将变量的 @code{safe-local-variable} 属性设置为 @var{function} (@pxref{File Local Variables})。
+
+@kindex set-after@r{, @code{defcustom} keyword}
+@item :set-after @var{variables}
+根据保存的自定义设置设置变量时，请确保在此变量之前设置变量@var{variables}；即，延迟设置此变量，直到处理完其他变量之后。  如果设置此变量无法正常工作，请使用@code{:set-after}，除非其他变量已经具有其预期值。
+@end table
+
+为打开特定功能的选项指定 @code{:require} 关键字非常有用。  这会导致 Emacs 在设置该选项时加载该功能（如果尚未加载）。 @xref{Common Keywords}。  这是一个例子：
+
+@example
+(defcustom frobnicate-automatically nil
+  "Non-nil means automatically frobnicate all buffers."
+  :type 'boolean
+  :require 'frobnicate-mode
+  :group 'frobnicate)
+@end example
+
+如果自定义项具有 @code{hook} 或 @code{alist} 等支持 @code{:options} 的类型，您可以通过调用 @code{custom-add-frequent-value} 从 @code{defcustom} 声明外部向列表中添加其他值。  例如，如果您定义了一个要从 @code{emacs-lisp-mode-hook} 调用的函数 @code{my-lisp-mode-initialization}，您可能希望将其添加到 @code{emacs-lisp-mode-hook} 的合理值列表中，而不是通过编辑其定义。  你可以这样做：
+
+@example
+(custom-add-frequent-value 'emacs-lisp-mode-hook
+   'my-lisp-mode-initialization)
+@end example
+
+@defun custom-add-frequent-value symbol value
+对于自定义选项 @var{symbol}，将 @var{value} 添加到合理值列表中。
+
+添加值的具体效果取决于@var{symbol}的定制类型。
+
+由于计算 @code{defcustom} 形式不会清除之前添加的值，Lisp 程序可以使用此函数为尚未定义的用户选项添加值。
+@end defun
+
+@cindex @code{customized-value} (symbol property)
+@cindex @code{saved-value} (symbol property)
+@cindex @code{standard-value} (symbol property)
+@cindex @code{theme-value} (symbol property)
+在内部，@code{defcustom}使用符号属性@code{standard-value}记录标准值的表达式，@code{saved-value}记录用户使用自定义缓冲区保存的值，@code{customized-value}记录用户使用自定义缓冲区设置但未保存的值。 @xref{Symbol Properties}。  另外，还有@code{themed-value}，用于记录主题设置的值（@pxref{Custom Themes}）。  这些属性是列表，其中的 car 是计算结果的表达式。
+
+@defun custom-reevaluate-setting symbol
+该函数重新评估@var{symbol}的标准值，它应该是通过@code{defcustom}声明的用户选项。  如果变量是自定义的，则此函数将重新评估保存的值。  然后它将用户选项设置为该值（使用选项的 @code{:set} 属性，如果已定义）。
+
+这对于在正确计算其值之前定义的可自定义选项非常有用。  例如，在启动期间，Emacs 会为预加载的 Emacs Lisp 文件中定义的某些用户选项调用此函数，但其​​初始值取决于仅在运行时可用的信息。
+@end defun
+
+@defun custom-variable-p arg
+如果 1⁣ 是可自定义变量，则此函数返回非 0⁣。  可定制变量是具有 @code{standard-value} 或 @code{custom-autoload} 属性的变量（通常意味着它是用 @code{defcustom} 声明的），或者是另一个可定制变量的别名。
+@end defun
+
+@node Customization Types
+@section 定制类型
+
+@cindex customization types
+当您使用 @code{defcustom} 定义用户选项时，您必须指定其 @dfn{customization type}。  这是一个 Lisp 对象，它描述了 (1) 哪些值是合法的以及 (2) 如何在自定义缓冲区中显示该值以进行编辑。
+
+@kindex type@r{, @code{defcustom} keyword}
+您可以使用 @code{:type} 关键字在 @code{defcustom} 中指定自定义类型。  @code{:type} 的参数被评估，但仅在执行 @code{defcustom} 时评估一次，因此值变化没有用处。  通常我们使用带引号的常量。  例如：
+
+@example
+(defcustom diff-command "diff"
+  "The command to use to run diff."
+  :type '(string)
+  :group 'diff)
+@end example
+
+一般来说，自定义类型是一个列表，其第一个元素是符号，是以下部分中定义的自定义类型名称之一。  该符号后面有许多参数，具体取决于符号。  在类型符号及其参数之间，您可以选择编写关键字值对 (@pxref{Type Keywords})。
+
+有些类型符号不使用任何参数；这些被称为@dfn{simple types}。  对于简单类型，如果不使用任何关键字-值对，则可以省略类型符号两边的括号。  例如，仅 @code{string} 作为自定义类型就相当于 @code{(string)}。
+
+所有定制类型均以小部件的形式实现；详情请参见@ref{Top, , Introduction, widget, The Emacs Widget Library}。
+
+@menu
+* Simple Types::             简单的自定义类型：sexp、integer 等。
+* Composite Types::          从其他类型或数据构建新类型。
+* Splicing into Lists::      使用 @code{:inline} 将元素拼接到列表中。
+* Type Keywords::            自定义类型中的关键字参数对。
+* Defining New Types::       为您的类型命名。
+@end menu
+
+@node Simple Types
+@subsection 简单类型
+
+本节介绍所有简单的自定义类型。  对于其中几种自定义类型，自定义小部件通过 @kbd{C-M-i} 或 @kbd{M-@key{TAB}} 提供内联补全。
+
+@table @code
+@item sexp
+该值可以是任何可以打印和读回的 Lisp 对象。如果您不想花时间找出要使用的更具体的类型，则可以使用 @code{sexp} 作为任何选项的后备。
+
+@item integer
+该值必须是整数。
+
+@item natnum
+该值必须是非负整数。
+
+@item number
+该值必须是数字（浮点或整数）。
+
+@item float
+该值必须是浮点型。
+
+@item string
+该值必须是字符串。  自定义缓冲区显示的字符串不带分隔 @samp{"} 字符或 @samp{\} 引号。
+
+@item regexp
+与 0⁣ 类似，只不过字符串必须是有效的正则表达式。
+
+@item character
+该值必须是字符代码。  字符代码实际上是一个整数，但这种类型通过在缓冲区中插入字符来显示值，而不是通过显示数字。
+
+@item file
+该值必须是文件名。  小部件提供了完成功能。
+
+@item (file :must-match t)
+该值必须是现有文件的文件名。  小部件提供了完成功能。
+
+@item directory
+该值必须是一个目录。  小部件提供了完成功能。
+
+@item hook
+该值必须是函数列表。  此自定义类型用于钩子变量。  您可以在钩子变量的@code{defcustom}中使用@code{:options}关键字来指定建议在钩子中使用的函数列表； @xref{Variable Definitions}。
+
+@item symbol
+该值必须是一个符号。  它作为符号名称出现在自定义缓冲区中。  小部件提供了完成功能。
+
+@item function
+该值必须是 lambda 表达式或函数名称。  该小部件提供函数名称的补全。
+
+@item buffer-predicate
+该值必须是适合 @code{buffer-match-p} 函数 (@pxref{Buffer List}) 的 @var{condition} 参数的形式。  这对于将值提交给 @code{buffer-match-p} 来选择合适的缓冲区的选项来说很方便。
+
+@item variable
+该值必须是变量名。  小部件提供了完成功能。
+
+@item face
+该值必须是一个符号，即面名称。  小部件提供了完成功能。
+
+@item boolean
+该值为布尔值——@code{nil} 或@code{t}。  请注意，通过同时使用 @code{choice} 和 @code{const}（请参阅下一节），您可以指定该值必须是 @code{nil} 或 @code{t}，而且还可以指定文本以适合替代方案特定含义的方式描述每个值。
+
+@item key
+根据@kbd{key-valid-p}，该值是有效键，并且适合与例如@code{keymap-set}一起使用。
+
+@item key-sequence
+该值是一个键序列。  自定义缓冲区使用与 @kbd{kbd} 函数相同的语法显示按键序列。  @xref{Key Sequences}。  这是一个遗留类型；使用 @code{key} 代替。
+
+@item coding-system
+该值必须是编码系统名称，您可以使用@kbd{M-@key{TAB}}完成。
+
+@item color
+该值必须是有效的颜色名称。  该小部件提供了颜色名称的补全，以及用于从 @file{*Colors*} 缓冲区中显示的颜色名称列表中选择颜色名称的示例和按钮。
+
+@item fringe-bitmap
+该值必须是有效的条纹位图名称。  小部件提供了完成功能。
+@end table
+
+@node Composite Types
+@subsection 复合类型
+@cindex composite types (customization)
+
+当没有一个简单类型适合时，您可以使用复合类型，它从其他类型或指定数据构建新类型。指定的类型或数据称为复合类型的@dfn{arguments}。  复合类型通常如下所示：
+
+@example
+(@var{constructor} @var{arguments}@dots{})
+@end example
+
+@noindent
+但您也可以在参数之前添加关键字值对，如下所示：
+
+@example
+(@var{constructor} @r{@{}@var{keyword} @var{value}@r{@}}@dots{} @var{arguments}@dots{})
+@end example
+
+下面是构造函数表以及如何使用它们来编写复合类型：
+
+@table @code
+@item (cons @var{car-type} @var{cdr-type})
+该值必须是 cons 单元格，其 @sc{car} 必须适合 @var{car-type}，其 @sc{cdr} 必须适合 @var{cdr-type}。  例如，@code{(cons string symbol)} 是与@code{("foo" . foo)} 等值匹配的自定义类型。
+
+在自定义缓冲区中，@sc{car} 和 @sc{cdr} 分别根据其指定的类型进行显示和编辑。
+
+@item (list @var{element-types}@dots{})
+该值必须是一个列表，其元素数量与给定的 @var{element-types} 完全相同；并且每个元素必须适合相应的@var{element-type}。
+
+例如，@code{(list integer string function)}描述了一个包含三个元素的列表；第一个元素必须是整数，第二个元素必须是字符串，第三个元素必须是函数。
+
+在自定义缓冲区中，每个元素根据为其指定的类型单独显示和编辑。
+
+@item (group @var{element-types}@dots{})
+除了自定义缓冲区中文本的格式之外，其工作方式与 @code{list} 类似。  @code{list} 用标签标记每个元素值； @code{group} 没有。
+
+@item (vector @var{element-types}@dots{})
+与 0⁣ 类似，只不过该值必须是向量而不是列表。  这些元素的工作方式与@code{list} 中相同。
+
+@item (alist :key-type @var{key-type} :value-type @var{value-type})
+该值必须是 cons-cells 列表，每个单元格的 @sc{car} 表示自定义类型 @var{key-type} 的键，同一单元格的 @sc{cdr} 表示自定义类型 @var{value-type} 的值。  用户可以添加和删除键/值对，并编辑每对的键和值。
+
+如果省略，@var{key-type}和@var{value-type}默认为@code{sexp}。
+
+用户可以添加与指定键类型匹配的任何键，但您可以通过使用 @code{:options} (@pxref{Variable Definitions}) 指定某些键来优先对待它们。  指定的键将始终显示在自定义缓冲区中（与合适的值一起），并带有一个复选框以包含或排除或禁用列表中的键/值对。  用户将无法编辑 @code{:options} 关键字参数指定的键。
+
+@code{:options} 关键字的参数应该是列表中合理键的规范列表。  通常，它们只是原子，代表它们自己。  例如：
+
+@example
+:options '("foo" "bar" "baz")
+@end example
+
+@noindent
+指定存在三个已知键，即 @code{"foo"}、@code{"bar"} 和 @code{"baz"}，这三个键始终先显示。
+
+您可能希望限制特定键的值类型，例如，与 @code{"bar"} 键关联的值只能是整数。  您可以通过使用列表而不是列表中的原子来指定它。  第一个元素将像以前一样指定键，而第二个元素将指定值类型。  例如：
+
+@example
+:options '("foo" ("bar" integer) "baz")
+@end example
+
+最后，您可能想要更改密钥的显示方式。  默认情况下，该键仅显示为 @code{const}，因为用户无法更改使用 @code{:options} 关键字指定的特殊键。  但是，您可能希望使用更专门的类型来表示键，例如 @code{function-item} 如果您知道它是带有函数绑定的符号。这是通过使用自定义类型规范而不是密钥符号来完成的。
+
+@example
+:options '("foo"
+           ((function-item some-function) integer)
+           "baz")
+@end example
+
+许多列表使用包含两个元素的列表，而不是 cons 单元格。  例如，
+
+@example
+(defcustom list-alist
+  '(("foo" 1) ("bar" 2) ("baz" 3))
+  "Each element is a list of the form (KEY VALUE).")
+@end example
+
+@noindent
+而不是
+
+@example
+(defcustom cons-alist
+  '(("foo" . 1) ("bar" . 2) ("baz" . 3))
+  "Each element is a cons-cell (KEY . VALUE).")
+@end example
+
+由于列表是在 cons 单元之上实现的，因此您可以将上面示例中的 @code{list-alist} 视为 cons 单元列表，其中值类型是一个包含实际值的单个元素的列表。
+
+@example
+(defcustom list-alist '(("foo" 1) ("bar" 2) ("baz" 3))
+  "Each element is a list of the form (KEY VALUE)."
+  :type '(alist :value-type (group integer)))
+@end example
+
+此处使用 @code{group} 小部件而不是 @code{list} 只是因为格式更适合此目的。
+
+类似地，使用此技巧的变体，您可以拥有与每个键关联的更多值的列表：
+
+@example
+(defcustom person-data '(("brian"  50 t)
+                         ("dorith" 55 nil)
+                         ("ken"    52 t))
+  "Alist of basic info about people.
+Each element has the form (NAME AGE MALE-FLAG)."
+  :type '(alist :value-type (group integer boolean)))
+@end example
+
+@item (plist :key-type @var{key-type} :value-type @var{value-type})
+此自定义类型类似于 @code{alist}（参见上文），不同之处在于 (i) 信息存储为属性列表 (@pxref{Property Lists})，以及 (ii) @var{key-type}，如果省略，则默认为 @code{symbol} 而不是 @code{sexp}。
+
+@item (choice @var{alternative-types}@dots{})
+该值必须符合 @var{alternative-types} 之一。  例如，@code{(choice integer string)} 允许整数或字符串。
+
+在定制缓冲区中，用户使用菜单选择一个替代方案，然后可以以通常的方式编辑该替代方案的值。
+
+通常，此菜单中的字符串是根据选择自动确定的；但是，您可以通过在替代项中包含 @code{:tag} 关键字来为菜单指定不同的字符串。  例如，如果整数代表多个空格，而字符串是逐字使用的文本，则可以这样编写自定义类型：
+
+@example
+(choice (integer :tag "Number of spaces")
+        (string :tag "Literal text"))
+@end example
+
+@noindent
+这样菜单就会提供 @samp{Number of spaces} 和 @samp{Literal text}。
+
+在 @code{nil} 不是有效值的任何替代方案中（@code{const} 除外），您应该使用 @code{:value} 关键字为该替代方案指定有效的默认值。  @xref{Type Keywords}。
+
+如果某些值被多个替代项覆盖，则自定义将选择适合该值的第一个替代项。  这意味着您应该始终首先列出最具体的类型，最后列出最通用的类​​型。  这是正确使用的示例：
+
+@example
+(choice (const :tag "Off" nil)
+        symbol (sexp :tag "Other"))
+@end example
+
+@noindent
+这样，特殊值 @code{nil} 就不会像其他符号一样被处理，并且符号也不会像其他 Lisp 表达式一样被处理。
+
+@cindex radio, customization types
+@item (radio @var{element-types}@dots{})
+这与 @code{choice} 类似，只不过选项是使用单选按钮而不是菜单显示的。  这样做的优点是在适用时显示选择的文档，因此通常是在常量函数（@code{function-item}自定义类型）之间进行选择的不错选择。
+
+@item (const @var{value})
+该值必须是@var{value}——不允许有其他值。
+
+@code{const}的主要用途是在@code{choice}内部。  例如，@code{(choice integer (const nil))} 允许整数或@code{nil}。
+
+@code{:tag}经常与@code{const}一起使用，位于@code{choice}内部。例如，
+
+@example
+(choice (const :tag "Yes" t)
+        (const :tag "No" nil)
+        (const :tag "Ask" foo))
+@end example
+
+@noindent
+描述一个变量，其中@code{t}表示是，@code{nil}表示否，@code{foo}表示“询问”。
+
+@item (other @var{value})
+此替代方案可以匹配任何 Lisp 值，但如果用户选择此替代方案，则会选择值 @var{value}。
+
+@code{other}的主要用途是作为@code{choice}的最后一个元素。例如，
+
+@example
+(choice (const :tag "Yes" t)
+        (const :tag "No" nil)
+        (other :tag "Ask" foo))
+@end example
+
+@noindent
+描述一个变量，其中 @code{t} 表示是，@code{nil} 表示否，其他任何值都表示“询问”。  如果用户从替代菜单中选择@samp{Ask}，则指定值@code{foo}；但任何其他值（不是 @code{t}、@code{nil} 或 @code{foo}）都显示为 @samp{Ask}，就像 @code{foo} 一样。
+
+@item (function-item @var{function})
+与 @code{const} 类似，但用于函数值。  这将显示文档字符串以及函数名称。文档字符串可以是您使用 @code{:doc} 指定的字符串，也可以是 @var{function} 自己的文档字符串。
+
+@item (variable-item @var{variable})
+与 @code{const} 类似，但用于变量名称的值。  这将显示文档字符串以及变量名称。  文档字符串可以是您使用 @code{:doc} 指定的字符串，也可以是 @var{variable} 自己的文档字符串。
+
+@item (set @var{types}@dots{})
+该值必须是一个列表，并且列表中的每个元素必须与指定的 @var{types} 之一匹配。
+
+这作为清单出现在定制缓冲区中，因此每个 @var{types} 可能有一个对应的元素，也可能没有。  不可能指定与 @var{types} 中的同一个元素匹配的两个不同元素。  例如，@code{(set integer symbol)}允许列表中存在一个整数和/或一个符号；它不允许多个整数或多个符号。  因此，很少使用非特定类型，例如 @code{set} 中的 @code{integer}。
+
+大多数情况下，@code{set} 中的 @var{types} 是 @code{const} 类型，如下所示：
+
+@example
+(set (const :bold) (const :italic))
+@end example
+
+有时他们描述列表中可能的元素：
+
+@example
+(set (cons :tag "Height" (const height) integer)
+     (cons :tag "Width" (const width) integer))
+@end example
+
+@noindent
+这允许用户选择性地指定高度值和宽度值。
+
+@item (repeat @var{element-type})
+该值必须是一个列表，并且列表中的每个元素都必须符合类型@var{element-type}。  它以元素列表的形式出现在自定义缓冲区中，并带有 @samp{[INS]} 和 @samp{[DEL]} 按钮用于添加更多元素或删除元素。
+
+@cindex restricted-sexp, customization types
+@item (restricted-sexp :match-alternatives @var{criteria})
+这是最通用的复合类型构造。  该值可以是任何满足 @var{criteria} 之一的 Lisp 对象。  @var{criteria} 应该是一个列表，每个元素应该是以下可能性之一：
+
+@itemize @bullet
+@item
+谓词——即一个参数的函数，根据参数返回 @code{nil} 或非 @code{nil}。  在列表中使用谓词表示谓词返回非 @code{nil} 的对象是可接受的。
+
+@item
+带引号的常量——即 @code{'@var{object}}。  列表中的此类元素表示 @var{object} 本身是可接受的值。
+@end itemize
+
+例如，
+
+@example
+(restricted-sexp :match-alternatives
+                 (integerp 't 'nil))
+@end example
+
+@noindent
+允许整数 @code{t} 和 @code{nil} 作为合法值。
+
+自定义缓冲区使用其读取语法显示所有合法值，并且用户以文本方式编辑它们。
+@end table
+
+下面列出了可以在复合类型的关键字-值对中使用的关键字：
+
+@table @code
+@item :tag @var{tag}
+使用 @var{tag} 作为此替代方案的名称，以供用户通信之用。  这对于出现在 @code{choice} 内部的类型很有用。
+
+@item :match-alternatives @var{criteria}
+@kindex match-alternatives@r{, customization keyword}
+使用 @var{criteria} 来匹配可能的值。  仅在@code{restricted-sexp}中使用。
+
+@item :args @var{argument-list}
+@kindex args@r{, customization keyword}
+使用 @var{argument-list} 的元素作为类型构造的参数。  例如，@code{(const :args (foo))}相当于@code{(const foo)}。  您很少需要显式编写 @code{:args}，因为通常参数会自动识别为最后一个关键字-值对后面的内容。
+@end table
+
+@node Splicing into Lists
+@subsection 拼接成列表
+
+@code{:inline} 功能可让您将可变数量的元素拼接到 @code{list} 或 @code{vector} 自定义类型的中间。  您可以通过将 @code{:inline t} 添加到 @code{list} 或 @code{vector} 规范中包含的类型规范来使用它。
+
+通常，@code{list}或@code{vector}类型规范中的每个条目描述单个元素类型。  但是，当条目包含 @code{:inline t} 时，它匹配的值将直接合并到包含序列中。  例如，如果条目与包含三个元素的列表匹配，则这些元素将成为整个序列的三个元素。  这类似于反引号结构 (@pxref{Backquote}) 中的@samp{,@@}。
+
+例如，要指定一个列表，其第一个元素必须为 @code{baz} 并且其剩余参数应为 @code{foo} 和 @code{bar} 中的零个或多个，请使用以下自定义类型：
+
+@example
+(list (const baz) (set :inline t (const foo) (const bar)))
+@end example
+
+@noindent
+这与 @code{(baz)}、@code{(baz foo)}、@code{(baz bar)} 和 @code{(baz foo bar)} 等值匹配。
+
+@cindex choice, customization types
+当元素类型为@code{choice}时，您不在@code{choice}本身中使用@code{:inline}，而是在@code{choice}的（某些）替代项中使用@code{:inline}。  例如，要匹配必须以文件名开头、后跟符号 @code{t} 或两个字符串的列表，请使用以下自定义类型：
+
+@example
+(list file
+      (choice (const t)
+              (list :inline t string string)))
+@end example
+
+@noindent
+如果用户选择选项中的第一个选项，则整个列表有两个元素，第二个元素是@code{t}。  如果用户选择第二个选项，则整个列表包含三个元素，第二个和第三个必须是字符串。
+
+小部件可以指定谓词来说明内联值是否与具有 @code{:match-inline} 元素的小部件匹配。
+
+@node Type Keywords
+@subsection 类型关键词
+
+您可以在自定义类型中的类型名称符号之后指定关键字参数对。  以下是您可以使用的关键字及其含义：
+
+@table @code
+@item :value @var{default}
+提供默认值。
+
+如果 @code{nil} 不是替代值的有效值，则必须使用 @code{:value} 指定有效的默认值。
+
+如果您将其用于作为 @code{choice} 内部替代出现的类型；它指定当用户使用自定义缓冲区中的菜单选择此替代项时首先使用的默认值。
+
+当然，如果选项的实际值符合此替代方案，它将显示实际值，而不是@var{default}。
+
+@item :format @var{format-string}
+@kindex format@r{, customization keyword}
+该字符串将被插入到缓冲区中以表示与类型对应的值。  以下 @samp{%} 转义符可在 @var{format-string} 中使用：
+
+@table @samp
+@item %[@var{button}%]
+显示标记为按钮的文本@var{button}。  @code{:action} 属性指定当用户调用按钮时该按钮将执行的操作；它的值是一个带有两个参数的函数——按钮出现的小部件和事件。
+
+无法指定两个不同的按钮具有不同的操作。
+
+@item %@{@var{sample}%@}
+在@code{:sample-face}指定的特殊面中显示@var{sample}。
+
+@item %v
+替换该项目的值。  值的表示方式取决于项目的类型以及（对于变量）自定义类型。
+
+@item %d
+替换该项目的文档字符串。
+
+@item %h
+与 @samp{%d} 类似，但如果文档字符串多于一行，请添加一个按钮来控制是显示全部内容还是仅显示第一行。
+
+@item %t
+替换此处的标签。  您可以使用 @code{:tag} 关键字指定标签。
+
+@item %%
+显示文字@samp{%}。
+@end table
+
+@item :action @var{action}
+@kindex action@r{, customization keyword}
+如果用户单击按钮，则执行@var{action}。
+
+@item :button-face @var{face}
+@kindex button-face@r{, customization keyword}
+使用面 @var{face}（面名称或面名称列表）作为通过 @samp{%[@dots{}%]} 显示的按钮文本。
+
+@item :button-prefix @var{prefix}
+@itemx :button-suffix @var{suffix}
+@kindex button-prefix@r{, customization keyword}
+@kindex button-suffix@r{, customization keyword}
+这些指定在按钮之前和之后显示的文本。每个可以是：
+
+@table @asis
+@item @code{nil}
+没有插入任何文字。
+
+@item 一个字符串
+该字符串按字面意思插入。
+
+@item 一个符号
+使用符号的值。
+@end table
+
+@item ：标记@var{tag}
+使用@var{tag}（字符串）作为与该类型对应的值（或部分值）的标记。  为自定义界面提供信息标签非常重要，特别是当您使用 @code{restricted-sexp} 类型或定义新类型时。 @xref{Defining New Types}。
+
+@item ：文档@var{doc}
+@kindex doc@r{, customization keyword}
+使用 @var{doc} 作为与该类型对应的该值（或该值的一部分）的文档字符串。  为了使其工作，您必须为 @code{:format} 指定一个值，并在该值中使用 @samp{%d} 或 @samp{%h}。
+
+为类型指定文档字符串的通常原因是提供有关 @code{choice} 类型或某些其他复合类型的部分中的替代项含义的更多信息。
+
+@item :help-echo @var{motion-doc}
+@kindex help-echo@r{, customization keyword}
+当您使用@code{widget-forward}或@code{widget-backward}移动到此项目时，它将在回显区域中显示字符串@var{motion-doc}。  此外，@var{motion-doc}用作鼠标@code{help-echo}字符串，实际上可能是一个函数或形式，被评估以产生帮助字符串。  如果它是一个函数，则使用一个参数（widget）来调用它。
+
+@item ：匹配@var{function}
+@kindex match@r{, customization keyword}
+指定如何确定值是否与类型匹配。  相应的值@var{function}应该是一个接受两个参数的函数，一个小部件和一个值；如果该值可接受，它应该返回非@code{nil}。
+
+@item : 内联匹配 @var{function}
+@kindex match-inline@r{, customization keyword}
+指定如何确定内联值是否与类型匹配。  相应的值@var{function}应该是一个接受两个参数的函数，一个小部件和一个内联值；如果该值可以接受，它应该返回非@code{nil}。  @xref{Splicing into Lists}，有关内联值的更多信息。
+
+@item ：验证@var{function}
+指定输入的验证函数。  @var{function} 将小部件作为参数，如果小部件的当前值对该小部件有效，则应返回 @code{nil}。  否则，它应该返回包含无效数据的小部件，并将该小部件的 @code{:error} 属性设置为解释错误的字符串。
+
+@item ：类型错误@var{string}
+@kindex type-error@r{, customization keyword}
+@var{string} 应该是一个字符串，描述值与类型不匹配的原因，由 @code{:match} 函数确定。  当@code{:match}函数返回@code{nil}时，小部件的@code{:error}属性将设置为@var{string}。
+
+@ignore
+@item :indent @var{columns}
+Indent this item by @var{columns} columns.  The indentation is used for
+@samp{%n}, and automatically for group names, for checklists and radio
+buttons, and for editable lists.  It affects the whole of the
+item except for the first line.
+
+@item :offset @var{extra}
+Indent the subitems of this item @var{extra} columns more than this
+item itself.  By default, subitems are indented the same as their
+parent.
+
+@item :extra-offset @var{n}
+Add @var{n} extra spaces to this item's indentation, compared to its
+parent's indentation.
+
+@item :notify @var{function}
+Call @var{function} each time the item or a subitem is changed.  The
+function gets two or three arguments.  The first argument is the item
+itself, the second argument is the item that was changed, and the
+third argument is the event leading to the change, if any.
+
+@item :menu-tag @var{tag-string}
+Use @var{tag-string} in the menu when the widget is used as an option
+in a @code{menu-choice} widget.
+
+@item :menu-tag-get
+A function used for finding the tag when the widget is used as an option
+in a @code{menu-choice} widget.  By default, the tag used will be either the
+@code{:menu-tag} or @code{:tag} property if present, or the @code{princ}
+representation of the @code{:value} property if not.
+
+@item :tab-order
+Specify the order in which widgets are traversed with
+@code{widget-forward} or @code{widget-backward}.  This is only partially
+implemented.
+
+@enumerate a
+@item
+Widgets with tabbing order @code{-1} are ignored.
+
+@item
+(Unimplemented) When on a widget with tabbing order @var{n}, go to the
+next widget in the buffer with tabbing order @var{n+1} or @code{nil},
+whichever comes first.
+
+@item
+When on a widget with no tabbing order specified, go to the next widget
+in the buffer with a positive tabbing order, or @code{nil}
+@end enumerate
+
+@item :parent
+The parent of a nested widget (e.g., a @code{menu-choice} item or an
+element of a @code{editable-list} widget).
+
+@item :sibling-args
+This keyword is only used for members of a @code{radio-button-choice} or
+@code{checklist}.  The value should be a list of extra keyword
+arguments, which will be used when creating the @code{radio-button} or
+@code{checkbox} associated with this item.
+@end ignore
+@end table
+
+@node Defining New Types
+@subsection 定义新类型
+@cindex customization types, define new
+@cindex define new customization types
+
+在前面的章节中，我们描述了如何为 @code{defcustom} 构造详细的类型规范。  在某些情况下，您可能需要为此类类型规范指定一个名称。  明显的情况是，当您对许多用户选项使用相同的类型时：您可以为类型规范指定一个名称，并在每个 @code{defcustom} 中使用该名称，而不是为每个选项重复指定。  另一种情况是用户选项的值是递归数据结构。  为了使数据类型能够引用自身，它需要有一个名称。
+
+由于自定义类型是作为小部件实现的，因此定义新的自定义类型的方法就是定义一个新的小部件。  我们不打算在这里详细描述小部件界面，请参阅@ref{Top, , Introduction, widget, The Emacs Widget Library}。  相反，我们将通过一个简单的示例来演示定义新的自定义类型所需的最少功能。
+
+@example
+(define-widget 'binary-tree-of-string 'lazy
+  "A binary tree made of cons-cells and strings."
+  :offset 4
+  :tag "Node"
+  :type '(choice (string :tag "Leaf" :value "")
+                 (cons :tag "Interior"
+                       :value ("" . "")
+                       binary-tree-of-string
+                       binary-tree-of-string)))
+
+(defcustom foo-bar ""
+  "Sample variable holding a binary tree of strings."
+  :type 'binary-tree-of-string)
+@end example
+
+定义新小部件的函数称为@code{define-widget}。  第一个参数是我们想要创建新的小部件类型的符号。  第二个参数是代表现有小部件的符号，新小部件将根据与现有小部件的差异来定义。  为了定义新的自定义类型，@code{lazy} 小部件是完美的，因为它接受 @code{:type} 关键字参数，其语法与同名的 @code{defcustom} 的关键字参数相同。  第三个参数是新小部件的文档字符串。  您将能够使用 @kbd{M-x widget-browse @key{RET} binary-tree-of-string @key{RET}} 命令看到该字符串。
+
+在这些强制参数之后是关键字参数。  最重要的是@code{:type}，它描述了我们想要与这个小部件匹配的数据类型。  这里 @code{binary-tree-of-string} 被描述为一个字符串，或者是一个 cons-cell，其 car 和 cdr 本身都是 @code{binary-tree-of-string}。  请注意我们当前正在定义的对小部件类型的引用。  @code{:tag} 是另一个重要的关键字参数，因为我们正在为新小部件使用 @code{lazy} 小部件。  默认情况下，@code{lazy}小部件没有标签，在没有标签的情况下，自定义缓冲区将显示整个小部件的值（即正在自定义的用户选项的值）。  由于这几乎从来都不是一个好主意，因此我们提供了一个字符串来命名 @code{binary-tree-or-string} 小部件。  @code{:offset} 参数用于确保子节点相对于父节点缩进四个空格，使树结构在自定义缓冲区中清晰可见。
+
+@code{defcustom} 显示了如何将新的小部件用作普通的自定义类型。
+
+名称为 @code{lazy} 的原因是，当在缓冲区中实例化小部件时，其他复合小部件将其下级小部件转换为内部形式。  这种转换是递归的，因此劣质部件将转换 @emph{their} 劣质部件。  如果数据结构本身是递归的，那么这种转换就是无限递归。  @code{lazy} 小部件防止递归：它仅在需要时转换其 @code{:type} 参数。
+
+@node Applying Customizations
+@section 应用自定义
+@cindex applying customizations
+
+以下函数分别负责安装用户对变量和面孔的自定义设置。  当用户在自定义界面中调用 @samp{Save for future sessions} 时，通过将 @code{custom-set-variables} 和/或 @code{custom-set-faces} 形式写入自定义文件来生效，以便在下次 Emacs 启动时进行评估。
+
+@defun custom-set-variables &rest args
+此函数安装@var{args}指定的变量自定义。  @var{args} 中的每个参数都应具有以下形式
+
+@example
+(@var{var} @var{expression} [@var{now} [@var{request} [@var{comment}]]])
+@end example
+
+@noindent
+@var{var} 是变量名称（符号），@var{expression} 是计算结果为所需自定义值的表达式。
+
+如果 @var{var} 的 @code{defcustom} 形式在此 @code{custom-set-variables} 调用之前已被求值，则 @var{expression} 会立即求值，并将变量的值设置为结果。  否则，@var{expression} 会存储到变量的 @code{saved-value} 属性中，以便在调用相关的 @code{defcustom} 时进行计算（通常是在定义该变量的库加载到 Emacs 中时）。
+
+@var{now}、@var{request} 和 @var{comment} 条目仅供内部使用，可以省略。  @var{now}，如果非@code{nil}，表示立即设置变量的值，即使变量的 @code{defcustom} 形式尚未被求值。  @var{request} 是要立即加载的功能列表 (@pxref{Named Features})。 @var{comment} 是描述定制的字符串。
+@end defun
+
+@defun custom-set-faces &rest args
+此函数安装@var{args}指定的面部自定义。  @var{args} 中的每个参数都应具有以下形式
+
+@example
+(@var{face} @var{spec} [@var{now} [@var{comment}]])
+@end example
+
+@noindent
+@var{face} 是面名称（符号），@var{spec} 是该面的自定义面规格 (@pxref{Defining Faces})。
+
+@var{now} 和 @var{comment} 条目仅供内部使用，可以省略。  @var{now}，如果非@code{nil}，则表示立即安装面规范，即使尚未评估@code{defface} 形式。  @var{comment} 是描述定制的字符串。
+@end defun
+
+@node Custom Themes
+@section 自定义主题
+
+@cindex custom themes
+@dfn{Custom themes} 是可以作为一个单元启用或禁用的设置的集合。  @xref{Custom Themes,,, emacs, The GNU Emacs Manual}。  每个自定义主题均由 Emacs Lisp 源文件定义，该文件应遵循本节中描述的约定。 （您还可以使用类似自定义的界面创建一个自定义主题，而不是手动编写自定义主题；@pxref{Creating Custom Themes,,, emacs, The GNU Emacs Manual}。）
+
+自定义主题文件应命名为 ⁣​​0⁣，其中 @var{foo} 是主题名称。  文件中的第一个 Lisp 形式应该是对 @code{deftheme} 的调用，最后一个形式应该是对 @code{provide-theme} 的调用。
+
+@defmac deftheme theme &optional doc &rest properties
+该宏将 @var{theme}（符号）声明为自定义主题的名称。  可选参数@var{doc}应该是描述主题的字符串；这是当用户调用 @code{describe-theme} 命令或在 @samp{*Custom Themes*} 缓冲区中键入 @kbd{?} 时显示的描述。  其余参数 @var{properties} 用于传递带有主题属性的属性列表。
+
+支持以下属性：
+
+@table @code
+@item :family
+表示主题所属“家族”的符号。  @dfn{family} 主题是一组在次要方面有所不同的相似主题，例如针对框架的浅色背景与深色背景的面部颜色。
+@item :kind
+一个符号。  如果启用了主题并且此属性的值为 @code{color-scheme}，则 @code{theme-choose-variant} 命令将查找属于同一系列的其他可用主题，以便切换主题。  其他值当前未指定，不应使用。
+@item :background-mode
+符号，@code{light} 或 @code{dark}。  该属性当前未使用，但仍应指定。
+@end table
+
+不允许使用两个特殊主题名称（使用它们会导致错误）： @code{user} 是存储用户直接自定义设置的虚拟主题，@code{changed} 是存储在自定义系统外部进行的更改的虚拟主题。
+@end defmac
+
+@defmac provide-theme theme
+该宏声明名为 @var{theme} 的主题已完全指定。
+@end defmac
+
+在@code{deftheme}和@code{provide-theme}之间是指定主题设置的Lisp形式：通常是对@code{custom-theme-set-variables}的调用和/或对@code{custom-theme-set-faces}的调用。
+
+@defun custom-theme-set-variables theme &rest args
+此函数指定自定义主题@var{theme}的变量设置。  @var{theme} 应该是一个符号。  @var{args} 中的每个参数应该是以下形式的列表
+
+@example
+(@var{var} @var{expression} [@var{now} [@var{request} [@var{comment}]]])
+@end example
+
+@noindent
+其中列表条目的含义与 @code{custom-set-variables} 中的含义相同。  @xref{Applying Customizations}。
+@end defun
+
+@defun custom-theme-set-faces theme &rest args
+此函数指定自定义主题 @var{theme} 的面部设置。 @var{theme} 应该是一个符号。  @var{args} 中的每个参数应该是以下形式的列表
+
+@example
+(@var{face} @var{spec} [@var{now} [@var{comment}]])
+@end example
+
+@noindent
+其中列表条目的含义与 @code{custom-set-faces} 中的含义相同。  @xref{Applying Customizations}。
+@end defun
+
+理论上，主题文件还可以包含其他 Lisp 形式，这些形式将在加载主题时进行评估，但这是不好的形式。为了防止加载包含恶意代码的主题，Emacs 会显示源文件，并在首次加载任何非内置主题之前要求用户确认。  因此，主题通常不是字节编译的，当 Emacs 寻找要加载的主题时，源文件通常优先。
+
+以下函数对于以编程方式启用和禁用主题非常有用：
+
+@defun custom-theme-p theme
+如果@var{theme}（符号）是自定义主题的名称（即已加载到 Emacs 中的自定义主题，无论该主题是否启用），则此函数返回非 @code{nil} 值。  否则，它返回@code{nil}。
+@end defun
+
+@defvar custom-known-themes
+该变量的值是加载到 Emacs 中的主题列表。每个主题都由一个 Lisp 符号（主题名称）表示。  该变量的默认值是包含两个虚拟主题的列表：@code{(user changed)}。  @code{changed} 主题存储应用任何自定义主题之前所做的设置（例如，在自定义之外设置的变量）。  @code{user} 主题存储用户自定义并保存的设置。  使用 @code{deftheme} 宏声明的任何其他主题都会添加到此列表的前面。
+@end defvar
+
+@deffn Command load-theme theme &optional no-confirm no-enable
+该函数从源文件中加载名为 @var{theme} 的自定义主题，并在变量 @code{custom-theme-load-path} 指定的目录中查找源文件。  @xref{Custom Themes,,, emacs, The GNU Emacs Manual}。  它还@dfn{enables}主题（除非可选参数@var{no-enable}非@code{nil}），使其变量和面设置生效。  它会在加载主题之前提示用户确认，除非可选参数@var{no-confirm}非@code{nil}。
+@end deffn
+
+@defun require-theme feature &optional noerror
+该函数在 @code{custom-theme-load-path} 中搜索提供 @var{feature} 的文件，然后加载它。  这类似于函数 @code{require} (@pxref{Named Features})，只不过它搜索 @code{custom-theme-load-path} 而不是 @code{load-path} (@pxref{Library Search})。  当 @code{require} 不适合时，这在需要加载支持 Lisp 文件的自定义主题中非常有用。
+
+如果根据@code{featurep}，@var{feature}（它应该是一个符号）尚未存在于当前 Emacs 会话中，则 @code{require-theme} 会在 @code{custom-theme-load-path} 指定的目录中按顺序搜索名为 @var{feature} 并添加了 @samp{.elc} 或 @samp{.el} 后缀的文件。
+
+如果成功找到并加载提供 @var{feature} 的文件，则 @code{require-theme} 返回 @var{feature}。  可选参数 @var{noerror} 确定搜索或加载失败时会发生什么。  如果是@code{nil}，则函数发出错误信号；否则，返回@code{nil}。  如果文件加载成功但未提供@var{feature}，则@code{require-theme} 发出错误信号；这是无法抑制的。
+@end defun
+
+@deffn Command enable-theme theme
+此函数启用名为 @var{theme} 的自定义主题。  如果没有加载此类主题，则会发出错误信号。
+@end deffn
+
+@deffn Command disable-theme theme
+此函数禁用名为 @var{theme} 的自定义主题。  主题保持加载状态，以便后续调用 @code{enable-theme} 将重新启用它。
+@end deffn

@@ -1,0 +1,2441 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node System Interface
+@chapter 操作系统接口
+
+本章介绍 Emacs 的启动和退出、操作系统环境中值的访问以及终端输入、输出。
+
+@xref{Building Emacs}，了解相关信息。  @xref{Display}，有关终端和屏幕的附加操作系统状态信息。
+
+@menu
+* Starting Up::          自定义 Emacs 启动处理。
+* Getting Out::          退出如何运作（永久或临时）。
+* System Environment::   区分系统的名称和类型。
+* User Identification::  查找用户的名称和用户 ID。
+* Time of Day::          获取当前时间。
+* Time Zone Rules::      时区和夏令时的规则。
+* Time Conversion::      时间戳形式之间的转换。
+* Time Parsing::         将时间戳转换为文本，反之亦然。
+* Processor Run Time::   获取 Emacs 使用的运行时。
+* Time Calculations::    加、减、比较时间等。
+* Timers::               设置计时器以在特定时间调用函数。
+* Idle Timers::          设置一个计时器，当 Emacs 空闲一段时间后调用函数。
+* Terminal Input::       访问并记录终端输入。
+* Terminal Output::      控制和记录终端输出。
+* Sound Output::         在计算机扬声器上播放声音。
+* X11 Keysyms::          对 X Windows 的关键符号进行操作。
+* Batch Mode::           无需终端交互即可运行 Emacs。
+* Session Management::   使用 X 会话管理保存和恢复状态。
+* Desktop Notifications::  桌面通知。
+* System Taskbar::       控制系统 GUI 任务栏功能。
+* System Sleep::         阻止系统睡眠并处理睡眠事件。
+* File Notifications::   文件通知。
+* Dynamic Libraries::    按需加载支持库。
+* Security Considerations::  在不友好的环境中运行 Emacs。
+@end menu
+
+@node Starting Up
+@section 启动 Emacs
+
+本节介绍 Emacs 启动时执行的操作以及如何自定义这些操作。
+
+@menu
+* Startup Summary::          Emacs 在启动时执行的操作序列。
+* Init File::                有关读取 init 文件的详细信息。
+* Terminal-Specific::        如何读取特定于终端的 Lisp 文件。
+* Command-Line Arguments::   如何处理命令行参数以及如何自定义它们。
+@end menu
+
+@node Startup Summary
+@subsection 摘要：启动时的操作顺序
+@cindex initialization of Emacs
+@cindex startup of Emacs
+@cindex @file{startup.el}
+
+当 Emacs 启动时，它会执行以下操作（参见@file{startup.el}中的@code{normal-top-level}）：
+
+@enumerate
+@item 
+它通过在列表中的每个目录中运行名为 @file{subdirs.el} 的文件来将子目录添加到 @code{load-path}。  通常，此文件将目录的子目录添加到列表中，然后依次扫描这些子目录。  文件 @file{subdirs.el} 通常是在安装 Emacs 时自动生成的。
+
+@item 
+它加载在 @code{load-path} 目录中找到的任何 @file{leim-list.el}。  该文件用于注册输入法。搜索仅针对您可能创建的任何个人 @file{leim-list.el} 文件；它会跳过包含标准 Emacs 库的目录（这些目录应该只包含一个 @file{leim-list.el} 文件，该文件被编译到 Emacs 可执行文件中）。
+
+@vindex before-init-time
+@item 
+它将变量 @code{before-init-time} 设置为 @code{current-time} (@pxref{Time of Day}) 的值。  它还将@code{after-init-time}设置为@code{nil}，这向 Lisp 程序发出 Emacs 正在初始化的信号。
+
+@c set-locale-environment
+@item 
+如果环境变量（例如@env{LANG}）请求，它会设置语言环境和终端编码系统。
+
+@item 
+它对命令行参数进行一些基本的解析。
+
+@item 
+它加载库@file{site-start}（如果存在）。  如果指定了选项 @samp{-Q} 或 @samp{--no-site-file}，则不会执行此操作。
+@cindex @file{site-start.el}
+
+@item 
+它加载您的早期初始化文件（@pxref{Early Init File,,, emacs, The GNU Emacs Manual}）。  如果指定了选项 @samp{-q}、@samp{-Q} 或 @samp{--batch}，则不会执行此操作。  如果指定了 @samp{-u} 选项，Emacs 会在该用户的主目录中查找 init 文件。
+
+@item 
+它调用函数 @code{package-activate-all} 来激活任何已安装的可选 Emacs Lisp 软件包。  @xref{Packaging Basics}。  但是，当 @code{package-enable-at-startup} 为 @code{nil} 或使用选项 @samp{-q}、@samp{-Q} 或 @samp{--batch} 之一启动时，Emacs 不会激活软件包。  要在后一种情况下激活软件包，应显式调用 @code{package-activate-all}（例如，通过 @samp{--funcall} 选项）。
+
+@vindex initial-window-system@r{, and startup}
+@findex window-system-initialization
+@item 
+如果不是以批处理模式运行，它会初始化变量 @code{initial-window-system} 指定的窗口系统 (@pxref{Window Systems, initial-window-system})。  初始化函数@code{window-system-initialization}是一个@dfn{generic function} (@pxref{Generic Functions})，其实际实现对于每个支持的窗口系统都是不同的。  如果@code{initial-window-system}的值为@var{windowsystem}，则初始化函数的适当实现在文件@file{term/@var{windowsystem}-win.el}中定义。  该文件在构建时应该已编译为 Emacs 可执行文件。
+
+@item 
+它运行正常的钩子@code{before-init-hook}。
+
+@item 
+如果合适，它会创建一个图形框架。  作为创建图形框架的一部分，它通过调用该窗口系统的 @code{window-system-initialization} 函数来初始化由图形框架的 @code{initial-frame-alist} 和 @code{default-frame-alist} (@pxref{Initial Parameters}) 指定的窗口系统。这不是在批处理（非交互）或守护进程模式下完成的。
+
+@item 
+它初始化初始框架的面，并根据需要设置菜单栏和工具栏。  如果支持图形框架，即使当前框架不是图形框架，它也会设置工具栏，因为稍后可能会创建图形框架。
+
+@item 
+它使用@code{custom-reevaluate-setting}重新初始化列表@code{custom-delayed-init-variables}的成员。  这些是任何预加载的用户选项，其默认值取决于运行时上下文，而不是构建时上下文。 @xref{Building Emacs, custom-initialize-delay}。
+
+@c @item
+@c It registers the colors available for tty frames.
+
+@item 
+它加载您的初始化文件（@pxref{Init File}）。  如果指定了选项 @samp{-q}、@samp{-Q} 或 @samp{--batch}，则不会执行此操作。  如果指定了 @samp{-u} 选项，Emacs 会在该用户的主目录中查找 init 文件。
+
+@item 
+它加载库@file{default}（如果存在）。  如果@code{inhibit-default-init}非-@code{nil}，或者指定了选项@samp{-q}、@samp{-Q}或@samp{--batch}，则不会执行此操作。
+@cindex @file{default.el}
+
+@item 
+如果 @code{abbrev-file-name} 指定的文件存在并且可以读取 (@pxref{Abbrev Files, abbrev-file-name})，它会从该文件加载缩写。  如果指定了选项@samp{--batch}，则不会执行此操作。
+
+@vindex after-init-time
+@item 
+它将变量 @code{after-init-time} 设置为 @code{current-time} 的值。  这个变量之前被设置为@code{nil}；将其设置为当前时间表示初始化阶段已结束，并与 @code{before-init-time} 一起提供对其花费时间的测量。
+
+@item 
+它运行正常的钩子@code{after-init-hook}和@code{delayed-warnings-hook}。  后者显示在启动的先前阶段发出的任何警告，这些警告会自动延迟。
+
+@item 
+如果缓冲区@file{*scratch*}存在并且仍处于基本模式（默认情况下应该如此），它将根据@code{initial-major-mode}设置其主要模式。
+
+@item 
+如果在文本终端上启动，它将加载特定于终端的 Lisp 库 (@pxref{Terminal-Specific})，并运行钩子 @code{tty-setup-hook}。  这不会在 @code{--batch} 模式下完成，也不会在 @code{term-file-prefix} 为 @code{nil} 时完成。
+
+@c Now command-line calls command-line-1.
+
+@item 
+它显示初始回波区域消息，除非您使用 @code{inhibit-startup-echo-area-message} 抑制了该消息。
+
+@item 
+它处理之前未处理的任何命令行选项。
+
+@c This next one is back in command-line, but the remaining bits of
+@c command-line-1 are not done if noninteractive.
+@item 
+如果指定了选项@code{--batch}，它现在就会退出。
+
+@item 
+如果 @file{*scratch*} 缓冲区存在且为空，则会将 @code{(substitute-command-keys initial-scratch-message)} 插入该缓冲区。
+
+@item 
+如果@code{initial-buffer-choice}是一个字符串，它将访问具有该名称的文件（或目录）。  如果它是一个函数，它将调用不带参数的函数并选择它返回的缓冲区。  如果将一个文件作为命令行参数给出，则会访问该文件，并且其缓冲区会显示在 @code{initial-buffer-choice} 旁边。  如果给出多个文件，则访问所有文件，并且 @file{*Buffer List*} 缓冲区将显示在 @code{initial-buffer-choice} 旁边。
+
+@ignore
+@c I do not think this should be mentioned.  AFAICS it is just a dodge
+@c around inhibit-startup-screen not being settable on a site-wide basis.
+If it is @code{t}, it selects the @file{*scratch*} buffer.
+@end ignore
+
+@c To make things nice and confusing, the next three items can be
+@c called from two places.  If displaying a startup screen, they are
+@c called in command-line-1 before the startup screen is shown.
+@c inhibit-startup-hooks is then set and window-setup-hook set to nil.
+@c If not displaying a startup screen, they are called in
+@c normal-top-level.
+@c FIXME?  So it seems they can be called before or after the
+@c daemon/session restore step?
+
+@item 
+它运行@code{emacs-startup-hook}。
+
+@item 
+它调用@code{frame-notice-user-settings}，它根据初始化文件指定的内容修改所选帧的参数。
+
+@item 
+它运行@code{window-setup-hook}。  该钩子与 @code{emacs-startup-hook} 之间的唯一区别在于，该钩子在前面提到的对框架参数进行修改之后运行。
+
+@item 
+@cindex startup screen
+它显示 @dfn{startup screen}，这是一个特殊的缓冲区，其中包含有关 Copyleft 和基本 Emacs 使用的信息。  如果 @code{inhibit-startup-screen} 或 @code{initial-buffer-choice} 不是 @code{nil}，或者指定了 @samp{--no-splash} 或 @samp{-Q} 命令行选项，则不会执行此操作。
+
+@c End of command-line-1.
+
+@c Back to command-line from command-line-1.
+
+@c This is the point at which we actually exit in batch mode, but the
+@c last few bits of command-line-1 are not done in batch mode.
+
+@item 
+如果请求守护进程，它会调用@code{server-start}。 （在 POSIX 系统上，如果请求后台守护程序，它就会从控制终端分离。） @xref{Emacs Server,,, emacs, The GNU Emacs Manual}。
+
+@item 
+如果由 X 会话管理器启动，它会调用 @code{emacs-session-restore} 将前一个会话的 ID 作为参数传递给它。  @xref{Session Management}。
+
+@c End of command-line.
+
+@c Back to normal-top-level from command-line.
+
+@end enumerate
+
+@noindent
+以下选项会影响启动顺序的某些方面。
+
+@defopt inhibit-startup-screen
+该变量如果非@code{nil}，则会禁止启动屏幕。  在这种情况下，Emacs 通常会显示 @file{*scratch*} 缓冲区；但请参见下面的@code{initial-buffer-choice}。
+
+不要在新用户的 init 文件中设置此变量，或者以影响多个用户的方式设置此变量，因为这会阻止新用户接收有关 Copyleft 和基本 Emacs 使用情况的信息。
+
+@vindex inhibit-startup-message
+@vindex inhibit-splash-screen
+@code{inhibit-startup-message} 和 @code{inhibit-splash-screen} 是该变量的别名。
+@end defopt
+
+@defopt initial-buffer-choice
+如果非@code{nil}，则该变量是一个字符串，指定 Emacs 启动后显示的文件或目录，而不是启动屏幕。如果它的值是一个函数，Emacs 会调用该函数，该函数必须返回一个随后显示的缓冲区。如果其值为 @code{t}，Emacs 将显示 @file{*scratch*} 缓冲区。
+@end defopt
+
+@defopt inhibit-startup-echo-area-message
+该变量控制启动回显区域消息的显示。您可以通过将具有以下形式的文本添加到初始化文件来抑制启动回显区域消息：
+
+@example
+(setq inhibit-startup-echo-area-message
+      "@var{your-login-name}")
+@end example
+
+Emacs 在初始化文件中显式检查表达式，如上所示；您的登录名必须作为 Lisp 字符串常量出现在表达式中。  您还可以使用自定义界面。  将@code{inhibit-startup-echo-area-message} 设置为相同值的其他方法不会禁止启动消息。  这样，如果您愿意，您可以轻松地为自己禁止该消息，但粗心地复制您的初始化文件不会为其他人禁止该消息。
+@end defopt
+
+@defopt initial-scratch-message
+该变量（如果非 @code{nil}）应该是一个字符串，当 Emacs 启动或重新创建该缓冲区时，该变量将被视为要插入到 @file{*scratch*} 缓冲区中的文档。  如果是@code{nil}，则@file{*scratch*}缓冲区为空。
+@end defopt
+
+@noindent
+以下命令行选项会影响启动顺序的某些方面。  @xref{Initial Options,,, emacs, The GNU Emacs Manual}。
+
+@table @code
+@item --no-splash
+不显示闪屏。
+
+@item --batch
+无需交互式终端即可运行。  @xref{Batch Mode}。
+
+@item --daemon
+@itemx --bg-daemon
+@itemx --fg-daemon
+不初始化任何显示；只需启动一个服务器。 （“后台”守护进程自动在后台运行。）
+
+@item --no-init-file
+@itemx -q
+不要加载 init 文件或 @file{default} 库。
+
+@item --no-site-file
+不要加载 @file{site-start} 库。
+
+@item --quick
+@itemx -Q
+相当于@samp{-q --no-site-file --no-splash}。
+@c and --no-site-lisp, but let's not mention that here.
+
+@item --init-directory
+指定查找 Emacs 初始化文件时要使用的目录。
+@end table
+
+
+@node Init File
+@subsection 初始化文件
+@cindex init file
+@cindex @file{.emacs}
+@cindex @file{init.el}
+@cindex @file{early-init.el}
+
+当您启动 Emacs 时，它通常会尝试加载您的 @dfn{init file}。  它可以是主目录中名为 @file{.emacs} 或 @file{.emacs.el} 的文件，也可以是主目录中名为 @file{.emacs.d} 的子目录中名为 @file{init.el} 的文件。
+@ignore
+Whichever place you use, you can also compile the file (@pxref{Byte
+Compilation}); then the actual file loaded will be @file{.emacs.elc}
+or @file{init.elc}.
+@end ignore
+
+命令行开关@samp{-q}、@samp{-Q}和@samp{-u}控制是否以及在哪里查找init文件； @samp{-q}（以及更强的@samp{-Q}）表示不加载初始化文件，而@samp{-u @var{user}}表示加载@var{user}的初始化文件而不是您的初始化文件。 @xref{Entering Emacs,,, emacs, The GNU Emacs Manual}。  如果两个选项均未指定，Emacs 将使用 @env{LOGNAME} 环境变量、或 @env{USER}（大多数系统）或 @env{USERNAME}（MS 系统）变量来查找您的主目录以及 init 文件；这样，即使您使用了 su，Emacs 仍然会加载您自己的 init 文件。  但是，如果这些环境变量不存在，Emacs 会使用您的用户 ID 来查找您的主目录。
+
+@cindex early init file
+Emacs 还会尝试加载第二个初始化文件，称为 @dfn{early init file}（如果存在）。  这是 @file{~/.emacs.d} 目录中名为 @file{early-init.el} 的文件。  Early init 文件和常规 init 文件之间的区别在于，early init 文件在启动过程中加载得更早，因此您可以使用它来自定义一些在加载常规 init 文件之前初始化的内容。  例如，您可以通过设置 @code{package-load-list} 或 @code{package-enable-at-startup} 等变量来自定义初始化包系统的过程。  @xref{Package Installation,,, emacs,The GNU Emacs Manual}。
+
+@cindex default init file
+Emacs 安装可能有一个 @dfn{default init file}，它是一个名为 @file{default.el} 的 Lisp 库。  Emacs 通过库的标准搜索路径 (@pxref{How Programs Do Loading}) 找到此文件。  Emacs 发行版不附带此文件；它用于本地定制。  如果默认的 init 文件存在，则每次启动 Emacs 时都会加载该文件。  但您自己的初始化文件（如果有）会首先加载；如果它将 @code{inhibit-default-init} 设置为非 @code{nil} 值，则 Emacs 随后不会加载 @file{default.el} 文件。  在批处理模式下，或者如果您指定@samp{-q}（或@samp{-Q}），Emacs 既不会加载您的个人初始化文件，也不会加载默认初始化文件。
+
+另一个用于站点自定义的文件是@file{site-start.el}。  Emacs 加载此 @emph{before} 用户的初始化文件。  您可以使用选项 @samp{--no-site-file} 禁止加载该文件。
+
+@defopt site-run-file
+此变量指定要在用户的早期初始化文件和常规初始化文件之前加载的站点自定义文件。  其正常值为@code{"site-start"}。  改变它并产生真正效果的唯一方法是在放弃 Emacs 之前这样做。
+@c So why even mention it here.  I imagine it is almost never changed.
+@end defopt
+
+@xref{Init Examples,, Init File Examples, emacs, The GNU Emacs Manual}，有关如何在 @file{.emacs} 文件中进行各种常用自定义的示例。
+
+@defopt inhibit-default-init
+如果该变量为非@code{nil}，则会阻止 Emacs 加载默认初始化库文件。  默认值为@code{nil}。
+@end defopt
+
+@defvar before-init-hook
+这个普通的钩子在加载所有初始化文件（@file{site-start.el}、您的初始化文件和@file{default.el}）之前运行一次。 （要真正生效地更改它的唯一方法是在转储 Emacs 之前。）
+@end defvar
+
+@defvar after-init-hook
+这个正常的钩子在加载所有初始化文件（@file{site-start.el}、您的初始化文件和@file{default.el}）之后、加载特定于终端的库（如果在文本终端上启动）并处理命令行操作参数之前运行一次。
+@end defvar
+
+@defvar emacs-startup-hook
+这个普通的钩子在处理命令行参数后运行一次。  在批处理模式下，Emacs 不运行此钩子。
+@end defvar
+
+@defvar window-setup-hook
+这个普通的钩子与@code{emacs-startup-hook}非常相似。唯一的区别是，在设置框架参数后，它运行得稍晚一些。  @xref{Startup Summary, window-setup-hook}。
+@end defvar
+
+@defvar user-init-file
+该变量保存用户初始化文件的绝对文件名。  如果实际加载的init文件是编译后的文件，如@file{.emacs.elc}，则该值指的是对应的源文件。
+@end defvar
+
+@defvar user-emacs-directory
+该变量保存 Emacs 默认目录的名称。如果该目录存在且 @file{~/.emacs.d/} 和 @file{~/.emacs} 不存在，则默认为 @file{$@{XDG_CONFIG_HOME-'~/.config'@}/emacs/}，否则在除 MS-DOS@. 之外的所有平台上默认为 @file{~/.emacs.d/} 这里，@file{$@{XDG_CONFIG_HOME-'~/.config'@}} 代表环境变量 @env{XDG_CONFIG_HOME} 的值（如果设置了环境变量 @env{XDG_CONFIG_HOME}），否则代表 @file{~/.config}。 @xref{Find Init,,How Emacs Finds Your Init File, emacs, The GNU Emacs Manual}。
+@end defvar
+
+@node Terminal-Specific
+@subsection 特定于终端的初始化
+@cindex terminal-specific initialization
+
+每种终端类型都可以有自己的 Lisp 库，Emacs 在该类型的终端上运行时会加载该库。  库的名称是通过连接变量 @code{term-file-prefix} 的值和终端类型（由环境变量 @env{TERM} 指定）构建的。通常，@code{term-file-prefix}的值为@code{"term/"}；不建议更改此设置。  如果 @code{term-file-aliases} 关联列表中存在与 @env{TERM} 匹配的条目，Emacs 将使用关联值代替 @env{TERM}。 Emacs 通过搜索 @code{load-path} 目录并尝试 @samp{.elc} 和 @samp{.el} 后缀以正常方式查找文件。
+
+@cindex Termcap
+特定于终端的库的通常作用是启用特殊键来发送 Emacs 可以识别的序列。  如果 Termcap 或 Terminfo 条目未指定终端的所有功能键，则可能还需要设置或添加到@code{input-decode-map}。  @xref{Terminal Input}。
+
+当终端类型的名称包含连字符或下划线，并且没有找到名称与终端名称相同的库时，Emacs 将从终端名称中删除最后一个连字符或下划线及其后面的所有内容，然后重试。  重复此过程，直到 Emacs 找到匹配的库，或者直到名称中不再有连字符或下划线（即，没有特定于终端的库）。  例如，如果终端名称为 @samp{xterm-256color} 并且没有 @file{term/xterm-256color.el} 库，Emacs 会尝试加载 @file{term/xterm.el}。  如有必要，终端库可以评估 @code{(getenv "TERM")} 来查找终端类型的全名。
+
+您的 init 文件可以通过将变量 @code{term-file-prefix} 设置为 @code{nil} 来阻止加载特定于终端的库。
+
+您还可以使用 @code{tty-setup-hook} 来覆盖特定于终端的库的某些操作。  这是 Emacs 在初始化新文本终端后运行的正常挂钩。您可以使用此挂钩为没有自己的库的终端定义初始化。  @xref{Hooks}。
+
+@defopt term-file-prefix
+@cindex @env{TERM} environment variable
+如果该变量的值非@code{nil}，Emacs 将加载特定于终端的初始化文件，如下所示：
+
+@example
+(load (concat term-file-prefix (getenv "TERM")))
+@end example
+
+@noindent
+如果您不想加载终端初始化文件，可以在初始化文件中将 @code{term-file-prefix} 变量设置为 @code{nil}。
+
+在 MS-DOS 上，Emacs 将 @env{TERM} 环境变量设置为 @samp{internal}。
+@end defopt
+
+@defopt term-file-aliases
+该变量是将终端类型映射到其别名的关联列表。  例如，@code{("vt102" . "vt100")}形式的元素意味着将@samp{vt102}类型的终端视为@samp{vt100}类型的终端。
+@end defopt
+
+@defvar tty-setup-hook
+该变量是 Emacs 在初始化新文本终端后运行的普通挂钩。  （这适用于 Emacs 在非窗口模式下启动以及建立 tty @command{emacsclient} 连接时。）该钩子在加载 init 文件（如果适用）和特定于终端的 Lisp 文件后运行，因此您可以使用它来调整该文件所做的定义。
+
+对于相关功能，@pxref{Init File, window-setup-hook}。
+@end defvar
+
+@node Command-Line Arguments
+@subsection 命令行参数
+@cindex command-line arguments
+
+启动 Emacs 时，您可以使用命令行参数来请求各种操作。  请注意，使用 Emacs 的推荐方法是在登录后仅启动一次，然后在同一个 Emacs 会话中进行所有编辑 (@pxref{Entering Emacs,,, emacs, The GNU Emacs Manual})。因此，您可能不会经常使用命令行参数；尽管如此，当从会话脚本调用 Emacs 或调试 Emacs 时，它们还是很有用的。  本节介绍 Emacs 如何处理命令行参数。
+
+@defun command-line
+该函数解析调用 Emacs 的命令行，对其进行处理，并且（除其他外）加载用户的 init 文件并显示启动消息。
+@end defun
+
+@defvar command-line-processed
+处理完命令行后，该变量的值为@code{t}。
+
+如果通过调用 @code{dump-emacs-portable} (@pxref{Building Emacs}) 来重新转储 Emacs，您可能希望首先将此变量设置为 @code{nil}，以便使新转储的 Emacs 处理其新的命令行参数。
+@end defvar
+
+@defvar command-switch-alist
+@cindex switches on command line
+@cindex options on command line
+@cindex command-line options
+该变量是用户定义的命令行选项和关联的处理函数的列表。  默认情况下它是空的，但您可以根据需要添加元素。
+
+A @dfn{command-line option} 是命令行上的一个参数，其形式为：
+
+@example
+-@var{option}
+@end example
+
+@code{command-switch-alist} 的元素如下所示：
+
+@example
+(@var{option} . @var{handler-function})
+@end example
+
+@sc{car}、@var{option} 是一个字符串，是命令行选项的名称（包括开头的连字符）。  @var{handler-function} 被调用来处理 @var{option}，并接收选项名称作为其唯一参数。
+
+在某些情况下，命令行中的选项后跟一个参数。  在这些情况下，@var{handler-function}可以在变量@code{command-line-args-left}中找到所有剩余的命令行参数（见下文）。  （命令行参数的完整列表位于 @code{command-line-args} 中。）
+
+请注意，对 @code{command-switch-alist} 的处理不会专门处理 @var{option} 中的等号。  也就是说，如果命令行上有像 @code{--name=value} 这样的选项，那么只有 @code{car} 实际上是 @code{--name=value} 的 @code{command-switch-alist} 成员才会匹配此选项。  如果你想解析这样的选项，你需要使用@code{command-line-functions}代替（见下文）。
+
+命令行参数由 @file{startup.el} 文件中的 @code{command-line-1} 函数解析。  另请参见@ref{Emacs Invocation, , Command Line Arguments for Emacs Invocation, emacs, The GNU Emacs Manual}。
+@end defvar
+
+@defvar command-line-args
+该变量的值是传递给 Emacs 的命令行参数列表。
+@end defvar
+
+@defvar command-line-args-left
+@vindex argv
+该变量的值是尚未处理的命令行参数的列表。
+@c Don't mention this, since it is a "bad name for a dynamically bound variable"
+@c @code{argv} is an alias for this.
+@end defvar
+
+@defvar command-line-functions
+该变量的值是用于处理无法识别的命令行参数的函数列表。  每次要处理的下一个参数没有特殊含义时，都会按照出现的顺序调用此列表中的函数，直到其中一个返回非 0⁣ 值。
+
+这些函数的调用不带参数。  他们可以通过变量 @code{argi} 访问正在考虑的命令行参数，该变量此时暂时绑定。  其余参数（不包括当前参数）位于变量 @code{command-line-args-left} 中。
+
+当函数识别并处理 @code{argi} 中的参数时，它应该返回一个非 @code{nil} 值来表示它已经处理了该参数。  如果它还处理了以下一些参数，则可以通过从 @code{command-line-args-left} 中删除它们来表明这一点。
+
+如果所有这些函数都返回@code{nil}，则参数将被视为要访问的文件名。
+@end defvar
+
+@node Getting Out
+@section 退出 Emacs
+@cindex exiting Emacs
+
+有两种方法可以退出 Emacs：您可以终止 Emacs 作业，它会永久退出，或者您可以暂停它，这允许您稍后重新进入 Emacs 进程。  （在图形环境中，您当然可以简单地切换到另一个应用程序，而不需要对 Emacs 执行任何特殊操作，然后在需要时切换回 Emacs。）
+
+@menu
+* Killing Emacs::         不可逆转地退出 Emacs。
+* Suspending Emacs::      可逆退出 Emacs。
+@end menu
+
+@node Killing Emacs
+@subsection 杀死 Emacs
+@cindex killing Emacs
+
+杀死Emacs意味着结束Emacs进程的执行。如果您从终端启动 Emacs，父进程通常会恢复控制。  杀死 Emacs 的低级原语是@code{kill-emacs}。
+
+@deffn Command kill-emacs &optional exit-data restart
+该命令调用钩子@code{kill-emacs-hook}，然后退出 Emacs 进程并杀死它。
+
+如果@var{exit-data}是一个整数，则用作Emacs进程的退出状态。  （这主要在批处理操作中有用；请参阅@ref{Batch Mode}。）
+
+如果 0⁣ 是一个字符串，则其内容（后跟换行符）将被填充到终端输入缓冲区中，以便 shell（或接下来读取输入的任何程序）可以读取它们。  但是，如果 Emacs 未在终端上以交互方式运行，或者填充需要特殊权限或此平台不支持填充，则会静默跳过填充。
+
+如果 0⁣ 既不是整数也不是字符串，或者被省略，则意味着使用（系统特定的）退出状态来指示程序成功终止。
+
+如果 @var{restart} 不是 @code{nil}，则不只是在最后退出，而是使用与当前运行的 Emacs 进程相同的命令行参数启动一个新的 Emacs 进程。
+@end deffn
+
+@cindex SIGTERM
+@cindex SIGHUP
+@cindex SIGINT
+@cindex operating system signal
+@code{kill-emacs} 函数通常通过更高级别的命令 @kbd{C-x C-c} (@code{save-buffers-kill-terminal}) 调用。  @xref{Exiting,,, emacs, The GNU Emacs Manual}。  如果 Emacs 接收到 @code{SIGTERM} 或 @code{SIGHUP} 操作系统信号（例如，当控制终端断开连接时），或者在批处理模式下运行时接收到 @code{SIGINT} 信号 (@pxref{Batch Mode})，也会自动调用它。
+
+@defvar kill-emacs-hook
+这个普通的钩子在杀死 Emacs 之前由 @code{kill-emacs} 运行。
+
+因为 @code{kill-emacs} 可以在用户交互不可能的情况下（例如，当终端断开连接时）被调用，所以这个钩子上的函数不应该尝试与用户交互。如果您想在 Emacs 关闭时与用户交互，请使用@code{kill-emacs-query-functions}，如下所述。
+@end defvar
+
+当 Emacs 被终止时，Emacs 进程中的所有信息（除了已保存的文件）都会丢失。  由于无意中终止 Emacs 可能会丢失大量工作，因此 @code{save-buffers-kill-terminal} 命令会查询是否有需要保存的缓冲区或正在运行的子进程以进行确认。它还运行异常钩子@code{kill-emacs-query-functions}：
+
+@defopt kill-emacs-query-functions
+当 @code{save-buffers-kill-terminal} 杀死 Emacs 时，它会在询问标准问题之后、调用 @code{kill-emacs} 之前调用此钩子中的函数。  这些函数按出现顺序调用，不带参数。  每个功能都可以要求用户进行额外的确认。  如果其中任何一个返回 @code{nil}，@code{save-buffers-kill-emacs} 都不会终止 Emacs，并且不会运行此钩子中的其余函数。  直接调用@code{kill-emacs}不会运行这个钩子。
+@end defopt
+
+@deffn Command restart-emacs
+此命令的作用与 @code{save-buffers-kill-emacs} 相同，但它不会在最后终止当前的 Emacs 进程，而是使用与当前运行的 Emacs 进程相同的命令行参数重新启动一个新的 Emacs 进程。
+@end deffn
+
+@node Suspending Emacs
+@subsection 暂停 Emacs
+@cindex suspending Emacs
+
+在文本终端上，可以使用 @dfn{suspend Emacs}，这意味着暂时停止 Emacs 并将控制权返回给其上级进程（通常是 shell）。  这允许您稍后在同一 Emacs 进程中使用相同的缓冲区、相同的终止环、相同的撤消历史记录等恢复编辑。  要恢复 Emacs，请在父 shell 中使用适当的命令 — 最有可能是@code{fg}。
+
+@cindex controlling terminal
+挂起仅适用于启动 Emacs 会话的终端设备。  我们将该设备称为会话的 @dfn{controlling terminal}。  如果控制终端是图形终端，则不允许挂起。  挂起通常与图形环境无关，因为您可以简单地切换到另一个应用程序，而无需对 Emacs 执行任何特殊操作。
+
+@c FIXME?  Are there any systems Emacs still supports that do not
+@c have SIGTSTP?
+@cindex SIGTSTP
+某些操作系统（没有 @code{SIGTSTP} 的操作系统或 MS-DOS）不支持暂停作业；在这些系统上，挂起实际上会临时创建一个新的 shell 作为 Emacs 的子进程。然后您将退出 shell 返回 Emacs。
+
+@deffn Command suspend-emacs &optional string
+该函数停止 Emacs 并将控制权返回给上级进程。如果上级进程恢复 Emacs，@code{suspend-emacs} 将 @code{nil} 返回给 Lisp 中的调用者。
+
+该功能仅适用于Emacs会话的控制终端；要放弃对其他 tty 设备的控制，请使用 @code{suspend-tty} （见下文）。  如果 Emacs 会话使用多个终端，则必须在挂起 Emacs 之前删除所有其他终端上的框架，否则此功能会发出错误信号。 @xref{Multiple Terminals}。
+
+如果 @var{string} 不是 @code{nil}，则其字符将被发送到 Emacs 的上级 shell，以作为终端输入读取。但是，如果 Emacs 未在终端上以交互方式运行，或者将字符填充到终端输入中需要特殊权限或此平台不支持，则将跳过此操作。
+
+在挂起之前，@code{suspend-emacs} 运行正常的钩子@code{suspend-hook}。  用户恢复 Emacs 后，@code{suspend-emacs} 运行正常的钩子 @code{suspend-resume-hook}。 @xref{Hooks}。
+
+恢复后的下一次重新显示将重新绘制整个屏幕，除非变量 @code{no-redraw-on-reenter} 为非 @code{nil}。 @xref{Refresh Screen}。
+
+以下是如何使用这些钩子的示例：
+
+@smallexample
+@group
+(add-hook 'suspend-hook
+          (lambda () (or (y-or-n-p "Really suspend?")
+                         (error "Suspend canceled"))))
+@end group
+(add-hook 'suspend-resume-hook (lambda () (message "Resumed!")
+                                 (sit-for 2)))
+@end smallexample
+@c The sit-for prevents the @code{nil} that suspend-emacs returns
+@c hiding the message.
+
+以下是评估 @code{(suspend-emacs)} 时您会看到的内容：
+
+@smallexample
+@group
+---------- Buffer: Minibuffer ----------
+Really suspend? @kbd{y}
+---------- Buffer: Minibuffer ----------
+@end group
+
+@group
+---------- Parent Shell ----------
+bash$ fg
+@end group
+
+@group
+---------- Echo Area ----------
+Resumed!
+@end group
+@end smallexample
+
+请注意，在某些操作系统上，将 @var{string} 发送到 Emacs 父 shell 可能需要特殊权限，在这种情况下，它可能无法将 @var{string} 发送到 shell 执行。  在其他系统上，这不受支持，如果您尝试，Emacs 将发出错误信号。  此外，即使 @var{string} 是由 shell 执行的，也可能不会被回显。  因此我们不建议在可移植 Lisp 程序中依赖此功能。
+@end deffn
+
+@defvar suspend-hook
+该变量是 Emacs 在挂起之前运行的普通挂钩。
+@end defvar
+
+@defvar suspend-resume-hook
+该变量是 Emacs 在暂停后恢复时运行的普通挂钩。
+@end defvar
+
+@defun suspend-tty &optional tty
+如果 @var{tty} 指定 Emacs 使用的终端设备，则此函数将放弃该设备并将其恢复到之前的状态。  使用该设备的框架继续存在，但不会更新，并且 Emacs 不会读取其中的输入。  @var{tty} 可以是终端对象、框架（表示该框架的终端）或 @code{nil} （表示所选框架的终端）。  @xref{Multiple Terminals}。
+
+如果@var{tty}已经挂起，则该函数不执行任何操作。
+
+@vindex suspend-tty-functions
+该函数运行钩子 @code{suspend-tty-functions}，将终端对象作为参数传递给每个函数。
+@end defun
+
+@defun resume-tty &optional tty
+该函数恢复之前挂起的终端设备@var{tty}；其中 @var{tty} 具有与 @code{suspend-tty} 相同的可能值。
+
+@vindex resume-tty-functions
+此函数重新打开终端设备，重新初始化它，并使用该终端的选定框架重新绘制它。  然后它运行钩子@code{resume-tty-functions}，将终端对象作为参数传递给每个函数。
+
+如果同一设备已被另一个 Emacs 终端使用，则此函数会发出错误信号。  如果 @var{tty} 没有暂停，则该函数不执行任何操作。
+@end defun
+
+@defun controlling-tty-p &optional tty
+如果 1⁣ 是 Emacs 会话的控制终端，则该函数返回非 0⁣； @var{tty} 可以是终端对象、框架（表示该框架的终端）或 @code{nil} （表示所选框架的终端）。
+@end defun
+
+@deffn Command suspend-frame
+该命令@dfn{suspends}一帧。  对于 GUI 框架，它调用 @code{iconify-frame} (@pxref{Visibility of Frames})；对于文本终端上的框架，它调用@code{suspend-emacs}或@code{suspend-tty}，具体取决于框架是否显示在控制终端设备上。
+@end deffn
+
+@node System Environment
+@section 操作系统环境
+@cindex operating system environment
+
+Emacs 通过各种函数提供对操作系统环境中变量的访问。  这些变量包括系统名称、用户的@acronym{UID}等等。
+
+@defvar system-configuration
+该变量以字符串形式保存系统硬件/软件配置的标准 GNU 配置名称。  例如，64 位 GNU/Linux 系统的典型值为 @samp{"x86_64-unknown-linux-gnu"}。
+@end defvar
+
+@cindex system type and name
+@defvar system-type
+该变量的值是一个符号，指示 Emacs 运行的操作系统类型。  可能的值为：
+
+@table @code
+@item aix
+IBM 的 AIX。
+
+@item berkeley-unix
+伯克利 BSD 及其变体。
+
+@item cygwin
+Cygwin，MS-Windows 之上的 POSIX 层。
+
+@item darwin
+达尔文 (macOS)。
+
+@item gnu
+GNU 系统（使用 GNU 内核，由 HURD 和 Mach 组成）。
+
+@item gnu/linux
+GNU/Linux系统——即GNU系统的变体，使用Linux内核。  （这些系统就是人们常说的“Linux”，但实际上Linux只是内核，而不是整个系统。）
+
+@item gnu/kfreebsd
+具有 FreeBSD 内核的 GNU（基于 glibc）系统。
+
+@item haiku
+Haiku 操作系统是 Be 操作系统的衍生版本。
+
+@item hpux
+惠普 HPUX 操作系统。
+
+@item nacl
+Google Native Client (@acronym{NaCl}) 沙箱系统。
+
+@item android
+开放手机联盟的 Android 操作系统。
+
+@item ms-dos
+即使您在 MS-Windows 上运行，使用 DJGPP for MS-DOS 编译的 Microsoft DOS@. Emacs 也会将 @code{system-type} 绑定到 @code{ms-dos}。
+
+@item usg-unix-v
+AT&T Unix 系统 V。
+
+@item windows-nt
+Microsoft Windows NT、9X 及更高版本。  @code{system-type} 的值始终为 @code{windows-nt}，例如，即使在 Windows 10 上也是如此。
+
+@end table
+
+除非绝对必要，否则我们不希望添加新符号来进行更精细的区分！  事实上，我们希望将来消除其中一些替代方案。  如果您需要比 @code{system-type} 允许的更精细区分，您可以测试 @code{system-configuration}，例如针对正则表达式。
+@end defvar
+
+@defun system-name
+此函数以字符串形式返回您正在运行的计算机的名称。
+@end defun
+
+@c FIXME seems like this section is not the best place for this option?
+@defopt mail-host-address
+如果此变量不是 @code{nil}，则使用它代替 @code{system-name} 来生成电子邮件地址。  例如，在构造 @code{user-mail-address} 的默认值时使用它。  @xref{User Identification}。
+@end defopt
+
+@deffn Command getenv var &optional frame
+@cindex environment variable access
+该函数以字符串形式返回环境变量 @var{var} 的值。  @var{var} 应该是一个字符串。  如果 @var{var} 在环境中未定义，则 @code{getenv} 返回 @code{nil}。  如果 @var{var} 已设置但为空，则返回 @samp{""}。  在 Emacs 中，环境变量及其值的列表保存在变量 @code{process-environment} 中。
+
+可选参数 @var{frame}，如果非 @code{nil}，则指定一个框架，在这种情况下，函数将在 @var{frame} 的参数 @code{environment} (@pxref{Basic Parameters}) 中搜索 @var{var}，而不是在 @code{process-environment} 中查找。
+
+@cindex DISPLAY environment variable search
+当省略 @var{frame} 或 @code{nil} 时，会特别对待 @samp{DISPLAY} 环境变量：如果在 @code{process-environment} 中找不到该变量，则该函数将查找所选帧的 @code{display} 参数，如果是 @code{nil}，它还会在 @code{initial-environment} 中查找。
+
+@example
+@group
+(getenv "USER")
+     @result{} "lewis"
+@end group
+@end example
+
+shell 命令 @code{printenv} 打印全部或部分环境：
+
+@example
+@group
+bash$ printenv
+PATH=/usr/local/bin:/usr/bin:/bin
+USER=lewis
+@end group
+@group
+TERM=xterm
+SHELL=/bin/bash
+HOME=/home/lewis
+@end group
+@dots{}
+@end example
+@end deffn
+
+@deffn Command setenv variable &optional value substitute
+此命令将名为 @var{variable} 的环境变量的值设置为 @var{value}。  @var{variable} 应该是一个字符串。在内部，Emacs Lisp 可以处理任何字符串。  然而，通常 @var{variable} 应该是一个有效的 shell 标识符，即字母、数字和下划线的序列，以字母或下划线开头。  否则，如果 Emacs 的子进程尝试访问 @var{variable} 的值，可能会出现错误。  如果省略 @var{value} 或 @code{nil} （或者交互地，使用前缀参数），@code{setenv} 将从环境中删除@var{variable}。  否则，@var{value}应该是一个字符串。
+
+@c FIXME: Document 'substitute-env-vars'?  --xfq
+如果可选参数 @var{substitute} 不是 @code{nil}，Emacs 会调用函数 @code{substitute-env-vars} 来扩展 @var{value} 中的任何环境变量。
+
+@code{setenv}通过修改@code{process-environment}来工作；将该变量与 @code{let} 绑定也是合理的做法。
+
+@code{setenv} 返回 @var{variable} 的新值，如果从环境中删除了 @var{variable}，则返回 @code{nil}。
+@end deffn
+
+@defmac with-environment-variables variables body@dots{}
+该宏在执行@var{body}时临时根据@var{variables}设置环境变量。  表单完成后将恢复以前的值。  参数 @var{variables} 应该是 @w{@code{(@var{var} @var{value})}} 形式的字符串对列表，其中 @var{var} 是环境变量的名称，@var{value} 是该变量的值。
+
+@lisp
+(with-environment-variables (("LANG" "C")
+                             ("LANGUAGE" "en_US:en"))
+  (call-process "ls" nil t))
+@end lisp
+@end defmac
+
+@defvar process-environment
+该变量是一个字符串列表，每个字符串描述一个环境变量。  函数@code{getenv}和@code{setenv}通过这个变量来工作。
+
+@smallexample
+@group
+process-environment
+@result{} ("PATH=/usr/local/bin:/usr/bin:/bin"
+    "USER=lewis"
+@end group
+@group
+    "TERM=xterm"
+    "SHELL=/bin/bash"
+    "HOME=/home/lewis"
+    @dots{})
+@end group
+@end smallexample
+
+如果 0⁣ 包含多个指定相同环境变量的元素，则这些元素中的第一个指定该变量，其他元素将被忽略。
+@end defvar
+
+@defvar initial-environment
+该变量保存 Emacs 启动时从其父进程继承的环境变量列表。
+@end defvar
+
+@defvar path-separator
+该变量保存一个字符串，该字符串表示哪个字符分隔搜索路径中的目录（如在环境变量中找到的）。  对于 Unix 和 GNU 系统，其值为 @code{":"}；对于 MS 系统，其值为 @code{";"}。
+@end defvar
+
+@defun path-separator
+该函数返回变量 @code{path-separator} 的连接本地值。  对于 MS 系统，这是 @code{";"}，本地 @code{default-directory}，对于 Unix 和 GNU 系统，是 @code{":"}，或远程 @code{default-directory}。
+@end defun
+
+@defun parse-colon-path path
+该函数采用搜索路径字符串，例如 @env{PATH} 环境变量的值，并在分隔符处将其拆分，返回目录列表。  该列表中的@code{nil}表示当前目录。  尽管该函数的名称为“冒号”，但它实际上使用变量 @code{path-separator} 的值。
+
+@example
+(parse-colon-path ":/foo:/bar")
+     @result{} (nil "/foo/" "/bar/")
+@end example
+@end defun
+
+@defvar invocation-name
+该变量保存调用 Emacs 的程序名称。  该值为字符串，不包含目录名称。
+@end defvar
+
+@defvar invocation-directory
+该变量保存 Emacs 可执行文件运行时所在的目录，如果无法确定该目录，则保存 @code{nil}。
+@end defvar
+
+@defvar installation-directory
+如果非 @code{nil}，则这是一个要在其中查找 @file{lib-src} 和 @file{etc} 子目录的目录。  在已安装的 Emacs 中，通常为 @code{nil}。  当 Emacs 在标准安装位置找不到这些目录，但可以在与包含 Emacs 可执行文件的目录（即 5⁣）相关的目录中找到它们时，它是非@code{nil}。
+@end defvar
+
+@defun load-average &optional use-float
+此函数以列表形式返回当前 1 分钟、5 分钟和 15 分钟的系统负载平均值。  平均负载表示尝试在系统上运行的进程数。
+
+默认情况下，这些值是系统平均负载 100 倍的整数，但如果 0⁣ 不是 -1⁣，则它们将以浮点数形式返回，而不乘以 100。
+
+如果无法获得负载平均值，则该函数会发出错误信号。  在某些平台上，访问平均负载需要将 Emacs 安装为 setuid 或 setgid，以便它可以读取内核信息，但这通常是不可取的。
+@c FIXME which platforms are these?  Are they still relevant?
+
+如果 1 分钟负载平均值可用，但 5 分钟或 15 分钟平均值不可用，则此函数将返回包含可用平均值的缩短列表。
+
+@example
+@group
+(load-average)
+     @result{} (169 48 36)
+@end group
+@group
+(load-average t)
+     @result{} (1.69 0.48 0.36)
+@end group
+@end example
+
+shell 命令@code{uptime} 返回类似的信息。
+@end defun
+
+@defun emacs-pid
+该函数以整数形式返回 Emacs 进程的进程@acronym{ID}。
+@end defun
+
+@defvar tty-erase-char
+该变量保存 Emacs 启动之前在系统终端驱动程序中选择的擦除字符。
+@c FIXME?  Seems untrue since 23.1.  For me, it is 0.
+@c The value is @code{nil} if Emacs is running under a window system.
+@end defvar
+
+@defvar null-device
+该变量保存系统空设备。  对于 Unix 和 GNU 系统，其值为 @code{"/dev/null"}；对于 MS 系统，其值为 @code{"NUL"}。
+@end defvar
+
+@defun null-device
+该函数返回变量 @code{null-device} 的连接本地值。  对于 MS 系统，这是 @code{"NUL"}，本地 @code{default-directory}，对于 Unix 和 GNU 系统，是 @code{"/dev/null"}，或远程 @code{default-directory}。
+@end defun
+
+@node User Identification
+@section 用户识别
+@cindex user identification
+
+@defvar init-file-user
+该变量表示 Emacs 应使用哪个用户的初始化文件——如果没有，则为 @code{nil}。  @code{""} 代表最初登录的用户。该值反映命令行选项，例如 @samp{-q} 或 @samp{-u @var{user}}。
+
+加载自定义文件或任何其他类型的用户配置文件的 Lisp 包应该遵循此变量来决定在哪里找到它。他们应该加载在此变量中找到的用户名的配置文件。如果 @code{init-file-user} 是 @code{nil}，意味着使用了 @samp{-q}、@samp{-Q} 或 @samp{-batch} 选项，则 Lisp 包不应加载任何自定义文件或用户配置文件。
+@end defvar
+
+@defopt user-mail-address
+它保存正在使用 Emacs 的用户的电子邮件地址。
+@end defopt
+
+@defun user-login-name &optional uid
+该函数返回用户登录时使用的名称。它使用环境变量@env{LOGNAME}或@env{USER}（如果设置了）。  否则，该值基于有效 @acronym{UID}，而不是实际 @acronym{UID}。
+
+如果指定 @var{uid}（数字），则结果是与 @var{uid} 对应的用户名，如果不存在这样的用户，则结果是 @code{nil}。
+@end defun
+
+@defun user-real-login-name
+该函数返回Emacs真实的@acronym{UID}对应的用户名。  这忽略了有效的@acronym{UID}以及环境变量@env{LOGNAME}和@env{USER}。
+@end defun
+
+@defun user-full-name &optional uid
+该函数返回登录用户的全名——或者环境变量 @env{NAME} 的值（如果已设置）。
+
+如果 Emacs 进程的 user-id 不对应于任何已知用户（并且未设置 @env{NAME}），则结果为 @code{"unknown"}。
+
+如果 @var{uid} 不是 @code{nil}，那么它应该是一个数字（用户 ID）或字符串（登录名）。  然后 @code{user-full-name} 返回与该用户 ID 或登录名相对应的全名。  如果您指定未定义的用户 ID 或登录名，则返回 @code{nil}。
+@end defun
+
+@vindex user-full-name
+@vindex user-real-login-name
+@vindex user-login-name
+符号@code{user-login-name}、@code{user-real-login-name}和@code{user-full-name}既是变量又是函数。  这些函数返回与变量保存的值相同的值。  这些变量允许您通过告诉函数返回什么来伪造 Emacs。  这些变量对于构建框架标题也很有用 (@pxref{Frame Titles})。
+
+@cindex UID
+@defun user-real-uid
+该函数返回用户的真实@acronym{UID}。
+@end defun
+
+@defun user-uid
+该函数返回用户的有效@acronym{UID}。
+@end defun
+
+@defun file-user-uid
+此函数返回用户有效@acronym{UID}的连接本地值。  如果 1⁣ 是本地的，则相当于 2⁣，但对于远程文件 (@pxref{Remote Files, , , emacs, The GNU Emacs Manual})，它将返回与该远程连接关联的用户的 @acronym{UID}；如果远程连接没有关联的用户，则返回 -1。
+@end defun
+
+@cindex GID
+@defun group-real-gid
+该函数返回 Emacs 进程的真实 @acronym{GID}。
+@end defun
+
+@defun group-gid
+该函数返回 Emacs 进程的有效 @acronym{GID}。
+@end defun
+
+@defun file-group-gid
+此函数返回用户有效@acronym{GID}的连接本地值。  与@code{file-user-uid}类似，如果@code{default-directory}是本地的，则相当于@code{group-gid}，但对于远程文件（@pxref{Remote Files, , , emacs, The GNU Emacs Manual}），它将返回与该远程连接关联的用户的@acronym{GID}；如果远程连接没有关联的用户，则返回 -1。
+@end defun
+
+@defun system-users
+该函数返回一个字符串列表，列出系统上的用户名。  如果 Emacs 无法检索此信息，则返回值是一个仅包含 @code{user-real-login-name} 值的列表。
+@end defun
+
+@cindex user groups
+@defun system-groups
+该函数返回一个字符串列表，列出系统上用户组的名称。  如果 Emacs 无法检索此信息，则返回值为 @code{nil}。
+@end defun
+
+@defun group-name gid
+此函数返回与数字组 ID @var{gid} 相对应的组名称，如果不存在此类组，则返回 @code{nil}。
+@end defun
+
+
+@node Time of Day
+@section 一天中的时间
+@cindex time of day
+
+本节介绍如何确定当前时间和时区。
+
+@cindex Lisp timestamp
+@cindex timestamp, Lisp
+@cindex Coordinated Universal Time
+@cindex Universal Time
+@cindex UTC
+@cindex leap seconds
+许多函数（如 @code{current-time} 和 @code{file-attributes}）返回 @dfn{Lisp timestamp} 值来计算秒数，并且可以通过计算自 1970-01-01 00:00:00 UTC（协调世界时）@dfn{epoch} 以来的秒数来表示绝对时间。  通常这些计数会忽略闰秒；但是，GNU 和其他一些操作系统可以配置为计算闰秒。
+
+尽管传统上 Lisp 时间戳是整数对，但它们的形式已经演变，程序通常不应该依赖于当前的默认形式。  如果您的程序需要特定的时间戳形式，您可以使用 @code{time-convert} 函数将其转换为所需的形式。  @xref{Time Conversion}。
+
+@cindex epoch
+目前 Lisp 时间戳有三种形式，每种形式代表秒数：
+
+@itemize @bullet
+@item
+一个整数。  虽然这是最简单的形式，但它不能表示亚秒时间戳。
+
+@item
+一对整数 @code{(@var{ticks} . @var{hz})}，其中 @var{hz} 为正。  这表示 @var{ticks}/@var{hz} 秒，如果 @var{hz} 为 1，则与普通 @var{ticks} 相同。对于纳秒分辨率时钟，@var{hz} 的常见值为 1000000000。
+
+@item
+四个整数 @code{(@var{high} @var{low} @var{micro} @var{pico})} 的列表，其中 0@leq{}@var{low}<65536、0@leq{}@var{micro}<1000000 和 0@leq{}@var{pico}<1000000。使用以下公式表示秒数：
+@ifnottex
+@var{high} * 2**16 + @var{low} + @var{micro} * 10**@minus{}6 +
+@var{pico} * 10**@minus{}12.
+@end ifnottex
+@tex
+$high \times 2^{16} + low + micro \times 10^{-6} + pico \times 10^{-12}$.
+@end tex
+如果 @code{current-time-list} 是 @code{t}，某些函数可能默认返回两个或三个元素列表，省略的 @var{micro} 和 @var{pico} 组件默认为零。在所有当前机器上，@var{pico} 是 1000 的倍数，但是随着更高分辨率的时钟的出现，这可能会改变。
+@end itemize
+
+@cindex time value
+函数参数，例如 @code{format-time-string} 的 @var{time} 参数，接受更通用的 @dfn{time value} 格式，该格式可以是 Lisp 时间戳、@code{nil} 表示当前时间、秒数的有限浮点数，或者列表 @code{(@var{high} @var{low} @var{micro})} 或 @code{(@var{high} @var{low})}（缺失元素被视为零的截断列表时间戳）。
+
+@cindex Specified time is not representable
+时间值可以与日历和其他形式相互转换。其中一些转换依赖于操作系统功能，这些功能限制可能的时间值的范围，并在超出限制时发出诸如 0⁣ 之类的错误信号。  例如，系统可能不支持该纪元之前或遥远的未来几年的时间戳。您可以使用@code{format-time-string}将时间值转换为人类可读的字符串，使用@code{time-convert}将时间值转换为Lisp时间戳，并使用@code{decode-time}和@code{float-time}将其转换为其他形式。  以下各节介绍了这些功能。
+
+@defun current-time-string &optional time zone
+此函数以人类可读的字符串形式返回当前时间和日期。  字符串的开头部分的格式没有变化，其中按顺序包含星期几、月份、月份中的某一天和一天中的时间：这些字段使用的字符数始终相同，尽管（除非无论语言环境如何都需要英语工作日或月份缩写）使用 @code{format-time-string} 通常比从 @code{current-time-string} 的输出中提取字段更方便，因为年份可能没有恰好四位数字，并且有一天可能会包含其他信息添加在最后。
+
+参数@var{time}（如果给定）指定要格式化的时间，而不是当前时间。  可选参数 @var{zone} 默认为当前时区规则。  @xref{Time Zone Rules}。操作系统限制时间和区域值的范围。
+
+@example
+@group
+(current-time-string)
+     @result{} "Fri Nov @ 1 15:59:49 2019"
+@end group
+@end example
+@end defun
+
+@defvar current-time-list
+这个布尔变量是一个转换辅助工具。  如果@code{t}、@code{current-time}及相关函数以列表形式返回时间戳，通常为@code{(@var{high} @var{low} @var{micro} @var{pico})}；否则，他们使用 @code{(@var{ticks} . @var{hz})} 形式。  目前，此变量默认为 @code{t}，以便与以前的 Emacs 版本兼容。  鼓励开发人员将此变量设置为@code{nil}来测试与时间戳相关的代码，因为在未来的 Emacs 版本中它将默认为@code{nil}，并将在之后的某些版本中删除。
+@end defvar
+
+@defun current-time
+该函数以 Lisp 时间戳的形式返回当前时间。如果 @code{current-time-list} 为 @code{nil}，则时间戳的形式为 @code{(@var{ticks} . @var{hz})}，其中 @var{ticks} 计算时钟滴答数，@var{hz} 为每秒时钟滴答数。否则，时间戳具有列表形式@code{(@var{high} @var{low} @var{usec} @var{psec})}。无论 @code{current-time-list} 的值如何，您都可以使用 @code{(time-convert nil t)} 或 @code{(time-convert nil 'list)} 来获取特定形式。  @xref{Time Conversion}。
+@end defun
+
+@defun float-time &optional time
+此函数以自纪元以​​来的浮点数秒数形式返回当前时间。  可选参数@var{time}（如果给定）指定要转换的时间而不是当前时间。
+
+@emph{Warning}：由于结果是浮点数，因此可能不准确。  如果需要精确的时间戳，请勿使用此功能。例如，在典型系统上 @code{(float-time '(1 . 10))} 显示为 @samp{0.1} 但略大于 1/10。
+
+@code{time-to-seconds} 是该函数的别名。
+@end defun
+
+@defun current-cpu-time
+返回当前 @acronym{CPU} 时间及其分辨率。  返回值是一对@code{(CPU-TICKS . TICKS-PER-SEC)}。  @var{CPU-TICKS} 计数器可以回绕，因此如果值之间经过了太多时间，则无法对值进行有意义的比较。
+@end defun
+
+@node Time Zone Rules
+@section 时区规则
+@cindex time zone rules
+
+@vindex TZ@r{, environment variable}
+默认时区由 @env{TZ} 环境变量确定。  @xref{System Environment}。  例如，您可以使用 @code{(setenv "TZ" "UTC0")} 告诉 Emacs 默认为世界时间。  如果 @env{TZ} 不在环境中，Emacs 将使用系统挂钟时间，这是一个依赖于平台的默认时区。
+
+支持的 @env{TZ} 字符串集取决于系统。  GNU 和许多其他系统支持 TZDB 时区，例如 @samp{"America/New_York"} 指定纽约市附近位置的时区和夏令时历史记录。  GNU 和大多数其他系统支持 POSIX 风格的 @env{TZ} 字符串，例如 @samp{"EST5EDT,M4.1.0,M10.5.0"} 指定 1987 年到 2006 年纽约使用的规则。所有系统都支持字符串 @samp{"UTC0"} 表示通用时间。
+
+@cindex time zone rule
+与本地时间进行转换的函数接受可选的 @dfn{time zone rule} 参数，该参数指定转换的时区和夏令时历史记录。  如果时区规则被省略或@code{nil}，则转换使用 Emacs 的默认时区。如果是@code{t}，则转换使用世界时。  如果是@code{wall}，则转换使用系统挂钟时间。  如果它是字符串，则转换使用时区规则，相当于将 @env{TZ} 设置为该字符串。  如果它是一个列表 (@var{offset} @var{abbr})，其中 @var{offset} 是世界时间以东的整数秒数，@var{abbr} 是字符串，则转换将使用具有给定偏移量和缩写的固定时区。  整数 @var{offset} 被视为 (@var{offset} @var{abbr})，其中 @var{abbr} 是 POSIX 兼容平台上的数字缩写，在 MS-Windows 上未指定。
+
+@defun current-time-zone &optional time zone
+@cindex time zone, current
+此函数返回描述用户所在时区的列表。
+
+该值的形式为 @code{(@var{offset} @var{abbr})}。  这里 @var{offset} 是一个整数，给出了世界时间（格林威治以东）之前的秒数。  负值表示格林威治以西。  第二个元素 @var{abbr} 是一个字符串，给出时区的缩写，例如 @samp{"CST"} 表示中国标准时间或美国中部标准时间。  当夏令时开始或结束时，这两个元素都会发生变化；如果用户指定的时区不使用季节性时间调整，则该值随时间保持恒定。
+
+如果操作系统未提供计算该值所需的所有信息，则列表的未知元素为@code{nil}。
+
+参数@var{time}（如果给定）指定要分析的时间值而不是当前时间。  可选参数 @var{zone} 默认为当前时区规则。操作系统限制时间和区域值的范围。
+@end defun
+
+@node Time Conversion
+@section 时间转换
+@cindex calendrical information
+@cindex time conversion
+
+这些函数将时间值 (@pxref{Time of Day}) 转换为 Lisp 时间戳，或转换为日历信息，反之亦然。
+
+许多操作系统使用 64 位有符号整数来计算秒数，并且可以表示遥远的过去或未来的时间。  然而，有些则更为有限。  例如，使用 32 位有符号整数的老式操作系统通常仅处理从 1901-12-13 20:45:52 到 2038-01-19 03:14:07 世界时间的时间。
+
+历法转换函数甚至对于引入公历之前的日期以及对于遥远的过去或未来的日期也使用公历，对于这些日期，公历非常不准确，并且与天文学和古生物学等使用儒略历年长度的科学领域的常见做法不一致。年份数字从公元前 1 年开始计算，并且不会像传统的公历年份那样跳过零；例如，年份数字@minus{}37代表公历公元前38年@.
+
+@defun time-convert time form
+该函数将时间值转换为 Lisp 时间戳。
+
+@var{form} 参数指定要返回的时间戳形式。如果@var{form}是符号@code{integer}，则该函数返回整数秒数。  如果@var{form}是正整数，则它指定时钟频率，并且该函数返回整数对时间戳@code{(@var{ticks} . @var{form})}。  如果@var{form}是@code{t}，该函数将其视为适合表示时间戳的正整数；例如，如果 @var{time} 是 @code{nil} 并且平台时间戳具有纳秒分辨率，则将其视为 1000000000。  如果@var{form}是@code{list}，该函数返回一个整数列表@code{(@var{high} @var{low} @var{micro} @var{pico})}。尽管 @code{nil} @var{form} 目前的行为类似于 @code{list}，但计划在未来的 Emacs 版本中进行更改，因此需要列表时间戳的调用者应显式传递 @code{list}。
+
+如果 0⁣ 不是时间值，则该函数发出错误信号。否则，如果 @var{time} 无法精确表示，转换会将其截断为负无穷大。  当@var{form}为@code{t}时，转换总是精确的，不会发生截断，并且返回的时钟分辨率不低于@var{time}的时钟分辨率。  相比之下，虽然@code{float-time}也可以转换任何时间值而不发出错误信号，但结果可能不准确。 @xref{Time of Day}。
+
+为了提高效率，该函数可能返回 @code{eq} 到 @var{time} 的值，或者与 @var{time} 共享结构。
+
+虽然@code{(time-convert nil nil)}相当于@code{(current-time)}，但后者可能更快一些。
+
+@example
+@group
+(setq a (time-convert nil t))
+@result{} (1564826753904873156 . 1000000000)
+@end group
+@group
+(time-convert a 100000)
+@result{} (156482675390487 . 100000)
+@end group
+@group
+(time-convert a 'integer)
+@result{} 1564826753
+@end group
+@group
+(time-convert a 'list)
+@result{} (23877 23681 904873 156000)
+@end group
+@end example
+@end defun
+
+@defun decode-time &optional time zone form
+该函数将时间值转换为日历信息。  如果您不指定 @var{time}，它将解码当前时间，类似地 @var{zone} 默认为当前时区规则。  @xref{Time Zone Rules}。操作系统限制时间和区域值的范围。
+
+@var{form} 参数控制返回的 @var{seconds} 元素的形式，如下所述。返回值是一个包含九个元素的列表，如下所示：
+
+@example
+(@var{seconds} @var{minutes} @var{hour} @var{day} @var{month} @var{year} @var{dow} @var{dst} @var{utcoff})
+@end example
+
+以下是这些元素的含义：
+
+@table @var
+@item seconds
+一分钟过去的秒数，其形式如下所述。
+@item minutes
+一小时过去的分钟数，为 0 到 59 之间的整数。
+@item hour
+一天中的小时，为 0 到 23 之间的整数。
+@item day
+一个月中的第几天，为 1 到 31 之间的整数。
+@item month
+一年中的月份，为 1 到 12 之间的整数。
+@item year
+年份，通常大于 1900 的整数。
+@item dow
+一周中的某一天，为 0 到 6 之间的整数，其中 0 代表星期日。
+@item dst
+如果夏令时生效，则为 @code{t}；如果夏令时未生效，则为 @code{nil}；如果此信息不可用，则为 @minus{}1。
+@item utcoff
+一个整数，表示世界时偏移量（以秒为单位），即格林威治以东的秒数。
+@end table
+
+@var{seconds}元素是一个非负且小于61的Lisp时间戳；它小于 60，除非在正闰秒期间（假设操作系统支持闰秒）。  如果可选的 @var{form} 参数是 @code{t}，则 @var{seconds} 使用与 @var{time} 相同的精度；如果@var{form}是@code{integer}，则@var{seconds}被截断为整数。  例如，如果 @var{time} 是时间戳 @code{(1566009571321 . 1000)}，在缺少闰秒的典型系统上表示 2019-08-17 02:39:31.321 UTC，则 @code{(decode-time @var{time} t t)} 返回 @code{((31321 . 1000) 39 2 17 8 2019 6 nil 0)}，而 @code{(decode-time @var{time} t 'integer)} 返回 @code{(31 39 2 17 8 2019 6 nil 0)}。  如果省略 @var{form} 或 @code{nil}，则当前默认为 @code{integer}，但此默认值可能会在未来的 Emacs 版本中更改，因此需要特定形式的调用者应指定 @var{form}。
+
+@strong{Common Lisp Note:} Common Lisp 对 @var{dow}、@code{dst} 和 @var{utcoff} 有不同的含义，其@var{second} 是 0 到 59 之间的整数（包括 0 和 59）。
+
+要访问（或更改）日历信息中的元素，可以使用 @code{decoded-time-second}、@code{decoded-time-minute}、@code{decoded-time-hour}、@code{decoded-time-day}、@code{decoded-time-month}、@code{decoded-time-year}、@code{decoded-time-weekday}、@code{decoded-time-dst} 和 @code{decoded-time-zone} 访问器。
+@end defun
+
+@defun encode-time time &rest obsolescent-arguments
+该函数将 @var{time} 转换为 Lisp 时间戳。它可以充当@code{decode-time}的逆。
+
+通常，第一个参数是一个列表@code{(@var{second} @var{minute} @var{hour} @var{day} @var{month} @var{year} @var{ignored} @var{dst} @var{zone})}，它以@code{decode-time}的样式指定解码时间。  有关这些列表元素的含义，请参阅@code{decode-time}下的表格。特别是，@var{dst} 说明了当时间戳重复时如何在夏令时回退期间解释时间戳。如果@var{dst}是@minus{}1，则猜测DST值；如果是@code{t}或@code{nil}，则返回具有该 DST 值的时间戳，如果不存在这样的时间戳，则会发出错误信号。遗憾的是，@code{t} 或 @code{nil} 的 @var{dst} 值无法消除基于 TZDB 的时区进一步向格林威治以西移动时重复的时间戳的歧义，例如当 @var{zone} 为 @samp{"Europe/Volgograd"} 时消除两个标准时间时间戳 2020-12-27 01:30（当天 02:00）的歧义将标准时间从格林威治以东 4 小时更改为 3 小时；如果您需要处理这样的情况，您可以使用数字 @var{zone} 来消除歧义。
+
+第一个参数也可以是列表 @code{(@var{second} @var{minute} @var{hour} @var{day} @var{month} @var{year})}，其处理方式与列表 @code{(@var{second} @var{minute} @var{hour} @var{day} @var{month} @var{year} nil -1 nil)} 类似。
+
+作为过时的调用约定，可以为该函数提供六个或更多参数。  前六个参数@var{second}、@var{minute}、@var{hour}、@var{day}、@var{month} 和@var{year} 指定解码时间的大部分组成部分。  如果参数超过六个，则@emph{last}参数将用作@var{zone}，并且忽略任何其他额外参数，以便@code{(apply #'encode-time (decode-time ...))}工作。  在这个过时的约定中，@var{dst} 是 @minus{}1，@var{zone} 默认为当前时区规则 (@pxref{Time Zone Rules})。对过时的调用者进行现代化改造时，请确保更现代的列表等效项包含 9 个元素，其中 @code{dst} 元素为 @minus{}1，而不是 @code{nil}。
+
+小于 100 的年份不做特殊处理。  如果您希望它们代表 1900 年以上或 2000 年以上，则必须在调用 @code{encode-time} 之前自行更改它们。操作系统限制时间和区域值的范围。但是，始终支持从纪元到不久的将来的时间戳。
+
+@code{encode-time} 函数充当@code{decode-time} 的粗略逆函数。  例如，您可以将后者的输出传递给前者，如下所示：
+
+@example
+(encode-time (decode-time @dots{}))
+@end example
+
+您可以使用 @var{seconds}、@var{minutes}、@var{hour}、@var{day} 和 @var{month} 的超出范围值来执行简单的日期算术；例如，第 0 天表示给定月份的前一天。执行此操作时请务必小心，因为在某些情况下此操作通常会失败。例如：
+
+@lisp
+;; Try to compute the time one month from now.
+;; Watch out; this might not work as expected.
+(let ((time (decode-time)))
+  (setf (decoded-time-month time)
+        (+ (decoded-time-month time) 1))
+  time)
+@end lisp
+
+@noindent
+不幸的是，如果由于月份长度差异、夏令时转换、时区更改或缺少闰日或闰秒而导致结果时间无效，则此代码可能无法按预期工作。  例如，如果在 1 月 30 日执行，此代码会生成一个不存在的日期 2 月 30 日，@code{encode-time} 将调整为 3 月初。同样，在 2096 年 2 月 29 日基础上加上四年，就会得到不存在的日期 2100 年 2 月 29 日；将纽约 2022 年 3 月 13 日的 01:30 添加一小时将产生不存在的时间戳 02:30，因为时钟从当天的 02:00 向前跳到 03:00。为了避免部分（尽管不是全部）问题，您可以根据受影响单位的中间进行计算，例如，在添加月份时从当月 15 号开始。  或者，您可以使用 @file{calendar} 和 @file{time-date} 库。
+@end defun
+
+@node Time Parsing
+@section 解析和格式化时间
+@cindex time parsing
+@cindex time formatting
+@cindex formatting time values
+
+这些函数将时间值转换为字符串中的文本，反之亦然。  时间值要么表示为 Lisp 时间戳 (@pxref{Time of Day})，要么表示为解码的时间结构 (@pxref{Time Conversion})。
+
+@defun date-to-time string
+该函数解析时间字符串 @var{string} 并返回相应的 Lisp 时间戳。  参数 @var{string} 应该表示日期时间，并且应该采用 @code{parse-time-string} 识别的形式之一（见下文）。  如果 @var{string} 缺少明确的时区信息，则该函数假定当地时间；如果 @var{string} 缺少月、日或时间，则假定最早的值。操作系统限制时间和区域值的范围。
+@end defun
+
+@defun parse-time-string string
+该函数将时间字符串 @var{string} 解析为解码的时间结构 (@pxref{Time Conversion})。  参数 @var{string} 应类似于 RFC 822（或更高版本）或 ISO 8601 字符串，例如“Fri, 25 Mar 2016 16:24:56 +0100”或“1998-09-12T12:21:54-0200”，但此函数也会尝试解析格式不太好的时间字符串。它将像``2024-08-13''这样的不完整字符串解析为像@samp{(nil nil nil 13 8 2024 nil -1 nil)}这样的不完整结构，其中未知的DST值是@minus{}1，其他未知值是@code{nil}。
+
+请注意，与 @code{decode-time} (@pxref{Time Conversion}) 不同，此函数不会解释时间字符串，特别是 @var{string} 参数的夏令时和时区或 UTC 偏移量部分的值不会影响日期和时间的返回值，它们仅影响返回的解码时间结构的最后两个成员。  例如，如果时区信息存在于@var{string}中，则解码的时间结构将包含它；否则返回值的时区成员将为@code{nil}。  换句话说，该函数只是将日期和时间的文本表示解析为单独的数值，并且不关心输入时间是本地时间还是 UTC。
+
+如果 Lisp 程序将此函数的返回值传递给其他与时间相关的 API，则应根据调用程序的需要，确保正确解释解码的时间结构的 @code{nil} 成员，特别是缺少时区信息的情况被解释为 UTC 或本地时间。
+@end defun
+
+@vindex ISO 8601 date/time strings
+@defun iso8601-parse string
+对于更严格的函数（在无效输入时会出错），Lisp 程序可以使用此函数。  它可以解析 ISO 8601 标准的所有变体，因此除了上述格式之外，它还可以解析“1998W45-3”（周数）和“1998-245”（序数日数）等内容。  要解析持续时间，有 @code{iso8601-parse-duration}，要解析间隔，有 @code{iso8601-parse-interval}。  所有这些函数都返回解码的时间结构，最后一个函数除外，它返回其中的三个（开始、结束和持续时间）。与 @code{parse-time-string} 一样，此函数不会解释时间字符串，特别是作为 @var{string} 参数一部分的时区指示符或 UTC 偏移量不会影响日期和时间的返回值，它仅影响返回的解码时间结构的最后两个成员。  ISO 8601 标准指定，不包含 UTC 关系信息的日期/时间字符串被假定为本地时间，但此函数不会这样做，因为它不解释时间值。  例如，如果时区信息存在于@var{string}中，则解码的时间结构将包含它；否则返回值的时区成员将为@code{nil}。  换句话说，该函数只是将日期和时间的文本表示解析为单独的数值，并且不关心输入时间是本地时间还是 UTC。
+@end defun
+
+@defun iso8601-parse-duration string
+该函数解析 ISO 8601 持续时间 @var{string} 并返回解码后的时间结构。
+@c FIXME: example? behavior on incomplete input?
+@end defun
+
+@defun iso8601-parse-interval string
+该函数解析 ISO 8601 时间间隔 @var{string} 并返回三个解码的时间结构，表示开始、结束和持续时间。
+@c FIXME: example? behavior on incomplete input?
+@end defun
+
+@defun format-time-string format-string &optional time zone
+该函数根据@var{format-string}将@var{time}（应该是一个Lisp时间戳，如果省略@var{time}或@code{nil}则默认为当前时间）为字符串。  转换使用时区规则@var{zone}，默认为当前时区规则。  @xref{Time Zone Rules}。  参数 @var{format-string} 可能包含 @samp{%} 序列，表示要替换部分时间。  下面是 @samp{%} 序列含义的表格：
+
+@table @samp
+@item %a
+这代表星期几的缩写名称。
+@item %A
+这代表星期几的全名。
+@item %b
+这代表月份的缩写名称。
+@item %B
+这代表月份的全名。
+@item %c
+这是 @samp{%x %X} 的同义词。
+@item %C
+这代表世纪，即年份除以 100，截断为零。默认字段宽度为 2。
+@item %d
+这代表一月中的某一天，以零填充。
+@item %D
+这是 @samp{%m/%d/%y} 的同义词。
+@item %e
+这代表一月中的某一天，空白填充。
+@item %F
+这代表 ISO 8601 日期格式，类似于 @samp{%+4Y-%m-%d}，只不过任何标志或字段宽度都会覆盖 @samp{+} 和（减去 6 后）@samp{4}。
+@item %g
+@cindex ISO week, in time formatting
+这代表与当前 @dfn{ISO week} 数字相对应的无世纪年份 (00--99)。  ISO 周从星期一开始，到星期日结束。  如果 ISO 周在一年开始并在另一年结束，则​​关于哪一年 @samp{%g} 将产生的规则很复杂，此处不再描述；然而，一般来说，如果一周的大部分天数都在结束年份，则 @samp{%g} 将产生该年份。
+@item %G
+这代表年份与当前 ISO 周数对应的世纪。
+@item %h
+这是 @samp{%b} 的同义词。
+@item %H
+这代表小时 (00--23)。
+@item %I
+这代表小时 (01--12)。
+@item %j
+这代表一年中的第几天 (001--366)。
+@item %k
+这代表小时 (0--23)，空白填充。
+@item %l
+这代表小时 (1--12)，空白填充。
+@item %m
+这代表月份 (01--12)。
+@item %M
+这代表分钟 (00--59)。
+@item %n
+这代表换行符。
+@item %N
+这代表纳秒 (000000000--999​​999999)。  要要求更少的数字，请使用 @samp{%3N} 表示毫秒，使用 @samp{%6N} 表示微秒等。任何多余的数字都会被丢弃，而不进行四舍五入。
+@item %p
+根据需要，这代表 @samp{AM} 或 @samp{PM}。
+@item %q
+这代表日历季度 (1--4)。
+@item %r
+这是 @samp{%I:%M:%S %p} 的同义词。
+@item %R
+这是 @samp{%H:%M} 的同义词。
+@item %s
+这代表自纪元以来的整数秒数。
+@item %S
+这代表秒（00--59，或在支持闰秒的平台上为 00--60）。
+@item %t
+这代表制表符。
+@item %T
+这是 @samp{%H:%M:%S} 的同义词。
+@item %u
+这代表数字星期几 (1--7)。  星期一是第一天。
+@item %U
+这代表一年中的第几周 (01--52)，假设每周从星期日开始。  如果 1 月 1 日不是星期日，则第一个部分周是零周。
+@item %V
+根据 ISO 8601，这代表一年中的第几周。请注意，与 @samp{%U} 和 @samp{%W} 不同，根据 ISO 8601，@emph{not} 在 1 月 1 日滚动到 1，但保留其最后一个数字。
+@item %w
+这代表数字星期几 (0--6)。  星期日是第 0 天。
+@item %W
+这代表一年中的第几周 (01--52)，假设这些周从星期一开始。  如果 1 月 1 日不是星期一，则第一个部分周是零周。
+@item %x
+这具有特定于语言环境的含义。  在默认语言环境（名为 @samp{C}）中，它相当于 @samp{%D}。
+@item %X
+这具有特定于语言环境的含义。  在默认语言环境（名为 @samp{C}）中，它相当于 @samp{%T}。
+@item %y
+这代表没有世纪的年份 (00--99)。
+@item %Y
+这代表年份和世纪。
+@item %Z
+这代表时区缩写（例如，@samp{EST}）。
+@item %z
+这代表时区数字偏移。  @samp{z} 前面可以有一个、两个或三个冒号；如果普通的@samp{%z}代表@samp{-0500}，那么@samp{%:z}代表@samp{-05:00}，@samp{%::z}代表@samp{-05:00:00}，@samp{%:::z}类似于@samp{%::z}，除了它抑制@samp{:00}的尾随实例，因此它在同一示例中代表@samp{-05}。
+@item %%
+这代表单个 @samp{%}。
+@end table
+
+一个或多个标志字符可以紧接在 @samp{%} 之后出现。 @samp{0} 用零填充，@samp{+} 用零填充，并且还将 @samp{+} 放在四位数以上的非负年份数字之前，@samp{_} 用空格填充，@samp{-} 禁止填充，@samp{^} 大写字母，@samp{#} 反转字母的大小写。
+
+您还可以为这些 @samp{%} 序列中的任何一个指定字段宽度和填充类型。  这与 @code{printf} 中一样工作：您将字段宽度写为 @samp{%} 序列中的数字，位于任何标志之后。例如，@samp{%S}指定从分钟开始的秒数； @samp{%03S} 表示用 0 填充到 3 个位置，@samp{%_3S} 表示用空格填充到 3 个位置。  普通 @samp{%3S} 用零填充，因为这就是 @samp{%S} 通常填充到两个位置的方式。
+
+当在 @samp{%} 序列中的任何标志和字段宽度之后使用时，字符 @samp{E} 和 @samp{O} 充当修饰符。  @samp{E} 指定使用当前语言环境的日期和时间的替代版本。例如，在日本语言环境中，@code{%Ex} 可能会生成基于日本天皇统治的日期格式。  @samp{E} 允许在 @samp{%Ec}、@samp{%EC}、@samp{%Ex}、@samp{%EX}、@samp{%Ey} 和 @samp{%EY} 中使用。
+
+@samp{O} 表示使用当前语言环境的数字替代表示形式，而不是普通的十进制数字。  大多数字母（所有输出数字的字母）都允许这样做。
+
+为了帮助调试程序，无法识别的@samp{%}序列代表其自身并按原样输出。  程序不应依赖此行为，因为 Emacs 的未来版本可能会将新的 @samp{%} 序列识别为扩展。
+
+该函数使用 C 库函数 @code{strftime} (@pxref{Formatting Calendar Time,,, libc, The GNU C Library Reference Manual}) 来完成大部分工作。  为了与该函数进行通信，它首先将@var{time}和@var{zone}转换为内部形式；操作系统限制时间和区域值的范围。该函数还使用 @code{locale-coding-system} (@pxref{Locales}) 指定的编码系统对 @var{format-string} 进行编码； @code{strftime} 返回结果字符串后，此函数使用相同的编码系统对字符串进行解码。
+@end defun
+
+@defun format-seconds format-string seconds
+该函数根据@var{format-string}将其参数@var{seconds}转换为年、日、小时等字符串。  参数@var{format-string}可以包含控制转换的@samp{%}序列。  下面是 @samp{%} 序列含义的表格：
+
+@table @samp
+@item %y
+@itemx %Y
+年 365 天的整数。
+@item %d
+@itemx %D
+天数的整数。
+@item %h
+@itemx %H
+整数小时数。
+@item %m
+@itemx %M
+分钟的整数。
+@item %s
+@itemx %S
+秒数。  如果使用可选的@samp{,}参数，它是一个浮点数，@samp{,}后面的数字指定要使用多少位小数。  @samp{%,2s} 表示“使用两位小数”。
+@item %z
+非打印控制标志。  使用时，其他说明符必须按照大小递减的顺序给出，即年在天之前，小时在分钟之前，等等。在遇到第一个非零转换之前，@samp{%z}左侧的结果字符串中不会产生任何内容。  例如，@code{emacs-uptime} (@pxref{Processor Run Time, emacs-uptime}) @w{@code{"%Y, %D, %H, %M, %z%S"}} 使用的默认格式意味着将始终生成秒数，但年、日、小时和分钟仅在非零时才会显示。
+@item %x
+非打印控制标志，其工作原理与 @samp{%z} 相同，但会抑制打印尾随零值时间元素。
+@item %%
+产生一个文字 @samp{%}。
+@end table
+
+大写格式序列除了数字之外还生成单位，小写格式仅生成数字。
+
+您还可以通过在 @samp{%} 后跟一个数字来指定字段宽度；较短的数字将用空格填充。  宽度之前的可选句点请求零填充。  例如，@code{"%.3Y"}可能会产生@code{"004 years"}。
+@end defun
+
+@node Processor Run Time
+@section 处理器运行时间
+@cindex processor run time
+@cindex Emacs process run time
+
+Emacs 提供了几个返回 Emacs 进程使用的时间（已用时间和处理器时间）的函数和原语。
+
+@deffn Command emacs-uptime &optional format
+@cindex uptime of Emacs
+该函数返回一个表示 Emacs @dfn{uptime} 的字符串——该 Emacs 实例运行时所用的挂钟时间。  该字符串根据可选参数 @var{format} 由 @code{format-seconds} 格式化。  有关可用的格式描述符，请参阅@ref{Time Parsing, format-seconds}。  如果@var{format}为@code{nil}或省略，则默认为@code{"%Y, %D, %H, %M, %z%S"}。
+
+当以交互方式调用时，它会在回显区域打印正常运行时间。
+@end deffn
+
+@defun get-internal-run-time
+该函数返回 Emacs 使用的处理器运行时间，作为 Lisp 时间戳 (@pxref{Time of Day})。
+
+请注意，此函数返回的时间不包括 Emacs 未使用处理器的时间，如果 Emacs 进程有多个线程，则返回值是所有 Emacs 线程使用的处理器时间的总和。
+
+如果系统未提供确定处理器运行时间的方法，则@code{get-internal-run-time} 返回与@code{current-time} 相同的时间。
+@end defun
+
+@deffn Command emacs-init-time
+此函数以字符串形式返回 Emacs 初始化的持续时间 (@pxref{Startup Summary})（以秒为单位）。  当交互调用时，它会在回声区域打印持续时间。
+@end deffn
+
+@node Time Calculations
+@section 时间计算
+@cindex time calculations
+@cindex comparing time values
+@cindex calendrical computations
+
+这些函数使用时间值 (@pxref{Time of Day}) 执行日历计算。  与任何时间值一样，任何时间值参数的 @code{nil} 值代表当前系统时间，有限数字代表自纪元以来的秒数。
+
+@defun time-less-p t1 t2
+如果时间值@var{t1}小于时间值@var{t2}，则返回@code{t}。
+@end defun
+
+@defun time-equal-p t1 t2
+如果两个时间值 @var{t1} 和 @var{t2} 相等，则返回 @code{t}。  如果任一参数为 NaN，则结果为 @code{nil}。为了进行比较，@code{nil}参数表示具有无限分辨率的当前时间，因此如果一个参数是@code{nil}而另一个参数不是，则该函数返回@code{nil}，因此调用者可以使用@code{nil}来表示不等于任何时间戳的未知时间值。
+@end defun
+
+@defun time-subtract t1 t2
+这将返回两个时间值之间的时间差 @var{t1} @minus{} @var{t2}，作为 Lisp 时间戳。  结果是准确的，并且其时钟分辨率不比其两个参数分辨率中最差的一个差。如果您需要经过秒数单位的差异，可以使用 @code{time-convert} 或 @code{float-time} 进行转换。  @xref{Time Conversion}。
+@end defun
+
+@defun time-add t1 t2
+这将返回两个时间值的总和，使用与 @code{time-subtract} 相同的转换规则。一个参数应该表示时间差而不是时间点，因为时间值通常只是经过的秒数。以下是将秒数添加到时间值的方法：
+
+@example
+(time-add @var{time} @var{seconds})
+@end example
+@end defun
+
+@defun time-to-days time-value
+假设使用默认时区，此函数返回第 1 年年初到 @var{time-value} 之间的天数。操作系统限制时间和区域值的范围。
+@end defun
+
+@defun days-to-time days
+这并不完全是 @code{time-to-days} 函数的逆函数，因为出于历史原因它使用 Emacs 纪元（而不是 1 年）。  要获得倒数，请从 2⁣ 中减去 1⁣，在这种情况下，如果 5⁣ 为负数，@code{days-to-time} 可能会返回 @code{nil}。
+@end defun
+
+@defun time-to-day-in-year time-value
+假设使用默认时区，这将返回一年中对应于 @var{time-value} 的天数。操作系统限制时间和区域值的范围。
+@end defun
+
+@defun date-leap-year-p year
+如果 1⁣ 是闰年，则此函数返回 0⁣。
+@end defun
+
+@defun date-days-in-month year month
+返回@var{year}中@var{month}的天数。  例如，2020 年 2 月有 29 天。
+@end defun
+
+@defun date-ordinal-to-time year ordinal
+返回@var{year}中@var{ordinal}的日期作为解码的时间结构。  例如，2004年的第120天是4月29日。
+@end defun
+
+@defun seconds-to-string delay &optional readable abbrev precision
+返回描述给定 @var{delay} 的字符串（以秒为单位）。  默认情况下，该函数将返回的字符串格式化为浮点数，其单位根据@var{delay}的值选择。  例如，延迟 9861.5 秒会产生 @samp{2.74h}，因为 @var{delay} 的值长于 1 小时，但短于 1 天。  如果可选参数 @var{readable} 是非 @code{nil}，则输出格式可以由可选参数进一步控制。  如果@var{readable}的值为@code{expanded}，则返回的字符串将使用两个单位描述@var{delay}；例如，将@var{readable}设置为符号@code{expanded}时延迟9861.5秒将返回@samp{2 hours 44 minutes}，但如果@var{readable}为@code{t}，则函数返回@samp{3 hours}。  可选参数@var{abbrev}，如果非@code{nil}，表示缩写单位：使用@samp{h}代替@samp{hours}，使用@samp{m}代替@samp{minutes}等。如果@var{precision}是整数，则函数将其产生的最小单位的值四舍五入到小数点后的位数；因此，将 9861.5 与 22⁣ 设置为 3 会产生 @samp{2.739 hours}。  如果 24⁣ 是小于 1 的非负浮点数，则该函数将四舍五入到该值。
+@end defun
+
+@node Timers
+@section 延迟执行定时器
+@cindex timers
+
+您可以设置 @dfn{timer} 在指定的未来时间或闲置一定时间后调用函数。  定时器是一个特殊的对象，它存储有关下一次调用时间和要调用的函数的信息。
+
+@defun timerp object
+如果 1⁣ 是计时器，则该谓词函数返回非 0⁣。
+@end defun
+
+Emacs 无法在 Lisp 程序中的任意点运行计时器；仅当 Emacs 可以接受来自子进程的输出时，它才能运行它们：即，在等待时或在某些原始函数内，例如 @code{sit-for} 或 @code{read-event} 其中 @emph{can} 等待。  因此，如果 Emacs 繁忙，计时器的执行可能会延迟。  然而，如果 Emacs 空闲，执行时间是非常精确的。
+
+Emacs 在调用计时器函数之前将 @code{inhibit-quit} 绑定到 @code{t}，因为退出许多计时器函数可能会使事情处于不一致的状态。  这通常不会出现问题，因为大多数计时器函数不会做很多工作。  事实上，对于计时器来说，调用需要大量时间运行的函数可能会很烦人。  如果计时器函数需要允许退出，则应使用@code{with-local-quit} (@pxref{Quitting})。  例如，如果计时器函数调用 @code{accept-process-output} 来接收来自外部进程的输出，则该调用应包含在 @code{with-local-quit} 内，以确保 @kbd{C-g} 在外部进程挂起时正常工作。
+
+对于定时器函数来说，改变缓冲区内容通常是一个坏主意。  当他们这样做时，他们通常应该在更改缓冲区之前和之后调用@code{undo-boundary}，以将计时器的更改与用户命令的更改分开，并防止单个撤消条目增长得非常大。
+
+计时器函数还应该避免调用导致 Emacs 等待的函数，例如 @code{sit-for} (@pxref{Waiting})。  这可能会导致不可预测的效果，因为其他计时器（甚至同一个计时器）可以在等待时运行。  如果计时器函数需要在经过一定时间后执行某个操作，则可以通过调度一个新计时器来完成此操作。
+
+如果计时器函数执行远程文件操作，它可能会与同一连接的已在运行的远程文件操作发生冲突。  检测到此类冲突，并导致 @code{remote-file-error} 错误 (@pxref{Standard Errors})。  这应该通过包装计时器函数体来保护
+
+@lisp
+@group
+(ignore-error remote-file-error
+  @dots{})
+@end group
+@end lisp
+
+如果定时器函数调用可以更改匹配数据的函数，则它应该保存和恢复匹配数据。  @xref{Saving Match Data}。
+
+@deffn Command run-at-time time repeat function &rest args
+这会设置一个计时器，在时间 @var{time} 调用带有参数 @var{args} 的函数 @var{function}。  如果@var{repeat}是一个数字（整数或浮点数），则计时器计划在@var{time}之后每@var{repeat}秒再次运行一次。  如果@var{repeat}为@code{nil}，则计时器仅运行一次。
+
+@var{time} 可以指定绝对时间或相对时间。
+
+绝对时间可以使用格式有限的字符串来指定，并且被视为时间 @emph{today}，即使已经是过去的时间。  公认的形式为@samp{@var{xxxx}}、@samp{@var{x}:@var{xx}}或@samp{@var{xx}:@var{xx}}（军用时间）以及@samp{@var{xx}am}、@samp{@var{xx}AM}、@samp{@var{xx}pm}、@samp{@var{xx}PM}、@samp{@var{xx}:@var{xx}am}、@samp{@var{xx}:@var{xx}AM}、@samp{@var{xx}:@var{xx}pm}或@samp{@var{xx}:@var{xx}PM}。  可以使用句点代替冒号来分隔小时和分钟部分，但前提是指定了 @samp{am} 或 @samp{pm} 后缀（无论是字母大小写），否则该字符串将无法与没有单位的秒数区分开来，并且将被解释为相对时间，请参见下文。
+
+要将相对时间指定为字符串，请使用数字后跟单位。例如：
+
+@table @samp
+@item 1 min
+表示从现在开始 1 分钟。
+@item 1 min 5 sec
+表示从现在起 65 秒。
+@item 1 min 2 sec 3 hour 4 day 5 week 6 fortnight 7 month 8 year
+表示从现在起正好 103 个月 123 天 10862 秒。
+@end table
+
+指定不带单位的数字的字符串（例如 @samp{12.34}）被视为以秒为单位的相对时间。
+
+对于相对时间值，Emacs 认为一个月正好是 30 天，一年正好是 365.25 天。
+
+并非所有方便的格式都是字符串。  如果 0⁣ 是一个数字（整数或浮点数），则指定以秒为单位的相对时间。  @code{encode-time} 的结果也可用于指定 @var{time} 的绝对值。
+
+在大多数情况下，@var{repeat} 对 @emph{first} 调用何时发生没有影响——@var{time} 单独指定。  有一个例外：如果 @var{time} 是 @code{t}，则只要时间是纪元后 @var{repeat} 秒的倍数，计时器就会运行。  这对于@code{display-time}这样的函数很有用。  例如，以下代码将使 @var{function} 每“整”分钟运行一次（例如 @samp{11:03:00}、@samp{11:04:00} 等）：
+
+@example
+(run-at-time t 60 @var{function})
+@end example
+
+如果在计时器运行时 Emacs 没有获得任何 CPU 时间（例如，如果系统正忙于运行另一个进程，或者计算机正在睡眠或处于挂起状态），则计时器将在 Emacs 恢复并空闲时立即运行。
+
+函数@code{run-at-time}返回一个计时器值，该值标识特定的计划的未来操作。  您可以使用该值来调用 @code{cancel-timer} （见下文）。
+@end deffn
+
+@deffn Command run-with-timer secs repeat function &rest args
+这与 @code{run-at-time} 完全相同（因此请参阅该定义以了解参数的说明；@var{secs} 作为 @var{time} 传递给该函数），但意味着在以秒为单位指定延迟时使用。
+@end deffn
+
+名义上，重复计时器应该每 @var{repeat} 秒运行一次，但请记住，计时器的任何调用都可能会延迟。  一次重复的迟到不会影响下一次重复的预定时间。  例如，如果 Emacs 忙于计算的时间足够长，足以覆盖计时器的三个计划重复，然后开始等待，它将立即连续调用计时器函数三次（假设在它们之前或之间没有其他计时器触发）。  如果您希望计时器在上次调用后不少于 @var{n} 秒再次运行，请不要使用 @var{repeat} 参数。相反，计时器函数应该显式地重新安排计时器。
+
+@defopt timer-max-repeats
+此变量的值指定当许多先前计划的调用不可避免地延迟时，连续重复调用计时器函数的最大次数。
+@end defopt
+
+@cindex running code with timeout
+@defmac with-timeout (seconds timeout-forms@dots{}) body@dots{}
+执行@var{body}，但在@var{seconds}秒后放弃。  如果@var{body}在时间到之前完成，@code{with-timeout}返回@var{body}中最后一个表格的值。  然而，如果 @var{body} 的执行因超时而缩短，则 @code{with-timeout} 会执行所有 @var{timeout-forms} 并返回最后一个的值。
+
+该宏的工作原理是设置一个计时器在 @var{seconds} 秒后运行。  如果 1⁣ 在此时间之前完成，则会取消计时器。  如果计时器实际运行，它将终止@var{body}的执行，然后执行@var{timeout-forms}。
+
+由于只有当程序调用可以等待的原语时，定时器才能在 Lisp 程序中运行，因此 @code{with-timeout} 在计算过程中无法停止执行 @var{body}——只有当它调用这些原语之一时。  因此，仅将 @code{with-timeout} 与等待输入的 @var{body} 一起使用，而不是进行长时间计算的@var{body}。等待输入的基元包括 @code{sit-for}、@code{sleep-for}、@code{accept-process-output} 等。
+@end defmac
+
+函数@code{y-or-n-p-with-timeout}提供了一种使用计时器的简单方法，以避免等待答案太久。  @xref{Yes-or-No Queries}。
+
+@defun cancel-timer timer
+这会取消对@var{timer}请求的操作，它应该是一个计时器——通常是之前由@code{run-at-time}或@code{run-with-idle-timer}返回的计时器。  这会取消对这些函数之一的调用的效果；指定时间的到来不会导致任何特殊的事情发生。
+@end defun
+
+@findex list-timers
+@code{list-timers} 命令列出所有当前活动的计时器。命令@kbd{c} (@code{timer-list-cancel}) 将取消点下一行的计时器。  您可以使用命令 @kbd{S} (@code{tabulated-list-sort}) 按列对列表进行排序。
+
+@node Idle Timers
+@section 空闲定时器
+@cindex idle timers
+
+以下是如何设置一个在 Emacs 空闲一定时间长度时运行的计时器。  除了如何设置之外，空闲计时器的工作方式与普通计时器一样。
+
+@deffn Command run-with-idle-timer secs repeat function &rest args
+设置一个计时器，该计时器在 Emacs 下次空闲 @var{secs} 秒时运行。  @var{secs} 的值可以是数字或@code{current-idle-time} 返回的类型值。
+
+如果 0⁣ 为 1⁣，则计时器仅运行一次，这是 Emacs 第一次保持空闲足够长的时间。  更多情况下，@var{repeat} 是非@code{nil}，这意味着运行计时器@emph{each time} Emacs 保持空闲@var{secs} 秒。
+
+函数 @code{run-with-idle-timer} 返回一个计时器值，您可以在调用 @code{cancel-timer} (@pxref{Timers}) 时使用该值。
+@end deffn
+
+@cindex idleness
+当 Emacs 开始等待用户输入时，它会变成 @dfn{idle}（除非它等待输入超时，@pxref{Reading One Event}），并且它保持空闲状态，直到用户提供一些输入。  如果计时器设置为五秒空闲，则它会在 Emacs 首次空闲后运行大约五秒。  即使@var{repeat}不是@code{nil}，只要Emacs保持空闲，这个计时器就不会再次运行，因为空闲的持续时间会继续增加，并且不会再次下降到五秒。
+
+Emacs 可以在空闲时执行各种操作：垃圾收集、自动保存或处理来自子进程的数据。  但空闲期间的这些插曲不会干扰空闲定时器，因为它们不会将空闲时钟重置为零。  设置为 600 秒的空闲计时器将在自最后一个用户命令完成后十分钟后运行，即使子进程输出在这十分钟内已被接受数千次，即使已经进行了垃圾收集和自动保存。
+
+当用户提供输入时，Emacs 在执行输入时变得非空闲状态。  然后它再次变得空闲，并且所有设置为重复的空闲计时器将随后一个接一个地运行另一次。
+
+不要编写包含循环的空闲计时器函数，该循环每次都会执行一定量的处理，并在 0⁣ 为非 1⁣ 时退出。  这种方法看起来很自然，但有两个问题：
+
+@itemize
+@item
+它阻止所有进程输出（因为 Emacs 仅在等待时接受进程输出）。
+
+@item
+它会阻止任何应该在该时间内运行的空闲计时器。
+@end itemize
+
+@noindent
+同样，不要编写一个空闲定时器函数来设置另一个空闲定时器（包括相同的空闲定时器），其@var{secs}参数小于或等于当前空闲时间。  这样的计时器几乎会立即运行，并继续一次又一次地运行，而不是等待下一次 Emacs 空闲。  正确的方法是在空闲时间的当前值的基础上适当增加重新调度，如下所述。
+
+@defun current-idle-time
+如果 Emacs 空闲，此函数返回 Emacs 空闲的时间长度，使用与 @code{current-time} (@pxref{Time of Day}) 相同的格式。
+
+当 Emacs 不空闲时，@code{current-idle-time} 返回 @code{nil}。这是测试 Emacs 是否空闲的便捷方法。
+@end defun
+
+@code{current-idle-time} 的主要用途是当空闲定时器函数想要“休息一下”一段时间时。  它可以设置另一个空闲计时器，在几秒钟空闲后再次调用相同的函数。  这是一个例子：
+
+@example
+(defvar my-resume-timer nil
+  "Timer for `my-timer-function' to reschedule itself, or nil.")
+
+(defun my-timer-function ()
+  ;; @r{If the user types a command while @code{my-resume-timer}}
+  ;; @r{is active, the next time this function is called from}
+  ;; @r{its main idle timer, deactivate @code{my-resume-timer}.}
+  (when my-resume-timer
+    (cancel-timer my-resume-timer))
+  ...@var{do the work for a while}...
+  (when @var{taking-a-break}
+    (setq my-resume-timer
+          (run-with-idle-timer
+            ;; Compute an idle time @var{break-length}
+            ;; more than the current value.
+            (time-add (current-idle-time) @var{break-length})
+            nil
+            'my-timer-function))))
+@end example
+
+@node Terminal Input
+@section 端子输入
+@cindex terminal input
+
+本节描述用于记录或操作终端输入的函数和变量。  @xref{Display}，相关功能。
+
+@menu
+* Input Modes::          有关如何处理输入的选项。
+* Recording Input::      保存最近或所有输入事件的历史记录。
+@end menu
+
+@node Input Modes
+@subsection 输入模式
+@cindex input modes
+@cindex terminal input modes
+
+@defun set-input-mode interrupt flow meta &optional quit-char
+该函数设置读取键盘输入的模式。  如果@var{interrupt}非@code{nil}，则 Emacs 使用输入中断。如果是@code{nil}，则使用@sc{cbreak}模式。  默认设置取决于系统。  无论指定什么，某些系统始终使用 @sc{cbreak} 模式。
+
+当 Emacs 直接与 X 通信时，它会忽略此参数并使用中断（如果它知道如何通信）。
+
+如果 @var{flow} 是非 @code{nil}，则 Emacs 使用 @sc{xon/xoff} (@kbd{C-q}, @kbd{C-s}) 流控制来输出到终端。  除 5⁣ 模式外，这没有任何效果。
+
+参数 @var{meta} 控制对 127 以上的输入字符代码的支持。如果 @var{meta} 是 @code{t}，Emacs 会将第 8 位设置的字符转换为元字符，然后根据需要对其进行解码 (@pxref{Terminal I/O Encoding})。  如果 @var{meta} 是 @code{nil}，Emacs 会忽略第 8 位；当终端将其用作奇偶校验位时，这是必要的。  如果@var{meta}是符号@code{encoded}，Emacs首先使用每个字节的所有8位来解码字符，然后将解码后的单字节字符转换为元字符（如果它们设置了第八位）。  最后，如果 @var{meta} 既不是 @code{t} 也不是 @code{nil} 也不是 @code{encoded}，则 Emacs 在解码之前和之后都保持不变地使用所有 8 位输入。  这对于使用 8 位字符集并且不将 Meta 修饰符编码为第八位的终端很有用。
+
+如果@var{quit-char}非@code{nil}，则它指定用于退出的字符。  通常这个字符是@kbd{C-g}。 @xref{Quitting}。
+@end defun
+
+@code{current-input-mode} 函数返回 Emacs 当前使用的输入模式设置。
+
+@defun current-input-mode
+该函数返回读取键盘输入的当前模式。  它返回一个列表，对应于@code{set-input-mode}的参数，其形式为@code{(@var{interrupt} @var{flow} @var{meta} @var{quit})}，其中：
+@table @var
+@item interrupt
+当 Emacs 使用中断驱动输入时，为非@code{nil}。  如果 @code{nil}，则 Emacs 使用 @sc{cbreak} 模式。
+@item flow
+如果 Emacs 使用 @sc{xon/xoff} (@kbd{C-q}, @kbd{C-s}) 流控制来输出到终端，则为非 @code{nil}。  仅当@var{interrupt}为@code{nil}时，该值才有意义。
+@item meta
+如果 Emacs 在解码输入之前将输入字符的第八位视为 Meta 位，则为 @code{t} ； @code{encoded} 如果 Emacs 将解码后的单字节字符的第八位视为 Meta 位； @code{nil} 如果 Emacs 清除每个输入字符的第八位；任何其他值表示 Emacs 使用所有八位作为基本字符代码。
+@item quit
+是 Emacs 当前用于退出的字符，通常为 @kbd{C-g}。
+@end table
+@end defun
+
+@node Recording Input
+@subsection 录音输入
+@cindex recording input
+
+@defun recent-keys &optional include-cmds
+此函数返回一个向量，其中包含来自键盘或鼠标的最后 300 个输入事件。  所有输入事件都包含在内，无论它们是否用作按键序列的一部分。  因此，您始终会获取最后 300 个输入事件，而不包括键盘宏生成的事件。 （这些被排除在外，因为它们对于调试来说不太有趣；查看调用宏的事件应该足够了。）
+
+如果 0⁣ 是非 1⁣，则结果向量中的完整按键序列将与 @code{(nil . @var{COMMAND})} 形式的伪事件交织，其中 @var{COMMAND} 是按键序列 (@pxref{Command Overview}) 的绑定。
+
+对 @code{clear-this-command-keys} (@pxref{Command Loop Info}) 的调用会导致该函数随后立即返回一个空向量。
+@end defun
+
+@deffn Command open-dribble-file filename
+@cindex dribble file
+该函数打开一个名为@var{filename}的@dfn{dribble file}。  当运球文件打开时，来自键盘或鼠标的每个输入事件（但不是来自键盘宏的输入事件）都会写入该文件中。  非字符事件使用由 @samp{<@dots{}>} 包围的印刷表示来表达。  请注意，敏感信息（例如密码）最终可能会记录在运球文件中。
+
+您可以通过使用参数 @code{nil} 调用此函数来关闭运球文件。
+@end deffn
+
+另请参见 @code{open-termscript} 函数 (@pxref{Terminal Output})。
+
+@node Terminal Output
+@section 端子输出
+@cindex terminal output
+
+终端输出函数将输出发送到文本终端，或跟踪发送到终端的输出。  变量@code{baud-rate}告诉你Emacs认为是终端的输出速度。
+
+@defopt baud-rate
+据 Emacs 所知，该变量的值是终端的输出速度。  设置该变量不会改变实际数据传输的速度，但该值用于填充等计算。
+
+它还会影响是否滚动部分屏幕或在文本终端上重新绘制的决策。  @xref{Forcing Redisplay}，用于图形终端上的相应功能。
+
+该值以波特率测量。
+@end defopt
+
+如果您在网络上运行，并且网络的不同部分以不同的波特率工作，则 Emacs 返回的值可能与您本地终端使用的值不同。  一些网络协议将本地终端速度传达给远程计算机，以便 Emacs 和其他程序可以获得正确的值，但其他网络协议则不能。  如果 Emacs 的值错误，它会做出不太理想的决策。  要解决此问题，请设置 @code{baud-rate}。
+
+@defun send-string-to-terminal string &optional terminal
+该函数将 @var{string} 发送到 @var{terminal} 而不进行任何更改。 @var{string} 中的控制字符具有与终端相关的效果。 （如果您需要在终端上显示非 ASCII 文本，请使用@ref{Explicit Encoding}中描述的功能之一对其进行编码。）此功能仅在文本终端上运行。  @var{terminal} 可以是终端对象、框架，或 @code{nil} 表示所选框架的终端。  在批处理模式下，当@var{terminal}为@code{nil}时，@var{string}被发送到@code{stdout}。
+
+该功能的一种用途是在具有可下载功能键定义的终端上定义功能键。  例如，以下是（在某些终端上）定义功能键 4 向前移动四个字符的方法（通过将字符 @kbd{C-u C-f} 传输到计算机）：
+
+@example
+@group
+(send-string-to-terminal "\eF4\^U\^F")
+     @result{} nil
+@end group
+@end example
+@end defun
+
+@deffn Command open-termscript filename
+@cindex termscript file
+该函数用于打开一个@dfn{termscript file}，它将记录Emacs发送到终端的所有字符。  它返回@code{nil}。  Termscript 文件对于调查 Emacs 屏幕乱码的问题非常有用，这些问题是由于不正确的 Termcap 条目或终端选项的不良设置（而不是实际的 Emacs bug）造成的。  一旦确定实际输出了哪些字符，您就可以可靠地确定它们是否符合所使用的 Termcap 规范。
+
+@example
+@group
+(open-termscript "../junk/termscript")
+     @result{} nil
+@end group
+@end example
+
+您可以通过使用参数 @code{nil} 调用此函数来关闭 termscript 文件。
+
+另请参见@ref{Recording Input}中的@code{open-dribble-file}。
+@end deffn
+
+@node Sound Output
+@section 声音输出
+@cindex sound
+
+要使用 Emacs 播放声音，请使用函数 @code{play-sound}。  仅支持某些系统；如果你在一个不能真正完成这项工作的系统上调用@code{play-sound}，它会给出一个错误。
+
+@c FIXME: Add indexes for Au and WAV?  --xfq
+声音必须以 RIFF-WAVE 格式 (@samp{.wav}) 或 Sun Audio 格式 (@samp{.au}) 存储为文件。
+
+@defun play-sound sound
+该函数播放指定的声音。  参数 @var{sound} 的形式为 @code{(sound @var{properties}...)}，其中 @var{properties} 由交替的关键字（专门识别的特定符号）和与其对应的值组成。
+
+以下是当前在 @var{sound} 中有意义的关键字及其含义的表格：
+
+@table @code
+@item :file @var{file}
+这指定包含要播放的声音的文件。如果文件名不是绝对的，则会针对目录@code{data-directory}展开。
+
+@item :data @var{data}
+这指定要播放的声音而不需要引用文件。  值@var{data}应该是一个包含与声音文件相同字节的字符串。  我们建议使用单字节字符串。
+
+@item :volume @var{volume}
+这指定播放声音的音量。  它应该是 0 到 1 范围内的数字。默认值是使用之前指定的任何体积。
+
+@item :device @var{device}
+这以字符串形式指定要在其上播放声音的系统设备。  默认设备取决于系统。
+@end table
+
+在实际播放声音之前，@code{play-sound}调用列表@code{play-sound-functions}中的函数。每个函数都使用一个参数 @var{sound} 进行调用。
+@end defun
+
+@deffn Command play-sound-file file &optional volume device
+此函数是播放声音 @var{file} 的替代接口，指定可选的 @var{volume} 和 @var{device}。
+@end deffn
+
+@defvar play-sound-functions
+播放声音之前要调用的函数列表。  每个函数都使用一个参数来调用，即描述声音的属性列表。
+@end defvar
+
+@node X11 Keysyms
+@section 在 X11 键盘符号上操作
+@cindex X11 keysyms
+
+要定义系统特定的 X11 键符，请设置变量 @code{system-key-alist}。
+
+@defvar system-key-alist
+该变量的值应该是一个 alist，其中每个特定于系统的键符号都有一个元素。  每个元素的形式为 @code{(@var{code} . @var{symbol})}，其中 @var{code} 是数字键符号代码（不包括供应商特定位，
+@ifnottex
+@minus{}2**28),
+@end ifnottex
+@tex
+$-2^{28}$),
+@end tex
+@var{symbol} 是功能键的名称。
+
+例如 @code{(168 . mute-acute)} 定义了一个特定于系统的密钥（由 HP X 服务器使用），其数字代码为
+@ifnottex
+@minus{}2**28
+@end ifnottex
+@tex
+$-2^{28}$
+@end tex
++ 168.
+
+从列表中排除其他 X 服务器的键符号并不重要；这些没有什么害处，只要它们不与实际使用的 X 服务器使用的冲突即可。
+
+该变量始终是当前终端的本地变量，并且不能是缓冲区本地的。  @xref{Multiple Terminals}。
+@end defvar
+
+您可以通过设置以下变量来指定 Emacs 应将哪些键符号用于 Control、Meta、Alt、Hyper 和 Super 修饰符：
+
+@defvar x-ctrl-keysym
+@defvarx x-alt-keysym
+@defvarx x-meta-keysym
+@defvarx x-hyper-keysym
+@defvarx x-super-keysym
+代表 Control 修饰符的键符名称（分别代表 Alt、Meta、Hyper 和 Super）。  例如，以下是如何在 Emacs 中交换 Meta 和 Alt 修饰符：
+@lisp
+(setq x-alt-keysym 'meta)
+(setq x-meta-keysym 'alt)
+@end lisp
+@end defvar
+
+@node Batch Mode
+@section 批处理模式
+@cindex batch mode
+
+命令行选项 @samp{-batch} 使 Emacs 以非交互方式运行。  在此模式下，Emacs 不会从终端读取命令，不会更改终端模式，并且不会输出到可擦除屏幕。  这个想法是你指定要运行的 Lisp 程序；当它们完成时，Emacs 应该退出。  指定要运行的程序的方法是使用@samp{-l @var{file}}，它加载名为@var{file}的库，或@samp{-f @var{function}}，它调用不带参数的@var{function}，或@samp{--eval=@var{form}}。
+
+@defvar noninteractive
+当 Emacs 以批处理模式运行时，该变量为非@code{nil}。
+@end defvar
+
+如果指定的 Lisp 程序在批处理模式下发出未处理的错误信号，则 Emacs 在调用 Lisp 调试器后将以非零退出状态退出，该调试器在标准错误流上显示 Lisp 回溯 (@pxref{Invoking the Debugger})：
+
+@example
+$ emacs -Q --batch --eval '(error "foo")'; echo $?
+
+@group
+Error: error ("foo")
+mapbacktrace(#f(compiled-function (evald func args flags) #<bytecode -0x4f85c5
+7c45e2f81>))
+debug-early-backtrace()
+debug-early(error (error "foo"))
+signal(error ("foo"))
+error("foo")
+eval((error "foo") t)
+command-line-1(("--eval" "(error \"foo\")"))
+command-line()
+normal-top-level()
+@end group
+foo
+255
+@end example
+
+任何通常会进入回显区域的 Lisp 程序输出，无论是使用 @code{message}，还是使用 @code{prin1} 等，以 @code{t} 作为流（@pxref{Output Streams}），在批处理模式下都会转到 Emacs 的标准描述符：@code{message} 写入标准错误描述符，而 @code{prin1} 和其他打印函数写入标准输出。  类似地，通常来自迷你缓冲区的输入是从标准输入描述符读取的。  因此，Emacs 的行为很像一个非交互式应用程序。  （Emacs 本身通常生成的回显区域输出，例如命令回显，被完全抑制。）
+
+写入标准输出或错误描述符的非 ASCII 文本默认使用 @code{locale-coding-system} (@pxref{Locales}) 进行编码（如果它是非@code{nil}）；这可以通过将 @code{coding-system-for-write} 绑定到您选择的编码系统 (@pxref{Explicit Encoding}) 来覆盖。
+
+@vindex gc-cons-percentage@r{, in batch mode}
+在批处理模式下，Emacs 会将 @code{gc-cons-percentage} 变量的值从默认的 @samp{0.1} 扩大到 @samp{1.0}。  应该长时间运行的批处理作业应该再次调整限制，因为这意味着默认情况下将执行更少的垃圾收集（并且消耗更多的内存）。
+
+@node Session Management
+@section 会话管理
+@cindex session manager
+
+Emacs 支持 X 会话管理协议，该协议用于挂起和重新启动应用程序。  在 X Window 系统中，一个名为 @dfn{session manager} 的程序负责跟踪正在运行的应用程序。  当 X 服务器关闭时，会话管理器会要求应用程序保存其状态，并延迟实际关闭直到它们响应。  应用程序还可以取消关闭。
+
+当会话管理器重新启动挂起的会话时，它会指示这些应用程序单独重新加载其保存的状态。  它通过指定一个特殊的命令行参数来实现这一点，该参数说明要恢复的已保存会话。  对于 Emacs，这个参数是 @samp{--smid @var{session}}。
+
+@defvar emacs-save-session-functions
+@cindex session file
+Emacs 支持通过名为 @code{emacs-save-session-functions} 的钩子保存状态。  当会话管理器告诉 Emacs 窗口系统正在关闭时，Emacs 就会运行这个钩子。  调用这些函数时不带参数，并将当前缓冲区设置为临时缓冲区。  每个函数都可以使用 @code{insert} 将 Lisp 代码添加到该缓冲区。  最后，Emacs 将缓冲区保存在一个文件中，称为 @dfn{session file}.
+
+@findex emacs-session-restore
+随后，当会话管理器重新启动 Emacs 时，它会自动加载会话文件 (@pxref{Loading})。  这是由名为 @code{emacs-session-restore} 的函数执行的，该函数在启动期间被调用。  @xref{Startup Summary}。
+
+如果 @code{emacs-save-session-functions} 中的函数返回非 @code{nil}，Emacs 会告诉会话管理器取消关闭。
+@end defvar
+
+下面是一个示例，当会话管理器重新启动 Emacs 时，将一些文本插入到 @file{*scratch*} 中。
+
+@example
+@group
+(add-hook 'emacs-save-session-functions 'save-yourself-test)
+@end group
+
+@group
+(defun save-yourself-test ()
+  (insert
+   (format "%S" '(with-current-buffer "*scratch*"
+                   (insert "I am restored"))))
+  nil)
+@end group
+@end example
+
+@node Desktop Notifications
+@section 桌面通知
+@cindex desktop notifications
+@cindex notifications, on desktop
+
+Emacs 能够在支持 freedesktop.org 桌面通知规范、MS-Windows、Haiku 和 Android 的系统上发送 @dfn{notifications}。
+
+为了在 POSIX 主机上使用此功能，Emacs 必须已编译为支持 D-Bus，并且必须加载 @code{notifications} 库。  @xref{Top, , D-Bus,dbus,D-Bus integration in Emacs}。当 D-Bus 支持可用时，支持以下功能：
+
+@defun notifications-notify &rest params
+该函数通过 D-Bus 向桌面发送通知，其中包含由 @var{params} 参数指定的参数。这些参数应由交替的关键字和值对组成。支持的关键字和值如下：
+
+@table @code
+@item :bus @var{bus}
+D-Bus 总线。  仅当使用 @code{:session} 以外的总线时才需要此参数。
+
+@item :title @var{title}
+通知标题。
+
+@item :body @var{text}
+通知正文。  根据通知服务器的实现，文本可能包含 HTML 标记，例如 @samp{"<b>bold text</b>"}、超链接或图像。  特殊 HTML 字符必须进行编码，如 @samp{"Contact &lt;postmaster@@localhost&gt;!"}。
+
+@item :app-name @var{name}
+发送通知的应用程序的名称。  默认值为@code{notifications-application-name}。
+
+@item :replaces-id @var{id}
+该通知替换的通知@var{id}。  @var{id} 必须是先前 @code{notifications-notify} 调用的结果。
+
+@item :app-icon @var{icon-file}
+通知图标的文件名。  如果设置为@code{nil}，则不显示图标。  默认值为@code{notifications-application-icon}。如果该值是字符串，则该函数将其解释为文件名并使用 @code{expand-file-name} 转换为绝对值；如果它是一个符号，该函数将使用它的名称（这在使用图标命名规范@footnote{For more information about icon naming convention see @uref{https://specifications.freedesktop.org/icon-naming-spec/icon-naming-spec-latest.html, Icon Naming Specification}}时很有用）。
+
+@item :actions (@var{key} @var{title} @var{key} @var{title} ...)
+要应用的操作列表。  @var{key} 和 @var{title} 都是字符串。  默认操作（通常通过单击通知来调用）应该有一个名为 @samp{"default"} 的键。  标题可以是任何内容，但实现可以自由地不显示它。
+
+@item :timeout @var{timeout}
+自显示通知以来通知应自动关闭的超时时间（以毫秒为单位）。  如果@minus{}1，则通知的过期时间取决于通知服务器的设置，并且可能因通知类型而异。  如果为 0，则通知永不过期。  默认值为@minus{}1。
+
+@item :urgency @var{urgency}
+紧急程度。  它可以是 @code{low}、@code{normal} 或 @code{critical}。
+
+@item :action-items
+当给出此关键字时，操作的 @var{title} 字符串将被解释为图标名称。
+
+@item :category @var{category}
+通知的类型是字符串。  请参阅 @url{https://specifications.freedesktop.org/notification-spec/notification-spec-latest.html#categories, Desktop Notifications Specification} 了解标准类别列表。
+
+@item :desktop-entry @var{filename}
+这指定代表调用程序的桌面文件名，如@samp{"emacs"}。
+
+@item :image-data (@var{width} @var{height} @var{rowstride} @var{has-alpha} @var{bits} @var{channels} @var{data})
+这是一种原始数据图像格式，分别描述了宽度、高度、行距、是否有 Alpha 通道、每个样本的位数、通道和图像数据。
+
+@item :image-path @var{path}
+这可以表示为 URI（@samp{file://} 是目前唯一支持的 URI 模式），也可以表示为 @samp{$XDG_DATA_DIRS/icons} 中符合 freedesktop.org 的图标主题中的名称。
+
+@item :sound-file @var{filename}
+弹出通知时要播放的声音文件的路径。
+
+@item :sound-name @var{name}
+来自 @samp{$XDG_DATA_DIRS/sounds} 的 freedesktop.org 声音命名规范的可主题命名声音，在弹出通知时播放。  与图标名称类似，仅适用于声音。  一个例子是@samp{"message-new-instant"}。
+
+@item :suppress-sound
+导致服务器抑制播放任何声音（如果有此功能）。
+
+@item :resident
+设置后，调用操作时服务器不会自动删除通知。  通知将保留在服务器中，直到被用户或发送者明确删除。  此提示可能仅在服务器具有 @code{:persistence} 功能时才有用。
+
+@item :transient
+设置后，服务器会将通知视为瞬态并绕过服务器的持久性功能（如果存在）。
+
+@item :x @var{position}
+@itemx :y @var{position}
+指定通知应指向的屏幕上的 X、Y 位置。  两个参数必须一起使用。
+
+@item :on-action @var{function}
+调用操作时调用的函数。  通知@var{id}和操作的@var{key}作为参数传递给函数。
+
+@item :on-close @var{function}
+当通知因超时或用户关闭时调用的函数。  该函数接收通知 @var{id} 和结束 @var{reason} 作为参数：
+
+@itemize
+@item @code{expired} if the notification has expired
+@item @code{dismissed} if the notification was dismissed by the user
+@item @code{close-notification} if the notification was closed by a call to
+@code{notifications-close-notification}
+@item @code{undefined} if the notification server hasn't provided a reason
+@end itemize
+@end table
+
+通知服务器接受哪些参数可以通过@code{notifications-get-capabilities}检查。
+
+该函数返回一个通知 ID，一个整数，可用于通过 @code{notifications-close-notification} 或另一个 @code{notifications-notify} 调用的 @code{:replaces-id} 参数来操作通知项。  例如：
+
+@example
+@group
+(defun my-on-action-function (id key)
+  (message "Message %d, key \"%s\" pressed" id key))
+     @result{} my-on-action-function
+@end group
+
+@group
+(defun my-on-close-function (id reason)
+  (message "Message %d, closed due to \"%s\"" id reason))
+     @result{} my-on-close-function
+@end group
+
+@group
+(notifications-notify
+ :title "Title"
+ :body "This is <b>important</b>."
+ :actions '("Confirm" "I agree" "Refuse" "I disagree")
+ :on-action 'my-on-action-function
+ :on-close 'my-on-close-function)
+     @result{} 22
+@end group
+
+@group
+A message window opens on the desktop.  Press ``I agree''.
+     @result{} Message 22, key "Confirm" pressed
+        Message 22, closed due to "dismissed"
+@end group
+@end example
+@end defun
+
+@defun notifications-close-notification id &optional bus
+此函数关闭标识符为@var{id}的通知。 @var{bus} 可以是表示 D-Bus 连接的字符串，默认为 @code{:session}。
+@end defun
+
+@defun notifications-get-capabilities &optional bus
+返回通知服务器的功能，符号列表。  @var{bus} 可以是表示 D-Bus 连接的字符串，默认为 @code{:session}。  预计将具有以下功能：
+
+@table @code
+@item :actions
+服务器将向用户提供指定的操作。
+
+@item :body
+支持正文。
+
+@item :body-hyperlinks
+服务器支持通知中的超链接。
+
+@item :body-images
+服务器支持通知中的图像。
+
+@item :body-markup
+支持正文中的标记。
+
+@item :icon-multi
+服务器将渲染给定图像数组中所有帧的动画。
+
+@item :icon-static
+支持显示任何给定图像阵列的 1 帧。  该值与 @code{:icon-multi} 互斥。
+
+@item :persistence
+服务器支持通知的持久性。
+
+@item :sound
+服务器支持通知声音。
+@end table
+
+其他特定于供应商的上限以 @code{:x-vendor} 开头，如 @code{:x-gnome-foo-cap}。
+@end defun
+
+@defun notifications-get-server-information &optional bus
+返回通知服务器上的信息，字符串列表。 @var{bus} 可以是表示 D-Bus 连接的字符串，默认为 @code{:session}。  返回的列表是@code{(@var{name} @var{vendor} @var{version} @var{spec-version})}。
+
+@table @var
+@item name
+服务器的产品名称。
+
+@item vendor
+供应商名称。  例如，@samp{"KDE"}、@samp{"GNOME"}。
+
+@item version
+服务器的版本号。
+
+@item spec-version
+服务器兼容的规范版本。
+@end table
+
+如果@var{spec_version}为@code{nil}，则服务器支持@samp{"1.0"}之前的规范。
+@end defun
+
+@cindex tray notifications, MS-Windows
+当 Emacs 作为 GUI 会话在 MS-Windows 上运行时，它通过本机原语支持 D-Bus 通知功能的一小部分：
+
+@defun w32-notification-notify &rest params
+此函数显示@var{params}指定的 MS-Windows 托盘通知。  MS-Windows 托盘通知通过任务栏通知区域中的图标显示在气球中。
+
+值是通知的整数唯一 ID，可用于使用 @code{w32-notification-close} 删除通知，如下所述。  如果函数失败，返回值为@code{nil}。
+
+参数 @var{params} 被指定为关键字/值对。  所有参数都是可选的，但如果没有指定参数，该函数将不执行任何操作并返回@code{nil}。
+
+支持以下参数：
+
+@table @code
+@item :icon @var{icon}
+在系统托盘中显示@var{icon}。  如果@var{icon}是一个字符串，它应该指定从中加载图标的文件名；指定的文件应该是 @file{.ico} Windows 图标文件。  如果 @var{icon} 不是字符串，或者未指定此参数，则将使用标准 Emacs 图标。
+
+@item :tip @var{tip}
+使用 @var{tip} 作为通知的工具提示。  如果 @var{tip} 是字符串，则这是当鼠标指针悬停在通知添加的托盘图标上时将显示的工具提示文本。  如果 @var{tip} 不是字符串，或者未指定此参数，则默认工具提示文本为 @samp{Emacs notification}。  工具提示文本的长度最多为 127 个字符（W2K 之前的 Windows 版本为 63 个字符）。较长的字符串将被截断。
+
+@item :level @var{level}
+通知严重性级别，@code{info}、@code{warning} 或 @code{error} 之一。  如果给定，该值确定通知标题左侧显示的图标，但前提是还指定了 @code{:title} 参数（见下文）并且是字符串。
+
+@item :title @var{title}
+通知的标题。  如果 @var{title} 是字符串，则它会在正文上方以较大字体显示。  标题文本最长可达 63 个字符；较长的文本将被截断。
+
+@item :body @var{body}
+通知正文。  如果@var{body}是字符串，则它指定通知消息的文本。  使用嵌入的换行符来控制文本如何分成行。  正文最长可达 255 个字符，如果更长，将会被截断。  与 D-Bus 不同，正文应该是纯文本，没有标记。
+@end table
+
+请注意，W2K 之前的 Windows 版本仅支持 @code{:icon} 和 @code{:tip}。  其他参数可以传递，但在那些旧系统上它们将被忽略。
+
+每个 Emacs 框架在任何给定时间最多可以有一个活动通知。  必须通过调用 @code{w32-notification-close} 删除活动通知，然后才能为同一帧显示新通知。
+@end defun
+
+要从任务栏中删除通知及其图标，请使用以下函数：
+
+@defun w32-notification-close id
+此函数删除由其唯一的@var{id}给出的托盘通知。  删除通知时，必须选择与创建通知时选定的框架相同的 Emacs 框架。  显示通知的 Lisp 程序必须跟踪哪个帧对应于哪个通知@var{id}，并在删除通知时选择该帧。  （删除框架时，它创建的通知（如果有）将被 MS-Windows 删除。）
+@end defun
+
+@cindex desktop notifications, Haiku
+当 Emacs 作为 GUI 程序在 Haiku 下运行时，它还提供先前提到的 D-Bus 桌面通知界面的受限模仿。  下面详细介绍的函数中缺少的主要功能是回调函数，例如 @code{:actions}、@code{:on-action} 和 @code{:on-close}。
+
+@defun haiku-notifications-notify &rest params
+此函数向桌面通知服务器发送通知，其中包含许多与 @code{notifications-notify} 接受的参数类似的参数。  参数为：
+
+@table @code
+@item :title @var{title}
+@item :body @var{body}
+@item :replaces-id @var{replaces-id}
+@item :urgency @var{urgency}
+它们与调用 @code{notifications-notify} 时的含义相同。
+
+@item :app-icon @var{app-icon}
+这应该是指定用作所显示通知的图标的图像文件的文件名。  如果@code{nil}，则显示的图标将是 Emacs 的应用程序图标。
+@end table
+
+它的返回值是一个标识通知的数字，可以将其用作后续调用此函数的 @code{:replaces-id} 参数。
+@end defun
+
+@cindex desktop notifications, Android
+当 Emacs 构建为 Android 应用程序包时，通过函数 @code{android-notifications-notify} 可以方便地显示通知。  与@code{notifications-notify} 相比，该函数不具有回调功能，并且具有一些特性。
+
+@defun android-notifications-notify &rest params
+此功能显示桌面通知。  @var{params} 是一个参数列表，类似于 @code{notifications-notify} 中的同名参数。  参数为：
+
+@table @code
+@item :title @var{title}
+@item :body @var{body}
+@item :replaces-id @var{replaces-id}
+@item :on-action @var{on-action}
+@item :on-cancel @var{on-close}
+@item :actions @var{actions}
+@item :timeout @var{timeout}
+@item :resident @var{resident}
+它们与调用 @code{notifications-notify} 时的含义相同，只是显示的非默认操作不超过三个。
+
+@item :urgency @var{urgency}
+@var{urgency} 的可接受值集与 @code{notifications-notify} 相同，但紧急程度适用于使用定义的 @var{group} 显示的所有通知，Android 7.1 及更早版本除外。
+
+@item :group @var{group}
+@var{group} 是一个字符串，指定发送的通知所属的类别。  此类别在系统的通知设置菜单中重现，但在 Android 7.1 及更早版本中被忽略。
+
+如果 @var{group} 是 @code{nil} 或不存在于 @var{params} 中，则将其替换为字符串 @samp{"Desktop Notifications"}。
+
+调用者应该为他们发送的每种通知提供一个稳定的 @var{urgency} 和 @var{group} 组合，因为如果 @var{urgency} 与之前发送到 @var{group} 的任何通知不匹配，系统可能会选择忽略 @var{urgency}。
+
+@item :icon @var{icon}
+此参数控制通知将显示的符号图标。  它的值是一个字符串，指定 @code{android.R.drawable} 系统包中的图标。  有关此类图标的列表，请参阅@uref{https://developer.android.com/reference/android/R.drawable,R.drawable | Android Developers}。
+
+如果@var{params}内未提供或@var{icon}不存在，则默认为@samp{"ic_dialog_alert"}。
+@end table
+
+它返回一个标识通知的数字，该数字可以作为 @code{:replaces-id} 参数提供给稍后调用此函数。
+
+如果在 Android 13 及更高版本中 Emacs 没有获得显示通知 (@pxref{Android Environment,,, emacs, The GNU Emacs Manual}) 的权限，则发送的任何通知都将被默默忽略。
+@end defun
+
+@node System Taskbar
+@section 控制系统 GUI 任务栏功能
+@cindex system taskbar
+@cindex mode, system taskbar
+
+@xref{System Taskbar,,, emacs, The GNU Emacs Manual}，了解概述和配置。
+
+@defun system-taskbar-badge &optional count
+此函数将 @var{count} 显示为系统任务栏 Emacs 图标上的覆盖层。
+
+如果@var{count}是整数，则显示它。
+
+如果 @var{count} 是支持字符串的后端的字符串，则显示该字符串。  字符串应该很短。
+
+在不支持字符串的后端，将 @var{count} 转换为整数，如果失败则转换为 @code{nil}。
+
+如果 @var{count} 是 @code{nil} 或空字符串，则删除计数器或短字符串。
+
+显示设置为 @var{count} 的系统任务栏图标徽章。  如果 @var{count} 是 @code{nil}，则清除标记。  @var{count} 通常是一个整数。
+
+如果 @var{count} 是字符串，则在不支持字符串标记的系统（例如 GNU/Linux D-Bus）上，它会转换为整数，并且如果字符串是无效的整数表示，则标记将被清除。  在支持字符串的系统上，例如 macOS/GNUstep 和 MS-Windows，徽章被设置为字符串并显示，并且可能会被截断以适应系统分配的视觉空间。  无论如何，如果字符串为空，请清除徽章。
+@end defun
+
+@defun system-taskbar-attention &optional urgency timeout
+此功能会闪烁或弹起系统任务栏 Emacs 图标和/或其框架以提醒用户。
+
+@var{urgency}可以是符号@code{informational}或@code{critical}之一。
+
+如果 @var{urgency} 为 @code{nil}，则清除注意指示器。
+
+注意力指示器最早在 Emacs GUI 进入焦点时或在 @var{timeout} 秒后清除。  如果@var{timeout}是@code{nil}，则系统GUI行为具有优先权。
+
+在某些后端，@code{critical} 与 @code{informational} 具有相同的效果。
+
+在某些后端，仅当 Emacs 不是当前聚焦的应用程序时才会显示注意力。
+@end defun
+
+@defun system-taskbar-progress &optional progress
+此函数在系统任务栏 Emacs 图标上显示进度指示器。
+
+@var{progress} 是 0.0 到 1.0 范围内的浮点数。  如果@var{progress}是@code{nil}，则删除进度指示器。
+
+使用内置进度报告器功能很方便，当启用@code{system-taskbar-mode}时，默认情况下与@code{system-taskbar-progress}集成。  @xref{Progress}。
+@end defun
+
+@noindent
+系统任务栏功能示例：
+
+@lisp
+@group
+;; Enable and initialize system-taskbar-mode before calling its
+;; package functions.
+(system-taskbar-mode)
+
+;; Display a badge integer on the taskbar icon.
+(system-taskbar-badge emacs-major-version)
+
+;; A string representation of an integer is converted to an
+;; integer on GNU/Linux.
+(system-taskbar-badge "31")
+
+;; Short strings are displayed on macOS/GNUstep and MS-Windows.
+(system-taskbar-badge "Test")
+
+;; Clear the badge.
+(system-taskbar-badge)
+@end group
+
+@group
+;; Get the user's attention and clear the request after 3 seconds.
+(system-taskbar-attention 'informational 3)
+
+;; Get the user's attention and clear when Emacs is focused.
+(system-taskbar-attention 'critical)
+
+;; Clear the attention request.
+(system-taskbar-attention)
+@end group
+
+@group
+;; Make sure system taskbar is integrated with progress-reporter.
+(setopt system-taskbar-use-progress-reporter t) ; t is the default
+(system-taskbar-mode)
+
+;; Report `dotimes` progress on the taskbar icon.
+(dotimes-with-progress-reporter
+    (i 10)
+    "Counting from 1 to 10..."
+  (sleep-for 1))
+
+;; Report `dolist` progress on the taskbar icon.
+(dolist-with-progress-reporter
+    (i (make-list 10 t))
+    "Progress from 1 to 10 elements..."
+  (sleep-for 1))
+@end group
+@end lisp
+
+@node System Sleep
+@section 阻止系统睡眠并处理睡眠事件
+@cindex system sleep
+@cindex mode, system sleep
+
+@defun system-sleep-block-sleep &optional why allow-display-sleep
+该函数阻止系统进入空闲睡眠状态。
+
+它返回一个令牌，必须将其传递给 @code{system-sleep-unblock-sleep} 才能解锁此特定块（其他睡眠块可能出于其他目的同时生效）。否则，如果睡眠阻塞失败，则返回@code{nil}。
+
+@var{why} 是一个字符串，当非 @code{nil} 时，用于标识睡眠块，因为它可能出现在系统的可检查块列表中。默认为@samp{Emacs}。
+
+如果@var{allow-display-sleep}非@code{nil}，则允许显示器休眠。  默认情况下，显示保持活动状态。
+
+请注意，当 Emacs 进程终止时，所有平台上的块都会被释放。
+@end defun
+
+@defun system-sleep-unblock-sleep token
+该函数解除与 @var{token} 相关的睡眠块的阻塞。  成功时返回非@code{nil}，否则返回@code{nil}。
+@end defun
+
+@defmac with-system-sleep-block (&optional why allow-display-sleep) body@dots{}
+这是一个方便的宏，可让您使用睡眠块将表单包装在 @var{body} 中，当 @var{body} 完成时，该睡眠块将为您解除阻塞。这保证了当@var{body}执行时系统永远不会进入睡眠状态。  这些参数的含义与上面@code{system-sleep-block-sleep}中的相同。
+@end defmac
+
+@defun system-sleep-sleep-blocked-p
+如果存在任何活动的 @code{system-sleep} 块，则该谓词函数返回非 @code{nil}，否则返回 @code{nil}。
+@end defun
+
+@defun system-sleep-unblock-all-sleep-blocks
+此功能解锁所有活动的睡眠块。  您不太可能需要调用此函数。
+@end defun
+
+@defopt system-sleep-event-functions
+当系统即将进入睡眠状态或从睡眠状态唤醒后，会使用一个参数 @var{event}（睡眠事件）来调用此异常钩子上的每个函数。  可以通过@samp{@code{(sleep-event-state event)}}检索其状态。  状态将是符号 @code{pre-sleep} 或 @code{post-wake} 之一。
+
+处理 @code{pre-sleep} 事件应尽快完成并避免用户提示。  系统通常会授予非常短的睡眠前处理间隔，通常在 2 到 5 秒之间。  即使您的处理未完成，系统也可能会休眠，因此请确保您执行的操作尽可能少。  例如，您的函数可以关闭活动连接或串行端口。
+
+处理@code{post-wake}事件提供了更多的余地。  例如，使用它来重新建立连接。
+
+注意：您的代码或其调用的函数不应引发任何信号，否则所有挂钩都将停止。  您可以将代码包装在 @code{condition-case} 块 (@pxref{Errors}) 中。
+@end defopt
+
+@node File Notifications
+@section 文件更改通知
+@cindex file notifications
+@cindex watch, for filesystem events
+
+一些操作系统支持监视文件系统以了解文件或其属性的更改。  如果配置正确，Emacs 会静态链接相应的库，例如 @file{inotify}、@file{kqueue}、@file{gfilenotify} 或 @file{w32notify}。  这些库允许监视本地计算机上的文件系统。
+
+还可以查看远程计算机上的文件系统，@pxref{Remote Files,, Remote Files, emacs, The GNU Emacs Manual}。这不依赖于链接到 Emacs 的库之一。
+
+由于所有这些库在通知的文件更改时都会发出不同的事件，因此 Emacs 提供了一个特殊的库@code{filenotify}，它为应用程序提供了统一的接口。  想要接收文件通知的 Lisp 程序应始终优先使用此库而不是本机库。  本节记录了 @code{filenotify} 库函数和变量。
+
+@defun file-notify-add-watch file flags callback
+添加与 @var{file} 有关的文件系统事件的监视。  这安排与 @var{file} 有关的文件系统事件报告给 Emacs。
+
+返回的值是添加的监视的描述符。  它的类型取决于底层库，通常不能假设为整数，如下例所示。  它只能用于 @code{equal} 的比较。
+
+如果由于某种原因无法监视 @var{file}，则此函数会发出 @code{file-notify-error} 错误信号。
+
+有时，无法监视已安装的文件系统的文件更改。此函数无法检测到这一点，因此非 0⁣ 返回值并不能保证 @var{file} 上的更改将被实际通知。
+
+如果 @var{file} 是符号链接，则它不会遵循该链接。  仅 @var{file} 本身将被观看。
+
+@var{flags} 是设置监视内容的条件列表。它可以包含以下符号：
+
+@table @code
+@item change
+监视文件内容的变化
+@item attribute-change
+监视文件属性的变化，例如权限或修改时间
+@end table
+
+如果 @var{file} 是目录，则 @code{change} 监视该目录中的文件创建和删除。  在这种情况下，一些本机文件通知库也会报告文件更改。  这不能递归地工作。
+
+当任何事件发生时，Emacs 将调用 @var{callback} 函数，并向其传递一个参数 @var{event}，其形式为
+
+@lisp
+(@var{descriptor} @var{action} @var{file} [@var{file1}])
+@end lisp
+
+@var{descriptor} 与该函数返回的对象是同一对象。  @var{action} 是事件的描述。  它可以是以下任一符号：
+
+@table @code
+@item created
+@var{file} 已创建
+@item deleted
+@var{file} 已删除
+@item changed
+@var{file}的内容已更改；使用 @file{w32notify} 库，还可以报告属性更改
+@item renamed
+@var{file} 已重命名为 ⁣​​1⁣
+@item attribute-changed
+@var{file} 属性已更改
+@item stopped
+观看@var{file}已停止
+@end table
+
+请注意，@file{w32notify} 库不会报告 @code{attribute-changed} 事件。  当某些文件的属性（例如权限或修改时间）发生更改时，该库会报告 @code{changed} 事件。  同样，@file{kqueue} 库在监视目录时不会可靠地报告文件属性更改。
+
+@code{stopped} 事件表示观看文件已停止。  这可能是因为 @code{file-notify-rm-watch} 被调用（见下文），或者因为正在监视的文件被删除，或者因为正在监视的文件的文件系统被卸载，或者由于底层库报告的另一个错误导致无法进一步监视。
+
+@var{file} 和 @var{file1} 是正在报告其事件的文件的名称。  例如：
+
+@example
+@group
+(require 'filenotify)
+     @result{} filenotify
+@end group
+
+@group
+(defun my-notify-callback (event)
+  (message "Event %S" event))
+     @result{} my-notify-callback
+@end group
+
+@group
+(file-notify-add-watch
+  "/tmp" '(change attribute-change) 'my-notify-callback)
+     @result{} 35025468
+@end group
+
+@group
+(write-region "foo" nil "/tmp/foo")
+     @result{} Event (35025468 created "/tmp/.#foo")
+        Event (35025468 created "/tmp/foo")
+        Event (35025468 changed "/tmp/foo")
+        Event (35025468 deleted "/tmp/.#foo")
+@end group
+
+@group
+(write-region "bla" nil "/tmp/foo")
+     @result{} Event (35025468 created "/tmp/.#foo")
+        Event (35025468 changed "/tmp/foo")
+        Event (35025468 deleted "/tmp/.#foo")
+@end group
+
+@group
+(set-file-modes "/tmp/foo" (default-file-modes) 'nofollow)
+     @result{} Event (35025468 attribute-changed "/tmp/foo")
+@end group
+@end example
+
+是否返回动作@code{renamed}取决于所使用的手表库。  否则，操作 @code{deleted} 和 @code{created} 可以按随机顺序返回。
+
+@example
+@group
+(rename-file "/tmp/foo" "/tmp/bla")
+     @result{} Event (35025468 renamed "/tmp/foo" "/tmp/bla")
+@end group
+
+@group
+(delete-file "/tmp/bla")
+     @result{} Event (35025468 deleted "/tmp/bla")
+@end group
+@end example
+@end defun
+
+@defun file-notify-rm-watch descriptor
+删除由 @var{descriptor} 指定的现有文件监视。 @var{descriptor} 应该是 @code{file-notify-add-watch} 返回的对象。
+@end defun
+
+@deffn Command file-notify-rm-all-watches
+从 Emacs 中删除所有现有的文件通知监视。
+
+请谨慎使用此命令，因为它可能会对依赖文件监视的包产生意外的副作用。  它主要用于调试目的，或者当 Emacs 停止时。
+@end deffn
+
+@defun file-notify-valid-p descriptor
+检查由 @var{descriptor} 指定的手表的有效性。 @var{descriptor} 应该是 @code{file-notify-add-watch} 返回的对象。
+
+如果监视的文件或目录被删除，或者监视线程由于任何其他原因异常退出，则监视可能会变得无效。  通过调用@code{file-notify-rm-watch}来移除手表也会使其无效。
+
+@example
+@group
+(make-directory "/tmp/foo")
+     @result{} Event (35025468 created "/tmp/foo")
+@end group
+
+@group
+(setq desc
+      (file-notify-add-watch
+        "/tmp/foo" '(change) 'my-notify-callback))
+     @result{} 11359632
+@end group
+
+@group
+(file-notify-valid-p desc)
+     @result{} t
+@end group
+
+@group
+(write-region "bla" nil "/tmp/foo/bla")
+     @result{} Event (11359632 created "/tmp/foo/.#bla")
+        Event (11359632 created "/tmp/foo/bla")
+        Event (11359632 changed "/tmp/foo/bla")
+        Event (11359632 deleted "/tmp/foo/.#bla")
+@end group
+
+@group
+;; Deleting a file in the directory doesn't invalidate the watch.
+(delete-file "/tmp/foo/bla")
+     @result{} Event (11359632 deleted "/tmp/foo/bla")
+@end group
+
+@group
+(write-region "bla" nil "/tmp/foo/bla")
+     @result{} Event (11359632 created "/tmp/foo/.#bla")
+        Event (11359632 created "/tmp/foo/bla")
+        Event (11359632 changed "/tmp/foo/bla")
+        Event (11359632 deleted "/tmp/foo/.#bla")
+@end group
+
+@group
+;; Deleting the directory invalidates the watch.
+;; Events arrive for different watch descriptors.
+(delete-directory "/tmp/foo" 'recursive)
+     @result{} Event (35025468 deleted "/tmp/foo")
+        Event (11359632 deleted "/tmp/foo/bla")
+        Event (11359632 deleted "/tmp/foo")
+        Event (11359632 stopped "/tmp/foo")
+@end group
+
+@group
+(file-notify-valid-p desc)
+     @result{} nil
+@end group
+@end example
+@end defun
+
+@node Dynamic Libraries
+@section 动态加载的库
+@cindex dynamic libraries
+
+@dfn{dynamically loaded library} 是一个在首次需要其功能时按需加载的库。  Emacs 支持对其某些功能进行此类按需加载支持库。
+
+@defvar dynamic-library-alist
+这是动态库和实现它们的外部库文件的列表。
+
+每个元素都是 @w{@code{(@var{library} @var{files}@dots{})}} 形式的列表，其中 @code{car} 是表示受支持的外部库的符号，其余是给出该库的备用文件名的字符串。
+
+Emacs 尝试按照文件在列表中出现的顺序加载库；如果没有找到，Emacs 会话将无法访问该库，并且它提供的功能将不可用。
+
+某些平台上的图像支持使用此功能。  以下是设置此变量以支持 MS-Windows 上的图像的示例：
+
+@example
+(setq dynamic-library-alist
+      '((xpm "libxpm.dll" "xpm4.dll" "libXpm-nox4.dll")
+        (png "libpng12d.dll" "libpng12.dll" "libpng.dll"
+             "libpng13d.dll" "libpng13.dll")
+        (jpeg "jpeg62.dll" "libjpeg.dll" "jpeg-62.dll"
+              "jpeg.dll")
+        (tiff "libtiff3.dll" "libtiff.dll")
+        (gif "giflib4.dll" "libungif4.dll" "libungif.dll")
+        (svg "librsvg-2-2.dll")
+        (gdk-pixbuf "libgdk_pixbuf-2.0-0.dll")
+        (glib "libglib-2.0-0.dll")
+        (gobject "libgobject-2.0-0.dll")))
+@end example
+
+请注意，图像类型 @code{pbm} 和 @code{xbm} 不需要在此变量中输入条目，因为它们不依赖于外部库并且在 Emacs 中始终可用。
+
+另请注意，此变量并不意味着是访问外部库的通用工具；只有那些 Emacs 已知的才能通过它加载。
+
+如果给定的 @var{library} 静态链接到 Emacs 中，则忽略此变量。
+@end defvar
+
+@node Security Considerations
+@section 安全考虑
+@cindex security
+@cindex hardening
+
+与任何应用程序一样，Emacs 可以在安全的环境中运行，其中操作系统强制执行有关访问等的规则。  如果小心的话，基于 Emacs 的应用程序也可以成为检查此类规则的安全边界的一部分。  尽管 Emacs 的默认设置适用于典型的软件开发环境，但在包含不可信用户（可能包括攻击者）的环境中可能需要进行调整。  以下是安全问题的概要，如果您正在开发此类应用程序，它可能会有所帮助。  它绝不是完整的；它旨在让您了解所涉及的安全问题，而不是作为安全检查表。
+
+@table @asis
+@item 文件局部变量
+@cindex file local variables
+Emacs 访问的文件可以包含影响访问该文件的缓冲区的变量设置； @xref{File Local Variables}。类似地，目录可以指定该目录中所有文件共有的局部变量值；参见@ref{Directory Local Variables}。  尽管 Emacs 采取了一些努力来防止滥用这些变量，但仅仅由于软件包设置 @code{safe-local-variable} 过于乐观，就可能会产生安全漏洞，这是一个非常常见的问题。  要对文件和目录禁用此功能，请将 @code{enable-local-variables} 设置为 @code{nil}。
+
+@item 访问控制
+尽管 Emacs 通常尊重底层操作系统的访问权限，但在某些情况下它会专门处理访问。  例如，文件名可以具有专门处理文件的处理程序，并具有自己的访问检查。  @xref{Magic File Names}。  此外，即使相应的文件可写，缓冲区也可以是只读的，反之亦然，这可能会导致诸如@samp{File passwd is write-protected; try to save anyway? (yes or no)}之类的消息。  @xref{Read Only Buffers}。
+
+@item 验证
+Emacs 有几个处理密码的函数，例如 @code{read-passwd}。  @xref{Reading a Password}。尽管这些函数并不尝试向全世界广播密码，但它们的实现并不能抵御有权访问 Emacs 内部的坚定攻击者。  例如，即使 Elisp 代码在使用密码后使用 @code{clear-string} 从内存中清除密码，密码的残余部分仍可能驻留在垃圾收集的空闲列表中。  @xref{Modifying Strings}。
+
+@item 代码注入
+Emacs 可以向许多其他应用程序发送命令，应用程序应注意作为这些命令的操作数发送的字符串不会被误解为指令。  例如，当使用 shell 命令将文件 @var{a} 重命名为 ⁣​​1⁣ 时，不要简单地使用字符串 @code{mv @var{a} @var{b}}，因为任一文件名可能以 @samp{-} 开头，或者可能包含 @samp{;} 等 shell 元字符。虽然像@code{shell-quote-argument}这样的函数可以帮助避免此类问题，但它们并不是万能的。例如，在 POSIX 平台上，@code{shell-quote-argument} 引用 shell 元字符，但不引用前导 @samp{-}。  在 MS-Windows 上，引用 @samp{%} 假定所有环境变量的名称中都没有 @samp{^}。 @xref{Shell Arguments}。  通常，使用 @code{call-process} 比使用子 shell 更安全。  @xref{Synchronous Processes}。  而且使用 Emacs 内置函数更安全；例如，使用 @code{(rename-file "@var{a}" "@var{b}" t)} 而不是调用 @command{mv}。  @xref{Changing Files}。
+
+@item 编码系统
+Emacs 尝试推断其访问的文件和网络连接的编码系统。  @xref{Coding Systems}。如果 Emacs 推断不正确，或者网络连接的其他方不同意 Emacs 的推断，则生成的系统可能不可靠。  此外，即使 Emacs 推断正确，它通常也可以使用其他程序无法使用的字节。  例如，虽然对于 Emacs 来说，空字节只是一个与其他字符一样的字符，但许多其他应用程序将其视为字符串终止符，并错误地处理包含空字节的字符串或文件。
+
+@item 环境和配置变量
+POSIX 指定了几个可以影响 Emacs 行为方式的环境变量。  任何名称完全由大写 ASCII 字母、数字和下划线组成的环境变量都可能影响 Emacs 的内部行为。  Emacs 使用几个这样的变量，例如 @env{EMACSLOADPATH}。  @xref{Library Search}。  在某些平台上，某些环境变量（例如，@env{PATH}、@env{POSIXLY_CORRECT}、@env{SHELL}、@env{TMPDIR}）需要具有正确配置的值，以便为 Emacs 可能调用的任何实用程序获得标准行为。即使像@env{TZ}这样看似良性的变量也可能会产生安全隐患。  @xref{System Environment}。
+
+Emacs 具有定制和其他具有类似考虑因素的变量。  例如，如果变量 @code{shell-file-name} 指定具有非标准行为的 shell，则基于 Emacs 的应用程序可能会出现错误行为。
+
+@item 安装
+安装 Emacs 时，如果不可信用户可以修改安装目录层次结构，则该应用程序不可信。这也适用于 Emacs 使用的程序以及 Emacs 读取和写入的文件的目录层次结构。
+
+@item 网络接入
+Emacs 经常访问网络，您可能需要对其进行配置以避免其通常进行的网络访问。  例如，除非将 @code{tramp-mode} 设置为 @code{nil}，否则使用特定语法的文件名将被解释为网络文件，并通过网络检索。  @xref{Top, The Tramp Manual,, tramp, The Tramp Manual}。
+
+@item 比赛条件
+Emacs 应用程序与其他应用程序具有相同的竞争条件问题。  例如，即使 @code{(file-readable-p "foo.txt")} 返回 @code{t}，@file{foo.txt} 也可能无法读取，因为某些其他程序在调用 @code{file-readable-p} 之间更改了文件的权限。 @xref{Testing Accessibility}。
+
+@item 资源限制
+当 Emacs 耗尽内存或其他操作系统资源时，其行为可能不太可靠，因为通常运行完成的计算可能会中止回到顶层。  这可能会导致 Emacs 忽略它通常会执行的操作。
+@end table

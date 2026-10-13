@@ -1,0 +1,2787 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Command Loop
+@chapter 命令循环
+@cindex editor command loop
+@cindex command loop
+
+当您运行 Emacs 时，它几乎立即进入 @dfn{editor command loop}。  该循环读取按键序列、执行它们的定义并显示结果。  在本章中，我们将描述这些事情是如何完成的，以及允许 Lisp 程序完成这些事情的子例程。
+
+@menu
+* Command Overview::     命令循环如何读取命令。
+* Defining Commands::    指定函数应如何读取参数。
+* Interactive Call::     调用命令，以便它读取参数。
+* Distinguish Interactive::      使命令区分交互式调用。
+* Command Loop Info::    由命令循环设置的变量供您检查。
+* Adjusting Point::      命令后点的调整。
+* Input Events::         当你阅读它时，输入看起来是什么样的。
+* Reading Input::        如何从键盘或鼠标读取输入事件。
+* Special Events::       事件立即单独处理。
+* Waiting::              等待用户输入或经过的时间。
+* Quitting::             @kbd{C-g} 如何工作。  如何抓住或推迟戒烟。
+* Prefix Command Arguments::     设置前缀参数的命令如何工作。
+* Recursive Editing::    输入递归编辑，以及为什么通常不应该这样做。
+* Disabling Commands::   命令循环如何处理禁用的命令。
+* Command History::      命令历史记录如何设置以及如何访问。
+* Keyboard Macros::      键盘宏是如何实现的。
+@end menu
+
+@node Command Overview
+@section 命令循环概述
+
+命令循环必须做的第一件事是读取按键序列，它是转换为命令的输入事件序列。它通过调用函数 @code{read-key-sequence} 来完成此操作。  Lisp 程序也可以调用这个函数 (@pxref{Key Sequence Input})。他们还可以使用@code{read-key}或@code{read-event}（@pxref{Reading One Event}）读取较低级别的输入，或使用@code{discard-input}（@pxref{Event Input Misc}）丢弃待处理的输入。
+
+键序列通过当前活动的键映射转换为命令。  @xref{Key Lookup}，了解如何完成此操作的信息。结果应该是键盘宏或交互式可调用函数。  如果键是@kbd{M-x}，那么它会读取另一个命令的名称，然后调用该命令。  这是通过命令 @code{execute-extended-command} (@pxref{Interactive Call}) 完成的。
+
+在执行该命令之前，Emacs 运行 @code{undo-boundary} 创建撤消边界。  @xref{Maintaining Undo}。
+
+要执行命令，Emacs 首先通过调用 @code{command-execute} (@pxref{Interactive Call}) 读取其参数。  对于用 Lisp 编写的命令，@code{interactive} 规范说明了如何读取参数。  这可以使用前缀参数 (@pxref{Prefix Command Arguments}) 或可以在迷你缓冲区 (@pxref{Minibuffers}) 中根据提示进行读取。  例如，命令@code{find-file}有一个@code{interactive}规范，它表示使用迷你缓冲区读取文件名。  @code{find-file} 的函数体不使用迷你缓冲区，因此如果您从 Lisp 代码中将 @code{find-file} 作为函数调用，则必须提供文件名字符串作为普通 Lisp 函数参数。
+
+如果命令是键盘宏（即字符串或向量），Emacs 将使用 @code{execute-kbd-macro} (@pxref{Keyboard Macros}) 执行它。
+
+@defvar pre-command-hook
+这个普通的钩子由编辑器命令循环在执行每个命令之前运行。  此时，@code{this-command}包含即将运行的命令，@code{last-command}描述前一个命令。  @xref{Command Loop Info}。
+@end defvar
+
+@defvar post-command-hook
+此正常挂钩由编辑器命令循环在执行每个命令（包括因退出或错误而提前终止的命令）后运行。  此时，@code{this-command}指的是刚刚运行的命令，@code{last-command}指的是之前的命令。
+
+当 Emacs 首次进入命令循环时（此时 @code{this-command} 和 @code{last-command} 均为 @code{nil}），也会运行此钩子。
+@end defvar
+
+运行 @code{pre-command-hook} 和 @code{post-command-hook} 时退出被抑制。  如果在执行这些钩子之一时发生错误，它不会终止该钩子的执行；相反，错误将被静音，并且发生错误的函数将从钩子中删除。
+
+进入 Emacs 服务器 (@pxref{Emacs Server,,, emacs, The GNU Emacs Manual}) 的请求就像键盘命令一样运行这两个钩子。
+
+请注意，当缓冲区文本包含很长的行时，这两个钩子会被调用，就像它们处于 @code{with-restriction} 形式 (@pxref{Narrowing}) 一样，带有 @code{long-line-optimizations-in-command-hooks} 标签，并且缓冲区缩小到点周围的部分。
+
+@node Defining Commands
+@section 定义命令
+@cindex defining commands
+@cindex commands, defining
+@cindex functions, making them interactive
+@cindex interactive function
+
+特殊形式 @code{interactive} 将 Lisp 函数转换为命令。  @code{interactive} 形式必须位于函数体的顶层，通常作为函数体内的第一个形式；这适用于 lambda 表达式 (@pxref{Lambda Expressions}) 和 @code{defun} 形式 (@pxref{Defining Functions})。  这种形式在函数的实际执行过程中不执行任何操作；它的存在充当一个标志，告诉 Emacs 命令循环该函数可以交互调用。  @code{interactive} 形式的参数指定如何读取交互式调用的参数。
+
+或者，可以在函数符号的 1⁣ 属性中指定 @code{interactive} 形式。  此属性的非 2⁣ 值优先于函数体本身中的任何 3⁣ 形式。  这个功能很少被使用。
+
+@anchor{The interactive-only property}
+@cindex @code{interactive-only} (symbol property)
+有时，函数只是为了交互调用，而不是直接从 Lisp 调用。  在这种情况下，直接或通过 @code{declare} (@pxref{Declare Form}) 为函数赋予非 @code{nil} @code{interactive-only} 属性。  如果从 Lisp 调用该命令，这会导致字节编译器发出警告。  @code{describe-function} 的输出将包含类似的信息。该属性的值可以是： 一个字符串，字节编译器将直接在其警告中使用该字符串（它应该以句点结尾，而不是以大写字母开头，例如 @code{"use (system-name) instead."}）； @code{t};任何其他符号，它应该是 Lisp 代码中使用的替代函数。
+
+通用函数 (@pxref{Generic Functions}) 不能通过添加 @code{interactive} 形式来转换为命令。
+
+@menu
+* Using Interactive::      @code{interactive} 的一般规则。
+* Interactive Codes::      以各种方式读取参数的标准字母代码。
+* Interactive Examples::   如何阅读交互式参数的示例。
+* Command Modes::          指定命令用于特定模式。
+* Generic Commands::       在命令选项中进行选择。
+@end menu
+
+@node Using Interactive
+@subsection 使用@code{interactive}
+@cindex arguments, interactive entry
+@cindex interactive spec, using
+
+本节介绍如何编写 @code{interactive} 形式使 Lisp 函数成为可交互调用的命令，以及如何检查命令的 @code{interactive} 形式。
+
+@defspec interactive &optional arg-descriptor &rest modes
+这种特殊形式声明函数是命令，因此可以交互地调用它（通过 @kbd{M-x} 或通过输入与其绑定的键序列）。  参数 @var{arg-descriptor} 声明当交互调用命令时如何计算命令的参数。
+
+一个命令可以像任何其他函数一样从 Lisp 程序中调用，但是调用者提供参数并且 @var{arg-descriptor} 不起作用。
+
+@cindex @code{interactive-form} (symbol property)
+@code{interactive} 形式必须位于函数体的顶层，或者位于函数符号的 @code{interactive-form} 属性 (@pxref{Symbol Properties}) 中。  它之所以有效，是因为命令循环在调用函数之前会查找它 (@pxref{Interactive Call})。  一旦函数被调用，它的所有主体形式都会被执行；此时，如果 @code{interactive} 形式出现在主体内，则该形式仅返回 @code{nil}，甚至不评估其参数。
+
+@var{modes} 列表允许指定命令的使用模式。 @xref{Command Modes}，了解有关指定 @var{modes} 的效果以及何时使用它的更多详细信息。
+
+按照惯例，您应该将 @code{interactive} 形式放在函数体中，作为第一个顶级形式。  如果 @code{interactive-form} 符号属性和函数体中都存在 @code{interactive} 形式，则前者优先。  @code{interactive-form} 符号属性可用于向现有函数添加交互式形式，或更改其参数的交互式处理方式，而无需重新定义函数。
+@end defspec
+
+参数@var{arg-descriptor}有三种可能：
+
+@itemize @bullet
+@item 
+可以省略或者@code{nil}；然后不带参数调用该命令。  如果命令需要一个或多个参数，这很快就会导致错误。
+
+@item 
+它可能是一个字符串；它的内容是一系列由换行符分隔的元素，每个参数对应一个@footnote{Some elements actually supply two arguments.}。  每个元素由一个代码字符 (@pxref{Interactive Codes}) 组成，可选地后跟一个提示（有些代码字符使用，有些则忽略）。  这是一个例子：
+
+@smallexample
+(interactive "P\nbFrobnicate buffer: ")
+@end smallexample
+
+@noindent
+代码字母 @samp{P} 将命令的第一个参数设置为原始命令前缀 (@pxref{Prefix Command Arguments})。  @samp{bFrobnicate buffer: } 使用 @samp{Frobnicate buffer: } 提示用户输入现有缓冲区的名称，该名称将成为第二个也是最后一个参数。
+
+提示字符串可以使用 @samp{%} 在提示中包含先前的参数值（从第一个参数开始）。  这是使用 @code{format-message} (@pxref{Formatting Strings}) 完成的。  例如，以下是如何读取现有缓冲区的名称，后跟该缓冲区的新名称：
+
+@smallexample
+@group
+(interactive "bBuffer to rename: \nsRename buffer %s to: ")
+@end group
+@end smallexample
+
+@cindex @samp{*} in @code{interactive}
+@cindex read-only buffers in interactive
+如果 0⁣ 出现在字符串的开头，则如果缓冲区是只读的，则会发出错误信号。
+
+@cindex @samp{@@} in @code{interactive}
+如果 @samp{@@} 出现在字符串的开头，并且用于调用该命令的按键序列包含任何鼠标事件，则在运行该命令之前将选择与第一个事件关联的窗口。
+
+@cindex @samp{^} in @code{interactive}
+@cindex shift-selection, and @code{interactive} spec
+如果 @samp{^} 出现在字符串的开头，并且如果通过 @dfn{shift-translation} 调用命令，则在运行命令之前设置标记并临时激活区域，或扩展已激活的区域。  如果调用该命令时没有进行移位转换，并且该区域暂时处于活动状态，请在运行该命令之前停用该区域。  Shift-translation 在用户级别由 @code{shift-select-mode} 控制；参见@ref{Shift Selection,,, emacs, The GNU Emacs Manual}。
+
+您可以同时使用@samp{*}、@samp{@@}和@code{^}；顺序并不重要。  参数的实际读取由提示字符串的其余部分控制（从第一个不是 @samp{*}、@samp{@@} 或 @samp{^} 的字符开始）。
+
+@item 
+它可能是一个 Lisp 表达式，但不是一个字符串；那么它应该是一个经过评估以获取要传递给命令的参数列表的形式。  通常，这种形式会调用各种函数来读取用户的输入，最常见的是通过迷你缓冲区（@pxref{Minibuffers}）或直接从键盘（@pxref{Reading Input}）。
+
+提供点或标记作为参数值也很常见，但如果您执行此@emph{and}读取输入（无论是否使用迷你缓冲区），请务必在读取后获取点或标记的整数值。  当前缓冲区可能正在接收子进程输出；如果在命令等待输入时子进程输出到达，它可以重新定位点和标记。
+
+以下是 @emph{not} 的操作示例：
+
+@smallexample
+(interactive
+ (list (region-beginning) (region-end)
+       (read-string "Foo: " nil 'my-history)))
+@end smallexample
+
+@noindent
+以下是通过在读取键盘输入后检查点和​​标记来避免该问题的方法：
+
+@smallexample
+(interactive
+ (let ((string (read-string "Foo: " nil 'my-history)))
+   (list (region-beginning) (region-end) string)))
+@end smallexample
+
+@strong{Warning:} 参数值不应包含任何无法打印和读取的数据类型。  有些设施将 @code{command-history} 保存在文件中，以便在后续会话中读取；如果命令的参数包含使用 @samp{#<@dots{}>} 语法打印的数据类型，则这些功能将不起作用。
+
+然而，也有一些例外：可以使用一组有限的表达式，例如 @code{(point)}、@code{(mark)}、@code{(region-beginning)} 和 @code{(region-end)}，因为 Emacs 会专门识别它们并将表达式（而不是其值）放入命令历史记录中。  要查看您编写的表达式是否属于这些异常之一，请运行该命令，然后检查@code{(car command-history)}。
+@end itemize
+
+@cindex examining the @code{interactive} form
+@defun interactive-form function
+该函数返回@var{function}的@code{interactive}形式。如果 @var{function} 是交互式可调用函数 (@pxref{Interactive Call})，则该值是命令的 @code{interactive} 形式 @code{(interactive @var{spec})}，它指定如何计算其参数。  否则，值为@code{nil}。  如果@var{function}是一个符号，则使用它的函数定义。当调用 OClose 时，工作将委托给通用函数@code{oclosure-interactive-form}。
+@end defun
+
+@defun oclosure-interactive-form function
+就像@code{interactive-form}一样，这个函数接受一个命令并返回其交互形式。  不同之处在于它是一个泛型函数，并且仅当 @var{function} 是 OClose (@pxref{OClosures}) 时才会被调用。  目的是使某些 OClose 类型能够动态计算其交互形式，而不是在其插槽之一中携带它。
+
+例如，这用于 @code{kmacro} 函数，以减少它们的内存大小，因为它们都共享相同的交互形式。  它还用于 @code{advice} 函数，其中交互形式是根据其组件的交互形式计算的，以便使该计算更加惰性，并在重新定义其组件之一时正确调整交互形式。
+@end defun
+
+@node Interactive Codes
+@subsection @code{interactive} 的代码字符
+@cindex interactive code description
+@cindex description for interactive codes
+@cindex codes, interactive, description of
+@cindex characters for interactive codes
+
+下面的代码字符描述包含一些关键词，这里定义如下：
+
+@table @b
+@item 完成
+@cindex interactive completion
+提供完成。  @key{TAB}、@key{SPC} 和 @key{RET} 执行名称补全，因为参数是使用 @code{completing-read} (@pxref{Completion}) 读取的。  @kbd{?} 显示可能完成的列表。
+
+@item 现存的
+需要现有对象的名称。  不接受无效名称；如果当前输入无效，则退出迷你缓冲区的命令不会退出。
+
+@item 默认
+@cindex default argument string
+如果用户没有在迷你缓冲区中输入文本，则使用某种默认值。  默认值取决于代码字符。
+
+@item 无输入/输出
+该代码字母无需读取任何输入即可计算参数。因此，它不使用提示字符串，并且您提供的任何提示字符串都将被忽略。
+
+即使代码字母不使用提示字符串，如果它不是字符串中的最后一个代码字符，您也必须在其后面添加换行符。
+
+@item 迅速的
+代码字符后立即出现提示。  提示符以字符串结尾或换行符结束。
+
+@item 特别的
+此代码字符仅在交互字符串的开头才有意义，并且不会查找提示或换行符。这是一个单一的、孤立的角色。
+@end table
+
+@cindex reading interactive arguments
+以下是与 @code{interactive} 一起使用的代码字符描述：
+
+@table @samp
+@item *
+如果当前缓冲区是只读的，则发出错误信号。  特别的。  请注意，如果命令尝试修改只读缓冲区的文本，许多 Emacs 原语将发出错误信号，即使该命令的交互规范不包含@samp{*}。  因此，当您想要强制发出错误信号（即使命令的实现不调用任何修改缓冲区的原语）时，或者如果您想避免命令的处理或副作用（稍后由于缓冲区修改而失败）时，可以使用此字符。  例如，一个绑定 @code{inhibit-read-only} 非 @code{nil} 的命令（因为它不仅仅影响只读缓冲区），或者一个命令，根据条件，最终可能不会修改缓冲区，但您仍然希望它发出此错误信号。
+
+@item @@
+选择调用此命令的按键序列中第一个鼠标事件中提到的窗口。  特别的。
+
+@item ^
+如果通过shift-translation调用该命令，请在运行该命令之前设置标记并临时激活该区域，或扩展已经活动的区域。  如果调用该命令时没有进行移位转换，并且该区域暂时处于活动状态，请在运行该命令之前停用该区域。  特别的。
+
+@item a
+函数名称（即满足@code{fboundp}的符号）。  现有、完成、提示。
+
+@item b
+现有缓冲区的名称。  默认情况下，使用当前缓冲区的名称 (@pxref{Buffers})。  现有、完成、默认、提示。
+
+@item B
+缓冲区名称。  缓冲区不需要存在。  默认情况下，使用除当前缓冲区之外的最近使用的缓冲区的名称。  完成、默认、提示。
+
+@item c
+一个角色。  光标不会移入回显区域。  迅速的。
+
+@item C
+命令名称（即满足@code{commandp}的符号）。  现有、完成、提示。
+
+@item d
+@cindex position argument
+点的位置，整数 (@pxref{Point})。  无输入/输出。
+
+@item D
+一个目录。  默认值是当前缓冲区的当前默认目录@code{default-directory} (@pxref{File Name Expansion})。现有、完成、默认、提示。
+
+@item e
+调用命令的按键序列中的第一个或下一个非键盘事件。  更准确地说，@samp{e} 获取的事件是列表，因此您可以查看列表中的数据。  @xref{Input Events}。  无输入/输出。
+
+您可以将 @samp{e} 用于鼠标事件和特殊系统事件 (@pxref{Misc Events})。  命令接收的事件列表取决于事件。  @xref{Input Events}，描述了相应小节中每个事件的列表形式。
+
+您可以在单个命令的交互规范中多次使用@samp{e}。  如果调用该命令的按键序列具有列出的 @var{n} 事件，则第 @var{n}3⁣ 提供第 @var{n} 这样的事件。  不是列表的事件，例如功能键和 @acronym{ASCII} 字符，在 @samp{e} 涉及的情况下不计算在内。
+
+@item f
+现有文件的文件名 (@pxref{File Names})。  @xref{Reading File Names}，有关默认值的详细信息。  现有、完成、默认、提示。
+
+@item F
+一个文件名。  该文件不必存在。  完成、默认、提示。
+
+@item G
+一个文件名。  该文件不必存在。  如果用户仅输入目录名称，则该值只是该目录名称，不添加目录中的文件名。  完成、默认、提示。
+
+@item i
+一个无关紧要的论点。  此代码始终提供 @code{nil} 作为参数值。  无输入/输出。
+
+@item k
+按键序列 (@pxref{Key Sequences})。  这将继续读取事件，直到在当前键映射中找到命令（或未定义的命令）。  键序列参数表示为字符串或向量。光标不会移入回显区域。  迅速的。
+
+如果 @samp{k} 读取以向下事件结束的按键序列，它还会读取并丢弃后续的向上事件。  您可以使用 @samp{U} 代码字符访问该上升事件。
+
+这种输入由 @code{describe-key} 和 @code{keymap-global-set} 等命令使用。
+
+@item K
+表单上的按键序列，可用作 @code{keymap-set} 等函数的输入。  这与 @samp{k} 类似，只是对于按键序列中的最后一个输入事件，它会抑制通常用于（必要时）将未定义按键转换为已定义按键的转换 (@pxref{Key Sequence Input})，因此在提示输入要绑定到命令的新按键序列时通常使用这种形式。
+
+@item m
+@cindex marker argument
+标记的位置，为整数。  无输入/输出。
+
+@item M
+任意文本，使用当前缓冲区的输入法读取迷你缓冲区，并以字符串形式返回 (@pxref{Input Methods,,, emacs, The GNU Emacs Manual})。  迅速的。
+
+@item n
+一个数字，用迷你缓冲区读取。  如果输入的不是数字，用户必须重试。  @samp{n} 从不使用前缀参数。迅速的。
+
+@item N
+数字前缀参数；但如果没有前缀参数，则像 @kbd{n} 一样读取数字。  该值始终是一个数字。  @xref{Prefix Command Arguments}。  迅速的。
+
+@item p
+@cindex numeric prefix argument usage
+数字前缀参数。  （请注意，此@samp{p} 是小写字母。）无 I/O。
+
+@item P
+@cindex raw prefix argument usage
+原始前缀参数。  （请注意，此@samp{P} 为大写。）无 I/O。
+
+@item r
+@cindex region argument
+点和标记作为两个数字参数，最小的在前。  这个和下面的代码字母是唯一指定两个连续参数而不是一个参数的代码字母。  如果调用命令时当前的缓冲区中未设置标记，@samp{r} 将发出错误信号。  如果打开瞬态标记模式 (@pxref{The Mark}) --- 默认情况下 --- 并且用户选项 @code{mark-even-if-inactive} 为 @code{nil}，即使标记 @emph{is} 设置但处于非活动状态，Emacs 也会发出错误信号。  无输入/输出。
+
+@item R
+点和标记作为两个数字参数，首先是最小的，但前提是该区域处于活动状态并且适合对其进行操作，在 @code{use-region-p} (@pxref{The Region}) 的意义上。  否则，对于每个连续的参数，提供 @code{nil} 两次。  该代码字母永远不会发出错误信号，因为如果未设置标记，@code{use-region-p} 只会返回 nil。  对于专门作用于活动区域的命令，请使用此代码字母而不是 @samp{r}。  无输入/输出。
+
+@item s
+任意文本，读入迷你缓冲区并以字符串形式返回 (@pxref{Text from Minibuffer})。  使用 @kbd{C-j} 或 @key{RET} 终止输入。  （@kbd{C-q} 可用于在输入中包含这些字符中的任何一个。）提示。
+
+@item S
+一个驻留符号，其名称在迷你缓冲区中读取。  使用 @kbd{C-j} 或 @key{RET} 终止输入。  通常终止符号的其他字符（例如空格、括号和方括号）在这里不这样做。  迅速的。
+
+@item U
+键序列或@code{nil}。  可以在 @samp{k} 或 @samp{K} 参数之后使用，以获取在 @samp{k} 或 @samp{K} 读取向下事件后丢弃的向上事件（如果有）。  如果没有丢弃任何向上事件，则@samp{U}提供@code{nil}作为参数。  无输入/输出。
+
+@item v
+声明为用户选项的变量（即满足谓词@code{custom-variable-p}）。  这使用@code{read-variable}读取变量。  @xref{Definition of read-variable}。  现有、完成、提示。
+
+@item x
+一个 Lisp 对象，用其读取语法指定，以 @kbd{C-j} 或 @key{RET} 终止。  不评估该对象。  @xref{Object from Minibuffer}。  迅速的。
+
+@item X
+@cindex evaluated expression argument
+Lisp 表单的值。  @samp{X} 的读取方式与 @samp{x} 相同，然后计算该形式，使其值成为命令的参数。迅速的。
+
+@item z
+编码系统名称（符号）。  如果用户输入空值，则参数值为@code{nil}。  @xref{Coding Systems}。  完成、现有、提示。
+
+@item Z
+编码系统名称（符号）——但前提是此命令具有前缀参数。  如果没有前缀参数，@samp{Z} 提供 @code{nil} 作为参数值。  完成、现有、提示。
+@end table
+
+@node Interactive Examples
+@subsection 使用@code{interactive}的示例
+@cindex examples of using @code{interactive}
+@cindex @code{interactive}, examples of using
+
+以下是 @code{interactive} 的一些示例：
+
+@example
+@group
+(defun foo1 ()              ; @r{@code{foo1} takes no arguments,}
+    (interactive)           ;   @r{just moves forward two words.}
+    (forward-word 2))
+     @result{} foo1
+@end group
+
+@group
+(defun foo2 (n)             ; @r{@code{foo2} takes one argument,}
+    (interactive "^p")      ;   @r{which is the numeric prefix.}
+                            ; @r{under @code{shift-select-mode},}
+                            ;   @r{will activate or extend region.}
+    (forward-word (* 2 n)))
+     @result{} foo2
+@end group
+
+@group
+(defun foo3 (n)             ; @r{@code{foo3} takes one argument,}
+    (interactive "nCount:") ;   @r{which is read with the Minibuffer.}
+    (forward-word (* 2 n)))
+     @result{} foo3
+@end group
+
+@group
+(defun three-b (b1 b2 b3)
+  "Select three existing buffers.
+Put them into three windows, selecting the last one."
+@end group
+    (interactive "bBuffer1:\nbBuffer2:\nbBuffer3:")
+    (delete-other-windows)
+    (split-window (selected-window) 8)
+    (switch-to-buffer b1)
+    (other-window 1)
+    (split-window (selected-window) 8)
+    (switch-to-buffer b2)
+    (other-window 1)
+    (switch-to-buffer b3))
+     @result{} three-b
+@group
+(three-b "*scratch*" "declarations.texi" "*mail*")
+     @result{} nil
+@end group
+@end example
+
+@node Command Modes
+@subsection 指定命令模式
+@cindex commands, mode-specific
+@cindex commands, specify as mode-specific
+@cindex mode-specific commands
+
+Emacs 中的许多命令都是通用的，与任何特定模式无关。例如，@kbd{M-x kill-region}几乎可以在任何具有可编辑文本的模式下使用，而显示信息的命令（如@kbd{M-x list-buffers}）可以在几乎任何上下文中使用。
+
+然而，许多其他命令专门与某种模式相关联，在该上下文之外没有任何意义。  例如，如果在 Dired 缓冲区之外使用，@code{M-x dired-diff} 只会发出错误信号。
+
+因此，Emacs 有一种机制来指定命令“属于”什么模式：
+
+@lisp
+(defun dired-diff (...)
+  ...
+  (interactive "p" dired-mode)
+  ...)
+@end lisp
+
+这将将该命令标记为仅适用于@code{dired-mode}（或从@code{dired-mode}派生的任何模式）。  可以将任意数量的模式添加到 @code{interactive} 形式中。
+
+@vindex read-extended-command-predicate
+指定模式会影响 @kbd{M-S-x} (@code{execute-extended-command-for-buffer}, @pxref{Interactive Call}) 中的命令完成。  它还可能影响 @kbd{M-x} 中的完成，具体取决于 @code{read-extended-command-predicate} 的值。
+
+例如，当使用 @code{command-completion-default-include-p} 谓词作为 @code{read-extended-command-predicate} 的值时，@kbd{M-x} 不会列出已标记为适用于特定模式的命令（当然，除非您位于使用该模式的缓冲区中）。  这适用于主要模式和次要模式。  （相比之下，@kbd{M-S-x}总是从补全候选中省略不适用的命令。）
+
+默认情况下，@code{read-extended-command-predicate}是@code{nil}，@kbd{M-x}中的完成会列出与用户键入的内容匹配的所有命令，无论这些命令是否被标记为适用于当前缓冲区的模式。
+
+将命令标记为适用于某种模式也会使 @kbd{C-h m} 列出这些命令（如果它们未绑定到任何键）。
+
+如果使用此扩展 @code{interactive} 形式不方便（因为代码应该在不支持扩展 @code{interactive} 形式的旧版 Emacs 中工作），则可以使用以下等效声明 (@pxref{Declare Form})：
+
+@lisp
+(declare (modes dired-mode))
+@end lisp
+
+用模式标记哪些命令在某种程度上是一个品味问题，但是显然在模式之外不起作用的命令应该被标记。  这包括如果从其他地方调用将发出错误信号的命令，也包括从意外模式调用时具有破坏性的命令。  （这通常包括为特殊（即非编辑）模式编写的大多数命令。）
+
+有些命令可能是无害的，并且在从其他模式调用时可以“工作”，但如果它们实际上在其他地方使用没有多大意义，则仍然应该用模式标记。  例如，许多特殊模式都有退出绑定到@kbd{q}的缓冲区的命令，并且可能不执行任何操作，只是发出“再见此模式”之类的消息，然后调用@code{kill-buffer}。  该命令可以在任何模式下“工作”，但是任何人实际上不太可能想要在该特殊模式的上下文之外使用该命令。
+
+许多模式都有一组不同的命令，可以以不同的方式启动模式（例如，@code{eww-open-in-new-buffer} 和 @code{eww-open-file}）。  像这样的命令永远不应该被标记为特定于模式，因为它们可以由用户从几乎任何上下文中发出。
+
+@node Generic Commands
+@subsection 在命令选项中选择
+@cindex generic commands
+@cindex alternative commands, defining
+
+有时定义一个命令作为“通用调度程序”很有用，该命令能够根据用户的需要调用一组命令中的一个。  例如，假设您要定义一个名为 @samp{open} 的命令，它可以“打开”并显示几种不同类型的对象。  或者，您可以使用名为 @samp{mua}（代表邮件用户代理）的命令，该命令可以使用多个电子邮件后端之一（例如 Rmail、Gnus 或 MH-E）读取和发送电子邮件。  宏@code{define-alternatives}可以用来定义这样的@dfn{generic commands}。  通用命令是一种交互功能，其实现可以根据用户偏好从多种替代方案中进行选择。
+
+@defmac define-alternatives command &rest customizations
+该宏定义了新的通用 @var{command}，它可以有多种替代实现。  参数 @var{command} 应该是一个不带引号的符号。
+
+调用时，该宏会创建一个交互式 Lisp 闭包 (@pxref{Closures})。  当用户第一次运行 @w{@kbd{M-x @var{command} @key{RET}}} 时，Emacs 会要求选择 @var{command} 的替代实现之一，并提供这些替代名称的补全。  这些名称来自宏创建的名为 @code{@var{command}-alternatives} 的用户选项（如果之前不存在）。  为了有用，此变量的值应该是一个 alist，其元素具有 @w{@code{(@var{alt-name} . @var{alt-func})}} 形式，其中 @var{alt-name} 是替代项的名称，@var{alt-func} 是选择此替代项时要调用的交互函数。  当用户选择一个替代项时，Emacs 会记住该选择，然后自动调用所选的替代项，而不会在用户再次调用 @kbd{M-x @var{command}} 时进行提示。  要选择不同的选项，请输入 @w{@kbd{C-u M-x @var{command} @key{RET}}}——然后 Emacs 将再次提示输入其中一个选项，并且该选择将覆盖前一个选项。
+
+可以在调用 @code{define-alternatives} 之前使用适当的值创建变量 @code{@var{command}-alternatives}；否则，宏将创建具有 @code{nil} 值的变量，然后应使用描述替代方案的关联来填充该变量。  希望提供自己的现有通用命令实现的包可以使用 @code{autoload} cookies (@pxref{Autoload}) 添加到列表中，例如：
+
+@lisp
+;;;###autoload (push '("My name" . my-foo-symbol) foo-alternatives
+@end lisp
+
+如果可选参数 @var{customizations} 不是 @code{nil}，则它应由交替的 @code{defcustom} 关键字（通常为 @code{:group} 和 @code{:version}）和要添加到 @code{defcustom} @code{@var{command}-alternatives} 定义的值组成。
+
+下面是一个名为 @code{open} 的简单通用调度程序命令的示例，具有 3 个替代实现：
+
+@example
+@group
+(define-alternatives open
+  :group 'files
+  :version "42.1")
+@end group
+@group
+(setq open-alternatives
+      '(("file" . find-file)
+	("directory" . dired)
+	("hexl" . hexl-find-file)))
+@end group
+@end example
+
+@end defmac
+
+@node Interactive Call
+@section 互动通话
+@cindex interactive call
+
+命令循环将按键序列转换为命令后，它使用函数 @code{command-execute} 调用该命令。  如果命令是函数，@code{command-execute} 调用 @code{call-interactively}，后者读取参数并调用命令。  您也可以自己调用这些函数。
+
+请注意，在此上下文中，术语“命令”指的是交互式可调用函数（或类似函数的对象）或键盘宏。  它不是指用于调用命令的按键序列 (@pxref{Keymaps})。
+
+@defun commandp object &optional for-call-interactively
+如果 1⁣ 是命令，则该函数返回 0⁣。否则，它返回@code{nil}。
+
+命令包括字符串和向量（被视为键盘宏）、包含顶级 @code{interactive} 形式 (@pxref{Using Interactive}) 的 lambda 表达式、由此类 lambda 表达式组成的字节码函数对象、声明为交互式的自动加载对象（@code{nil} 的第四个参数@code{autoload}）以及一些原始函数。  此外，如果符号具有非 @code{nil} @code{interactive-form} 属性，或其函数定义满足 @code{commandp}，则该符号被视为命令。
+
+如果 @var{for-call-interactively} 是非 @code{nil}，则 @code{commandp} 仅针对 @code{call-interactively} 可以调用的对象返回 @code{t} — 因此，不适用于键盘宏。
+
+请参阅@ref{Accessing Documentation}中的@code{documentation}，了解使用@code{commandp}的实际示例。
+@end defun
+
+@defun call-interactively command &optional record-flag keys
+该函数调用交互式可调用函数@var{command}，并根据其交互式调用规范提供参数。它返回 @var{command} 返回的内容。
+
+例如，如果您有一个具有以下签名的函数：
+
+@example
+(defun foo (begin end)
+  (interactive "r")
+  ...)
+@end example
+
+然后说
+
+@example
+(call-interactively 'foo)
+@end example
+
+将以区域（@code{point} 和 @code{mark}）作为参数调用 @code{foo}。
+
+如果 @var{command} 不是函数或者不能交互调用（即不是命令），则会发出错误信号。  请注意，键盘宏（字符串和向量）不被接受，即使它们被视为命令，因为它们不是函数。  如果 1⁣ 是一个符号，则 2⁣ 使用其函数定义。
+
+@cindex record command history
+如果@var{record-flag}非@code{nil}，则该命令及其参数将无条件添加到列表@code{command-history}。否则，仅当该命令使用迷你缓冲区读取参数时才会添加该命令。  @xref{Command History}。
+
+参数@var{keys}（如果给定）应该是一个向量，如果命令查询使用哪些事件来调用它，则指定要提供的事件序列。  如果省略@var{keys}或@code{nil}，则默认为@code{this-command-keys-vector}的返回值。 @xref{Definition of this-command-keys-vector}。
+@end defun
+
+@defun funcall-interactively function &rest arguments
+此函数的工作方式类似于 @code{funcall} (@pxref{Calling Functions})，但它使调用看起来像交互式调用：在 @var{function} 内调用 @code{called-interactively-p} 将返回 @code{t}。  如果 5⁣ 不是命令，则调用它时不会发出错误信号。
+@end defun
+
+@defun command-execute command &optional record-flag keys special
+@cindex keyboard macro execution
+该函数执行@var{command}。  参数 @var{command} 必须满足 @code{commandp} 谓词；即，它必须是可交互调用的函数或键盘宏。
+
+作为 @var{command} 的字符串或向量用 @code{execute-kbd-macro} 执行。  函数连同 @var{record-flag} 和 @var{keys} 参数一起传递给 @code{call-interactively} （见上文）。
+
+如果 @var{command} 是一个符号，则使用其函数定义来代替它。  如果具有 @code{autoload} 定义的符号被声明为代表可交互调用的函数，则该符号被视为命令。  这样的定义是通过加载指定的库然后重新检查符号的定义来处理的。
+
+参数@var{special}，如果给定，意味着忽略前缀参数并且不清除它。  这用于执行特殊事件 (@pxref{Special Events})。
+@end defun
+
+@deffn Command execute-extended-command prefix-argument
+@cindex read command name
+该函数使用 @code{completing-read} (@pxref{Completion}) 从迷你缓冲区读取命令名称。  然后它使用@code{command-execute}调用指定的命令。  该命令返回的任何内容都会成为 @code{execute-extended-command} 的值。
+
+@cindex execute with prefix argument
+如果命令要求前缀参数，它会收到值@var{prefix-argument}。  如果以交互方式调用 @code{execute-extended-command}，则当前的原始前缀参数将用于 @var{prefix-argument}，从而传递到运行的任何命令。
+
+@c !!! Should this be @kindex?
+@cindex @kbd{M-x}
+@code{execute-extended-command} 是 @kbd{M-x} 的正常定义，因此它使用字符串 @w{@samp{M-x }} 作为提示。  （最好从用于调用 @code{execute-extended-command} 的事件中获取提示，但这实现起来很痛苦。）前缀参数值的描述（如果有）也会成为提示的一部分。
+
+@example
+@group
+(execute-extended-command 3)
+---------- Buffer: Minibuffer ----------
+3 M-x forward-word @key{RET}
+---------- Buffer: Minibuffer ----------
+     @result{} t
+@end group
+@end example
+
+@vindex read-extended-command-predicate
+@findex command-completion-default-include-p
+该命令关注 @code{read-extended-command-predicate} 变量，它可以过滤掉不适用于当前主要模式（或启用的次要模式）的命令。  默认情况下，该变量的值为@code{nil}，并且不会过滤掉任何命令。但是，自定义它以调用函数 @code{command-completion-default-include-p} 将执行与模式相关的过滤。  @code{read-extended-command-predicate} 可以是任何谓词函数；它将用两个参数调用：命令的符号和当前缓冲区。  如果在该缓冲区中完成时要包含该命令，则应返回非@code{nil}。
+@end deffn
+
+@kindex @kbd{M-X}
+@kindex @kbd{M-S-x}
+@deffn Command execute-extended-command-for-buffer prefix-argument
+这类似于@code{execute-extended-command}，但将提供的用于完成的命令限制为与当前主要模式（以及启用的次要模式）特别相关的命令。  这包括标有模式 (@pxref{Using Interactive}) 的命令，以及绑定到本地活动键盘映射的命令。  该命令是 @kbd{M-S-x} 的正常定义（即“元移位 x”）。
+@end deffn
+
+这两个命令都提示输入命令名称，但具有不同的完成规则。  您可以在出现提示时使用 @kbd{M-S-x} 命令在这两种模式之间切换。
+
+@node Distinguish Interactive
+@section 区分互动通话
+@cindex distinguish interactive calls
+@cindex is this call interactive
+
+有时，命令应该仅针对交互式呼叫显示额外的视觉反馈（例如回显区域中的信息性消息）。  有三种方法可以做到这一点。  测试函数是否使用 @code{call-interactively} 调用的推荐方法是为其提供可选参数 @code{print-message} 并使用 @code{interactive} 规范使其在交互式调用中成为非 @code{nil}。  这是一个例子：
+
+@example
+(defun foo (&optional print-message)
+  (interactive "p")
+  (when print-message
+    (message "foo")))
+@end example
+
+@noindent
+我们使用@code{"p"}，因为数字前缀参数永远不是@code{nil}。  以这种方式定义，该函数在从键盘宏调用时确实会显示消息。
+
+上述带有附加参数的方法通常是最好的，因为它允许调用者说“将此调用视为交互式”。但您也可以通过测试 @code{called-interactively-p} 来完成这项工作。
+
+@defun called-interactively-p kind
+当使用@code{call-interactively}调用调用函数时，该函数返回@code{t}。
+
+参数 @var{kind} 应该是符号 @code{interactive} 或符号 @code{any}。  如果它是 @code{interactive}，则仅当调用是由用户直接进行时，@code{called-interactively-p} 返回 @code{t} — 例如，如果用户键入绑定到调用函数的键序列，但如果用户运行调用该函数的键盘宏 (@pxref{Keyboard Macros})，则返回 @emph{not}。  如果 @var{kind} 为 @code{any}，对于任何类型的交互式调用（包括键盘宏），@code{called-interactively-p} 返回 @code{t}。
+
+如果有疑问，请使用@code{any}； @code{interactive} 唯一已知的正确用法是，如果您需要决定是否在函数运行时显示有用的消息。
+
+如果函数是通过 Lisp 求值（或使用 @code{apply} 或 @code{funcall}）调用的，则永远不会认为该函数是交互式调用的。
+@end defun
+
+@noindent
+这是使用 @code{called-interactively-p} 的示例：
+
+@example
+@group
+(defun foo ()
+  (interactive)
+  (when (called-interactively-p 'any)
+    (message "Interactive!")
+    'foo-called-interactively))
+@end group
+
+@group
+;; @r{Type @kbd{M-x foo}.}
+     @print{} Interactive!
+@end group
+
+@group
+(foo)
+     @result{} nil
+@end group
+@end example
+
+@noindent
+这是另一个对比直接和间接调用 @code{called-interactively-p} 的例子。
+
+@example
+@group
+(defun bar ()
+  (interactive)
+  (message "%s" (list (foo) (called-interactively-p 'any))))
+@end group
+
+@group
+;; @r{Type @kbd{M-x bar}.}
+     @print{} (nil t)
+@end group
+@end example
+
+@node Command Loop Info
+@section 来自命令循环的信息
+@cindex command loop variables
+
+编辑器命令循环设置几个 Lisp 变量来保存其自身和运行的命令的状态记录。  除了 0⁣ 和 @code{last-command} 之外，在 Lisp 程序中更改任何这些变量通常都是一个坏主意。
+
+@defvar last-command
+该变量记录命令循环执行的上一个命令的名称（当前命令之前的命令）。  通常该值是带有函数定义的符号，但这不能保证。
+
+当命令返回到命令循环时，该值将从 @code{this-command} 复制，除非该命令为后续命令指定了前缀参数。
+
+该变量始终是当前终端的本地变量，并且不能是缓冲区本地的。  @xref{Multiple Terminals}。
+@end defvar
+
+@defvar real-last-command
+这个变量是由 Emacs 设置的，就像 @code{last-command} 一样，但从未被 Lisp 程序更改过。
+@end defvar
+
+@defvar last-repeatable-command
+该变量存储最近执行的不属于输入事件的命令。  这是命令 @code{repeat} 将尝试重复，@xref{Repeating,,, emacs, The GNU Emacs Manual}。
+@end defvar
+
+@defvar this-command
+@cindex current command
+该变量记录编辑器命令循环现在正在执行的命令的名称。  与@code{last-command}一样，它通常是带有函数定义的符号。
+
+命令循环在运行命令之前设置此变量，并在命令完成时将其值复制到@code{last-command}（除非该命令为后续命令指定了前缀参数）。
+
+@cindex kill command repetition
+某些命令在执行期间设置此变量，作为接下来运行的任何命令的标志。  特别是，用于终止文本的函数将@code{this-command}设置为@code{kill-region}，以便紧随其后的任何终止命令都知道将终止的文本附加到之前的终止中。
+@end defvar
+
+如果您不希望某个特定命令在出现错误时被识别为前一个命令，则必须对该命令进行编码以防止出现这种情况。  一种方法是在命令开头将 @code{this-command} 设置为 @code{t}，并在命令末尾将 @code{this-command} 设置回其正确值，如下所示：
+
+@example
+(defun foo (args@dots{})
+  (interactive @dots{})
+  (let ((old-this-command this-command))
+    (setq this-command t)
+    @r{@dots{}do the work@dots{}}
+    (setq this-command old-this-command)))
+@end example
+
+@noindent
+我们不将 @code{this-command} 与 @code{let} 绑定，因为这会在出现错误时恢复旧值——这是 @code{let} 的一个特性，在这种情况下，它正是我们想要避免的。
+
+@defvar this-original-command
+它与 @code{this-command} 具有相同的值，除非发生命令重新映射 (@pxref{Remapping Commands})。  在这种情况下，@code{this-command}给出实际运行的命令（重新映射的结果），@code{this-original-command}给出指定运行但重新映射到另一个命令的命令。
+@end defvar
+
+@defvar current-minibuffer-command
+它与 @code{this-command} 具有相同的值，但在进入迷你缓冲区时会递归绑定。  可以在迷你缓冲区挂钩等中使用此变量来确定打开当前迷你缓冲区会话的命令。
+@end defvar
+
+@defun this-command-keys
+此函数返回一个字符串或向量，其中包含调用当前命令的按键序列。  使用 @code{read-event} 命令读取的任何没有超时的事件都会被添加到末尾。
+
+但是，如果该命令调用了@code{read-key-sequence}，它将返回最后读取的按键序列。  @xref{Key Sequence Input}。  如果序列中的所有事件都是适合字符串的字符，则该值是字符串。  @xref{Input Events}。
+
+@example
+@group
+(this-command-keys)
+;; @r{Now use @kbd{C-u C-x C-e} to evaluate that.}
+     @result{} "^X^E"
+@end group
+@end example
+@end defun
+
+@defun this-command-keys-vector
+@anchor{Definition of this-command-keys-vector}
+与 @code{this-command-keys} 类似，但它始终以向量形式返回事件，因此您无需处理将输入事件存储在字符串 (@pxref{Strings of Events}) 中的复杂性。
+@end defun
+
+@defun clear-this-command-keys &optional keep-record
+该函数清空事件表以便 @code{this-command-keys} 返回。  除非@var{keep-record}非@code{nil}，否则它还会清空函数@code{recent-keys} (@pxref{Recording Input}) 随后返回的记录。这在读取密码后很有用，可以防止密码在某些情况下无意中作为下一个命令的一部分回显。
+@end defun
+
+@defvar last-nonmenu-event
+该变量保存作为按键序列的一部分读取的最后一个输入事件，不计算鼠标菜单产生的事件。
+
+该变量的一种用途是告诉 @code{x-popup-menu} 在哪里弹出菜单。  它也由 @code{y-or-n-p} (@pxref{Yes-or-No Queries}) 在内部使用。
+@end defvar
+
+@defvar last-command-event
+该变量设置为命令循环作为命令的一部分读取的最后一个输入事件。  该变量的主要用途是在 @code{self-insert-command} 中，它使用它来决定要插入哪个字符，以及在 @code{post-self-insert-hook} (@pxref{Commands for Insertion}) 中，它使用它来访问刚刚插入的字符。
+
+@example
+@group
+last-command-event
+;; @r{Now use @kbd{C-u C-x C-e} to evaluate that.}
+     @result{} 5
+@end group
+@end example
+
+@noindent
+该值为 5，因为这是 @kbd{C-e} 的 @acronym{ASCII} 代码。
+@end defvar
+
+@defvar last-event-frame
+该变量记录最后一个输入事件定向到的帧。通常这是生成事件时选择的帧，但如果该帧已将输入焦点重定向到另一个帧，则该值是事件重定向到的帧。 @xref{Input Focus}。
+
+如果最后一个事件来自键盘宏，则值为 @code{macro}。
+@end defvar
+
+@cindex input devices
+@cindex device names
+输入事件必须来自某个地方；有时，它是一个键盘宏、一个信号或@code{unread-command-events}，但它通常是连接到由用户控制的计算机的物理输入设备。  这些设备被称为 @dfn{input devices}，Emacs 将每个输入事件与其起源的输入设备相关联。  它们通过每个输入设备唯一的名称来标识。
+
+确定所使用的精确输入设备的能力取决于每个系统的细节。  当该信息不可用时，Emacs 会将键盘事件报告为源自 @samp{"Virtual core keyboard"}，并将其他事件报告为源自 @samp{"Virtual core pointer"}。  （这些值在每个平台上使用，因为当详细的设备信息未知时，X 服务器会报告它们。）
+
+@defvar last-event-device
+该变量记录生成最后读取的输入事件的输入设备的名称。  如果不存在这样的设备，则为@code{nil}，即，最后一个输入事件是从@code{unread-command-events}读取的，或者来自键盘宏。
+
+当 X 输入扩展在 X Windows 上使用时，设备名称是一个字符串，对于连接到 X 服务器的每个物理键盘、指点设备和触摸屏来说都是唯一的。  否则，它是字符串 @samp{"Virtual core pointer"} 或 @samp{"Virtual core keyboard"}，具体取决于事件是由指点设备（例如鼠标）还是键盘生成的。
+@end defvar
+
+@defun device-class frame name
+设备有多种不同类型，从其名称即可确定。  此函数可用于确定源自 @var{frame} 的事件的设备 @var{name} 的正确类型。
+
+返回值是以下符号之一（“设备类”）：
+
+@table @code
+@item core-keyboard
+核心键盘；这意味着该设备是类似键盘的设备，但没有其他未知的特征。
+
+@item core-pointer
+核心指针；这意味着该设备是指点设备，但没有其他特征已知。
+
+@item mouse
+电脑鼠标。
+
+@item trackpoint
+指点杆或操纵杆（或其他类似的控件。）
+
+@item eraser
+绘图板上的手写笔的另一端，或独立的橡皮擦。
+
+@item pen
+绘图板、手写笔或其他类似设备上的笔的尖端。
+
+@item puck
+一种看起来像计算机鼠标的设备，但报告相对于其他表面的绝对坐标。
+
+@item power-button
+电源按钮或音量按钮（或其他类似的控件。）
+
+@item keyboard
+电脑键盘。
+
+@item touchscreen
+电脑触摸板。
+
+@item pad
+绘图板周围常见的敏感按钮、环和条带的集合。
+
+@item touchpad
+间接触摸设备，例如触摸板。
+
+@item piano
+一种乐器，例如电子键盘。
+
+@item test
+XTEST 扩展用来报告输入的设备。
+@end table
+@end defun
+
+@node Adjusting Point
+@section 命令后调整点
+@cindex adjusting point
+@cindex invisible/intangible text, and point
+@cindex @code{display} property, and point display
+@cindex @code{composition} property, and point display
+
+当文本序列具有 @code{display} 或 @code{composition} 属性或不可见时，可能存在多个缓冲区位置，导致光标显示在屏幕上的同一位置。因此，在命令完成并返回到命令循环后，如果点位于这样的序列中，命令循环通常会移动点以尝试使该序列实际上变得无形。
+
+这个@emph{point adjustment}遵循以下一般规则：第一，调整不应改变命令的整体方向；其次，如果命令移动了点，则调整会尝试确保光标也移动；第三，Emacs 更喜欢无形序列的边缘，并且在这些边缘中它更喜欢非粘性边缘，以便新插入的文本可见。
+
+命令可以通过设置变量 @code{disable-point-adjustment} 来禁止此功能：
+
+@defvar disable-point-adjustment
+如果当命令返回到命令循环时此变量为非@code{nil}，则命令循环不会检查这些文本属性，并且不会将点移出具有它们的序列。
+
+命令循环在每个命令之前将此变量设置为@code{nil}，因此如果命令设置它，则效果仅适用于该命令。
+@end defvar
+
+@defvar global-disable-point-adjustment
+如果将此变量设置为非 @code{nil} 值，则将点移出这些序列的功能将完全关闭。
+@end defvar
+
+@node Input Events
+@section 输入事件
+@cindex events
+@cindex input events
+
+Emacs 命令循环读取代表键盘或鼠标活动或发送到 Emacs 的系统事件的 @dfn{input events} 序列。键盘活动的事件是字符或符号；其他事件始终列出。  本节详细描述输入事件的表示和含义。
+
+@defun eventp object
+如果 1⁣ 是输入事件或事件类型，则此函数返回非 0⁣。
+
+请注意，任何非 0⁣ 符号都可以用作事件或事件类型； @code{eventp} 无法区分 Lisp 代码是否打算将符号用作事件。
+@end defun
+
+@menu
+* Keyboard Events::              普通字符——带有符号的按键。
+* Function Keys::                功能键——带有名称而不是符号的键。
+* Mouse Events::                 鼠标事件概述。
+* Click Events::                 按下并释放鼠标按钮。
+* Drag Events::                  在释放按钮之前移动鼠标。
+* Button-Down Events::           按钮被按下但尚未释放。
+* Repeat Events::                双击或三次单击（或拖动或向下）。
+* Motion Events::                只需移动鼠标，无需按按钮。
+* Touchscreen Events::           在触摸屏上点击并移动手指。
+* Focus Events::                 在帧之间移动鼠标。
+* Xwidget Events::               xwidgets 生成的事件。
+* Misc Events::                  系统可以生成的其他事件。
+* Event Examples::               鼠标事件列表的示例。
+* Classifying Events::           查找事件符号中的修饰键。事件类型。
+* Accessing Mouse::              从鼠标事件中提取信息的函数。
+* Accessing Scroll::             从滚动条事件获取信息的函数。
+* Strings of Events::            将键盘字符事件放入字符串中的特殊注意事项。
+@end menu
+
+@node Keyboard Events
+@subsection 键盘事件
+@cindex keyboard events
+
+@cindex character event
+您可以从键盘获得两种输入：普通键和功能键。  普通按键对应（可能经过修改的）字符；它们生成的事件在 Lisp 中表示为字符。  @dfn{character event} 的事件类型是字符本身（整数），它可能设置了一些修饰位；参见@ref{Classifying Events}。
+
+@cindex modifier bits (of input character)
+@cindex basic code (of input character)
+输入字符事件由 0 到 524287 之间的 @dfn{basic code} 以及以下任意或全部 @dfn{modifier bits} 组成：
+
+@table @asis
+@item 元
+这
+@tex
+@math{2^{27}}
+@end tex
+@ifnottex
+2**27
+@end ifnottex
+字符代码中的位表示按住元键键入的字符。
+
+@item 控制
+这
+@tex
+@math{2^{26}}
+@end tex
+@ifnottex
+2**26
+@end ifnottex
+字符代码中的位表示非@acronym{ASCII}控制字符。
+
+@sc{ascii} 控制字符（如 @kbd{C-a}）有自己特殊的基本代码，因此 Emacs 不需要特殊的位来指示它们。因此，@kbd{C-a} 的代码就是 1。
+
+但如果您输入的控制组合不是 @acronym{ASCII} 中的，例如使用 control 键输入 @kbd{%}，您得到的数值就是 @kbd{%} 加的代码
+@tex
+@math{2^{26}}
+@end tex
+@ifnottex
+2**26
+@end ifnottex
+（假设终端支持非@acronym{ASCII}控制字符），即@:设置了第27位。
+
+@item 转移
+这
+@tex
+@math{2^{25}}
+@end tex
+@ifnottex
+2**25
+@end ifnottex
+字符事件代码中的第 1 位（第 26 位）表示按住 Shift 键时键入的 @acronym{ASCII} 控制字符。
+
+对于字母，基本代码本身表示大小写；对于数字和标点符号，Shift 键会选择具有不同基本代码的完全不同的字符。  为了尽可能保持在 @acronym{ASCII} 字符集中，Emacs 避免使用
+@tex
+@math{2^{25}}
+@end tex
+@ifnottex
+2**25
+@end ifnottex
+这些字符事件的位。
+
+但是，@acronym{ASCII} 无法区分 @kbd{C-A} 和 @kbd{C-a}，因此 Emacs 使用
+@tex
+@math{2^{25}}
+@end tex
+@ifnottex
+2**25
+@end ifnottex
+位位于 @kbd{C-A} 中，而不位于 @kbd{C-a} 中。
+
+@item 超级
+这
+@tex
+@math{2^{24}}
+@end tex
+@ifnottex
+2**24
+@end ifnottex
+字符事件代码中的位表示按住超级键时键入的字符。
+
+@item 极好的
+这
+@tex
+@math{2^{23}}
+@end tex
+@ifnottex
+2**23
+@end ifnottex
+字符事件代码中的位表示按住超级键时键入的字符。
+
+@item 替代
+这
+@tex
+@math{2^{22}}
+@end tex
+@ifnottex
+2**22
+@end ifnottex
+字符事件代码中的位表示按住 alt 键时键入的字符。  （大多数键盘上标有 @key{Alt} 的键实际上被视为元键，而不是这个。）
+@end table
+
+最好避免在程序中提及特定的位数。要测试字符的修饰符位，请使用函数 @code{event-modifiers} (@pxref{Classifying Events})。  当使用 @code{keymap-set} 进行键绑定时，您可以使用 @samp{C-H-x} 等字符串来指定这些事件（对于“control hyper x”）(@pxref{Changing Key Bindings})。
+
+@node Function Keys
+@subsection 功能键
+
+@cindex function keys
+大多数键盘还具有 @dfn{function keys}——具有非字符名称或符号的键。  功能键在 Emacs Lisp 中表示为符号；符号的名称是功能键的标签，小写。  例如，按下标记为@key{F1}的键会生成由符号@code{f1}表示的输入事件。
+
+功能键事件的事件类型是事件符号本身。 @xref{Classifying Events}。
+
+以下是功能键符号命名约定中的一些特殊情况：
+
+@table @asis
+@item @code{backspace}, @code{tab}, @code{newline}, @code{return}, @code{delete}
+这些键对应于常见的 @acronym{ASCII} 控制字符，这些字符在大多数键盘上都有特殊键。
+
+在 @acronym{ASCII} 中，@kbd{C-i} 和 @key{TAB} 是相同的字符。  如果终端可以区分它们，Emacs 会通过将前者表示为整数 9，将后者表示为符号 @code{tab} 来向 Lisp 程序传达区别。
+
+大多数时候，区分两者是没有用的。  因此，通常将@code{local-function-key-map} (@pxref{Translation Keymaps}) 设置为将@code{tab} 映射到9。因此，字符代码9（字符@kbd{C-i}）的键绑定也适用于@code{tab}。  对于该组中的其他符号也是如此。  函数@code{read-char}同样将这些事件转换为字符。
+
+在@acronym{ASCII}中，@key{BS}实际上是@kbd{C-h}。  但是 @code{backspace} 转换为字符代码 127 (@key{DEL})，而不是代码 8 (@key{BS})。  这是大多数用户所喜欢的。
+
+@item @code{left}, @code{up}, @code{right}, @code{down}
+光标箭头键
+@item @code{kp-add}, @code{kp-decimal}, @code{kp-divide}, @dots{}
+小键盘按键（位于常规键盘的右侧）。
+@item @code{kp-0}, @code{kp-1}, @dots{}
+带数字的键盘按键。
+@item @code{kp-f1}, @code{kp-f2}, @code{kp-f3}, @code{kp-f4}
+键盘 PF 键。
+@item @code{kp-home}, @code{kp-left}, @code{kp-up}, @code{kp-right}, @code{kp-down}
+键盘方向键。  Emacs 通常将这些转换为相应的非键盘按键 @code{home}、@code{left}、@dots{}
+@item @code{kp-prior}, @code{kp-next}, @code{kp-end}, @code{kp-begin}, @code{kp-insert}, @code{kp-delete}
+额外的键盘与通常在其他地方找到的按键重复。  Emacs 通常将这些键转换为类似名称的非小键盘键。
+@end table
+
+您可以将修饰键 @key{ALT}、@key{CTRL}、@key{HYPER}、@key{META}、@key{SHIFT} 和 @key{SUPER} 与功能键一起使用。  表示它们的方法是在符号名称中添加前缀：
+
+@table @samp
+@item A-
+替代修饰符。
+@item C-
+控制修饰符。
+@item H-
+超级修饰符。
+@item M-
+元修饰符。
+@item S-
+移位修饰符。
+@item s-
+超级修改器。
+@end table
+
+因此，按住@key{META}的键@key{F3}的符号是@code{M-f3}。  当您使用多个前缀时，我们建议您按字母顺序书写；但键绑定查找和修改函数的参数中的顺序并不重要。
+
+@node Mouse Events
+@subsection 鼠标事件
+
+Emacs 支持四种鼠标事件：单击事件、拖动事件、按钮按下事件和移动事件。  所有鼠标事件都以列表的形式表示。  列表中的@sc{car}是事件类型；这表明涉及哪个鼠标按钮，以及使用了哪些修饰键。事件类型还可以区分两次或三次按钮按下 (@pxref{Repeat Events})。  列表的其余元素提供位置和时间信息。
+
+对于键查找，只有事件类型很重要：相同类型的两个事件必须运行相同的命令。  该命令可以使用 @samp{e} 交互式代码访问这些事件的完整值。 @xref{Interactive Codes}。
+
+使用鼠标所在窗口中缓冲区的键映射（而不是当前缓冲区）读取以鼠标事件开始的键序列。  这并不意味着在窗口中单击会选择该窗口或其缓冲区——这完全受按键序列的命令绑定的控制。
+
+@node Click Events
+@subsection 点击事件
+@cindex click event
+@cindex mouse click event
+@cindex mouse wheel event
+
+当用户按下鼠标按钮并在同一位置释放它时，会生成 @dfn{click} 事件。  根据窗口系统报告鼠标滚轮事件的方式，转动鼠标滚轮可以生成鼠标单击或鼠标滚轮事件。  所有鼠标事件共享相同的格式：
+
+@example
+(@var{event-type} @var{position} @var{click-count})
+@end example
+
+@table @asis
+@item @var{event-type}
+这是一个指示使用了哪个鼠标按钮的符号。  它是符号 @code{mouse-1}、@code{mouse-2}、@dots{} 之一，其中按钮从左到右编号。  对于鼠标滚轮事件，可以是@code{wheel-up}或@code{wheel-down}。
+
+您还可以使用前缀 @samp{A-}、@samp{C-}、@samp{H-}、@samp{M-}、@samp{S-} 和 @samp{s-} 来修饰修饰符 alt、control、hyper、meta、shift 和 super，就像使用功能键一样。
+
+该符号也用作事件的事件类型。  键绑定按事件类型描述事件；因此，如果 @code{mouse-1} 有一个键绑定，则该绑定将应用于 @var{event-type} 为 @code{mouse-1} 的所有事件。
+
+@item @var{position}
+@cindex mouse position list
+这是一个 @dfn{mouse position list} 指定鼠标事件发生的位置；详情请参见下文。
+
+@item @var{click-count}
+这是迄今为止快速重复按下同一鼠标按钮的次数或重复转动滚轮的次数。  @xref{Repeat Events}。
+@end table
+
+要访问鼠标事件的 @var{position} 槽中的鼠标位置列表的内容，您通常应该使用 @ref{Accessing Mouse} 中记录的函数。
+
+列表的显式格式取决于事件发生的位置。对于在文本区域、模式行、标题行、制表符行或边缘或边缘区域中的单击，鼠标位置列表具有以下形式
+
+@example
+(@var{window} @var{pos-or-area} (@var{x} . @var{y}) @var{timestamp}
+ @var{object} @var{text-pos} (@var{col} . @var{row})
+ @var{image} (@var{dx} . @var{dy}) (@var{width} . @var{height}))
+@end example
+
+@noindent
+这些列表元素的含义如下：
+
+@table @asis
+@item @var{window}
+发生鼠标事件的窗口。
+
+@item @var{pos-or-area}
+点击的字符在文本区域的缓冲区位置；或者，如果事件位于文本区域之外，则位于事件发生的窗口区域。  它是符号 @code{mode-line}、@code{header-line}、@code{tab-line}、@code{vertical-line}、@code{left-margin}、@code{right-margin}、@code{left-fringe} 或 @code{right-fringe} 之一。
+
+在一种特殊情况下，@var{pos-or-area} 是一个包含符号（上面列出的符号之一）的列表，而不仅仅是符号。  这会在 Emacs 注册事件的虚拟前缀键之后发生。  @xref{Key Sequence Input}。
+
+@item @var{x}, @var{y}
+事件的相对像素坐标。  对于窗口文本区域中的事件，坐标原点 @code{(0 . 0)} 被视为文本区域的左上角。  @xref{Window Sizes}。  对于模式行、标题行或选项卡行中的事件，坐标原点是窗口本身的左上角。  对于边缘、边距和垂直边框，@var{x} 没有有意义的数据。对于边缘和边距，@var{y} 相对于标题行的下边缘。  在所有情况下，@var{x}和@var{y}坐标分别向右和向下增加。
+
+@item @var{timestamp}
+事件发生的时间，以自系统相关初始时间以来的整数毫秒数表示。
+
+@item @var{object}
+要么是 @code{nil}，这意味着事件发生在缓冲区文本上，要么是 @w{(@var{string} . @var{string-pos})} 形式的 cons 单元格（如果事件位置有来自文本属性的字符串或覆盖）。
+
+@table @asis
+@item @var{string}
+单击的字符串，包括任何属性。
+
+@item @var{string-pos}
+字符串中发生点击的位置。
+@end table
+
+@item @var{text-pos}
+对于边缘区域或边缘的点击，这是窗口中相应行中第一个可见字符的缓冲区位置。  对于点击模式行、标题行或选项卡行，这是@code{nil}。  对于其他事件，它是最接近点击的缓冲区位置。
+
+@item @var{col}, @var{row}
+这些是 @var{x}、@var{y} 位置下字形的实际列和行坐标号。  如果 @var{x} 超出其行上实际文本的最后一列，则通过添加具有默认字符宽度的虚构额外列来报告 @var{col}。如果窗口有标题行，则将第 0 行视为标题行；如果窗口也有制表符行，则将第 1 行视为标题行，否则将视为文本区域的最上面一行。  对于窗口文本区域上的点击，第 0 列被视为文本区域的最左边的列，或者对于在那里点击的最左边的模式行或标题行列。  对于边缘或垂直边框的点击，这些没有有意义的数据。  对于边距上的点击，@var{col} 是从边距区域的左边缘开始测量的，@var{row} 是从边距区域的顶部开始测量的。
+
+@item @var{image}
+如果点击位置有图像，则为@code{find-image} (@pxref{Defining Images}) 返回的图像对象；否则这是@code{nil}。
+
+@item @var{dx}, @var{dy}
+这些是点击相对于距离点击最近的 @var{object} 字形左上角的像素偏移。  相关的@var{object}s可以是缓冲区、字符串或图像，见上文。  如果 @var{object} 是 @code{nil} 或字符串，则坐标相对于单击的字符字形的左上角。  请注意，当 @var{object} 为 @code{nil} 时，文本模式帧上的偏移量始终为零，因为每个字形都被认为具有恰好 1x1 像素尺寸。
+
+@item @var{width}, @var{height}
+如果单击的是字符，无论是从缓冲区文本还是从覆盖或显示字符串，这些都是该字符字形的像素宽度和高度；否则它们是单击的 @var{object} 的尺寸。
+@end table
+
+对于滚动条上的点击，@var{position} 具有以下形式：
+
+@example
+(@var{window} @var{area} (@var{portion} . @var{whole}) @var{timestamp} @var{part})
+@end example
+
+@table @asis
+@item @var{window}
+滚动条被单击的窗口。
+
+@item @var{area}
+这是符号@code{vertical-scroll-bar}。
+
+@item @var{portion}
+从滚动条顶部到单击位置的像素数。  在某些工具包（包括 GTK+）上，Emacs 无法提取此数据，因此该值始终为 @code{0}。
+
+@item @var{whole}
+滚动条的总长度（以像素为单位）。  在某些工具包（包括 GTK+）上，Emacs 无法提取此数据，因此该值始终为 @code{0}。
+
+@item @var{timestamp}
+事件发生的时间，以毫秒为单位。  在某些工具包（包括 GTK+）上，Emacs 无法提取此数据，因此该值始终为 @code{0}。
+
+@item @var{part}
+发生单击的滚动条部分。  它是符号 @code{handle}（滚动条手柄）、@code{above-handle}（手柄上方的区域）、@code{below-handle}（手柄下方的区域）、@code{up}（滚动条一端的向上箭头）或 @code{down}（滚动条一端的向下箭头）之一。
+@c The 'top', 'bottom', and 'end-scroll' codes don't seem to be used.
+@end table
+
+对于点击框架的内部边框 (@pxref{Frame Layout})、框架的工具栏 (@pxref{Tool Bar}) 或选项卡栏或菜单栏，@var{position} 具有以下形式：
+
+@example
+ (@var{frame} @var{part} (@var{X} . @var{Y}) @var{timestamp} @var{object})
+@end example
+
+@table @asis
+@item @var{frame}
+其内部边框或工具栏或选项卡栏或菜单栏被单击的框架。
+
+@item @var{part}
+框架中被单击的部分。  这可以是以下之一：
+
+@table @code
+@cindex tool-bar mouse events
+@item tool-bar
+框架有一个工具栏，事件位于工具栏区域。
+
+@cindex tab-bar mouse events
+@item tab-bar
+框架有一个选项卡栏，事件位于选项卡栏区域。
+
+@cindex menu-bar mouse events
+@item menu-bar
+该事件位于框架的菜单栏区域。  这种单击事件只能发生在纯文本框架或非工具包版本的 Emacs 中的 X 框架上。  （在 Emacs 的工具包版本中，菜单栏单击由工具包处理，并且对于 Emacs 来说不可见作为单击事件。）
+
+@item left-edge
+@itemx top-edge
+@itemx right-edge
+@itemx bottom-edge
+单击是在相应边框上，距边框最近的角至少有一个规范字符的偏移量。
+
+@item top-left-corner
+@itemx top-right-corner
+@itemx bottom-right-corner
+@itemx bottom-left-corner
+单击的是内部边框的相应角。
+
+@item nil
+框架没有内部边框，并且事件不在选项卡栏或工具栏上。  这通常发生在文本模式框架上。  如果框架未将其 @code{drag-internal-border} 参数 (@pxref{Mouse Dragging Parameters}) 设置为非 @code{nil} 值，则在具有内部边框的 GUI 框架上也会发生这种情况。
+@end table
+
+@item @var{object}
+该成员仅在单击选项卡栏时出现，并且是包含有关单击的按钮的信息的属性化字符串。
+@end table
+
+
+@node Drag Events
+@subsection 拖动事件
+@cindex drag event
+@cindex mouse drag event
+
+有了Emacs，你甚至不用换衣服就可以举办变装活动。  每次用户按下鼠标按钮，然后在释放按钮之前将鼠标移动到不同的字符位置，都会发生 @dfn{drag event} 。  与所有鼠标事件一样，拖动事件在 Lisp 中表示为列表。  该列表记录了鼠标的起始位置和最终位置，如下所示：
+
+@example
+(@var{event-type} @var{start-position} @var{end-position})
+@end example
+
+对于拖动事件，符号 @var{event-type} 的名称包含前缀 @samp{drag-}。  例如，按住按钮 2 拖动鼠标会生成 @code{drag-mouse-2} 事件。  事件的第二个和第三个元素（上图中的@var{start-position} 和@var{end-position}）被设置为拖动的开始位置和结束位置作为鼠标位置列表（@pxref{Click Events}）。  您可以以相同的方式访问任何鼠标事件的第二个元素。但是，拖动事件可能会在最初选择的帧的边界之外结束。  在这种情况下，第三个元素的位置列表包含该框架而不是窗口。
+
+@samp{drag-} 前缀位于修饰键前缀之后，例如 @samp{C-} 和 @samp{M-}。
+
+如果 @code{read-key-sequence} 接收到没有键绑定的拖动事件，并且相应的单击事件确实有绑定，则会将拖动事件更改为拖动起始位置处的单击事件。  这意味着除非您愿意，否则不必区分单击事件和拖动事件。
+
+@node Button-Down Events
+@subsection 按钮按下事件
+@cindex button-down event
+
+当用户释放鼠标按钮时，会发生单击和拖动事件。它们不能更早发生，因为在释放按钮之前无法区分单击和拖动。
+
+如果您想在按下按钮后立即采取行动，则需要处理 @dfn{button-down} 事件。@footnote{Button-down is the conservative antithesis of drag.} 这些事件在按下按钮后立即发生。  它们由看起来与点击事件 (@pxref{Click Events}) 完全相同的列表表示，只不过 @var{event-type} 符号名称包含前缀 @samp{down-}。  @samp{down-} 前缀跟随修饰键前缀，例如 @samp{C-} 和 @samp{M-}。
+
+函数 @code{read-key-sequence} 忽略任何没有命令绑定的按钮按下事件；因此，Emacs 命令循环也会忽略它们。  这意味着您不必担心定义按钮按下事件，除非您希望它们执行某些操作。  定义按钮按下事件的通常原因是，您可以跟踪鼠标运动（通过读取运动事件）直到按钮被释放。 @xref{Motion Events}。
+
+@node Repeat Events
+@subsection 重复活动
+@cindex repeat events
+@cindex double-click events
+@cindex triple-click events
+@cindex mouse events, repeated
+
+如果您快速连续多次按下同一个鼠标按钮而不移动鼠标，Emacs 会为第二次及后续按下生成特殊的 @dfn{repeat} 鼠标事件。
+
+最常见的重复事件是 @dfn{double-click} 事件。  当您单击按钮两次时，Emacs 会生成双击事件；当您释放按钮时该事件发生（对于所有单击事件都是正常的）。
+
+双击事件的事件类型包含前缀@samp{double-}。  因此，按住 @key{meta} 双击第二个鼠标按钮，Lisp 程序将显示为 @code{M-double-mouse-2}。  如果双击事件没有绑定，则使用对应的普通单击事件的绑定来执行。  因此，除非您确实愿意，否则无需注意双击功能。
+
+当用户执行双击时，Emacs 首先生成一个普通的单击事件，然后生成一个双击事件。  因此，您必须设计双击事件的命令绑定以假设单击命令已经运行。  它必须从单击的结果开始，产生双击所需的结果。
+
+如果双击的含义以某种方式建立在单击的含义之上，那么这很方便——这是推荐的双击用户界面设计实践。
+
+如果您单击一个按钮，然后再次按下它并开始在按住按钮的情况下移动鼠标，那么当您最终释放按钮时，您会收到一个 @dfn{double-drag} 事件。  它的事件类型包含@samp{double-drag}，而不仅仅是@samp{drag}。  如果双击事件没有绑定，Emacs 会查找备用绑定，就像该事件是普通拖动一样。
+
+在双击或双击事件之前，当用户第二次按下按钮时，Emacs 会生成 @dfn{double-down} 事件。  它的事件类型包含@samp{double-down}，而不仅仅是@samp{down}。  如果双击事件没有绑定，Emacs 会查找备用绑定，就好像该事件是普通的按钮按下事件一样。如果它也找不到这种方式的绑定，则忽略双下事件。
+
+总而言之，当您单击一个按钮然后立即再次按下它时，Emacs 会生成一个向下事件和第一次单击的单击事件，再次按下该按钮时会生成一个双击事件，最后会生成一个双击或双击事件。
+
+如果您连续快速单击一个按钮两次，然后再次按下，Emacs 会生成一个 @dfn{triple-down} 事件，然后是 @dfn{triple-click} 或 @dfn{triple-drag}。  这些事件的事件类型包含@samp{triple}而不是@samp{double}。  如果任何三重事件没有绑定，Emacs 将使用用于相应双事件的绑定。
+
+如果单击某个按钮三次或多次，然后再次按下该按钮，则第三次之后的按下事件均为三重事件。  Emacs 没有针对四元组、五元组等@: 事件的单独事件类型。  但是，您可以查看事件列表来准确了解按钮被按下的次数。
+
+@defun event-click-count event
+此函数返回导致 @var{event} 的连续按钮按下次数。  如果@var{event}是双击、双击或双击事件，则值为2。如果@var{event}是三重事件，则值为3或更大。  如果@var{event}是普通鼠标事件（不是重复事件），则值为 1。
+@end defun
+
+@defopt double-click-fuzz
+要生成重复事件，连续按下鼠标按钮必须位于大致相同的屏幕位置。  @code{double-click-fuzz} 的值指定鼠标在两次连续单击之间可以移动（水平或垂直）以进行双击的最大像素数。
+
+该变量也是将鼠标运动算作拖动的阈值。
+@end defopt
+
+@defopt double-click-time
+要生成重复事件，连续按下按钮之间的毫秒数必须小于 @code{double-click-time} 的值。  将 @code{double-click-time} 设置为 @code{nil} 会完全禁用多次点击检测。  将其设置为@code{t}可消除时间限制；然后，Emacs 仅按位置检测多次单击。
+@end defopt
+
+@node Motion Events
+@subsection 运动事件
+@cindex motion event
+@cindex mouse motion events
+
+Emacs 有时会生成 @dfn{mouse motion} 事件来描述鼠标的运动，而无需任何按钮活动。  鼠标移动事件由如下所示的列表表示：
+
+@example
+(mouse-movement POSITION)
+@end example
+
+@noindent
+@var{position} 是鼠标位置列表 (@pxref{Click Events})，指定鼠标光标的当前位置。  与拖动事件的结束位置一样，该位置列表可以表示初始选择的帧的边界之外的位置，在这种情况下，该列表包含该帧而不是窗口。
+
+@code{track-mouse} 宏可以在其体内生成运动事件。  在 @code{track-mouse} 主体之外，Emacs 不会仅为鼠标移动而生成事件，并且这些事件不会出现。  @xref{Mouse Tracking}。
+
+@defvar mouse-fine-grained-tracking
+当非@code{nil}时，即使是非常小的移动也会生成鼠标运动事件。  否则，只要鼠标光标仍然指向文本中的相同字形，就不会生成运动事件。
+@end defvar
+
+@node Touchscreen Events
+@subsection 触摸屏事件
+@cindex touchscreen events
+@cindex support for touchscreens
+
+一些窗口系统提供对输入设备的支持，这些输入设备对用户触摸屏幕以及触摸屏幕时移动手指做出反应。  这些输入设备称为触摸屏，Emacs 将它们生成的事件报告为 @dfn{touchscreen events}。
+
+触摸屏生成的大多数单独事件仅作为更大的其他事件序列的一部分才有意义：例如，点击触摸屏的简单操作涉及用户将手指放在触摸屏上并抬起，而滑动显示屏以滚动它则涉及放置手指，向上或向下移动多次，然后抬起手指。
+
+@cindex touch point, in touchscreen events
+虽然由一根手指组成的简单模型足以进行点击和滚动，但更复杂的手势需要支持跟踪多个手指，其中每个手指的位置由 @dfn{touch point} 表示。  例如，“捏合缩放”手势可能包括用户放置两根手指并分别向相反方向移动它们，其中各个点的位置之间的距离确定缩放显示的量，而这些位置之间的假想线的中心确定缩放后平移显示的位置。
+
+下面描述的低级触摸屏事件可用于实现上面描述的所有触摸序列。  在这些事件中，每个点都由标识触摸点的任意数字的 cons 和指定事件发生时手指位置的鼠标位置列表 (@pxref{Click Events}) 表示。
+
+@table @code
+@cindex @code{touchscreen-begin} event
+@item (touchscreen-begin @var{point})
+当用户用手指按触摸屏创建 @var{point} 时，会发送此事件。
+
+当这些事件源自框架或窗口的特殊部分顶部时，虚构的前缀键也会附加到这些事件 @code{read-key-sequence} 上。  @xref{Key Sequence Input}。
+
+@cindex @code{touchscreen-update} event
+@item (touchscreen-update @var{points})
+当触摸屏上的点改变位置时发送此事件。  @var{points} 是触摸点列表，其中包含当前触摸屏上每个触摸点的最新位置。
+
+@cindex @code{touchscreen-end} event
+@item (touchscreen-end @var{point} @var{canceled})
+当 @var{point} 不再出现在显示屏上时，会发送此事件，因为另一个程序进行了抓取，或者因为用户从触摸屏上抬起了手指。
+
+如果触摸序列已被另一个程序（例如窗口管理器）截获，则 @var{canceled} 为非 @code{nil}，并且 Emacs 应撤消或避免任何由触摸序列产生的编辑命令。
+
+当这些事件源自框架或窗口的特殊部分顶部时，虚构的前缀键也会附加到这些事件 @code{read-key-sequence} 上。
+@end table
+
+如果触摸点按下菜单栏，那么 Emacs 将不会生成任何相应的 @code{touchscreen-begin} 或 @code{touchscreen-end} 事件；相反，在其他情况下，菜单栏可能会在 @code{touchscreen-end} 发出后显示。
+
+@cindex mouse emulation from touch screen events
+当没有命令绑定到 @code{touchscreen-begin}、@code{touchscreen-end} 或 @code{touchscreen-update} 时，Emacs 会调用“按键转换函数”(@pxref{Translation Keymaps}) 将包含触摸屏事件的按键序列转换为普通鼠标事件 (@pxref{Mouse Events})。由于 Emacs 不支持区分源自不同鼠标设备的事件，因此它假定在进行转换时最多有两个触摸点处于活动状态，并且不会放置任何触摸点当超出限制时保证事件转换的结果。
+
+Emacs 应用两种不同的策略将触摸事件转换为鼠标事件，具体取决于诸如绑定到在 @code{touchscreen-begin} 事件位置处处于活动状态的键盘映射的命令之类的因素。  如果命令在该位置绑定到 @code{down-mouse-1}，则初始转换由单个 @code{down-mouse-1} 事件组成，后续 @code{touchscreen-update} 事件转换为鼠标移动事件 (@pxref{Motion Events})，最终 @code{touchscreen-end} 事件转换为 @code{mouse-1} 或 @code{drag-mouse-1} 事件（除非 @code{touchscreen-end} 事件指示触摸序列已被另一个程序。）这被称为“简单翻译”，并在触摸点运动和鼠标运动之间产生简单的对应关系。
+
+@cindex @code{ignored-mouse-command} (symbol property)
+然而，例如，某些绑定到@code{down-mouse-1}——@code{mouse-drag-region}的命令要么与定义的触摸屏手势（例如“长按拖动”）冲突，要么与用户对触摸输入的期望冲突，并且不应使触摸序列受到简单转换。  如果遇到名称包含属性 (@pxref{Symbol Properties}) @code{ignored-mouse-command} 的命令，或者没有绑定到 @code{down-mouse-1} 的命令，则会发生更不规则的转换形式：这里，Emacs 首先处理触摸屏手势 (@pxref{Touchscreens,,, emacs, The GNU Emacs Manual})，如果在关闭 @code{touchscreen-end} 事件（及其 @var{canceled} 参数）之前没有检测到手势，则最后尝试将触摸屏事件转换为鼠标事件@code{nil}，与简单翻译一样）并且命令绑定到该事件位置处的@code{mouse-1}。  在生成 @code{mouse-1} 事件之前，还将 point 设置为 @code{touchscreen-end} 事件的位置，并选择包含该事件位置的窗口，作为对假定 @code{mouse-drag-region} 已将 point 设置为任何鼠标单击位置并选择发生事件的窗口的包的折衷方案。
+
+为了防止在鼠标菜单关闭 (@pxref{Mouse Menus}) 后出现不需要的 @code{mouse-1} 事件，如果 @code{down-mouse-1} 绑定到键盘映射，使其成为前缀键，Emacs 还会禁用简单转换。  它将关闭 @code{touchscreen-end} 转换为带有触摸序列起始位置的 @code{down-mouse-1} 事件，而不是简单的转换，从而显示鼠标菜单。
+
+@vindex @code{touch-screen-simple-mouse-conversion}
+如果变量 @code{touch-screen-simple-mouse-conversion} 被绑定或设置为非 @code{nil} 值，则无论是否存在命令或菜单绑定，都将启用简单转换，例如，@code{read-key} 的调用者可能希望接收 @code{mouse-movement} 和 @code{drag-mouse-1} 事件。
+
+@cindex @code{mouse-1-menu-command} (symbol property)
+由于出于显示弹出菜单的目的，某些命令也绑定到 @code{down-mouse-1}，因此如果 @code{down-mouse-1} 绑定到名称具有属性 @code{mouse-1-menu-command} 的命令，Emacs 的行为还会如上一段所示。
+
+@cindex pinch-to-zoom touchscreen gesture translation
+当第二个触摸点被注册为已经平移的触摸点时，手势平移终止，并且测量从第二个触摸点（@dfn{ancillary tool}）到第一个触摸点的距离。  来自这些触摸点中的任何一个的后续运动将产生 @code{touchscreen-pinch} 事件，其中包含新位置之间的距离与开始时测量的距离形成的比率，如下表所示。
+
+@cindex touchscreen gesture events
+如果在翻译过程中检测到触摸手势，则可能会生成以下输入事件之一：
+
+@table @code
+@cindex @code{touchscreen-scroll} event
+@item (touchscreen-scroll @var{window} @var{dx} @var{dy})
+如果在转换过程中检测到“滚动”手势，则每个后续 @code{touchscreen-update} 事件都会转换为 @code{touchscreen-scroll} 事件，其中 @var{dx} 和 @var{dy} 以像素为单位指定触摸点相对于启动序列的 @code{touchscreen-begin} 事件或最后一个 @code{touchscreen-scroll} 事件（以较晚发生者为准）的位置的相对运动。
+
+@cindex @code{touchscreen-hold} event
+@item (touchscreen-hold @var{posn})
+如果生成 @code{touchscreen-begin} 后单个活动触摸点保持静止超过 @code{touch-screen-delay} 秒，则在转换过程中会检测到“长按”手势，并发送 @code{touchscreen-hold} 事件，并将 @var{posn} 设置为包含 @code{touchscreen-begin} 事件位置的鼠标位置列表。
+
+@cindex @code{touchscreen-drag} event
+@item (touchscreen-drag @var{posn})
+如果在转换当前触摸序列时检测到“长按”手势，或者由于 @code{touch-screen-extend-selection} 用户选项而恢复“拖动选择”，则在每个后续 @code{touchscreen-update} 事件上发送 @code{touchscreen-drag} 事件，并将 @var{posn} 设置为触摸点的新位置。
+
+@cindex @code{touchscreen-restart-drag} event
+@item (touchscreen-restart-drag @var{posn})
+该事件在触摸序列开始时发送，导致继续“拖动选择”手势（取决于上述用户选项），并将 @var{posn} 设置为该触摸序列内初始 @code{touchscreen-begin} 事件的位置列表。
+
+@cindex @code{touchscreen-pinch} event
+@item (touchscreen-pinch @var{posn} @var{ratio} @var{pan-x} @var{pan-y} @var{ratio-diff})
+当辅助工具处于活动状态时，当任一活动触摸点的位置发生显着变化时，将传递此事件。
+
+@var{posn} 是从辅助工具到所观察的另一个触摸点绘制的线的中点的鼠标位置列表。
+
+@var{ratio} 是观察到的两个触摸点之间的距离除以首次注册辅助点时的距离；也就是说，“捏”手势的大小。
+
+@var{pan-x} 和 @var{pan-y} 是 @var{posn} 的像素位置与属于这一系列触摸事件的最后一个事件中的该位置之间的差值，或者在不存在此类事件的情况下，是首次注册辅助工具时两个触摸点之间的中心点。
+
+@var{ratio-diff} 是本次事件的比率与上次传递的事件中的 @var{ratio} 之间的差值；如果不存在这样的事件，则为@var{ratio}。
+
+当它们表示的变化幅度将产生 @var{ratio} 且与前一个事件相差超过 @code{0.2} 或 @var{pan-x} 和 @var{pan-y} 之和将超过帧字符宽度（以像素为单位）的一半 (@pxref{Frame Font}) 时，将发送此类事件。
+@end table
+
+@cindex handling touch screen events
+@cindex tap and drag, touch screen gestures
+为处理触摸屏事件的 Lisp 程序提供了几个函数。  下面描述的前两个函数的预期用途是直接绑定到 @code{touchscreen-begin} 事件的命令；它们允许与鼠标事件转换分开响应常用的触摸屏手势。
+
+@defun touch-screen-track-tap event &optional update data threshold
+此函数用于跟踪源自 @code{touchscreen-begin} 事件 @var{event} 的单个“点击”手势，通常用于设置点或激活按钮。  它等待具有相同触摸标识符的@code{touchscreen-end}事件到达，此时它返回@code{t}，表示手势结束。
+
+如果@code{touchscreen-update}事件同时到达并且至少包含一个与@var{event}中具有相同标识符的接触点，则使用两个参数调用函数@var{update}，即@code{touchscreen-update}事件中的接触点列表和@var{data}。
+
+如果 @var{threshold} 为非 @code{nil} 并且此类事件表明 @var{event} 表示的触摸点已移动超过 @var{threshold} 或 10 个像素的阈值（如果它不是来自 @var{event} 位置的数字），则返回 @code{nil} 并恢复该触摸点的鼠标事件转换，以免妨碍识别由其产生的任何后续触摸屏手势。序列。
+
+如果同时有任何其他事件到达，则返回@code{nil}。在这种情况下，调用者不应执行任何操作。
+@end defun
+
+@defun touch-screen-track-drag event update &optional data
+此函数用于跟踪源自 @code{touchscreen-begin} 事件 @code{event} 的单个“拖动”手势。
+
+它的行为类似于 @code{touch-screen-track-tap}，不同之处在于，如果 @code{event} 中的触摸点移动距离不够远（默认情况下，距离 @code{event} 中的位置 5 个像素）以符合实际拖动的条件，它会返回 @code{no-drag} 并避免调用 @var{update}。
+@end defun
+
+除了这两个函数之外，还为与通过鼠标事件转换生成的某些类型的事件绑定的命令提供了一个函数，以防止在调用该函数后生成不需要的事件。
+
+@defun touch-screen-inhibit-drag
+在调用该函数后，在触摸序列被转换的持续时间内，该函数会在鼠标事件转换期间抑制 @code{touchscreen-drag} 事件的生成。  它必须从绑定到 @code{touchscreen-hold} 或 @code{touchscreen-drag} 事件的命令中调用，否则发出错误信号。
+
+由于该函数只能在鼠标事件转换过程中识别出手势后才能调用，因此调用该函数后，构成前面提到的触摸序列的触摸事件将不会生成鼠标事件。
+@end defun
+
+@node Focus Events
+@subsection 焦点事件
+@cindex focus event
+
+本节讨论窗口系统和 Emacs 框架。  当仅谈论“框架”或“窗口”时，它指的是 Emacs 框架和 Emacs 窗口。  当谈论窗口系统窗口（也是 Emacs 框架）时，本节总是说“窗口系统窗口”。
+
+@noindent
+窗口系统为用户提供了控制哪个窗口系统窗口或 Emacs 框架获取键盘输入的通用方法。  这种选择的窗口系统窗口称为@dfn{focus}。  当用户在 Emacs 框架之间进行切换时，会生成 @dfn{focus event}。  当使用 @var{mouse-autoselect-window} 在 Emacs 框架内的 Emacs 窗口之间切换时，Emacs 也会生成焦点事件。
+
+按键序列中间的焦点事件会导致序列混乱。  因此，Emacs 永远不会在按键序列中间生成焦点事件。  如果用户在键序列的中间（即前缀键之后）更改焦点，则 Emacs 会对事件重新排序，以便焦点事件出现在多事件键序列之前或之后，而不是在其中。
+
+@subsubheading Focus events for frames
+
+在全局键盘映射中，切换帧的焦点事件的正常定义是在 Emacs 中选择新帧，正如用户所期望的那样。  @xref{Input Focus}，它还描述了与帧的焦点事件相关的钩子。  框架的焦点事件在 Lisp 中表示为如下所示的列表：
+
+@example
+(switch-frame @var{new-frame})
+@end example
+
+@noindent
+其中@var{new-frame}是切换到的帧。
+
+某些 X 窗口管理器的设置是，只需将鼠标移动到框架中就足以将焦点设置在那里。  通常，在其他类型的输入到达之前，Lisp 程序不需要知道焦点的变化。  仅当用户在新框架中实际键入键盘键或按下鼠标按钮时，Emacs 才会生成焦点事件；仅在帧之间移动鼠标不会生成焦点事件。
+
+@subsubheading Focus events for windows
+
+当设置@var{mouse-autoselect-window}时，将鼠标移动到框架内的新窗口上也可以切换所选窗口。  @xref{Mouse Window Auto-selection}，描述了不同值的行为。  当鼠标移动到新窗口上时，会生成切换窗口的焦点事件。  窗口的焦点事件在 Lisp 中表示为如下所示的列表：
+
+@example
+(select-window @var{new-window})
+@end example
+
+@noindent
+其中 @var{new-window} 是切换到的窗口。
+
+@node Xwidget Events
+@subsection XWidget事件
+
+Xwidgets (@pxref{Xwidgets}) 可以发送事件来更新 Lisp 程序的状态。  这些事件被称为@code{xwidget-events}，并包含描述变化性质的各种数据。
+
+@table @code
+@cindex @code{xwidget-event} event
+@item (xwidget-event @var{kind} @var{xwidget} @var{arg})
+每当 @var{xwidget} 中发生某种更新时，就会发送此事件。  更新有多种类型，由 @var{kind} 标识。
+
+@cindex xwidget callbacks
+这是一个特殊事件 (@pxref{Special Events})，应通过向 xwidget 添加回调来处理，每当收到 @var{xwidget} 的 xwidget 事件时就会调用该回调。
+
+您可以通过设置 xwidget 属性列表的 @code{callback} 添加回调，该列表应该是接受 @var{xwidget} 和 @var{kind} 作为参数的函数。
+
+@table @code
+@cindex @code{load-changed} xwidget event
+@item load-changed
+此 xwidget 事件指示 @var{xwidget} 已到达页面加载过程的特定点。  当这些事件被发送时，@var{arg}将包含一个字符串，进一步描述小部件的状态：
+
+@table @samp
+@cindex @samp{load-started} in xwidgets
+@item load-started
+这意味着小部件已经开始页面加载操作。
+
+@cindex @samp{load-finished} in xwidgets
+@item load-finished
+这意味着 @var{xwidget} 已完成处理之前执行的任何页面加载操作。
+
+@cindex @samp{load-redirected} in xwidgets
+@item load-redirected
+这意味着 @var{xwidget} 在页面加载操作期间遇到并遵循重定向。
+
+@cindex @samp{load-committed} in xwidgets
+@item load-committed
+这意味着 @var{xwidget} 在页面加载操作期间已提交给给定的 URL，即 @: 该 URL 是 @var{xwidget} 在当前页面加载操作期间将呈现的最终 URL。
+@end table
+
+@cindex @code{download-callback} xwidget events
+@item download-callback
+此事件表明某种下载已完成。
+@end table
+
+在上述事件中，@var{arg}之后可以有参数，它本身指示从中检索下载文件的URL：@var{arg}之后的第一个参数指示下载的MIME类型，作为字符串，而第二个参数包含下载文件的完整文件名。
+
+@table @code
+@cindex @code{download-started} xwidget events
+@item download-started
+此事件表明下载已开始。  在这些事件中，@var{arg} 包含当前正在下载的文件的 URL。
+
+@cindex @code{javascript-callback} xwidget events
+@item javascript-callback
+该事件包含 JavaScript 回调数据。  这些事件由@code{xwidget-webkit-execute-script}内部使用。
+@end table
+
+@cindex @code{xwidget-display-event} event
+@item (xwidget-display-event @var{xwidget} @var{source})
+每当 xwidget 请求显示另一个 xwidget 时，就会发送此事件。  @var{xwidget}是应该显示的xwidget，@var{source}是要求显示@var{xwidget}的xwidget。
+
+这也是一个特殊的事件，应该通过回调来处理。您可以通过设置 @var{source} 属性列表的 @code{display-callback} 来添加这样的回调，该列表应该是一个接受 @var{xwidget} 和 @var{source} 作为参数的函数。
+
+@var{xwidget} 的缓冲区将被设置为临时缓冲区。  显示小部件时，应注意使用 @code{set-xwidget-buffer} (@pxref{Xwidgets}) 将缓冲区替换为将在其中显示 xwidget 的缓冲区。
+@end table
+
+@node Misc Events
+@subsection 杂项系统事件
+
+其他一些事件类型表示系统内发生的事件。
+
+@table @code
+@cindex @code{text-conversion} event
+@item text-conversion
+发送此类事件@strong{after}系统范围的输入方法对一个或多个缓冲区执行编辑。
+
+@vindex text-conversion-edits
+发送事件后，输入方法可能已经对许多不同帧内的多个缓冲区进行了更改。  要确定哪些缓冲区已更改以及对它们进行了哪些编辑，请使用变量 @code{text-conversion-edits}，该变量在发送每个 @code{text-conversion} 事件之前设置；它是以下形式的列表：
+
+@example
+@w{@code{((@var{buffer} @var{beg} @var{end} @var{ephemeral}) ...)}}
+@end example
+
+其中 @var{ephemeral} 是已修改的缓冲区，@var{beg} 和 @var{end} 是在编辑完成时设置到编辑位置的标记，@var{ephemeral} 是一个字符串，包含插入的任何文本（或删除点之前的任何文本），@code{t}，表示该编辑是由输入法进行的临时编辑，或 @code{nil}，表示某些文本点后被删除。
+
+@vindex text-conversion-style
+是否发送此事件取决于缓冲区局部变量 @code{text-conversion-style} 的值，该变量确定希望编辑缓冲区内容的输入方法的行为方式。
+
+该变量可以具有四个值之一：
+
+@table @code
+@item nil
+这意味着输入法将被完全禁用，并且将发送按键事件而不是文本转换事件。
+
+@item action
+这意味着输入法将被启用，但是每当输入法想要插入新行时就会发送@key{RET}。
+
+@item password
+这与 @code{action} 基本相同，但也请求输入法能够插入 ASCII 字符，并指示它不要将输入保存在随后可能被无法处理敏感信息（例如文本建议）的输入法功能检索到的位置。
+
+@item t
+该值或任何其他值意味着输入法将被启用并在 @code{text-conversion} 事件之后进行编辑。
+@end table
+
+@findex set-text-conversion-style
+对此变量值的更改仅在缓冲区成为帧的选定缓冲区后的下一次重新显示时生效。  如果您需要以立即生效的方式禁用文本转换，请改为调用函数@code{set-text-conversion-style}。  这可能会长时间锁定输入法，因此应谨慎使用。
+
+@vindex disable-inhibit-text-conversion
+此外，在命令循环或@code{read-key-sequence}读取前缀键后，文本转换将自动禁用。  可以通过将变量 @code{disable-inhibit-text-conversion} 设置或绑定到非 @code{nil} 值来禁用此功能。
+
+@cindex @code{delete-frame} event
+@item (delete-frame (@var{frame}))
+此类事件表明用户向窗口管理器发出删除特定窗口的命令，该窗口恰好是 Emacs 框架。
+
+@code{delete-frame}事件的标准定义是删除@var{frame}。
+
+@cindex @code{iconify-frame} event
+@item (iconify-frame (@var{frame}))
+此类事件表示用户使用窗口管理器图标化了@var{frame}。  它的标准定义是@code{ignore}；由于框架已经图标化，Emacs 无需做任何工作。  此事件类型的目的是让您可以根据需要跟踪此类事件。
+
+@cindex @code{make-frame-visible} event
+@item (make-frame-visible (@var{frame}))
+此类事件表明用户使用窗口管理器取消了 @var{frame} 图标。  它的标准定义是@code{ignore}；由于框架已经可见，Emacs 无需执行任何操作。
+
+@cindex @code{touch-end} event
+@item (touch-end (@var{position}))
+此类事件表示用户的手指离开了鼠标滚轮或触摸板。  @var{position} 元素是鼠标位置列表 (@pxref{Click Events})，指定当手指移离鼠标滚轮时鼠标光标的位置。
+
+@cindex @code{wheel-up} event
+@cindex @code{wheel-down} event
+@item (wheel-up @var{position} @var{clicks} @var{lines} @var{pixel-delta})
+@itemx (wheel-down @var{position} @var{clicks} @var{lines} @var{pixel-delta})
+这些事件是通过移动鼠标滚轮生成的。  @var{position} 元素是鼠标位置列表 (@pxref{Click Events})，指定事件发生时鼠标光标的位置。
+
+@vindex mwheel-coalesce-scroll-events
+@var{clicks}（如果存在）是轮子快速连续移动的次数。  @xref{Repeat Events}。  @var{lines}（如果存在且不存在 @code{nil}）是应滚动的正屏幕行数（当事件为 @code{wheel-up} 时向上滚动，或者当事件为 @code{wheel-down} 时向下滚动）。  @var{pixel-delta}（如果存在）是 @w{@code{(@var{x} . @var{y})}} 形式的 cons 单元，其中 @var{x} 和 @var{y} 是在每个轴上滚动的像素数，也称为@: @dfn{pixelwise deltas}。  通常，两者中只有一个非零，另一个为零或非常接近于零；较大的数字表示滚动窗口的轴。当变量@code{mwheel-coalesce-scroll-events}为@code{nil}时，滚动命令会忽略@var{lines}元素，即使它不是@code{nil}，而是使用@var{pixel-delta}数据；在这种情况下，滚动方向由像素增量的符号确定，并且忽略事件类型暗示的方向（向上或向下）。
+
+@cindex pixel-resolution wheel events
+您可以使用这些 @var{x} 和 @var{y} 像素增量来确定鼠标滚轮在像素分辨率下实际移动了多少。  例如，像素增量可用于以像素分辨率滚动显示，完全根据用户转动鼠标滚轮的情况。  仅当@code{mwheel-coalesce-scroll-events}为@code{nil}时，这种像素滚动才是可能的，并且通常当该变量为非@code{nil}时，不会生成@var{pixel-delta}数据。
+
+@vindex mouse-wheel-up-event
+@vindex mouse-wheel-down-event
+@code{wheel-up} 和 @code{wheel-down} 事件仅在某些类型的系统上生成。  在其他系统上，会使用其他事件，例如 @code{mouse-4} 和 @code{mouse-5}。  可移植代码应该处理@code{wheel-up}和@code{wheel-down}事件以及在@file{mwheel.el}中定义的变量@code{mouse-wheel-up-event}和@code{mouse-wheel-down-event}中指定的事件。请注意，由于历史原因，@code{mouse-wheel-@emph{up}-event} 是保存事件的变量，该事件的处理方式应与@code{wheel-@emph{down}} 类似，反之亦然。
+
+@vindex mouse-wheel-left-event
+@vindex mouse-wheel-right-event
+这同样适用于通常由 @code{wheel-left} 和 @code{wheel-right} 事件表示的水平轮运动，但可移植代码还应遵循 @file{mwheel.el} 中定义的变量 @code{mouse-wheel-left-event} 和 @code{mouse-wheel-right-event}。然而，一些鼠标在生成这些滚动事件的同时也会生成其他事件，这可能会造成妨碍。解决这个问题的方法通常是解除这些事件的绑定（例如，@code{mouse-6}或@code{mouse-7}，但这非常依赖于硬件和操作系统）。
+
+@cindex @code{pinch} event
+@item (pinch @var{position} @var{dx} @var{dy} @var{scale} @var{angle})
+此类事件是由用户通过将两根手指放在触摸板上并将其靠近或远离彼此移动来执行“捏合”手势而生成的。  @var{position} 是鼠标位置列表 (@pxref{Click Events})，提供事件发生时鼠标指针的位置，@var{dx} 是自同一序列中的最后一个事件以来手指之间的水平距离的变化，@var{dy} 是自同一序列中的最后一个事件以来手指的垂直移动，@var{scale} 是手指之间的当前距离与序列开始时的距离的比率，以及@var{angle} 是该事件中连接手指的线的方向与同一序列的最后一个事件中该线的方向之间的角度差。
+
+由于捏事件仅在开始时或捏序列期间发送，因此它们不会报告用户在触摸板上以旋转方式移动两根手指而不捏手指的手势。
+
+@var{position} 之后的所有参数都是浮点数。
+
+此事件通常作为序列的一部分发送，该序列从用户将两根手指放在触摸板上开始，到用户移开这些手指结束。  在序列的第一个事件中，@var{dx}、@var{dy} 和 @var{angle} 将是 @code{0.0}；后续事件将为事件结构的这些成员报告非零值。
+
+@var{dx} 和@var{dy} 以虚数相对单位表示，其中@code{1.0} 分别是触摸板的宽度和高度。  它们通常被解释为相对于手势下方的对象的大小：图像、窗口等。
+
+@cindex @code{preedit-text} event
+@item (preedit-text @var{arg})
+当系统输入法告诉 Emacs 显示一些文本以向用户指示将插入的内容时，将发送此事件。  @var{arg} 的内容取决于所使用的窗口系统。
+
+在 X 上，@var{arg} 是一个字符串，描述要放置在光标后面的一些文本。  它可以是@code{nil}，这意味着删除之前显示的任何文本。
+
+在 PGTK 框架 (@pxref{Frames}) 上，@var{arg} 是一个字符串列表，其中包含有关其颜色和下划线属性的信息。  它具有以下形式：
+
+@example
+@group
+   ((@var{string1}
+     (ul . @var{underline-color})
+     (bg . @var{background-color})
+     (fg . @var{foreground-color}))
+    (@var{string2}
+     (ul . @var{underline-color})
+     (bg . @var{background-color})
+     (fg . @var{foreground-color}))
+    @dots{}
+   )
+@end group
+@end example
+
+可以省略颜色信息，只留下字符串的文本。  @var{underline-color} 可以是 @code{t}，表示带有默认下划线颜色的下划线文本，也可以是字符串，即绘制下划线的颜色名称。
+
+这是一个特殊事件 (@pxref{Special Events})，通常用户不应将其绑定到任何命令。  当接收到事件时，Emacs 通常会在点后面的覆盖层中显示事件中包含的文本。
+
+@cindex @code{drag-n-drop} event
+@item (drag-n-drop @var{position} @var{files})
+当在 Emacs 之外的应用程序中选择一组文件，然后将其拖放到 Emacs 框架上时，就会生成此类事件。
+
+元素 @var{position} 是描述事件位置的列表，其格式与鼠标单击事件 (@pxref{Click Events}) 中使用的格式相同，@var{files} 是拖放的文件名列表。  处理此事件的常用方法是访问这些文件。
+
+目前，此类事件仅在某些类型的系统上生成。
+
+@cindex @code{help-echo} event
+@item help-echo
+当鼠标指针移动到具有 @code{help-echo} 文本属性的缓冲区文本部分时，会生成此类事件。生成的事件具有以下形式：
+
+@example
+(help-echo @var{frame} @var{help} @var{window} @var{object} @var{pos})
+@end example
+
+@noindent
+事件参数的精确含义以及这些参数用于显示帮助回显文本的方式在@ref{Text help-echo}中描述。
+
+@cindex @code{sigusr1} event
+@cindex @code{sigusr2} event
+@cindex user signals
+@item sigusr1
+@itemx sigusr2
+当 Emacs 进程收到信号 @code{SIGUSR1} 和 @code{SIGUSR2} 时，会生成这些事件。  它们不包含附加数据，因为信号不携带附加信息。它们对于调试很有用 (@pxref{Error Debugging})。
+
+要捕获用户信号，请将相应的事件绑定到 @code{special-event-map} (@pxref{Controlling Active Maps}) 中的交互式命令。该命令的调用不带参数，具体的信号事件在@code{last-input-event}（@pxref{Event Input Misc}）中可用。例如：
+
+@smallexample
+(defun sigusr-handler ()
+  (interactive)
+  (message "Caught signal %S" last-input-event))
+
+(keymap-set special-event-map "<sigusr1>" 'sigusr-handler)
+@end smallexample
+
+要测试信号处理程序，您可以让 Emacs 向自身发送信号：
+
+@smallexample
+(signal-process (emacs-pid) 'sigusr1)
+@end smallexample
+
+@cindex @code{sleep-event} event
+@item (sleep-event @var{state})
+当运行 Emacs 的设备即将进入睡眠状态或刚刚从睡眠状态唤醒时，会注入此事件。  @var{state} 将是符号 @code{pre-sleep} 或 @code{post-wake}。
+
+这是在 GNU/Linux、macOS 和 MS-Windows 上实现的。
+
+@cindex @code{language-change} event
+@item language-change
+当输入语言发生更改时，MS-Windows 上会生成此类事件。  这通常意味着键盘按键将从不同语言发送到 Emacs 字符。  生成的事件具有以下形式：
+
+@smallexample
+(language-change @var{frame} @var{codepage} @var{language-id})
+@end smallexample
+
+@noindent
+这里@var{frame}是输入语言改变时当前的帧； @var{codepage} 是新的代码页编号； @var{language-id} 是新输入语言的数字 ID。  与@var{codepage}对应的编码系统（@pxref{Coding Systems}）是@code{cp@var{codepage}}或@code{windows-@var{codepage}}。  要将 @var{language-id} 转换为字符串（例如，将其用于各种与语言相关的功能，例如 @code{set-language-environment}），请使用 @code{w32-get-locale-info} 函数，如下所示：
+
+@smallexample
+;; Get the abbreviated language name, such as "ENU" for English
+(w32-get-locale-info language-id)
+;; Get the full English name of the language,
+;; such as "English (United States)"
+(w32-get-locale-info language-id 4097)
+;; Get the full localized name of the language
+(w32-get-locale-info language-id t)
+@end smallexample
+
+@cindex @code{end-session} event
+@item end-session
+当操作系统通知 Emacs 用户终止了交互式会话或系统正在关闭时，MS-Windows 上会生成此事件。  该事件的标准定义是调用@code{kill-emacs}命令（@pxref{Killing Emacs}）来有序关闭Emacs；如果有未保存的更改，这将生成自动保存文件 (@pxref{Auto-Saving})，用户可以在重新启动会话后使用该文件来恢复未保存的编辑。
+@end table
+
+如果这些事件之一到达键序列的中间（即前缀键之后），则 Emacs 会对事件重新排序，以便该事件出现在多事件键序列之前或之后，而不是在其中。
+
+其中一些特殊事件，例如 @code{delete-frame}，默认调用 Emacs 命令；其他人则不受约束。  如果您想安排一个特殊事件来调用命令，您可以通过@code{special-event-map} 来完成。  然后，您绑定到该映射中的功能键的命令可以检查在 @code{last-input-event} 中调用它的完整事件。  @xref{Special Events}。
+
+@node Event Examples
+@subsection 事件示例
+
+如果用户在同一位置按下并释放鼠标左键，则会生成如下事件序列：
+
+@smallexample
+(down-mouse-1 (#<window 18 on NEWS> 2613 (0 . 38) -864320))
+(mouse-1      (#<window 18 on NEWS> 2613 (0 . 38) -864180))
+@end smallexample
+
+在按住控制键的同时，用户可以按住第二个鼠标按钮，并将鼠标从一行拖动到下一行。这会产生两个事件，如下所示：
+
+@smallexample
+(C-down-mouse-2 (#<window 18 on NEWS> 3440 (0 . 27) -731219))
+(C-drag-mouse-2 (#<window 18 on NEWS> 3440 (0 . 27) -731219)
+                (#<window 18 on NEWS> 3510 (0 . 28) -729648))
+@end smallexample
+
+在按住元键和 Shift 键的同时，用户可以按窗口模式行上的第二个鼠标按钮，然后将鼠标拖动到另一个窗口中。  这会产生一对像这样的事件：
+
+@smallexample
+(M-S-down-mouse-2 (#<window 18 on NEWS> mode-line (33 . 31) -457844))
+(M-S-drag-mouse-2 (#<window 18 on NEWS> mode-line (33 . 31) -457844)
+                  (#<window 20 on carlton-sanskrit.tex> 161 (33 . 3)
+                   -453816))
+@end smallexample
+
+具有输入焦点的框架可能不会占据整个屏幕，并且用户可能将鼠标移到框架范围之外。  在 @code{track-mouse} 宏内部，会产生如下事件：
+
+@smallexample
+(mouse-movement (#<frame *ielm* 0x102849a30> nil (563 . 205) 532301936))
+@end smallexample
+
+@node Classifying Events
+@subsection 事件分类
+@cindex event type
+@cindex classifying events
+
+每个事件都有一个 @dfn{event type}，它根据键绑定目的对事件进行分类。  对于键盘事件，事件类型等于事件值；因此，字符的事件类型是字符，功能键符号的事件类型是符号本身。  对于列表事件，事件类型是列表 @sc{car} 中的符号。  因此，事件类型始终是符号或字符。
+
+就键绑定而言，同一类型的两个事件是等效的；因此，他们总是运行相同的命令。  然而，这并不一定意味着它们会做相同的事情，因为某些命令会查看整个事件来决定要做什么。  例如，某些命令使用鼠标事件的位置来决定在缓冲区中的位置进行操作。
+
+有时，对事件进行更广泛的分类是有用的。  例如，您可能想询问事件是否涉及 @key{META} 键，无论使用哪个其他键或鼠标按钮。
+
+提供函数@code{event-modifiers}和@code{event-basic-type}来方便地获取这些信息。
+
+@defun event-modifiers event
+该函数返回 @var{event} 具有的修饰符列表。  修饰符是符号；它们包括 @code{shift}、@code{control}、@code{meta}、@code{alt}、@code{hyper} 和 @code{super}。  此外，鼠标事件符号的修饰符列表始终包含 @code{click}、@code{drag} 和 @code{down} 之一。  对于双重或三重事件，它还包含@code{double}或@code{triple}。
+
+参数 @var{event} 可以是整个事件对象，也可以只是一个事件类型。  如果 @var{event} 是从未在当前 Emacs 会话中作为输入读取的事件中使用过的符号，则 @code{event-modifiers} 可以返回 @code{nil}，即使 @var{event} 实际上具有修饰符。
+
+以下是一些示例：
+
+@example
+(event-modifiers ?a)
+     @result{} nil
+(event-modifiers ?A)
+     @result{} (shift)
+(event-modifiers ?\C-a)
+     @result{} (control)
+(event-modifiers ?\C-%)
+     @result{} (control)
+(event-modifiers ?\C-\S-a)
+     @result{} (control shift)
+(event-modifiers 'f5)
+     @result{} nil
+(event-modifiers 's-f5)
+     @result{} (super)
+(event-modifiers 'M-S-f5)
+     @result{} (meta shift)
+(event-modifiers 'mouse-1)
+     @result{} (click)
+(event-modifiers 'down-mouse-1)
+     @result{} (down)
+@end example
+
+单击事件的修饰符列表显式包含@code{click}，但事件符号名称本身不包含@samp{click}。类似地，@acronym{ASCII} 控制字符（例如 @samp{C-a}）的修饰符列表包含 @code{control}，即使通过 @code{read-char} 读取此类事件将返回值 1，且删除了控制修饰符位。
+@end defun
+
+@defun event-basic-type event
+此函数返回 @var{event} 描述的键或鼠标按钮，并删除所有修饰符。  @var{event} 论证与 @code{event-modifiers} 中相同。  例如：
+
+@example
+(event-basic-type ?a)
+     @result{} 97
+(event-basic-type ?A)
+     @result{} 97
+(event-basic-type ?\C-a)
+     @result{} 97
+(event-basic-type ?\C-\S-a)
+     @result{} 97
+(event-basic-type 'f5)
+     @result{} f5
+(event-basic-type 's-f5)
+     @result{} f5
+(event-basic-type 'M-S-f5)
+     @result{} f5
+(event-basic-type 'down-mouse-1)
+     @result{} mouse-1
+@end example
+@end defun
+
+@defun mouse-movement-p object
+如果@var{object}是鼠标移动事件，则该函数返回非@code{nil}。  @xref{Motion Events}。
+@end defun
+
+@node Accessing Mouse
+@subsection 访问鼠标事件
+@cindex mouse events, data in
+@cindex keyboard events, data in
+
+本节介绍用于访问鼠标按钮或运动事件中的数据的便捷函数。  可以使用相同的函数访问键盘事件数据，但不适用于键盘事件的数据元素为零或@code{nil}。
+
+以下两个函数返回鼠标位置列表 (@pxref{Click Events})，指定鼠标事件的位置。
+
+@defun event-start event
+这将返回 @var{event} 的起始位置。
+
+如果 @var{event} 是单击或按钮按下事件，则返回事件的位置。  如果 1⁣ 是拖动事件，则返回拖动的起始位置。
+@end defun
+
+@defun event-end event
+这将返回 @var{event} 的结束位置。
+
+如果 @var{event} 是拖动事件，则返回用户释放鼠标按钮的位置。  如果 @var{event} 是单击或按钮按下事件，则该值实际上是起始位置，这是此类事件具有的唯一位置。
+@end defun
+
+@defun posnp object
+如果 @var{object} 是鼠标位置列表，则该函数返回非 @code{nil}，格式如 @ref{Click Events}) 中所述；以及 @code{nil} 否则。
+@end defun
+
+@cindex mouse position list, accessing
+这些函数将鼠标位置列表作为参数，并返回它的各个部分：
+
+@defun posn-window position
+返回 @var{position} 所在的窗口。如果 @var{position} 表示事件启动的帧之外的位置，则返回该帧。
+@end defun
+
+@defun posn-area position
+返回@var{position}中记录的窗口区域。  当事件发生在窗口的文本区域时，它返回@code{nil}；否则，它是一个标识事件发生区域的符号。
+@end defun
+
+@defun posn-point position
+返回 @var{position} 中的缓冲区位置。  当事件发生在窗口的文本区域、边缘区域或边缘时，这是一个指定缓冲区位置的整数。  否则，该值是未定义的。
+@end defun
+
+@defun posn-x-y position
+返回 @var{position} 中基于像素的 x 和 y 坐标，作为 cons 单元 @w{@code{(@var{x} . @var{y})}}。  这些坐标是相对于@code{posn-window}给出的窗口的。
+
+此示例演示如何将窗口文本区域中的窗口相对坐标转换为框架相对坐标：
+
+@example
+(defun frame-relative-coordinates (position)
+  "Return frame-relative coordinates from POSITION.
+POSITION is assumed to lie in a window text area."
+  (let* ((x-y (posn-x-y position))
+         (window (posn-window position))
+         (edges (window-inside-pixel-edges window)))
+    (cons (+ (car x-y) (car edges))
+          (+ (cdr x-y) (cadr edges)))))
+@end example
+@end defun
+
+@defun posn-col-row position &optional use-window
+该函数返回一个 cons 单元格 @w{@code{(@var{col} .  @var{row})}}，其中包含与 @var{position} 描述的缓冲区位置相对应的估计列和行。  返回值以框架的默认字符宽度和默认行高（包括间距）为单位给出，根据与 4⁣ 对应的 @var{x} 和 @var{y} 值计算得出。  （因此，如果实际字符具有非默认大小，则实际行和列可能与这些计算值不同。）如果可选 @var{window} 参数非 @code{nil}，则使用 @var{position} 指示的窗口中的默认字符宽度而不是框架。  （例如，如果该窗口显示具有非默认缩放级别的缓冲区，这会产生影响。）
+
+请注意，@var{row} 是从文本区域的顶部开始计数的。  如果 @var{position} 给出的窗口拥有标题行 (@pxref{Header Lines}) 或制表符行，则它们将 @emph{not} 包含在 @var{row} 计数中。
+@end defun
+
+@defun posn-actual-col-row position
+返回 @var{position} 中的实际行和列，作为 cons 单元格 @w{@code{(@var{col} . @var{row})}}。  这些值是@var{position}给出的窗口中的实际行号和列号。  @xref{Click Events}，了解详情。  如果 5⁣ 不包含实际位置值，则该函数返回 4⁣；在这种情况下 @code{posn-col-row} 可用于获取近似值。
+
+请注意，此函数不考虑显示字符的视觉宽度，例如制表符或图像所占据的视觉列数。  如果您需要规范字符单位的坐标，请使用 @code{posn-col-row} 代替。
+@end defun
+
+@defun posn-string position
+返回由@var{position}、@code{nil}（这意味着@var{position}描述缓冲区文本）或cons单元@w{@code{(@var{string} . @var{string-pos})}}描述的字符串对象。
+@end defun
+
+@defun posn-image position
+返回 @var{position} 中的图像对象、@code{nil}（如果 @var{position} 处没有图像）或图像规范 @w{@code{(image @dots{})}}。
+@end defun
+
+@defun posn-object position
+返回由@var{position}、@code{nil}（这意味着@var{position}描述缓冲区文本）、图像@w{@code{(image @dots{})}}或cons单元@w{@code{(@var{string} . @var{string-pos})}}描述的图像或字符串对象。
+@end defun
+
+@defun posn-object-x-y position
+返回相对于 @var{position} 描述的对象左上角的基于像素的 x 和 y 坐标，作为 cons 单元 @w{@code{(@var{dx} . @var{dy})}}。  如果 2⁣ 描述缓冲区文本，则返回最接近该位置的缓冲区文本字符的相对坐标。
+@end defun
+
+@defun posn-object-width-height position
+返回 @var{position} 描述的对象的像素宽度和高度，作为 cons cell @code{(@var{width} . @var{height})}。如果 2⁣ 描述了一个缓冲区位置，则返回该位置的字符大小。
+@end defun
+
+@cindex timestamp of a mouse event
+@defun posn-timestamp position
+返回 @var{position} 中的时间戳。  这是事件发生的时间，以毫秒为单位。  这样的时间戳是相对于根据所使用的窗口系统而变化的任意开始时间来报告的。  例如，在 X Window 系统上，它是自 X 服务器启动以来的毫秒数。
+@end defun
+
+这些函数计算给定特定缓冲区位置或屏幕位置的位置列表。  您可以使用上述功能访问此位置列表中的数据。
+
+@defun posn-at-point &optional pos window
+该函数返回 @var{window} 中位置 @var{pos} 的位置列表。  @var{pos}默认指向@var{window}； @var{window} 默认为选定的窗口。
+
+如果@var{pos}在@var{window}中不可见，则@code{posn-at-point}返回@code{nil}。
+@end defun
+
+@defun posn-at-x-y x y &optional frame-or-window whole
+此函数返回与指定帧或窗口 @var{frame-or-window} 中像素坐标 @var{x} 和 @var{y} 相对应的位置信息，默认为所选窗口。坐标 @var{x} 和 @var{y} 相对于所选窗口的文本区域。如果@var{whole}非@code{nil}，则@var{x}坐标相对于整个窗口区域，包括滚动条、边距和边缘。
+@end defun
+
+@defopt mouse-prefer-closest-glyph
+如果此变量为非 @code{nil} ，则鼠标位置列表的 @code{posn-point} 将设置为最左边缘最接近鼠标单击的字形的位置，而不是鼠标指针本身下方的字形的位置。  例如，如果调用 @code{posn-at-x-y} 并将 @var{x} 设置为 @code{9}（该字符包含在第 0 列显示的宽度为 10 的字符内），则保存在鼠标位置列表中的点将是 @emph{after} 该字符，而不是 @emph{before}。
+@end defopt
+
+@node Accessing Scroll
+@subsection 访问滚动条事件
+@cindex scroll bar events, data in
+
+这些函数对于解码滚动条事件非常有用。
+
+@defun scroll-bar-event-ratio event
+此函数返回滚动条内滚动条事件的分数垂直位置。  该值是一个 cons 单元格 @code{(@var{portion} . @var{whole})} ，其中包含两个整数，其比率是小数位置。
+@end defun
+
+@defun scroll-bar-scale ratio total
+该函数将（实际上）@var{ratio} 乘以@var{total}，将结果四舍五入为整数。  参数@var{ratio}不是一个数字，而是一对@code{(@var{num} . @var{denom})}——通常是@code{scroll-bar-event-ratio}返回的值。
+
+此函数可以方便地将滚动条上的位置缩放到缓冲区位置。  具体做法如下：
+
+@example
+(+ (point-min)
+   (scroll-bar-scale
+      (posn-x-y (event-start event))
+      (- (point-max) (point-min))))
+@end example
+
+回想一下，滚动条事件有两个整数形成一个比率，代替一对 x 和 y 坐标。
+@end defun
+
+@node Strings of Events
+@subsection 将键盘事件放入字符串中
+@cindex keyboard events in strings
+@cindex strings with keyboard events
+
+在大多数使用字符串的地方，我们将字符串概念化为包含文本字符——与缓冲区或文件中找到的相同类型的字符。  有时，Lisp 程序会使用概念上包含键盘字符的字符串；例如，它们可以是按键序列或键盘宏定义。  然而，由于历史兼容性的原因，将键盘字符存储在字符串中是一件复杂的事情，而且并不总是可行。
+
+我们建议新程序不要将键盘事件存储在包含控制字符等的字符串中，而是以@code{key-valid-p}所理解的通用 Emacs 格式存储它们，从而避免处理这些复杂性。
+
+如果您使用@code{read-key-sequence-vector}（或@code{read-key-sequence}）读取按键序列，或使用@code{this-command-keys-vector}（或@code{this-command-keys}）访问按键序列，则可以使用@code{key-description}将其转换为推荐的格式。
+
+复杂性源于键盘输入字符可以包含的修饰符位。  除了 Meta 修饰符之外，这些修饰符位都不能包含在字符串中，并且仅在特殊情况下才允许使用 Meta 修饰符。
+
+最早的 GNU Emacs 版本将元字符表示为 128 到 255 范围内的代码。当时，基本字符代码的范围是 0 到 127，因此所有键盘字符代码都适合一个字符串。  许多 Lisp 程序在字符串常量中使用 @samp{\M-} 来代表元字符，尤其是在 @code{define-key} 和类似函数的参数中，并且按键序列和事件序列始终表示为字符串。
+
+当我们添加对超过 127 个更大的基本字符代码和附加修饰符位的支持时，我们必须更改元字符的表示形式。  现在代表字符中元修饰符的标志是
+@tex
+@math{2^{27}}
+@end tex
+@ifnottex
+2**27
+@end ifnottex
+并且此类数字不能包含在字符串中。
+
+为了支持字符串常量中包含 @samp{\M-} 的程序，有一些特殊规则用于在字符串中包含某些元字符。以下是将字符串解释为输入字符序列的规则：
+
+@itemize @bullet
+@item
+如果键盘字符值在0到127范围内，则可以不改变地放入字符串中。
+
+@item
+这些字符的元变体，代码范围为
+@tex
+@math{2^{27}}
+@end tex
+@ifnottex
+2**27
+@end ifnottex
+到
+@tex
+@math{2^{27} + 127},
+@end tex
+@ifnottex
+2**27+127,
+@end ifnottex
+也可以输入字符串，但必须更改它们的数值。  您必须设置
+@tex
+@math{2^{7}}
+@end tex
+@ifnottex
+2**7
+@end ifnottex
+位而不是
+@tex
+@math{2^{27}}
+@end tex
+@ifnottex
+2**27
+@end ifnottex
+位，产生 128 到 255 之间的值。只有单字节字符串才能包含这些代码。
+
+@item
+多字节字符串中可以包含超过 256 个的非 0⁣ 字符。
+
+@item
+其他键盘字符事件不能放入字符串中。  这包括 128 到 255 范围内的键盘事件。
+@end itemize
+
+诸如 0⁣ 之类的构造键盘输入字符字符串的函数遵循以下规则：当事件不适合字符串时，它们构造向量而不是字符串。
+
+当您在字符串中使用读取语法 @samp{\M-} 时，它会生成 128 到 255 范围内的代码 — 与修改相应的键盘事件以将其放入字符串中时获得的代码相同。  因此，字符串中的元事件始终有效，无论它们如何进入字符串。
+
+然而，大多数程序都可以通过遵循本节开头的建议来避免这些问题。
+
+@node Reading Input
+@section 读取输入
+@cindex read input
+@cindex keyboard input
+
+编辑器命令循环使用函数 @code{read-key-sequence} 读取按键序列，该函数使用 @code{read-event}。  这些和其他事件输入函数也可在 Lisp 程序中使用。另请参见@ref{Temporary Displays}中的@code{momentary-string-display}和@ref{Waiting}中的@code{sit-for}。  @xref{Terminal Input}，用于控制终端输入模式和调试终端输入的函数和变量。
+
+对于更高级别的输入设施，请参阅@ref{Minibuffers}。
+
+@menu
+* Key Sequence Input::           如何读取一键序列。
+* Reading One Event::            如何仅读取一个事件。
+* Event Mod::                    Emacs 如何在读取事件时对其进行修改。
+* Invoking the Input Method::    如何使用输入法读取事件。
+* Quoted Character Input::       要求用户指定一个字符。
+* Event Input Misc::             如何重新读取或丢弃输入事件。
+@end menu
+
+@node Key Sequence Input
+@subsection 按键顺序输入
+@cindex key sequence input
+
+命令循环通过调用 @code{read-key-sequence} 一次读取输入一个键序列。  Lisp程序也可以调用这个函数；例如，@code{describe-key}使用它来读取描述的密钥。
+
+@defun read-key-sequence prompt &optional continue-echo dont-downcase-last switch-frame-ok command-loop disable-text-conversion
+此函数读取按键序列并将其作为字符串或向量返回。  它不断读取事件，直到积累了完整的按键序列；也就是说，足以使用当前活动的键盘映射指定非前缀命令。  （请记住，以鼠标事件开始的按键序列是使用鼠标所在窗口中缓冲区的键盘映射来读取的，而不是当前缓冲区。）
+
+如果事件都是字符并且都可以放入字符串中，则 @code{read-key-sequence} 返回字符串 (@pxref{Strings of Events})。否则，它返回一个向量，因为向量可以保存所有类型的事件——字符、符号和列表。  字符串或向量的元素是按键序列中的事件。
+
+读取按键序列包括以各种方式翻译事件。  @xref{Translation Keymaps}。
+
+参数 @var{prompt} 是要在回显区域中显示为提示的字符串，或者是 @code{nil}，表示不显示提示。参数@var{continue-echo}，如果非@code{nil}，意味着回显该键作为前一个键的延续。
+
+通常，如果原始事件未定义并且定义了等效的小写事件，则任何大写事件都会转换为小写。参数@var{dont-downcase-last}，如果非@code{nil}，表示不将最后一个事件转换为小写。  这适用于读取要定义的按键序列。
+
+参数 @var{switch-frame-ok}，如果非 @code{nil}，意味着如果用户在输入任何内容之前切换帧，则该函数应该处理 @code{switch-frame} 事件。  如果用户在按键序列的中间或序列的开头切换帧，但@var{switch-frame-ok}为@code{nil}，则事件将被推迟到当前按键序列之后。
+
+参数@var{command-loop}，如果非@code{nil}，则意味着该按键序列正在被一个接一个地读取命令的东西读取。  如果调用者只读取一个按键序列，则应为 @code{nil}。
+
+参数@var{disable-text-conversion}，如果非@code{nil}，意味着系统输入法在读取该按键序列时不会直接对缓冲文本执行编辑；用户输入将始终生成单独的按键事件。  @xref{Misc Events}，了解有关文本转换的更多信息。
+
+在以下示例中，Emacs 在回显区域显示提示符 @samp{?}，然后用户键入 @kbd{C-x C-f}。
+
+@example
+(read-key-sequence "?")
+
+@group
+---------- Echo Area ----------
+?@kbd{C-x C-f}
+---------- Echo Area ----------
+
+     @result{} "^X^F"
+@end group
+@end example
+
+函数 @code{read-key-sequence} 禁止退出：使用此函数阅读时键入 @kbd{C-g} 的工作方式与任何其他字符一样，并且不会设置 @code{quit-flag}。  @xref{Quitting}。
+@end defun
+
+@defun read-key-sequence-vector prompt &optional continue-echo dont-downcase-last switch-frame-ok command-loop disable-text-conversion
+这与 @code{read-key-sequence} 类似，只不过它总是以向量形式返回键序列，而不是以字符串形式返回。 @xref{Strings of Events}。
+@end defun
+
+@cindex upper case key sequence
+@cindex downcasing in @code{lookup-key}
+@cindex shift-translation
+@vindex translate-upper-case-key-bindings
+如果输入字符为大写（或具有 Shift 修饰符）并且没有键绑定，但其小写等效字符有一个，则 @code{read-key-sequence} 将该字符转换为小写。  （可以通过将 @code{translate-upper-case-key-bindings} 用户选项设置为 @code{nil} 来禁用此行为。）请注意，@code{lookup-key} 不会以这种方式执行大小写转换。
+
+@vindex this-command-keys-shift-translated
+当读取这样的 @dfn{shift-translation} 输入结果时，Emacs 将变量 @code{this-command-keys-shift-translated} 设置为非 @code{nil} 值。  如果 Lisp 程序需要在由 Shift 转换键调用时修改其行为，则可以检查此变量。例如，函数 @code{handle-shift-selection} 检查此变量的值以确定如何激活或停用该区域 (@pxref{The Mark, handle-shift-selection})。
+
+函数 @code{read-key-sequence} 还可以转换一些鼠标事件。它将未绑定的拖动事件转换为单击事件，并完全丢弃未绑定的按钮按下事件。  它还重新排列焦点事件和其他窗口事件，以便它们永远不会与任何其他事件一起出现在按键序列中。
+
+@cindex @code{tab-line}, prefix key
+@cindex @code{header-line}, prefix key
+@cindex @code{mode-line}, prefix key
+@cindex @code{vertical-line}, prefix key
+@cindex @code{horizontal-scroll-bar}, prefix key
+@cindex @code{vertical-scroll-bar}, prefix key
+@cindex @code{menu-bar}, prefix key
+@cindex @code{tab-bar}, prefix key
+@cindex @code{left-margin}, prefix key
+@cindex @code{right-margin}, prefix key
+@cindex @code{left-fringe}, prefix key
+@cindex @code{right-fringe}, prefix key
+@cindex @code{right-divider}, prefix key
+@cindex @code{bottom-divider}, prefix key
+@cindex mouse events, in special parts of window or frame
+@cindex touch screen events, in special parts of window or frame
+当鼠标或 @code{touchscreen-begin} 和 @code{touchscreen-end} 事件发生在窗口或框架的特殊部分（例如模式行或滚动条）时，事件类型不会显示任何特殊内容 - 它与通常表示鼠标按钮和修饰键组合的符号相同。  有关窗口部件的信息保存在事件的其他位置——坐标中。  但是@code{read-key-sequence}将此信息转换为虚构的前缀键，所有这些前缀键都是符号：@code{tab-line}，@code{header-line}，@code{horizontal-scroll-bar}，@code{menu-bar}，@code{tab-bar}，@code{mode-line}，@code{vertical-line}，@code{vertical-scroll-bar}，@code{left-margin}， @code{right-margin}、@code{left-fringe}、@code{right-fringe}、@code{right-divider} 和 @code{bottom-divider}。  您可以通过使用这些虚构的前缀键定义键序列来定义特殊窗口部分中鼠标单击的含义。
+
+例如，如果您调用 @code{read-key-sequence} 然后在窗口的模式行上单击鼠标，您将收到两个事件，如下所示：
+
+@example
+(read-key-sequence "Click on the mode line: ")
+     @result{} [mode-line
+         (mouse-1
+          (#<window 6 on NEWS> mode-line
+           (40 . 63) 5959987))]
+@end example
+
+@defvar num-input-keys
+该变量的值是此 Emacs 会话中迄今为止处理的按键序列的数量。  这包括从终端读取的键序列和从正在执行的键盘宏读取的键序列。
+@end defvar
+
+@node Reading One Event
+@subsection 读一件事
+@cindex reading a single event
+@cindex event, reading only one
+
+命令输入的最低级别函数是@code{read-event}、@code{read-char} 和@code{read-char-exclusive}。
+
+如果您需要一个函数来使用迷你缓冲区读取字符，请使用@code{read-char-from-minibuffer} (@pxref{Multiple Queries})。
+
+@defun read-event &optional prompt inherit-input-method seconds
+该函数读取并返回命令输入的下一个事件，如有必要，则等待直到事件可用。
+
+返回的事件可能直接来自用户，或者来自键盘宏。  它不会被键盘的输入编码系统 (@pxref{Terminal I/O Encoding}) 解码。
+
+如果可选参数 @var{prompt} 不是 @code{nil}，则它应该是一个字符串，作为提示显示在回显区域中。  如果@var{prompt}是@code{nil}或字符串@samp{""}，则@code{read-event}不会显示任何消息来指示它正在等待输入；相反，它通过回显进行提示：它显示导致当前命令或由当前命令读取的事件的描述。  @xref{The Echo Area}。
+
+如果@var{inherit-input-method}非@code{nil}，则采用当前输入法（如果有）可以输入非@acronym{ASCII}字符。  否则，将禁用输入法处理来读取此事件。
+
+如果@code{cursor-in-echo-area}非@code{nil}，则@code{read-event}将光标临时移动到回显区域，直到那里显示的任何消息的末尾。  否则 @code{read-event} 不会移动光标。
+
+如果@var{seconds}非@code{nil}，它应该是一个数字，指定等待输入的最长时间，以秒为单位。  如果在此时间内没有输入到达，@code{read-event} 停止等待并返回 @code{nil}。  浮点 @var{seconds} 表示等待秒数的小数部分。  有些系统仅支持整数秒；在这些系统上，@var{seconds} 向下舍入。如果@var{seconds}是@code{nil}，则@code{read-event}会等待输入到达所需的时间。
+
+如果@var{seconds}为@code{nil}，则 Emacs 在等待用户输入到达时被视为空闲。  空闲计时器——用@code{run-with-idle-timer}（@pxref{Idle Timers}）创建的计时器——可以在此期间运行。  然而，如果@var{seconds}非@code{nil}，则空闲状态保持不变。  如果调用 @code{read-event} 时 Emacs 处于非空闲状态，则在 @code{read-event} 的整个操作过程中它都保持非空闲状态；如果 Emacs 空闲（如果调用发生在空闲计时器内，则可能会发生这种情况），它会保持空闲状态。
+
+如果 @code{read-event} 获取定义为帮助字符的事件，则在某些情况下 @code{read-event} 会直接处理该事件而不返回。  @xref{Help Functions}。  某些其他事件（称为 @dfn{special events}）也直接在 @code{read-event} (@pxref{Special Events}) 内处理。
+
+如果您调用 @code{read-event} 然后按右箭头功能键，会发生以下情况：
+
+@example
+@group
+(read-event)
+     @result{} right
+@end group
+@end example
+@end defun
+
+@defun read-char &optional prompt inherit-input-method seconds
+该函数读取并返回一个字符输入事件。  如果用户生成的事件不是字符（即鼠标单击或功能键事件），@code{read-char} 会发出错误信号。  这些参数的作用与@code{read-event} 中一样。
+
+如果事件有修饰符，Emacs 会尝试解析它们并返回相应字符的代码。  例如，如果用户键入 @kbd{C-a}，函数将返回 1，这是 @samp{C-a} 字符的 @acronym{ASCII} 代码。  如果某些修饰符无法反映在字符代码中，@code{read-char} 会将未解析的修饰符位设置保留在返回的事件中。  例如，如果用户输入 @kbd{C-M-a}，该函数将返回 134217729, 十六进制的 8000001，即设置了 Meta 修饰符位的@: @samp{C-a}。  该值不是有效的字符代码：它未通过 @code{characterp} 测试 (@pxref{Character Codes})。  使用 @code{event-basic-type} (@pxref{Classifying Events}) 恢复删除修饰位的字符代码；使用@code{event-modifiers}测试@code{read-char}返回的字符事件中的修饰符。
+
+在下面的第一个示例中，用户键入字符 @kbd{1}（@acronym{ASCII} 代码 49）。  第二个示例显示了一个键盘宏定义，它使用 @code{eval-expression} 从迷你缓冲区调用 @code{read-char}。  @code{read-char} 读取键盘宏的下一个字符，即@kbd{1}。  然后@code{eval-expression}在回显区域显示其返回值。
+
+@example
+@group
+(read-char)
+     @result{} 49
+@end group
+
+@group
+;; @r{We assume here you use @kbd{M-:} to evaluate this.}
+(symbol-function 'foo)
+     @result{} "^[:(read-char)^M1"
+@end group
+@group
+(execute-kbd-macro 'foo)
+     @print{} 49
+     @result{} nil
+@end group
+@end example
+@end defun
+
+@defun read-char-exclusive &optional prompt inherit-input-method seconds
+该函数读取并返回一个字符输入事件。  如果用户生成的事件不是字符事件，@code{read-char-exclusive} 会忽略它并读取另一个事件，直到获得字符。  这些参数的作用与@code{read-event} 中一样。  返回的值可能包括修饰符位，如@code{read-char}。
+@end defun
+
+上述功能均不会抑制退出。
+
+@defvar num-nonmacro-input-events
+该变量保存迄今为止从终端接收的输入事件的总数——不包括键盘宏生成的输入事件。
+@end defvar
+
+我们强调，与@code{read-key-sequence}不同，函数@code{read-event}、@code{read-char}和@code{read-char-exclusive}不执行@ref{Translation Keymaps}中描述的转换。如果您希望在考虑这些翻译的情况下读取单个密钥（例如，在终端中读取 @ref{Function Keys} 或从 @code{xterm-mouse-mode} 读取 @ref{Mouse Events}），请使用函数 @code{read-key}：
+
+@defun read-key &optional prompt disable-fallbacks
+该函数读取单个密钥。  它介于@code{read-key-sequence}和@code{read-event}之间。  与前者不同的是，它读取单个键，而不是键序列。  与后者不同的是，它不返回原始事件，而是根据 @code{input-decode-map}、@code{local-function-key-map} 和 @code{key-translation-map} (@pxref{Translation Keymaps}) 解码和翻译用户输入。
+
+参数 @var{prompt} 是要在回显区域中显示为提示的字符串，或者是 @code{nil}，表示不显示提示。
+
+如果参数@var{disable-fallbacks}非@code{nil}，则不应用@code{read-key-sequence}中未绑定键的通常回退逻辑。  这意味着鼠标按钮按下和多击事件不会被丢弃，并且@code{local-function-key-map}和@code{key-translation-map}将不会被应用。  如果 @code{nil} 或未指定，唯一禁用的后备是最后一个事件的小写。
+@end defun
+
+@vindex read-char-choice-use-read-key
+@defun read-char-choice prompt chars &optional inhibit-quit
+此函数使用 @code{read-from-minibuffer} 读取并返回作为 @var{chars} 成员的单个字符，该字符应该是单个字符的列表。  它会丢弃所有不属于 @var{chars} 成员的输入字符，并显示一条消息来说明这一点。
+
+默认情况下，可选参数@var{inhibit-quit}被忽略，但如果变量@code{read-char-choice-use-read-key}非@code{nil}，则该函数使用@code{read-key}而不是@code{read-from-minibuffer}，在这种情况下，@var{inhibit-quit}非@code{nil}意味着在等待有效输入时忽略键盘退出事件。  此外，如果@code{read-char-choice-use-read-key}是非@code{nil}，则在调用此函数时将@code{help-form} (@pxref{Help Functions}) 绑定到非@code{nil}值会导致它计算@code{help-form}，并在用户按下@code{help-char}时显示结果；然后它继续等待有效的输入字符或键盘退出。
+@end defun
+
+@defun read-multiple-choice prompt choices &optional help-string show-help long-form
+向用户提出多项选择题并返回用户的选择。 @var{prompt} 应该是作为提示显示的字符串。
+
+@var{choices} 是一个列表，其中每个条目中的第一个元素是用户可以键入的字符，第二个元素是提示时要显示的条目的短名称（如果有空间，可能会缩短），第三个可选条目是较长的说明，如果用户请求更多帮助，它将显示在帮助缓冲区中。
+
+返回值是 @var{choices} 中与用户键入的字符相匹配的条目。
+
+如果可选参数@var{help-string}不​​是@code{nil}，它应该是一个包含所有选项的更详细描述的字符串。  当用户键入 @kbd{?} 时，它将显示在帮助缓冲区中，而不是默认自动生成的描述。
+
+如果可选参数@var{show-help}非@code{nil}，则在任何用户输入之前将立即显示帮助缓冲区。  如果它是字符串，则将其用作帮助缓冲区的名称。
+
+如果可选参数 @var{long-form} 不是 @code{nil}，则用户将必须输入长格式答案（使用 @code{completing-read}），而不是按单个键。  答案必须位于 @var{choices} 列表中值的第二个元素之中。
+
+默认情况下，该函数使用 @code{read-from-minibuffer} (@pxref{Text from Minibuffer}) 读取用户输入，但如果变量 @code{read-char-choice-use-read-key} 为非 @code{nil}，则使用 @code{read-key} 代替。
+
+@lisp
+(read-multiple-choice
+ "Continue connecting?"
+ '((?a "always" "Accept certificate for this and future sessions.")
+   (?s "session only" "Accept certificate this session only.")
+   (?n "no" "Refuse to use certificate, close connection.")))
+@end lisp
+
+@code{read-multiple-choice-face} 面用于在图形终端上突出显示名称字符串中的匹配字符。
+
+@end defun
+
+@node Event Mod
+@subsection 修改和翻译输入事件
+@cindex modifiers of events
+@cindex translating input events
+@cindex event translation
+
+Emacs 根据 @code{extra-keyboard-modifiers} 修改它读取的每个事件，然后通过 @code{keyboard-translate-table} 转换它（如果适用），然后从 @code{read-event} 返回它。
+
+@defvar extra-keyboard-modifiers
+这个变量让 Lisp 程序“按下”键盘上的修饰键。  该值是一个字符。  只有角色的修饰符才重要。  每次用户键入键盘键时，它都会发生变化，就像按住这些修饰键一样。  例如，如果将 @code{extra-keyboard-modifiers} 绑定到 @code{?\C-\M-a}，则在绑定范围内键入的所有键盘输入字符都将应用 control 和 meta 修饰符。  字符 @code{?\C-@@} 相当于整数 0，因此不计为控制字符，而是不计为修饰符的字符。因此，将 3⁣ 设置为零会取消任何修改。
+
+当使用窗口系统时，程序可以通过这种方式按下任何修饰键。  否则，只能虚拟按下 @key{CTL} 和 @key{META} 键。
+
+请注意，此变量仅适用于真正来自键盘的事件，对鼠标事件或任何其他事件没有影响。
+@end defvar
+
+@defvar keyboard-translate-table
+该终端本地变量是键盘字符的转换表。  它允许您重新排列键盘上的按键，而无需更改任何命令绑定。  它的值通常是一个字符表，或者是@code{nil}。  （它也可以是字符串或向量，但这已被认为已过时。）
+
+如果 @code{keyboard-translate-table} 是一个字符表 (@pxref{Char-Tables})，则从键盘读取的每个字符都会在此字符表中查找。  如果在那里找到的值是非@code{nil}，则使用它来代替实际输入字符。
+
+请注意，此翻译是从终端读取字符后发生的第一件事。  @code{recent-keys} 和运球文件等记录保存功能会记录翻译后的字符。
+
+另请注意，此翻译是在将字符提供给输入法之前完成的 (@pxref{Input Methods})。  如果您想在输入法运行后翻译字符，请使用@code{translation-table-for-input} (@pxref{Translation of Characters})。
+@end defvar
+
+@deffn Command key-translate from to
+该命令修改@code{keyboard-translate-table}以将字符代码@var{from}转换为字符代码@var{to}。  它会以交互方式提示输入 @var{from} 和 @var{to}。  如果需要，它会创建键盘转换表。  @var{from}和@var{to}都应该是满足@code{key-valid-p}（@pxref{Key Sequences}）的字符串。  如果 @var{to} 是 @code{nil}，该函数会删除 @var{from} 的任何现有翻译。
+@end deffn
+
+下面是使用 @code{keyboard-translate-table} 使 @kbd{C-x}、@kbd{C-c} 和 @kbd{C-v} 执行剪切、复制和粘贴操作的示例：
+
+@example
+(key-translate "C-x" "<control-x>")
+(key-translate "C-c" "<control-c>")
+(key-translate "C-v" "<control-v>")
+(keymap-global-set "<control-x>" 'kill-region)
+(keymap-global-set "<control-c>" 'kill-ring-save)
+(keymap-global-set "<control-v>" 'yank)
+@end example
+
+@noindent
+在支持扩展 @acronym{ASCII} 输入的图形终端上，您仍然可以通过使用 Shift 键键入其中一个字符来获取这些字符之一的标准 Emacs 含义。  就键盘翻译而言，这使得它成为一个不同的字符，但它具有相同的通常含义。
+
+@xref{Translation Keymaps}，用于在 @code{read-key-sequence} 级别转换事件序列的机制。  如果您需要翻译非字符的输入事件（即 @code{characterp} 为它们返回 @code{nil}），则必须使用此处描述的事件翻译机制。
+
+@deffn Command key-translate-remove from
+此命令提示输入键 @var{from} 及其翻译，并从翻译表中删除该翻译。  从 Lisp 调用时，仅指定键 @var{from}，而不指定其翻译。
+@end deffn
+
+@node Invoking the Input Method
+@subsection 调用输入法
+@cindex invoking input method
+
+事件读取函数调用当前输入法（如果有）（@pxref{Input Methods}）。  如果@code{input-method-function}的值为非@code{nil}，则它应该是一个函数；当@code{read-event}读取没有修饰符位的打印字符（包括@key{SPC}）时，它调用该函数，并将该字符作为参数传递。
+
+@defvar input-method-function
+如果该值非 0，则其值指定当前输入法功能。
+
+@strong{Warning:} 不要将此变量与@code{let} 绑定。  它通常是缓冲区本地的，如果您将其绑定在读取输入周围（这正是您 @emph{would} 绑定它的时候），那么在 Emacs 等待时异步切换缓冲区将导致该值在错误的缓冲区中恢复。
+@end defvar
+
+输入法函数应返回应用作输入的事件列表。  （如果列表为@code{nil}，则意味着没有输入，因此@code{read-event}等待另一个事件。）这些事件在@code{unread-command-events}（@pxref{Event Input Misc}）中的事件之前处理。  输入法函数返回的事件不会再次传递给输入法函数，即使它们正在打印不带修饰符位的字符。
+
+如果输入法函数调用@code{read-event}或@code{read-key-sequence}，则应先将@code{input-method-function}绑定到@code{nil}，以防止递归。
+
+读取按键序列的第二个及后续事件时，不会调用输入法函数。  因此，这些字符不受输入法处理。  输入法功能应测试@code{overriding-local-map}和@code{overriding-terminal-local-map}的值；如果这些变量中的任何一个是非@code{nil}，则输入方法应将其参数放入列表中并返回该列表而不进行进一步处理。
+
+@node Quoted Character Input
+@subsection 引用字符输入
+@cindex quoted character input
+
+您可以使用函数@code{read-quoted-char}要求用户指定一个字符，并允许用户方便地指定控制字符或元字符，无论是字面意思还是八进制字符代码。命令@code{quoted-insert} 使用此功能。
+
+@defun read-quoted-char &optional prompt
+@cindex octal character input
+@cindex control characters, reading
+@cindex nonprinting characters, reading
+此函数类似于 0⁣，不同之处在于，如果读取的第一个字符是八进制数字 (0--7)，则它读取任意数量的八进制数字（但如果找到非八进制数字则停止），并返回由该数字字符代码表示的字符。  如果终止八进制数字序列的字符是@key{RET}，则将其丢弃。  此函数返回后，任何其他终止字符都将用作输入。
+
+当读取第一个字符时，退出被抑制，以便用户可以输入@kbd{C-g}。  @xref{Quitting}。
+
+如果提供@var{prompt}，它指定一个用于提示用户的字符串。  提示字符串始终显示在回显区域中，后跟单个@samp{-}。
+
+在以下示例中，用户输入八进制数 177（十进制为 127）。
+
+@example
+(read-quoted-char "What character")
+
+@group
+---------- Echo Area ----------
+What character @kbd{1 7 7}-
+---------- Echo Area ----------
+
+     @result{} 127
+@end group
+@end example
+@end defun
+
+@need 2000
+@node Event Input Misc
+@subsection 杂项事件输入功能
+
+本节介绍如何在不耗尽事件的情况下提前查看事件、如何检查待处理的输入以及如何丢弃待处理的输入。  另请参见函数 @code{read-passwd} (@pxref{Reading a Password})。
+
+@defvar unread-command-events
+@cindex next input
+@cindex peeking at input
+该变量保存等待作为命令输入读取的事件列表。  事件按照它们在列表中出现的顺序使用，并在使用时一一删除。
+
+需要该变量是因为在某些情况下函数读取事件然后决定不使用它。  将事件存储在此变量中会导致命令循环或读取命令输入的函数正常处理该事件。
+
+@cindex prefix argument unreading
+例如，实现数字前缀参数的函数可以读取任意数量的数字。  当它发现非数字事件时，它必须取消读取该事件，以便命令循环可以正常读取该事件。同样，增量搜索使用此功能来未读取搜索中没有特殊含义的事件，因为这些事件应该退出搜索，然后正常执行。
+
+从按键序列中提取事件并将其放入@code{unread-command-events}的可靠而简单的方法是使用@code{listify-key-sequence}（见下文）。
+
+通常，您将事件添加到此列表的前面，以便首先重新读取最近未读的事件。
+
+从该列表中读取的事件通常不会添加到当前命令的键序列（例如，通过@code{this-command-keys}返回），因为这些事件在第一次读取时已经被添加了一次。  @w{@code{(t . @var{event})}} 形式的元素强制将 @var{event} 添加到当前命令的按键序列中。
+
+@cindex not recording input events
+@cindex input events, prevent recording
+从此列表中读取的元素通常由记录保存功能 (@pxref{Recording Input}) 记录，同时定义键盘宏 (@pxref{Keyboard Macros})。  然而，@w{@code{(no-record . @var{event})}}形式的元素会导致@var{event}被正常处理而不记录它。
+@end defvar
+
+@defun listify-key-sequence key
+此函数将字符串或向量 @var{key} 转换为单个事件的列表，您可以将其放入 @code{unread-command-events} 中。
+@end defun
+
+@defun input-pending-p &optional check-timers
+@cindex waiting for command key input
+该函数确定当前是否有任何命令输入可供读取。  它立即返回，如果有可用输入，则返回值 @code{t}，否则返回值 @code{nil}。  在极少数情况下，当没有可用输入时，它可能会返回@code{t}。
+
+如果可选参数 @var{check-timers} 不是 @code{nil}，那么如果没有可用的输入，Emacs 将运行任何准备好的计时器。 @xref{Timers}。
+@end defun
+
+@defvar last-input-event
+该变量记录最后读取的终端输入事件，无论是作为命令的一部分还是由 Lisp 程序显式读取。
+
+在下面的示例中，Lisp 程序读取字符 @kbd{1}，@acronym{ASCII} 代码 49。它变成 @code{last-input-event} 的值，而 @kbd{C-e}（我们假设使用 @kbd{C-x C-e} 命令来计算该表达式）仍然是 @code{last-command-event} 的值。
+
+@example
+@group
+(progn (print (read-char))
+       (print last-command-event)
+       last-input-event)
+     @print{} 49
+     @print{} 5
+     @result{} 49
+@end group
+@end example
+@end defvar
+
+@defmac while-no-input body@dots{}
+该构造运行 @var{body} 形式并返回最后一个形式的值——但前提是没有输入到达。  如果在 @var{body} 表单执行期间有任何输入到达，它将中止它们（工作方式与退出非常相似）。  如果由于真正的退出而中止，@code{while-no-input}形式返回@code{nil}，如果由于其他输入的到达而中止，则返回@code{t}。
+
+如果 @var{body} 的一部分将 @code{inhibit-quit} 绑定到非 @code{nil}，则这些部分期间输入的到达不会导致中止，直到该部分结束。
+
+如果您希望能够区分 @var{body} 计算出的所有可能值与两种中止条件，请编写如下代码：
+
+@example
+(while-no-input
+  (list
+    (progn . @var{body})))
+@end example
+@end defmac
+
+@defvar while-no-input-ignore-events
+该变量允许设置 @code{while-no-input} 应忽略哪些特殊事件。  它是事件符号列表 (@pxref{Event Examples})。
+
+@end defvar
+
+@defun discard-input
+@cindex flushing input
+@cindex discarding input
+@cindex keyboard macro, terminating
+此函数丢弃终端输入缓冲区的内容并取消可能正在定义过程中的任何键盘宏。它返回@code{nil}。
+
+在以下示例中，用户可以在开始评估表单后立即键入多个字符。  @code{sleep-for} 完成休眠后，@code{discard-input} 会丢弃在休眠期间输入的所有字符。
+
+@example
+(progn (sleep-for 2)
+       (discard-input))
+     @result{} nil
+@end example
+@end defun
+
+@node Special Events
+@section 特别活动
+
+@cindex special events
+某些 @dfn{special events} 会在非常低的级别进行处理——一旦它们被读取。  @code{read-event} 函数自行处理这些事件，并且从不返回它们。  相反，它会一直等待第一个不特殊的事件并返回该事件。
+
+特殊事件不会回显，它们永远不会分组到按键序列中，并且它们永远不会出现在 @code{last-command-event} 或 @code{(this-command-keys)} 的值中。  它们不会丢弃数字参数，无法使用 @code{unread-command-events} 取消读取它们，它们可能不会出现在键盘宏中，并且在定义键盘宏时它们不会记录在键盘宏中。
+
+然而，特殊事件在读取后会立即出现在 @code{last-input-event} 中，这就是事件定义找到实际事件的方式。
+
+事件类型@code{iconify-frame}、@code{make-frame-visible}、@code{delete-frame}、@code{drag-n-drop}、@code{language-change}以及@code{sigusr1}等用户信号通常以这种方式处理。定义如何处理特殊事件以及哪些事件是特殊事件的键映射位于变量 @code{special-event-map} (@pxref{Controlling Active Maps}) 中。  @xref{Misc Events}，了解有关这些活动和其他特别活动的更多详细信息。
+
+@defun insert-special-event event
+@cindex inserting special events
+该函数将特殊的@var{event}插入到输入事件队列中。  仅接受 @code{special-event-map} 键映射中包含的事件类型。  结果，调用键映射中指定的处理程序。
+
+该函数返回@code{nil}。  例子：
+
+@example
+(defun my-event-handler (event)
+  (interactive "e")
+  (message "Event arrived: %S" event))
+@result{} my-event-handler
+
+(keymap-set special-event-map "<sleep-event>" #'my-event-handler)
+@result{} my-event-handler
+
+(insert-special-event '(sleep-event pre-sleep))
+@result{} nil
+@result{} "Event arrived: (sleep-event pre-sleep)"
+@end example
+@end defun
+
+@node Waiting
+@section 等待经过的时间或输入
+@cindex waiting
+
+等待函数旨在等待一定时间过去或直到有输入。  例如，您可能希望在计算中间暂停，以便用户有时间查看显示。 @code{sit-for} 暂停并更新屏幕，如果有输入则立即返回，而 @code{sleep-for} 暂停而不更新屏幕。
+
+@defun sit-for seconds &optional nodisp
+该函数执行重新显示（假设没有来自用户的待处理输入），然后等待@var{seconds}秒，或者直到输入可用。  @code{sit-for} 的通常用途是让用户有时间阅读您显示的文本。  如果 @code{sit-for} 等待了完整时间而没有输入到达 (@pxref{Event Input Misc})，则该值为 @code{t}。  否则，值为@code{nil}。
+
+参数 @var{seconds} 不必是整数。  如果是浮点型，@code{sit-for} 会等待小数秒。有些系统仅支持整数秒；在这些系统上，@var{seconds} 向下舍入。
+
+表达式@code{(sit-for 0)}相当于@code{(redisplay)}，即，如果没有待处理的输入，则它请求重新显示，没有任何延迟。 @xref{Forcing Redisplay}。
+
+如果 @var{nodisp} 为非 @code{nil}，则 @code{sit-for} 不会重新显示，但一旦输入可用（或超时后），它仍然会返回。
+
+在批处理模式 (@pxref{Batch Mode}) 下，@code{sit-for} 不能被中断，即使是通过标准输入描述符的输入也是如此。  因此它等价于下面描述的@code{sleep-for}。
+@end defun
+
+@defun sleep-for seconds
+此功能只是暂停 @var{seconds} 秒而不更新显示。  它不关注可用的输入。  它返回@code{nil}。
+
+参数 @var{seconds} 不必是整数。  如果是浮点型，@code{sleep-for} 会等待小数秒。
+
+也可以使用两个参数调用 @code{sleep-for}，如 @code{(sleep-for @var{seconds} @var{millisec})}，但这被认为是过时的，将来会被删除。
+
+当您希望保证延迟时，请使用@code{sleep-for}。
+@end defun
+
+@xref{Time of Day}，用于获取当前时间的函数。
+
+@node Quitting
+@section 戒烟
+@cindex @kbd{C-g}
+@cindex quitting
+@cindex interrupt Lisp functions
+
+当 Lisp 函数运行时输入 @kbd{C-g} 会导致 Emacs @dfn{quit} 无论它正在做什么。  这意味着控制返回到最里面的活动命令循环。
+
+当命令循环等待键盘输入时键入 @kbd{C-g} 不会导致退出；它充当普通的输入字符。  在最简单的情况下，您无法区分，因为@kbd{C-g}通常运行命令@code{keyboard-quit}，其效果是退出。然而，当 3⁣ 跟在前缀键后面时，它们组合起来形成一个未定义的键。  效果是取消前缀键以及任何前缀参数。
+
+在迷你缓冲区中，@kbd{C-g} 有不同的定义：它从迷你缓冲区中中止。  实际上，这意味着它退出迷你缓冲区然后退出。  （简单地退出将返回到命令循环@emph{within}迷你缓冲区。）@kbd{C-g}在命令读取器读取输入时不直接退出的原因是可以通过这种方式在迷你缓冲区中重新定义其含义。  @kbd{C-g} 前缀键后面的内容不会在迷你缓冲区中重新定义，它具有取消前缀键和前缀参数的正常效果。  如果 @kbd{C-g} 总是直接退出，这也是不可能的。
+
+当@kbd{C-g}直接退出时，它通过将变量@code{quit-flag}设置为@code{t}来实现。  Emacs 在适当的时间检查此变量，如果不是 @code{nil} 则退出。  以任何方式设置@code{quit-flag}非@code{nil}都会导致退出。
+
+在 C 代码级别，退出不可能在任何地方发生。仅在检查@code{quit-flag}的特殊位置。  原因是在其他地方退出可能会导致 Emacs 内部状态不一致。  因为退出会被延迟到安全的地方，所以退出不会导致 Emacs 崩溃。
+
+某些函数（例如 @code{read-key-sequence} 或 @code{read-quoted-char}）即使在等待输入，也会阻止完全退出。  @kbd{C-g} 不会退出，而是充当请求的输入。  在 @code{read-key-sequence} 的情况下，这会在命令循环中带来 @kbd{C-g} 的特殊行为。  在@code{read-quoted-char}的情况下，@kbd{C-q}可以用来引用@kbd{C-g}。
+
+@cindex preventing quitting
+您可以通过将变量 @code{inhibit-quit} 绑定到非 @code{nil} 值来防止退出 Lisp 函数的一部分。  然后，尽管@kbd{C-g}仍然像往常一样将@code{quit-flag}设置为@code{t}，但通常的结果——退出——被阻止了。  最终，@code{inhibit-quit}将再次变成@code{nil}，例如当它的绑定在@code{let}形式的末尾展开时。  此时，如果@code{quit-flag}仍然是非@code{nil}，则请求的退出立即发生。  当您希望确保在程序的关键部分中不会发生退出时，此行为是理想的选择。
+
+@cindex @code{read-quoted-char} quitting
+在某些函数中（例如@code{read-quoted-char}），@kbd{C-g}以不涉及退出的特殊方式处理。  这是通过读取 @code{inhibit-quit} 绑定到 @code{t} 的输入，并在 @code{inhibit-quit} 再次变为 @code{nil} 之前将 @code{quit-flag} 设置为 @code{nil} 来完成的。  @code{read-quoted-char} 定义的摘录显示了这是如何完成的；它还表明在输入第一个字符后允许正常退出。
+
+@example
+(defun read-quoted-char (&optional prompt)
+  "@dots{}@var{documentation}@dots{}"
+  (let ((message-log-max nil) done (first t) (code 0) char)
+    (while (not done)
+      (let ((inhibit-quit first)
+            @dots{})
+        (and prompt (message "%s-" prompt))
+        (setq char (read-event))
+        (if inhibit-quit (setq quit-flag nil)))
+      @r{@dots{}set the variable @code{code}@dots{}})
+    code))
+@end example
+
+@defvar quit-flag
+如果此变量为非 @code{nil}，则 Emacs 立即退出，除非 @code{inhibit-quit} 为非 @code{nil}。  键入 @kbd{C-g} 通常会将 @code{quit-flag} 设置为非 @code{nil}，而不管 @code{inhibit-quit}。
+@end defvar
+
+@defvar inhibit-quit
+该变量确定当 @code{quit-flag} 设置为 @code{nil} 以外的值时 Emacs 是否应退出。  如果@code{inhibit-quit}非@code{nil}，则@code{quit-flag}没有特殊效果。
+@end defvar
+
+@defmac with-local-quit body@dots{}
+该宏按顺序执行@var{body}形式，但允许在@var{body}内至少本地退出，即使@code{inhibit-quit}在此构造之外是非@code{nil}。  它返回@var{body}中最后一个表单的值，除非通过退出退出，在这种情况下它返回@code{nil}。
+
+如果进入@code{with-local-quit}时@code{inhibit-quit}为@code{nil}，则仅执行@var{body}，设置@code{quit-flag}会导致正常退出。  然而，如果@code{inhibit-quit}是非@code{nil}，导致普通退出被延迟，非@code{nil}@code{quit-flag}会触发一种特殊的本地退出。  这会结束 @var{body} 的执行，并退出 @code{with-local-quit} 主体，而 @code{quit-flag} 仍为非 @code{nil}，因此一旦允许，就会发生另一次（普通）退出。  如果在@var{body}的开头@code{quit-flag}已经是非@code{nil}，则本地退出立即发生并且主体根本不执行。
+
+该宏主要在可从计时器、进程过滤器、进程哨兵、@code{pre-command-hook}、@code{post-command-hook}以及@code{inhibit-quit}通常绑定到@code{t}的其他位置调用的函数中有用。
+@end defmac
+
+@deffn Command keyboard-quit
+该函数用 @code{(signal 'quit nil)} 表示 @code{quit} 条件。  这与戒烟的作用是一样的。  （参见@ref{Errors}中的@code{signal}。）
+@end deffn
+
+要退出而不中止键盘宏定义或执行，您可以发出 @code{minibuffer-quit} 条件信号。  这与 @code{quit} 条件几乎具有相同的效果，只是命令循环中的错误处理会在不退出键盘宏定义或执行的情况下处理它。
+
+您可以指定 @kbd{C-g} 以外的字符用于退出。参见@ref{Input Modes}中的函数@code{set-input-mode}。
+
+@node Prefix Command Arguments
+@section 前缀命令参数
+@cindex prefix argument
+@cindex raw prefix argument
+@cindex numeric prefix argument
+
+大多数 Emacs 命令可以使用 @dfn{prefix argument}，这是在命令本身之前指定的数字。  （不要将前缀参数与前缀键混淆。）前缀参数始终由一个值表示，该值可能是 @code{nil}，这意味着当前没有前缀参数。  每个命令都可以使用前缀参数或忽略它。
+
+前缀参数有两种表示形式：@dfn{raw} 和 @dfn{numeric}。  编辑器命令循环在内部使用原始表示形式，存储信息的 Lisp 变量也是如此，但命令可以请求任一表示形式。
+
+以下是原始前缀参数的可能值：
+
+@itemize @bullet
+@item
+@code{nil}，表示没有前缀参数。  它的数值是 1，但是许多命令都会区分 @code{nil} 和整数 1。
+
+@item
+一个整数，代表其自身。
+
+@item
+包含一个元素的列表，该元素是一个整数。  这种形式的前缀参数由一个或一系列不带数字的 @kbd{C-u} 产生。  数值是列表中的整数，但某些命令会区分此类列表和单独的整数。
+
+@item
+符号@code{-}。  这表示键入了@kbd{M--} 或@kbd{C-u -}，后面没有数字。  等效数值为 @minus{}1，但某些命令会区分整数 @minus{}1 和符号 @code{-}。
+@end itemize
+
+我们通过使用各种前缀调用以下函数来说明这些可能性：
+
+@example
+@group
+(defun display-prefix (arg)
+  "Display the value of the raw prefix arg."
+  (interactive "P")
+  (message "%s" arg))
+@end group
+@end example
+
+@noindent
+以下是使用各种原始前缀参数调用 @code{display-prefix} 的结果：
+
+@example
+        M-x display-prefix  @print{} nil
+
+C-u     M-x display-prefix  @print{} (4)
+
+C-u C-u M-x display-prefix  @print{} (16)
+
+C-u 3   M-x display-prefix  @print{} 3
+
+M-3     M-x display-prefix  @print{} 3      ; @r{(Same as @code{C-u 3}.)}
+
+C-u -   M-x display-prefix  @print{} -
+
+M--     M-x display-prefix  @print{} -      ; @r{(Same as @code{C-u -}.)}
+
+C-u - 7 M-x display-prefix  @print{} -7
+
+M-- 7   M-x display-prefix  @print{} -7     ; @r{(Same as @code{C-u -7}.)}
+@end example
+
+Emacs 使用两个变量来存储前缀参数：@code{prefix-arg} 和 @code{current-prefix-arg}。  诸如 2⁣ 等为其他命令设置前缀参数的命令将它们存储在 3⁣ 中。  相反，@code{current-prefix-arg} 将前缀参数传递给当前命令，因此设置它对未来命令的前缀参数没有影响。
+
+通常，命令在 @code{interactive} 规范中指定用于前缀参数的表示形式，数字或原始。 （@xref{Using Interactive}。）或者，函数可以直接在变量@code{current-prefix-arg}中查看前缀参数的值，但这不太干净。
+
+@defun prefix-numeric-value arg
+此函数返回有效原始前缀参数值 @var{arg} 的数字含义。  参数可以是符号、数字或列表。如果是@code{nil}，则返回值1；如果是@code{-}，则返回值@minus{}1；如果是数字，则返回该数字；如果它是一个列表，则返回该列表的 @sc{car} （应该是一个数字）。
+@end defun
+
+@defvar current-prefix-arg
+该变量保存 @emph{current} 命令的原始前缀参数。  命令可以直接检查它，但访问它的常用方法是使用@code{(interactive "P")}。
+@end defvar
+
+@defvar prefix-arg
+该变量的值是 @emph{next} 编辑命令的原始前缀参数。  诸如 1⁣ 之类的命令为以下命令指定前缀参数，通过设置此变量来工作。
+@end defvar
+
+@defvar last-prefix-arg
+上一个命令使用的原始前缀参数值。
+@end defvar
+
+存在以下命令来设置以下命令的前缀参数。  不要因任何其他原因给他们打电话。
+
+@deffn Command universal-argument
+此命令读取输入并为以下命令指定前缀参数。  除非您知道自己在做什么，否则不要自己调用此命令。
+@end deffn
+
+@deffn Command digit-argument arg
+此命令添加到以下命令的前缀参数。  参数 @var{arg} 是原始前缀参数，与此命令之前一样；它用于计算更新的前缀参数。  除非您知道自己在做什么，否则不要自己调用此命令。
+@end deffn
+
+@deffn Command negative-argument arg
+此命令添加到下一个命令的数字参数中。  参数 @var{arg} 是原始前缀参数，与此命令之前一样；它的值被否定以形成新的前缀参数。  除非您知道自己在做什么，否则不要自己调用此命令。
+@end deffn
+
+@node Recursive Editing
+@section 递归编辑
+@cindex recursive command loop
+@cindex recursive editing level
+@cindex command loop, recursive
+
+Emacs 启动时会自动进入 Emacs 命令循环。命令循环的顶层调用永远不会退出；只要 Emacs 运行，它就会一直运行。  Lisp 程序还可以调用命令循环。  由于这会多次激活命令循环，因此我们将其称为@dfn{recursive editing}。  递归编辑级别具有暂停调用它的任何命令并允许用户在恢复该命令之前进行任意编辑的效果。
+
+递归编辑期间可用的命令与顶级编辑循环中可用并在键盘映射中定义的命令相同。只有少数特殊命令退出递归编辑级别；其他人完成后返回到递归编辑级别。  （用于退出的特殊命令始终可用，但在递归编辑未进行时它们不执行任何操作。）
+
+所有命令循环（包括递归命令循环）都会设置通用错误处理程序，以便命令循环运行的命令中的错误不会退出循环。
+
+@cindex minibuffer input
+迷你缓冲区输入是一种特殊的递归编辑。  它有一些特殊的问题，例如启用迷你缓冲区和迷你缓冲区窗口的显示，但比您想象的要少。  某些键在迷你缓冲区中的行为有所不同，但这只是因为迷你缓冲区的本地映射；如果你切换窗口，你会得到常用的 Emacs 命令。
+
+@cindex @code{throw} example
+@kindex exit
+@cindex exit recursive editing
+@cindex aborting
+要调用递归编辑级别，请调用函数@code{recursive-edit}。  该函数包含命令循环；它还包含对带有标签 @code{exit} 的 @code{catch} 的调用，这使得可以通过抛出 @code{exit} (@pxref{Catch and Throw}) 来退出递归编辑级别。  抛出 @code{t} 值会导致 @code{recursive-edit} 退出，以便控制权返回到上一级的命令循环。  这称为 @dfn{aborting}，由 @kbd{C-]} (@code{abort-recursive-edit}) 完成。  同样，您可以抛出一个字符串值来使 @code{recursive-edit} 发出错误信号，并打印该字符串作为消息。  如果你抛出一个函数，@code{recursive-edit}将在返回之前不带参数地调用它。抛出任何其他值，将使 @code{recursive-edit} 正常返回到调用它的函数。  命令 @kbd{C-M-c} (@code{exit-recursive-edit}) 可以执行此操作。
+
+大多数应用程序不应使用递归编辑，除非作为使用迷你缓冲区的一部分。  通常，如果将当前缓冲区的主要模式临时更改为特殊的主要模式，对用户来说会更方便，该模式应该有一个返回到先前模式的命令。 （Rmail 中的@kbd{e}命令使用此技术。）或者，如果您希望为用户提供不同的文本以递归编辑，请在特殊模式下创建并选择一个新缓冲区。  在此模式下，定义一个命令来完成处理并返回到先前的缓冲区。  （Rmail 中的 @kbd{m} 命令执行此操作。）
+
+递归编辑在调试中很有用。  您可以将对 @code{debug} 的调用作为一种断点插入到函数定义中，以便您可以在函数到达那里时四处查看。  @code{debug} 调用递归编辑，但还提供调试器的其他功能。
+
+当您在 @code{query-replace} 中键入 @kbd{C-r} 或使用 @kbd{C-x q} (@code{kbd-macro-query}) 时，也会使用递归编辑级别。
+
+@deffn Command recursive-edit
+@cindex suspend evaluation
+该函数调用编辑器命令循环。  它由 Emacs 初始化时自动调用，让用户开始编辑。  当从 Lisp 程序调用时，它进入递归编辑级别。
+
+如果当前缓冲区与所选窗口的缓冲区不同，@code{recursive-edit} 保存并恢复当前缓冲区。  否则，如果您切换缓冲区，则您切换到的缓冲区在@code{recursive-edit}返回后就是当前的。
+
+在下面的示例中，函数@code{simple-rec}首先前进指向一个单词，然后进入递归编辑，在回显区域打印出一条消息。  然后，用户可以进行任何所需的编辑，然后输入@kbd{C-M-c}退出并继续执行@code{simple-rec}。
+
+@example
+(defun simple-rec ()
+  (forward-word 1)
+  (message "Recursive edit in progress")
+  (recursive-edit)
+  (forward-word 1))
+     @result{} simple-rec
+(simple-rec)
+     @result{} nil
+@end example
+@end deffn
+
+@deffn Command exit-recursive-edit
+该函数从最里面的递归编辑（包括迷你缓冲区输入）退出。  它的定义实际上是@code{(throw 'exit nil)}。
+@end deffn
+
+@deffn Command abort-recursive-edit
+该函数通过在退出递归编辑后发出 @code{quit} 信号来中止请求最内层递归编辑（包括迷你缓冲区输入）的命令。  它的定义实际上是@code{(throw 'exit t)}。  @xref{Quitting}。
+@end deffn
+
+@deffn Command top-level
+该函数退出所有递归编辑级别；它不返回值，因为它完全跳出任何计算，直接返回主命令循环。
+@end deffn
+
+@defun recursion-depth
+此函数返回递归编辑的当前深度。  当没有递归编辑处于活动状态时，它返回 0。
+@end defun
+
+@node Disabling Commands
+@section 禁用命令
+@cindex disabled command
+
+@dfn{Disabling a command} 将该命令标记为需要用户确认才能执行。  禁用用于可能会让初学者感到困惑的命令，以防止他们意外使用这些命令。
+
+@cindex @code{disabled} (symbol property)
+禁用命令的低级机制是在该命令的 Lisp 符号上放置一个非 @code{nil} @code{disabled} 属性。  这些属性通常由用户的初始化文件 (@pxref{Init File}) 使用 Lisp 表达式设置，如下所示：
+
+@example
+(put 'upcase-region 'disabled t)
+@end example
+
+@noindent
+对于一些命令，这些属性默认存在（如果您愿意，可以在初始化文件中删除它们）。
+
+如果 @code{disabled} 属性的值是字符串，则表示该命令被禁用的消息包含该字符串。  例如：
+
+@example
+(put 'delete-region 'disabled
+     "Text deleted this way cannot be yanked back!\n")
+@end example
+
+@xref{Disabling,,, emacs, The GNU Emacs Manual}，了解交互调用禁用命令时会发生什么情况的详细信息。禁用命令对于从 Lisp 程序中将其作为函数调用没有影响。
+
+@findex command-query
+@code{disabled} 属性的值也可以是一个列表，其中第一个元素是符号 @code{query}。  在这种情况下，将询问用户是否执行该命令。  列表中的第二个元素应该是@code{nil}或非@code{nil}，分别表示是否使用@code{y-or-n-p}或@code{yes-or-no-p}，第三个元素是要使用的问题。  @code{command-query} 便利函数应该用于启用命令查询。
+
+@deffn Command enable-command command
+从现在开始，允许执行@var{command}（一个符号）而无需特殊确认，并更改用户的初始化文件（@pxref{Init File}），以便这将适用于未来的会话。
+@end deffn
+
+@deffn Command disable-command command
+需要特别确认才能从现在开始执行@var{command}，并更改用户的初始化文件，以便这适用于将来的会话。
+@end deffn
+
+@defvar disabled-command-function
+该变量的值应该是一个函数。  当用户交互调用禁用命令时，将调用此函数而不是禁用命令。  它可以使用 @code{this-command-keys} 来确定用户输入的内容来运行命令，从而找到命令本身。
+
+该值也可以是@code{nil}。  然后所有命令都可以正常工作，即使是禁用的命令也是如此。
+
+默认情况下，该值是一个询问用户是否继续的函数。
+@end defvar
+
+@node Command History
+@section 命令历史
+@cindex command history
+@cindex complex command
+@cindex history of commands
+
+命令循环保存已执行的复杂命令的历史记录，以便于重复这些命令。  @dfn{complex command} 是一种交互式参数读取使用迷你缓冲区的类型。  这包括任何 @kbd{M-x} 命令、任何 @kbd{M-:} 命令以及其 @code{interactive} 规范从迷你缓冲区读取参数的任何命令。  在命令本身执行期间显式使用迷你缓冲区不会导致命令被视为复杂。
+
+@defvar command-history
+该变量的值是最近的复杂命令的列表，每个命令都表示为要评估的形式。  它会在编辑会话期间继续累积所有复杂命令，但是当它达到最大大小 (@pxref{Minibuffer History}) 时，最旧的元素将被删除，同时添加新的元素。
+
+@example
+@group
+command-history
+@result{} ((switch-to-buffer "chistory.texi")
+    (describe-key "^X^[")
+    (visit-tags-table "~/emacs/src/")
+    (find-tag "repeat-complex-command"))
+@end group
+@end example
+@end defvar
+
+这个历史列表实际上是迷你缓冲区历史 (@pxref{Minibuffer History}) 的一种特殊情况，有一个特殊的变化：元素是表达式而不是字符串。
+
+有许多命令专门用于编辑和调用以前的命令。  命令 @code{repeat-complex-command} 和 @code{list-command-history} 在用户手册 (@pxref{Repetition,,, emacs, The GNU Emacs Manual}) 中进行了描述。  在迷你缓冲区内，可以使用常用的迷你缓冲区历史命令。
+
+@node Keyboard Macros
+@section 键盘宏
+@cindex keyboard macros
+
+@dfn{keyboard macro} 是输入事件的固定序列，可以将其视为命令并定义键。  键盘宏的 Lisp 表示是包含事件的字符串或向量。  不要将键盘宏与 Lisp 宏混淆 (@pxref{Macros})。
+
+@defun execute-kbd-macro kbdmacro &optional count loopfunc
+该函数将 @var{kbdmacro} 作为事件序列执行。  如果 1⁣ 是字符串或向量，则其中的事件将完全按照用户输入的方式执行。  @emph{not} 预期该序列是单个按键序列；通常键盘宏定义由几个串联的键序列组成。
+
+如果@var{kbdmacro}是一个符号，则使用其函数定义来代替@var{kbdmacro}。  如果这是另一个符号，则重复此过程。最终结果应该是一个字符串或向量。  如果结果不是符号、字符串或向量，则会发出错误信号。
+
+参数@var{count}是重复计数； @var{kbdmacro} 被执行了很多次。  如果省略@var{count}或@code{nil}，则@var{kbdmacro}执行一次。  如果为 0，则 @var{kbdmacro} 会反复执行，直到遇到错误或搜索失败。
+
+如果@var{loopfunc}非@code{nil}，则它是在宏的每次迭代之前调用的函数，不带参数。  如果@var{loopfunc}返回@code{nil}，则停止宏的执行。
+
+@xref{Reading One Event}，使用 @code{execute-kbd-macro} 的示例。
+@end defun
+
+@defvar executing-kbd-macro
+该变量包含定义当前正在执行的键盘宏的字符串或向量。  如果当前没有宏正在执行，则为@code{nil}。  命令可以测试此变量，以便在从执行宏运行时表现不同。  不要自己设置此变量。
+@end defvar
+
+@defvar defining-kbd-macro
+当且仅当定义了键盘宏时，该变量才为非@code{nil}。  命令可以测试此变量，以便在定义宏时表现不同。  当附加到现有宏的定义时，该值为 @code{append}。命令@code{start-kbd-macro}、@code{kmacro-start-macro} 和@code{end-kbd-macro} 设置此变量——请勿自行设置。
+
+该变量始终是当前终端的本地变量，并且不能是缓冲区本地的。  @xref{Multiple Terminals}。
+@end defvar
+
+@defvar last-kbd-macro
+该变量是最近定义的键盘宏的定义。  它的值是一个字符串或向量，或@code{nil}。
+
+该变量始终是当前终端的本地变量，并且不能是缓冲区本地的。  @xref{Multiple Terminals}。
+@end defvar
+
+@defvar kbd-macro-termination-hook
+当键盘宏终止时，将运行此正常挂钩，无论是什么原因导致其终止（到达宏结尾或过早结束宏的错误）。
+@end defvar

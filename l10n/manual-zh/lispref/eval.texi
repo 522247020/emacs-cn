@@ -1,0 +1,720 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1994, 1998, 2001--2026 Free Software Foundation,
+@c Inc.
+@c See the file elisp.texi for copying conditions.
+@node Evaluation
+@chapter 评估
+@cindex evaluation
+@cindex  interpreter
+@cindex interpreter
+@cindex value of expression
+
+Emacs Lisp 中表达式的 @dfn{evaluation} 由 @dfn{Lisp interpreter} 执行——一个接收 Lisp 对象作为输入并计算其 @dfn{value as an expression} 的程序。  根据本章中描述的规则，它如何执行此操作取决于对象的数据类型。  解释器会自动运行来评估程序的各个部分，但也可以通过 Lisp 原语函数@code{eval}显式调用。
+
+@ifnottex
+@menu
+* Intro Eval::     Evaluation in the scheme of things.
+* Forms::          How various sorts of objects are evaluated.
+* Quoting::        Avoiding evaluation (to put constants in the program).
+* Backquote::      Easier construction of list structure.
+* Eval::           How to invoke the Lisp interpreter explicitly.
+* Deferred Eval::  Deferred and lazy evaluation of forms.
+@end menu
+
+@node Intro Eval
+@section Introduction to Evaluation
+
+  The Lisp interpreter, or evaluator, is the part of Emacs that
+computes the value of an expression that is given to it.  When a
+function written in Lisp is called, the evaluator computes the value
+of the function by evaluating the expressions in the function body.
+Thus, running any Lisp program really means running the Lisp
+interpreter.
+@end ifnottex
+
+@cindex form
+@cindex expression
+@cindex S-expression
+@cindex sexp
+用于计算的 Lisp 对象称为 @dfn{form} 或 @dfn{expression}@footnote{It is sometimes also referred to as an @dfn{S-expression} or @dfn{sexp}, but we generally do not use this terminology in this manual.}。  表单是数据对象而不仅仅是文本，这一事实是类 Lisp 语言和典型编程语言之间的根本区别之一。  任何对象都可以被评估，但实际上只有数字、符号、列表和字符串被经常评估。
+
+在后续部分中，我们将详细描述每种形式的评估含义。
+
+阅读 Lisp 表单然后评估该表单是很常见的，但阅读和评估是单独的活动，并且两者都可以单独执行。  阅读本身并不评估任何东西；它将 Lisp 对象的打印表示转换为对象本身。  由 @code{read} 的调用者指定该对象是要评估的形式，还是服务于某些完全不同的目的。  @xref{Input Functions}。
+
+@cindex recursive evaluation
+评估是一个递归过程，评估表单通常涉及评估该表单内的部分。  例如，当您计算 @dfn{function call} 形式（如 @code{(car x)}）时，Emacs 首先计算参数（子形式 @code{x}）。  在评估参数之后，Emacs @dfn{executes} 函数 (@code{car})，如果该函数是用 Lisp 编写的，则通过评估函数的 @dfn{body} 来执行（但是，在此示例中，@code{car} 不是 Lisp 函数；它是用 C 实现的原始函数）。 @xref{Functions}，有关函数和函数调用的更多信息。
+
+@cindex environment
+计算在称为 @dfn{environment} 的上下文中进行，该上下文由所有 Lisp 变量 (@pxref{Variables}) 的当前值和绑定组成。@footnote{This definition of ``environment'' is specifically not intended to include all the data that can affect the result of a program.} 每当表单引用变量而不为其创建新绑定时，该变量就会计算为当前环境给定的值。  评估表单还可以通过绑定变量暂时改变环境 (@pxref{Local Variables})。
+
+@cindex side effect
+@anchor{Definition of side effect}
+评估表单也可能会做出持续的改变；这些变化称为@dfn{side effects}。  产生副作用的形式的一个例子是@code{(setq foo 1)}。
+
+不要将评估与命令键解释混淆。  编辑器命令循环使用活动键盘映射将键盘输入转换为命令（交互式可调用函数），然后使用 @code{call-interactively} 执行该命令。  如果命令是用 Lisp 编写的，则执行命令通常涉及评估；但是，此步骤不被视为命令键解释的一部分。  @xref{Command Loop}。
+
+@node Forms
+@section 表格种类
+
+打算被求值的 Lisp 对象称为 @dfn{form} （或 @dfn{expression}）。  Emacs 如何评估表单取决于其数据类型。  Emacs 具有三种不同类型的形式，它们的计算方式也不同：符号、列表和所有其他类型。  本节从其他类型开始，一一描述这三种类型，它们是自评估形式。
+
+@menu
+* Self-Evaluating Forms::    自我评估的形式。
+* Symbol Forms::             符号作为变量进行计算。
+* Classifying Lists::        如何区分各种列表形式。
+* Function Indirection::     当一个符号作为列表中的汽车出现时，我们可以通过该符号找到真正的功能。
+* Function Forms::           调用函数的表单。
+* Macro Forms::              调用宏的表单。
+* Special Forms::            特殊形式是特殊的原语，其中大多数都非常重要。
+* Autoloading::              设置函数来加载包含其真实定义的文件。
+@end menu
+
+@node Self-Evaluating Forms
+@subsection 自我评估表
+@cindex vector evaluation
+@cindex literal evaluation
+@cindex self-evaluating form
+@cindex form, self-evaluating
+
+A @dfn{self-evaluating form} 是除列表或符号之外的任何形式。  自评价形式对自身进行评价：评价的结果与被评价的对象相同。  因此，数字 25 的计算结果为 25，字符串 1⁣ 的计算结果为字符串 25。  同样，评估向量不会导致评估向量的元素——它返回内容不变的相同向量。
+
+@example
+@group
+'123               ; @r{A number, shown without evaluation.}
+     @result{} 123
+@end group
+@group
+123                ; @r{Evaluated as usual---result is the same.}
+     @result{} 123
+@end group
+@group
+(eval '123)        ; @r{Evaluated "by hand"---result is the same.}
+     @result{} 123
+@end group
+@group
+(eval (eval '123)) ; @r{Evaluating twice changes nothing.}
+     @result{} 123
+@end group
+@end example
+
+自求值形式产生的值将成为程序的一部分，您不应尝试通过 @code{setcar}、@code{aset} 或类似操作来修改它。  Lisp 解释器可能会统一程序的自求值形式生成的常量，以便这些常量可以共享结构。  @xref{Mutability}。
+
+在 Lisp 代码中编写数字、字符、字符串甚至向量是很常见的，利用它们的自求值这一事实。但是，对于缺乏读取语法的类型执行此操作是很不寻常的，因为无法以文本方式编写它们。  可以通过 Lisp 程序构造包含这些类型的 Lisp 表达式。  这是一个例子：
+
+@example
+@group
+;; @r{Build an expression containing a buffer object.}
+(setq print-exp (list 'print (current-buffer)))
+     @result{} (print #<buffer eval.texi>)
+@end group
+@group
+;; @r{Evaluate it.}
+(eval print-exp)
+     @print{} #<buffer eval.texi>
+     @result{} #<buffer eval.texi>
+@end group
+@end example
+
+@node Symbol Forms
+@subsection 符号形式
+@cindex symbol evaluation
+@cindex symbol forms
+@cindex forms, symbol
+
+当一个符号被求值时，它被视为一个变量。  结果是变量的值（如果有）。  如果符号没有作为变量的值，Lisp 解释器会发出错误信号。  有关使用变量的更多信息，请参阅@ref{Variables}。
+
+在下面的示例中，我们使用 @code{setq} 设置符号的值。  然后我们评估该符号，并返回 @code{setq} 存储的值。
+
+@example
+@group
+(setq a 123)
+     @result{} 123
+@end group
+@group
+(eval 'a)
+     @result{} 123
+@end group
+@group
+a
+     @result{} 123
+@end group
+@end example
+
+符号@code{nil}和@code{t}经过特殊处理，使得@code{nil}的值始终为@code{nil}，@code{t}的值始终为@code{t}；您不能将它们设置或绑定到任何其他值。  因此，这两个符号的行为就像自我评估形式，尽管 @code{eval} 将它们视为任何其他符号。  名称以 @samp{:} 开头的符号也以相同的方式进行自评估；同样，它的值通常不能改变。  @xref{Constant Variables}。
+
+@node Classifying Lists
+@subsection 列表形式的分类
+@cindex list form evaluation
+@cindex forms, list
+
+非空列表的形式可以是函数调用、宏调用或特殊形式，具体取决于其第一个元素。  这三种形式的评估方式不同，如下所述。  其余列表元素构成函数、宏或特殊形式的@dfn{arguments}。
+
+评估非空列表的第一步是检查其第一个元素。  该元素单独决定列表的形式以及如何处理列表的其余部分。  第一个元素是 @emph{not} 计算的，就像在某些 Lisp 方言（例如Scheme）中一样。
+
+@node Function Indirection
+@subsection 符号 函数 间接
+@cindex symbol function indirection
+@cindex indirection for functions
+@cindex void function
+
+如果列表的第一个元素是符号，则求值将检查该符号的功能单元，并使用其内容而不是原始符号。  如果内容是另一个符号，则重复此过程（称为 0⁣），直到获得非符号。  @xref{Function Names}，有关符号函数间接的更多信息。我们最终得到一个非符号，它应该是一个函数或其他合适的对象。
+
+@kindex invalid-function
+更准确地说，我们现在应该有一个 Lisp 函数（一个 lambda 表达式）、一个字节码函数、一个原始函数、一个 Lisp 宏、一个特殊形式或一个自动加载对象。  这些类型中的每一种都是以下部分之一中描述的情况。  如果对象不是这些类型之一，Emacs 会发出 @code{invalid-function} 错误信号。
+
+以下示例说明了符号间接过程。我们使用 @code{fset} 设置符号的功能单元，并使用 @code{symbol-function} 获取功能单元内容 (@pxref{Function Cells})。  具体来说，我们将符号@code{car}存储到@code{first}的功能单元中，将符号@code{first}存储到@code{erste}的功能单元中。
+
+@example
+@group
+;; @r{Build this function cell linkage:}
+;;   -------------       -----        -------        -------
+;;  | #<subr car> | <-- | car |  <-- | first |  <-- | erste |
+;;   -------------       -----        -------        -------
+@end group
+@group
+(symbol-function 'car)
+     @result{} #<subr car>
+@end group
+@group
+(fset 'first 'car)
+     @result{} car
+@end group
+@group
+(fset 'erste 'first)
+     @result{} first
+@end group
+@group
+(erste '(1 2 3))   ; @r{Call the function referenced by @code{erste}.}
+     @result{} 1
+@end group
+@end example
+
+相比之下，下面的示例调用一个没有任何符号函数间接的函数，因为第一个元素是匿名 Lisp 函数，而不是符号。
+
+@example
+@group
+((lambda (arg) (erste arg))
+ '(1 2 3))
+     @result{} 1
+@end group
+@end example
+
+@noindent
+执行函数本身会评估其主体；这确实涉及调用 @code{erste} 时的符号函数间接。
+
+这种形式很少使用，现已弃用。  相反，您应该将其写为：
+
+@example
+@group
+(funcall (lambda (arg) (erste arg))
+         '(1 2 3))
+@end group
+@end example
+或者只是
+@example
+@group
+(let ((arg '(1 2 3))) (erste arg))
+@end group
+@end example
+
+内置函数 @code{indirect-function} 提供了一种显式执行符号函数间接寻址的简单方法。
+
+@defun indirect-function function
+@anchor{Definition of indirect-function}
+该函数返回 @var{function} 作为函数的含义。  如果 1⁣ 是一个符号，那么它会找到 2⁣ 的函数定义并以该值重新开始。  如果 3⁣ 不是符号，则返回 4⁣ 本身。
+
+如果最终符号未绑定，则此函数返回@code{nil}。
+
+还有第二个可选参数，该参数已过时且无效。
+
+下面是在 Lisp 中定义 @code{indirect-function} 的方法：
+
+@example
+(defun indirect-function (function)
+  (if (and function
+           (symbolp function))
+      (indirect-function (symbol-function function))
+    function))
+@end example
+@end defun
+
+@node Function Forms
+@subsection 函数形式的评估
+@cindex function form evaluation
+@cindex function call
+@cindex forms, function call
+
+如果正在计算的列表的第一个元素是 Lisp 函数对象、字节码对象或原始函数对象，则该列表是 @dfn{function call}。  例如，这里是对函数@code{+}的调用：
+
+@example
+(+ 1 x)
+@end example
+
+评估函数调用的第一步是从左到右评估列表的剩余元素。  结果是实际参数值，每个列表元素一个值。  下一步是使用此参数列表调用函数，有效地使用函数 @code{apply} (@pxref{Calling Functions})。  如果函数是用 Lisp 编写的，则参数用于绑定函数的参数变量 (@pxref{Lambda Expressions})；然后函数体中的形式按顺序求值，最后一个函数体形式的值成为函数调用的值。
+
+@node Macro Forms
+@subsection Lisp 宏评估
+@cindex macro call evaluation
+@cindex forms, macro call
+
+如果正在评估的列表的第一个元素是宏对象，则该列表是@dfn{macro call}。  当评估宏调用时，列表其余部分的元素首先被评估 @emph{not} 。相反，这些元素本身用作宏的参数。  宏定义计算一个替换形式，称为宏的 @dfn{expansion} ，以代替原始形式进行计算。  展开式可以是任何形式：自求常量、符号或列表。  如果扩展本身是宏调用，则重复此扩展过程，直到产生其他类型的形式。
+
+宏调用的普通评估通过评估扩展来完成。  然而，宏扩展不一定立即评估，或者根本不评估，因为其他程序也扩展宏调用，并且它们可能会也可能不会评估扩展。
+
+通常，参数表达式不会作为计算宏扩展的一部分进行求值，而是作为扩展的一部分出现，因此它们是在求值扩展时计算的。
+
+例如，给定一个定义如下的宏：
+
+@example
+@group
+(defmacro cadr (x)
+  (list 'car (list 'cdr x)))
+@end group
+@end example
+
+@noindent
+像@code{(cadr (assq 'handler list))}这样的表达式是一个宏调用，它的扩展是：
+
+@example
+(car (cdr (assq 'handler list)))
+@end example
+
+@noindent
+请注意，参数 @code{(assq 'handler list)} 出现在展开式中。
+
+@xref{Macros}，了解 Emacs Lisp 宏的完整描述。
+
+@node Special Forms
+@subsection 特殊表格
+@cindex special forms
+@cindex forms, special
+@cindex evaluation of special forms
+
+@dfn{special form} 是一个经过特殊标记的原语，因此它的参数不会全部被求值。  大多数特殊形式定义控制结构或执行变量绑定——这是函数无法完成的事情。
+
+每种特殊形式都有自己的规则，对参数进行求值以及在不求值的情况下使用参数。  是否评估特定参数可能取决于评估其他参数的结果。
+
+如果表达式的第一个符号是特殊形式的符号，则该表达式应遵循该特殊形式的规则；否则，Emacs 的行为定义不明确（尽管它不会崩溃）。  例如， @code{((lambda (x) x . 3) 4)} 包含以 @code{lambda} 开头的子表达式，但不是格式良好的 @code{lambda} 表达式，因此 Emacs 可能会发出错误信号，或者可能返回 3 或 4 或 @code{nil}，或者可能以其他方式运行。
+
+@defun special-form-p object
+该谓词测试其参数是否为特殊形式，如果是，则返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+以下是 Emacs Lisp 中所有特殊形式的列表（按字母顺序排列），并附有对每个特殊形式的描述位置的参考。
+
+@table @code
+@item and
+@pxref{Combining Conditions}
+
+@item catch
+@pxref{Catch and Throw}
+
+@item cond
+@pxref{Conditionals}
+
+@item condition-case
+@pxref{Handling Errors}
+
+@item defconst
+@pxref{Defining Variables}
+
+@item defvar
+@pxref{Defining Variables}
+
+@item function
+@pxref{Anonymous Functions}
+
+@item if
+@pxref{Conditionals}
+
+@item interactive
+@pxref{Interactive Call}
+
+@item lambda
+@pxref{Lambda Expressions}
+
+@item let
+@itemx let*
+@pxref{Local Variables}
+
+@item or
+@pxref{Combining Conditions}
+
+@item prog1
+@itemx prog2
+@itemx progn
+@pxref{Sequencing}
+
+@item quote
+@pxref{Quoting}
+
+@item save-current-buffer
+@pxref{Current Buffer}
+
+@item save-excursion
+@pxref{Excursions}
+
+@item save-restriction
+@pxref{Narrowing}
+
+@item setq
+@pxref{Setting Variables}
+
+@item setq-default
+@pxref{Creating Buffer-Local}
+
+@item unwind-protect
+@pxref{Nonlocal Exits}
+
+@item while
+@pxref{Iteration}
+@end table
+
+@cindex CL note---special forms compared
+@quotation
+@b{Common Lisp note:} 以下是 GNU Emacs Lisp 和 Common Lisp 中特殊形式的一些比较。  @code{setq}、@code{if} 和 @code{catch} 是 Emacs Lisp 和 Common Lisp 中的特殊形式。 @code{save-excursion} 是 Emacs Lisp 中的一种特殊形式，但在 Common Lisp 中不存在。  @code{throw} 是 Common Lisp 中的一种特殊形式（因为它必须能够抛出多个值），但它是 Emacs Lisp 中的一个函数（它没有多个值）。
+@end quotation
+
+@node Autoloading
+@subsection 自动加载
+
+@dfn{autoload} 功能允许您调用函数定义尚未加载到 Emacs 中的函数或宏。  它指定哪个文件包含该定义。  当自动加载对象作为符号的函数定义出现时，将该符号作为函数调用会自动加载指定的文件；然后它调用从该文件加载的真实定义。  @ref{Autoload} 中描述了安排自动加载对象作为符号函数定义出现的方法。
+
+@node Quoting
+@section 引用
+@cindex forms, quote
+
+特殊形式 @code{quote} 返回其单个参数（如所写），而不对其求值。  这提供了一种在程序中包含常量符号和列表（它们不是自求值对象）的方法。  （没有必要引用自求值对象，例如数字、字符串和向量。）
+
+@defspec quote object
+这种特殊形式返回@var{object}，而不对其求值。返回的值可能是共享的并且不应被修改。 @xref{Self-Evaluating Forms}。
+@end defspec
+
+@cindex @samp{'} for quoting
+@cindex quoting using apostrophe
+@cindex apostrophe for quoting
+由于 @code{quote} 在程序中经常使用，Lisp 为其提供了方便的读取语法。  撇号字符 (@samp{'}) 后跟一个 Lisp 对象（在读取语法中）扩展为一个列表，其第一个元素是 @code{quote}，第二个元素是该对象。  因此，读取语法@code{'x}是@code{(quote x)}的缩写。
+
+以下是使用 @code{quote} 的表达式的一些示例：
+
+@example
+@group
+(quote (+ 1 2))
+     @result{} (+ 1 2)
+@end group
+@group
+(quote foo)
+     @result{} foo
+@end group
+@group
+'foo
+     @result{} foo
+@end group
+@group
+''foo
+     @result{} 'foo
+@end group
+@group
+'(quote foo)
+     @result{} 'foo
+@end group
+@group
+['foo]
+     @result{} ['foo]
+@end group
+@end example
+
+虽然表达式 @code{(list '+ 1 2)} 和 @code{'(+ 1 2)} 都生成等于 @code{(+ 1 2)} 的列表，但前者生成一个新创建的可变列表，而后者生成一个由可能共享且不应修改的 conses 构建的列表。 @xref{Self-Evaluating Forms}。
+
+其他引用结构包括 @code{function} (@pxref{Anonymous Functions})，它会编译用 Lisp 编写的匿名 lambda 表达式；以及 @samp{`} (@pxref{Backquote})，它用于仅引用列表的一部分，同时计算和替换其他部分。
+
+@node Backquote
+@section 反引号
+@cindex backquote (list substitution)
+@cindex ` (list substitution)
+@findex `
+@cindex forms, backquote
+
+@dfn{Backquote constructs} 允许您引用列表，但有选择地评估该列表的元素。  在最简单的情况下，它与特殊形式相同
+@iftex
+@code{quote}.
+@end iftex
+@ifnottex
+@code{quote}
+(described in the previous section; @pxref{Quoting}).
+@end ifnottex
+例如，这两种形式产生相同的结果：
+
+@example
+@group
+`(a list of (+ 2 3) elements)
+     @result{} (a list of (+ 2 3) elements)
+@end group
+@group
+'(a list of (+ 2 3) elements)
+     @result{} (a list of (+ 2 3) elements)
+@end group
+@end example
+
+@findex , @r{(with backquote)}
+反引号参数内部的特殊标记 @samp{,} 指示一个不是常量的值。  Emacs Lisp 求值器计算 @samp{,} 的参数，并将值放入列表结构中：
+
+@example
+@group
+`(a list of ,(+ 2 3) elements)
+     @result{} (a list of 5 elements)
+@end group
+@end example
+
+@noindent
+在列表结构的更深层次上也允许用 @samp{,} 进行替换。  例如：
+
+@example
+@group
+`(1 2 (3 ,(+ 4 5)))
+     @result{} (1 2 (3 9))
+@end group
+@end example
+
+@findex ,@@ @r{(with backquote)}
+@cindex splicing (with backquote)
+您还可以使用特殊标记 @samp{,@@} 将评估值 @dfn{splice} 放入结果列表中。  拼接列表的元素成为与结果列表的其他元素处于同一级别的元素。  不使用 @samp{`} 的等效代码通常不可读。以下是一些示例：
+
+@example
+@group
+(setq some-list '(2 3))
+     @result{} (2 3)
+@end group
+@group
+(cons 1 (append some-list '(4) some-list))
+     @result{} (1 2 3 4 2 3)
+@end group
+@group
+`(1 ,@@some-list 4 ,@@some-list)
+     @result{} (1 2 3 4 2 3)
+@end group
+
+@group
+(setq list '(hack foo bar))
+     @result{} (hack foo bar)
+@end group
+@group
+(cons 'use
+  (cons 'the
+    (cons 'words (append (cdr list) '(as elements)))))
+     @result{} (use the words foo bar as elements)
+@end group
+@group
+`(use the words ,@@(cdr list) as elements)
+     @result{} (use the words foo bar as elements)
+@end group
+@end example
+
+反引号构造的作用类似于 0⁣，因为它生成可以共享且不应修改的常量、向量和字符串。 @xref{Self-Evaluating Forms}。
+
+@node Eval
+@section 评估
+
+大多数情况下，表单会根据它们在正在运行的程序中出现的情况自动进行评估。  在极少数情况下，您可能需要编写代码来评估在运行时计算的表单，例如从正在编辑的文本读取表单或从属性列表获取表单后。  在这些情况下，请使用 @code{eval} 函数。通常不需要@code{eval}，而应该使用其他东西来代替。例如，要获取变量的值，虽然@code{eval}有效，但@code{symbol-value}更可取；或者，与其将表达式存储在属性列表中然后需要经过@code{eval}，不如存储函数，然后将其传递给@code{funcall}。
+
+本节中描述的函数和变量评估表单，指定评估过程的限制，或记录最近返回的值。  加载文件也会进行评估 (@pxref{Loading})。
+
+通常，将函数存储在数据结构中并使用 @code{funcall} 或 @code{apply} 调用它，比在数据结构中存储表达式并对其求值更干净、更灵活。  使用函数可以将信息作为参数传递给它们。
+
+@defun eval form &optional lexical
+这是计算表达式的基本函数。  它在当前环境中评估@var{form}，并返回结果。  @var{form} 对象的类型决定了它的计算方式。 @xref{Forms}。
+
+参数 @var{lexical} 指定局部变量 (@pxref{Variable Scoping}) 的作用域规则。  如果是@code{t}，则意味着使用词法作用域来评估@var{form}；这是推荐值。  如果省略或@code{nil}，则意味着使用旧的仅动态变量作用域规则。
+
+@var{lexical} 的值也可以是一个非空列表，为词法绑定指定特定的 @dfn{lexical environment}；但是，此功能仅对特殊用途有用，例如在 Emacs Lisp 调试器中。  列表中的每个成员要么是代表词法符号值对的 cons 单元格，要么是代表在绑定时将使用动态作用域的（特殊）变量的符号。
+
+由于 @code{eval} 是一个函数，因此对 @code{eval} 的调用中出现的参数表达式会被求值两次：一次是在调用 @code{eval} 之前做准备，另一次是由 @code{eval} 函数本身求值。这是一个例子：
+
+@example
+@group
+(setq foo 'bar)
+     @result{} bar
+@end group
+@group
+(setq bar 'baz)
+     @result{} baz
+;; @r{Here @code{eval} receives argument @code{foo}}
+(eval 'foo)
+     @result{} bar
+;; @r{Here @code{eval} receives argument @code{bar}, which is the value of @code{foo}}
+(eval foo)
+     @result{} baz
+@end group
+@end example
+
+当前对 @code{eval} 的活动调用数量限制为 @code{max-lisp-eval-depth}（见下文）。
+@end defun
+
+@deffn Command eval-region start end &optional stream read-function
+@anchor{Definition of eval-region}
+该函数评估由位置 @var{start} 和 @var{end} 定义的区域中当前缓冲区中的表单。  它从该区域读取表单并对其调用@code{eval}，直到到达该区域的末尾，或者直到发出错误信号但未处理为止。
+
+默认情况下，@code{eval-region} 不产生任何输出。  然而，如果@var{stream}不是@code{nil}，则输出函数（@pxref{Output Functions}）产生的任何输出以及计算该区域中的表达式所产生的值都将使用@var{stream}打印。  @xref{Output Streams}。
+
+如果@var{read-function}不是@code{nil}，它应该是一个函数，用来代替@code{read}来逐个读取表达式。使用一个参数调用该函数，即用于读取输入的流。  您还可以使用变量 @code{load-read-function} (@pxref{Definition of load-read-function,, How Programs Do Loading}) 来指定此函数，但使用 @var{read-function} 参数更加稳健。
+
+@code{eval-region} 不移动点。  它总是返回@code{nil}。
+@end deffn
+
+@cindex evaluation of buffer contents
+@deffn Command eval-buffer &optional buffer-or-name stream filename unibyte print
+这与 @code{eval-region} 类似，但参数提供不同的可选功能。  @code{eval-buffer} 对缓冲区 @var{buffer-or-name} (@pxref{Narrowing,,, emacs, The GNU Emacs Manual}) 的整个可访问部分进行操作。 @var{buffer-or-name} 可以是一个缓冲区、缓冲区名称（字符串）或 @code{nil} （或省略），表示使用当前缓冲区。 @var{stream} 与 @code{eval-region} 中一样使用，除非 @var{stream} 是 @code{nil} 并且 @var{print} 非 @code{nil}。  在这种情况下，计算表达式所产生的值仍会被丢弃，但输出函数的输出会打印在回显区域中。 @var{filename} 是用于@code{load-history} (@pxref{Unloading}) 的文件名，默认为@code{buffer-file-name} (@pxref{Buffer File Name})。  如果 @var{unibyte} 不是 @code{nil}，则 @code{read} 会尽可能将字符串转换为单字节。
+@end deffn
+
+@defopt max-lisp-eval-depth
+@anchor{Definition of max-lisp-eval-depth}
+该变量定义在发出错误信号（带有错误消息 @code{"Lisp nesting exceeds max-lisp-eval-depth"}）之前调用 @code{eval}、@code{apply} 和 @code{funcall} 所允许的最大深度。
+
+Emacs Lisp 是如何避免在定义不明确的函数上进行无限递归的，并且在超过该限制时会产生相关错误。  如果将@code{max-lisp-eval-depth}的值增加太多，这样的代码反而会导致堆栈溢出。  在某些系统上，可以处理这种溢出。  在这种情况下，正常的 Lisp 计算会被中断，控制权会转移回顶层命令循环 (@code{top-level})。  请注意，在这种情况下无法进入 Emacs Lisp 调试器。  @xref{Error Debugging}。
+
+@cindex Lisp nesting error
+
+深度限制计算@code{eval}、@code{apply}和@code{funcall}的内部使用，例如调用Lisp表达式中提到的函数、函数调用参数和函数体形式的递归求值，以及Lisp代码中的显式调用。
+
+该变量的默认值为 1600。如果将其设置为小于 100 的值，则在达到给定值时 Lisp 会将其重置为 100。
+@end defopt
+
+@defopt lisp-eval-depth-reserve
+为了能够调试无限递归错误，当调用 Lisp 调试器时，如果剩余空间所剩无几，Emacs 会暂时增加 @code{max-lisp-eval-depth} 的值，以确保调试器本身有空间执行。  运行 @code{handler-bind} 的处理程序时也会发生同样的情况。  @xref{Handling Errors}。
+
+变量 @code{lisp-eval-depth-reserve} 限制了 Emacs 在特殊情况下可以添加到 @code{max-lisp-eval-depth} 的额外深度。
+
+该变量的默认值为 200。
+@end defopt
+
+
+@defvar values
+该变量的值是执行此操作的标准 Emacs 命令从缓冲区（包括迷你缓冲区）读取、计算和打印的所有表达式返回的值的列表。  （请注意，这 @emph{not} 包括 @file{*ielm*} 缓冲区中的评估，也不包括使用 @kbd{C-j}、@kbd{C-x C-e} 以及 @code{lisp-interaction-mode} 中类似评估命令的评估。）
+
+该变量已过时，并将在未来版本中删除，因为它不断扩大 Emacs 进程的内存占用量。  因此，我们建议不要使用它。
+
+@code{values} 的元素按照最新的顺序排列在最前面。
+
+@example
+@group
+(setq x 1)
+     @result{} 1
+@end group
+@group
+(list 'A (1+ 2) auto-save-default)
+     @result{} (A 3 t)
+@end group
+@group
+values
+     @result{} ((A 3 t) 1 @dots{})
+@end group
+@end example
+
+该变量对于引用最近评估的表单的值可能很有用。  打印 @code{values} 本身的值通常是一个坏主意，因为这可能很长。  相反，检查特定元素，如下所示：
+
+@example
+@group
+;; @r{Refer to the most recent evaluation result.}
+(nth 0 values)
+     @result{} (A 3 t)
+@end group
+@group
+;; @r{That put a new element on,}
+;;   @r{so all elements move back one.}
+(nth 1 values)
+     @result{} (A 3 t)
+@end group
+@group
+;; @r{This gets the element that was next-to-most-recent}
+;;   @r{before this example.}
+(nth 3 values)
+     @result{} 1
+@end group
+@end example
+@end defvar
+
+@node Deferred Eval
+@section 延迟和惰性评估
+
+@cindex deferred evaluation
+@cindex lazy evaluation
+
+
+有时，延迟表达式的计算很有用，例如，如果您想避免在程序的未来不需要结果时执行耗时的计算。  @file{thunk}库提供了以下函数和宏来支持此类@dfn{deferred evaluation}：
+
+@cindex thunk
+@defmac thunk-delay forms@dots{}
+返回 @dfn{thunk} 来评估 @var{forms}。  thunk 是一个闭包 (@pxref{Closures})，它继承了 @code{thunk-delay} 调用的词法环境。  使用该宏需要@code{lexical-binding}。
+@end defmac
+
+@defun thunk-force thunk
+强制 @var{thunk} 对创建 thunk 的 @code{thunk-delay} 中指定的形式执行评估。  返回最后一个表单的评估结果。  @var{thunk} 还“记住”它已被强制：任何使用相同 @var{thunk} 进一步调用 @code{thunk-force} 都只会返回相同的结果，而无需再次评估表单。
+@end defun
+
+@defmac thunk-let (bindings@dots{}) forms@dots{}
+该宏类似于 @code{let} 但创建“惰性”变量绑定。  任何绑定都具有 @w{@code{(@var{symbol} @var{value-form})}} 的形式。  与@code{let}不同，任何@var{value-form}的评估都会被推迟，直到在评估@var{forms}时第一次使用相应的@var{symbol}的绑定。  任何 @var{value-form} 最多被评估一次。  使用该宏需要@code{lexical-binding}。
+@end defmac
+
+例子：
+
+@example
+@group
+(defun f (number)
+  (thunk-let ((derived-number
+              (progn (message "Calculating 1 plus 2 times %d" number)
+                     (1+ (* 2 number)))))
+    (if (> number 10)
+        derived-number
+      number)))
+@end group
+
+@group
+(f 5)
+@result{} 5
+@end group
+
+@group
+(f 12)
+@print{} Calculating 1 plus 2 times 12
+@result{} 25
+@end group
+
+@end example
+
+由于延迟绑定变量的特殊性，设置它们是错误的（例如@:与@code{setq}）。
+
+
+@defmac thunk-let* (bindings@dots{}) forms@dots{}
+这与 @code{thunk-let} 类似，但 @var{bindings} 中的任何表达式都可以引用此 @code{thunk-let*} 形式中的先前绑定。  使用该宏需要@code{lexical-binding}。
+@end defmac
+
+@example
+@group
+(thunk-let* ((x (prog2 (message "Calculating x...")
+                    (+ 1 1)
+                  (message "Finished calculating x")))
+             (y (prog2 (message "Calculating y...")
+                    (+ x 1)
+                  (message "Finished calculating y")))
+             (z (prog2 (message "Calculating z...")
+                    (+ y 1)
+                  (message "Finished calculating z")))
+             (a (prog2 (message "Calculating a...")
+                    (+ z 1)
+                  (message "Finished calculating a"))))
+  (* z x))
+
+@print{} Calculating z...
+@print{} Calculating y...
+@print{} Calculating x...
+@print{} Finished calculating x
+@print{} Finished calculating y
+@print{} Finished calculating z
+@result{} 8
+
+@end group
+@end example
+
+@code{thunk-let} 和 @code{thunk-let*} 隐式使用 thunk：它们的扩展创建辅助符号并将它们绑定到包装绑定表达式的 thunk。  然后，对主体 @var{forms} 中原始变量的所有引用都将替换为一个表达式，该表达式以相应的辅助变量作为参数来调用 @code{thunk-force}。因此，任何使用 @code{thunk-let} 或 @code{thunk-let*} 的代码都可以重写为使用 thunk，但在许多情况下，使用这些宏会产生比显式使用 thunk 更好的代码。

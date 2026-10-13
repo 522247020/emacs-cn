@@ -1,0 +1,699 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1994, 2001--2026 Free Software Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Byte Compilation
+@chapter 字节编译
+@cindex byte compilation
+@cindex byte-code
+@cindex compilation (Emacs Lisp)
+
+Emacs Lisp 有一个 @dfn{compiler} ，它将用 Lisp 编写的函数转换为称为 @dfn{byte-code} 的特殊表示形式，可以更有效地执行。  编译器用字节码替换 Lisp 函数定义。  当调用字节码函数时，其定义由@dfn{byte-code interpreter}求值。
+
+由于字节编译的代码是由字节码解释器评估的，而不是直接由机器的硬件执行（如真正的编译代码那样），因此字节代码完全可以在机器之间传输，而无需重新编译。  然而，它并不像真正的编译代码那么快。
+
+一般来说，任何版本的 Emacs 都可以运行最近早期版本的 Emacs 生成的字节编译代码，但反之则不然。
+
+@vindex no-byte-compile
+如果您不想编译 Lisp 文件，请将 @code{no-byte-compile} 的文件局部变量绑定放入其中，如下所示：
+
+@example
+;; -*-no-byte-compile: t; -*-
+@end example
+
+@menu
+* Speed of Byte-Code::           字节编译加速的示例。
+* Compilation Functions::        字节编译函数。
+* Docs and Compilation::         文档字符串的动态加载。
+* Eval During Compile::          编译时要评估的代码。
+* Compiler Errors::              处理编译器错误消息。
+* Closure Objects::              用于字节编译函数的数据类型。
+* Disassembly::                  反汇编字节码；如何读取字节码。
+@end menu
+
+@node Speed of Byte-Code
+@section 字节编译代码的性能
+
+字节编译函数的效率不如用 C 编写的原始函数，但运行速度比用 Lisp 编写的版本快得多。这是一个例子：
+
+@example
+@group
+(defun silly-loop (n)
+  "Return the time, in seconds, to run N iterations of a loop."
+  (let ((t1 (float-time)))
+    (while (> (setq n (1- n)) 0))
+    (- (float-time) t1)))
+@result{} silly-loop
+@end group
+
+@group
+(silly-loop 50000000)
+@result{} 5.200886011123657
+@end group
+
+@group
+(byte-compile 'silly-loop)
+@result{} @r{[Compiled code not shown]}
+@end group
+
+@group
+(silly-loop 50000000)
+@result{} 0.6239290237426758
+@end group
+@end example
+
+在此示例中，解释代码需要超过 5 秒才能运行，而字节编译代码则需要不到 1 秒。  这些结果具有代表性，但实际结果可能会有所不同。
+
+@node Compilation Functions
+@section 字节编译函数
+@cindex compilation functions
+
+您可以使用 @code{byte-compile} 函数对单个函数或宏定义进行字节编译。  您可以使用 @code{byte-compile-file} 编译整个文件，也可以使用 @code{byte-recompile-directory} 或 @code{batch-byte-compile} 编译多个文件。
+
+@vindex byte-compile-debug
+有时，字节编译器会生成警告和/或错误消息（@pxref{Compiler Errors}，了解详细信息）。  这些消息通常记录在名为 @file{*Compile-Log*} 的缓冲区中，该缓冲区使用编译模式。  @xref{Compilation Mode,,,emacs, The GNU Emacs Manual}。  然而，如果变量 @code{byte-compile-debug} 不是 @code{nil}，错误消息将被标记为 Lisp 错误 (@pxref{Errors})。
+
+@cindex macro compilation
+在要进行字节编译的文件中编写宏调用时要小心。  由于宏调用在编译时会展开，因此需要将宏加载到 Emacs 中，否则字节编译器将无法执行正确的操作。  处理此问题的常用方法是使用 @code{require} 形式指定包含所需宏定义的文件 (@pxref{Named Features})。  通常，字节编译器不会评估它正在编译的代码，但它通过加载指定的库来专门处理 @code{require} 形式。  为了避免在 @emph{runs} 编译的程序时加载宏定义文件，请在 @code{require} 调用 (@pxref{Eval During Compile}) 周围写上 @code{eval-when-compile}。  欲了解更多详情，@xref{Compiling Macros}。
+
+内联（@code{defsubst}）函数不那么麻烦；如果在知道其定义之前编译对此类函数的调用，则该调用仍然可以正常工作，只是运行速度会变慢。
+
+@defun byte-compile symbol
+该函数对@var{symbol}的函数定义进行字节编译，用编译后的定义替换之前的定义。  @var{symbol}的函数定义必须是该函数的实际代码； @code{byte-compile} 不处理函数间接。  返回值是字节码函数对象，它是@var{symbol}（@pxref{Closure Objects}）的编译定义。
+
+@example
+@group
+(defun factorial (integer)
+  "Compute factorial of INTEGER."
+  (if (= 1 integer) 1
+    (* integer (factorial (1- integer)))))
+@result{} factorial
+@end group
+
+@group
+(byte-compile 'factorial)
+@result{}
+#[257
+  "\211\300U\203^H^@@\300\207\211\301^BS!_\207"
+  [1 factorial] 4
+  "Compute factorial of INTEGER.\n\n(fn INTEGER)"]
+@end group
+@end example
+
+如果@var{symbol}的定义是字节码函数对象，则@code{byte-compile}不执行任何操作并返回@code{nil}。  它不会再次编译符号的定义，因为原始（未编译）代码已在符号的功能单元中被字节编译代码替换。
+
+@code{byte-compile} 的参数也可以是 @code{lambda} 表达式。  在这种情况下，该函数返回相应的编译代码，但不会将其存储在任何地方。
+@end defun
+
+@deffn Command compile-defun &optional arg
+该命令读取包含点的 defun，对其进行编译并评估结果。  如果您在实际上是函数定义的 defun 上使用它，则效果是安装该函数的编译版本。
+
+@code{compile-defun} 通常在回显区域中显示评估结果，但如果 @var{arg} 为非 @code{nil}，则会将结果插入到当前缓冲区中编译后的表格中。
+@end deffn
+
+@deffn Command byte-compile-file filename
+该函数将名为 @var{filename} 的 Lisp 代码文件编译为字节码文件。  输出文件的名称是将@samp{.el}后缀更改为@samp{.elc}；如果@var{filename}不以@samp{.el}结尾，则会将@samp{.elc}添加到@var{filename}的末尾。
+
+编译的工作方式是一次读取一种形式的输入文件。  如果是函数或宏的定义，则写出编译后的函数或宏定义。  其他形式一起批处理，然后对每个批处理进行编译和写入，以便在读取文件时执行其编译的代码。  读取输入文件时，所有注释都将被丢弃。
+
+如果没有错误，此命令将返回 @code{t}，否则返回 @code{nil}。  当以交互方式调用时，它会提示输入文件名。
+
+@example
+@group
+$ ls -l push*
+-rw-r--r-- 1 lewis lewis 791 Oct  5 20:31 push.el
+@end group
+
+@group
+(byte-compile-file "~/emacs/push.el")
+     @result{} t
+@end group
+
+@group
+$ ls -l push*
+-rw-r--r-- 1 lewis lewis 791 Oct  5 20:31 push.el
+-rw-rw-rw- 1 lewis lewis 638 Oct  8 20:25 push.elc
+@end group
+@end example
+@end deffn
+
+@deffn Command byte-recompile-directory directory &optional flag force follow-symlinks
+@cindex library compilation
+此命令重新编译 @var{directory} （或其子目录）中需要重新编译的每个 @samp{.el} 文件。  如果 @samp{.elc} 文件存在但比 @samp{.el} 文件旧，则文件需要重新编译。
+
+When a @samp{.el} file has no corresponding @samp{.elc} file, @var{flag} says what to do.  If it is @code{nil}, this command ignores these files.  如果 4⁣ 为 0，则编译它们。  If it is neither @code{nil} nor 0, it asks the user whether to compile each such file, and asks about each subdirectory as well.
+
+以交互方式，@code{byte-recompile-directory} 提示输入 @var{directory}，@var{flag} 是前缀参数。
+
+如果 @var{force} 不是 @code{nil}，则此命令将重新编译具有 @samp{.elc} 文件的每个 @samp{.el} 文件。
+
+
+
+返回值是不可预测的。
+@end deffn
+
+@defun batch-byte-compile &optional noforce
+This function runs @code{byte-compile-file} on files specified on the command line.  This function must be used only in a batch execution of Emacs, as it kills Emacs on completion.  一个文件中的错误不会阻止后续文件的处理，但不会为其生成输出文件，并且 Emacs 进程将以非零状态代码终止。
+
+如果 @var{noforce} 不是 @code{nil}，则此函数不会重新编译具有最新 @samp{.elc} 文件的文件。
+
+@example
+$ emacs -batch -f batch-byte-compile *.el
+@end example
+@end defun
+
+@node Docs and Compilation
+@section 文档字符串和编译
+@cindex dynamic loading of documentation
+
+
+
+此功能有一个缺点：如果删除、移动或更改已编译的文件（例如通过编译新版本），Emacs 可能无法再访问先前加载的函数或变量的文档字符串。  Such a problem normally only occurs if you build Emacs yourself, and happen to edit and/or recompile the Lisp source files.  To solve it, just reload each file after recompilation.
+
+对于每个字节编译文件，在编译时确定从字节编译文件动态加载文档字符串。  可以通过选项@code{byte-compile-dynamic-docstrings}禁用它。
+
+@defopt byte-compile-dynamic-docstrings
+
+
+要禁用特定文件的动态加载功能，请在其标题行 (@pxref{File Variables, , Local Variables in Files, emacs, The GNU Emacs Manual}) 中将此选项设置为@code{nil}，如下所示：
+
+@smallexample
+-*-byte-compile-dynamic-docstrings: nil;-*-
+@end smallexample
+
+这主要在您希望更改文件并且希望已加载该文件的 Emacs 会话在文件更改时继续工作时有用。
+@end defopt
+
+@cindex @samp{#@@@var{count}}
+@cindex @samp{#$}
+在内部，文档字符串的动态加载是通过使用特殊的 Lisp 阅读器构造 @samp{#@@@var{count}} 编写编译文件来完成的。  此结构会跳过接下来的 @var{count} 字符。  它还使用 @samp{#$} 构造，代表该文件的名称，作为字符串。  Do not use these constructs in Lisp source files; they are not designed to be clear to humans reading the file.
+
+@node Eval During Compile
+@section 编译期间评估
+@cindex eval during compilation
+
+这些功能允许您编写要在程序编译期间进行评估的代码。
+
+@defmac eval-and-compile body@dots{}
+这种形式将 @var{body} 标记为在编译包含的代码和运行它时（无论是否编译）进行评估。
+
+通过将 @var{body} 放入单独的文件中并使用 @code{require} 引用该文件，可以获得类似的结果。  当 2⁣ 大时，该方法是优选的。  实际上 @code{require} 自动是 @code{eval-and-compile}，在编译和执行时都会加载包。
+
+@code{autoload} 实际上也是 @code{eval-and-compile}。  It's recognized when compiling, so uses of such a function don't produce ``not known to be defined'' warnings.
+
+@code{eval-and-compile} 的大多数用法都相当复杂。
+
+如果宏有一个辅助函数来构建其结果，并且该宏在本地和包外部使用，则应在编译时和稍后运行时使用 @code{eval-and-compile} 来获取辅助函数。
+
+如果函数以编程方式定义（例如使用 @code{fset}），则可以使用 @code{eval-and-compile} 在编译时和运行时完成该操作，因此会检查对这些函数的调用（并抑制有关“未知定义”的警告）。
+@end defmac
+
+@defmac eval-when-compile body@dots{}
+这种形式将 @var{body} 标记为在编译时评估，但不在加载已编译程序时评估。  编译器的评估结果成为出现在编译后的程序中的常量。  如果加载源文件，而不是编译它，则 @var{body} 会正常计算。
+
+@cindex compile-time constant
+如果您有一个需要一些计算才能生成的常量，@code{eval-when-compile} 可以在编译时执行此操作。  例如，
+
+@lisp
+(defvar gauss-schoolboy-problem
+  (eval-when-compile (apply #'+ (number-sequence 1 100))))
+@end lisp
+
+@cindex macros, at compile time
+如果您使用另一个包，但只需要其中的宏（字节编译器将扩​​展这些宏），则可以使用 @code{eval-when-compile} 加载它进行编译，但不能执行。  例如，
+
+@lisp
+(eval-when-compile
+  (require 'my-macro-package))
+@end lisp
+
+同样的事情也适用于本地定义且仅在文件内使用的宏和 @code{defsubst} 函数。  编译文件需要它们，但在大多数情况下，执行编译后的文件不需要它们。  例如，
+
+@lisp
+(eval-when-compile
+  (unless (fboundp 'some-new-thing)
+    (defmacro some-new-thing ()
+      (compatibility code))))
+@end lisp
+
+@noindent
+这对于那些只是与其他版本的 Emacs 兼容的后备方案的代码来说通常很有用。
+
+@strong{Common Lisp Note:} 在顶层，@code{eval-when-compile} 类似于 Common Lisp 惯用法 @code{(eval-when (compile eval) @dots{})}。  在其他地方，Common Lisp @samp{#.} 阅读器宏（但不是在解释时）更接近 @code{eval-when-compile} 的功能。
+@end defmac
+
+@node Compiler Errors
+@section 编译器错误
+@cindex compiler errors
+@cindex byte-compiler errors
+
+来自字节编译的错误和警告消息打印在名为 @file{*Compile-Log*} 的缓冲区中。  这些消息包括标识问题位置的文件名和行号。  可以对这些消息使用用于操作编译器输出的常用 Emacs 命令。
+
+当错误是由于程序中的无效语法所致时，字节编译器可能会对错误的确切位置感到困惑。  一种研究方法是切换到缓冲区@w{@file{ *Compiler Input*}}。  （此缓冲区名称以空格开头，因此不会显示在缓冲区菜单中。）此缓冲区包含正在编译的程序，点显示字节编译器能够读取的程度；错误原因可能就在附近。  @xref{Syntax Errors}，有关定位语法错误的一些技巧。
+
+@cindex byte-compiler warnings
+@cindex free variable, byte-compiler warning
+@cindex reference to free variable, compilation warning
+@cindex function not known to be defined, compilation warning
+字节编译器发出的一种常见警告类型是针对已使用但未定义的函数和变量。  此类警告报告文件末尾的行号，而不是使用缺少的函数或变量的位置；要找到这些，您必须手动搜索文件。
+
+如果您确定有关缺少函数或变量的警告消息是不合理的，可以通过多种方法来抑制它：
+
+@itemize @bullet
+@item 
+您可以通过在 @code{fboundp} 测试上设置条件来抑制对函数 @var{func} 的特定调用的警告，如下所示：
+
+@example
+(if (fboundp '@var{func}) ...(@var{func} ...)...)
+@end example
+
+@noindent
+对 @var{func} 的调用必须位于 @code{if} 的 @var{then-form} 中，并且 @var{func} 必须在对 @code{fboundp} 的调用中引用。  （此功能也适用于@code{cond}。）
+
+@item 
+同样，您可以通过在 @code{boundp} 测试上条件化变量 @var{variable} 的特定使用来抑制警告：
+
+@example
+(if (boundp '@var{variable}) ...@var{variable}...)
+@end example
+
+@noindent
+对@var{variable}的引用必须在@code{if}的@var{then-form}中，并且@var{variable}必须在对@code{boundp}的调用中引用。
+
+@item 
+您可以告诉编译器使用 @code{declare-function} 定义了一个函数。  @xref{Declaring Functions}。
+
+@item 
+同样，您可以告诉编译器变量是使用 @code{defvar} 定义的，没有初始值。  （请注意，这将变量标记为特殊变量，即 @: 动态绑定，但仅在当前词法范围内，或者如果位于顶层则为文件。） @xref{Defining Variables}。
+@end itemize
+
+您还可以使用 @code{with-suppressed-warnings} 宏来抑制特定表达式中的编译器警告：
+
+@defspec with-suppressed-warnings warnings body@dots{}
+在执行中，这相当于@code{(progn @var{body}...)}，但编译器不会针对@var{body}中指定的条件发出警告。  @var{warnings} 是警告符号和它们所适用的函数/变量符号的关联列表。  例如，如果您希望调用一个名为 @code{foo} 的过时函数，但想要抑制编译警告，请说：
+
+@lisp
+(with-suppressed-warnings ((obsolete foo))
+  (foo ...))
+@end lisp
+@end defspec
+
+为了更粗粒度地抑制编译器警告，您可以使用 @code{with-no-warnings} 构造：
+
+@c This is implemented with a defun, but conceptually it is
+@c a special form.
+
+@defspec with-no-warnings body@dots{}
+在执行中，这相当于@code{(progn @var{body}...)}，但编译器不会对@var{body}内部发生的任何事情发出警告。
+
+我们建议您使用 @code{with-suppressed-warnings} 代替，但如果您确实使用此构造，请在尽可能小的代码片段周围使用它，以避免遗漏除您打算抑制的警告之外的可能警告。
+@end defspec
+
+通过设置变量@code{byte-compile-warnings}可以更精确地控制字节编译器警告。  有关详细信息，请参阅其文档字符串。
+
+@vindex byte-compile-error-on-warn
+有时您可能希望使用 @code{error} 报告字节编译器警告。  如果是这样，请将 @code{byte-compile-error-on-warn} 设置为非 @code{nil} 值。
+
+@node Closure Objects
+@section 闭包函数对象
+@cindex compiled function
+@cindex byte-code function
+@cindex byte-code object
+
+字节编译函数使用特殊的数据类型：它们是闭包。闭包既可用于字节编译的 Lisp 函数，也可用于解释的 Lisp 函数。  每当这样的对象作为要调用的函数出现时，Emacs 就会使用适当的解释器来执行字节码或未编译的 Lisp 代码。
+
+在内部，闭包很像一个向量；可以使用@code{aref}访问它的元素。  它的打印表示类似于向量，在开头 @samp{[} 之前有一个额外的 @samp{#}。  它必须至少具有三个要素；没有最大数量，但只有前六个元素可以正常使用。  他们是：
+
+@table @var
+@item argdesc
+参数的描述符。  这可以是参数列表，如 @ref{Argument List} 中所述，也可以是编码所需参数数量的整数。  在后一种情况下，描述符的值在位 0 到 6 中指定参数的最小数量，在位 8 到 14 中指定参数的最大数量。如果参数列表使用 @code{&rest}，则设置位 7；否则，位 7 被设置。否则就被清除了。
+
+当闭包是字节码函数时，如果@var{argdesc}是一个列表，则在执行字节码之前将动态绑定参数。  如果 1⁣ 是整数，则在执行代码之前，参数将被推送到字节码解释器的堆栈上。
+
+@item code
+对于解释函数，此元素是构成函数体的 Lisp 形式的（非空）列表。  对于字节编译函数，它是包含字节码指令的字符串。
+
+@item constants
+对于字节编译函数，它保存字节代码引用的 Lisp 对象的向量。  其中包括用作函数名称和变量名称的符号。对于解释函数，如果函数使用旧的 Emacs Lisp 动态作用域方言，则为 @code{nil}，否则它保存函数的词法环境。
+
+@item stacksize
+该函数需要的最大堆栈大小。  该元素不用于解释函数。
+
+@item docstring
+文档字符串（如果有）；否则，@code{nil}。  如果文档字符串存储在文件中，则该值可以是数字或列表。  使用函数 @code{documentation} 获取真实的文档字符串 (@pxref{Accessing Documentation})。
+
+@item interactive
+交互式规范（如果有）。  这可以是字符串或 Lisp 表达式。  对于非交互式函数，它是 @code{nil}。
+@end table
+
+下面是一个以打印形式表示的字节码函数对象的示例。  这是命令@code{backward-sexp}的定义。
+
+@example
+#[256
+  "\211\204^G^@@\300\262^A\301^A[!\207"
+  [1 forward-sexp]
+  3
+  1793299
+  "^p"]
+@end example
+
+创建字节码对象的原始方法是使用@code{make-byte-code}：
+
+@defun make-byte-code &rest elements
+该函数构造并返回一个闭包，该闭包表示以 @var{elements} 作为其元素的字节码函数对象。
+@end defun
+
+您不应该尝试自己提出字节码函数的元素，因为如果它们不一致，那么当您调用该函数时，Emacs 可能会崩溃。  始终将其留给字节编译器来创建这些对象；它使元素保持一致（我们希望）。
+
+创建解释函数的原始方法是使用 @code{make-interpreted-closure}：
+
+@defun make-interpreted-closure args body env &optional docstring iform
+该函数构造并返回一个闭包，表示带有参数 @var{args} 的解释函数，其主体由 @var{body} 组成，它必须是 Lisp 形式的非 @code{nil} 列表。  @var{env} 是词法环境，其形式与 @code{eval} (@pxref{Eval}) 所使用的形式相同。  如果非 @code{nil} 则文档 @var{docstring} 应为字符串，而交互形式 @var{iform} 如果非 @code{nil} 则应为 @w{@code{(interactive @var{arg-descriptor})}} (@pxref{Using Interactive}) 形式。
+@end defun
+
+@node Disassembly
+@section 反汇编字节码
+@cindex disassembled byte-code
+
+人们不编写字节码；而是编写字节码。这项工作留给了字节编译器。  但我们提供了一个反汇编器来满足猫般的好奇心。  反汇编器将字节编译的代码转换为人类可读的形式。
+
+字节码解释器被实现为一个简单的堆栈机。它将值推送到自己的堆栈上，然后将它们弹出以在计算中使用它们，计算结果本身会被推回到堆栈上。当字节码函数返回时，它会从堆栈中弹出一个值并将其作为函数的值返回。
+
+除了堆栈之外，字节码函数还可以通过在变量和堆栈之间传输值来使用、绑定和设置普通 Lisp 变量。
+
+@deffn Command disassemble object &optional buffer-or-name
+此命令显示 @var{object} 的反汇编代码。  在交互式使用中，或者如果@var{buffer-or-name}是@code{nil}或被省略，输出将进入名为@file{*Disassemble*}的缓冲区。  如果@var{buffer-or-name}非@code{nil}，它必须是一个缓冲区或现有缓冲区的名称。  然后输出到达 point 处，而 point 则留在输出之前。
+
+参数 @var{object} 可以是函数名、lambda 表达式 (@pxref{Lambda Expressions}) 或字节码对象 (@pxref{Closure Objects})。  如果它是 lambda 表达式，@code{disassemble} 会编译它并反汇编生成的编译代码。
+@end deffn
+
+以下是使用 @code{disassemble} 函数的两个示例。  我们添加了解释性注释来帮助您将字节码与 Lisp 源代码关联起来；这些不会出现在 @code{disassemble} 的输出中。
+
+@example
+@group
+(defun factorial (integer)
+  "Compute factorial of an integer."
+  (if (= 1 integer) 1
+    (* integer (factorial (1- integer)))))
+     @result{} factorial
+@end group
+
+@group
+(factorial 4)
+     @result{} 24
+@end group
+
+@group
+(disassemble 'factorial)
+     @print{} byte-code for factorial:
+ doc: Compute factorial of an integer.
+ args: (arg1)
+@end group
+
+@group
+0   dup                   ; @r{Get the value of @code{integer} and}
+                          ;   @r{push it onto the stack.}
+1   constant 1            ; @r{Push 1 onto stack.}
+@end group
+@group
+2   eqlsign               ; @r{Pop top two values off stack, compare}
+                          ;   @r{them, and push result onto stack.}
+@end group
+@group
+3   goto-if-nil 1         ; @r{Pop and test top of stack;}
+                          ;   @r{if @code{nil}, go to 1, else continue.}
+6   constant 1            ; @r{Push 1 onto top of stack.}
+7   return                ; @r{Return the top element of the stack.}
+@end group
+@group
+8:1 dup                   ; @r{Push value of @code{integer} onto stack.}
+9   constant factorial    ; @r{Push @code{factorial} onto stack.}
+10  stack-ref 2           ; @r{Push value of @code{integer} onto stack.}
+11  sub1                  ; @r{Pop @code{integer}, decrement value,}
+                          ;   @r{push new value onto stack.}
+12  call     1            ; @r{Call function @code{factorial} using first}
+                          ;   @r{(i.e., top) stack element as argument;}
+                          ;   @r{push returned value onto stack.}
+@end group
+@group
+13  mult                  ; @r{Pop top two values off stack, multiply}
+                          ;   @r{them, and push result onto stack.}
+14  return                ; @r{Return the top element of the stack.}
+@end group
+@end example
+
+@code{silly-loop} 函数稍微复杂一些：
+
+@example
+@group
+(defun silly-loop (n)
+  "Return time before and after N iterations of a loop."
+  (let ((t1 (current-time-string)))
+    (while (> (setq n (1- n))
+              0))
+    (list t1 (current-time-string))))
+     @result{} silly-loop
+@end group
+
+@group
+(disassemble 'silly-loop)
+     @print{} byte-code for silly-loop:
+ doc: Return time before and after N iterations of a loop.
+ args: (arg1)
+@end group
+
+@group
+0   constant current-time-string  ; @r{Push @code{current-time-string}}
+                                  ;   @r{onto top of stack.}
+@end group
+@group
+1   call     0            ; @r{Call @code{current-time-string} with no}
+                          ;   @r{argument, push result onto stack as @code{t1}.}
+@end group
+@group
+2:1 stack-ref 1           ; @r{Get value of the argument @code{n}}
+                          ;   @r{and push the value on the stack.}
+3   sub1                  ; @r{Subtract 1 from top of stack.}
+@end group
+@group
+4   dup                   ; @r{Duplicate top of stack; i.e., copy the top}
+                          ;   @r{of the stack and push copy onto stack.}
+5   stack-set 3           ; @r{Pop the top of the stack,}
+                          ;   @r{and set @code{n} to the value.}
+
+;; @r{(In effect, the sequence @code{dup stack-set} copies the top of}
+;; @r{the stack into the value of @code{n} without popping it.)}
+@end group
+
+@group
+7   constant 0            ; @r{Push 0 onto stack.}
+8   gtr                   ; @r{Pop top two values off stack,}
+                          ;   @r{test if @var{n} is greater than 0}
+                          ;   @r{and push result onto stack.}
+@end group
+@group
+9   goto-if-not-nil 1     ; @r{Goto 1 if @code{n} > 0}
+                          ;   @r{(this continues the while loop)}
+                          ;   @r{else continue.}
+@end group
+@group
+12  dup                   ; @r{Push value of @code{t1} onto stack.}
+13  constant current-time-string  ; @r{Push @code{current-time-string}}
+                                  ;   @r{onto the top of the stack.}
+14  call     0            ; @r{Call @code{current-time-string} again.}
+@end group
+@group
+15  list2                 ; @r{Pop top two elements off stack, create a}
+                          ;   @r{list of them, and push it onto stack.}
+16  return                ; @r{Return value of the top of stack.}
+@end group
+@end example
+
+@node Native Compilation
+@chapter Lisp 编译为本机代码
+@cindex native compilation
+@cindex compilation to native code (Emacs Lisp)
+
+@cindex native code
+除了@ref{Byte Compilation, the previous chapter}中描述的字节编译之外，Emacs 还可以选择将 Lisp 函数定义编译为真正的编译代码，称为@dfn{native code}。  此功能使用 @file{libgccjit} 库，它是 GCC 发行版的一部分，并且需要构建支持使用该库的 Emacs。  它还需要您的系统上有 GCC 和 Binutils（汇编器和链接器），以便您能够本机编译 Lisp 代码。
+
+@vindex native-compile@r{, a Lisp feature}
+要确定当前 Emacs 进程是否可以生成并加载本机编译的 Lisp 代码，请调用 @code{native-comp-available-p} (@pxref{Native-Compilation Functions})。
+
+与字节编译代码不同，本机编译的 Lisp 代码直接由机器硬件执行，因此以主机 CPU 可以提供的全速运行。  最终的加速通常取决于 Lisp 代码的作用，但通常比相应的字节编译代码快 2.5 到 5 倍。
+
+由于本机代码通常在不同系统之间不兼容，因此本机编译的代码可以 @emph{not} 从一台机器传输到另一台机器，因此它只能在生成它的同一台机器上或非常相似的机器上使用（具有相同的 CPU 和运行时库）。  本机编译代码的可移植性与共享库（@file{.so} 或 @file{.dll} 文件）的可移植性相同。
+
+本机编译代码的库包含对 Emacs Lisp 原语 (@pxref{What Is a Function}) 及其调用约定的关键依赖项，因此 Emacs 通常不会加载早期或更高版本的 Emacs 生成的本机编译代码；由不同 Emacs 版本对相同 Lisp 代码进行本机编译通常会生成一个具有唯一文件名的本机编译库，只有该版本的 Emacs 才能加载该库。  然而，使用唯一的文件名可以将由多个不同版本的 Emacs 本机编译的同一 Lisp 库的多个版本放置在同一目录中。
+
+@vindex no-native-compile
+@code{no-byte-compile} (@pxref{Byte Compilation}) 的非@code{nil}文件局部变量绑定也会禁用该文件的本机编译。  此外，类似的变量@code{no-native-compile}仅禁用文件的本机编译。  如果同时指定了@code{no-byte-compile}和@code{no-native-compile}，则前者优先。
+
+@cindex native compilation, prevent writing @file{*.eln} files
+有时可能需要阻止本机编译将其结果（@file{*.eln} 文件）写入@code{user-emacs-directory} (@pxref{Init File}) 的子目录。  您可以通过更改 @code{native-comp-eln-load-path} (@pxref{Native-Compilation Variables}) 的值或临时将 @env{HOME} 环境变量指向不存在的目录来实现此目的。  请注意，如果 Emacs 需要生成 @dfn{trampolines}，则后一种技术可能仍会生成少量 @file{*.eln} 文件，如果在本机编译的 Lisp 代码中建议或重新定义 Lisp 原语，则使用这些文件。  @xref{Native-Compilation Variables, trampolines}。  或者，您可以使用 @code{startup-redirect-eln-cache} 函数指定将 @file{*.eln} 文件写入非默认目录； @pxref{Native-Compilation Functions}。
+
+@menu
+* Native-Compilation Functions::   本地编译 Lisp 的函数。
+* Native-Compilation Variables::   控制本机编译的变量。
+@end menu
+
+@node Native-Compilation Functions
+@section 本机编译函数
+@cindex native-compilation functions
+
+本机编译是作为字节编译 (@pxref{Byte Compilation}) 的副作用实现的。  因此，本地编译 Lisp 代码也总是会生成其字节代码，因此为字节编译 (@pxref{Compilation Functions}) 准备 Lisp 代码的所有规则和注意事项对于本地编译也有效。
+
+您可以使用 @code{native-compile} 函数本地编译单个函数或宏定义，或者整个 Lisp 代码文件。  本机编译文件将生成带有本机代码的 @file{.eln} 文件。
+
+@findex native-comp-limple-mode
+@vindex native-comp-verbose
+本机编译可能会产生警告或错误消息；这些通常记录在称为 0⁣ 的缓冲区中。  在交互式会话中，它使用特殊的 LIMPLE 模式 (@code{native-comp-limple-mode})，该模式根据此日志设置@code{font-lock}，其他方面与基本模式相同。  记录本机编译产生的消息可以由 @code{native-comp-verbose} 变量 (@pxref{Native-Compilation Variables}) 控制。
+
+当 Emacs 以非交互方式运行时，本机编译生成的消息通过调用 @code{message} (@pxref{Displaying Messages}) 报告，并且通常显示在调用 Emacs 的终端的标准错误流上。
+
+@defun native-compile function-or-file &optional output
+该函数将@var{function-or-file}编译为本机代码。  参数 1⁣ 可以是函数符号、Lisp 形式或包含要编译的 Emacs Lisp 源代码的文件的名称（字符串）。  如果提供了可选参数@var{output}，它必须是一个字符串，指定要写入编译代码的文件的名称。  否则，如果 3⁣ 是函数或 Lisp 形式，则该函数返回编译后的对象，如果 4⁣ 是文件名，则该函数返回为编译代码创建的文件的完整绝对名称。  输出文件默认具有 @file{.eln} 扩展名。
+
+该函数运行本机编译的最后阶段，该阶段在单独的子进程中通过 @file{libgccjit} 调用 GCC，该子进程调用与调用该函数的进程相同的 Emacs 可执行文件。
+@end defun
+
+@defun native-compile-directory directory
+该函数递归地搜索 @var{directory} 及其任何子目录中的 @file{.el} 文件，并对任何尚未编译的文件运行本机编译。  为了确定文件是否已编译，它会在 @code{native-comp-eln-load-path} 变量 (@pxref{Native-Compilation Variables}) 中搜索相应的 @file{.eln}。
+@end defun
+
+@defun batch-native-compile &optional for-tarball
+此函数以批处理模式对 Emacs 命令行上指定的文件运行本机编译。  它只能在 Emacs 的批量执行中使用，因为它会在编译完成后杀死 Emacs。  如果一个或多个文件无法编译，Emacs 进程将尝试编译所有其他文件，并以非零状态代码终止。  可选参数 @var{for-tarball}，如果非 @code{nil}，则告诉函数将生成的 @file{.eln} 文件放置在 @code{native-comp-eln-load-path} (@pxref{Library Search}) 中提到的最后一个目录中；这意味着第一次构建 Emacs 源 tarball 的一部分，当源 tarball 中不存在的本机编译文件应该在构建树而不是用户的缓存目录中生成时。
+@end defun
+
+本机编译可以在主 Emacs 进程的子进程中完全异步运行。  这使得主 Emacs 进程可以自由使用，同时编译在后台运行。  当没有可用的本机编译文件时，Emacs 使用此方法对加载到 Emacs 中的任何 Lisp 文件或字节编译的 Lisp 文件进行本机编译。  请注意，由于使用了子进程，本机编译可能会产生字节编译不会产生的警告和错误，因此可能需要修改 Lisp 代码才能正常工作。  更多详情请参见@pxref{Native-Compilation Variables}中的@code{native-comp-async-report-warnings-errors}。
+
+@defun native-compile-async files &optional recursively load selector
+该函数异步编译命名的@var{files}。  参数 @var{files} 应该是单个文件名（字符串）或一个或多个文件和/或目录名的列表。  如果列表中存在目录，则可选参数 @var{recursively} 应为非 @code{nil} 以使编译递归到这些目录。  如果@var{load}非@code{nil}，Emacs将加载它成功编译的每个文件。  可选参数 @var{selector} 允许控制将编译 @var{files} 中的哪一个；它可以具有以下值之一：
+
+@table @asis
+@item @code{nil} 或省略
+选择@var{files}中的所有文件和目录。
+@item 正则表达式字符串
+选择名称与正则表达式匹配的文件和目录。
+@item 一个函数
+谓词函数，将针对 @var{files} 中的每个文件和目录进行调用，如果应选择文件或目录进行编译，则应返回非 @code{nil}。
+@end table
+
+在具有多个 CPU 执行单元的系统上，当 0⁣ 命名多个文件时，该函数通常会在 @code{native-comp-async-jobs-number} (@pxref{Native-Compilation Variables}) 的控制下并行启动多个编译子进程。
+@end defun
+
+@defun native-compile-directory directory
+如果在 @code{native-comp-eln-load-path} 列表 (@pxref{Library Search}) 中提到的任何目录中都找不到相应的 @file{.eln} 文件，则此函数会将指定 @var{directory} 中的所有 @file{*.el} 文件编译为本机代码，并递归地编译其所有子目录中的所有 @file{.eln} 文件。
+@end defun
+
+@deffn Command emacs-lisp-native-compile
+如果该文件自上次本机编译以来已更改，则此命令会将当前缓冲区访问的文件编译为本机代码。
+@end deffn
+
+@deffn Command emacs-lisp-native-compile-and-load
+该命令将当前缓冲区访问的文件编译为本机代码，如@code{emacs-lisp-native-compile}，但它也会在编译完成时加载本机代码。
+@end deffn
+
+以下函数允许 Lisp 程序在运行时测试本机编译是否可用。
+
+@defun native-comp-available-p
+如果正在运行的 Emacs 进程已编译了本机编译支持，则此函数返回非@code{nil}。  在动态加载 @file{libgccjit} 的系统上，它还确保库可用并且可以加载。  需要预先知道本机编译是否可用的 Lisp 程序应该使用此谓词。
+@end defun
+
+默认情况下，异步本机编译将其生成的 @file{*.eln} 文件写入由 @code{native-comp-eln-load-path} 变量 (@pxref{Native-Compilation Variables}) 指定的第一个可写目录的子目录中。  您可以通过在启动文件中使用以下函数来更改此设置：
+
+@defun startup-redirect-eln-cache cache-directory
+该函数安排异步本机编译将生成的 @file{*.eln} 文件写入 @var{cache-directory}，该文件必须是单个目录、字符串。  它还破坏性地修改@code{native-comp-eln-load-path}，使其第一个元素为@var{cache-directory}。  如果 @var{cache-directory} 不是绝对文件名，则会相对于 @code{user-emacs-directory} (@pxref{Init File}) 进行解释。
+@end defun
+
+@node Native-Compilation Variables
+@section 本机编译变量
+@cindex native-compilation variables
+
+本节记录了控制本机编译的变量。
+
+@defopt native-comp-speed
+该变量指定本机编译的优化级别。它的值应该是@minus{}1和3之间的数字。0和3之间的值指定相当于相应编译器@option{-O0}、@option{-O1}等@:编译器命令行选项的优化级别。  值@minus{}1表示禁用本机编译：函数和文件将仅进行字节编译；但是，仍然会生成 @file{*.eln} 文件，它们仅包含字节码形式的编译代码。  （这可以通过使用 @w{@code{(declare (speed -1))}} 形式 @pxref{Declare Form} 在函数粒度上实现。）默认值为 2。
+@end defopt
+
+@anchor{compilation-safety}
+@defopt compilation-safety
+该变量指定用于发出的本机代码的安全级别。  该值应该是一个数字，可以是 0 或 1，其含义如下：
+
+@table @asis
+@item 0
+如果函数的声明没有正确描述该函数的功能或调用方式，并且该函数是本机编译的，则发出的代码可能会出现错误（甚至导致 Emacs 崩溃）。
+@item 1
+即使函数声明错误，发出的代码也必须以安全的方式生成。
+@end table
+
+这也可以通过使用 @code{safety} @code{declare} 形式 @pxref{Declare Form} 以函数粒度进行控制。
+@end defopt
+
+@defopt native-comp-debug
+该变量指定本机编译生成的调试信息的级别。  它的值应该是0到3之间的数字，含义如下：
+
+@table @asis
+@item 0
+无调试输出。  这是默认设置。
+@item 1
+使用本机代码发出调试符号。  这样可以使用 @command{gdb} 等调试器更轻松地调试本机代码。
+@item 2
+与 1 类似，另外还转储伪 C 代码。
+@item 3
+与 2 类似，此外还转储 GCC 中间通道和 @file{libgccjit} 日志文件。
+@end table
+
+生成后，伪 C 代码将存放在与相应的 @file{.eln} 文件相同的目录中。
+@end defopt
+
+@defopt native-comp-verbose
+该变量通过抑制本机编译发出的部分或全部日志消息来控制本机编译的详细程度。  如果其值为零（默认情况下），所有日志消息都会被抑制。将其设置为 1 到 3 之间的值将允许记录级别高于该值的消息。  这些值有以下解释：
+
+@table @asis
+@item 0
+没有日志记录。  这是默认设置。
+@item 1
+记录代码的最终 @acronym{LIMPLE} 表示。
+@item 2
+记录 @acronym{LAP}、最终的 @acronym{LIMPLE} 以及一些额外的传递信息。
+@item 3
+最大详细程度：记录所有内容。
+@end table
+@end defopt
+
+@defopt native-comp-async-jobs-number
+该变量确定同时启动的本机编译子进程的最大数量。  它应该是一个非负数。  默认值为零，表示使用一半数量的 CPU 执行单元；如果 CPU 只有一个执行单元，则默认值为 1。
+@end defopt
+
+@defopt native-comp-async-report-warnings-errors
+如果此变量的值非 0，来自异步本机编译子进程的警告和错误将在主 Emacs 会话中名为 1 的缓冲区中报告。  默认值@code{t}表示显示结果缓冲区。  要记录警告而不弹出 @file{*Warnings*} 缓冲区，请将此变量设置为 @code{silent}。
+
+异步本机编译产生警告的常见原因是编译的文件缺少某些 @code{require} 必要功能。  该功能可能会加载到主 emacs 中，但由于本机编译始终从具有原始环境的子进程开始，因此对于子进程来说可能并非如此。
+@end defopt
+
+@defopt native-comp-async-query-on-exit
+如果该变量的值非 @code{nil}，Emacs 将在退出时查询是否退出并终止任何仍在运行的异步本机编译子进程，从而阻止写入相应的 @file{.eln} 文件。  如果值为 @code{nil}（默认值），Emacs 将终止这些子进程而不进行查询。
+@end defopt
+
+变量 @code{native-comp-eln-load-path} 保存 Emacs 查找 @file{*.eln} 文件的目录列表 (@pxref{Library Search})；在该角色中，它相当于用于查找 @file{*.el} 和 @file{*.elc} 文件的 @code{load-path}。此列表中的目录还用于写入异步本机编译生成的 @file{*.eln} 文件；具体来说，Emacs 会将这些文件写入列表中的第一个可写目录中。  因此，您可以通过更改此变量的值来控制本机编译存储结果的位置。
+
+@cindex disable asynchronous native compilation
+@cindex inhibit asynchronous native compilation
+@cindex asynchronous native compilation, disable
+@defvar native-comp-jit-compilation
+如果此变量为非 @code{nil}，则启用由 Emacs 加载的 @file{*.elc} 文件的异步（又名@: @dfn{just-in-time} 或 @acronym{JIT}）本机编译，而对应的 @file{*.eln} 文件尚不存在。  根据 @code{native-comp-async-jobs-number} 的值，此 JIT 编译使用以批处理模式运行的单独 Emacs 子进程。  当 Lisp 文件的 JIT 编译成功完成时，生成的 @file{.eln} 文件将被加载，并且其代码将替换 @file{.elc} 文件提供的函数定义。
+@end defvar
+
+@cindex trampolines, in native compilation
+将 @code{native-comp-jit-compilation} 的值设置为 @code{nil} 将禁用 JIT 本机编译。  然而，即使 JIT 本机编译被禁用，Emacs 可能仍然需要启动异步本机编译子进程来生成@dfn{trampolines}。  要控制这一点，请使用单独的变量，如下所述。
+
+@defvar native-comp-enable-subr-trampolines
+该变量控制蹦床的生成。  Trampoline 是一小段本机代码，允许从使用 @code{native-comp-speed} 设置为 2 或更大的本机编译的 Lisp 代码调用 Lisp 原语，这些原语是建议或重新定义的。 Emacs 将生成的蹦床存储在单独的 @file{*.eln} 文件中。默认情况下，该变量的值为@code{t}，可以生成trampoline文件；将其设置为 @code{nil} 将禁用蹦床的生成。  请注意，如果建议或重新定义原语所需的蹦床不可用且无法生成，则从本机编译的 Lisp 对该原语的调用将忽​​略重新定义和建议，并且其行为就像直接从 C 调用该原语一样。因此，我们不建议禁用蹦床生成，除非您知道 Lisp 程序所需的所有蹦床都已编译并且可供 Emacs 访问。
+
+该变量的值也可以是字符串，在这种情况下，它指定存储生成的 Trampoline @file{*.eln} 文件的目录名称，覆盖 @code{native-comp-eln-load-path} 中的目录。  如果您希望根据需要生成蹦床，但不想将它们存储在用户的 @env{HOME} 目录下或保存 @file{*.eln} 文件的其他公共目录中，这非常有用。  然而，与@code{native-comp-eln-load-path}中的目录不同，蹦床将存储在该变量值指定的目录中，而不是存储在其特定于版本的子目录中。  如果该目录的名称不是绝对的，则它是相对于 @code{invocation-directory} (@pxref{System Environment}) 进行解释的
+
+如果这个变量是非@code{nil}，并且Emacs需要生成一个trampoline，但是它找不到任何可写目录来存储trampoline，它会将其存储在@code{temporary-file-directory}（@pxref{Unique File Names}）中。
+
+当找不到可写目录来存储它们时，或者当此变量是字符串时，生成的 Trampolines 将仅在当前 Emacs 会话期间可用，因为 Emacs 不会在这些位置中的任何一个位置查找 Trampolines。
+@end defvar

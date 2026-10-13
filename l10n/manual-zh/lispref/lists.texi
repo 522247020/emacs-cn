@@ -1,0 +1,1637 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Lists
+@chapter 列表
+@cindex lists
+@cindex element (of list)
+
+@dfn{list} 表示零个或多个元素的序列（可以是任何 Lisp 对象）。  列表和向量之间的重要区别在于两个或多个列表可以共享其部分结构；此外，您可以在列表中插入或删除元素，而无需复制整个列表。
+
+@menu
+* Cons Cells::           列表是如何由 cons 单元格组成的。
+* List-related Predicates::         这个对象是一个列表吗？  比较两个列表。
+* List Elements::        提取列表的各个部分。
+* Building Lists::       创建列表结构。
+* List Variables::       修改存储在变量中的列表。
+* Modifying Lists::      将新片段存储到现有列表中。
+* Sets And Lists::       列表可以表示有限的数学集合。
+* Association Lists::    列表可以表示有限关系或映射。
+* Property Lists::       成对元素的列表。
+@end menu
+
+@node Cons Cells
+@section 列表和缺点单元格
+@cindex lists and cons cells
+
+Lisp 中的列表不是原始数据类型；它们是由 @dfn{cons cells} (@pxref{Cons Cell Type}) 构建而成。  cons 单元是表示有序对的数据对象。  也就是说，它有两个槽，每个槽 @dfn{holds} 或 @dfn{refers to} 都是某个 Lisp 对象。  一个插槽称为 @sc{car}，另一个插槽称为 @sc{cdr}。 （这些名称是传统名称；参见@ref{Cons Cell Type}。）@sc{cdr} 发音为“could-er”。
+
+我们说“这个 cons 单元的 @sc{car} 是”它的 @sc{car} 槽当前持有的任何对象，对于 @sc{cdr} 也是如此。
+
+列表是一系列链接在一​​起的 cons 单元，因此每个单元都引用下一个单元。  列表中的每个元素都有一个 cons 单元格。  按照惯例，cons 单元的 @sc{car} 保存列表的元素，@sc{cdr} 用于链接列表（@sc{car} 和 @sc{cdr} 之间的这种不对称完全是约定问题；在 cons 单元级别，@sc{car} 和 @sc{cdr} 槽具有相似的属性）。  因此，列表中每个 cons cell 的 @sc{cdr} 时隙指的是后面的 cons cell。
+
+@cindex proper list
+@cindex true list
+同样按照惯例，列表中最后一个 cons 单元格的 @sc{cdr} 是 @code{nil}。  我们将这样的 @code{nil} 终止结构称为 @dfn{proper list}@footnote{It is sometimes also referred to as a @dfn{true list}, but we generally do not use this terminology in this manual.}。  在 Emacs Lisp 中，符号 @code{nil} 既是一个符号，又是一个没有元素的列表。  为了方便起见，符号@code{nil}被视为将@code{nil}作为其@sc{cdr}（也作为其@sc{car}）。
+
+因此，真列表的 @sc{cdr} 始终是真列表。  非空真列表的 @sc{cdr} 是包含除第一个元素之外的所有元素的真列表。
+
+@cindex dotted list
+@cindex circular list
+如果列表最后一个 cons 单元的 @sc{cdr} 是 @code{nil} 以外的某个值，我们将该结构称为 @dfn{dotted list}，因为其打印表示将使用点对符号 (@pxref{Dotted Pair Notation})。  还有另一种可能性：某些 cons 单元的 @sc{cdr} 可能指向列表中先前的 cons 单元之一。我们将该结构称为@dfn{circular list}。
+
+出于某些目的，列表是正确的、循环的还是点状的并不重要。  如果程序没有在列表中查找足够远的位置来查看最终 cons 单元格的 @sc{cdr}，则它不会关心。然而，一些对列表进行操作的函数需要正确的列表，如果给定点列表则发出错误信号。  如果给定循环列表，大多数尝试查找列表末尾的函数都会进入无限循环。  您可以使用下一节 (@pxref{List-related Predicates, proper-list-p}) 中描述的函数 @code{proper-list-p} 来确定列表是否正确。
+
+@cindex list structure
+因为大多数 cons 单元都用作列表的一部分，所以我们将由 cons 单元组成的任何结构称为 @dfn{list structure}。
+
+@node List-related Predicates
+@section 列表上的谓词
+@cindex predicates for lists
+@cindex list predicates
+
+以下谓词测试 Lisp 对象是否是原子，是否是 cons 单元或列表，或者是否是可区分对象@code{nil}。  （其中许多谓词可以根据其他谓词来定义，但它们使用得如此频繁，因此值得拥有它们。）
+
+@defun consp object
+如果 1⁣ 是 cons 单元，则该函数返回 @code{t}，否则返回 @code{nil}。  @code{nil} 不是 cons 单元格，尽管它 @emph{is} 是一个列表。
+@end defun
+
+@defun atom object
+如果 1⁣ 是原子，则该函数返回 @code{t}，否则返回 @code{nil}。  除了 con cell 之外的所有物体都是原子。  符号@code{nil}是一个原子，也是一个列表；它是唯一一个兼具两者的 Lisp 对象。
+
+@example
+(atom @var{object}) @equiv{} (not (consp @var{object}))
+@end example
+@end defun
+
+@defun listp object
+如果 1⁣ 是 cons 单元或 2⁣，则该函数返回 @code{t}。  否则，它返回@code{nil}。
+
+@example
+@group
+(listp '(1))
+     @result{} t
+@end group
+@group
+(listp '())
+     @result{} t
+@end group
+@end example
+@end defun
+
+@defun nlistp object
+该函数与 @code{listp} 相反：如果 @var{object} 不是列表，则返回 @code{t}。  否则，它返回@code{nil}。
+
+@example
+(listp @var{object}) @equiv{} (not (nlistp @var{object}))
+@end example
+@end defun
+
+@defun null object
+如果@var{object}是@code{nil}，该函数返回@code{t}，否则返回@code{nil}。  该函数与@code{not}相同，但为了清楚起见，当@var{object}被视为真值时，我们使用@code{not}（参见@ref{Combining Conditions}中的@code{not}），否则使用@code{null}。
+
+@example
+@group
+(null '(1))
+     @result{} nil
+@end group
+@group
+(null '())
+     @result{} t
+@end group
+@end example
+@end defun
+
+@defun proper-list-p object
+如果它是正确列表，则该函数返回 @var{object} 的长度，否则返回 @code{nil} (@pxref{Cons Cells})。  除了满足@code{listp}之外，正确的列表既不是圆形的也不是点状的。
+
+@example
+@group
+(proper-list-p '(a b c))
+    @result{} 3
+@end group
+@group
+(proper-list-p '(a b . c))
+    @result{} nil
+@end group
+@end example
+@end defun
+
+@node List Elements
+@section 访问列表的元素
+@cindex list elements
+
+@defun car cons-cell
+该函数返回 cons 单元的第一个槽位 @var{cons-cell} 引用的值。  换句话说，它返回 @var{cons-cell} 的 @sc{car}。
+
+作为一种特殊情况，如果 @var{cons-cell} 是 @code{nil}，则该函数返回 @code{nil}。  因此，任何列表都是有效的论点。  如果参数不是 cons 单元或 @code{nil}，则会发出错误信号。
+
+@example
+@group
+(car '(a b c))
+     @result{} a
+@end group
+@group
+(car '())
+     @result{} nil
+@end group
+@end example
+@end defun
+
+@defun cdr cons-cell
+该函数返回 cons 单元的第二个槽 @var{cons-cell} 引用的值。  换句话说，它返回 @var{cons-cell} 的 @sc{cdr}。
+
+作为特殊情况，如果@var{cons-cell}是@code{nil}，则该函数返回@code{nil}；因此，任何列表都是有效的参数。  如果参数不是 cons 单元或 @code{nil}，则会发出错误信号。
+
+@example
+@group
+(cdr '(a b c))
+     @result{} (b c)
+@end group
+@group
+(cdr '())
+     @result{} nil
+@end group
+@end example
+@end defun
+
+@defun car-safe object
+此函数可让您获取 cons 单元格的 @sc{car}，同时避免其他数据类型的错误。  如果 3⁣ 是 cons 单元，则返回 @var{object} 的 @sc{car}，否则返回 @code{nil}。  这与 @code{car} 相反，如果 @var{object} 不是列表，则表示错误。
+
+@example
+@group
+(car-safe @var{object})
+@equiv{}
+(let ((x @var{object}))
+  (if (consp x)
+      (car x)
+    nil))
+@end group
+@end example
+@end defun
+
+@defun cdr-safe object
+此函数可让您获取 cons 单元格的 @sc{cdr}，同时避免其他数据类型的错误。  如果 3⁣ 是 cons 单元格，则返回 @var{object} 的 @sc{cdr}，否则返回 @code{nil}。这与 @code{cdr} 相反，如果 @var{object} 不是列表，则表示错误。
+
+@example
+@group
+(cdr-safe @var{object})
+@equiv{}
+(let ((x @var{object}))
+  (if (consp x)
+      (cdr x)
+    nil))
+@end group
+@end example
+@end defun
+
+@defmac pop listname
+这个宏提供了一种方便的方法来检查列表的 @sc{car} ，并将其从列表中一次性删除。  它对存储在@var{listname}中的列表进行操作。  它从列表中删除第一个元素，将 @sc{cdr} 保存到 @var{listname} 中，然后返回删除的元素。
+
+在最简单的情况下，@var{listname}是一个不带引号的符号，用于命名列表；在这种情况下，该宏相当于@w{@code{(prog1 (car listname) (setq listname (cdr listname)))}}。
+
+@example
+x
+     @result{} (a b c)
+(pop x)
+     @result{} a
+x
+     @result{} (b c)
+@end example
+
+更一般地，@var{listname}可以是广义变量。  在这种情况下，该宏使用 @code{setf} 保存到 @var{listname} 中。 @xref{Generalized Variables}。
+
+对于 @code{push} 宏，它将元素添加到列表中，@xref{List Variables}。
+@end defmac
+
+@defun nth n list
+@anchor{Definition of nth}
+该函数返回@var{list}的第@var{n}元素。  元素从零开始编号，因此 @var{list} 的 @sc{car} 是元素编号零。  如果@var{list}的长度为@var{n}或更小，则值为@code{nil}。
+
+@c Behavior for -ve n undefined since 2013/08; see bug#15059.
+@ignore
+If @var{n} is negative, @code{nth} returns the first element of @var{list}.
+@end ignore
+
+@example
+@group
+(nth 2 '(1 2 3 4))
+     @result{} 3
+@end group
+@group
+(nth 10 '(1 2 3 4))
+     @result{} nil
+
+(nth n x) @equiv{} (car (nthcdr n x))
+@end group
+@end example
+
+函数 @code{elt} 类似，但适用于任何类型的序列。由于历史原因，它以相反的顺序提出论点。 @xref{Sequence Functions}。
+@end defun
+
+@findex drop
+@defun nthcdr n list
+该函数返回 @var{list} 的第 @var{n}1⁣。  换句话说，它跳过 @var{list} 的前 @var{n} 链接并返回后面的内容。
+
+@c "or negative" removed 2013/08; see bug#15059.
+如果@var{n}为零，则@code{nthcdr}返回所有@var{list}。  如果@var{list}的长度为@var{n}或更小，则@code{nthcdr}返回@code{nil}。
+
+@code{nthcdr} 的别名是 @code{drop}。
+
+@example
+@group
+(nthcdr 1 '(1 2 3 4))
+     @result{} (2 3 4)
+@end group
+@group
+(nthcdr 10 '(1 2 3 4))
+     @result{} nil
+@end group
+@group
+(nthcdr 0 '(1 2 3 4))
+     @result{} (1 2 3 4)
+@end group
+@end example
+@end defun
+
+@defun take n list
+该函数返回@var{list}的第一个@var{n}元素。  本质上，它返回 @var{list} 中被 @code{nthcdr} 跳过的部分。
+
+如果短于 @var{n} 个元素，@code{take} 返回 @var{list}；如果@var{n}为零或负数，则返回@code{nil}。
+
+一般来说，@code{(append (take @var{n} @var{list}) (drop @var{n} @var{list}))}将返回等于@var{list}的列表。
+
+@example
+@group
+(take 3 '(a b c d))
+     @result{} (a b c)
+@end group
+@group
+(take 10 '(a b c d))
+     @result{} (a b c d)
+@end group
+@group
+(take 0 '(a b c d))
+     @result{} nil
+@end group
+@end example
+@end defun
+
+@defun ntake n list
+这是 @code{take} 的一个版本，它通过破坏性地修改参数的列表结构来工作。  这使得速度更快，但 1⁣ 的原始值可能会丢失。
+
+如果短于 @var{n} 个元素，@code{ntake} 返回未修改的 @var{list}；如果@var{n}为零或负数，则返回@code{nil}。否则，它返回截断为前 @var{n} 元素的 @var{list} 。
+
+这意味着使用返回值而不仅仅是依赖截断效应通常是一个好主意，除非 @var{n} 已知为正数。
+@end defun
+
+@defun drop-while pred list
+该函数会跳过谓词 @var{pred} 返回非 @code{nil} 的前导列表元素，并返回其余元素。
+
+@example
+@group
+(drop-while #'numberp '(1 2 a b 3 4))
+     @result{} (a b 3 4)
+@end group
+@end example
+@end defun
+
+@defun take-while pred list
+该函数返回谓词 @var{pred} 返回非 @code{nil} 的前导列表元素，并忽略其余元素。
+
+一般来说，@code{(append (take-while @var{p} @var{list}) (drop-while @var{p} @var{list}))}将返回等于@var{list}的列表。
+
+@example
+@group
+(take-while #'numberp '(1 2 a b 3 4))
+     @result{} (1 2)
+@end group
+@end example
+@end defun
+
+@defun all pred list
+如果@var{pred}对于@var{list}中的所有元素都为真，则该函数返回@code{t}。
+
+@example
+@group
+(all #'numberp '(1 2 3 4))     @result{} t
+(all #'numberp '(1 2 a b 3 4)) @result{} nil
+(all #'numberp '())            @result{} t
+@end group
+@end example
+@end defun
+
+@defun member-if pred list
+如果@var{pred}对于@var{list}中的至少一个元素为真，则该函数返回非@code{nil}。  返回值是第一个元素满足@var{pred}的最长@var{list}后缀。
+
+@example
+@group
+(member-if #'symbolp '(1 2 3 4))     @result{} nil
+(member-if #'symbolp '(1 2 a b 3 4)) @result{} (a b 3 4)
+(member-if #'symbolp '())            @result{} nil
+@end group
+@end example
+@end defun
+
+@defun any pred list
+该函数是 @code{member-if} 的别名。  在不使用返回值而仅使用返回值是否为零的上下文中，它可能更可取。
+@end defun
+
+@defun last list &optional n
+该函数返回@var{list}的最后一个链接。  该链接的 @code{car} 是列表的最后一个元素。  如果@var{list}为空，则返回@code{nil}。  如果 4⁣ 不是 5⁣，则返回倒数第 6 个链接，或者如果 8⁣ 大于 9⁣ 的长度，则返回整个 @var{list}。
+@end defun
+
+@defun safe-length list
+@anchor{Definition of safe-length}
+该函数返回 @var{list} 的长度，不存在错误或无限循环的风险。  它通常返回列表中不同 con 单元格的数量。  然而，对于循环列表，该值只是一个上限；它通常太大。
+
+如果 @var{list} 不是 @code{nil} 或 cons 单元格，@code{safe-length} 返回 0。
+@end defun
+
+当您不担心列表可能是循环时，计算列表长度的最常见方法是使用 @code{length}。  @xref{Sequence Functions}。
+
+@defun caar cons-cell
+这与@code{(car (car @var{cons-cell}))}相同。
+@end defun
+
+@defun cadr cons-cell
+这与 @code{(car (cdr @var{cons-cell}))} 或 @code{(nth 1 @var{cons-cell})} 相同。
+@end defun
+
+@defun cdar cons-cell
+这与@code{(cdr (car @var{cons-cell}))}相同。
+@end defun
+
+@defun cddr cons-cell
+这与 @code{(cdr (cdr @var{cons-cell}))} 或 @code{(nthcdr 2 @var{cons-cell})} 相同。
+@end defun
+
+@findex caaar
+@findex caadr
+@findex cadar
+@findex caddr
+@findex cdaar
+@findex cdadr
+@findex cddar
+@findex cdddr
+@findex caaaar
+@findex caaadr
+@findex caadar
+@findex caaddr
+@findex cadaar
+@findex cadadr
+@findex caddar
+@findex cadddr
+@findex cdaaar
+@findex cdaadr
+@findex cdadar
+@findex cdaddr
+@findex cddaar
+@findex cddadr
+@findex cdddar
+@findex cddddr
+除上述之外，@code{car}和@code{cdr}的另外24种组合被定义为@code{c@var{xxx}r}和@code{c@var{xxxx}r}，其中每个@code{@var{x}}是@code{a}或@code{d}。  @code{cadr}、@code{caddr} 和 @code{cadddr} 分别选取列表的第二个、第三个或第四个元素。  @file{cl-lib} 提供了相同的名称 @code{cl-second}、@code{cl-third} 和 @code{cl-fourth}。  @xref{List Functions,,, cl, Common Lisp Extensions}。
+
+@defun butlast x &optional n
+此函数返回列表 @var{x}，其中最后一个元素或最后一个 @var{n} 元素已被删除。  如果 2⁣ 大于零，它会复制列表，以免损坏原始列表。  一般来说，@code{(append (butlast @var{x} @var{n}) (last @var{x} @var{n}))}将返回等于@var{x}的列表。
+@end defun
+
+@defun nbutlast x &optional n
+这是 @code{butlast} 的一个版本，它通过破坏性地修改适当元素的 @code{cdr} 来工作，而不是制作列表的副本。
+@end defun
+
+@node Building Lists
+@section 构建 Cons 单元格和列表
+@cindex cons cells
+@cindex building lists
+
+许多函数都会构建列表，因为列表是 Lisp 的核心。 @code{cons} 是基本的列表构建函数；然而，有趣的是，在 Emacs 源代码中，@code{list} 的使用次数多于 @code{cons}。
+
+@defun cons object1 object2
+该函数是构建新列表结构的最基本函数。  它创建了一个新的 cons 单元，使 @var{object1} 成为 @sc{car}，使 @var{object2} 成为 @sc{cdr}。  然后它返回新的 cons 单元。  参数 @var{object1} 和 @var{object2} 可以是任何 Lisp 对象，但最常见的是 @var{object2} 是一个列表。
+
+@example
+@group
+(cons 1 '(2))
+     @result{} (1 2)
+@end group
+@group
+(cons 1 '())
+     @result{} (1)
+@end group
+@group
+(cons 1 2)
+     @result{} (1 . 2)
+@end group
+@end example
+
+@cindex consing
+@code{cons} 通常用于将单个元素添加到列表的前面。  这称为@dfn{consing the element onto the list}。
+@footnote{There is no strictly equivalent way to add an element to
+列表的末尾。  您可以使用 @code{(append @var{listname} (list @var{newelt}))}，它通过复制 @var{listname} 并将 @var{newelt} 添加到其末尾来创建一个全新的列表。  或者您可以使用@code{(nconc @var{listname} (list @var{newelt}))}，它通过跟随所有@sc{cdr}然后替换终止的@code{nil}来修改@var{listname}。  将此与使用 @code{cons} 添加元素到列表开头进行比较，后者既不复制也不修改列表。}例如：
+
+@example
+(setq list (cons newelt list))
+@end example
+
+请注意，本示例中使用的名为 @code{list} 的变量与下面描述的名为 @code{list} 的函数之间不存在冲突；任何符号都可以达到这两个目的。
+@end defun
+
+@defun list &rest objects
+该函数创建一个以 @var{objects} 作为元素的列表。  结果列表始终以 1⁣ 结尾。  如果没有给出 @var{objects}，则返回空列表。
+
+@example
+@group
+(list 1 2 3 4 5)
+     @result{} (1 2 3 4 5)
+@end group
+@group
+(list 1 2 '(3 4 5) 'foo)
+     @result{} (1 2 (3 4 5) foo)
+@end group
+@group
+(list)
+     @result{} nil
+@end group
+@end example
+@end defun
+
+@defun make-list length object
+该函数创建一个由 @var{length} 元素组成的列表，其中每个元素都是 @var{object}。  将 @code{make-list} 与 @code{make-string} (@pxref{Creating Strings}) 进行比较。
+
+@example
+@group
+(make-list 3 'pigs)
+     @result{} (pigs pigs pigs)
+@end group
+@group
+(make-list 0 'pigs)
+     @result{} nil
+@end group
+@group
+(setq l (make-list 3 '(a b)))
+     @result{} ((a b) (a b) (a b))
+(eq (car l) (cadr l))
+     @result{} t
+@end group
+@end example
+@end defun
+
+@defun append &rest sequences
+@cindex copying lists
+该函数返回一个包含 @var{sequences} 的所有元素的列表。  @var{sequences} 可以是列表、向量、布尔向量或字符串，但最后一个通常应该是列表。除最后一个参数之外的所有参数都会被复制，因此不会更改任何参数。  （参见@ref{Rearrangement}中的@code{nconc}，了解无需复制即可连接列表的方法。）
+
+更一般地，@code{append} 的最终参数可以是任何 Lisp 对象。  最终参数不被复制或转换；它成为新列表中最后一个 cons 单元格的 @sc{cdr} 。  如果最后一个参数本身是一个列表，那么它的元素实际上成为结果列表的元素。  如果最后一个元素不是列表，则结果是点分列表，因为它的最终 @sc{cdr} 不是正确列表 (@pxref{Cons Cells}) 中所需的 @code{nil}。
+@end defun
+
+这是使用 @code{append} 的示例：
+
+@example
+@group
+(setq trees '(pine oak))
+     @result{} (pine oak)
+(setq more-trees (append '(maple birch) trees))
+     @result{} (maple birch pine oak)
+@end group
+
+@group
+trees
+     @result{} (pine oak)
+more-trees
+     @result{} (maple birch pine oak)
+@end group
+@group
+(eq trees (cdr (cdr more-trees)))
+     @result{} t
+@end group
+@end example
+
+您可以通过查看框图来了解 @code{append} 的工作原理。  变量@code{trees}设置为列表@code{(pine oak)}，然后变量@code{more-trees}设置为列表@code{(maple birch pine oak)}。  然而，变量@code{trees}继续引用原始列表：
+
+@smallexample
+@group
+more-trees                trees
+|                           |
+|     --- ---      --- ---   -> --- ---      --- ---
+ --> |   |   |--> |   |   |--> |   |   |--> |   |   |--> nil
+      --- ---      --- ---      --- ---      --- ---
+       |            |            |            |
+       |            |            |            |
+        --> maple    -->birch     --> pine     --> oak
+@end group
+@end smallexample
+
+空序列对 @code{append} 返回的值没有任何贡献。  因此，最后一个 @code{nil} 参数会强制复制前一个参数：
+
+@example
+@group
+trees
+     @result{} (pine oak)
+@end group
+@group
+(setq wood (append trees nil))
+     @result{} (pine oak)
+@end group
+@group
+wood
+     @result{} (pine oak)
+@end group
+@group
+(eq wood trees)
+     @result{} nil
+@end group
+@end example
+
+@noindent
+在函数 @code{copy-sequence} 发明之前，这曾经是复制列表的常用方法。  @xref{Sequences Arrays Vectors}。
+
+这里我们展示了如何使用向量和字符串作为 @code{append} 的参数：
+
+@example
+@group
+(append [a b] "cd" nil)
+     @result{} (a b 99 100)
+@end group
+@end example
+
+@cindex list of characters of a string
+@cindex convert string to list of its characters
+@findex string-to-list
+以下是将字符串转换为其字符列表的方法：
+
+@example
+@group
+(append "abcd" nil)
+     @result{} (97 98 99 100)
+@end group
+@end example
+
+@noindent
+函数 @code{string-to-list} 是上述功能的便捷快捷方式。
+
+在 @code{apply} (@pxref{Calling Functions}) 的帮助下，我们可以将所有列表追加到列表列表中：
+
+@example
+@group
+(apply 'append '((a b c) nil (x y z) nil))
+     @result{} (a b c x y z)
+@end group
+@end example
+
+如果没有给出 @var{sequences}，则返回 @code{nil}：
+
+@example
+@group
+(append)
+     @result{} nil
+@end group
+@end example
+
+以下是最终参数不是列表的一些示例：
+
+@example
+@group
+(append '(x y) 'z)
+     @result{} (x y . z)
+(append '(x y) [z])
+     @result{} (x y . [z])
+@end group
+@end example
+
+@noindent
+第二个示例显示，当最终参数是序列而不是列表时，序列的元素不会成为结果列表的元素。  相反，该序列成为最终的 @sc{cdr}，就像任何其他非列表最终参数一样。
+
+作为例外，如果除最后一个参数之外的所有参数都是 @code{nil} 并且最后一个参数不是列表，则返回值是最后一个参数不变（即，在这种情况下返回值不是列表）：
+
+@example
+@group
+(append nil nil "abcd")
+     @result{} "abcd"
+@end group
+@end example
+
+@defun copy-tree tree &optional vectors-and-records
+该函数返回树@var{tree}的副本。  如果@var{tree}是一个cons单元，这会创建一个具有相同@sc{car}和@sc{cdr}的新cons单元，然后以相同的方式递归复制@sc{car}和@sc{cdr}。
+
+通常，当@var{tree}不是cons单元时，@code{copy-tree}简单地返回@var{tree}。  然而，如果@var{vectors-and-records}非@code{nil}，它也会复制向量和记录（并对它们的元素进行递归操作）。  @var{tree} 参数不得包含循环。
+@end defun
+
+@defun flatten-tree tree
+该函数返回@var{tree}的“扁平化”副本，即包含以@var{tree}为根的cons单元树的所有非@code{nil}终端节点或叶子的列表。  返回列表中的叶子顺序与 @var{tree} 中的顺序相同。
+@end defun
+
+@example
+(flatten-tree '(1 (2 . 3) nil (4 5 (6)) 7))
+    @result{}(1 2 3 4 5 6 7)
+@end example
+
+@defun ensure-list object
+该函数将 @var{object} 作为列表返回。  如果 1⁣ 已经是一个列表，则该函数返回它；否则，该函数返回一个包含 @var{object} 的单元素列表。
+
+如果您有一个可能是也可能不是列表的变量，那么这通常很有用，然后您可以说，例如：
+
+@lisp
+(dolist (elem (ensure-list foo))
+  (princ elem))
+@end lisp
+@end defun
+
+@defun ensure-proper-list object
+该函数返回 @var{object} 作为正确列表 (@pxref{(elisp) Cons Cells})。  如果 2⁣ 已经是一个正确的列表，该函数返回它；否则，该函数返回一个包含 @var{object} 的单元素列表。
+
+如果@var{object}可能是一个很长的列表，则更喜欢@code{ensure-list}，因为后一个函数以恒定时间运行，而@code{ensure-proper-list}以线性时间运行。  对于短列表，此函数是将 cons-cells 视为非列表的便捷方法：
+
+@lisp
+(ensure-list '(1 . 2))
+    @result{}(1 . 2)
+
+(ensure-proper-list '(1 . 2))
+    @result{}((1 . 2))
+@end lisp
+@end defun
+
+@defun number-sequence from &optional to separation
+此函数返回以 @var{from} 开头并按 @var{separation} 递增，并在 @var{to} 或之前结束的数字列表。  @var{separation} 可以为正数或负数，默认为 1。如果 @var{to} 为 @code{nil} 或在数值上等于 @var{from}，则该值为单元素列表 @code{(@var{from})}。  如果 @var{to} 小于 @var{from}（且 @var{separation} 为正），或大于 @var{from}（且为负 @var{separation}），则该值为 @code{nil}，因为这些参数指定了空序列。
+
+如果 0⁣ 为 0 并且 1⁣ 既不为 2⁣ 也不在数值上等于 @var{from}，则 @code{number-sequence} 会发出错误信号，因为这些参数指定了无限序列。
+
+所有参数都是数字。浮点参数可能很棘手，因为浮点算术不精确。  例如，根据机器的不同，@code{(number-sequence 0.4 0.6 0.2)}很可能返回一个元素列表@code{(0.4)}，而@code{(number-sequence 0.4 0.8 0.2)}返回一个包含三个元素的列表。  列表的第 3 个元素通过精确的公式 4 计算。  因此，如果想要确保 @var{to} 包含在列表中，可以为 @var{to} 传递这一精确类型的表达式。  或者，可以将 @var{to} 替换为稍大的值（或者，如果 @var{separation} 为负数，则替换为稍微更负的值）。
+
+一些例子：
+
+@example
+(number-sequence 4 9)
+     @result{} (4 5 6 7 8 9)
+(number-sequence 9 4 -1)
+     @result{} (9 8 7 6 5 4)
+(number-sequence 9 4 -2)
+     @result{} (9 7 5)
+(number-sequence 8)
+     @result{} (8)
+(number-sequence 8 5)
+     @result{} nil
+(number-sequence 5 8 -1)
+     @result{} nil
+(number-sequence 1.5 6 2)
+     @result{} (1.5 3.5 5.5)
+@end example
+@end defun
+
+@node List Variables
+@section 修改列表变量
+@cindex modify a list
+@cindex list modification
+
+这些函数和一个宏提供了修改存储在变量中的列表的便捷方法。
+
+@defmac push element listname
+该宏创建一个新列表，其@sc{car}为@var{element}，其@sc{cdr}为@var{listname}指定的列表，并将该列表保存在@var{listname}中。  在最简单的情况下，@var{listname}是一个不带引号的符号，命名列表，该宏相当于@w{@code{(setq @var{listname} (cons @var{element} @var{listname}))}}。
+
+@example
+(setq l '(a b))
+     @result{} (a b)
+(push 'c l)
+     @result{} (c a b)
+l
+     @result{} (c a b)
+@end example
+
+更一般地，@code{listname}可以是广义变量。  在这种情况下，该宏的作用相当于@w{@code{(setf @var{listname} (cons @var{element} @var{listname}))}}。 @xref{Generalized Variables}。
+
+对于 @code{pop} 宏，它从列表中删除第一个元素 @xref{List Elements}。
+@end defmac
+
+两个函数修改作为变量值的列表。
+
+@defun add-to-list symbol element &optional append compare-fn
+如果 @var{element} 还不是该值的成员，则此函数通过将 @var{element} consing 到旧值来设置变量 @var{symbol}。  它返回结果列表，无论是否更新。  @var{symbol} 的值最好是在调用之前就已存在的列表。 @code{add-to-list} 使用 @var{compare-fn} 将 @var{element} 与现有列表成员进行比较；如果@var{compare-fn}是@code{nil}，则使用@code{equal}。
+
+通常，如果添加@var{element}，则将其添加到@var{symbol}的前面，但如果可选参数@var{append}为非@code{nil}，则将其添加在末尾。
+
+参数 @var{symbol} 没有被隐式引用； @code{add-to-list} 是一个普通函数，与 @code{set} 类似，但与 @code{setq} 不同。  如果您想要的话，请自己引用该论点。
+
+该函数用于向配置变量添加元素，例如 @code{load-path} (@pxref{Library Search})、@code{image-load-path} (@pxref{Defining Images}) 等。其代码包含针对这些用途的相当多的特殊检查，并发出警告以支持它们。  因此，我们建议不要在 Lisp 程序中使用它来构造任意列表；使用 @code{push} 代替。  @xref{List Variables}。
+
+当 @var{symbol} 引用词法变量时，请勿使用此函数。
+@end defun
+
+以下场景展示了如何使用 @code{add-to-list}：
+
+@example
+(setq foo '(a b))
+     @result{} (a b)
+
+(add-to-list 'foo 'c)     ;; @r{Add @code{c}.}
+     @result{} (c a b)
+
+(add-to-list 'foo 'b)     ;; @r{No effect.}
+     @result{} (c a b)
+
+foo                       ;; @r{@code{foo} was changed.}
+     @result{} (c a b)
+@end example
+
+@code{(add-to-list '@var{var} @var{value})} 的等效表达式如下：
+
+@example
+(if (member @var{value} @var{var})
+    @var{var}
+  (setq @var{var} (cons @var{value} @var{var})))
+@end example
+
+@defun add-to-ordered-list symbol element &optional order
+该函数通过将@var{element}插入旧值（必须是列表）中@var{order}指定的位置来设置变量@var{symbol}。  如果@var{element}已经是列表的成员，则其在列表中的位置根据@var{order}进行调整。  使用@code{eq} 测试成员资格。此函数返回结果列表，无论是否更新。
+
+@var{order} 通常是一个数字（整数或浮点数），列表的元素按非递减的数字顺序排序。
+
+也可以省略@var{order}或@code{nil}。  如果@var{element}已有一个，则其数字顺序保持不变；否则，@var{element} 没有数字顺序。  没有数字列表顺序的元素被放置在列表的末尾，没有特定的顺序。
+
+@var{order} 的任何其他值都会删除 @var{element} 的数字顺序（如果已存在）；否则，它相当于@code{nil}。
+
+参数 @var{symbol} 没有被隐式引用； @code{add-to-ordered-list} 是一个普通函数，与 @code{set} 类似，但与 @code{setq} 不同。  如有必要，请自行引用论点。
+
+排序信息存储在 @var{symbol} 的 @code{list-order} 属性上的哈希表中。 @var{symbol} 不能引用词法变量。
+@end defun
+
+以下场景展示了如何使用 @code{add-to-ordered-list}：
+
+@example
+(setq foo '())
+     @result{} nil
+
+(add-to-ordered-list 'foo 'a 1)     ;; @r{Add @code{a}.}
+     @result{} (a)
+
+(add-to-ordered-list 'foo 'c 3)     ;; @r{Add @code{c}.}
+     @result{} (a c)
+
+(add-to-ordered-list 'foo 'b 2)     ;; @r{Add @code{b}.}
+     @result{} (a b c)
+
+(add-to-ordered-list 'foo 'b 4)     ;; @r{Move @code{b}.}
+     @result{} (a c b)
+
+(add-to-ordered-list 'foo 'd)       ;; @r{Append @code{d}.}
+     @result{} (a c b d)
+
+(add-to-ordered-list 'foo 'e)       ;; @r{Add @code{e}}.
+     @result{} (a c b e d)
+
+foo                       ;; @r{@code{foo} was changed.}
+     @result{} (a c b e d)
+@end example
+
+@node Modifying Lists
+@section 修改现有列表结构
+@cindex destructive list operations
+@cindex mutable lists
+
+您可以使用基元 @code{setcar} 和 @code{setcdr} 修改 cons 单元的 @sc{car} 和 @sc{cdr} 内容。  这些是破坏性操作，因为它们改变了现有的列表结构。破坏性操作只能应用于可变列表，即通过 @code{cons}、@code{list} 或类似操作构造的列表。  通过引用创建的列表是程序的一部分，不应通过破坏性操作进行更改。  @xref{Mutability}。
+
+@cindex CL note---@code{rplaca} vs @code{setcar}
+@quotation
+@findex rplaca
+@findex rplacd
+@b{Common Lisp note:} Common Lisp 使用函数 @code{rplaca} 和 @code{rplacd} 来改变列表结构；它们以与 @code{setcar} 和 @code{setcdr} 相同的方式改变结构，但是 Common Lisp 函数返回 cons 单元，而 @code{setcar} 和 @code{setcdr} 返回新的 @sc{car} 或 @sc{cdr}。
+@end quotation
+
+@menu
+* Setcar::           替换列表中的元素。
+* Setcdr::           替换部分列表主干。这可用于删除或添加元素。
+* Rearrangement::    对列表中的元素重新排序；组合列表。
+@end menu
+
+@node Setcar
+@subsection 使用 @code{setcar} 更改列表元素
+@cindex replace list element
+@cindex list, replace element
+
+更改 cons 单元的 @sc{car} 是通过 @code{setcar} 完成的。  当在列表上使用时，@code{setcar} 将列表中的一个元素替换为不同的元素。
+
+@defun setcar cons object
+该函数将@var{object}存储为@var{cons}的新@sc{car}，替换其之前的@sc{car}。  换句话说，它将 @var{cons} 的 @sc{car} 槽更改为引用 @var{object}。  它返回值@var{object}。  例如：
+
+@example
+@group
+(setq x (list 1 2))
+     @result{} (1 2)
+@end group
+@group
+(setcar x 4)
+     @result{} 4
+@end group
+@group
+x
+     @result{} (4 2)
+@end group
+@end example
+@end defun
+
+当 cons 单元是多个列表的共享结构的一部分时，将新的 @sc{car} 存储到 cons 中会更改每个列表的一个元素。  这是一个例子：
+
+@example
+@group
+;; @r{Create two lists that are partly shared.}
+(setq x1 (list 'a 'b 'c))
+     @result{} (a b c)
+(setq x2 (cons 'z (cdr x1)))
+     @result{} (z b c)
+@end group
+
+@group
+;; @r{Replace the @sc{car} of a shared link.}
+(setcar (cdr x1) 'foo)
+     @result{} foo
+x1                           ; @r{Both lists are changed.}
+     @result{} (a foo c)
+x2
+     @result{} (z foo c)
+@end group
+
+@group
+;; @r{Replace the @sc{car} of a link that is not shared.}
+(setcar x1 'baz)
+     @result{} baz
+x1                           ; @r{Only one list is changed.}
+     @result{} (baz foo c)
+x2
+     @result{} (z foo c)
+@end group
+@end example
+
+下面是变量 @code{x1} 和 @code{x2} 中两个列表的共享结构的图形描述，说明了为什么替换 @code{b} 会改变它们：
+
+@example
+@group
+        --- ---        --- ---      --- ---
+x1---> |   |   |----> |   |   |--> |   |   |--> nil
+        --- ---        --- ---      --- ---
+         |        -->   |            |
+         |       |      |            |
+          --> a  |       --> b        --> c
+                 |
+       --- ---   |
+x2--> |   |   |--
+       --- ---
+        |
+        |
+         --> z
+@end group
+@end example
+
+这是箱线图的另一种形式，显示了相同的关系：
+
+@example
+@group
+x1:
+ --------------       --------------       --------------
+| car   | cdr  |     | car   | cdr  |     | car   | cdr  |
+|   a   |   o------->|   b   |   o------->|   c   |  nil |
+|       |      |  -->|       |      |     |       |      |
+ --------------  |    --------------       --------------
+                 |
+x2:              |
+ --------------  |
+| car   | cdr  | |
+|   z   |   o----
+|       |      |
+ --------------
+@end group
+@end example
+
+@node Setcdr
+@subsection 更改列表的 CDR
+@cindex replace part of list
+
+用于修改 @sc{cdr} 的最低级别原语是 @code{setcdr}：
+
+@defun setcdr cons object
+该函数将@var{object}存储为@var{cons}的新@sc{cdr}，替换其之前的@sc{cdr}。  换句话说，它将 @var{cons} 的 @sc{cdr} 槽更改为引用 @var{object}。  它返回值@var{object}。
+@end defun
+
+下面是用另一个列表替换列表的 @sc{cdr} 的示例。  除了列表的第一个元素之外的所有元素都被删除，以支持不同的元素序列。  第一个元素保持不变，因为它位于列表的 @sc{car} 中，并且不能通过 @sc{cdr} 到达。
+
+@example
+@group
+(setq x (list 1 2 3))
+     @result{} (1 2 3)
+@end group
+@group
+(setcdr x '(4))
+     @result{} (4)
+@end group
+@group
+x
+     @result{} (1 4)
+@end group
+@end example
+
+您可以通过更改列表中 cons 单元格的 @sc{cdr} 来删除列表中间的元素。  例如，这里我们通过更改第一个 cons 单元格的 @sc{cdr} 来从列表 @code{(a b c)} 中删除第二个元素 @code{b}：
+
+@example
+@group
+(setq x1 (list 'a 'b 'c))
+     @result{} (a b c)
+(setcdr x1 (cdr (cdr x1)))
+     @result{} (c)
+x1
+     @result{} (a c)
+@end group
+@end example
+
+以下是用方框表示的结果：
+
+@smallexample
+@group
+                   --------------------
+                  |                    |
+ --------------   |   --------------   |    --------------
+| car   | cdr  |  |  | car   | cdr  |   -->| car   | cdr  |
+|   a   |   o-----   |   b   |   o-------->|   c   |  nil |
+|       |      |     |       |      |      |       |      |
+ --------------       --------------        --------------
+@end group
+@end smallexample
+
+@noindent
+之前保存元素 @code{b} 的第二个 cons 单元仍然存在，其 @sc{car} 仍然是 @code{b}，但它不再构成此列表的一部分。
+
+通过更改 @sc{cdr}s 插入新元素同样容易：
+
+@example
+@group
+(setq x1 (list 'a 'b 'c))
+     @result{} (a b c)
+(setcdr x1 (cons 'd (cdr x1)))
+     @result{} (d b c)
+x1
+     @result{} (a d b c)
+@end group
+@end example
+
+这是用方框表示法表示的结果：
+
+@smallexample
+@group
+ --------------        -------------       -------------
+| car  | cdr   |      | car  | cdr  |     | car  | cdr  |
+|   a  |   o   |   -->|   b  |   o------->|   c  |  nil |
+|      |   |   |  |   |      |      |     |      |      |
+ --------- | --   |    -------------       -------------
+           |      |
+     -----         --------
+    |                      |
+    |    ---------------   |
+    |   | car   | cdr   |  |
+     -->|   d   |   o------
+        |       |       |
+         ---------------
+@end group
+@end smallexample
+
+@node Rearrangement
+@subsection 重新排列列表的函数
+@cindex rearrangement of lists
+@cindex reordering, of elements in lists
+@cindex modification of lists
+
+以下是一些通过修改其组件 cons 单元格的 @sc{cdr} 来破坏性地重新排列列表的函数。  这些函数具有破坏性，因为它们会破坏作为参数传递给它们的原始列表，重新链接它们的 cons 单元格以形成作为返回值的新列表。
+
+@ifnottex
+  See @code{delq}, in @ref{Sets And Lists}, for another function
+that modifies cons cells.
+@end ifnottex
+@iftex
+   The function @code{delq} in the following section is another example
+of destructive list manipulation.
+@end iftex
+
+@defun nconc &rest lists
+@cindex concatenating lists
+@cindex joining lists
+该函数返回一个包含 @var{lists} 的所有元素的列表。与@code{append} (@pxref{Building Lists}) 不同，@var{lists} 被复制为@emph{not}。  相反，每个 @var{lists} 的最后一个 @sc{cdr} 更改为引用以下列表。  @var{lists} 的最后一个没有改变。  例如：
+
+@example
+@group
+(setq x (list 1 2 3))
+     @result{} (1 2 3)
+@end group
+@group
+(nconc x '(4 5))
+     @result{} (1 2 3 4 5)
+@end group
+@group
+x
+     @result{} (1 2 3 4 5)
+@end group
+@end example
+
+由于@code{nconc}的最后一个参数本身没有被修改，因此使用常量列表是合理的，例如@code{'(4 5)}，如上例所示。  出于同样的原因，最后一个参数不必是列表：
+
+@example
+@group
+(setq x (list 1 2 3))
+     @result{} (1 2 3)
+@end group
+@group
+(nconc x 'z)
+     @result{} (1 2 3 . z)
+@end group
+@group
+x
+     @result{} (1 2 3 . z)
+@end group
+@end example
+
+但是，其他参数（除了最后一个之外的所有参数）应该是可变列表。  它们可以是点列表，最后一个 @sc{cdr} 被下一个参数替换：
+
+@example
+@group
+(nconc (cons 1 2) (cons 3 (cons 4 5)) 'z)
+     @result{} (1 3 4 . z)
+@end group
+@end example
+
+一个常见的陷阱是使用常量列表作为 @code{nconc} 的非最后一个参数。  如果这样做，结果行为是未定义的 (@pxref{Self-Evaluating Forms})。  您的程序可能会在每次运行时发生变化！  以下是可能发生的情况（尽管不能保证会发生）：
+
+@smallexample
+@group
+(defun add-foo (x)            ; @r{We want this function to add}
+  (nconc '(foo) x))           ;   @r{@code{foo} to the front of its arg.}
+@end group
+
+@group
+(symbol-function 'add-foo)
+     @result{} #f(lambda (x) [t] (nconc '(foo) x))
+@end group
+
+@group
+(setq xx (add-foo '(1 2)))    ; @r{It seems to work.}
+     @result{} (foo 1 2)
+@end group
+@group
+(setq xy (add-foo '(3 4)))    ; @r{What happened?}
+     @result{} (foo 1 2 3 4)
+@end group
+@group
+(eq xx xy)
+     @result{} t
+@end group
+
+@group
+(symbol-function 'add-foo)
+     @result{} #f(lambda (x) [t] (nconc '(foo 1 2 3 4) x))
+@end group
+@end smallexample
+@end defun
+
+@node Sets And Lists
+@section 使用列表作为集合
+@cindex lists as sets
+@cindex sets
+
+列表可以表示无序的数学集合——如果某个值出现在列表中，则只需将其视为集合的元素，并忽略列表的顺序。  要形成两个集合的并集，请使用 @code{append} （只要您不介意有重复元素）。  您可以使用 @code{delete-dups} 或 @code{seq-uniq} 删除 @code{equal} 重复项。其他有用的集合函数包括 @code{memq} 和 @code{delq}，以及它们的 @code{equal} 版本，@code{member} 和 @code{delete}。
+
+@cindex CL note---lack @code{union}, @code{intersection}
+@quotation
+@b{Common Lisp note:} Common Lisp 具有用于集合操作的函数@code{union}（避免重复元素）和@code{intersection}。在 Emacs Lisp 中，这些工具的变体由 @file{cl-lib} 库提供。  @xref{Lists as Sets,,,cl,Common Lisp Extensions}。
+@end quotation
+
+@defun memq object list
+@cindex membership in a list
+该函数测试@var{object}是否是@var{list}的成员。  如果是，@code{memq} 返回从第一次出现 @var{object} 开始的列表。  否则，它返回@code{nil}。 @code{memq}中的字母@samp{q}表示它使用@code{eq}来将@var{object}与列表中的元素进行比较。  例如：
+
+@example
+@group
+(memq 'b '(a b c b a))
+     @result{} (b c b a)
+@end group
+@group
+(memq '(2) '((1) (2)))    ; @r{The two @code{(2)}s need not be @code{eq}.}
+     @result{} @r{Unspecified; might be @code{nil} or @code{((2))}.}
+@end group
+@end example
+@end defun
+
+@defun delq object list
+@cindex deleting list elements
+该函数破坏性地删除@var{list}中的所有元素@code{eq}到@var{object}，并返回结果列表。  @code{delq}中的字母@samp{q}表示它使用@code{eq}将@var{object}与列表中的元素进行比较，如@code{memq}和@code{remq}。
+
+通常，当您调用 @code{delq} 时，您应该通过将返回值分配给保存原始列表的变量来使用它。下面解释其原因。
+@end defun
+
+@code{delq} 函数通过简单地向下推进列表并返回在这些元素之后开始的子列表来删除列表前面的元素。  例如：
+
+@example
+@group
+(delq 'a '(a b c)) @equiv{} (cdr '(a b c))
+@end group
+@end example
+
+@noindent
+当要删除的元素出现在列表中间时，删除它涉及到更改@sc{cdr} (@pxref{Setcdr})。
+
+@example
+@group
+(setq sample-list (list 'a 'b 'c '(4)))
+     @result{} (a b c (4))
+@end group
+@group
+(delq 'a sample-list)
+     @result{} (b c (4))
+@end group
+@group
+sample-list
+     @result{} (a b c (4))
+@end group
+@group
+(delq 'c sample-list)
+     @result{} (a b (4))
+@end group
+@group
+sample-list
+     @result{} (a b (4))
+@end group
+@end example
+
+请注意，@code{(delq 'c sample-list)}修改@code{sample-list}以拼接出第三个元素，但@code{(delq 'a sample-list)}不拼接任何内容——它只是返回一个较短的列表。  不要假设以前保存参数 @var{list} 的变量现在元素较少，或者它仍然保存原始列表！  相反，保存 @code{delq} 的结果并使用它。  大多数情况下，我们将结果存储回保存原始列表的变量中：
+
+@example
+(setq flowers (delq 'rose flowers))
+@end example
+
+在以下示例中，@code{delq}尝试匹配的@code{(list 4)}和@code{sample-list}中的@code{(4)}是@code{equal}，而不是@code{eq}：
+
+@example
+@group
+(delq (list 4) sample-list)
+     @result{} (a c (4))
+@end group
+@end example
+
+如果要删除 @code{equal} 为给定值的元素，请使用 @code{delete}（见下文）。
+
+@defun remq object list
+该函数返回@var{list}的副本，其中删除了@code{eq}到@var{object}的所有元素。  @code{remq}中的字母@samp{q}表示它使用@code{eq}来将@var{object}与@code{list}的元素进行比较。
+
+@example
+@group
+(setq sample-list (list 'a 'b 'c 'a 'b 'c))
+     @result{} (a b c a b c)
+@end group
+@group
+(remq 'a sample-list)
+     @result{} (b c b c)
+@end group
+@group
+sample-list
+     @result{} (a b c a b c)
+@end group
+@end example
+@end defun
+
+@defun memql object list
+函数@code{memql}测试@var{object}是否是@var{list}的成员，使用@code{eql}将成员与@var{object}进行比较，因此浮点元素是按值进行比较的。如果@var{object}是成员，@code{memql}返回一个列表，从它在@var{list}中第一次出现开始。  否则，它返回@code{nil}。
+
+与 @code{memq} 比较：
+
+@example
+@group
+(memql 1.2 '(1.1 1.2 1.3))  ; @r{@code{1.2} and @code{1.2} are @code{eql}.}
+     @result{} (1.2 1.3)
+@end group
+@group
+(memq 1.2 '(1.1 1.2 1.3))  ; @r{The two @code{1.2}s need not be @code{eq}.}
+     @result{} @r{Unspecified; might be @code{nil} or @code{(1.2 1.3)}.}
+@end group
+@end example
+@end defun
+
+以下三个函数类似于@code{memq}、@code{delq}和@code{remq}，但使用@code{equal}而不是@code{eq}来比较元素。  @xref{Equality Predicates}。
+
+@defun member object list
+函数@code{member}测试@var{object}是否是@var{list}的成员，并使用@code{equal}将成员与@var{object}进行比较。如果@var{object}是成员，@code{member}返回一个列表，从它在@var{list}中第一次出现开始。  否则，它返回@code{nil}。
+
+与 @code{memq} 比较：
+
+@example
+@group
+(member '(2) '((1) (2)))  ; @r{@code{(2)} and @code{(2)} are @code{equal}.}
+     @result{} ((2))
+@end group
+@group
+(memq '(2) '((1) (2)))    ; @r{The two @code{(2)}s need not be @code{eq}.}
+     @result{} @r{Unspecified; might be @code{nil} or @code{(2)}.}
+@end group
+@group
+;; @r{Two strings with the same contents are @code{equal}.}
+(member "foo" '("foo" "bar"))
+     @result{} ("foo" "bar")
+@end group
+@end example
+@end defun
+
+@defun delete object sequence
+该函数从@var{sequence}中删除@code{equal}到@var{object}的所有元素，并返回结果序列。
+
+如果@var{sequence}是一个列表，@code{delete}与@code{delq}的关系就像@code{member}与@code{memq}的关系一样：它使用@code{equal}与@var{object}比较元素，如@code{member}；当它找到匹配的元素时，它会像 @code{delq} 一样删除该元素。  与 9⁣ 一样，您通常应该通过将返回值分配给保存原始列表的变量来使用它。
+
+如果@code{sequence}是向量或字符串，则@code{delete}返回@code{sequence}的副本，其中删除了@code{equal}到@code{object}的所有元素。
+
+例如：
+
+@example
+@group
+(setq l (list '(2) '(1) '(2)))
+(delete '(2) l)
+     @result{} ((1))
+l
+     @result{} ((2) (1))
+;; @r{If you want to change @code{l} reliably,}
+;; @r{write @code{(setq l (delete '(2) l))}.}
+@end group
+@group
+(setq l (list '(2) '(1) '(2)))
+(delete '(1) l)
+     @result{} ((2) (2))
+l
+     @result{} ((2) (2))
+;; @r{In this case, it makes no difference whether you set @code{l},}
+;; @r{but you should do so for the sake of the other case.}
+@end group
+@group
+(delete '(2) [(2) (1) (2)])
+     @result{} [(1)]
+@end group
+@end example
+@end defun
+
+@defun remove object sequence
+该函数是 @code{delete} 的非破坏性对应函数。  它返回 @code{sequence} 的副本、列表、向量或字符串，其中删除了元素 @code{equal} 到 @code{object}。  例如：
+
+@example
+@group
+(remove '(2) '((2) (1) (2)))
+     @result{} ((1))
+@end group
+@group
+(remove '(2) [(2) (1) (2)])
+     @result{} [(1)]
+@end group
+@end example
+@end defun
+
+@quotation
+@b{Common Lisp note:} GNU Emacs Lisp 中的函数 @code{member}、@code{delete} 和 @code{remove} 源自 Maclisp，而不是 Common Lisp。  Common Lisp 版本不使用 @code{equal} 来比较元素。
+@end quotation
+
+@defun member-ignore-case object list
+此函数类似于 @code{member}，不同之处在于 @var{object} 应该是一个字符串，并且它忽略字母大小写和文本表示的差异：大写和小写字母被视为相等，并且在比较之前将单字节字符串转换为多字节。
+@end defun
+
+@defun delete-dups list
+该函数破坏性地删除 @var{list} 中的所有 @code{equal} 重复项，将结果存储在 @var{list} 中并返回它。  在 @var{list} 中某个元素出现了几次 @code{equal} 中，@code{delete-dups} 保留第一个。  有关非破坏性操作，请参阅@code{seq-uniq} (@pxref{Sequence Functions})。
+@end defun
+
+另请参阅 @ref{List Variables} 中的函数 @code{add-to-list}，了解将元素添加到存储在变量中并用作集合的列表的方法。
+
+@node Association Lists
+@section 协会名单
+@cindex association list
+@cindex alist
+
+@dfn{association list}，简称为@dfn{alist}，记录从键到值的映射。  它是一个称为@dfn{associations}的cons单元列表：每个cons单元的@sc{car}是@dfn{key}，@sc{cdr}是@dfn{associated value}。@footnote{This usage of ``key'' is not related to the term ``key sequence''; it means a value used to look up an item in a table.  In this case, the table is the alist, and the alist associations are the items.}
+
+这是一个 alist 的例子。  键 @code{pine} 与值 @code{cones} 相关联；键 @code{oak} 与 @code{acorns} 相关联；键 @code{maple} 与 @code{seeds} 相关联。
+
+@example
+@group
+((pine . cones)
+ (oak . acorns)
+ (maple . seeds))
+@end group
+@end example
+
+alist 中的值和键都可以是任何 Lisp 对象。例如，在以下 alist 中，符号 @code{a} 与数字 @code{1} 关联，字符串 @code{"b"} 与 @emph{list} @code{(2 3)} 关联，即 alist 元素的 @sc{cdr}：
+
+@example
+((a . 1) ("b" 2 3))
+@end example
+
+有时，最好设计一个 alist 将关联值存储在元素的 @sc{cdr} 的 @sc{car} 中。  以下是此类列表的示例：
+
+@example
+((rose red) (lily white) (buttercup yellow))
+@end example
+
+@noindent
+这里我们将@code{red}视为与@code{rose}相关的值。  这种列表的优点之一是您可以在 @sc{cdr} 的 @sc{cdr} 中存储其他相关信息，甚至是其他项目的列表。  一个缺点是您无法使用@code{rassq}（见下文）来查找包含给定值的元素。  当这些考虑因素都不重要时，选择就是一个品味问题，只要您对任何给定的列表保持一致即可。
+
+上面显示的相同列表可以被视为在元素的 @sc{cdr} 中具有关联值；与 @code{rose} 关联的值将是列表 @code{(red)}。
+
+关联列表通常用于记录可能保留在堆栈中的信息，因为可以轻松地将新关联添加到列表的前面。  当在关联列表中搜索与给定键的关联时，如果存在多个关联，则返回找到的第一个关联。
+
+在 Emacs Lisp 中，如果关联列表的元素不是 cons 单元，则 @emph{not} 是一个错误。  alist 搜索函数只是忽略这些元素。  许多其他版本的 Lisp 在这种情况下都会发出错误信号。
+
+请注意，属性列表在几个方面与关联列表类似。  属性列表的行为类似于关联列表，其中每个键只能出现一次。  @xref{Property Lists}，用于属性列表和关联列表的比较。
+
+@defun assoc key alist &optional testfn
+该函数返回@var{alist}中@var{key}的第一个关联，如果@var{key}是函数，则使用@var{testfn}与alist元素进行比较，否则使用@code{equal}（@pxref{Equality Predicates}）。  如果 @var{testfn} 是一个函数，则使用两个参数调用它：@var{alist} 和 @var{key} 中的元素的 @sc{car}。  如果@var{alist}中没有关联的@sc{car}等于@var{key}（经@var{testfn}测试），则该函数返回@code{nil}。  例如：
+
+@smallexample
+(setq trees '((pine . cones) (oak . acorns) (maple . seeds)))
+     @result{} ((pine . cones) (oak . acorns) (maple . seeds))
+(assoc 'oak trees)
+     @result{} (oak . acorns)
+(cdr (assoc 'oak trees))
+     @result{} acorns
+(assoc 'birch trees)
+     @result{} nil
+@end smallexample
+
+这是另一个示例，其中键和值不是符号：
+
+@smallexample
+(setq needles-per-cluster
+      '((2 "Austrian Pine" "Red Pine")
+        (3 "Pitch Pine")
+        (5 "White Pine")))
+
+(cdr (assoc 3 needles-per-cluster))
+     @result{} ("Pitch Pine")
+(cdr (assoc 2 needles-per-cluster))
+     @result{} ("Austrian Pine" "Red Pine")
+@end smallexample
+@end defun
+
+函数 @code{assoc-string} 与 @code{assoc} 很相似，只是它忽略了字符串之间的某些差异。  @xref{Text Comparison}。
+
+@defun rassoc value alist
+该函数返回 @var{alist} 中与值 @var{value} 的第一个关联。  如果 @var{alist} 中不存在 @sc{cdr} @code{equal} 到 @var{value} 的关联，则返回 @code{nil}。
+
+@code{rassoc} 类似于 @code{assoc}，只不过它比较每个 @var{alist} 关联的 @sc{cdr} 而不是 @sc{car}。  您可以将其视为反向@code{assoc}，查找给定值的键。
+@end defun
+
+@defun assq key alist
+该函数与 @code{assoc} 类似，它返回 @var{alist} 中 @var{key} 的第一个关联，但它使用 @code{eq} 进行比较。  如果@var{alist}中没有@sc{car}@code{eq}到@var{key}的关联，则@code{assq}返回@code{nil}。  该函数比 10 更常用，因为 11 比 12 更快，并且大多数 alist 使用符号作为键。  @xref{Equality Predicates}。
+
+@smallexample
+(setq trees '((pine . cones) (oak . acorns) (maple . seeds)))
+     @result{} ((pine . cones) (oak . acorns) (maple . seeds))
+(assq 'pine trees)
+     @result{} (pine . cones)
+@end smallexample
+
+另一方面， @code{assq} 在键可能不是符号的列表中通常没有用：
+
+@smallexample
+(setq leaves
+      '(("simple leaves" . oak)
+        ("compound leaves" . horsechestnut)))
+
+(assq "simple leaves" leaves)
+     @result{} @r{Unspecified; might be @code{nil} or @code{("simple leaves" . oak)}.}
+(assoc "simple leaves" leaves)
+     @result{} ("simple leaves" . oak)
+@end smallexample
+@end defun
+
+@defun alist-get key alist &optional default remove testfn
+该函数与@code{assq}类似。  它通过将 @var{key} 与 @var{alist} 元素进行比较来找到第一个关联 @w{@code{(@var{key} . @var{value})}}，如果找到，则返回该关联的 @var{value}。  如果未找到关联，该函数将返回 @var{default}。  @var{key} 与 @var{alist} 元素的比较使用 @var{testfn} 指定的函数，默认为 @code{eq}。
+
+这是一个广义变量 (@pxref{Generalized Variables})，可用于通过 @code{setf} 更改值。  当使用它来设置值时，可选参数@var{remove}非@code{nil}意味着如果新值是@code{eql}到@var{default}，则从@var{alist}中删除@var{key}的关联。
+@end defun
+
+@defun rassq value alist
+该函数返回 @var{alist} 中与值 @var{value} 的第一个关联。  如果 @var{alist} 中不存在 @sc{cdr} @code{eq} 到 @var{value} 的关联，则返回 @code{nil}。
+
+@code{rassq} 类似于 @code{assq}，只不过它比较每个 @var{alist} 关联的 @sc{cdr} 而不是 @sc{car}。  您可以将其视为反向@code{assq}，查找给定值的键。
+
+例如：
+
+@smallexample
+(setq trees '((pine . cones) (oak . acorns) (maple . seeds)))
+
+(rassq 'acorns trees)
+     @result{} (oak . acorns)
+(rassq 'spores trees)
+     @result{} nil
+@end smallexample
+
+@code{rassq} 无法搜索存储在元素的 @sc{cdr} 的 @sc{car} 中的值：
+
+@smallexample
+(setq colors '((rose red) (lily white) (buttercup yellow)))
+
+(rassq 'white colors)
+     @result{} nil
+@end smallexample
+
+在这种情况下，关联@code{(lily white)}的@sc{cdr}不是符号@code{white}，而是列表@code{(white)}。  如果关联以点对符号书写，这一点会变得更清楚：
+
+@smallexample
+(lily white) @equiv{} (lily . (white))
+@end smallexample
+@end defun
+
+@defun assoc-default key alist &optional test default
+该函数在 @var{alist} 中搜索 @var{key} 的匹配项。  对于@var{alist}的每个元素，它通过使用两个参数调用@var{test}：元素或其@sc{car}和@var{key}，将该元素（如果它是原子）或元素的@sc{car}（如果它是cons）与@var{key}进行比较。  参数按该顺序传递，以便您可以使用 @code{string-match} 和包含正则表达式 (@pxref{Regexp Search}) 的列表来获得有用的结果。  如果省略@var{test}或@code{nil}，则使用@code{equal}进行比较。
+
+如果 alist 元素通过此条件匹配 @var{key}，则 @code{assoc-default} 返回基于此元素的值。如果该元素是 cons，则该值为该元素的 @sc{cdr}。否则，返回值为@var{default}。
+
+如果没有 alist 元素匹配 @var{key}，则 @code{assoc-default} 返回 @code{nil}。
+@end defun
+
+@defun copy-alist alist
+@cindex copying alists
+此函数返回 @var{alist} 的两级深层副本：它为每个关联创建一个新副本，以便您可以在不更改旧列表的情况下更改新列表的关联。
+
+@smallexample
+@group
+(setq needles-per-cluster
+      '((2 . ("Austrian Pine" "Red Pine"))
+        (3 . ("Pitch Pine"))
+@end group
+        (5 . ("White Pine"))))
+@result{}
+((2 "Austrian Pine" "Red Pine")
+ (3 "Pitch Pine")
+ (5 "White Pine"))
+
+(setq copy (copy-alist needles-per-cluster))
+@result{}
+((2 "Austrian Pine" "Red Pine")
+ (3 "Pitch Pine")
+ (5 "White Pine"))
+
+(eq needles-per-cluster copy)
+     @result{} nil
+(equal needles-per-cluster copy)
+     @result{} t
+(eq (car needles-per-cluster) (car copy))
+     @result{} nil
+(cdr (car (cdr needles-per-cluster)))
+     @result{} ("Pitch Pine")
+@group
+(eq (cdr (car (cdr needles-per-cluster)))
+    (cdr (car (cdr copy))))
+     @result{} t
+@end group
+@end smallexample
+
+此示例展示了 @code{copy-alist} 如何能够更改一个副本的关联而不影响另一个副本：
+
+@smallexample
+@group
+(setcdr (assq 3 copy) '("Martian Vacuum Pine"))
+(cdr (assq 3 needles-per-cluster))
+     @result{} ("Pitch Pine")
+@end group
+@end smallexample
+@end defun
+
+@defun assq-delete-all key alist
+该函数从 @var{alist} 中删除 @sc{car} 为 @code{eq} 到 @var{key} 的所有元素，就像使用 @code{delq} 逐一删除每个这样的元素一样。  它返回缩短的列表，并且经常修改@var{alist}的原始列表结构。  为了获得正确的结果，请使用 @code{assq-delete-all} 的返回值，而不是查看 @var{alist} 的保存值。
+
+@example
+(setq alist (list '(foo 1) '(bar 2) '(foo 3) '(lose 4)))
+     @result{} ((foo 1) (bar 2) (foo 3) (lose 4))
+(assq-delete-all 'foo alist)
+     @result{} ((bar 2) (lose 4))
+alist
+     @result{} ((foo 1) (bar 2) (lose 4))
+@end example
+@end defun
+
+@defun assoc-delete-all key alist &optional test
+该函数与 @code{assq-delete-all} 类似，只不过它接受可选参数 @var{test}，这是一个用于比较 @var{alist} 中的键的谓词函数。  如果省略或@code{nil}，则@var{test}默认为@code{equal}。  与@code{assq-delete-all}一样，该函数经常修改@var{alist}的原始列表结构。
+@end defun
+
+@defun rassq-delete-all value alist
+该函数从@var{alist}删除@sc{cdr}为@code{eq}到@var{value}的所有元素。  它返回缩短的列表，并且经常修改@var{alist}的原始列表结构。 @code{rassq-delete-all} 类似于 @code{assq-delete-all}，只不过它比较每个 @var{alist} 关联的 @sc{cdr} 而不是 @sc{car}。
+@end defun
+
+@defmac let-alist alist body
+为用作关联列表@var{alist}键的每个符号创建一个绑定，以点为前缀。  当访问同一关联列表中的多个项目时，这可能很有用，并且可以通过一个简单的示例来最好地理解：
+
+@lisp
+(setq colors '((rose . red) (lily . white) (buttercup . yellow)))
+(let-alist colors
+  (if (eq .rose 'red)
+      .lily))
+     @result{} white
+@end lisp
+
+宏扩展期间会检查 @var{body}，并且将绑定在 @var{body} 中字面出现且以 @samp{.} 作为符号名称中第一个字符的符号。  查找键是通过 @code{assq} 完成的，并且此 @code{assq} 返回值的 @code{cdr} 被指定为绑定的值。  生成的代码在 @var{body} 的任何其他部分之前执行所有 @var{alist} 查找，因此出现在正文中任何位置的符号 @code{.foo} 将被查找（使用键 @code{foo}）并绑定，无论它是否在运行时在 @var{body} 中实际使用。
+
+支持嵌套关联列表：
+
+@lisp
+(setq colors '((rose . red) (lily (belladonna . yellow) (brindisi . pink))))
+(let-alist colors
+  (if (eq .rose 'red)
+      .lily.belladonna))
+     @result{} yellow
+@end lisp
+
+允许 @code{let-alist} 相互嵌套，但内部 @code{let-alist} 中的代码无法访问外部 @code{let-alist} 绑定的变量。
+
+还支持对列表进行索引：
+
+@lisp
+(setq colors '((rose . red) (lily . (yellow pink))))
+(let-alist colors .lily.1)
+     @result{} pink
+@end lisp
+
+请注意，像 @samp{.0} 或 @samp{.3} 这样的形式被解释为数字而不是符号，因此它们不会绑定到 @var{alist} 中的相应值。
+
+@end defmac
+
+@node Property Lists
+@section 房产清单
+@cindex property list
+@cindex plist
+
+@dfn{property list}（简称@dfn{plist}）是成对元素的列表。  每对都将属性名称（通常是符号）与属性或值相关联。  以下是属性列表的示例：
+
+@example
+(pine cones numbers (1 2 3) color "blue")
+@end example
+
+@noindent
+此属性列表将 @code{pine} 与 @code{cones} 关联、@code{numbers} 与 @code{(1 2 3)} 关联、以及 @code{color} 与 @code{"blue"} 关联。  属性名称和值可以是任何 Lisp 对象，但名称通常是符号（如本例所示）。
+
+属性列表在多种情况下使用。  例如，函数 @code{put-text-property} 接受一个属性列表参数，指定要应用于字符串或缓冲区中文本的文本属性和关联值。  @xref{Text Properties}。
+
+属性列表的另一个重要用途是存储符号属性。  每个符号都拥有一个属性列表，用于记录有关该符号的各种信息；这些属性以属性列表的形式存储。  @xref{Symbol Properties}。
+
+@defun plistp object
+如果 @var{object} 是有效的属性列表，则该谓词函数返回非 @code{nil}。
+@end defun
+
+@menu
+* Plists and Alists::            属性列表和关联列表的优点比较。
+* Plist Access::                 访问存储在其他地方的属性列表。
+@end menu
+
+@node Plists and Alists
+@subsection 属性列表和关联列表
+@cindex plist vs.@: alist
+@cindex alist vs.@: plist
+
+@cindex property lists vs association lists
+关联列表 (@pxref{Association Lists}) 与属性列表非常相似。  与关联列表相比，属性列表中的对的顺序并不重要，因为属性名称必须不同。
+
+对于将信息附加到各种 Lisp 函数名称或变量，属性列表比关联列表更好。  如果您的程序将所有此类信息保存在一个关联列表中，则每次检查特定 Lisp 函数名称或变量的关联时，通常都需要搜索整个列表，这可能会很慢。  相比之下，如果在函数名称或变量本身的属性列表中保留相同的信息，则每次搜索将仅扫描一个属性列表的长度，该长度通常很短。  这就是变量的文档记录在名为 @code{variable-documentation} 的属性中的原因。  字节编译器同样使用属性来记录那些需要特殊处理的函数。
+
+然而，关联列表有其自身的优点。  根据您的应用程序，将关联添加到关联列表的前面可能比更新属性更快。  符号的所有属性都存储在同一属性列表中，因此属性名称的不同用途之间可能会发生冲突。  （出于这个原因，最好选择可能唯一的属性名称，例如以程序通常的变量和函数名称前缀开头属性名称。）关联列表可以像堆栈一样使用，其中关联被推到列表的前面，然后被丢弃；这对于属性列表来说是不可能的。
+
+@node Plist Access
+@subsection 符号外的属性列表
+@cindex plist access
+@cindex accessing plist properties
+
+以下函数可用于操作属性列表。它们都默认使用 @code{eq} 来比较属性名称。
+
+@defun plist-get plist property &optional predicate
+这将返回存储在属性列表 @var{plist} 中的 @var{property} 属性的值。  使用 @var{predicate} 进行比较，默认为 @code{eq}。  它接受格式错误的 @var{plist} 参数。  如果在@var{plist}中没有找到@var{property}，则返回@code{nil}。  例如，
+
+@example
+(plist-get '(foo 4) 'foo)
+     @result{} 4
+(plist-get '(foo 4 bad) 'foo)
+     @result{} 4
+(plist-get '(foo 4 bad) 'bad)
+     @result{} nil
+(plist-get '(foo 4 bad) 'bar)
+     @result{} nil
+@end example
+@end defun
+
+@defun plist-put plist property value &optional predicate
+这会将 @var{value} 存储为属性列表 @var{plist} 中 @var{property} 属性的值。  使用 @var{predicate} 进行比较，默认为 @code{eq}。  它可能会破坏性地修改@var{plist}，或者它可能会构造一个新的列表结构而不改变旧的。  该函数返回修改后的属性列表，因此您可以将其存储回您获得 @var{plist} 的位置。  例如，
+
+@example
+(setq my-plist (list 'bar t 'foo 4))
+     @result{} (bar t foo 4)
+(setq my-plist (plist-put my-plist 'foo 69))
+     @result{} (bar t foo 69)
+(setq my-plist (plist-put my-plist 'quux '(a)))
+     @result{} (bar t foo 69 quux (a))
+@end example
+@end defun
+
+@defun lax-plist-get plist property
+这个过时的函数类似于 @code{plist-get}，只不过它使用 @code{equal} 而不是 @code{eq} 来比较属性。
+@end defun
+
+@defun lax-plist-put plist property value
+这个过时的函数类似于 @code{plist-put}，只不过它使用 @code{equal} 而不是 @code{eq} 来比较属性。
+@end defun
+
+@defun plist-member plist property &optional predicate
+如果@var{plist}包含给定的@var{property}，则返回非@code{nil}。  使用 @var{predicate} 进行比较，默认为 @code{eq}。  与 @code{plist-get} 不同，这允许您区分缺失的属性和具有值 @code{nil} 的属性。  该值实际上是@var{plist}的尾部，其@code{car}是@var{property}。
+@end defun

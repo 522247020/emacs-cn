@@ -1,0 +1,3818 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--2026 Free Software Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Text
+@chapter 文本
+@cindex text
+
+本章描述处理缓冲区中文本的函数。  大多数检查、插入或删除当前缓冲区中的文本，通常在点或与点相邻的文本上进行操作。  许多是互动的。  所有更改文本的函数都可以撤消更改 (@pxref{Undo})。
+
+许多与文本相关的函数对由名为 @var{start} 和 @var{end} 的参数中传递的两个缓冲区位置定义的文本区域进行操作。这些参数应该是标记 (@pxref{Markers}) 或数字字符位置 (@pxref{Positions})。  这些参数的顺序并不重要； @var{start} 可以作为该区域的终点，@var{end} 可以作为该区域的起点。  例如，@code{(delete-region 1 10)}和@code{(delete-region 10 1)}是等价的。  如果 9⁣ 或 10⁣ 位于缓冲区的可访问部分之外，则会发出 @code{args-out-of-range} 错误信号。  在交互式调用中，点和标记用于这些参数。
+
+@cindex buffer contents
+在本章中，“文本”指的是缓冲区中的字符及其属性（如果相关）。  请记住，点始终位于两个字符之间，并且光标出现在点之后的字符上。
+
+@menu
+* Near Point::        检查点附近的文本。
+* Buffer Contents::   以一般方式检查文本。
+* Comparing Text::    比较缓冲区的子字符串。
+* Insertion::         将新文本添加到缓冲区。
+* Commands for Insertion::   用于插入文本的用户级命令。
+* Deletion::          从缓冲区中删除文本。
+* User-Level Deletion::      用于删除文本的用户级命令。
+* The Kill Ring::     有时会保存删除的文本以供以后使用。
+* Undo::              撤消对缓冲区文本的更改。
+* Maintaining Undo::  如何启用和禁用撤消信息。如何控制保留多少信息。
+* Filling::           显式填充函数。
+* Margins::           如何指定填充命令的边距。
+* Adaptive Fill::     自适应填充模式从上下文中选择填充前缀。
+* Auto Filling::      如何实现自动填充模式来换行。
+* Sorting::           对缓冲区的各个部分进行排序的函数。
+* Columns::           计算水平位置并使用它们。
+* Indentation::       插入或调整缩进的功能。
+* Case Changes::      缓冲区各部分的大小写转换。
+* Text Properties::   将 Lisp 属性列表分配给文本字符。
+* Substitution::      替换出现的给定字符。
+* Registers::         寄存器是如何实现的。  访问存储在寄存器中的文本或位置。
+* Transposition::     交换缓冲区的两部分。
+* Replacing::         将一个缓冲区的文本替换为另一个缓冲区的文本。
+* Decompression::     处理压缩数据。
+* Base 64::           与 Base 64 编码之间的转换。
+* Checksum/Hash::     计算加密哈希值。
+* Suspicious Text::   确定字符串是否可疑。
+* GnuTLS Cryptography::  从 GnuTLS 导入的加密算法。
+* Database::          与 SQL 数据库交互。
+* Parsing HTML/XML::  解析 HTML 和 XML。
+* Parsing JSON::      解析并生成 JSON 值。
+* JSONRPC::           JSON 远程过程调用协议
+* Atomic Changes::    以原子方式安装多个缓冲区更改。
+* Change Hooks::      提供文本更改时要运行的函数。
+@end menu
+
+@node Near Point
+@section 检查文本近点
+@cindex text near point
+
+提供了许多函数来查看点周围的字符。这里描述了几个简单的功能。  另请参见@ref{Regexp Search}中的@code{looking-at}。
+
+在以下四个函数中，缓冲区的“开始”或“结束”指的是可访问部分的开始或结束。
+
+@defun char-after &optional position
+该函数返回当前缓冲区中位置@var{position}（即紧接其后）的字符。  如果@var{position}超出了此目的的范围，无论是在缓冲区开始之前，还是在缓冲区结尾处或之后，则该值为@code{nil}。  @var{position} 的默认值是点。
+
+在以下示例中，假设缓冲区中的第一个字符是@samp{@@}：
+
+@example
+@group
+(string (char-after 1))
+     @result{} "@@"
+@end group
+@end example
+@end defun
+
+@defun char-before &optional position
+该函数返回当前缓冲区中位置@var{position}之前的字符。  如果@var{position}超出了此目的的范围，无论是在缓冲区的开头或之前，还是超出了结尾，则该值为@code{nil}。  @var{position} 的默认值是点。
+@end defun
+
+@defun following-char
+该函数返回当前缓冲区中点后面的字符。  这与@code{(char-after (point))}类似。  但是，如果 point 位于缓冲区末尾，则 @code{following-char} 返回 0。
+
+请记住，该点始终位于字符之间，并且光标通常出现在字符后面的点上。  因此，@code{following-char}返回的字符就是光标所在的字符。
+
+在此示例中，点位于 @samp{a} 和 @samp{c} 之间。
+
+@example
+@group
+---------- Buffer: foo ----------
+Gentlemen may cry ``Pea@point{}ce! Peace!,''
+but there is no peace.
+---------- Buffer: foo ----------
+@end group
+
+@group
+(string (preceding-char))
+     @result{} "a"
+(string (following-char))
+     @result{} "c"
+@end group
+@end example
+@end defun
+
+@defun preceding-char
+该函数返回当前缓冲区中前一个字符。  请参阅上文 @code{following-char} 下的示例。  如果点位于缓冲区的开头，@code{preceding-char} 返回 0。
+@end defun
+
+@defun bobp
+如果点位于缓冲区的开头，则该函数返回@code{t}。  如果缩小生效，这意味着文本的可访问部分的开始。  另请参见@ref{Point}中的@code{point-min}。
+@end defun
+
+@defun eobp
+如果点位于缓冲区末尾，则该函数返回@code{t}。如果缩小生效，则意味着文本的可访问部分结束。  另请参见@xref{Point}中的@code{point-max}。
+@end defun
+
+@defun bolp
+如果点位于行的开头，则此函数返回@code{t}。 @xref{Text Lines}。  缓冲区的开头（或其可访问部分）始终算作行的开头。
+@end defun
+
+@defun eolp
+如果点位于线的末尾，则此函数返回@code{t}。  缓冲区的末尾（或其可访问部分）始终被视为行的末尾。
+@end defun
+
+@node Buffer Contents
+@section 检查缓冲区内容
+@cindex buffer portion as string
+
+本节介绍允许 Lisp 程序将缓冲区中文本的任何部分转换为字符串的函数。
+
+@defun buffer-substring start end
+该函数返回一个字符串，其中包含当前缓冲区中位置 @var{start} 和 @var{end} 定义的区域文本的副本。  如果参数不是缓冲区可访问部分中的位置，则 @code{buffer-substring} 发出 @code{args-out-of-range} 错误信号。
+
+以下是假设未启用字体锁定模式的示例：
+
+@example
+@group
+---------- Buffer: foo ----------
+This is the contents of buffer foo
+
+---------- Buffer: foo ----------
+@end group
+
+@group
+(buffer-substring 1 10)
+     @result{} "This is t"
+@end group
+@group
+(buffer-substring (point-max) 10)
+     @result{} "he contents of buffer foo\n"
+@end group
+@end example
+
+如果要复制的文本具有任何文本属性，这些属性将与其所属的字符一起复制到字符串中。  @xref{Text Properties}。  但是，缓冲区中的覆盖 (@pxref{Overlays}) 及其属性将被忽略，而不是被复制。
+
+例如，如果启用了字体锁定模式，您可能会得到如下结果：
+
+@example
+@group
+(buffer-substring 1 10)
+     @result{} #("This is t" 0 1 (fontified t) 1 9 (fontified t))
+@end group
+@end example
+@end defun
+
+@defun buffer-substring-no-properties start end
+这类似于 @code{buffer-substring}，只不过它不复制文本属性，只复制字符本身。  @xref{Text Properties}。
+@end defun
+
+@defun buffer-string
+此函数以字符串形式返回当前缓冲区的整个可访问部分的内容。  如果要复制的文本具有任何文本属性，这些属性将与其所属的字符一起复制到字符串中。
+@end defun
+
+如果您需要确保生成的字符串在复制到其他位置时不会因双向文本的重新排序而改变其视觉外观，请使用 @code{buffer-substring-with-bidi-context} 函数 (@pxref{Bidirectional Display, buffer-substring-with-bidi-context})。
+
+@defun filter-buffer-substring start end &optional delete
+该函数使用变量@code{filter-buffer-substring-function}指定的函数过滤@var{start}和@var{end}之间的缓冲区文本，并返回结果。  @var{start} 和 @var{end} 指定的缓冲区位置的顺序并不重要，因为此函数经常用于提取传递给终止函数 (@pxref{Kill Functions}) 的文本。
+
+默认过滤器函数参考过时的包装器钩子@code{filter-buffer-substring-functions}（有关此过时设施的详细信息，请参阅宏@code{with-wrapper-hook}的文档字符串）。  如果是@code{nil}，它将从缓冲区返回未更改的文本，即@code{buffer-substring}将返回的内容。
+
+如果@var{delete}非@code{nil}，则该函数在复制后删除@var{start}和@var{end}之间的文本，就像@code{delete-and-extract-region}一样。
+
+当复制到用户可访问的数据结构（例如kill-ring、X剪贴板和寄存器）时，Lisp代码应该使用此函数而不是@code{buffer-substring}、@code{buffer-substring-no-properties}或@code{delete-and-extract-region}。主要和次要模式可以修改 @code{filter-buffer-substring-function} 来更改从缓冲区复制出来的文本。
+@end defun
+
+@defvar filter-buffer-substring-function
+该变量的值是一个函数，@code{filter-buffer-substring} 将调用该函数来完成实际工作。  该函数接收三个参数，与 @code{filter-buffer-substring} 的参数相同，它应该按照该函数的文档处理这些参数。  它应该返回过滤后的文本（并且可以选择删除源文本）。请注意，它必须处理 @var{start} 和 @var{end} 参数，无论它们指定的缓冲区位置的顺序如何，以遵守提取文本以杀死文本的协议。
+@end defvar
+
+@noindent The following two variables are obsoleted by
+@code{filter-buffer-substring-function}，但仍支持向后兼容。
+
+@defvar filter-buffer-substring-functions
+这个过时的变量是一个包装钩子，其成员应该是接受四个参数的函数：@var{fun}、@var{start}、@var{end}和@var{delete}。  @var{fun} 是一个接受三个参数（@var{start}、@var{end} 和 @var{delete}）的函数，并返回一个字符串。  在这两种情况下，@var{start}、@var{end} 和 @var{delete} 参数与 @code{filter-buffer-substring} 的参数相同。
+
+第一个钩子函数传递一个@var{fun}，它相当于@code{filter-buffer-substring}的默认操作，即，它返回@var{start}和@var{end}之间的缓冲区子字符串，并可选择从缓冲区中删除原始文本。  大多数情况下，钩子函数会调用一次@var{fun}，然后对结果进行自己的处理。  下一个钩子函数接收与此等效的@var{fun}，依此类推。  实际的返回值是所有钩子函数按顺序作用的结果。
+@end defvar
+
+@defun current-word &optional strict really-word
+此函数以字符串形式返回点处或附近的符号（或单词）。  返回值不包含文本属性。
+
+如果可选参数@var{really-word}非@code{nil}，则查找一个单词；否则，它找到一个符号（包括单词字符和符号组成字符）。
+
+如果可选参数@var{strict}非-@code{nil}，则点必须位于符号或单词中或旁边——如果不存在符号或单词，则函数返回@code{nil}。  否则，同一行上附近的符号或单词是可以接受的。
+@end defun
+
+@defun thing-at-point thing &optional no-properties
+以字符串形式返回点周围或旁边的 @var{thing}。
+
+参数 @var{thing} 是指定一种语法实体的符号。  可能性包括 @code{symbol}、@code{list}、@code{sexp}、@code{defun}、@code{filename}、@code{existing-filename}、@code{url}、@code{word}、@code{sentence}、@code{whitespace}、@code{line}、@code{page}、 @code{string}，等等。
+
+当可选参数 @var{no-properties} 为非 @code{nil} 时，此函数从返回值中删除文本属性。
+
+@example
+---------- Buffer: foo ----------
+Gentlemen may cry ``Pea@point{}ce! Peace!,''
+but there is no peace.
+---------- Buffer: foo ----------
+
+(thing-at-point 'word)
+     @result{} "Peace"
+(thing-at-point 'line)
+     @result{} "Gentlemen may cry ``Peace! Peace!,''\n"
+(thing-at-point 'whitespace)
+     @result{} nil
+@end example
+
+@defvar thing-at-point-provider-alist
+该变量允许用户和模式调整 @code{thing-at-point} 的工作方式。  它是 1⁣ 和返回该内容的函数（用零参数调用）的关联列表。将依次评估 @var{thing} 的条目，直到返回非 @code{nil} 结果。
+
+例如，主要模式可以说：
+
+@lisp
+(setq-local thing-at-point-provider-alist
+            (append thing-at-point-provider-alist
+                    '((url . my-mode--url-at-point))))
+@end lisp
+
+如果没有提供者返回非 @code{nil} ，则 @var{thing} 将以标准方式计算。
+@end defvar
+@end defun
+
+@node Comparing Text
+@section 比较文本
+@cindex comparing buffer text
+
+此函数允许您比较缓冲区中的文本部分，而无需先将它们复制到字符串中。
+
+@defun compare-buffer-substrings buffer1 start1 end1 buffer2 start2 end2
+此函数允许您比较同一缓冲区或两个不同缓冲区的两个子字符串。  前三个参数指定一个子字符串，给出一个缓冲区（或缓冲区名称）和缓冲区内的两个位置。  最后三个参数以相同的方式指定另一个子字符串。  您可以使用 @code{nil} 代替 @var{buffer1}、@var{buffer2} 或两者来代表当前缓冲区。
+
+如果第一个子字符串较小，则该值为负；如果第一个子字符串较大，则该值为正；如果它们相等，则该值为零。  结果的绝对值是一加上子字符串中第一个不同字符的索引。
+
+如果 @code{case-fold-search} 为非 @code{nil}，则该函数在比较字符时忽略大小写。  它总是忽略文本属性。
+
+假设当前缓冲区中有文本 @w{@samp{foobarbar haha!rara!}}；那么在这个例子中，两个子字符串是@samp{rbar }和@samp{rara!}。  该值为 2，因为第一个子字符串的第二个字符更大。
+
+@example
+(compare-buffer-substrings nil 6 11 nil 16 21)
+     @result{} 2
+@end example
+@end defun
+
+@node Insertion
+@section 插入文本
+@cindex insertion of text
+@cindex text insertion
+
+@cindex insertion before point
+@cindex before point, insertion
+@dfn{Insertion} 表示将新文本添加到缓冲区。  插入的文本位于点——点之前的字符和点之后的字符之间。  某些插入函数将点保留在插入文本之前，而其他函数则将其保留在插入文本之后。  我们将前一个插入称为@dfn{after point}，将后一个插入称为@dfn{before point}。
+
+插入会移动位于插入点之后位置的标记，以便它们与周围的文本保持在一起 (@pxref{Markers})。当标记指向插入位置时，插入可能会也可能不会重新定位标记，具体取决于标记的插入类型 (@pxref{Marker Insertion Types})。  某些特殊函数（例如 @code{insert-before-markers}）会将所有此类标记重新定位到插入文本之后，无论标记的插入类型如何。
+
+如果当前缓冲区是只读的 (@pxref{Read Only Buffers}) 或插入只读文本 (@pxref{Special Properties})，则插入函数会发出错误信号。
+
+这些函数从字符串和缓冲区复制文本字符及其属性。  插入的字符与从中复制的字符具有完全相同的属性。  相比之下，指定为单独参数（而不是字符串或缓冲区的一部分）的字符从相邻文本继承其文本属性。
+
+插入函数将文本从单字节转换为多字节，以便插入多字节缓冲区，反之亦然 — 如果文本来自字符串或缓冲区。  但是，它们不会将单字节字符代码 128 到 255 转换为多字节字符，即使当前缓冲区是多字节缓冲区也是如此。  @xref{Converting Representations}。
+
+@defun insert &rest args
+该函数将字符串和/或字符 @var{args} 插入当前缓冲区中的点，向前移动点。  换句话说，它将文本插入到点之前。  除非所有 @var{args} 都是字符串或字符，否则会发出错误信号。  值为@code{nil}。
+@end defun
+
+@defun insert-before-markers &rest args
+该函数将字符串和/或字符 @var{args} 插入当前缓冲区中的点，向前移动点。  除非所有 @var{args} 都是字符串或字符，否则会发出错误信号。  值为@code{nil}。
+
+此函数与其他插入函数不同，它将最初指向插入点的标记重新定位到插入文本之后。  如果覆盖从插入点开始，则插入的文本将落在覆盖之外；如果非空覆盖层在插入点处结束，则插入的文本将落入该覆盖层内。
+@end defun
+
+@deffn Command insert-char character &optional count inherit
+此命令将 @var{character} 的 @var{count} 实例插入到当前缓冲区中的 point 之前。  参数 @var{count} 必须是整数，@var{character} 必须是字符。
+
+如果以交互方式调用，此命令会提示使用其 Unicode 名称或其代码点输入 @var{character}。  @xref{Inserting Text,,, emacs, The GNU Emacs Manual}。
+
+此函数不会将单字节字符代码 128 到 255 转换为多字节字符，即使当前缓冲区是多字节缓冲区也是如此。  @xref{Converting Representations}。
+
+如果 @var{inherit} 为非 @code{nil}，则插入的字符将从插入点之前和之后的两个字符继承粘性文本属性。  @xref{Sticky Properties}。
+@end deffn
+
+@defun insert-buffer-substring from-buffer-or-name &optional start end
+该函数将缓冲区 @var{from-buffer-or-name} 的一部分插入到当前缓冲区中的 point 之前。  插入的文本是@var{start}（包含）和@var{end}（不包含）之间的区域。  （这些参数默认为该缓冲区可访问部分的开头和结尾。）该函数返回 @code{nil}。
+
+在此示例中，表单以缓冲区 @samp{bar} 作为当前缓冲区执行。  我们假设缓冲区 @samp{bar} 最初是空的。
+
+@example
+@group
+---------- Buffer: foo ----------
+We hold these truths to be self-evident, that all
+---------- Buffer: foo ----------
+@end group
+
+@group
+(insert-buffer-substring "foo" 1 20)
+     @result{} nil
+
+---------- Buffer: bar ----------
+We hold these truth@point{}
+---------- Buffer: bar ----------
+@end group
+@end example
+@end defun
+
+@defun insert-buffer-substring-no-properties from-buffer-or-name &optional start end
+这与 @code{insert-buffer-substring} 类似，只是它不复制任何文本属性。
+@end defun
+
+@defun insert-into-buffer to-buffer &optional start end
+这类似于@code{insert-buffer-substring}，但工作方向相反：文本从当前缓冲区复制到@var{to-buffer}。  文本块被复制到@var{to-buffer}（@pxref{Point}）中的缓冲点，并且缓冲点前进到复制文本末尾之后。  如果@code{start}/@code{end}为@code{nil}，则复制当前缓冲区中的整个文本。
+@end defun
+
+@xref{Sticky Properties}，用于除了插入之外还从附近文本继承文本属性的其他插入函数。由缩进函数插入的空格也继承了文本属性。
+
+@node Commands for Insertion
+@section 用户级插入命令
+
+本节介绍用于插入文本的高级命令，这些命令主要供用户使用，但在 Lisp 程序中也很有用。
+
+@deffn Command insert-buffer from-buffer-or-name
+该命令将 @var{from-buffer-or-name} 的全部可访问内容（必须存在）插入到当前缓冲区中的点之后。  它会在插入的文本后留下标记。  值为@code{nil}。
+@end deffn
+
+@deffn Command self-insert-command count &optional char
+@cindex character insertion
+@cindex self-insertion
+该命令插入字符@var{char}（最后输入的字符）；它在 point 之前执行 @var{count} 次，并返回 @code{nil}。大多数打印字符都与此命令绑定。  在日常使用中，@code{self-insert-command}是Emacs中最常调用的函数，但程序很少使用它，除了将其安装在键盘映射上。
+
+在交互式调用中，@var{count} 是数字前缀参数。
+
+@c FIXME: This variable is obsolete since 23.1.
+自插入将输入字符翻译为@code{translation-table-for-input}。  @xref{Translation of Characters}。
+
+只要该字符不是 @code{nil} 并且插入的字符位于表 @code{auto-fill-chars} (@pxref{Auto Filling}) 中，此命令就会调用 @code{auto-fill-function}。
+
+@c Cross refs reworded to prevent overfull hbox.  --rjc 15mar92
+如果启用缩写模式并且插入的字符不具有词构成语法，则此命令执行缩写扩展。  （@xref{Abbrevs}和@ref{Syntax Class Table}。）当插入的字符具有右括号语法（@pxref{Blinking}）时，它还负责调用@code{blink-paren-function}。
+
+@vindex post-self-insert-hook
+@vindex self-insert-uses-region-functions
+该命令执行的最后一件事是运行钩子 @code{post-self-insert-hook}。  例如，您可以使用它在键入文本时自动重新缩进文本。  该钩子上的函数可以使用@code{last-command-event} (@pxref{Command Loop Info}) 来访问刚刚插入的字符。
+
+如果此挂钩上的任何函数需要作用于区域 (@pxref{The Region})，则应确保删除选择模式 (@pxref{Using Region, Delete Selection, , emacs, The GNU Emacs Manual}) 在调用 @code{post-self-insert-hook} 函数之前不会删除该区域。  这样做的方法是添加一个将 @code{nil} 返回到 @code{self-insert-uses-region-functions} 的函数，这是一个特殊的钩子，告诉删除选择模式不应删除该区域。
+
+不要尝试用您自己的 @code{self-insert-command} 定义替换标准定义。  编辑器命令循环专门处理此功能。
+@end deffn
+
+@deffn Command newline &optional number-of-newlines interactive
+该命令将换行符插入到当前缓冲区中的 point 之前。如果提供 @var{number-of-newlines}，则会插入许多换行符。  在交互式调用中，@var{number-of-newlines} 是数字前缀参数。
+
+@cindex newline and Auto Fill mode
+此命令调用 @code{self-insert-command} 插入换行符，随后可能会通过调用 @code{auto-fill-function} (@pxref{Auto Filling}) 来中断前一行。  通常，@code{auto-fill-function} 的作用是插入换行符；因此，这种情况下的总体结果是在不同位置插入两个换行符：一个在该位置，另一个在该行的前面。  如果 5⁣ 不是 6⁣，则 @code{newline} 不会自动填充。
+
+该命令不会运行钩子 @code{post-self-insert-hook} 除非交互调用或者 @var{interactive} 不是 @code{nil}。
+
+如果左边距不为零，则此命令将缩进到左边距。 @xref{Margins}。
+
+返回的值为@code{nil}。
+@end deffn
+
+@deffn Command ensure-empty-lines &optional number-of-empty-lines
+此命令可用于确保 point 之前有特定数量的空行。  （“空行”在这里定义为没有字符的行——带有空格字符的行不是空行。）它默认确保在点之前有一个空行。
+
+如果 point 不在行的开头，则首先插入换行符。  如果 point 之前的空行数多于指定的空行数，则会减少空行数。  否则增加到指定数量。
+@end deffn
+
+@defvar overwrite-mode
+该变量控制覆盖模式是否有效。  该值应为 @code{overwrite-mode-textual}、@code{overwrite-mode-binary} 或 @code{nil}。  @code{overwrite-mode-textual} 指定文本覆盖模式（特别对待换行符和制表符），@code{overwrite-mode-binary} 指定二进制覆盖模式（像对待任何其他字符一样对待换行符和制表符）。
+@end defvar
+
+@node Deletion
+@section 删除文本
+@cindex text deletion
+
+@cindex deleting text vs killing
+删除意味着删除缓冲区中的部分文本，而不将其保存在 Kill Ring 中 (@pxref{The Kill Ring})。  删除的文本无法被拉出，但可以使用撤消机制重新插入 (@pxref{Undo})。在某些特殊情况下，某些删除功能确实会将文本保存在 Kill Ring 中。
+
+所有删除函数都对当前缓冲区进行操作。
+
+@deffn Command erase-buffer
+此函数删除当前缓冲区的整个文本（@emph{not} 只是可访问的部分），将其留空。  如果缓冲区是只读的，则发出 @code{buffer-read-only} 错误信号；如果其中的某些文本是只读的，则会发出 @code{text-read-only} 错误信号。  否则，它会删除该文本而不要求任何确认。  它返回@code{nil}。
+
+通常，从缓冲区中删除大量文本会抑制该缓冲区的进一步自动保存，因为它已经缩小了。  然而，@code{erase-buffer}并没有这样做，其想法是未来的文本与之前的文本并不真正相关，并且它的大小不应该与之前的文本进行比较。
+@end deffn
+
+@deffn Command delete-region start end
+该命令删除当前缓冲区中位置@var{start}和@var{end}之间的文本，并返回@code{nil}。  如果点位于删除区域内，则其之后的值为@var{start}。否则，点将与周围的文本一起重新定位，就像标记一样。
+@end deffn
+
+@defun delete-and-extract-region start end
+该函数删除当前缓冲区中位置@var{start}和@var{end}之间的文本，并返回包含刚刚删除的文本的字符串。
+
+如果点位于删除区域内，则其之后的值为@var{start}。  否则，点将与周围的文本一起重新定位，就像标记一样。
+@end defun
+
+@deffn Command delete-char count &optional killp
+该命令直接删除点之后的 @var{count} 个字符，如果 @var{count} 为负数，则删除点之前的字符。  如果@var{killp}非@code{nil}，则它将删除的字符保存在killring中。
+
+在交互式调用中，@var{count} 是数字前缀参数，@var{killp} 是未处理的前缀参数。  因此，如果提供了前缀参数，则文本将保存在终止环中。  如果没有提供前缀参数，则删除一个字符，但不会保存在 Kill Ring 中。
+
+返回的值始终为@code{nil}。
+@end deffn
+
+@deffn Command delete-backward-char count &optional killp
+@cindex deleting previous char
+该命令删除点之前的 @var{count} 字符，如果 @var{count} 为负数，则删除点之后的字符。  如果@var{killp}非@code{nil}，则它将删除的字符保存在killring中。
+
+在交互式调用中，@var{count} 是数字前缀参数，@var{killp} 是未处理的前缀参数。  因此，如果提供了前缀参数，则文本将保存在终止环中。  如果没有提供前缀参数，则删除一个字符，但不会保存在 Kill Ring 中。
+
+返回的值始终为@code{nil}。
+@end deffn
+
+@deffn Command backward-delete-char-untabify count &optional killp
+@cindex tab deletion
+此命令向后删除 @var{count} 个字符，将制表符更改为空格。  当要删除的下一个字符是制表符时，首先将其替换为适当数量的空格以保持对齐，然后删除其中一个空格而不是制表符。  如果@var{killp}非@code{nil}，则该命令将删除的字符保存在killring中。
+
+仅当 0⁣ 为正数时才会发生制表符到空格的转换。如果为负数，则删除 point 之后的 @minus{}@var{count} 个字符。
+
+在交互式调用中，@var{count} 是数字前缀参数，@var{killp} 是未处理的前缀参数。  因此，如果提供了前缀参数，则文本将保存在终止环中。  如果没有提供前缀参数，则删除一个字符，但不会保存在 Kill Ring 中。
+
+返回的值始终为@code{nil}。
+@end deffn
+
+@defopt backward-delete-char-untabify-method
+此选项指定 @code{backward-delete-char-untabify} 应如何处理空格。  可能的值包括默认值@code{untabify}，表示将制表符转换为多个空格并删除一个； @code{hungry}，意思是一键删除点之前的所有制表符和空格； @code{all} 表示删除点之前的所有制表符、空格和换行符，@code{nil} 表示对空白字符不执行任何特殊操作。
+@end defopt
+
+@node User-Level Deletion
+@section 用户级删除命令
+
+本节介绍用于删除文本的高级命令，这些命令主要供用户使用，但在 Lisp 程序中也很有用。
+
+@deffn Command delete-horizontal-space &optional backward-only
+@cindex deleting whitespace
+此函数删除点周围的所有空格和制表符。  它返回@code{nil}。
+
+如果@var{backward-only}非@code{nil}，该函数将删除点之前的空格和制表符，但不会删除点之后的空格和制表符。
+
+在下面的示例中，我们调用 @code{delete-horizontal-space} 四次，每行一次，每次点都位于该行的第二个和第三个字符之间。
+
+@example
+@group
+---------- Buffer: foo ----------
+I @point{}thought
+I @point{}     thought
+We@point{} thought
+Yo@point{}u thought
+---------- Buffer: foo ----------
+@end group
+
+@group
+(delete-horizontal-space)   ; @r{Four times.}
+     @result{} nil
+
+---------- Buffer: foo ----------
+Ithought
+Ithought
+Wethought
+You thought
+---------- Buffer: foo ----------
+@end group
+@end example
+@end deffn
+
+@deffn Command delete-indentation &optional join-following-p beg end
+此函数将行点连接到上一行，删除连接处的所有空格，并在某些情况下用一个空格替换它。  如果 @var{join-following-p} 不是 @code{nil}，则 @code{delete-indentation} 将此行连接到下一行。  否则，如果@var{beg}和@var{end}不是@code{nil}，则此函数将连接它们定义的区域中的所有线。
+
+在交互式调用中，@var{join-following-p}是前缀参数，@var{beg}和@var{end}分别是区域的开始和结束（如果它处于活动状态），否则为@code{nil}。  该函数返回@code{nil}。
+
+如果存在填充前缀，并且要连接的第二行以该前缀开头，则 @code{delete-indentation} 会在连接行之前删除填充前缀。  @xref{Margins}。
+
+在下面的示例中，点位于从 @samp{events} 开始的行上，如果前一行中存在尾随空格，则没有区别。
+
+@smallexample
+@group
+---------- Buffer: foo ----------
+When in the course of human
+@point{}    events, it becomes necessary
+---------- Buffer: foo ----------
+@end group
+
+(delete-indentation)
+     @result{} nil
+
+@group
+---------- Buffer: foo ----------
+When in the course of human@point{} events, it becomes necessary
+---------- Buffer: foo ----------
+@end group
+@end smallexample
+
+线条连接后，函数@code{fixup-whitespace}负责决定是否在连接处留出空格。
+@end deffn
+
+@deffn Command fixup-whitespace
+此函数根据上下文将点周围的所有水平空白替换为一个空格或无空格。  它返回@code{nil}。
+
+在行的开头或结尾，适当的空间量是无。  在具有闭括号语法的字符之前，或者在具有左括号或表达式前缀语法的字符之后，没有空格也是合适的。  否则，一个空格就合适了。  @xref{Syntax Class Table}。
+
+在下面的示例中，第一次调用 @code{fixup-whitespace} 时，点位于第一行单词 @samp{spaces} 之前。  对于第二次调用，point 位于 @samp{(} 之后。
+
+@smallexample
+@group
+---------- Buffer: foo ----------
+This has too many     @point{}spaces
+This has too many spaces at the start of (@point{}   this list)
+---------- Buffer: foo ----------
+@end group
+
+@group
+(fixup-whitespace)
+     @result{} nil
+(fixup-whitespace)
+     @result{} nil
+@end group
+
+@group
+---------- Buffer: foo ----------
+This has too many spaces
+This has too many spaces at the start of (this list)
+---------- Buffer: foo ----------
+@end group
+@end smallexample
+@end deffn
+
+@deffn Command just-one-space &optional n
+@comment !!SourceFile simple.el
+此命令将点周围的任何空格和制表符替换为单个空格，或者如果指定了 @var{n} 则替换 @var{n} 空格。  它返回@code{nil}。
+@end deffn
+
+@c There is also cycle-spacing, but I cannot see it being useful in
+@c Lisp programs, so it is not mentioned here.
+
+@deffn Command delete-blank-lines
+此功能删除点周围的空白行。  如果点位于空白行上，且其前后有一个或多个空白行，则除其中一个以外的所有空白行都将被删除。  如果点位于孤立的空行上，则将其删除。  如果点位于非空行上，则该命令将删除紧随其后的所有空行。
+
+空行定义为仅包含制表符和空格的行。
+@c and the Newline character?
+
+@code{delete-blank-lines} 返回@code{nil}。
+@end deffn
+
+@deffn Command delete-trailing-whitespace &optional start end
+删除由 @var{start} 和 @var{end} 定义的区域中的尾随空白。
+
+此命令删除该区域中每行最后一个非空白字符后面的空白字符。
+
+如果此命令作用于整个缓冲区（即，如果使用标记 inactive 交互调用，或者使用 @var{end} @code{nil} 从 Lisp 调用），如果变量 @code{delete-trailing-lines} 为非 @code{nil}，它还会删除缓冲区末尾的所有尾随行。
+@end deffn
+
+@node The Kill Ring
+@section 杀戮戒指
+@cindex kill ring
+
+@dfn{Kill functions} 像删除功能一样删除文本，但保存它以便用户可以通过@dfn{yanking} 重新插入它。  大多数这些函数的名称中都有@samp{kill-}。  相比之下，名称以 @samp{delete-} 开头的函数通常不会保存用于拉取的文本（尽管它们仍然可以撤消）；这些是删除函数。
+
+大多数kill命令主要用于交互使用，这里不再赘述。  我们所描述的是提供用于编写​​此类命令的函数。  您可以使用这些函数来编写用于删除文本的命令。  当您需要在 Lisp 函数中出于内部目的删除文本时，通常应该使用删除函数，以免干扰 Kill Ring 内容。 @xref{Deletion}。
+
+删除的文本将被保存以供稍后在 @dfn{kill ring} 中拉取。  这是一个包含最近一些杀戮的列表，而不仅仅是最后一个文本杀戮。  我们称其为“环”，因为拉动将其视为具有循环顺序的元素。  列表保存在变量@code{kill-ring}中，可以使用列表的常用函数进行操作；还有本节中描述的将其视为环的专门函数。
+
+有些人认为“杀死”这个词的使用是不幸的，因为它指的是专门@emph{do not}摧毁被杀死的实体的操作。  这与日常生活形成鲜明对比，在日常生活中，死亡是永久性的，被杀死的实体不会复活。  因此，人们提出了其他隐喻。  例如，“剪切环”一词对于在计算机出现之前使用剪刀和粘贴来剪切和重新排列手稿的人们来说是有意义的。  然而，现在很难改变术语。
+
+@menu
+* Kill Ring Concepts::      杀戮环中的文字是什么样的。
+* Kill Functions::          杀死文本的函数。
+* Yanking::                 猛拉是如何完成的。
+* Yank Commands::           访问 Kill Ring 的命令。
+* Low-Level Kill Ring::     用于杀环访问的函数和变量。
+* Internals of Kill Ring::  保存杀环数据的变量。
+@end menu
+
+@node Kill Ring Concepts
+@subsection 杀环概念
+
+杀环将被杀的文本记录为列表中的字符串，最新的排在最前面。  例如，一个短的杀伤环可能如下所示：
+
+@example
+("some text" "a different piece of text" "even older text")
+@end example
+
+@noindent
+当列表长度达到@code{kill-ring-max}条目时，添加新条目会自动删除最后一个条目。
+
+当kill命令与其他命令交织在一起时，每个kill命令都会在kill环中创建一个新条目。  连续的多个kill命令会构建一个killring条目，该条目将作为一个单元被拉出；第二个和后续的连续终止命令将文本添加到第一个命令创建的条目中。
+
+对于猛拉，杀伤环中的一个条目被指定为环的前部。  一些猛拉命令通过指定不同的元素作为前面来旋转环。  但这种虚拟轮换不会改变列表本身——最新的条目总是排在列表的第一位。
+
+@node Kill Functions
+@subsection 杀戮函数
+
+@code{kill-region} 是用于删除文本的常用子例程。  任何调用此函数的命令都是一个终止命令（并且其名称中可能应该有@samp{kill}）。  @code{kill-region} 将新杀死的文本放入杀死环开头的新元素中，或将其添加到最近的元素中。  它自动确定（使用 @code{last-command}）前一个命令是否是终止命令，如果是，则将终止的文本附加到最近的条目。
+
+@cindex filtering killed text
+下面描述的命令可以在将被杀死的文本保存到 Kill Ring 之前对其进行过滤。  他们调用 @code{filter-buffer-substring} (@pxref{Buffer Contents}) 来执行过滤。  默认情况下，没有过滤，但是主要和次要模式以及钩子函数可以设置过滤，以便杀死环中保存的文本与缓冲区中的文本不同。
+
+@deffn Command kill-region start end &optional region
+该函数删除@var{start}和@var{end}之间的文本延伸；但如果可选参数@var{region}不是@code{nil}，它会忽略@var{start}和@var{end}，并杀死当前区域中的文本。  文本将被删除，但与其文本属性一起保存在 Kill Ring 中。  该值始终为@code{nil}。
+
+在交互式调用中，@var{start}和@var{end}是点和标记，而@var{region}始终是非@code{nil}，因此该命令始终删除当前区域中的文本。
+
+如果缓冲区或文本是只读的，@code{kill-region} 会同样修改终止环，然后发出错误信号而不修改缓冲区。这很方便，因为它允许用户使用一系列终止命令将文本从只读缓冲区复制到终止环中。
+@end deffn
+
+@defopt kill-read-only-ok
+如果此选项为非 @code{nil}，且缓冲区或文本是只读的，@code{kill-region} 不会发出错误信号。  相反，它只是返回，更新终止环但不更改缓冲区。
+@end defopt
+
+@deffn Command copy-region-as-kill start end &optional region
+此函数将 @var{start} 和 @var{end} 之间的文本片段保存在 Kill Ring 上（包括文本属性），但不会从缓冲区中删除文本。  但是，如果可选参数 @var{region} 不是 @code{nil}，则该函数会忽略 @var{start} 和 @var{end}，并保存当前区域。  它总是返回@code{nil}。
+
+在交互式调用中，@var{start}和@var{end}是点和标记，而@var{region}始终是非@code{nil}，因此该命令始终将文本保存在当前区域中。
+
+该命令不会将 @code{this-command} 设置为 @code{kill-region}，因此后续的 Kill 命令不会附加到相同的 Kill Ring 条目。
+@end deffn
+
+@node Yanking
+@subsection 扬金
+
+Yanking的意思是从killring中插入文本，但它并不是盲目地插入文本。  @code{yank} 命令和相关命令在插入文本之前使用 @code{insert-for-yank} 对文本执行特殊处理。
+
+@defun insert-for-yank string
+该函数的工作方式与 @code{insert} 类似，只不过它根据 @code{yank-handler} 文本属性以及变量 @code{yank-handled-properties} 和 @code{yank-excluded-properties}（见下文）处理 @var{string} 中的文本，然后将结果插入当前缓冲区。
+
+在插入之前，@var{string} 将遍历 @code{yank-transform-functions}（见下文）。
+@end defun
+
+@defun insert-buffer-substring-as-yank buf &optional start end
+该函数类似于 @code{insert-buffer-substring}，不同之处在于它根据 @code{yank-handled-properties} 和 @code{yank-excluded-properties} 处理文本。  （它不处理 @code{yank-handler} 属性，该属性通常不会出现在缓冲区文本中。）
+@end defun
+
+@c FIXME: Add an index for yank-handler.
+如果将 @code{yank-handler} 文本属性放在字符串的全部或部分上，则会改变 @code{insert-for-yank} 插入字符串的方式。  如果字符串的不同部分具有不同的 @code{yank-handler} 值（与 @code{eq} 进行比较），则每个子字符串将单独处理。  属性值必须是包含一到四个元素的列表，具有以下格式（其中第一个元素之后的元素可以省略）：
+
+@example
+(@var{function} @var{param} @var{noexclude} @var{undo})
+@end example
+
+以下是这些元素的作用：
+
+@table @var
+@item function
+当@var{function}非@code{nil}时，调用它而不是@code{insert}来插入字符串，只有一个参数——要插入的字符串。
+
+@item param
+如果 @var{param} 存在并且非 @code{nil}，它将替换 @var{string} （或正在处理的 @var{string} 的子字符串）作为传递给 @var{function} （或 @code{insert}）的对象。  例如，如果 @var{function} 是 @code{yank-rectangle}，则 @var{param} 应该是要作为矩形插入的字符串列表。
+
+@item noexclude
+如果 @var{noexclude} 存在且非 @code{nil}，则会禁用 @code{yank-handled-properties} 和 @code{yank-excluded-properties} 对插入字符串的正常操作。
+
+@item undo
+如果@var{undo}存在且非@code{nil}，则@code{yank-pop}将调用该函数来撤消当前对象的插入。它使用两个参数调用，即当前区域的开始和结束。  @var{function} 可以设置 @code{yank-undo-function} 来覆盖 @var{undo} 值。
+@end table
+
+@cindex yanking and text properties
+@defopt yank-handled-properties
+此变量指定拉出文本的特殊文本属性处理条件。  它在文本插入后（通常或通过 @code{yank-handler} 属性）、@code{yank-excluded-properties} 生效之前生效。
+
+该值应该是元素@code{(@var{prop} . @var{fun})} 的列表。  每个 alist 元素都按顺序处理。  扫描插入的文本以查找具有文本属性 @code{eq} 至 @var{prop} 的文本片段；对于每个这样的拉伸，都会使用三个参数调用 @var{fun}：属性值以及文本的开始和结束位置。
+@end defopt
+
+@defopt yank-excluded-properties
+该变量的值是要从插入的文本中删除的属性列表。  它的默认值包含可能导致恼人结果的属性，例如导致文本响应鼠标或指定键绑定。  @code{yank-handled-properties}后生效。
+@end defopt
+
+@defvar yank-transform-functions
+该变量是函数列表。  每个函数都以要拉出的字符串作为参数（按顺序）调用，并且应该返回一个（可能已转换的）字符串。  该变量可以全局设置，但也可以用于创建作为 @code{yank} 变体的新命令。  例如，要创建一个类似于 @code{yank} 的命令，但在插入之前清除空格，您可以这样说：
+
+@lisp
+(defun yank-with-clean-whitespace ()
+  (interactive)
+  (let ((yank-transform-functions
+	 '(string-clean-whitespace)))
+    (call-interactively #'yank)))
+@end lisp
+@end defvar
+
+@node Yank Commands
+@subsection 猛拉功能
+
+本节介绍用于拉取的高级命令，这些命令主要面向用户，但在 Lisp 程序中也很有用。 @code{yank} 和 @code{yank-pop} 均支持 @code{yank-excluded-properties} 变量和 @code{yank-handler} 文本属性 (@pxref{Yanking})。
+
+@deffn Command yank &optional arg
+@cindex inserting killed text
+此命令将在 Kill Ring 前面的 Point 文本之前插入。  它使用 @code{push-mark} (@pxref{The Mark}) 在该文本的开头设置标记，并在末尾放置点。
+
+如果 @var{arg} 是非 @code{nil} 列表（当用户键入不带数字的 @kbd{C-u} 时以交互方式出现），则 @code{yank} 如上所述插入文本，但在拉出的文本之前放置点并在其后设置标记。
+
+如果@var{arg}是一个数字，则@code{yank}插入最近被杀死的第@var{arg}文本——杀死环列表中的第@var{arg}元素，从前面开始循环计数，为此目的，它被认为是第一个元素。
+
+@code{yank} 不会更改 Kill Ring 的内容，除非它使用另一个程序提供的文本，在这种情况下，它将将该文本推送到 Kill Ring 上。  然而，如果@var{arg}是一个不同于1的整数，它会旋转kill环以将拉动的字符串放在前面。
+
+@code{yank} 返回@code{nil}。
+@end deffn
+
+@deffn Command yank-pop &optional arg
+当在 @code{yank} 或另一个 @code{yank-pop} 之后立即调用时，此命令会将刚刚从 Kill Ring 中拉出的条目替换为与 Kill Ring 不同的条目。  当像这样调用此命令时，该区域包含刚刚由另一个 yank 命令插入的文本。  @code{yank-pop} 删除该文本并在其位置插入另一段被删除的文本。  它不会将删除的文本添加到终止环中，因为它已经位于终止环中的某个位置。  然而，它确实旋转了杀伤环，将新拉动的绳子放在前面。
+
+如果 @var{arg} 是 @code{nil}，则替换文本是终止环的前一个元素。  如果@var{arg}是数字，则替换为之前的@var{arg}杀戮。  如果@var{arg}为负，则最近的杀戮将被替换。
+
+杀戮环中的杀戮顺序是循环的，因此，如果重复调用@code{yank-pop}并到达最旧的杀戮，则其后的杀戮是最新的杀戮，而最新杀戮之前的杀戮是最旧的杀戮。
+
+也可以在非 yank 命令之后调用此命令。  在这种情况下，它会在迷你缓冲区中提示输入终止环条目并完成，并使用终止环元素作为迷你缓冲区历史记录 (@pxref{Minibuffer History})。  这允许用户交互地选择杀戮环中记录的先前杀戮之一。
+
+返回值始终为@code{nil}。
+@end deffn
+
+@defvar yank-undo-function
+如果此变量为非 @code{nil}，则函数 @code{yank-pop} 使用其值而不是 @code{delete-region} 来删除先前 @code{yank} 或 @code{yank-pop} 命令插入的文本。  该值必须是两个参数的函数，即当前区域的开始和结束。
+
+函数 @code{insert-for-yank} 根据 @code{yank-handler} 文本属性的 @var{undo} 元素（如果有）自动设置此变量。
+@end defvar
+
+@node Low-Level Kill Ring
+@subsection 低级杀环
+
+这些函数和变量提供了对较低级别的 Kill Ring 的访问，但在 Lisp 程序中使用仍然很方便，因为它们负责与窗口系统选择的交互 (@pxref{Window System Selections})。
+
+@defun current-kill n &optional do-not-move
+函数@code{current-kill}将指定kill环前部的拉动指针旋转@var{n}位置（从较新的kill到较旧的kill），并返回环中该位置的文本。
+
+如果可选的第二个参数 @var{do-not-move} 是非 @code{nil}，则 @code{current-kill} 不会更改拉动指针；它只返回第 3 个杀戮，从当前的猛拉指针开始计数。
+
+如果 @var{n} 为零，表示请求最新终止，则 @code{current-kill} 在咨询终止环之前调用 @code{interprogram-paste-function} 的值（如下所述）。  如果该值是一个函数并且调用它返回一个字符串或多个字符串的列表，则 @code{current-kill} 将字符串推入终止环并返回第一个字符串。它还将拉动指针设置为指向@code{interprogram-paste-function}返回的第一个字符串的kill-ring条目，而不管@var{do-not-move}的值是什么。  否则，@code{current-kill}不会专门对待@var{n}的零值：它返回拉动指针指向的条目，并且不移动拉动指针。
+@end defun
+
+@defun kill-new string &optional replace
+该函数将文本 @var{string} 推到终止环上，并使拉动指针指向它。  如果合适的话，它会丢弃最旧的条目。  它还调用@code{interprogram-paste-function}（取决于用户选项@code{save-interprogram-paste-before-kill}）和@code{interprogram-cut-function}（见下文）的值。
+
+如果@var{replace}非@code{nil}，则@code{kill-new}用@var{string}替换杀伤环的第一个元素，而不是将@var{string}推到杀伤环上。
+@end defun
+
+@defun kill-append string before-p
+此函数将文本 @var{string} 附加到终止环中的第一个条目，并使拉动指针指向组合条目。通常，@var{string} 位于条目末尾，但如果 @var{before-p} 为非 @code{nil}，则它位于条目开头。  该函数将@code{kill-new}作为子例程调用，从而导致@code{interprogram-cut-function}和可能的@code{interprogram-paste-function}（见下文）的值被扩展调用。
+@end defun
+
+@defvar interprogram-paste-function
+当您使用窗口系统时，此变量提供了一种从其他程序传输终止文本的方法。  它的值应该是 @code{nil} 或一个没有参数的函数。
+
+如果该值是一个函数，则@code{current-kill}调用它来获取最近的kill。  如果函数返回非 1⁣ 值，则该值将用作最近的终止。  如果它返回@code{nil}，则使用杀伤环的前面。
+
+为了促进对支持多重选择的窗口系统的支持，该函数还可以返回字符串列表。  在这种情况下，第一个字符串用作最近的终止，所有其他字符串都被推入终止环，以便通过@code{yank-pop}轻松访问。
+
+这个函数的正常使用是获取窗口系统的剪贴板作为最近的kill，即使选择属于另一个应用程序。  @xref{Window System Selections}。  但是，如果剪贴板内容来自当前 Emacs 会话，则此函数应返回 @code{nil}。
+@end defvar
+
+@defvar interprogram-cut-function
+当您使用窗口系统时，此变量提供了一种将终止文本传达给其他程序的方法。  它的值应该是 @code{nil} 或一个必需参数的函数。
+
+如果该值是一个函数，则@code{kill-new}和@code{kill-append}以kill环的新第一个元素作为参数来调用它。
+
+该函数的正常用途是将新杀死的文本放入窗口系统的剪贴板中。  @xref{Window System Selections}。
+@end defvar
+
+@node Internals of Kill Ring
+@subsection 杀戮环的内部结构
+
+变量@code{kill-ring}以字符串列表的形式保存终止环内容。  最近的杀戮总是位于列表的前面。
+
+@code{kill-ring-yank-pointer}变量指向kill环列表中的一个链接，其@sc{car}是接下来要拉取的文本。  我们说它标识了戒指的正面。  将 @code{kill-ring-yank-pointer} 移动到不同的链接称为 @dfn{rotating the kill ring}。  我们将kill环称为“环”，因为将复制指针从列表末尾移动到开头的函数，反之亦然。  杀伤环的旋转是虚拟的；它不会改变@code{kill-ring}的值。
+
+@code{kill-ring} 和 @code{kill-ring-yank-pointer} 都是 Lisp 变量，其值通常是列表。  @code{kill-ring-yank-pointer} 名称中的“指针”一词表示该变量的用途是标识列表中的一个元素，以供下一个 yank 命令使用。
+
+@code{kill-ring-yank-pointer} 的值始终是 @code{eq} 到杀伤环列表中的链接之一。  它标识的元素是该链接的 @sc{car}。  Kill 命令会更改 Kill Ring，也会将此变量设置为 @code{kill-ring} 的值。  效果是旋转圆环，使新删除的文本位于前面。
+
+这是一个图表，显示变量 @code{kill-ring-yank-pointer} 指向终止环 @code{("some text" "a different piece of text" "yet older text")} 中的第二个条目。
+
+@example
+@group
+kill-ring                  ---- kill-ring-yank-pointer
+  |                       |
+  |                       v
+  |     --- ---          --- ---      --- ---
+   --> |   |   |------> |   |   |--> |   |   |--> nil
+        --- ---          --- ---      --- ---
+         |                |            |
+         |                |            |
+         |                |             -->"yet older text"
+         |                |
+         |                 --> "a different piece of text"
+         |
+          --> "some text"
+@end group
+@end example
+
+@noindent
+这种状态可能发生在 @kbd{C-y} (@code{yank}) 之后，紧接着是 @kbd{M-y} (@code{yank-pop})。
+
+@defvar kill-ring
+该变量保存被杀死的文本序列的列表，最近被杀死的文本序列最先被杀死。
+@end defvar
+
+@defvar kill-ring-yank-pointer
+该变量的值指示杀死环的哪个元素位于环的前面以进行猛拉。  更准确地说，该值是 @code{kill-ring} 值的尾部，其 @sc{car} 是 @kbd{C-y} 应该拉出的终止字符串。
+@end defvar
+
+@defopt kill-ring-max
+该变量的值是在元素最终被丢弃之前杀戮环可以增长的最大长度。  @code{kill-ring-max} 的默认值为 120。
+@end defopt
+
+@node Undo
+@section 撤消
+@cindex redo
+
+大多数缓冲区都有一个@dfn{undo list}，它记录对缓冲区文本所做的所有更改，以便可以撤消它们。  （没有的缓冲区通常是特殊用途的缓冲区，Emacs 认为撤消对这些缓冲区没有用处。特别是，任何名称以空格开头的缓冲区默认都会关闭其撤消记录；请参阅@ref{Buffer Names}。）所有修改缓冲区中文本的原语都会自动将元素添加到撤消列表的前面，该列表位于变量@code{buffer-undo-list} 中。
+
+@defvar buffer-undo-list
+该缓冲区局部变量的值是当前缓冲区的撤消列表。  值@code{t}禁用撤消信息的记录。
+@end defvar
+
+以下是撤消列表可以具有的元素类型：
+
+@table @code
+@item @var{position}
+此类元素记录了point的前一个值；撤消此元素会将点移动到@var{position}。  普通的光标移动不会进行任何类型的撤消记录，但删除操作使用这些条目来记录点在命令之前的位置（如果通过撤消删除重新插入已删除的文本不会将点放置在正确的位置）。  需要通过撤消命令来确保正确恢复点的 Lisp 程序可以显式将 @code{(point)} 推送到 @code{buffer-undo-list} 来记录要恢复的位置。
+
+@item (@var{beg} . @var{end})
+此类元素指示如何删除插入的文本。插入后，文本占据缓冲区中的范围 @var{beg}--@var{end}。
+
+@item (@var{text} . @var{position})
+此类元素指示如何重新插入已删除的文本。删除的文本本身是字符串@var{text}。  重新插入的位置是@code{(abs @var{position})}。  如果 2⁣ 为正，则点位于已删除文本的开头，否则位于末尾。  零个或多个 (@var{marker} ​​. @var{adjustment}) 个元素紧跟在该元素之后。
+
+@item (t . @var{time-flag})
+这种元素表明未修改的缓冲区已被修改。  @var{time-flag} 是一个非整数 Lisp 时间戳，表示所访问的文件自上次访问或保存时起的修改时间，使用与 @code{current-time} 相同的格式；见@ref{Time of Day}。 @var{time-flag} 为 0 表示缓冲区不对应任何文件； @minus{}1 表示之前访问的文件不存在。 @code{primitive-undo} 使用这些值来确定是否再次将缓冲区标记为未修改；仅当文件的状态与 @var{time-flag} 的状态匹配时才会执行此操作。
+
+@item (nil @var{property} @var{value} @var{beg} . @var{end})
+这种元素记录文本属性的变化。以下是撤消更改的方法：
+
+@example
+(put-text-property @var{beg} @var{end} @var{property} @var{value})
+@end example
+
+@item (@var{marker} . @var{adjustment})
+这种元素记录了标记@var{marker}由于周围文本的删除而重新定位的事实，并且它移动了@var{adjustment}字符位置。  如果标记的位置与撤消列表中其前面的 (@var{text} . @var{position}) 元素一致，则撤消此元素会移动 @var{marker} @minus{} @var{adjustment} 个字符。
+
+@item (apply @var{funname} . @var{args})
+这是一个可扩展的撤消项，通过使用参数 @var{args} 调用 @var{funname} 来撤消。
+
+@item (apply @var{delta} @var{beg} @var{end} @var{funname} . @var{args})
+这是一个可扩展的撤消项，它记录限制在 @var{beg} 到 @var{end} 范围内的更改，这将缓冲区的大小增加了 @var{delta} 个字符。  通过使用参数 @var{args} 调用 @var{funname} 可以撤消它。
+
+这种元素可以将撤消限制在某个区域，以确定该元素是否属于该区域。
+
+@item nil
+该元素是一个边界。  两个边界之间的元素称为 @dfn{change group}；通常，每个更改组对应一个键盘命令，而撤消命令通常将整个组作为一个单元撤消。
+@end table
+
+@defun undo-boundary
+该函数将边界元素放置在撤消列表中。  撤消命令在这样的边界处停止，并且连续的撤消命令撤消到越来越早的边界。  该函数返回@code{nil}。
+
+显式调用此函数对于将命令的效果拆分为多个单元非常有用。  例如，@code{query-replace}在每次替换后调用@code{undo-boundary}，以便用户可以逐一撤消各个替换。
+
+然而，大多数情况下，该函数会在适当的时间自动调用。
+@end defun
+
+@defun undo-auto-amalgamate
+@cindex amalgamating commands, and undo
+@vindex amalgamating-undo-limit
+编辑器命令循环在执行每个按键序列之前自动调用 @code{undo-boundary}，以便每次撤消通常撤消一个命令的效果。  一些特殊命令是@dfn{amalgamating}：这些命令通常会导致缓冲区发生微小变化，因此仅每 20 个命令插入一个边界，从而允许作为一个组撤消更改。  默认情况下，生成自插入输入字符 (@pxref{Commands for Insertion}) 的命令 @code{self-insert-command} 和删除字符 (@pxref{Deletion}) 的命令 @code{delete-char} 是合并的。当一个命令影响多个缓冲区的内容时，例如，当@code{post-command-hook}上的函数影响@code{current-buffer}以外的缓冲区时，将在每个受影响的缓冲区中调用@code{undo-boundary}。
+
+该函数可以在合并命令之前调用。  如果进行了一系列此类调用，它将删除之前的 @code{undo-boundary}。
+
+可以合并的最大更改数量由 @code{amalgamating-undo-limit} 变量控制。  如果此变量为 1，则不会合并任何更改。
+@end defun
+
+Lisp 程序可以通过调用 @code{undo-amalgamate-change-group} (@pxref{Atomic Changes}) 将一系列更改合并到单个更改组中。  请注意，@code{amalgamating-undo-limit} 对该函数生成的组没有影响。
+
+@defvar undo-auto-current-boundary-timer
+即使没有命令正在执行，某些缓冲区（例如进程缓冲区）也可能会发生变化。  在这些情况下，@code{undo-boundary} 通常由该变量中的计时器定期调用。  将此变量设置为非 @code{nil} 可防止此行为。
+@end defvar
+
+@defvar undo-in-progress
+该变量通常为@code{nil}，但撤消命令将其绑定到@code{t}。  这样，各种更改挂钩就可以知道何时为了撤消而调用它们。
+@end defvar
+
+@defun primitive-undo count list
+这是撤消撤消列表元素的基本功能。它撤消 @var{list} 的前 @var{count} 元素，返回 @var{list} 的其余部分。
+
+@code{primitive-undo} 在更改缓冲区时将元素添加到缓冲区的撤消列表中。  撤消命令通过在撤消操作序列的开始处保存撤消列表值来避免混淆。  然后撤消操作使用并更新保存的值。  通过撤消添加的新元素不是此保存值的一部分，因此它们不会干扰继续撤消。
+
+该函数不绑定@code{undo-in-progress}。
+@end defun
+
+@defmac with-undo-amalgamate body@dots{}
+该宏删除在执行 @var{body} 期间插入的所有撤消边界，以便可以作为单个步骤撤消。
+@end defmac
+
+@cindex @code{undo-inhibit-region} (symbol property)
+某些命令在执行后使该区域保持活动状态，从而干扰对该命令的选择性撤消。  要使 @code{undo} 在此类命令之后立即调用时忽略活动区域，请将命令功能符号的属性 @code{undo-inhibit-region} 设置为非 @code{nil} 值。  @xref{Standard Properties}。
+
+@node Maintaining Undo
+@section 维护撤消列表
+
+本节介绍如何启用和禁用给定缓冲区的撤消信息。  它还解释了如何自动截断撤消列表，使其不会变得太大。
+
+在新创建的缓冲区中记录撤消信息通常是在开始时启用的；但如果缓冲区名称以空格开头，则撤消记录最初会被禁用。  您可以使用以下两个函数显式启用或禁用撤消录制，或者通过自行设置 @code{buffer-undo-list} 来启用或禁用撤消录制。
+
+@deffn Command buffer-enable-undo &optional buffer-or-name
+该命令允许记录缓冲区@var{buffer-or-name}的撤消信息，以便可以撤消后续更改。  如果未提供参数，则使用当前缓冲区。  如果缓冲区中已启用撤消记录，则此函数不会执行任何操作。  它返回@code{nil}。
+
+在交互式调用中，@var{buffer-or-name} 是当前缓冲区。您不能指定任何其他缓冲区。
+@end deffn
+
+@deffn Command buffer-disable-undo &optional buffer-or-name
+@cindex disabling undo
+该函数丢弃@var{buffer-or-name}的撤消列表，并禁止进一步记录撤消信息。  因此，无法再撤消先前的更改或任何后续更改。  如果@var{buffer-or-name}的撤消列表已被禁用，则此功能无效。
+
+在交互式调用中，BUFFER-OR-NAME 是当前缓冲区。  您不能指定任何其他缓冲区。  该函数返回@code{nil}。
+@end deffn
+
+随着编辑的继续，撤消列表变得越来越长。  为了防止它们耗尽所有可用内存空间，垃圾收集会将它们修剪回您可以设置的大小限制。  （为此，撤消列表的大小测量组成列表的 cons 单元格以及已删除文本的字符串。）三个变量控制可接受大小的范围：@code{undo-limit}、@code{undo-strong-limit} 和 @code{undo-outer-limit}。  在这些变量中，大小计算为占用的字节数，其中包括保存的文本和其他数据。
+
+@defopt undo-limit
+这是可接受的撤消列表大小的软限制。  超过此大小的更改组是最后保留的更改组。
+@end defopt
+
+@defopt undo-strong-limit
+这是可接受的撤消列表大小的上限。  超过此大小的更改组本身将被丢弃（以及所有较旧的更改组）。  有一个例外：只有当最新的更改组超过 @code{undo-outer-limit} 时才会被丢弃。
+@end defopt
+
+@defopt undo-outer-limit
+如果在垃圾回收时当前命令的撤消信息超过此限制，Emacs 将丢弃该信息并显示警告。这是防止内存溢出的最后一搏限制。
+@end defopt
+
+@defopt undo-ask-before-discard
+如果该变量为非@code{nil}，则当撤消信息超过@code{undo-outer-limit}时，Emacs 在回显区域询问是否丢弃该信息。  默认值为@code{nil}，表示自动丢弃。
+
+该选项主要用于调试。  提问时垃圾收集会被禁止，这意味着如果用户在回答问题之前等待太久，Emacs 可能会泄漏内存。
+@end defopt
+
+@node Filling
+@section 填充
+@cindex filling text
+
+@dfn{Filling} 表示调整线的长度（通过移动换行符），使它们接近（但不大于）指定的最大宽度。  此外，行可以是@dfn{justified}，这意味着插入空格以使左侧和/或右侧边距精确对齐。  宽度由变量@code{fill-column}控制。为了便于阅读，行数不应超过 70 列左右。
+
+您可以使用自动填充模式 (@pxref{Auto Filling}) 在插入文本时自动填充文本，但对现有文本的更改可能会导致填充不正确。  然后您必须明确地填写文本。
+
+本节中的大多数命令返回没有意义的值。  所有进行填充的函数都会记录当前的左边距、当前的右边距和当前的对齐方式 (@pxref{Margins})。  如果当前的对齐方式为@code{none}，则填充函数实际上不会执行任何操作。
+
+几个填充函数都有一个参数@var{justify}。如果它是非@code{nil}，则需要某种理由。  它可以是 @code{left}、@code{right}、@code{full} 或 @code{center}，以请求特定的理由样式。  如果是@code{t}，则意味着对这部分文本使用当前的对齐方式（请参见下面的@code{current-justification}）。  任何其他值都被视为 @code{full}。
+
+当您以交互方式调用填充函数时，使用前缀参数意味着 @var{justify} 的值为 @code{full}。
+
+@deffn Command fill-paragraph &optional justify region
+此命令在该点或该点之后填充段落。  如果@var{justify}非@code{nil}，则每行也对齐。它使用普通的段落运动命令来查找段落边界。  @xref{Paragraphs,,, emacs, The GNU Emacs Manual}。
+
+当 @var{region} 为非 @code{nil} 时，如果启用了瞬态标记模式并且标记处于活动状态，则此命令调用 @code{fill-region} 来填充区域中的所有段落，而不是仅填充当前段落。  当交互调用该命令时，@var{region} 为 @code{t}。
+@end deffn
+
+@deffn Command unfill-paragraph arg &optional beg end
+此命令与上一个命令相反：它将当前段落的行连接起来。  使用数字前缀参数@var{arg}，它将操作应用于多个段落。  如果没有前缀参数和活动区域，则取消填充该区域中的每个段落。  当使用 @var{arg} @code{nil} 和 @var{beg} 以及 @var{end} 非 @code{nil} 从 Lisp 调用时，填充由 @var{beg} 和 @var{end} 界定的区域中的段落。
+@end deffn
+
+@deffn Command fill-region start end &optional justify nosqueeze to-eop
+此命令填充从 @var{start} 到 @var{end} 区域中的每个段落。  It justifies as well if @var{justify} is non-@code{nil}.
+
+如果@var{nosqueeze}非@code{nil}，则意味着除了换行符之外的空白保持不变。  如果@var{to-eop}不是@code{nil}，则意味着继续填充到段落末尾——或者下一个硬换行符，如果@code{use-hard-newlines}已启用（见下文）。
+
+变量@code{paragraph-separate}控制如何区分段落。  @xref{Standard Regexps}。
+@end deffn
+
+@defun pixel-fill-region start end pixel-width
+大多数 Emacs 缓冲区使用等宽文本，因此所有填充函数（如 @code{fill-region}）都基于字符数和 @code{char-width} 工作。  但是，Emacs 可以呈现其他类型的内容，例如包含图像和使用比例字体的文本，并且 @code{pixel-fill-region} 可以处理该问题。  它以像素粒度填充 @var{start} 和 @var{end} 之间的文本区域，因此无论字符大小如何，使用可变间距字体或几种不同字体的文本看起来都会被填充。  参数@var{pixel-width}指定填充后线条允许的最大像素宽度；它的像素分辨率相当于@code{fill-region}中的@code{fill-column}。  例如，这个 Lisp 代码片段将使用比例字体插入文本，然后将其填充为不宽于 300 像素：
+
+@lisp
+(insert (propertize
+	 "This is a sentence that's ends here."
+	 'face 'variable-pitch))
+(pixel-fill-region (point) (point-max) 300)
+@end lisp
+
+如果 @var{start} 不在行的开头，则 @var{start} 的水平位置（转换为像素单位）将用作后续行的缩进前缀。
+
+@findex pixel-fill-width
+@code{pixel-fill-width} 辅助函数可用于计算要使用的像素宽度。  如果没有给出任何参数，它将返回一个略小于当前窗口宽度的值。  第一个可选值 @var{columns} 使用标准等宽字体指定列数，例如 @code{fill-column}。  The second optional value is the window to use.  You'd typically use it like this:
+
+@lisp
+(pixel-fill-region
+  start end (pixel-fill-width fill-column))
+@end lisp
+@end defun
+
+@deffn Command fill-individual-paragraphs start end &optional justify citation-regexp
+此命令根据其各自的填充前缀填充区域中的每个段落。  因此，如果段落的行缩进有空格，则填充的段落将以相同的方式保持缩进。
+
+前两个参数@var{start}和@var{end}是要填充区域的开始和结束。  第三个和第四个参数 @var{justify} 和 @var{citation-regexp} 是可选的。  如果@var{justify}非@code{nil}，则段落将被对齐并被填充。  如果@var{citation-regexp}非@code{nil}，则意味着该函数正在对邮件消息进行操作，因此不应填充标题行。  如果@var{citation-regexp}是字符串，则将其用作正则表达式；如果它与行的开头匹配，则该行被视为引用标记。
+
+@c FIXME: "That mode" is confusing.  It isn't a major/minor mode.
+通常，@code{fill-individual-paragraphs}将每次缩进变化视为开始一个新段落。  如果@code{fill-individual-varying-indent}非@code{nil}，则仅分隔线分隔段落。  该模式可以处理缩进的段落，并在第一行添加额外的缩进。
+@end deffn
+
+@defopt fill-individual-varying-indent
+该变量改变 @code{fill-individual-paragraphs} 的作用，如上所述。
+@end defopt
+
+@deffn Command fill-region-as-paragraph start end &optional justify nosqueeze squeeze-after
+此命令将文本区域视为单个段落并填充它。  该命令的行为由变量 @code{fill-region-as-paragraph-function} 控制，默认实现为 @code{fill-region-as-paragraph-default}，下面将详细介绍。
+
+如果该区域由许多段落组成，则段落之间的空行将被删除。  当@var{justify} 为非@code{nil} 时，该函数会进行对齐和填充。
+
+如果@var{nosqueeze}非@code{nil}，则意味着除了换行符之外的空白保持不变。  如果@var{squeeze-after}是非@code{nil}，它指定区域中的一个位置，并且意味着该位置之前除换行符之外的空白应保持不变。
+
+在自适应填充模式下，此命令默认调用 @code{fill-context-prefix} 选择填充前缀。  @xref{Adaptive Fill}。
+@end deffn
+
+@deffn Command justify-current-line &optional how eop nosqueeze
+此命令在当前行的单词之间插入空格，以便该行恰好在 @code{fill-column} 处结束。  它返回@code{nil}。
+
+参数@var{how}（如果非@code{nil}）明确指定了理由的风格。  它可以是 @code{left}、@code{right}、@code{full}、@code{center} 或 @code{none}。  如果是@code{t}，则意味着遵循指定的对齐方式（参见下面的@code{current-justification}）。  @code{nil} 的意思是完全称义。
+
+如果@var{eop}非@code{nil}，则意味着如果@code{current-justification}指定完全对齐，则仅进行左对齐。  这用于段落的最后一行；即使整个段落是完全合理的，最后一行也不应该如此。
+
+如果@var{nosqueeze}非@code{nil}，则意味着不更改内部空白。
+@end deffn
+
+@defopt default-justification
+此变量的值指定用于未使用文本属性指定样式的文本的对齐方式。  可能的值为 @code{left}、@code{right}、@code{full}、@code{center} 或 @code{none}。  默认值为@code{left}。
+@end defopt
+
+@defun current-justification
+此函数返回正确的对齐样式，用于填充点周围的文本。
+
+这将返回该点处 @code{justification} 文本属性的值，如果没有此类文本属性，则返回变量 @code{default-justification}。  但是，它返回 @code{nil} 而不是 @code{none} 来表示“不要证明”。
+@end defun
+
+@defopt sentence-end-double-space
+@anchor{Definition of sentence-end-double-space}
+如果该变量为非@code{nil}，则句点后跟一个空格不算作句子的结尾，并且填充函数会避免在此类位置断行。
+@end defopt
+
+@defopt sentence-end-without-period
+如果该变量为非@code{nil}，则句子可以不带句点结束。  这用于泰语等语言，其中句子以双空格结尾，但没有句号。
+@end defopt
+
+@defopt sentence-end-without-space
+如果这个变量是非@code{nil}，它应该是一个字符串，可以结束一个句子，后面不带空格。
+@end defopt
+
+@defopt fill-separate-heterogeneous-words-with-space
+如果该变量为非@code{nil}，则两个不同种类的单词（例如英语和中日韩）在连接一行末尾的一个和下一行开头的另一个单词进行填充时将用空格分隔。
+@end defopt
+
+@defvar fill-paragraph-function
+该变量提供了一种覆盖段落填充的方法。如果其值为非 @code{nil}，则 @code{fill-paragraph} 调用此函数来完成工作。  如果函数返回非 @code{nil} 值，则 @code{fill-paragraph} 假定作业已完成，并立即返回该值。
+
+该功能的通常用途是在编程语言模式中填充注释。  如果该函数需要以通常的方式填充一个段落，可以这样做：
+
+@example
+(let ((fill-paragraph-function nil))
+  (fill-paragraph arg))
+@end example
+@end defvar
+
+@defvar fill-forward-paragraph-function
+此变量提供了一种方法来覆盖填充函数（例如 @code{fill-region} 和 @code{fill-paragraph}）如何前进到下一段。  它的值应该是一个函数，使用单个参数 @var{n}（要移动的段落数）调用，并且应该返回 @var{n} 与实际移动的段落数之间的差值。  该变量的默认值为@code{forward-paragraph}。  @xref{Paragraphs,,, emacs, The GNU Emacs Manual}。
+@end defvar
+
+@defvar fill-region-as-paragraph-function
+此变量提供了一种覆盖 @code{fill-paragraph} 和 @code{fill-region} 等函数填充文本方式的方法。  它的值应该是一个函数，它应该接受 @code{fill-region-as-paragraph} 定义的参数并返回用于填充的填充前缀。  该变量的默认值为@code{fill-region-as-paragraph-default}。
+@end defvar
+
+@defvar use-hard-newlines
+如果此变量非 @code{nil}，则填充函数不会删除具有 @code{hard} 文本属性的换行符。  这些硬换行符充当段落分隔符。  @xref{Hard and Soft Newlines,, Hard and Soft Newlines, emacs, The GNU Emacs Manual}。
+@end defvar
+
+@node Margins
+@section 填充边距
+@cindex margins, filling
+
+@defopt fill-prefix
+该缓冲区局部变量，如果非 0⁣，则指定出现在普通文本行开头的文本字符串，在填充它们时应忽略它们。  任何未能以 fill 前缀开头的行都被视为段落的开头；任何以填充前缀开头，后跟附加空格的行也是如此。以填充前缀开头但没有附加空格的行是可以一起填充的普通文本行。  生成的填充行也以填充前缀开头。
+
+填充前缀位于左边距空白（如果有）之后。
+@end defopt
+
+@defopt fill-column
+该缓冲区局部变量指定填充行的最大宽度。它的值应该是一个整数，即多列。  所有填充、对齐和居中命令均受此变量影响，包括自动填充模式 (@pxref{Auto Filling})。
+
+实际上，如果您正在编写供其他人阅读的文本，则应将 @code{fill-column} 设置为不超过 70。否则，该行将太长，人们无法舒适地阅读，并且这会使文本显得笨拙。
+
+@code{fill-column} 的默认值为 70。要在特定模式下禁用自动填充模式，您可以这样说：
+
+@lisp
+(add-hook 'foo-mode-hook (lambda () (auto-fill-mode -1))
+@end lisp
+@end defopt
+
+@deffn Command set-left-margin from to margin
+这会将从 @var{from} 到 @var{to} 的文本上的 @code{left-margin} 属性设置为值 @var{margin}。  如果启用自动填充模式，此命令还会重新填充该区域以适应新的边距。
+@end deffn
+
+@deffn Command set-right-margin from to margin
+这会将从 @var{from} 到 @var{to} 的文本上的 @code{right-margin} 属性设置为值 @var{margin}。  如果启用自动填充模式，此命令还会重新填充该区域以适应新的边距。
+@end deffn
+
+@defun current-left-margin
+此函数返回正确的左边距值，用于填充点周围的文本。  该值是当前行开头字符的 @code{left-margin} 属性（如果没有则为零）与变量 @code{left-margin} 的值之和。
+@end defun
+
+@defun current-fill-column
+此函数返回正确的填充列值，用于填充点周围的文本。  该值是 @code{fill-column} 变量的值减去点之后字符的 @code{right-margin} 属性的值。
+@end defun
+
+@deffn Command move-to-left-margin &optional n force
+该函数将点移动到当前行的左边距。  移动到的列是通过调用函数@code{current-left-margin}来确定的。  如果参数 @var{n} 是非 @code{nil}，则 @code{move-to-left-margin} 首先向前移动 @var{n}@minus{}1 行。
+
+如果 @var{force} 是非 @code{nil}，则表示如果与左边距值不匹配，则修复行的缩进。
+@end deffn
+
+@defun delete-to-left-margin &optional from to
+此函数删除 @var{from} 和 @var{to} 之间文本的左边距缩进。  要删除的缩进量通过调用 @code{current-left-margin} 确定。  在任何情况下，该函数都不会删除非空白字符。  如果省略 @var{from} 和 @var{to} ，则它们默认为整个缓冲区。
+@end defun
+
+@defun indent-to-left-margin
+该函数将当前行开头的缩进调整为变量@code{left-margin}指定的值。  （这可能涉及插入或删除空格。）该函数是段落缩进文本模式下 @code{indent-line-function} 的值。
+@end defun
+
+@defopt left-margin
+该变量指定基础左边距列。  在基本模式下，@key{RET} 缩进至此列。  当以任何方式设置时，该变量会自动成为缓冲区本地变量。
+@end defopt
+
+@defopt fill-nobreak-predicate
+该变量为主要模式提供了一种指定不在某些位置断行的方法。  它的值应该是一个函数列表。  每当填充考虑在缓冲区中的某个位置断行时，它都会不带参数且使用位于该位置的点来调用每个函数。  如果任何函数返回非@code{nil}，则该行不会被中断。
+@end defopt
+
+@node Adaptive Fill
+@section 自适应填充模式
+@c @cindex Adaptive Fill mode  "adaptive-fill-mode" is adjacent.
+
+当启用 @dfn{Adaptive Fill Mode} 时，Emacs 自动根据每个正在填充的段落中的文本确定填充前缀，而不是使用预定值。  在填充过程中，此填充前缀会插入到段落的第二行及后续行的开头，如@ref{Filling}和@ref{Auto Filling}中所述。
+
+@defopt adaptive-fill-mode
+当该变量为非@code{nil} 时，启用自适应填充模式。默认为@code{t}。
+@end defopt
+
+@defun fill-context-prefix from to
+该函数实现了自适应填充模式的核心；它根据 @var{from} 和 @var{to} 之间的文本（通常是段落的开头和结尾）选择填充前缀。  它通过根据下面描述的变量查看段落的前两行来实现这一点。
+@c The optional argument first-line-regexp is not documented
+@c because it exists for internal purposes and might be eliminated
+@c in the future.
+
+通常，此函数返回填充前缀，即一个字符串。  然而，在执行此操作之前，该函数会进行最终检查（下文中未特别提及），以确保以此前缀开头的行看起来不像段落的开头。  如果发生这种情况，该函数会通过返回 @code{nil} 来发出异常信号。
+
+详细来说，@code{fill-context-prefix} 的作用是：
+
+@enumerate
+@item
+它从第一行获取填充前缀的候选者——它首先尝试 @code{adaptive-fill-function} 中的函数（如果有），然后尝试正则表达式 @code{adaptive-fill-regexp}（见下文）。其中第一个非 2⁣ 结果，或者如果它们都是 3⁣ 则为空字符串，成为第一行的候选。
+@item
+如果该段落还只有一行，该函数将测试刚刚找到的候选前缀的有效性。  然后，如果候选值有效，该函数将返回该候选值，否则返回一串空格。 （参见下面@code{adaptive-fill-first-line-regexp}的描述）。
+@item
+当段落已经有两行时，该函数接下来在第二行上查找前缀候选，其方式与第一行相同。  如果没有找到，则返回@code{nil}。
+@item
+该函数现在试探性地比较两个候选前缀：如果第 2 行候选中的非空白字符在第 1 行候选中以相同的顺序出现，则该函数返回第 2 行候选。  否则，它返回两个候选者共有的最大初始子字符串（可能是空字符串）。
+@end enumerate
+@end defun
+
+@defopt adaptive-fill-regexp
+自适应填充模式将此正则表达式与行中左边距空白（如果有）之后开始的文本进行匹配；它匹配的字符是该行填充前缀的候选字符。
+
+默认值与混合有某些标点符号的空格相匹配。
+@end defopt
+
+@defopt adaptive-fill-first-line-regexp
+此正则表达式仅在单行段落中使用，充当对一个可用候选填充前缀的有效性的附加检查：候选必须匹配此正则表达式，或匹配@code{comment-start-skip}。  如果没有，@code{fill-context-prefix} 会用与其宽度相同的空格字符串替换候选者。
+
+该变量的默认值为@w{@code{"\\`[ \t]*\\'"}}，仅匹配空白字符串。  此默认值的效果是强制单行段落中的填充前缀始终为纯空白。
+@end defopt
+
+@defopt adaptive-fill-function
+您可以通过将此变量设置为函数来指定自动选择填充前缀的更复杂的方法。  该函数在行的左边距（如果有）之后使用点调用，并且必须保留点。  它应该返回该行的填充前缀或 @code{nil}，这意味着它无法确定前缀。
+@end defopt
+
+@node Auto Filling
+@section 自动填充
+@cindex filling, automatic
+@cindex Auto Fill mode
+
+自动填充模式是一种次要模式，可在插入文本时自动填充行。  @xref{Auto Fill,,, emacs, The GNU Emacs Manual}。  本节介绍自动填充模式使用的一些变量。  有关可以显式调用以填充和对齐现有文本的函数的说明，请参阅@ref{Filling}。
+
+自动填充模式还启用了更改边距和对齐方式以重新填充文本部分的功能。  @xref{Margins}。
+
+@defvar auto-fill-function
+该缓冲区局部变量的值应该是一个函数（无参数），在从表@code{auto-fill-chars}中自行插入字符后调用，请参见下文。  它可能是@code{nil}，在这种情况下不做任何特殊处理。
+
+当自动填充模式启用时，@code{auto-fill-function} 的值为@code{do-auto-fill}。  该函数的唯一目的是实现通常的断线策略。
+@end defvar
+
+@defvar normal-auto-fill-function
+该变量指定在自动填充打开时用于 @code{auto-fill-function} 的函数。  主要模式可以为此变量设置缓冲区本地值，以改变自动填充的工作方式。
+@end defvar
+
+@defvar auto-fill-chars
+一个字符表，在大多数语言环境中自插入时调用 @code{auto-fill-function}——空格和换行符。  他们在表中有一个条目@code{t}。
+@end defvar
+
+@defopt comment-auto-fill-only-comments
+该变量如果非@code{nil}，则表示仅在注释内自动填充行。  更准确地说，这意味着如果为当前缓冲区定义了注释语法，那么在注释之外自行插入字符将不会调用@code{auto-fill-function}。
+@end defopt
+
+
+@node Sorting
+@section 文本排序
+@cindex sorting text
+
+本节中描述的排序函数都会重新排列缓冲区中的文本。  这与函数 @code{sort} 形成对比，后者重新排列列表元素的顺序 (@pxref{Rearrangement})。这些函数返回的值没有意义。
+
+@defun sort-subr reverse nextrecfun endrecfun &optional startkeyfun endkeyfun predicate
+该函数是通用的文本排序例程，它将缓冲区细分为记录，然后对它们进行排序。  本节中的大多数命令都使用此函数。
+
+要理解 @code{sort-subr} 的工作原理，请将缓冲区的整个可访问部分视为被划分为称为 @dfn{sort records} 的不相交部分。  这些记录可以是连续的，也可以是不连续的，但它们不能重叠。  每个排序记录的一部分（可能是全部）被指定为排序键。  排序按记录的排序键重新排列记录。
+
+通常，记录按升序排序键重新排列。如果 @code{sort-subr} 函数的第一个参数 @var{reverse} 为非 @code{nil}，则排序记录将按降序排序键重新排列。
+
+@code{sort-subr} 接下来的四个参数是被调用以在排序记录中移动点的函数。  他们从内部被多次调用@code{sort-subr}。
+
+@enumerate
+@item
+@var{nextrecfun} 是用记录末尾的点来调用的。  该函数将指针移动到下一条记录的开头。  假设第一条记录从调用 @code{sort-subr} 时的位置开始。  因此，在调用 @code{sort-subr} 之前，您通常应该将指针移动到缓冲区的开头。
+
+该函数可以通过在缓冲区末尾留下点来指示不再有排序记录。
+
+@item
+@var{endrecfun} 用记录内的点来调用。  它将指针移动到记录的末尾。
+
+@item
+调用 @var{startkeyfun} 将点从记录的开头移动到排序键的开头。  该参数是可选的；如果省略，则整个记录就是排序键。  如果提供，该函数应该返回一个非@code{nil}值用作排序键，或者返回@code{nil}以指示排序键位于从点开始的缓冲区中。  在后一种情况下，调用 @var{endkeyfun} 来查找排序键的末尾。
+
+@item
+调用 @var{endkeyfun} 将点从排序键的开头移动到排序键的结尾。  该参数是可选的。  如果 @var{startkeyfun} 返回 @code{nil} 并且省略该参数（或 @code{nil}），则排序键将延伸到记录的末尾。  如果@var{startkeyfun}返回非@code{nil}值，则不需要@var{endkeyfun}。
+@end enumerate
+
+参数 @var{predicate} 是用于比较键的函数。它使用两个参数（即要比较的键）调用，并且如果第一个键按排序顺序位于第二个键之前，则应返回非@code{nil}。  关键参数到底是什么取决于 @var{startkeyfun} 和 @var{endkeyfun} 返回的内容。  如果省略 @var{predicate} 或 @code{nil}，则如果键是数字，则默认为 @code{<}；如果键是 cons 单元（其 @code{car} 和 @code{cdr} 是键的开始和结束缓冲区位置），则默认为 @code{compare-buffer-substrings}；否则默认为 @code{string<}（假设键是字符串）。
+
+作为 @code{sort-subr} 的示例，以下是 @code{sort-lines} 的完整函数定义：
+
+@example
+@group
+;; @r{Note that the first two lines of doc string}
+;; @r{are effectively one line when viewed by a user.}
+(defun sort-lines (reverse beg end)
+  "Sort lines in region alphabetically;\
+ argument means descending order.
+Called from a program, there are three arguments:
+@end group
+@group
+REVERSE (non-nil means reverse order),\
+ BEG and END (region to sort).
+The variable `sort-fold-case' determines\
+ whether alphabetic case affects
+the sort order."
+@end group
+@group
+  (interactive "P\nr")
+  (save-excursion
+    (save-restriction
+      (narrow-to-region beg end)
+      (goto-char (point-min))
+      (let ((inhibit-field-text-motion t))
+        (sort-subr reverse 'forward-line 'end-of-line)))))
+@end group
+@end example
+
+这里 @code{forward-line} 将指针移动到下一条记录的开头，而 @code{end-of-line} 将指针移动到记录的末尾。  我们不传递参数@var{startkeyfun}和@var{endkeyfun}，因为整个记录用作排序键。
+
+@code{sort-paragraphs} 函数非常相似，除了它的 @code{sort-subr} 调用如下所示：
+
+@example
+@group
+(sort-subr reverse
+           (lambda ()
+             (while (and (not (eobp))
+                         (looking-at paragraph-separate))
+               (forward-line 1)))
+           'forward-paragraph)
+@end group
+@end example
+
+@code{sort-subr} 返回后，指向任何排序记录的标记都没有任何有用的位置。
+@end defun
+
+@defopt sort-fold-case
+如果该变量非 @code{nil}，@code{sort-subr} 和其他缓冲区排序函数在比较字符串时会忽略大小写。
+@end defopt
+
+@deffn Command sort-regexp-fields reverse record-regexp key-regexp start end
+此命令按照 @var{record-regexp} 和 @var{key-regexp} 指定的字母顺序对 @var{start} 和 @var{end} 之间的区域进行排序。如果@var{reverse}是负整数，则按相反顺序排序。
+
+按字母顺序排序意味着通过比较每个排序键的第一个字符、每个第二个字符等来比较两个排序键。  如果发现不匹配，则说明排序键不相等；在第一个不匹配点处字符较小的排序键是较小的排序键。  各个字符根据 Emacs 字符集中的数字字符代码进行比较。
+
+@var{record-regexp} 参数的值指定如何将缓冲区划分为排序记录。  在每条记录的末尾，都会搜索该正则表达式，并将与其匹配的文本作为下一条记录。  例如，正则表达式 @samp{^.+$} 匹配除了换行符之外至少有一个字符的行，将使每个这样的行成为一个排序记录。  @xref{Regular Expressions}，用于描述正则表达式的语法和含义。
+
+@var{key-regexp} 参数的值指定每个记录的哪一部分是排序键。  @var{key-regexp} 可以匹配整个记录，也可以只匹配一部分。  在后一种情况下，记录的其余部分对记录的排序顺序没有影响，但当记录移动到新位置时，它会被保留。
+
+@var{key-regexp} 参数可以引用与 @var{record-regexp} 的子表达式匹配的文本，或者它本身可以是正则表达式。
+
+如果@var{key-regexp}是：
+
+@table @asis
+@item @samp{\@var{digit}}
+那么@var{record-regexp}中第@var{digit}括号分组匹配的文本就是排序键。
+
+@item @samp{\&}
+那么整个记录就是排序键。
+
+@item 正则表达式
+然后 @code{sort-regexp-fields} 在记录中搜索正则表达式的匹配项。  如果找到这样的匹配，它就是排序键。  如果记录中没有与 @var{key-regexp} 匹配的记录，则该记录将被忽略，这意味着它在缓冲区中的位置不会更改。  （其他记录可能会围绕它移动。）
+@end table
+
+例如，如果您计划按每行上以字母 @samp{f} 开头的第一个单词对区域中的所有行进行排序，则应将 @var{record-regexp} 设置为 @samp{^.*$} 并将 @var{key-regexp} 设置为 @samp{\<f\w*\>}。  结果表达式如下所示：
+
+@example
+@group
+(sort-regexp-fields nil "^.*$" "\\<f\\w*\\>"
+                    (region-beginning)
+                    (region-end))
+@end group
+@end example
+
+如果您以交互方式调用 @code{sort-regexp-fields}，它会提示在迷你缓冲区中输入 @var{record-regexp} 和 @var{key-regexp}。
+@end deffn
+
+@deffn Command sort-lines reverse start end
+此命令按字母顺序对 @var{start} 和 @var{end} 之间的区域中的行进行排序。  如果@var{reverse}非@code{nil}，则按相反顺序排序。
+@end deffn
+
+@deffn Command sort-paragraphs reverse start end
+此命令按字母顺序对 @var{start} 和 @var{end} 之间的区域中的段落进行排序。  如果@var{reverse}非@code{nil}，则按相反顺序排序。
+@end deffn
+
+@deffn Command sort-pages reverse start end
+此命令按字母顺序对 @var{start} 和 @var{end} 之间的区域中的页面进行排序。  如果@var{reverse}非@code{nil}，则按相反顺序排序。
+@end deffn
+
+@deffn Command sort-fields field start end
+此命令对@var{start}和@var{end}之间的区域中的行进行排序，并按每行的第@var{field}字段的字母顺序比较它们。  字段由空格分隔，并从 1 开始编号。如果 @var{field} 为负数，则按 @w{@minus{}@var{field}th} 字段从行尾开始排序。  该命令对于对表进行排序很有用。
+@end deffn
+
+@deffn Command sort-numeric-fields field start end
+此命令对 @var{start} 和 @var{end} 之间的区域中的行进行排序，并通过每行的第 2⁣ 字段对它们进行数字比较。  字段以空格分隔，并从 1 开始编号。指定的字段必须在该区域的每一行中包含一个数字。  以 0 开头的数字被视为八进制，以 3⁣ 开头的数字被视为十六进制。
+
+如果 0⁣ 为负数，则从行尾开始按 1⁣ 字段排序。  该命令对于对表进行排序很有用。
+@end deffn
+
+@defopt sort-numeric-base
+该变量指定 @code{sort-numeric-fields} 解析数字的默认基数。
+@end defopt
+
+@deffn Command sort-columns reverse &optional beg end
+此命令对 @var{beg} 和 @var{end} 之间的区域中的行进行排序，并按一定范围的列按字母顺序比较它们。  @var{beg} 和 @var{end} 的列位置限制了要排序的列的范围。
+
+如果@var{reverse}非@code{nil}，则按相反顺序排序。
+
+该命令的一个不寻常之处是包含位置 @var{beg} 的整行和包含位置 @var{end} 的整行都包含在已排序的区域中。
+
+请注意，@code{sort-columns} 拒绝包含制表符的文本，因为制表符可以跨指定的列进行拆分。  在排序之前使用 @kbd{M-x untabify} 将制表符转换为空格。
+
+如果可能的话，该命令实际上是通过调用 @code{sort} 实用程序来工作的。
+@end deffn
+
+@node Columns
+@section 计数列
+@cindex columns
+@cindex counting columns
+@cindex horizontal position
+
+列函数在字符位置（从缓冲区开头计算字符）和列位置（从行开头计算屏幕字符）之间进行转换。
+
+这些函数根据每个字符在屏幕上占据的列数来对每个字符进行计数。  这意味着控制字符算作占用 2 或 4 列，具体取决于 @code{ctl-arrow} 的值，制表符算作占用多个列，具体取决于 @code{tab-width} 的值以及制表符开始的列。  @xref{Usual Display}。
+
+列数计算忽略窗口的宽度和水平滚动量。  因此，列值可以任意高。  第一列（或最左边的列）编号为 0。除了不可见性之外，它们还忽略覆盖和文本属性。不可见文本被视为具有零宽度，除非 @code{buffer-invisibility-spec} 指定不可见文本应显示为省略号 (@pxref{Invisible Text})。
+
+@defun current-column
+此函数返回点的水平位置，以列为单位测量，从左边距 0 开始计数。  列位置是当前行的开头和点之间所有显示的字符表示形式的宽度之和。
+@end defun
+
+@deffn Command move-to-column column &optional force
+该函数将当前行中的点移动到@var{column}。  @var{column} 的计算考虑了行的起点和点之间字符的显示表示的宽度。
+
+当交互调用时，@var{column} 是前缀数字参数的值。  如果 1⁣ 不是整数，则会发出错误信号。
+
+@c This behavior used to be documented until 2013/08.
+@ignore
+If column @var{column} is beyond the end of the line, point moves to
+the end of the line.  If @var{column} is negative, point moves to the
+beginning of the line.
+@end ignore
+
+如果由于第 0 列位于多列字符（例如制表符）的中间而无法移动到该列，则点将移动到该字符的末尾。  然而，如果@var{force}不是@code{nil}，并且@var{column}位于制表符的中间，则@code{move-to-column}要么将制表符转换为空格（当@code{indent-tabs-mode}为@code{nil}时），要么在其前面插入足够的空格（否则），以便该点可以精确地移动到第@var{column}列。  尽管 @var{force} 其他多列字符可能会导致异常，因为无法分割它们。
+
+如果行的长度不足以到达列 @var{column}，则参数 @var{force} 也会产生影响；如果是@code{t}，则意味着在行尾添加空格以到达该列。
+
+返回值是实际移动到的列号。
+@end deffn
+
+@node Indentation
+@section 缩进
+@cindex indentation
+
+缩进函数用于检查、移动到和更改行首的空白。  某些函数还可以更改行中其他位置的空白。  列和缩进从左边距的零开始计数。
+
+@menu
+* Primitive Indent::       用于计算和插入缩进的函数。
+* Mode-Specific Indent::   自定义不同模式的缩进。
+* Region Indent::          缩进一个区域中的所有行。
+* Relative Indent::        根据前一行缩进当前行。
+* Indent Tabs::            可调节、类似打字机的制表位。
+* Motion by Indent::       移至第一个非空白字符。
+@end menu
+
+@node Primitive Indent
+@subsection 缩进原语
+
+本节介绍用于计算和插入缩进的原始函数。  以下部分中的函数使用这些原语。  @xref{Size of Displayed Text}，相关功能。
+
+@defun current-indentation
+@comment !!Type Primitive Function
+@comment !!SourceFile indent.c
+此函数返回当前行的缩进，即第一个非空白字符的水平位置。  如果内容完全空白，则这是行尾的水平位置。
+
+此函数将不可见文本视为宽度为零，除非 @code{buffer-invisibility-spec} 指定不可见文本应显示为省略号。  @xref{Invisible Text}。
+@end defun
+
+@deffn Command indent-to column &optional minimum
+@comment !!Type Primitive Function
+@comment !!SourceFile indent.c
+该函数从带有制表符和空格的点开始缩进，直到到达 @var{column}。  如果指定了@var{minimum}且非@code{nil}，则至少会插入那么多空格，即使这需要超出@var{column}。  否则，如果点已经超过@var{column}，则该函数不执行任何操作。  该值是插入的缩进结束的列。
+
+插入的空白字符从周围的文本（通常仅从前面的文本）继承文本属性。  @xref{Sticky Properties}。
+@end deffn
+
+@defopt indent-tabs-mode
+@comment !!SourceFile indent.c
+如果此变量为非@code{nil}，缩进函数可以插入制表符和空格。  否则，它们仅插入空格。  自动设置此变量使其成为当前缓冲区中的缓冲区本地变量。
+@end defopt
+
+@node Mode-Specific Indent
+@subsection 由主模式控制的缩进
+
+每个主要模式的一个重要功能是自定义 @key{TAB} 键以针对正在编辑的语言正确缩进。  本节介绍 @key{TAB} 键的机制以及如何控制它。本节中的函数返回不可预测的值。
+
+@deffn Command indent-for-tab-command &optional rigid
+这是在大多数编辑模式中绑定到 @key{TAB} 的命令。  它通常的操作是缩进当前行，但它也可以插入制表符或缩进一个区域。
+
+它的作用如下：
+
+@itemize
+@item 
+首先，它检查瞬态标记模式是否已启用以及该区域是否处于活动状态。  如果是这样，它会调用 @code{indent-region} 来缩进该区域 (@pxref{Region Indent}) 中的所有文本。
+
+@item 
+否则，如果 @code{indent-line-function} 中的缩进函数是 @code{indent-to-left-margin} （插入制表符的简单命令），或者如果变量 @code{tab-always-indent} 指定应该插入制表符（见下文），则它将插入制表符。
+
+@item 
+否则，缩进当前行；这是通过调用@code{indent-line-function}中的函数来完成的。  如果该行已经缩进，并且 @code{tab-always-indent} 的值为 @code{complete}（见下文），它会尝试在该点完成文本。
+@end itemize
+
+如果@var{rigid}是非@code{nil}（交互式地，带有前缀参数），那么在该命令缩进一行或插入制表符之后，它还会严格缩进从当前行开头开始的整个平衡表达式，以反映新的缩进。  如果命令缩进区域，则忽略此参数。
+@end deffn
+
+@defvar indent-line-function
+该变量的值是 @code{indent-for-tab-command} 和各种其他缩进命令使用的函数，用于缩进当前行。  通常由主模式分配；例如，Lisp 模式将其设置为@code{lisp-indent-line}，C 模式将其设置为@code{c-indent-line}，依此类推。  默认值为@code{indent-relative}。  @xref{Auto-Indentation}。
+@end defvar
+
+@deffn Command indent-according-to-mode
+该命令调用@code{indent-line-function}中的函数以适合当前主模式的方式缩进当前行。
+@end deffn
+
+@deffn Command newline-and-indent
+该函数插入一个换行符，然后根据主模式缩进新行（刚刚插入的换行符后面的一行）。  它通过调用 @code{indent-according-to-mode} 进行缩进。
+@end deffn
+
+@deffn Command reindent-then-newline-and-indent
+此命令重新缩进当前行，在该位置插入换行符，然后缩进新行（刚刚插入的换行符后面的行）。  它通过调用 @code{indent-according-to-mode} 对两行进行缩进。
+@end deffn
+
+@defopt tab-always-indent
+该变量可用于自定义 @key{TAB} (@code{indent-for-tab-command}) 命令的行为。  如果值为@code{t}（默认值），则该命令通常仅缩进当前行。  如果值为@code{nil}，则仅当点位于左边距或行缩进中时，该命令才会缩进当前行；否则，它会插入一个制表符。  如果值为 @code{complete}，该命令首先尝试缩进当前行，如果该行已经缩进，则调用 @code{completion-at-point} 来完成点 (@pxref{Completion in Buffers}) 处的文本。
+@end defopt
+
+@defopt tab-first-completion
+如果@code{tab-always-indent}是@code{complete}，可以通过@code{tab-first-completion}变量进一步定制是否扩展或缩进。  可以使用以下值：
+@table @code
+@item eol
+仅当点位于行尾时才完成。
+
+@item word
+除非下一个字符具有单词语法，否则完成。
+
+@item word-or-paren
+除非下一个字符具有单词语法或者是括号，否则完成。
+
+@item word-or-paren-or-punct
+除非下一个字符具有单词语法、或者是括号、或者是标点符号，否则是完整的。
+@end table
+
+无论如何，第二次输入 @kbd{TAB} 总是会完成。
+@end defopt
+
+@cindex literate programming
+@cindex multi-mode indentation
+某些主要模式需要支持其语法属于不同主要模式的嵌入文本区域。  示例包括组合文档和源代码片段的 @dfn{literate programming} 源文件、包含 Python 或 JS 代码片段的 Yacc/Bison 程序等。为了正确缩进嵌入的块，主模式需要将缩进委托给另一个模式的缩进引擎（例如，对于 JS 代码调用 @code{js-indent-line} 或对于 Python 调用 @code{python-indent-line}），同时为其提供一些上下文来指导缩进。  就主要模式而言，应避免在缩进代码中调用 @code{widen} 并遵守 @code{prog-first-column}。
+
+@defvar prog-indentation-context
+当该变量非 0 时，它保存由上级主模式提供的子模式缩进引擎的缩进上下文。该值应该是 @w{@code{(@var{first-column} . @var{rest})}} 形式的列表。列表中的成员含义如下：
+
+@table @var
+@item first-column
+用于顶级构造的列。  这取代了子模式使用的顶级列的默认值，通常为零。
+@item rest
+该值当前未使用。
+@end table
+@end defvar
+
+主要模式的缩进引擎应该使用以下便利函数来支持作为另一个主要模式的子模式的调用。
+
+@defun prog-first-column
+调用此函数而不是使用列号的文字值（通常为零）来缩进顶级程序结构。  该函数的值是用于顶级构造的列号。当没有有效的高级模式时，该函数返回零。
+@end defun
+
+
+@node Region Indent
+@subsection 缩进整个区域
+
+本节介绍缩进该区域中所有行的命令。  它们返回不可预测的值。
+
+@deffn Command indent-region start end &optional to-column
+此命令缩进从 @var{start}（含）和 @var{end}（不包括）之间开始的每个非空行。  如果@var{to-column}是@code{nil}，则@code{indent-region}通过调用当前模式的缩进函数（@code{indent-line-function}的值）来缩进每个非空行。
+
+如果@var{to-column}非@code{nil}，则它应该是一个整数，指定缩进的列数；那么这个函数通过添加或删除空格来为每行提供同样多的缩进。
+
+如果有填充前缀，@code{indent-region} 会通过使其以填充前缀开头来缩进每行。
+@end deffn
+
+@defvar indent-region-function
+该变量的值是一个可以被@code{indent-region}用作快捷方式的函数。  它应该有两个参数，区域的开始和结束。  您应该设计该函数，使其产生与逐一缩进该区域的行相同的结果，但可能更快。
+
+如果值为@code{nil}，则没有捷径，而@code{indent-region}实际上是逐行工作的。
+
+快捷函数在 C 模式和 Lisp 模式等模式中很有用，其中 0⁣ 必须从函数定义的开头开始扫描：将其应用到每一行将在时间上成二次方。  当快捷方式穿过缩进的线时，可以更新扫描信息；这需要线性时间。  在单独缩进一行的速度很快的模式下，不需要捷径。
+
+@code{indent-region} 带有非 @code{nil} 参数 @var{to-column} 具有不同的含义，并且不使用此变量。
+@end defvar
+
+@deffn Command indent-rigidly start end count
+此函数将从 @var{start}（包含）和 @var{end}（不包含）之间开始的所有行横向缩进 @var{count} 列。这保留了受影响区域的形状，将其作为一个刚性单元移动。
+
+这不仅对于缩进未缩进文本的区域很有用，而且对于缩进格式化代码的区域也很有用。  例如，如果 0⁣ 为 3，则此命令向指定区域开始的每一行添加 3 列缩进。
+
+如果以交互方式调用且不带前缀参数，则此命令将调用瞬态模式来严格调整缩进。  @xref{Indentation Commands,,, emacs, The GNU Emacs Manual}。
+@end deffn
+
+@deffn Command indent-code-rigidly start end columns &optional nochange-regexp
+这类似于 @code{indent-rigidly}，只不过它不会更改以字符串或注释开头的行。
+
+此外，如果 @var{nochange-regexp} 在行的开头匹配（如果 @var{nochange-regexp} 是非 @code{nil}），它不会更改该行。
+@end deffn
+
+@node Relative Indent
+@subsection 相对于前一行的缩进
+
+本节介绍两个根据前一行的内容缩进当前行的命令。
+
+@deffn Command indent-relative &optional first-only unindented-ok
+此命令在点处插入空格，延伸到与上一个非空行的下一个 @dfn{indent point} 相同的列。  缩进点是空格后面的非空格字符。  下一个缩进点是比当前列的点大的列中的第一个缩进点。  例如，如果 point 位于一行文本的第一个非空白字符的左侧下方，则它会通过插入空格移动到该列。
+
+如果前一个非空行没有下一个缩进点（即，在足够大的列位置上没有缩进点），则 @code{indent-relative} 要么不执行任何操作（如果 @var{unindented-ok} 为非 @code{nil}），要么调用 @code{tab-to-tab-stop}。  因此，如果 point 位于短行文本最后一列的右侧下方，则此命令通常会通过插入空格将 point 移动到下一个制表位。
+
+如果 0⁣ 是非 1⁣，则仅考虑第一个缩进点。
+
+@code{indent-relative} 的返回值是不可预测的。
+
+在以下示例中，point 位于第二行的开头：
+
+@example
+@group
+            This line is indented twelve spaces.
+@point{}The quick brown fox jumped.
+@end group
+@end example
+
+@noindent
+表达式 @code{(indent-relative nil)} 的计算结果如下：
+
+@example
+@group
+            This line is indented twelve spaces.
+            @point{}The quick brown fox jumped.
+@end group
+@end example
+
+在下一个示例中，点位于 @samp{jumped} 的 @samp{m} 和 @samp{p} 之间：
+
+@example
+@group
+            This line is indented twelve spaces.
+The quick brown fox jum@point{}ped.
+@end group
+@end example
+
+@noindent
+表达式 @code{(indent-relative nil)} 的计算结果如下：
+
+@example
+@group
+            This line is indented twelve spaces.
+The quick brown fox jum  @point{}ped.
+@end group
+@end example
+@end deffn
+
+@deffn Command indent-relative-first-indent-point
+@comment !!SourceFile indent.el
+此命令通过使用 @code{t} 作为 @var{first-only} 参数调用 @code{indent-relative} 来缩进当前行，就像前一个非空行一样。  返回值是不可预测的。
+
+如果前一个非空行在当前列之外没有缩进点，则此命令不执行任何操作。
+@end deffn
+
+@node Indent Tabs
+@subsection 可调节制表位
+@cindex tabs stops for indentation
+
+本节介绍用户指定制表位的机制以及使用和设置它们的机制。  使用“制表位”这个名称是因为该功能类似于打字机上的制表位。  该功能的工作原理是插入适当数量的空格和制表符以到达下一个制表位列；它不会影响缓冲区中制表符的显示 (@pxref{Usual Display})。  请注意，作为输入的 @key{TAB} 字符仅在少数主要模式下使用此制表位功能，例如文本模式。 @xref{Tab Stops,,, emacs, The GNU Emacs Manual}。
+
+@deffn Command tab-to-tab-stop
+此命令在点之前插入空格或制表符，直到由 @code{tab-stop-list} 定义的下一个制表位列。
+@end deffn
+
+@defopt tab-stop-list
+该变量定义 @code{tab-to-tab-stop} 使用的制表位列。它应该是 @code{nil} ，或者是一个递增整数列表，不需要均匀间隔。  通过重复最后一个和倒数第二个元素之间的间隔（如果列表少于两个元素，则为 2⁣），列表隐式扩展到无穷大。  值 @code{nil} 表示每 @code{tab-width} 列一个制表位。
+
+使用 @kbd{M-x edit-tab-stops} 以交互方式编辑制表位的位置。
+@end defopt
+
+@node Motion by Indent
+@subsection 基于压痕的运动命令
+
+这些命令主要用于交互使用，根据文本中的缩进进行操作。
+
+@deffn Command back-to-indentation
+@comment !!SourceFile simple.el
+此命令将 point 移动到当前行（即 point 所在的行）中的第一个非空白字符。
+@end deffn
+
+@deffn Command backward-to-indentation &optional arg
+@comment !!SourceFile simple.el
+该命令将点向后移动 @var{arg} 行，然后移动到该行的第一个非空白字符。  如果省略 @var{arg} 或@code{nil}，则默认为 1。
+@end deffn
+
+@deffn Command forward-to-indentation &optional arg
+@comment !!SourceFile simple.el
+该命令将点向前移动 @var{arg} 行，然后移动到该行的第一个非空白字符。  如果省略 @var{arg} 或@code{nil}，则默认为 1。
+@end deffn
+
+@node Case Changes
+@section 案例变更
+@cindex case conversion in buffers
+
+此处描述的大小写更改命令适用于当前缓冲区中的文本。  @xref{Case Conversion}，用于处理字符串和字符的大小写转换函数。  @xref{Case Tables}，了解如何自定义哪些字符是大写或小写以及如何转换它们。
+
+@deffn Command capitalize-region start end
+此函数将 @var{start} 和 @var{end} 定义的区域中的所有单词大写。  大写意味着将每个单词的第一个字符转换为大写，并将每个单词的其余字符转换为小写。  该函数返回@code{nil}。
+
+如果该区域的一端位于单词的中间，则该区域内的单词部分将被视为整个单词。
+
+当@code{capitalize-region}被交互调用时，@var{start}和@var{end}是点和标记，最小的在前。
+
+@example
+@group
+---------- Buffer: foo ----------
+This is the contents of the 5th foo.
+---------- Buffer: foo ----------
+@end group
+
+@group
+(capitalize-region 1 37)
+@result{} nil
+
+---------- Buffer: foo ----------
+This Is The Contents Of The 5th Foo.
+---------- Buffer: foo ----------
+@end group
+@end example
+@end deffn
+
+@deffn Command downcase-region start end
+该函数将 @var{start} 和 @var{end} 定义的区域中的所有字母转换为小写。  该函数返回@code{nil}。
+
+当@code{downcase-region}被交互调用时，@var{start}和@var{end}是点和标记，最小的在前。
+@end deffn
+
+@deffn Command upcase-region start end
+该函数将 @var{start} 和 @var{end} 定义的区域中的所有字母转换为大写。  该函数返回@code{nil}。
+
+当@code{upcase-region}被交互调用时，@var{start}和@var{end}是点和标记，最小的在前。
+@end deffn
+
+@deffn Command capitalize-word count
+该函数将点后的 @var{count} 个单词大写，同时将点移动。  大写意味着将每个单词的第一个字符转换为大写，并将每个单词的其余字符转换为小写。如果 1⁣ 为负，则该函数将 2⁣@var{count} 之前的单词大写，但不移动点。  该值为@code{nil}。
+
+如果 point 位于单词的中间，则向前移动时将忽略 point 之前的单词部分。  其余部分被视为整个单词。
+
+当 @code{capitalize-word} 被交互调用时，@var{count} 被设置为数字前缀参数。
+@end deffn
+
+@deffn Command downcase-word count
+该函数将 point 之后的 @var{count} 单词转换为全部小写，同时将 point 移过去。  如果 1⁣ 为负，则转换 2⁣@var{count} 之前的单词，但不移动点。该值为@code{nil}。
+
+当 @code{downcase-word} 被交互调用时，@var{count} 被设置为数字前缀参数。
+@end deffn
+
+@deffn Command upcase-word count
+该函数将 point 之后的 @var{count} 单词转换为全部大写，同时将 point 移过去。  如果 1⁣ 为负，则转换 2⁣@var{count} 之前的单词，但不移动点。该值为@code{nil}。
+
+当 @code{upcase-word} 被交互调用时，@var{count} 被设置为数字前缀参数。
+@end deffn
+
+@node Text Properties
+@section 文本属性
+@cindex text properties
+@cindex attributes of text
+@cindex properties of text
+
+缓冲区或字符串中的每个字符位置都可以有一个 @dfn{text property list}，非常类似于符号的属性列表 (@pxref{Property Lists})。  这些属性属于特定位置的特定字符，例如本句开头的字母@samp{T}或@samp{foo}中的第一个@samp{o}——如果同一个字符出现在两个不同的位置，则这两个出现通常具有不同的属性。
+
+每个属性都有一个名称和一个值。  它们都可以是任何 Lisp 对象，但名称通常是一个符号。  通常，每个属性名称符号都用于特定目的；例如，文本属性 @code{face} 指定显示字符 (@pxref{Special Properties}) 的面。  访问属性列表的通常方法是指定一个名称并询问它对应的值。
+
+如果一个角色具有 @code{category} 属性，我们称其为该角色的 @dfn{property category}。  它应该是一个符号。  符号的属性用作字符属性的默认值。
+
+在字符串和缓冲区之间复制文本会保留属性以及字符；这包括 @code{substring}、@code{insert} 和 @code{buffer-substring} 等不同的函数。  删除然后拉出文本 (@pxref{The Kill Ring}) 也会保留属性，但某些属性是经过特殊处理的，并且在拉出文本时可能会被删除； @pxref{Yanking}。
+
+@menu
+* Examining Properties::    查看一个角色的属性。
+* Changing Properties::     设置文本范围的属性。
+* Property Search::         搜索属性更改值的位置。
+* Special Properties::      具有特殊含义的特殊属性。
+* Format Properties::       用于表示文本格式的属性。
+* Sticky Properties::       插入的文本如何从相邻文本获取属性。
+* Lazy Properties::         仅当检查文本时才以惰性方式计算文本属性。
+* Clickable Text::          使用文本属性使文本区域在单击时执行某些操作。
+* Fields::                  @code{field} 属性定义缓冲区内的字段。
+* Not Intervals::           为什么文本属性不使用 Lisp 可见的文本间隔。
+@end menu
+
+@node Examining Properties
+@subsection 检查文本属性
+@cindex examining text properties
+@cindex text properties, examining
+
+检查文本属性的最简单方法是询问特定字符的特定属性的值。  为此，请使用@code{get-text-property}。  使用 @code{text-properties-at} 获取角色的整个属性列表。  @xref{Property Search}，用于同时检查多个字符的属性的函数。
+
+这些函数处理字符串和缓冲区。  请记住，字符串中的位置从 0 开始，而缓冲区中的位置从 1 开始。传递当前缓冲区以外的缓冲区可能会很慢。
+
+@defun get-text-property pos prop &optional object
+此函数返回 @var{object}（缓冲区或字符串）中位置 @var{pos} 之后的字符的 @var{prop} 属性值。  参数 @var{object} 是可选的，默认为当前缓冲区。
+
+如果@var{position}位于@var{object}的末尾，则值为@code{nil}，但请注意，缓冲区缩小不会影响该值。也就是说，如果@var{object}是缓冲区或@code{nil}，并且缓冲区已缩小并且@var{position}位于缩小后的缓冲区的末尾，则结果可能为非@code{nil}。
+
+如果严格来说没有 @var{prop} 属性，但角色具有作为符号的属性类别，则 @code{get-text-property} 返回该符号的 @var{prop} 属性。
+@end defun
+
+@defun get-char-property position prop &optional object
+此函数类似于 @code{get-text-property}，不同之处在于它首先检查叠加层，然后检查文本属性。  @xref{Overlays}。
+
+参数@var{object}可以是字符串、缓冲区或窗口。  如果它是一个窗口，则该窗口中显示的缓冲区将用于文本属性和覆盖，但仅考虑该窗口的活动覆盖。  如果 1⁣ 是缓冲区，则首先按优先级降序考虑该缓冲区中的覆盖，然后是文本属性。  如果 2⁣ 是字符串，则仅考虑文本属性，因为字符串永远不会覆盖。
+@end defun
+
+@anchor{Boundaries of text and overlay properties}
+@defun get-pos-property position prop &optional object
+该函数类似于@code{get-char-property}，不同之处在于它关注的是属性的粘性和叠加层的进度设置，而不是@var{position}处（即紧随其后）的角色属性。
+@end defun
+
+@defun get-char-property-and-overlay position prop &optional object
+这类似于 @code{get-char-property}，但提供了有关属性值来自的覆盖层的额外信息。
+
+它的值是一个 cons 单元，其 @sc{car} 是属性值，相同的值 @code{get-char-property} 将使用相同的参数返回。  它的 @sc{cdr} 是在其中找到该属性的覆盖层，或者 @code{nil} ，如果它是作为文本属性找到的或根本没有找到。
+
+如果@var{position}位于@var{object}的末尾，则该值的@sc{car}和@sc{cdr}都是@code{nil}。
+@end defun
+
+@defvar char-property-alias-alist
+该变量保存一个 alist，它将属性名称映射到备用属性名称列表。  如果字符没有指定属性的直接值，则按顺序查阅替代属性名称；使用第一个非 0⁣ 值。  该变量优先于 @code{default-text-properties}，@code{category} 属性优先于该变量。
+@end defvar
+
+@defun text-properties-at position &optional object
+该函数返回字符串或缓冲区@var{object}中@var{position}处字符的整个属性列表。  如果@var{object}是@code{nil}，则默认为当前缓冲区。
+
+如果@var{position}位于@var{object}的末尾，则值为@code{nil}，但请注意，缓冲区缩小不会影响该值。也就是说，如果@var{object}是缓冲区或@code{nil}，并且缓冲区已缩小并且@var{position}位于缩小后的缓冲区的末尾，则结果可能为非@code{nil}。
+@end defun
+
+@defvar default-text-properties
+该变量保存一个属性列表，为文本属性提供默认值。  每当角色未直接指定属性值（无论是通过类别符号还是通过 @code{char-property-alias-alist}）时，都会使用存储在该列表中的值。  这是一个例子：
+
+@example
+(setq default-text-properties '(foo 69)
+      char-property-alias-alist nil)
+;; @r{Make sure character 1 has no properties of its own.}
+(set-text-properties 1 2 nil)
+;; @r{What we get, when we ask, is the default value.}
+(get-text-property 1 'foo)
+     @result{} 69
+@end example
+@end defvar
+
+@defun object-intervals OBJECT
+该函数返回 @var{object} 中的间隔副本（即文本属性）作为间隔列表。  @var{object} 必须是字符串或缓冲区。  更改此列表的结构不会更改对象中的间隔。
+
+@example
+(object-intervals (propertize "foo" 'face 'bold))
+     @result{} ((0 3 (face bold)))
+@end example
+
+返回列表中的每个元素代表一个区间。  每个间隔都有三个部分：第一部分是开始，第二部分是结束，第三部分是文本属性本身。
+@end defun
+
+@node Changing Properties
+@subsection 更改文本属性
+@cindex changing text properties
+@cindex text properties, changing
+
+用于更改属性的原语适用于缓冲区或字符串中指定的文本范围。  函数 @code{set-text-properties} （参见本节末尾）设置该范围内文本的整个属性列表；更常见的是，仅添加、更改或删除按名称指定的某些属性会很有用。
+
+由于文本属性被视为缓冲区（或字符串）内容的一部分，并且会影响缓冲区在屏幕上的外观，因此缓冲区文本属性的任何更改都会将缓冲区标记为已修改。缓冲区文本属性更改也是不可撤销的 (@pxref{Undo})。字符串中的位置从 0 开始，而缓冲区中的位置从 1 开始。
+
+@defun put-text-property start end prop value &optional object
+此函数将字符串或缓冲区 @var{object} 中 @var{start} 和 @var{end} 之间的文本的 @var{prop} 属性设置为 @var{value}。如果@var{object}是@code{nil}，则默认为当前缓冲区。
+@end defun
+
+@defun add-text-properties start end props &optional object
+此函数添加或覆盖字符串或缓冲区 @var{object} 中 @var{start} 和 @var{end} 之间的文本的文本属性。  如果@var{object}是@code{nil}，则默认为当前缓冲区。
+
+参数 @var{props} 指定要添加的属性。  它应该具有属性列表 (@pxref{Property Lists}) 的形式：一个列表，其元素包括属性名称，后面交替跟随相应的值。
+
+如果函数实际上更改了某些属性的值，则返回值为@code{t}； @code{nil} 否则（如果 @var{props} 是 @code{nil} 或者其值与文本中的值一致）。
+
+例如，以下是如何设置文本范围的 @code{comment} 和 @code{face} 属性：
+
+@example
+(add-text-properties @var{start} @var{end}
+                     '(comment t face highlight))
+@end example
+@end defun
+
+@defun remove-text-properties start end props &optional object
+
+
+The argument @var{props} specifies which properties to delete.  It should have the form of a property list (@pxref{Property Lists}): a list whose elements are property names alternating with corresponding values.但只有名称很重要——它们附带的值将被忽略。例如，以下是删除 @code{face} 属性的方法。
+
+@example
+(remove-text-properties @var{start} @var{end} '(face nil))
+@end example
+
+如果函数实际上更改了某些属性的值，则返回值为@code{t}； @code{nil} 否则（如果 @var{props} 是 @code{nil} 或者指定文本中没有字符具有任何这些属性）。
+
+要从某些文本中删除所有文本属性，请使用 @code{set-text-properties} 并为新属性列表指定 @code{nil}。
+@end defun
+
+@defun remove-list-of-text-properties start end list-of-properties &optional object
+与 0⁣ 类似，只不过 1⁣ 只是属性名称列表，而不是属性名称和值的交替列表。
+@end defun
+
+@defun set-text-properties start end props &optional object
+此函数完全替换字符串或缓冲区 @var{object} 中 @var{start} 和 @var{end} 之间文本的文本属性列表。如果@var{object}是@code{nil}，则默认为当前缓冲区。
+
+参数 @var{props} 是新的属性列表。  它应该是一个列表，其元素是属性名称与相应值交替出现。
+
+@code{set-text-properties}返回后，指定范围内的所有字符都具有相同的属性。
+
+If @var{props} is @code{nil}, the effect is to get rid of all properties from the specified range of text.  这是一个例子：
+
+@example
+(set-text-properties @var{start} @var{end} nil)
+@end example
+
+不要依赖该函数的返回值。
+@end defun
+
+@defun add-face-text-property start end face &optional appendp object
+This function acts on the text between @var{start} and @var{end}, adding the face @var{face} to the @code{face} text property. @var{face} 应该是 @code{face} 属性 (@pxref{Special Properties}) 的有效值，例如面孔名称或匿名面孔 (@pxref{Faces})。
+
+If any text in the region already has a non-@code{nil} @code{face} property, those face(s) are retained.  此函数将 @code{face} 属性设置为面列表，其中 @var{face} 作为第一个元素（默认情况下），预先存在的面作为其余元素。  If the optional argument @var{appendp} is non-@code{nil}, @var{face} is appended to the end of the list instead.  Note that in a face list, the first occurring value for each attribute takes precedence.
+
+例如，以下代码将为 @var{start} 和 @var{end} 之间的文本分配绿色斜体：
+
+@example
+(add-face-text-property @var{start} @var{end} 'italic)
+(add-face-text-property @var{start} @var{end} '(:foreground "red"))
+(add-face-text-property @var{start} @var{end} '(:foreground "green"))
+@end example
+
+
+@end defun
+
+
+
+@defun propertize string &rest properties
+
+
+@smallexample
+(propertize "foo" 'face 'italic
+            'mouse-face 'bold-italic)
+     @result{} #("foo" 0 3 (mouse-face bold-italic face italic))
+@end smallexample
+
+要将不同的属性放在字符串的各个部分，您可以使用 @code{propertize} 构造每个部分，然后使用 @code{concat} 将它们组合起来：
+
+@smallexample
+(concat
+ (propertize "foo" 'face 'italic
+             'mouse-face 'bold-italic)
+ " and "
+ (propertize "bar" 'face 'italic
+             'mouse-face 'bold-italic))
+     @result{} #("foo and bar"
+                 0 3 (face italic mouse-face bold-italic)
+                 3 8 nil
+                 8 11 (face italic mouse-face bold-italic))
+@end smallexample
+@end defun
+
+@xref{Buffer Contents}，对于函数@code{buffer-substring-no-properties}，它从缓冲区复制文本，但不复制其属性。
+
+@findex with-silent-modifications, and changes in text properties
+If you wish to add text properties to a buffer or remove them without marking the buffer as modified, you can wrap the calls above in the @code{with-silent-modifications} macro.  @xref{Buffer Modification}。
+
+@node Property Search
+@subsection 文本属性搜索功能
+@cindex searching text properties
+@cindex text properties, searching
+
+在文本属性的典型使用中，大多数情况下，几个或多个连续字符对于属性具有相同的值。  Rather than writing your programs to examine characters one by one, it is much faster to process chunks of text that have the same property value.
+
+您可以使用以下函数来执行此操作。  他们使用 @code{eq} 来比较属性值。  在所有情况下，@var{object} 默认为当前缓冲区。
+
+
+
+这些功能不移动点；相反，它们返回一个位置（或@code{nil}）。  Remember that a position is always between two characters; the position returned by these functions is between two characters with different properties.
+
+@defun next-property-change pos &optional object limit
+该函数从字符串或缓冲区 @var{object} 中的位置 @var{pos} 向前扫描文本，直到发现某些文本属性发生更改，然后返回更改的位置。  换句话说，它返回 @var{pos} 之外的第一个字符的位置，其属性与 @var{pos} 之后的字符的属性不同。
+
+如果@var{limit}非@code{nil}，则扫描在位置@var{limit}结束。  如果该点之前没有属性更改，则此函数返回@var{limit}。
+
+如果属性一直保持不变到 @var{object} 末尾且 @var{limit} 为 @code{nil}，则值为 @code{nil}。  如果该值为非@code{nil}，则其位置大于或等于@var{pos}。仅当@var{limit}等于@var{pos}时，该值才等于@var{pos}。
+
+下面是如何通过文本块扫描缓冲区的示例，其中所有属性都是恒定的：
+
+@smallexample
+(while (not (eobp))
+  (let ((plist (text-properties-at (point)))
+        (next-change
+         (or (next-property-change (point) (current-buffer))
+             (point-max))))
+    @r{Process text from point to @var{next-change}@dots{}}
+    (goto-char next-change)))
+@end smallexample
+@end defun
+
+@defun previous-property-change pos &optional object limit
+这类似于 @code{next-property-change}，但从 @var{pos} 向后扫描而不是向前扫描。  如果该值为非@code{nil}，则为小于或等于@var{pos}的位置；仅当@var{limit}等于@var{pos}时，它才等于@var{pos}。
+@end defun
+
+@defun next-single-property-change pos prop &optional object limit
+该函数扫描文本中 @var{prop} 属性的更改，然后返回更改的位置。  扫描从字符串或缓冲区 @var{object} 中的位置 @var{pos} 向前进行。  In other words, this function returns the position of the first character beyond @var{pos} whose @var{prop} property differs from that of the character just after @var{pos}.
+
+如果@var{limit}非@code{nil}，则扫描在位置@var{limit}结束。  如果该点之前没有属性更改，则 @code{next-single-property-change} 返回 @var{limit}。
+
+如果属性一直保持不变到 @var{object} 末尾且 @var{limit} 为 @code{nil}，则值为 @code{nil}。  If the value is non-@code{nil}, it is a position greater than or equal to @var{pos};仅当@var{limit}等于@var{pos}时，它才等于@var{pos}。
+@end defun
+
+@defun previous-single-property-change pos prop &optional object limit
+This is like @code{next-single-property-change}, but scans back from @var{pos} instead of forward.  如果该值为非@code{nil}，则为小于或等于@var{pos}的位置；仅当@var{limit}等于@var{pos}时，它才等于@var{pos}。
+@end defun
+
+@defun next-char-property-change pos &optional limit
+这与 @code{next-property-change} 类似，只不过它考虑了覆盖属性和文本属性，并且如果在缓冲区结束之前没有发现任何变化，则返回最大缓冲区位置而不是 @code{nil}（从这个意义上说，它类似于相应的覆盖函数 @code{next-overlay-change}，而不是 @code{next-property-change}）。  没有 4⁣ 操作数，因为该函数仅对当前缓冲区进行操作。  它返回任一属性发生更改的下一个地址。
+@end defun
+
+@defun previous-char-property-change pos &optional limit
+这与 @code{next-char-property-change} 类似，但从 @var{pos} 向后扫描而不是向前扫描，如果没有发现变化，则返回最小缓冲区位置。
+@end defun
+
+@defun next-single-char-property-change pos prop &optional object limit
+这与 @code{next-single-property-change} 类似，只不过它考虑了覆盖属性和文本属性，并且如果在 @var{object} 结束之前未发现任何更改，则返回 @var{object} 中的最大有效位置，而不是@code{nil}。  与@code{next-char-property-change}不同，此函数@emph{does}有一个@var{object}操作数；如果 7⁣ 不是缓冲区，则仅考虑文本属性。
+@end defun
+
+@defun previous-single-char-property-change pos prop &optional object limit
+这与 @code{next-single-char-property-change} 类似，但从 @var{pos} 向后扫描而不是向前扫描，如果没有发现变化，则返回 @var{object} 中的最小有效位置。
+@end defun
+
+@defun text-property-any start end prop value &optional object
+如果 @var{start} 和 @var{end} 之间至少有一个字符具有值为 @var{value} 的属性 @var{prop}，则该函数返回非 @code{nil}。  更准确地说，它返回第一个此类字符的位置。  否则，它返回@code{nil}。
+
+可选的第五个参数@var{object}指定要扫描的字符串或缓冲区。  位置是相对于 @var{object} 的。  @var{object} 的默认值是当前缓冲区。
+@end defun
+
+@defun text-property-not-all start end prop value &optional object
+如果 @var{start} 和 @var{end} 之间至少有一个字符不具有值为 @var{value} 的属性 @var{prop}，则此函数返回非 @code{nil}。  更准确地说，它返回第一个此类字符的位置。  否则，它返回@code{nil}。
+
+可选的第五个参数@var{object}指定要扫描的字符串或缓冲区。  位置是相对于 @var{object} 的。  @var{object} 的默认值是当前缓冲区。
+@end defun
+
+@defun text-property-search-forward prop &optional value predicate not-current
+根据 @var{predicate} 搜索其属性 @var{prop} 与 @var{value}（默认为 @code{nil}）匹配的下一个文本区域。
+
+该函数模仿 @code{search-forward} (@pxref{String Search}) 和朋友建模，因为它移动点，但它也返回一个描述匹配的结构，而不是在 @code{match-beginning} 和朋友中返回它。
+
+如果找不到值为匹配的文本属性，则该函数返回@code{nil}。  如果找到，则将点放置在具有此匹配文本属性的区域的末尾，并且该函数返回一个包含有关匹配信息的 @code{prop-match} 结构。
+
+@var{predicate}可以是@code{t}（它是@code{equal}的同义词）、@code{nil}（这意味着“不等于”），或者是一个用两个参数调用的谓词：@var{value}和作为匹配候选的缓冲区位置处的文本属性@var{prop}的值。  如果匹配，该函数应返回非 @code{nil} ，否则返回 @code{nil} 。
+
+如果@var{not-current}不是@code{nil}，那么如果点已经位于我们有属性匹配的区域中，则跳过该区域并查找下一个区域。
+
+@code{prop-match}结构具有以下访问器函数：@code{prop-match-beginning}（比赛开始）、@code{prop-match-end}（比赛结束）和@code{prop-match-value}（比赛开始时@var{property}的值）。
+
+在下面的示例中，我们使用一个缓冲区，其内容为：
+
+@display
+这是@b{bold}，这里是@b{@i{bolditalic}}，这就是结束。
+@end display
+
+也就是说，“粗体”字是@code{bold}面，“斜体”字是@code{italic}面。
+
+以点开头：
+
+@lisp
+(while (setq match (text-property-search-forward 'face 'bold t))
+  (push (buffer-substring (prop-match-beginning match)
+                          (prop-match-end match))
+        words))
+@end lisp
+
+这将挑选出所有使用 @code{bold} 面的单词。
+
+@lisp
+(while (setq match (text-property-search-forward 'face nil t))
+  (push (buffer-substring (prop-match-beginning match)
+                          (prop-match-end match))
+        words))
+@end lisp
+
+这将挑选出所有没有面属性的位，这将产生列表@samp{(@w{"This is a "} @w{"and here's "} @w{"and this is the end"})}（仅以相反的顺序，因为我们使用了@code{push}，@pxref{List Variables}）。
+
+@lisp
+(while (setq match (text-property-search-forward 'face nil nil))
+  (push (buffer-substring (prop-match-beginning match)
+                          (prop-match-end match))
+        words))
+@end lisp
+
+这将挑选出 @code{face} 设置为某项的所有区域，但这会分为属性更改的区域，因此这里的结果将是 @samp{("bold" "bold" "italic")}。
+
+对于您可能使用此功能的更实际示例，请考虑您有一个缓冲区，其中某些部分代表 URL，并且这些部分标有 @code{shr-url}。
+
+@lisp
+(while (setq match (text-property-search-forward 'shr-url nil nil))
+  (push (prop-match-value match) urls))
+@end lisp
+
+这将为您提供所有这些 URL 的列表。
+
+@end defun
+
+@defun text-property-search-backward prop &optional value predicate not-current
+这与 @code{text-property-search-forward} 类似，但向后搜索，如果找到匹配项，则将点放置在匹配区域的开头而不是末尾。
+@end defun
+
+
+@node Special Properties
+@subsection 具有特殊含义的属性
+
+下面是具有特殊内置含义的文本属性名称表。  以下部分列出了一些控制填充和属性继承的附加特殊属性名称。  所有其他名称都没有标准含义，您可以随意使用它们。
+
+注意：在每个 Emacs 命令之后，属性 @code{composition}、@code{display}、@code{invisible} 和 @code{intangible} 也可以导致点移动到可接受的位置。  @xref{Adjusting Point}。
+
+@table @code
+@cindex property category of text character
+@c FIXME: Isn't @kindex for keyboard commands?
+@kindex category @r{(text property)}
+@item category
+如果一个角色具有 @code{category} 属性，我们称其为该角色的 @dfn{property category}。  它应该是一个符号。  该符号的属性用作角色属性的默认值。
+
+@item face
+@cindex face codes of text
+@kindex face @r{(text property)}
+@code{face} 属性控制角色 (@pxref{Faces}) 的外观。  属性的值可以是：
+
+@itemize @bullet
+@item
+面孔名称（符号或字符串）。
+
+@item
+匿名面：@code{(@var{keyword} @var{value} @dots{})}形式的属性列表，其中每个@var{keyword}是面属性名称，@var{value}是该属性的值。
+
+@item
+面孔列表。  每个列表元素应该是面孔名称或匿名面孔。  这指定了一个面，它是每个列出的面的属性的聚合。  列表中较早出现的面孔具有更高的优先级。
+
+@item
+@code{(foreground-color . @var{color-name})} 或 @code{(background-color . @var{color-name})} 形式的 cons 单元。  这指定前景色或背景色，类似于 @code{(:foreground @var{color-name})} 或 @code{(:background @var{color-name})}。  支持这种形式只是为了向后兼容，应该避免。
+
+@item
+@w{@code{(:filtered @var{filter} @var{face-spec})}} 形式的 cons 单元格，指定由 @var{face-spec} 给出的面，但前提是当该面用于显示时 @var{filter} 匹配。 @var{face-spec}可以使用上述任何形式。  @var{filter} 的形式应为 @w{@code{(:window @var{param} @var{value})}}，它与参数 @var{param} 为 @code{eq} 至 @var{value} 的窗口匹配。  如果变量 @code{face-filters-always-match} 不是 @code{nil}，则所有面部过滤器都被视为已匹配。
+@end itemize
+
+字体锁定模式 (@pxref{Font Lock Mode}) 通过根据上下文动态更新字符的 @code{face} 属性，在大多数缓冲区中工作。
+
+@code{add-face-text-property} 函数提供了一种设置此文本属性的便捷方法。  @xref{Changing Properties}。
+
+@kindex font-lock-face @r{(text property)}
+@item font-lock-face
+此属性指定 @code{face} 属性的值，字体锁定模式应应用于基础文本。  它是字体锁定模式使用的字体化方法之一，对于实现自己突出显示的特殊模式很有用。 @xref{Precalculated Fontification}。  当字体锁定模式禁用时，@code{font-lock-face} 无效。
+
+@kindex mouse-face @r{(text property)}
+@item mouse-face
+当鼠标指针悬停在具有此属性的文本上时，将使用此属性而不是 @code{face}。  发生这种情况时，具有相同 @code{mouse-face} 属性值的整个文本片段（而不仅仅是鼠标下方的字符）都会突出显示。
+
+Emacs 忽略 @code{mouse-face} 属性中改变文本大小的所有面属性（例如，@code{:height}、@code{:weight} 和 @code{:slant}）。  这些属性始终与未突出显示的文本相同。
+
+@kindex cursor-face @r{(text property)}
+@findex cursor-face-highlight-mode
+@vindex cursor-face-highlight-nonselected-window
+@item cursor-face
+此属性类似于 @code{mouse-face}，但当点（而不是鼠标）位于具有此属性的文本内部时使用。  仅当模式 @code{cursor-face-highlight-mode} 启用时才会突出显示。  当变量 @code{cursor-face-highlight-nonselected-window} 为非 @code{nil} 时，即使未选择窗口，具有该面的文本也会突出显示，类似于 @code{highlight-nonselected-windows} 对区域 (@pxref{Mark,, The Mark and the Region, emacs, The GNU Emacs Manual}) 所做的操作。
+
+@kindex fontified @r{(text property)}
+@item fontified
+该属性表示文本是否准备好显示。  如果@code{nil}，Emacs 的重新显示例程会调用@code{fontification-functions} (@pxref{Auto Faces}) 中的函数来在显示之前准备好这部分缓冲区。  它由即时字体锁定代码在内部使用。
+
+@item display
+该属性激活各种改变文本显示方式的功能。  例如，它可以使文本显得更高或更短、更高或更低、更宽或更窄，或者替换为图像。 @xref{Display Property}。
+
+@kindex help-echo @r{(text property)}
+@cindex tooltip for help strings
+@item help-echo
+@anchor{Text help-echo}
+如果文本有一个字符串作为其 @code{help-echo} 属性，那么当您将鼠标移到该文本上时，Emacs 在将其传递给 @code{substitute-command-keys} 后，会在回显区域或工具提示窗口 (@pxref{Tooltips}) 中显示该字符串。
+
+如果 @code{help-echo} 属性的值是一个函数，则使用三个参数 @var{window}、@var{object} 和 @var{pos} 调用该函数，并且应该返回帮助字符串，如果没有则返回 @code{nil}。  第一个参数 @var{window} 是找到帮助的窗口。  第二个@var{object}是具有@code{help-echo}属性的缓冲区、覆盖层或字符串。  @var{pos} 论证如下：
+
+@itemize @bullet{}
+@item
+如果 0⁣ 是缓冲区，则 1⁣ 是缓冲区中的位置。
+@item
+如果 @var{object} 是一个覆盖层，则该覆盖层具有 @code{help-echo} 属性，而 @var{pos} 是覆盖层缓冲区中的位置。
+@item
+如果 @var{object} 是字符串（覆盖字符串或使用 @code{display} 属性显示的字符串），则 @var{pos} 是该字符串中的位置。
+@end itemize
+
+如果 @code{help-echo} 属性的值既不是函数也不是字符串，则对其进行求值以获得帮助字符串。
+
+您可以通过设置变量 @code{show-help-function} (@pxref{Help display}) 来更改帮助文本的显示方式。
+
+此功能用于模式行和其他活动文本。
+
+@cindex help-echo text, avoid command-key substitution
+@kindex help-echo-inhibit-substitution @r{(text property)}
+@item help-echo-inhibit-substitution
+如果 @code{help-echo} 字符串的第一个字符具有非 @code{nil} @code{help-echo-inhibit-substitution} 属性，则它按原样由 @code{show-help-function} 显示，而不通过 @code{substitute-command-keys} 传递。
+
+@cindex help-echo text on fringes
+@item left-fringe-help
+@itemx right-fringe-help
+如果屏幕行的任何可见文本具有 @code{left-fringe-help} 或 @code{right-fringe-help} 文本属性，其值为字符串，则当鼠标指针通过 @code{show-help-function} (@pxref{Help display}) 悬停在相应行的边缘时，将显示该字符串。  当与边缘光标和位图一起使用时，这非常有用 (@pxref{Fringes})。
+
+@cindex keymap of character
+@kindex keymap @r{(text property)}
+@item keymap
+@code{keymap} 属性指定命令的附加键盘映射。  当应用此键映射时，它用于在次要模式键映射之前和缓冲区的本地映射之前进行键查找。 @xref{Active Keymaps}。  如果属性值是符号，则该符号的功能定义将用作键盘映射。
+
+如果点之前的字符为非@code{nil}且后置粘性，则应用点之前的字符的属性值；如果点为非@code{nil}且前粘性，则应用点之后的字符的属性值。  （对于鼠标单击，使用单击的位置而不是点的位置。）
+
+@kindex local-map @r{(text property)}
+@item local-map
+此属性的工作方式与 @code{keymap} 类似，只不过它指定一个键盘映射来使用 @emph{instead of} 缓冲区的本地映射。  对于大多数用途（也许是所有用途），最好使用 @code{keymap} 属性。
+
+@item syntax-table
+@code{syntax-table} 属性会覆盖语法表中有关该特定字符的内容。  @xref{Syntax Properties}。
+
+@cindex read-only character
+@kindex read-only @r{(text property)}
+@item read-only
+如果某个字符具有属性 @code{read-only}，则不允许修改该字符。  任何这样做的命令都会出错，@code{text-read-only}。  如果属性值是字符串，则该字符串将用作错误消息。
+
+如果在只读字符旁边插入普通文本会由于粘性而继承 @code{read-only} 属性，则在只读字符旁边插入是错误的。  因此，您可以通过控制粘性来控制在只读文本旁边插入的权限。  @xref{Sticky Properties}。
+
+由于更改属性被视为修改缓冲区，因此除非您知道特殊技巧，否则不可能删除 @code{read-only} 属性：将 @code{inhibit-read-only} 绑定到非 @code{nil} 值，然后删除该属性。  @xref{Read Only Buffers}。
+
+@kindex inhibit-read-only @r{(text property)}
+@item inhibit-read-only
+即使在只读缓冲区中，也可以编辑具有属性 @code{inhibit-read-only} 的字符。  @xref{Read Only Buffers}。
+
+@kindex invisible @r{(text property)}
+@item invisible
+非 @code{nil} @code{invisible} 属性可以使角色在屏幕上不可见。  @xref{Invisible Text}，了解详情。
+
+@item inhibit-isearch
+@kindex inhibit-isearch @r{(text property)}
+非 @code{nil} @code{inhibit-isearch} 属性将使 isearch 跳过文本。
+
+@kindex intangible @r{(text property)}
+@item intangible
+如果一组连续字符具有相等且非 @code{nil} @code{intangible} 属性，则不能在它们之间放置点。如果您尝试将点向前移动到组中，点实际上会移动到组的末尾。  如果您尝试将点向后移动到组中，点实际上会移动到组的开头。
+
+如果连续字符具有不相等的非 @code{nil} @code{intangible} 属性，则它们属于不同的组；如上所述，对每组进行单独处理。
+
+当变量 @code{inhibit-point-motion-hooks} 为非 @code{nil} 时（默认情况下），@code{intangible} 属性将被忽略。
+
+请注意：此属性在非常低的级别上运行，并以意想不到的方式影响大量代码。  所以使用它时要格外小心。  一个常见的误用是在不可见文本上放置无形属性，这实际上是不必要的，因为命令循环无论如何都会将点移到每个命令末尾的不可见文本之外。  @xref{Adjusting Point}。  由于这些原因，该属性已过时；请改用 @code{cursor-intangible} 属性。
+
+@kindex cursor-intangible @r{(text property)}
+@findex cursor-intangible-mode
+@cindex rear-nonsticky, and cursor-intangible property
+@item cursor-intangible
+当次要模式 @code{cursor-intangible-mode} 打开时，点会在重新显示发生之前从任何具有非 @code{nil} @code{cursor-intangible} 属性的位置移开。请注意，在计算允许的光标位置时，会考虑属性 (@pxref{Sticky Properties}) 的“粘性”，因此（例如）要插入光标无法输入的五个 @samp{x} 字符，您应该执行以下操作：
+
+@lisp
+(insert
+ (propertize "xxxx" 'cursor-intangible t)
+ (propertize "x" 'cursor-intangible t 'rear-nonsticky t))
+@end lisp
+
+@vindex cursor-sensor-inhibit
+当变量 @code{cursor-sensor-inhibit} 为非 @code{nil} 时，忽略 @code{cursor-intangible} 属性和 @code{cursor-sensor-functions} 属性（如下所述）。
+
+@kindex field @r{(text property)}
+@item field
+具有相同 @code{field} 属性的连续字符构成 @dfn{field}。  一些运动函数（包括 @code{forward-word} 和 @code{beginning-of-line}）在场边界处停止移动。 @xref{Fields}。
+
+@kindex cursor @r{(text property)}
+@item cursor
+通常，光标显示在“隐藏”（即显示而不是）当前缓冲区位置的任何覆盖和文本属性字符串的开头或结尾。  您可以通过为该字符指定非 @code{nil} @code{cursor} 文本属性来告诉 Emacs 将光标放置在这些字符串的任何所需字符上。此外，如果 2⁣ 属性的值为整数，则它指定缓冲区的字符位置数，从覆盖或 3⁣ 属性开始的位置开始，光标应显示在该字符上。具体来说，如果字符的 @code{cursor} 属性值为数字 @var{n}，则光标将显示在该字符上 @code{[@var{ovpos}..@var{ovpos}+@var{n})} 范围内的任何缓冲区位置，其中 @var{ovpos} 是由 @code{overlay-start} (@pxref{Managing Overlays}) 给出的叠加层起始位置，或者是 @code{display} 文本属性在缓冲区中开始的位置。
+
+换句话说，当覆盖或显示字符串使点在显示器上不可见时，具有任何非 1⁣ 值的 0⁣ 属性的字符串字符是显示光标的字符。  该属性的值表示在哪个缓冲区位置显示光标。  如果该值为整数 @var{n}，则当点位于叠加层或 @code{display} 属性的开头和之后的 @var{n} 位置之间的任意位置时，光标将显示在那里。  如果该值是其他值且非 5⁣，则仅当点位于 @code{display} 属性开头的缓冲区位置时，或者在@code{overlay-start}（如果该位置在显示上不可见）时，光标才会显示在那里。  请注意， @code{cursor} 属性的整数值可能意味着即使点在显示器上可见，光标也会显示在该字符上。
+
+此属性的一个微妙之处在于，将此属性放在作为显示或覆盖字符串一部分的换行符上不起作用。  这是因为换行符在屏幕上没有图形表示，以便 Emacs 在查找带有 @code{cursor} 属性的显示字符时找到。
+
+@cindex cursor position for @code{display} properties and overlays
+当缓冲区有许多覆盖字符串（例如，@pxref{Overlay Properties, before-string}）隐藏了一些缓冲区文本或 @code{display} 属性（字符串）时，最好在这些字符串上使用 @code{cursor} 属性来提示 Emacs 显示在遍历这些字符串时将光标放在何处。  当点位于被显示或覆盖字符串“覆盖”的某个缓冲区位置时，这会直接与 Lisp 程序想要放置光标的显示引擎或用户期望光标的位置进行通信。
+
+@kindex pointer @r{(text property)}
+@item pointer
+当鼠标指针悬停在该文本或图像上时，这指定了特定的指针形状。  @xref{Pointer Shape}，可能的指针形状。
+
+@kindex line-spacing @r{(text property)}
+@item line-spacing
+换行符可以具有 @code{line-spacing} 文本或覆盖属性，用于控制以换行符结尾的显示行的高度。  该属性值会覆盖默认的帧行间距和缓冲区本地 @code{line-spacing} 变量。  @xref{Line Height}。
+
+@kindex line-height @r{(text property)}
+@item line-height
+换行符可以具有 @code{line-height} 文本或覆盖属性，用于控制以换行符结尾的显示行的总高度。 @xref{Line Height}。
+
+@item wrap-prefix
+如果文本区域具有 @code{wrap-prefix} 属性，则由于文本换行，它定义的前缀将在显示时添加到每个连续行的开头（因此，如果行被截断，则永远不会使用换行前缀）。  属性值可以是字符串或图像 (@pxref{Other Display Specs})，或者一段空白，例如由 @code{:width} 或 @code{:align-to} 显示属性 (@pxref{Specified Space}) 指定的空白。  请注意，要发挥其效果，必须在整个文本区域上设置 @code{wrap-prefix} 属性，从该文本第一行的第一个字符开始到最后一行的最后一个字符；否则，以不同方式将文本分成行可能无法显示前缀，因为显示引擎仅在继续一行后立即检查此属性。
+
+也可以使用 @code{wrap-prefix} 缓冲区局部变量为整个缓冲区指定换行前缀（但是， @code{wrap-prefix} 文本属性优先于 @code{wrap-prefix} 变量的值）。  @xref{Truncation}。
+
+@item line-prefix
+如果文本区域具有 @code{line-prefix} 属性，则它定义的前缀将在显示时添加到每个非连续行的开头。  属性值可以是字符串或图像 (@pxref{Other Display Specs})，或者一段空白，例如由 @code{:width} 或 @code{:align-to} 显示属性 (@pxref{Specified Space}) 指定的空白。  请注意，要发挥其效果，必须在整个文本区域上设置 @code{line-prefix} 属性，从该文本第一行的第一个字符开始到最后一行的最后一个字符；否则，以不同的方式将文本分成行可能无法显示前缀，因为显示引擎仅在开始新行时检查此属性。
+
+还可以使用 @code{line-prefix} 缓冲区局部变量为整个缓冲区指定行前缀（但是， @code{line-prefix} 文本属性优先于 @code{line-prefix} 变量的值）。  @xref{Truncation}。
+
+@cindex change hooks for a character
+@cindex hooks for changing a character
+@kindex modification-hooks @r{(text property)}
+@item modification-hooks
+如果一个字符具有属性@code{modification-hooks}，那么它的值应该是一个函数列表；修改该字符会在实际修改之前调用所有这些函数。  每个函数接收两个参数：正在修改的缓冲区部分的开头和结尾。  请注意，如果特定的修改钩子函数出现在由单个基元修改的多个字符上，则无法预测该函数将被调用多少次。此外，插入不会修改任何现有字符，因此只有在删除某些字符、用其他字符替换它们或更改其文本属性时才会运行此挂钩。
+
+与其他类似的钩子不同，当 Emacs 调用这些函数时，@code{inhibit-modification-hooks} 会将 @emph{not} 绑定到非 @code{nil}。  如果函数修改缓冲区，您应该考虑将此变量绑定到非@code{nil}，以防止运行更改挂钩时发生任何缓冲区更改。  否则，您必须为递归调用做好准备。  @xref{Change Hooks}。
+
+叠加层也支持 @code{modification-hooks} 属性，但细节有些不同 (@pxref{Overlay Properties})。
+
+@kindex insert-in-front-hooks @r{(text property)}
+@kindex insert-behind-hooks @r{(text property)}
+@item insert-in-front-hooks
+@itemx insert-behind-hooks
+在缓冲区中插入文本的操作还会调用后一个字符的 @code{insert-in-front-hooks} 属性和前一个字符的 @code{insert-behind-hooks} 属性中列出的函数。  这些函数接收两个参数，即插入文本的开头和结尾。  这些函数称为 @emph{after} 实际插入发生。
+
+当调用这些函数时，@code{inhibit-modification-hooks} 绑定到非 @code{nil}。  如果函数修改缓冲区，您可能需要将 @code{inhibit-modification-hooks} 绑定到 @code{nil}，以便使更改挂钩针对这些修改运行。  但是，这样做可能会递归地调用您自己的更改挂钩，因此请务必为此做好准备。
+
+另请参阅@ref{Change Hooks}，了解更改缓冲区中的文本时调用的其他挂钩。
+
+@cindex hooks for motion of point
+@kindex point-entered @r{(text property)}
+@kindex point-left @r{(text property)}
+@item point-entered
+@itemx point-left
+特殊属性@code{point-entered}和@code{point-left}记录报告点运动的钩子函数。  每次移动时间点，Emacs 都会比较这两个属性值：
+
+@itemize @bullet
+@item
+旧位置之后的字符的 @code{point-left} 属性，以及
+@item
+新位置之后的字符的 @code{point-entered} 属性。
+@end itemize
+
+@noindent
+如果这两个值不同，则使用两个参数调用它们中的每一个（如果不是@code{nil}）：point 的旧值和新值。
+
+对于新旧地点之前的角色也进行了同样的比较。  结果可能是执行两个 0 函数（可能是同一函数）和/或两个 1 函数（可能是同一函数）。  无论如何，首先调用所有 @code{point-left} 函数，然后调用所有 @code{point-entered} 函数。
+
+可以使用 @code{char-after} 检查各个缓冲区位置处的字符，而无需将指针移动到这些位置。  只有 point 值的实际变化才会运行这些钩子函数。
+
+默认情况下，变量 @code{inhibit-point-motion-hooks} 禁止运行 @code{point-left} 和 @code{point-entered} 钩子，请参阅 @ref{Inhibit point motion hooks}。
+
+这些属性已过时；请使用 @code{cursor-sensor-functions} 代替。
+
+@kindex cursor-sensor-functions @r{(text property)}
+@findex cursor-sensor-mode
+@item cursor-sensor-functions
+这个特殊属性记录了对光标移动做出反应的函数列表。  列表中的每个函数都会在重新显示之前调用，并带有 3 个参数：受影响的窗口、先前已知的光标位置以及指示移动方向的符号。移动可以是 @code{entered} 或 @code{left}，具体取决于光标是进入还是离开具有此属性的文本，或者当光标在该文本内移动时为 @code{moved}。应忽略方向的其他值。边界位置（在覆盖层或文本属性延伸的开始和结束处）是否被视为内部或外部遵循与 @code{get-pos-property}、@pxref{Boundaries of text and overlay properties} 相同的规则。仅当次要模式 @code{cursor-sensor-mode} 打开时才会调用这些函数。
+
+当变量 @code{cursor-sensor-inhibit} 为非 @code{nil} 时，@code{cursor-sensor-functions} 属性被忽略。
+
+@kindex composition @r{(text property)}
+@item composition
+此文本属性用于将字符序列显示为由组件组成的单个字形。  但属性本身的值完全是 Emacs 内部的，不应直接由 @code{put-text-property} 等操作。
+
+@kindex minibuffer-message @r{(text property)}
+@item minibuffer-message
+此文本属性指示在活动迷你缓冲区中的何处显示临时消息。  具体来说，具有此属性的迷你缓冲区文本的第一个字符将在其前面显示临时消息。  默认设置是在迷你缓冲区文本的末尾显示临时消息。  该文本属性由作为 @code{set-message-function} (@pxref{Displaying Messages}) 默认值的函数使用。
+
+@kindex display-line-numbers-disable @r{(text property)}
+@item display-line-numbers-disable
+此文本属性可防止显示具有此属性的文本的行号 (@pxref{Display Custom, display-line-numbers,, emacs, The GNU Emacs Manual})。
+
+@end table
+
+@defvar inhibit-point-motion-hooks
+@anchor{Inhibit point motion hooks} When this obsolete variable is
+非 @code{nil}、@code{point-left} 和 @code{point-entered} 钩子不会运行，且 @code{intangible} 属性不起作用。  不要全局设置该变量；将其与 @code{let} 绑定。  由于受影响的属性已过时，因此该变量的默认值为@code{t}，以有效禁用它们。
+@end defvar
+
+@defvar show-help-function
+@anchor{Help display} If this variable is non-@code{nil}, it specifies
+调用以显示帮助字符串的函数。  这些可能是 @code{help-echo} 属性、菜单帮助字符串 (@pxref{Simple Menu Items}、@pxref{Extended Menu Items}) 或工具栏帮助字符串 (@pxref{Tool Bar})。  使用一个参数调用指定的函数，即要显示的帮助字符串，该字符串在传递给函数之前会通过 @code{substitute-command-keys} 传递，除非帮助字符串在其第一个字符上具有非 @code{nil} @code{help-echo-inhibit-substitution} 属性；参见@ref{Keys in Documentation}。  有关使用 @code{show-help-function} 的模式示例，请参阅工具提示模式 (@pxref{Tooltips,,, emacs, The GNU Emacs Manual}) 的代码。
+@end defvar
+
+@defvar face-filters-always-match
+如果此变量为非@code{nil}，则指定仅在满足某些条件时应用的属性的面部过滤器将被视为始终匹配。
+@end defvar
+
+@node Format Properties
+@subsection 格式化文本属性
+
+这些文本属性会影响填充命令的行为。  它们用于表示格式化文本。  @xref{Filling}和@ref{Margins}。
+
+@table @code
+@item hard
+如果换行符具有此属性，则它是“硬”换行符。填充命令不会改变硬换行符，也不会在其中移动单词。  但是，此属性仅在启用 @code{use-hard-newlines} 次要模式时才生效。  @xref{Hard and Soft Newlines,, Hard and Soft Newlines, emacs, The GNU Emacs Manual}。
+
+@item right-margin
+该属性指定额外的右边距来填充这部分文本。
+
+@item left-margin
+此属性指定用于填充这部分文本的额外左边距。
+
+@item justification
+此属性指定填充这部分文本的对齐方式。
+@end table
+
+@node Sticky Properties
+@subsection 文本属性的粘性
+@cindex sticky text properties
+@cindex inheritance, text property
+
+自插入字符，即当用户键入字符时插入到缓冲区中的字符 (@pxref{Commands for Insertion})，通常具有与前一个字符相同的属性。  这称为属性的@dfn{inheritance}。
+
+相比之下，Lisp 程序可以通过继承或不通过继承来进行插入，具体取决于插入原语的选择。  普通的文本插入函数，例如@code{insert}，不继承任何属性。  它们插入的文本精确地具有所插入字符串的属性，而不是其他属性。  对于将文本从一个上下文复制到另一个上下文的程序来说，这是正确的——例如，复制到杀伤环中或从杀戮环中复制出来。  要通过继承插入，请使用本节中描述的特殊原语。  自插入字符继承属性，因为它们使用这些基元进行工作。
+
+@cindex front-sticky text property
+@cindex rear-nonsticky text property
+当您通过继承进行插入时，@emph{which}属性会被继承，并且从哪里继承，取决于哪些属性是@dfn{sticky}。在字符之后插入会继承其 @dfn{rear-sticky} 的属性。  在字符之前插入会继承其 @dfn{front-sticky} 的属性。  当双方为同一属性提供不同的粘性值时，前一个字符的值优先。
+
+默认情况下，文本属性是后粘性的，但不是前粘性的；因此，默认情况是继承前一个字符的所有属性，而不继承后一个字符的任何属性。
+
+您可以使用两个特定文本属性@code{front-sticky}和@code{rear-nonsticky}以及变量@code{text-property-default-nonsticky}来控制各种文本属性的粘性。  您可以使用该变量为给定属性指定不同的默认值。您可以使用这两个文本属性来使文本的任何特定部分中的任何特定属性粘性或不粘性。
+
+如果角色的 @code{front-sticky} 属性为 @code{t}，则其所有属性都是前粘性的。  如果 @code{front-sticky} 属性是一个列表，那么角色的粘性属性就是那些名字在列表中的属性。  例如，如果某个角色的 @code{front-sticky} 属性的值为 @code{(face read-only)}，则在该角色之前插入可以继承其 @code{face} 属性和 @code{read-only} 属性，但不能继承其他属性。
+
+@code{rear-nonsticky} 属性的作用相反。  默认情况下，大多数属性都是后粘性的，因此 @code{rear-nonsticky} 属性表示哪些属性是 @emph{not} 后粘性的。  如果角色的 @code{rear-nonsticky} 属性为 @code{t}，则其所有属性都不是后粘性的。  如果 @code{rear-nonsticky} 属性是一个列表，则属性是后粘性的 @emph{unless} 它们的名称在列表中。
+
+@defvar text-property-default-nonsticky
+这个缓冲区局部变量保存一个列表，它定义缓冲区中各种文本属性的默认后粘性。  每个元素的形式为@code{(@var{property} . @var{nonstickiness})}，它定义特定文本属性@var{property}的粘性。
+
+如果@var{nonstickiness}是非@code{nil}，这意味着属性@var{property}默认是后置非粘性的。  由于默认情况下所有属性都是前端非粘性的，这使得 @var{property} 默认情况下在两个方向上都是非粘性的。
+
+文本属性@code{front-sticky}和@code{rear-nonsticky}在使用时优先于@code{text-property-default-nonsticky}中指定的默认@var{nonstickiness}。
+@end defvar
+
+以下是通过属性继承插入文本的函数：
+
+@defun insert-and-inherit &rest strings
+插入字符串 @var{strings}，就像函数 @code{insert} 一样，但继承相邻文本的任何粘性属性。
+@end defun
+
+@defun insert-before-markers-and-inherit &rest strings
+插入字符串 @var{strings}，就像函数 @code{insert-before-markers} 一样，但继承相邻文本的任何粘性属性。
+@end defun
+
+@xref{Insertion}，对于不继承的普通插入函数。
+
+@node Lazy Properties
+@subsection 文本属性的延迟计算
+
+您可以安排在某些内容依赖于部分文本时计算部分文本的文本属性，而不是计算缓冲区中所有文本的文本属性。
+
+从缓冲区中提取文本及其属性的原语是@code{buffer-substring}。  在检查属性之前，该函数运行异常钩子@code{buffer-access-fontify-functions}。
+
+@defvar buffer-access-fontify-functions
+该变量保存用于计算文本属性的函数列表。在 @code{buffer-substring} 复制缓冲区一部分的文本和文本属性之前，它会调用此列表中的所有函数。  每个函数接收两个参数，指定正在访问的缓冲区的范围。  （缓冲区本身始终是当前缓冲区。）
+@end defvar
+
+函数 @code{buffer-substring-no-properties} 不会调用这些函数，因为它无论如何都会忽略文本属性。
+
+为了防止对缓冲区的同一部分多次调用钩子函数，可以使用变量@code{buffer-access-fontified-property}。
+
+@defvar buffer-access-fontified-property
+如果该变量的值非@code{nil}，则它是用作文本属性名称的符号。  该文本属性的非 1⁣ 值意味着该字符的其他文本属性已被计算。
+
+如果为 @code{buffer-substring} 指定的范围内的所有字符都具有该属性的非 @code{nil} 值，则 @code{buffer-substring} 不会调用 @code{buffer-access-fontify-functions} 函数。  它假设这些字符已经具有正确的文本属性，并且仅复制它们已有的属性。
+
+使用此功能的正常方法是 @code{buffer-access-fontify-functions} 函数将此属性以及其他属性添加到它们所操作的字符中。  这样，他们就可以避免被一遍又一遍地要求输入相同的文本。
+@end defvar
+
+@node Clickable Text
+@subsection 定义可点击文本
+@cindex clickable text
+@cindex follow links
+@cindex mouse-1
+
+@dfn{Clickable text} 是可以使用鼠标或通过键盘命令单击以产生某些结果的文本。  许多主要模式使用可点击文本来实现文本超链接，简称为@dfn{links}。
+
+插入和操作链接的最简单方法是使用 @code{button} 包。  @xref{Buttons}。  在本节中，我们将解释如何使用文本属性在缓冲区中手动设置可点击文本。  为简单起见，我们将可点击文本称为 @dfn{link}。
+
+实现链接涉及三个单独的步骤： (1) 当鼠标移到链接上时指示可点击性； (2) 使该链接上的 @key{RET} 或 @kbd{mouse-2} 执行某些操作； (3) 设置 @code{follow-link} 条件，使得链路服从 @code{mouse-1-click-follows-link}。
+
+要指示可点击性，请将 @code{mouse-face} 文本属性添加到链接的文本中；那么当鼠标移到链接上时，Emacs 将突出显示该链接。  此外，您应该使用 @code{help-echo} 文本属性定义工具提示或回显区域消息。  @xref{Special Properties}。  例如，Dired 指示文件名可点击的方式如下：
+
+@smallexample
+ (if (dired-move-to-filename)
+     (add-text-properties
+       (point)
+       (save-excursion
+         (dired-move-to-end-of-filename)
+         (point))
+       '(mouse-face highlight
+         help-echo "mouse-2: visit this file in other window")))
+@end smallexample
+
+要使链接可单击，请将 @key{RET} 和 @kbd{mouse-2} 绑定到执行所需操作的命令。  每个命令都应该检查它是否在链接上被调用，并采取相应的行动。  例如，Dired 的主模式键盘映射将 @kbd{mouse-2} 绑定到以下命令：
+
+@smallexample
+(defun dired-mouse-find-file-other-window (event)
+  "In Dired, visit the file or directory name you click on."
+  (interactive "e")
+  (let ((window (posn-window (event-end event)))
+        (pos (posn-point (event-end event)))
+        file)
+    (if (not (windowp window))
+        (error "No file chosen"))
+    (with-current-buffer (window-buffer window)
+      (goto-char pos)
+      (setq file (dired-get-file-for-visit)))
+    (if (file-directory-p file)
+        (or (and (cdr dired-subdir-alist)
+                 (dired-goto-subdir file))
+            (progn
+              (select-window window)
+              (dired-other-window file)))
+      (select-window window)
+      (find-file-other-window (file-name-sans-versions file t)))))
+@end smallexample
+
+@noindent
+该命令使用函数 @code{posn-window} 和 @code{posn-point} 来确定单击发生的位置，并使用 @code{dired-get-file-for-visit} 来确定要访问哪个文件。
+
+您可以使用 @code{keymap} 文本属性 (@pxref{Special Properties}) 将鼠标命令绑定在链接文本中，而不是在主模式键盘映射中绑定鼠标命令。  例如：
+
+@example
+(let ((map (make-sparse-keymap)))
+  (keymap-set map "<mouse-2>" 'operate-this-button)
+  (put-text-property link-start link-end 'keymap map))
+@end example
+
+@noindent
+通过这种方法，您可以轻松地为不同的链接定义不同的命令。  此外，@key{RET}和@kbd{mouse-2}的全局定义仍然可用于缓冲区中的其余文本。
+
+@vindex mouse-1-click-follows-link
+用于单击链接的基本 Emacs 命令是 @kbd{mouse-2}。然而，为了与其他图形应用程序兼容，Emacs 还可以识别 @kbd{mouse-1} 对链接的单击，前提是用户快速单击链接而不移动鼠标。  此行为由用户选项@code{mouse-1-click-follows-link} 控制。 @xref{Mouse References,,, emacs, The GNU Emacs Manual}。
+
+@kindex follow-link @r{(text or overlay property)}
+要设置链接以使其遵循 @code{mouse-1-click-follows-link}，您必须 (1) 将 @code{follow-link} 文本或覆盖属性应用于链接文本，或者 (2) 将 @code{follow-link} 事件绑定到键盘映射（可以是主要模式键盘映射或通过 @code{keymap} 文本属性指定的本地键盘映射）。  @code{follow-link} 属性的值或 @code{follow-link} 事件的绑定充当链接操作的条件。  这个条件告诉 Emacs 两件事：在什么情况下 @kbd{mouse-1} 点击应该被视为发生在链接内部，以及如何计算一个动作代码来说明将 @kbd{mouse-1} 点击转换成什么。  链接动作条件可以是以下之一：
+
+@table @asis
+@item @code{mouse-face}
+如果条件是符号 @code{mouse-face}，则如果该位置存在非 @code{nil} @code{mouse-face} 属性，则该位置位于链接内部。  操作代码始终为@code{t}。
+
+例如，以下是 Info 模式处理 @key{mouse-1} 的方式：
+
+@smallexample
+(keymap-set Info-mode-map "<follow-link>" 'mouse-face)
+@end smallexample
+
+@item 一个函数
+如果条件是函数 @var{func}，则当 @code{(@var{func} @var{pos})} 计算结果为非 @code{nil} 时，位置 @var{pos} 位于链接内部。  @var{func} 返回的值作为动作代码。
+
+例如，以下是 pcvs 如何使 @kbd{mouse-1} 仅跟踪文件名上的链接：
+
+@smallexample
+(keymap-set map "<follow-link>"
+            (lambda (pos)
+              (eq (get-char-property pos 'face) 'cvs-filename-face)))
+@end smallexample
+
+@item 还要别的吗
+如果条件值是其他值，则该位置位于链接内，并且条件本身就是操作代码。  显然，仅当通过链接文本上的文本或覆盖属性应用条件时才应指定此类条件（以便它不会应用于整个缓冲区）。
+@end table
+
+@noindent
+操作代码告诉 @kbd{mouse-1} 如何访问链接：
+
+@table @asis
+@item 字符串或向量
+如果动作代码是字符串或向量，则@kbd{mouse-1}事件被转换为字符串或向量的第一个元素；即，@kbd{mouse-1} 单击的操作是该字符或符号的本地或全局绑定。  因此，如果操作代码为@code{"foo"}，则@kbd{mouse-1} 会转换为@kbd{f}。  如果是@code{[foo]}，则@kbd{mouse-1} 转换为@key{foo}。
+
+@item 还要别的吗
+对于任何其他非 @code{nil} 操作代码，@kbd{mouse-1} 事件会在同一位置转换为 @kbd{mouse-2} 事件。
+@end table
+
+要定义 @kbd{mouse-1} 来激活用 @code{define-button-type} 定义的按钮，请为按钮指定 @code{follow-link} 属性。  属性值应该是链接操作条件，如上所述。  @xref{Buttons}。  例如，以下是帮助模式如何处理 @kbd{mouse-1}：
+
+@smallexample
+(define-button-type 'help-xref
+  'follow-link t
+  'action #'help-button-action)
+@end smallexample
+
+要在使用 @code{define-widget} 定义的小部件上定义 @kbd{mouse-1}，请为该小部件指定 @code{:follow-link} 属性。属性值应该是链接操作条件，如上所述。  例如，以下是 @code{link} 小部件如何指定 @key{mouse-1} 单击应转换为 @key{RET}：
+
+@smallexample
+(define-widget 'link 'item
+  "An embedded link."
+  :button-prefix 'widget-link-prefix
+  :button-suffix 'widget-link-suffix
+  :follow-link "\C-m"
+  :help-echo "Follow the link."
+  :format "%[%t%]")
+@end smallexample
+
+@defun mouse-on-link-p pos
+如果当前缓冲区中的位置@var{pos}位于链接上，则该函数返回非@code{nil}。  @var{pos} 也可以是鼠标事件位置，由 @code{event-start} (@pxref{Accessing Mouse}) 返回。
+@end defun
+
+@node Fields
+@subsection 定义和使用字段
+@cindex fields
+
+字段是缓冲区中的一系列连续字符，通过具有 @code{field} 属性（文本属性或覆盖属性）的相同值（与 @code{eq} 相比）来标识。本节介绍可用于字段操作的特殊功能。
+
+您指定一个带有缓冲区位置 @var{pos} 的字段。  我们认为每个字段都包含一定范围的缓冲区位置，因此您指定的位置代表包含该位置的字段。
+
+当 @var{pos} 之前和之后的字符属于同一字段时，毫无疑问哪个字段包含 @var{pos}：这些字符都属于该字段。  当@var{pos}位于字段之间的边界时，它属于哪个字段取决于周围两个字符（@pxref{Sticky Properties}）的@code{field}属性的粘性。  其属性将由在@var{pos}处插入的文本继承的字段是包含@var{pos}的字段。
+
+有一种异常情况，即在 @var{pos} 处新插入的文本不会从任何一侧继承 @code{field} 属性。  如果前一个角色的 @code{field} 属性不是后粘性的，并且后一个角色的 @code{field} 属性不是前粘性的，就会发生这种情况。  在这种情况下，@var{pos}既不属于前场也不属于后场；字段函数将其视为属于一个空字段，其起点和终点均位于@var{pos}。
+
+在所有这些函数中，如果省略@var{pos}或@code{nil}，则默认使用point的值。  如果缩小有效，则 2⁣ 应落在可访问部分内。  @xref{Narrowing}。
+
+@defun field-beginning &optional pos escape-from-edge limit
+该函数返回由@var{pos}指定的字段的开头。
+
+如果@var{pos}位于其字段的开头，并且@var{escape-from-edge}不是@code{nil}，则返回值始终是@emph{ends}在@var{pos}的前一个字段的开头，无论@var{pos}周围的@code{field}属性的粘性如何。
+
+如果@var{limit}非@code{nil}，则为缓冲位置；如果字段的开头在 @var{limit} 之前，则将返回 @var{limit}。
+@end defun
+
+@defun field-end &optional pos escape-from-edge limit
+该函数返回由@var{pos}指定的字段的结尾。
+
+如果@var{pos}位于其字段的末尾，并且@var{escape-from-edge}不是@code{nil}，则返回值始终是@emph{begins}位于@var{pos}的下一个字段的末尾，无论@var{pos}周围的@code{field}属性的粘性如何。
+
+如果@var{limit}非@code{nil}，则为缓冲位置；如果字段结尾在@var{limit}之后，则将返回@var{limit}。
+@end defun
+
+@defun field-string &optional pos
+该函数以字符串形式返回 @var{pos} 指定的字段内容。
+@end defun
+
+@defun field-string-no-properties &optional pos
+此函数以字符串形式返回 @var{pos} 指定的字段内容，并丢弃文本属性。
+@end defun
+
+@defun delete-field &optional pos
+该函数删除@var{pos}指定字段的文本。
+@end defun
+
+@defun constrain-to-field new-pos old-pos &optional escape-from-edge only-in-line inhibit-capture-property
+该函数将 @var{new-pos} 限制为 @var{old-pos} 所属的字段——换句话说，它返回最接近 @var{new-pos} 的位置，该位置与 @var{old-pos} 位于同一字段中。
+
+如果 @var{new-pos} 是 @code{nil}，则 @code{constrain-to-field} 使用 point 的值，除了返回该位置之外，还将 point 移动到结果位置。
+
+如果@var{old-pos}位于两个字段的边界，则可接受的最终位置取决于参数@var{escape-from-edge}。  如果 @var{escape-from-edge} 是 @code{nil}，则 @var{new-pos} 必须位于其 @code{field} 属性等于在 @var{old-pos} 插入的新字符将继承的字段中。  （这取决于 @var{old-pos} 之前和之后的字符的 @code{field} 属性的粘性。）如果 @var{escape-from-edge} 是非 @code{nil}，则 @var{new-pos} 可以位于两个相邻字段中的任何位置。此外，如果两个字段被具有特殊值@code{boundary}的另一个字段分隔，则该特殊字段内的任何点也被认为位于边界上。
+
+像 @kbd{C-a} 这样不带参数的命令，通常向后移动到特定位置并停留在那里，可能应该为 @var{escape-from-edge} 指定 @code{nil}。  检查字段的其他运动命令可能应该通过@code{t}。
+
+如果可选参数 @var{only-in-line} 是非 @code{nil}，并且以通常的方式约束 @var{new-pos} 会将其移动到不同的行，则 @var{new-pos} 将不受约束地返回。  这用于按行移动的命令，例如 @code{next-line} 和 @code{beginning-of-line}，以便它们仅在仍然可以移动到右行的情况下才遵循字段边界。
+
+如果可选参数 @var{inhibit-capture-property} 是非 @code{nil}，并且 @var{old-pos} 具有该名称的非 @code{nil} 属性，则忽略任何字段边界。
+
+您可以通过将变量 @code{inhibit-field-text-motion} 绑定到非 @code{nil} 值来使 @code{constrain-to-field} 忽略所有字段边界（因此永远不会约束任何内容）。
+@end defun
+
+@node Not Intervals
+@subsection 为什么文本属性不是间隔
+@cindex intervals
+
+一些支持向缓冲区中的文本添加属性的编辑器通过让用户指定文本内的间隔并将属性添加到间隔来实现。  这些编辑器允许用户或程序员确定各个间隔的开始和结束位置。  我们特意在 Emacs Lisp 中提供了一种不同类型的接口，以避免与文本修改相关的某些自相矛盾的行为。
+
+如果实际细分为间隔是有意义的，则意味着您可以区分仅是具有特定属性的一个间隔的缓冲区和包含细分为两个间隔的相同文本的缓冲区，这两个间隔都具有该属性。
+
+假设您仅用一个时间间隔获取缓冲区并删除部分文本。  保留在缓冲区中的文本是一个间隔，而杀死环（和撤消列表）中的副本则成为一个单独的间隔。然后，如果您拉回被删除的文本，您将获得两个具有相同属性的间隔。  因此，编辑不会保留一个音程和两个音程之间的区别。
+
+假设我们尝试通过在插入文本时合并两个间隔来解决此问题。  如果缓冲区最初是单个间隔，那么效果很好。  但假设我们有两个具有相同属性的相邻间隔，并且我们删除一个间隔的文本并将其拉回。  拯救另一种情况的相同间隔合并功能在本例中引起了麻烦：猛拉之后，我们只有一个间隔。  再次强调，编辑并不保留一个音程和两个音程之间的区别。
+
+在间隔之间的边界处插入文本也会提出一些没有令人满意答案的问题。
+
+然而，很容易安排编辑以一致地处理以下形式的问题：“此缓冲区或字符串位置的文本属性是什么？”因此我们决定这些是唯一有意义的问题；我们还没有实施询问间隔从哪里开始或结束的问题。
+
+在实践中，您通常可以使用文本属性搜索功能来代替显式区间边界。  您可以将它们视为寻找间隔的边界，假设间隔总是尽可能合并。  @xref{Property Search}。
+
+Emacs 还提供了明确的间隔作为演示功能；见@ref{Overlays}。
+
+@node Substitution
+@section 替换字符代码
+@cindex replace characters in region
+@cindex substitute characters
+
+以下函数根据字符代码替换指定区域内的字符。
+
+@defun subst-char-in-region start end old-char new-char &optional noundo
+@cindex replace characters
+该函数将在@var{start}和@var{end}定义的当前缓冲区区域中出现的所有字符@var{old-char}替换为字符@var{new-char}。  两个字符的多字节形式的长度必须相同。
+
+@cindex undo avoidance
+如果@var{noundo}非@code{nil}，则@code{subst-char-in-region}不会记录撤消的更改，也不会将缓冲区标记为已修改。这对于控制旧的选择性显示功能（@pxref{Selective Display}）很有用。
+
+@code{subst-char-in-region} 不移动点并返回@code{nil}。
+
+@example
+@group
+---------- Buffer: foo ----------
+This is the contents of the buffer before.
+---------- Buffer: foo ----------
+@end group
+
+@group
+(subst-char-in-region 1 20 ?i ?X)
+     @result{} nil
+
+---------- Buffer: foo ----------
+ThXs Xs the contents of the buffer before.
+---------- Buffer: foo ----------
+@end group
+@end example
+@end defun
+
+
+@defun subst-char-in-string fromchar tochar string &optional inplace
+@cindex replace characters in string
+此函数将 @var{string} 中出现的所有字符 @var{fromchar} 替换为 @var{tochar}。  默认情况下，替换发生在 @var{string} 的副本中，但如果可选参数 @var{inplace} 为非 @code{nil}，则该函数会修改 @var{string} 本身。  无论如何，该函数都会返回结果字符串。
+
+对于更改现有字符串时的限制，@pxref{Modifying Strings}。
+@end defun
+
+@deffn Command translate-region start end table
+此函数将转换表应用于缓冲区中位置 @var{start} 和 @var{end} 之间的字符。
+
+翻译表@var{table}是字符串或字符表； @code{(aref @var{table} @var{ochar})} 给出对应于@var{ochar} 的翻译字符。  如果@var{table}是字符串，则任何代码大于@var{table}长度的字符都不会被翻译改变。
+
+@code{translate-region}的返回值是翻译实际改变的字符数。  这不计算在转换表中映射到自身的字符。
+@end deffn
+
+@node Registers
+@section 寄存器
+@cindex registers
+
+寄存器是 Emacs 编辑中使用的一种变量，可以保存各种不同类型的值。  每个寄存器都由单个字符命名。  所有 @acronym{ASCII} 字符及其元变体（@kbd{C-g} 除外）均可用于命名寄存器。因此，有 255 个可能的寄存器。  在 Emacs Lisp 中，寄存器通过其名称字符来指定。
+
+@defvar register-alist
+该变量是 @code{(@var{name} . @var{contents})} 形式的元素列表。  通常，每个已使用的 Emacs 寄存器都有一个元素。
+
+对象@var{name}是标识寄存器的字符（整数）。
+@end defvar
+
+寄存器的 @var{contents} 可以有多种可能的类型：
+
+@table @asis
+@item 一个数字
+数字代表其本身。  如果@code{insert-register}在寄存器中找到一个数字，它将将该数字转换为十进制。
+
+@item 一个标记
+标记代表要跳转到的缓冲区位置。
+
+@item 一个字符串
+字符串是保存在寄存器中的文本。
+
+@item 一个矩形
+@cindex rectangle, as contents of a register
+矩形由字符串列表表示。
+
+@item @code{(@var{window-configuration} @var{position})}
+这表示要在一帧中恢复的窗口配置以及当前缓冲区中要跳转到的位置。
+
+@cindex frameset
+@item @code{(@var{frame-configuration} @var{position})}
+这表示要恢复的帧配置以及当前缓冲区中要跳转到的位置。  帧配置也称为 @dfn{framesets}。
+
+@item @code{(file @var{filename})}
+这代表要访问的文件；跳转到该值访问文件@var{filename}。
+
+@item @code{(file-query @var{filename} @var{position})}
+这代表要访问的文件及其中的位置；跳转到该值访问文件@var{filename}并转到缓冲区位置@var{position}。  恢复此类位置首先要求用户确认。
+
+@item @code{(buffer @var{buffer})}
+这代表一个缓冲区；跳转到该值会切换到@var{buffer}。
+@end table
+
+除非另有说明，本节中的函数返回不可预测的值。
+
+@defun get-register reg
+该函数返回寄存器@var{reg}的内容，如果没有内容则返回@code{nil}。
+@end defun
+
+@defun set-register reg value
+该函数将寄存器@var{reg}的内容设置为@var{value}。寄存器可以设置为任何值，但其他寄存器功能仅需要某些数据类型。  返回值为@var{value}。
+@end defun
+
+@deffn Command view-register reg
+该命令显示寄存器@var{reg}中包含的内容。
+@end deffn
+
+@deffn Command insert-register reg &optional beforep
+该命令将寄存器@var{reg}的内容插入到当前缓冲区中。
+
+通常，此命令在插入的文本之前放置点，在其之后放置标记。  但是，如果可选的第二个参数 @var{beforep} 是非 @code{nil}，它将把标记放在前面并指向后面。
+
+当以交互方式调用时，该命令默认在文本后放置点，并且前缀参数会反转此行为。
+
+如果寄存器包含一个矩形，则插入矩形时其左上角位于点处。  这意味着文本将插入当前行及其下方的连续行中。
+
+如果寄存器包含除保存的文本（字符串）或矩形（列表）之外的其他内容，则当前会发生无用的事情。  这将来可能会改变。
+@end deffn
+
+@defun register-read-with-preview prompt
+@cindex register preview
+该函数读取并返回寄存器名称，用 @var{prompt} 进行提示，并可能显示现有寄存器及其内容的预览。  如果其值和 2⁣ 均为非 3⁣，则在用户选项 @code{register-preview-delay} 指定的延迟之后，预览将显示在临时窗口中。  如果用户请求帮助（例如，通过键入帮助字符），也会显示预览。  我们建议所有读取寄存器名称的交互命令都使用此函数。
+@end defun
+
+@node Transposition
+@section 文本转置
+
+此函数可用于转置文本片段：
+
+@defun transpose-regions start1 end1 start2 end2 &optional leave-markers
+该函数交换缓冲区的两个不重叠部分（如果它们重叠，该函数会发出错误信号）。  参数@var{start1}和@var{end1}指定一个部分的边界，参数@var{start2}和@var{end2}指定另一部分的边界。
+
+通常，@code{transpose-regions} 使用转置文本重新定位标记；先前位于两个调换部分之一内的标记随该部分一起移动，从而在新位置中保留在相同的两个字符之间。  但是，如果 1⁣ 不是 2⁣，则 3⁣ 不会执行此操作 - 它不会重新定位所有标记。
+@end defun
+
+@node Replacing
+@section 替换缓冲区文本
+
+您可以使用以下函数来替换当前缓冲区的一些文本：
+
+@defun replace-region-contents beg end source &optional max-secs max-costs inherit
+此函数将当前缓冲区的 @var{beg} 和 @var{end} 之间的区域替换为 @var{source} 中找到的文本，该文本通常是字符串或缓冲区，在这种情况下，它将使用该缓冲区的可访问部分。
+
+此函数尝试保持当前缓冲区中的点、标记、文本属性和覆盖完好无损。  此行为有用的一种潜在情况是外部代码格式化程序：它们通常将重新格式化的文本写入临时缓冲区或文件，并且使用 @code{insert} 和 @code{delete-region} 会破坏这些属性。
+
+然而，为了做到这一点，@code{replace-region-contents}需要将原始缓冲区的内容与@var{source}的内容进行比较，使用一种昂贵的算法，这使得操作比简单的@code{insert}和@code{delete-region}慢得多。  在许多情况下，您可能不需要这种细化，然后您将希望将 0 作为 @var{max-secs} 参数传递，以便缩短该昂贵的算法：然后它将与 @code{insert} 和 @code{delete-region} 一样快，同时仍然更好地保留点和标记。
+
+除了基本用法之外，如果您需要使用缓冲区可访问部分的子集作为源，@var{source} 也可以是向量 @code{[@var{sbuf} @var{sbeg} @var{send}]}，其中缓冲区 @var{sbuf} 中 @var{sbeg} 和 @var{send} 之间的区域是您要用作源的文本。
+
+如果您需要插入的文本从相邻文本继承文本属性，则可以将非 @code{nil} 值作为 @var{inherit} 参数传递。
+
+当您确实需要昂贵的改进替换时，为了将 @code{replace-region-contents} 的运行时间保持在界限内，它有两个可选参数。
+
+@var{max-secs} 定义了以秒为单位的硬边界。  如果给定并超过，它将回落到@code{delete-region}和@code{insert-buffer-substring}。
+
+@var{max-costs} 定义差异计算的质量。  如果实际成本超过此限制，则使用启发式方法来提供更快但次优的解决方案。  默认值为 1000000。
+
+如果可以执行非破坏性替换，则@code{replace-region-contents}返回@code{t}。  否则，即，如果超过 @var{max-secs}，则返回 @code{nil}。
+
+注意：当使用精化替换算法时，如果替换是字符串，它将被内部复制到临时缓冲区。因此，在其他条件相同的情况下，最好传递缓冲区而不是字符串作为 @var{source} 参数。
+@end defun
+
+@node Decompression
+@section 处理压缩数据
+
+当启用 @code{auto-compression-mode} 时，Emacs 在您访问压缩文件时自动解压缩它们，并且在您更改并保存它们时自动重新压缩它们。  @xref{Compressed Files,,, emacs, The GNU Emacs Manual}。
+
+上述功能通过调用外部可执行文件（例如，@command{gzip}）来工作。  Emacs 还可以使用 zlib 库编译支持内置解压，这比调用外部程序更快。
+
+@defun zlib-available-p
+如果内置 zlib 解压缩可用，则此函数返回非@code{nil}。
+@end defun
+
+@defun zlib-decompress-region start end &optional allow-partial
+该函数使用内置 zlib 解压缩来解压缩 @var{start} 和 @var{end} 之间的区域。  该区域应包含使用 gzip 或 zlib 压缩的数据。  成功后，该函数会用解压缩的数据替换该区域的内容。  如果 @var{allow-partial} 为 @code{nil} 或被省略，则在失败时，该函数将保持该区域不变并返回 @code{nil}。  否则，它返回未解压缩的字节数，并用成功解压缩的任何数据替换区域文本。  该函数只能在单字节缓冲区中调用。
+@end defun
+
+
+@node Base 64
+@section Base 64 编码
+@cindex base 64 encoding
+
+电子邮件中使用 Base 64 代码将 8 位字节序列编码为较长的 @acronym{ASCII} 图形字符序列。  它在 Internet RFC@footnote{ An RFC, an acronym for @dfn{Request for Comments}, is a numbered Internet informational document describing a standard.  RFCs are usually written by technical experts acting on their own initiative, and are traditionally written in a pragmatic, experience-driven manner. }2045 和 RFC 4648 中定义。本节介绍与此代码相互转换的函数。
+
+@deffn Command base64-encode-region beg end &optional no-line-break
+此函数将从 @var{beg} 到 @var{end} 的区域转换为 Base 64 代码。  它返回编码文本的长度。  如果该区域中的字符是多字节，即在多字节缓冲区中该区域必须仅包含 ASCII 字符或原始字节，则会发出错误信号。
+
+通常，此函数会在编码文本中插入换行符，以避免行过长。  但是，如果可选参数 @var{no-line-break} 为非 @code{nil}，则不会添加这些换行符，因此输出只是一长行。
+@end deffn
+
+@deffn Command base64url-encode-region beg end &optional no-pad
+此函数类似于 0⁣，但它根据 RFC 4648 实现了 Base 64 编码的 URL 变体，并且它不会在编码文本中插入换行符，因此输出只是一长行。
+
+如果可选参数 @var{no-pad} 为非 @code{nil}，则此函数不会生成填充 (@code{=})。
+@end deffn
+
+@defun base64-encode-string string &optional no-line-break
+该函数将字符串 @var{string} 转换为 Base 64 代码。  它返回一个包含编码文本的字符串。  对于@code{base64-encode-region}，如果字符串中的字符是多字节，则会发出错误信号。
+
+通常，此函数会在编码文本中插入换行符，以避免行过长。  但是，如果可选参数@var{no-line-break}不​​是@code{nil}，则不会添加这些换行符，因此结果字符串只是一长行。
+@end defun
+
+@defun base64url-encode-string string &optional no-pad
+与 @code{base64-encode-string} 类似，但生成 Base 64 的 URL 变体，并且不会在编码文本中插入换行符，因此结果只是一长行。
+
+如果可选参数 @var{no-pad} 为非 @code{nil}，则此函数不会生成填充。
+@end defun
+
+@deffn Command base64-decode-region beg end &optional base64url ignore-invalid
+该函数将 @var{beg} 到 @var{end} 的区域从 Base 64 代码转换为相应的解码文本。  它返回解码文本的长度。
+
+解码函数忽略编码文本中的换行符。
+
+如果可选参数 @var{base64url} 为非 @code{nil}，则填充是可选的，并且使用 Base 64 编码的 URL 变体。如果可选参数 @var{ignore-invalid} 为非 @code{nil}，则忽略任何无法识别的字符。
+@end deffn
+
+@defun base64-decode-string string &optional base64url ignore-invalid
+该函数将字符串 @var{string} 从 ​​Base 64 代码转换为相应的解码文本。  它返回一个包含解码文本的单字节字符串。
+
+解码函数忽略编码文本中的换行符。
+
+
+如果可选参数 @var{base64url} 为非 @code{nil}，则填充是可选的，并且使用 Base 64 编码的 URL 变体。如果可选参数 @var{ignore-invalid} 为非 @code{nil}，则忽略任何无法识别的字符。
+@end defun
+
+@node Checksum/Hash
+@section 校验和/哈希
+@cindex MD5 checksum
+@cindex SHA hash
+@cindex hash, cryptographic
+@cindex cryptographic hash
+
+Emacs 内置了对计算@dfn{cryptographic hashes} 的支持。加密哈希或@dfn{checksum}是一段数据（例如文本块）的数字指纹，可用于检查您是否拥有该数据的未更改副本。
+
+@cindex message digest
+Emacs 支持多种常见的加密哈希算法：MD5、SHA-1、SHA-2、SHA-224、SHA-256、SHA-384、SHA-512、SHA3-224、SHA3-256、SHA3-384 和 SHA3-512。  MD5 是这些算法中最古老的，通常在 @dfn{message digests} 中用于检查通过网络传输的消息的完整性。  MD5 和 SHA-1 不具有抗冲突性（即，可以故意设计具有相同 MD5 或 SHA-1 哈希值的不同数据片段），因此您不应将它们用于任何与安全相关的内容。  对于与安全相关的应用程序，您应该使用其他哈希类型，例如 SHA-2（例如 @code{sha256} 或 @code{sha512}）或 SHA-3（例如 @code{sha3-256} 或 @code{sha3-512}）。
+
+@defun secure-hash-algorithms
+该函数返回代表 @code{secure-hash} 可以使用的算法的符号列表。
+@end defun
+
+@defun secure-hash algorithm object &optional start end binary
+该函数返回 @var{object} 的哈希值。  参数 @var{algorithm} 是一个符号，说明要计算哪个哈希：@code{md5}、@code{sha1}、@code{sha224}、@code{sha256}、@code{sha384}、@code{sha512}、@code{sha3-224}、@code{sha3-256}、@code{sha3-384} 或 @code{sha3-512} 之一。  参数 @var{object} 应该是一个缓冲区或一个字符串。
+
+可选参数@var{start}和@var{end}是字符位置，指定要计算消息摘要的@var{object}部分。  如果它们是 @code{nil} 或省略，则为整个 @var{object} 计算哈希值。
+
+如果省略参数 @var{binary} 或 @code{nil}，该函数将返回散列的 @dfn{text form}，作为普通的 Lisp 字符串。如果@var{binary}不是@code{nil}，则它返回@dfn{binary form}中的哈希值，作为存储在单字节字符串中的字节序列。  返回字符串的长度取决于@var{algorithm}：
+
+@itemize
+@item 
+对于@code{md5}：32 个字符（如果@var{binary} 为非@code{nil}，则为 16 个字节）。
+@item 
+对于@code{sha1}：40 个字符（如果@var{binary} 为非@code{nil}，则为 20 个字节）。
+@item 
+对于 @code{sha224}：56 个字符（如果 @var{binary} 为非 @code{nil}，则为 28 个字节）。
+@item 
+对于@code{sha256}：64 个字符（如果@var{binary} 为非@code{nil}，则为 32 个字节）。
+@item 
+对于@code{sha384}：96 个字符（如果@var{binary} 为非@code{nil}，则为 48 个字节）。
+@item 
+对于 @code{sha512}：128 个字符（如果 @var{binary} 为非 @code{nil}，则为 64 个字节）。
+@item 
+对于 @code{sha3-224}：56 个字符（如果 @var{binary} 为非 @code{nil}，则为 28 个字节）。
+@item 
+对于@code{sha3-256}：64 个字符（如果@var{binary} 为非@code{nil}，则为 32 个字节）。
+@item 
+对于@code{sha3-384}：96 个字符（如果@var{binary} 为非@code{nil}，则为 48 个字节）。
+@item 
+对于 @code{sha3-512}：128 个字符（如果 @var{binary} 为非 @code{nil}，则为 64 个字节）。
+@end itemize
+
+该函数不会直接根据 @var{object} 文本 (@pxref{Text Representations}) 的内部表示来计算哈希值。相反，它使用编码系统 (@pxref{Coding Systems}) 对文本进行编码，并根据该编码文本计算哈希值。  如果 @var{object} 是一个缓冲区，则使用的编码系统是默认选择的用于将该缓冲区的文本写入文件的编码系统。  如果@var{object}是字符串，则使用用户的首选编码系统（@pxref{Recognize Coding,,, emacs, GNU Emacs Manual}）。
+@end defun
+
+@defun md5 object &optional start end coding-system noerror
+该函数返回 MD5 哈希值。  它是半过时的，因为对于大多数用途来说，它相当于以 1⁣ 作为 2⁣ 参数调用 @code{secure-hash}。  @var{object}、@var{start} 和 @var{end} 参数与@code{secure-hash} 中的含义相同。  该函数返回一个 32 个字符的字符串。
+
+如果@var{coding-system}非@code{nil}，则它指定用于对文本进行编码的编码系统；如果省略或@code{nil}，则使用默认编码系统，如@code{secure-hash}中所示。
+
+通常，如果无法使用指定或选择的编码系统对文本进行编码，则 @code{md5} 会发出错误信号。  然而，如果@var{noerror}不是@code{nil}，它会默默地使用@code{raw-text}编码。
+@end defun
+
+@defun buffer-hash &optional buffer-or-name
+返回 @var{buffer-or-name} 的哈希值。  如果@code{nil}，则默认为当前缓冲区。  与@code{secure-hash}相反，该函数根据缓冲区的内部表示来计算哈希，而不考虑任何编码系统。  因此，它仅在比较在同一 Emacs 中运行的两个缓冲区时有用，并且不能保证在不同 Emacs 版本之间返回相同的哈希值。它在更大的缓冲区上应该比 3⁣ 更有效，并且不应该分配更多的内存。
+@c Note that we do not document what hashing function we're using, or
+@c even whether it's a cryptographic hash, since that may change
+@c according to what we find useful.  We also don't document the
+@c length of the hash string it returns, since that can be used to
+@c guess the hashing function being used.
+@end defun
+
+@defun sha1 object &optional start end binary
+这个函数相当于像这样调用@code{secure-hash}：
+
+@lisp
+(secure-hash 'sha1 object start end binary)
+@end lisp
+
+如果 @var{binary} 是 @code{nil}，则返回 40 个字符的字符串，否则返回 20 字节的单字节字符串。
+@end defun
+
+@node Suspicious Text
+@section 可疑文字
+@cindex suspicious text
+@cindex insecure text
+@cindex security vulnerabilities in text
+
+Emacs 可以显示来自许多外部源的文本，例如电子邮件和网站。  攻击者可能会尝试使用混淆的 @acronym{URL} 或电子邮件地址来迷惑阅读此文本的用户，并诱骗用户访问他们不打算访问的网页，或向错误的地址发送电子邮件。
+
+这通常涉及使用脚本中视觉上看起来像 @acronym{ASCII} 字符（即同形文字）的字符，但也使用其他技术，例如使用双向覆盖，或者使用 @acronym{HTML} 链接文本表示一件事，而底层 @acronym{URL} 指向其他地方。
+
+@cindex suspicious text strings
+@cindex confusable characters
+为了帮助识别这些@dfn{suspicious text strings}，Emacs 提供了一个库来对文本进行多项检查。  （请参阅@url{https://www.unicode.org/reports/tr39/, UTS #39: Unicode Security Mechanisms}了解可用检查背后的基本原理以及有关这些检查的更多详细信息。）提供可能可疑数据的包应使用此库来标记显示的可疑文本。
+
+@vindex textsec-check
+@defun textsec-suspicious-p object type
+该函数是包应该使用的高级接口函数。  它尊重 @code{textsec-check} 用户选项，该选项允许用户禁用检查。
+
+该函数检查@var{object}（其数据类型取决于@var{type}），看看它在解释为@var{type}时是否看起来可疑。  可用类型和相应的 @var{object} 数据类型为：
+
+@table @code
+@item domain
+检查域名是否（例如，@samp{www.gnu.org} 看起来可疑。@var{object} 应该是一个字符串，即域名。
+
+@item url
+检查@acronym{URL}（例如@samp{http://gnu.org/foo/bar}）是否看起来可疑。  @var{object} 应该是一个字符串，要检查的 @acronym{URL} 。
+
+@item link
+检查@acronym{HTML}链接（例如，@samp{<a href='http://gnu.org'>fsf.org</a>}看起来可疑。在这种情况下，@var{object}应该是@code{cons}单元格，其中@code{car}是@acronym{URL}字符串，@code{cdr}是链接文本。如果链接文本包含域名，并且该域名指向除@acronym{URL}。
+
+@item email-address
+检查电子邮件地址（例如，@samp{foo@@example.org}）是否看起来可疑。  @var{object} 应该是一个字符串。
+
+@item local-address
+检查电子邮件地址的本地部分（@samp{@@} 符号之前的位）是否看起来可疑。  @var{object} 应该是一个字符串。
+
+@item name
+检查名称（在电子邮件地址标题中使用）是否看起来可疑。  @var{object} 应该是一个字符串。
+
+@item email-address-header
+检查完整的 RFC2822 电子邮件地址标头（例如 @samp{=?utf-8?Q?=E2=84=AB?= <foo@@example.com>}）是否看起来可疑。 @var{object} 应该是一个字符串。
+@end table
+
+如果 @var{object} 可疑，此函数将返回一个字符串来解释其可疑的原因。  如果 @var{object} 不可疑，则该函数返回 @code{nil}。
+@end defun
+
+@vindex textsec-suspicious@r{ (face)}
+如果文本可疑，应用程序应使用 @code{textsec-suspicious} 标记可疑文本，并以某种方式（例如，在工具提示中）向用户提供 @code{textsec-suspicious-p} 返回的解释。  应用程序还可能在对可疑字符串采取任何操作（例如向可疑电子邮件地址发送电子邮件）之前提示用户进行确认。
+
+@node GnuTLS Cryptography
+@section GnuTLS 密码学
+@cindex MD5 checksum
+@cindex SHA hash
+@cindex hash, cryptographic
+@cindex cryptographic hash
+@cindex AEAD cipher
+@cindex cipher, AEAD
+@cindex symmetric cipher
+@cindex cipher, symmetric
+
+如果使用 GnuTLS 编译，Emacs 会提供内置的加密支持。  根据 GnuTLS API 术语，可用的工具包括摘要、MAC、对称密码和 AEAD 密码。
+
+本文使用的术语，例如 IV（初始化向量），需要对密码学有一定的了解，因此不会详细定义。请参阅 @uref{https://www.gnutls.org/} 了解具体文档，这些文档可以帮助您理解 GnuTLS 库的术语和结构。
+
+@menu
+* Format of GnuTLS Cryptography Inputs::
+* GnuTLS Cryptographic Functions::
+@end menu
+
+@node Format of GnuTLS Cryptography Inputs
+@subsection GnuTLS 加密输入的格式
+@cindex format of gnutls cryptography inputs
+@cindex gnutls cryptography inputs format
+
+GnuTLS 加密函数的输入可以通过多种方式指定，既可以作为原始 Emacs Lisp 类型，也可以作为列表。
+
+列表形式目前类似于@code{md5}和@code{secure-hash}的操作方式。
+
+@table @code
+@item @var{buffer}
+简单地传递一个缓冲区作为输入意味着应该使用整个缓冲区。
+
+@item @var{string}
+将直接使用字符串作为输入。  它可能会被函数修改（与大多数其他 Emacs Lisp 函数不同），以减少函数完成工作后暴露敏感数据的机会。
+
+@item (@var{buffer-or-string} @var{start} @var{end} @var{coding-system} @var{noerror})
+这指定了如上所述的缓冲区或字符串，但是可以使用 @var{start} 和 @var{end} 指定可选范围。
+
+此外，如果需要，可以指定可选的@var{coding-system}。
+
+最后一个可选项目 @var{noerror} 会在无法使用指定或选择的编码系统对文本进行编码时覆盖正常错误。当@var{noerror}非@code{nil}时，该函数默默地使用@code{raw-text}编码。
+
+@item (@code{iv-auto} @var{length})
+这会生成指定长度的随机 IV（初始化向量）并将其传递给函数。  这确保了 IV 是不可预测的并且不太可能在同一会话中重复使用。
+
+@end table
+
+@node GnuTLS Cryptographic Functions
+@subsection GnuTLS 加密函数
+@cindex gnutls cryptographic functions
+
+@defun gnutls-digests
+此函数返回 GnuTLS 摘要算法的列表。
+
+每个条目都有一个代表算法的键，后面跟着一个包含算法内部详细信息的 plist。  plist 将具有 @code{:type gnutls-digest-algorithm} 并且还将具有键 @code{:digest-algorithm-length 64} 来指示生成的摘要的大小（以字节为单位）。
+
+GnuTLS MAC 和摘要算法之间有一个名称相似的地方，但它们在内部是独立的东西，不应该混合。
+@end defun
+
+@defun gnutls-hash-digest digest-method input
+@var{digest-method} 可以是 @code{gnutls-digests} 中的整个 plist，或者只是符号键，或者是带有该符号名称的字符串。
+
+@var{input} 可以指定为缓冲区或字符串或以其他方式 (@pxref{Format of GnuTLS Cryptography Inputs})。
+
+该函数在出错时返回 @code{nil}，并在 @var{digest-method} 或 @var{input} 无效时发出 Lisp 错误信号。  成功后，它会返回一个二进制字符串（输出）和所使用的 IV 的列表。
+@end defun
+
+@defun gnutls-macs
+此函数返回 GnuTLS MAC 算法的列表。
+
+每个条目都有一个代表算法的键，后面跟着一个包含算法内部详细信息的 plist。  plist 将具有 @code{:type gnutls-mac-algorithm} 并且还将具有键 @code{:mac-algorithm-length} @code{:mac-algorithm-keysize} @code{:mac-algorithm-noncesize} 分别指示结果哈希、密钥和随机数的大小（以字节为单位）。
+
+目前该随机数尚未使用，只有部分 MAC 支持它。
+
+GnuTLS MAC 和摘要算法之间有一个名称相似的地方，但它们在内部是独立的东西，不应该混合。
+@end defun
+
+@defun gnutls-hash-mac hash-method key input
+@var{hash-method} 可以是 @code{gnutls-macs} 中的整个 plist，或者只是符号键，或者是带有该符号名称的字符串。
+
+@var{key} 可以指定为缓冲区或字符串或以其他方式 (@pxref{Format of GnuTLS Cryptography Inputs})。  如果@var{key}是字符串，则使用后将被擦除。
+
+@var{input} 可以指定为缓冲区或字符串或以其他方式 (@pxref{Format of GnuTLS Cryptography Inputs})。
+
+该函数在出错时返回 @code{nil}，并在 @var{hash-method} 或 @var{key} 或 @var{input} 无效时发出 Lisp 错误信号。
+
+成功后，它会返回一个二进制字符串（输出）和所使用的 IV 的列表。
+@end defun
+
+@defun gnutls-ciphers
+此函数返回 GnuTLS 密码的列表。
+
+每个条目都有一个代表密码的密钥，后面跟着一个包含算法内部详细信息的 plist。  plist 将具有 @code{:type gnutls-symmetric-cipher} 并且还将键 @code{:cipher-aead-capable} 设置为 @code{nil} 或 @code{t} 以指示 AEAD 功能；和 @code{:cipher-tagsize} @code{:cipher-blocksize} @code{:cipher-keysize} @code{:cipher-ivsize} 分别指示标签的大小（以字节为单位）、结果数据的块大小、密钥和 IV。
+@end defun
+
+@defun gnutls-symmetric-encrypt cipher key iv input &optional aead_auth
+@var{cipher} 可以是 @code{gnutls-ciphers} 中的整个 plist，或者只是符号键，或者是带有该符号名称的字符串。
+
+@var{key} 可以指定为缓冲区或字符串或以其他方式 (@pxref{Format of GnuTLS Cryptography Inputs})。  如果@var{key}是字符串，则使用后将被擦除。
+
+@var{iv}和@var{input}以及可选的@var{aead_auth}可以指定为缓冲区或字符串或以其他方式（@pxref{Format of GnuTLS Cryptography Inputs}）。
+
+@var{aead_auth} 仅使用 AEAD 密码进行检查，即 plist 具有 @code{:cipher-aead-capable t} 的密码。  否则会被忽略。
+
+如果 @var{cipher} 或 @var{key}、@var{iv} 或 @var{input} 无效，或者使用 AEAD 密码指定 @var{aead_auth} 并且无效，此函数将返回 @code{nil}，并发出 Lisp 错误信号。
+
+成功后，它会返回一个二进制字符串（输出）和所使用的 IV 的列表。
+@end defun
+
+@defun gnutls-symmetric-decrypt cipher key iv input &optional aead_auth
+@var{cipher} 可以是 @code{gnutls-ciphers} 中的整个 plist，或者只是符号键，或者是带有该符号名称的字符串。
+
+@var{key} 可以指定为缓冲区或字符串或以其他方式 (@pxref{Format of GnuTLS Cryptography Inputs})。  如果@var{key}是字符串，则使用后将被擦除。
+
+@var{iv}和@var{input}以及可选的@var{aead_auth}可以指定为缓冲区或字符串或以其他方式（@pxref{Format of GnuTLS Cryptography Inputs}）。
+
+@var{aead_auth} 仅使用 AEAD 密码进行检查，即 plist 具有 @code{:cipher-aead-capable t} 的密码。  否则会被忽略。
+
+如果 @var{cipher} 或 @var{key}、@var{iv} 或 @var{input} 无效，或者如果 @var{aead_auth} 使用 AEAD 密码指定且无效，则此函数在解密错误时返回 @code{nil}，并发出 Lisp 错误信号。
+
+成功后，它会返回一个二进制字符串（输出）和所使用的 IV 的列表。
+@end defun
+
+@node Database
+@section 数据库
+@cindex database access, SQLite
+
+Emacs 可以编译为内置支持访问 SQLite 数据库。  本节描述可用于从 Lisp 程序访问 SQLite 数据库的工具。
+
+@defun sqlite-available-p
+如果此 Emacs 会话中提供内置 SQLite 支持，则该函数返回非 @code{nil}。
+@end defun
+
+当 SQLite 支持可用时，可以使用以下函数。
+
+@cindex database object
+@defun sqlite-open &optional file readonly disable-uri
+此函数将 @var{file} 作为 SQLite 数据库文件打开。  如果@var{file}不存在，将创建一个新数据库并将其存储在该文件中。  如果省略@var{file}或@code{nil}，则会创建一个新的内存数据库。  第二个可选参数@var{readonly}，如果非@code{nil}，表示仅打开数据库进行读取；在这种情况下，数据库必须已经存在。  默认情况下， @var{file} 可以是 @file{file://} URI 以及文件名；在特殊情况下，您有一个名称以 @file{file:} 开头的本地文件，请为第三个可选参数 @var{disable-uri} 指定一个非 @code{nil} 值，以禁用 URI 的自动识别和处理。
+
+返回值是 0 ，可以用作下面描述的大多数后续函数的参数。
+@end defun
+
+@defun sqlitep object
+如果 1⁣ 是 SQLite 数据库对象，则此谓词返回非 0⁣。  @code{sqlite-open} 函数返回的数据库对象满足此谓词。
+@end defun
+
+@defun sqlite-close db
+关闭数据库@var{db}。  通常不需要显式调用此函数——如果 Emacs 关闭或数据库对象被垃圾回收，数据库将自动关闭。  如果@var{db}标识的连接已经关闭，则该函数不执行任何操作。
+@end defun
+
+@defun sqlite-execute db statement &optional values
+执行@acronym{SQL}@var{statement}。  例如：
+
+@lisp
+(sqlite-execute db "insert into foo values ('bar', 2)")
+@end lisp
+
+如果存在可选的 @var{values} 参数，则它应该是执行语句时要绑定的值的列表或向量。例如：
+
+@lisp
+(sqlite-execute db "insert into foo values (?, ?)" '("bar" 2))
+@end lisp
+
+这与前面的示例具有完全相同的效果，但更高效、更安全（因为它不涉及任何字符串解析或插值）。
+
+@code{sqlite-execute} 通常返回受影响的行数。例如，@samp{insert}语句通常返回@samp{1}，而@samp{update}语句可能返回零或更大的数字。  但是，当使用@w{@samp{insert into @dots{} returning @dots{}}}等@acronym{SQL}语句时，将返回@w{@samp{returning @dots{}}}指定的值。
+
+默认情况下，SQLite 中的字符串存储为 @code{utf-8}，选择文本列将使用该字符集对字符串进行解码。选择 blob 列将返回原始数据而不进行任何解码（即，它将返回包含数据库中存储的字节的单字节字符串）。  然而，将二进制数据插入 blob 列需要小心，因为默认情况下，@code{sqlite-execute} 会将所有字符串解释为 @code{utf-8}。
+
+因此，例如，如果您在名为 1⁣ 的单字节字符串中有 @acronym{GIF} 数据，则必须对其进行特殊标记，以便让 @code{sqlite-execute} 知道这一点：
+
+@lisp
+(put-text-property 0 1 'coding-system 'binary gif)
+(sqlite-execute db "insert into foo values (?, ?)" (list gif 2))
+@end lisp
+
+@end defun
+
+@defun sqlite-execute-batch db statements
+执行@acronym{SQL}@var{statements}。  @var{statements} 是包含 0 个或多个 @acronym{SQL} 语句的字符串。  当 Lisp 程序需要一次性执行多个数据定义语言 (@acronym{DDL}) 语句时，此命令可能很有用。
+
+@end defun
+
+@defun sqlite-select db query &optional values return-type
+从 @var{db} 中选择一些数据并返回。  例如：
+
+@lisp
+(sqlite-select db "select * from foo where key = 2")
+  @result{} (("bar" 2))
+@end lisp
+
+与 0⁣ 一样，您可以选择传入将在执行选择之前绑定的值的列表或向量：
+
+@lisp
+(sqlite-select db "select * from foo where key = ?" [2])
+  @result{} (("bar" 2))
+@end lisp
+
+这通常比前面示例使用的方法更有效、更安全。
+
+默认情况下，此函数返回匹配行的列表，其中每行都是列值的列表。  如果@var{return-type}是@code{full}，列的名称（作为字符串列表）将作为返回值中的第一个元素返回。
+
+@cindex statement object
+如果@var{return-type}是@code{set}，该函数将返回@dfn{statement object}。  可以使用 @code{sqlite-next}、@code{sqlite-columns} 和 @code{sqlite-more-p} 函数检查该对象。  如果结果集很小，直接返回数据通常会更方便，但如果结果集很大（或者您不会使用集中的所有数据），使用 @code{set} 方法将分配更少的内存，因此内存效率更高。
+@end defun
+
+@defun sqlite-next statement
+该函数返回结果集@var{statement}中的下一行，通常是@code{sqlite-select}返回的对象。
+
+@lisp
+(sqlite-next stmt)
+    @result{} ("bar" 2)
+@end lisp
+@end defun
+
+@defun sqlite-columns statement
+该函数返回结果集@var{statement}的列名称，通常是@code{sqlite-select}返回的对象。
+
+@lisp
+(sqlite-columns stmt)
+    @result{} ("name" "issue")
+@end lisp
+@end defun
+
+@defun sqlite-more-p statement
+该谓词表示是否有更多数据要从结果集 @var{statement} 中获取，通常是 @code{sqlite-select} 返回的对象。
+@end defun
+
+@defun sqlite-finalize statement
+如果@var{statement}不再被使用，调用此函数将释放@var{statement}使用的资源。  这通常是不必要的——当 @var{statement} 对象被垃圾回收时，Emacs 会自动释放其资源。
+@end defun
+
+@defun sqlite-transaction db
+在@var{db}开始交易。  在事务中时，数据库的其他读取器在 @code{sqlite-commit} 提交事务之前不会访问结果。
+@end defun
+
+@defun sqlite-commit db
+在 @var{db} 中结束事务并将数据写入其文件。
+@end defun
+
+@defun sqlite-rollback db
+在 @var{db} 中结束事务并丢弃该事务所做的任何更改。
+@end defun
+
+@defmac with-sqlite-transaction db body@dots{}
+与 @code{progn} (@pxref{Sequencing}) 类似，但在持有事务的情况下执行 @var{body}，如果 @var{body} 正常完成则在最后提交事务。  如果@var{body}发出错误信号，或者提交事务失败，@var{body}执行的@var{db}中的更改将被回滚。  如果正常完成并且提交成功，该宏将返回 @var{body} 的值。
+@end defmac
+
+@defun sqlite-pragma db pragma
+在@var{db}中执行@var{pragma}。  @dfn{pragma} 通常是影响整个数据库而不是任何特定表的命令。例如，要使 SQLite 自动垃圾收集不再需要的数据，您可以说：
+
+@lisp
+(sqlite-pragma db "auto_vacuum = FULL")
+@end lisp
+
+该函数在成功时返回非@code{nil}，如果编译指示失败则返回@code{nil}。  许多编译指示只能在数据库全新且为空时发出。
+@end defun
+
+@defun sqlite-load-extension db module
+将命名扩展 @var{module} 加载到数据库 @var{db} 中。扩展通常是共享库文件；在 GNU 和 Unix 系统上，它们具有 @file{.so} 文件扩展名。
+@end defun
+
+@defun sqlite-version
+返回一个字符串，表示正在使用的 SQLite 库的版本。
+@end defun
+
+@findex sqlite-mode-open-file
+如果您想列出 SQLite 文件的内容，可以使用 @code{sqlite-mode-open-file} 命令。  这将使用 @code{sqlite-mode} 弹出到缓冲区，这允许您检查（和更改）SQLite 数据库的内容。
+
+@node Parsing HTML/XML
+@section 解析 HTML 和 XML
+@cindex parsing html
+
+Emacs 可以使用内置的 @file{libxml2} 支持进行编译。
+
+@defun libxml-available-p
+如果此 Emacs 会话中提供内置 libxml2 支持，则此函数返回非@code{nil}。
+@end defun
+
+当 libxml2 支持可用时，可以使用以下函数将 HTML 或 XML 文本解析为 Lisp 对象树。
+
+@defun libxml-parse-html-region &optional start end base-url discard-comments
+该函数将 @var{start} 和 @var{end} 之间的文本解析为 HTML，并返回表示 HTML @dfn{parse tree} 的列表。  它尝试通过稳健地处理语法错误来处理现实世界的 HTML。
+
+如果 @var{start} 或 @var{end} 为 @code{nil}，则它们分别默认为 @code{point-min} 和 @code{point-max} 中的值。
+
+可选参数 @var{base-url}，如果不是 @code{nil}，应该用于 @file{libxml2} 库报告的警告和错误，但 Emacs 目前调用该库时禁用了错误和警告，因此不使用此参数。
+
+如果可选参数@var{discard-comments}非@code{nil}，则任何顶级注释都将被丢弃。  （此参数已过时，将在未来的 Emacs 版本中删除。要删除注释，请在调用解析函数之前对数据使用 @code{xml-remove-comments} 实用程序函数。）
+
+在解析树中，每个 HTML 节点都由一个列表表示，其中第一个元素是表示节点名称的符号，第二个元素是节点属性列表，其余元素是子节点。
+
+以下示例演示了这一点。  鉴于这个（格式错误的）HTML 文档：
+
+@example
+<html><head></head><body width=101><div class=thing>Foo<div>Yes
+@end example
+
+@noindent
+对 @code{libxml-parse-html-region} 的调用返回此 @acronym{DOM}（文档对象模型）：
+
+@example
+(html nil
+ (head nil)
+ (body ((width . "101"))
+  (div ((class . "thing"))
+   "Foo"
+   (div nil
+    "Yes"))))
+@end example
+@end defun
+
+@cindex rendering html
+@defun shr-insert-document dom
+该函数将 @var{dom} 中解析后的 H​​TML 渲染到当前缓冲区中。  参数 @var{dom} 应该是由 @code{libxml-parse-html-region} 生成的列表。  例如，该函数由 @ref{Top, EWW,, eww, The Emacs Web Wowser Manual} 使用。
+@end defun
+
+@cindex parsing xml
+@defun libxml-parse-xml-region &optional start end base-url discard-comments
+该函数与 @code{libxml-parse-html-region} 相同，只是它将文本解析为 XML 而不是 HTML（因此语法更严格）。
+@end defun
+
+@menu
+* Document Object Model::  访问、操作和搜索@acronym{DOM}。
+@end menu
+
+@node Document Object Model
+@subsection 文档对象模型
+@cindex HTML DOM
+@cindex XML DOM
+@cindex DOM
+@cindex Document Object Model
+
+@code{libxml-parse-html-region}（以及其他@acronym{XML}解析函数）返回的@acronym{DOM}是一个树结构，其中每个节点都有一个节点名称（称为@dfn{tag}），以及可选的键/值@dfn{attribute}列表，然后是@dfn{child nodes}列表。  子节点是字符串或 6⁣ 对象。
+
+@example
+(body ((width . "101"))
+ (div ((class . "thing"))
+  "Foo"
+  (div nil
+   "Yes")))
+@end example
+
+@defun dom-node tag &optional attributes &rest children
+该函数创建一个类型为@var{tag}的@acronym{DOM}节点。  如果给定，@var{attributes} 应该是一个键/值对列表。如果给定，@var{children} 应该是 @acronym{DOM} 节点。
+@end defun
+
+以下函数可用于处理此结构。  每个函数都采用一个 @acronym{DOM} 节点或节点列表。  在后一种情况下，仅使用列表中的第一个节点。
+
+简单的访问器：
+
+@table @code
+@item dom-tag @var{node}
+返回节点的@dfn{tag}（也称为“节点名称”）。
+
+@item dom-attr @var{node} @var{attribute}
+返回节点中@var{attribute}的值。  一个常见的用法是：
+
+@lisp
+(dom-attr img 'href)
+=> "https://fsf.org/logo.png"
+@end lisp
+
+@item dom-children @var{node}
+返回该节点的所有子节点。
+
+@item dom-non-text-children @var{node}
+返回节点的所有非字符串子节点。
+
+@item dom-attributes @var{node}
+返回节点属性的键/值对列表。
+
+@item dom-inner-text @var{node}
+以串联字符串的形式递归返回节点的所有文本元素以及该节点的所有子节点的文本元素。
+
+@item dom-parent @var{dom} @var{node}
+返回@var{dom}中@var{node}的父级。
+
+@item dom-remove @var{dom} @var{node}
+从 @var{dom} 中删除 @var{node}。
+@end table
+
+以下是更改 @acronym{DOM} 的函数。
+
+@table @code
+@item dom-set-attribute @var{node} @var{attribute} @var{value}
+将节点的@var{attribute}设置为@var{value}。
+
+@item dom-remove-attribute @var{node} @var{attribute}
+从 @var{node} 中删除 @var{attribute}。
+
+@item dom-append-child @var{node} @var{child}
+将 @var{child} 添加为 @var{node} 的最后一个子节点。
+
+@item dom-add-child-before @var{node} @var{child} @var{before}
+将 @var{child} 添加到 @var{node} 的子列表中 @var{before} 节点之前。  如果 @var{before} 是 @code{nil}，则将 @var{child} 作为第一个子节点。
+
+@item dom-set-attributes @var{node} @var{attributes}
+将节点的所有属性替换为新的键/值列表。
+@end table
+
+以下是在 @acronym{DOM} 中搜索元素的函数。  它们都返回匹配节点的列表。
+
+@table @code
+@item dom-by-tag @var{dom} @var{tag}
+返回 @var{dom} 中类型为 @var{tag} 的所有节点。  典型的用途是：
+
+@lisp
+(dom-by-tag dom 'td)
+=> '((td ...) (td ...) (td ...))
+@end lisp
+
+@item dom-by-class @var{dom} @var{match}
+返回 @var{dom} 中类名与 @var{match} 匹配的所有节点，@var{match} 是一个正则表达式。
+
+@item dom-by-style @var{dom} @var{style}
+返回 @var{dom} 中具有与 @var{match} 匹配的样式的所有节点，@var{match} 是正则表达式。
+
+@item dom-by-id @var{dom} @var{style}
+返回 @var{dom} 中 ID 与 @var{match} 匹配的所有节点，@var{match} 是一个正则表达式。
+
+@item dom-search @var{dom} @var{predicate}
+返回 @var{dom} 中的所有节点，其中 @var{predicate} 返回非 @code{nil} 值。  @var{predicate} 被调用，将要测试的节点作为参数。
+
+@item dom-strings @var{dom}
+返回 @var{dom} 中的所有字符串。
+
+@end table
+
+实用功能：
+
+@table @code
+@item dom-pp @var{dom} &optional @var{remove-empty}
+在点处漂亮地打印@var{dom}。  如果 @var{remove-empty}，则不打印仅包含空格的文本节点。
+
+@item dom-print @var{dom} &optional @var{pretty} @var{xml}
+在点处打印@var{dom}。  如果@var{xml}非@code{nil}，则打印为@acronym{XML}；否则，打印为@acronym{HTML}。  如果@var{pretty}非@code{nil}，则逻辑上缩进@acronym{HTML}/@acronym{XML}。
+@end table
+
+
+@node Parsing JSON
+@section 解析并生成 JSON 值
+@cindex JSON
+@cindex JavaScript Object Notation
+
+Emacs @acronym{JSON} (@dfn{JavaScript Object Notation}) 支持提供了多个在 Lisp 对象和 JSON 值之间进行转换的函数。  任何 JSON 值都可以转换为 Lisp 对象，但反之则不然。  具体来说：
+
+@itemize
+@item
+JSON 使用三个关键字：@code{true}、@code{null}、@code{false}。 @code{true}由符号@code{t}表示。  默认情况下，其余两个分别用符号 @code{:null} 和 @code{:false} 表示。
+
+@item
+JSON 仅包含浮点数。  它们既可以表示 Lisp 整数，也可以表示 Lisp 浮点数。
+
+@item
+JSON 字符串始终是以 UTF-8 编码的 Unicode 字符串。  Lisp 字符串可以包含非 Unicode 字符。
+
+@item
+JSON 只有一种序列类型，即数组。  JSON 数组使用 Lisp 向量表示。
+
+@item
+JSON 只有一种映射类型，即对象。  JSON 对象使用 Lisp 哈希表、alists 或 plist 来表示。  当 alist 或 plist 包含多个具有相同键的元素时，Emacs 根据 @code{assq} 的行为仅使用第一个元素进行序列化。
+@end itemize
+
+@noindent
+请注意，@code{nil}既是有效的 alist，又是有效的 plist，代表 @code{@{@}}，即空 JSON 对象；不是 @code{null}、@code{false} 或空数组，它们都是不同的 JSON 值。
+
+如果某些 Lisp 对象无法用 JSON 表示，序列化函数将发出 @code{wrong-type-argument} 类型的错误信号。解析函数还可以发出以下错误信号：
+
+@table @code
+@item json-unavailable
+当解析库不可用时发出信号。
+
+@item json-end-of-file
+当遇到输入文本提前结束时发出信号。
+
+@item json-trailing-content
+在解析第一个 JSON 对象后遇到意外输入时发出信号。
+
+@item json-parse-error
+遇到无效的 JSON 语法时发出信号。
+@end table
+
+顶级值和这些顶级值中的子对象可以序列化为 JSON@. 同样，解析函数将返回上述任何可能的类型。
+
+@defun json-serialize object &rest args
+该函数返回一个新的 Lisp 单字节字符串，其中包含 @var{object} 的 JSON 表示形式。  参数 @var{args} 是关键字/参数对的列表。  接受以下关键字：
+
+@table @code
+@item :null-object
+该值决定使用哪个 Lisp 对象来表示 JSON 关键字@code{null}。  它默认为符号 @code{:null}。
+
+@item :false-object
+该值决定使用哪个 Lisp 对象来表示 JSON 关键字@code{false}。  它默认为符号 @code{:false}。
+@end table
+
+@end defun
+
+@defun json-insert object &rest args
+该函数将 @var{object} 的 JSON 表示形式插入到当前缓冲区中的 point 之前。  参数 @var{args} 被解释为 @code{json-serialize}。
+@end defun
+
+@defun json-parse-string string &rest args
+该函数解析@var{string}中的JSON值，它必须是一个Lisp字符串。  如果 @var{string} 不包含有效的 JSON 对象，则此函数会发出 @code{json-parse-error} 错误信号。
+
+参数 @var{args} 是关键字/参数对的列表。  接受以下关键字：
+
+@table @code
+@item :object-type
+该值决定使用哪个 Lisp 对象来表示 JSON 对象的键值映射。  它可以是 @code{hash-table}（默认值），以字符串作为键创建哈希表； @code{alist} 使用以符号为键的列表；或 @code{plist} 使用以关键字符号作为键的 plist。
+
+@item :array-type
+该值决定使用哪个 Lisp 对象来表示 JSON 数组。  它可以是 @code{array}（默认值）以使用 Lisp 数组；或 @code{list} 使用列表。
+
+@item :null-object
+该值决定使用哪个 Lisp 对象来表示 JSON 关键字@code{null}。  它默认为符号 @code{:null}。
+
+@item :false-object
+该值决定使用哪个 Lisp 对象来表示 JSON 关键字@code{false}。  它默认为符号 @code{:false}。
+@end table
+
+@end defun
+
+@defun json-parse-buffer &rest args
+此函数从当前缓冲区中读取下一个 JSON 值，从 point 开始。  如果包含有效的 JSON 对象，则将指针移动到紧随该值之后的位置；否则，它会发出 @code{json-parse-error} 错误信号并且不会移动点。  参数 @var{args} 的解释与 @code{json-parse-string} 中相同。
+@end defun
+
+@node JSONRPC
+@section JSONRPC通信
+@cindex JSON remote procedure call protocol
+@cindex JSONRPC
+
+@code{jsonrpc} 库实现了 @acronym{JSONRPC} 规范，版本 2.0，如 @uref{https://www.jsonrpc.org/} 中所述。  顾名思义，JSONRPC 是一个围绕 @acronym{JSON} 对象设计的通用 @dfn{Remote Procedure Call} 协议，您可以在 Lisp 对象 (@pxref{Parsing JSON}) 之间进行转换。
+
+@menu
+* JSONRPC Overview::
+* Process-based JSONRPC connections::
+* JSONRPC JSON object format::
+* JSONRPC deferred requests::
+@end menu
+
+@node JSONRPC Overview
+@subsection 概述
+
+引用@uref{https://www.jsonrpc.org/, spec}，JSONRPC“与传输无关，因为这些概念可以在同一进程中、通过套接字、通过 http 或在许多不同的消息传递环境中使用。”
+
+@findex jsonrpc-connection
+为了模拟这种不可知论，@code{jsonrpc}库使用@code{jsonrpc-connection}类的对象，这些对象表示与远程 JSON 端点的连接（有关 Emacs 对象系统的详细信息，@pxref{Top,EIEIO,,eieio,EIEIO}）。  用现代面向对象的说法，这个类是“抽象的”，即@:有用的连接对象的实际类始终是@code{jsonrpc-connection}的子类。尽管如此，我们可以围绕 @code{jsonrpc-connection} 类定义两个不同的 API：
+
+@cindex JSONRPC application interfaces
+@enumerate
+
+@item An API for building JSONRPC applications
+
+@findex :request-dispatcher
+@findex :notification-dispatcher
+@findex jsonrpc-notify
+@findex jsonrpc-request
+@findex jsonrpc-async-request
+在这种情况下，一个新的基于 JSONRPC 的应用程序选择 @code{jsonrpc-connection} 的具体子类，它为要在端点之间交换的 JSONRPC 消息提供传输。
+
+应用程序使用 @code{make-instance} 创建该子类的对象。  要发起与远程端点的联系，应用程序将此对象传递给函数，例如 @code{jsonrpc-notify}、@code{jsonrpc-request} 或 @code{jsonrpc-async-request}。
+
+为了处理通常异步进入的远程发起的联系，@code{make-instance}实例化应使用 @code{:request-dispatcher} 和 @code{:notification-dispatcher} EIEIO 关键字参数对其进行初始化。  这些都是 3 个参数的函数：连接对象；命名远程调用的 JSONRPC 方法的符号；和一个 JSONRPC @code{params} 对象。
+
+@findex jsonrpc-error
+作为 @code{:request-dispatcher} 传递的函数负责处理远程端点的请求，该请求期望来自本地端点（在本例中为您正在构建的应用程序）的答复。在该函数内部，您可以本地返回（常规返回）或非本地返回（抛出错误）。  请求调度程序的两次退出都会导致通过传输发送对远程端点请求的答复。
+
+常规返回确定成功响应，并且返回值必须是可以序列化为 JSON (@pxref{Parsing JSON}) 的 Lisp 对象。  结果作为 JSONRPC @code{result} 对象转发到服务器。  通过调用函数@code{jsonrpc-error}实现的非本地返回会导致将错误响应发送到服务器。  由任何其他类型的意外错误触发的非本地返回也会导致发送响应。  调试器永远不会被调用（除非您设置了@code{debug-on-error}，在这种情况下可能会调用 Lisp 调试器，@pxref{Error Debugging}）。
+
+附带的 JSONRPC @code{error} 对象的详细信息会自动填写（在出现意外错误的情况下），或者使用传递给 @code{jsonrpc-error} 的任何内容（在显式调用的情况下）。
+
+特殊情况下，对 @code{jsonrpc-error} 的显式调用将 @code{:code} 设置为 32000 并将 @code{:data} 设置为任何 JSON 对象，具有“无错误”的含义，并触发对远程端点的正常响应，并将 @code{result} 设置为 @code{:data}。  如果应用程序想要将某些非本地退出（例如用户退出）视为良性退出，这非常有用。
+
+@findex jsonrpc-convert-to-endpoint
+@findex jsonrpc-convert-from-endpoint
+可以使用 @code{jsonrpc} 库来构建基于传输协议的应用程序，这些协议可以被描述为“准 JSONRPC”。  它们与 JSONRPC 类似，但并不完全相同，例如 @uref{https://www.jsonrpc.org/, DAP (Debug Adapter Protocol)}。  这些协议还定义了请求、响应和通知消息，但格式与 JSONRPC 不太相同。通用函数 @code{jsonrpc-convert-to-endpoint} 和 @code{jsonrpc-convert-from-endpoint} 可以自定义，用于在 JSONRPC 的内部表示和端点接受的任何内容之间进行转换 (@pxref{Generic Functions})。
+
+@item An API for building JSONRPC transports
+
+在这种情况下，@code{jsonrpc-connection}被子类化以实现不同的底层传输策略（有关如何子类化的详细信息，请参阅@ref{Inheritance,Inheritance,,eieio}。）。  然后，应用程序构建接口的用户可以实例化该具体类的对象（使用 @code{make-instance} 函数）并使用该策略连接到 JSONRPC 端点。  @xref{Process-based JSONRPC connections}，用于内置传输实现。
+
+该API有强制部分和可选部分。
+
+@findex jsonrpc-connection-send
+为了允许用户发起 JSONRPC 联系（通知或请求）或回复端点请求，新的传输实现必须为 @code{jsonrpc-connection-send} 通用函数配备新子类 (@pxref{Generic Functions}) 的专门化。  这个通用函数由 @code{jsonrpc-request} 和 @code{jsonrpc-notify} 等原语自动调用。  专业化应确保参数列表中描述的消息通过新传输用于与端点通信的任何底层通信机制（又名@:“wire”）发送。  该“线路”可以是网络套接字、串行接口、HTTP 连接等。
+
+@findex jsonrpc-connection-receive
+同样，为了处理三种类型的远程联系（请求、通知和对本地请求的响应），传输实现必须在注意到“线路”上的一些数据可用于制作 JSONRPC（或准 JSONRPC）消息后，安排从 Elisp 调用函数@code{jsonrpc-connection-receive}。
+
+@findex jsonrpc-shutdown
+@findex jsonrpc-running-p
+最后，如果这些概念适用于传输，@code{jsonrpc-connection} 子类应该向 @code{jsonrpc-shutdown} 和 @code{jsonrpc-running-p} 通用函数添加专门化（可选）。  @code{jsonrpc-shutdown} 的专门化应确保释放用于侦听线路上消息的任何系统资源（例如@: 进程、计时器等）。  @code{jsonrpc-running-p} 的特化应该告诉我们这些资源是否仍然处于活动状态或者已经被释放（通过 @code{jsonrpc-shutdown} 或其他方式）。
+
+@end enumerate
+
+@node Process-based JSONRPC connections
+@subsection 基于进程的 JSONRPC 连接
+@cindex JSONRPC process-based connections
+
+@findex jsonrpc-process-connection
+为了方便起见，@code{jsonrpc}库附带了一个内置的@code{jsonrpc-process-connection}传输实现，可以与本地子进程通信（使用标准输入和标准输出）；或 TCP 主机（使用套接字）；或 Emacs 进程对象可以表示的任何其他远程端点 (@pxref{Processes})。
+
+使用此传输，JSONRPC 消息在网络上以纯文本形式进行编码，并以一些基本的 HTTP 样式封装标头（例如“Content-Length”）作为前缀。
+
+有关在 JSONRPC 之上使用此传输方案的应用程序示例，请参阅@uref{https://microsoft.github.io/language-server-protocol/specification, Language Server Protocol}。
+
+@cindex JSONRPC connection initargs
+除了强制的 @code{:request-dispatcher} 和 @code{:notification-dispatcher} initargs 之外，@code{jsonrpc-process-connection} 类的用户还应将以下 initargs 作为关键字值对传递给 @code{make-instance}：
+
+@table @code
+@item :process
+值必须是一个实时进程对象，或者是一个生成此类对象的无参数函数。  如果传递一个进程对象，该对象应该包含一个预先建立的连接；否则，在创建对象后立即调用该函数。
+
+@item :on-shutdown
+值必须是单个参数（@code{jsonrpc-process-connection} 对象）的函数。  该函数在底层进程对象被删除后调用（要么是@code{jsonrpc-shutdown}故意删除，要么是由于某些外部原因而意外删除）。
+@end table
+
+@node JSONRPC JSON object format
+@subsection JSONRPC JSON 对象格式
+@cindex JSONRPC object format
+
+JSONRPC JSON 对象作为 Lisp plist 进行交换 (@pxref{Property Lists})：与 JSON 兼容的 plist 被传递给调度程序函数，同样，与 JSON 兼容的 plist 应该被传递给 @code{jsonrpc-notify}、@code{jsonrpc-request} 和 @code{jsonrpc-async-request}。
+
+@findex jsonrpc-lambda
+为了便于处理 plist，该库自由使用 @code{cl-lib} 库 (@pxref{Top,cl-lib,,cl,Common Lisp Extensions for GNU Emacs Lisp}) 并建议（但不强制）其客户端也这样做。  宏 @code{jsonrpc-lambda} 可用于创建 lambda 来解构 JSON 对象，如下例所示：
+
+@example
+(jsonrpc-async-request
+ myproc :frobnicate `(:foo "trix")
+ :success-fn (jsonrpc-lambda (&key bar baz &allow-other-keys)
+               (message "Server replied back with %s and %s!"
+                        bar baz))
+ :error-fn (jsonrpc-lambda (&key code message _data)
+             (message "Sadly, server reports %s: %s"
+                      code message)))
+@end example
+
+@node JSONRPC deferred requests
+@subsection 延迟的 JSONRPC 请求
+@cindex JSONRPC deferred requests
+
+在许多 @acronym{RPC} 情况下，两个通信端点之间的同步取决于正确设计 RPC 应用程序：当需要同步时，应使用请求（阻塞）；当需要同步时，应使用请求（阻塞）；如果不是，通知就足够了。然而，当 Emacs 充当这些端点之一时，可能会触发异步事件（例如，与计时器或进程相关的事件），而远程端点的状态仍然存在不确定性。此外，根据事件的具体性质，对这些事件进行操作有时可能只需要同步。
+
+@findex :deferred@r{, JSONRPC keyword}
+@code{jsonrpc-request}和@code{jsonrpc-async-request}的@code{:deferred}关键字参数旨在让调用者指示特定请求需要同步，并且其实际发出可能会延迟到将来，直到满足某些条件。  为请求指定 @code{:deferred} 并不意味着它会被延迟 @emph{will} ，而只是意味着它会被延迟 @emph{can} 。  如果请求没有立即发送，@code{jsonrpc} 将重新努力在通信过程中的某些关键时间发送请求，例如在接收或向端点发送其他消息时。
+
+@findex jsonrpc-connection-ready-p
+在尝试发送请求之前，会检查特定于应用程序的条件。  由于 @code{jsonrpc} 库无法知道这些条件是什么，因此程序可以使用 @code{jsonrpc-connection-ready-p} 泛型函数 (@pxref{Generic Functions}) 来指定它们。  此函数的默认方法返回 @code{t}，但您可以添加在某些情况下返回 @code{nil} 的重写方法，具体取决于传递给它的参数，即 @code{jsonrpc-connection} 对象 (@pxref{JSONRPC Overview}) 以及作为 @code{:deferred} 关键字参数传递的值。
+
+@node Atomic Changes
+@section 原子改变组
+@cindex atomic changes
+
+在数据库术语中，@dfn{atomic}更改是不可分割的更改——它可以完全成功，也可以完全失败，但不能部分成功。  Lisp 程序可以对一个或多个缓冲区进行一系列更改作为 @dfn{atomic change group}，这意味着整个系列的更改将被安装到它们的缓冲区中，或者，如果发生错误，则不会安装任何更改。
+
+要对一个缓冲区（已经是当前缓冲区）执行此操作，只需在进行更改的代码周围编写一个对 @code{atomic-change-group} 的调用，如下所示：
+
+@example
+(atomic-change-group
+  (insert foo)
+  (delete-region x y))
+@end example
+
+@noindent
+如果 @code{atomic-change-group} 的主体内部发生错误（或其他非本地退出），它将取消主体执行期间该缓冲区中的所有更改。  这种更改组对任何其他缓冲区都没有影响——任何此类更改都会保留。
+
+如果您需要更复杂的东西，例如使各种缓冲区中的更改构成一个原子组，则必须直接调用 @code{atomic-change-group} 使用的较低级别函数。
+
+@defun prepare-change-group &optional buffer
+该函数为缓冲区@var{buffer}设置一个更改组，默认为当前缓冲区。  它返回代表更改组的句柄。  您必须使用此句柄来激活更改组并随后完成它。
+@end defun
+
+要使用更改组，您必须 @dfn{activate} 它。  您必须在对 @var{buffer} 的文本进行任何更改之前执行此操作。
+
+@defun activate-change-group handle
+该函数激活 @var{handle} 指定的更改组。
+@end defun
+
+激活更改组后，您在该缓冲区中所做的任何更改都会成为其中的一部分。  一旦您在缓冲区中完成了所有所需的更改，您必须 @dfn{finish} 更改组。  有两种方法可以执行此操作：您可以接受（并完成）所有更改，也可以全部取消。
+
+@defun accept-change-group handle
+该函数接受@var{handle}指定的更改组中的所有更改，使它们成为最终的。
+@end defun
+
+@defun cancel-change-group handle
+此函数取消并撤消@var{handle}指定的更改组中的所有更改。
+@end defun
+
+您可以使用 @code{undo-amalgamate-change-group} 使更改组中的部分或全部更改被视为单个单元，以用于 @code{undo} 命令 (@pxref{Undo})。
+
+@defun undo-amalgamate-change-group
+合并自 @var{handle} 标识的状态以来在更改组中所做的所有更改。  此函数删除自 @var{handle} 描述的状态以来更改的撤消记录之间的所有撤消边界。  通常，@var{handle}是@code{prepare-change-group}返回的句柄，在这种情况下，自更改组开始以来的所有更改都会合并到单个撤消单元中。
+@end defun
+
+您的代码应该使用 @code{unwind-protect} 来确保组始终完成。  对 @code{activate-change-group} 的调用应该在 @code{unwind-protect} 内部，以防用户在运行后立即键入 @kbd{C-g}。  （这就是为什么 @code{prepare-change-group} 和 @code{activate-change-group} 是独立函数的原因之一，因为通常您会在 @code{unwind-protect} 开始之前调用 @code{prepare-change-group}。）完成该组后，不要再次使用该句柄 — 特别是，不要尝试两次完成同一组。
+
+要创建多缓冲区更改组，请为要覆盖的每个缓冲区调用 @code{prepare-change-group} 一次，然后使用 @code{nconc} 组合返回的值，如下所示：
+
+@example
+(nconc (prepare-change-group buffer-1)
+       (prepare-change-group buffer-2))
+@end example
+
+然后，您可以通过一次调用 @code{activate-change-group} 来激活多缓冲区更改组，并通过一次调用 @code{accept-change-group} 或 @code{cancel-change-group} 来完成它。
+
+对同一缓冲区嵌套使用多个更改组的效果正如您所期望的那样。  对同一缓冲区非嵌套使用更改组会让 Emacs 感到困惑，所以不要让它发生；您为任何给定缓冲区启动的第一个更改组应该是最后一个完成的更改组。
+
+Emacs 通过假设跟踪 @code{buffer-undo-list} 中的每个 cdr，最终将到达调用 @code{prepare-change-group} 时设置的 cons 来跟踪更改组。
+
+如果 @code{buffer-undo-list} 不再包含该 cons，Emacs 将丢失任何更改组的跟踪，从而在取消更改组时导致错误。  为了避免这种情况，当更改组处于活动状态时，不要调用任何可能以这种方式编辑撤消列表的函数：特别是“合并”命令，例如 @code{delete-char}，它调用 @code{undo-auto-amalgamate}。
+
+@node Change Hooks
+@section 更换挂钩
+@cindex change hooks
+@cindex hooks for text changes
+
+这些钩子变量可让您安排注意缓冲区中的更改（或特定缓冲区中的更改，如果您将它们设置为缓冲区本地的）。另请参阅@ref{Special Properties}，了解如何检测文本特定部分的更改。
+
+如果这些钩子中使用的函数执行任何使用正则表达式的操作，则它们应该保存和恢复匹配数据；否则，它们将以奇怪的方式干扰调用它们的编辑操作。  此外，这些钩子中的函数应避免更改缓冲区文本、外观、属性、覆盖以及缓冲区特定状态的其他方面（钩子函数本身创建和管理的部分除外），因为 Emacs 的其他部分可能会因背后的此类更改而感到困惑。
+
+@defvar before-change-functions
+该变量保存 Emacs 即将修改缓冲区时要调用的函数列表。  每个函数都有两个参数，即即将更改的区域的开头和结尾，以整数表示。调用该函数时，即将更改的缓冲区始终是当前缓冲区。
+@end defvar
+
+@defvar after-change-functions
+该变量保存 Emacs 修改缓冲区后要调用的函数列表。  每个函数接收三个参数：刚刚更改的区域的开头和结尾，以及更改之前存在的文本的长度。  所有三个参数都是整数。  调用该函数时，已更改的缓冲区始终是当前缓冲区。
+
+旧文本的长度是该文本前后缓冲区位置之间的差异（与更改之前相同）。  至于更改后的文本，其长度只是前两个参数之间的差值。
+@end defvar
+
+将消息输出到 @file{*Messages*} 缓冲区不会调用这些函数，某些内部缓冲区更改也不会调用这些函数，例如 Emacs 内部为某些作业创建的缓冲区的更改，这些更改对于 Lisp 程序来说是不可见的。
+
+绝大多数缓冲区更改原语将在平衡对中调用 @code{before-change-functions} 和 @code{after-change-functions}，每次更改一次，其中这些钩子的参数精确地界定所进行的更改。  然而，钩子函数不应该总是依赖这种情况，因为一些复杂的原语在进行更改之前调用 @code{before-change-functions} 一次，然后调用 @code{after-change-functions} 零次或多次，具体取决于原语进行的单独更改的数量。  当发生这种情况时，@code{before-change-functions}的参数将包含一个在其中进行单独更改的区域，但不一定是最小的此类区域，并且@code{after-change-functions}的每个连续调用的参数将精确地界定要更改的文本部分。  一般来说，我们建议使用 before- 或 after-change 挂钩，但不要同时使用两者。
+
+@defmac combine-after-change-calls body@dots{}
+该宏正常执行 @var{body}，但安排在一系列多个更改中仅调用一次更改后函数 — 如果这看起来安全的话。
+
+如果程序在缓冲区的同一区域中进行了多次文本更改，则在程序的该部分周围使用宏 @code{combine-after-change-calls} 可以使其在使用更改后挂钩时运行得相当快。  当最终调用更改后挂钩时，参数指定缓冲区的一部分，包括在 1⁣ 主体内所做的所有更改。
+
+@strong{Warning:} 您不得更改 @code{combine-after-change-calls} 表单主体内的 @code{after-change-functions} 值。
+
+@strong{Warning:} 如果您组合的更改发生在缓冲区广泛分散的部分，这仍然有效，但不建议这样做，因为它可能会导致某些更改挂钩函数的低效行为。
+@end defmac
+
+@defmac combine-change-calls beg end body@dots{}
+这会正常执行 @var{body}，除非它所做的任何缓冲区更改都不会触发对 @code{before-change-functions} 和 @code{after-change-functions} 的调用。  相反，对于@var{beg}和@var{end}包围的区域，每个钩子都会进行一次调用，提供给@code{after-change-functions}的参数反映了@var{body}对区域大小所做的更改。
+
+该宏的结果是@var{body}返回的结果。
+
+当函数可能对缓冲区进行大量重复更改时，此宏非常有用，并且如果要为每个单独的缓冲区修改运行更改挂钩，则更改挂钩将需要很长时间才能运行。  Emacs 本身使用此宏，例如在命令 @code{comment-region} 和 @code{uncomment-region} 中。
+
+@strong{Warning:} 您不得更改 @var{body} 内的 @code{before-change-functions} 或 @code{after-change-function} 的值。
+
+@strong{Warning:} 您不得在 @var{beg} 和 @var{end} 指定的区域之外进行任何缓冲区更改。
+@end defmac
+
+@defvar first-change-hook
+该变量是一个普通的钩子，每当以前处于未修改状态的缓冲区发生更改时就会运行。
+@end defvar
+
+@defvar inhibit-modification-hooks
+如果该变量为非@code{nil}，则所有更改挂钩均被禁用；他们都没有跑。  这会影响本节上面描述的所有钩子变量，以及附加到某些特殊文本属性 (@pxref{Special Properties}) 和覆盖属性 (@pxref{Overlay Properties}) 的钩子。
+
+此外，在运行相同的钩子变量时，该变量绑定到非@code{nil}，因此默认情况下，从修改钩子修改缓冲区不会导致其他修改钩子运行。如果您确实希望修改挂钩在本身从修改挂钩运行的特定代码段中运行，则在本地重新绑定 @code{inhibit-modification-hooks} 到 @code{nil}。  但是，这样做可能会导致对修改挂钩的递归调用，因此请务必为此做好准备（例如，通过绑定一些告诉您的挂钩不执行任何操作的变量）。
+
+我们建议您仅在不会导致缓冲区文本内容持久更改（例如面部更改或临时修改）的修改时绑定此变量。  如果您需要在一系列更改期间延迟更改挂钩（通常出于性能原因），请改用 @code{combine-change-calls} 或 @code{combine-after-change-calls}。
+@end defvar
+
+@menu
+* Tracking changes::        跟踪缓冲区修改。
+@end menu
+
+@node Tracking changes
+@subsection 跟踪缓冲区修改
+@cindex track-changes
+@cindex change tracker
+
+在实践中使用 @code{before-change-functions} 和 @code{after-change-functions} 可能会很困难，因为存在许多陷阱，例如这两个调用并不总是正确配对，或者某些调用可能会丢失，因为某些 Emacs 原语未能正确配对它们，或者因为@code{inhibit-modification-hooks} 的使用不正确。  此外，这些钩子函数有许多限制，例如它们基本上不应该修改当前缓冲区，也不应该使用可能阻塞的操作，并且它们会快速执行，因为某些命令可能会多次调用这些钩子。
+
+Track-Changes 库从根本上提供了一个替代 API，构建在这些挂钩之上。  与@code{after-change-functions}相比，第一个重要的区别是，它不提供更改的边界和先前的长度，而是提供更改的边界和该区域的实际先前内容。  需要从缓冲区的原始内容中提取信息是某些包需要同时使用@code{before-change-functions}和@code{after-change-functions}然后尝试将它们匹配的主要原因之一。
+
+第二个区别是，它将更改通知与处理更改的行为分离，并且它自动将第一次更改和实际处理之间发生的所有更改合并到单个更改操作中。  这使得以更大的粒度（例如每个命令一次）处理更改变得自然而容易，并且消除了适用于常见更改挂钩函数的大多数限制，从而可以使用阻塞操作或修改缓冲区。
+
+要开始跟踪更改，您必须调用 @code{track-changes-register}，并向其传递 @var{signal} 函数作为参数。  这将返回一个跟踪器 @var{id}，用于将您的更改跟踪器识别到库的其他函数。当缓冲区被修改时，库会调用 @var{signal} 函数来通知您该更改，并立即开始将后续更改累积为单个组合更改。 @var{signal} 函数仅用于警告发生了修改，但不接收更改的描述。  此外，在您检索更改之前，图书馆不会再次调用它。
+
+要检索更改，您需要调用 @code{track-changes-fetch}，它为您提供自上次调用以来累积的更改范围，以及该区域之前的内容。  它还“重新武装”@var{signal}函数，以便库在下一次缓冲区修改后再次调用它。
+
+@defun track-changes-register signal &key nobefore disjoint immediate
+该函数创建一个新的@dfn{change tracker}。  变更跟踪器保持抽象，因此我们将它们称为纯粹的身份，因此该函数返回跟踪器的@var{id}。
+
+@var{signal} 是库将调用以通知更改的函数。  它有时会用一个参数来调用它，有时会用两个参数来调用它。  自该跟踪器上次调用 @code{track-changes-fetch} 以来，在第一次更改缓冲区时，库会使用保存跟踪器的 @var{id} 的单个参数来调用此 @var{signal} 函数。
+
+默认情况下，对 @var{signal} 函数的调用不会立即发生，而是使用 0 秒计时器 (@pxref{Timers}) 推迟。  这通常是为了确保 @var{signal} 函数不会被过于频繁地调用并在许可的上下文中运行，从而使客户端免于性能问题或担心哪些操作可能出现问题。  如果客户端想要拥有更多控制权，他们可以提供非 @code{nil} 值作为 @var{immediate} 参数，在这种情况下，库直接从 @code{after-change-functions} 调用 @var{signal} 函数。  请注意，这意味着 @var{signal} 函数必须小心，不要修改缓冲区或使用可能阻塞的操作。
+
+如果您对缓冲区的实际先前内容不感兴趣，而使用此库只是因为它能够将许多小的更改组合成一个较大的更改并将处理延迟到更方便的时间，则可以为 @var{nobefore} 参数指定一个非 @code{nil} 值。  在这种情况下，@code{track-change-fetch} 只为您提供先前内容的长度，就像 @code{after-change-functions} 一样。  它还可以让图书馆节省一些工作。
+
+虽然您可能希望将许多小的更改累积为较大的更改，但如果更改相距太远，您可能不想这样做。  如果您为 @var{disjoint} 参数指定非 @code{nil} 值，则库将通过立即调用 @var{signal} 函数，让您知道何时将要发生与当前挂起的更改“相距甚远”的更改，这次向其传递两个参数：跟踪器的 @var{id} 以及将即将发生的更改与已挂起的更改分开的字符数。  这本身并不妨碍将这个新的更改与之前的更改相结合，因此如果您认为即将到来的更改确实太远了，您需要立即调用@code{track-change-fetch}。请注意，当由于不相交的更改而调用 @var{signal} 函数时，这种情况直接从 @code{before-change-functions} 发生，因此通常的限制适用于修改缓冲区或使用可能阻塞的操作。
+@end defun
+
+@defun track-changes-fetch id func
+这个函数可以让你找出缓冲区中发生了什么变化。  通过提供跟踪器@var{id}，您可以让库找出您的跟踪器已经看到了哪些更改。  @code{track-changes-fetch} 不返回更改的描述，而是以 3 个参数的形式使用该描述调用 @var{func} 函数：@var{beg}、@var{end} 和 @var{before}，其中 @code{@var{beg}..@var{end}} 界定已修改的区域，@var{before} 描述该区域之前的内容。通常 @var{before} 是包含已修改区域的先前文本的字符串，但如果您为 @code{track-changes-register} 指定了非 @code{nil} @var{nobefore} 参数，则它将被替换为先前文本的字符数。
+
+如果自上次调用后没有发生任何变化，@code{track-changes-fetch} 就不会调用 @var{func} 并返回 @code{nil}。  如果确实发生了变化，它会调用@var{func}并返回@var{func}返回的值。  但请注意，无论发生多少次更改，@var{func} 都只会被调用一次：这些更改被汇总为单个 @var{beg}/@var{end}/@var{before} 三元组。
+
+在某些情况下，库不会正确通知所有更改，例如，由于低级 C 代码中的错误或由于 @code{inhibit-modification-hooks} 的使用不当。  当它检测到这样的问题时，@var{func}接收覆盖整个缓冲区的@code{@var{beg}..@var{end}}区域，而@var{before}参数是符号@code{error}，表示库无法确定更改的内容。
+
+一旦@var{func}完成，@code{track-changes-fetch}将重新启用@var{signal}函数，以便下次发生更改时调用它。  这就是它调用 @var{func} 而不是返回描述的原因：它让您可以处理更改，而不必担心 @var{signal} 函数在中间被触发的风险，因为 @var{signal} 仅在 @var{func} 完成后才会重新启用。
+@end defun
+
+@defvar track-changes-undo-only
+如果您的代码使用 @code{track-changes} 对缓冲区执行进一步修改（例如，标记缓冲区中已编辑的部分），那么当更改是撤消的结果时（这可能也会撤消您在进行相应编辑时应用的修改），您可能希望避免进行这些修改。为此，如果更改是撤消的结果，则在调用 @var{func} 期间，@code{track-changes-fetch} 将 @code{track-changes-undo-only} 绑定到非 @code{nil}。
+@end defvar
+
+
+@defun track-changes-unregister id
+该函数告诉库跟踪器@var{id}不再需要了解缓冲区更改。  大多数客户端永远不会希望停止跟踪更改，但是对于诸如次要模式之类的客户端，在禁用次要模式时调用此函数很重要，否则跟踪器将不断累积更改并消耗越来越多的资源。
+@end defun

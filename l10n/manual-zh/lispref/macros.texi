@@ -1,0 +1,448 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998, 2001--2026 Free Software Foundation,
+@c Inc.
+@c See the file elisp.texi for copying conditions.
+@node Macros
+@chapter 宏
+@cindex macros
+
+@dfn{Macros} 使您能够定义新的控制结构和其他语言功能。  宏的定义很像函数，但它不是告诉我们如何计算一个值，而是告诉我们如何计算另一个 Lisp 表达式，而该表达式又会计算该值。  我们将此表达式称为宏的@dfn{expansion}。
+
+宏可以做到这一点，因为它们对参数的未计算表达式进行操作，而不是像函数那样对参数值进行操作。  因此，他们可以构造一个包含这些参数表达式或其中一部分的扩展。
+
+如果您使用宏来执行普通函数可以执行的操作，只是为了速度，请考虑使用内联函数。  @xref{Inline Functions}。
+
+@menu
+* Simple Macro::             一个基本的例子。
+* Expansion::                如何、何时以及为何扩展宏。
+* Compiling Macros::         编译器如何扩展宏。
+* Defining Macros::          如何编写宏定义。
+* Problems with Macros::     不要多次评估宏参数。不要隐藏用户的变量。
+* Indenting Macros::         指定如何缩进宏调用。
+@end menu
+
+@node Simple Macro
+@section 宏的简单示例
+
+假设我们想定义一个 Lisp 结构来增加一个变量值，就像 C@. 中的 @code{++} 运算符一样，我们想写成 @code{(inc x)} 并具有 @code{(setq x (1+ x))} 的效果。这是完成这项工作的宏定义：
+
+@findex inc
+@example
+@group
+(defmacro inc (var)
+   (list 'setq var (list '1+ var)))
+@end group
+@end example
+
+当用 @code{(inc x)} 调用时，参数 @var{var} 是符号 @code{x}---@emph{not} @code{x} 的 @emph{value}，就像在函数中一样。  宏的主体使用它来构造扩展，即@code{(setq x (1+ x))}。  一旦宏定义返回此扩展，Lisp 就会继续对其求值，从而递增 @code{x}。
+
+@defun macrop object
+该谓词测试其参数是否为宏，如果是则返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@node Expansion
+@section 宏调用的扩展
+@cindex expansion of macros
+@cindex macro call
+
+宏调用看起来就像函数调用，因为它是一个以宏名称开头的列表。  列表的其余元素是宏的参数。
+
+宏调用的计算开始类似于函数调用的计算，除了一个关键的区别：宏参数是宏调用中出现的实际表达式。  它们在被赋予宏定义之前不会被评估。  相比之下，函数的参数是对函数调用列表的元素求值的结果。
+
+获得参数后，Lisp 会像调用函数一样调用宏定义。  宏的参数变量绑定到宏调用的参数值，或者在 @code{&rest} 参数的情况下绑定到它们的列表。  宏体就像函数体一样执行并返回其值。
+
+宏和函数之间的第二个关键区别是宏体返回的值是一个替代的 Lisp 表达式，也称为宏的 @dfn{expansion}。  一旦从宏返回，Lisp 解释器就会继续评估扩展。
+
+由于扩展是以正常方式计算的，因此它可能包含对其他宏的调用。  它甚至可能是对同一个宏的调用，尽管这种情况不常见。
+
+请注意，Emacs 在加载未编译的 Lisp 文件时会尝试扩展宏。  这并不总是可能的，但如果是的话，它会加快后续执行的速度。  @xref{How Programs Do Loading}。
+
+您可以通过调用@code{macroexpand}来查看给定宏调用的扩展。
+
+@defun macroexpand form &optional environment
+@cindex macro expansion
+如果该函数是宏调用，则它会扩展 @var{form}。  如果结果是另一个宏调用，则依次展开，直到结果不是宏调用。  这就是@code{macroexpand}返回的值。  如果 @var{form} 不是一个宏调用，则按给定方式返回。
+
+请注意，@code{macroexpand} 不会查看 @var{form} 的子表达式（尽管某些宏定义可能会这样做）。  即使它们本身是宏调用，@code{macroexpand} 也不会扩展它们。
+
+函数 @code{macroexpand} 不会扩展对内联函数的调用。通常不需要这样做，因为对内联函数的调用并不比对普通函数的调用更难理解。
+
+如果提供了@var{environment}，它指定一个宏定义列表，该列表会隐藏当前定义的宏。  字节编译就利用了这个特性。
+
+@example
+@group
+(defmacro inc (var)
+    (list 'setq var (list '1+ var)))
+@end group
+
+@group
+(macroexpand '(inc r))
+     @result{} (setq r (1+ r))
+@end group
+
+@group
+(defmacro inc2 (var1 var2)
+    (list 'progn (list 'inc var1) (list 'inc var2)))
+@end group
+
+@group
+(macroexpand '(inc2 r s))
+     @result{} (progn (inc r) (inc s))  ; @r{@code{inc} not expanded here.}
+@end group
+@end example
+@end defun
+
+
+@defun macroexpand-all form &optional environment
+@code{macroexpand-all} 会像 @code{macroexpand} 一样扩展宏，但会查找并扩展 @var{form} 中的所有宏，而不仅仅是顶层宏。  如果没有扩展宏，则返回值为 @code{eq} 到 @var{form}。
+
+使用 @code{macroexpand-all} 重复上面用于 @code{macroexpand} 的示例，我们看到 @code{macroexpand-all} @emph{does} 将嵌入调用扩展到 @code{inc}：
+
+@example
+(macroexpand-all '(inc2 r s))
+     @result{} (progn (setq r (1+ r)) (setq s (1+ s)))
+@end example
+
+@end defun
+
+@defun macroexpand-1 form &optional environment
+该函数像@code{macroexpand}一样扩展宏，但它只执行一步扩展：如果结果是另一个宏调用，@code{macroexpand-1}将不会扩展它。
+@end defun
+
+@node Compiling Macros
+@section 宏和字节编译
+@cindex byte-compiling macros
+
+您可能会问为什么我们要费心计算宏的展开式，然后评估该展开式。  为什么不让宏观体直接产生想要的结果呢？  原因与编译有关。
+
+当宏调用出现在正在编译的 Lisp 程序中时，Lisp 编译器就像解释器一样调用宏定义，并接收扩展。  但它不是评估这个扩展，而是编译这个扩展，就好像它直接出现在程序中一样。因此，编译后的代码会产生宏所需的值和副作用，但会以全编译速度执行。  如果宏体本身计算值和副作用，那么这将不起作用——它们将在编译时计算，这是没有用的。
+
+为了使宏调用的编译能够正常工作，在编译对宏的调用时，宏必须已经在 Lisp 中定义。  编译器有一个特殊功能可以帮助您做到这一点：如果正在编译的文件包含 @code{defmacro} 形式，则为该文件的其余编译过程临时定义该宏。
+
+字节编译文件还会在文件的顶层执行任何 @code{require} 调用，因此您可以通过要求定义宏定义的文件 (@pxref{Named Features}) 来确保编译期间可用的必要宏定义。  为了避免在 @emph{runs} 编译的程序时加载宏定义文件，请在 @code{require} 调用 (@pxref{Eval During Compile}) 周围写上 @code{eval-when-compile}。
+
+@node Defining Macros
+@section 定义宏
+@cindex defining macros
+@cindex macro, how to define
+
+Lisp 宏对象是一个列表，其 @sc{car} 为 @code{macro}，且 @sc{cdr} 为函数。  宏的扩展通过将函数（使用 @code{apply}）应用到宏调用中的 @emph{unevaluated} 参数列表来实现。
+
+可以像使用匿名函数一样使用匿名 Lisp 宏，但这种做法永远不会被执行，因为将匿名宏传递给诸如 0⁣ 之类的函数是没有意义的。  实际上，所有 Lisp 宏都有名称，并且它们几乎总是用 @code{defmacro} 宏定义。
+
+@defmac defmacro name args [doc] [declare] body@dots{}
+@code{defmacro} 将符号 @var{name} （不应被引用）定义为如下宏：
+
+@example
+(macro lambda @var{args} . @var{body})
+@end example
+
+（请注意，该列表的 @sc{cdr} 是一个 lambda 表达式。）该宏对象存储在 @var{name} 的函数单元中。  @var{args} 的含义与函数中相同，可以使用关键字 @code{&rest} 和 @code{&optional} (@pxref{Argument List})。 @var{name} 和 @var{args} 均不应被引用。  @code{defmacro} 的返回值未定义。
+
+@var{doc}（如果存在）应该是指定宏的文档字符串的字符串。  @var{declare}（如果存在）应该是 @code{declare} 形式，指定宏的元数据 (@pxref{Declare Form})。  请注意，宏不能具有交互式声明，因为它们不能被交互式调用。
+@end defmac
+
+宏通常需要从常量和非常量部分的混合中构造大型列表结构。  为了使这更容易，请使用 @samp{`} 语法 (@pxref{Backquote})。  例如：
+
+@example
+@group
+(defmacro t-becomes-nil (variable)
+  `(if (eq ,variable t)
+       (setq ,variable nil)))
+@end group
+
+@group
+(t-becomes-nil foo)
+     @equiv{} (if (eq foo t) (setq foo nil))
+@end group
+@end example
+
+@node Problems with Macros
+@section 使用宏的常见问题
+@cindex macro caveats
+
+宏观扩张可能会产生违反直觉的后果。  本节介绍一些可能导致麻烦的重要后果，以及避免麻烦应遵循的规则。
+
+@menu
+* Wrong Time::              在扩展中进行工作，而不是在宏中进行。
+* Argument Evaluation::     扩展应该对每个宏参数求值一次。
+* Surprising Local Vars::   扩展中的局部变量绑定需要特别小心。
+* Eval During Expansion::   不要评价他们；将它们放入扩展中。
+* Repeated Expansion::      避免依赖于扩展完成的次数。
+@end menu
+
+@node Wrong Time
+@subsection 错误的时间
+
+编写宏时最常见的问题是在扩展宏时过早地完成一些实际工作，而不是在扩展本身中。  例如，一个真实的包具有以下宏定义：
+
+@example
+(defmacro my-set-buffer-multibyte (arg)
+  (if (fboundp 'set-buffer-multibyte)
+      (set-buffer-multibyte arg)))
+@end example
+
+由于这个错误的宏定义，程序在解释时工作正常，但在编译时失败。  这个宏定义在编译时调用了@code{set-buffer-multibyte}，这是错误的，然后在编译后的包运行时什么也没做。  程序员真正想要的定义是这样的：
+
+@example
+(defmacro my-set-buffer-multibyte (arg)
+  (if (fboundp 'set-buffer-multibyte)
+      `(set-buffer-multibyte ,arg)))
+@end example
+
+@noindent
+如果合适的话，该宏会扩展为对 @code{set-buffer-multibyte} 的调用，该调用将在编译的程序实际运行时执行。
+
+@node Argument Evaluation
+@subsection 反复评估宏观参数
+
+定义宏时，必须注意执行扩展时对参数求值的次数。  下面的宏（用于促进迭代）说明了这个问题。  这个宏允许我们编写一个 for 循环结构。
+
+@findex for
+@example
+@group
+(defmacro for (var from init to final do &rest body)
+  "Execute a simple \"for\" loop.
+For example, (for i from 1 to 10 do (print i))."
+  (list 'let (list (list var init))
+        (cons 'while
+              (cons (list '<= var final)
+                    (append body (list (list 'inc var)))))))
+@end group
+
+@group
+(for i from 1 to 3 do
+   (setq square (* i i))
+   (princ (format "\n%d %d" i square)))
+@expansion{}
+@end group
+@group
+(let ((i 1))
+  (while (<= i 3)
+    (setq square (* i i))
+    (princ (format "\n%d %d" i square))
+    (inc i)))
+@end group
+@group
+
+     @print{}1       1
+     @print{}2       4
+     @print{}3       9
+@result{} nil
+@end group
+@end example
+
+@noindent
+该宏中的参数@code{from}、@code{to}和@code{do}是语法糖；他们完全被忽视了。  这个想法是，您将在宏调用中的这些位置写入干扰词（例如 @code{from}、@code{to} 和 @code{do}）。
+
+这是通过使用反引号简化的等效定义：
+
+@example
+@group
+(defmacro for (var from init to final do &rest body)
+  "Execute a simple \"for\" loop.
+For example, (for i from 1 to 10 do (print i))."
+  `(let ((,var ,init))
+     (while (<= ,var ,final)
+       ,@@body
+       (inc ,var))))
+@end group
+@end example
+
+该定义的两种形式（带反引号和不带反引号）都存在缺陷，即每次迭代都会评估 @var{final} 。  如果 1⁣ 是一个常数，这不是问题。  如果它是更复杂的形式，例如 2⁣，这会显着减慢执行速度。  如果@var{final}有副作用，多次执行它可能是不正确的。
+
+@cindex macro argument evaluation
+精心设计的宏定义会采取措施来避免此问题，方法是生成一个扩展，该扩展仅对参数表达式求值一次，除非重复求值是宏的预期目的的一部分。  这是 @code{for} 宏的正确扩展：
+
+@example
+@group
+(let ((i 1)
+      (max 3))
+  (while (<= i max)
+    (setq square (* i i))
+    (princ (format "%d      %d" i square))
+    (inc i)))
+@end group
+@end example
+
+这是创建此扩展的宏定义：
+
+@example
+@group
+(defmacro for (var from init to final do &rest body)
+  "Execute a simple for loop: (for i from 1 to 10 do (print i))."
+  `(let ((,var ,init)
+         (max ,final))
+     (while (<= ,var max)
+       ,@@body
+       (inc ,var))))
+@end group
+@end example
+
+不幸的是，此修复引入了另一个问题，如下一节所述。
+
+@node Surprising Local Vars
+@subsection 宏扩展中的局部变量
+
+@ifnottex
+  In the previous section, the definition of @code{for} was fixed as
+follows to make the expansion evaluate the macro arguments the proper
+number of times:
+
+@example
+@group
+(defmacro for (var from init to final do &rest body)
+  "Execute a simple for loop: (for i from 1 to 10 do (print i))."
+@end group
+@group
+  `(let ((,var ,init)
+         (max ,final))
+     (while (<= ,var max)
+       ,@@body
+       (inc ,var))))
+@end group
+@end example
+@end ifnottex
+
+@code{for} 的新定义有一个新问题：它引入了一个用户不期望的名为 @code{max} 的局部变量。  这会在如下示例中引起麻烦：
+
+@example
+@group
+(let ((max 0))
+  (for x from 0 to 10 do
+    (let ((this (frob x)))
+      (if (< max this)
+          (setq max this)))))
+@end group
+@end example
+
+@noindent
+@code{for}主体内对@code{max}的引用本应引用用户对@code{max}的绑定，但实际上访问了@code{for}所做的绑定。
+
+纠正此问题的方法是使用未驻留的符号而不是 @code{max} (@pxref{Creating Symbols})。  未驻留符号可以像任何其他符号一样绑定和引用，但由于它是由 @code{for} 创建的，我们知道它不能出现在用户的程序中。  由于它没有被保留，用户以后无法将其放入程序中。  除了 3⁣ 放置的地方之外，它永远不会出现在任何地方。  以下是 @code{for} 的定义，其工作方式如下：
+
+@example
+@group
+(defmacro for (var from init to final do &rest body)
+  "Execute a simple for loop: (for i from 1 to 10 do (print i))."
+  (let ((tempvar (make-symbol "max")))
+    `(let ((,var ,init)
+           (,tempvar ,final))
+       (while (<= ,var ,tempvar)
+         ,@@body
+         (inc ,var)))))
+@end group
+@end example
+
+@noindent
+这将创建一个名为 @code{max} 的未驻留符号，并将其放入扩展中，而不是通常出现在表达式中的常用驻留符号 @code{max}。
+
+@node Eval During Expansion
+@subsection 评估扩展中的宏观参数
+
+如果宏定义本身计算任何宏参数表达式，例如通过调用 @code{eval} (@pxref{Eval})，则可能会出现另一个问题。  您必须考虑到，当调用者的上下文（将在其中评估宏扩展）尚无法访问时，宏扩展可能会在代码执行之前很久发生。
+
+另外，如果你的宏定义不使用@code{lexical-binding}，它的形式参数可能会隐藏用户的同名变量。  在宏体内，宏参数绑定是此类变量的最本地绑定，因此正在评估的表单内的任何引用都会引用它。  这是一个例子：
+
+@example
+@group
+(defmacro foo (a)
+  (list 'setq (eval a) t))
+@end group
+@group
+(setq x 'b)
+(foo x) @expansion{} (setq b t)
+     @result{} t                  ; @r{and @code{b} has been set.}
+;; @r{but}
+(setq a 'c)
+(foo a) @expansion{} (setq a t)
+     @result{} t                  ; @r{but this set @code{a}, not @code{c}.}
+
+@end group
+@end example
+
+用户的变量命名为 ⁣​​0⁣ 还是 @code{x} 都会有所不同，因为 @code{a} 与宏参数变量 @code{a} 冲突。
+
+此外，上面 @code{(foo x)} 的扩展将在代码编译时返回不同的内容或发出错误信号，因为在这种情况下 @code{(foo x)} 在编译期间扩展，而 @code{(setq x 'b)} 的执行只会在稍后执行代码时发生。
+
+为了避免这些问题，@strong{don't evaluate an argument expression while computing the macro expansion}。  相反，请将表达式替换到宏扩展中，以便在执行扩展时计算其值。  这就是本章中其他示例的工作原理。
+
+@node Repeated Expansion
+@subsection 宏扩展了多少倍？
+
+有时，问题是由于宏调用在解释函数中每次求值时都会展开，但在编译函数中仅展开一次（在编译期间）。  If the macro definition has side effects, they will work differently depending on how many times the macro is expanded.
+
+
+
+一种特殊的副作用是无法避免的：构造 Lisp 对象。  几乎所有的宏扩展都包含构造列表；这就是大多数宏的要点。  这通常是安全的；只有一种情况必须小心：当您构造的对象是宏扩展中带引号的常量的一部分时。
+
+If the macro is expanded just once, in compilation, then the object is constructed just once, during compilation.  但在解释执行中，每次运行宏调用时都会扩展宏，这意味着每次都会构造一个新对象。
+
+在大多数干净的 Lisp 代码中，这种差异并不重要。  仅当您对宏定义构造的对象执行副作用时，这才有意义。  因此，为了避免麻烦，@strong{avoid side effects on objects constructed by macro definitions}。  以下是此类副作用如何给您带来麻烦的示例：
+
+@lisp
+@group
+(defmacro empty-object ()
+  (list 'quote (cons nil nil)))
+@end group
+
+@group
+(defun initialize (condition)
+  (let ((object (empty-object)))
+    (if condition
+        (setcar object condition))
+    object))
+@end group
+@end lisp
+
+@noindent
+如果 @code{initialize} 被解释，则每次调用 @code{initialize} 时都会构造一个新列表 @code{(nil)}。  因此，调用之间不会产生副作用。  如果编译@code{initialize}，则宏@code{empty-object}会在编译期间展开，生成一个常量@code{(nil)}，每次调用@code{initialize}时都会重用并更改该常量。
+
+避免这种病态情况的一种方法是将 0⁣ 视为一种有趣的常量，而不是内存分配结构。  您不会在 @code{'(nil)} 等常量上使用 @code{setcar}，因此自然也不会在 @code{(empty-object)} 上使用它。
+
+@node Indenting Macros
+@section 缩进宏
+
+在宏定义中，您可以使用 @code{declare} 形式 (@pxref{Defining Macros}) 来指定 @key{TAB} 应如何缩进对宏的调用。  缩进规范是这样写的：
+
+@example
+(declare (indent @var{indent-spec}))
+@end example
+
+@noindent
+@cindex @code{lisp-indent-function} property
+
+
+@noindent
+以下是 @var{indent-spec} 的可能性：
+
+@table @asis
+@item @code{nil}
+
+@item @code{defun}
+
+@item 一个整数，@var{number}
+The first @var{number} arguments of the function are @dfn{distinguished} arguments;其余部分被视为表达式的主体。  A line in the expression is indented according to whether the first argument on it is distinguished or not.  If the argument is part of the body, the line is indented @code{lisp-body-indent} more columns than the open-parenthesis starting the containing expression.  If the argument is distinguished and is either the first or second argument, it is indented @emph{twice} that many extra columns. If the argument is distinguished and not the first or second argument, the line uses the standard pattern.
+@item 一个符号，@var{symbol}
+@var{symbol} 应该是一个函数名称；调用该函数来计算该表达式中一行的缩进。  该函数接收两个参数：
+
+@table @asis
+@item @var{pos}
+
+@item @var{state}
+
+@end table
+
+@noindent
+它应该返回一个数字（该行的缩进列数），或者返回一个列表，其中汽车就是这样的数字。  返回数字和返回列表之间的区别在于，数字表示同一嵌套级别的所有后续行都应像此行一样缩进；列表表明以下行可能需要不同的缩进。  当通过 @kbd{C-M-q} 计算缩进时，这会产生影响；如果该值为数字，则@kbd{C-M-q}不需要重新计算后续行的缩进，直到列表末尾。
+@end table
+
+@defvar lisp-indent-local-overrides
+此变量可用于覆盖用于某些符号的缩进规范，如使用其 @code{lisp-indent-function} 符号属性 (@pxref{Symbol Properties}) 指定的那样。  它旨在用作文件本地或目录本地变量； @xref{File Variables, , Local Variables in Files, emacs, The GNU Emacs Manual}。
+
+每个键都是一个符号，每个值都是一个缩进规范，它会覆盖符号的 @code{lisp-indent-function} 属性的值。  该值可以采用与上面记录的符号属性值相同的形式。  请注意，使用函数并不安全，应避免使用，否则所有访问该文件的用户都必须明确批准或拒绝其使用。
+
+该变量由函数 @code{lisp-indent-function} 和 @code{common-lisp-indent-function} 使用。  对于后者，符号属性 @code{common-lisp-indent-function-for-elisp} 和 @code{common-lisp-indent-function} 不仅优先于 @code{lisp-indent-function} 属性，而且优先于该变量。
+
+@end defvar

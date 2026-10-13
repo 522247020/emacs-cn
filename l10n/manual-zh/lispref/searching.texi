@@ -1,0 +1,2166 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Searching and Matching
+@chapter 搜索和匹配
+@cindex searching
+
+GNU Emacs 提供了两种在缓冲区中搜索指定文本的方法：精确字符串搜索和正则表达式搜索。  正则表达式搜索后，您可以检查 @dfn{match data} 以确定哪个文本与整个正则表达式或其各个部分匹配。
+
+@menu
+* String Search::          搜索完全匹配。
+* Searching and Case::     不区分大小写或区分大小写的搜索。
+* Regular Expressions::    描述字符串的类别。
+* Regexp Search::          搜索正则表达式的匹配项。
+* Longest Match::          搜索最长的匹配。
+* Match Data::             在字符串或正则表达式搜索后找出文本的哪一部分匹配。
+* Search and Replace::     循环、搜索和替换的命令。
+* Standard Regexps::       用于查找句子、页面等的有用正则表达式
+* POSIX Regexps::          Emacs 正则表达式与 POSIX 正则表达式。
+@end menu
+
+@samp{skip-chars@dots{}} 函数也执行一种搜索。 @xref{Skipping Characters}。  要搜索角色属性的更改，请参阅@ref{Property Search}。
+
+@node String Search
+@section 搜索字符串
+@cindex string search
+
+这些是用于搜索缓冲区中文本的基本函数。  它们旨在在程序中使用，但您可以交互地调用它们。  如果您这样做，它们会提示您输入搜索字符串；参数 @var{limit} 和 @var{noerror} 为 @code{nil}，@var{repeat} 为 1。有关交互式搜索的更多详细信息，@pxref{Search,, Searching and Replacement, emacs, The GNU Emacs Manual}。
+
+如果缓冲区是多字节，这些搜索函数将搜索字符串转换为多字节；如果缓冲区是单字节的，它们会将搜索字符串转换为单字节。  @xref{Text Representations}。
+
+@deffn Command search-forward string &optional limit noerror count
+该函数从点向前搜索 @var{string} 的精确匹配。  如果成功，它将 point 设置为找到的匹配项的末尾，并返回 point 的新值。  如果未找到匹配项，则值和副作用取决于@var{noerror}（见下文）。
+
+在以下示例中，点最初位于行的开头。  然后@code{(search-forward "fox")}将点移动到@samp{fox}的最后一个字母之后：
+
+@example
+@group
+---------- Buffer: foo ----------
+@point{}The quick brown fox jumped over the lazy dog.
+---------- Buffer: foo ----------
+@end group
+
+@group
+(search-forward "fox")
+     @result{} 20
+
+---------- Buffer: foo ----------
+The quick brown fox@point{} jumped over the lazy dog.
+---------- Buffer: foo ----------
+@end group
+@end example
+
+参数 @var{limit} 指定搜索范围，并且应该是当前缓冲区中的一个位置。  不接受在该位置之后延伸的任何匹配。  如果省略@var{limit}或@code{nil}，则默认为缓冲区可访问部分的末尾。
+
+@kindex search-failed
+搜索失败时会发生什么取决于@var{noerror}的值。  如果@var{noerror}是@code{nil}，则发出@code{search-failed}错误信号。  如果@var{noerror}是@code{t}，则@code{search-forward}返回@code{nil}并且不执行任何操作。  如果@var{noerror}既不是@code{nil}也不是@code{t}，则@code{search-forward}将点移动到上限并返回@code{nil}。
+@c I see no prospect of this ever changing, and frankly the current
+@c behavior seems better, so there seems no need to mention this.
+@ignore
+(It would be more consistent now to return the new position of point
+in that case, but some existing programs may depend on a value of
+@code{nil}.)
+@end ignore
+
+参数 @var{noerror} 仅影响无法找到匹配项的有效搜索。  无论@var{noerror}如何，无效参数都会导致错误。
+
+如果@var{count}是正数@var{n}，则搜索完成@var{n}次；每个连续的搜索都从上一场比赛结束时开始。  如果所有这些连续搜索都成功，则函数调用成功，移动点并返回其新值。否则，函数调用将失败，结果取决于 3⁣ 的值，如上所述。  如果@var{count}是负数@minus{}@var{n}，则在相反（向后）方向上搜索@var{n}次。
+@end deffn
+
+@deffn Command search-backward string &optional limit noerror count
+该函数从点向后搜索@var{string}。  它类似于@code{search-forward}，只不过它向后搜索而不是向前搜索。  向后搜索会在比赛开始时留下点。
+@end deffn
+
+@deffn Command word-search-forward string &optional limit noerror count
+该函数从点向前搜索 @var{string} 的单词匹配。  如果找到匹配项，它将 point 设置为找到的匹配项的末尾，并返回 point 的新值。
+
+单词匹配将 @var{string} 视为单词序列，忽略分隔它们的标点符号。  它在缓冲区中搜索相同的单词序列。  缓冲区中的每个单词必须是不同的（搜索单词 @samp{ball} 与单词 @samp{balls} 不匹配），但标点符号和空格的详细信息将被忽略（搜索 @samp{ball boy} 与单词 @samp{ball.  Boy!} 匹配）。
+
+在此示例中，point 最初位于缓冲区的开头；搜索将其留在 @samp{y} 和 @samp{!} 之间。
+
+@example
+@group
+---------- Buffer: foo ----------
+@point{}He said "Please!  Find
+the ball boy!"
+---------- Buffer: foo ----------
+@end group
+
+@group
+(word-search-forward "Please find the ball, boy.")
+     @result{} 39
+
+---------- Buffer: foo ----------
+He said "Please!  Find
+the ball boy@point{}!"
+---------- Buffer: foo ----------
+@end group
+@end example
+
+如果@var{limit}非@code{nil}，则它必须是当前缓冲区中的位置；它指定搜索的上限。  找到的匹配不得延伸到该位置之后。
+
+如果 @var{noerror} 是 @code{nil}，则当搜索失败时 @code{word-search-forward} 会发出错误信号。  如果@var{noerror}是@code{t}，那么它返回@code{nil}而不是发出错误信号。  如果@var{noerror}既不是@code{nil}也不是@code{t}，它将指针移动到@var{limit}（或缓冲区可访问部分的末尾）并返回@code{nil}。
+
+如果 0⁣ 是正数，则指定要搜索的连续出现次数。  点位于最后一场比赛结束时。  如果 1⁣ 是负数，则向后搜索，点位于最后一个匹配的开头。
+
+@findex word-search-regexp
+在内部，@code{word-search-forward}和相关函数使用函数@code{word-search-regexp}将@var{string}转换为忽略标点符号的正则表达式。
+@end deffn
+
+@deffn Command word-search-forward-lax string &optional limit noerror count
+此命令与 0⁣ 相同，只是 1⁣ 的开头或结尾不需要与字边界匹配，除非 2⁣ 以空格开头或结尾。例如，搜索 @samp{ball boy} 匹配 @samp{ball boyee}，但不匹配 @samp{balls boy}。
+@end deffn
+
+@deffn Command word-search-backward string &optional limit noerror count
+该函数从单词匹配点向后搜索到@var{string}。  该函数与 @code{word-search-forward} 类似，只不过它向后搜索并且通常在匹配的开头留下点。
+@end deffn
+
+@deffn Command word-search-backward-lax string &optional limit noerror count
+此命令与 0⁣ 相同，只是 1⁣ 的开头或结尾不需要与字边界匹配，除非 2⁣ 以空格开头或结尾。
+@end deffn
+
+@node Searching and Case
+@section 搜索与案例
+@cindex searching and case
+
+默认情况下，Emacs 中的搜索会忽略正在搜索的文本的大小写；如果您指定搜索 @samp{FOO}，则 @samp{Foo} 或 @samp{foo} 也被视为匹配。  这也适用于正则表达式；因此，@samp{[aB]}将匹配@samp{a}或@samp{A}或@samp{b}或@samp{B}。
+
+如果您不需要此功能，请将变量 @code{case-fold-search} 设置为 @code{nil}。  然后所有字母必须完全匹配，包括大小写。  这是一个缓冲区局部变量；更改变量仅影响当前缓冲区。  (@xref{Intro to Buffer-Local}.) 或者，您可以更改默认值。在 Lisp 代码中，您通常会使用 @code{let} 将 @code{case-fold-search} 绑定到所需的值。
+
+请注意，用户级增量搜索功能以不同方式处理大小写区别。  当搜索字符串仅包含小写字母时，搜索将忽略大小写，但当搜索字符串包含一个或多个大写字母时，搜索将区分大小写。  但这与 Lisp 代码中使用的搜索函数无关。  @xref{Incremental Search,,, emacs, The GNU Emacs Manual}。
+
+@defopt case-fold-search
+此缓冲区局部变量确定搜索是否应忽略大小写。  如果变量是@code{nil}，它们不会忽略大小写；否则（默认情况下）他们会忽略大小写。
+@end defopt
+
+@defopt case-replace
+该变量确定更高级别的替换函数是否应保留大小写。  如果变量是@code{nil}，则意味着逐字使用替换文本。  非 1⁣ 值意味着根据被替换的文本转换替换文本的大小写。
+
+通过将其作为参数传递给函数@code{replace-match}来使用该变量。  @xref{Replacing Match}。
+@end defopt
+
+@node Regular Expressions
+@section 正则表达式
+@cindex regular expression
+@cindex regexp
+
+@dfn{regular expression}，或简称为@dfn{regexp}，是一种表示一组（可能是无限的）字符串的模式。  搜索正则表达式的匹配项是一项非常强大的操作。  本节介绍如何编写正则表达式；以下部分介绍如何搜索它们。
+
+@findex re-builder
+@cindex regular expressions, developing
+对于正则表达式的交互式开发，可以使用@kbd{M-x re-builder}命令。  它通过在单独的缓冲区中提供即时视觉反馈，为创建正则表达式提供了一个方便的界面。  当您编辑正则表达式时，目标缓冲区中的所有匹配项都会突出显示。  正则表达式的每个带括号的子表达式都以不同的面显示，这使得验证甚至非常复杂的正则表达式变得更容易。
+
+请注意，默认情况下 Emacs 搜索会忽略大小写 (@pxref{Searching and Case})。  要启用区分大小写的正则表达式搜索和匹配，请将 @code{case-fold-search} 绑定到您想要区分大小写的代码周围的 @code{nil}。
+
+@menu
+* Syntax of Regexps::        编写正则表达式的规则。
+* Regexp Example::           说明正则表达式语法。
+@ifnottex
+* Rx Notation::             An alternative, structured regexp notation.
+@end ifnottex
+* Regexp Functions::         用于操作正则表达式的函数。
+* Regexp Problems::          一些问题以及如何避免这些问题。
+@end menu
+
+@node Syntax of Regexps
+@subsection 正则表达式的语法
+@cindex regexp syntax
+@cindex syntax of regular expressions
+
+正则表达式的语法中，一些字符是特殊结构，其余字符是 @dfn{ordinary}。  普通字符是一个简单的正则表达式，仅与该字符匹配。  特殊字符为 @samp{.}、@samp{*}、@samp{+}、@samp{?}、@samp{[}、@samp{^}、@samp{$} 和 @samp{\}；将来不会定义新的特殊字符。  如果字符 @samp{]} 结束一个括号表达式（见下文），那么它是特殊的。字符 @samp{-} 在方括号表达式中是特殊的。  @samp{[:} 和平衡 @samp{:]} 将字符类括在括号表达式内。  正则表达式中出现的任何其他字符都是普通字符，除非其前面有 @samp{\}。
+
+例如，@samp{f}不是特殊字符，因此它是普通字符，因此@samp{f}是与字符串@samp{f}匹配且不匹配其他字符串的正则表达式。  （它确实与 @emph{not} 匹配字符串 @samp{fg}，但它确实匹配该字符串的 @emph{part}。）同样，@samp{o} 是仅匹配 @samp{o} 的正则表达式。
+
+任意两个正则表达式@var{a}和@var{b}都可以连接。  如果 @var{a} 匹配某个字符串的开头部分并且 @var{b} 匹配该字符串的其余部分，则结果是匹配该字符串的正则表达式。
+
+举个简单的例子，我们可以将正则表达式@samp{f}和@samp{o}连接起来得到正则表达式@samp{fo}，它只匹配字符串@samp{fo}。  还是微不足道的。  要执行更强大的操作，您需要使用一种特殊的正则表达式结构。
+
+@menu
+* Regexp Special::       正则表达式中的特殊字符。
+* Char Classes::         正则表达式中使用的字符类。
+* Regexp Backslash::     正则表达式中的反斜杠序列。
+@end menu
+
+@node Regexp Special
+@subsubsection 正则表达式中的特殊字符
+@cindex regexp, special characters in
+
+以下是正则表达式中特殊字符的列表。
+
+@need 800
+@table @asis
+@item @samp{.}@: @r{(Period)}
+@cindex @samp{.} in regexp
+是一个特殊字符，可以匹配除换行符之外的任何单个字符。使用串联，我们可以创建像 @samp{a.b} 这样的正则表达式，它匹配以 @samp{a} 开头并以 @samp{b} 结尾的任何三字符字符串。
+
+@item @samp{*}
+@cindex @samp{*} in regexp
+本身不是一个构造；它是一个后缀运算符，意味着尽可能多次地重复匹配前面的正则表达式。  因此，@samp{o*}匹配任意数量的@samp{o}（不包括@samp{o}）。
+
+@samp{*} 始终适用于 @emph{smallest} 可能的前面表达式。  因此，@samp{fo*}具有重复的@samp{o}，而不是重复的@samp{fo}。  它匹配 @samp{f}、@samp{fo}、@samp{foo} 等。
+
+@cindex backtracking and regular expressions
+匹配器通过立即匹配尽可能多的重复来处理 @samp{*} 构造。  然后继续该模式的其余部分。  如果失败，则会发生回溯，丢弃 @samp{*} 修改的构造的一些匹配项，希望这能够匹配模式的其余部分。  例如，在将 @samp{ca*ar} 与字符串 @samp{caaar} 匹配时，@samp{a*} 首先尝试匹配所有三个 @samp{a}；但模式的其余部分是 @samp{ar} 并且只剩下 @samp{r} 可以匹配，所以这次尝试失败。下一个替代方案是 @samp{a*} 仅匹配两个 @samp{a}。  通过此选择，正则表达式的其余部分将成功匹配。
+
+@item @samp{+}
+@cindex @samp{+} in regexp
+是一个后缀运算符，与@samp{*}类似，只不过它必须与前面的表达式至少匹配一次。  因此，例如， @samp{ca+r} 匹配字符串 @samp{car} 和 @samp{caaaar}，但不匹配字符串 @samp{cr}，而 @samp{ca*r} 匹配所有三个字符串。
+
+@item @samp{?}
+@cindex @samp{?} in regexp
+是一个后缀运算符，与 @samp{*} 类似，只不过它必须匹配前面的表达式一次或根本不匹配。  例如，@samp{ca?r} 匹配 @samp{car} 或 @samp{cr}；没有别的。
+
+@anchor{Non-greedy repetition}
+@item @samp{*?}, @samp{+?}, @samp{??}
+@cindex non-greedy repetition characters in regexp
+是运算符 @samp{*}、@samp{+} 和 @samp{?} 的 @dfn{non-greedy} 变体。  当这些运算符匹配最大可能的子字符串（与匹配整个包含表达式一致）时，非贪婪变体匹配最小的可能子字符串（与匹配整个包含表达式一致）。
+
+例如，正则表达式@samp{c[ad]*a}应用于字符串@samp{cdaaada}时匹配整个字符串；但是正则表达式 @samp{c[ad]*?a} 应用于同一字符串，仅匹配 @samp{cda}。  （此处允许整个表达式匹配的 @samp{[ad]*?} 的最小可能匹配是 @samp{d}。）
+
+@item @samp{[ @dots{} ]}
+@cindex bracket expression (in regexp)
+@cindex character alternative (in regexp)
+@cindex @samp{[} in regexp
+@cindex @samp{]} in regexp
+是一个@dfn{bracket expression}（又名@:@dfn{character alternative}），以@samp{[}开始，以@samp{]}结束。  最简单的情况下，两个括号之间的字符就是这个括号表达式可以匹配的字符。
+
+因此，@samp{[ad]}匹配一个@samp{a}或一个@samp{d}，@samp{[ad]*}匹配仅由@samp{a}和@samp{d}组成的任何字符串（包括空字符串）。  由此可见，@samp{c[ad]*r} 匹配@samp{cr}、@samp{car}、@samp{cdr}、@samp{caddaar} 等。
+
+您还可以在括号表达式中包含字符范围，方法是在起始字符和结束字符之间添加 @samp{-}。因此，@samp{[a-z]} 匹配任何小写的 @acronym{ASCII} 字母。范围可以与单个字符自由混合，如 @samp{[a-z$%.]} 所示，它匹配任何小写 @acronym{ASCII} 字母或 @samp{$}、@samp{%} 或句点。  但是，一个范围的结束字符不应该是另一个范围的起点；例如，应避免使用@samp{[a-m-z]}。
+
+括号表达式还可以指定命名字符类 (@pxref{Char Classes})。  例如，@samp{[[:ascii:]]} 匹配任何 @acronym{ASCII} 字符。  使用字符类相当于提及该类中的每个字符；但后者在实践中并不可行，因为某些类包含数千个不同的字符。  字符类不应显示为范围的下限或上限。
+
+通常的正则表达式特殊字符在括号表达式中并不特殊。  一组完全不同的字符是特殊的：@samp{]}、@samp{-} 和 @samp{^}。要将 @samp{]} 包含在括号表达式中，请将其放在开头。  要包含 @samp{^}，请将其放在除开头以外的任何位置。要包含 @samp{-}，请将其放在最后。  因此，@samp{[]^-]} 匹配所有这三个特殊字符。  您不能使用 @samp{\} 来转义这三个字符，因为 @samp{\} 在这里并不特殊。
+
+范围的以下方面是 Emacs 特有的，因为 POSIX 允许但不要求这种行为，并且 Emacs 以外的程序的行为可能有所不同：
+
+@enumerate
+@item 
+如果 @code{case-fold-search} 不是 @code{nil}，则 @samp{[a-z]} 也匹配大写字母。
+
+@item 
+范围不受区域设置的排序规则序列的影响：它始终表示其代码点范围在其边界之间的字符集，因此 @samp{[a-z]} 仅匹配 ASCII 字母，即使在 C 或 POSIX 区域设置之外也是如此。
+
+@item 
+如果范围的下限大于上限，则该范围为空并且不表示任何字符。  因此，@samp{[z-a]}总是无法匹配，而@samp{[^z-a]}匹配任何字符，包括换行符。  然而，相反的范围应该始终是从字母@samp{z}到字母@samp{a}，以明确这不是拼写错误；例如，应避免使用 @samp{[+-*/]}，因为它仅匹配 @samp{/} 而不是可能的四个字符。
+
+@item 
+如果范围的终点是原始 8 位字节 (@pxref{Text Representations})，或者范围起点是 ASCII 而终点是原始字节（如 @samp{[a-\377]}），则范围将仅匹配 ASCII 字符和原始 8 位字节，而不匹配非 ASCII 字符。  此功能用于在单字节缓冲区和字符串中搜索文本。
+
+@cindex raw bytes, regexps for searching
+@item 
+要搜索属于 @code{eight-bit} 字符集 (@pxref{Character Sets}) 的字符 @dfn{raw bytes}，您可以使用 @samp{[\200-\377]} 或 @samp{[\x3fff80-\x3fffff]}
+@end enumerate
+
+某些类型的括号表达式并不是最好的样式，尽管它们在 Emacs 中具有明确定义的含义。  它们包括：
+
+@enumerate
+@item 
+虽然范围的界限几乎可以是任何字符，但最好保持 ASCII 字母和数字的自然序列，因为大多数人没有记住字符代码表。例如，@samp{[.-9]} 不如 @samp{[./0-9]} 清晰，@samp{[`-~]} 不如@samp{[`a-z@{|@}~]} 清晰。 Unicode 字符转义在这里可以提供帮助；例如，对于大多数程序员来说，@samp{[ก-ฺ฿-๛]} 不如 @samp{[\u0E01-\u0E3A\u0E3F-\u0E5B]} 清晰。
+
+@item 
+尽管括号表达式可以包含重复项，但最好避免重复项。  例如，@samp{[XYa-yYb-zX]} 不如@samp{[XYa-z]} 清晰。
+
+@item 
+尽管范围可以仅表示一个、两个或三个字符，但列出字符会更简单。  例如，@samp{[a-a0]} 不如 @samp{[a0]} 清晰，@samp{[i-j]} 不如@samp{[ij]} 清晰，@samp{[i-k]} 不如@samp{[ijk]} 清晰。
+
+@item 
+尽管 @samp{-} 可以出现在括号表达式的开头或作为范围的上限，但最好将 @samp{-} 本身放在括号表达式的末尾。  例如，虽然 @samp{[-a-z]} 有效，但 @samp{[a-z-]} 是更好的样式；虽然@samp{[*--]}有效，但@samp{[*+,-]}更清晰。
+@end enumerate
+
+@item @samp{[^ @dots{} ]}
+@cindex @samp{^} in regexp
+@samp{[^} 开始@dfn{complemented bracket expression} 或@dfn{complemented character alternative}。  这匹配除指定字符之外的任何字符。  因此，@samp{[^a-z0-9A-Z]} 匹配所有字符@emph{except} ASCII 字母和数字。
+
+@samp{^} 在方括号表达式中并不特殊，除非它是第一个字符。  @samp{^} 之后的字符被视为第一个字符（换句话说，@samp{-} 和 @samp{]} 在那里并不特殊）。
+
+补充括号表达式可以匹配换行符，除非换行符被提及为不匹配的字符之一。  这与 @code{grep} 等程序中的正则表达式处理形成对比。
+
+您可以指定命名字符类，就像在括号表达式中一样。  例如，@samp{[^[:ascii:]]} 匹配任何非 @acronym{ASCII} 字符。  @xref{Char Classes}。
+
+@item @samp{^}
+@cindex beginning of line in regexp
+匹配缓冲区时，@samp{^} 匹配空字符串，但仅匹配所匹配文本中行的开头（或缓冲区可访问部分的开头）。  否则它无法匹配任何东西。  因此，@samp{^foo} 匹配出现在行首的@samp{foo}。
+
+当匹配字符串而不是缓冲区时，@samp{^} 匹配字符串的开头或换行符之后。
+
+为了历史兼容性，@samp{^} 仅在正则表达式的开头或@samp{\(}、@samp{\(?:} 或@samp{\|} 之后才是特殊的。尽管 @samp{^} 在其他上下文中是普通字符，但即使如此，使用 @samp{\^} 也是一个好习惯。
+
+@item @samp{$}
+@cindex @samp{$} in regexp
+@cindex end of line in regexp
+与 @samp{^} 类似，但仅在行尾（或缓冲区可访问部分的末尾）匹配。  因此，@samp{x+$} 匹配行尾包含 1 个或更多 @samp{x} 的字符串。
+
+当匹配字符串而不是缓冲区时，@samp{$} 匹配字符串末尾或换行符之前。
+
+为了历史兼容性，@samp{$} 仅在正则表达式末尾或在 @samp{\)} 或 @samp{\|} 之前是特殊的。尽管 @samp{$} 在其他上下文中是普通字符，但即使如此，使用 @samp{\$} 也是一个好习惯。
+
+@item @samp{\}
+@cindex @samp{\} in regexp
+有两个功能：它引用特殊字符（包括@samp{\}），并引入额外的特殊结构。
+
+因为@samp{\}引用特殊字符，所以@samp{\$}是仅匹配@samp{$}的正则表达式，@samp{\[}是仅匹配@samp{[}的正则表达式，依此类推。
+
+请注意，@samp{\} 在 Lisp 字符串 (@pxref{String Type}) 的读取语法中也具有特殊含义，并且必须用 @samp{\} 引用。  例如，匹配@samp{\}字符的正则表达式是@samp{\\}。  要编写包含字符 @samp{\\} 的 Lisp 字符串，Lisp 语法要求您用另一个 @samp{\} 引用每个 @samp{\}。  因此，匹配@samp{\}的正则表达式的读取语法是@code{"\\\\"}。
+@end table
+
+为了历史兼容性，如果重复运算符出现在正则表达式的开头或@samp{^}、@samp{\`}、@samp{\(}、@samp{\(?:} 或@samp{\|} 之后，则将其视为普通运算符。例如，@samp{*foo} 被视为 @samp{\*foo}，@samp{two\|^\@{2\@}} 被视为@samp{two\|^@{2@}}。依赖这种行为是不好的做法；不管重复操作符出现在哪里，无论如何都要使用正确的反斜杠转义。
+
+由于 @samp{\} 在括号表达式中并不特殊，因此它永远不能删除 @samp{-}、@samp{^} 或 @samp{]} 的特殊含义。当这些字符没有特殊含义时，不应引用它们。  这不会澄清任何事情，因为反斜杠可以合法地位于这些具有特殊含义的字符之前，如 @samp{[^\]}（@code{"[^\\]"} 表示 Lisp 字符串语法），它匹配除反斜杠之外的任何单个字符。
+
+实际上，正则表达式中出现的大多数 @samp{]} 都会关闭括号表达式，因此是特殊的。  但是，有时正则表达式可能会尝试匹配文字 @samp{[} 和 @samp{]} 的复杂模式。  在这种情况下，有时可能需要从一开始就仔细解析正则表达式，以确定哪些方括号包含方括号表达式。  例如，@samp{[^][]]} 由补括号表达式 @samp{[^][]}（它匹配非方括号的任何单个字符）组成，后跟文字 @samp{]}。
+
+确切的规则是，在正则表达式的开头，@samp{[} 是特殊的，@samp{]} 不是。  这一直持续到第一个不带引号的@samp{[}，之后我们就进入了括号表达式； @samp{[} 不再特殊（除非它开始一个字符类），但 @samp{]} 是特殊的，除非它紧跟在特殊的 @samp{[} 或 @samp{[} 后跟 @samp{^}。  这一直持续到下一个不结束字符类的特殊@samp{]}。  这样就结束了括号表达式，恢复了正则表达式的普通语法；不带引号的 @samp{[} 又是特殊的，而 @samp{]} 则不是。
+
+@node Char Classes
+@subsubsection 字符类
+@cindex character classes in regexp
+@cindex ascii character class, regexp
+@cindex alnum character class, regexp
+@cindex alpha character class, regexp
+@cindex xdigit character class, regexp
+
+下表列出了可以在方括号表达式 (@pxref{Regexp Special, bracket expression}) 中使用的类及其含义。请注意，包含类名称的 @samp{[} 和 @samp{]} 字符是名称的一部分，因此使用这些类的正则表达式还需要一对括号。  例如，匹配一个或多个字母和数字序列的正则表达式将是@samp{[[:alnum:]]+}，而不是@samp{[:alnum:]+}。
+
+@table @samp
+@item [:ascii:]
+它匹配任何 @acronym{ASCII} 字符（代码 0--127）。
+@item [:alnum:]
+这匹配任何字母或数字。  对于多字节字符，它匹配 Unicode @samp{general-category} 属性 (@pxref{Character Properties}) 指示它们是字母或十进制数字字符的字符。
+@item [:alpha:]
+这匹配任何字母。  对于多字节字符，它匹配 Unicode @samp{general-category} 属性 (@pxref{Character Properties}) 指示它们是字母字符的字符。
+@item [:blank:]
+这与 Unicode 技术标准 #18 的附录 C 所定义的水平空白相匹配。  特别是，它匹配空格、制表符和其他 Unicode @samp{general-category} 属性 (@pxref{Character Properties}) 指示它们是空格分隔符的字符。  （如果您只需要查找 ASCII 空白字符，我们建议使用一组显式的替代字符，例如 @w{@samp{[ \t]}}，因为它比 @code{[[:blank:]]} 更快。）
+@item [:cntrl:]
+它匹配代码在 0--31 范围内的任何字符。
+@item [:digit:]
+这匹配 @samp{0} 到 @samp{9}。  因此，@samp{[-+[:digit:]]} 匹配任何数字，@samp{+} 和 @samp{-} 也是如此。
+@cindex graphic characters
+@item [:graph:]
+它匹配图形字符 — 除空格、@acronym{ASCII} 和非 @acronym{ASCII} 控制字符、代理项以及 Unicode 未分配的代码点之外的所有内容，如 Unicode @samp{general-category} 属性 (@pxref{Character Properties}) 所示。
+@item [:lower:]
+这与当前大小写表 (@pxref{Case Tables}) 确定的任何小写字母匹配。  如果@code{case-fold-search}不是@code{nil}，它也匹配任何大写字母。  请注意，缓冲区可以拥有与默认情况不同的自己的本地情况表。
+@item [:multibyte:]
+这匹配任何多字节字符 (@pxref{Text Representations})。
+@item [:nonascii:]
+这匹配任何非 0⁣ 字符。
+@cindex printable characters
+@item [:print:]
+它匹配任何打印字符——空格或与 @samp{[:graph:]} 匹配的图形字符。
+@item [:punct:]
+这与任何标点字符匹配。  （目前，对于多字节字符，它匹配任何具有非单词语法的内容，因此其确切定义可能因一种主要模式而异，因为字符的语法取决于主要模式。）
+@item [:space:]
+这匹配任何具有空格语法的字符 (@pxref{Syntax Class Table})。  请注意，字符的语法以及哪些字符被视为“空白”取决于主要模式。
+@item [:unibyte:]
+这匹配任何单字节字符 (@pxref{Text Representations})。
+@item [:upper:]
+这与当前大小写表 (@pxref{Case Tables}) 确定的任何大写字母匹配。  如果@code{case-fold-search} 不是@code{nil}，则它也匹配任何小写字母。  请注意，缓冲区可以拥有与默认情况不同的自己的本地情况表。
+@item [:word:]
+这匹配任何具有单词语法 (@pxref{Syntax Class Table}) 的字符。  请注意，字符的语法以及哪些字符被视为“单词组成部分”取决于主要模式。
+@item [:xdigit:]
+这与十六进制数字匹配：@samp{0}到@samp{9}、@samp{a}到@samp{f}以及@samp{A}到@samp{F}。
+@end table
+
+类 @samp{[:space:]}、@samp{[:word:]} 和 @samp{[:punct:]} 使用当前缓冲区的语法表，但不使用任何覆盖语法文本属性 (@pxref{Syntax Properties})。
+
+@node Regexp Backslash
+@subsubsection 正则表达式中的反斜杠结构
+@cindex backslash in regular expressions
+
+在大多数情况下，@samp{\} 后跟任何字符仅匹配该字符。  但是，也有一些例外：某些以 @samp{\} 开头的序列具有特殊含义。  这是特殊 @samp{\} 结构的表格。
+
+@table @samp
+@item \|
+@cindex @samp{|} in regexp
+@cindex regexp alternative
+指定一个替代方案。两个正则表达式 @var{a} 和 @var{b} 以及 @samp{\|} 组成一个表达式，该表达式匹配 @var{a} 或 @var{b} 匹配的任何内容。
+
+因此，@samp{foo\|bar} 匹配@samp{foo} 或@samp{bar}，但不匹配其他字符串。
+
+@samp{\|} 适用于最大可能的周围表达式。  只有周围的@samp{\( @dots{} \)}分组才能限制@samp{\|}的分组能力。
+
+如果您需要完整的回溯功能来处理 @samp{\|} 的多次使用，请使用 POSIX 正则表达式函数 (@pxref{POSIX Regexps})。
+
+@item \@{@var{m}\@}
+是一个后缀运算符，它精确地重复前面的模式 @var{m} 次。  因此，@samp{x\@{5\@}} 匹配字符串@samp{xxxxx}，而不匹配其他任何内容。  @samp{c[ad]\@{3\@}r} 匹配@samp{caaar}、@samp{cdddr}、@samp{cadar} 等字符串。
+
+@item \@{@var{m},@var{n}\@}
+是一个更通用的后缀运算符，它指定最少 @var{m} 重复次数和最多 @var{n} 重复次数的重复。  如果省略@var{m}，则最小值为0；如果 @var{n} 被省略，则没有最大值。  对于这两种形式，@var{m} 和 @var{n}（如果指定）可能不大于
+@ifnottex
+2**16 @minus{} 1
+@end ifnottex
+@tex
+@math{2^{16}-1}
+@end tex
+.
+
+例如，@samp{c[ad]\@{1,2\@}r} 匹配字符串 @samp{car}、@samp{cdr}、@samp{caar}、@samp{cadr}、@samp{cdar} 和 @samp{cddr}，仅匹配字符串。@* @samp{\@{0,1\@}} 或 @samp{\@{,1\@}} 相当于@samp{?}.@* @samp{\@{0,\@}} 或@samp{\@{,\@}} 相当于@samp{*}。@* @samp{\@{1,\@}} 相当于@samp{+}。
+
+@item \( @dots{} \)
+@cindex @samp{(} in regexp
+@cindex @samp{)} in regexp
+@cindex regexp grouping
+是一个分组结构，具有三个目的：
+
+@enumerate
+@item
+包含一组用于其他操作的 @samp{\|} 替代方案。  因此，正则表达式 @samp{\(foo\|bar\)x} 匹配 @samp{foox} 或 @samp{barx}。
+
+@item
+包含一个复杂的表达式，供后缀运算符 @samp{*}、@samp{+} 和 @samp{?} 进行操作。  因此，@samp{ba\(na\)*} 匹配 @samp{ba}、@samp{bana}、@samp{banana}、@samp{bananana} 等，以及任意数量（零个或更多）的 @samp{na} 字符串。
+
+@item
+使用 @samp{\@var{digit}} 记录匹配的子字符串以供将来参考（见下文）。
+@end enumerate
+
+最后一个应用程序不是括号分组思想的结果；而是一个应用程序。它是一个单独的功能，被指定为相同 @samp{\( @dots{} \)} 结构的第二个含义，因为在实践中，这两个含义之间通常不存在冲突。  但偶尔也会发生冲突，这导致了害羞团体的出现。
+
+@item \(?: @dots{} \)
+@cindex shy groups
+@cindex non-capturing group
+@cindex unnumbered group
+@cindex @samp{(?:} in regexp
+是 @dfn{shy group} 结构。  害羞组服务于普通组的前两个目的（控制其他运算符的嵌套），但它没有获得数字，因此您无法使用 @samp{\@var{digit}} 引用它的值。  Shy 组对于机械构造的正则表达式特别有用，因为它们可以自动添加，而无需更改普通非 Shy 组的编号。
+
+害羞群体也称为 @dfn{non-capturing} 或 @dfn{unnumbered groups}。
+
+@item \(?@var{num}: @dots{} \)
+是 @dfn{explicitly numbered group} 结构。  正常群体根据其位置隐式获取其号码，这可能会很不方便。  此构造允许您强制使用特定的组号。  编号没有特殊限制，例如，您可以有多个具有相同编号的组，在这种情况下，最后一个匹配的组（即最右边的匹配项）将获胜。隐式编号的组总是获得比任何先前组的整数大的最小整数。
+
+@item \@var{digit}
+匹配与分组 (@samp{\( @dots{} \)}) 构造的第 @var{digit} 次出现匹配的相同文本。
+
+换句话说，在一个组结束之后，匹配器会记住该组匹配的文本的开头和结尾。  稍后在正则表达式中，您可以使用 @samp{\} 后跟 @var{digit} 来匹配相同的文本，无论它是什么。
+
+与传递给搜索或匹配函数的整个正则表达式中出现的前九个分组结构相匹配的字符串按照左括号在正则表达式中出现的顺序分配数字 1 到 9。  因此，您可以使用 @samp{\1} 到 @samp{\9} 来引用相应分组结构匹配的文本。
+
+例如，@samp{\(.*\)\1} 匹配任何由两个相同的半部分组成的无换行符字符串。  @samp{\(.*\)} 匹配前半部分，可以是任何内容，但后面的 @samp{\1} 必须匹配相同的确切文本。
+
+如果 @samp{\( @dots{} \)} 结构匹配多次（例如，如果它后面跟着 @samp{*}，这种情况就会发生），则仅记录最后一次匹配。
+
+如果正则表达式中的特定分组构造从未匹配（例如，如果它出现在未使用的替代项内部，或者出现在重复零次的重复内部），则相应的 @samp{\@var{digit}} 构造永远不会匹配任何内容。  使用一个人为的例子，@samp{\(foo\(b*\)\|lose\)\2}无法匹配@samp{lose}：较大组内的第二个替代项与其匹配，但@samp{\2}未定义并且无法匹配任何内容。  但它可以匹配@samp{foobb}，因为第一个替代匹配@samp{foob}，@samp{\2}匹配@samp{b}。
+
+@item \w
+@cindex @samp{\w} in regexp
+匹配任何单词组成字符。  编辑器语法表确定这些字符。  @xref{Syntax Tables}。
+
+@item \W
+@cindex @samp{\W} in regexp
+匹配任何不是单词组成部分的字符。
+
+@item \s@var{code}
+@cindex @samp{\s} in regexp
+匹配任何语法为 @var{code} 的字符。  这里 @var{code} 是表示语法代码的字符：因此，@samp{w} 表示单词成分，@samp{-} 表示空格，@samp{(} 表示左括号等。要表示空格语法，请使用 @samp{-} 或空格字符。  @xref{Syntax Class Table}，查看语法代码及其代表字符的列表。
+
+@item \S@var{code}
+@cindex @samp{\S} in regexp
+匹配语法不是 @var{code} 的任何字符。
+
+@cindex category, regexp search for
+@item \c@var{code}
+匹配类别为 @var{code} 的任何字符。  这里@var{code}是代表类别的字符：例如，在标准类别表中，@samp{c}代表汉字，@samp{g}代表希腊字符。  您可以使用 @w{@kbd{M-x describe-categories @key{RET}}} 查看当前定义的所有类别的列表。  除了标准类别之外，您还可以使用 @code{define-category} 函数 (@pxref{Categories}) 定义自己的类别。
+
+@item \C@var{code}
+匹配类别不是 @var{code} 的任何字符。
+@end table
+
+以下正则表达式构造匹配空字符串——也就是说，它们不消耗任何字符——但它们是否匹配取决于上下文。  对于所有缓冲区的可访问部分的开始和结束都被视为缓冲区的实际开始和结束。
+
+@table @samp
+@item \`
+@cindex @samp{\`} in regexp
+匹配空字符串，但仅在要匹配的缓冲区或字符串的开头。
+
+@item \'
+@cindex @samp{\'} in regexp
+匹配空字符串，但仅在要匹配的缓冲区或字符串的末尾。
+
+@item \=
+@cindex @samp{\=} in regexp
+匹配空字符串，但仅在点处匹配。 （当匹配字符串时，未定义此构造。）
+
+@item \b
+@cindex @samp{\b} in regexp
+匹配空字符串，但仅匹配单词的开头或结尾。  因此，@samp{\bfoo\b} 匹配任何出现的 @samp{foo} 作为单独的单词。  @samp{\bballs?\b} 与 @samp{ball} 或 @samp{balls} 作为单独的单词匹配。
+
+@samp{\b} 匹配缓冲区（或字符串）的开头或结尾，无论其旁边出现什么文本。
+
+@item \B
+@cindex @samp{\B} in regexp
+匹配空字符串，但 @emph{not} 位于单词的开头或结尾，也不位于缓冲区（或字符串）的开头或结尾。
+
+@item \<
+@cindex @samp{\<} in regexp
+匹配空字符串，但仅匹配单词的开头。仅当后面有单词组成字符时，@samp{\<} 才匹配缓冲区（或字符串）的开头。
+
+@item \>
+@cindex @samp{\>} in regexp
+匹配空字符串，但仅匹配单词末尾。  仅当内容以单词组成字符结尾时，@samp{\>} 才在缓冲区（或字符串）的末尾匹配。
+
+@item \_<
+@cindex @samp{\_<} in regexp
+匹配空字符串，但仅匹配符号的开头。  符号是一个或多个单词或符号组成字符的序列。  仅当后面有符号组成字符时，@samp{\_<} 才在缓冲区（或字符串）的开头匹配。
+
+@item \_>
+@cindex @samp{\_>} in regexp
+匹配空字符串，但仅匹配符号末尾。  仅当内容以符号组成字符结尾时，@samp{\_>} 才在缓冲区（或字符串）的末尾匹配。
+@end table
+
+@kindex invalid-regexp
+并非每个字符串都是有效的正则表达式。  例如，在括号表达式内结束且没有终止 @samp{]} 的字符串是无效的，以单个 @samp{\} 结尾的字符串也是无效的。  如果将无效的正则表达式传递给任何搜索函数，则会发出 @code{invalid-regexp} 错误信号。
+
+@node Regexp Example
+@subsection 复杂正则表达式示例
+
+这是一个复杂的正则表达式，Emacs 以前使用它来识别句子的结尾以及后面的任何空格。  （现在 Emacs 使用类似但更复杂的默认正则表达式，由函数 @code{sentence-end}.@xref{Standard Regexps} 构造。）
+
+下面，我们首先将正则表达式显示为 Lisp 语法中的字符串（以区分空格和制表符），然后显示其计算结果。  字符串常量以双引号开头和结尾。  @samp{\"} 代表双引号作为字符串的一部分，@samp{\\} 代表反斜杠作为字符串的一部分，@samp{\t} 代表制表符，@samp{\n} 代表换行符。
+
+@example
+@group
+"[.?!][]\"')@}]*\\($\\| $\\|\t\\|@ @ \\)[ \t\n]*"
+     @result{} "[.?!][]\"')@}]*\\($\\| $\\|  \\|@ @ \\)[
+]*"
+@end group
+@end example
+
+@noindent
+在输出中，制表符和换行符本身显示。
+
+该正则表达式包含连续的四个部分，可以解读如下：
+
+@table @code
+@item [.?!]
+该模式的第一部分是一个括号表达式，它匹配三个字符中的任意一个：句号、问号和感叹号。  匹配必须以这三个字符之一开始。  （这是 Emacs 使用的新默认正则表达式与旧值不同的一点。新值还允许一些非 0⁣ 字符来结束句子，而没有任何后续空格。）
+
+@item []\"')@}]*
+模式的第二部分与句号、问号或感叹号后面的任何右大括号和引号（零个或多个）匹配。  @code{\"} 是字符串中双引号的 Lisp 语法。  末尾的 1⁣ 表示前一个正则表达式（在本例中为括号表达式）可以重复零次或多次。
+
+@item \\($\\|@ $\\|\t\\|@ @ \\)
+模式的第三部分与句子末尾后面的空格匹配：行尾（可选地带有空格）、制表符或两个空格。  双反斜杠将括号和竖线标记为正则表达式语法；括号界定一组，竖线分隔备选方案。  美元符号用于匹配行尾。
+
+@item [ \t\n]*
+最后，模式的最后部分与结束句子所需的最少空格之外的任何其他空格相匹配。
+@end table
+
+@ifnottex
+In the @code{rx} notation (@pxref{Rx Notation}), the regexp could be written
+
+@example
+@group
+(rx (any ".?!")                    ; Punctuation ending sentence.
+    (zero-or-more (any "\"')]@}"))  ; Closing quotes or brackets.
+    (or line-end
+        (seq " " line-end)
+        "\t"
+        "  ")                      ; Two spaces.
+    (zero-or-more (any "\t\n ")))  ; Optional extra whitespace.
+@end group
+@end example
+
+Since @code{rx} regexps are just S-expressions, they can be formatted
+and commented as such.
+@end ifnottex
+
+@ifnottex
+@node Rx Notation
+@subsection The @code{rx} Structured Regexp Notation
+@cindex rx
+@cindex regexp syntax
+
+  As an alternative to the string-based syntax, Emacs provides the
+structured @code{rx} notation based on Lisp S-expressions.  This
+notation is usually easier to read, write and maintain than regexp
+strings, and can be indented and commented freely.  It requires a
+conversion into string form since that is what regexp functions
+expect, but that conversion typically takes place during
+byte-compilation rather than when the Lisp code using the regexp is
+run.
+
+  Here is an @code{rx} regexp@footnote{It could be written much
+simpler with non-greedy operators (how?), but that would make the
+example less interesting.} that matches a block comment in the C
+programming language:
+
+@example
+@group
+(rx "/*"                            ; Initial /*
+    (zero-or-more
+     (or (not "*")                  ;  Either non-*,
+         (seq (one-or-more "*")     ;  or some * followed by
+              (not (or "*" "/"))))) ;     neither * nor /
+    (one-or-more "*")               ; At least one star,
+    "/")                            ; and the final /
+@end group
+@end example
+
+@noindent
+or, using shorter synonyms and written more compactly,
+
+@example
+@group
+(rx "/*"
+    (* (| (not "*")
+          (: (+ "*") (not (in "*/")))))
+    (+ "*") "/")
+@end group
+@end example
+
+@noindent
+In conventional string syntax, it would be written
+
+@example
+"/\\*\\(?:[^*]\\|\\*+[^*/]\\)*\\*+/"
+@end example
+
+The @code{rx} notation is mainly useful in Lisp code; it cannot be
+used in most interactive situations where a regexp is requested, such
+as when running @code{query-replace-regexp} or in variable
+customization.
+
+@menu
+* Rx Constructs::       Constructs valid in rx forms.
+* Rx Functions::        Functions and macros that use rx forms.
+* Extending Rx::        How to define your own rx forms.
+@end menu
+
+@node Rx Constructs
+@subsubsection Constructs in @code{rx} regexps
+
+The various forms in @code{rx} regexps are described below.  The
+shorthand @var{rx} represents any @code{rx} form.  @var{rx}@dots{}
+means zero or more @code{rx} forms and, unless stated otherwise,
+matches these forms in sequence as if wrapped in a @code{(seq @dots{})}
+subform.
+
+These are all valid arguments to the @code{rx} macro.  All forms are
+defined by their described semantics; the corresponding string regexps
+are provided for ease of understanding only.  @var{A}, @var{B}, @dots{}
+denote (suitably bracketed) string regexp subexpressions therein.
+
+@subsubheading Literals
+
+@table @asis
+@item @code{"some-string"}
+Match the string @samp{some-string} literally.  There are no
+characters with special meaning, unlike in string regexps.
+
+@item @code{?C}
+Match the character @samp{C} literally.
+@end table
+
+@subsubheading Sequence and alternative
+
+@table @asis
+@item @code{(seq @var{rx}@dots{})}
+@cindex @code{seq} in rx
+@itemx @code{(sequence @var{rx}@dots{})}
+@cindex @code{sequence} in rx
+@itemx @code{(: @var{rx}@dots{})}
+@cindex @code{:} in rx
+@itemx @code{(and @var{rx}@dots{})}
+@cindex @code{and} in rx
+Match the @var{rx}s in sequence.  Without arguments, the expression
+matches the empty string.@*
+Corresponding string regexp: @samp{@var{A}@var{B}@dots{}}
+(subexpressions in sequence).
+
+@item @code{(or @var{rx}@dots{})}
+@cindex @code{or} in rx
+@itemx @code{(| @var{rx}@dots{})}
+@cindex @code{|} in rx
+Match exactly one of the @var{rx}s.
+If all arguments are strings, characters, or @code{or} forms
+so constrained, the longest possible match will always be used.
+Otherwise, either the longest match or the
+first (in left-to-right order) will be used.
+Without arguments, the expression will not match anything at all.@*
+Corresponding string regexp: @samp{@var{A}\|@var{B}\|@dots{}}.
+
+@item @code{unmatchable}
+@cindex @code{unmatchable} in rx
+Refuse any match.  Equivalent to @code{(or)}.
+@xref{regexp-unmatchable}.
+@end table
+
+@subsubheading Repetition
+
+Normally, repetition forms are greedy, in that they attempt to match
+as many times as possible.  Some forms are non-greedy; they try to
+match as few times as possible (@pxref{Non-greedy repetition}).
+
+@table @code
+@item (zero-or-more @var{rx}@dots{})
+@cindex @code{zero-or-more} in rx
+@itemx (0+ @var{rx}@dots{})
+@cindex @code{0+} in rx
+Match the @var{rx}s zero or more times.  Greedy by default.@*
+Corresponding string regexp: @samp{@var{A}*} (greedy),
+@samp{@var{A}*?} (non-greedy)
+
+@item (one-or-more @var{rx}@dots{})
+@cindex @code{one-or-more} in rx
+@itemx (1+ @var{rx}@dots{})
+@cindex @code{1+} in rx
+Match the @var{rx}s one or more times.  Greedy by default.@*
+Corresponding string regexp: @samp{@var{A}+} (greedy),
+@samp{@var{A}+?} (non-greedy)
+
+@item (zero-or-one @var{rx}@dots{})
+@cindex @code{zero-or-one} in rx
+@itemx (optional @var{rx}@dots{})
+@cindex @code{optional} in rx
+@itemx (opt @var{rx}@dots{})
+@cindex @code{opt} in rx
+Match the @var{rx}s once or an empty string.  Greedy by default.@*
+Corresponding string regexp: @samp{@var{A}?} (greedy),
+@samp{@var{A}??} (non-greedy).
+
+@item (* @var{rx}@dots{})
+@cindex @code{*} in rx
+Match the @var{rx}s zero or more times.  Greedy.@*
+Corresponding string regexp: @samp{@var{A}*}
+
+@item (+ @var{rx}@dots{})
+@cindex @code{+} in rx
+Match the @var{rx}s one or more times.  Greedy.@*
+Corresponding string regexp: @samp{@var{A}+}
+
+@item (? @var{rx}@dots{})
+@cindex @code{?} in rx
+Match the @var{rx}s once or an empty string.  Greedy.@*
+Corresponding string regexp: @samp{@var{A}?}
+
+@item (*? @var{rx}@dots{})
+@cindex @code{*?} in rx
+Match the @var{rx}s zero or more times.  Non-greedy.@*
+Corresponding string regexp: @samp{@var{A}*?}
+
+@item (+? @var{rx}@dots{})
+@cindex @code{+?} in rx
+Match the @var{rx}s one or more times.  Non-greedy.@*
+Corresponding string regexp: @samp{@var{A}+?}
+
+@item (?? @var{rx}@dots{})
+@cindex @code{??} in rx
+Match the @var{rx}s or an empty string.  Non-greedy.@*
+Corresponding string regexp: @samp{@var{A}??}
+
+@item (= @var{n} @var{rx}@dots{})
+@cindex @code{=} in rx
+@itemx (repeat @var{n} @var{rx})
+Match the @var{rx}s exactly @var{n} times.@*
+Corresponding string regexp: @samp{@var{A}\@{@var{n}\@}}
+
+@item (>= @var{n} @var{rx}@dots{})
+@cindex @code{>=} in rx
+Match the @var{rx}s @var{n} or more times.  Greedy.@*
+Corresponding string regexp: @samp{@var{A}\@{@var{n},\@}}
+
+@item (** @var{n} @var{m} @var{rx}@dots{})
+@cindex @code{**} in rx
+@itemx (repeat @var{n} @var{m} @var{rx}@dots{})
+@cindex @code{repeat} in rx
+Match the @var{rx}s at least @var{n} but no more than @var{m} times.  Greedy.@*
+Corresponding string regexp: @samp{@var{A}\@{@var{n},@var{m}\@}}
+@end table
+
+The greediness of some repetition forms can be controlled using the
+following constructs.  However, it is usually better to use the
+explicit non-greedy forms above when such matching is required.
+
+@table @code
+@item (minimal-match @var{rx})
+@cindex @code{minimal-match} in rx
+Match @var{rx}, with @code{zero-or-more}, @code{0+},
+@code{one-or-more}, @code{1+}, @code{zero-or-one}, @code{opt} and
+@code{optional} using non-greedy matching.
+
+@item (maximal-match @var{rx})
+@cindex @code{maximal-match} in rx
+Match @var{rx}, with @code{zero-or-more}, @code{0+},
+@code{one-or-more}, @code{1+}, @code{zero-or-one}, @code{opt} and
+@code{optional} using greedy matching.  This is the default.
+@end table
+
+@subsubheading Matching single characters
+
+@table @asis
+@item @code{(any @var{set}@dots{})}
+@cindex @code{any} in rx
+@itemx @code{(char @var{set}@dots{})}
+@cindex @code{char} in rx
+@itemx @code{(in @var{set}@dots{})}
+@cindex @code{in} in rx
+@cindex character class in rx
+Match a single character from one of the @var{set}s.  Each @var{set}
+is a character, a string representing the set of its characters, a
+range or a character class (see below).  A range is either a
+hyphen-separated string like @code{"A-Z"}, or a cons of characters
+like @code{(?A . ?Z)}.
+
+Note that hyphen (@code{-}) is special in strings in this construct,
+since it acts as a range separator.  To include a hyphen, add it as a
+separate character or single-character string.@*
+Corresponding string regexp: @samp{[@dots{}]}
+
+@item @code{(not @var{charspec})}
+@cindex @code{not} in rx
+Match a character not included in @var{charspec}.  @var{charspec} can
+be a character, a single-character string, an @code{any}, @code{not},
+@code{or}, @code{intersection}, @code{syntax} or @code{category} form,
+or a character class.
+If @var{charspec} is an @code{or} form, its arguments have the same
+restrictions as those of @code{intersection}; see below.@*
+Corresponding string regexp: @samp{[^@dots{}]}, @samp{\S@var{code}},
+@samp{\C@var{code}}
+
+@item @code{(intersection @var{charset}@dots{})}
+@cindex @code{intersection} in rx
+Match a character included in all of the @var{charset}s.
+Each @var{charset} can be a character, a single-character string, an
+@code{any} form without character classes, or an @code{intersection},
+@code{or} or @code{not} form whose arguments are also @var{charset}s.
+
+@item @code{not-newline}, @code{nonl}
+@cindex @code{not-newline} in rx
+@cindex @code{nonl} in rx
+Match any character except a newline.@*
+Corresponding string regexp: @samp{.} (dot)
+
+@item @code{anychar}, @code{anything}
+@cindex @code{anychar} in rx
+@cindex @code{anything} in rx
+Match any character.@*
+Corresponding string regexp: @samp{.\|\n} (for example)
+
+@item character class
+@cindex character class in rx
+Match a character from a named character class:
+
+@table @asis
+@item @code{alpha}, @code{alphabetic}, @code{letter}
+Match alphabetic characters.  More precisely, match characters whose
+Unicode @samp{general-category} property indicates that they are
+alphabetic.
+
+@item @code{alnum}, @code{alphanumeric}
+Match alphabetic characters and digits.  More precisely, match
+characters whose Unicode @samp{general-category} property indicates
+that they are alphabetic or decimal digits.
+
+@item @code{digit}, @code{numeric}, @code{num}
+Match the digits @samp{0}--@samp{9}.
+
+@item @code{xdigit}, @code{hex-digit}, @code{hex}
+Match the hexadecimal digits @samp{0}--@samp{9}, @samp{A}--@samp{F}
+and @samp{a}--@samp{f}.
+
+@item @code{cntrl}, @code{control}
+Match any character whose code is in the range 0--31.
+
+@item @code{blank}
+Match horizontal whitespace.  More precisely, match characters whose
+Unicode @samp{general-category} property indicates that they are
+spacing separators.
+
+@item @code{space}, @code{whitespace}, @code{white}
+Match any character that has whitespace syntax
+(@pxref{Syntax Class Table}).
+
+@item @code{lower}, @code{lower-case}
+Match anything lower-case, as determined by the current case table.
+If @code{case-fold-search} is non-@code{nil}, this also matches any
+upper-case letter.
+
+@item @code{upper}, @code{upper-case}
+Match anything upper-case, as determined by the current case table.
+If @code{case-fold-search} is non-@code{nil}, this also matches any
+lower-case letter.
+
+@item @code{graph}, @code{graphic}
+Match any character except whitespace, @acronym{ASCII} and
+non-@acronym{ASCII} control characters, surrogates, and codepoints
+unassigned by Unicode, as indicated by the Unicode
+@samp{general-category} property.
+
+@item @code{print}, @code{printing}
+Match whitespace or a character matched by @code{graph}.
+
+@item @code{punct}, @code{punctuation}
+Match any punctuation character.  (At present, for multibyte
+characters, anything that has non-word syntax.)
+
+@item @code{word}, @code{wordchar}
+Match any character that has word syntax (@pxref{Syntax Class Table}).
+
+@item @code{ascii}
+Match any @acronym{ASCII} character (codes 0--127).
+
+@item @code{nonascii}
+Match any non-@acronym{ASCII} character (but not raw bytes).
+@end table
+
+The classes @code{space}, @code{word} and @code{punct} use the
+syntax-table of the current buffer but not any overriding syntax text
+properties (@pxref{Syntax Properties}).@*
+Corresponding string regexp: @samp{[[:@var{class}:]]}
+
+@item @code{(syntax @var{syntax})}
+@cindex @code{syntax} in rx
+Match a character with syntax @var{syntax}, being one of the following
+names:
+
+@multitable {@code{close-parenthesis}} {Syntax character}
+@headitem Syntax name          @tab Syntax character
+@item @code{whitespace}        @tab @code{-}
+@item @code{punctuation}       @tab @code{.}
+@item @code{word}              @tab @code{w}
+@item @code{symbol}            @tab @code{_}
+@item @code{open-parenthesis}  @tab @code{(}
+@item @code{close-parenthesis} @tab @code{)}
+@item @code{expression-prefix} @tab @code{'}
+@item @code{string-quote}      @tab @code{"}
+@item @code{paired-delimiter}  @tab @code{$}
+@item @code{escape}            @tab @code{\}
+@item @code{character-quote}   @tab @code{/}
+@item @code{comment-start}     @tab @code{<}
+@item @code{comment-end}       @tab @code{>}
+@item @code{string-delimiter}  @tab @code{|}
+@item @code{comment-delimiter} @tab @code{!}
+@end multitable
+
+For details, @pxref{Syntax Class Table}.  Please note that
+@code{(syntax punctuation)} is @emph{not} equivalent to the character class
+@code{punctuation}.@*
+Corresponding string regexp: @samp{\s@var{char}} where @var{char} is the
+syntax character.
+
+@item @code{(category @var{category})}
+@cindex @code{category} in rx
+Match a character in category @var{category}, which is either one of
+the names below or its category character.
+
+@multitable {@code{vowel-modifying-diacritical-mark}} {Category character}
+@headitem Category name                       @tab Category character
+@item @code{space-for-indent}                 @tab space
+@item @code{base}                             @tab @code{.}
+@item @code{consonant}                        @tab @code{0}
+@item @code{base-vowel}                       @tab @code{1}
+@item @code{upper-diacritical-mark}           @tab @code{2}
+@item @code{lower-diacritical-mark}           @tab @code{3}
+@item @code{tone-mark}                        @tab @code{4}
+@item @code{symbol}                           @tab @code{5}
+@item @code{digit}                            @tab @code{6}
+@item @code{vowel-modifying-diacritical-mark} @tab @code{7}
+@item @code{vowel-sign}                       @tab @code{8}
+@item @code{semivowel-lower}                  @tab @code{9}
+@item @code{not-at-end-of-line}               @tab @code{<}
+@item @code{not-at-beginning-of-line}         @tab @code{>}
+@item @code{alpha-numeric-two-byte}           @tab @code{A}
+@item @code{chinese-two-byte}                 @tab @code{C}
+@item @code{greek-two-byte}                   @tab @code{G}
+@item @code{japanese-hiragana-two-byte}       @tab @code{H}
+@item @code{indian-two-byte}                  @tab @code{I}
+@item @code{japanese-katakana-two-byte}       @tab @code{K}
+@item @code{strong-left-to-right}             @tab @code{L}
+@item @code{korean-hangul-two-byte}           @tab @code{N}
+@item @code{strong-right-to-left}             @tab @code{R}
+@item @code{cyrillic-two-byte}                @tab @code{Y}
+@item @code{combining-diacritic}              @tab @code{^}
+@item @code{ascii}                            @tab @code{a}
+@item @code{arabic}                           @tab @code{b}
+@item @code{chinese}                          @tab @code{c}
+@item @code{ethiopic}                         @tab @code{e}
+@item @code{greek}                            @tab @code{g}
+@item @code{korean}                           @tab @code{h}
+@item @code{indian}                           @tab @code{i}
+@item @code{japanese}                         @tab @code{j}
+@item @code{japanese-katakana}                @tab @code{k}
+@item @code{latin}                            @tab @code{l}
+@item @code{lao}                              @tab @code{o}
+@item @code{tibetan}                          @tab @code{q}
+@item @code{japanese-roman}                   @tab @code{r}
+@item @code{thai}                             @tab @code{t}
+@item @code{vietnamese}                       @tab @code{v}
+@item @code{hebrew}                           @tab @code{w}
+@item @code{cyrillic}                         @tab @code{y}
+@item @code{can-break}                        @tab @code{|}
+@end multitable
+
+For more information about currently defined categories, run the
+command @kbd{M-x describe-categories @key{RET}}.  For how to define
+new categories, @pxref{Categories}.@*
+Corresponding string regexp: @samp{\c@var{char}} where @var{char} is the
+category character.
+@end table
+
+@subsubheading Zero-width assertions
+
+These all match the empty string, but only in specific places.
+
+@table @asis
+@item @code{line-start}, @code{bol}
+@cindex @code{line-start} in rx
+@cindex @code{bol} in rx
+Match at the beginning of a line.@*
+Corresponding string regexp: @samp{^}
+
+@item @code{line-end}, @code{eol}
+@cindex @code{line-end} in rx
+@cindex @code{eol} in rx
+Match at the end of a line.@*
+Corresponding string regexp: @samp{$}
+
+@item @code{string-start}, @code{bos}, @code{buffer-start}, @code{bot}
+@cindex @code{string-start} in rx
+@cindex @code{bos} in rx
+@cindex @code{buffer-start} in rx
+@cindex @code{bot} in rx
+Match at the start of the string or buffer being matched against.@*
+Corresponding string regexp: @samp{\`}
+
+@item @code{string-end}, @code{eos}, @code{buffer-end}, @code{eot}
+@cindex @code{string-end} in rx
+@cindex @code{eos} in rx
+@cindex @code{buffer-end} in rx
+@cindex @code{eot} in rx
+Match at the end of the string or buffer being matched against.@*
+Corresponding string regexp: @samp{\'}
+
+@item @code{point}
+@cindex @code{point} in rx
+Match at point.@*
+Corresponding string regexp: @samp{\=}
+
+@item @code{word-start}, @code{bow}
+@cindex @code{word-start} in rx
+@cindex @code{bow} in rx
+Match at the beginning of a word.@*
+Corresponding string regexp: @samp{\<}
+
+@item @code{word-end}, @code{eow}
+@cindex @code{word-end} in rx
+@cindex @code{eow} in rx
+Match at the end of a word.@*
+Corresponding string regexp: @samp{\>}
+
+@item @code{word-boundary}
+@cindex @code{word-boundary} in rx
+Match at the beginning or end of a word.@*
+Corresponding string regexp: @samp{\b}
+
+@item @code{not-word-boundary}
+@cindex @code{not-word-boundary} in rx
+Match anywhere but at the beginning or end of a word.@*
+Corresponding string regexp: @samp{\B}
+
+@item @code{symbol-start}
+@cindex @code{symbol-start} in rx
+Match at the beginning of a symbol.@*
+Corresponding string regexp: @samp{\_<}
+
+@item @code{symbol-end}
+@cindex @code{symbol-end} in rx
+Match at the end of a symbol.@*
+Corresponding string regexp: @samp{\_>}
+@end table
+
+@subsubheading Capture groups
+
+@table @code
+@item (group @var{rx}@dots{})
+@cindex @code{group} in rx
+@itemx (submatch @var{rx}@dots{})
+@cindex @code{submatch} in rx
+Match the @var{rx}s, making the matched text and position accessible
+in the match data.  The first group in a regexp is numbered 1;
+subsequent groups will be numbered one above the previously
+highest-numbered group in the pattern so far.@*
+Corresponding string regexp: @samp{\(@dots{}\)}
+
+@item (group-n @var{n} @var{rx}@dots{})
+@cindex @code{group-n} in rx
+@itemx (submatch-n @var{n} @var{rx}@dots{})
+@cindex @code{submatch-n} in rx
+Like @code{group}, but explicitly assign the group number @var{n}.
+@var{n} must be positive.@*
+Corresponding string regexp: @samp{\(?@var{n}:@dots{}\)}
+
+@item (backref @var{n})
+@cindex @code{backref} in rx
+Match the text previously matched by group number @var{n}.
+@var{n} must be in the range 1--9.@*
+Corresponding string regexp: @samp{\@var{n}}
+@end table
+
+@subsubheading Dynamic inclusion
+
+@table @code
+@item (literal @var{expr})
+@cindex @code{literal} in rx
+Match the literal string that is the result from evaluating the Lisp
+expression @var{expr}.  The evaluation takes place at call time, in
+the current lexical environment.
+
+@item (regexp @var{expr})
+@cindex @code{regexp} in rx
+@itemx (regex @var{expr})
+@cindex @code{regex} in rx
+Match the string regexp that is the result from evaluating the Lisp
+expression @var{expr}.  The evaluation takes place at call time, in
+the current lexical environment.
+
+@item (eval @var{expr})
+@cindex @code{eval} in rx
+Match the rx form that is the result from evaluating the Lisp
+expression @var{expr}.  The evaluation takes place at macro-expansion
+time for @code{rx}, at call time for @code{rx-to-string},
+in the current global environment.
+@end table
+
+@node Rx Functions
+@subsubsection Functions and macros using @code{rx} regexps
+
+@defmac rx rx-form@dots{}
+Translate the @var{rx-form}s to a string regexp, as if they were the
+body of a @code{(seq @dots{})} form.  The @code{rx} macro expands to a
+string constant, or, if @code{literal} or @code{regexp} forms are
+used, a Lisp expression that evaluates to a string.  Example:
+
+@example
+@group
+(rx (+ alpha) "=" (+ digit))
+  @result{} "[[:alpha:]]+=[[:digit:]]+"
+@end group
+@end example
+@end defmac
+
+@defun rx-to-string rx-expr &optional no-group
+Translate @var{rx-expr} to a string regexp which is returned.
+If @var{no-group} is absent or @code{nil}, bracket the result in a
+non-capturing group, @samp{\(?:@dots{}\)}, if necessary to ensure that
+a postfix operator appended to it will apply to the whole expression.
+Example:
+
+@example
+@group
+(rx-to-string '(seq (+ alpha) "=" (+ digit)) t)
+  @result{} "[[:alpha:]]+=[[:digit:]]+"
+@end group
+@end example
+
+Arguments to @code{literal} and @code{regexp} forms in @var{rx-expr}
+must be string literals.
+@end defun
+
+The @code{pcase} macro can use @code{rx} expressions as patterns
+directly; @pxref{rx in pcase}.
+
+For mechanisms to add user-defined extensions to the @code{rx}
+notation, @pxref{Extending Rx}.
+
+@node Extending Rx
+@subsubsection Defining new @code{rx} forms
+
+The @code{rx} notation can be extended by defining new symbols and
+parameterized forms in terms of other @code{rx} expressions.  This is
+handy for sharing parts between several regexps, and for making
+complex ones easier to build and understand by putting them together
+from smaller pieces.
+
+For example, you could define @code{name} to mean
+@code{(one-or-more letter)}, and @code{(quoted @var{x})} to mean
+@code{(seq ?' @var{x} ?')} for any @var{x}.  These forms could then be
+used in @code{rx} expressions like any other: @code{(rx (quoted name))}
+would match a nonempty sequence of letters inside single quotes.
+
+The Lisp macros below provide different ways of binding names to
+definitions.  Common to all of them are the following rules:
+
+@itemize
+@item
+Built-in @code{rx} forms, like @code{digit} and @code{group}, cannot
+be redefined.
+
+@item
+The definitions live in a name space of their own, separate from that
+of Lisp variables.  There is thus no need to attach a suffix like
+@code{-regexp} to names; they cannot collide with anything else.
+
+@item
+Definitions cannot refer to themselves recursively, directly or
+indirectly.  If you find yourself needing this, you want a parser, not
+a regular expression.
+
+@item
+Definitions are only ever expanded in calls to @code{rx} or
+@code{rx-to-string}, not merely by their presence in definition
+macros.  This means that the order of definitions doesn't matter, even
+when they refer to each other, and that syntax errors only show up
+when they are used, not when they are defined.
+
+@item
+User-defined forms are allowed wherever arbitrary @code{rx}
+expressions are expected; for example, in the body of a
+@code{zero-or-one} form, but not inside @code{any} or @code{category}
+forms.  They are also allowed inside @code{not} and
+@code{intersection} forms.
+@end itemize
+
+@defmac rx-define name [arglist] rx-form
+Define @var{name} globally in all subsequent calls to @code{rx} and
+@code{rx-to-string}.  If @var{arglist} is absent, then @var{name} is
+defined as a plain symbol to be replaced with @var{rx-form}.  Example:
+
+@example
+@group
+(rx-define haskell-comment (seq "--" (zero-or-more nonl)))
+(rx haskell-comment)
+     @result{} "--.*"
+@end group
+@end example
+
+If @var{arglist} is present, it must be a list of zero or more
+argument names, and @var{name} is then defined as a parameterized form.
+When used in an @code{rx} expression as @code{(@var{name} @var{arg}@dots{})},
+each @var{arg} will replace the corresponding argument name inside
+@var{rx-form}.
+
+@var{arglist} may end in @code{&rest} and one final argument name,
+denoting a rest parameter.  The rest parameter will expand to all
+extra actual argument values not matched by any other parameter in
+@var{arglist}, spliced into @var{rx-form} where it occurs.  Example:
+
+@example
+@group
+(rx-define moan (x y &rest r) (seq x (one-or-more y) r "!"))
+(rx (moan "MOO" "A" "MEE" "OW"))
+     @result{} "MOOA+MEEOW!"
+@end group
+@end example
+
+Since the definition is global, it is recommended to give @var{name} a
+package prefix to avoid name clashes with definitions elsewhere, as is
+usual when naming non-local variables and functions.
+
+Forms defined this way only perform simple template substitution.
+For arbitrary computations, use them together with the @code{rx}
+forms @code{eval}, @code{regexp} or @code{literal}.  Example:
+
+@example
+@group
+(defun n-tuple-rx (n element)
+  `(seq "<"
+        (group-n 1 ,element)
+        ,@@(mapcar (lambda (i) `(seq ?, (group-n ,i ,element)))
+                  (number-sequence 2 n))
+        ">"))
+(rx-define n-tuple (n element) (eval (n-tuple-rx n 'element)))
+(rx (n-tuple 3 (+ (in "0-9"))))
+  @result{} "<\\(?1:[0-9]+\\),\\(?2:[0-9]+\\),\\(?3:[0-9]+\\)>"
+@end group
+@end example
+@end defmac
+
+@defmac rx-let (bindings@dots{}) body@dots{}
+Make the @code{rx} definitions in @var{bindings} available locally for
+@code{rx} macro invocations in @var{body}, which is then evaluated.
+
+Each element of @var{bindings} is on the form
+@w{@code{(@var{name} [@var{arglist}] @var{rx-form})}}, where the parts
+have the same meaning as in @code{rx-define} above.  Example:
+
+@example
+@group
+(rx-let ((comma-separated (item) (seq item (0+ "," item)))
+         (number (1+ digit))
+         (numbers (comma-separated number)))
+  (re-search-forward (rx "(" numbers ")")))
+@end group
+@end example
+
+The definitions are only available during the macro-expansion of
+@var{body}, and are thus not present during execution of compiled
+code.
+
+@code{rx-let} can be used not only inside a function, but also at top
+level to include global variable and function definitions that need
+to share a common set of @code{rx} forms.  Since the names are local
+inside @var{body}, there is no need for any package prefixes.
+Example:
+
+@example
+@group
+(rx-let ((phone-number (seq (opt ?+) (1+ (any digit ?-)))))
+  (defun find-next-phone-number ()
+    (re-search-forward (rx phone-number)))
+  (defun phone-number-p (string)
+    (string-match-p (rx bos phone-number eos) string)))
+@end group
+@end example
+
+The scope of the @code{rx-let} bindings is lexical, which means that
+they are not visible outside @var{body} itself, even in functions
+called from @var{body}.
+@end defmac
+
+@defmac rx-let-eval bindings body@dots{}
+Evaluate @var{bindings} to a list of bindings as in @code{rx-let},
+and evaluate @var{body} with those bindings in effect for calls
+to @code{rx-to-string}.
+
+This macro is similar to @code{rx-let}, except that the @var{bindings}
+argument is evaluated (and thus needs to be quoted if it is a list
+literal), and the definitions are substituted at run time, which is
+required for @code{rx-to-string} to work.  Example:
+
+@example
+@group
+(rx-let-eval
+    '((ponder (x) (seq "Where have all the " x " gone?")))
+  (looking-at (rx-to-string
+               '(ponder (or "flowers" "young girls"
+                            "left socks")))))
+@end group
+@end example
+
+Another difference from @code{rx-let} is that the @var{bindings} are
+dynamically scoped, and thus also available in functions called from
+@var{body}.  However, they are not visible inside functions defined in
+@var{body}.
+@end defmac
+
+@end ifnottex
+
+@node Regexp Functions
+@subsection 正则表达式函数
+
+这些函数对正则表达式进行操作。
+
+@cindex quote special characters in regexp
+@defun regexp-quote string
+该函数返回一个正则表达式，其唯一精确匹配是@var{string}。  仅当缓冲区中的下一个字符是 @var{string} 时，在 @code{looking-at} 中使用此正则表达式才会成功；如果搜索的文本包含@var{string}，则在搜索功能中使用它将会成功。  @xref{Regexp Search}。
+
+这允许您在调用需要正则表达式的函数时请求精确的字符串匹配或搜索。
+
+@example
+@group
+(regexp-quote "^The cat$")
+     @result{} "\\^The cat\\$"
+@end group
+@end example
+
+@code{regexp-quote} 的一种用途是将精确的字符串匹配与描述为正则表达式的上下文结合起来。  例如，这会搜索 @var{string} 的值的字符串，并用空格包围：
+
+@example
+@group
+(re-search-forward
+ (concat "\\s-" (regexp-quote string) "\\s-"))
+@end group
+@end example
+
+如果返回的字符串不包含任何特殊字符，则它可能是 0⁣ 本身。
+@end defun
+
+@cindex optimize regexp
+@defun regexp-opt strings &optional paren
+该函数返回一个高效的正则表达式，它将匹配列表@var{strings}中的任何字符串。  当您需要尽可能快地进行匹配或搜索时，这非常有用 - 例如，对于字体锁定模式@footnote{Note that @code{regexp-opt} does not guarantee that its result is absolutely the most efficient form possible.  A hand-tuned regular expression can sometimes be slightly more efficient, but is almost never worth the effort.}。
+@c E.g., see https://debbugs.gnu.org/2816
+
+如果 @var{strings} 是空列表，则返回值是一个从不匹配任何内容的正则表达式。
+
+可选参数 @var{paren} 可以是以下任意一个：
+
+@table @asis
+@item 一个字符串
+生成的正则表达式前面是 @var{paren}，后面是 @samp{\)}。  例如，使用 @samp{"\\(?1:"} 生成明确编号的组。
+
+@item @code{words}
+生成的正则表达式被 @samp{\<\(} 和 @samp{\)\>} 包围。
+
+@item @code{symbols}
+生成的正则表达式被 @samp{\_<\(} 和 @samp{\)\_>} 包围（这在匹配编程语言关键字等时通常是合适的）。
+
+@item 非@code{nil}
+生成的正则表达式被 @samp{\(} 和 @samp{\)} 包围。
+
+@item @code{nil}
+如果需要确保附加的后缀运算符适用于整个表达式，则生成的正则表达式将被 @samp{\(?:} 和 @samp{\)} 包围。
+@end table
+
+返回的正则表达式的排序方式使其始终与可能的最长字符串匹配。
+
+在重新排序之前，@code{regexp-opt} 的结果正则表达式与简化版本等效，但通常比简化版本更有效：
+
+@example
+(defun simplified-regexp-opt (strings &optional paren)
+ (let ((parens
+        (cond
+         ((stringp paren)       (cons paren "\\)"))
+         ((eq paren 'words)    '("\\<\\(" . "\\)\\>"))
+         ((eq paren 'symbols) '("\\_<\\(" . "\\)\\_>"))
+         ((null paren)          '("\\(?:" . "\\)"))
+         (t                       '("\\(" . "\\)")))))
+   (concat (car parens)
+           (mapconcat 'regexp-quote strings "\\|")
+           (cdr parens))))
+@end example
+@end defun
+
+@defun regexp-opt-depth regexp
+该函数返回 @var{regexp} 中分组结构（括号表达式）的总数。  这不包括害羞的群体 (@pxref{Regexp Backslash})。
+@end defun
+
+@c Supposedly an internal regexp-opt function, but table.el uses it at least.
+@defun regexp-opt-charset chars
+该函数返回与字符列表@var{chars}中的字符匹配的正则表达式。
+
+@example
+(regexp-opt-charset '(?a ?b ?c ?d ?e))
+     @result{} "[a-e]"
+@end example
+@end defun
+
+@c Internal functions: regexp-opt-group
+
+@anchor{regexp-unmatchable}
+@defvar regexp-unmatchable
+该变量包含一个保证不匹配任何字符串的正则表达式。  它作为变量的默认值特别有用，这些变量可以设置为实际匹配的模式。
+@end defvar
+
+@node Regexp Problems
+@subsection 正则表达式的问题
+@cindex regular expression problems
+@cindex regexp stack overflow
+@cindex stack overflow in regexp
+
+Emacs regexp 实现与许多同类实现一样，通常很健壮，但偶尔会以两种方式引起问题：匹配可能会耗尽内部堆栈空间并发出错误信号，并且可能需要很长时间才能完成。  以下建议将减少出现这些症状的可能性，并有助于缓解确实出现的问题。
+
+@itemize
+@item 
+使用零宽度断言（@samp{^} 和 @code{\`}）将正则表达式锚定在行、字符串或缓冲区的开头。  这在实现中利用了快速路径，并且可以避免徒劳的匹配尝试。  其他零宽度断言也可能通过导致匹配提前失败而带来好处。
+
+@item 
+避免使用 or 模式，而使用括号表达式：写 @samp{[ab]} 而不是 @samp{a\|b}。  回想一下，大多数时候，@samp{\s-}和@samp{\sw}分别相当于@samp{[[:space:]]}和@samp{[[:word:]]}。
+
+@item 
+由于 or 模式的最后一个分支不会在堆栈上添加回溯点，因此请考虑将最可能匹配的模式放在最后。例如，如果尝试匹配很长的 @samp{a} 字符串，@samp{^\(?:a\|.b\)*c} 将耗尽堆栈，但等效的 @samp{^\(?:.b\|a\)*c} 则不会。
+
+（这是一个权衡：成功匹配的 or 模式运行得更快，首先使用最频繁匹配的模式。）
+
+@item 
+尽量确保文本的任何部分只能以单一方式匹配。  例如，@samp{a*a*}将与@samp{a*}匹配同一组字符串，但前者可以通过多种方式进行匹配，因此如果稍后匹配失败，将导致回溯缓慢。  如果可能的话，使 or-pattern 分支互斥，这样匹配在失败之前不会深入到多个分支。
+
+对于嵌套重复要特别小心：在存在歧义的情况下，它们很容易导致匹配速度非常慢。  例如，在失败之前，@samp{\(?:a*b*\)+c}将花费很长时间尝试匹配即使是中等长度的@samp{a}字符串。  等效的 @samp{\(?:a\|b\)*c} 更快，而 @samp{[ab]*c} 更好。
+
+@item 
+除非确实需要，否则不要使用捕获组；也就是说，使用 @samp{\(?:@dots{}\)} 而不是 @samp{\(@dots{}\)} 来进行包围。
+
+@ifnottex
+@item
+Consider using @code{rx} (@pxref{Rx Notation}); it can optimize some
+or-patterns automatically and will never introduce capturing groups
+unless explicitly requested.
+@end ifnottex
+@end itemize
+
+如果尽管遵循上述建议，但仍遇到正则表达式堆栈溢出，请不要害怕在多个函数调用中执行匹配，每个函数调用都使用更简单的正则表达式，可以更轻松地包含回溯。
+
+@defun re--describe-compiled regexp &optional raw
+为了帮助诊断正则表达式或正则表达式引擎本身的问题，此函数返回一个描述 @var{regexp} 编译形式的字符串。  为了理解它，至少有必要阅读 Emacs 源代码中 @code{src/regex-emacs.c} 文件中 @code{re_opcode_t} 类型的描述。
+
+目前，只有使用 @code{--enable-checking} 编译 Emacs 时，它才能给出有意义的描述。
+@end defun
+
+@node Regexp Search
+@section 正则表达式搜索
+@cindex regular expression searching
+@cindex regexp searching
+@cindex searching for regexp
+
+在 GNU Emacs 中，您可以增量或不增量地搜索正则表达式 (@pxref{Syntax of Regexps}) 的下一个匹配项。有关增量搜索命令，请参阅@ref{Regexp Search, , Regular Expression Search, emacs, The GNU Emacs Manual}。  这里我们只描述程序中有用的搜索功能。  主要的一个是@code{re-search-forward}。
+
+如果缓冲区是多字节，这些搜索函数会将正则表达式转换为多字节；如果缓冲区是单字节的，它们会将正则表达式转换为单字节。  @xref{Text Representations}。
+
+@deffn Command re-search-forward regexp &optional limit noerror count
+该函数在当前缓冲区中向前搜索与正则表达式@var{regexp}匹配的文本字符串。  该函数会跳过 @var{regexp} 不匹配的任何文本量，并将点保留在找到的第一个匹配项的末尾。它返回点的新值。
+
+如果@var{limit}非@code{nil}，则它必须是当前缓冲区中的位置。  它指定搜索的上限。  不接受在该位置之后延伸的任何匹配。  如果省略@var{limit}或@code{nil}，则默认为缓冲区可访问部分的末尾。
+
+当搜索失败时@code{re-search-forward}做什么取决于@var{noerror}的值：
+
+@table @asis
+@item @code{nil}
+发出 @code{search-failed} 错误信号。
+@item @code{t}
+什么都不做并返回@code{nil}。
+@item 还要别的吗
+将点移动到@var{limit}（或缓冲区可访问部分的末尾）并返回@code{nil}。
+@end table
+
+参数 @var{noerror} 仅影响无法找到匹配项的有效搜索。  无论@var{noerror}如何，无效参数都会导致错误。
+
+如果@var{count}是正数@var{n}，则搜索完成@var{n}次；每个连续的搜索都从上一场比赛结束时开始。  如果所有这些连续搜索都成功，则函数调用成功，移动点并返回其新值。否则，函数调用将失败，结果取决于 3⁣ 的值，如上所述。  如果@var{count}是负数@minus{}@var{n}，则在相反（向后）方向上搜索@var{n}次。
+
+在以下示例中，点最初位于 @samp{T} 之前。计算搜索调用会将指针移动到该行的末尾（在 @samp{hat} 的 @samp{t} 和换行符之间）。
+
+@example
+@group
+---------- Buffer: foo ----------
+I read "@point{}The cat in the hat
+comes back" twice.
+---------- Buffer: foo ----------
+@end group
+
+@group
+(re-search-forward "[a-z]+" nil t 5)
+     @result{} 27
+
+---------- Buffer: foo ----------
+I read "The cat in the hat@point{}
+comes back" twice.
+---------- Buffer: foo ----------
+@end group
+@end example
+@end deffn
+
+@c This anchor is referenced by re-search-backward's docstring.
+@anchor{re-search-backward}
+@deffn Command re-search-backward regexp &optional limit noerror count
+该函数在当前缓冲区中向后搜索与正则表达式 @var{regexp} 匹配的文本字符串，将点保留在找到的第一个文本的开头。
+
+该函数类似于@code{re-search-forward}，但它们不是简单的镜像。  @code{re-search-forward} 查找开头尽可能接近起始点的匹配。  如果@code{re-search-backward}是完美镜像，它将找到终点尽可能接近的匹配项。  然而，事实上，它会找到开头尽可能接近的匹配（但在起点之前结束）。  原因是在给定位置匹配正则表达式总是从头到尾进行匹配，并且从指定的开始位置开始。
+
+@code{re-search-forward} 的真正镜像需要一个特殊的功能来从头到尾匹配正则表达式。  不值得这么麻烦地实施它。
+@end deffn
+
+@defun string-match regexp string &optional start inhibit-modify
+该函数返回 @var{string} 中正则表达式 @var{regexp} 的第一个匹配的开始索引，如果没有匹配则返回 @code{nil}。  如果@var{start}非@code{nil}，则搜索从@var{string}中的该索引开始。
+
+例如，
+
+@example
+@group
+(string-match
+ "quick" "The quick brown fox jumped quickly.")
+     @result{} 4
+@end group
+@group
+(string-match
+ "quick" "The quick brown fox jumped quickly." 8)
+     @result{} 27
+@end group
+@end example
+
+@noindent
+字符串的第一个字符的索引为 0，第二个字符的索引为 1，依此类推。
+
+默认情况下，如果此函数找到匹配项，则超出匹配项的第一个字符的索引可用为 @code{(match-end 0)}。 @xref{Match Data}。  如果@var{inhibit-modify}非@code{nil}，则不修改匹配数据。
+
+@example
+@group
+(string-match
+ "quick" "The quick brown fox jumped quickly." 8)
+     @result{} 27
+@end group
+
+@group
+(match-end 0)
+     @result{} 32
+@end group
+@end example
+@end defun
+
+@defun string-match-p regexp string &optional start
+该谓词函数执行 @code{string-match} 的操作，但它避免修改匹配数据。
+@end defun
+
+@defun looking-at regexp &optional inhibit-modify
+该函数确定当前缓冲区中紧随点之后的文本是否与正则表达式@var{regexp}匹配。  “直接跟随”的确切含义是：搜索是“锚定”的，并且只能从跟随点的第一个字符开始成功。  如果是，结果为 @code{t}，否则为 @code{nil}。
+
+此函数不会移动点，但会更新匹配数据（如果 @var{inhibit-modify} 为 @code{nil} 或缺失，这是默认值）。  @xref{Match Data}。  为了方便起见，您可以使用 @code{looking-at-p} 来代替使用 @var{inhibit-modify} 参数，如下所述。
+
+在此示例中，点位于 @samp{T} 的正前方。  如果在其他地方，结果将是@code{nil}。
+
+@example
+@group
+---------- Buffer: foo ----------
+I read "@point{}The cat in the hat
+comes back" twice.
+---------- Buffer: foo ----------
+
+(looking-at "The cat in the hat$")
+     @result{} t
+@end group
+@end example
+@end defun
+
+@defun looking-back regexp limit &optional greedy
+如果@var{regexp}与紧邻点之前的文本匹配（即以点结束），则此函数返回@code{t}，否则返回@code{nil}。
+
+因为正则表达式匹配只能向前进行，所以这是通过从点向后搜索以点结束的匹配来实现的。  如果必须搜索很长的距离，那可能会很慢。您可以通过为@var{limit}指定非@code{nil}值来限制所需的时间，这表示不在@var{limit}之前搜索。  在这种情况下，找到的匹配必须从 @var{limit} 或之后开始。这是一个例子：
+
+@example
+@group
+---------- Buffer: foo ----------
+I read "@point{}The cat in the hat
+comes back" twice.
+---------- Buffer: foo ----------
+
+(looking-back "read \"" 3)
+     @result{} t
+(looking-back "read \"" 4)
+     @result{} nil
+@end group
+@end example
+
+如果@var{greedy}非@code{nil}，则此函数尽可能向后扩展匹配，当单个附加前一个字符不能成为@var{regexp}匹配的一部分时停止。  当比赛延长时，其起始位置允许出现在@var{limit}之前。
+
+@c https://debbugs.gnu.org/5689
+作为一般建议，尽可能避免使用 @code{looking-back}，因为它很慢。  因此，没有计划添加 @code{looking-back-p} 功能。
+@end defun
+
+@defun looking-at-p regexp
+该谓词函数的工作方式类似于 @code{looking-at}，但不更新匹配数据。
+@end defun
+
+@defvar search-spaces-regexp
+如果这个变量是非@code{nil}，它应该是一个正则表达式，说明如何搜索空格。  在这种情况下，正在搜索的正则表达式中的任何一组空格都代表该正则表达式的使用。  然而，@samp{[@dots{}]}和@samp{*}、@samp{+}、@samp{?}等结构内部的空间不受@code{search-spaces-regexp}的影响。
+
+由于此变量影响所有正则表达式搜索和匹配结构，因此您应该将其临时绑定到尽可能小的代码部分，并且仅在受绑定影响的 Lisp 代码执行其正则表达式是从交互式用户输入生成的搜索的情况下。  换句话说，该变量只能用于告诉正则表达式搜索原语如何解释用户键入的空格。
+@end defvar
+
+@node Longest Match
+@section 正则表达式匹配的最长匹配搜索
+
+@cindex backtracking and POSIX regular expressions
+通常的正则表达式函数在需要处理 @samp{\|} 和重复结构时会进行回溯，但它们只会继续执行此操作，直到找到 @emph{some} 匹配为止。  然后他们成功并报告找到的第一个匹配项。
+
+本节介绍替代搜索函数，这些函数执行 POSIX 标准指定的正则表达式匹配的完整回溯。  他们继续回溯，直到尝试了所有可能性并找到所有匹配，这样他们就可以报告最长的匹配，按照 POSIX@. 的要求，这要慢得多，所以只有当你确实需要最长的匹配时才使用这些函数。
+
+尽管名称如此，POSIX 搜索和匹配函数使用 Emacs 正则表达式，而不是 POSIX 正则表达式。 @xref{POSIX Regexps}。  此外，它们不能正确支持非贪婪重复运算符 (@pxref{Regexp Special, non-greedy})。这是因为 POSIX 回溯与非贪婪重复的语义相冲突。
+
+@deffn Command posix-search-forward regexp &optional limit noerror count
+这与 @code{re-search-forward} 类似，只不过它执行 POSIX 标准指定的正则表达式匹配的完整回溯。
+@end deffn
+
+@deffn Command posix-search-backward regexp &optional limit noerror count
+这与 @code{re-search-backward} 类似，只不过它执行 POSIX 标准指定的正则表达式匹配的完整回溯。
+@end deffn
+
+@defun posix-looking-at regexp &optional inhibit-modify
+这与 @code{looking-at} 类似，只不过它执行 POSIX 标准指定的正则表达式匹配的完整回溯。
+@end defun
+
+@defun posix-string-match regexp string &optional start inhibit-modify
+这与 @code{string-match} 类似，只不过它执行 POSIX 标准指定的正则表达式匹配的完整回溯。
+@end defun
+
+@node Match Data
+@section 比赛数据
+@cindex match data
+
+Emacs 跟踪搜索期间找到的文本段的开始和结束位置；这称为 @dfn{match data}。借助匹配数据，您可以搜索复杂的模式，例如邮件消息中的日期，然后在模式的控制下提取匹配的部分。
+
+由于匹配数据通常仅描述最近的搜索，因此您必须小心，不要在您希望引用的搜索和匹配数据的使用之间无意中进行另一次搜索。  如果您无法避免另一次干预搜索，则必须保存并恢复其周围的匹配数据，以防止其被覆盖。
+
+请注意，所有函数都可以覆盖匹配数据，除非明确记录不这样做。  结果是在后台隐式运行的函数（@pxref{Timers}和@ref{Idle Timers}）可能应该显式保存和恢复匹配数据。
+
+@menu
+* Replacing Match::        替换匹配的子字符串。
+* Simple Match Data::      访问匹配数据的单个项目，例如特定子表达式的开始位置。
+* Entire Match Data::      以列表形式一次性访问整个比赛数据。
+* Saving Match Data::      保存和恢复比赛数据。
+@end menu
+
+@node Replacing Match
+@subsection 替换匹配的文本
+@cindex replace matched text
+
+此函数替换上次搜索匹配的全部或部分文本。  它通过比赛数据发挥作用。
+
+@cindex case in replacements
+@defun replace-match replacement &optional fixedcase literal string subexp
+该函数对缓冲区或字符串执行替换操作。
+
+如果您在缓冲区中进行了最后一次搜索，则应省略 @var{string} 参数或为其指定 @code{nil}，并确保当前缓冲区是您执行最后一次搜索的缓冲区。然后该函数编辑缓冲区，用 @var{replacement} 替换匹配的文本。  它在替换文本的末尾留下点。
+
+如果您对字符串执行了最后一次搜索，请传递与 @var{string} 相同的字符串。  然后该函数返回一个新字符串，其中匹配的文本被替换为@var{replacement}。
+
+如果@var{fixedcase}非@code{nil}，则@code{replace-match}使用替换文本而不进行大小写转换；否则，它会根据要替换的文本的大小写来转换替换文本。  如果原始文本全部大写，这会将替换文本转换为大写。  如果原始文本的所有单词均大写，则替换文本的所有单词均大写。  如果所有单词均为单字母且均为大写，则它们将被视为大写单词而不是全部大写单词。
+
+如果@var{literal}不是@code{nil}，则@var{replacement}将完全按原样插入，唯一的改变是根据需要更改大小写。如果是@code{nil}（默认值），那么字符@samp{\}会被特殊对待。  如果@samp{\}出现在@var{replacement}中，那么它必须是以下序列之一的一部分：
+
+@table @asis
+@item @samp{\&}
+@cindex @samp{&} in replacement
+这代表整个文本被替换。
+
+@item @samp{\@var{n}}，其中 @var{n} 是数字
+@cindex @samp{\@var{n}} in replacement
+这代表与原始正则表达式中第 0 个子表达式匹配的文本。  子表达式是分组在 @samp{\(@dots{}\)} 内的表达式。  如果第 2 个子表达式从未匹配，则替换为空字符串。
+
+@item @samp{\\}
+@cindex @samp{\} in replacement
+这代表替换文本中的单个 @samp{\}。
+
+@item @samp{\?}
+这代表其本身（与 @code{replace-regexp} 和相关命令兼容；@pxref{Regexp Replace,,, emacs, The GNU Emacs Manual}）。
+@end table
+
+@noindent
+@samp{\} 后面的任何其他字符都表示错误。
+
+@samp{\&} 和 @samp{\@var{n}} 执行的替换发生在大小写转换（如果有）之后。  因此，它们替换的字符串永远不会进行大小写转换。
+
+如果 @var{subexp} 是非 @code{nil}，则表示仅替换匹配的正则表达式的子表达式编号 @var{subexp}，而不是整个匹配。  例如，匹配@samp{foo \(ba*r\)}后，用1调用@code{replace-match}作为@var{subexp}意味着仅替换匹配@samp{\(ba*r\)}的文本。
+@end defun
+
+@defun match-substitute-replacement replacement &optional fixedcase literal string subexp
+该函数返回将通过 @code{replace-match} 插入缓冲区的文本，但不修改缓冲区。  如果您想向用户呈现实际的替换结果，并使用 @samp{\@var{n}} 或 @samp{\&} 等结构替换为匹配的组，那么它非常有用。  参数@var{replacement}和可选的@var{fixedcase}、@var{literal}、@var{string}和@var{subexp}与@code{replace-match}具有相同的含义。
+@end defun
+
+@node Simple Match Data
+@subsection 简单匹配数据访问
+
+本节介绍如何使用匹配数据来查找上次搜索或匹配操作所匹配的内容（如果成功）。
+
+您可以询问整个匹配文本，或者正则表达式的特定括号子表达式。  下面函数中的 @var{count} 参数指定了哪个。  如果 1⁣ 为零，则您正在询问整个比赛。  如果 2⁣ 为正，则它指定您想要的子表达式。
+
+回想一下，正则表达式的子表达式是用转义括号 @samp{\(@dots{}\)} 分组的表达式。  第 1 个子表达式是通过从整个正则表达式的开头开始计算 2 的出现次数来找到的。  第一个子表达式编号为 1，第二个子表达式编号为 2，依此类推。  只有正则表达式可以有子表达式——在简单的字符串搜索之后，唯一可用的信息是关于整个匹配的信息。
+
+每次成功的搜索都会设置匹配数据。  因此，您应该在搜索后立即查询匹配数据，然后再调用可能执行另一次搜索的任何其他函数。  或者，您可以保存和恢复调用可以执行另一次搜索的函数的匹配数据 (@pxref{Saving Match Data})。  或者使用明确不修改匹配数据的函数；例如，@code{string-match-p}。
+
+@c This is an old comment and presumably there is no prospect of this
+@c changing now.  But still the advice stands.
+失败的搜索可能会也可能不会改变匹配数据。  在当前的实现中，它没有，但我们将来可能会更改它。  搜索失败后，请勿尝试依赖匹配数据的值。
+
+@defun match-string count &optional in-string
+此函数以字符串形式返回上次搜索或匹配操作中匹配的文本。  如果 0⁣ 为零，则返回整个文本；如果 2⁣ 为正，则仅返回与第 1⁣ 个括号子表达式对应的部分。
+
+如果最后一次此类操作是针对带有 @code{string-match} 的字符串完成的，那么您应该传递与参数 @var{in-string} 相同的字符串。  在缓冲区搜索或匹配之后，您应该省略 @var{in-string} 或传递 @code{nil} ；但是您应该确保调用 @code{match-string} 时的当前缓冲区是您进行搜索或匹配的缓冲区。  不遵循此建议将导致错误的结果。
+
+如果 1⁣ 超出范围，或者未使用 2⁣ 替代项内的子表达式或重复零次的重复，则该值为 @code{nil}。
+@end defun
+
+@defun match-string-no-properties count &optional in-string
+该函数类似于 @code{match-string}，只不过结果没有文本属性。
+@end defun
+
+@defun match-beginning count
+如果最后一次正则表达式搜索找到匹配项，则此函数返回匹配文本或其子表达式的开头位置。
+
+如果@var{count}为零，则该值为整个比赛的开始位置。  否则，@var{count}指定正则表达式中的子表达式，并且函数的值是该子表达式的匹配的起始位置。
+
+对于未使用的 @samp{\|} 替代项内的子表达式或重复零次的重复，该值为 @code{nil}。
+@end defun
+
+@defun match-end count
+该函数与 @code{match-beginning} 类似，只不过它返回匹配结束的位置，而不是开始的位置。
+@end defun
+
+以下是使用匹配数据的示例，其中注释显示了文本中的位置：
+
+@example
+@group
+(string-match "\\(qu\\)\\(ick\\)"
+              "The quick fox jumped quickly.")
+              ;0123456789
+     @result{} 4
+@end group
+
+@group
+(match-string 0 "The quick fox jumped quickly.")
+     @result{} "quick"
+(match-string 1 "The quick fox jumped quickly.")
+     @result{} "qu"
+(match-string 2 "The quick fox jumped quickly.")
+     @result{} "ick"
+@end group
+
+@group
+(match-beginning 1)       ; @r{The beginning of the match}
+     @result{} 4                 ;   @r{with @samp{qu} is at index 4.}
+@end group
+
+@group
+(match-beginning 2)       ; @r{The beginning of the match}
+     @result{} 6                 ;   @r{with @samp{ick} is at index 6.}
+@end group
+
+@group
+(match-end 1)             ; @r{The end of the match}
+     @result{} 6                 ;   @r{with @samp{qu} is at index 6.}
+
+(match-end 2)             ; @r{The end of the match}
+     @result{} 9                 ;   @r{with @samp{ick} is at index 9.}
+@end group
+@end example
+
+这是另一个例子。  点最初位于线的开头。  搜索将指向空格和单词 @samp{in} 之间的位置。  整个匹配的开头位于缓冲区的第 9 个字符 (@samp{T})，第一个子表达式的匹配开头位于第 13 个字符 (@samp{c})。
+
+@example
+@group
+(list
+  (re-search-forward "The \\(cat \\)")
+  (match-beginning 0)
+  (match-beginning 1))
+    @result{} (17 9 13)
+@end group
+
+@group
+---------- Buffer: foo ----------
+I read "The cat @point{}in the hat comes back" twice.
+        ^   ^
+        9  13
+---------- Buffer: foo ----------
+@end group
+@end example
+
+@noindent
+（在这种情况下，返回的索引是缓冲区位置；缓冲区的第一个字符计为 1。）
+
+@node Entire Match Data
+@subsection 访问整个比赛数据
+
+函数 @code{match-data} 和 @code{set-match-data} 一次性读取或写入整个比赛数据。
+
+@defun match-data &optional integers reuse reseat
+该函数返回一个位置列表（标记或整数），记录了上次搜索匹配的文本的所有信息。元素零是整个表达式匹配的开始位置；元素一是表达式匹配结束的位置。  接下来的两个元素是第一个子表达式的匹配的开始和结束位置，依此类推。一般来说，元素
+@ifnottex
+number 2@var{n}
+@end ifnottex
+@tex
+number {\mathsurround=0pt $2n$}
+@end tex
+对应@code{(match-beginning @var{n})}；和元素
+@ifnottex
+number 2@var{n} + 1
+@end ifnottex
+@tex
+number {\mathsurround=0pt $2n+1$}
+@end tex
+对应于@code{(match-end @var{n})}。
+
+通常所有元素都是标记或@code{nil}，但如果@var{integers}不是@code{nil}，则意味着使用整数而不是标记。  （在这种情况下，缓冲区本身作为附加元素附加在列表末尾，以方便完全恢复匹配数据。）如果最后一次匹配是在带有 @code{string-match} 的字符串上完成的，则始终使用整数，因为标记不能指向字符串。
+
+如果@var{reuse}非@code{nil}，它应该是一个列表。  在这种情况下，@code{match-data}将匹配数据存储在@var{reuse}中。  也就是说，@var{reuse} 被破坏性修改。  @var{reuse} 不需要具有正确的长度。  如果它的长度不足以包含匹配数据，则会对其进行扩展。  如果太长，@var{reuse}的长度保持不变，但未使用的元素设置为@code{nil}。  此功能的目的是减少垃圾收集的需要。
+
+如果 @var{reseat} 不是 @code{nil}，则 @var{reuse} 列表上的所有标记都将重新定位以指向任何位置。
+
+与往常一样，在对搜索函数的调用和对旨在访问该搜索的匹配数据的 @code{match-data} 的调用之间一定不可能存在干预搜索的可能性。
+
+@example
+@group
+(match-data)
+     @result{}  (#<marker at 9 in foo>
+          #<marker at 17 in foo>
+          #<marker at 13 in foo>
+          #<marker at 17 in foo>)
+@end group
+@end example
+@end defun
+
+@defun set-match-data match-list &optional reseat
+该函数设置 @var{match-list} 元素的匹配数据，该列表应该是先前调用 @code{match-data} 的值的列表。  （更准确地说，任何具有相同格式的东西都可以。）
+
+如果 @var{match-list} 引用不存在的缓冲区，则不会收到错误；以一种无意义但无害的方式设置比赛数据。
+
+如果 @var{reseat} 不是 @code{nil}，则 @var{match-list} 列表上的所有标记都将重新定位以指向任何位置。
+
+@c TODO Make it properly obsolete.
+@findex store-match-data
+@code{store-match-data} 是 @code{set-match-data} 的半过时别名。
+@end defun
+
+@node Saving Match Data
+@subsection 保存和恢复比赛数据
+
+当您调用可能搜索的函数时，如果您想保留先前搜索的匹配数据以供以后使用，则可能需要保存和恢复该调用周围的匹配数据。  下面是一个示例，显示了如果无法保存比赛数据会出现的问题：
+
+@example
+@group
+(re-search-forward "The \\(cat \\)")
+     @result{} 48
+(foo)                   ; @r{@code{foo} does more searching.}
+(match-end 0)
+     @result{} 61              ; @r{Unexpected result---not 48!}
+@end group
+@end example
+
+您可以使用@code{save-match-data}保存和恢复比赛数据：
+
+@defmac save-match-data body@dots{}
+该宏执行@var{body}，保存并恢复其周围的匹配数据。  返回值是@var{body}中最后一个表单的值。
+@end defmac
+
+您可以将@code{set-match-data}与@code{match-data}一起使用来模仿特殊形式@code{save-match-data}的效果。  具体方法如下：
+
+@example
+@group
+(let ((data (match-data)))
+  (unwind-protect
+      @dots{}   ; @r{Ok to change the original match data.}
+    (set-match-data data)))
+@end group
+@end example
+
+Emacs 在运行进程过滤函数 (@pxref{Filter Functions}) 和进程哨兵 (@pxref{Sentinels}) 时自动保存和恢复匹配数据。
+
+@ignore
+  Here is a function which restores the match data provided the buffer
+associated with it still exists.
+
+@smallexample
+@group
+(defun restore-match-data (data)
+@c It is incorrect to split the first line of a doc string.
+@c If there's a problem here, it should be solved in some other way.
+  "Restore the match data DATA unless the buffer is missing."
+  (catch 'foo
+    (let ((d data))
+@end group
+      (while d
+        (and (car d)
+             (null (marker-buffer (car d)))
+@group
+             ;; @file{match-data} @r{buffer is deleted.}
+             (throw 'foo nil))
+        (setq d (cdr d)))
+      (set-match-data data))))
+@end group
+@end smallexample
+@end ignore
+
+@node Search and Replace
+@section 搜索和替换
+@cindex replacement after search
+@cindex searching and replacing
+
+如果您想在缓冲区的一部分中找到正则表达式的所有匹配项并替换它们，最灵活的方法是使用 @code{re-search-forward} 和 @code{replace-match} 编写显式循环，如下所示：
+
+@example
+(while (re-search-forward "foo[ \t]+bar" nil t)
+  (replace-match "foobar"))
+@end example
+
+@noindent
+@xref{Replacing Match,, Replacing the Text that Matched}，用于描述@code{replace-match}。
+
+将替换限制在特定区域可能会更方便。  函数 @code{replace-regexp-in-region} 就是这样做的。
+
+@defun replace-regexp-in-region regexp replacement &optional start end
+该函数将缓冲区文本中 @var{start} 和 @var{end} 之间出现的所有 @var{regexp} 替换为 @var{replacement}； @var{start} 默认为点的位置，@var{end} 默认为缓冲区的最后可访问位置。  搜索 @var{regexp} 区分大小写，插入 @var{replacement} 时不更改其字母大小写。  @var{replacement} 字符串可以使用与 @code{replace-match} 相同的以 @samp{\} 开头的特殊元素。  该函数返回替换出现的次数，如果未找到 12 则返回 11 。  该函数保留点的位置。
+
+@example
+(replace-regexp-in-region "foo[ \t]+bar" "foobar")
+@end example
+@end defun
+
+@defun replace-string-in-region string replacement &optional start end
+此函数的工作方式与 @code{replace-regexp-in-region} 类似，但搜索并替换文字 @var{string} 而不是正则表达式。
+@end defun
+
+Emacs 还具有用于替换字符串中的匹配项的特殊函数。
+
+@defun replace-regexp-in-string regexp rep string &optional fixedcase literal subexp start
+此函数复制 @var{string} 并在其中搜索 @var{regexp} 的匹配项，并将其替换为 @var{rep}。  它返回修改后的副本。  如果@var{start}非@code{nil}，则从@var{string}中的该索引开始搜索匹配项，并且返回值不包括@var{string}的前@var{start}字符。要获取整个转换后的字符串，请将 @var{string} 的前 @var{start} 字符与返回值连接起来。
+
+该函数使用 @code{replace-match} 进行替换，并将可选参数 @var{fixedcase}、@var{literal} 和 @var{subexp} 传递给 @code{replace-match}。
+
+@var{rep} 可以是一个函数，而不是一个字符串。  在这种情况下，@code{replace-regexp-in-string}为每个匹配调用@var{rep}，并将匹配的文本作为其唯一参数传递。  它收集 @var{rep} 返回的值并将其传递给 @code{replace-match} 作为替换字符串。  此时的匹配数据是@var{regexp}与@var{string}的子字符串匹配的结果。
+@end defun
+
+@defun string-replace from-string to-string in-string
+该函数将 @var{in-string} 中所有出现的 @var{from-string} 替换为 @var{to-string} 并返回结果。  它可能会返回其参数之一不变、常量字符串或新字符串。  大小写很重要，并且文本属性被忽略。
+@end defun
+
+如果您想按照 @code{query-replace} 的方式编写命令，可以使用 @code{perform-replace} 来完成这项工作。
+
+@defun perform-replace from-string replacements query-flag regexp-flag delimited-flag &optional repeat-count map start end backward region-noncontiguous-p
+该函数是 @code{query-replace} 和相关命令的核心。  它在位置 @var{start} 和 @var{end} 之间的文本中搜索@var{from-string} 的出现，并替换其中的部分或全部。  如果@var{start}是@code{nil}（或省略），则使用点代替，并且缓冲区可访问部分的末尾用于@var{end}。  （如果可选参数@var{backward}不是@code{nil}，则搜索从@var{end}开始并向后进行。）
+
+如果 @var{query-flag} 是 @code{nil}，则替换所有出现的情况；否则，它会询问用户如何处理每一项。
+
+如果@var{regexp-flag}非@code{nil}，则@var{from-string}被视为正则表达式；否则，它必须字面匹配。  如果@var{delimited-flag}非@code{nil}，则仅考虑由字边界包围的替换。
+
+参数 @var{replacements} 指定用什么来替换出现的内容。  如果它是一个字符串，则使用该字符串。  它也可以是一个字符串列表，以循环顺序使用。
+
+如果@var{replacements}是一个cons单元，@w{@code{(@var{function} . @var{data})}}，这意味着在每次匹配后调用@var{function}来获取替换文本。  使用两个参数调用此函数：@var{data} 和已进行的替换数。
+
+如果@var{repeat-count}不是@code{nil}，它应该是一个整数。  然后，它指定在循环前进到下一个字符串之前使用 @var{replacements} 列表中的每个字符串多少次。
+
+如果 @var{from-string} 包含大写字母，则 @code{perform-replace} 将 @code{case-fold-search} 绑定到 @code{nil}，并使用 @var{replacements} 而不改变其大小写。
+
+通常，键映射 @code{query-replace-map} 定义用户可能对查询做出的响应。  参数@var{map}，如果不是@code{nil}，则指定要使用的键盘映射而不是@code{query-replace-map}。
+
+非 @code{nil} @var{region-noncontiguous-p} 意味着 @var{start} 和 @var{end} 之间的区域由不连续的块组成。最常见的示例是矩形区域，其中各个部分由换行符分隔。
+
+该函数使用两个函数之一来搜索下一次出现的@var{from-string}。  这些函数由两个变量的值指定：@code{replace-re-search-function} 和 @code{replace-search-function}。  当参数 @var{regexp-flag} 为非 @code{nil} 时调用前者，当参数 @code{nil} 时调用后者。
+@end defun
+
+@defvar query-replace-map
+该变量保存一个特殊的键盘映射，它定义了@code{perform-replace}的有效用户响应和使用它的命令，以及@code{y-or-n-p}和@code{map-y-or-n-p}。  这张地图有两个不同寻常的地方：
+
+@itemize @bullet
+@item 
+键绑定不是命令，只是对使用此映射的函数有意义的符号。
+
+@item 
+不支持前缀键；每个键绑定必须适用于单事件键序列。  这是因为函数不使用 @code{read-key-sequence} 来获取输入；相反，他们读取单个事件并“手动”查找。
+@end itemize
+@end defvar
+
+以下是 @code{query-replace-map} 的有意义的绑定。其中有几个只对@code{query-replace}和朋友有意义。
+
+@table @code
+@item act
+一定要采取正在考虑的行动——换句话说，“是”。
+
+@item skip
+不要针对这个问题采取行动——换句话说，“不”。
+
+@item exit
+对这个问题回答“否”，并放弃整个系列的问题，假设答案是“否”。
+
+@item exit-prefix
+与@code{exit}类似，但将按下的键添加到@code{unread-command-events} (@pxref{Event Input Misc})。
+
+@item act-and-exit
+回答这个问题“是”，并放弃整个系列的问题，假设后续答案将是“否”。
+
+@item act-and-show
+回答这个问题“是”，但显示结果——不要前进到下一个问题。
+
+@item automatic
+用“是”回答此问题以及本系列中的所有后续问题，无需进一步的用户交互。
+
+@item backup
+返回到之前提出问题的位置。
+
+@item undo
+撤消上次替换并移回执行替换的位置。
+
+@item undo-all
+撤消所有替换并移回执行第一次替换的位置。
+
+@item edit
+输入递归编辑来处理这个问题——而不是通常采取的任何其他操作。
+
+@item edit-replacement
+在迷你缓冲区中编辑此问题的替换内容。
+
+@item delete-and-edit
+删除正在考虑的文本，然后输入递归编辑来替换它。
+
+@item recenter
+@itemx scroll-up
+@itemx scroll-down
+@itemx scroll-other-window
+@itemx scroll-other-window-down
+执行指定的窗口滚动操作，然后再次询问相同的问题。  只有@code{y-or-n-p}和相关函数使用这个答案。
+
+@item quit
+立即执行退出。  只有@code{y-or-n-p}和相关函数使用这个答案。
+
+@item help
+显示一些帮助，然后再次询问。
+@end table
+
+@defvar multi-query-replace-map
+该变量保存一个键映射，通过提供在多缓冲区替换中有用的附加键绑定来扩展 @code{query-replace-map}。  额外的绑定是：
+
+@table @code
+@item automatic-all
+对于所有剩余的缓冲区，请回答此问题以及本系列中的所有后续问题“是”，无需进一步的用户交互。
+
+@item exit-current
+回答这个问题“否”，并放弃当前缓冲区的整个系列问题。  继续到序列中的下一个缓冲区。
+@end table
+@end defvar
+
+@defvar replace-search-function
+该变量指定 @code{perform-replace} 调用的函数来搜索下一个要替换的字符串。  它的默认值为@code{search-forward}。  任何其他值都应命名具有 3 个参数的函数：@code{search-forward} (@pxref{String Search}) 的前 3 个参数。
+@end defvar
+
+@defvar replace-re-search-function
+该变量指定 @code{perform-replace} 调用的函数来搜索下一个要替换的正则表达式。  它的默认值为@code{re-search-forward}。  任何其他值都应命名具有 3 个参数的函数：@code{re-search-forward} (@pxref{Regexp Search}) 的前 3 个参数。
+@end defvar
+
+@node Standard Regexps
+@section 编辑中使用的标准正则表达式
+@cindex regexps used standardly in editing
+@cindex standard regexps used in editing
+
+本节介绍一些保存用于编辑中某些目的的正则表达式的变量：
+
+@defopt page-delimiter
+这是描述分隔页面的行开头的正则表达式。  默认值为@code{"^\014"}（即@code{"^^L"}或@code{"^\C-l"}）；这匹配以换页符开头的行。
+@end defopt
+
+以下两个正则表达式应该 @emph{not} 假设匹配始终从行首开始；他们不应该使用 @samp{^} 来锚定比赛。  大多数情况下，段落命令仅在行的开头检查匹配，这意味着 2⁣ 是多余的。  当左边距非零时，它们接受在左边距之后开始的匹配。  在这种情况下，@samp{^} 将是不正确的。  然而，在从不使用左边距的模式中，@samp{^}是无害的。
+
+@defopt paragraph-separate
+这是用于识别分隔段落的行的开头的正则表达式。  （如果更改此设置，则可能还必须更改 @code{paragraph-start}。）默认值为 @w{@code{"[@ \t\f]*$"}}，它匹配完全由空格、制表符和换页符（在其左边距之后）组成的行。
+@end defopt
+
+@defopt paragraph-start
+这是用于识别以 @emph{or} 开头的行开头的正则表达式，用于分隔段落。  默认值为@w{@code{"\f\\|[ \t]*$"}}，它匹配仅包含空格或以换页符开头（在其左边距之后）的行。
+@end defopt
+
+@defopt sentence-end
+如果非@code{nil}，则该值应该是描述句子结尾的正则表达式，包括句子后面的空格。  （无论如何，所有段落边界也会结束句子。）
+
+如果该值为 @code{nil}（默认情况下），则函数 @code{sentence-end} 会构造正则表达式。  这就是为什么您应该始终调用函数 @code{sentence-end} 来获取用于识别句子结尾的正则表达式。
+@end defopt
+
+@defun sentence-end
+如果非 @code{nil}，该函数返回变量 @code{sentence-end} 的值。  否则，它将根据变量 @code{sentence-end-double-space} (@pxref{Definition of sentence-end-double-space})、@code{sentence-end-without-period} 和 @code{sentence-end-without-space} 的值返回默认值。
+@end defun
+
+@node POSIX Regexps
+@section Emacs 与 POSIX 正则表达式
+@cindex POSIX regular expressions
+
+正则表达式语法在计算机程序之间存在显着差异。在编写生成正则表达式以供其他程序使用的 Elisp 代码时，了解语法变体有何不同会很有帮助。为了让大家感受一下这种变体，本节讨论 Emacs 正则表达式与 POSIX 标准的两种语法变体有何不同：基本正则表达式 (BRE) 和扩展正则表达式 (ERE)。 Plain @command{grep} 使用 BRE，@samp{grep -E} 使用 ERE。
+
+Emacs 正则表达式的语法更接近 ERE，而不是 BRE，并带有一些扩展。  以下总结了 POSIX BRE 和 ERE 与 Emacs 正则表达式的区别。
+
+@itemize @bullet
+@item
+在 POSIX BRE 中，@samp{+} 和 @samp{?} 并不特殊。唯一的反斜杠转义序列是@samp{\(@dots{}\)}、@samp{\@{@dots{}\@}}、@samp{\1}到@samp{\9}，以及转义的特殊字符@samp{\$}、@samp{\*}、@samp{\.}、@samp{\[}、@samp{\\}和@samp{\^}。因此@samp{\(?:}的作用类似于@samp{\([?]:}。 POSIX 没有定义其他 BRE 转义符的行为方式；例如，GNU @command{grep} 像 Emacs 一样对待 @samp{\|}，但不支持所有 Emacs 转义。
+
+@item
+在 POSIX BRE 中，@samp{^} 在 @samp{\(} 之后是否特殊是一个实现选项； GNU @command{grep} 像 Emacs 一样对待它。在 POSIX ERE 中，@samp{^} 在括号表达式之外始终是特殊的，这意味着 ERE @samp{x^} 永远不会匹配。在 Emacs 正则表达式中，@samp{^} 仅在正则表达式的开头或在 @samp{\(}、@samp{\(?:} 或 @samp{\|} 之后才是特殊的。
+
+@item
+在 POSIX BRE 中，@samp{$} 在 @samp{\)} 之前是否特殊是一个实现选项； GNU @command{grep} 像 Emacs 一样对待它。  在 POSIX ERE 中，@samp{$} 在括号表达式 (@pxref{Regexp Special, bracket expressions}) 之外始终是特殊的，这意味着 ERE @samp{$x} 永远不会匹配。  在 Emacs 正则表达式中，@samp{$} 仅在正则表达式末尾，或者在 @samp{\)} 或 @samp{\|} 之前是特殊的。
+
+@item
+在 POSIX ERE 中@samp{@{}, @samp{(} and @samp{|} are special, and @samp{)} is special when matched with a preceding @samp{(}. These special characters do not use preceding backslashes; @samp{(?} produces undefined results. The only backslash escape sequences are the escaped special characters @samp{\$}, @samp{\(}, @samp{\)}, @samp{\*}, @samp{\+}, @samp{\.}, @samp{\?}, @samp{\[}, @samp{\\}, @samp{\^}, @samp{\@{} and @samp{\|}. POSIX does not define how other ERE escapes behave; for example, GNU @samp{grep -E} treats @samp{\1} like Emacs does, but does not support all the Emacs escapes.
+
+@item
+在 POSIX BRE 和 ERE 中，正则表达式或子表达式开头的重复运算符（可能前面有 @samp{^}）会产生未定义的结果，但重复运算符 @samp{*} 在 BRE 中的行为与在 Emacs 中的行为相同。在 Emacs 中，这些运算符被视为普通运算符。
+
+@item
+在 BRE 和 ERE 中，未定义的结果由两个重复运算符按顺序产生。  在 Emacs 中，它们具有明确定义的行为，例如，@samp{a**} 相当于 @samp{a*}。
+
+@item
+在 BRE 和 ERE 中，空正则表达式或子表达式会产生未定义的结果。  在 Emacs 中，它们具有明确定义的行为，例如 @samp{\(\)*} 匹配空字符串，
+
+@item
+在 BRE 和 ERE 中，为命名字符类 @samp{[:ascii:]}、@samp{[:multibyte:]}、@samp{[:nonascii:]}、@samp{[:unibyte:]} 和 @samp{[:word:]} 生成未定义的结果。
+
+@item
+BRE 和 ERE 可以在括号表达式中包含整理符号和等价类表达式，例如 @samp{[[.ch.]d[=a=]]}。 Emacs 正则表达式不支持这一点。
+
+@item
+BRE、ERE 及其匹配的字符串不能包含编码错误或 NUL 字节。  在 Emacs 中，这些结构只是简单地匹配自身。
+
+@item
+BRE 和 ERE 搜索总是找到最长的匹配。 Emacs 默认搜索并不一定这样做。 @xref{Longest Match}。
+@end itemize

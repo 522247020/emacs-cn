@@ -206,11 +206,12 @@ def parse_file(path):
     return pieces
 
 
-def collect_tasks():
+def collect_tasks(src, only=None):
     tasks = []          # (file, index, kind, prefix, text, store, protected)
-    files = sorted(f for f in os.listdir(SRC) if f.endswith('.texi'))
+    files = sorted(f for f in os.listdir(src) if f.endswith('.texi')
+                   and (not only or f in only))
     for fn in files:
-        path = os.path.join(SRC, fn)
+        path = os.path.join(src, fn)
         pieces = parse_file(path)
         for idx, pc in enumerate(pieces):
             if isinstance(pc, tuple):
@@ -225,9 +226,20 @@ def collect_tasks():
 
 
 def main():
-    os.makedirs(OUT, exist_ok=True)
-    files, tasks = collect_tasks()
-    print('files=%d tasks=%d' % (len(files), len(tasks)), file=sys.stderr)
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--src', default=SRC)
+    ap.add_argument('--out', default=OUT)
+    ap.add_argument('--only', default='',
+                    help='逗号分隔的文件名（仅翻译这些，含所需 @include）')
+    a = ap.parse_args()
+    src_dir, out_dir = a.src, a.out
+    only = set(x for x in a.only.split(',') if x) or None
+
+    os.makedirs(out_dir, exist_ok=True)
+    files, tasks = collect_tasks(src_dir, only)
+    print('dir=%s files=%d tasks=%d' % (src_dir, len(files), len(tasks)),
+          file=sys.stderr)
 
     cache = {}
     if os.path.exists(CACHE):
@@ -281,7 +293,7 @@ def main():
     for t in tasks:
         byfile.setdefault(t[0], {})[t[1]] = t
     for fn in files:
-        pieces = parse_file(os.path.join(SRC, fn))
+        pieces = parse_file(os.path.join(src_dir, fn))
         out = []
         for idx, pc in enumerate(pieces):
             if isinstance(pc, tuple):
@@ -291,8 +303,8 @@ def main():
                 out.append(pre + translated + suffix)
             else:
                 out.append(pc)
-        open(os.path.join(OUT, fn), 'w', encoding='utf-8').write('\n'.join(out))
-    print('written to', OUT, file=sys.stderr)
+        open(os.path.join(out_dir, fn), 'w', encoding='utf-8').write('\n'.join(out))
+    print('written to', out_dir, file=sys.stderr)
 
 
 if __name__ == '__main__':

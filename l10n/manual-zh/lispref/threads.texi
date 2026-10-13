@@ -1,0 +1,219 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 2012--2026 Free Software Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Threads
+@chapter 线程数
+@cindex threads
+@cindex concurrency
+
+Emacs Lisp 提供了一种有限形式的并发，称为 @dfn{threads}。  给定 Emacs 实例中的所有线程共享相同的内存。  Emacs Lisp 中的并发是“主要是协作的”，这意味着 Emacs 只会在明确定义的时间在线程之间切换执行。  然而，Emacs 线程支持的设计方式是为了以后允许更细粒度的并发，并且正确的程序不应依赖于协作线程。
+
+目前，当等待键盘输入或异步进程的进程输出时（例如，在@code{accept-process-output}期间），或者在与线程相关的阻塞操作（例如互斥锁定或@code{thread-join}）期间，将根据通过@code{thread-yield}的显式请求进行线程切换。
+
+Emacs Lisp 提供了原语来创建和控制线程，还提供了创建和控制互斥体和条件变量的原语，这对于线程同步非常有用。
+
+虽然全局变量在所有 Emacs Lisp 线程之间共享，但局部变量不是——动态 @code{let} 绑定是局部的。  每个线程还有自己的当前缓冲区 (@pxref{Current Buffer}) 和自己的匹配数据 (@pxref{Match Data})。
+
+请注意，Emacs Lisp 实现对 @code{let} 绑定进行了特殊处理。  除了使用 @code{let} 之外，没有其他方法可以复制这种展开和倒带行为。  例如，使用 @code{unwind-protect} 编写的 @code{let} 的手动实现无法将变量值安排为线程特定的。
+
+对于词法绑定 (@pxref{Variable Scoping})，闭包是一个与 Emacs Lisp 中的任何其他对象一样的对象，并且闭包中的绑定由调用该闭包的任何线程共享。
+
+@menu
+* Basic Thread Functions::       基本线程函数。
+* Mutexes::                      互斥体允许对数据进行独占访问。
+* Condition Variables::          线程间事件。
+* The Thread List::              显示活动线程。
+@end menu
+
+@node Basic Thread Functions
+@section 基本线程函数
+
+线程可以被创建并等待。  线程不能直接退出，但当前线程可以隐式退出，并且可以向其他线程发出信号。
+
+@defun make-thread function &optional name buffer-disposition
+创建一个调用@var{function}的新执行线程。  当@var{function}返回时，线程退出。
+
+创建新线程时没有有效的局部变量绑定。新线程的当前缓冲区是从当前线程继承的。
+
+可以提供 @var{name} 来为线程命名。  该名称仅用于调试和提供信息；它对 Emacs 没有任何意义。  如果提供了@var{name}，它必须是一个字符串。
+
+@var{buffer-disposition} 表示如果线程的当前缓冲区即将被杀死，会发生什么情况。  如果值为@code{t}，则不允许杀死缓冲区。  任何其他值，包括@code{nil}（默认值），都意味着缓冲区被终止，并且线程被分配另一个当前缓冲区，并发出错误信号@code{thread-buffer-killed}。  但如果该值是符号 @code{silently}，则不会发出错误信号。
+
+该函数返回新线程。
+@end defun
+
+@findex thread-buffer-disposition
+@findex thread-set-buffer-disposition
+创建线程后，您可以使用函数 @code{thread-buffer-disposition} 和 @code{thread-set-buffer-disposition} 检查或更改其缓冲区配置。
+
+@defun threadp object
+如果 1⁣ 代表 Emacs 线程，则该函数返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@defun thread-join thread
+阻塞直到@var{thread}退出，或者直到当前线程收到信号。  它返回 @var{thread} 函数的结果。  如果@var{thread}已经退出，则立即返回。
+@end defun
+
+@defun thread-signal thread error-symbol data
+与 @code{signal} (@pxref{Signaling Errors}) 类似，但信号是在线程 @var{thread} 中传递的。  如果@var{thread}是当前线程，那么这将立即调用@code{signal}。  否则，一旦信号变成当前信号，@var{thread}就会接收到该信号。如果@var{thread}被@code{mutex-lock}、@code{condition-wait}或@code{thread-join}的调用阻塞； @code{thread-signal} 将解锁它。
+
+如果@var{thread}是主线程，则信号不会在那里传播。  相反，它在主线程中显示为消息。
+@end defun
+
+@defun thread-yield
+将执行让给下一个可运行线程。
+@end defun
+
+@defun thread-name thread
+返回 @var{thread} 的名称，如 @code{make-thread} 所指定。
+@end defun
+
+@defun thread-live-p thread
+如果 1⁣ 还活着，则返回 @code{t}；如果不活着，则返回 @code{nil}。只要其函数仍在执行，线程就处于活动状态。
+@end defun
+
+@defun thread--blocker thread
+返回 @var{thread} 正在等待的对象。  该函数主要用于调试，并给出一个“双连字符”名称来表明这一点。
+
+如果@var{thread}被@code{thread-join}阻塞，则返回它正在等待的线程。
+
+如果@var{thread}被@code{mutex-lock}阻塞，则返回互斥体。
+
+如果@var{thread}被@code{condition-wait}阻塞，则返回条件变量。
+
+否则，返回@code{nil}。
+@end defun
+
+@defun current-thread
+返回当前线程。
+@end defun
+
+@defun all-threads
+返回所有活动线程对象的列表。  每次调用都会返回一个新列表。
+@end defun
+
+@defvar main-thread
+该变量保持主线程 Emacs 正在运行，或者如果 Emacs 编译时没有线程支持，则为 @code{nil}。
+@end defvar
+
+当线程运行的代码发出未处理的错误信号时，该线程将退出。  其他线程可以使用以下函数访问导致线程退出的错误形式。
+
+@defun thread-last-error &optional cleanup
+该函数返回线程因错误退出时记录的最后一个错误形式。  每个异常退出的线程都会用新值覆盖前一个线程错误存储的表单，因此只能访问最后一个线程。  如果@var{cleanup}非@code{nil}，则存储的形式重置为@code{nil}。
+@end defun
+
+@node Mutexes
+@section 互斥体
+
+@dfn{mutex} 是独占锁。  在任何时刻，零个或一个线程都可能拥有互斥锁。  如果一个线程尝试获取互斥锁，并且该互斥锁已被其他线程拥有，则获取线程将阻塞，直到该互斥锁变得可用。
+
+Emacs Lisp 互斥体是一种称为 @dfn{recursive} 的类型，这意味着线程可以多次重新获取它所拥有的互斥体。  互斥锁会记录其被获取的次数，并且每次获取互斥锁都必须与释放配对。  线程最后一次释放互斥锁会将其恢复为无主状态，从而可能允许另一个线程获取该互斥锁。
+
+@defun mutexp object
+如果 1⁣ 表示 Emacs 互斥体，则该函数返回 0⁣，否则返回 2⁣。
+@end defun
+
+@defun make-mutex &optional name
+创建一个新的互斥体并返回它。  如果 @var{name} 被指定，它就是互斥体的名称。  它必须是一个字符串。  该名称仅用于调试目的；它对 Emacs 没有任何意义。
+@end defun
+
+@defun mutex-name mutex
+返回 @var{mutex} 的名称，如 @code{make-mutex} 所指定。
+@end defun
+
+@defun mutex-lock mutex
+这将阻塞，直到该线程获取 @var{mutex}，或者直到该线程使用 @code{thread-signal} 发出信号。  如果 @var{mutex} 已被该线程拥有，则仅返回。
+@end defun
+
+@defun mutex-unlock mutex
+释放@var{mutex}。  如果 1⁣ 不属于该线程，则会发出错误信号。
+@end defun
+
+@defmac with-mutex mutex body@dots{}
+该宏是在持有互斥体时评估表单的最简单、最安全的方法。  它获取@var{mutex}，调用@var{body}，然后释放@var{mutex}。  它返回 @var{body} 的结果。
+@end defmac
+
+@node Condition Variables
+@section 条件变量
+
+@dfn{condition variable} 是线程阻塞直到某个事件发生的一种方式。  线程可以等待条件变量，以便在其他线程通知该条件时被唤醒。
+
+条件变量与互斥锁相关联，并且从概念上讲，与某些条件相关联。  为了正确操作，必须获取互斥体，然后等待线程必须循环，测试条件并等待条件变量。  例如：
+
+@example
+(with-mutex mutex
+  (while (not global-variable)
+    (condition-wait cond-var)))
+@end example
+
+互斥体确保原子性，循环是为了鲁棒性——可能存在虚假通知。
+
+同样，在通知条件之前必须保持互斥锁。典型的也是最好的方法是获取互斥锁，进行与此条件相关的更改，然后通知它：
+
+@example
+(with-mutex mutex
+  (setq global-variable (some-computation))
+  (condition-notify cond-var))
+@end example
+
+@defun make-condition-variable mutex &optional name
+创建一个与 @var{mutex} 关联的新条件变量。  如果指定了@var{name}，则它是给条件变量的名称。它必须是一个字符串。  该名称仅用于调试目的；它对 Emacs 没有任何意义。
+@end defun
+
+@defun condition-variable-p object
+如果 1⁣ 表示条件变量，则该函数返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@defun condition-wait cond
+等待另一个线程通知条件变量@var{cond}。该函数将阻塞，直到通知条件，或者直到使用 @code{thread-signal} 将信号传送到该线程。
+
+在不持有条件关联互斥体的情况下调用 @code{condition-wait} 是错误的。
+
+@code{condition-wait} 在等待时释放关联的互斥锁。这允许其他线程获取互斥锁以通知该情况。
+@end defun
+
+@defun condition-notify cond &optional all
+通知@var{cond}。  在调用此之前必须持有具有 @var{cond} 的互斥体。  通常，单个等待线程由@code{condition-notify}唤醒；但如果@var{all}不是@code{nil}，则所有等待@var{cond}的线程都会收到通知。
+
+@code{condition-notify} 释放关联的互斥体。这允许其他线程获取互斥体以便等待条件。
+@c why bother?
+@end defun
+
+@defun condition-name cond
+返回传递给 @code{make-condition-variable} 的 @var{cond} 的名称。
+@end defun
+
+@defun condition-mutex cond
+返回与 @var{cond} 关联的互斥体。  请注意，关联的互斥体无法更改。
+@end defun
+
+@node The Thread List
+@section 主题列表
+
+@cindex thread list
+@cindex list of threads
+@findex list-threads
+@code{list-threads} 命令列出所有当前活动的线程。在生成的缓冲区中，每个线程通过传递给 @code{make-thread} (@pxref{Basic Thread Functions}) 的名称来标识，或者通过其唯一的内部标识符（如果未使用名称创建）来标识。  除了线程当时被阻塞的对象（如果被阻塞）之外，还会显示创建或上次更新缓冲区时每个线程的状态。
+
+@defvar thread-list-refresh-seconds
+@file{*Threads*} 缓冲区每秒自动更新两次。  您可以通过自定义此变量来加快或减慢刷新率。
+@end defvar
+
+以下是线程列表缓冲区中可用的命令：
+
+@table @kbd
+
+@cindex backtrace of thread
+@cindex thread backtrace
+@item b
+显示线程在该点的回溯。  这将显示在您按下 @kbd{b} 时线程在其代码中的何处让出或被阻塞。  请注意，回溯是一个快照；线程可能同时恢复执行，并处于不同的状态，或者可能已经退出。
+
+您可以在线程的回溯缓冲区中使用 @kbd{g} 来获取更新的回溯，因为回溯缓冲区不会自动更新。 @xref{Backtraces}，用于描述回溯以及对其起作用的其他命令。
+
+@item s
+在该点向线程发出信号。  在 @kbd{s} 之后，键入 @kbd{q} 发送退出信号，或键入 @kbd{e} 发送错误信号。  线程可以实现信号处理，但默认行为是在收到任何信号时退出。  因此，只有当您了解如何重新启动目标线程时才应该使用此命令，因为如果必要的线程被终止，您的 Emacs 会话可能会表现不正确。
+
+@item g
+更新线程列表及其状态。
+@end table

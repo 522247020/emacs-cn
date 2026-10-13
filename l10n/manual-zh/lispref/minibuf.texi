@@ -1,0 +1,1733 @@
+@c -*-texinfo-*-
+@c This is part of the GNU Emacs Lisp Reference Manual.
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2026 Free Software
+@c Foundation, Inc.
+@c See the file elisp.texi for copying conditions.
+@node Minibuffers
+@chapter 迷你缓冲区
+@cindex arguments, reading
+@cindex complex arguments
+@cindex minibuffer
+
+@dfn{minibuffer} 是一个特殊的缓冲区，Emacs 命令用它来读取比单个数字前缀参数更复杂的参数。  这些参数包括文件名、缓冲区名称和命令名称（如@kbd{M-x}中所示）。  迷你缓冲区显示在帧的底行，与回显区域 (@pxref{The Echo Area}) 位于同一位置，但仅当它用于读取参数时才显示。
+
+@menu
+* Intro to Minibuffers::       有关迷你缓冲区的基本信息。
+* Text from Minibuffer::       如何读取直接文本字符串。
+* Object from Minibuffer::     如何读取 Lisp 对象或表达式。
+* Minibuffer History::         记录以前的迷你缓冲区输入，以便用户可以重复使用它们。
+* Initial Input::              指定迷你缓冲区的初始内容。
+* Completion::                 如何调用和自定义完成。
+* Yes-or-No Queries::          提出问题并给出简单的答案。
+* Multiple Queries::           提出复杂的问题。
+* Reading a Password::         从终端读取密码。
+* Minibuffer Commands::        用作迷你缓冲区中的键绑定的命令。
+* Minibuffer Windows::         在特殊的迷你缓冲区窗口上操作。
+* Minibuffer Contents::        此类命令如何访问迷你缓冲区文本。
+* Recursive Mini::             是否允许递归进入迷你缓冲区。
+* Inhibiting Interaction::     当无法进行交互时运行 Emacs。
+* Minibuffer Misc::            各种定制挂钩和变量。
+@end menu
+
+@node Intro to Minibuffers
+@section 迷你缓冲区简介
+
+在大多数情况下，迷你缓冲区是普通的 Emacs 缓冲区。  大多数操作@emph{within}缓冲区，例如编辑命令，在迷你缓冲区中正常工作。  然而，许多管理缓冲区的操作并不适用于迷你缓冲区。  迷你缓冲区的名称始终采用 @w{@samp{ *Minibuf-@var{number}*}} 的形式，并且无法更改。  迷你缓冲区仅显示在仅用于迷你缓冲区的特殊窗口中；这些窗口总是出现在框架的底部。  （有时帧没有迷你缓冲区窗口，有时一种特殊类型的帧只包含一个迷你缓冲区窗口；请参阅@ref{Minibuffers and Frames}。）
+
+迷你缓冲区中的文本始终以 @dfn{prompt string} 开头，该文本由使用迷你缓冲区的程序指定，以告诉用户要键入哪种类型的输入。  该文本被标记为只读，因此您不会意外删除或更改它。  它还被标记为字段 (@pxref{Fields})，以便某些运动函数（包括 @code{beginning-of-line}、@code{forward-word}、@code{forward-sentence} 和 @code{forward-paragraph}）停止在提示和实际文本之间的边界处。
+
+@c See https://debbugs.gnu.org/11276
+迷你缓冲区的窗口通常是一行；如果内容需要更多空间，它会自动增长。  当迷你缓冲区处于活动状态时，您可以使用窗口大小调整命令临时显式调整其窗口大小；当迷你缓冲区退出时，窗口恢复到正常大小。  当迷你缓冲区未处于活动状态时，您可以使用框架的其他窗口中的窗口大小调整命令或用鼠标拖动模式线来永久调整其窗口大小。  （由于当前实现的细节，要使其工作，@code{resize-mini-windows} 必须是 @code{nil}。）如果帧仅包含一个迷你缓冲区窗口，则可以通过更改帧的大小来更改其大小。
+
+使用迷你缓冲区读取输入事件，并更改变量的值，例如 @code{this-command} 和 @code{last-command} (@pxref{Command Loop Info})。  如果您不希望更改它们，您的程序应该将它们绑定在使用迷你缓冲区的代码周围。
+
+在某些情况下，即使存在活动的迷你缓冲区，命令也可以使用迷你缓冲区；这样的迷你缓冲区称为@dfn{recursive minibuffer}。  第一个迷你缓冲区被命名为@w{@samp{ *Minibuf-1*}}。  递归迷你缓冲区通过增加名称末尾的数字来命名。  （名称以空格开头，这样它们就不会出现在正常的缓冲区列表中。）在几个递归迷你缓冲区中，最里面的（或最近输入的）是 @dfn{active minibuffer} - 您可以通过键入 @key{RET} (@code{exit-minibuffer}) 来终止它。我们通常称其为 @emph{the} 迷你缓冲区。  您可以通过设置变量 @code{enable-recursive-minibuffers} 或将该名称的属性放在命令符号 (@xref{Recursive Mini}) 上来允许或禁止递归迷你缓冲区。
+
+与其他缓冲区一样，迷你缓冲区使用本地键盘映射 (@pxref{Keymaps}) 来指定特殊的键绑定。  调用迷你缓冲区的函数还根据要完成的工作设置其本地映射。  @xref{Text from Minibuffer}，对于未完成的迷你缓冲区本地映射。  @xref{Completion Commands}，用于完成迷你缓冲区本地映射。
+
+@cindex active minibuffer
+活动的迷你缓冲区通常具有主模式@code{minibuffer-mode}。这是 Emacs 内部模式，没有任何特殊功能。  要自定义迷你缓冲区的设置，我们建议您使用 @code{minibuffer-setup-hook} (@pxref{Minibuffer Misc}) 而不是 @code{minibuffer-mode-hook}，因为前者稍后运行，在迷你缓冲区完全初始化之后。
+
+@cindex inactive minibuffer
+当迷你缓冲区处于非活动状态时，其主要模式为@code{minibuffer-inactive-mode}，键映射为@code{minibuffer-inactive-mode-map}。  仅当迷你缓冲区位于单独的帧中时，这才真正有用。  @xref{Minibuffers and Frames}。
+
+当 Emacs 以批处理模式运行时，任何从迷你缓冲区读取的请求实际上都是从 Emacs 启动时提供的标准输入描述符中读取一行。  这仅支持基本输入：没有任何特殊的迷你缓冲区功能（历史记录、完成等）@: 在批处理模式下可用。
+
+@node Text from Minibuffer
+@section 使用迷你缓冲区读取文本字符串
+@cindex minibuffer input, reading text strings
+
+迷你缓冲区输入最基本的原语是@code{read-from-minibuffer}，它可用于以文本形式读取字符串或 Lisp 对象。  函数@code{read-regexp}用于读取正则表达式（@pxref{Regular Expressions}），这是一种特殊的字符串。  还有专门的函数用于读取命令、变量、文件名等@: (@pxref{Completion})。
+
+在大多数情况下，您不应在 Lisp 函数中间调用迷你缓冲区输入函数。  相反，在 @code{interactive} 规范中，将所有迷你缓冲区输入作为读取命令参数的一部分。  @xref{Defining Commands}。
+
+@defun read-from-minibuffer prompt &optional initial keymap read history default inherit-input-method
+此函数是从迷你缓冲区获取输入的最通用方法。  默认情况下，它接受任意文本并将其作为字符串返回；但是，如果 @var{read} 不是 @code{nil}，则它使用 @code{read} 将文本转换为 Lisp 对象 (@pxref{Input Functions})。
+
+该函数所做的第一件事是激活一个迷你缓冲区并以 @var{prompt} （必须是字符串）作为提示符显示它。  然后用户可以编辑迷你缓冲区中的文本。
+
+当用户键入退出迷你缓冲区的命令时，@code{read-from-minibuffer} 从迷你缓冲区中的文本构造返回值。  通常它返回一个包含该文本的字符串。但是，如果 1⁣ 不是 2⁣，则 3⁣ 读取文本并返回结果 Lisp 对象（未求值）。 （@xref{Input Functions}，有关阅读的信息。）
+
+@cindex future history in minibuffer input
+参数 @var{default} 指定可通过历史命令使用的默认值。  它应该是一个字符串、字符串列表或@code{nil}。  一个或多个字符串成为迷你缓冲区的“未来历史”，可供用户使用@kbd{M-n}使用。  此外，如果调用提供补全（例如，通过 @var{keymap} 参数），则当 @var{default} 中的值被 @kbd{M-n} 耗尽时，补全候选将被添加到“未来历史记录”中；见@ref{Minibuffer History,, minibuffer-default-add-function}。
+
+如果 @var{read} 是非 @code{nil}，则当用户输入空输入时，@var{default} 也用作 @code{read} 的输入。如果 @var{default} 是字符串列表，则第一个字符串用作输入。如果@var{default}是@code{nil}，空输入会导致@code{end-of-file}错误。然而，在通常情况下（其中@var{read}为@code{nil}），当用户输入空输入并返回空字符串@code{""}时，@code{read-from-minibuffer}会忽略@var{default}。  在这方面，它与本章中的所有其他迷你缓冲区输入函数不同。
+
+如果@var{keymap}非@code{nil}，则该键盘映射是在迷你缓冲区中使用的本地键盘映射。  如果省略 @var{keymap} 或 @code{nil}，则 @code{minibuffer-local-map} 的值将用作键盘映射。  指定键盘映射是为各种应用程序（例如补全）自定义迷你缓冲区的最重要方法。
+
+参数 @var{history} 指定一个历史列表变量，用于保存输入和迷你缓冲区中使用的历史命令。默认为@code{minibuffer-history}。  如果@var{history}是符号@code{t}，则不记录历史。  您也可以选择指定历史列表中的起始位置。  @xref{Minibuffer History}。
+
+如果变量 @code{minibuffer-allow-text-properties} 是非 @code{nil}，无论是迷你缓冲区中的 let 绑定还是缓冲区本地，则返回的字符串包括迷你缓冲区中存在的任何文本属性。  否则，当返回值时，所有文本属性都将被删除。  （默认情况下，该变量为 @code{nil}。）
+
+@vindex minibuffer-prompt-properties
+@code{minibuffer-prompt-properties} 中的文本属性应用于提示。  默认情况下，此属性列表定义用于提示的面。  该面（如果存在）将应用到面列表的末尾并在显示之前合并。
+
+如果用户想要完全控制提示的外观，最方便的方法是在所有面孔列表的末尾指定 @code{default} 面孔。  例如：
+
+@lisp
+(read-from-minibuffer
+ (concat
+  (propertize "Bold" 'face '(bold default))
+  (propertize " and normal: " 'face '(default))))
+@end lisp
+
+如果参数 @var{inherit-input-method} 为非 @code{nil}，则迷你缓冲区将从进入迷你缓冲区之前的当前缓冲区继承当前输入法 (@pxref{Input Methods}) 和 @code{enable-multibyte-characters} (@pxref{Text Representations}) 的设置。
+
+@var{initial} 的使用大多已被弃用；我们建议仅将非 @code{nil} 值与指定 @var{history} 的 cons 单元格结合使用。  @xref{Initial Input}。
+@end defun
+
+@defun read-string prompt &optional initial history default inherit-input-method
+该函数从迷你缓冲区读取一个字符串并返回它。  参数@var{prompt}、@var{initial}、@var{history} 和@var{inherit-input-method} 的使用方式与@code{read-from-minibuffer} 中相同。使用的键盘映射是@code{minibuffer-local-map}。
+
+可选参数 @var{default} 的使用方式与 @code{read-from-minibuffer} 相同，不同之处在于，如果非 @code{nil}，它还指定在用户输入空输入时返回的默认值。  如 @code{read-from-minibuffer} 所示，它应该是一个字符串、字符串列表，或者 @code{nil}，它相当于一个空字符串。  当@var{default}是字符串时，该字符串是默认值。  当它是字符串列表时，第一个字符串是默认值。  （所有这些字符串都可以在“未来的迷你缓冲区历史记录”中提供给用户。）
+
+该函数通过调用 @code{read-from-minibuffer} 函数来工作：
+
+@smallexample
+@group
+(read-string @var{prompt} @var{initial} @var{history} @var{default} @var{inherit})
+@equiv{}
+(let ((value
+       (read-from-minibuffer @var{prompt} @var{initial} nil nil
+                             @var{history} @var{default} @var{inherit})))
+  (if (and (equal value "") @var{default})
+      (if (consp @var{default}) (car @var{default}) @var{default})
+    value))
+@end group
+@end smallexample
+
+@findex read-string-from-buffer
+如果您想要编辑一个很长的字符串（例如，有几行长的字符串），那么使用 @code{read-string} 可能并不理想。  在这种情况下，弹出到一个新的普通缓冲区，用户可以在其中编辑字符串可能会更方便，您可以使用 @code{read-string-from-buffer} 函数来执行此操作。
+@end defun
+
+@defun read-regexp prompt &optional defaults history
+该函数从迷你缓冲区中读取正则表达式作为字符串并将其返回。  如果迷你缓冲区提示字符串 @var{prompt} 不以 @samp{:} 结尾（后跟可选空格），则该函数会将 @samp{: } 添加到末尾，前面是默认返回值（见下文）（如果该值非空）。
+
+可选参数 @var{defaults} 控制用户输入空输入时返回的默认值，并且应该是以下之一： 字符串； @code{nil}，相当于空字符串；字符串列表；或一个符号。
+
+如果@var{defaults}是一个符号，@code{read-regexp}参考变量@code{read-regexp-defaults-function}的值（见下文），如果它是非@code{nil}，则优先使用它而不是@var{defaults}。这种情况下的值应该是：
+
+@itemize @minus
+@item 
+@code{regexp-history-last}，这意味着使用适当的迷你缓冲区历史列表的第一个元素（见下文）。
+
+@item 
+一个无参数的函数，其返回值（应该是@code{nil}、字符串或字符串列表）成为@var{defaults}的值。
+@end itemize
+
+@code{read-regexp} 现在确保处理 @var{defaults} 的结果是一个列表（即，如果值为 @code{nil} 或字符串，它将其转换为一个元素的列表）。  然后，@code{read-regexp} 在此列表中附加一些可能有用的输入候选。  这些都是：
+
+@itemize @minus
+@item 
+点上的单词或符号。
+@item 
+增量搜索中使用的最后一个正则表达式。
+@item 
+增量搜索中使用的最后一个字符串。
+@item 
+查询替换命令中使用的最后一个字符串或模式。
+@end itemize
+
+该函数现在有一个正则表达式列表，它传递给 @code{read-from-minibuffer} 来获取用户的输入。  列表的第一个元素是空输入情况下的默认结果。  列表中的所有元素都可以作为“未来迷你缓冲区历史记录”列表 (@pxref{Minibuffer History, future list,, emacs, The GNU Emacs Manual}) 提供给用户。
+
+可选参数 @var{history}，如果非 @code{nil}，是指定要使用的迷你缓冲区历史列表的符号 (@pxref{Minibuffer History})。  如果省略或@code{nil}，则历史列表默认为@code{regexp-history}。
+
+@cindex @code{case-fold}, text property
+@findex read-regexp-case-fold-search
+用户可以使用 @kbd{M-s c} 命令来指示是否应打开或关闭大小写折叠。  如果用户使用了此命令，则返回的字符串会将文本属性 @code{case-fold} 设置为 @code{fold} 或 @code{inhibit-fold}。  由@code{read-regexp}的调用者实际使用这个值，并且为此提供了便利的函数@code{read-regexp-case-fold-search}。  这里的典型使用模式可能如下所示：
+
+@lisp
+(let* ((regexp (read-regexp "Search for: "))
+       (case-fold-search (read-regexp-case-fold-search regexp)))
+  (re-search-forward regexp))
+@end lisp
+@end defun
+
+@defopt read-regexp-defaults-function
+函数@code{read-regexp}可以使用该变量的值来确定其默认正则表达式列表。  如果非@code{nil}，则该变量的值应为：
+
+@itemize @minus
+@item 
+符号@code{regexp-history-last}。
+
+@item 
+一个无参数的函数，返回 @code{nil}、字符串或字符串列表。
+@end itemize
+
+@noindent
+有关如何使用这些值的详细信息，请参阅上面的@code{read-regexp}。
+@end defopt
+
+@defvar minibuffer-allow-text-properties
+如果此变量为默认值 @code{nil}，则 @code{read-from-minibuffer} 和所有执行迷你缓冲区输入的函数在返回之前会从迷你缓冲区输入中删除所有文本属性。
+
+但是，@code{read-minibuffer} 和相关函数 (@pxref{Object from Minibuffer,, Reading Lisp Objects With the Minibuffer}) 无条件删除文本属性，无论此变量的值如何。
+
+如果此变量不是 @code{nil}，无论是迷你缓冲区中的 let 绑定还是缓冲区本地变量，则 @code{read-from-minibuffer}、@code{read-string} 和所有相关函数都会保留文本属性。  但是完成迷你缓冲区输入的函数会删除 @code{face} 属性，同时保留其他文本属性。
+
+@lisp
+(minibuffer-with-setup-hook
+    (lambda ()
+      (setq-local minibuffer-allow-text-properties t))
+  (completing-read
+   "String: " (list (propertize "foobar" 'face 'baz 'data 'zot))))
+=> #("foobar" 0 6 (data zot))
+@end lisp
+
+在此示例中，用户键入 @samp{foo}，然后按 @kbd{TAB} 键，则保留除 @code{face} 属性之外的所有文本属性。
+@end defvar
+
+@vindex minibuffer-mode-map
+@defvar minibuffer-local-map
+这
+@anchor{Definition of minibuffer-local-map}
+@c avoid page break at anchor; work around Texinfo deficiency
+是从迷你缓冲区读取的默认本地键盘映射。  默认情况下，它进行以下绑定：
+
+@table @asis
+@item @kbd{C-j}
+@code{exit-minibuffer}
+
+@item @key{RET}
+@code{exit-minibuffer}
+
+@item @kbd{M-<}
+@code{minibuffer-beginning-of-buffer}
+
+@item @kbd{C-g}
+@code{abort-recursive-edit}
+
+@item @kbd{M-n}
+@itemx @key{DOWN}
+@code{next-history-element}
+
+@item @kbd{M-p}
+@itemx @key{UP}
+@code{previous-history-element}
+
+@item @kbd{M-s}
+@code{next-matching-history-element}
+
+@item @kbd{M-r}
+@code{previous-matching-history-element}
+
+@ignore
+@c Does not seem worth/appropriate mentioning.
+@item @kbd{C-@key{TAB}}
+@code{file-cache-minibuffer-complete}
+@end ignore
+@end table
+
+@noindent
+变量 @code{minibuffer-mode-map} 是该变量的别名。
+@end defvar
+
+@defun read-no-blanks-input prompt &optional initial inherit-input-method
+此函数从迷你缓冲区读取字符串，但不允许空格字符作为输入的一部分：相反，这些字符终止输入。  参数 @var{prompt}、@var{initial} 和 @var{inherit-input-method} 的使用方式与 @code{read-from-minibuffer} 中相同。
+
+这是 @code{read-from-minibuffer} 函数的简化接口，并将 @code{minibuffer-local-ns-map} 键映射的值作为该函数的 @var{keymap} 参数传递。  由于键映射 @code{minibuffer-local-ns-map} 不会重新绑定 @kbd{C-q}，因此 @emph{is} 可以通过引用它来将空格放入字符串中。
+@end defun
+
+@c Slightly unfortunate name, suggesting it might be related to the
+@c Nextstep port...
+@defvar minibuffer-local-ns-map
+这个内置变量是在函数 @code{read-no-blanks-input} 中用作迷你缓冲区本地键盘映射的键盘映射。  默认情况下，除了 @code{minibuffer-local-map} 的绑定之外，它还进行以下绑定：
+
+@table @asis
+@item @key{SPC}
+@cindex @key{SPC} in minibuffer
+@code{exit-minibuffer}
+
+@item @key{TAB}
+@cindex @key{TAB} in minibuffer
+@code{exit-minibuffer}
+
+@item @kbd{?}
+@cindex @kbd{?} in minibuffer
+@code{self-insert-and-exit}
+@end table
+@end defvar
+
+@vindex minibuffer-default-prompt-format
+@defun format-prompt prompt default &rest format-args
+根据 @code{minibuffer-default-prompt-format} 变量将 @var{prompt} 格式化为默认值 @var{default}。
+
+@code{minibuffer-default-prompt-format} 是一个格式字符串（默认为@samp{" (default %s)"}，表示如何格式化@samp{"Local filename (default somefile): "} 等提示中的“默认”位。
+
+为了允许用户自定义其显示方式，提示用户输入值（并具有默认值）的代码应该类似于以下代码片段：
+
+@lisp
+(read-file-name
+ (format-prompt "Local filename" file)
+ nil file)
+@end lisp
+
+如果 @var{format-args} 是 @code{nil}，则 @var{prompt} 用作文字字符串。  如果@var{format-args}非-@code{nil}，@var{prompt}用作格式控制字符串，@var{prompt}和@var{format-args}传递给@code{format}（@pxref{Formatting Strings}）。
+
+@code{minibuffer-default-prompt-format} 可以是 @samp{""}，在这种情况下不显示默认值。
+
+如果@var{default}是@code{nil}，则没有默认值，因此结果值中不包含“default value”字符串。如果 @var{default} 是非 @code{nil} 列表，则在提示中使用列表的第一个元素。
+
+@var{prompt} 和@code{minibuffer-default-prompt-format} 都经过@code{substitute-command-keys} (@pxref{Keys in Documentation})。
+@end defun
+
+@defvar read-minibuffer-restore-windows
+如果此选项为非@code{nil}（默认值），则从迷你缓冲区获取输入将在退出时恢复输入迷你缓冲区的帧的窗口配置，如果不同，则恢复拥有迷你缓冲区窗口的帧。  这意味着，例如，如果用户在同一帧上从迷你缓冲区获取输入时分割窗口，则退出迷你缓冲区时该分割将被撤消。
+
+如果此选项为@code{nil}，则不会进行此类恢复。  因此，退出迷你缓冲区后，上述窗口分割将持续存在。
+@end defvar
+
+@node Object from Minibuffer
+@section 使用 Minibuffer 读取 Lisp 对象
+@cindex minibuffer input, reading lisp objects
+
+本节描述使用迷你缓冲区读取 Lisp 对象的函数。
+
+@defun read-minibuffer prompt &optional initial
+该函数使用迷你缓冲区读取 Lisp 对象，然后返回它而不对其进行评估。  参数 @var{prompt} 和 @var{initial} 的使用方式与 @code{read-from-minibuffer} 中相同。
+
+这是 @code{read-from-minibuffer} 函数的简化接口：
+
+@smallexample
+@group
+(read-minibuffer @var{prompt} @var{initial})
+@equiv{}
+(let (minibuffer-allow-text-properties)
+  (read-from-minibuffer @var{prompt} @var{initial} nil t))
+@end group
+@end smallexample
+
+这是一个示例，其中我们提供字符串 @code{"(testing)"} 作为初始输入：
+
+@smallexample
+@group
+(read-minibuffer
+ "Enter an expression: " (format "%s" '(testing)))
+
+;; @r{Here is how the minibuffer is displayed:}
+@end group
+
+@group
+---------- Buffer: Minibuffer ----------
+Enter an expression: (testing)@point{}
+---------- Buffer: Minibuffer ----------
+@end group
+@end smallexample
+
+@noindent
+用户可以立即键入 @key{RET} 以使用初始输入作为默认值，或者可以编辑输入。
+@end defun
+
+@defun eval-minibuffer prompt &optional initial
+该函数使用迷你缓冲区读取 Lisp 表达式，对其求值，然后返回结果。  参数 @var{prompt} 和 @var{initial} 的使用方式与 @code{read-from-minibuffer} 中相同。
+
+该函数只是评估调用 @code{read-minibuffer} 的结果：
+
+@smallexample
+@group
+(eval-minibuffer @var{prompt} @var{initial})
+@equiv{}
+(eval (read-minibuffer @var{prompt} @var{initial}))
+@end group
+@end smallexample
+@end defun
+
+@defun edit-and-eval-command prompt form
+该函数读取迷你缓冲区中的 Lisp 表达式，对其求值，然后返回结果。  该命令与 @code{eval-minibuffer} 之间的区别在于，这里初始的 @var{form} 不是可选的，它被视为要转换为打印表示的 Lisp 对象，而不是文本字符串。  它打印有@code{prin1}，所以如果它是一个字符串，双引号字符（@samp{"}）会出现在初始文本中。  @xref{Output Functions}。
+
+在下面的示例中，我们为用户提供一个初始文本的表达式，该文本已经是有效的形式：
+
+@smallexample
+@group
+(edit-and-eval-command "Please edit: " '(forward-word 1))
+
+;; @r{After evaluation of the preceding expression,}
+;;   @r{the following appears in the minibuffer:}
+@end group
+
+@group
+---------- Buffer: Minibuffer ----------
+Please edit: (forward-word 1)@point{}
+---------- Buffer: Minibuffer ----------
+@end group
+@end smallexample
+
+@noindent
+立即输入 @key{RET} 将退出迷你缓冲区并计算表达式，从而将点向前移动一个单词。
+@end defun
+
+@node Minibuffer History
+@section 迷你缓冲区历史
+@cindex minibuffer history
+@cindex history list
+
+A @dfn{minibuffer history list} 记录以前的迷你缓冲区输入，以便用户可以方便地重复使用它们。  它是一个变量，其值是字符串列表（以前的输入），最新的在前。
+
+有许多单独的迷你缓冲区历史列表，用于不同类型的输入。  Lisp 程序员的工作是为每次使用迷你缓冲区指定正确的历史列表。
+
+您可以使用 @code{read-from-minibuffer} 或 @code{completing-read} 的可选 @var{history} 参数指定迷你缓冲区历史列表。以下是它的可能值：
+
+@table @asis
+@item @var{variable}
+使用@var{variable}（符号）作为历史列表。
+
+@item (@var{variable} . @var{startpos})
+使用@var{variable}（符号）作为历史列表，并假设初始历史位置为@var{startpos}（非负整数）。
+
+为 @var{startpos} 指定 0 相当于仅指定符号 @var{variable}。  @code{previous-history-element} 将显示迷你缓冲区中历史列表的最新元素。  如果指定正值 @var{startpos}，则迷你缓冲区历史函数的行为就像 @code{(elt @var{variable} (1- @var{startpos}))} 是当前在迷你缓冲区中显示的历史元素一样。
+
+为了保持一致性，您还应该使用迷你缓冲区输入函数 (@pxref{Initial Input}) 的 @var{initial} 参数指定历史记录的元素作为初始迷你缓冲区内容。
+@end table
+
+如果您不指定 @var{history}，则使用默认历史列表 @code{minibuffer-history}。  对于其他标准历史列表，请参见下文。  您还可以创建自己的历史列表变量；只需在第一次使用之前将其初始化为 @code{nil} 即可。  如果变量是缓冲区本地的，则每个缓冲区将有自己的输入历史列表。
+
+@code{read-from-minibuffer} 和 @code{completing-read} 都会自动将新元素添加到历史列表中，并提供命令以允许用户重用列表中的项目 (@pxref{Minibuffer Commands})。  要使用历史列表，程序唯一需要做的就是初始化它并在需要时将其名称传递给输入函数。  但是，当迷你缓冲区输入函数不使用列表时，手动修改列表是安全的。
+
+@vindex minibuffer-default-add-function
+默认情况下，当@kbd{M-n}（@code{next-history-element}，@pxref{Minibuffer Commands,,next-history-element}）到达启动从迷你缓冲区读取输入的命令提供的默认值列表的末尾时，@kbd{M-n}会将@code{minibuffer-completion-table}（@pxref{Completion Commands}）指定的所有完成候选添加到默认值列表中，以便所有这些候选都可用作“未来历史记录”。  您的程序可以通过变量 @code{minibuffer-default-add-function} 进行控制：如果它的值不是函数，则禁用此自动添加，并且您还可以将此变量设置为您自己的函数，该函数仅将一些候选值或一些其他值添加到“未来历史记录”中。
+
+@cindex @code{history-length} (symbol property)
+如果列表太长，向历史列表添加新元素的 Emacs 函数也可以删除旧元素。  变量 @code{history-length} 指定大多数历史列表的最大长度。  要为特定历史列表指定不同的最大长度，请将长度放入历史列表符号的 @code{history-length} 属性中。  变量@code{history-delete-duplicates}指定是否删除历史记录中的重复项。
+
+@defun add-to-history history-var newelt &optional maxelt keep-all
+该函数将一个新元素 @var{newelt} （如果它不是空字符串）添加到存储在变量 @var{history-var} 中的历史列表中，并返回更新后的历史列表。  它将列表长度限制为@var{maxelt}（如果非@code{nil}）或@code{history-length}（如下所述）的值。  @var{maxelt} 的可能值与 @code{history-length} 的值具有相同的含义。 @var{history-var} 不能引用词法变量。
+
+通常，如果@code{history-delete-duplicates}非@code{nil}，则@code{add-to-history}会从历史列表中删除重复的成员。但是，如果 @var{keep-all} 不是 @code{nil}，则表示不删除重复项，并将 @var{newelt} 添加到列表中，即使它为空。
+@end defun
+
+@defvar history-add-new-input
+如果此变量的值为@code{nil}，则从迷你缓冲区读取的标准函数不会将新元素添加到历史列表中。这使得 Lisp 程序可以使用 @code{add-to-history} 显式管理输入历史记录。  默认值为@code{t}。
+@end defvar
+
+@defopt history-length
+此变量的值指定所有未指定其自身最大长度的历史列表的最大长度。  如果值为@code{t}，则表示没有最大值（不删除旧元素）。  如果历史列表变量的符号具有非 @code{nil} @code{history-length} 属性，它将覆盖该特定历史列表的该变量。
+@end defopt
+
+@defopt history-delete-duplicates
+如果这个变量的值为@code{t}，这意味着当添加一个新的历史元素时，所有之前相同的元素都会被删除。
+@end defopt
+
+以下是一些标准迷你缓冲区历史列表变量：
+
+@defvar minibuffer-history
+迷你缓冲区历史输入的默认历史列表。
+@end defvar
+
+@defvar query-replace-history
+@code{query-replace} 参数的历史列表（以及其他命令的类似参数）。
+@end defvar
+
+@defvar file-name-history
+文件名参数的历史列表。
+@end defvar
+
+@defvar buffer-name-history
+缓冲区名称参数的历史列表。
+@end defvar
+
+@defvar regexp-history
+正则表达式参数的历史列表。
+@end defvar
+
+@defvar extended-command-history
+作为扩展命令名称的参数的历史列表。
+@end defvar
+
+@defvar shell-command-history
+shell 命令参数的历史列表。
+@end defvar
+
+@defvar read-expression-history
+作为要计算的 Lisp 表达式的参数的历史列表。
+@end defvar
+
+@defvar face-name-history
+面孔参数的历史列表。
+@end defvar
+
+@findex read-variable@r{, history list}
+@defvar custom-variable-history
+由@code{read-variable}读取的变量名参数的历史列表。
+@end defvar
+
+@defvar read-number-history
+@code{read-number} 读取的号码的历史列表。
+@end defvar
+
+@defvar goto-line-history
+@code{goto-line} 参数的历史列表。  通过自定义用户选项@code{goto-line-history-local}，可以将该变量设置为每个缓冲区中的本地变量。
+@end defvar
+
+@c Less common: coding-system-history, input-method-history,
+@c command-history, grep-history, grep-find-history,
+@c read-envvar-name-history, setenv-history, yes-or-no-p-history.
+
+@node Initial Input
+@section 初始输入
+
+用于迷你缓冲区输入的几个函数都有一个名为 @var{initial} 的参数。  这是一个大多数已弃用的功能，用于指定迷你缓冲区应以某些文本开始，而不是像往常一样为空。
+
+如果 0⁣ 是字符串，则当用户开始编辑文本时，迷你缓冲区开始包含字符串的文本，末尾带有点。  如果用户只需键入 @key{RET} 即可退出迷你缓冲区，它将使用初始输入字符串来确定要返回的值。
+
+@strong{We discourage use of a non-@code{nil} value for @var{initial}}，因为初始输入是侵入式界面。历史列表和默认值提供了一种更方便的方法来向用户提供有用的默认输入。
+
+只有一种情况您应该为 @var{initial} 参数指定一个字符串。  这是当您为 @var{history} 参数指定 cons 单元时。  @xref{Minibuffer History}。
+
+@var{initial} 也可以是 @code{(@var{string} . @var{position})} 形式的 cons 单元。  这意味着将 @var{string} 插入到迷你缓冲区中，但将指针放在字符串文本中的 @var{position} 处。
+
+作为一个历史意外，@var{position}在不同的函数中实现不一致。  在@code{completing-read}中，@var{position}的值被解释为原点零；也就是说，值 0 表示字符串的开头，1 表示第一个字符之后，等等。在 @code{read-minibuffer} 和其他支持此参数的非完成迷你缓冲区输入函数中，1 表示字符串的开头，2 表示第一个字符之后，等等。
+
+不推荐使用 cons 单元格作为 @var{initial} 参数的值。
+
+@node Completion
+@section 完成
+@cindex completion
+
+@dfn{Completion} 是一个从缩写开始填充名称其余部分的功能。  完成功能的工作原理是将用户的输入与有效名称列表进行比较，并确定有多少名称是由用户键入的内容唯一确定的。  例如，当您输入 @kbd{C-x b} (@code{switch-to-buffer}) 然后
+@c "This is the sort of English up with which I will not put."
+输入要切换到的缓冲区名称的前几个字母，然后输入 @key{TAB} (@code{minibuffer-complete})，Emacs 会尽可能扩展名称。
+
+标准 Emacs 命令提供符号、文件、缓冲区和进程名称的补全；使用本节中的函数，您可以实现其他类型名称的补全。
+
+@code{try-completion} 函数是完成的基本原语：它返回给定初始字符串的最长确定的完成，以及要匹配的给定字符串集。
+
+函数@code{completing-read}提供了一个更高级别的接口来完成。  对 @code{completing-read} 的调用指定如何确定有效名称列表。  然后，该函数使用本地键盘映射激活迷你缓冲区，该键盘映射将一些键绑定到有助于完成的命令。  其他函数提供了方便简单的接口来完成读取某些类型的名称。
+
+@menu
+* Basic Completion::        用于完成字符串的低级函数。
+* Minibuffer Completion::   调用迷你缓冲区并完成。
+* Completion Commands::     执行完成操作的迷你缓冲区命令。
+* High-Level Completion::   方便的特殊情况完成（读取缓冲区名称、变量名称等）。
+* Reading File Names::      使用补全来读取文件名和 shell 命令。
+* Completion Variables::    控制完成行为的变量。
+* Programmed Completion::   编写自己的补全函数。
+* Completion in Buffers::   完成普通缓冲区中的文本。
+@end menu
+
+@node Basic Completion
+@subsection 基本完成功能
+
+以下完成函数本身与迷你缓冲区无关。  我们在这里描述它们是为了让它们接近使用迷你缓冲区的更高级别的完成功能。
+
+@defun try-completion string collection &optional predicate
+该函数返回 @var{collection} 中 @var{string} 的所有可能补全的最长公共子串。
+
+@cindex completion table
+@var{collection}称为@dfn{completion table}。  它的值必须是字符串或 cons 单元的列表、obarray、哈希表或完成函数。
+
+@code{try-completion} 将 @var{string} 与完成表指定的每个允许的完成进行比较。  如果没有允许的完成匹配，则返回@code{nil}。  如果只有一个匹配完成，并且匹配准确，则返回@code{t}。  否则，它返回所有可能的匹配完成所共有的最长初始序列。
+
+如果 @var{collection} 是一个列表，则允许的补全由列表的元素指定，每个元素都应该是一个字符串，或者是一个 cons 单元，其 @sc{car} 是字符串或符号（使用 @code{symbol-name} 将符号转换为字符串）。  如果列表包含任何其他类型的元素，则这些元素将被忽略。
+
+@cindex obarray in completion
+如果 @var{collection} 是一个 obarray (@pxref{Creating Symbols})，则 obarray 中所有符号的名称构成允许的补全集。
+
+如果@var{collection}是一个哈希表，那么字符串或符号的键就是可能的补全。  其他键将被忽略。
+
+您还可以使用函数作为 @var{collection}。  然后该函数独自负责执行完成； @code{try-completion} 返回此函数返回的任何内容。  该函数使用三个参数调用：@var{string}、@var{predicate} 和 @code{nil}（第三个参数是为了在 @code{all-completions} 中使用相同的函数，并在任一情况下执行适当的操作）。  @xref{Programmed Completion}。
+
+如果参数@var{predicate}是非@code{nil}，那么它必须是一个参数的函数，除非@var{collection}是一个哈希表，在这种情况下它应该是两个参数的函数。  它用于测试每个可能的匹配，并且仅当@var{predicate}返回非@code{nil}时才接受匹配。  赋予 @var{predicate} 的参数可以是来自 alist 的字符串或 cons 单元格（其中 @sc{car} 是字符串），或者是来自 obarray 的符号（@emph{not} 符号名称）。  如果 @var{collection} 是哈希表，则使用两个参数调用 @var{predicate}：字符串键和关联值。
+
+此外，为了可以接受，完成还必须匹配 @code{completion-regexp-list} 中的所有正则表达式。  （除非 1⁣ 是一个函数，在这种情况下，该函数必须处理 2⁣ 本身。）
+
+在以下第一个示例中，字符串 @samp{foo} 与三个列表 @sc{car} 匹配。  所有匹配都以字符 @samp{fooba} 开头，所以这就是结果。  在第二个示例中，只有一个可能的匹配，并且是精确的，因此返回值为@code{t}。
+
+@smallexample
+@group
+(try-completion
+ "foo"
+ '(("foobar1" 1) ("barfoo" 2) ("foobaz" 3) ("foobar2" 4)))
+     @result{} "fooba"
+@end group
+
+@group
+(try-completion "foo" '(("barfoo" 2) ("foo" 3)))
+     @result{} t
+@end group
+@end smallexample
+
+在以下示例中，许多符号都以字符 @samp{forw} 开头，并且所有符号都以单词 @samp{forward} 开头。  在大多数符号中，后面都会跟有 @samp{-}，但并非全部，因此最多只能完成 @samp{forward}。
+
+@smallexample
+@group
+(try-completion "forw" obarray)
+     @result{} "forward"
+@end group
+@end smallexample
+
+最后，在下面的示例中，三个可能的匹配中只有两个通过谓词 @code{test}（字符串 @samp{foobaz} 太短）。  两者都以字符串 @samp{foobar} 开头。
+
+@smallexample
+@group
+(defun test (s)
+  (> (length (car s)) 6))
+     @result{} test
+@end group
+@group
+(try-completion
+ "foo"
+ '(("foobar1" 1) ("barfoo" 2) ("foobaz" 3) ("foobar2" 4))
+ 'test)
+     @result{} "foobar"
+@end group
+@end smallexample
+@end defun
+
+@defun all-completions string collection &optional predicate
+该函数返回 @var{string} 所有可能完成的列表。  该函数的参数与@code{try-completion}的参数相同，并且它使用@code{completion-regexp-list}的方式与@code{try-completion}相同。
+
+如果@var{collection}是一个函数，则使用三个参数调用它：@var{string}、@var{predicate}和@code{t}；那么 @code{all-completions} 返回函数返回的内容。  @xref{Programmed Completion}。
+
+下面是一个示例，使用 @code{try-completion} 示例中所示的函数 @code{test}：
+
+@smallexample
+@group
+(defun test (s)
+  (> (length (car s)) 6))
+     @result{} test
+@end group
+
+@group
+(all-completions
+ "foo"
+ '(("foobar1" 1) ("barfoo" 2) ("foobaz" 3) ("foobar2" 4))
+ 'test)
+     @result{} ("foobar1" "foobar2")
+@end group
+@end smallexample
+@end defun
+
+@defun test-completion string collection &optional predicate
+@anchor{Definition of test-completion}
+如果@var{string}是@var{collection}和@var{predicate}指定的有效完成替代，则该函数返回非@code{nil}。  参数与@code{try-completion}中相同。  例如，如果@var{collection}是字符串列表，则如果@var{string}出现在列表中并且满足@var{predicate}则为真。
+
+该函数使用 @code{completion-regexp-list} 的方式与 @code{try-completion} 相同。
+
+如果 @var{predicate} 是非 @code{nil} 并且 @var{collection} 包含多个彼此相等的字符串（由 @code{compare-strings} 根据 @code{completion-ignore-case} 确定），则 @var{predicate} 应该接受全部或不接受其中任何一个。否则，@code{test-completion}的返回值本质上是不可预测的。
+
+如果 @var{collection} 是一个函数，则使用三个参数调用它，即值 @var{string}、@var{predicate} 和 @code{lambda}；无论它返回什么，@code{test-completion}都会依次返回。
+@end defun
+
+@defun completion-boundaries string collection predicate suffix
+该函数返回 @var{collection} 将操作的字段的边界，假设 @var{string} 保存点之前的文本，@var{suffix} 保存点之后的文本。
+
+通常完成操作对整个字符串进行操作，因此对于所有普通集合，这将始终返回 @code{(0 . (length @var{suffix}))}。  但更复杂的完成（例如文件的完成）一次完成一个字段。  例如，即使@code{"/usr/share/doc"}存在，@code{"/usr/sh"}的完成将包括@code{"/usr/share/"}但不包括@code{"/usr/share/doc"}。另外，@code{"/usr/sh"}上的@code{all-completions}将不包括@code{"/usr/share/"}，而仅包括@code{"share/"}。  因此，如果@var{string}是@code{"/usr/sh"}并且@var{suffix}是@code{"e/doc"}，@code{completion-boundaries}将返回@w{@code{(5 . 1)}}，这告诉我们@var{collection}只会返回属于@code{"/usr/"}之后和@code{"/doc"}之前区域的完成信息。 @code{try-completion} 不受非平凡边界的影响；例如，@code{"/usr/sh"}上的@code{try-completion}可能仍返回@code{"/usr/share/"}，而不是@code{"share/"}。
+@end defun
+
+如果将完成列表存储在变量中，则应通过赋予其非 @code{nil} @code{risky-local-variable} 属性来将该变量标记为有风险。  @xref{File Local Variables}。
+
+@defvar completion-ignore-case
+如果该变量的值为非@code{nil}，则 case 在完成时不被认为是重要的。  在@code{read-file-name}内，该变量被@code{read-file-name-completion-ignore-case}（@pxref{Reading File Names}）覆盖；在@code{read-buffer}内，它被@code{read-buffer-completion-ignore-case}（@pxref{High-Level Completion}）覆盖。
+@end defvar
+
+@defvar completion-regexp-list
+这是正则表达式的列表。  补全函数仅在与此列表中的所有正则表达式匹配且 @code{case-fold-search} (@pxref{Searching and Case}) 绑定到 @code{completion-ignore-case} 的值时才认为补全可接受。
+
+不要全局将此变量设置为非@code{nil}值，因为这不安全，并且可能会导致完成命令中的错误。该变量只能在调用基本完成函数时被 let-bound 绑定到非 @code{nil} 值：@code{try-completion}、@code{test-completion} 和 @code{all-completions}。
+@end defvar
+
+@defmac lazy-completion-table var fun
+该宏提供了一种以惰性方式将变量 @var{var} 初始化为集合以完成的方法，直到第一次需要它们时才计算其实际内容。  您可以使用此宏生成一个值，并将其存储在 @var{var} 中。  正确值的实际计算是在第一次使用 @var{var} 完成时完成的。这是通过调用不带参数的 @var{fun} 来完成的。  @var{fun}返回的值成为@var{var}的永久值。
+
+这是一个例子：
+
+@smallexample
+(defvar foo (lazy-completion-table foo make-my-alist))
+@end smallexample
+@end defmac
+
+@c FIXME?  completion-table-with-context?
+@findex completion-table-case-fold
+@findex completion-table-in-turn
+@findex completion-table-merge
+@findex completion-table-subvert
+@findex completion-table-with-quoting
+@findex completion-table-with-predicate
+@findex completion-table-with-terminator
+@cindex completion table, modifying
+@cindex completion tables, combining
+有几个函数可以获取现有的完成表并返回修改后的版本。  @code{completion-table-case-fold} 返回不区分大小写的表。  @code{completion-table-in-turn} 和 @code{completion-table-merge} 以不同的方式组合多个输入表。  @code{completion-table-subvert} 更改表以使用不同的初始前缀。  @code{completion-table-with-quoting} 返回一个适合对引用文本进行操作的表。 @code{completion-table-with-predicate} 使用谓词函数过滤表。  @code{completion-table-with-terminator} 添加终止字符串。
+
+
+@node Minibuffer Completion
+@subsection 完成和迷你缓冲区
+@cindex minibuffer completion
+@cindex reading from minibuffer with completion
+
+本节介绍从迷你缓冲区读取完成的基本接口。
+
+@defun completing-read prompt collection &optional predicate require-match initial history default inherit-input-method
+该函数读取迷你缓冲区中的字符串，通过提供补全来帮助用户。  它使用提示符 @var{prompt} 激活迷你缓冲区，提示符必须是字符串。
+
+实际完成是通过将完成表 @var{collection} 和完成谓词 @var{predicate} 传递给函数 @code{try-completion} (@pxref{Basic Completion}) 来完成的。  这种情况发生在用于完成的本地键盘映射中绑定的某些命令中。  其中一些命令还调用 @code{test-completion}。因此，如果@var{predicate}不是@code{nil}，它应该与@var{collection}和@code{completion-ignore-case}兼容。 @xref{Definition of test-completion}。
+
+@xref{Programmed Completion}，@var{collection}为函数时的详细要求。
+
+可选参数@var{require-match}的值决定用户如何退出迷你缓冲区：
+
+@itemize @bullet
+@item 
+如果@code{nil}，则无论迷你缓冲区中的输入如何，通常的迷你缓冲区退出命令都会起作用。
+
+@item 
+如果@code{t}，通常的迷你缓冲区退出命令将不会退出，除非输入完成到@var{collection}的元素。
+
+@item 
+如果@code{confirm}，用户可以通过任何输入退出，但如果输入不是@var{collection}的元素，则要求确认。
+
+@item 
+如果@code{confirm-after-completion}，用户可以通过任何输入退出，但会被要求确认前面的命令是否是完成命令（即@code{minibuffer-confirm-exit-commands}中的命令之一）并且结果输入不是@var{collection}的元素。  @xref{Completion Commands}。
+
+@item 
+如果是函数，则以输入作为唯一参数来调用它。  如果输入可接受，该函数应返回非 0 值。
+
+@item 
+@var{require-match} 的任何其他值的行为都与 @code{t} 相似，只是退出命令在执行完成时不会退出。
+@end itemize
+
+然而，无论 @var{require-match} 的值如何，始终允许空输入；在这种情况下，@code{completing-read} 返回 @var{default} 的第一个元素（如果它是列表）； @code{""}，如果@var{default}是@code{nil}；或@var{default}。  用户也可以通过历史命令 (@pxref{Minibuffer Commands}) 使用@var{default}中的一个或多个字符串。  此外，当@var{default}中的值被@kbd{M-n}耗尽时，完成候选者将被添加到“未来历史”中；参见@ref{Minibuffer History,, minibuffer-default-add-function}。
+
+如果@var{require-match}是@code{nil}，则函数@code{completing-read}使用@code{minibuffer-local-completion-map}作为键盘映射，如果⁣​​5⁣不是@code{nil}，则使用@code{minibuffer-local-must-match-map}。  @xref{Completion Commands}。
+
+参数 @var{history} 指定使用哪个历史列表变量来保存输入和迷你缓冲区历史命令。  默认为@code{minibuffer-history}。  如果@var{history}是符号@code{t}，则不记录历史。  @xref{Minibuffer History}。
+
+参数 @var{initial} 大部分已被弃用；我们建议仅将非 @code{nil} 值与指定 @var{history} 的 cons 单元格结合使用。  @xref{Initial Input}。  对于默认输入，请使用 @var{default} 代替。
+
+如果参数 @var{inherit-input-method} 为非 @code{nil}，则迷你缓冲区将从进入迷你缓冲区之前的当前缓冲区继承当前输入法 (@pxref{Input Methods}) 和 @code{enable-multibyte-characters} (@pxref{Text Representations}) 的设置。
+
+如果变量 @code{completion-ignore-case} 不是 @code{nil}，则在将输入与可能的匹配进行比较时，完成操作会忽略大小写。  @xref{Basic Completion}。  在这种操作模式下，@var{predicate}也必须忽略大小写，否则你会得到令人惊讶的结果。
+
+这是使用 @code{completing-read} 的示例：
+
+@smallexample
+@group
+(completing-read
+ "Complete a foo: "
+ '(("foobar1" 1) ("barfoo" 2) ("foobaz" 3) ("foobar2" 4))
+ nil t "fo")
+@end group
+
+@group
+;; @r{After evaluation of the preceding expression,}
+;;   @r{the following appears in the minibuffer:}
+
+---------- Buffer: Minibuffer ----------
+Complete a foo: fo@point{}
+---------- Buffer: Minibuffer ----------
+@end group
+@end smallexample
+
+@noindent
+如果用户随后输入 @kbd{@key{DEL} @key{DEL} b @key{RET}}，则 @code{completing-read} 返回 @code{barfoo}。
+
+@code{completing-read} 函数绑定变量以将信息传递给实际完成的命令。它们将在下一节中描述。
+@end defun
+
+@defvar completing-read-function
+该变量的值必须是一个函数，由 @code{completing-read} 调用来实际完成其工作。  它应该接受与@code{completing-read}相同的参数。  这可以绑定到不同的函数以完全覆盖 @code{completing-read} 的正常行为。
+@end defvar
+
+@findex completing-read-multiple
+@vindex crm-separator
+如果您需要提示用户输入多个字符串，例如列表的多个元素或连接的多个参数（例如，用户、主机和端口），您可以使用@code{completing-read-multiple}。  它允许输入由分隔符字符串分隔的多个字符串（默认情况下为制表符和逗号；自定义 @code{crm-separator} 进行更改），并为用户输入的每个单独字符串提供补全功能。  它将读取的字符串作为列表返回。
+
+@node Completion Commands
+@subsection 完成的迷你缓冲区命令
+
+本节介绍迷你缓冲区中用于完成补全操作的键盘映射、命令和用户选项。
+
+@defvar minibuffer-completion-table
+该变量的值是用于完成迷你缓冲区中的完成表 (@pxref{Basic Completion})。  这是缓冲区局部变量，包含 @code{completing-read} 传递给 @code{try-completion} 的内容。  它由迷你缓冲区完成命令（例如 @code{minibuffer-complete}）使用。
+@end defvar
+
+@defvar minibuffer-completion-predicate
+该变量的值是 @code{completing-read} 传递给 @code{try-completion} 的谓词。  其他迷你缓冲区完成函数也使用该变量。
+@end defvar
+
+@defvar minibuffer-completion-confirm
+该变量决定 Emacs 在退出迷你缓冲区之前是否要求确认； @code{completing-read} 设置此变量，函数 @code{minibuffer-complete-and-exit} 在退出前检查该值。  如果值为@code{nil}，则无需确认。  如果该值为@code{confirm}，用户可能会退出并输入无效的完成选项，但 Emacs 会要求确认。  如果值为 @code{confirm-after-completion}，则用户可能会以不是有效补全替代项的输入退出，但如果用户在 @code{minibuffer-confirm-exit-commands} 中的任何补全命令之后提交输入，Emacs 会要求确认。
+@end defvar
+
+@defvar minibuffer-confirm-exit-commands
+该变量保存一个命令列表，如果 @code{completing-read} 的 @var{require-match} 参数为 @code{confirm-after-completion}，则这些命令会导致 Emacs 在退出迷你缓冲区之前要求确认。如果用户在调用此列表中的任何命令后尝试立即退出迷你缓冲区，则请求确认。
+@end defvar
+
+@deffn Command minibuffer-complete-word
+该函数最多用一个字来完成迷你缓冲区的内容。  即使迷你缓冲区内容只有一个完成，@code{minibuffer-complete-word} 也不会在第一个不是单词组成部分的字符之外添加任何字符。  @xref{Syntax Tables}。
+@end deffn
+
+@deffn Command minibuffer-complete
+该函数尽可能补全minibuffer的内容。
+@end deffn
+
+@deffn Command minibuffer-complete-and-exit
+该函数完成迷你缓冲区的内容，如果不需要确认，即如果@code{minibuffer-completion-confirm}是@code{nil}，则退出。  如果需要确认@emph{is}，则通过立即重复此命令来给出——该命令被编程为在连续运行两次时无需确认即可工作。
+@end deffn
+
+@deffn Command minibuffer-completion-help
+该函数创建当前迷你缓冲区内容可能完成的列表。  它的工作原理是使用变量 @code{minibuffer-completion-table} 的值作为 @var{collection} 参数，以及 @code{minibuffer-completion-predicate} 的值作为 @var{predicate} 参数来调用 @code{all-completions}。完成列表以文本形式显示在名为 @file{*Completions*} 的缓冲区中。
+@end deffn
+
+@defun display-completion-list completions
+此函数将 @var{completions} 显示到 @code{standard-output} 中的流（通常是缓冲区）。  （@xref{Read and Print}，有关流的更多信息。）参数 @var{completions} 通常是由 @code{all-completions} 返回的完成列表，但不一定如此。  每个元素可以是一个符号或一个字符串，其中任何一个都可以简单地打印。  它也可以是两个字符串的列表，打印时就好像字符串是连接的一样。  两个字符串中的第一个是实际完成，第二个字符串用作注释。
+
+该函数由@code{minibuffer-completion-help}调用。  一种常见的使用方法是与 @code{with-output-to-temp-buffer} 一起使用，如下所示：
+
+@example
+(with-output-to-temp-buffer "*Completions*"
+  (display-completion-list
+    (all-completions (buffer-string) my-alist)))
+@end example
+@end defun
+
+@defopt completion-auto-help
+如果该变量为非 0 ，则每当由于下一个字符未唯一确定而无法完成任何内容时，完成命令会自动显示可能完成的列表。
+@end defopt
+
+@defvar minibuffer-local-completion-map
+当不需要其中一个补全的精确匹配时，@code{completing-read} 使用该值作为本地键盘映射。  默认情况下，此键映射进行以下绑定：
+
+@table @asis
+@item @kbd{?}
+@code{minibuffer-completion-help}
+
+@item @key{SPC}
+@code{minibuffer-complete-word}
+
+@item @key{TAB}
+@code{minibuffer-complete}
+@end table
+
+@noindent
+并使用 @code{minibuffer-local-map} 作为其父键盘映射 (@pxref{Definition of minibuffer-local-map})。
+@end defvar
+
+@defvar minibuffer-local-must-match-map
+当需要其中一个补全的精确匹配时，@code{completing-read} 使用该值作为本地键盘映射。  因此，没有键绑定到无条件退出迷你缓冲区的命令@code{exit-minibuffer}。  默认情况下，此键映射进行以下绑定：
+
+@table @asis
+@item @kbd{C-j}
+@code{minibuffer-complete-and-exit}
+
+@item @key{RET}
+@code{minibuffer-complete-and-exit}
+@end table
+
+@noindent
+并使用 @code{minibuffer-local-completion-map} 作为其父键盘映射。
+@end defvar
+
+@defvar minibuffer-local-filename-completion-map
+这是一个稀疏的键盘映射，只是解除了@key{SPC}的绑定；因为文件名可以包含空格。  函数 @code{read-file-name} 将此键盘映射与 @code{minibuffer-local-completion-map} 或 @code{minibuffer-local-must-match-map} 组合。
+@end defvar
+
+@defvar minibuffer-beginning-of-buffer-movement
+如果非 @code{nil}，且点位于提示末尾之后，@kbd{M-<} 命令将移动到提示末尾。  如果 point 位于提示末尾或之前，则移至缓冲区的开头。  如果此变量为 @code{nil}，则该命令的行为类似于 @code{beginning-of-buffer}。
+@end defvar
+
+
+@node High-Level Completion
+@subsection 高级完成功能
+
+本节介绍用于完整读取某些类型名称的高级便利函数。
+
+在大多数情况下，您不应在 Lisp 函数中间调用这些函数。  如果可能，请在 @code{interactive} 规范中将所有迷你缓冲区输入作为读取命令参数的一部分。  @xref{Defining Commands}。
+
+@defun read-buffer prompt &optional default require-match predicate
+该函数读取缓冲区的名称并将其作为字符串返回。它以@var{prompt}提示。  参数 @var{default} 是要使用的默认名称，如果用户以空的迷你缓冲区退出，则返回该值。  如果非 2⁣，它应该是一个字符串、字符串列表或缓冲区。  如果是列表，则默认值为该列表的第一个元素。  它在提示中提到，但没有作为初始输入插入到迷你缓冲区中。
+
+参数 @var{prompt} 应该是一个以冒号和空格结尾的字符串。  如果@var{default}不是@code{nil}，该函数会将其插入到冒号之前的@var{prompt}中，以遵循使用默认值（@pxref{Programming Tips}）从迷你缓冲区读取的约定。
+
+可选参数 @var{require-match} 与 @code{completing-read} 具有相同的含义。  @xref{Minibuffer Completion}。
+
+可选参数@var{predicate}，如果非@code{nil}，指定一个函数来过滤应考虑的缓冲区：该函数将以每个潜在候选者作为其参数来调用，并且应返回@code{nil}以拒绝候选者，非@code{nil}以接受它。
+
+在以下示例中，用户输入 @samp{minibuffer.t}，然后键入 @key{RET}。  参数@var{require-match}是@code{t}，唯一以给定输入开头的缓冲区名称是@samp{minibuffer.texi}，因此名称就是值。
+
+@example
+(read-buffer "Buffer name: " "foo" t)
+@group
+;; @r{After evaluation of the preceding expression,}
+;;   @r{the following prompt appears,}
+;;   @r{with an empty minibuffer:}
+@end group
+
+@group
+---------- Buffer: Minibuffer ----------
+Buffer name (default foo): @point{}
+---------- Buffer: Minibuffer ----------
+@end group
+
+@group
+;; @r{The user types @kbd{minibuffer.t @key{RET}}.}
+     @result{} "minibuffer.texi"
+@end group
+@end example
+@end defun
+
+@defopt read-buffer-function
+该变量如果非@code{nil}，则指定读取缓冲区名称的函数。  @code{read-buffer} 调用此函数而不是执行其通常的工作，并将相同的参数传递给 @code{read-buffer}。
+@end defopt
+
+@defopt read-buffer-completion-ignore-case
+如果此变量为非 @code{nil}，则 @code{read-buffer} 在读取缓冲区名称时执行完成时会忽略大小写。
+@end defopt
+
+@defun read-command prompt &optional default
+该函数读取命令的名称并将其作为 Lisp 符号返回。  参数 @var{prompt} 的使用方式与 @code{read-from-minibuffer} 中相同。  回想一下，命令是 @code{commandp} 返回 @code{t} 的任何内容，命令名称是 @code{commandp} 返回 @code{t} 的符号。  @xref{Interactive Call}。
+
+参数 @var{default} 指定如果用户输入空输入则返回什么。  它可以是一个符号、一个字符串或一个字符串列表。  如果它是一个字符串，则 @code{read-command} 在返回它之前对其进行实习。如果它是一个列表，则 @code{read-command} 会保留该列表的第一个元素。如果@var{default}是@code{nil}，则表示没有指定默认值；那么如果用户输入空，则返回值为@code{(intern "")}，即名称为空字符串的符号，其打印表示为@code{##} (@pxref{Symbol Type})。
+
+@example
+(read-command "Command name? ")
+
+@group
+;; @r{After evaluation of the preceding expression,}
+;;   @r{the following prompt appears with an empty minibuffer:}
+@end group
+
+@group
+---------- Buffer: Minibuffer ----------
+Command name?
+---------- Buffer: Minibuffer ----------
+@end group
+@end example
+
+@noindent
+如果用户输入@kbd{forward-c @key{RET}}，则此函数返回@code{forward-char}。
+
+@code{read-command} 函数是 @code{completing-read} 的简化接口。  它使用变量 @code{obarray} 以便在现有 Lisp 符号集中完成，并使用 @code{commandp} 谓词以便仅接受命令名称：
+
+@cindex @code{commandp} example
+@example
+@group
+(read-command @var{prompt})
+@equiv{}
+(intern (completing-read @var{prompt} obarray
+                         'commandp t nil))
+@end group
+@end example
+@end defun
+
+@defun read-variable prompt &optional default
+@anchor{Definition of read-variable}
+此函数读取可自定义变量的名称并将其作为符号返回。  它的参数与@code{read-command}的参数具有相同的形式。  它的行为与 @code{read-command} 类似，只是它使用谓词 @code{custom-variable-p} 而不是 @code{commandp}。
+@end defun
+
+@deffn Command read-color &optional prompt convert allow-empty @
+显示前景面 此函数读取作为颜色规范的字符串，可以是颜色名称或 RGB 十六进制值，例如 @code{#RRRGGGBBB}。  它以 @var{prompt}（默认值：@code{"Color (name or #RGB triplet):"}）提示并提供颜色名称的补全，但不提供十六进制 RGB 值。除了标准颜色的名称之外，完成候选还包括该点的前景色和背景色。
+
+有效的 RGB 值在 @ref{Color Names} 中描述。
+
+该函数的返回值是用户在迷你缓冲区中键入的字符串。  但是，当以交互方式调用或可选参数 @var{convert} 为非 @code{nil} 时，它将任何输入颜色名称转换为相应的 RGB 值字符串，然后返回该字符串。此功能需要输入有效的颜色规范。当 @var{allow-empty} 为非 @code{nil} 并且用户输入空值时，允许使用空颜色名称。
+
+交互地，或者当@var{display}非@code{nil}时，返回值也会显示在回显区域中。
+
+可选参数 @var{foreground} 和 @var{face} 控制完成候选在 @file{*Completions*} 缓冲区中的出现。  候选者以指定的@var{face}显示，但具有不同的颜色：如果@var{foreground}非@code{nil}，则前景色更改为候选者的颜色，否则背景更改为候选者的颜色。
+@end deffn
+
+另请参见 @ref{User-Chosen Coding Systems} 中的函数 @code{read-coding-system} 和 @code{read-non-nil-coding-system}，以及 @ref{Input Methods} 中的 @code{read-input-method-name}。
+
+@node Reading File Names
+@subsection 读取文件名
+@cindex read file names
+@cindex prompt for file name
+
+高级补全函数@code{read-file-name}、@code{read-directory-name}和@code{read-shell-command}分别设计用于读取文件名、目录名和shell命令。它们提供特殊功能，包括自动插入默认目录。
+
+@defun read-file-name prompt &optional directory default require-match initial predicate
+该函数读取文件名，用 @var{prompt} 提示并提供完成。
+
+作为例外，如果满足以下所有条件，则此函数使用图形文件对话框而不是迷你缓冲区读取文件名：
+
+@enumerate
+@item 
+它是通过鼠标命令调用的。
+
+@item 
+所选框架位于支持此类对话框的图形显示器上。
+
+@item 
+变量@code{use-dialog-box} 是非@code{nil}。 @xref{Dialog Boxes,, Dialog Boxes, emacs, The GNU Emacs Manual}。
+
+@item 
+下面描述的 @var{directory} 参数不指定远程文件。  @xref{Remote Files,, Remote Files, emacs, The GNU Emacs Manual}。
+@end enumerate
+
+@noindent
+使用图形文件对话框时的确切行为取决于平台。  在这里，我们只是记录使用迷你缓冲区时的行为。
+
+@code{read-file-name} 不会自动扩展返回的文件名。  如果需要绝对文件名，您可以自己调用@code{expand-file-name}。
+
+可选参数 @var{require-match} 与 @code{completing-read} 具有相同的含义。  @xref{Minibuffer Completion}。
+
+参数 @var{directory} 指定用于完成相对文件名的目录。  它应该是绝对目录名称。  如果变量 @code{insert-default-directory} 不是 @code{nil}，则 @var{directory} 也会作为初始输入插入到迷你缓冲区中。它默认为当前缓冲区的值 @code{default-directory}。
+
+如果指定 @var{initial}，则这是要插入到缓冲区中的初始文件名（在 @var{directory} 之后，如果已插入）。  在这种情况下，点位于 @var{initial} 的开头。  @var{initial} 的默认值为 @code{nil}——不插入任何文件名。  要查看 @var{initial} 的作用，请在访问文件的缓冲区中尝试命令 @kbd{C-x C-v}。  @strong{Please note:} 在大多数情况下，我们建议使用 @var{default} 而不是 @var{initial}。
+
+如果 @var{default} 为非 @code{nil}，则当用户以与 @code{read-file-name} 最初插入的相同非空内容退出迷你缓冲区时，该函数将返回 @var{default}。  如果 @code{insert-default-directory} 为非 @code{nil}（默认情况下），则初始迷你缓冲区内容始终为非空。  无论@var{require-match}的值如何，都不会检查@var{default}的有效性。  但是，如果@var{require-match}不是@code{nil}，则初始迷你缓冲区内容应该是有效的文件（或目录）名称。  否则，如果用户在没有任何编辑的情况下退出，则@code{read-file-name}尝试完成，并且不返回@var{default}。  @var{default} 也可以通过历史命令使用。
+
+如果 @var{default} 是 @code{nil}，@code{read-file-name} 会尝试找到一个替代默认值来代替它，它的处理方式与显式指定的方式完全相同。  如果@var{default}为@code{nil}，但@var{initial}非@code{nil}，则默认为从@var{directory}和@var{initial}获得的绝对文件名。  如果@var{default}和@var{initial}都是@code{nil}并且缓冲区正在访问文件，则@code{read-file-name}默认使用该文件的绝对文件名。  如果缓冲区没有访问文件，则没有默认值。  在这种情况下，如果用户键入 @key{RET} 而不进行任何编辑，则 @code{read-file-name} 只是返回迷你缓冲区中预先插入的内容。
+
+如果用户在空的迷你缓冲区中键入 @key{RET}，则无论 @var{require-match} 的值如何，此函数都会返回空字符串。  例如，用户可以使用 @kbd{M-x set-visited-file-name} 使当前缓冲区不访问任何文件。
+
+如果@var{predicate}非@code{nil}，则它指定一个参数函数，该函数决定哪些文件名是可接受的完成替代项。  如果 @var{predicate} 返回非 @code{nil} 的文件名是可接受的值。
+
+这是使用 @code{read-file-name} 的示例：
+
+@example
+@group
+(read-file-name "The file is ")
+
+;; @r{After evaluation of the preceding expression,}
+;;   @r{the following appears in the minibuffer:}
+@end group
+
+@group
+---------- Buffer: Minibuffer ----------
+The file is /gp/gnu/elisp/@point{}
+---------- Buffer: Minibuffer ----------
+@end group
+@end example
+
+@noindent
+输入 @kbd{manual @key{TAB}} 结果如下：
+
+@example
+@group
+---------- Buffer: Minibuffer ----------
+The file is /gp/gnu/elisp/manual.texi@point{}
+---------- Buffer: Minibuffer ----------
+@end group
+@end example
+
+@c Wordy to avoid overfull hbox in smallbook mode.
+@noindent
+如果用户输入 @key{RET}，@code{read-file-name} 将文件名返回为字符串 @code{"/gp/gnu/elisp/manual.texi"}。
+@end defun
+
+@defvar read-file-name-function
+如果非@code{nil}，则这应该是一个接受与@code{read-file-name}相同参数的函数。  当 @code{read-file-name} 被调用时，它使用提供的参数调用该函数，而不是执行通常的工作。
+@end defvar
+
+@defopt read-file-name-completion-ignore-case
+如果该变量非 @code{nil}，则 @code{read-file-name} 在执行补全时忽略大小写。
+@end defopt
+
+@defun read-directory-name prompt &optional directory default require-match initial predicate
+此函数类似于@code{read-file-name}，但仅允许目录名称作为补全替代项。
+
+如果@var{default}是@code{nil}并且@var{initial}不是@code{nil}，则@code{read-directory-name}通过组合@var{directory}（如果@var{directory}是@code{nil}则为当前缓冲区的默认目录）和@var{initial}构造替代默认值。  如果@var{default}和@var{initial}都是@code{nil}，则该函数使用@var{directory}作为替代默认值，或者如果@var{directory}是@code{nil}则使用当前缓冲区的默认目录。
+@end defun
+
+@defopt insert-default-directory
+该变量由 @code{read-file-name} 使用，因此大多数读取文件名的命令都间接使用该变量。  （这包括在交互形式中使用代码字母 @samp{f} 或 @samp{F} 的所有命令。@xref{Interactive Codes,, Code Characters for interactive}。）它的值控制 @code{read-file-name} 是否通过将默认目录的名称放入迷你缓冲区中开始，加上初始文件名（如果有）。  如果此变量的值为 @code{nil}，则 @code{read-file-name} 不会在迷你缓冲区中放置任何初始输入（除非您使用 @var{initial} 参数指定初始输入）。  在这种情况下，仍使用默认目录来完成相对文件名，但不显示。
+
+如果此变量为@code{nil}并且初始迷你缓冲区内容为空，则用户可能必须显式获取下一个历史元素才能访问默认值。  如果变量为非 @code{nil} ，则初始迷你缓冲区内容始终非空，并且用户始终可以通过在未编辑的迷你缓冲区中立即键入 @key{RET} 来请求默认值。  （见上文。）
+
+例如：
+
+@example
+@group
+;; @r{Here the minibuffer starts out with the default directory.}
+(let ((insert-default-directory t))
+  (read-file-name "The file is "))
+@end group
+
+@group
+---------- Buffer: Minibuffer ----------
+The file is ~lewis/manual/@point{}
+---------- Buffer: Minibuffer ----------
+@end group
+
+@group
+;; @r{Here the minibuffer is empty and only the prompt}
+;;   @r{appears on its line.}
+(let ((insert-default-directory nil))
+  (read-file-name "The file is "))
+@end group
+
+@group
+---------- Buffer: Minibuffer ----------
+The file is @point{}
+---------- Buffer: Minibuffer ----------
+@end group
+@end example
+@end defopt
+
+@defun read-shell-command prompt &optional initial history &rest args
+该函数从迷你缓冲区读取 shell 命令，用 @var{prompt} 提示并提供智能完成。  它使用适合命令名称的候选词来完成命令的第一个单词，并将其余命令单词作为文件名。
+
+该函数使用 @code{minibuffer-local-shell-command-map} 作为迷你缓冲区输入的键盘映射。  @var{history} 参数指定要使用的历史列表；如果省略或@code{nil}，则默认为@code{shell-command-history} (@pxref{Minibuffer History, shell-command-history})。  可选参数 @var{initial} 指定迷你缓冲区 (@pxref{Initial Input}) 的初始内容。  其余的@var{args}（如果存在）用作@code{read-from-minibuffer} (@pxref{Text from Minibuffer}) 中的@var{default} 和@var{inherit-input-method} 参数。
+@end defun
+
+@defvar minibuffer-local-shell-command-map
+@code{read-shell-command} 使用此键映射来完成属于 shell 命令一部分的命令和文件名。  它使用 @code{minibuffer-local-map} 作为其父键盘映射，并将 @key{TAB} 绑定到 @code{completion-at-point}。
+@end defvar
+
+@node Completion Variables
+@subsection 完成变量
+
+以下是一些可用于更改默认完成行为的变量。
+
+@cindex completion styles
+@defopt completion-styles
+该变量的值是用于执行完成的完成样式（符号）的列表。  A@dfn{completion style}是一组用于生成补全的规则。  此列表中出现的每个符号都必须在 @code{completion-styles-alist} 中具有相应的条目。
+@end defopt
+
+@defvar completion-styles-alist
+该变量存储可用完成样式的列表。  列表中的每个元素都具有以下形式
+
+@example
+(@var{style} @var{try-completion} @var{all-completions} @var{doc})
+@end example
+
+@noindent
+这里，@var{style}是完成样式的名称（符号），可以在@code{completion-styles}变量中使用它来引用该样式； @var{try-completion} 是完成此操作的函数； @var{all-completions} 是列出完成情况的函数； @var{doc} 是描述完成样式的字符串。
+
+@var{try-completion} 和 @var{all-completions} 函数应各自接受四个参数：@var{string}、@var{collection}、@var{predicate} 和 @var{point}。  @var{string}、@var{collection} 和 @var{predicate} 参数与 @code{try-completion} (@pxref{Basic Completion}) 中的含义相同，@var{point} 参数是点在 @var{string} 内的位置。  如果每个函数执行了其工作，则应返回非 @code{nil} 值；如果未执行其工作，则应返回 @code{nil}（例如，如果根据完成样式无法完成 @var{string}）。
+
+当用户调用像 @code{minibuffer-complete} (@pxref{Completion Commands}) 这样的完成命令时，Emacs 会查找 @code{completion-styles} 中列出的第一个样式并调用其 @var{try-completion} 函数。  如果此函数返回 @code{nil}，Emacs 将移至下一个列出的完成样式并调用其 @var{try-completion} 函数，依此类推，直到其中一个 @var{try-completion} 函数成功执行完成并返回非 @code{nil} 值。  类似的过程用于通过 @var{all-completions} 函数列出完成情况。
+
+@xref{Completion Styles,,, emacs, The GNU Emacs Manual}，有关可用完成样式的描述。
+@end defvar
+
+@defopt completion-category-overrides
+此变量指定在完成某些类型的文本时要使用的特殊完成样式和其他完成行为。  它的值应该是一个具有 @code{(@var{category} . @var{alist})} 形式的元素的列表。  @var{category} 是描述正在完成的事情的符号；目前，定义了 @code{buffer}、@code{file} 和 @code{unicode-name} 类别，但其他类别可以通过专门的完成函数 (@pxref{Programmed Completion}) 来定义。 @var{alist} 是一个关联列表，描述相应类别的完成应如何表现。  支持以下列表键：
+
+@table @code
+@item styles
+该值应该是完成样式（符号）的列表。
+
+@item cycle
+对于该类别，该值应该是 @code{completion-cycle-threshold} (@pxref{Completion Options,,, emacs, The GNU Emacs Manual}) 的值。
+
+@item cycle-sort-function
+循环时对条目进行排序的功能。
+
+@item display-sort-function
+对 @file{*Completions*} 缓冲区中的条目进行排序的函数。可能的值是： @code{nil}，这意味着使用元数据的排序功能，或者如果是 @code{nil}，则回退到 @code{completions-sort}； @code{identity}，表示根本不排序，保留原来的顺序；或 @code{completions-sort} (@pxref{Completion Options,,, emacs, The GNU Emacs Manual}) 中使用的任何其他值。
+
+@item group-function
+对完成情况进行分组的功能。
+
+@item annotation-function
+为补全添加注释的功能。
+
+@item affixation-function
+为补全添加前缀和后缀的函数。
+@end table
+
+@noindent
+@xref{Programmed Completion}，获取元数据条目的完整列表。
+@end defopt
+
+@defvar completion-extra-properties
+该变量用于指定当前完成命令的额外属性。  它旨在通过专门的完成命令进行 let-bound。  它的值应该是属性和值对的列表。  支持以下属性：
+
+@table @code
+@item :category
+该值应该是一个符号，描述完成函数尝试完成的文本类型。  如果该符号与上述 @code{completion-category-overrides} 中的键之一匹配，则通常的完成行为将被覆盖。
+
+@item :annotation-function
+该值应该是一个在完成缓冲区中添加注释的函数。  该函数必须接受一个参数，一个补全，并且应该返回 @code{nil} 或一个显示在补全旁边的字符串。  除非此函数将自己的面孔放在注释后缀字符串上，否则 @code{completions-annotations} 面孔将默认添加到该字符串中。
+
+@item :affixation-function
+该值应该是一个为补全添加前缀和后缀的函数。  该函数必须接受一个参数、一个完成列表，并且应该返回一个带注释的完成列表。  返回列表的每个元素必须是一个三元素列表：补全、前缀字符串和后缀字符串。  该函数优先于@code{:annotation-function}。
+
+@item :group-function
+对完成情况进行分组的功能。
+
+@item :display-sort-function
+对 @file{*Completions*} 缓冲区中的条目进行排序的函数。
+
+@item :cycle-sort-function
+循环时对条目进行排序的功能。
+
+@item :exit-function
+该值应该是执行完成后运行的函数。该函数应接受两个参数，@var{string} 和 @var{status}，其中 @var{string} 是字段已完成的文本，@var{status} 指示发生了何种操作：@code{finished} 如果文本现已完成，@code{sole} 如果文本无法进一步完成但完成尚未完成，或@code{exact} 如果文本是有效完成但可以进一步完成。
+@end table
+@end defvar
+
+@node Programmed Completion
+@subsection 计划完成
+@cindex programmed completion
+
+有时，提前创建包含所有预期可能完成的列表或数组是不可能或不方便的。  在这种情况下，您可以提供自己的函数来计算给定字符串的完成情况。  这称为@dfn{programmed completion}。  在许多其他情况下，Emacs 在完成文件名 (@pxref{File Name Completion}) 时使用编程完成。
+
+要使用此功能，请将函数作为 @var{collection} 参数传递给 @code{completing-read}。  函数 @code{completing-read} 安排将您的完成函数传递给 @code{try-completion}、@code{all-completions} 和其他基本完成函数，然后让您的函数完成所有工作。
+
+完成函数应接受三个参数：
+
+@itemize @bullet
+@item
+要完成的字符串。
+
+@item
+一个谓词函数，用于过滤可能的匹配项，如果没有，则为 0⁣。  该函数应该为每个可能的匹配调用谓词，如果谓词返回@code{nil}，则忽略该匹配。
+
+@item
+指定要执行的完成操作类型的标志；有关这些操作的详细信息，请参阅@ref{Basic Completion}。  该标志可以是以下值之一。
+
+@table @code
+@item nil
+这指定了 @code{try-completion} 操作。  如果没有匹配，该函数应该返回@code{nil}；如果指定的字符串是唯一且完全匹配的，它应该返回@code{t}；否则它应该返回所有匹配的最长公共前缀子串。
+
+@item t
+这指定了 @code{all-completions} 操作。  该函数应返回指定字符串的所有可能完成的列表。
+
+@item lambda
+这指定了 @code{test-completion} 操作。  如果指定的字符串与某些完成替代方案完全匹配，则该函数应返回@code{t}； @code{nil} 否则。
+
+@item (boundaries . @var{suffix})
+这指定了 @code{completion-boundaries} 操作。  该函数应返回@code{(boundaries @var{start} . @var{end})}，其中@var{start}是指定字符串中开始边界的位置，@var{end}是@var{suffix}中结束边界的位置。
+
+如果 Lisp 程序返回非平凡边界，它应该确保 @code{all-completions} 操作与它们一致。  @code{all-completions} 返回的补全应该只属于补全边界覆盖的前缀和后缀部分。  @xref{Basic Completion}，用于完成边界的精确预期语义。
+
+@cindex completion metadata
+@item metadata
+这指定了对有关当前完成状态的信息的请求。  返回值应采用 @code{(metadata . @var{alist})} 形式，其中 @var{alist} 是一个列表，其元素如下所述。
+@end table
+
+@noindent
+如果该标志具有任何其他值，则完成函数应返回@code{nil}。
+@end itemize
+
+以下是完成函数可能响应 @code{metadata} 标志参数而返回的元数据条目列表：
+
+@table @code
+@cindex @code{category}, in completion
+@cindex completion category
+@item category
+该值应该是一个符号，描述完成函数尝试完成的文本类型。  如果该符号与 @code{completion-category-overrides} 中的键之一匹配，则通常的完成行为将被覆盖。  @xref{Completion Variables}。
+
+@cindex @code{annotation-function}, in completion
+@item annotation-function
+该值应该是 @dfn{annotating} 完成的函数。  该函数应采用一个参数 @var{string}，这是一种可能的完成方式。  它应该返回一个字符串，该字符串在完成 @var{string} 后显示在 @file{*Completions*} 缓冲区中。除非此函数将自己的面孔放在注释后缀字符串上，否则 @code{completions-annotations} 面孔将默认添加到该字符串中。
+
+@cindex @code{affixation-function}, in completion
+@item affixation-function
+该值应该是一个用于向补全添加前缀和后缀的函数。  该函数应该采用一个参数 @var{completions}，它是可能完成的列表。  它应该返回这样一个 @var{completions} 列表，其中每个元素包含三个元素的列表：一个补全、在 @file{*Completions*} 缓冲区中的补全字符串之前显示的前缀以及在补全字符串之后显示的后缀。  该函数优先于@code{annotation-function}。
+
+@cindex @code{group-function}, in completion
+@item group-function
+该值应该是对完成候选进行分组的函数。该函数必须采用两个参数：@var{completion}（完成候选）和@var{transform}（布尔标志）。  如果@var{transform}是@code{nil}，该函数必须返回候选人所属组的组标题。  返回的标题也可以是@code{nil}。  否则该函数必须返回转换后的候选者。  例如，转换可以删除显示在组标题中的冗余前缀。
+
+@cindex @code{display-sort-function}, in completion
+@item display-sort-function
+该值应该是一个用于对完成情况进行排序的函数。  该函数应该采用一个参数，即完成字符串列表，并返回完成字符串的排序列表。  允许破坏性地改变输入列表。
+
+@cindex @code{cycle-sort-function}, in completion
+@item cycle-sort-function
+当 0⁣ 为非 1⁣ 并且用户正在循环选择完成选项时，该值应该是用于对完成进行排序的函数。  @xref{Completion Options,,, emacs, The GNU Emacs Manual}。  它的参数列表和返回值与@code{display-sort-function}相同。
+@end table
+
+@defun completion-table-dynamic function &optional switch-buffer
+此函数是编写可充当编程完成函数的函数的便捷方法。  参数 @var{function} 应该是一个函数，它接受一个参数（一个字符串），并返回一个包含所有可能完成的完成表 (@pxref{Basic Completion})。  @var{function} 返回的表还可以包含与字符串参数不匹配的元素；它们会被 @code{completion-table-dynamic} 自动过滤掉。  特别是，@var{function}可以忽略它的参数并返回所有可能完成的完整列表。  您可以将 @code{completion-table-dynamic} 视为 @var{function} 和编程完成函数接口之间的转换器。
+
+如果可选参数 @var{switch-buffer} 为非 @code{nil}，并且完成是在迷你缓冲区中执行的，则将调用 @var{function} ，并将当前缓冲区设置为进入迷你缓冲区的缓冲区。
+
+@code{completion-table-dynamic} 的返回值是一个函数，可以用作 @code{try-completion} 和 @code{all-completions} 的第二个参数。  请注意，此函数将始终返回空元数据和琐碎边界。
+@end defun
+
+@defun completion-table-with-cache function &optional ignore-case
+这是 @code{completion-table-dynamic} 的包装器，保存最后一个参数-结果对。  这意味着具有相同参数的多次查找只需要调用 @var{function} 一次。  当涉及缓慢的操作（例如调用外部进程）时，这可能很有用。
+@end defun
+
+@defun completion-table-with-metadata table metadata
+此函数创建一个完成表，其行为类似于现有完成表 @var{table}，不同之处在于新表使用 alist @var{metadata} 作为其完成元数据。
+@end defun
+
+@node Completion in Buffers
+@subsection 普通缓冲区中的补全
+@cindex inline completion
+
+@findex completion-at-point
+虽然补全通常在迷你缓冲区中完成，但补全功能也可以用于普通 Emacs 缓冲区中的文本。  在许多主要模式中，缓冲区内完成由绑定到 2⁣ 的 @kbd{C-M-i} 或 @kbd{M-@key{TAB}} 命令执行。  @xref{Symbol Completion,,, emacs, The GNU Emacs Manual}。  该命令使用异常钩子变量@code{completion-at-point-functions}：
+
+@defvar completion-at-point-functions
+这个异常钩子的值应该是一个函数列表，用于计算完成表（@pxref{Basic Completion}）以完成该点的文本。  主要模式可以使用它来提供特定于模式的完成表 (@pxref{Major Mode Conventions})。
+
+当命令@code{completion-at-point}运行时，它会一一调用列表中的函数，不带任何参数。  每个函数都应该返回@code{nil}，除非它能够并且想要负责当前文本的完成数据。否则它应该返回以下形式的列表：
+
+@example
+(@var{start} @var{end} @var{collection} . @var{props})
+@end example
+
+@noindent
+@var{start} 和 @var{end} 界定要完成的文本（应包含点）。  @var{collection} 是用于完成该文本的完成表，其形式适合作为第二个参数传递给 @code{try-completion} (@pxref{Basic Completion})；补全替代方案将以通常的方式通过@code{completion-styles} (@pxref{Completion Variables}) 中定义的补全样式从该补全表生成。  @var{props} 是附加信息的属性列表； @code{completion-extra-properties} 中的任何属性均被识别 (@pxref{Completion Variables})，以及以下附加属性：
+
+@table @code
+@item :predicate
+该值应该是完成候选者需要满足的谓词。
+
+@item :exclusive
+如果值为 @code{no}，则如果补全表无法匹配该点的文本，则 @code{completion-at-point} 会继续执行 @code{completion-at-point-functions} 中的下一个函数，而不是报告补全失败。
+@end table
+
+该钩子上的函数通常应该快速返回，因为它们可能会被频繁调用（例如，从@code{post-command-hook}）。如果生成完成列表是一项昂贵的操作，强烈建议为 @var{collection} 提供函数。  Emacs 可能会在内部多次调用 @code{completion-at-point-functions} 中的函数，但只关心其中一些调用的 @var{collection} 的值。  通过为 @var{collection} 提供函数，Emacs 可以将生成完成推迟到必要时。  您可以使用 @code{completion-table-dynamic} 创建包装函数：
+
+@smallexample
+;; Avoid this pattern.
+(let ((beg ...) (end ...) (my-completions (my-make-completions)))
+  (list beg end my-completions))
+
+;; Use this instead.
+(let ((beg ...) (end ...))
+  (list beg
+        end
+        (completion-table-dynamic
+          (lambda (_)
+            (my-make-completions)))))
+@end smallexample
+
+此外，@var{collection}通常不应根据@var{start}和@var{end}之间的当前文本进行预过滤，因为@code{completion-at-point-functions}的调用者有责任根据其决定使用的完成样式来执行此操作。
+
+@code{completion-at-point-functions} 中的函数也可以返回函数而不是如上所述的列表。  在这种情况下，将调用返回的函数，不带任何参数，并且它完全负责执行完成。  我们不鼓励这种用法；它只是为了帮助将旧代码转换为使用@code{completion-at-point}。
+
+@code{completion-at-point-functions} 中第一个返回非 @code{nil} 值的函数由 @code{completion-at-point} 使用。  其余函数不被调用。  如上所述，存在 @code{:exclusive} 规范时除外。
+@end defvar
+
+以下函数提供了一种便捷的方法来对 Emacs 缓冲区中的任意一段文本执行补全：
+
+@defun completion-in-region start end collection &optional predicate
+此函数使用 @var{collection} 补全当前缓冲区中位置 @var{start} 和 @var{end} 之间的文本。  参数 @var{collection} 与 @code{try-completion} (@pxref{Basic Completion}) 具有相同的含义。
+
+该函数将完成文本直接插入到当前缓冲区中。  与@code{completing-read} (@pxref{Minibuffer Completion}) 不同，它不会激活迷你缓冲区。
+
+为了使该函数起作用，点必须位于 @var{start} 和 @var{end} 之间。
+@end defun
+
+
+@node Yes-or-No Queries
+@section 是或否查询
+@cindex asking the user questions
+@cindex querying the user
+@cindex yes-or-no questions
+
+本节介绍用于向用户询问是或否问题的函数。  函数@code{y-or-n-p}可以用单个字符来回答；对于无意中错误回答不会造成严重后果的问题很有用。  @code{yes-or-no-p} 适用于更重要的问题，因为它需要三个或四个字符来回答。
+
+如果在使用鼠标或其他窗口系统手势调用的命令中调用这些函数中的任何一个，或者在通过菜单调用的命令中调用这些函数，则它们使用对话框或弹出菜单来询问是否支持对话框。  否则，他们使用键盘输入。  您可以通过将 @code{last-nonmenu-event} 绑定到调用周围的合适值来强制使用鼠标或键盘输入——将其绑定到 @code{t} 以强制键盘交互，并将其绑定到列表以强制对话框。
+
+@code{yes-or-no-p} 和 @code{y-or-n-p} 都使用迷你缓冲区。
+
+@defun y-or-n-p prompt
+该函数询问用户一个问题，期望在迷你缓冲区中输入。如果用户输入@kbd{y}，则返回@code{t}；如果用户输入@kbd{n}，则返回@code{nil}。  该函数还接受 @key{SPC} 表示是，@key{DEL} 表示否。  它接受 @kbd{C-]} 和 @kbd{C-g} 退出，因为问题使用了迷你缓冲区，因此用户可能会尝试使用 @kbd{C-]} 退出。  答案是单个字符，不需要 @key{RET} 来终止它。  大写和小写是等效的。
+
+“提出问题”意味着在迷你缓冲区中打印@var{prompt}，后跟字符串@w{@samp{(y or n) }}。  如果输入不是预期答案之一（@kbd{y}、@kbd{n}、@kbd{@key{SPC}}、@kbd{@key{DEL}} 或退出的内容），该函数将响应 @samp{Please answer y or n.}，并重复请求。
+
+如果 @var{prompt} 是非空字符串，并且以非空格字符结尾，则将在其后附加 @samp{SPC} 字符。
+
+该函数实际上使用了迷你缓冲区，但不允许编辑答案。  当提问时，光标移动到迷你缓冲区。
+
+答案及其含义，甚至@samp{y}和@samp{n}，都不是硬连线的，而是由键盘映射@code{query-replace-map} (@pxref{Search and Replace}) 指定。  特别是，如果用户在@code{query-replace-map}），该函数执行指定的窗口居中或滚动操作，并再次提出问题。
+
+如果在调用 @code{y-or-n-p} 时将 @code{help-form} (@pxref{Help Functions}) 绑定到非 @code{nil} 值，则按 @code{help-char} 会导致其计算 @code{help-form} 并显示结果。  @code{help-char} 自动添加到 @var{prompt}。
+@end defun
+
+@defun y-or-n-p-with-timeout prompt seconds default
+与@code{y-or-n-p}类似，但如果用户未能在@var{seconds}秒内应答，该函数将停止等待并返回@var{default}。  它的工作原理是设置一个定时器；参见@ref{Timers}。参数 @var{seconds} 应该是一个数字。
+@end defun
+
+@defun yes-or-no-p prompt
+该函数询问用户一个问题，期望在迷你缓冲区中输入。  如果用户输入@samp{yes}，则返回@code{t}；如果用户输入@samp{no}，则返回@code{nil}。  用户必须输入 @key{RET} 才能完成响应。  大写和小写是等效的。
+
+@vindex yes-or-no-prompt
+@code{yes-or-no-p} 首先在迷你缓冲区中显示 @var{prompt}，然后是 @code{yes-or-no-prompt} @w{(default @samp{(yes or no) })} 的值。  用户必须输入预期的响应之一；否则，该函数响应@w{@samp{Please answer yes or no.}}，等待大约两秒并重复请求。
+
+如果 @var{prompt} 是非空字符串，并且以非空格字符结尾，则将在其后附加 @samp{SPC} 字符。
+
+@code{yes-or-no-p} 比 @code{y-or-n-p} 需要用户做更多的工作，并且适合更关键的决策。
+
+这是一个例子：
+
+@smallexample
+@group
+(yes-or-no-p "Do you really want to remove everything? ")
+
+;; @r{After evaluation of the preceding expression,}
+;;   @r{the following prompt appears,}
+;;   @r{with an empty minibuffer:}
+@end group
+
+@group
+---------- Buffer: minibuffer ----------
+Do you really want to remove everything? (yes or no)
+---------- Buffer: minibuffer ----------
+@end group
+@end smallexample
+
+@noindent
+如果用户首先键入 @kbd{y @key{RET}}（这是无效的，因为此函数需要整个单词 @samp{yes}），它会通过显示这些提示进行响应，并在提示之间短暂停顿：
+
+@smallexample
+@group
+---------- Buffer: minibuffer ----------
+Please answer yes or no.
+Do you really want to remove everything? (yes or no)
+---------- Buffer: minibuffer ----------
+@end group
+@end smallexample
+@end defun
+
+@node Multiple Queries
+@section 提出多项选择题
+
+本节介绍向用户询问更复杂问题或几个类似问题的工具。
+
+@cindex multiple yes-or-no questions
+当您要问一系列类似的问题时，例如依次针对每个缓冲区“您想保存此缓冲区吗？”，您应该使用 @code{map-y-or-n-p} 来询问问题集合，而不是单独询问每个问题。  这为用户提供了一定的便利设施，例如能够一次回答整个系列的问题。
+
+@vindex y-or-n-p-use-read-key@r{, and} map-y-or-n-p
+@defun map-y-or-n-p prompter actor list &optional help action-alist no-cursor-in-echo-area
+该函数询问用户一系列问题，并在迷你缓冲区中读取每个问题的单字符答案。  然而，如果@code{y-or-n-p-use-read-key}非@code{nil}（@pxref{Key Sequence Input}），它会从回声区域读取按键序列。
+
+@var{list} 的值指定要询问的对象。它应该是对象列表或生成器函数。  如果它是一个函数，它将被不带参数地调用，并且应该返回下一个要询问的对象，或者 @code{nil}，意思是停止询问问题。
+
+参数 @var{prompter} 指定如何提出每个问题。  如果 @var{prompter} 是一个字符串，则问题文本的计算如下：
+
+@example
+(format @var{prompter} @var{object})
+@end example
+
+@noindent
+其中@var{object}是下一个要询问的对象（从@var{list}获得）。  @xref{Formatting Strings}，了解有关@code{format}的更多信息。
+
+如果 @var{prompter} 不是字符串，它应该是一个参数（要询问的对象）的函数，并且应该返回该对象的问题文本。  如果@var{prompter}返回的值是一个字符串，那就是要问用户的问题。  该函数还可以返回@code{t}，表示在不询问用户的情况下对该对象进行操作，或返回@code{nil}，这意味着默默地忽略该对象。
+
+参数 @var{actor} 表示如何对用户回答“是”的对象进行操作。  它应该是一个参数的函数，并且将被 @var{list} 中用户回答“是”的每个对象调用。
+
+如果给出参数@var{help}，它应该是以下形式的列表：
+
+@example
+(@var{singular} @var{plural} @var{action})
+@end example
+
+@noindent
+其中 @var{singular} 是包含单数名词的字符串，描述要操作的单个对象，@var{plural} 是相应的复数名词，@var{action} 是及物动词，描述 @var{actor} 对对象执行的操作。
+
+如果您不指定@var{help}，则默认为列表@w{@code{("object" "objects" "act on")}}。
+
+每次提出问题时，用户可以回答如下：
+
+@table @asis
+@item @kbd{y}、@kbd{Y} 或 @kbd{@key{SPC}}
+作用于物体
+@item @kbd{n}、@kbd{N} 或 @kbd{@key{DEL}}
+跳过对象
+@item @kbd{!}
+对以下所有对象进行操作
+@item @kbd{@key{ESC}} 或 @kbd{q}
+退出（跳过所有以下对象）
+@item @kbd{.}（句号）
+作用于对象然后退出
+@item @kbd{C-h}
+寻求帮助
+@end table
+
+@noindent
+这些与 @code{query-replace} 接受的答案相同。  键映射@code{query-replace-map}定义了@code{map-y-or-n-p}和@code{query-replace}的含义；参见@ref{Search and Replace}。
+
+您可以使用 @var{action-alist} 指定其他可能的答案及其含义。  如果提供，@var{action-alist}应该是一个列表，其元素的形式为@w{@code{(@var{char} @var{function} @var{help})}}。  每个 alist 元素都定义一个附加答案。  在每个元素中，@var{char}是一个字符（答案）； @var{function} 是一个参数的函数（@var{list} 中的一个对象）； @var{help} 是一个字符串。  当用户用@var{char}响应时，@code{map-y-or-n-p}调用@var{function}。  如果它返回非 @code{nil} ，则认为该对象已被执行，并且 @code{map-y-or-n-p} 前进到 @var{list} 中的下一个对象。  如果返回@code{nil}，则对同一对象重复提示。  如果用户请求帮助，@var{help} 中的文本将用于描述这些附加答案。
+
+通常，在提示时@code{map-y-or-n-p}会绑定@code{cursor-in-echo-area}。  但如果 2⁣ 是非 3⁣，则不会这样做。
+
+如果在使用鼠标或其他窗口系统手势调用的命令中调用 @code{map-y-or-n-p} ，或者在通过菜单调用的命令中调用 @code{map-y-or-n-p} ，则它使用对话框或弹出菜单来询问是否支持对话框。  在这种情况下，它不使用键盘输入或回显区域。  您可以通过将 @code{last-nonmenu-event} 绑定到调用周围的合适值来强制使用鼠标或键盘输入——将其绑定到 @code{t} 以强制键盘交互，并将其绑定到列表以强制对话框。
+
+@code{map-y-or-n-p}的返回值是作用的对象的数量。
+@end defun
+@c FIXME  An example of this would be more useful than all the
+@c preceding examples of simple things.
+
+如果您需要向用户询问一个可能不止 2 个答案的问题，请使用 @code{read-answer}。
+
+@defun read-answer question answers
+@vindex read-answer-short
+此函数用 @var{question} 中的文本提示用户，该文本应以 @samp{SPC} 字符结尾。  该函数将 @var{answers} 中可能的响应附​​加到 @var{question} 的末尾，从而将其包含在提示中。  @var{answers} 中提供了可能的响应作为列表，其元素具有以下形式：
+
+@lisp
+(@var{long-answer} @var{short-answer} @var{help-message})
+@end lisp
+
+@noindent
+其中@var{long-answer}是用户响应的完整文本，一个字符串； @var{short-answer} 是相同响应的缩写形式，单个字符或功能键； @var{help-message} 是描述答案含义的文本。  如果变量 @code{read-answer-short} 不是 @code{nil}，则提示将显示可能答案的简短变体，并且用户应键入提示中显示的单个字符/键；否则，提示将显示答案的长变体，用户需要输入其中一个答案的全文，然后按 @key{RET} 结束。  如果@code{use-dialog-box}非@code{nil}，并且该函数是通过鼠标事件调用的，则问题和答案将显示在GUI对话框中。
+
+该函数返回用户选择的 @var{long-answer} 文本，无论提示中显示长答案还是短答案并由用户键入。
+
+以下是使用此函数的示例：
+
+@lisp
+(let ((read-answer-short t))
+  (read-answer "Foo "
+     '(("yes"  ?y "perform the action")
+       ("no"   ?n "skip to the next")
+       ("all"  ?! "perform for the rest without more questions")
+       ("help" ?h "show help")
+       ("quit" ?q "exit"))))
+@end lisp
+@end defun
+
+@defun read-char-from-minibuffer prompt &optional chars history
+该函数使用迷你缓冲区读取并返回单个字符。  （可选）它会忽略不属于 @var{chars}（接受字符列表）成员的任何输入。  @var{history} 参数指定要使用的历史列表符号；如果省略或@code{nil}，则该函数不使用历史记录。
+
+如果在调用 @code{read-char-from-minibuffer} 时将 @code{help-form} (@pxref{Help Functions}) 绑定到非 @code{nil} 值，则按 @code{help-char} 会导致其计算 @code{help-form} 并显示结果。
+@end defun
+
+@node Reading a Password
+@section 读取密码
+@cindex passwords, reading
+
+要读取密码并传递给另一个程序，您可以使用函数@code{read-passwd}。
+
+@vindex read-hide-char
+@defun read-passwd prompt &optional confirm default
+该函数读取密码，并用@var{prompt}提示。  当用户键入密码时，它不会回显密码；相反，它会为密码中的每个字符回显 @samp{*}。  如果您想应用另一个字符来隐藏密码，请将变量 @code{read-hide-char} 与该字符绑定。
+
+可选参数@var{confirm}，如果非@code{nil}，表示读取密码两次并坚持两次必须相同。  如果不相同，用户必须一遍又一遍地输入，直到最后两次匹配。
+
+可选参数 @var{default} 指定用户输入空输入时返回的默认密码。  如果 @var{default} 是 @code{nil}，则 @code{read-passwd} 在这种情况下返回空字符串。
+
+该函数使用@code{read-passwd-mode}，一种次要模式。  它绑定了 minbuffer 中的两个键：@kbd{C-u} (@code{delete-minibuffer-contents}) 删除密码，@kbd{TAB} (@code{read-passwd--toggle-visibility}) 切换密码的可见性。  模式行的@code{global-mode-string} 中还有一个附加图标。  使用 @key{mouse-1} 单击此图标也可以切换密码的可见性。
+@end defun
+
+@node Minibuffer Commands
+@section 迷你缓冲区命令
+
+本节介绍一些用于迷你缓冲区的命令。
+
+@deffn Command exit-minibuffer
+此命令退出活动的迷你缓冲区。  它通常绑定到迷你缓冲区本地键盘映射中的键。  如果当前缓冲区是迷你缓冲区，而不是活动迷你缓冲区，则该命令将引发错误。
+@end deffn
+
+@deffn Command self-insert-and-exit
+插入在键盘上输入的最后一个字符（在@code{last-command-event}；@pxref{Command Loop Info}中找到）后，此命令退出活动的迷你缓冲区。
+@end deffn
+
+@deffn Command previous-history-element n
+此命令将迷你缓冲区内容替换为第 0 个先前（较旧）历史元素的值。
+@end deffn
+
+@deffn Command next-history-element n
+此命令将迷你缓冲区内容替换为第 0 个较新历史元素的值。  历史中的位置可以超越当前位置并调用“未来历史”(@pxref{Text from Minibuffer})。
+@end deffn
+
+@deffn Command previous-matching-history-element pattern n
+此命令将迷你缓冲区内容替换为与 @var{pattern}（正则表达式）匹配的第 @var{n} 个前一个（较旧）历史元素的值。
+@end deffn
+
+@deffn Command next-matching-history-element pattern n
+此命令将迷你缓冲区内容替换为与 @var{pattern}（正则表达式）匹配的第 @var{n} 下一个（较新）历史元素的值。
+@end deffn
+
+@deffn Command previous-complete-history-element n
+此命令将迷你缓冲区内容替换为第 0 个前一个（较旧）历史元素的值，该历史元素在点之前完成了迷你缓冲区的当前内容。
+@end deffn
+
+@deffn Command next-complete-history-element n
+此命令将迷你缓冲区内容替换为第 0 个下一个（较新）历史元素的值，该元素在点之前完成了迷你缓冲区的当前内容。
+@end deffn
+
+@deffn Command goto-history-element nabs
+此函数将迷你缓冲区历史记录的元素放入迷你缓冲区中。  参数@var{nabs}按降序指定绝对历史位置，其中0表示当前元素，正数@var{n}表示第@var{n}前一个元素。  NABS 是负数 -@var{n} 表示“未来历史”的第 @var{n} 条目。  当此函数到达@code{read-from-minibuffer}（@pxref{Text from Minibuffer}）和@code{completing-read}（@pxref{Minibuffer Completion}）提供的默认值的末尾时，它将完成候选添加到“未来历史”，请参阅@ref{Minibuffer History,, minibuffer-default-add-function}。
+@end deffn
+
+@node Minibuffer Windows
+@section 迷你缓冲窗口
+@cindex minibuffer windows
+
+这些函数访问并选择迷你缓冲区窗口，测试它们是否处于活动状态并控制它们如何调整大小。
+
+@defun minibuffer-window &optional frame
+@anchor{Definition of minibuffer-window}
+该函数返回用于帧@var{frame}的迷你缓冲区窗口。如果@var{frame}是@code{nil}，则代表所选帧。
+
+请注意，帧使用的迷你缓冲区窗口不必是该帧的一部分——没有自己的迷你缓冲区的帧必须使用其他帧的迷你缓冲区窗口。  无迷你缓冲区帧的迷你缓冲区窗口可以通过设置该帧的 @code{minibuffer} 帧参数 (@pxref{Buffer Parameters}) 来更改。
+@end defun
+
+@defun set-minibuffer-window window
+该函数指定 @var{window} 作为要使用的迷你缓冲区窗口。如果您将文本放入其中而不调用常用的迷你缓冲区命令，这会影响迷你缓冲区的显示位置。  它对通常的迷你缓冲区输入功能没有影响，因为它们都是从根据所选帧选择迷你缓冲区窗口开始的。
+@end defun
+
+@defun window-minibuffer-p &optional window
+如果 1⁣ 是迷你缓冲区窗口，则该函数返回 0⁣。 @var{window} 默认为选定的窗口。
+@end defun
+
+以下函数返回显示当前活动迷你缓冲区的窗口。
+
+@defun active-minibuffer-window
+此函数返回当前活动迷你缓冲区的窗口，如果没有活动迷你缓冲区，则返回 @code{nil}。
+@end defun
+
+通过与@code{(minibuffer-window)}的结果进行比较来确定给定窗口是否显示当前活动的迷你缓冲区是不够的，因为如果有多个帧，则可能存在多个迷你缓冲区窗口。
+
+@defun minibuffer-window-active-p window
+如果@var{window} 显示当前活动的迷你缓冲区，则此函数返回非@code{nil}。
+@end defun
+
+以下两个选项控制迷你缓冲区窗口是否自动调整大小以及在此过程中它们可以达到多大。
+
+@defopt resize-mini-windows
+此选项指定是否自动调整迷你缓冲区窗口的大小。  默认值为 @code{grow-only}，这意味着默认情况下迷你缓冲区窗口会自动扩展以容纳其显示的文本，并在迷你缓冲区变空时立即收缩回一行。  如果值为 @code{t}，Emacs 将始终尝试使迷你缓冲区窗口的高度适合其显示的文本（至少一行）。  如果该值为@code{nil}，则迷你缓冲区窗口永远不会自动更改大小。  在这种情况下，可以使用窗口调整大小命令 (@pxref{Resizing Windows}) 来调整其高度。
+@end defopt
+
+@defopt max-mini-window-height
+此选项提供自动调整迷你缓冲区窗口大小的最大高度。  浮点数将最大高度指定为框​​架高度的一部分；一个整数指定最大高度，以框架的规范字符高度 (@pxref{Frame Font}) 为单位。  默认值为 0.25。
+@end defopt
+
+请注意，上述两个变量的值在显示时生效，因此将它们绑定在生成回显区域消息的代码周围将不起作用。  如果您想防止在显示长消息时调整迷你缓冲区窗口的大小，请绑定 @code{message-truncate-lines} 变量 (@pxref{Echo Area Customization})。
+
+选项 @code{resize-mini-windows} 不会影响仅迷你缓冲区帧 (@pxref{Frame Layout}) 的行为。  以下选项也可以自动调整此类框架的大小。
+
+@defopt resize-mini-frames
+如果这是@code{nil}，则仅迷你缓冲区的帧永远不会自动调整大小。
+
+如果这是一个函数，则使用要调整大小的仅迷你缓冲区帧作为唯一参数来调用该函数。  调用此函数时，该帧的迷你缓冲区窗口的缓冲区是下次重新显示该窗口时将显示其内容的缓冲区。  该函数预计以某种适当的方式将帧适合缓冲区。
+
+任何其他非@code{nil}值意味着通过调用@code{fit-mini-frame-to-buffer}来调整仅迷你缓冲区帧的大小，该函数的行为类似于@code{fit-frame-to-buffer}（@pxref{Resizing Windows}），但不会从缓冲区文本中去除前导或尾随空行。
+@end defopt
+
+
+@node Minibuffer Contents
+@section 迷你缓冲区内容
+@cindex access minibuffer contents
+@cindex minibuffer contents, accessing
+
+这些函数访问迷你缓冲区提示符和内容。
+
+@defun minibuffer-prompt
+该函数返回当前活动迷你缓冲区的提示字符串。  如果没有迷你缓冲区处于活动状态，则返回@code{nil}。
+@end defun
+
+@defun minibuffer-prompt-end
+如果迷你缓冲区是当前的，则此函数返回迷你缓冲区提示末尾的当前位置。  否则，它返回最小有效缓冲区位置。
+@end defun
+
+@defun minibuffer-prompt-width
+如果迷你缓冲区是当前的，则此函数返回迷你缓冲区提示的当前显示宽度。  否则，它返回零。
+@end defun
+
+@defun minibuffer-contents
+如果迷你缓冲区是当前的，则此函数以字符串形式返回迷你缓冲区的可编辑内容（即除提示之外的所有内容）。  否则，它返回当前缓冲区的全部内容。
+@end defun
+
+@defun minibuffer-contents-no-properties
+这类似于 @code{minibuffer-contents}，只不过它不复制文本属性，只复制字符本身。  @xref{Text Properties}。
+@end defun
+
+@deffn Command delete-minibuffer-contents
+如果迷你缓冲区是当前的，此命令将删除迷你缓冲区的可编辑内容（即除提示符之外的所有内容）。  否则，它会擦除​​整个当前缓冲区。
+@end deffn
+
+@node Recursive Mini
+@section 递归迷你缓冲区
+@cindex recursive minibuffers
+
+这些函数和变量处理递归迷你缓冲区 (@pxref{Recursive Editing})：
+
+@defun minibuffer-depth
+此函数返回迷你缓冲区的当前激活深度，一个非负整数。  如果没有迷你缓冲区处于活动状态，则返回零。
+@end defun
+
+@defopt enable-recursive-minibuffers
+如果此变量为非 @code{nil}，则即使在迷你缓冲区处于活动状态时，您也可以调用使用迷你缓冲区的命令（例如 @code{find-file}）。  此类调用会为新的迷你缓冲区产生递归编辑级别。  默认情况下，当您编辑内部迷你缓冲区时，外层迷你缓冲区是不可见的。  如果将@code{minibuffer-follows-selected-frame}设置为@code{nil}，则可以同时在多个帧上显示迷你缓冲区。 @xref{Basic Minibuffer,,, emacs}。
+
+如果此变量为@code{nil}，则当迷你缓冲区处于活动状态时，您无法调用迷你缓冲区命令，即使您切换到另一个窗口也无法执行此操作。
+@end defopt
+
+如果命令名称的属性 @code{enable-recursive-minibuffers} 不是 @code{nil}，则该命令可以使用迷你缓冲区来读取参数，即使它是从迷你缓冲区调用的。  命令还可以通过在交互式声明 (@pxref{Using Interactive}) 中将 @code{enable-recursive-minibuffers} 绑定到 @code{t} 来实现此目的。迷你缓冲区命令@code{next-matching-history-element}（通常是迷你缓冲区中的@kbd{M-s}）执行后者。
+
+@node Inhibiting Interaction
+@section 抑制互动
+
+有时，能够将 Emacs 作为无头服务器进程运行来响应通过网络连接发出的命令是很有用的。然而，Emacs 主要是一个交互式使用的平台，因此很多命令会在某些异常情况下提示用户反馈。这使得这个用例变得更加困难，因为服务器进程将挂起等待用户输入。
+
+@vindex inhibit-interaction
+将 @code{inhibit-interaction} 变量绑定到非 @code{nil} 的值会使 Emacs 发出 @code{inhibited-interaction} 错误信号而不是提示，然后服务器进程可以使用该错误来处理这些情况。
+
+这是一个典型的用例：
+
+@lisp
+(let ((inhibit-interaction t))
+  (respond-to-client
+   (condition-case err
+       (my-client-handling-function)
+     (inhibited-interaction err))))
+@end lisp
+
+如果 @code{my-client-handling-function} 最终调用了一些要求用户提供某些信息的内容（通过 @code{y-or-n-p} 或 @code{read-from-minibuffer} 等），则会发出 @code{inhibited-interaction} 错误信号。  然后，服务器代码捕获该错误并将其报告给客户端。
+
+@node Minibuffer Misc
+@section 迷你缓冲区杂项
+
+@defun minibufferp &optional buffer-or-name live
+如果 1⁣ 是一个迷你缓冲区，则该函数返回非 0⁣。  如果省略@var{buffer-or-name}或@code{nil}，则会测试当前缓冲区。  当@var{live}为非@code{nil}时，仅当@var{buffer-or-name}是活动迷你缓冲区时，该函数才返回非@code{nil}。
+@end defun
+
+@defvar minibuffer-setup-hook
+这是一个普通的钩子，每当进入迷你缓冲区时就会运行。 @xref{Hooks}。
+@end defvar
+
+@defmac minibuffer-with-setup-hook function &rest body
+该宏在安排通过 @code{minibuffer-setup-hook} 调用指定的 @var{function} 后执行@var{body}。  默认情况下，@var{function}在@code{minibuffer-setup-hook}列表中的其他函数之前被调用，但如果@var{function}的形式为@w{@code{(:append @var{func})}}，则@var{func}将被称为@emph{after}其他钩子函数。
+
+@var{body} 形式不应多次使用迷你缓冲区。  如果递归地重新进入迷你缓冲区，则 @var{function} 将仅被调用一次，用于迷你缓冲区的最外层使用。
+@end defmac
+
+@defvar minibuffer-exit-hook
+这是一个普通的钩子，每当迷你缓冲区退出时就会运行。 @xref{Hooks}。
+@end defvar
+
+@defvar minibuffer-help-form
+@anchor{Definition of minibuffer-help-form}
+该变量的当前值用于在迷你缓冲区 (@pxref{Help Functions}) 内本地重新绑定 @code{help-form}。
+@end defvar
+
+@defvar minibuffer-scroll-window
+@anchor{Definition of minibuffer-scroll-window}
+如果该变量的值非@code{nil}，则它应该是一个窗口对象。  当在迷你缓冲区中调用函数@code{scroll-other-window}时，它会滚动该窗口（@pxref{Textual Scrolling}）。
+@end defvar
+
+@defun minibuffer-selected-window
+此函数返回在选择迷你缓冲区窗口之前选择的窗口。  如果所选窗口不是迷你缓冲区窗口，则返回@code{nil}。
+@end defun
+
+@vindex minibuffer-message-timeout
+@defun minibuffer-message string &rest args
+此函数类似于 @code{message} (@pxref{Displaying Messages})，但当用户在迷你缓冲区中键入时，它会专门显示消息，通常是因为 Emacs 提示用户进行某些输入。当迷你缓冲区是当前缓冲区时，该函数将@var{string}指定的消息暂时显示在迷你缓冲区文本的末尾，从而避免通过消息的回显区域显示来隐藏迷你缓冲区文本。  它将消息显示几秒钟，或者直到下一个输入事件到达，以先到者为准。  变量@code{minibuffer-message-timeout}指定在没有输入的情况下等待的秒数。  默认为2。如果@var{args}非@code{nil}，则通过@var{string}和@var{args}通过@code{format-message}传递实际消息。 @xref{Formatting Strings}。
+
+如果在迷你缓冲区不是当前缓冲区时调用该函数，则该函数仅调用@code{message}，因此@var{string}将显示在回显区域中。
+@end defun
+
+@deffn Command minibuffer-inactive-mode
+这是非活动迷你缓冲区中使用的主要模式。  它使用键盘映射@code{minibuffer-inactive-mode-map}。  如果迷你缓冲区位于单独的帧中，这可能很有用。  @xref{Minibuffers and Frames}。
+@end deffn
+
+@deffn Command minibuffer-regexp-mode
+这种次要模式使得在迷你缓冲区中编辑正则表达式更加方便。  它以用户友好的方式通过 @code{show-paren-mode} 和 @code{blink-matching-paren} 突出显示括号，避免报告错误的括号不匹配，并使 sexp 导航更加直观。
+@end deffn
+
+默认情况下，当迷你缓冲区激活时，只有某些迷你缓冲区提示会自动激活 @code{minibuffer-regexp-mode} 的便利功能。  该提示列表可以通过 @code{minibuffer-regexp-prompts} 自定义。
+
+@defopt minibuffer-regexp-prompts
+该变量保存用于激活迷你缓冲区中 @code{minibuffer-regexp-mode} 功能的正则表达式列表。  仅当迷你缓冲区提示与列表中的正则表达式之一匹配时，才会激活该模式的功能。
+@end defopt
