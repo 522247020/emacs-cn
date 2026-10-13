@@ -249,7 +249,11 @@ $HOME/.local/emacs-cn/bin/emacs -nw
 | Emacs 手册 | `(emacs)` | `doc/emacs` |
 | Elisp 参考手册 | `(elisp)` | `doc/lispref` |
 | Emacs Lisp 入门 | `(eintr)` | `doc/lispintro` |
-| Org 手册 | `(org)` | `doc/misc` |
+| **`doc/misc` 全部手册（68 本）** | 各自 | `doc/misc` |
+
+`doc/misc` 包含 Emacs FAQ、Gnus、Tramp、Calc、CC Mode、CL、Eshell、Erc、
+RefTeX、Viper、Widget、Use-package、Eglot、Flymake、Woman、Autotype、DBus、
+Todo、MH-E、Modus Themes、Org 等。
 
 - 译文位置：`l10n/manual-zh/<手册>/*.texi`
 - 构建时 `ci/build-emacs.sh` 会自动调用 `ci/apply-manual-zh.sh` 把译文套用到
