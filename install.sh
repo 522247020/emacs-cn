@@ -67,11 +67,16 @@ install_missing() {
     fi
   elif command -v pacman >/dev/null 2>&1; then
     echo "==> 用 pacman 安装运行时依赖"
-    $SUDO pacman -S --needed --noconfirm \
-      gtk3 libxml2 gnutls jansson harfbuzz ncurses zlib \
-      libjpeg-turbo libpng giflib libtiff librsvg libxpm \
-      libotf m17n-lib libsystemd dbus sqlite libffi nettle p11-kit \
-      libidn2 libunistring acl libselinux gpm libgccjit || true
+    ARCH_RT="gtk3 libxml2 gnutls jansson harfbuzz ncurses zlib
+      libjpeg-turbo libpng giflib libtiff librsvg libxpm
+      libotf m17n-lib systemd-libs dbus sqlite libffi nettle p11-kit
+      libidn2 libunistring acl gpm libgccjit"
+    pkgs=""
+    for p in $ARCH_RT; do
+      pacman -Si "$p" >/dev/null 2>&1 && pkgs="$pkgs $p"
+    done
+    # shellcheck disable=SC2086
+    $SUDO pacman -S --needed --noconfirm $pkgs || true
   elif command -v dnf >/dev/null 2>&1; then
     echo "==> 用 dnf 安装运行时依赖"
     $SUDO dnf install -y \

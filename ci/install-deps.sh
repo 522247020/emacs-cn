@@ -34,12 +34,25 @@ if command -v pacman >/dev/null 2>&1; then
 
   # 容器里 keyring 可能过期
   $SUDO pacman -Sy --noconfirm archlinux-keyring || true
-  $SUDO pacman -Syu --needed --noconfirm \
-    base-devel git autoconf automake texinfo pkgconf zstd \
-    gnutls libxml2 jansson gmp gtk3 harfbuzz ncurses zlib \
-    libjpeg-turbo libpng giflib libtiff librsvg libxpm \
-    libotf m17n-lib libsystemd dbus sqlite libffi nettle p11-kit \
-    libidn2 libunistring acl libselinux gpm libgccjit
+
+  # Arch 包名（systemd-libs 提供 libsystemd；SELinux 官方仓库没有，可选）
+  ARCH_PKGS="base-devel git autoconf automake texinfo pkgconf zstd
+    gnutls libxml2 jansson gmp gtk3 harfbuzz ncurses zlib
+    libjpeg-turbo libpng giflib libtiff librsvg libxpm
+    libotf m17n-lib systemd-libs dbus sqlite libffi nettle p11-kit
+    libidn2 libunistring acl gpm libgccjit"
+
+  # 只安装仓库中确实存在的包
+  pkgs=""
+  for p in $ARCH_PKGS; do
+    if pacman -Si "$p" >/dev/null 2>&1; then
+      pkgs="$pkgs $p"
+    else
+      echo "    跳过仓库中不存在的包：$p"
+    fi
+  done
+  # shellcheck disable=SC2086
+  $SUDO pacman -S --needed --noconfirm $pkgs
 
 elif command -v apt-get >/dev/null 2>&1; then
   echo "==> 检测到 Debian/Ubuntu，使用 apt 安装依赖"

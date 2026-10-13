@@ -151,7 +151,8 @@ make install
 ```
 
 > `ci/install-deps.sh` 在各发行版上安装的包：
-> - **Arch**：`base-devel autoconf automake texinfo pkgconf zstd gnutls libxml2 jansson gmp gtk3 harfbuzz ncurses zlib libjpeg-turbo libpng giflib libtiff librsvg libxpm libotf m17n-lib libsystemd dbus sqlite libffi nettle p11-kit libidn2 libunistring acl libselinux gpm libgccjit`
+> - **Arch**：`base-devel autoconf automake texinfo pkgconf zstd gnutls libxml2 jansson gmp gtk3 harfbuzz ncurses zlib libjpeg-turbo libpng giflib libtiff librsvg libxpm libotf m17n-lib systemd-libs dbus sqlite libffi nettle p11-kit libidn2 libunistring acl gpm libgccjit`
+>   （脚本会自动跳过仓库中不存在的包；`libselinux` 在 Arch 官方仓库没有，SELinux 支持为可选，会自动省略）
 > - **Debian/Ubuntu**：`build-essential autoconf automake texinfo pkg-config zstd libgnutls28-dev libxml2-dev libjansson-dev libgmp-dev libgtk-3-dev libharfbuzz-dev libncurses-dev zlib1g-dev libjpeg-dev libpng-dev libgif-dev libtiff-dev librsvg2-dev libxpm-dev libotf-dev libm17n-dev libsystemd-dev libdbus-1-dev libsqlite3-dev libffi-dev libnettle-dev libp11-kit-dev libidn2-dev libunistring-dev libacl1-dev libselinux1-dev libgpm-dev` + `libgccjit-<ver>-dev`
 
 ## 自动构建（GitHub / Gitea）
