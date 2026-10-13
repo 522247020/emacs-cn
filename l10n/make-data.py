@@ -409,6 +409,25 @@ MANUAL = {
     '\n  (this binding is currently shadowed)': '\n  （此绑定当前被遮蔽）',
     ', which is ': '，即 ',
     ', which is not currently defined.\n': '，它当前未定义。\n',
+
+    # Info 阅读器 / 菜单常见项
+    'Up': '向上',
+    'Next': '下一个',
+    'Previous': '上一个',
+    'Backward': '向后',
+    'Forward': '向前',
+    'Beginning': '开头',
+    'Top': '顶部',
+    'Final Node': '末尾节点',
+    'First Node': '第一个节点',
+    'Go to Node...': '转到节点…',
+    'Go to node...': '转到节点…',
+    'Search...': '搜索…',
+    'Search Next': '查找下一个',
+    'Copy Node Name': '复制节点名',
+    'Clone Info buffer': '克隆 Info 缓冲区',
+    'Index': '索引',
+    'Menu': '菜单',
 }
 
 

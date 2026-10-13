@@ -499,6 +499,24 @@ tooltips show Chinese documentation."
 
 ;;; Setup
 
+;;; easy-menu（许多主模式用它，菜单在打开时才构建）
+
+(defun chinese-l10n--easy-menu-convert (item)
+  "Translate the menu item returned by `easy-menu-convert-item'.
+The result is either (menu-item LABEL ...) or (KEY menu-item LABEL ...)."
+  (cond
+   ((and (consp item) (eq (car item) 'menu-item))
+    (chinese-l10n--translate-menu-item item))
+   ((and (consp item) (eq (cadr item) 'menu-item))
+    (chinese-l10n--translate-menu-item (cdr item))))
+  item)
+
+(defun chinese-l10n--setup-easy-menu ()
+  "Translate menus built lazily by `easy-menu-define'."
+  (when (fboundp 'easy-menu-convert-item)
+    (advice-add 'easy-menu-convert-item :filter-return
+                #'chinese-l10n--easy-menu-convert)))
+
 (defun chinese-l10n-setup ()
   "Enable Chinese localization of the user interface."
   (unless (hash-table-p chinese-l10n-table)
@@ -510,6 +528,7 @@ tooltips show Chinese documentation."
       (setq yes-or-no-prompt "\uff08\u662f\u6216\u5426\uff09 "))
     (chinese-l10n--setup-prompts)
     (chinese-l10n--setup-widgets)
+    (chinese-l10n--setup-easy-menu)
     (chinese-l10n--setup-completion)
     (chinese-l10n--setup-documentation)
     (chinese-l10n--translate-error-symbols)
