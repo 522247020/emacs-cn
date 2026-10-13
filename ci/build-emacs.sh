@@ -15,7 +15,18 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 PREFIX=${PREFIX:-/opt/emacs-cn}
 NATIVE=${NATIVE:-yes}
 JOBS=${JOBS:-$(nproc 2>/dev/null || echo 2)}
-OUT=${OUT:-emacs-cn-linux-x86_64.tar.zst}
+
+# 按发行版自动命名产物（可用 OUT 覆盖）
+if [ -z "${OUT:-}" ]; then
+  ID=""; ID_LIKE=""
+  # shellcheck disable=SC1091
+  [ -r /etc/os-release ] && . /etc/os-release 2>/dev/null || true
+  case "$ID $ID_LIKE" in
+    *arch*|*manjaro*|*omarchy*) OUT=emacs-cn-arch-x86_64.tar.zst ;;
+    *debian*|*ubuntu*|*mint*|*pop*) OUT=emacs-cn-debian-x86_64.tar.zst ;;
+    *) OUT=emacs-cn-linux-x86_64.tar.zst ;;
+  esac
+fi
 
 case "$NATIVE" in
   yes|true|1) NATIVE_OPT=--with-native-compilation ;;
