@@ -1,0 +1,1567 @@
+\输入texinfo
+@c %**start of header
+@setfilename ../../info/erc.info
+@settitle ERC手册
+@documentlanguage en
+@set ERCVER 5.6.2.31.1
+@set ERCDIST as distributed with Emacs @value{EMACSVER}
+@include docstyle.texi
+@syncodeindex fn cp
+@include emacsver.texi
+@c %**end of header
+
+@copying
+本手册适用于 ERC @value{ERCVER} @value{ERCDIST}。
+
+版权所有 @copyright{} 2005--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+
+本文档中包含的所有 Emacs Lisp 代码都可以不受限制地使用、分发和修改。
+@end quotation
+@end copying
+
+@dircategory Emacs network features
+@direntry
+* ERC: (erc).                    适用于 Emacs 的强大且可扩展的 IRC 客户端。
+@end direntry
+
+@titlepage
+@title ERC手册
+@subtitle 功能齐全的 IRC 客户端
+@subtitle 对于 Emacs
+
+@c The following two commands
+@c start the copyright page.
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top ERC
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Introduction::                 什么是ERC？
+* Getting Started::              使用 ERC 的快速入门指南。
+* Keystroke Summary::            ERC 缓冲区中使用的击键。
+* Modules::                      ERC 的可用模块。
+* Advanced Usage::               使用 ERC 的酷炫方式。
+* Getting Help and Reporting Bugs::
+* History::                      ERC 的历史。
+* GNU Free Documentation License::   本文档的许可证。
+* Concept Index::                搜索术语。
+
+@detailmenu
+--- 详细节点列表 ---
+
+入门
+
+* Sample Session::               连接到 @samp{#emacs} 通道的示例
+* Special Features::             与独立 IRC 客户端的差异
+
+高级用法
+
+* Connecting::                   连接到 IRC 服务器的方式。
+* SASL::                         通过 SASL 进行身份验证。
+* Sample Configuration::         示例配置文件。
+* Integrations::                 可用于 ERC 的集成。
+* Options::                      可用于 ERC 的选项。
+
+@end detailmenu
+@end menu
+
+@node Introduction
+@chapter 介绍
+
+ERC 是 Emacs 的强大、模块化且可扩展的 IRC 客户端。它自 2006 年起就被包含在 Emacs 中 (@pxref{History})，并且也可以在 GNU ELPA 上使用。
+
+IRC 是互联网中继聊天的缩写。  使用IRC时，您可以与同一IRC网络上的其他用户进行通信。  有许多不同的网络——如果您在您最喜欢的搜索引擎中搜索“IRC 网络”，您将找到满足各种兴趣和主题的 IRC 网络的最新列表。
+
+要使用 IRC，您需要一个 IRC 客户端，例如 ERC。  使用客户端，您可以连接到 IRC 服务器。  完成此操作后，您将可以访问该服务器网络上的所有可用频道。  频道基本上是一个聊天室，您在频道中键入的内容将显示给该频道中的所有其他用户。  您可以同时进入多个频道——ERC 将在其自己的缓冲区中显示每个频道。
+
+IRC 频道名称始终以 @samp{#} 字符开头。  例如，Libera.Chat 上的 Emacs 通道是@samp{#emacs}，ERC 通道是@samp{#erc}。  不要将它们与许多社交媒体平台上使用的主题标签混淆。
+
+您还可以向同一网络上的其他 IRC 用户发送私人消息，即使他们与您不在同一频道中。
+
+ERC 默认启用以下功能。
+
+@itemize @bullet
+@item 防洪
+@item 时间戳
+@item 自动加入频道
+@item 对 URL、昵称和其他文本进行按钮化
+@item 换行长线
+@item 突出显示或删除 IRC 控制字符
+@item 突出显示朋友、傻瓜和其他关键字
+@item 检测网络分裂
+@item 以可编程方式完成昵称和命令
+@item 将显示的行设置为只读
+@item 输入历史记录
+@item 跟踪模式行中的渠道活动
+
+@end itemize
+
+
+@node Getting Started
+@chapter 入门
+@cindex settings
+
+命令@kbd{M-x erc}将启动 ERC 并提示连接服务器。  如果您不确定要连接到哪个服务器或网络，我们建议从“irc.libera.chat”开始。  在那里您可以找到 @samp{#emacs} 频道，您可以在其中与其他 Emacs 用户聊天，如果您在使用 ERC 时遇到问题，可以加入 @samp{#erc} 频道并在那里寻求帮助。
+
+在您的 ERC 之旅中的某个时刻，您将不可避免地想要改变客户的外观和行为方式。  与其他 Emacs 应用程序一样，存储设置的典型位置是 @file{init.el}。  如果您更愿意使用自定义界面，那么运行 @kbd{M-x customize-group @key{RET} erc @key{RET}} 是一个不错的起点。  特别是，ERC 附带了许多可以启用或禁用的模块；要选择您想要的，请执行@kbd{M-x customize-variable @key{RET} erc-modules @key{RET}}。
+
+@menu
+* Sample Session::               连接到 #emacs 频道的示例
+* Special Features::             与独立 IRC 客户端的差异
+@end menu
+
+@node Sample Session
+@section 示例会话
+
+此示例 ERC 会话描述了如何连接到 Libera.Chat 上的 @samp{#emacs} 通道。  另外值得一看的是 Libera 自己的 IRC 入门指南，@uref{https://libera.chat/guides/basics}，它提供了更全面的概述，但没有专门针对 ERC 的说明。
+
+@itemize @bullet
+
+@item 连接到 Libera.Chat
+
+运行@kbd{M-x erc @key{RET}}。  使用 @samp{irc.libera.chat} 表示服务器，使用 @samp{6667} 表示端口。  选择一个昵称，当询问您是否愿意通过 @acronym{TLS} 连接时，请点击 @key{y}。
+
+@item 习惯界面
+
+如果您尚未到达，请切换到 @file{Libera.Chat} 缓冲区。 ERC 将此称为 @dfn{server buffer}，并且它必须在会话期间存在。  您可能会看到一些有关“ident”、身份验证等的消息，后面是描述当前服务器和网络的信息。
+
+@item 加入#emacs 频道
+
+在服务器缓冲区中，根据提示键入 @kbd{/join #emacs @key{RET}}。 ERC 将创建一个名为 @file{#emacs} 的新缓冲区。  如果您已经配置了 ERC，则可能需要手动切换到它。  到达那里后，您将在缓冲区的标题行 (@pxref{Header Lines,,,elisp,}) 中看到频道的“主题”以及当前在频道中的人员列表。  如果您看不到完整的主题，请将鼠标悬停在该主题上或在提示符处输入 @kbd{/topic @key{RET}}。
+
+@item 使用 Libera.Chat 注册您的昵称
+
+为了访问基本的网络功能，例如在某些频道中发言和参与私人对话，您可能必须“注册”您的昵称。  为此，请切换到 @file{Libera.Chat} 缓冲区并输入 @kbd{/msg NickServ register @samp{<password>} @samp{<email>} @key{RET}}，将 @samp{<password>} 和 @samp{<email>} 替换为您所需的帐户密码和联系电子邮件（均不含引号）。  服务器应该告诉您操作成功。  如果遇到问题，请参阅官方 Libera.Chat 文档。
+
+除了创建帐户之外，此过程还在会话期间向网络的“帐户服务”系统“验证”您的身份。  换句话说，您现在已登录。但是，当您将来连接时，您需要通过以某种方式提供相同的凭据来再次进行身份验证。  当您完成本演练后，请参阅下面的“后续步骤”，了解一些实现此目的的方法。
+
+@item 与频道中的人交谈
+
+切换回 @file{#emacs} 缓冲区并在提示符下键入消息，满意后点击 @kbd{RET}。  频道中的每个人现在都会看到您的消息。
+
+@item 打开查询缓冲区与某人交谈
+
+如果您想与某人私下交谈，请输入 @kbd{/query @samp{<nick>} @key{RET}}，将 @samp{<nick>} 替换为他们的昵称。  和以前一样，对于服务器缓冲区，如果这个新的 @dfn{query buffer} 没有出现在当前窗口中，您可能必须切换到它。  无论如何，它的名称应该与 @samp{<nick>} 匹配。  到达那里后，在提示符下输入一些内容并按@kbd{RET}，对方就会看到它。
+
+请记住，如果任何一方未经过身份验证，您可能根本无法进行交谈。  此外，根据网络的不同，某些社会惯例可能适用于直接消息传递的实践。  作为一般规则，查询通常应保留用于个人事务而不是技术帮助，这通常可以使更多受众受益（并且受益于 @emph{from}）。
+
+@item 后续步骤
+
+尝试加入另一个频道，例如 @samp{#erc}，ERC 用户和开发人员经常在其中闲逛（@pxref{Official IRC channels} 了解有关 @samp{#emacs} 历史的更多信息）。  有关各种自定义选项的想法，@pxref{Sample Configuration}。  要了解 ERC 如何在您连接时自动对网络进行身份验证，@pxref{SASL}。  一如既往，如果您遇到问题，@pxref{Getting Help and Reporting Bugs}。
+
+@end itemize
+
+@node Special Features
+@section 特色
+
+ERC 具有一些区别于某些 IRC 客户端的功能。
+
+@itemize @bullet
+
+@item 多渠道、多服务器
+
+每个通道都放在单独的缓冲区中。  可以同时连接多个 IRC 服务器。
+
+@cindex query buffers
+@item 私信分离
+
+私人对话被视为通道，并被放入 Emacs 中单独的缓冲区中。  我们称这些为“查询缓冲区”。
+
+@item 突出显示
+
+某些出现的单词可以突出显示，这使得跟踪不同类型的对话变得更加容易。
+
+@item 通知
+
+ERC 可以通知您某些用户在线。
+
+@item 渠道追踪
+
+可以隐藏频道并在后台继续对话。  当在当前不可见的频道中说出某些内容时，您会收到通知。  这使得您可以轻松完成实际工作，同时仍保持 IRC 存在。
+
+@item 缺口补全
+
+ERC 可以在点击@kbd{TAB} 时完成单词，这简化了消息中昵称的书写。
+
+@cindex history ring
+@item 历史
+
+过去的操作保存在历史环中以供将来使用。  要导航历史记录环，请按 @kbd{M-p} 向后移动，按 @kbd{M-n} 向前移动。
+
+@item 多种语言
+
+不同的频道和服务器可能有不同的语言编码。
+
+多种语言。  如果您有兴趣帮助翻译工作，请联系 Emacs 开发人员。
+
+@item 用户脚本
+
+用户可以在 ERC 启动时加载脚本（例如自动问候脚本）。
+
+如果您了解一点 Emacs Lisp，也可以创建自定义 IRC 命令。  只需创建一个 Emacs Lisp 函数并将其命名为 ⁣​​0⁣，其中 @code{NEWCOMMAND} 是新命令的大写字母名称。
+
+@item 自动重新连接
+
+如果连接在某个时刻断开，ERC 将尝试自动重新连接。  如果重新连接失败，并且您想稍后尝试手动重新建立连接，请切换到 ERC 缓冲区并运行 @code{/RECONNECT} 命令。
+
+@end itemize
+
+
+@node Keystroke Summary
+@chapter ERC 中使用的密钥
+@cindex keystrokes
+
+这是每个 ERC 缓冲区中可用的击键摘要。
+
+@table @kbd
+
+@item C-a or <home> (@code{erc-bol})
+转到行首或提示符末尾。
+
+@item @key{RET} (@code{erc-send-current-line})
+发送当前行
+
+@item @key{TAB} (@code{completion-at-point} or @code{erc-button-next})
+如果出现提示，请完成当前单词。否则，移至下一个链接或按钮。
+
+@item M-@key{TAB} (@code{ispell-complete-word})
+使用 ispell 完成给定的单词。
+
+@item C-c C-a (@code{erc-bol})
+转到行首或提示符末尾。
+
+@item C-c C-b (@code{erc-switch-to-buffer})
+使用 @code{read-buffer} 提示切换到 ERC 缓冲区。
+
+@item C-c C-c (@code{erc-toggle-interpret-controls})
+切换消息中控制序列的解释。
+
+@item C-c C-d (@code{erc-input-action})
+交互式输入用户操作并将其发送到 IRC。
+
+@item C-c C-e (@code{erc-toggle-ctcp-autoresponse})
+切换自动 CTCP 回复（如 VERSION 和 PING）。
+
+@item C-c C-f (@code{erc-toggle-flood-control})
+切换对发送的消息使用洪水控制。
+
+@item C-c @key{TAB} (@code{erc-invite-only-mode})
+打开当前频道的仅限邀请模式 (+i)。
+
+@item C-c C-j (@code{erc-join-channel})
+加入频道。  如果 point 位于通道名称的开头，则使用它作为默认值。
+
+@item C-c C-k (@code{erc-go-to-log-matches-buffer})
+以交互方式打开 erc-log-matches 缓冲区
+
+@item C-c C-l (@code{erc-save-buffer-in-logs})
+如果启用了日志记录，则将缓冲区内容附加到日志文件。
+
+@item C-c C-n (@code{erc-channel-names})
+在当前频道中运行“/names #channel”。
+
+@item C-c C-o (@code{erc-get-channel-mode-from-keypress})
+读取按键序列并调用相应的通道模式函数。执行@kbd{C-c C-o}后，输入通道模式字母。
+
+@kbd{C-g} 表示退出。 @kbd{RET} 可让您一次输入多种模式。如果按下@kbd{l}，则会调用@code{erc-set-channel-limit}。如果按下@kbd{k}，则会调用@code{erc-set-channel-key}。其他任何内容都会发送到@code{erc-toggle-channel-mode}。
+
+@item C-c C-p (@code{erc-part-from-channel})
+退出当前频道并提示原因。
+
+@item C-c C-q (@code{erc-quit-server})
+提示原因后断开与当前服务器的连接。
+
+@item C-c C-r (@code{erc-remove-text-properties-region})
+清除对象中区域（开始、结束）的所有颜色等。
+
+@item C-c C-t (@code{erc-set-topic})
+提示输入当前频道的主题。
+
+@item C-c C-u (@code{erc-kill-input})
+使用 @code{erc-bol} 后跟 @code{kill-line} 终止当前输入行。
+
+@end table
+
+
+@node Modules
+@chapter 模块
+@cindex modules
+
+向 ERC 添加功能的一种方法是自定义加载其众多模块中的哪些模块。
+
+您可以通过键入 @kbd{C-h v erc-modules @key{RET}} 并单击生成的帮助缓冲区底部附近的 @samp{customize} 来完成此操作，其中显示“您可以 @emph{customize} 这个变量”。在自定义之外删除模块时，您可能希望通过使用非正前缀参数（例如 @kbd{C-u - M-x erc-spelling-mode @key{RET}}）调用其关联的次要模式切换来确保其被禁用。  此外，如果您计划加载在激活时执行非典型设置的第三方模块，您可能需要安排在初始化文件中调用@code{erc-update-modules}。  此类设置的示例可能包括注册 @code{erc-before-connect} 挂钩、建议 @code{erc-open} 以及修改 @code{erc-modules} 本身。  在 Emacs 29 及更高版本上，您还可以通过 @code{(setopt erc-modules erc-modules)} 间接运行 @code{erc-update-modules}。
+
+以下是可用模块的列表。
+
+@table @code
+
+@cindex modules, autoaway
+@item autoaway
+自动设置离开状态
+
+@cindex modules, autojoin
+@item autojoin
+自动加入频道
+
+@cindex modules, bufbar
+@item bufbar
+列出属于侧窗口中的连接的缓冲区；属于自定义组@code{erc-status-sidebar}
+
+@cindex modules, button
+@item button
+对 URL、昵称和其他文本进行按钮化
+
+@cindex modules, capab-identify
+@item capab-identify
+在 freenode 和其他支持 CAPAB 的服务器上标记身份不明的用户。
+
+@cindex modules, command-indicator
+@item command-indicator (local)
+回显“斜线命令”的命令行，例如 @kbd{/JOIN #erc} 和 @kbd{/HELP join}
+
+@cindex modules, completion
+@cindex modules, pcomplete
+@item completion (aka pcomplete)
+完整的昵称和命令（可编程）
+
+@cindex modules, fill
+@item fill
+换行长线
+
+@cindex modules, identd
+@item identd
+在端口 8113 上启动 identd 服务器
+
+@cindex modules, irccontrols
+@item irccontrols
+突出显示或删除 IRC 控制字符
+
+@cindex modules, keep-place
+@item keep-place
+记住您在缓冲区中的位置
+
+@cindex modules, log
+@item log
+将缓冲区保存在日志中
+
+@cindex modules, match
+@item match
+突出显示朋友、傻瓜和其他关键字
+
+@cindex modules, menu
+@item menu
+在 ERC 缓冲区中显示菜单
+
+@cindex modules, netsplit
+@item netsplit
+检测网络分裂
+
+@cindex modules, nicks
+@item nicks (local)
+自动为刻痕着色
+
+@cindex modules, nickbar
+@item nickbar
+在侧窗中列出当前目标缓冲区的参与缺口；属于自定义组@code{erc-speedbar}
+
+@cindex modules, noncommands
+@item noncommands
+评估后不显示非 IRC 命令
+
+@cindex modules, notify
+@item notify
+当某些用户的在线状态发生变化时通知
+
+@cindex modules, notifications
+@item notifications
+当您收到私人消息或提及您的昵称时向您发送通知
+
+@cindex modules, page
+@item page
+处理来自 IRC 的 CTCP PAGE 请求
+
+@cindex modules, readonly
+@item readonly
+将显示的行设置为只读
+
+@cindex modules, replace
+@item replace
+替换消息中的文本
+
+@cindex modules, ring
+@item ring
+启用输入历史记录
+
+@cindex modules, sasl
+@item sasl (local)
+启用 SASL 身份验证
+
+@cindex modules, scrolltobottom
+@item scrolltobottom
+滚动到缓冲区底部
+
+@cindex modules, services
+@item services
+自动识别 Nickserv（IRC 服务）
+
+@cindex modules, smiley
+@item smiley
+将笑脸转换为漂亮的图标
+
+@cindex modules, sound
+@item sound
+当您收到 CTCP SOUND 请求时播放声音
+
+@cindex modules, spelling
+@item spelling
+检查消息的拼写
+
+@cindex modules, stamp
+@item stamp
+为消息添加时间戳
+
+@cindex modules, track
+@item track
+跟踪模式行中的渠道活动
+
+@cindex modules, truncate
+@item truncate
+将缓冲区截断至特定大小
+
+@cindex modules, unmorse
+@item unmorse
+翻译消息中的摩尔斯电码
+
+@end table
+
+@anchor{Auxiliary Modules}
+@subheading 辅助模块
+@cindex auxiliary modules
+
+由于各种原因，以下模块当前未在 @code{erc-modules} 的自定义界面中列出，但您可以随意显式添加它们。  它们可能由另一个模块管理，或者被认为太小众或实验性。
+
+@table @code
+
+@cindex modules, fill-wrap
+@item fill-wrap (local)
+使用 @code{visual-line-mode} 换行
+
+@cindex modules, keep-place-indicator
+@item keep-place-indicator (local)
+通过可见的提醒记住您在缓冲区中的位置；以交互方式或通过类似@code{erc-join-hook}之类的方式激活
+
+@cindex modules, querypoll
+@item querypoll (local)
+通过不断轮询服务器来更新查询参与者数据
+
+@cindex modules, services-regain
+@item services-regain (local)
+重新连接时自动要求 NickServ 收回您的昵称；自 ERC 5.6 起处于实验阶段
+
+@end table
+
+@anchor{Required Modules}
+@subheading 所需模块
+@cindex required modules
+
+请注意，某些模块对于核心 IRC 操作至关重要，因此上面未列出。  尽管如此，您仍然可以删除它们，但这样做需要采取特殊的预防措施，以避免降低用户体验。目前，唯一的这样的模块是@code{networks}，无论如何它的库 ERC 总是加载。
+
+@anchor{Local Modules}
+@subheading 本地模块
+@cindex local modules
+
+@c Earlier language in code comments, commit messages, and tracker
+@c discussions used to describe a local module as being "active" in a
+@c buffer if it had a local binding but "disabled" if that binding's
+@c value was nil.  For better or worse, ERC has since abandoned that
+@c distinction and now considers "active" to be synonymous with
+@c "enabled".
+
+所有模块在底层都以次要模式运行，较新的模块大多定义为缓冲区本地。  这些所谓的 @dfn{local modules} 是一项正在进行的工作，它们的行为和界面可能会发生变化。  自 ERC 5.6 起，唯一的实际差异如下：
+
+@enumerate
+@item
+@dfn{Mode variables}，又名@dfn{control variables}，与@code{erc-sasl-mode} 一样，在 IRC 会话中保留其值。
+@item
+通过自定义从 @code{erc-modules} 中删除本地模块不仅会禁用其模式，还会杀死所有 ERC 缓冲区中的模式变量。
+@item
+@dfn{Mode commands} 与 @code{erc-sasl-mode} 及其单向变体 @code{erc-sasl-enable} 和 @code{erc-sasl-disable} 的行为与其全局对应物不同。
+@end enumerate
+
+要检测模块是否是本地模块，请检查其模式变量。  例如，如果您运行@kbd{C-h v erc-sasl-mode @key{RET}}，您会注意到它显示“设置时自动成为缓冲区本地”。  您可以在 Lisp 代码中使用 @code{(local-variable-if-set-p 'erc-sasl-mode)} 执行相同的操作。
+
+在 ERC 缓冲区中，如果本地模块的模式变量具有本地绑定，则该模块将被启用或禁用。  这个@dfn{activation state}可能与@code{erc-modules}中模块的存在相矛盾，即在它不适用或已被禁用的缓冲区中。  事实上，本地模块在 @code{erc-modules} 中的成员资格只不过是保证
+
+@enumerate
+@item
+它的设置代码在 @emph{new} 缓冲区中运行
+@item
+它的模式变量在所有受影响的缓冲区中都有本地绑定
+@end enumerate
+
+为了与此保持一致，所有内置本地模块都会在不适用的缓冲区中禁用自身，而不是保持无操作状态。  有些人还会在需要时在其他地方采取措施，或者至少发出有用的错误。  例如，@samp{nicks}模块在服务器缓冲区中执行这两项操作，在它主要服务的目标缓冲区之间共享资源。  ERC 期望第三方本地模块模仿这种模式并记录它们运行的​​缓冲区类型：服务器、查询或通道。  （在@samp{nicks}的情况下，这将是全部三个：它是@dfn{session-local}。）
+
+在 ERC 中，您可以将 IRC 会话视为共享与服务器的同一连接的一组缓冲区。  连接结束后，这种关联会持续存在，以便 ERC 可以在重新连接时恢复会话。  与连接参数一样，ERC 因此通过重新连接保留本地模块的激活状态，重新启用先前处于活动状态的模块，同时确保禁用其他模块。  这里需要注意的一些相关事项是
+
+@enumerate
+@item
+每个模块必须管理自己的应用程序数据并相应地恢复或重置其环境
+@item
+如果用户在会话之间更改 @code{erc-modules} 的构成，会话持久性就不太可预测
+@end enumerate
+
+当涉及本地模块的各种激活命令时，主要模式命令（例如 @code{erc-sasl-mode}）仅影响当前缓冲区，但其单向表兄弟（例如 @code{erc-sasl-enable} 和 @code{erc-sasl-disable}）对属于其连接的所有缓冲区进行操作（交互调用时）。  与全局切换不同，这些都不会发生突变 @code{erc-modules}。
+
+
+@c FIXME add section to Advanced chapter for creating modules, and
+@c move this there.
+@anchor{Module Loading}
+@subheading 加载中
+@cindex module loading
+
+ERC 按字母顺序加载内部模块，并按 @code{erc-modules} 中的顺序加载第三方模块。  定义自己的模块时，请注意确保 ERC 可以找到它。  一种简单的方法是模仿文档字符串中 @code{define-erc-module} 的示例（如下所示）。  由于历史原因，ERC 回落到 2⁣ing 功能。  例如，如果@code{erc-modules}中的某些模块@code{my-module}缺少相应的@code{erc-my-module-mode}命令，ERC将在连接之前尝试加载库@code{erc-my-module}。  如果失败，ERC 会发出错误信号。  在 init 文件中定义个人模块的用户应该 @code{(provide 'erc-my-module)} 某个地方来安抚 ERC。不支持动态动态生成模块。
+
+一些较旧的内置模块有第二个名称和第二个次要模式切换，这只是其主要对应部分的函数别名。  出于实际原因，ERC 没有定义相应的变量别名，因为与间接变量的竞争会使簿记任务变得复杂，例如跨 IRC 会话持久保存模块状态。  新模块绝对应该避免在没有充分理由的情况下定义别名。
+
+已知某些软件包会自动加载模块的定义，而不是其次要模式命令，这会切断库和模块之间的链接。  这意味着通过调用其命令切换来启用该模式不足以加载其定义库。  因此，包应该只提供与模块相关的自动加载 cookie，其模块的次要模式命令具有实际的 @code{autoload} 形式，如下所示：
+
+@lisp
+;;;###autoload(autoload 'erc-my-module-mode "erc-my-module" nil t)
+(define-erc-module my-module nil
+  "My doc string."
+  ((add-hook 'erc-insert-post-hook #'erc-my-module-on-insert-post))
+  ((remove-hook 'erc-insert-post-hook #'erc-my-module-on-insert-post)))
+@end lisp
+
+@noindent
+正如前面所暗示的，只要模块的前缀名称与其定义库的前缀名称和库提供的功能相匹配，包通常可以完全省略此类 cookie。
+
+最后，还观察到包以顶级形式运行@code{erc-update-modules}，迫使 ERC 采取特殊预防措施以避免递归调用。  另一个不幸的做法是在加载 @code{erc} 时改变 @code{erc-modules} 本身，可能是通过自动加载的方式。  执行此技巧自定义会错误地显示 @code{erc-modules} 的小部件，并将内置模块从预定义的清单移至用户提供的自由格式区域。
+
+@c PRE5_4: Document every option of every module in its own subnode
+
+
+@node Advanced Usage
+@chapter 高级用法
+@cindex advanced topics
+
+@menu
+* Connecting::                   连接到 IRC 服务器的方式。
+* SASL::                         通过 SASL 进行身份验证。
+* Sample Configuration::         示例配置文件。
+* Integrations::                 可用于 ERC 的集成。
+* Options::                      可用于 ERC 的选项。
+
+@detailmenu
+--- 详细节点列表 ---
+
+集成
+
+* URL::                          在 ERC 中打开 IRC URL。
+* SOCKS::                        使用 SOCKS 代理连接到 IRC。
+* auth-source::                  使用 ERC 检索 auth-source 条目。
+* display-buffer::               控制 ERC 如何显示缓冲区。
+
+@end detailmenu
+@end menu
+
+@node Connecting
+@section 连接到 IRC 服务器
+@cindex connecting
+
+连接到 IRC 服务器的最简单方法是调用 @kbd{M-x erc}。如果你想将此功能分配给一个按键，下面将帮助你弄清楚它的参数。
+
+@defun erc
+选择连接参数并以非交互方式运行 ERC@.，它采用以下关键字参数。
+
+@itemize @bullet
+@item @var{server}
+@item @var{port}
+@item @var{nick}
+@item @var{user}
+@item @var{password}
+@item @var{full-name}
+@item @var{id}
+@end itemize
+
+例如，像这样调用命令
+
+@example lisp
+(erc :server "irc.libera.chat" :full-name "J. Random Hacker")
+@end example
+
+@noindent
+直接设置 @var{server} 和 @var{full-name}，而将其余的留给像 @code{erc-compute-port} 这样的函数。  请注意，某些参数无法以交互方式指定。  尤其是@var{id}，很少需要（@pxref{Network Identifier}）。
+
+@end defun
+
+@noindent
+要通过加密的 TLS 连接进行安全连接，请使用 @kbd{M-x erc-tls}。
+
+@defun erc-tls
+选择连接参数并通过 TLS@. 非交互式运行 ERC，它采用以下关键字参数。
+
+@itemize @bullet
+@item @var{server}
+@item @var{port}
+@item @var{nick}
+@item @var{user}
+@item @var{password}
+@item @var{full-name}
+@item @var{id}
+@item @var{client-certificate}
+@end itemize
+
+也就是说，如果按照下面的方式调用
+
+@example lisp
+(erc-tls :server "irc.libera.chat" :full-name "J. Random Hacker")
+@end example
+
+@noindent
+该命令将相应地设置@var{server}和@var{full-name}，而帮助器（如@code{erc-compute-nick}）将确定其他参数，而有些（如@code{client-certificate}）将只是@code{nil}。
+
+@anchor{client-certificate}
+要使用带有 @code{erc-tls} 的证书，请指定可选的 @var{client-certificate} 关键字参数，其值应如 @code{open-network-stream} 文档中所述：如果非 @code{nil}，则它应该是一个列表，其中第一个元素是与客户端证书对应的私钥文件名，第二个元素是通过 TLS 连接时要使用的客户端证书本身的文件名，或者是 @code{t}，这意味着@code{auth-source} 将查询私钥和证书。  使用 TLS 客户端证书进行身份验证也被各种 IRC 网络称为“CertFP”（证书指纹）身份验证。
+
+使用示例：
+
+@example
+(erc-tls :server "irc.libera.chat" :port 6697
+         :client-certificate
+         (list (expand-file-name "~/key.pem")
+               (expand-file-name "~/cert.pem")))
+@end example
+
+@example
+(erc-tls :server "irc.libera.chat" :port 6697
+         :client-certificate
+         '("/home/bandali/libera.pem"
+           "/home/bandali/libera.pem")) ; same file
+@end example
+
+@example
+(erc-tls :server "irc.libera.chat" :port 6697
+         :client-certificate t)
+@end example
+
+确保对密钥和证书使用绝对文件名。  文件本身必须采用 @acronym{PEM} 编码的文本格式，并且可以连接到单个文件中。
+
+对于 @code{:client-certificate t}，您需要将如下行添加到您的 authinfo 文件中（例如，@file{~/.authinfo.gpg}）：
+
+@example
+machine irc.libera.chat key /home/bandali/key.pem cert /home/bandali/cert.pem
+@end example
+
+@xref{Help for users,,,auth, Emacs auth-source Library}，了解有关 @code{auth-source} 的 @file{.authinfo}/@file{.netrc} 后端的更多信息。如果您以交互方式调用 @code{erc-tls} 并需要 ERC 来查询客户端证书的身份验证源，请参阅用户选项 @code{network-stream-use-client-certificates}。对于整个 ERC 中 auth-source 的其他用途，@pxref{auth-source, ERC's auth-source integration}。
+@end defun
+
+@subheading 服务器
+
+@defun erc-compute-server &optional server
+返回 IRC 服务器名称。
+
+这会尝试逐渐增加默认方法的数量，直到找到非 0 值。
+
+@itemize @bullet
+@item @var{server} (the argument passed to this function)
+@item The @code{erc-server} option
+@item The value of the IRCSERVER environment variable
+@item The @code{erc-default-server} variable
+@end itemize
+
+@end defun
+
+@defopt erc-server
+如果未提供 IRC 服务器，则使用该服务器。
+@end defopt
+
+@subheading 港口
+
+@defun erc-compute-port &optional port
+返回 IRC 服务器的端口。
+
+这会尝试逐渐增加默认方法的数量，直到找到非 0 值。
+
+@itemize @bullet
+@item @var{port} (the argument passed to this function)
+@item The @code{erc-port} option
+@item The @code{erc-default-port} variable
+@end itemize
+
+@end defun
+
+@defopt erc-port
+如果未指定，则使用 IRC 端口。
+
+这可以是字符串或数字。
+@end defopt
+
+@subheading 缺口
+
+@defun erc-compute-nick &optional nick
+返回用户的 IRC 昵称。
+
+这会尝试逐渐增加默认方法的数量，直到找到非 0 值。
+
+@itemize
+@item @var{nick} (the argument passed to this function)
+@item The @code{erc-nick} option
+@item The value of the IRCNICK environment variable
+@item The result from the @code{user-login-name} function
+@end itemize
+
+@end defun
+
+@defopt erc-nick
+如果未提供则使用的昵称。
+
+这可以是一个字符串，也可以是一个字符串列表。在后一种情况下，如果列表中的第一个昵称已被使用，则按列表顺序尝试其他昵称。
+@end defopt
+
+@defopt erc-show-speaker-membership-status
+一个布尔值，用于在频道成员说话时在其显示名称中包含 @dfn{status prefix}。
+@end defopt
+
+@defopt erc-nick-uniquifier
+如果已使用昵称，则附加到昵称的字符串。
+@end defopt
+
+@defopt erc-try-new-nick-p
+如果您选择的昵称不可用，并且此选项非@code{nil}，则 ERC 应自动尝试连接另一个昵称。
+
+您可以使用 /NICK 命令手动设置另一个昵称。
+@end defopt
+
+@anchor{username parameter}
+@subheading 用户
+@cindex username parameter
+
+@defun erc-compute-user &optional user
+通过查阅以下来源，确定要作为开头 @samp{USER} IRC 命令的第一个参数发送的合适值：
+
+@itemize
+@item
+@var{user}，传递给该函数的参数
+@item
+选项@code{erc-email-userid}，假设@code{erc-anonymous-login}非@code{nil}
+@item
+调用函数的结果@code{user-login-name}
+@end itemize
+
+@end defun
+
+@defopt erc-email-userid
+为所有连接发送的永久用户名值。  它应该是一个遵守网络规则的字符串。
+@end defopt
+
+@anchor{password parameter}
+@anchor{server password}
+@cindex password, server
+@subheading 密码
+
+该参数传统上用于指定与 IRC @samp{PASS} 命令一起发送的 @dfn{server password}。  然而，此类密码并未得到广泛使用。  相反，网络通常期望它们（当存在时）传达其他身份验证信息。  对于帐户服务（又名“NickServ”）凭证，这通常涉及特殊语法，例如@samp{myuser:mypass}。 IRC 保镖通常会执行类似的操作，但包含预配置的网络 ID 组件，例如 @samp{bncuser/mynet:bncpass}。
+
+一般来说，如果您的网络或保镖要求@emph{not}指定重新调整用途的服务器密码，您应该考虑设置@samp{services}，或者最好是@samp{sasl}，两个 ERC 模块 (@pxref{Modules})。  除了执行网络帐户身份验证之外，这些还完全不需要此参数，尽管两者都可以选择借用它用于自己的目的。  （@xref{SASL, SASL in ERC}。）
+
+@defopt erc-prompt-for-password
+如果非 @code{nil}（默认值），则 @kbd{M-x erc} 和 @kbd{M-x erc-tls} 提示输入服务器密码。  这仅影响@code{erc}和@code{erc-tls}的交互式调用。
+@end defopt
+
+@noindent
+如果您愿意，可以将此选项设置为 @code{nil} 并使用 auth-source 工具来检索服务器密码，尽管在提示符下点击 @kbd{RET} 可能会达到相同的效果。 @xref{auth-source, ERC's auth-source integration}，了解更多。
+
+@subheading 姓名
+
+@defun erc-compute-full-name &optional full-name
+返回用户的全名。
+
+这会尝试逐渐增加默认方法的数量，直到找到非 0 值。
+
+@itemize @bullet
+@item
+@var{full-name}（传递给该函数的参数）
+@item
+@code{erc-user-full-name}选项
+@item
+IRCNAME 环境变量的值
+@item
+@code{user-full-name} 函数的结果
+@end itemize
+
+@end defun
+
+@defopt erc-user-full-name
+用户全名。
+
+这可以是要调用的字符串或函数。
+@end defopt
+
+
+@anchor{Network Identifier}
+@subheading ID
+
+ERC 使用一个名为 @dfn{network context identifier} 的抽象名称来引用内部连接。  虽然 ID 通常源自逻辑和物理连接参数的组合，但也可以通过入口点命令（如 1⁣）显式提供。  在极少数情况下使用此选项，否则 ERC 将无法区分连接。
+
+当使用具有相同昵称但不同（非标准）@samp{device}标识符的同一网络的多个连接时，可能会出现一种这样的情况，某些保镖可能支持这种情况。  另一个可能是模仿流行的独立客户端提供的体验，这些客户端通常提供“命名”持久配置，服务器缓冲区反映这些名称。  另一个用例可能涉及第三方代码，需要明确识别连接，但以适合 UI 组件的人性化方式。
+
+当提供 ID 作为入口点参数时，字符串和符号最有意义，但任何合理的可打印对象都是可以接受的。
+
+@node SASL
+@section 通过 SASL 进行身份验证
+@cindex SASL
+
+如果您在其他地方使用过 @acronym{SASL}，您可能可以跳到下面的示例。  否则，如果您尚未在网络上注册，请立即进行注册，请参阅网络本身的说明以了解详细信息。  如果您是 IRC 新手并且正在使用保镖，请注意您可能不需要它来进行客户端到保镖的连接。
+
+当您准备好开始时，将 @code{sasl} 添加到 @code{erc-modules}，就像添加任何其他模块一样。  如果不确定选择哪个 @dfn{mechanism}，请坚持使用默认值 @samp{PLAIN}。然后尝试 @kbd{C-u M-x erc-tls @key{RET}}，并为 @samp{user} 参数提供您的帐户名称，并为 @samp{server password} 提供您的帐户密码。
+
+@defopt erc-sasl-mechanism
+SASL 子协议类型的名称为 @emph{lowercase} 符号。该值可以是以下之一：
+
+@table @asis
+@item @code{plain} 或 @code{scram}（“基于密码”）
+这里的“密码”是指您的账户密码，通常是您的@samp{NickServ}密码。  要实现此功能，请自定义 @code{erc-sasl-user} 和 @code{erc-sasl-password} 或在调用 @code{erc-tls} 时指定 @code{:user} 和 @code{:password} 关键字参数。
+
+@item @code{external}（通过客户端@acronym{TLS}证书）
+这与 @code{erc-tls} 提供的 @code{:client-certificate} 关键字结合使用。  只需确保您事先在网络上注册了指纹即可。  指纹通常是“标准化”或“openssl”形式的 SHA1 或 SHA256 摘要。  第一个是小写字母，不带分隔符 (@samp{deadbeef})，第二个是大写字母，带冒号分隔符 (@samp{DE:AD:BE:EF})。  如今，NickServ 通常提供一个 @samp{CERT ADD} 命令，如果您在与客户端证书连接时发出该命令，则可以自动注册您。  @xref{client-certificate}。
+
+其他注意事项：
+@enumerate
+@item 
+大多数 IRCd 允许您使用客户端证书进行身份验证，但没有 SASL 的麻烦（意味着您可能不需要此模块）。
+@item 
+从技术上讲，@var{EXTERNAL}仅表示带外身份验证模式已生效（被推迟），因此根据特定的应用程序或服务，您的服务器极有可能有其他想法。
+@end enumerate
+
+@item @code{ecdsa-nist256p-challenge}
+这种机制非常复杂，目前需要外部 @samp{openssl} 可执行文件，因此如果可能的话请使用其他东西。  忽略这一点，将您的密钥文件（例如 @samp{~/pki/mykey.pem}）指定为 @code{erc-sasl-password} 的值，然后配置您的网络设置。  在运行 Atheme 服务的服务器上，您可以使用 @samp{NickServ} 添加公钥，如下所示：
+
+@example
+ERC> /msg NickServ set property \
+     pubkey AgGZmlYTUjJlea/BVz7yrjJ6gysiAPaQxzeUzTH4hd5j
+
+@end example
+（您可以省略 @samp{property} 子命令。）
+@end table
+
+@end defopt
+
+@defopt erc-sasl-user
+这应该是您的网络帐户用户名，通常与通过昵称服务注册的用户名相同。  当您的 NickServ 登录名与您连接的 @code{:user} 不同时，请指定此项。 @xref{username parameter}。
+@end defopt
+
+@defopt erc-sasl-password
+正如其他地方所指出的，入口点 @code{:password} 参数最初用于传统的“服务器密码”，但这些实际上不再使用（@pxref{password parameter}）。  因此，此选项默认借用该参数供其自己使用，从而允许您调用 @code{erc-tls} 并将 @code{:password} 设置为您的 NickServ 密码。
+
+您还可以将其设置为非空字符串，ERC 将在需要时发送该字符串，不会提出任何问题。  或者，如果您更愿意使用 auth-source，请将 @code{erc-sasl-auth-source-function} 设置为函数，ERC 将执行 auth-source 查询。  在所有情况下，ERC 都会提示您输入信息，作为最后的手段。
+
+最后，如果您的机制是@code{ecdsa-nist256p-challenge}，则此选项应保存密钥的文件名。
+@end defopt
+
+@anchor{SASL auth-source function}
+@defopt erc-sasl-auth-source-function
+这与其他 ERC @samp{auth-source} 函数选项 (@pxref{auth-source functions}) 几乎相同，只是这里的默认值是 @code{nil}，这意味着您必须将其设置为 @code{erc-auth-source-search} 之类的值才能执行查询。  为了方便起见，该模块提供以下作为可能的值：
+
+@defun erc-sasl-auth-source-password-as-host &rest plist
+将@code{erc-sasl-auth-source-function}设置为此函数会告诉ERC在查询auth-source时使用@code{erc-sasl-password}作为@code{:host}字段，即使其值为默认@code{:password}，在这种情况下，ERC知道将其“解析”为@code{erc-session-password}并使用它，只要它是非@code{nil}。  否则，ERC 只是按照 @code{erc-auth-source-search} 来确定 @code{:host} 以及其他所有内容。
+@end defun
+
+只要此选项指定一个函数，ERC 就会向其传递 auth-source @code{:user} 参数的 @code{erc-sasl-user} 的“已解析”值。
+@end defopt
+
+@defopt erc-sasl-authzid
+在极少数情况下，网络可能希望您指定特定角色或承担备用身份。  在大多数情况下，发生这种情况是因为服务器有错误或配置错误。  如果您怀疑有此类情况，请联系您的网络运营商。  否则，只需将此设置保留为@code{nil}。
+@end defopt
+
+@subheading 示例
+
+@itemize @bullet
+@item 
+默认值
+
+@lisp
+(erc-tls :server "irc.libera.chat" :port 6697
+         :nick "aph"
+         :user "APHacker"
+         :password "changeme")
+@end lisp
+
+在这里，通过自定义界面将@code{sasl}添加到@code{erc-modules}后，您可以使用@samp{PLAIN}机制和您的NickServ凭证@samp{APHacker}和@samp{changeme}向Libera.Chat进行身份验证。
+
+@item 
+外部的
+
+@lisp
+(setopt erc-sasl-mechanism 'external)
+
+(erc-tls :server "irc.libera.chat" :port 6697 :nick "aph"
+         :client-certificate
+         '("/home/aph/key.pem" "/home/aph/cert.pem"))
+@end lisp
+
+您决定改变现状并尝试 @samp{EXTERNAL} 机制。  您按照网络说明告知 NickServ 您的客户端证书指纹，并且身份验证成功。
+
+@item 
+多个网络
+
+@example
+# ~/.authinfo.gpg
+
+machine irc.libera.chat key /home/aph/key.pem cert /home/aph/cert.pem
+machine Example.Net login alyssa password sEcReT
+machine Example.Net login aph-bot password sesame
+@end example
+
+@lisp
+;; init.el
+
+(defun my-erc-up (network)
+  (interactive "Snetwork: ")
+  (require 'erc-sasl)
+  (or (let ((erc-modules (cons 'sasl erc-modules)))
+        (pcase network
+          ('libera
+           (let ((erc-sasl-mechanism 'external))
+             (erc-tls :server "irc.libera.chat"
+                      :client-certificate t)))
+          ('example
+           (let ((erc-sasl-auth-source-function
+                  #'erc-sasl-auth-source-password-as-host))
+             (erc-tls :server "irc.example.net"
+                      :user "alyssa"
+                      :password "Example.Net")))))
+      ;; Non-SASL
+      (call-interactively #'erc-tls)))
+@end lisp
+
+您已开始使用 auth-source 存储您的凭据，并决定也在另一个网络上尝试 SASL。  但有一个问题：该网络不支持@samp{EXTERNAL}。  您可以使用 @code{let} 绑定来解决此问题并成功对两个网络进行身份验证。  （请注意，此示例假设您已从 @code{erc-modules} 全局删除 @code{sasl}，并选择在连接到预配置网络时在本地添加它。）
+
+@end itemize
+
+@subheading 故障排除
+
+首先，请注意，ERC 的 SASL 产品目前由于缺乏对适当 IRCv3 功能协商的支持而受到限制。在大多数情况下，这不会影响您的身份验证能力。
+
+如果您遇到困难，请记住您的 SASL 密码几乎始终是您的 NickServ 密码。  如有疑问，请尝试将所有 SASL 选项恢复为默认值，并调用 @code{erc-tls}，其中 @code{:user} 设置为您的 NickServ 帐户名，@code{:password} 设置为您的 NickServ 密码。  如果您仍然遇到问题，请联系我们 (@pxref{Getting Help and Reporting Bugs})。
+
+当您尝试不同的设置时，请记住，最好为每次更改创建一个新的会话，例如，通过从头开始调用 @code{erc-tls}。  更有经验的用户可能可以通过循环 @code{erc-sasl-mode} 并发出 @samp{/reconnect} 来摆脱困境，但通常不建议这样做。  无论如何，您可能希望在实验时暂时禁用 @code{erc-server-auto-reconnect}。
+
+@node Sample Configuration
+@section 配置示例
+@cindex configuration, sample
+
+如果您不熟悉 @samp{use-package} 或没有兴趣学习，这里是 ERC@. @strong{Don't panic} 的示例配置。  就我们的目的而言，它只是以整洁、标准化的格式呈现配置详细信息的一种方法。  如果有帮助，就假装它是某种虚构的伪配置语言。虽然下面的语法很容易凭直觉并适应您的设置，但您可能希望记住以下几点：
+
+@itemize @bullet
+@item 
+每个@code{use-package}“声明”都集中在一个库“功能”上，这只是您通常在配置中使用@code{require}的符号。
+
+@item 
+Emacs 加载 @code{:config} 部分中的任何内容 @emph{after} 加载声明功能的任何库 @code{provide}。
+
+@item 
+@code{:custom} 或 @code{:custom-face} 部分中的所有内容基本上都是您在 @code{custom-file} 中找到的内容。
+
+@item 
+如需了解更多信息，请@pxref{Named Features,,, elisp,}或@pxref{Top,,, use-package,}。
+@end itemize
+
+@noindent
+以下内容通常会出现在您的初始化文件中。  有经验的用户可能会选择将任何非设置（例如命令和功能）保留在专用的 @file{~/.emacs.d/.ercrc.el} 中。  无论哪种情况，请记住，您几乎可以使用自定义设置 (@pxref{Sample configuration via Customize}) 替换以下所有内容。
+
+@lisp
+;;; My ERC configuration -*- lexical-binding: t -*-
+
+(use-package erc
+  :config
+  ;; Prefer SASL to NickServ, colorize nicknames, and show side panels
+  ;; with joined channels and members
+  (setopt erc-modules
+          (seq-union '(sasl nicks bufbar nickbar scrolltobottom)
+                     erc-modules))
+
+  :custom
+  ;; Protect me from accidentally sending excess lines.
+  (erc-inhibit-multiline-input t)
+  (erc-send-whitespace-lines t)
+  (erc-ask-about-multiline-input t)
+  ;; Scroll all windows to prompt when submitting input.
+  (erc-scrolltobottom-all t)
+
+  ;; Wait a bit longer between automatic reconnect attempts.
+  (erc-server-reconnect-timeout 30)
+
+  ;; Show new buffers in the current window instead of a split.
+  (erc-interactive-display 'buffer)
+
+  ;; Insert a newline when I hit <RET> at the prompt, and prefer
+  ;; something more deliberate for actually sending messages.
+  :bind (:map erc-mode-map
+              ("RET" . nil)
+              ("C-c C-c" . #'erc-send-current-line))
+
+  ;; Emphasize buttonized text in notices.
+  :custom-face (erc-notice-face ((t (:slant italic :weight unspecified)))))
+
+(use-package erc-sasl
+  ;; Since my account name is the same as my nick, free me from having
+  ;; to hit C-u before M-x erc to trigger a username prompt.
+  :custom (erc-sasl-user :nick))
+
+(use-package erc-join
+  ;; Join #emacs and #erc whenever I connect to Libera.Chat.
+  :custom (erc-autojoin-channels-alist '((Libera.Chat "#emacs" "#erc"))))
+
+(use-package erc-fill
+  :custom
+  ;; Prefer one message per line without continuation indicators.
+  (erc-fill-function #'erc-fill-wrap)
+  (erc-fill-static-center 18)
+
+  :bind (:map erc-fill-wrap-mode-map ("C-c =" . #'erc-fill-wrap-nudge)))
+
+(use-package erc-match
+  ;; Use the same face for my own nick wherever it appears.
+  :custom-face
+  (erc-current-nick-face ((t ( :weight unspecified
+                               :foreground unspecified
+                               :inherit erc-my-nick-face)))))
+
+(use-package erc-track
+  ;; Prevent JOINs and PARTs from lighting up the mode-line.
+  :config (setopt erc-track-faces-priority-list
+                  (remq 'erc-notice-face erc-track-faces-priority-list))
+
+  :custom (erc-track-priority-faces-only 'all))
+
+(use-package erc-goodies
+  ;; Turn on read indicators when joining channels.
+  :hook (erc-join . my-erc-enable-keep-place-indicator-on-join))
+
+(defvar my-erc-read-indicator-channels '("#emacs")
+  "Channels in which to show a `keep-place-indicator'.")
+
+(defun my-erc-enable-keep-place-indicator-on-join ()
+  "Enable read indicators for certain queries or channels."
+  (when (member (erc-default-target) my-erc-read-indicator-channels)
+    (erc-keep-place-indicator-mode +1)))
+
+;; Handy commands from the Emacs Wiki.
+(defun erc-cmd-TRACK (&optional target)
+  "Start tracking TARGET or that of current buffer."
+  (setq erc-track-exclude
+        (delete (or target (erc-default-target) (current-buffer))
+                erc-track-exclude)))
+
+(defun erc-cmd-UNTRACK (&optional target)
+  "Stop tracking TARGET or that of current buffer."
+  (setq erc-track-exclude
+        (cl-pushnew (or target (erc-default-target) (current-buffer))
+                    erc-track-exclude
+                    :test #'equal)))
+
+@end lisp
+
+@noindent
+熟悉 @code{use-package} 的人可能已经注意到缺少 @code{:defer} 关键字参数。  这样做是为了节省空间，但您可以假装该用户在其他地方启用了@code{use-package-always-defer}。
+
+@anchor{Sample configuration via Customize}
+@subheading 通过定制
+@cindex configuration, via customize
+
+如前所述，自定义用户可以通过自定义界面完成上述几乎所有操作。  首先运行@kbd{M-x customize-group @key{RET} erc @key{RET}}，然后使用@kbd{C-s modules @key{RET}}搜索“模块”。  切换打开弹出菜单以显示完整的 @dfn{widget} 面板，这是“Erc 模块”的类似 Web 表单的界面。  勾选 @samp{bufbar}、@samp{nickbar}、@samp{nicks}、@samp{sasl} 和 @samp{scrolltobottom} 的框。
+
+接下来，搜索短语“Erc 询问多行输入”、“Erc 禁止多行输入”和“Erc 发送空白行”。  这些是三个布尔选项的打印名称，它们控制 ERC 如何处理包含换行符的提示输入。  访问每个选项的部分时，旋转打开其三角形图标以显示其小部件 UI，然后单击其 @samp{[Toggle]} 按钮将其值设置为 @code{t}。在进行此操作时，您可能会发现浏览一下描述会很有帮助，以防您以后想要禁用它们。  完成后，点击缓冲区顶部的@kbd{C-x C-s}或单击@samp{[Apply and Save]}。
+
+现在对另一个选项执行相同的操作，这次与自动重新连接有关。  但不要搜索它的打印名称，而是尝试运行 @kbd{M-x customize-option @key{RET} erc-server-reconnect-timeout @key{RET}}。  （如果有帮助，请点击@key{TAB}完成。）您可能已经注意到，单独自定义选项时，每个缓冲区仅显示一个选项的小部件。  对于 @code{erc-server-reconnect-timeout}，您将遇到一个文本字段（而不是按钮），其工作方式与典型 Web 表单中的类似。输入@samp{30}，然后按@kbd{C-x C-s}保存，或者按@key{TAB}转到@samp{[State]}，然后按@key{RET}，然后按@kbd{1}保存更改。
+
+只是为了好玩，请单击缓冲区底部的@samp{Erc Server} 的组链接。  您也可以单独设置此“自定义组”缓冲区中的最后两个选项，这与 @samp{Erc} 组的选项非常相似，该组实际上是该组的“父级”（请注意缓冲区顶部组 @samp{Erc} 的“面包屑”）。事实上，您随时可以通过从 Emacs 中的几乎任何位置运行 @kbd{M-x customize-group @key{RET} erc-server @key{RET}} 返回这里。
+
+为了确保您已经掌握了这一点，请尝试快速自定义选项 @code{erc-interactive-display}，该选项位于 @samp{Erc Buffers} 组 (@kbd{M-x customize-group @key{RET} erc-buffers @key{RET}}) 中。  正如其文档字符串所解释的那样，该选项控制当您在 ERC 提示下执行 @kbd{M-x erc-tls @key{RET}} 或发出某些 @dfn{slash commands}（如 @kbd{/JOIN #emacs-beginners @key{RET}}）时新缓冲区显示的位置。  通过从选项的@samp{[Value Menu]}中选择@samp{Use current window}（项目@kbd{5}）将其值更改为符号@code{buffer}。  别忘了保存。
+
+如果您需要更多练习，请尝试启用布尔选项 @code{erc-scrolltobottom-all}，它位于 @samp{Erc Display} 组 (@kbd{M-x customize-group @key{RET} erc-display @key{RET}}) 中。启用后，此选项会告诉 @samp{scrolltobottom} 模块调整所有 ERC 窗口，而不仅仅是您当前正在输入的窗口。
+
+现在是时候为 @code{erc-mode-map} 设置一些键绑定了，这是所有 ERC 缓冲区中都处于活动状态的主模式键映射。  一般来说，最好完全完成这部分工作，或者与 init 文件中的一些 lisp 代码结合起来完成。  然而，为了保持事情“简单”，我们将在定制缓冲区中完成这一切。  首先，点击 @kbd{M-x customize-group @key{RET} erc-hooks @key{RET}} 并搜索“Erc Mode Hook”。  在小部件表单中，单击@samp{[INS]}，然后将以下内容粘贴到值字段中代替默认文本。
+
+@lisp
+(lambda ()
+  (keymap-set erc-mode-map "RET" nil)
+  (keymap-set erc-mode-map "C-c C-c" 'erc-send-current-line))
+@end lisp
+
+@noindent
+不用担心断线。  Emacs 足够智能来处理这些问题。  准备好后，单击@samp{[Apply and Save]}。
+
+接下来，尝试调整 ERC 使用的界面来风格化服务器消息，比如“SoAndSo 已加入频道 #chan”。  输入@kbd{M-x customize-face @key{RET} erc-notice-face @key{RET}}。  单击最底部的“链接”按钮，上面写着“显示所有属性”。  取消勾选@samp{Weight}并勾选@samp{Slant}。然后，在后者的@samp{[Value Menu]}中，为@samp{italic}输入@samp{0}。  按@kbd{C-x C-s}保存。
+
+是时候进行更多相关配置了。  从现在开始，如果某些内容不适用于您的设置，请跳过。  另请注意，如果您已从 GNU ELPA 安装了 ERC，则可能需要先加载您想要自定义的组和选项的库，然后 Emacs 才能创建自定义缓冲区。  例如，要对组 @code{erc-sasl} 执行此操作，请运行 @kbd{M-: (require 'erc-sasl) @key{RET}}。
+
+说到 @acronym{SASL}，那些已经使用它进行身份验证的人可能已经注意到，交互式连接需要运行 @kbd{C-u M-x erc-tls @key{RET}} 才能收到输入帐户名的“用户”提示。  但是，如果您的昵称恰好与您的账户名相同，您可以通过将选项 @code{erc-sasl-user} 自定义为关键字符号 @code{:nick} 来避免前导 @kbd{C-u}。在撰写本文时，当选项的@samp{[Value menu]}提示时，您会点击@kbd{2}。  点击@kbd{C-x C-s}保存您的更改。
+
+ERC 配置最多的选项之一位于 @file{erc-join}，它决定您在连接时加入的频道。  为了让它为您工作，请自定义选项@code{erc-autojoin-channels-alist}。  在自定义小部件中，点击 @samp{[INS]} 创建一个新条目。  在@samp{Network:}字段中，输入@samp{Libera.Chat}。  在@samp{Channels:}下，再次点击@samp{[INS]}，这次创建一个用于输入频道名称的字段，然后输入@samp{#emacs}。  现在，找到并单击最下面的@samp{[INS]}，这次在@samp{Name:}字段中输入@samp{#erc}。  保存您的更改。
+
+如果您是 ERC 新手，您可能不熟悉它通过插入换行符“填充”消息文本的各种方式。  最现代的填充样式称为 @code{fill-wrap}，可以通过将 @code{erc-fill-function} 自定义为 @code{erc-fill-wrap} 来使用，它在选项的 @samp{[Value Menu]} 中显示为 @samp{Dynamic word-wrap}。  设置完毕后，将相关选项@code{erc-fill-static-center}更改为整数@samp{18}。  保存您的更改。  作为奖励练习，尝试将键 @kbd{C-c =} 绑定到次要模式键盘映射 @code{erc-fill-wrap-mode-map} 中的功能 @code{erc-fill-wrap-nudge}（提示：次要模式的挂钩称为 @code{erc-fill-wrap-mode-hook}，它不是任何自定义组的成员）。
+
+尝试自定义另一张脸，这次是继承。  每当有人在对话中提及您时，ERC 的匹配模块都会突出显示您的昵称。  然而，有些用户不喜欢这张脸与您自己消息中的脸不同。  让我们改变这一点。  输入@kbd{M-x customize-group @key{RET} erc-faces @key{RET}}。  搜索单词“当前”或输入@kbd{M-x customize-face @key{RET} erc-current-nick-face @key{RET}}。  取消勾选 @samp{Weight} 和 @samp{Foreground}，然后单击它们下方的“显示所有属性”按钮。  向下导航到 @samp{Inherit} 框，勾选它，点击 @samp{[INS]}，然后在 @samp{Face} 字段中输入 @code{erc-my-nick-face}。按@kbd{C-x C-s}保存。
+
+ERC 用户往往对模式线很挑剔。  如果您发现您不想在人们加入和离开频道时看到更改，请自定义选项 @code{erc-track-faces-priority-list}。  当访问其自定义缓冲区时，您会发现它非常繁忙。忽略一切并输入@kbd{C-s erc-notice-face @key{RET}}。  单击最终行开头的 @samp{[DEL]} 按钮，然后保存更改。  接下来，将相关选项@code{erc-track-priority-faces-only}自定义为@samp{[Value Menu]}选项@samp{all}。  再次保存您的更改。
+
+假设您想在特定通道中启用 @dfn{local module}（ERC 版本的本地次要模式）。  一种方法是，如果通道名称匹配，则运行一些代码来激活模块。  现在通过自定义选项 @code{erc-join-hook} 来尝试一下。保存更改之前，在值字段中添加以下内容：
+
+@lisp
+(lambda ()
+  (require 'erc-goodies)
+  (when (equal (erc-default-target) "#emacs")
+    (erc-keep-place-indicator-mode +1)))
+@end lisp
+
+最后，如果您确实想要上一节末尾定义的两个@dfn{slash commands}，可以将它们放入@code{erc-startup-file-list}中列出的任何文件中，例如@file{~/.emacs.d/.ercrc.el}。确保将 @code{(require 'erc-track)} 放在文件顶部附近。这些将允许您在通道和查询缓冲区中键入@kbd{/TRACK @key{RET}}和@kbd{/UNTRACK @key{RET}}，以告诉 ERC 是否在模式行中显示这些缓冲区的活动。
+
+
+@node Integrations
+@section 集成
+@cindex integrations
+
+@menu
+* auth-source::                  使用 ERC 检索 auth-source 条目。
+* display-buffer::               控制 ERC 如何显示缓冲区。
+@end menu
+
+@anchor{URL}
+@subsection 网址
+@cindex URL
+
+为了使任何工作正常，您需要将 @code{url-irc-function} 设置为 @code{url-irc-erc}。  根据经验，从 Emacs 29.1 开始，直接依赖 @code{url-retrieve} 的库应该可以正常使用。在旧版本的 Emacs 上，您可能需要提前 @code{(require 'erc)}。  @xref{Retrieving URLs,,, url, URL}。
+
+对于其他应用程序和库，例如依赖于更高级别 @code{browse-url} 的应用程序和库，您经常会被要求指定一个模式，有时与接受字符串 URL 作为第一个参数的函数配对。  例如，使用 EWW，您可能需要将 @code{"\\|\\`irc6?s?:"} 之类的内容添加到 @code{eww-use-browse-url} 的末尾。  但对于 @code{gnus-button-alist}，您还需要一个函数：
+
+@lisp
+  '("\\birc6?s?://[][a-z0-9.,@@_:+%?&/#-]+" 0 t browse-url-irc 0)
+@end lisp
+
+@noindent
+Emacs 28 及更低版本的用户可能需要使用 @code{browse-url} 代替。
+
+@anchor{SOCKS}
+@subsection 袜子
+@cindex SOCKS
+
+想要通过 @acronym{SOCKS} 代理连接到 IRC 的人很可能对通过 @acronym{TOR}（洋葱路由器）进行连接感兴趣。  如果 @emph{not} 您是这样的人，请相应地调整这些说明。  否则，请记住，对 Tor 的支持是实验性的，因此不足以保护用户的身份和位置，特别是在针对目标个人的情况下。
+
+ERC 的首选 Tor 设置通过 Emacs 附带的内置 @file{socks.el} 库访问本地 Tor 服务来工作。不支持其他访问 Tor 的方式，例如通过 @command{torsocks}。  在开始之前，请检查您的 Tor 服务是否已启动并正在运行。  您可以使用以下命令来执行此操作：
+
+@example
+curl --proxy socks5h://localhost:9050 https://check.torproject.org | \
+  grep 'Congratulations'
+@end example
+
+网络和服务器在公开 Tor 端点的方式上有所不同。  在所有情况下，您都需要首先将选项 @code{socks-server} 设置为适当的值，例如 @code{("tor" "127.0.0.1" 9050 5)}。  对于某些网络，将 @code{erc-server-connect-function} 设置为 @code{socks-open-network-stream} 可能就足够了。  其他的，如@samp{Libera.Chat}，涉及额外的设置。  在撰写本文时，连接到该网络需要 @acronym{TLS} 和允许的 @acronym{SASL} 机制，例如 @samp{EXTERNAL} (@pxref{SASL})，如以下示例所示：
+
+@lisp
+(require 'erc)
+(require 'socks)
+
+(defun my-erc-open-socks-tls-stream (&rest args)
+  (let ((socks-username "")
+        (socks-password "")
+        (socks-server '("tor" "localhost" 9050 5)))
+    (apply #'erc-open-socks-tls-stream args)))
+
+(setopt erc-server-reconnect-function #'erc-server-delayed-check-reconnect)
+
+(let* ((erc-modules (cons 'sasl erc-modules))
+       (erc-sasl-mechanism 'external)
+       (erc-server-connect-function #'my-erc-open-socks-tls-stream))
+  (erc-tls
+   :server "libera75jm6of4wxpxt4aynol3xjmbtxgfyjpu34ss4d7r7q2v5zrpyd.onion"
+   :port 6697
+   :nick "jrh"
+   :user "jrandomhacker"
+   :full-name "J. Random Hacker"
+   :client-certificate (list "/home/jrh/key.pem" "/home/jrh/cert.pem")))
+@end lisp
+
+@noindent
+在这里，用户提供的 @code{my-erc-open-socks-tls-stream} 确保重新连接时 @code{socks-server} 和朋友的首选值可用。  如果您计划仅将 @acronym{SOCKS} 与 ERC 结合使用，则只需全局设置这些选项和变量，然后将 @code{erc-server-connect-function} 绑定到 @code{erc-open-socks-tls-stream} 即可。
+
+@defun erc-open-socks-tls-stream
+@acronym{SOCKS} 连接的默认 TLS @dfn{connector}。与选项@code{erc-server-connect-function}兼容。  请注意，如果与 @code{erc-server-reconnect-function} 的某些值（例如 @code{erc-server-prefer-check-reconnect}，当前默认的 @dfn{reconnector}，或 @code{erc-server-delayed-check-reconnect}，它遵循的更专业的主力）结合使用，此函数可能会导致 ERC 将与代理相关的故障错误报告为互联网连接中的常规故障。
+@end defun
+
+@node auth-source
+@subsection 授权源
+@cindex auth-source
+
+您可以将 ERC 配置为使用内置的 auth-source 库来查找密码。 @xref{Top,,auth-source, auth, Emacs auth-source Library}，有关设置各种后端的一般信息，但请记住其中一些可能不兼容。  当前支持的有 netrc、plstore、json、secrets 和 pass。  要开始使用默认后端 netrc，请在 @file{~/.authinfo.gpg}（或选项 @code{auth-sources} 中命名的任何文件）中添加如下行：
+
+@example
+machine irc.example.net login mynick password sEcReT
+@end example
+
+@anchor{auth-source Server Password}
+@subsubheading Server Passwords
+当检索 IRC @samp{PASS} 命令 (@pxref{password parameter}) 附带的密码时，ERC 要求 auth-source 将 @code{erc-tls} 的 @var{server} 参数与每个条目的 @samp{host} 字段（上例中的@w{@code{machine irc.example.net}}）进行匹配。  不幸的是，指定网络（如@samp{Libera.Chat}）或特定网络服务器（如@samp{platinum.libera.chat}）通常无法查找服务器密码，因为在打开介绍期间该信息不可用。  （实际上，ERC @emph{can} 可以查找任何上下文中具有任意 @samp{host} 值的条目，包括服务器密码，但这需要自定义下面的更高级选项。）
+
+如果 ERC 找不到合适的服务器密码，它将完全跳过 IRC @samp{PASS} 命令，这是用户在使用 CertFP 或通过 ERC 的 @code{services} 模块参与 NickServ 时可能需要的功能。如果这对您有吸引力，请考虑将选项 @code{erc-auth-source-server-function} 自定义为 @code{nil} 以跳过所有服务器的服务器密码查找。  请注意，某些网络和 IRCd 可能接受通过服务器密码进行的帐户服务身份验证。此外，某些 ERC 模块可能会为了自己的目的而征用 @code{erc-tls} @var{password} 参数，这可能不涉及服务器密码。
+
+@subsubheading The @samp{services} module
+您可以使用 auth-source 通过名为 @samp{NickServ} 的机器人以传统方式对帐户服务进行身份验证。  为此，请将 @code{services} 添加到 @code{erc-modules} 并将选项 @code{erc-use-auth-source-for-nickserv-password} 设置为 @code{t}。  之后，相关 auth-source 查询中的 @samp{user} 参数将成为您当前的昵称。
+
+大多数时候，查询的精确上下文详细信息（例如是否授予或强制分配昵称）不应影响您在后端定义条目的方式。  但是，如果某些功能不太有效，您可能需要研究选项 @code{erc-nickserv-identify-mode} 和帐户服务之间的相互作用。  特别是，如果您发现自己遇到后缀为 @code{erc-nick-uniquifier}（臭名昭著的 @samp{`}）的昵称，请检查 @code{erc-nickserv-alist} 中的网络条目是否是最新的，如果出现问题，请告诉我们 (@pxref{Getting Help and Reporting Bugs})。当然，如果您已经厌倦了摆弄这个模块，请考虑切换到 SASL，以获得更一致的身份验证源体验。  （@xref{SASL}。）
+
+@subsubheading Default query behavior
+在为后端准备条目时，了解 ERC 及其模块如何进行搜索可能会有所帮助，尤其是在探索新的上下文（例如频道键）时。  但总体而言，ERC 尝试在跨各种身份验证上下文执行查询时保持一致。  以下是 @samp{host} 字段的预期结果，默认情况下，该字段对查询的命运影响最大：
+
+@enumerate
+@item 
+首先匹配具有自定义标识符和网络的条目 (@pxref{Network Identifier})
+@item 
+其次是特定于网络的服务器
+@item 
+最后，拨打端点（通常将 @var{server} 参数传递给 @code{erc-tls}）
+@end enumerate
+
+@noindent
+以下 netrc 样式条目按优先顺序出现：
+
+@example
+machine Libera/cellphone login MyNick password sEcReT
+machine Libera.Chat login MyNick password sEcReT
+machine zirconium.libera.chat login MyNick password sEcReT
+machine irc.libera.chat login MyNick password sEcReT
+@end example
+
+@noindent
+请记住，字段标签因后端而异，因此 @samp{machine} （在 netrc 的情况下）映射到 auth-source 的主机广义概念，因此 @samp{:host} 关键字参数为 @code{auth-source-search}。另外，请务必注意您选择的后端媒体的语法。  例如，始终引用 netrc 文件中的通道名称。
+
+最后，如果这一切看起来过于微妙或只是简单地对您不感兴趣，请参阅选项@code{erc-auth-source-services-function}和朋友，如下所述。
+
+@subsubheading Custom query functions
+这些让您可以按照自己的方式查询授权源。  大多数用户可以简单地忽略传入的参数并使用如下所示的内容：
+
+@lisp
+(defun my-fancy-auth-source-func (&rest _)
+  (let* ((host (read-string "host: " nil nil "default"))
+         (pass (auth-source-pick-first-password :host host)))
+    (if (and pass (string-search "libera" host))
+        (concat "MyNick:" pass)
+      pass)))
+@end lisp
+
+@anchor{auth-source functions}
+@defopt erc-auth-source-server-function
+@end defopt
+@defopt erc-auth-source-services-function
+@end defopt
+@defopt erc-auth-source-join-function
+
+ERC 使用 @code{auth-source-search} 识别的关键字参数调用这些函数，即那些被认为与当前上下文最相关的函数（如果有）。  例如，在识别服务时，@code{:user} 包含您当前的昵称。  通用参数名称（如 @code{:user} 和 @code{:host}）始终优先于后端特定参数名称（如 @code{:login} 或 @code{:machine}）。  作为回报，如果搜索成功，ERC 需要一个字符串；如果失败，则需要 @code{nil}。
+
+@findex erc-auth-source-search
+所有三个选项的默认值都是函数@code{erc-auth-source-search}。  它尝试将相关上下文参数与从逻辑连接或底层传输提供或发现的参数合并。
+
+对于将 auth-source 与 SASL 一起使用，@pxref{SASL auth-source function}。
+@end defopt
+
+@subsubheading Channel keys
+ERC 还会查阅 @code{auth-source} 来查找您加入的某些频道可能需要的“密钥”。  为此目的修改传统的 @code{auth-source} 条目时，请将通道名称放入 @samp{user} 字段（例如，在 netrc 的情况下为 @samp{login "#fsf"}）。实际的密钥位于 @samp{password}（或 @samp{secret}）字段中。
+
+@anchor{auth-source Troubleshooting}
+@subheading 故障排除
+默认情况下，ERC 查询 @code{auth-source} 获取通道密钥和服务器密码 (@pxref{auth-source Server Password})，以及其他特定于模块的凭证。  一般来说，如果您在自定义查询函数（如 @code{erc-auth-source-server-function}）中调用 @code{auth-source-search} 时遇到问题，请尝试临时将变量 @code{auth-source-debug} 设置为 @code{t} 并定期检查 @file{*Messages*} 以深入了解 @code{auth-source} 的运行情况。
+
+如果您使用 @acronym{GPG} 加密文件并发现自定义函数值查询选项之一无法解决您的问题，请探索 @code{epg} 自定义组 (@pxref{GnuPG Pinentry,,, epa, EasyPG Assistant}) 中的选项 @code{epg-pinentry-mode} 和 @code{epg-debug}。  此外，请留意 @file{*Error*} 缓冲区，其中可能包含有关您情况的更具体线索。  如果您将 libsecrets 集成 (@pxref{Secret Service API,,, auth, Emacs auth-source}) 与 GNOME Keyring 之类的东西一起使用，您可能需要选中密码弹出对话框中的“记住”框，以避免每次运行 ERC 时都提示您确认。  如果一开始不起作用，请尝试注销。  如果有疑问，请尝试使用 Emacs 命令 @code{secrets-show-secrets} 浏览 @samp{Login} 密钥环。  应该有一个 @samp{GnuPG/stored-by} 条目，其值为 @samp{GnuPG Pinentry} 或类似值。
+
+@node display-buffer
+@subsection 显示缓冲区
+@cindex display-buffer
+
+ERC 支持 @code{display-buffer} 和 @file{window.el} 的朋友使用的“action”界面。  @xref{Displaying Buffers,,, elisp, Emacs Lisp}，了解具体情况。  当 ERC 显示新的或“重新关联”的缓冲区时，它会参考各种缓冲区显示选项，例如@code{erc-buffer-display}，以决定缓冲区是否以及如何显示在窗口中。  它具体参考哪一个取决于缓冲区被显示的上下文。
+
+对于某些缓冲区显示选项，上下文非常简单。例如，在 @code{erc-receive-query-display} 的情况下，您正在收到来自当前会话中尚未与之聊天的人的查询。  对于其他选项，例如@code{erc-interactive-display}，精确的上下文会有所不同。  例如，您可能使用命令 @kbd{/QUERY bob @key{RET}} 打开查询缓冲区或使用 @kbd{/JOIN #chan @key{RET}} 加入新通道。  希望区分这些细微差别的上下文或只是对缓冲区显示行为进行更多控制的高级用户通常可以选择通过将一个或多个设置为接受 @var{buffer} 和 @var{action} 参数的“@code{display-buffer} 类”函数来覆盖这些选项。
+
+@subsubheading Examples
+
+在第一个示例中，用户提供的缓冲区显示函数在发出 @kbd{M-x erc-tls @key{RET}} 时在当前窗口中显示新的服务器缓冲区，并在选项 @code{erc-interactive-display} 涵盖的所有其他交互上下文的拆分窗口中显示新的服务器缓冲区，例如单击 @samp{irc://} 样式 @acronym{URL} (@pxref{URL})。
+
+@lisp
+(defun my-erc-interactive-display-buffer (buffer action)
+  "Pop to BUFFER when running \\[erc-tls], clicking a link, etc."
+  (when-let* ((alist (cdr action))
+              (found (alist-get 'erc-interactive-display alist)))
+    (if (eq found 'erc-tls)
+        (pop-to-buffer-same-window buffer action)
+      (pop-to-buffer buffer action))))
+
+(setopt erc-interactive-display #'my-erc-interactive-display-buffer)
+@end lisp
+
+@noindent
+观察 ERC 将缓冲区显示选项的名称提供为 @var{action} alist 键，并将它们与上下文常量配对，例如符号 @samp{erc-tls} 或 @samp{url}，其完整阵容如下所示。
+
+在第二个示例中，对于 Emacs 29 及更高版本，用户编写了三个有点类似于上面的“@code{display-buffer}-like”函数的谓词。  这些也寻找共享 ERC 缓冲区显示选项名称的 @var{action} alist 键（以及，在一种情况下，共享模块的次要模式）。
+
+@lisp
+(defun my-erc-disp-entry-p (_ action)
+  (memq (cdr (or (assq 'erc-buffer-display action)
+                 (assq 'erc-interactive-display action)))
+        '(erc-tls url)))
+
+(defun my-erc-disp-query-p (_ action)
+  (or (eq (cdr (assq 'erc-interactive-display action)) '/QUERY)
+      (and (eq (cdr (assq 'erc-receive-query-display action)) 'PRIVMSG)
+           (member (erc-default-target) '("bob" "alice")))))
+
+(defun my-erc-disp-chan-p (_ action)
+  (or (assq 'erc-autojoin-mode action)
+      (and (eq (cdr (assq 'erc-buffer-display action)) 'JOIN)
+           (member (erc-default-target) '("#emacs" "#fsf")))))
+@end lisp
+
+@noindent
+您会注意到，我们忽略了这些谓词的 @var{buffer} 参数，因为 ERC 确保 @var{buffer} 已经是当前的（这就是我们可以自由调用 @code{erc-default-target} 的原因）。  另请注意，当 @var{action} 参数实际上是一个或多个函数和 alist 的缺点时，我们将它视为 alist ，这有点作弊。
+
+@noindent
+为了补充我们的谓词，我们将 @var{action} 列表查找中引用的所有三个缓冲区显示选项设置为 @code{display-buffer}。  这告诉 ERC 在这些选项涵盖的显示上下文中遵循该函数。
+
+@lisp
+(setopt erc-buffer-display #'display-buffer
+        erc-interactive-display #'display-buffer
+        erc-receive-query-display #'display-buffer
+        ;;
+        erc-auto-reconnect-display 'bury)
+@end lisp
+
+@noindent
+上面的最后一个选项只是告诉 ERC 在自动重新连接时避免任何缓冲区显示机制。  （由于历史原因，ERC 的缓冲区显示选项使用术语“埋葬”来表示“忽略”而不是@code{bury-buffer}。）
+
+最后，我们将谓词组成 @code{buffer-match-p} 条件，并将它们与各种众所周知的 @code{display-buffer} 动作函数和动作主义成员配对。
+
+@lisp
+(setopt display-buffer-alist
+
+        ;; Create new frame with M-x erc-tls RET or (erc-tls ...)
+        '(((and (major-mode . erc-mode) my-erc-disp-entry-p)
+           display-buffer-pop-up-frame
+           (reusable-frames . visible))
+
+          ;; Show important chans and queries in a split.
+          ((and (major-mode . erc-mode)
+                (or my-erc-disp-chan-p my-erc-disp-query-p))
+           display-buffer-pop-up-window)
+
+          ;; Ignore everything else.
+          ((major-mode . erc-mode)
+           display-buffer-no-window
+           (allow-no-window . t))))
+@end lisp
+
+@noindent
+当然，我们也可以将缓冲区显示选项设置为一个或多个简单的函数，而不必费心使用 @code{display-buffer-alist} （这将使我们的第一个示例的版本更加复杂）。  但也许我们已经拥有越来越多的类似谓词，并且喜欢将所有内容都放在 @file{init.el} 中的一个位置。
+
+@subsubheading Action alist items
+
+@table @asis
+@item 基于选项的键：
+除非另有说明，所有键和值都是符号。
+
+@itemize @bullet
+@item @code{erc-buffer-display}
+@itemize @minus
+@item @samp{JOIN}
+@item @samp{NOTICE}
+@item @samp{PRIVMSG}
+@item @samp{erc}（非交互式调用的入口点）
+@item @samp{erc-tls}
+@end itemize
+
+@item @code{erc-interactive-display}
+@itemize @minus
+@item @samp{/QUERY}
+@item @samp{/JOIN}
+@item @samp{/RECONNECT}
+@item @samp{url}（点击超链接）
+@item @samp{erc}（交互调用的入口点）
+@item @samp{erc-tls}
+@end itemize
+
+@item @code{erc-receive-query-display}
+@itemize @minus
+@item @samp{NOTICE}
+@item @samp{PRIVMSG}
+@end itemize
+
+@item @code{erc-auto-reconnect-display}
+@itemize @minus
+@item 非@code{nil}的东西
+@end itemize
+@end itemize
+
+@item 基于模块（次要模式）的键：
+
+@itemize @bullet
+@item @code{erc-autojoin-mode}
+@itemize @minus
+@item 通道名称为字符串，例如 @code{"#chan"}
+@end itemize
+@end itemize
+@end table
+
+@node Options
+@section 选项
+@cindex options
+
+@c PRE5_4: (Node) Document every ERC option (module options go in
+@c previous chapter)
+
+这部分极其不完整。  目前，查看 ERC 所有可用选项的最简单方法是执行@kbd{M-x customize-group @key{RET} erc @key{RET}}。
+
+@defopt erc-hide-list
+如果不是，@code{nil}，这是要隐藏的 IRC 消息类型列表，例如：
+
+@example
+(setq erc-hide-list '("JOIN" "PART" "QUIT"))
+@end example
+@end defopt
+
+@defopt erc-network-hide-list
+如果不是，@code{nil}，这是要隐藏的 IRC 网络和消息类型的列表，例如：
+
+@example
+(setq erc-network-hide-list (("Libera.Chat" "JOIN" "PART" "QUIT")
+("OFTC" "JOIN" "PART""))
+@end example
+@end defopt
+
+@defopt erc-channel-hide-list
+如果不是，@code{nil}，这是要隐藏的 IRC 频道和消息类型的列表，例如：
+
+@example
+(setq erc-channel-hide-list (("#erc" "JOIN" "PART" "QUIT")
+("#emacs" "NICK"))
+@end example
+@end defopt
+
+@defopt erc-lurker-hide-list
+与@code{erc-hide-list}类似，但仅适用于潜伏者发送的消息。  函数@code{erc-lurker-p}确定给定的昵称是否被视为潜伏者。
+@end defopt
+
+@node Getting Help and Reporting Bugs
+@chapter 获取帮助和报告错误
+@cindex help, getting
+@cindex bugs, reporting
+
+阅读本指南后，如果您仍然对 ERC 有疑问，或者有错误要报告，您可以去几个地方。
+
+@itemize @bullet
+
+@item 
+@uref{https://www.emacswiki.org/emacs/ERC} 是 ERC@. 的 emacswiki.org 页面，任何人都可以向其中添加技巧、提示等@:。如果您这样做，请帮助保持最新状态。
+
+@item 
+您可以在 Emacs 邮件列表 @uref{https://lists.gnu.org/mailman/listinfo/help-gnu-emacs} 以及 ERC 自己的小批量列表 @uref{https://lists.gnu.org/mailman/listinfo/emacs-erc} 上询问有关使用 ERC 的问题。
+
+@item 
+您可以访问 IRC Libera.Chat 频道@samp{#emacs}。  许多贡献者经常出现并愿意回答您的问题。  您还可以尝试在同一网络上相对安静的@samp{#erc}，以解决更多涉及的问题。
+
+@item 
+@anchor{Upgrading}
+您可以检查 Emacs 版本之间的 GNU ELPA，以查看是否有可用的更新版本，该版本可能包含针对您的问题的修复：@uref{https://elpa.gnu.org/packages/erc.html}。
+
+要升级，请运行@kbd{M-x list-packages @key{RET}}。  在 @file{*Packages*} (@code{package-menu-mode}) 缓冲区中，单击所需版本的 @samp{erc} 软件包链接。  如果不确定，或者版本列太窄而无法区分，请尝试最底部的候选版本。在生成的@code{help-mode}缓冲区中，确认版本并单击@samp{Install}。  确保在重新连接到 IRC 之前重新启动 Emacs，并且不要忘记可以通过运行 @kbd{M-x package-delete @key{RET}} 回滚到以前的版本。 @xref{Packages,,,emacs, The Emacs Editor}，了解更多信息。
+
+请注意，影响 Emacs 打包机制的错误可能会阻止上述方法在 Emacs 版本 29 及更低版本上运行。  29 号用户可以尝试运行 @kbd{C-u M-x package-install @key{RET}}。 28 及以下的用户可以单击 @file{*Packages*} 缓冲区中的 @emph{installed} @samp{erc} 行项目而不是最新的行项目，然后在生成的 @code{help-mode} 缓冲区中，找到并激活最新版本的按钮，该按钮应出现在摘要项目 @samp{Other versions} 中。
+
+在极少数情况下，您需要紧急修复或自愿测试 ERC 版本之间的边缘功能，您可以在执行上述步骤之前尝试将 @samp{("devel" . "https://elpa.gnu.org/devel/")} 添加到 @code{package-archives}。  为此，您需要从菜单中选择 @dfn{snapshot} 版本。  请注意，采用此方法时，最新的更改可能尚未可用，并且您面临出现其他错误和遇到不稳定功能的风险。
+
+@item 
+要报告 ERC 中的错误，请使用@kbd{M-x erc-bug}。
+
+@end itemize
+
+
+@node History
+@chapter 历史
+@cindex history, of ERC
+
+@c abel@@bfr.co.il, sergey.berezin@@cs.cmu.edu
+ERC 最初由 Alexander L. Belikoff 和 Sergey Berezin 编写。他们于 1999 年 12 月左右停止开发。他们最后发布的版本是 ERC 2.0。
+
+P.S.：如果 ERC 的原始开发人员之一阅读此内容，我们希望收到此文件的其他信息并听取一般评论。
+
+@itemize
+@item 2001
+
+@c mlang@@delysid.org, alex@@gnu.org
+2001 年 6 月，Mario Lang 和 Alex Schroeder 接管开发并在 @uref{https://sourceforge.net/projects/erc} 创建了一个 ERC 项目。
+
+在回复有关新 ERC 开发工作的邮件时，Sergey Berezin 表示：“首先，我很高兴我的 ERC 版本正在那里使用。  问题是，我没有空闲时间和足够的动力来从事 ERC 工作，所以如果你们完全接管这个项目，我会很高兴。”
+
+因此，我们愉快地破解了 ERC，不久之后（2001 年 9 月）发布了下一个“稳定”版本 2.1。
+
+新 ERC 的大部分开发都发生在 irc.openprojects.net 上的@samp{#emacs}。  随着时间的推移，许多人贡献了代码、想法、错误修复以及大量的 alpha/beta/gamma 测试。
+
+请参阅 @file{CREDITS} 文件以获取贡献者列表。
+
+@item 2003
+
+ERC 3.0发布。
+
+@item 2004
+
+ERC 4.0发布。
+
+@item 2005
+
+@c mwolson@@gnu.org
+ERC 5.0发布。  Michael Olson 成为发布经理，并最终成为维护者。
+
+经过他和 Emacs 开发人员的一番讨论，决定将 ERC 包含在 Emacs 中。
+
+@item 2006
+
+ERC 5.1 发布。  它随后被包含在 Emacs 22 中。
+
+ERC 成为官方 GNU 项目，开发移至@uref{https://sv.gnu.org/projects/erc}。  我们改用 GNU Arch 作为我们的版本控制系统。  我们的邮件列表地址也发生了变化。
+
+@item 2007
+
+我们改用 git 作为我们的版本控制系统。
+
+@item 2009+
+
+大约从 2009 年开始，ERC 不再作为单独的项目开发，而是作为 Emacs 的一部分进行维护。
+
+@end itemize
+
+@anchor{Official IRC channels}
+@subheading 官方 IRC 频道
+@cindex official IRC channels
+
+GNU Emacs 和 ERC 的官方频道一直驻留在 Freenode IRC 网络上，直到 2021 年 6 月，之后，在 2021 年 5 月和 6 月 Freenode 的治理和政策发生变化之后，它们与 GNU 项目、自由软件基金会和许多其他自由软件社区的官方 IRC 频道一起迁移到 Libera.Chat 网络。GNU 和 FSF 对此的公告位于@uref{https://lists.gnu.org/archive/html/info-gnu/2021-06/msg00005.html}， @uref{https://lists.gnu.org/archive/html/info-gnu/2021-06/msg00007.html}和@uref{https://lists.gnu.org/archive/html/info-gnu-emacs/2021-06/msg00000.html}。
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Concept Index
+@unnumbered 指数
+
+@printindex cp
+
+@bye

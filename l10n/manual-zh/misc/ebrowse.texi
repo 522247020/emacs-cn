@@ -1,0 +1,1176 @@
+\输入 texinfo @c -*-texinfo-*-
+
+@comment %**start of header
+@setfilename ../../info/ebrowse.info
+@settitle 
+@documentlanguage en
+@include docstyle.texi
+@setchapternewpage odd
+@syncodeindex fn cp
+@comment %**end of header
+
+@copying
+该文件记录了 Ebrowse，一个用于 GNU Emacs 的 C++ 类浏览器。
+
+版权所有 @copyright{} 2000--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* Ebrowse: (ebrowse).            Emacs 的 C++ 类浏览器。
+@end direntry
+
+@titlepage
+@title 
+@sp 4
+@subtitle 
+@sp 5
+@author Gerd Moellmann
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top Ebrowse
+
+You can browse C++ class hierarchies from within Emacs by using
+Ebrowse.
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Overview::                     它是什么以及它是如何工作的？
+* Generating browser files::     如何处理C++源文件
+* Loading a Tree::               
+* Tree Buffers::                 遍历类层次结构
+* Member Buffers::               查看会员信息
+* Tags-like Functions::          从源文件中查找成员
+* GNU Free Documentation License::  本文档的许可证。
+* Concept Index::                每个定义的概念都有一个条目
+@end menu
+
+
+
+
+@node Overview
+@chapter 介绍
+
+在使用 C++ 从事软件项目时，我经常错过以下两件事的软件支持：
+
+@itemize @bullet
+@item 
+当您获得一个新的类库，或者您必须处理您自己未编写的（或很久以前编写的）源代码时，您需要一个工具来导航类层次结构并研究软件的功能。  如果没有这样的工具，您通常会最终@command{grep}浏览数十个甚至数百个文件。
+
+@item 
+一旦您提高了工作效率，如果有一个工具能够了解您的源代码并在您编辑源代码时为您提供帮助，那就太好了。  想象一下，在编辑时能够跳转到标识符的定义，或者可以完成长标识符名称，因为它知道程序中定义了哪些标识符@dots{}。
+@end itemize
+
+Ebrowse的设计就体现了这两种需求。
+
+它是如何运作的？
+
+@cindex parser for C++ sources
+用 C 编写的快速解析器用于处理 C++ 源文件。解析器生成一个数据库，其中包含有关源中找到的类、成员、全局函数、定义、类型等@:的信息。
+
+Ebrowse 的第二部分是 Lisp 程序。  该程序读取解析器生成的数据库。  它以各种形式显示其内容，并允许您对其执行操作，或借助数据库中包含的知识执行某些操作。
+
+@cindex major modes, of Ebrowse buffers
+@dfn{Navigational} Ebrowse 的使用主要围绕两种类型的缓冲区，它们定义了自己的主要模式：
+
+@cindex tree buffer
+@dfn{Tree buffers} 用于以树形式查看类层次结构。它们允许您快速查找类、查找或查看类声明、对源文件集执行查询替换等操作，最后使用树缓冲区生成第二种缓冲区形式——成员缓冲区。  @xref{Tree Buffers}。
+
+@cindex member buffer
+成员显示在@dfn{member buffers}中。  Ebrowse 区分了六种不同类型的会员；每种类型都显示为其自己的成员列表：
+
+@itemize @bullet
+@item 
+实例成员变量；
+
+@item 
+实例成员函数；
+
+@item 
+静态成员变量；
+
+@item 
+静态成员函数；
+
+@item 
+朋友/定义。  定义列表包含在伪类@samp{*Globals*}的好友列表中；
+
+@item 
+类型（使用类作用域定义的@code{enum}s 和@code{typedef}s）。
+@end itemize
+
+您可以将成员缓冲区从一个列表切换到另一个列表或另一个类。  您可以在显示中包含继承的成员，可以设置从显示中删除成员类别的过滤器，最重要的是，您可以通过按键查找或查看成员声明和定义。  @xref{Member Buffers}。
+
+这两种缓冲区类型及其提供的命令支持浏览器的导航使用。  第二种形式类似于 Emacs 用于 C 和其他过程语言的 Tags 包。  Ebrowse 的这种类型的命令并不局限于特殊的缓冲区；它们在您编辑源代码时最常使用。
+
+要仅列出您可以使用 Ebrowse 的标签部分来实现的内容的子集：
+
+@itemize @bullet
+@item 
+使用电子位置堆栈跳转到源代码中标识符的定义或声明，可让您轻松地来回导航。
+
+@item 
+使用仅包含源代码中的标识符的完成列表来完成源中的标识符。
+
+@item 
+对部分或全部源文件执行搜索和查询替换操作。
+
+@item 
+显示与正则表达式匹配的所有标识符——如果您愿意，还可以跳转到其中之一。
+@end itemize
+
+
+
+
+@node Generating browser files
+@chapter 处理源文件
+
+@cindex @command{ebrowse}, the program
+@cindex class data base creation
+在开始浏览类层次结构之前，必须在源文件上运行解析器@command{ebrowse}，以生成描述程序的 Lisp 数据库。
+
+@cindex command line for @command{ebrowse}
+@command{ebrowse} 的操作可以通过命令行选项进行定制。  在正常情况下，让解析器使用其默认设置就足够了。  如果您想这样做，请使用如下命令行调用它：
+
+@example
+ebrowse *.h *.cc
+@end example
+
+@noindent
+或者，如果您的 shell 不允许在命令行上指定所有文件名，
+
+@example
+ebrowse --files=@var{file}
+@end example
+
+@noindent
+其中@var{file}包含要解析的文件的名称，每行一个。
+
+@findex --help
+当使用选项 @samp{--help} 调用时，@command{ebrowse} 会打印可用命令行选项的列表。
+
+@menu
+* Input files::          指定要解析的文件
+* Output file::          更改输出文件名
+* Structs and unions::   省略 @code{struct}s 和 @code{union}s
+* Matching::             设置正则表达式长度
+* Verbosity::            获取长时间操作的反馈
+@end menu
+
+
+
+
+@comment name,     next,        prev,                     up
+@node Input files
+@section 指定输入文件
+
+@table @samp
+@cindex input files, for @command{ebrowse}
+@item file
+命令行上的每个文件名都会告诉 @command{ebrowse} 解析该文件。
+
+@cindex response files
+@findex --files
+@item --files=@var{file}
+此命令行开关指定 @var{file} 包含要解析的文件名列表。  @var{file} 中的每一行必须包含一个文件名。  允许不止一种此类选项。  例如，您可能希望使用一个文件作为头文件，使用另一个文件作为源文件。
+
+@cindex standard input, specifying input files
+@item standard input
+当@command{ebrowse}在命令行上找不到文件名，并且未指定@samp{--file}选项时，它将从标准输入读取文件名。  当 2⁣ 用作命令管道的一部分时，这有时很方便。
+
+@findex --search-path
+@item --search-path=@var{paths}
+此选项允许您指定输入文件的搜索路径。 @var{paths} 是目录列表，用冒号或分号分隔，具体取决于操作系统。
+@end table
+
+@cindex header files
+@cindex friend functions
+通常最好指定输入文件，以便在源文件之前解析头文件。  这有利于解析器正确识别类的友元函数的工作。
+
+
+
+@comment name,     next,               prev,        up
+@node Output file
+@section 更改输出文件名
+
+@table @samp
+@cindex output file name
+@findex --output-file
+@cindex @file{BROWSE} file
+@item --output-file=@var{file}
+该选项指示 @command{ebrowse} 生成名为 @var{file} 的 Lisp 数据库。  默认情况下，数据库名为@file{BROWSE}，并写入调用@command{ebrowse}的目录中。
+
+如果您经常使用与默认名称不同的数据库名称，您可能需要将其添加到您的初始化文件中：
+
+@lisp
+(add-to-list 'auto-mode-alist '(@var{NAME} . ebrowse-tree-mode))
+@end lisp
+
+@noindent
+其中 @var{NAME} 是您正在使用的 Lisp 数据库名称。
+
+@findex --append
+@cindex appending output to class data base
+@item --append
+默认情况下，每次运行 @command{ebrowse} 都会在写入时擦除输出文件的旧内容。  您可以使用此命令行选项指示 @command{ebrowse} 将其输出附加到 @command{ebrowse} 生成的现有文件中。
+@end table
+
+
+
+
+@comment name,            next,     prev,        up
+@node Structs and unions
+@section 结构和联合
+@cindex structs
+@cindex unions
+
+@table @samp
+@findex --no-structs-or-unions
+@item --no-structs-or-unions
+此开关会抑制数据库中在输出中声明为 @code{struct} 或 @code{union} 的所有类。
+
+当您将现有 C 程序转换为 C++，并且不希望在类树中看到旧的 C 结构时，这主要有用。
+@end table
+
+
+
+
+@comment name,  next,      prev,               up
+@node Matching
+@section 正则表达式
+
+@cindex regular expressions, recording
+解析器 @command{ebrowse} 通常将正则表达式写入其输出文件，以帮助 Ebrowse 的 Lisp 部分在其源文件中查找函数、变量等@:。
+
+您可以通过使用命令行开关 @samp{--no-regexps} 调用它来指示 @command{ebrowse} 省略这些正则表达式。
+
+当您执行此操作时，Ebrowse 的 Lisp 部分会尝试根据成员或类名称猜测合适的正则表达式，以在源文件中查找该类或成员。  这在大多数情况下工作得很好，但如果使用不寻常的编码风格，正则表达式的自动生成可能会太弱。
+
+@table @samp
+@findex --no-regexps
+@item --no-regexps
+此选项关闭正则表达式记录。
+
+@findex --min-regexp-length
+@cindex minimum regexp length for recording
+@item --min-regexp-length=@var{n}
+此选项后面的数字@var{n}指定记录的用于匹配类和成员声明和定义的正则表达式的最小长度。  默认值是在 @command{ebrowse} 编译时设置的。
+
+最小长度越小，Ebrowse 找到错误匹配的概率就越高。  该值越大，输出文件越大，因此从 Emacs 读取文件后的内存消耗也越大。
+
+@findex --max-regexp-length
+@cindex maximum regexp length for recording
+@item --max-regexp-length=@var{n}
+此选项后面的数字指定用于匹配类和成员声明和定义的正则表达式的最大长度。  默认值是在编译时设置的 @command{ebrowse}。
+
+最大长度越大，浏览器找到正确匹配的概率就越高，但值越大，输出文件越大，因此读取数据后的内存消耗也越大。  第二个影响是，正则表达式越大，编辑文件后不再匹配的概率就越高。
+@end table
+
+
+
+
+@node Verbosity
+@section 详细模式
+@cindex verbose operation
+
+@table @samp
+@findex --verbose
+@item --verbose
+当在命令行上指定此选项时，@command{ebrowse} 为每个解析的文件打印一个句点，并为写入输出文件的每个类显示一个 @samp{+}。
+
+@findex --very-verbose
+@item --very-verbose
+该选项使@command{ebrowse}打印出文件的名称和所看到的类的名称。
+@end table
+
+
+
+
+@node Loading a Tree
+@chapter 开始浏览
+@cindex loading
+@cindex browsing
+
+您只需通过 @kbd{C-x C-f} 查找 @file{BROWSE} 文件即可开始浏览由 @command{ebrowse} 解析的类层次结构。
+
+树缓冲区显示的示例如下所示。
+
+@example
+|  Collection
+|    IndexedCollection
+|      Array
+|        FixedArray
+|    Set
+|    Dictionary
+@end example
+
+@cindex mouse highlight in tree buffers
+当您在支持颜色和鼠标的显示器上运行 Emacs 时，您会注意到当您将鼠标移到树缓冲区中的某些区域时，它们会突出显示。  该突出显示标记了缓冲区中的鼠标敏感区域。  请注意当鼠标移动到敏感区域时回显区域中的帮助字符串。
+
+@cindex context menu
+在鼠标敏感区域上单击 @kbd{mouse-3} 可打开上下文菜单。  除此之外，每个缓冲区还有一个特定于缓冲区的菜单，可以通过在缓冲区中不显示突出显示的某处单击 @kbd{mouse-3} 打开该菜单。
+
+
+
+@comment ****************************************************************
+@comment ***
+@comment ***                 TREE BUFFERS
+@comment ***
+@comment ****************************************************************
+
+@node Tree Buffers
+@chapter 树缓冲区
+@cindex tree buffer mode
+@cindex class trees
+
+类树显示在 @dfn{tree buffers} 中，它们安装了自己的主要模式。  大多数 Emacs 键以通常的方式在树缓冲区中工作，例如，您可以使用通常的 @kbd{C-f}、@kbd{C-v} 等在缓冲区中移动，或者可以使用 @kbd{C-s} 进行搜索。
+
+树特定命令绑定到简单的击键，类似于 @code{Gnus}。  您可以通过输入 @kbd{?} 来查看键绑定，它会在树和成员缓冲区中调用 @code{M-x describe-mode}。
+
+@menu
+* Source Display::               查看和查找类声明
+* Member Display::               显示成员，切换到成员缓冲区
+* Go to Class::                  寻找班级
+* Quitting::                     丢弃并掩埋树缓冲区
+* File Name Display::            在树中显示文件名
+* Expanding and Collapsing::     扩展和折叠分支
+* Tree Indentation::             更改树缩进
+* Killing Classes::              从树中删除类
+* Saving a Tree::                保存修改后的树
+* Statistics::                   显示类树统计信息
+* Marking Classes::              标记和取消标记类
+@end menu
+
+
+
+@node Source Display
+@section 查看和查找类声明
+@cindex viewing, class
+@cindex finding a class
+@cindex class declaration
+
+当光标位于类名称上时，您可以查看或查找类声明。
+
+@table @kbd
+@item @key{SPC}
+如果数据库包含有关类的信息，此命令将查看类声明。  如果您不解析正在处理的整个源代码，则仅知道某些类存在，但不知道它们的声明和定义的位置。
+
+@item @key{RET}
+与 @kbd{@key{SPC}} 类似，只不过它是查找类声明而不是查看它，以便可以进行编辑。
+@end table
+
+通过类名上的 @kbd{mouse-3} 打开的菜单可以使用相同的功能。
+
+
+
+
+@node Member Display
+@section 显示会员
+@cindex @file{*Members*} buffer
+@cindex @samp{*Globals*}
+@cindex freezing a member buffer
+@cindex member lists, in tree buffers
+
+Ebrowse 区分了六种不同类型的成员，每种成员都显示为单独的@dfn{member list}：实例变量、实例函数、静态变量、静态函数、友元函数和类型。
+
+当光标位于类名称上时，可以使用以 @kbd{L} 开头的命令将这些列表中的每一个显示在成员缓冲区中。  默认情况下，每次显示成员列表时，只有一个名为 1⁣ 的成员缓冲区会被重用——事实证明，这比用数十个成员缓冲区弄乱缓冲区列表更实用。
+
+如果您想一次显示多个成员列表，您可以 @dfn{freeze} 其成员缓冲区。  冻结成员缓冲区可防止下次显示成员列表时覆盖它。  您可以随时切换此缓冲区状态。
+
+树缓冲区中的每个成员列表显示命令都可以与前缀参数 (@kbd{C-u}) 一起使用。  如果没有前缀参数，该命令将弹出到显示成员列表的成员缓冲区。  使用前缀参数，成员缓冲区将另外为@dfn{frozen}。
+
+@table @kbd
+@cindex instance member variables, list
+@item L v
+该命令显示实例成员变量的列表。
+
+@cindex static variables, list
+@item L V
+显示静态变量列表。
+
+@cindex friend functions, list
+@item L d
+显示好友功能列表。  如果您正在查看类 @samp{*Globals*}（全局符号的占位符），则此列表用于定义。
+
+@cindex member functions, list
+@item L f
+显示成员函数列表。
+
+@cindex static member functions, list
+@item L F
+显示静态成员函数的列表。
+
+@cindex types, list
+@item L t
+显示类型列表。
+@end table
+
+这些列表也可以从通过类名称上的 @kbd{mouse-3} 调用的类上下文菜单中获得。
+
+
+
+
+@node Go to Class
+@section 寻找班级
+@cindex locate class
+@cindex expanding branches
+@cindex class location
+
+@table @kbd
+@cindex search for class
+@item /
+此命令从迷你缓冲区中完整读取类名，并将光标定位在类树中的类上。
+
+如果包含所搜索的类的类树的分支当前已折叠，则该类本身及其所有基类将递归地变得可见。  （另见@ref{Expanding and Collapsing}。）
+
+也可以从树缓冲区的上下文菜单中使用此功能。
+
+@item n
+重复使用 @kbd{/} 完成的最后一次搜索。  每个树缓冲区都有其自己的上次在其中搜索的正则表达式的本地副本。
+@end table
+
+
+
+
+@node Quitting
+@section 掩埋树木缓冲区
+@cindex burying tree buffer
+
+@table @kbd
+@item q
+是@kbd{M-x bury-buffer}的同义词。
+@end table
+
+
+
+
+@node File Name Display
+@section 显示文件名
+
+@table @kbd
+@cindex file names in tree buffers
+@item T f
+此命令切换树缓冲区中文件名的显示。  如果打开文件名显示，则包含类声明的文件的名称将显示在类名的右侧。  如果文件未知，则显示字符串 @samp{unknown}。
+
+树缓冲区的上下文菜单中也提供了此命令。
+
+@item s
+显示当前行的文件名，或前缀参数给出的行数。
+@end table
+
+以下是显示文件名的树缓冲区示例。
+
+@example
+|  Collection           (unknown)
+|    IndexedCollection  (indexedcltn.h)
+|      Array            (array.h)
+|        FixedArray     (fixedarray.h)
+|    Set                (set.h)
+|    Dictionary         (dict.h)
+@end example
+
+
+@node Expanding and Collapsing
+@section 展开和折叠树
+@cindex expand tree branch
+@cindex collapse tree branch
+@cindex branches of class tree
+@cindex class tree, collapse or expand
+
+您可以展开和折叠树的某些部分，以降低大型类层次结构的复杂性。  展开或折叠树的分支不会影响其他命令的功能，例如@kbd{/}。  （另见@ref{Go to Class}。）
+
+折叠的分支用类名后面的省略号表示，如下例所示。
+
+@example
+|  Collection
+|    IndexedCollection...
+|    Set
+|    Dictionary
+@end example
+
+@table @kbd
+@item -
+此命令会折叠从光标所在的类开始的树分支。
+
+@item +
+此命令从光标所在的类开始展开树的分支。  用于折叠和展开分支的命令也可以从类的对象菜单中获得。
+
+@item *
+此命令展开树中所有折叠的分支。
+@end table
+
+
+
+
+@node Tree Indentation
+@section 更改树缩进
+@cindex tree indentation
+@cindex indentation of the tree
+
+@table @kbd
+@item T w
+此命令从迷你缓冲区读取新的缩进宽度，并使用新的缩进重新显示树缓冲区。也可以从树缓冲区的上下文菜单中使用该命令。
+@end table
+
+
+
+
+@node Killing Classes
+@section 从树中删除类
+@cindex killing classes
+@cindex class, remove from tree
+
+@table @kbd
+@item C-k
+此命令从树中删除光标所在的类及其所有派生类。  在实际执行删除之前，会要求用户确认。
+@end table
+
+
+
+
+@node Saving a Tree
+@section 拯救一棵树
+@cindex save tree to a file
+@cindex tree, save to a file
+@cindex class tree, save to a file
+
+@table @kbd
+@item C-x C-s
+该命令将类树写入从中读取类树的文件中。从树中删除类后，这非常有用。
+
+@item  C-x C-w
+将树写入一个文件，该文件的名称是从迷你缓冲区读取的。
+@end table
+
+
+
+
+@node     Statistics
+@section 统计数据
+@cindex statistics for a tree
+@cindex tree statistics
+@cindex class statistics
+
+@table @kbd
+@item x
+显示树的统计信息，例如其中的类数量、成员函数数量等。此命令也可以在缓冲区的上下文菜单中找到。
+@end table
+
+
+
+
+@node     Marking Classes
+@section 标记类别
+@cindex marking classes
+@cindex operations on marked classes
+
+可以将类标记为类似于标准 Emacs 命令 @kbd{M-x tags-search} 和 @kbd{M-x tags-query-replace} 的操作（另请参阅@pxref{Tags-like Functions}。）
+
+@table @kbd
+@cindex toggle mark
+@item M t
+切换线点的标记位于前缀命令指定的行中或行数中。  该命令也可以在类的上下文菜单中找到。
+
+@cindex unmark all
+@item M a
+取消标记所有类。  使用前缀参数@kbd{C-u}，标记树中的所有类。  由于该命令作用于整个缓冲区，因此也可以在缓冲区的对象菜单中找到它。
+@end table
+
+标记的类在树显示的第一列中显示为 @code{>}，如下例所示
+
+@example
+|> Collection
+|    IndexedCollection...
+|>   Set
+|    Dictionary
+@end example
+
+
+
+
+@c ****************************************************************
+@c ***
+@c ***                 MEMBER BUFFERS
+@c ***
+@c ****************************************************************
+
+@node Member Buffers
+@chapter 会员缓冲区
+@cindex members
+@cindex member buffer mode
+
+@cindex class members, types
+@cindex types of class members
+@dfn{Member buffers} 用于对类的成员列表进行操作。 Ebrowse 区分六种列表：
+
+@itemize @bullet
+@item
+实例变量（普通成员变量）；
+@item
+实例函数（普通成员函数）；
+@item
+静态变量；
+@item
+静态成员函数；
+@item
+好友功能；
+@item
+使用类范围定义的类型（@code{enum}s 和 @code{typedef}s）。嵌套类将像普通类一样显示在类树中。
+@end itemize
+
+与树缓冲区一样，成员缓冲区安装自己的主要模式。  与树缓冲区一样，为缓冲区中的某些区域提供了菜单：成员、类和缓冲区本身。
+
+@menu
+* Switching Member Lists::       选择要显示的成员
+* Finding/Viewing::              修改源代码
+* Inherited Members::            显示继承成员
+* Searching Members::            在成员缓冲区中查找成员
+* Switching to Tree::            回到树缓冲区
+* Filters::                      选择性会员展示
+* Attributes::                   显示@code{virtual}等
+* Long and Short Display::       全面详细的显示
+* Regexp Display::               显示匹配的正则表达式
+* Switching Classes::            显示另一个类
+* Killing/Burying::              摆脱成员缓冲区
+* Column Width::                 展示风格
+* Redisplay::                    重新绘制成员列表
+* Getting Help::                 如何获取有关按键绑定的帮助
+@end menu
+
+
+
+
+@node Switching Member Lists
+@section 切换成员列表
+@cindex member lists, in member buffers
+@cindex static members
+@cindex friends
+@cindex types
+@cindex defines
+
+@table @kbd
+@cindex next member list
+@item L n
+该命令将成员缓冲区显示切换到下一个成员列表。
+
+@cindex previous member list
+@item L p
+该命令将成员缓冲区显示切换到先前的成员列表。
+
+@item L f
+切换到成员函数列表。
+
+@cindex static
+@item L F
+切换到静态成员函数列表。
+
+@item L v
+切换到成员变量列表。
+
+@item L V
+切换到静态成员变量列表。
+
+@item L d
+切换到好友或定义列表。
+
+@item L t
+切换到类型列表。
+@end table
+
+这两个命令都循环遍历成员列表。
+
+大多数命令也可以从成员缓冲区的上下文菜单中获得。
+
+
+
+
+@node Finding/Viewing
+@section 查找并查看会员来源
+@cindex finding members, in member buffers
+@cindex viewing members, in member buffers
+@cindex member definitions, in member buffers
+@cindex member declarations, in member buffers
+@cindex definition of a member, in member buffers
+@cindex declaration of a member, in member buffers
+
+@table @kbd
+@item @key{RET}
+此命令查找光标所在成员的定义。查找涉及的内容与标准 Emacs 标签功能大致相同——加载文件并搜索与成员匹配的正则表达式。
+
+@item f
+该命令查找光标所在成员的声明。
+
+@item @key{SPC}
+该命令与 @kbd{@key{RET}} 相同，但查看成员定义而不是查找成员的源文件。
+
+@item v
+这与 @kbd{f} 是相同的命令，但查看成员的声明而不是查找声明所在的文件。
+@end table
+
+您可以安装挂钩函数，以便在找到成员或类声明或定义后或未找到时执行操作。
+
+上述所有命令也可以在单击成员名称上的@kbd{mouse-2}时显示的上下文菜单中找到。
+
+
+
+
+@node Inherited Members
+@section 显示继承成员
+@cindex superclasses, members
+@cindex base classes, members
+@cindex inherited members
+
+@table @kbd
+@item D b
+此命令切换成员缓冲区中继承成员的显示。  这也在缓冲区的上下文菜单中。
+@end table
+
+
+
+
+@node Searching Members
+@section 搜寻会员
+@cindex searching members
+
+@table @kbd
+@item G v
+将光标定位在从迷你缓冲区读取其名称的成员上；只有当前成员缓冲区中显示的成员才会出现在完成列表中。
+
+@item G m
+与上面的命令类似，但当前类的所有成员都显示在完成列表中。  如有必要，将当前成员列表切换到包含该成员的列表。
+
+使用前缀参数 (@kbd{C-u})，类树中的所有成员（即浏览器知道的所有成员）都会出现在完成列表中。  成员显示将切换到包含该成员的班级和成员列表。
+
+@item G n
+重复上次的成员搜索。
+@end table
+
+查看缓冲区的上下文菜单，了解使用鼠标执行此操作的便捷方法。
+
+
+
+@node Switching to Tree
+@section 切换到树缓冲区
+@cindex tree buffer, switch to
+@cindex buffer switching
+@cindex switching buffers
+
+@table @kbd
+@item @key{TAB}
+弹出成员缓冲区所属的树缓冲区。
+
+@item t
+执行与 @key{TAB} 相同的操作，但还将光标定位在成员缓冲区中显示的类上。
+@end table
+
+
+
+
+@node Filters
+@section 过滤器
+@cindex filters
+
+@table @kbd
+@cindex @code{public} members
+@item F a u
+此命令切换 @code{public} 成员的显示。  @samp{a} 代表“访问”。
+
+@cindex @code{protected} members
+@item F a o
+此命令切换 @code{protected} 成员的显示。
+
+@cindex @code{private} members
+@item F a i
+此命令切换 @code{private} 成员的显示。
+
+@cindex @code{virtual} members
+@item F v
+此命令切换 @code{virtual} 成员的显示。
+
+@cindex @code{inline} members
+@item F i
+此命令切换 @code{inline} 成员的显示。
+
+@cindex @code{const} members
+@item F c
+此命令切换 @code{const} 成员的显示。
+
+@cindex pure virtual members
+@item F p
+此命令切换纯虚拟成员的显示。
+
+@cindex remove filters
+@item F r
+此命令删除所有过滤器。
+@end table
+
+这些命令也可以在缓冲区的上下文菜单中找到。
+
+
+
+
+@node Attributes
+@section 显示会员属性
+@cindex attributes
+@cindex member attribute display
+
+@table @kbd
+@item D a
+切换成员属性的显示（默认为打开）。
+
+Ebrowse 知道的九个成员属性显示为一个列表，其中包含在成员名称前面的尖括号内的单字符标志。  给定位置处的 @samp{-} 表示该属性为 false。  属性列表从左到右是
+
+@table @samp
+@cindex @code{template} attribute
+@item T
+该成员是一个模板。
+
+@cindex @code{extern "C"} attribute
+@item C
+该成员被声明为@code{extern "C"}。
+
+@cindex @code{virtual} attribute
+@item v
+意味着该成员被声明为@code{virtual}。
+
+@cindex @code{inline}
+@item i
+该成员被声明为@code{inline}。
+
+@cindex @code{const} attribute
+@item c
+该成员是@code{const}。
+
+@cindex pure virtual function attribute
+@item 0
+该成员是一个纯虚函数。
+
+@cindex @code{mutable} attribute
+@item m
+该成员被声明为@code{mutable}。
+
+@cindex @code{explicit} attribute
+@item e
+该成员被声明为@code{explicit}。
+
+@item t
+该成员是一个带有抛出列表的函数。
+@end table
+@end table
+
+该命令也在缓冲区的上下文菜单中。
+
+
+
+@node Long and Short Display
+@section 多空会员展示
+@cindex display form
+@cindex long display
+@cindex short display
+
+@table @kbd
+@item D l
+此命令在短显示形式和长显示形式之间切换成员缓冲区。  简短显示表单仅显示成员名称：
+
+@example
+| isEmpty        contains       hasMember      create
+| storeSize      hash           isEqual        restoreGuts
+| saveGuts
+@end example
+
+长显示每行显示一个成员，其中包含成员名称和与该成员匹配的正则表达式（如果已知）：
+
+@example
+| isEmpty               Bool isEmpty () const...
+| hash                  unsigned hash () const...
+| isEqual               int isEqual (...
+@end example
+
+仅当 Lisp 数据库尚未使用 @command{ebrowse} 选项 @samp{--no-regexps} 生成时，才会显示正则表达式。 @xref{Matching, --no-regexps, Regular Expressions}。
+@end table
+
+
+
+
+@node Regexp Display
+@section 正则表达式的显示
+@cindex regular expression display
+
+@table @kbd
+@item D r
+此命令将长显示形式从显示与成员声明匹配的正则表达式切换为与成员定义匹配的表达式。
+@end table
+
+仅当 Lisp 数据库尚未使用@command{ebrowse}选项@samp{--no-regexps}生成时，才会显示正则表达式，请参阅@ref{Matching, --no-regexps, Regular Expressions}。
+
+
+
+
+@node Switching Classes
+@section 显示另一个类
+@cindex base class, display
+@cindex derived class, display
+@cindex superclass, display
+@cindex subclass, display
+@cindex class display
+
+@table @kbd
+@item C c
+此命令允许您将成员缓冲区切换到另一个类。  它从迷你缓冲区中读取新类的名称并完成。
+
+@item C b
+这与 @kbd{C c} 是相同的命令，但将完成列表中显示的类仅限于直接基类。  如果仅存在一个基类，则该基类会立即显示在迷你缓冲区中。
+
+@item C d
+与 @kbd{C b} 相同，但针对派生类。
+
+@item C p
+切换到类层次结构中与当前显示的类处于同一级别的上一个类。
+
+@item C n
+切换到类树中该类的下一个同级。
+@end table
+
+
+
+
+@node Killing/Burying
+@section 埋藏成员缓冲区
+@cindex burying member buffers
+
+@table @kbd
+@item q
+该命令是 @kbd{M-x bury-buffer} 的同义词。
+@end table
+
+
+
+
+@node Column Width
+@section 设置列宽
+@cindex column width
+@cindex member indentation
+@cindex indentation, member
+
+@table @kbd
+@item D w
+该命令根据所使用的显示形式（长显示或短显示）设置列宽。
+@end table
+
+
+
+
+@node Redisplay
+@section 强制重新显示
+@cindex redisplay of member buffers
+
+@table @kbd
+@item C-l
+该命令强制重新显示成员缓冲区。  如果显示成员缓冲区的窗口宽度发生更改，此命令将使用适当的列宽和列数重新绘制成员列表。
+@end table
+
+
+
+
+@node Getting Help
+@section 寻求帮助
+@cindex help
+
+@table @kbd
+@item ?
+该键绑定到@code{describe-mode}。
+@end table
+
+
+
+
+@comment **************************************************************
+@comment ***                TAGS LIKE FUNCTIONS
+@comment **************************************************************
+
+@node Tags-like Functions
+@chapter 类似标签的函数
+
+Ebrowse 提供的标签功能与标准 Emacs 标签工具类似，但更适合 C++ 程序员的需求。
+
+@menu
+* Finding and Viewing::    转到成员声明/定义
+* Position Stack::         移动到以前的位置
+* Search & Replace::       搜索和替换类树文件
+* Members in Files::       列出给定文件中的所有成员
+* Apropos::                列出与正则表达式匹配的成员
+* Symbol Completion::      编辑时填写名称
+* Member Buffer Display::  快速显示某个标识符的成员缓冲区
+@end menu
+
+
+
+@node Finding and Viewing
+@section 查找和查看成员
+@cindex finding class member, in C++ source
+@cindex viewing class member, in C++ source
+@cindex tags
+@cindex member definition, finding, in C++ source
+@cindex member declaration, finding, in C++ source
+
+本节中的函数与@ref{Source Display}和@ref{Finding/Viewing}中描述的函数类似，不同之处在于它们在 C++ 源缓冲区中工作，而不是在 Ebrowse 创建的成员和树缓冲区中工作。
+
+@table @kbd
+@item C-c C-m f
+求点周围成员的定义。  如果使用前缀参数调用此函数，则会搜索声明。
+
+如果多个类包含具有给定名称的成员，您可以选择完整的类。  如果成员名称前面有范围声明，则该类名称将用作完成的初始输入。
+
+@item C-c C-m F
+找到point周围成员的声明。
+
+@item C-c C-m v
+查看点周围成员的定义。
+
+@item C-c C-m V
+查看点周围成员的声明。
+
+@item C-c C-m 4 f
+在另一个窗口中查找成员的定义。
+
+@item C-c C-m 4 F
+在另一个窗口中查找成员声明。
+
+@item C-c C-m 4 v
+在另一个窗口中查看成员的定义。
+
+@item C-c C-m 4 V
+在另一个窗口中查看成员的声明。
+
+@item C-c C-m 5 f
+在另一个框架中查找成员的定义。
+
+@item C-c C-m 5 F
+在另一个框架中查找成员声明。
+
+@item C-c C-m 5 v
+在另一个框架中查看成员的定义。
+
+@item C-c C-m 5 V
+在另一个框架中查看成员的声明。
+@end table
+
+
+
+@node Position Stack
+@section 位置堆栈
+@cindex position stack
+
+当使用 Ebrowse 的命令之一跳转到成员声明或定义时，执行跳转的位置和跳转到的位置将记录在 @dfn{position stack} 中。  您可以通过多种方式快速移动到堆栈中的位置：
+
+@table @kbd
+@cindex return to original position
+@item C-c C-m -
+该命令将点设置为位置堆栈中的上一个位置。在您执行跳跃后，这将使您立即回到原来的位置。
+
+堆栈不会弹出，即您始终可以在堆栈中的位置之间来回切换。  为了避免让堆栈增长到无限大小，定义了最大位置数。  当达到这个数字时，当新的位置被压入堆栈时，旧的位置将被丢弃。
+
+@item C-c C-m +
+该命令在位置堆栈中向前移动，将点设置为存储在位置堆栈中的下一个位置。
+
+@item C-c C-m p
+显示一个电子缓冲区，显示堆栈中保存的所有位置。您可以在一行中按 @kbd{@key{SPC}} 选择位置。  您可以使用 @kbd{v} 查看位置。
+@end table
+
+
+
+
+@node Search & Replace
+@section 搜索和替换
+@cindex searching multiple C++ files
+@cindex replacing in multiple C++ files
+@cindex restart tags-operation
+
+Ebrowse 允许您对类树中提到的所有或部分文件执行操作。  当您调用以下函数之一并加载多个类树时，您必须从电动树菜单中选择要使用的类树。  如果选定的树包含标记的类，则以下命令仅对标记的类中提到的文件进行操作。  否则，将使用类树中的所有文件。
+
+@table @kbd
+@item C-c C-m s
+此函数在选定的文件集中执行正则表达式搜索。
+
+@item C-c C-m u
+此命令执行对以通常方式选择的给定成员的呼叫的搜索并完成。
+
+@item C-c C-m %
+对文件集执行查询替换。
+
+@item C-c C-m ,
+当找到匹配项时，上述所有三个操作都会停止。  您可以使用此命令重新启动操作。
+
+@item C-c C-m n
+这将使用列表中的下一个文件重新启动最后一个标签操作。
+@end table
+
+
+
+
+@node Members in Files
+@section 文件中的成员
+@cindex files
+@cindex members in file, listing
+@cindex list class members in a file
+@cindex file, members
+
+命令@kbd{C-c C-m l}列出给定文件中的所有成员。  文件名是从迷你缓冲区中完整读取的。
+
+
+
+
+@node Apropos
+@section 会员Apropos
+@cindex apropos on class members
+@cindex members, matching regexp
+
+命令 @kbd{C-c C-m a} 可用于显示与给定正则表达式匹配的所有成员。  如果您只记住成员名称的一部分而不是其开头，则此命令可能非常有用。
+
+弹出一个特殊的缓冲区，其中包含与正则表达式匹配的所有标识符，以及它是什么类型的符号（例如，成员函数或类型）。  然后，您可以切换到该缓冲区，并使用命令 @kbd{C-c C-m f} 例如，跳转到特定成员。
+
+
+
+
+@node Symbol Completion
+@section 符号完成
+@cindex completion
+@cindex symbol completion
+
+命令@kbd{C-c C-m @key{TAB}}补全点前面的符号。
+
+
+
+
+@node Member Buffer Display
+@section 快速会员展示
+@cindex member buffer, for member at point
+
+您可以使用命令 @kbd{C-c C-m m} 快速显示包含光标所在成员的成员缓冲区。
+
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+
+@node Concept Index
+@unnumbered 概念索引
+@printindex cp
+
+@bye

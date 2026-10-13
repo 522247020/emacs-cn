@@ -1,0 +1,1632 @@
+\输入 texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename ../../info/wisent.info
+@set TITLE  Wisent Parser Development
+@set AUTHOR Eric M. Ludlam, David Ponce, and Richard Y. Kim
+@settitle @value{TITLE}
+@documentlanguage en
+@include docstyle.texi
+
+@c *************************************************************************
+@c @ Header
+@c *************************************************************************
+
+@c Merge all indexes into a single index for now.
+@c We can always separate them later into two or more as needed.
+@syncodeindex vr cp
+@syncodeindex fn cp
+@syncodeindex ky cp
+@syncodeindex pg cp
+@syncodeindex tp cp
+
+@c @footnotestyle separate
+@c @paragraphindent 2
+@c @@smallbook
+@c %**end of header
+
+@copying
+版权所有 @copyright{} 1988--1993、1995、1998--2004、2007、2012--2026 自由软件基金会
+
+@c Since we are both GNU manuals, we do not need to ack each other here.
+@ignore
+Some texts are borrowed or adapted from the manual of Bison version
+1.35.  The text in section entitled ``Understanding the automaton'' is
+adapted from the section ``Understanding Your Parser'' in the manual
+of Bison version 1.49.
+@end ignore
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* Wisent: (wisent).              语义 Wisent 解析器开发。
+@end direntry
+
+@iftex
+@finalout
+@end iftex
+
+@c @setchapternewpage odd
+@c @setchapternewpage off
+
+@titlepage
+@sp 10
+@title @value{TITLE}
+@author by @value{AUTHOR}
+@page
+@vskip 0pt plus 1 fill
+@insertcopying
+@end titlepage
+@page
+
+@macro semantic{}
+@i{Semantic}
+@end macro
+
+@c *************************************************************************
+@c @ Document
+@c *************************************************************************
+@contents
+
+@node top
+@top @value{TITLE}
+
+Wisent（欧洲 Bison；-）是 GNU 编译器 Bison 编译器的 Emacs Lisp 实现。
+
+本手册介绍了如何使用Wisent开发编程语言的语法，以及如何使用语法来解析Emacs缓冲区中的语言源。
+
+它还描述了如何将 Wisent 与 @ref{Top, Semantic Manual, Semantic Manual, semantic} 中描述的 @semantic{} 工具集一起使用。
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* Wisent Overview::
+* Wisent Grammar::
+* Wisent Parsing::
+* Wisent Semantic::
+* GNU Free Documentation License::
+* Index::
+@end menu
+
+@node Wisent Overview
+@chapter 威森特概况
+
+@dfn{Wisent}（欧洲 Bison）是 GNU 编译器 Bison 编译器在 Emacs Lisp 中的实现。  它的代码是 GNU Bison 1.28 & 1.31 的 C 代码的移植。
+
+有关理解 Wisent 的基本概念的更多详细信息，值得阅读@ref{Top, Bison Manual, , bison}。
+
+Wisent 可以生成与 @semantic{} 工具集兼容的编译器。参见@ref{Top, Semantic Manual, , semantic}。
+
+它受益于这些 Bison 功能：
+
+@itemize @bullet
+@item 
+它对解析表使用快速但空间效率不高的编码，如伯克利 Corbett 的博士论文所述：
+@quotation
+@cite{Static Semantics in Compiler Error Recovery}@* 1985 年 6 月，报告号@: UCB/CSD 85/251。
+@end quotation
+
+@item 
+为了生成前瞻集，Wisent 使用 F. DeRemer 和 T. Pennello 的著名技术，如下所述：
+@quotation
+@cite{Efficient Computation of LALR(1) Look-Ahead Sets}@* 1982 年 10 月，ACM TOPLAS 第 4 卷第 4 期，615--49，@uref{https://doi.org/10.1145/69622.357187}。
+@end quotation
+
+@item 
+Wisent 使用运算符优先级和关联性解决移位/归约冲突。
+
+@item 
+解析器错误恢复是使用与特殊标记@code{error}匹配的规则来完成的。
+@end itemize
+
+尽管如此，Bison 和 Wisent 之间还是存在一些根本区别。
+
+@itemize
+@item 
+Wisent 旨在在 Emacs 中使用。  它读取并生成 Emacs Lisp 数据结构。  语法中使用的所有附加代码都是 Emacs Lisp 代码。
+
+@item 
+与 Bison 相反，Wisent 不会生成结合 Emacs Lisp 代码和语法结构的解析器。  它们是分开存在的。 Wisent 从 Lisp 数据结构中读取语法，然后生成语法结构作为表。  之后，派生表可以包含在单独的 Emacs Lisp 文件中并进行字节编译，并在稍后由 Wisent 的解析器引擎使用。
+
+@item 
+Wisent 允许多个起始非终结符，并允许为特定起始非终结符调用解析函数。  例如，这对于解析 Emacs 缓冲区的区域特别有用。  @semantic{} 很大程度上取决于此功能的可用性。
+@end itemize
+
+@node Wisent Grammar
+@chapter 智慧语法
+
+@cindex context-free grammar
+@cindex rule
+为了让 Wisent 解析一种语言，它必须用 @dfn{context-free grammar} 来描述。  这是一种指定为规则的语法，无论上下文如何都可以应用。  有关更多信息，请参阅 Bison 手册中的@ref{Language and Grammar, , , bison}。
+
+@cindex terminal
+@cindex nonterminal
+正式语法是使用 @dfn{terminal} 和 @dfn{nonterminal} 项制定的。  终结符可以是 Emacs Lisp 符号或字符，非终结符只是符号。
+
+@cindex token
+终结符（也称为 @dfn{tokens}）代表语言的词汇元素，如数字、字符串等。
+
+例如@samp{PLUS}可以代表运算符@samp{+}。
+
+非终结符由规则描述：
+
+@example
+@group
+RESULT @equiv{} COMPONENTS@dots{}
+@end group
+@end example
+
+@samp{RESULT} 是该规则描述的非终结符，@samp{COMPONENTS} 是由该规则组合在一起的各种终结符和非终结符。
+
+例如，这条规则：
+
+@example
+@group
+exp @equiv{} exp PLUS exp
+@end group
+@end example
+
+表示两个 @samp{exp} 类型的分组（中间有 @samp{PLUS} 标记）可以组合成一个更大的 @samp{exp} 类型分组。
+
+@menu
+* Grammar format::
+* Example::
+* Compiling a grammar::
+* Conflicts::
+@end menu
+
+@node Grammar format
+@section 语法格式
+
+@cindex grammar format
+为了被 Wisent 接受，上下文无关语法必须遵循特定的格式。  也就是说，必须表示为以下形式的 Emacs Lisp 列表：
+
+@code{(@var{terminals} @var{assocs} . @var{non-terminals})}
+
+@table @var
+@item terminals
+是语法中使用的终结符列表。
+
+@cindex associativity
+@item assocs
+指定 @var{terminals} 的结合性。  当没有定义关联性时，它是@code{nil}，或者是@w{@code{(@var{assoc-type} . @var{assoc-value})}}元素的列表。
+
+@var{assoc-type} 必须是@code{default-prec}、@code{nonassoc}、@code{left} 或@code{right} 符号之一。  当@var{assoc-type}为@code{default-prec}时，@var{assoc-value}必须为@code{nil}或@code{t}（默认）。  否则，它是必须先前在@var{terminals}中声明的标记列表。
+
+有关详细信息，请参阅 Bison 手册中的@ref{Contextual Precedence, , , bison}。
+
+@item non-terminals
+是非终结符定义的列表。  每个定义的形式如下：
+
+@code{(@var{nonterm} . @var{rules})}
+
+其中@var{nonterm}是定义的非终结符，@var{rules}是描述该非终结符的规则列表。  每条规则都是一个列表：
+
+@code{(@var{components} [@var{precedence}] [@var{action}])}
+
+在哪里：
+
+@table @var
+@item components
+是按此规则放在一起的各种终结符和非终结符的列表。
+
+例如，
+
+@example
+@group
+(exp ((exp ?+ exp))          ;; exp: exp '+' exp
+     )                       ;;    ;
+@end group
+@end example
+
+表示两个 @samp{exp} 类型的分组（中间有 @samp{+} 标记）可以组合成一个更大的 @samp{exp} 类型分组。
+
+@cindex grammar coding conventions
+按照惯例，非终结符号应为小写，例如 @samp{exp}、@samp{stmt} 或 @samp{declaration}。  终结符号应为大写，以区别于非终结符号：例如，@samp{INTEGER}、@samp{IDENTIFIER}、@samp{IF} 或 @samp{RETURN}。  表示语言中特定关键字的终止符号通常与转换为大写的关键字相同。  终端符号 @code{error} 保留用于错误恢复。
+
+@cindex middle-rule actions
+分散在组件之间的可以是 @dfn{middle-rule} 动作。通常只提供 @var{action} (@pxref{action})。
+
+如果规则中@var{components}为@code{nil}，则表示该规则可以匹配空字符串。  例如，以下是如何定义零个或多个 @samp{exp} 分组的逗号分隔序列：
+
+@smallexample
+@group
+(expseq  (nil)               ;; expseq: ;; empty
+         ((expseq1))         ;;       | expseq1
+         )                   ;;       ;
+
+(expseq1 ((exp))             ;; expseq1: exp
+         ((expseq1 ?, exp))  ;;        | expseq1 ',' exp
+         )                   ;;        ;
+@end group
+@end smallexample
+
+@cindex precedence level
+@item precedence
+为规则分配给定终端项的优先级，覆盖为其推断的优先级，即其中最后一个终端项的优先级。  请注意，只有在 @var{assocs} 中声明的终端才具有优先级。  改变后的规则优先级会影响涉及该规则的冲突的解决方式。
+
+@var{precedence} 是一个终结项的可选向量。
+
+这是@var{precedence}如何解决一元减问题的。首先，声明名为 @code{UMINUS} 的虚构终结符号的优先级。  没有这种类型的标记，但符号用于代表其优先级：
+
+@example
+@dots{}
+((default-prec t) ;; This is the default
+ (left '+' '-')
+ (left '*')
+ (left UMINUS))
+@end example
+
+现在@code{UMINUS}的优先级可以用在特定的规则中：
+
+@smallexample
+@group
+(exp    @dots{}                  ;; exp:    @dots{}
+         ((exp ?- exp))      ;;         | exp '-' exp
+        @dots{}                  ;;         @dots{}
+         ((?- exp) [UMINUS]) ;;         | '-' exp %prec UMINUS
+        @dots{}                  ;;         @dots{}
+        )                    ;;         ;
+@end group
+@end smallexample
+
+如果您忘记将 @code{[UMINUS]} 附加到一元减法规则中，Wisent 会默默地假设减法具有其通常的优先级。  这类问题很难调试，因为通常只有通过测试代码才能发现错误。
+
+使用@code{(default-prec nil)}声明可以更容易系统地发现此类问题。  它会导致缺少 @var{precedence} 修饰符的规则没有优先级，即使其组件中提到的最后一个终端符号具有声明的优先级。
+
+如果 @code{(default-prec nil)} 有效，则必须为参与优先级冲突解决的所有规则指定 @var{precedence}。  然后，您将看到任何移位/归约冲突，直到您告诉 Wisent 如何解决它，通过更改语法或添加显式优先级。  这可能会向语法添加声明，但它有助于防止错误的规则优先级。
+
+@code{(default-prec nil)} 的效果可以通过指定 @code{(default-prec t)} 来逆转，这是默认值。
+
+有关更多详细信息，请参阅 Bison 手册中的@ref{Contextual Precedence, , , bison}。
+
+重要的是要理解 @var{assocs} 声明不仅定义了关联性，而且还为终结点分配了优先级。  在同一 @code{left}、@code{right} 或 @code{nonassoc} 关联中声明的所有终端都具有相同的优先级。  每个新关联的优先级都会增加。
+
+另一方面，@var{precedence}明确地将给定终端的优先级分配给规则。
+
+@cindex semantic actions
+@anchor{action}
+@item action
+操作是可选的 Emacs Lisp 函数调用，如下所示：
+
+@code{(identity $1)}
+
+动作的结果决定了规则的语义值。
+
+从实现的角度来看，函数调用将嵌入到 lambda 表达式中，并且将定义几个有用的局部变量：
+
+@table @code
+@vindex $N
+@item $@var{n}
+其中@var{n}是正整数。  与 Bison 一样，@code{$@var{n}} 的值是 @var{components} 的第 2⁣ 个元素的语义值，从 1 开始。它可以是任何 Lisp 数据类型。
+
+@vindex $region@var{n}
+@item $regionN
+其中@var{n}是正整数。  对于定义的每个 @code{$@var{n}} 变量，都有一个对应的 @code{$region@var{n}} 变量。  它的值是一对 @code{(@var{start-pos} . @var{end-pos})} ，表示 @code{$@var{n}} 值的开始位置和结束位置（在词汇输入流中）。  当组件位置不可用时（例如空字符串组件），它可以是@code{nil}。
+
+@vindex $region
+@item $region
+它的值是规则中所有@var{components}匹配的输入数据的最左和最右位置。  这是一对@code{(@var{leftmost-pos} .  @var{rightmost-pos})}。  当元件位置不可用时，它可以是@code{nil}。
+
+@vindex $nterm
+@item $nterm
+该变量使用规则所属的非终结符 (@var{nonterm}) 进行初始化。  它对于改进错误报告或调试可能很有用。  它还用于自动为 @semantic{} 标签 (@pxref{Wisent Semantic}) 提供增量重新解析入口点。
+
+@vindex $action
+@item $action
+@code{$action} 的值是当前语义动作 (@pxref{Debugging actions}) 的符号名称。
+@end table
+
+当未指定操作时，将提供默认值，即@code{(identity $1)}。  这意味着规则的默认语义值是其第一个组件的值。  匹配空字符串的规则除外，其默认操作是返回@code{nil}。
+@end table
+@end table
+
+@node Example
+@section 例子
+
+@cindex grammar example
+这是解析简单中缀算术表达式的示例。 @xref{Infix Calc, , , bison}，详见 Bison 手册。
+
+@lisp
+@group
+'(
+  ;; Terminals
+  (NUM)
+
+  ;; Terminal associativity & precedence
+  ((nonassoc ?=)
+   (left ?- ?+)
+   (left ?* ?/)
+   (left NEG)
+   (right ?^))
+
+  ;; Rules
+  (input
+   ((line))
+   ((input line)
+    (format "%s %s" $1 $2))
+   )
+
+  (line
+   ((?;)
+    (progn ";"))
+   ((exp ?;)
+    (format "%s;" $1))
+   ((error ?;)
+    (progn "Error;")))
+   )
+
+  (exp
+   ((NUM)
+    (string-to-number $1))
+   ((exp ?= exp)
+    (= $1 $3))
+   ((exp ?+ exp)
+    (+ $1 $3))
+   ((exp ?- exp)
+    (- $1 $3))
+   ((exp ?* exp)
+    (* $1 $3))
+   ((exp ?/ exp)
+    (/ $1 $3))
+   ((?- exp) [NEG]
+    (- $2))
+   ((exp ?^ exp)
+    (expt $1 $3))
+   ((?\( exp ?\))
+    (progn $2))
+   )
+  )
+@end group
+@end lisp
+
+在类似野牛的 @dfn{WY} 格式 (@pxref{Wisent Semantic}) 中，语法如下所示：
+
+@example
+@group
+%token <number> NUM
+
+%nonassoc '=' ;; comparison
+%left '-' '+'
+%left '*' '/'
+%left NEG     ;; negation--unary minus
+%right '^'    ;; exponentiation
+
+%%
+
+input:
+    line
+  | input line
+    (format "%s %s" $1 $2)
+  ;
+
+line:
+    ';'
+    @{";"@}
+  | exp ';'
+    (format "%s;" $1)
+  | error ';'
+    @{"Error;"@}
+  ;
+
+exp:
+    NUM
+    (string-to-number $1)
+  | exp '=' exp
+    (= $1 $3)
+  | exp '+' exp
+    (+ $1 $3)
+  | exp '-' exp
+    (- $1 $3)
+  | exp '*' exp
+    (* $1 $3)
+  | exp '/' exp
+    (/ $1 $3)
+  | '-' exp %prec NEG
+    (- $2)
+  | exp '^' exp
+    (expt $1 $3)
+  | '(' exp ')'
+    @{$2@}
+  ;
+
+%%
+@end group
+@end example
+
+@node Compiling a grammar
+@section 编译语法
+
+@cindex automaton
+以合适的格式提供上下文无关语法后，必须将其转换为一组表（@dfn{automaton}），用于派生解析器。  与 Bison 一样，Wisent 翻译的语法必须是@dfn{LALR(1)}。
+
+@cindex LALR(1) grammar
+@cindex look-ahead token
+如果可以仅使用单个前瞻标记：@dfn{look-ahead token} 来告诉如何解析输入字符串的任何部分，则语法为@acronym{LALR(1)}。  @xref{Language and Grammar, , , bison}，请参阅 Bison 手册了解更多信息。
+
+@cindex grammar compilation
+语法翻译（编译）是通过函数实现的：
+
+@cindex compiling a grammar
+@vindex wisent-single-start-flag
+@findex wisent-compile-grammar
+@defun wisent-compile-grammar grammar &optional start-list
+编译@var{grammar}并返回一个@acronym{LALR(1)}自动机。
+
+可选参数 @var{start-list} 是起始符号（非终结符）的列表。  如果 @code{nil} 语法中定义的第一个非终结符是默认的起始符号。  如果 2⁣ 仅包含一个元素，则它定义起始符号。  如果@var{start-list}包含多个元素，则所有元素都被定义为潜在的起始符号，除非@code{wisent-single-start-flag}是非@code{nil}。  在这种情况下，@var{start-list} 的第一个元素定义起始符号，其他元素将被忽略。
+
+@acronym{LALR(1)} 自动机是以下形式的向量：
+
+@code{[@var{actions gotos starts functions}]}
+
+@table @var
+@item actions
+状态/标记矩阵告诉解析器根据当前的前瞻标记在每个状态做什么。  即转移、减少、接受或错误。  另请参见@ref{Wisent Parsing}。
+
+@item gotos
+状态/非终结矩阵告诉解析器在使用每个规则进行归约后要进入的下一个状态。
+
+@item starts
+一个 alist，它将允许的起始符号（非终结符）映射到将首先移入解析器堆栈的词汇标记。
+
+@item functions
+语义动作符号的数组。  语义动作实际上是一个 Emacs Lisp 函数（lambda 表达式）。
+@end table
+@end defun
+
+@node Conflicts
+@section 冲突
+
+通常，语法应该生成一个自动机，其中解析器在每种状态下只有一个动作要做（@pxref{Wisent Parsing}）。
+
+@cindex ambiguous grammar
+在某些情况下，语法可以产生一个自动机，在某些状态下，可能有多个动作。  这样的文法是@dfn{ambiguous}，并生成@dfn{conflicts}。
+
+@cindex deterministic automaton
+解析器不能由不完全@dfn{deterministic}（即包含冲突）的自动机驱动。  必须化解矛盾，消除矛盾。  Wisent 像 Bison 一样解决冲突。
+
+@cindex grammar conflicts
+@cindex conflicts resolution
+冲突有两种：
+
+@table @dfn
+@cindex shift/reduce conflicts
+@item 转移/减少冲突
+当移位或减少在同一状态下有效时。
+
+此类冲突可以通过选择移位来解决，除非运算符优先级声明另有指示。 @xref{Shift/Reduce , , , bison}，请参阅 Bison 手册了解更多信息。
+
+@cindex reduce/reduce conflicts
+@item 减少/减少冲突
+如果有两个或多个规则应用于相同的输入序列，就会发生这种情况。  这通常表明语法中存在严重错误。
+
+此类冲突可以通过选择使用语法中最先出现的规则来解决，但依赖于此是非常危险的。  每个减少/减少冲突都必须进行研究并通常予以消除。 @xref{Reduce/Reduce , , , bison}，请参阅 Bison 手册了解更多信息。
+@end table
+
+@menu
+* Grammar Debugging::
+* Understanding the automaton::
+@end menu
+
+@node Grammar Debugging
+@subsection 语法调试
+
+@cindex grammar debugging
+@cindex grammar verbose description
+为了帮助编写新语法，@code{wisent-compile-grammar}可以生成一份详细报告，其中包含语法和解析器的详细描述（相当于 Bison 使用@option{--verbose}选项报告的内容）。
+
+要启用详细报告，您可以将变量设置为非@code{nil}：
+
+@vindex wisent-verbose-flag
+@deffn Option wisent-verbose-flag
+non-@code{nil} 表示报告生成的解析器的详细信息。
+@end deffn
+
+或者交互地使用命令：
+
+@findex wisent-toggle-verbose-flag
+@deffn Command wisent-toggle-verbose-flag
+切换是否报告生成的解析器的详细信息。
+@end deffn
+
+当交互运行时，详细报告打印在临时缓冲区 @file{*wisent-log*} 中，或者当以批处理模式运行时，打印在文件 @file{wisent.output} 中。  不同的报告之间用一行分隔开，如下所示：
+
+@example
+@group
+*** Wisent @var{source-file} - 2002-06-27 17:33
+@end group
+@end example
+
+其中 @var{source-file} 是从中读取语法的 Emacs Lisp 文件的名称。  @xref{Understanding the automaton}，有关详细报告的详细信息。
+
+@table @strong
+@item 请注意
+为了帮助调试语法编译器本身，您可以设置此变量来打印一些内部数据结构的内容：
+
+@vindex wisent-debug-flag
+@defvar wisent-debug-flag
+非@code{nil}表示启用一些调试功能。
+@end defvar
+@end table
+
+@node Understanding the automaton
+@subsection 了解自动机
+
+@cindex understanding the automaton
+本节（摘自 Bison 1.49 手册）描述了如何使用 @code{wisent-compile-grammar} 打印的详细报告来理解生成的自动机，调整或修复语法。
+
+我们将使用以下示例：
+
+@example
+@group
+(let ((wisent-verbose-flag t)) ;; Print a verbose report!
+  (wisent-compile-grammar
+   '((NUM STR)                          ; %token NUM STR
+
+     ((left ?+ ?-)                      ; %left '+' '-';
+      (left ?*))                        ; %left '*'
+
+     (exp                               ; exp:
+      ((exp ?+ exp))                    ;    exp '+' exp
+      ((exp ?- exp))                    ;  | exp '-' exp
+      ((exp ?* exp))                    ;  | exp '*' exp
+      ((exp ?/ exp))                    ;  | exp '/' exp
+      ((NUM))                           ;  | NUM
+      )                                 ;  ;
+
+     (useless                           ; useless:
+      ((STR))                           ;    STR
+      )                                 ;  ;
+     )
+   'nil)                                ; no %start declarations
+  )
+@end group
+@end example
+
+当评估上面的表达式时，语法编译首先发出以下两条明确的消息：
+
+@example
+@group
+Grammar contains 1 useless nonterminals and 1 useless rules
+Grammar contains 7 shift/reduce conflicts
+@end group
+@end example
+
+@file{*wisent-log*} 缓冲区详细说明了事情！
+
+第一部分报告使用优先级和/或关联性解决的冲突：
+
+@example
+@group
+Conflict in state 7 between rule 1 and token '+' resolved as reduce.
+Conflict in state 7 between rule 1 and token '-' resolved as reduce.
+Conflict in state 7 between rule 1 and token '*' resolved as shift.
+Conflict in state 8 between rule 2 and token '+' resolved as reduce.
+Conflict in state 8 between rule 2 and token '-' resolved as reduce.
+Conflict in state 8 between rule 2 and token '*' resolved as shift.
+Conflict in state 9 between rule 3 and token '+' resolved as reduce.
+Conflict in state 9 between rule 3 and token '-' resolved as reduce.
+Conflict in state 9 between rule 3 and token '*' resolved as reduce.
+@end group
+@end example
+
+下一节报告无用的令牌、非终结符和规则（请注意，扫描器可能会使用无用的令牌）：
+
+@example
+@group
+Useless nonterminals:
+
+   useless
+
+
+Terminals which are not used:
+
+   STR
+
+
+Useless rules:
+
+#6     useless: STR;
+@end group
+@end example
+
+下一部分列出了仍然存在冲突的状态：
+
+@example
+@group
+State 7 contains 1 shift/reduce conflict.
+State 8 contains 1 shift/reduce conflict.
+State 9 contains 1 shift/reduce conflict.
+State 10 contains 4 shift/reduce conflicts.
+@end group
+@end example
+
+下一节将重现所使用的语法：
+
+@example
+@group
+Grammar
+
+  Number, Rule
+  1       exp -> exp '+' exp
+  2       exp -> exp '-' exp
+  3       exp -> exp '*' exp
+  4       exp -> exp '/' exp
+  5       exp -> NUM
+@end group
+@end example
+
+并报告符号的用途：
+
+@example
+@group
+Terminals, with rules where they appear
+
+$EOI (-1)
+error (1)
+NUM (2) 5
+STR (3) 6
+'+' (4) 1
+'-' (5) 2
+'*' (6) 3
+'/' (7) 4
+
+
+Nonterminals, with rules where they appear
+
+exp (8)
+    on left: 1 2 3 4 5, on right: 1 2 3 4
+@end group
+@end example
+
+然后，报告详细介绍了自动机本身，用 @dfn{items} 组（也称为 @dfn{pointed rules}）描述每个状态。  每一项都是一个产生式规则以及一个输入光标的点（用@samp{.}标记）。
+
+@example
+@group
+state 0
+
+    NUM shift, and go to state 1
+
+    exp go to state 2
+@end group
+@end example
+
+状态 0 对应于在初始规则中位于解析的最开始，就在开始符号 (@samp{exp}) 之前。  当解析器在减少生成 @samp{exp} 的规则后立即返回到此状态时，它会跳转到状态 2。如果非终结符上没有此类转换，并且先行是 @samp{NUM}，则该令牌将在解析堆栈上移动，并且控制流跳转到状态 1。任何其他先行都会触发解析错误。
+
+在状态1...
+
+@example
+@group
+state 1
+
+    exp  ->  NUM .   (rule 5)
+
+    $default    reduce using rule 5 (exp)
+@end group
+@end example
+
+规则 5 @samp{exp: NUM;} 已完成。  无论前瞻 (@samp{$default}) 是什么，解析器都会减少它。  如果它来自状态 0，那么在减少之后它将返回到状态 0，并跳转到状态 2 (@samp{exp: go to state 2})。
+
+@example
+@group
+state 2
+
+    exp  ->  exp . '+' exp   (rule 1)
+    exp  ->  exp . '-' exp   (rule 2)
+    exp  ->  exp . '*' exp   (rule 3)
+    exp  ->  exp . '/' exp   (rule 4)
+
+    $EOI        shift, and go to state 11
+    '+' shift, and go to state 3
+    '-' shift, and go to state 4
+    '*' shift, and go to state 5
+    '/' shift, and go to state 6
+@end group
+@end example
+
+在状态 2 中，自动机只能移动一个符号。  例如，由于项目@samp{exp -> exp . '+' exp}，如果先行查找@samp{+}，它将在解析堆栈上移动，并且自动机控制将跳转到状态3，对应于项目@samp{exp -> exp . '+' exp}：
+
+@example
+@group
+state 3
+
+    exp  ->  exp '+' . exp   (rule 1)
+
+    NUM shift, and go to state 1
+
+    exp go to state 7
+@end group
+@end example
+
+由于没有默认操作，因此除上面列出的标记之外的任何其他标记都将触发解析错误。
+
+状态 4 到 6 的解释很简单：
+
+@example
+@group
+state 4
+
+    exp  ->  exp '-' . exp   (rule 2)
+
+    NUM shift, and go to state 1
+
+    exp go to state 8
+
+
+
+state 5
+
+    exp  ->  exp '*' . exp   (rule 3)
+
+    NUM shift, and go to state 1
+
+    exp go to state 9
+
+
+
+state 6
+
+    exp  ->  exp '/' . exp   (rule 4)
+
+    NUM shift, and go to state 1
+
+    exp go to state 10
+@end group
+@end example
+
+正如报告开头所宣布的，@samp{State 7 contains 1 shift/reduce conflict.}：
+
+@example
+@group
+state 7
+
+    exp  ->  exp . '+' exp   (rule 1)
+    exp  ->  exp '+' exp .   (rule 1)
+    exp  ->  exp . '-' exp   (rule 2)
+    exp  ->  exp . '*' exp   (rule 3)
+    exp  ->  exp . '/' exp   (rule 4)
+
+    '*' shift, and go to state 5
+    '/' shift, and go to state 6
+
+    '/' [reduce using rule 1 (exp)]
+    $default    reduce using rule 1 (exp)
+@end group
+@end example
+
+事实上，有两个与前瞻 @samp{/} 相关的操作：要么转移（并进入状态 6），要么减少规则 1。冲突意味着语法不明确，或者解析器缺乏做出正确决策的信息。  事实上，语法是不明确的，因为我们没有指定@samp{/}的优先级，句子@samp{NUM + NUM / NUM}可以被解析为@samp{NUM + (NUM / NUM)}，它对应于移位@samp{/}，或者@samp{(NUM + NUM) / NUM}，它对应于减少规则1。
+
+因为在@acronym{LALR(1)}解析中可以做出单个决定，Wisent任意选择禁用归约，参见@ref{Conflicts}。  丢弃的操作在方括号内报告。
+
+请注意，所有先前的状态都有一个可能的操作：要么移动下一个标记并转到相应的状态，要么减少单个规则。  在其他情况下，即当可以进行 0⁣ 减少或者可以进行 1⁣ 减少时，需要先行来选择动作。  状态 7 就是这样一种状态：如果先行为 @samp{*} 或 @samp{/}，则操作正在转移，否则操作为减少规则 1。换句话说，当先行为 @samp{*} 时，对应于规则 1 的前两项不符合条件，因为我们指定 @samp{*} 的优先级高于 @samp{+}。  更一般地说，某些项目仅适用于某些可能的前瞻集。
+
+状态 8 到 10 类似：
+
+@example
+@group
+state 8
+
+    exp  ->  exp . '+' exp   (rule 1)
+    exp  ->  exp . '-' exp   (rule 2)
+    exp  ->  exp '-' exp .   (rule 2)
+    exp  ->  exp . '*' exp   (rule 3)
+    exp  ->  exp . '/' exp   (rule 4)
+
+    '*' shift, and go to state 5
+    '/' shift, and go to state 6
+
+    '/' [reduce using rule 2 (exp)]
+    $default    reduce using rule 2 (exp)
+
+
+state 9
+
+    exp  ->  exp . '+' exp   (rule 1)
+    exp  ->  exp . '-' exp   (rule 2)
+    exp  ->  exp . '*' exp   (rule 3)
+    exp  ->  exp '*' exp .   (rule 3)
+    exp  ->  exp . '/' exp   (rule 4)
+
+    '/' shift, and go to state 6
+
+    '/' [reduce using rule 3 (exp)]
+    $default    reduce using rule 3 (exp)
+
+
+state 10
+
+    exp  ->  exp . '+' exp   (rule 1)
+    exp  ->  exp . '-' exp   (rule 2)
+    exp  ->  exp . '*' exp   (rule 3)
+    exp  ->  exp . '/' exp   (rule 4)
+    exp  ->  exp '/' exp .   (rule 4)
+
+    '+' shift, and go to state 3
+    '-' shift, and go to state 4
+    '*' shift, and go to state 5
+    '/' shift, and go to state 6
+
+    '+' [reduce using rule 4 (exp)]
+    '-' [reduce using rule 4 (exp)]
+    '*' [reduce using rule 4 (exp)]
+    '/' [reduce using rule 4 (exp)]
+    $default    reduce using rule 4 (exp)
+@end group
+@end example
+
+观察到状态 10 包含冲突，因为 @samp{/} 相对于 @samp{+}、@samp{-} 和 @samp{*} 缺乏优先级，而且还因为未指定 @samp{/} 的关联性。
+
+最后，状态 11（加上 12）被命名为 ⁣​​0⁣ 或 @dfn{accepting state}：
+
+@example
+@group
+state 11
+
+    $EOI        shift, and go to state 12
+
+
+
+state 12
+
+    $default    accept
+@end group
+@end example
+
+输入的末尾被移动 @samp{$EOI shift,} 并且解析器成功退出（@samp{go to state 12}，终止）。
+
+@node Wisent Parsing
+@chapter 智慧解析
+
+@cindex bottom-up parser
+@cindex shift-reduce parser
+Wisent 的解析器是所谓的 @dfn{bottom-up} 或 @dfn{shift-reduce} 解析器，它会重复：
+
+@table @dfn
+@cindex shift
+@item 转移
+也就是说，将最后读取的词汇标记（先行标记）的值推入值堆栈，然后读取新的值。
+
+@cindex reduce
+@item 减少
+即用其语义值替换非终结符。  形成规则右侧的组件的值从值堆栈中弹出，并通过该规则的语义操作来减少。结果被推回值堆栈的顶部。
+@end table
+
+解析器将停止在：
+
+@table @dfn
+@cindex accept
+@item 接受
+当所有输入都已成功解析时。  起始非终结符的语义值位于值堆栈的顶部。
+
+@cindex syntax error
+@item 错误
+当检测到语法错误（输入中出现意外标记）时。此时，解析器会发出错误消息，并停止或调用恢复例程来尝试恢复解析。
+@end table
+
+@cindex table-driven parser
+上述基本动作由 @code{wisent-compile-grammar} 根据上下文无关语法构建的 @acronym{LALR(1)} 自动机驱动。
+
+Wisent的解析器是通过调用以下函数进入的：
+
+@findex wisent-parse
+@defun wisent-parse automaton lexer &optional error start
+使用@var{automaton}中指定的自动机解析输入。
+
+@table @var
+@item automaton
+是由 @code{wisent-compile-grammar} (@pxref{Wisent Grammar}) 生成的 @acronym{LALR(1)} 自动机。
+
+@item lexer
+是解析器调用的不带参数的函数，用于获取输入 (@pxref{Writing a lexer}) 中的下一个终结符（标记）。
+
+@item error
+是发生解析错误时调用的可选报告函数。它接收要报告的消息字符串。  它默认为函数 @code{wisent-message} (@pxref{Report errors})。
+
+@item start
+指定解析器使用的起始符号（非终结符）作为其目标。它默认为语法中定义的起始符号 (@pxref{Wisent Grammar})。
+@end table
+@end defun
+
+以下两个普通钩子允许分别在开始解析之前和解析器终止之后进行一些有用的处理。
+
+@vindex wisent-pre-parse-hook
+@defvar wisent-pre-parse-hook
+正常钩子在进入 @var{LR} 解析器引擎之前运行。
+@end defvar
+
+@vindex wisent-post-parse-hook
+@defvar wisent-post-parse-hook
+正常钩子在 @var{LR} 解析器引擎终止后运行。
+@end defvar
+
+@menu
+* Writing a lexer::
+* Actions goodies::
+* Report errors::
+* Error recovery::
+* Debugging actions::
+@end menu
+
+@node Writing a lexer
+@section 解析器必须接收什么
+
+重要的是要理解，解析器并不解析字符，而是解析词汇标记，并且对文本流中的字符一无所知！
+
+@cindex lexical analysis
+@cindex lexer
+@cindex scanner
+读取输入数据以生成词汇标记是由词法分析器（也称为扫描器）在词法分析步骤中、在解析器执行语法分析步骤之前执行的。  当解析器需要解析下一个标记时，它会自动调用词法分析器。
+
+@cindex lexical tokens
+Wisent 的词法分析器是一个不带参数的 Emacs Lisp 函数。  它必须返回以下形式的有效词汇标记：
+
+@code{(@var{token-class value} [@var{start} . @var{end}])}
+
+@table @var
+@item token-class
+是词汇标记的类别，用于识别语法 (@pxref{Wisent Grammar}) 中指定的终端。  它可以是符号或字符文字。
+
+@item value
+是词汇标记的值。  它可以是任何有效的 Emacs Lisp 数据类型。
+
+@item start
+@itemx end
+是输入流中@var{value}的可选开始和结束位置。
+@end table
+
+当没有更多令牌可供读取时，词法分析器必须向每个请求返回令牌 @code{(list wisent-eoi-term)}。
+
+@vindex wisent-eoi-term
+@defvar wisent-eoi-term
+预定义常量，输入结束端子符号。
+@end defvar
+
+@code{wisent-lex} 是词法分析器的一个示例，它读取 @semantic{} 词法分析器生成的词汇标记，并将它们转换为适合 Wisent 解析器的词汇标记。  另请参见@ref{Wisent Lex}。
+
+要在语义操作中调用词法分析器，请使用函数@code{wisent-lexer}。  另请参见@ref{Actions goodies}。
+
+@node Actions goodies
+@section 在语法操作中有用的变量和宏。
+
+@vindex wisent-input
+@defvar wisent-input
+最后读取的令牌。该变量仅在@code{wisent-parse}范围内有意义。
+@end defvar
+
+@findex wisent-lexer
+@defun wisent-lexer
+获取输入中的下一个终端。
+@end defun
+
+@findex wisent-region
+@defun wisent-region &rest positions
+返回区域的开始/结束位置，包括@var{positions}。  @var{positions} 的每个元素都是一对 @w{@code{(@var{start-pos} .  @var{end-pos})}} 或 @code{nil}。  如果没有 @var{positions} 可用，则返回值是 @w{@code{(@var{min-start-pos} . @var{max-end-pos})}} 或 @code{nil} 对。
+@end defun
+
+@node Report errors
+@section 错误报告功能
+
+@cindex error reporting
+当解析器遇到语法错误时，它会调用用户定义的函数。  它必须是一个带有一个参数的 Emacs Lisp 函数：一个包含要报告的消息的字符串。
+
+默认情况下，解析器使用此函数来报告错误消息：
+
+@findex wisent-message
+@defun wisent-message string &rest args
+如果设置了@code{wisent-parse-verbose-flag}，则打印一行消息。将@var{string}和@var{args}参数传递给@dfn{message}。
+@end defun
+
+@table @strong
+@item 请注意：
+@code{wisent-message} 使用以下函数来打印词汇标记：
+
+@defun wisent-token-to-string token
+返回词汇标记 @var{token} 的打印表示。
+@end defun
+
+词汇标记的一般打印形式是：
+
+@w{@code{@var{token}(@var{value})@@@var{location}}}
+@end table
+
+要控制解析器的详细程度，您可以将此变量设置为非@code{nil}：
+
+@vindex wisent-parse-verbose-flag
+@deffn Option wisent-parse-verbose-flag
+非@code{nil}表示解析时发出更多消息。
+@end deffn
+
+或者交互地使用命令：
+
+@findex wisent-parse-toggle-verbose-flag
+@deffn Command wisent-parse-toggle-verbose-flag
+切换解析时是否发出更多消息。
+@end deffn
+
+当输入错误报告函数时，变量@code{wisent-input}包含词法分析器返回的意外标记。
+
+错误报告函数也可以使用特殊宏@code{wisent-error}从语义操作中调用。  当从错误恢复（@pxref{Error recovery}）输入的语义操作中调用时，变量@code{wisent-recovering}的值是非@code{nil}。
+
+@node Error recovery
+@section 错误恢复
+
+@cindex error recovery
+Wisent 解析器的错误恢复机制与 Bison 使用的一致。  @xref{Error Recovery, , , bison}，详见 Bison 手册。
+
+@cindex error token
+要从语法错误中恢复，您必须编写规则来识别特殊标记@code{error}。  这是自动定义并保留用于错误处理的终端符号。
+
+当解析器遇到语法错误时，它会弹出状态堆栈，直到找到允许移动 @code{error} 标记的状态。移位后，如果旧的先行标记不可接受接下来移位，则解析器将读取标记并丢弃它们，直到找到可接受的标记。
+
+@cindex error recovery strategy
+错误恢复策略取决于语法中错误规则的选择。  一个简单而有用的策略是，如果检测到错误，则跳过当前语句的其余部分：
+
+@example
+@group
+(statement (( error ?; )) ;; on error, skip until ';' is read
+           )
+@end group
+@end example
+
+恢复到已解析的开始分隔符的匹配结束分隔符也很有用：
+
+@example
+@group
+(primary (( ?@{ expr  ?@} ))
+         (( ?@{ error ?@} ))
+         @dots{}
+         )
+@end group
+@end example
+
+@cindex error recovery actions
+请注意，错误恢复规则可能有操作，就像任何其他规则一样。  以下是一些预定义的挂钩、变量、函数或宏，在此类操作中很有用：
+
+@vindex wisent-nerrs
+@defvar wisent-nerrs
+到目前为止遇到的解析错误的数量。
+@end defvar
+
+@vindex wisent-recovering
+@defvar wisent-recovering
+非@code{nil}表示解析器正在恢复。该变量仅在@code{wisent-parse}范围内有意义。
+@end defvar
+
+@findex wisent-error
+@defun wisent-error msg
+使用消息 @var{msg} (@pxref{Report errors}) 调用用户提供的错误报告函数。
+
+作为使用示例，@xref{wisent-skip-token}。
+@end defun
+
+@findex wisent-errok
+@defun wisent-errok
+立即恢复为后续语法错误生成错误消息。
+
+解析器会抑制第一个错误之后不久发生的语法错误的错误消息，直到三个连续的输入标记已成功移位。
+
+在操作中调用@code{wisent-errok}，使错误消息立即恢复。  如果您在错误规则的操作中调用它，则不会抑制任何错误消息。
+
+作为使用示例，@xref{wisent-skip-token}。
+@end defun
+
+@findex wisent-clearin
+@defun wisent-clearin
+丢弃当前的先行标记。这将导致读取新的词汇标记。
+
+在错误规则的操作中，将立即重新分析先前的先行标记。  可以调用@code{wisent-clearin}来清除该令牌。
+
+例如，假设在发生解析错误时，调用错误处理例程，将输入流前进到应再次开始解析的某个点。  词法扫描器返回的下一个符号可能是正确的。  之前的前瞻标记应该用 @code{wisent-clearin} 丢弃。
+
+作为使用示例，@xref{wisent-skip-token}。
+@end defun
+
+@findex wisent-abort
+@defun wisent-abort
+中止解析并保存前瞻标记。
+@end defun
+
+@findex wisent-set-region
+@defun wisent-set-region start end
+更改当前非终结符匹配的文本区域。 @var{start} 和 @var{end} 分别是与该非终结符关联的组件组所占据的区域的开始和结束位置。  如果 2⁣ 或 3⁣ 值不是有效位置，则区域将设置为 4⁣。
+
+作为使用示例，@xref{wisent-skip-token}。
+@end defun
+
+@vindex wisent-discarding-token-functions
+@defvar wisent-discarding-token-functions
+丢弃词汇标记时要调用的函数列表。这些函数接收丢弃的词汇标记。当解析器遇到意外标记时，它可以根据错误恢复规则的指示丢弃它们。  当解析器读取标记直到找到可以移动的标记时，或者当语义动作调用函数@code{wisent-skip-token}或@code{wisent-skip-block}时。对于特定于语言的挂钩，请确保将其定义为本地挂钩。
+
+例如，在@semantic{}中，这个钩子被设置为函数@code{wisent-collect-unmatched-syntax}来收集不匹配的词汇标记（@pxref{Useful functions}）。
+@end defvar
+
+@findex wisent-skip-token
+@defun wisent-skip-token
+@anchor{wisent-skip-token}
+跳过前瞻标记以继续解析。返回@code{nil}。必须在错误恢复语义操作中使用。
+
+它通常看起来像这样：
+
+@lisp
+@group
+(wisent-message "%s: skip %s" $action
+                (wisent-token-to-string wisent-input))
+(run-hook-with-args
+ 'wisent-discarding-token-functions wisent-input)
+(wisent-clearin)
+(wisent-errok)))
+@end group
+@end lisp
+@end defun
+
+@findex wisent-skip-block
+@defun wisent-skip-block
+安全地跳过一个块以继续解析。返回@code{nil}。必须在错误恢复语义操作中使用。
+
+块是开放分隔符（语法类 @code{(}）和匹配的封闭分隔符（语法类 @code{)}）之间的数据：
+
+@example
+@group
+(a parenthesized block)
+[a block between brackets]
+@{a block between braces@}
+@end group
+@end example
+
+以下示例在 @samp{other-components} 中出现语法错误时，使用 @code{wisent-skip-block} 安全地跳过由 @samp{LBRACE} (@code{@{}) and @samp{RBRACE} (@code{@}}) 标记分隔的块：
+
+@example
+@group
+(block ((LBRACE other-components RBRACE))
+       ((LBRACE RBRACE))
+       ((LBRACE error)
+        (wisent-skip-block))
+       )
+@end group
+@end example
+@end defun
+
+@node Debugging actions
+@section 调试语义动作
+
+@cindex semantic action symbols
+每个语义动作都由嵌入在 @dfn{obarray} 中的符号表示，该符号是 @acronym{LALR(1)} 自动机 (@pxref{Compiling a grammar}) 的一部分。  @code{symbol-function} 对语义动作符号返回语义动作 lambda 表达式。
+
+语义动作符号名称的形式为@code{@var{nonterminal}:@var{index}}，其中@var{nonterminal}是动作所属的非终结符号的名称，@var{index}是@var{nonterminal}范围内的动作序列号。例如，这个非终结符定义：
+
+@example
+@group
+input:
+   line                     [@code{input:0}]
+ | input line
+   (format "%s %s" $1 $2)   [@code{input:1}]
+ ;
+@end group
+@end example
+
+将产生两个语义动作，以及关联的符号：
+
+@table @code
+@item input:0
+返回 @code{$1} 的默认操作。
+
+@item input:1
+返回@code{(format "%s %s" $1 $2)}。
+@end table
+
+@cindex debugging semantic actions
+调试使用 Lisp 调试器来调查语义操作执行期间发生的情况。三个命令可用于调试语义操作。  他们收到两个论点：
+
+@itemize @bullet
+@item The automaton that contains the semantic action.
+
+@item The semantic action symbol.
+@end itemize
+
+@findex wisent-debug-on-entry
+@deffn Command wisent-debug-on-entry automaton function
+请求 @var{automaton} 的 @var{function} 在每次调用调试器时调用它。 @var{function} 必须是@var{automaton} 中存在的语义动作符号。
+@end deffn
+
+@findex wisent-cancel-debug-on-entry
+@deffn Command wisent-cancel-debug-on-entry automaton function
+撤销 @code{wisent-debug-on-entry} 对 @var{automaton} 的 @var{function} 的影响。 @var{function} 必须是@var{automaton} 中存在的语义动作符号。
+@end deffn
+
+@findex wisent-debug-show-entry
+@deffn Command wisent-debug-show-entry automaton function
+显示@var{automaton}语义动作@var{function}的来源。 @var{function} 必须是@var{automaton} 中存在的语义动作符号。
+@end deffn
+
+@node Wisent Semantic
+@chapter 如何使用 Wisent 和 Semantic
+
+@cindex tags
+本节介绍如何使用 Wisent 的解析器为 @semantic{} 工具集生成 @dfn{tags}。
+
+@semantic{} tags form a hierarchy of Emacs Lisp data structures that
+以独立于编程语言的方式描述程序。标签映射程序声明，如函数、方法、变量、数据类型、类、包含、语法规则等。
+
+@cindex WY grammar format
+要将 Wisent 解析器与 @semantic{} 一起使用，您必须以 @dfn{WY} 形式定义语法，这是一种非常接近 Bison 使用的语法格式。
+
+@menu
+* Grammar styles::
+* Wisent Lex::
+@end menu
+
+@node Grammar styles
+@section 语法风格
+
+@cindex grammar styles
+@semantic{} parsing heavily depends on how you wrote the grammar.
+主要有两种编写与 @semantic{} 工具集一起使用的 Wisent 语法的样式：@dfn{Iterative style} 和 @dfn{Bison style}。  每种风格都有优点和缺点，在某些情况下，两种风格的混合是值得的！
+
+@menu
+* Iterative style::
+* Bison style::
+* Mixed style::
+* Start nonterminals::
+* Useful functions::
+@end menu
+
+@node Iterative style
+@subsection 迭代风格
+
+@cindex grammar iterative style
+@dfn{iterative style} 是与 @semantic{} 一起使用的首选样式。它依赖于一种迭代解析器后端机制，该机制一次解析一个起始非终结符，并自动跳过输入中意外的词汇标记。
+
+与基于规则的迭代函数 (@pxref{Bison style}) 相比，迭代解析器更好，因为它们可以更干净地处理模糊错误。
+
+@cindex raw tag
+每个起始非终结符必须通过使用适当的参数调用类似@code{TAG}的语法宏来生成@dfn{raw tag}。  另请参见@ref{Start nonterminals}。
+
+@cindex expanded tag
+然后，每次解析迭代都会自动将原始标签转换为@dfn{expanded tags}，并使用内部属性和缓冲区相关数据更新原始标签结构。
+
+解析完成后，会生成扩展标签树。
+
+以下示例是文件 @file{semantic/wisent/java-tags.wy} 中的 @semantic{} 发行版中提供的迭代式 Java 语法的片段。
+
+@example
+@group
+@dots{}
+;; Alternate entry points
+;;    - Needed by partial re-parse
+%start formal_parameter
+@dots{}
+;;    - Needed by EXPANDFULL clauses
+%start formal_parameters
+@dots{}
+
+formal_parameter_list
+  : PAREN_BLOCK
+    (EXPANDFULL $1 formal_parameters)
+  ;
+
+formal_parameters
+  : LPAREN
+    ()
+  | RPAREN
+    ()
+  | formal_parameter COMMA
+  | formal_parameter RPAREN
+  ;
+
+formal_parameter
+  : formal_parameter_modifier_opt type variable_declarator_id
+    (VARIABLE-TAG $3 $2 nil :typemodifiers $1)
+  ;
+@end group
+@end example
+
+@findex EXPANDFULL
+它展示了如何使用 @code{EXPANDFULL} 语法宏来解析包含 @samp{formal_parameter_list} 的 @samp{PAREN_BLOCK}。 @code{EXPANDFULL} 告诉在 @samp{PAREN_BLOCK} 中递归解析 @samp{formal_parameters}。  解析器进行迭代，直到消化完 @samp{PAREN_BLOCK} 内的所有可用输入数据，尝试匹配任何 @samp{formal_parameters} 规则：
+
+@itemize
+@item @samp{LPAREN}
+
+@item @samp{RPAREN}
+
+@item @samp{formal_parameter COMMA}
+
+@item @samp{formal_parameter RPAREN}
+@end itemize
+
+在每次迭代时，它将返回 @samp{formal_parameter} 原始标签，或 @code{nil} 以跳过不需要的（例如单个 @samp{LPAREN} 或 @samp{RPAREN}）或意外的输入数据。  这些原始标签将由迭代后端解析器自动扩展。
+
+@node Bison style
+@subsection 野牛风格
+
+@cindex grammar bison style
+我们所说的 @dfn{Bison style} 是 Bison 语法的传统风格。  与迭代风格相比，在@semantic{}中使用以 Bison 风格编写的语法并不简单。  主要是因为此类语法旨在一次性解析整个输入数据，并且不使用迭代解析器后端机制（@pxref{Iterative style}）。  使用 Bison 风格，解析器被调用一次来解析语法起始非终结符。
+
+以下示例是文件 @file{semantic/wisent/java.wy} 的 @semantic{} 发行版中提供的 Bison 风格 Java 语法的片段。
+
+@example
+@group
+%start formal_parameter
+@dots{}
+
+formal_parameter_list
+  : formal_parameter_list COMMA formal_parameter
+    (cons $3 $1)
+  | formal_parameter
+    (list $1)
+  ;
+
+formal_parameter
+  : formal_parameter_modifier_opt type variable_declarator_id
+    (EXPANDTAG
+     (VARIABLE-TAG $3 $2 :typemodifiers $1)
+     )
+  ;
+@end group
+@end example
+
+第一个结果是@semantic{}不会自动处理语法错误。  因此，有必要在语法级别显式地处理它们，提供错误恢复规则来跳过意外的输入数据。
+
+第二个结果是迭代解析器无法执行自动标记扩展，除了起始非终结值之外。  有必要通过使用原始标签作为参数调用语法宏@code{EXPANDTAG}来显式扩展相关语义操作的标签。  另请参阅@ref{Start nonterminals}，了解增量重新解析注意事项。
+
+@node Mixed style
+@subsection 混合风格
+
+@cindex grammar mixed style
+@example
+@group
+%start grammar
+;; Reparse
+%start prologue epilogue declaration nonterminal rule
+@dots{}
+
+%%
+
+grammar:
+    prologue
+  | epilogue
+  | declaration
+  | nonterminal
+  | PERCENT_PERCENT
+  ;
+@dots{}
+
+nonterminal:
+    SYMBOL COLON rules SEMI
+    (TAG $1 'nonterminal :children $3)
+  ;
+
+rules:
+    lifo_rules
+    (apply 'nconc (nreverse $1))
+  ;
+
+lifo_rules:
+    lifo_rules OR rule
+    (cons $3 $1)
+  | rule
+    (list $1)
+  ;
+
+rule:
+    rhs
+    (let* ((rhs $1)
+           name type comps prec action elt)
+      @dots{}
+      (EXPANDTAG
+       (TAG name 'rule :type type :value comps :prec prec :expr action)
+       ))
+  ;
+@end group
+@end example
+
+此示例展示了如何将迭代和 Bison 样式组合在同一语法中，以在交互式环境中在语法复杂性和高效解析策略之间获得良好的折衷。
+
+@samp{nonterminal} 通过主要 @samp{grammar} 规则使用迭代风格进行解析。  语义操作使用 @code{TAG} 宏生成原始标签，并由 @semantic{} 自动扩展。
+
+但是 @samp{rules} 部分是用 Bison 风格解析的！  为什么？
+
+规则分隔符是非终结符名称后面的冒号 (@code{:}) 和最后的分号 (@code{;})。  不幸的是，这些分隔符不是 @code{open-paren}/@code{close-paren} 类型，并且 Emacs 语法分析器无法轻松隔离它们之间的数据以生成 @samp{RULES_PART} 括号块状词汇标记。因此，不可能使用 @code{EXPANDFULL} 来迭代 @samp{RULES_PART}，如下所示：
+
+@example
+@group
+nonterminal:
+    SYMBOL COLON rules SEMI
+    (TAG $1 'nonterminal :children $3)
+  ;
+
+rules:
+    RULES_PART  ;; @strong{Map a parenthesis-block-like lexical token}
+    (EXPANDFULL $1 'rules)
+  ;
+
+rules:
+    COLON
+    ()
+    OR
+    ()
+    SEMI
+    ()
+    rhs
+    rhs
+    (let* ((rhs $1)
+           name type comps prec action elt)
+      @dots{}
+      (TAG name 'rule :type type :value comps :prec prec :expr action)
+      )
+  ;
+@end group
+@end example
+
+在这种情况下，当 Emacs 很难获取类似括号块的词法标记时，最好的解决方案是使用带有错误恢复功能的传统 Bison 风格！
+
+在某些极端情况下，扩展词法分析器、提供新的词汇标记、简化语法也很方便。
+
+@node Start nonterminals
+@subsection 启动非终结符
+
+@cindex start nonterminals
+@cindex @code{reparse-symbol} property
+当您为 @semantic{} 编写语法时，仔细指示起始非终结符非常重要。  每一个都定义了语法中的一个入口点，解析后其语义值返回到后端迭代引擎。  最后：
+
+@strong{The semantic value of a start nonterminal must be a produced by a TAG like grammar macro}.
+
+起始非终结符由 @code{%start} 语句声明。  当未指定任何内容时，语法中出现的第一个非终结符是起始非终结符。
+
+通常，必须将以下非终结符声明为起始符号：
+
+@itemize @bullet
+@item The main grammar entry point
+@quotation
+当然！
+@end quotation
+
+@item nonterminals passed to @code{EXPAND}/@code{EXPANDFULL}
+@quotation
+这些语法宏根据给定非终结符的规则递归地解析输入数据的一部分。
+
+例如，以下将使用 @samp{formal_parameters} 规则解析 @samp{PAREN_BLOCK} 数据：
+
+@example
+@group
+formal_parameter_list
+  : PAREN_BLOCK
+    (EXPANDFULL $1 formal_parameters)
+  ;
+@end group
+@end example
+
+@samp{formal_parameters} 的语义值成为 @code{EXPANDFULL} 表达式的值。  它是标签树中拼接的@semantic{}标签列表。
+
+因为自动机必须知道 @samp{formal_parameters} 是一个开始符号，所以必须这样声明：
+
+@example
+@group
+%start formal_parameters
+@end group
+@end example
+@end quotation
+@end itemize
+
+@cindex incremental re-parse
+@cindex reparse-symbol
+@code{EXPANDFULL} 宏有一个重要的副作用，与 @semantic{} 的增量重解析机制相关，这一点很重要：传递给 @code{EXPANDFULL} 的非终结符号参数也成为 @code{EXPANDFULL} 表达式返回的标记的 @code{reparse-symbol} 属性。
+
+当标签映射的缓冲区数据被修改时，@semantic{} 会使用标签的 @code{reparse-symbol} 属性作为起始非终结符来调度该数据的增量重新解析。
+
+@strong{The rules associated to such start symbols must be carefully reviewed to ensure that the incremental parser will work!}
+
+当语法以 Bison 风格编写时，情况会有所不同。
+
+@strong{The @code{reparse-symbol} property is set to the nonterminal symbol the rule that explicitly uses @code{EXPANDTAG} belongs to.}
+
+例如：
+
+@example
+@group
+rule:
+    rhs
+    (let* ((rhs $1)
+           name type comps prec action elt)
+      @dots{}
+      (EXPANDTAG
+       (TAG name 'rule :type type :value comps :prec prec :expr action)
+       ))
+  ;
+@end group
+@end example
+
+将扩展标签的@code{reparse-symbol}属性设置为@samp{rule}。  一个重要的结果是：
+
+@strong{Every nonterminal having any rule that calls @code{EXPANDTAG} in a semantic action, should be declared as a start symbol!}
+
+@node Useful functions
+@subsection 有用的功能
+
+以下是一些预定义函数的描述，在编写新代码以在 @semantic{} 中使用 Wisent 时了解这些函数可能会很有用：
+
+@findex wisent-collect-unmatched-syntax
+@defun wisent-collect-unmatched-syntax input
+将 @var{input} 词汇标记添加到变量 @code{semantic-unmatched-syntax-cache} 中不匹配标记的缓存中。
+
+有关使用示例，请参阅 @ref{Error recovery} 中函数 @code{wisent-skip-token} 的实现。
+@end defun
+
+@node Wisent Lex
+@section Wisent Lex 词法分析器
+
+@findex semantic-lex
+@semantic{} 的词法分析步骤由通用函数 @code{semantic-lex} 执行。
+
+@code{semantic-lex} 产生以下形式的词汇标记：
+
+@example
+@group
+@code{(@var{token-class start} . @var{end})}
+@end group
+@end example
+
+@table @var
+@item token-class
+是标识词汇标记类的符号，例如 @code{symbol}、@code{string}、@code{number} 或 @code{PAREN_BLOCK}。
+
+@item start
+@itemx end
+是输入缓冲区中映射数据的开始和结束位置。
+@end table
+
+Wisent 的解析器不依赖于分析输入流的性质（缓冲区、字符串等），并且要求词汇标记具有不同的形式 (@pxref{Writing a lexer})：
+
+@example
+@group
+@code{(@var{token-class value} [@var{start} . @var{end}])}
+@end group
+@end example
+
+@cindex lexical token mapping
+@code{wisent-lex} 是 @semantic{} 中使用的默认 Wisent 词法分析器。
+
+@vindex wisent-lex-istream
+@findex wisent-lex
+@defun wisent-lex
+以 Wisent 的形式返回下一个可用的词汇标记。
+
+变量 @code{wisent-lex-istream} 包含由 @code{semantic-lex} 生成的词汇标记列表。  弹出下一个可用的标记并将其转换为适合 Wisent 解析器的形式。
+@end defun
+
+将 @code{semantic-lex} 生成的词汇标记映射到等效的 Wisent 词汇标记非常简单：
+
+@example
+@group
+(@var{token-class start} . @var{end})
+     @result{} (@var{token-class value start} . @var{end})
+@end group
+@end example
+
+@var{value} 是从@var{start} 到@var{end} 的输入@code{buffer-substring}。
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+
+@include doclicense.texi
+
+@node Index
+@unnumbered 指数
+@printindex cp
+
+@iftex
+@contents
+@summarycontents
+@end iftex
+
+@bye
+
+@c Following comments are for the benefit of ispell.
+
+@c  LocalWords:  Wisent automagically wisent Wisent's LALR obarray

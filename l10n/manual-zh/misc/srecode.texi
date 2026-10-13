@@ -1,0 +1,1406 @@
+\输入texinfo
+@c %**start of header
+@setfilename ../../info/srecode.info
+@set TITLE SRecoder Manual
+@set AUTHOR Eric M. Ludlam
+@settitle @value{TITLE}
+@documentlanguage en
+@include docstyle.texi
+
+@c Merge all indexes into a single index for now.
+@c We can always separate them later into two or more as needed.
+@syncodeindex vr cp
+@syncodeindex fn cp
+@syncodeindex ky cp
+@syncodeindex pg cp
+@syncodeindex tp cp
+@c %**end of header
+
+@copying
+版权所有 @copyright{} 2007--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* SRecode: (srecode).            语义模板代码生成器。
+@end direntry
+
+@titlepage
+@sp 10
+@center @titlefont{SRecode}
+@vskip 0pt plus 1 fill
+@center by @value{AUTHOR}
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@macro semantic{}
+@i{Semantic}
+@end macro
+
+@macro EIEIO{}
+@i{EIEIO}
+@end macro
+
+@macro srecode{}
+@i{SRecode}
+@end macro
+
+@node Top
+@top @value{TITLE}
+
+@srecode{} is the @i{Semantic Recoder}.  Where @semantic{} will parse
+如果将源文件转换为标签列表，@i{Semantic Recoder} 将帮助将 @semantic{} 标签和各种其他信息转换回各种类型的代码。
+
+虽然 @srecode{} 工具提供了模板语言、多种语言的模板，甚至是一系列启发式方法来帮助用户选择要插入的模板，但这并不是
+@srecode{}.
+
+@srecode{} 的目标是提供一个应用程序框架，人们可以在其中编写复杂的代码生成器，并且底层模板的通用性使其能够轻松地以多种语言工作。
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* Quick Start::                  模板插入的基本设置。
+* User Templates::               自定义用户模板
+* Parts of SRecode::             系统部分
+* SRecode Minor Mode::           使用模板的次要模式
+* Template Writing::             如何编写模板
+* Dictionaries::                 字典如何工作
+* Developing Template Functions::  如何编写自己的模板插入函数。
+* Template Naming Conventions::  创建一组核心模板
+* Inserting Tag Lists::          通过模板插入语义标签
+* Application Writing::          编写 @srecode{}r 应用程序
+* GNU Free Documentation License::  本文档的许可证。
+* Index::
+@end menu
+
+
+@node Quick Start
+@chapter 快速入门
+
+当您安装 CEDET 并启用 @srecode{} 时，应出现 @code{SRecoder} 菜单项。
+
+要打开和关闭 @srecode{} 次要模式，请使用：
+
+@example
+M-x srecode-minor-mode @key{RET}
+@end example
+或者
+@example
+M-x global-srecode-minor-mode @key{RET}
+@end example
+
+或添加
+
+@example
+(srecode-minor-mode 1)
+@end example
+
+进入语言钩子函数以强制其打开（这是默认设置）或传入 @code{-1} 来强制其关闭。
+
+@xref{SRecode Minor Mode}，了解有关使用次要模式的更多信息。
+
+使用菜单将模板插入到当前文件中。
+
+您可以在@file{~/.srecode}中添加自己的模板，或更新模板映射路径：
+
+@deffn Option srecode-map-load-path
+@anchor{srecode-map-load-path}
+SRecode 模板文件的全局加载路径。
+@end deffn
+
+
+安装后，您可以使用菜单或命令开始插入模板：
+
+@deffn Command srecode-insert template-name &rest dict-entries
+@anchor{srecode-insert}
+将模板 @var{template-name} 插入当前缓冲区中的点。 @var{dict-entries} 是要添加的其他字典值。
+@end deffn
+
+SRecode Insert 将提示输入模板名称。  模板名称特定于每个主要模式。  典型的名称格式为：@code{CONTEXT:NAME}，其中@var{CONTEXT}可能类似于@code{file}或@code{declaration}。  相同的@var{NAME}可以出现在多个上下文中。
+
+@node User Templates
+@chapter 用户模板
+
+@srecode{} builds and maintains a map of all template files.  The root
+模板文件位于 @srecode{} 发行版中。  用户编写的模板文件保存在@file{~/.srecode}中，以及
+@srecode{} map file.
+
+@defvar srecode-map-save-file
+@anchor{srecode-map-save-file}
+SRecode 地图文件的保存位置。
+@end defvar
+
+模板文件以 @file{.srt} 扩展名结尾。  有关如何编写模板的详细信息请参见@ref{Template Writing}。
+
+您编写的每个模板文件专用于一个主要模式。  在其中，您可以在与核心模板相同的上下文中并使用相同的名称编写模板。  您可以通过设置优先级强制模板覆盖特定主要模式的核心模板。  @xref{Special Variables}。
+
+要快速开始，请打开一个新的 @file{.srt} 文件。  它将以@srecode{}模板写入模式启动。  使用 @srecode{} 次要模式菜单插入 @code{empty} 文件模板。
+
+在其他模式下使用模板（例如 C++ 或 Emacs Lisp 模板）时，请使用“编辑模板”菜单查找要更新的模板。  将其复制到您的用户模板文件中，然后进行更改。
+
+如果您要更新用户模板文件中的@code{declaration:function}，那么您将获得这个新模板，而不是@srecode{}附带的模板。  更高级别的应用程序在生成自己的代码时应始终使用 @code{declaration:function}，因此更高级别的模板会将您对 @code{declaration:function} 的更改应用到自身中。
+
+您还可以覆盖变量。  核心变量存储在
+@srecode{} root template file @file{default.srt}, and that contains
+常用的版权，以及一些基本的文件设置格式。通过指定 @code{default} 的 @code{mode} 来覆盖这样的变量，如下所示：
+
+@example
+set mode "default"
+@end example
+
+@node Parts of SRecode
+@chapter SRecode 的部分内容
+
+@srecode{} 系统由多个层组成，这些层一起工作来生成代码。
+
+@section 模板层
+模板层提供了一种编写和编译模板的方法。  模板层是用于将文本插入 Emacs 缓冲区的方案。
+
+@srecode{} 模板层比 Emacs 包 @code{skeleton} 或 @code{tempo} 等其他模式更先进，因为它允许使用相同名称创建多层模板。  这意味着@srecode{}可以提供广泛的模板，用户可以只覆盖他们想要的小部分，而不是接受别人的模板，或者编写自己的大型新模板。
+
+模板写入 @file{.srt} 文件中。  您可以了解如何创作新的 @file{.srt} 文件 @ref{Template Writing}。
+
+虽然模板系统是为基于 @srecode{} 的应用程序设计的，但它也可以在典型编码过程中独立用于简单的模板插入。
+
+@section 模板管理器
+一旦编写了模板，就需要一个加载和选择模板的方案。  模板管理器有一个加载器，用于查找模板文件，并确定哪些模板与当前缓冲区相关。  模板文件按优先级排序，首先找到用户模板，最后找到系统级默认模板。模板也按应用程序排序。  每个应用程序都有自己的模板，并且与通用模板分开。
+
+@section 字典
+字典包含与变量关联的值。  变量在模板的宏中使用。  变量允许通用模板（例如函数）变得特定，例如名为 foo 的函数。  变量的值可以是以下三种之一：一个字符串、更多字典的列表或特殊的 @code{srecode-dictionary-compound-value} 对象子类。 @xref{Variables}，了解更多相关信息。
+
+@section 模板插入
+模板插入层是对基本模板层的扩展。  多种自定义变量可用于将派生数据作为宏混合到模板的纯文本中。
+
+此外，模板可以用参数声明。  这些参数代表预定的字典值集，例如当前文件名、用户名、时间等的特征。
+
+有些参数是特定于主模式的，例如 @code{:el} 或 @code{:cpp} 参数。
+
+@section 模板插入上下文
+可以为文件中的模板提供上下文。  这有助于按名称自动选择模板，或允许不同上下文中的模板具有相同的名称。  一些标准上下文是 @code{file}、@code{declaration} 和 @code{classdecl}。
+
+上下文也可以根据 @i{Semantic} 的解析状态自动导出。  @xref{Top, Semantic Manual,, semantic}。
+
+@section 应用领域
+执行特定用户任务的命令，还涉及编写 Emacs Lisp 代码。  应用程序位于顶层。  这些应用程序有自己的模板文件和填充字典或定位光标所需的逻辑。  SRecode 附带了一个示例 @code{srecode-document} 应用程序，用于为语义标签创建注释。  CEDET 应用程序@i{EDE} 的项目类型是
+@srecode{} application.
+
+@section 现场编辑
+如果变量 @code{srecode-insert-ask-variable-method} 设置为“field”，那么通常会提出问题的变量将在缓冲区中创建“fields”。  字段编辑层通过字段提供简单的交互。  在字段中键入将导致所有相同的变量位置同时编辑。  在字段上按 @kbd{@key{TAB}} 会将您移至下一个字段。
+
+@node SRecode Minor Mode
+@chapter SRecode 次要模式
+
+语义重新编码次要模式启用键盘映射和菜单，可提供对不同模板或模板应用程序的简单访问。
+
+键前缀是@kbd{C-c /}。
+
+如果设置了变量@code{srecode-takeover-INS-key}，则也可以使用键@kbd{@key{INSERT}}。
+
+最重要的键绑定到@code{srecode-insert}，即@kbd{C-c / /}或@kbd{@key{INSERT} @key{INSERT}}。  @ref{Quick Start}。
+
+主要的按键绑定有：
+
+@table @kbd
+@item C-c / /
+插入一个模板，其名称已输入到迷你缓冲区中。
+@item C-c / <lower case letter>
+保留用于使用模板文件中的键绑定命令将简单模板直接绑定到键。
+@item C-c / <upper case letter>
+为模板应用程序保留（例如注释或获取/设置插入器。）
+@item C-c / E
+编辑模板的代码。
+@item C-c / .
+再次插入模板。  这将导致先前插入的模板被再次插入。
+@end table
+
+@section 现场编辑
+
+默认情况下，插入模板时，如果用户需要输入文本来填充模板的一部分，则使用迷你缓冲区来查询该信息。  SRecode 还支持可以替代使用的字段编辑模式。  要启用它设置：
+
+@defun srecode-insert-ask-variable-method
+@anchor{srecode-insert-ask-variable-method}
+确定插入模板时如何请求字典值。只有 @var{ASK} 样式插入器才会向用户查询值。询问以 ? 开头的字典值引用特点。可能的值为：
+@table @code
+@item ask
+插入值时在迷你缓冲区中进行提示。
+@item field
+使用字典宏名称作为插入值，并在其中放置一个字段。  匹配的字段一起改变。
+@end table
+@end defun
+
+较新版本的 Emacs 支持字段编辑模式。  插入模板时，系统不会提示您填写值。  相反，短区域将突出显示，并将光标放置在字段中。  然后在字段中输入内容即可填写该值。多个字段可能链接在一起。  在这种情况下，在一个区域中键入内容将修改其他链接区域。  按 @key{TAB} 将在模板中的可编辑字段之间移动。
+
+一旦光标移出模板插入的区域，所有字段都将被取消。
+
+@b{NOTE}：使用字段编辑模式时，模板中的一些便利功能（例如完成或字符限制）会丢失。
+
+@node Template Writing
+@chapter 模板编写
+@anchor{@code{SRecode-template-mode}}
+
+@code{srecode-template-mode} 是用于设计新模板的主要模式。  @srecode{} 文件（扩展名@file{.srt}）由变量设置和模板声明组成。
+
+以下是接下来几节中所需术语的概述：
+
+@table @asis
+@item 模板文件
+扩展名为 @file{.srt} 的文件，其中包含设置、变量和模板。
+@item 模板
+一个命名实体，表示将插入的文本块。  文本被编译成一系列可插入实体。  这些实体是字符串常量和宏。
+@item 宏
+宏是模板文本中被替换为其他值的文本序列。
+@item 字典
+变量名称和值的表。
+@item 子词典
+作为某个变量的值从属于另一个字典的字典。
+@item 多变的
+变量是字典中具有值的条目。
+@end table
+
+@menu
+* Variables::  创建特殊变量和常规变量。
+* Templates::  创建模板
+* Contexts::   模板按上下文分组
+* Prompts::    设置交互式插入宏的提示
+@end menu
+
+@node Variables
+@section 变量
+
+可以在模板中设置和使用变量。  您可能使用的许多变量都是通过模板参数设置的，但有些变量可能是用户可以设置的在系统模板中使用的首选项。
+
+扩展模板时，变量存储在@dfn{dictionary}中。字典条目是变量。  模板中定义的变量可以具有类似字符串的值。
+
+变量可以这样设置：
+@example
+set VARNAME "some value"
+@end example
+
+请注意，变量是字典中的名称，可以在模板中的宏中使用。  该宏通过名称引用某个变量。
+
+@menu
+* String Values::        基本变量值
+* Multi-string Values::  复杂变量值
+* Section Show::         启用命名部分的显示。
+* Special Variables::    具有特殊名称的变量
+* Automatic Loop Variables::  在部分循环中自动设置变量。
+* Compound Variable Values::  复合变量值
+@end menu
+
+@node String Values
+@subsection 字符串值
+
+变量可以设置为字符串。  字符串可能包含换行符或任何其他字符。  字符串由 Emacs Lisp 阅读器解释，因此 @code{\n}、@code{\t} 和 @code{\"} 可以工作。
+
+当字符串作为模板的一部分插入时，字符串中的任何内容都不会被解释，例如模板转义字符。
+
+@node Multi-string Values
+@subsection 多字符串值
+
+一个变量可以设置为多个字符串。  当您稍后想要使用字典条目作为变量的一部分时，通常会使用复合值。
+
+多字符串变量值的设置方式与字符串值类似，只不过有多于一个。  例如
+
+@example
+set NAME "this" "-mode"
+@end example
+
+这两个字符串将连接在一起。
+
+更有用的是包含字典变量并将它们连接到字符串中。  使用“macro”关键字来包含变量的名称。  这就像模板中的宏。  例如：
+
+@example
+set NAME macro "MODE" "-mode"
+@end example
+
+将提取字典变量 MODE 的值并将“-mode”附加到末尾。
+
+@node Section Show
+@subsection 剖面展示
+
+要设置变量以显示模板部分，请使用 @code{show} 命令。  节是包含在节宏中的模板块。如果存在使用 @var{NAME} 的节宏，则会为与 @var{NAME} 宏关联的每个字典显示该宏。
+
+@example
+show NAME
+@end example
+
+这将启用该部分。
+
+
+注意：2008年5月11日：我还没有使用过这个，所以我不知道它是否有效。
+
+
+@node Special Variables
+@subsection 特殊变量
+
+一些变量具有特殊含义，可以在编译模板时更改属性，包括：
+
+@table @code
+@item escape-start
+这是从原始文本转义为模板宏名称的字符序列。  更改转义字符的能力是使 @srecode{} 模板能够跨多种语言工作的关键。
+@item escape-end
+这是转义模板宏名称末尾的字符序列。
+
+例子：
+@example
+set escape_start "$"
+set escape_end "$"
+@end example
+@item mode
+这是主要模式，作为一个字符串，其中包含完整的 Emacs Lisp 符号。  该文件中的所有模板都将安装到该主要模式的模板表中。
+
+多个模板文件可以使用相同的模式，并且所有这些模板都将在该模式的缓冲区中可用。
+
+例子：
+@example
+set mode "emacs-lisp-mode"
+@end example
+
+@item priority
+文件的优先级是字符串常量中的数字，指示文件在模板搜索顺序中的位置。  系统模板默认为低优先级编号。  用户模板默认为高优先级编号。  您可以指定模板的优先级，以将其插入模板搜索列表中的任意位置。
+
+如果存在多个具有相同上下文和名称的模板，则将使用优先级最高的模板。
+
+如果多个文件具有相同的优先级，则排序顺序是不可预测的。  如果没有模板名称匹配，那么也没关系。
+
+例子：
+@example
+set priority "35"
+@end example
+
+@item application
+如果模板文件包含仅特定应用程序所需的模板，则指定一个应用程序。  应用程序的模板文件存储在模板存储库中，但在通用模板插入情况下不使用。
+
+具有特定名称的应用程序将从 Lisp 代码访问这些模板。
+
+例子：
+@example
+set application "document"
+@end example
+
+@item project
+如果模板文件包含特定于特定目录下的一组文件的模板或模板覆盖，则该模板文件可以指定它所属的“项目”。
+
+将“project”特殊变量设置为目录名称。  只有该目录下的文件才能访问该文件中的模板。
+
+任何指定了项目的模板文件都将具有在 SRecode 基本模板和用户定义模板之间设置的优先级。
+
+模板可以通过项目系统进行编译，例如 EDE@. EDE 加载的模板将自动获得 @var{project} 设置。
+
+例子：
+@example
+set project "/tmp/testproject"
+@end example
+
+@end table
+
+如果您需要插入属于变量 @code{escape_start} 或 @code{escape_end} 的字符，请将它们放入变量中。  例如
+
+@example
+set escape_start "$"
+set escape_end "$"
+set DOLLAR "$"
+@end example
+
+@node Automatic Loop Variables
+@subsection 自动循环变量
+
+使用节宏时，将为绑定到循环变量的每个子词典重复该节。
+
+添加的每个字典都会自动获取位置宏的值，这将启用不同的@var{sections}。  自动部分变量是。
+
+@itemize @bullet
+@item @var{first}---The first entry in the table.
+@item @var{notfirst}---Not the first entry in the table.
+@item @var{last}---The last entry in the table
+@item @var{notlast}---Not the last entry in the table.
+@end itemize
+
+@node Compound Variable Values
+@subsection 复合变量值
+
+变量也可以具有复合值。  这意味着变量的值是一个 @EIEIO{} 对象，它是 @code{srecode-dictionary-compound-value} 的子类。
+
+新的复合变量只能从 Lisp 代码中设置。 @xref{Compound Dictionary Values}，有关从 Lisp 设置复合变量的详细信息。
+
+@node Templates
+@section 模板
+
+模板表示可以插入缓冲区的文本模式。
+
+基本模板声明如下：
+
+@example
+template TEMPLATENAME :arg1 :arg2
+"Optional documentation string"
+----
+The text to your template goes here.
+----
+bind "a"
+@end example
+
+模板按名称存储在模板表中，并通过提供的 @var{templatename} 插入。
+
+文档字符串是可选的。  该文档字符串将用于帮助用户选择他们想要使用的模板。
+
+组成原始模板的代码出现在包含文本“-----”的行之间。
+
+@menu
+* Template Section Dictionaries::   模板范围宏值
+* Template Macros::      模板模式中出现的宏
+@end menu
+
+@node Template Section Dictionaries
+@subsection 模板部分字典
+
+要将变量值添加到特定模板中使用的节字典，您可以将它们添加到模板声明的开头，如下所示：
+
+@example
+template TEMPLATENAME :arg1 :arg2
+"Optional documentation string"
+sectiondictionary "A"
+set NAME "foo"
+----
+A beginning line @{@{NAME@}@}
+@{@{#A@}@}Optional string @{@{NAME@}@} here@{@{/A@}@}
+An end line
+----
+@end example
+
+在此示例中，@var{NAME}变量获取值“foo”，但仅当它位于节宏 A@. 内部时，外部作用域 NAME 将为空。
+
+这在使用包含宏引入第二个模板时特别有用。  通过这种方式，您可以将一个模板中已知的值传递到某些值未知的下级模板。
+
+在 Emacs Lisp 默认模板文件中，语法表只是一个具有特殊值的变量。
+
+如果像这样声明变量（其中 $ 是转义字符）：
+
+@example
+template variable :el
+"Insert a variable.
+DOC is optional."
+----
+(defvar $?NAME$ $^$
+  "$DOC$")
+----
+@end example
+
+然后你可以看到需要一个NAME和DOC。 @code{^} 点插入器在这里也是一个方便的钥匙。
+
+语法表需要一个变量，但知道其中一些变量的值，并且可以通过使用特定于模板的 @code{sectiondictionary} 宏声明来重新构造问题。
+
+@example
+template syntax-table
+"Create a syntax table."
+sectiondictionary "A"
+set NAME macro "?MODESYM" "-mode-syntax-table"
+set DOC "Syntax table used in " macro "?MODESYM" " buffers."
+----
+$<A:variable$
+  (let ((table (make-syntax-table (standard-syntax-table))))
+    (modify-syntax-entry ?\; ". 12"  table) ;; SEMI, Comment start ;;
+    ;; ...
+    table)
+$/A$
+----
+@end example
+
+这样，@var{NAME}可以设置为用户对@var{MODESYM}提出的问题，并附加“-mode-syntax-table”。  还将插入简化的文档字符串。
+
+最后，@var{A} 部分包含更多插入到 @code{^} 点标记处的宏文本。
+
+通过为函数或变量声明等创建有用的基本模板，并在高阶模板中回收它们，最终用户可以覆盖基本声明符，然后高阶模板将遵循新格式，甚至可能在不止一种主要模式下工作。
+
+@node Template Macros
+@subsection 模板宏
+
+模板宏出现在模板文本中。  默认转义字符是“@{@{”和“@}@}”，尽管它们可以在顶级变量中更改。  @xref{Variables}。
+
+因此，如果您的模板代码如下所示：
+
+@example
+;; Author: @{@{AUTHOR@}@}
+@end example
+
+那么@{@{和@}@}之间的文本是一个宏，并替换为变量@var{AUTHOR}的值。
+
+宏可以专门化为不仅仅是文本字符串。  例如，上面的宏可以用 Emacs Lisp 函数来增强。
+
+@example
+;; Author: @{@{AUTHOR:upcase@}@}
+@end example
+
+在这种情况下，将针对 1⁣ 变量的文本值调用 Emacs Lisp 函数 @code{upcase}。
+
+宏还可以通过使用前缀、非字母字符或符号来专门具有不同的行为。  例如：
+
+@example
+@{@{! This is a comment inside macro escape characters @}@}
+@end example
+
+表明“!”符号用于注释。
+
+或者，宏可以在插入期间查询用户：
+
+@example
+(defun @{@{?NAME@}@} ()
+   @{@{^@}@}
+   ) ;; End of @{@{NAME@}@}
+@end example
+
+“?”符号表示如果符号 @var{NAME} 不在字典中，则应向用户查询 @var{NAME} 变量。  如果模板中再次出现@var{NAME}，则将再次插入用户指定的原始值。
+
+如果要以列格式放置字典值中的文本，则可以使用“|”符号来指示您想要列控制。  例如：
+
+@example
+   | this | that |@{@{#A@}@}
+   | @{@{|THIS:4@}@} | @{@{|THAT:4@}@} |@{@{/A@}@}
+@end example
+
+对于每个重复部分“#A”，将插入 @var{THIS} 和 @var{THAT} 的字典值，并修剪或扩展至 4 个字符的宽度。
+
+以“#”符号为前缀的宏表示一个节。  具有“/”前缀的同名宏表示该部分的结尾。
+
+@example
+@{@{#MOOSE@}@}
+Here is some text describing moose.
+@{@{/MOOSE@}@}
+@end example
+
+在此示例中，如果 MOOSE 部分在活动词典中“显示”，则 # 和 / 宏之间的文本也将被插入。
+
+某个部分中的所有文本和宏要么根本不显示（如果该部分不“可见”），要么针对添加到该符号的每个字典显示一次该部分。 @xref{Developing Template Functions}。
+
+以“>”为前缀的宏将包含另一个模板。  包含宏看起来像这样：
+
+@example
+@{@{>FOO:defun@}@}
+@end example
+
+其中@code{FOO}是用于扩展模板@code{defun}的子词典的字典变量。  将在当前模式或任何继承模式的模板存储库中查找 @code{defun} 模板。
+
+包含另一个模板的另一种方法是使用包含宏，它也将包装部分文本。  includewrap 插入方法如下所示：
+
+@example
+@{@{<FOO:defun@}@}Handy Text goes here@{@{/FOO@}@}
+@end example
+
+在这种情况下，如上所示包含 @code{defun}。  如果 @code{defun} 模板中包含 @{@{^@}@} 宏，则将在该点插入节文本“Handy Text gets here”，并且该位置不会保存为光标位置。
+
+如果没有@{@{^@}@}，则不会插入文本。
+
+对于这两种包含宏，您可能需要包含来自不同上下文的模板。  您可以使用 @code{:} 将上下文与名称分开，如下所示：
+
+@example
+@{@{>FOO:declaration:function@}@}
+@end example
+
+@node Contexts
+@section 语境
+
+每个模板都属于一个上下文。  当按名称提示输入模板时（例如使用 @kbd{C-c / /}），名称以当前上下文为前缀。  如果没有上下文，则默认为@code{declaration}。
+
+您可以像这样更改上下文：
+
+@example
+context NAME
+@end example
+
+其中@var{name}是代表任何上下文的符号。
+
+上下文驻留在其后的所有模板上，直到下一个上下文语句。  因此：
+
+@example
+context C1
+
+template foo
+"Foo template in C1"
+----
+----
+
+context C2
+
+template foo
+"Foo template in C2"
+----
+----
+@end example
+
+创建两个 @code{foo} 模板。  第一个是在上下文 C1 中。  第二个在上下文 C2 中可用。
+
+如果有多种方法来声明函数或变量之类的东西，而这些方法仅在语言语法中的位置不同，那么这非常有用。  名称 @code{foo} 并不含糊，因为每个名称都处于不同的上下文中。
+
+@node Prompts
+@section 迅速的
+
+某些模板使用提示宏插入。  需要提示的宏如下所示：
+
+@example
+@{@{?NAME@}@}
+@end example
+
+在哪里 ？在第一个转义字符之后。
+
+默认情况下，遇到时会使用这样的提示：
+
+@example
+Specify NAME:
+@end example
+
+对于此类宏，您可以为任何字典条目预先定义提示。当第一次遇到该字典条目时，系统会提示用户，并且该字典条目的后续出现将使用相同的值。
+
+要获得不同的提示，请使用如下提示命令：
+
+@example
+prompt VARNAME "Nice Way to ask for VARNAME: "
+@end example
+
+现在，如果您将其放入模板中：
+
+@example
+template variable
+----
+(defvar @{@{?VARNAME@}@} nil
+   "")
+----
+@end example
+
+当遇到VARNAME时，它会使用nice提示。
+
+提示也可以扩展。  例如：
+
+@example
+prompt VARNAME "VARNAME: " default "srecode" read y-or-n-p
+@end example
+
+在本例中，@code{default}关键字指示@code{"srecode"}是要使用的默认字符串，@code{y-or-n-p}是用于提出问题的函数。
+
+对于@code{y-or-n-p}，如果您键入“y”，它将插入默认字符串，否则它将插入空。
+
+对于 @code{read} 标记之后出现的任何其他符号，预计采用与 @code{read-string} 相同的参数列表。  因此，您可以创建自己的提示来完成对确定性值的读取。
+
+要稍后根据字典条目计算默认值，您需要使用 @code{defaultmacro} 关键字。
+
+@example
+prompt VARNAME "Varname: " defaultmacro "PREFIX"
+@end example
+
+现在，当它尝试读取 VARNAME 时，它将使用 PREFIX 的值预先填充文本编辑部分。
+
+某些语言参数可能会提供可能的提示前缀。创建提示时请查找这些内容。
+
+@node Dictionaries
+@chapter 词典
+
+字典是一组变量。  与变量名称关联的值可以是任何值，但如何处理它取决于所插入的宏的类型。
+
+本章的大部分内容是编写使用 @srecode{} 的 Lisp 程序。如果你只想写模板文件，那么你只需要阅读@ref{Template Argument Dictionary Entries}部分。
+
+@menu
+* Create a Dictionary::
+* Setting Dictionary Values::    基本字典值
+* Compound Dictionary Values::   复杂的字典值
+* Argument Resolution::          自动模板参数解析
+* Creating new Arguments::       创建在模板中使用的新参数
+* Querying a Dictionary::        查询字典中的值。
+* Template Argument Dictionary Entries::  参数目录
+@end menu
+
+@node Create a Dictionary
+@section 创建字典
+
+@defun srecode-create-dictionary &optional buffer
+@anchor{srecode-create-dictionary}
+为 @var{buffer} 创建字典。如果未指定@var{buffer}，则使用当前缓冲区。字典初始化时没有变量或启用的部分。然而，模板中使用 @code{set} 定义的任何变量都会成为字典中的名称。
+@end defun
+
+@node Setting Dictionary Values
+@section 设置字典值
+
+当构建基于 @srecode{} 的应用程序时，您需要自己设置字典值。  有几个实用函数可以实现此目的。
+
+在最简单的形式中，您可以将字符串与变量关联起来。
+
+@defun srecode-dictionary-set-value dict name value
+@anchor{srecode-dictionary-set-value}
+在字典@var{dict}中，将@var{name}设置为具有@var{value}。
+@end defun
+
+对于部分宏，您可以有替代值。  一个部分可以切换为可见，也可以充当循环。
+
+@defun srecode-dictionary-show-section dict name
+@anchor{srecode-dictionary-show-section}
+在字典@var{dict}中，指示应暴露部分@var{name}。
+@end defun
+
+
+@defun srecode-dictionary-add-section-dictionary dict name show-only
+@anchor{srecode-dictionary-add-section-dictionary}
+在字典@var{DICT}中，为节宏@var{NAME}添加节字典。返回新词典。
+
+您可以将多个词典添加到同一部分条目。对于添加到变量的每个字典，模板中的代码块将被重复。
+
+如果可选参数 @var{SHOW-ONLY} 为非 @code{nil}，则在已有字典的情况下，请勿添加新字典。  另外，请勿添加 @var{FIRST}/@var{LAST} 条目。当我们只显示一个部分时，不需要这些条目。
+
+添加的每个字典都会自动获取位置宏的值，这将启用 @var{SECTIONS} 。
+
+@table @var
+@item first
+表中的第一个条目。
+@item notfirst
+不是表中的第一个条目。
+@item last
+表中的最后一项
+@item notlast
+不是表中的最后一个条目。
+@end table
+
+添加新字典将更改先前插入的字典中的这些值。
+@end defun
+
+@node Compound Dictionary Values
+@section 复合字典值
+
+如果要将非字符串值与字典变量关联，则需要使用复合值。  复合字典值是使用 @EIEIO{} 从基类派生的，用于处理宏中的任意数据。
+
+@deffn Type srecode-dictionary-compound-value
+@anchor{srecode-dictionary-compound-value}
+复合字典值。存储在字典中的值必须是 @var{string}、用于显示部分的字典或此类的子类的实例。
+
+复合字典值派生自此类，并且必须提供一系列方法实现以转换为字符串。
+@end deffn
+
+复合值的新子类需要实现这些方法：
+
+@defun srecode-compound-toString cp function dictionary
+@anchor{srecode-compound-toString}
+将复合字典值@var{cp}转换为字符串。如果@var{function}非@code{nil}，则@var{function}以某种方式应用于复合值的一个方面。  @var{function} 可以是某些功能符号的一部分，不包括逻辑前缀。
+@end defun
+
+下一个方法是在调试期间转储表。
+
+@defun srecode-dump cp &optional indent
+@anchor{srecode-dump}
+显示有关该化合物值的信息。
+@end defun
+
+
+以下是将语义标签包装在复合值中的示例：
+
+@example
+(defclass srecode-semantic-tag (srecode-dictionary-compound-value)
+  ((prime :initarg :prime
+          :type semantic-tag
+          :documentation
+          "This is the primary insertion tag.")
+   )
+  "Wrap up a collection of semantic tag information.
+This class will be used to derive dictionary values.")
+
+(cl-defmethod srecode-compound-toString ((cp srecode-semantic-tag)
+                                         function
+                                         dictionary)
+  "Convert the compound dictionary value CP to a string.
+If FUNCTION is non-nil, then FUNCTION is somehow applied to an
+aspect of the compound value."
+  (if (not function)
+      ;; Just format it in some handy dandy way.
+      (semantic-format-tag-prototype (oref cp :prime))
+    ;; Otherwise, apply the function to the tag itself.
+    (funcall function (oref cp :prime))
+    ))
+@end example
+
+@node Argument Resolution
+@section 争论解决
+
+一些字典条目可以通过模板声明中的模板参数进行设置。  有关模板参数的示例，请参阅@ref{Template Argument Dictionary Entries}。
+
+您可以使用以下方法将参数列表解析为字典：
+
+@defun srecode-resolve-arguments temp dict
+@anchor{srecode-resolve-arguments}
+解析模板@var{temp}所需的所有参数。将学到的任何东西应用到字典中@var{dict}。
+@end defun
+
+@node Creating new Arguments
+@section 创建新参数
+
+您可以通过编写新的 Emacs Lisp 函数来创建在模板文件中使用的新参数。  这样做很容易。  以下是 @code{:user} 参数的示例：
+
+@example
+(defun srecode-semantic-handle-:user (dict)
+  "Add macros into the dictionary DICT based on the current :user."
+  (srecode-dictionary-set-value dict "AUTHOR" (user-full-name))
+  (srecode-dictionary-set-value dict "LOGIN" (user-login-name))
+   ;; ...
+  )
+@end example
+
+在本例中，名称前缀为 0⁣、以 1⁣ 结尾的函数会创建一个可在模板中使用的新参数 @code{:user}。
+
+你的参数处理程序必须采用一个参数@var{dict}，这是要填充的字典。在你的函数中，你可以做任何你想做的事情，但添加字典值是正确的事情。
+
+@node Querying a Dictionary
+@section 查询字典
+
+创建新参数时，询问字典已经设置了哪些条目，并根据这些条目有条件地创建新条目可能会很有用。
+
+通过这种方式，模板作者可以通过更高级的参数获得额外的逻辑。
+
+@defun srecode-dictionary-lookup-name dict name
+@anchor{srecode-dictionary-lookup-name}
+返回有关 @var{NAME} 当前 @var{DICT} 值的信息。 @var{DICT} 是字典，@var{NAME} 是字典中符号名称的字符串。此函数派生一些特殊名称的值，例如 @var{FIRST} 和 '@var{LAST}'。
+@end defun
+
+
+
+@node Template Argument Dictionary Entries
+@section 模板参数字典条目
+
+当为模板初始化字典时，将使用一组预定义的宏值来初始化字典。
+
+表格模板：
+
+@example
+template template-name :arg1 :arg2
+----
+Your template goes here
+----
+@end example
+
+指定两个参数：arg1 和：arg2。
+
+可以使用以下内置简单参数：
+
+@menu
+* Base Arguments::
+* Semantic Arguments::
+* Language Arguments::
+@end menu
+
+@node Base Arguments
+@subsection 基本参数
+
+@subsubsection 参数：缩进
+
+提供 @code{INDENT} 宏。  当 1⁣ 为非 2⁣ 时，则在宏处理期间每行单独缩进 @code{indent-according-to-mode}。
+
+@subsubsection 参数：空白
+
+指定此参数会在模板的开头和结尾添加一个特殊的 @code{:blank} 处理程序。  如果插入点本身不在一行上，则该处理程序将插入 @code{\n}。
+
+@subsubsection 参数：区域
+
+如果通过 @code{transient-mark-mode} 或 @code{mouse-drag-region} 存在活动区域​​，则@code{REGION} 部分将被启用。
+
+此外，@code{REGIONTEXT} 将被设置为该区域中的文本，并且该文本区域将从当前缓冲区中“删除”。
+
+如果标准输出不是当前缓冲区，则不会删除该区域。  这样，您就可以在任意输出流中使用模板安全地使用@code{:region}。
+
+@subsubsection 参数：用户
+
+设置有关当前用户的变量。
+
+@table @code
+@item AUTHOR
+Emacs 函数的值 @code{user-full-name}
+@item EMAIL
+当前 Emacs 用户的电子邮件地址。
+@item LOGIN
+当前 Emacs 用户的登录名。
+@item UID
+当前 Emacs 用户的登录 ID。
+@item EMACSINITFILE
+此 Emacs 会话的初始化文件。
+@end table
+
+@subsubsection 参数：时间
+
+使用当前日期和时间设置变量。
+
+@table @code
+@item YEAR
+本年度。
+@item MONTH
+当前月份为数字。
+@item MONTHNAME
+当前月份名称，未缩写。
+@item DAY
+当前日期为数字。
+@item WEEKDAY
+星期几作为缩写名称
+@item HOUR
+24 小时格式的当前时间。
+@item HOUR12
+12 小时格式的当前小时。
+@item AMPM
+AM 或 PM@. 的区域设置对 HOUR12 很有用。
+@item MINUTE
+当前分钟。
+@item SECOND
+当前第二。
+@item TIMEZONE
+时区字符串。
+@item DATE
+区域设置支持的日期 (%D)。
+@item TIME
+区域设置支持的时间格式 (%X)。
+@end table
+
+@subsubsection 参数：文件
+
+设置包含当前文件详细信息的变量。
+
+@table @code
+@item FILENAME
+当前缓冲区的不带目录部分的文件名。
+@item FILE
+不带目录或扩展名的文件名
+@item EXTENSION
+文件扩展名。
+@item DIRECTORY
+当前缓冲区所在的目录。
+@item MODE
+该缓冲区的主要模式。
+@item SHORTMODE
+该缓冲区的主要模式，不带“-mode”。对于插入 Emacs 模式说明符很有用。
+@item section RCS
+如果此处有 CVS 或 RCS 目录，则显示 RCS 部分。
+@end table
+
+@subsubsection 参数：系统
+
+使用计算机系统信息设置变量。
+
+@table @code
+@item SYSTEMCONF
+“系统配置”。
+@item SYSTEMTYPE
+“系统类型”。
+@item SYSTEMNAME
+“系统名称”。
+@item MAILHOST
+Emacs 派生邮件“来自”的机器名称。
+@end table
+
+@subsubsection 参数：杀死
+
+@table @code
+@item KILL
+杀戮环最上面的物品。
+@item KILL2
+杀戮环中的第二件物品。
+@item KILL3
+杀戮环中的第三件物品。
+@item KILL4
+杀戮环中的第四件物品。
+@end table
+
+@node Semantic Arguments
+@subsection 语义论证
+
+@subsubsection 参数：标签
+
+:tag 参数用来自 Semantic 的信息填充。有问题的标签是从参议员标签环中查询的，或者是从在模板中使用标签的 @srecode{} 实用程序传入的。
+
+@table @code
+@item TAG
+这是当前参议员杀环中标签的复合值，或者通过变量@code{srecode-semantic-selected-tag}处理的值。
+
+@defvar srecode-semantic-selected-tag
+@anchor{srecode-semantic-selected-tag}
+由 @code{:tag} 模板参数选择的标签。如果这是@code{nil}，则使用@code{senator-tag-ring}。
+@end defvar
+
+使用宏插入的函数部分来提取标记的模糊部分。
+@item NAME
+标签的名称作为字符串。
+@item TYPE
+标签的数据类型为字符串。
+@end table
+
+如果 @var{tag} 是一个函数，您将获得这些额外的字典条目。
+
+@table @code
+@item ARGS
+循环宏值。  每个参数都插入 ARGS@. 要创建逗号分隔的参数列表，您可以这样做：
+
+@example
+@{@{#ARGS@}@}@{@{TYPE@}@} @{@{NAME@}@}@{@{#NOTLAST@}@},@{@{/NOTLAST@}@}@{@{/ARGS@}@}
+@end example
+
+在每个参数的节字典中，除了 @var{FIRST}、@var{LAST}、@var{NOTFIRST} 和 @var{NOTLAST} 的自动节值之外，您还可以找到 @var{NAME} 和 @var{TYPE}。
+@item PARENT
+如果该函数是某个类的方法，则该函数的父级的字符串名称。
+@item THROWS
+在每个 @var{THROWS} 条目中，指定抛出信号的 @var{NAME}。
+@end table
+
+如果 @var{tag} 是一个变量，您将获得这些字典条目。
+
+@table @code
+@item DEFAULTVALUE
+如果有 @var{VALUE} 则启用。
+@item VALUE
+@var{HAVEDEFAULT} 子词典中的条目，表示该变量默认值的文本表示。
+@end table
+
+如果 @var{tag} 是数据类型，您将获得这些字典条目。
+
+@table @code
+@item PARENTS
+本班家长的部分词典。  每个父母都会有一个@var{NAME}。
+@item INTERFACES
+此类所有已实现接口的部分字典。  每个接口都会有一个@var{NAME}。
+@end table
+
+请注意，数据类型模板中应始终包含一个 @code{@{@{^@}@}} 宏，其中包含该类型的核心内容。  这就是为什么数据类型没有充满类或结构中槽的子字典。
+
+@node Language Arguments
+@subsection 语言参数
+
+每种语言通常都有自己的论点。  这些参数可用于填充有用的语言特定值。
+
+@subsubsection 参数：srt
+
+用于 SRecoder 模板文件。
+
+@table @code
+@item ESCAPE_START
+用于转义开始的字符
+@item ESCAPE_END
+用于转义结束的字符
+@end table
+
+@subsubsection 参数：cpp
+
+@table @code
+@item HEADER
+如果当前文件是头文件，则显示此部分。
+@item NOTHEADER
+与@code{HEADER}相反。
+@item FILENAME_SYMBOL
+当前文件名重新格式化为 C 友好符号。
+@end table
+
+@subsection 参数：java
+
+@table @code
+@item FILENAME_AS_PACKAGE
+将文件名转换为适合作为包名称的文本。
+@item FILENAME_AS_CLASS
+将文件名转换为适合作为文件中主类的类名的文本。
+@item CURRENT_PACKAGE
+查找“package”的出现并获取其值。
+@end table
+
+@subsubsection 参数：el
+
+设置@code{PRENAME}。  这将是当前缓冲区中所有标签的公共前缀。
+
+大多数 Emacs Lisp 包都有一些通用的前缀，其使用方式类似于其他语言中的命名空间。
+
+@subsubsection 参数：el-custom
+
+@table @code
+@item GROUP
+@code{defcustom} 实例应使用的 Emacs 自定义组的名称。
+@item FACEGROUP
+应该使用用 @code{defface} 声明的 Emacs 自定义组的名称。
+@end table
+
+@subsubsection 参数：texi
+
+@table @code
+@item LEVEL
+当前部分级别，例如 @code{chapter} 或 @code{section}。
+@item NEXTLEVEL
+再往下一层，所以如果@code{LEVEL}是@code{chapter}，那么@code{NEXTLEVEL}将是@code{section}。
+@end table
+
+@subsubsection 参数：texitag
+
+@code{:texitag} 参数与 @code{:tag} 参数类似，只是为每个标签提供了附加变量 @code{TAGDOC}。
+
+@code{TAGDOC} 充满了来自相关标签的派生文档，并且该文档也被重新格式化以大部分与 texinfo 兼容。
+
+@subsection 参数：android
+
+@code{:android} 参数从当前项目中提取信息。
+
+@@TODO - 在此处添加更多内容。
+
+@node Developing Template Functions
+@chapter 开发模板函数
+
+您可以开发自己的自定义模板插入功能。这样做相对简单，并且需要您编写 Emacs Lisp 命令。
+
+如果内置命令没有提供足够的选项，您将需要编写自己的函数，以便为词典提供自定义模板所需的值。
+
+通过这种方式，您可以基于一组预定义宏为任何语言构建您自己的代码生成器，您需要自己从 Emacs Lisp 代码中派生这些宏的值。
+
+例如：
+
+@example
+(defun my-srecode-insert (template-name)
+  "Insert the template TEMPLATE-NAME into the current buffer at point."
+
+  ;; Read in a template name.
+  (interactive (list (srecode-read-template-name "Template Name: ")))
+  (if (not (srecode-table))
+      (error "No template table found for mode %s" major-mode))
+  (let ((temp (srecode-template-get-table (srecode-table) template-name))
+
+       ;; Create a new dictionary
+	(newdict (srecode-create-dictionary)))
+
+    (if (not temp)
+        (error "No Template named %s" template-name))
+
+    ;; Add some values into the dictionary!
+    (srecode-dictionary-set-value newdict "FOO" (my-get-value-of-foo))
+    ;; Optionally show a section
+    (srecode-dictionary-show-section newdict "BLARG")
+
+    ;; Add in several items over a loop
+    (let ((my-stuff (get-my-stuff-list)))
+       (while my-stuff
+          (let ((subdict (srecode-dictionary-add-section-dictionary
+                             newdict "LOOP")))
+             (srecode-dictionary-set-value subdict "NAME" (nth 0 my-stuff))
+             (srecode-dictionary-set-value subdict "ARG" (nth 1 my-stuff))
+             (srecode-dictionary-set-value subdict "MOOSE" (nth 2 my-stuff))
+             )
+          (setq my-stuff (cdr my-stuff)))
+
+    ;; Some templates have arguments that need to be resolved.
+    (srecode-resolve-arguments temp newdict)
+
+    ;; Do the expansion
+    (srecode-insert-fcn temp newdict)
+    ))
+@end example
+
+我们看一下上面涉及到的关键函数：
+
+@section 互动完成：
+
+@defun srecode-read-template-name prompt
+@anchor{srecode-read-template-name}
+完成语义重新编码器模板名称的读取。 @var{prompt} 用于查询所需模板的名称。
+@end defun
+
+@section 模板查找
+
+即使您的程序不向用户查询模板名称，您也需要找到模板。  首先，您需要找到要在其中查找模板的表。
+
+@defun srecode-table &optional mode
+@anchor{srecode-table}
+返回此缓冲区当前活动的语义重新编码器表。可选参数@var{MODE}指定要使用的模式表。
+@end defun
+
+
+@defun srecode-template-get-table tab template-name &optional context application
+@anchor{srecode-template-get-table}
+在模式表@var{TAB}的模板中找到@var{TEMPLATE-NAME}的模板。可选参数 @var{CONTEXT} 指定特定模板所属的上下文。可选参数 @var{APPLICATION} 将搜索限制为仅属于特定应用程序的模板表。  如果@var{APPLICATION}是@code{nil}，则仅搜索不属于应用程序的表。
+@end defun
+
+出于 @srecode{} 应用程序的目的，决定调用应用程序的内容并将其与此方法调用一起使用非常重要。
+
+@section 创建字典
+
+此示例中进行了多次字典调用，包括：
+@table @code
+@item srecode-create-dictionary
+@item srecode-dictionary-set-value
+@item srecode-dictionary-show-section
+@item srecode-dictionary-add-section-dictionary
+@end table
+
+这些都有更完整的记录@ref{Dictionaries}。
+
+还使用的是@code{srecode-resolve-arguments}。  要了解更多信息，请参阅@ref{Argument Resolution}。
+
+@section 模板插入命令
+
+插入模板的方法有多种。  从主入口点开始是最简单的。
+
+@defun srecode-insert-fcn template dictionary &optional stream
+@anchor{srecode-insert-fcn}
+使用@var{dictionary}将@var{template}插入@var{stream}。如果@var{stream}是@code{nil}，则使用当前缓冲区。
+@end defun
+
+@node Template Naming Conventions
+@chapter 模板命名约定
+
+为了使 @srecode{} 能够可靠地跨语言工作，模板需要遵循可预测的模式。  对于每种性质相似的语言（OO、函数式、基于文档），如果它们都提供相同的基本模板，则可以根据基本模板编写应用程序，并且它将在每种受支持的语言中工作。
+
+拥有一致的模板还可以在通过 @code{srecode-minor-mode} 进行基本交互式插入期间从用户角度轻松使用这些模板。
+
+
+本章注释：
+
+这些公约正在制定中。  如果您想支持某种语言，请查看 CEDET-DEVEL 邮件列表，或者编写应用程序并提供您对此主题的意见。  任何帮助表示赞赏。
+
+
+@section 上下文：文件
+
+每种语言都应该支持 @code{file:empty} 模板。  这通常会使用默认的版权插入机制。
+
+@section 上下文：声明
+
+函数式语言应该尝试支持以下内容：
+
+@table @code
+@item function
+一个独立的功能。  不是方法、外部方法或其他。
+@item method
+属于某个类的方法，在该类声明的文本范围之外声明。
+@item variable
+全局变量。
+@item type
+一种数据类型。  如果该语言支持多种类型的数据类型，则不要使用它，而应使用更具体的数据类型。
+@item class
+对于 OO 语言，请使用此值而不是 @code{type}。
+@item include
+包含文件。
+@end table
+
+对于您语言中的任何 @semantic{} 标签类，您可能希望有一个相应的模板。
+
+为了使 @srecode{} 函数 @code{srecode-semantic-insert-tag} 正常工作，您可以创建与上述类似的模板，但末尾附加 @code{-tag} 除外。  这使得像 3⁣ 这样的模板在引用 @code{function-tag} 时可以为用户带来便利，同时还允许标签插入器使用更简单的模板来完成其工作。
+
+@section 上下文：类定义
+
+在类定义中。  这些将被插入到类声明的文本范围内。
+
+@table @code
+@item function
+这将是被插入的类的方法。
+@item constructor
+@itemx destructor
+与@code{function}类似，但特定于对象的分配/删除。
+@item variable
+这将是要插入的类的字段。
+@end table
+
+@section 上下文：代码
+
+在代码体内部，例如函数或方法体。
+
+---还没有约定。
+
+@section 标准字典值
+
+为了使这些变量有用，应使用标准名称。这些值可以直接从语义标签或应用程序提供。
+
+@table @var
+@item NAME
+正在创建的声明的名称。
+@item PARENT
+如果该项属于某个父类型，则它将是该类型的全名，包括命名空间。
+@item TYPE
+变量的数据类型名称或函数的返回值。
+@item DOC
+如果有一些与该项目相关的文档，则 DOC 应包含该值。  （选修的）
+@item ARGS
+ARGS 变量定义函数或方法的 0 个或多个参数的部分。  ARGS 中的每个条目都将遵循其余的命名约定，例如 NAME 和 TYPE。
+@end table
+
+对于@code{srecode-semantic-insert-tag}使用的模板，还有以下有用的字典值。
+
+@table @var
+@item TAG
+特殊的插入值 TAG@. 您可以使用语义函数将标签转换为字符串。
+@item HAVEDEFAULT
+@itemx DEFAULT
+变量的默认值。
+@end table
+
+@node Inserting Tag Lists
+@chapter 插入标签列表
+
+由于@srecode{}是@i{Semantic Recoder}，所以最终目标
+@srecode{} is to convert lists of tags, as produced by @semantic{}
+回到代码中。
+
+单个函数为程序提供执行此操作的接口，但它需要任何特定语言提供正确的模板才能使其工作。
+
+@defun srecode-semantic-insert-tag tag &optional style-option point-insert-fcn &rest dict-entries
+@anchor{srecode-semantic-insert-tag}
+使用 srecode 模板将 @var{tag} 插入到缓冲区中。
+
+可选的@var{style-option}是样式的次要配置列表，例如用于原型函数的符号@code{'prototype}，或用于系统包含的@code{'system}，以及用于doxygen样式注释的@code{'doxygen}。
+
+可选的第三个参数 @var{point-insert-fcn} 是一个在插入 @var{tag} 之后运行的钩子，它允许有机会填充某些内容的主体。  该钩子函数使用一个参数调用，即插入的@var{tag}。
+
+其余参数为@var{dict-entries}。  @var{dict-entries} 的形式为 ( @var{name1} @var{value1} @var{name2} @var{value2} @dots{} NAMEn VALUEn)。
+
+使用的确切模板基于当前上下文。使用的模板可在通过 @dfn{srecode-calculate-context} 计算的顶级上下文中找到，例如 @code{declaration}、@code{classdecl} 或 @code{code}。
+
+对于各种条件，此函数都会查找名为 @var{class}-tag 的模板，其中 @var{class} 是标签类。  如果找不到，它将在 @code{declaration} 上下文中查找该模板（如果当前上下文不是 @code{declaration}）。
+
+如果指定了 @var{prototype}，它将首先查找名称为 @var{class}-tag-prototype 或 @var{class}-prototype 的模板，如上所述。
+
+有关调用模板时字典中内容的详细信息，请参阅@dfn{srecode-semantic-apply-tag-to-dict}。
+
+该函数返回缓冲区中插入标签@var{ends}的位置，并根据点插入器的任何出现将点留在插入的文本内。  诸如 1⁣ 之类的模板将留下可能插入代码的位置。
+@end defun
+
+
+@node Application Writing
+@chapter 申请写作
+
+@srecode{} 的主要目标是为编写代码生成应用程序提供强大的平台。
+
+任何特定于应用程序的模板都应为其使用的每个模板文件进行应用程序声明。  这可以防止在该应用程序之外使用这些模板。
+
+例如，将其添加到文件中：
+@example
+set application "getset"
+@end example
+
+然后，您将在应用程序 Emacs Lisp 代码中加载这些模板。  典型的初始化如下所示：
+
+@example
+  (srecode-load-tables-for-mode major-mode)
+  (srecode-load-tables-for-mode major-mode 'getset)
+@end example
+
+这两行将加载主要模式的基本模板，然后加载特定于应用程序的模板。
+
+@defun srecode-load-tables-for-mode mmode &optional appname
+@anchor{srecode-load-tables-for-mode}
+加载@var{mmode}的所有模板文件。模板可在 SRecode 模板映射中找到。更多信息请参见@dfn{srecode-get-maps}。 @var{appname} 是应用程序的名称。  在这种情况下，将加载该应用程序的所有模板文件。
+@end defun
+
+
+待办事项：添加示例。  大多数核心内容已经在上面描述了。
+
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+
+@node Index
+@unnumbered 指数
+@printindex cp
+
+@iftex
+@contents
+@summarycontents
+@end iftex
+
+@bye

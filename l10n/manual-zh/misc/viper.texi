@@ -1,0 +1,2915 @@
+% -*-texinfo-*- \输入 texinfo
+
+@comment Using viper.info instead of viper in setfilename breaks DOS.
+@comment @setfilename viper
+@comment @setfilename viper.info
+@setfilename ../../info/viper.info
+@documentlanguage en
+@include docstyle.texi
+
+@copying
+版权所有 @copyright{} 1995--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* VIPER: (viper).                Emacs 的 VI 模拟模式。
+@end direntry
+
+@finalout
+
+@titlepage
+@title Viper 是 Emacs Rebels 的一个软件包
+@subtitle Emacs 的 Vi 模拟器
+@subtitle 2013 年 7 月，Viper 版本 3.14.2
+
+@author Michael Kifer (Viper)
+@author Aamod Sane (VIP 4.4)
+@author Masahiko Sato (VIP 3.5)
+
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top Viper
+
+We believe that one or more of the following statements are adequate
+descriptions of Viper:
+
+@example
+Viper Is a Package for Emacs Rebels;
+it is a VI Plan for Emacs Rescue
+and/or a venomous VI PERil.
+@end example
+
+Technically speaking, Viper is a Vi emulation package for Emacs.  It
+implements all Vi and Ex commands, occasionally improving on them and
+adding many new features.  It gives the user the best of both worlds: Vi
+keystrokes for editing combined with the power of the Emacs environment.
+
+Viper emulates Vi at several levels, from the one that closely follows Vi
+conventions to the one that departs from many of them.  It has many
+customizable options, which can be used to tailor Viper to the work habits
+of various users.
+This manual describes Viper, concentrating on the differences from Vi and
+new features of Viper.
+
+Viper, formerly known as VIP-19, was written by Michael Kifer.  It is based
+on VIP version 3.5 by Masahiko Sato and VIP version 4.4 by Aamod Sane.
+About 15% of the code still comes from those older packages.
+
+Viper is intended to be usable without reading this manual; the defaults
+are set to make Viper as close to Vi as possible.  At startup, Viper will
+try to set the most appropriate default environment for you, based on
+your familiarity with Emacs.  It will also tell you the basic GNU Emacs window
+management commands to help you start immediately.
+
+Although this manual explains how to customize Viper, some basic
+familiarity with Emacs Lisp is a plus.
+
+It is recommended that you read the Overview node.  The other nodes may
+be visited as needed.
+
+Comments and bug reports are welcome.
+@code{kifer@@cs.stonybrook.edu} is the current address for Viper bug reports.
+Please use the Ex command @kbd{:submitReport} for this purpose.
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Overview::                     阅读以获得更顺利的开始
+* Improvements over Vi::         新功能、改进
+* Customization::                如何定制毒蛇
+* Commands::                     Vi 和 Ex 命令
+* GNU Free Documentation License::  本文档的许可证。
+* Acknowledgments::
+* Key Index::                    Vi 和 Ex 命令索引
+* Function Index::               Viper 函数索引
+* Variable Index::               Viper 变量索引
+* Package Index::                本文档中提到的软件包索引
+* Concept Index::                Vi、Ex 和 Emacs 概念
+@end menu
+@iftex
+@unnumbered Introduction
+
+We believe that one or more of the following statements are adequate
+descriptions of Viper:
+
+@example
+Viper Is a Package for Emacs Rebels;
+it is a VI Plan for Emacs Rescue
+and/or a venomous VI PERil.
+@end example
+
+Viper is a Vi emulation package for Emacs.  Viper contains virtually all
+of Vi and Ex functionality and much more.  It gives you the best of both
+worlds: Vi keystrokes for editing combined with the GNU Emacs
+environment.  Viper also fixes some common complaints with Vi commands.
+This manual describes Viper, concentrating on the differences from Vi
+and on the new features of Viper.
+
+Viper was written by Michael Kifer.  It is based on VIP version 3.5 by
+Masahiko Sato and VIP version 4.4 by Aamod Sane.  About 15% of the code
+still comes from those older packages.
+
+Viper is intended to be usable out of the box, without reading this manual;
+the defaults are set to make Viper as close to Vi as possible.  At
+startup, Viper will attempt to set the most appropriate default environment
+for you, based on your familiarity with Emacs.  It will also tell you the
+basic GNU Emacs window management commands to help you start immediately.
+
+Although this manual explains how to customize Viper, some basic
+familiarity with Emacs Lisp is a plus.
+
+It is recommended that you read the chapter Overview.  The other chapters
+will be useful for customization and advanced usage.
+
+You should also learn to use the Info on-line hypertext manual system that
+comes with Emacs.  This manual can be read as an Info file.  Try the command
+@kbd{@key{ESC} x info} with vanilla Emacs sometime.
+
+Comments and bug reports are welcome.
+@code{kifer@@cs.stonybrook.edu} is the current address for Viper bug reports.
+Please use the Ex command @kbd{:submitReport} for this purpose.
+
+@end iftex
+
+@node Overview
+@chapter 毒蛇概述
+
+Viper 是 Emacs 之上的 Vi 模拟器。  同时，Viper 提供了对 Emacs 设施的几乎不受限制的访问。  与 Vi 完美兼容是可能的，但并不理想。  本章向您介绍您应该了解的 Emacs 理念、如何在 Emacs 中使用 Viper 以及一些不兼容性。
+
+本手册的编写假设您是一位经验丰富的 Vi 用户，希望切换到 Emacs，同时保留 Vi 风格编辑文件的能力。  尽管看起来令人难以置信，但有经验丰富的 Emacs 用户使用 Viper 作为进入高级（每个 Vi 用户都知道）Vi 世界的后门！  这些用户非常熟悉 Emacs 绑定，并且在某些情况下更喜欢它们，尤其是在 Vi Insert 状态下。  John Hawkins <jshawkin@@eecs.umich.edu> 提供了一组自定义设置，可在 Viper 下启用其他 Emacs 绑定。  这些自定义可以包含在您的 @file{~/.emacs.d/viper} 文件中，并可以在以下 URL 中找到：@file{http://traeki.freeshell.org/files/viper-sample}。
+
+@menu
+* Emacs Preliminaries::          Emacs 中的基本概念。
+* Loading Viper::                加载和初步配置。
+* States in Viper::              Viper 有四种与 Emacs 模式正交的状态。
+* The Minibuffer::               Emacs 中的命令行。
+* Multiple Files in Viper::      真正的多文件处理。
+* Unimplemented Features::       这不太可能被实施。
+@end menu
+
+@node Emacs Preliminaries
+@section Emacs 预备知识
+
+@cindex buffer
+@cindex point
+@cindex mark
+@cindex text
+@cindex looking at
+@cindex end (of buffer)
+@cindex end (of line)
+@cindex region
+Emacs 可以同时编辑多个文件。  Emacs 中的文件放置在通常与文件同名的 @dfn{buffer} 中。  缓冲区还用于其他目的，例如 shell 接口、目录编辑等。例如，@xref{Dired,,Directory Editor,emacs,The GNU Emacs Manual}。
+
+缓冲区有一个称为 0⁣ 的特殊位置。 A @dfn{point} 始终位于 2 个字符之间，并且是 @dfn{looking at} 右侧字符。  光标位于右侧字符上。  因此，当@dfn{point}查看行尾时，光标位于行尾字符上，即超出行上最后一个字符。  这是 Emacs 的默认行为。
+
+Viper 的默认设置尝试模仿 Vi 的行为，防止光标超出该行的最后一个字符。  通过直接使用 Emacs 命令（例如绑定到箭头键的命令），可以使光标超出行尾。  但是，如果您将自己限制为标准 Vi 键，则不会（或不应该）发生这种情况，除非您修改默认编辑样式。  @xref{Customization}。
+
+除了@dfn{point}之外，还有另一个特殊的缓冲区位置，称为@dfn{mark}。  @xref{Mark,,Mark,emacs,The GNU Emacs manual}，了解有关该标记的更多信息。  @dfn{point} 和 @dfn{mark} 之间的文本称为缓冲区的@dfn{region}。  对于 Viper 用户来说，这仅仅意味着除了 Vi 文本标记 a--z 之外，还有另一个标记，称为 @dfn{mark}。  这类似于跳转命令@kbd{``}和@kbd{''}使用的未命名Vi标记，它们将光标移动到最后一个绝对跳转的位置。  Viper 在大多数文本操作命令中提供对区域的访问，作为操作文本区域的命令的 @kbd{r} 和 @kbd{R} 后缀，例如，@kbd{dr} 删除区域等。
+
+此外，Viper 允许 Ex 风格的命令在当前区域工作。这是通过在 @kbd{:} 之前输入数字参数来完成的。  例如，输入 @kbd{1:} 会提示您类似 @emph{:123,135} 的内容，假设当前区域从第 123 行开始，到第 135 行结束。无需输入行号，因为 Viper 会自动将它们插入到 Ex 命令前面。
+
+@xref{Basics}，了解更多信息。
+
+@cindex window
+@cindex mode line
+@cindex buffer information
+@cindex Minibuffer
+@cindex command line
+@cindex buffer (modified)
+Emacs 将屏幕分为平铺的@dfn{windows}。  您可以通过与缓冲区关联的窗口看到缓冲区的内容。  屏幕光标位于@dfn{point}之后的字符上。每个窗口都有一个 @dfn{mode line} 显示有关缓冲区的信息。您可以更改模式行的格式，但通常如果您在模式行开头看到@samp{**}，则表示缓冲区为@dfn{modified}。  如果将缓冲区的内容写出到文件中，则缓冲区将变为未修改。  此外，如果您在模式行的开头看到@samp{%%}，则表示与缓冲区关联的文件受到写保护。  模式行还将显示缓冲区名称以及当前的主要和次要模式（见下文）。称为 @dfn{Minibuffer} 的特殊缓冲区显示为迷你缓冲区窗口中的最后一行。  迷你缓冲区窗口用于命令输入输出。  Viper 对 @kbd{/} 和 @kbd{:} 命令使用迷你缓冲区窗口。
+
+@cindex mode
+@cindex keymap
+@cindex local keymap
+@cindex global keymap
+@cindex major mode
+@cindex minor mode
+Emacs 缓冲区可以有一个 @dfn{major mode}，它可以通过更改按键的功能来自定义 Emacs 以编辑特定类型的文本。键是使用 @dfn{keymap} 定义的，记录击键和功能之间的绑定。  @dfn{global keymap} 对于所有缓冲区都是通用的。  此外，每个缓冲区都有其 @dfn{local keymap} 来确定缓冲区的 @dfn{mode}。  如果某个函数绑定到本地键盘映射中的某个键，那么当您键入该键时将执行该函数。然而，如果没有函数绑定到本地映射中的键，则将执行绑定到全局映射中的键的函数。  @xref{Major Modes,Major Modes,Major Modes,emacs,The GNU Emacs Manual}，了解更多信息。
+
+缓冲区也可以有 @dfn{minor mode}。  次要模式是您可以使用或不使用的选项。  @code{text-mode} 中的缓冲区可以将 @code{auto-fill-mode} 作为次要模式，可以随时关闭或打开。  在 Emacs 中，次要模式可能有自己的键盘映射，当次要模式打开时，它会覆盖本地键盘映射。  欲了解更多信息，@pxref{Minor Modes,Minor Modes,Minor Modes,emacs,The GNU Emacs Manual}。
+
+@cindex Viper as minor mode
+@cindex Control keys
+@cindex Meta key
+Viper 是作为次要模式的集合来实现的。  Viper 模拟 Vi 命令模式、Vi 插入模式等时会涉及到不同的次要模式。在 Vi 命令模式下，您还可以随时打开和关闭 Viper。 @xref{States in Viper}，了解更多信息。
+
+Emacs 使用 Control 和 Meta 修饰符。  它们表示为 C 和 M，例如，@kbd{^Z} 表示为 @kbd{C-z}，@kbd{Meta-x} 表示为 @kbd{M-x}。  Meta 键通常位于空格键的两侧；它的使用方式与 Control 键类似，例如，@kbd{M-x} 表示在按住 Meta 键的同时键入@kbd{x}。  对于没有 Meta 键的键盘，@key{ESC} 用作 Meta。  因此 @kbd{M-x} 的类型为 @kbd{@key{ESC} x}。  Viper 使用@key{ESC}从Insert 状态切换到Vi 状态。  因此Viper将@kbd{C-\}定义为其Vi状态下的Meta键。  @xref{Vi State}，了解更多信息。
+
+Emacs 的结构是围绕 C 核心的 Lisp 解释器。  Emacs 键导致 Lisp 函数被调用。  可以通过键入 @kbd{M-x function-name} 直接调用这些函数。
+
+@node Loading Viper
+@section 加载毒蛇
+
+自动加载它的最常见方法是包含以下行（按给定的顺序！）：
+
+@lisp
+(setq viper-mode t)
+(require 'viper)
+@end lisp
+
+@noindent
+在你的 @file{~/.emacs} 文件中。  @file{.emacs} 文件放置在您的主目录中，每次调用 Emacs 时都会执行该文件。  这是所有常规 Emacs 定制发生的地方。  Emacs 有一个交互式界面 (@kbd{M-x customize})，它显着简化了定制工作。
+
+Viper 还使用文件 @file{~/.emacs.d/viper} 进行 Viper 特定的自定义。 Viper 自定义文件的位置可以通过设置 @file{.emacs} @emph{prior} 中的变量 @code{viper-custom-file-name} 来加载 Viper 来更改。
+
+最新版本的 Emacs 有一个交互式定制工具，它允许您（大部分）绕过 @file{.emacs} 和 @code{viper-custom-file-name} 文件的使用。  您可以通过执行 Ex 命令@kbd{:customize} 从 Viper 的 VI 状态中访问此自定义功能。
+
+一旦被调用，Viper 将安排在 Vi 状态下启动 Emacs 缓冲区（只要有意义）。 @xref{Packages that Change Keymaps}，找出何时在缓冲区上强制使用 Vi 命令状态可能会适得其反。
+
+即使您的 @file{.emacs} 文件不会自动调用 Viper，您仍然可以通过在 Emacs 中键入以下内容来加载 Viper 并进入 Vi 命令状态：
+
+@lisp
+M-x viper-mode
+@end lisp
+
+当 Emacs 第一次启动时，如果你没有在命令行中指定文件，它将显示 @file{*scratch*} 缓冲区，处于 @samp{Lisp Interaction} 模式。  调用 Viper 后，您可以使用 @kbd{:e}、@kbd{:vi} 或 @kbd{v} 命令开始编辑文件。 （@pxref{File and Buffer Handling}，有关 @kbd{v} 和其他新命令的更多信息，在许多情况下，这些命令比 @kbd{:e}、@kbd{:vi} 和类似的旧式 Vi 命令更方便。）
+
+最后，如果在加载 Viper 后某个时刻您想要对正在运行的 Emacs 副本进行反 Viperize，则命令 @kbd{M-x viper-go-away} 将为您完成此操作。  函数 @code{toggle-viper-mode} 打开和关闭 Emacs Viperization。
+
+@node States in Viper
+@section 毒蛇州
+
+@kindex C-z
+@kindex ESC
+@kindex i
+@cindex Emacs state
+@cindex Vi state
+@cindex Insert state
+@cindex Replace state
+@cindex Ex commands
+@findex viper-go-away
+@findex toggle-viper-mode
+Viper 有四种状态：Emacs、Vi、Insert 和 Replace。
+
+@table @samp
+@item Emacs state
+这是普通 Emacs 通常所处的状态。加载 Viper 后，@kbd{C-z} 通常会将您带到 Vi 命令状态。  另一个@kbd{C-z} 将带您返回 Emacs 状态。  该切换键可以更改，@pxref{Customization} 您也可以键入@kbd{M-x viper-mode} 更改为 Vi 状态。
+
+
+对于在 Viper 设置时选择将用户级别设置为 1 的用户，为了不让新手用户感到困惑，故意使切换到 Emacs 状态变得更加困难。  在这种情况下，@kbd{C-z} 将图标化 Emacs（如果 Emacs 作为 X 下的应用程序运行）或停止 Emacs（如果 Emacs 在哑终端或 Xterm 窗口中运行）。
+
+@item Vi state
+这就是 Vi 命令模式。  任何 Vi 命令，例如 @kbd{i, o, a}、@dots{}，都会带您进入插入状态。  所有 Vi 命令都可以在此模式下使用。  大多数 Ex 命令也可以使用。要查看 Viper 支持的 Ex 命令的完整列表，请键入 @kbd{:}，然后键入 @key{TAB}。  要获得任何问题的帮助（包括 Ex 命令），请输入 @kbd{:help}。  这将调用 Viper Info（如果已安装）。  然后输入 @kbd{i} 将提示您输入要在索引中搜索的主题。  注意：要在索引中搜索 Ex 命令，您应该以 @kbd{:} 开头，例如 @kbd{:WW}。
+
+在 Viper 中，Ex 命令可以在当前 Emacs 区域上运行。这是通过在 @kbd{:} 之前输入数字参数来完成的。例如，输入 @kbd{1:} 会提示您类似 @emph{:123,135} 的内容，假设当前区域从第 123 行开始，到第 135 行结束。无需输入行号，因为 Viper 会自动将它们插入到 Ex 命令前面。
+
+@item Insert state
+插入状态是Vi插入模式。  @key{ESC} 将带您返回 Vi 状态。  可以进行插入状态编辑，包括自动缩进。  默认情况下，Viper 在插入状态下禁用 Emacs 键绑定。
+
+@item Replace state
+像@kbd{cw}这样的命令会调用替换状态。  当您跨越替换区域的边界（通常通过@samp{$}符号指定）时，它将自动更改为插入状态。  您不必担心它。  键绑定实际上与插入状态下相同。  如果输入@key{ESC}，Viper 将切换到 Vi 命令模式，终止替换状态。
+@end table
+
+@cindex mode line
+模式在 @dfn{mode line} 上指示为 <E>、<I>、<V> 和 <R>，因此多种模式不会让您感到困惑。  大多数编辑可以在 Vi 和 Insert 状态下完成。  Viper 会尝试使所有新缓冲区处于 Vi 状态，但有时它们可​​能会出现在 Emacs 状态。  在这种情况下，@kbd{C-z} 将带您进入 Vi 状态。  在一些主要模式中，如 Dired、Info、Gnus 等，您不应切换到 Vi 状态（Viper 不会尝试这样做），因为这些模式不适用于文本编辑，并且许多 Vi 键在那里具有特殊含义。  如果您计划从 Emacs 阅读新闻、浏览目录、阅读邮件等（您应该很快就开始这样做！），您应该了解这些特殊模式中各个键的含义（在缓冲区中键入 @kbd{C-h m} 可以提供有关该缓冲区主要模式的键绑定的帮助）。
+
+如果您在 Dired 或类似模式下切换到 Vi，不会造成任何损害。  只是这些模式提供的特殊按键绑定将暂时被 Viper 的绑定所掩盖。  切换回 Viper 的 Emacs 状态将恢复当前主要模式提供的环境。
+
+Viper 中的状态与 Emacs 主要模式正交，例如 C 模式或 Dired 模式。  您可以在任何 Emacs 状态下打开和关闭 Viper。  当Viper开启时，Vi状态可以用来移动。  在插入状态下，可以访问这些模式的绑定。  对于初学者（Viper 级别 1 和 2 的用户），这些绑定在插入状态下被抑制，以便新用户不会被 Emacs 状态迷惑。  请注意，除非您允许 Emacs 绑定处于插入状态，否则您无法执行许多有趣的操作，例如语言敏感编辑。  对于新手用户（Viper 级别 1），所有主要模式绑定在 Vi 状态下也会关闭。  这包括以 @kbd{C-c} 开头的按键序列的绑定，这实际上意味着所有主要模式绑定均不受支持。  @xref{Customization}，了解如何允许 Emacs 按键处于插入状态。
+
+@menu
+* Emacs State::          当您熟悉 Viper 时，您应该更多地了解这种状态。
+* Vi State::             Vi 命令在此状态下执行。
+* Insert State::         您可以输入文本，如果您了解足够的 Emacs 命令，还可以进行复杂的编辑。
+* Replace State::        与插入模式类似，但它是通过替换命令调用的，例如 cw、C、R 等。
+@end menu
+
+@node Emacs State
+@subsection Emacs 状态
+
+@kindex C-z
+@cindex Emacs state
+您只会偶然进入此模式（希望如此）。  这是 Emacs 通常所处的状态（想象一下！！）。  现在输入 @kbd{C-z} 尽快离开它。  然后你就会进入 Vi 状态（松一口气）:-)。
+
+Emacs 状态实际上是一个 Viperism，表示除 Viper 之外 Emacs 可以处于的所有主要和次要模式 (@pxref{Emacs Preliminaries})。Emacs 可以有多种模式，例如用于编辑 C 程序的 C 模式、用于编辑 LaTeX 文档的 LaTeX 模式、用于目录编辑的 Dired 等。这些是主要模式，每种模式都有一组不同的键绑定。  Viper 状态与这些 Emacs 主要模式正交。  这些语言敏感模式和其他模式的存在是对 Vi 的重大胜利。  @xref{Improvements over Vi}，了解更多。
+
+这些模式的绑定可以在 Viper Insert 状态以及 Emacs 状态下使用。  除非您将用户级别指定为 1（新手），否则所有以 @kbd{C-x} 和 @kbd{C-c} 开头的主要模式按键序列在 Vi 状态下也可用。  这很重要，因为设计用于编辑文件的主要模式（例如 cc 模式或 Latex 模式）使用以 @kbd{C-x} 和 @kbd{C-c} 开头的按键序列。
+
+还有一个键可以让您暂时从插入状态转入 Vi 命令状态：输入 @kbd{C-z} 可以让您在保持 Viper 的插入状态时执行单个 Vi 命令。
+
+
+@node Vi State
+@subsection 维州
+
+@cindex Vi state
+这就是 Vi 命令模式。  当Viper处于Vi状态时，您将在模式行中看到符号<V>。  大多数键的工作方式与 Vi 中相同。  值得注意的例外是：
+
+@table @kbd
+@kindex C-x
+@item C-x
+@kbd{C-x} 用于调用 Emacs 命令，主要是进行窗口管理的命令。  @kbd{C-x 2} 将分割一个窗口，@kbd{C-x 0} 将关闭一个窗口。  @kbd{C-x 1} 将关闭所有其他窗口。  @kbd{C-xb} 用于切换窗口中的缓冲区，@kbd{C-xo} 用于在窗口中移动。这些是唯一必要的击键。其余内容请参阅 GNU Emacs 手册。
+
+@kindex C-c
+@item C-c
+对于 2 级及更高级别的用户，该键充当各种主要模式使用的按键序列的前缀键。  对于 Viper 1 级的用户，@kbd{C-c} 只是发出蜂鸣声。
+
+@kindex C-g
+@kindex C-]
+@item C-g and C-]
+这些是 Emacs @samp{quit} 键。在某些情况下，您必须使用 @kbd{C-g} 退出。  类似地，在 Emacs 中，@kbd{C-]} 用于退出 @samp{Recursive Edits}，而 Emacs 中没有类似的 Vi 功能，也没有键绑定。  递归编辑由模式行上的 @samp{[]} 括号表示模式。 @xref{Recursive Edit,Recursive Edit,Recursive Edit,emacs,The GNU Emacs Manual}。在用户级别 1，@kbd{C-g} 改为绑定到 @code{viper-info-on-file} 函数。
+
+@kindex C-\
+@cindex Meta key
+@item C-\
+Viper 使用 @key{ESC} 作为 Insert 和 Vi 状态之间的切换。  Emacs 使用 @key{ESC} 表示 Meta。  Meta 键在 Emacs 中非常重要，因为许多功能只能通过该键（如 @kbd{M-x function-name}）访问。因此，我们需要以某种方式模拟它。  在 Viper 的 Vi、Insert 和 Replace 状态下，元键设置为@kbd{C-\}。  因此，要获得@kbd{M-x}，您应该输入@kbd{C-\ x}（如果键盘没有 Meta 键，这在当今很少见）。这在 Vi 命令状态以及插入和替换状态下都有效。  在 Vi 命令状态下，您还可以使用@kbd{\ @key{ESC}} 作为元键。
+
+注意：Emacs 将 @kbd{C-\} 绑定到一个函数，该函数提供在多语言环境中更改键盘输入法的功能。  Viper 会覆盖此绑定。  不过，仍然可以通过在 Vi 命令状态下键入 @kbd{\ C-\} 和在插入状态下键入 @kbd{C-z \ C-\} 来切换输入法。或者您可以使用菜单栏中的 MULE 菜单。
+@end table
+@noindent
+其他差异主要是改进。  您应该了解的内容是：
+
+@table @samp
+@cindex multiple undo
+@cindex undo
+@kindex u
+@item Undo
+@kbd{u} 将撤消。  可以通过 @kbd{.} 键重复撤消操作。  撤消本身可以被撤消。  另一个@kbd{u}将改变方向。  可重复撤消的存在意味着@kbd{U}（撤消行）并不是很重要。  因此，@kbd{U}也调用@code{viper-undo}。
+
+
+@item Counts
+大多数命令，@kbd{~}、@kbd{[[}、@kbd{p}、@kbd{/}、@dots{} 等都需要计数。
+
+@comment ]] Just to balance parens
+@cindex regular expressions
+@cindex vanilla search
+@cindex case-sensitive search
+@cindex case-insensitive search
+@kindex C-c /
+@item Regexps
+Viper 使用 Emacs 正则表达式进行搜索。  这些是 Vi 正则表达式的超集，除了大小写更改转义符 @samp{\u}、@samp{\L}、@dots{} 等。@xref{Regexps,,Syntax of Regular Expressions,emacs,The GNU Emacs Manual}，了解详细信息。指定为 @kbd{:e} 的文件使用 @code{csh} 正则表达式（通配符、通配符等）。但是，函数 @code{viper-toggle-search-style} 绑定到 @kbd{C-c /}，可以让用户从使用正则表达式的搜索切换到普通搜索，反之亦然。  它还允许用户在区分大小写的搜索和不区分大小写的搜索之间切换。 @xref{Viper Specials}，了解更多详情。
+
+@cindex Ex commands
+@item Ex commands
+如果您输入 @kbd{:e} 然后输入空格，缓冲区的当前工作目录会自动插入到迷你缓冲区中。  Viper 中较少需要绝对文件名。  对于文件名，Emacs 使用的约定与其他程序略有不同。  它旨在最大限度地减少删除 Emacs 在提示中提供的文件名的需要。  （这通常很方便，但有时提示可能会建议您错误的文件名。）如果您看到提示 @kbd{/usr/foo/} 并且希望编辑文件 @kbd{~/.file}，则不必删除提示。  相反，只需继续输入您需要的内容即可。  Emacs 将正确解释 @kbd{/usr/foo/~/.file}。  同样，如果提示符为 @kbd{~/foo/} 而您需要转到 @kbd{/bar/file}，请继续输入。  Emacs 将 @kbd{~/foo//bar/} 解释为 @kbd{/bar/file}，因为当它看到 @samp{//} 时，它就知道 @kbd{~/foo/} 将被丢弃。
+
+命令@kbd{:cd}将更改当前缓冲区的默认目录。  命令@kbd{:e}将解释@code{csh}中的文件名参数。  @xref{Customization}，如果您想更改默认 shell。命令 @kbd{:next} 从 @kbd{:args} 获取计数，因此 @kbd{:rew} 已过时。  此外，@kbd{:args} 将仅显示不可见的文件（即当前在 Emacs 窗口中看不到的文件）。
+
+如果适用，Ex 命令支持文件完成和历史记录。  这意味着通过输入部分文件名然后输入@key{TAB}，Emacs 将尝试完成该名称，或者它将提供一个可能完成的菜单。其工作原理与 Tcsh 类似，并扩展了 Csh 的行为。  当 Emacs 等待文件名时，您可以输入 @kbd{M-p} 来获取您之前输入的文件名。  重复输入@kbd{M-p}和@kbd{M-n}将让您浏览文件历史记录。
+
+与文件名一样，部分键入的 Ex 命令可以通过键入 @key{TAB} 来完成，Viper 会保留 Ex 命令的历史记录。  输入 @kbd{:} 后，您可以通过输入 @kbd{M-p} 和 @kbd{M-n} 浏览之前输入的 Ex 命令。  Viper 在将 Ex 命令放入历史列表时试图合理化。  例如，如果您输入 @kbd{:w!@: foo}，则只有 @kbd{:w!} 会被放置在历史列表中。  这是因为最后一个历史记录元素是默认值，只需键入 @kbd{: @key{RET}} 即可调用。  如果将@kbd{:w!@: foo}放在列表中，则很容易覆盖另一个文件中的有价值的数据。  从历史记录中重建完整的命令@kbd{:w!@: foo}仍然不那么困难，因为 Viper 有单独的文件名历史记录。  通过输入@kbd{: M-p}，您将在迷你缓冲区中获得@kbd{:w!}。  然后，重复@kbd{M-p}将让您浏览文件历史记录，一个接一个地插入文件名。
+
+与@kbd{:w!@: foo}相反，如果命令是@kbd{:r foo}，则整个命令将出现在历史列表中。  这是因为单独使用 @kbd{:r} 作为默认值是没有意义的，因为该命令需要文件参数。
+@end table
+@noindent
+与 Vi 一样，Viper 的破坏性命令可以通过键入句点 (@kbd{.}) 来重新执行。然而，除此之外，Viper 还会跟踪此类命令的历史记录。  可以通过输入 @kbd{C-c M-p} 和 @kbd{C-c M-n} 来仔细阅读这段历史。找到适当的命令后，可以通过键入句点来执行它。 @xref{Improvements over Vi}，了解更多信息。
+
+@node Insert State
+@subsection 插入状态
+
+@cindex Insert state
+为了避免初学者（Viper 1 级和 2 级）感到困惑，Viper 仅在插入状态下提供标准 Vi 键。  这意味着 Emacs 主要模式不能在插入状态下使用。强烈建议您一旦感到方便，就使 Emacs 状态绑定可见（通过将用户级别更改为 3 或更高）。 @xref{Customization}，看看如何做到这一点。
+
+完成此操作后，就可以在插入状态下进行大量编辑。  例如，Emacs 有一个 @dfn{yank} 命令，@kbd{C-y}，它类似于 Vi 的 @kbd{p}。  然而，与@kbd{p}不同，@kbd{C-y}可以在Viper的插入状态下使用。  Emacs 还有一个删除环，它可以保存您在编辑缓冲区时删除的文本片段。  命令 @kbd{M-y} 用于删除之前由 Emacs 的 @kbd{C-y} 或 Vi 的 @kbd{p} 命令放回的文本，并重新插入之前放置在 Kill-ring 上的文本。
+
+这在 Vi 和 Insert 状态下都有效。在 Vi 状态下，@kbd{M-y} 是比通常的 Vi 恢复先前删除的 10 个文本块的方式更好的替代方法。  在插入状态下，您可以按如下方式使用它。  假设您删除了一段文本，现在需要在插入模式下编辑时重新插入它。  键@kbd{C-y}将放回最近删除的块。  如果这不是您想要的，请重复输入@kbd{M-y}，希望您能找到您想要的块。
+
+最后，在插入和替换状态下，Viper 提供先前插入或替换命令中插入的文本片段的历史记录。  在插入或替换状态下重复键入@kbd{C-c M-p}或@kbd{C-c M-n}可以恢复这些文本字符串。  （此功能在迷你缓冲区中被禁用：上述键通常绑定到其他历史记录，这在迷你缓冲区中更合适。）
+
+
+@cindex Meta key
+您可以从插入状态调用元函数。  与 Vi 状态一样，Meta 键是@kbd{C-\}。  因此 @kbd{M-x} 的类型为 @kbd{C-\ x}。
+
+在插入状态下有用的其他 Emacs 命令是 @kbd{C-e} 和 @kbd{C-a}，它们分别将光标移动到当前行的末尾和开头。  您还可以使用@kbd{M-f}和@kbd{M-b}，将光标向前（或向后）移动一个单词。如果您的显示器有 Meta 键，则可以通过按住 Meta 键然后分别键入 @kbd{f} 和 @kbd{b} 来调用这些功能。  在没有 Meta 键的显示器上，通过键入 @kbd{C-\ f} 和 @kbd{C-\ b} 来调用这些功能（@kbd{C-\} 模拟插入状态下的 Meta 键，如上所述）。
+
+@kbd{C-z} 键有时在插入状态下也很有用：它允许您在 Vi 状态下执行单个命令，而无需离开插入状态！例如，@kbd{C-z d2w} 将删除接下来的两个单词而不离开插入状态。
+
+当Viper处于插入状态时，您将在模式行中看到<I>。
+
+@node Replace State
+@subsection 替换状态
+
+@cindex Replace state
+通过 Vi 替换命令（例如 @kbd{C}、@kbd{cw} 等）或输入 @kbd{R} 进入此状态。  在替换状态下，Viper 将 <R> 放在模式行中，让您知道哪个状态有效。  如果通过@kbd{R}进入替换状态，Viper 将保持该状态，直到用户点击@key{ESC}。  如果通过其他替换命令进入此状态，则替换状态将一直有效，直到您点击 @key{ESC} 或直到您穿过替换区域的最右边界。  在后一种情况下，Viper 将其状态从“替换”更改为“插入”（您将通过模式行的变化注意到这一点）。
+
+由于 Viper 在 Emacs 下运行，因此可以在替换状态下在缓冲区之间进行切换。  您还可以使用箭头键（即使在哑终端上！）@: 和鼠标移动光标。  由于这种自由度（在常规 Vi 中无法实现），可以将光标移到替换区域之外。  （出于多种原因，这可能是必要的，包括需要使用鼠标启用文本选择和区域设置。）
+
+然后就出现了当用户按下 @key{ESC} 键时该怎么办的问题。  在 Vi 中，这将导致光标和替换区域末尾之间的文本被删除。  但是，如果光标不在替换区域内（在 Viper 中可能会发生这种情况）怎么办？
+
+为了解决这个问题，Viper 会跟踪仍在替换区域内的最后一个光标位置。  因此，在上述情况下，Viper 会删除该位置和替换区域末尾之间的文本。
+
+@node The Minibuffer
+@section 迷你缓冲区
+
+@cindex Minibuffer
+迷你缓冲区是命令输入的地方。可以通过插入状态下的命令来完成编辑，即：
+
+@table @kbd
+@item C-h
+退格键
+@item C-w
+删除单词
+@item C-u
+擦除线
+@item C-v
+引用以下字符
+@item @key{RET}
+执行命令
+@item C-g and C-]
+Emacs 退出和中止键。  这些可能是必要的。  @xref{Vi State}，解释一下。
+@item M-p and M-n
+这些键绑定到读取迷你缓冲区历史记录的函数。  要细读的确切历史取决于上下文。  它可能是搜索字符串、Ex 命令、文件名等的历史记录。
+@item C-s
+如果通过 Viper 搜索命令 @kbd{/} 或 @kbd{?} 输入迷你缓冲区，则此键将插入 Emacs 增量搜索命令使用的最后一个搜索字符串（除本例外，在任何地方都绑定到 @kbd{C-s}）。
+@end table
+
+大多数 Emacs 键在迷你缓冲区中都可以使用。  在迷你缓冲区中，Viper 尝试使编辑类似于 Vi 等待用户输入 Ex 命令时的行为。  特别是，您可以使用常规 Vi 命令来编辑迷你缓冲区。  你可以随意切换Vi状态和Insert状态，甚至可以使用替换模式。最初，迷你缓冲区处于插入状态。
+
+一些用户更喜欢迷你缓冲区中的纯 Emacs 绑定。  为此，请在 Viper 自定义文件中将 @code{viper-vi-style-in-minibuffer} 设置为 @code{nil}。  @xref{Customization}，学习如何做到这一点。
+
+当迷你缓冲区更改 Viper 状态时，您会注意到其中文本的外观也会发生变化。  这很有用，因为迷你缓冲区没有模式行来判断它处于哪个 Vi 状态。迷你缓冲区中文本的外观可以更改。 @xref{Viper Specials}，了解更多详情。
+
+@node Multiple Files in Viper
+@section Viper 中的多个文件
+
+@cindex multiple files
+@cindex managing multiple files
+Viper 可以编辑多个文件。  例如，这意味着您永远不需要遭受 @code{No write since last change} 错误。一些 Viper 元素在所有文件中都是通用的。
+
+@table @samp
+@cindex markers
+@cindex textmarkers
+@item Textmarkers
+文本标记记住@emph{files and positions}。如果您在文件 @file{foo} 中设置标记 @samp{a}，则开始编辑文件 @file{bar} 并键入 @kbd{'a}，然后键入 @emph{YOU WILL SWITCH TO FILE @file{foo}}。  您可以使用 Viper 命令 @kbd{[<a-z>} 查看文本标记的内容，其中 <a-z> 是文本标记，例如， @kbd{[a} 查看标记 @samp{a} 。
+@item Repeated Commands
+命令重复在文件中很常见。  键入 @kbd{!!} 将重复最后一个 @kbd{!} 命令，无论该命令是从哪个文件发出的。键入 @kbd{.} 将重复任何文件中的最后一个命令，搜索将重复最后一个搜索。  Ex 命令可以通过输入 @kbd{: @key{RET}} 来重复。注意：在极少数情况下，@kbd{: @key{RET}} 可能会做出危险的事情。然而，通常可以通过输入@kbd{u}来撤销它的效果。
+
+@cindex registers
+@item Registers
+寄存器对于文件来说是通用的。  此外，使用 @kbd{y} 拉出的文本可以放回 (@kbd{p}) 到任何文件中。  Viper 命令 @kbd{]<a-z>}（其中 <a-z> 是寄存器）可用于查看寄存器的内容，例如，键入 @kbd{]a} 可查看寄存器 @samp{a}。
+
+您应该注意文本删除的一个区别。  这个区别来自 Emacs，并被 Viper 采用，因为我们发现它非常有用。  在 Vi 中，如果您删除一行，然后再删除另一行，那么如果您使用 @samp{p} 命令，这两次删除将被分开并分别放回原处。  在 Emacs（和 Viper）中，由其他命令进行的一系列连续删除 @emph{not interrupted} 会集中在一起，因此删除的文本会累积起来并可以作为一个块放回原处。  如果要中断一系列删除操作，以便新删除的文本可以与先前删除的文本分开放回，则应该执行非删除操作，例如，将光标向任意方向移动一个字符。
+
+@cindex absolute file names
+@item Absolute Filenames
+文件的当前目录名称会自动添加到任何 @kbd{:e}、@kbd{:r}、@kbd{:w} 等命令中的文件名前面（在 Emacs 中，每个缓冲区都有一个当前目录）。一旦您在 @kbd{:e, r} 等后面键入空格，该目录就会插入到迷你缓冲区中。Viper 还支持完成文件名和 Ex 命令 (@key{TAB})，并跟踪命令和文件历史记录 (@kbd{M-p}、@kbd{M-n})。 Viper 中较少需要绝对文件名。
+
+您应该知道 Emacs 将 @kbd{/foo/bar//bla} 解释为 @kbd{/bla}，将 @kbd{/foo/~/bar} 解释为 @kbd{~/bar}。  这样做的目的是，如果建议的文件名不是您想要的，则可以最大限度地减少删除 Emacs 在提示中建议的文件名的需要。
+
+命令 @kbd{:cd} 将更改当前 Emacs 缓冲区的默认目录。  默认情况下，Ex 命令 @kbd{:e} 将解释 @samp{csh} 中的文件名参数。  @xref{Customization}，如果你想改变这个。
+@end table
+
+@noindent
+可以使用 @kbd{:ar} 命令列出当前未显示的文件。  命令 @kbd{:n} 可以从 @kbd{:ar} 列表中获取计数以切换到其他文件。  例如，使用 @samp{:n3} 移动到该列表中的第三个文件。
+
+@node Unimplemented Features
+@section 未实现的功能
+
+未实现的功能包括：
+
+@itemize @bullet
+@item
+@kbd{:ab} 和 @kbd{:una} 未实现，因为 @kbd{:ab} 被认为已过时，因为 Emacs 有更强大的工具来定义缩写。
+@item
+@kbd{:set option?} 未实现。  当前的 @kbd{:set} 也可用于设置 Emacs 变量。
+@item
+@kbd{:se list}需要修改Emacs的显示代码，所以没有实现。一个有用的替代方案是@code{cat -t -e file}。  不幸的是，它不能直接在 Emacs 中使用，因为 Emacs 会顽固地将 @samp{^I} 更改回普通选项卡。
+@end itemize
+
+@node Improvements over Vi
+@chapter 相对 Vi 的改进
+
+Vi 和 Ex 的一些常见问题已在 Viper 中得到解决。  这包括更好地实现现有命令、新命令以及 Emacs 提供的设施。
+
+@menu
+* Basics::                   Viper 的基本差异，多文件效果。
+* Undo and Backups::         多次撤消、自动保存、备份和更改
+* History::                  Ex 和 Vi 命令的历史记录。
+* Macros and Registers::     键盘宏（扩展“.”）@: @@reg 执行。
+* Completion::               Ex 的文件名和命令完成。
+* Improved Search::          增量搜索和缓冲区内容搜索。
+* Abbreviation Facilities::  普通缩写、模板和动态缩写。
+* Movement and Markers::     屏幕编辑器动作，查看文本标记。
+* New Commands::             Vi 中不存在的命令。
+* Useful Packages::          一些 Emacs 软件包的示例，以及您应该了解的内容。
+@end menu
+
+@node Basics
+@section 基础知识
+
+Vi 命令集基于将运动命令与其他命令相结合的思想。  运动命令用作其他命令的文本区域说明符。我们将运动命令分为@dfn{point commands}和@dfn{line commands}。
+
+@cindex point commands
+点命令是：
+
+@quotation
+@kbd{h}, @kbd{l}, @kbd{0},  @kbd{$}, @kbd{w}, @kbd{W}, @kbd{b}, @kbd{B}, @kbd{e}, @kbd{E}, @kbd{(}, @kbd{)}, @kbd{/}, @kbd{?}, @kbd{`}, @kbd{f}, @kbd{F}, @kbd{t}, @kbd{T}, @kbd{%}, @kbd{;}, @kbd{,}, @kbd{^}
+@end quotation
+
+@cindex line commands
+行命令是：
+
+@quotation
+@kbd{j}, @kbd{k}, @kbd{+}, @kbd{-}, @kbd{H}, @kbd{M}, @kbd{L}, @kbd{@{}, @kbd{@}}, @kbd{G}, @kbd{'},  @kbd{[[}, @kbd{]]}, @kbd{[]}
+@end quotation
+
+@cindex region
+@cindex region specification
+@cindex expanding (region)
+@cindex describing regions
+@cindex movement commands
+@noindent
+如果将点命令作为修​​改命令的参数给出，则由点命令确定的区域将受到修改命令的影响。  另一方面，如果将行命令作为修​​改命令的参数给出，则由行命令确定的区域将被放大，使其成为正确包含该区域并由整行组成的最小区域（我们将此过程称为@dfn{expanding the region}），然后放大的区域将受到修改命令的影响。文本删除命令 (@pxref{Deleting Text})、更改命令 (@pxref{Changing Text})，甚至 Shell 命令 (@pxref{Shell Commands}) 使用这些命令来描述要操作的文本区域。因此，输入 @kbd{dw} 删除单词，输入 @kbd{>@}} 移动段落，或输入 @kbd{!'afmt} 格式化从 @samp{point} 到文本标记 @samp{a} 的区域。
+
+@cindex r and R region specifiers
+Viper 添加了区域说明符 @samp{r} 和 @samp{R}。  Emacs 有一个特殊的标记，称为 @dfn{mark}。  当前光标位置 @dfn{point} 和 @dfn{mark} 之间的文本区域称为 @dfn{region}。 @samp{r} 指定原始区域，@samp{R} 是扩展区域（即包含原始区域的整行的最小连续块）。 @kbd{dr} 现在将删除该区域，@kbd{>r} 将移动它，等等。然而，@kbd{r,R} 不是运动命令。  特殊标记由@kbd{m.}等命令设置。  @xref{Marking}，了解更多信息。
+
+Viper 还为大多数有意义的命令添加了计数。
+
+在概述一章中，讨论了一些多文件问题 (@pxref{Multiple Files in Viper})。  除了文件之外，Emacs 还有缓冲区。  这些可以在 @kbd{:args} 列表中看到，如果您键入 @kbd{:set ex-cycle-through-non-files t} 或在 Viper 自定义文件中指定 @code{(setq ex-cycle-through-non-files t)}，则可以使用 @kbd{:next} 进行切换。  @xref{Customization}，了解详情。
+
+@node Undo and Backups
+@section 撤消和备份
+
+@cindex undo
+Viper 提供多重撤消。  撤消的数量和大小受机器限制。  Viper 命令@kbd{u} 执行撤消操作。  可以通过输入 @kbd{.}（句点）来重复撤消操作。  另一个@kbd{u}将撤消撤消操作，进一步的@kbd{.}将重复该操作。  键入 @kbd{u} 执行第一次撤消，并更改方向。
+
+@cindex backup files
+@cindex auto save
+由于撤消大小有限，Viper 可以创建备份文件和自动保存文件。  它通常会自动执行此操作。  可以有编号备份等。有关详细信息，@pxref{Backup,,Backup and Auto-Save,emacs,The GNU Emacs Manual}。
+
+@comment [ balance parens
+@cindex viewing registers and markers
+@cindex registers
+@cindex markers
+@cindex textmarkers
+之前 9 次更改的结果可在 9 个数字寄存器中获得，如 Vi 中所示。  额外的好处是能够访问这些寄存器，此外还可以通过 1⁣ 和 2⁣（@pxref{Insert State}，了解详细信息）访问它们。Viper 命令 @kbd{] register} 将显示任何寄存器的内容，无论是数字还是字母。  相关命令@kbd{[ textmarker}将显示文本标记周围的文本。  @samp{register} 和 @samp{textmarker} 可以是从 a 到 z 的任何字母。
+@comment ] balance parens
+
+@node History
+@section 历史
+
+@cindex history
+@cindex Minibuffer
+为 Ex 命令、Vi 搜索、文件名、使用插入或替换状态的早期命令中插入的文本片段以及 Vi 状态下的破坏性命令提供历史记录。  这些对于修复那些搞砸搜索和 @kbd{:s} 的小拼写错误，以及消除与重复键入文件名或需要频繁插入的文本片段相关的例程很有用。在迷你缓冲区中出现 @kbd{:} 或 @kbd{/} 提示时，您可以执行以下操作：
+
+@table @kbd
+@item M-p and M-n
+移动到上一个和下一个历史记录项目。  这会导致历史记录项目出现在命令行上，您可以在其中编辑它们，或者只需键入 Return 即可执行。
+@item M-r and M-s
+向后和向前搜索历史。
+@item @key{RET}
+输入 @key{RET} 接受默认值（显示在提示中）。
+@end table
+
+在插入或替换状态下，可以通过键入 @kbd{C-c M-p} 和 @kbd{C-c M-n} 来仔细阅读插入的历史记录。当 Viper 处于 Vi 状态时，可以通过相同的按键阅读破坏性 Vi 命令的历史记录。  @xref{Viper Specials}，了解详情。
+
+所有 Ex 命令都有文件历史记录。  例如，输入 @kbd{:e}、空格，然后输入 @kbd{M-p} 将显示先前输入的文件名。  重复输入@kbd{M-p}、@kbd{M-n}等，可以浏览文件历史记录。
+
+同样，与切换缓冲区有关的命令具有缓冲区历史记录，而需要字符串或正则表达式的命令则保留这些项目的历史记录。
+
+@node Macros and Registers
+@section 宏和寄存器
+
+@cindex keyboard macros
+@cindex macros
+@cindex registers
+@cindex register execution
+Viper 方便了 Emacs 风格的键盘宏的使用。  @kbd{@@#} 将启动宏定义。  当您键入时，命令将被执行并被记住（这在某些编辑器中称为“学习模式”。）@kbd{@@register}将完成宏，将其放入@samp{register}中，其中@samp{register}是从@samp{a}到@samp{z}的任何字符。  然后你可以使用@kbd{@@register}执行这个宏。  当然，可以将一些文本拉入寄存器并使用@kbd{@@register}执行它。  输入 @kbd{@@@@}、@kbd{@@@key{RET}} 或 @kbd{@@C-j} 将执行使用 @kbd{@@register} 执行的最后一个宏。
+
+Viper 会自动将寄存器小写，因此按 @kbd{SHIFT} 键代替 @kbd{@@} 不会产生问题。  这适用于 @kbd{@@} 宏和 @kbd{"p} @emph{only}。  在@kbd{y}的情况下，@kbd{"Ayy}将附加到@emph{register a}。  对于@kbd{[,],',`}，使用大写寄存器名称是错误的。
+
+@comment [ balance parens
+@cindex viewing registers and markers
+通过@kbd{]register}可以看到寄存器的内容。  （@kbd{[textmarker} 将显示文本标记的内容）。
+@comment ] balance parens
+
+@cindex last keyboard macro
+最后一个键盘宏也可以使用@kbd{*}执行，并且可以使用@kbd{@@!register}将其拉入寄存器。这对于使用 @kbd{C-x(} 和 @kbd{C-x)} 定义的 Emacs 风格键盘宏很有用。  Emacs 键盘宏具有更多功能。 @xref{Keyboard Macros,,Keyboard Macros,emacs, The GNU Emacs Manual}，了解详情。
+
+键盘宏允许一种有趣的查询替换形式：@kbd{/pattern}或@kbd{n}转到下一个模式（查询），然后执行键盘宏执行@kbd{@@@@}（替换）。
+
+Viper 还提供 Vi 风格的宏。  @xref{Vi Macros}，了解详情。
+
+
+@node Completion
+@section 完成
+
+@cindex completion
+当您输入 @key{TAB} 时完成。  Emacs 完成程序不会在文件名中使用通配符。  输入通配符后，完成符将不再适用于该文件名。  请记住，Emacs 将 @kbd{/foo//bar} 形式的文件名解释为 @kbd{/bar}，将 @kbd{/foo/~/bar} 解释为 @kbd{~/bar}。
+
+@node Improved Search
+@section 改进的搜索
+
+@cindex buffer search
+@cindex word search
+Viper 提供缓冲区搜索，能够在缓冲区中搜索光标下的区域。  您必须在 Viper 自定义文件中通过调用来打开此功能
+
+@example
+(viper-buffer-search-enable)
+@end example
+
+@noindent
+或者将 @code{viper-buffer-search-char} 设置为 @kbd{f3}：
+@example
+(setq viper-buffer-search-char ?g)
+@end example
+
+@noindent
+如果用户显式调用@code{viper-buffer-search-enable}（第一种方法），则@code{viper-buffer-search-char}将被设置为@kbd{g}。无论如何启用此功能，键 @code{viper-buffer-search-char} 都将采用移动命令（如 @kbd{w,/,e}）来查找区域，然后搜索该区域的内容。  该命令对于在程序中搜索变量名称等非常有用。  搜索可以重复 @kbd{n} 或反向搜索 @kbd{N}。
+
+@cindex incremental search
+Emacs 提供增量搜索。  当您输入字符串时，光标将移动到下一个匹配项。  当你进行时，你可以从缓冲区中抓取单词。  增量搜索通常绑定到@kbd{C-s}和@kbd{C-r}。  @xref{Customization}，了解如何更改 @kbd{C-r or C-s} 的绑定。欲知详情，@pxref{Incremental Search,,Incremental Search,emacs,The GNU Emacs Manual}。
+
+@cindex query replace
+Viper 还提供了查询替换功能，可以通过迷你缓冲区进行提示。  在 Vi 状态下通过 @kbd{Q} 键调用它。
+
+@cindex mouse search
+在窗口显示上，Viper支持鼠标搜索，即您可以通过单击来搜索单词。  @xref{Viper Specials}，了解详情。
+
+最后，Viper 在窗口显示上突出显示找到的搜索模式。  这是通过 Emacs 中的 @emph{faces} 来完成的。  控制搜索模式如何突出显示的变量是@code{viper-search-face}。  如果您根本不想突出显示任何内容，请输入
+@example
+(copy-face 'default 'viper-search-face)
+@end example
+@vindex viper-search-face
+@noindent
+在您的 Viper 自定义文件中。  如果您想更改图案的突出显示方式，则必须根据您的喜好更改 @code{viper-search-face}。最简单的方法是使用 Emacs 自定义小部件，可以从菜单栏访问该小部件。  Viper 自定义组位于 @emph{Emulations} 自定义组下，而@emph{Emulations} 自定义组又位于 @emph{Editing} 组下（或者只需键入 @kbd{:customize}）。  所有 Viper 面都归为 Viper 的 @emph{Highlighting} 组。
+
+尝试一下：真的很简单！
+
+@node Abbreviation Facilities
+@section 缩写设施
+
+@cindex abbrevs
+在 Emacs 中可以根据缓冲区的内容定义缩写。可以使用 Emacs 缩写工具来定义复杂的模板。  @xref{Abbrevs,,Abbreviations,emacs,The GNU Emacs Manual}，了解详情。
+
+@cindex dynamic abbrevs
+Emacs 还提供动态缩写。  给定一个部分单词，Emacs 将搜索缓冲区以查找该单词的扩展名。  例如，可以通过键入 @samp{A} 来键入 @samp{Abbreviations}，然后按击键完成@samp{A} 到 @samp{Abbreviations}。  重复输入将在缓冲区中进一步搜索，这样就可以通过重复击键来获得@samp{Abbrevs}，该击键出现在文本的前面。  Emacs 将其绑定到 @kbd{@key{ESC} /}，因此您必须找到一个键并将函数 @code{dabbrev-expand} 绑定到该键。像这样的设施使得 Vi 的 @kbd{:ab} 命令变得过时。
+
+@node Movement and Markers
+@section 运动和标记
+
+@cindex Ex style motion
+@cindex line editor motion
+Viper 可以摆脱 Vi 中受行限制的移动，例如 @kbd{l} 拒绝超出行，@key{ESC} 向后移动一个字符等。这些源自 Ex，它是一个行编辑器。  如果您的 Viper 自定义文件包含
+
+@example
+@code{(setq viper-ex-style-motion nil)}
+@end example
+
+@noindent
+该动作将是真正的屏幕编辑器动作。  您必须注意的一件事是它可能位于行尾字符上。键 @kbd{x} 和 @kbd{%} 仍然可以正常工作，即，就像它们在最后一个字符上一样。
+
+@vindex viper-syntax-preference
+@cindex syntax table
+单词移动命令 @kbd{w}、@kbd{e} 等，以及相关的删除/拉取命令 @kbd{dw}、@kbd{yw} 等，可以用来理解 Emacs 语法表。  如果变量@code{viper-syntax-preference}设置为@code{strict-vi}，则@emph{word}的含义与Vi中相同。  但是，如果值为 @code{reformed-vi}（默认值），则字母数字符号将是当前 Emacs 语法表指定的字母数字符号（对于不同的主要模式可能有所不同）加上下划线符号@kbd{_}，减去一些非单词符号，如 '.;、| 等。@code{strict-vi} 和 @code{reformed-vi} 在传统情况下与 Vi 的工作方式接近，但 @code{reformed-vi} 则不同编辑非拉丁字母文本时效果更好。
+
+用户还可以指定值@code{emacs}，这将使 Viper 完全使用 Emacs 的单词概念。  特别是，下划线可能不是单词的一部分。  最后，如果@code{viper-syntax-preference}设置为@code{extended}，Viper单词将由被分类为字母数字@emph{or}作为符号部分的字符组成。  这对于编写程序和许多其他情况都很方便。
+
+@code{viper-syntax-preference} 是一个局部变量，因此对于不同的主模式它可以有不同的值。  例如，在编程模式中，它可以具有值@code{extended}。  在单词包含特殊字符（例如欧洲（非英语）字母、西里尔字母等）的文本模式下，该值可以是 @code{reformed-vi} 或 @code{emacs}。
+
+对 @code{viper-syntax-preference} 的更改应该通过执行 @code{viper-set-syntax-preference} 在各种主要模式的挂钩中完成，如下例所示：
+
+@example
+(viper-set-syntax-preference nil "emacs")
+@end example
+
+@findex viper-set-syntax-preference
+上面对Viper言语含义的讨论仅涉及Viper的移动命令。  在正则表达式中，单词与 Emacs 中的单词保持相同。  也就是说，表达式 @code{\w}、@code{\>}、@code{\<} 等使用 Emacs 的单词概念，并且它们不查看变量 @code{viper-syntax-preference} 的值。  这是因为 Viper 不会更改语法表，因为担心会扰乱设置这些表的各种主要模式。
+
+@cindex textmarkers
+Viper 中的文本标记会记住文件和位置，因此您只需执行 @kbd{'a} 即可切换文件。  如果您制定了使用文本标记的方案，这将非常有用。  文本标记的内容可以通过@kbd{[marker}查看。  （寄存器的内容可以通过@kbd{]register}查看）。
+
+@node New Commands
+@section 新命令
+
+这些命令没有 Vi 类似命令。
+
+@table @kbd
+@kindex C-x
+@kindex C-c
+@item C-x, C-c
+这两个键调用许多重要的 Emacs 功能。  例如，如果您先按@kbd{C-x}，然后按@kbd{2}，则当前窗口将被分成 2 个。除了新手用户之外，@kbd{C-c} 还设置为从当前主模式执行 Emacs 命令。  如果您通过在 Viper 自定义文件中将 @code{viper-no-multiple-ESC} 设置为 @code{nil} 将 @key{ESC} 配置为 Meta，@key{ESC} 也会执行相同的操作。  @xref{Customization}。 Insert、Replace 或 Vi 状态下的 @kbd{C-\} 将使 Emacs 认为 @kbd{Meta} 已被击中。
+
+@kindex \
+@item \
+转义到 Emacs 以执行单个 Emacs 命令。  例如，@kbd{\ @key{ESC}} 将充当元键。
+
+@kindex Q
+@cindex query replace
+@item Q
+@kbd{Q} 用于查询替换。  默认情况下，每个要替换的字符串都被视为正则表达式。  您可以在 @file{.emacs} 文件中使用 @code{(setq viper-re-query-replace nil)} 来关闭此功能。  （对于普通搜索，@kbd{:se nomagic} 可以工作。请注意，@kbd{:se nomagic} 完全关闭正则表达式，与 Vi 不同）。
+
+@kindex v
+@kindex V
+@kindex C-v
+@item v
+@itemx V
+@itemx C-v
+这些键用于访问文件。  @kbd{v} 将切换到一个缓冲区访问文件，其名称可以在迷你缓冲区中输入。  @kbd{V} 类似，但将使用与当前窗口不同的窗口。 @kbd{C-v} 与 @kbd{V} 类似，只不过将使用新框架（X 窗口）而不是新的 Emacs 窗口。
+
+@kindex #
+@item #
+如果后面跟着某个字符@var{ch}，它就变成一个运算符，其参数是由后面的运动命令确定的区域（表示为<move>）。目前，@var{ch}可以是@kbd{c}、@kbd{C}、@kbd{g}、@kbd{q}和@kbd{s}之一。  例如，@kbd{#qr} 将提示您输入一个字符串，然后将该字符串添加到缓冲区中的每一行。
+
+@kindex #c<move>
+@cindex changing case
+@item # c
+将区域中的大写字符更改为小写字符 (@code{downcase-region})。 Emacs 命令 @kbd{M-l} 对单词执行相同的操作。
+
+@kindex #C<move>
+@item # C
+将区域中的小写字符更改为大写。  例如，@kbd{# C 3 w}将从当前点（@code{upcase-region}）起将3个单词大写。 Emacs 命令 @kbd{M-u} 对单词执行相同的操作。
+
+@kindex #g<move>
+@item # g
+为区域中的每一行执行最后一个键盘宏 (@code{viper-global-execute})。
+
+@kindex #q<move>
+@item # q
+在区域中每行的开头插入指定的字符串 (@code{viper-quote-region})。  默认字符串由适合当前主要模式的注释字符组成。
+
+@kindex #s<move>
+@item # s
+检查该区域中单词的拼写 (@code{spell-region})。用于拼写的函数由变量 @code{viper-spell-function} 确定。
+
+@vindex viper-spell-function
+@kindex *
+@item *
+调用最后一个键盘宏。
+
+@item m .
+在点处设置标记并将旧标记从环上推出
+
+@item m<
+@itemx m>
+分别在缓冲区的开头和结尾设置标记。
+
+@item m,
+跳到标记处并将标记从环上弹出。  @xref{Mark,,Mark,emacs,The GNU Emacs Manual}，了解更多信息。
+
+@kindex ]<a-z>
+@item ] register
+查看寄存器内容
+
+@kindex [<a-z>
+@item [ textmarker
+查看文件名和文本标记的位置
+
+@kindex @@#
+@kindex @@<a-z>
+@kindex @@!
+@cindex keyboard macros
+@cindex register execution
+@item @@#
+@itemx @@register
+@itemx @@!
+开始/结束键盘宏。  @@寄存器在@kbd{@@#}之后使用时具有不同的含义。  @xref{Macros and Registers}，了解详情
+
+@kindex []
+@item []
+转到标题末尾。
+
+@item g <@emph{movement command}>
+在缓冲区中搜索由移动命令分隔的文本。  典型的例子是 @kbd{gw} 来搜索光标下的单词。 @xref{Improved Search}，了解详情。
+
+@kindex C-g
+@kindex C-]
+@item C-g and C-]
+退出并中止递归编辑。  有时这些可能是必要的。 @xref{Vi State}，是有原因的。
+
+@kindex C-c C-g
+@item C-c C-g
+点击@kbd{C-c}然后点击@kbd{C-g}将显示当前缓冲区的信息。  这与在 Vi 中点击 @kbd{C-g} 相同，但是，如上所述，在 Emacs 中需要 @kbd{C-g} 来实现其他目的。
+
+@cindex vanilla search
+@cindex case-sensitive search
+@cindex case-insensitive search
+@kindex C-c /
+@item C-c /
+如果没有前缀参数，此命令会切换区分大小写/不区分大小写的搜索模式和普通/正则表达式搜索。  使用前缀参数 1，即 @kbd{1 C-c /}，可以切换区分大小写；使用前缀参数 2，切换普通搜索和使用正则表达式的搜索。  @xref{Viper Specials}，了解调用此函数的其他方法。
+
+@kindex M-p
+@kindex M-n
+@item M-p and M-n
+在迷你缓冲区中，这些命令浏览迷你缓冲区历史记录，例如搜索字符串的历史记录、Ex 命令等。
+
+@kindex C-s
+@item C-s
+如果通过 Viper 搜索命令 @kbd{/} 或 @kbd{?} 输入迷你缓冲区，则键入此键将插入 Emacs 增量搜索命令使用的最后一个搜索字符串（除本例外，在任何地方都绑定到 @kbd{C-s}）。
+
+@kindex C-c M-p
+@kindex C-c M-n
+@cindex Insertion history
+@cindex Insertion ring
+@cindex Command history
+@cindex Command ring
+@item C-c M-p and C-c M-n
+在插入或替换状态下，这些命令允许用户仔细阅读先前插入或替换命令中使用的插入字符串的历史记录。  尝试反复点击@kbd{C-c M-p}或@kbd{C-c M-n}，看看会发生什么。  @xref{Viper Specials}，了解更多。
+
+在 Vi 状态下，这些命令可让用户仔细查看 Vi 风格的破坏性命令的历史记录，例如 @kbd{dw}、@kbd{J}、@kbd{a} 等。通过重复键入 @kbd{C-c M-p} 或 @kbd{C-c M-n}，您将在 Viper 中循环浏览最近的 Vi 命令历史记录，一一显示命令。  一旦找到合适的命令，就可以通过键入句点来执行它。
+
+由于输入@kbd{C-c M-p}很乏味，因此将适当的功能绑定到键盘上的功能键并使用该键会更方便。 @xref{Viper Specials}，了解详情。
+
+@findex  @kbd{Ex args}
+@findex  @kbd{Ex n}
+@findex  @kbd{Ex pwd}
+@findex  @kbd{Ex pre}
+@item Ex commands
+命令@kbd{:args}、@kbd{:next}、@kbd{:pre} 的行为有所不同。  @kbd{:pwd} 存在用于获取当前目录。命令 @kbd{:b} 和 @kbd{:B} 切换缓冲区。  @xref{File and Buffer Handling}，了解详情。
+@findex @kbd{Ex RelatedFile}
+@findex @kbd{Ex PreviousRelatedFile}
+还有新命令 @kbd{:RelatedFile} 和 @kbd{PreviousRelatedFile}（分别缩写为 @kbd{R} 和 @kbd{P}。@xref{Viper Specials}，了解详细信息。
+@end table
+
+除了新命令之外，许多旧命令也得到了增强。  最值得注意的是，Vi 风格的宏在 Viper 中比在 Vi 中强大得多。  @xref{Vi Macros}，了解详情。
+
+@node Useful Packages
+@section 有用的包
+
+这里提到一些 Emacs 软件包作为对新 Viper 用户的帮助，以表明 Viper 的功能。标准 Emacs 发行版附带了大量的内容，还有更多内容存在于网络和档案中。
+
+本手册还提到了新用户应该了解的一些 Emacs 功能。  这些的详细信息可以在 GNU Emacs 手册中找到。
+
+先说特点。  有关详细信息，请参阅 Emacs 手册。
+
+@table @samp
+@cindex make
+@cindex compiling
+@item Make
+可以从编辑器中完成制作和编译。  错误消息将被解析，您可以移至错误行。
+
+@cindex shell
+@cindex interactive shell
+@item Shell
+您可以从编辑器内部与 Shell 对话。  您的整个 shell 会话可以被视为一个文件。
+
+@cindex email
+@cindex mail
+@item Mail
+可以在编辑器中读取和发送邮件。  存在几个复杂的包。
+
+@item Language Sensitive Editing
+编辑模式是为现有的大多数计算机语言编写的。  通过控制缩进，他们可以捕获标点符号错误。
+@end table
+
+下面的软件包只是 Emacs 标准发行版附带的特殊用途软件包中的一小部分。
+
+@table @samp
+@cindex transparent ftp
+@pindex ange-ftp.el
+@item Transparent FTP
+@code{ange-ftp.el} 可以从编辑器 ftp 到其他机器上的文件，这对于用户来说是透明的。
+
+@cindex version maintenance
+@cindex RCS
+@pindex vc.el
+@item RCS Interfaces
+@code{vc.el} 用于从编辑器内部执行 RCS 命令
+
+@cindex dired
+@pindex dired.el
+@item Directory Editor
+@code{dired.el} 用于编辑目录内容以及在文件系统中导航。
+
+@cindex font-lock
+@pindex font-lock.el
+@item Syntactic Highlighting
+@code{font-lock.el} 用于使用不同的字体和颜色自动突出显示缓冲区的各个部分。
+
+@cindex desktop
+@pindex desktop.el
+@item Saving Emacs Configuration
+@code{desktop.el} 用于在 Emacs 退出/启动时保存/恢复配置。
+
+@cindex ispell
+@pindex ispell.el
+@item Spell Checker
+@code{ispell.el} 用于对缓冲区、单词、区域等进行拼写检查。
+
+@cindex ediff
+@pindex ediff.el
+@item File and Buffer Comparison
+@code{ediff.el} 用于查找文件之间的差异并应用补丁。
+@end table
+
+@noindent
+Emacs Lisp 档案存在于 @samp{archive.cis.ohio-state.edu} 和 @samp{wuarchive.wustl.edu}
+
+
+@node Customization
+@chapter 定制化
+
+@cindex customization
+定制可以通过两种方式完成。
+
+@itemize @bullet
+@cindex initialization
+@cindex .viper
+@item
+@file{~/.emacs.d/viper}（或@file{~/.viper}）文件中的 Elisp 代码。 Viper 在绑定模式挂钩之前加载此文件。这仅建议专家使用。
+
+@cindex .emacs
+@item
+@file{.emacs} 文件中 @code{(require 'viper)} 行之前和之后的 Elisp 代码。  @emph{not} 建议使用此方法，除非您知道自己在做什么。  在加载 Viper 之前（即在 @code{(require 'viper)} 命令之前），应该在 @file{.emacs} 中自定义两个变量，@code{viper-mode} 和 @code{viper-custom-file-name}。
+
+@cindex Ex customize
+@item
+通过执行 @kbd{:customize} Ex 命令。  这将带您进入 Emacs 自定义小部件，它可以让您轻松更改 Viper 可自定义变量的值。  这种方法对于新手和专家来说都很好。  Lisp 命令形式的自定义代码将放置在 @file{~/.emacs} 或其他自定义文件中，具体取决于您使用的 Emacs 版本。  尽管如此，还是建议将 Emacs 自定义小部件生成的与 Viper 相关的自定义分开，并将其保留在 Viper 自定义文件中。
+
+但是，某些高级自定义无法通过这种方式完成，必须在 Viper 自定义文件中的 Emacs Lisp 中完成。  对于常见情况，提供了示例，您可以直接使用。
+@end itemize
+
+
+@menu
+* Rudimentary Changes::           简单的常量定义。
+* Key Bindings::                  启用 Emacs 键、重新绑定键等。
+* Packages that Change Keymaps::  面对这样的猛兽，该如何应对。
+* Viper Specials::                特殊的毒蛇命令。
+* Vi Macros::                     如何做 Vi 风格的宏。
+@end menu
+
+@node Rudimentary Changes
+@section 初步变化
+
+@cindex setting variables
+@cindex variables for customization
+@findex @kbd{Ex set}
+自定义 Viper 的一个简单方法是更改​​ Viper 中使用的常量值。  以下是 Viper 中使用的常量及其默认值的列表。  还指示了相应的 :se 命令。  （符号@code{t}和@code{nil}在Lisp中代表“真”和“假”）。
+
+Viper 支持缩写的 Vi 变量名称及其全名。  变量完成仅针对全名完成。  @key{TAB} 和 @key{SPC} 完整变量名称。  输入 @kbd{=} 将完成名称，然后将提示输入值（如果适用）。  例如，@kbd{:se au @key{SPC}}将完成@kbd{:set autoindent}的命令； @kbd{:se ta @key{SPC}} 将完成命令并进一步提示，如下所示：@kbd{:set tabstop = }。但是，输入 @kbd{:se ts @key{SPC}} 将产生“不匹配”消息，因为 @kbd{ts} 是 @kbd{tabstop} 的缩写，而 Viper 仅支持全名补全。  但是，您仍然可以点击 @key{RET} 或 @kbd{=}，这将完成如下命令：@kbd{:set ts = }，Viper 将等待您为 tabstop 变量键入一个值。要获取 Vi 变量的完整列表，请输入 @kbd{:se @key{SPC} @key{TAB}}。
+
+@table @code
+@vindex viper-auto-indent
+@item viper-auto-indent nil
+@itemx :se ai (:se autoindent)
+@itemx :se ai-g (:se autoindent-global)
+如果@code{t}，则启用自动缩进。通过 @key{RET}、@kbd{o} 或 @kbd{O} 命令。
+
+@code{viper-auto-indent} 是局部变量。  要全局更改该值，请使用 @code{setq-default}。  对于某些主要模态来说，拥有自己的 @code{viper-auto-indent} 值可能很有用。  这可以通过使用 @code{setq} 将该变量在钩子中的本地值更改为适当的主要模式来实现。
+
+@kbd{:se ai} 仅更改当前缓冲区中@code{viper-auto-indent} 的值； @kbd{:se ai-g} 在全球范围内执行相同的操作。
+
+@vindex viper-electric-mode
+@item viper-electric-mode t
+如果不是@code{nil}，则自动缩进变为电动，这意味着@key{RET}、@kbd{O}和@kbd{o}会根据当前的主模式缩进光标。  将来，这个变量可能会控制额外的电动功能。
+
+这是一个局部变量：@code{setq} 仅更改当前缓冲区中该变量的值。  使用 @code{setq-default} 更改所有缓冲区中的值。
+
+@vindex viper-case-fold-search
+@item viper-case-fold-search nil
+@itemx :se ic (:se ignorecase)
+如果不是@code{nil}，搜索将忽略大小写。这也可以通过快速点击 @kbd{/} 两次来切换。
+
+@vindex viper-re-search
+@item viper-re-search nil
+@itemx :se magic
+如果不是@code{nil}，搜索将使用正则表达式；如果 @code{nil} 则使用普通搜索。也可以通过快速点击 @kbd{/}三次来切换此行为。
+
+@vindex buffer-read-only
+@item buffer-read-only
+@itemx :se ro (:se readonly)
+将当前缓冲区设置为只读。  要全局更改，请将 @code{(setq-default buffer-read-only t)} 放入 @file{.emacs} 文件中。
+
+@item blink-matching-paren t
+@itemx :se sm (:se showmatch)
+通过闪烁光标显示匹配的括号。
+
+@item tab-width t (default setting via @code{setq-default})
+@itemx :se ts=value (:se tabstop=value)
+@itemx :se ts-g=value (:se tabstop-global=value)
+@code{tab-width} 是一个局部变量，用于控制制表位的宽度。要全局更改该值，请使用 @code{setq-default}；对于本地设置，请使用@code{setq}。
+
+命令@kbd{:se ts}仅设置当前缓冲区中的制表符宽度；它对其他缓冲区没有影响。
+
+命令 @kbd{:se ts-g} 为所有尚未本地设置制表符的缓冲区（包括新缓冲区）全局设置制表符宽度。
+
+请注意，键入 @key{TAB} 通常不会插入制表符，因为此键通常绑定到文本格式化功能 @code{indent-for-tab-command} （这有助于编程和文档编写）。  相反，选项卡是通过命令 @code{viper-insert-tab} 插入的，该命令绑定到 @kbd{S-tab}（shift + tab）。
+
+在某些文本终端上，Shift 不会修改 @key{TAB} 键，因此 @kbd{S-tab} 的行为就像 @key{TAB} 一样。  在这种情况下，您必须将 @code{viper-insert-tab} 绑定到其他方便的键。
+
+@vindex viper-shift-width
+@item viper-shift-width 8
+@itemx :se sw=value  (:se shiftwidth=value)
+通过 @kbd{>} 和 @kbd{<} 命令移动的列数。
+
+@vindex viper-search-wrap-around
+@item viper-search-wrap-around t
+@itemx :se ws (:se wrapscan)
+如果不是@code{nil}，搜索将环绕缓冲区的末尾/开头。
+
+@vindex viper-search-scroll-threshold
+@item viper-search-scroll-threshold 2
+如果搜索落在窗口顶部或底部的这么多行内，则窗口将向上或向下滚动大约其大小的 1/7，以显示上下文。  如果值为负，则不滚动。
+
+@vindex viper-tags-file-name
+@item viper-tags-file-name "TAGS"
+用作标记表的文件的名称。
+
+@vindex viper-re-query-replace
+@item viper-re-query-replace nil
+如果不是 @code{nil}，则在查询替换中使用 reg-exp 替换。
+
+@vindex viper-want-ctl-h-help
+@item viper-want-ctl-h-help nil
+如果不是@code{nil}，则@kbd{C-h}绑定到@code{help-command}；否则，@kbd{C-h} 在 Vi 中照常绑定。
+
+@vindex viper-vi-style-in-minibuffer
+@item viper-vi-style-in-minibuffer t
+如果不是@code{nil}，当您在迷你缓冲区中键入文本时，Viper 会提供与 Vi 插入模式的高度兼容性；如果@code{nil}，在迷你缓冲区中输入内容就像普通的 Emacs 一样。
+
+@vindex viper-no-multiple-ESC
+@item viper-no-multiple-ESC t
+如果将其设置为@code{nil}，则可以在Vi状态下使用@key{ESC}作为Meta。通常，这是不必要的，因为图形显示具有单独的元键（通常位于空格键的每一侧）。  在哑终端上，Viper 将此变量设置为 @code{twice}，这几乎与 @code{nil} 类似，只是发出两声 @key{ESC} 蜂鸣声。  这也让 @key{ESC} 可以用作元。
+
+@vindex viper-fast-keyseq-timeout
+@item viper-fast-keyseq-timeout 200
+相隔这么多毫秒的按键序列被视为 Vi 风格的键盘宏。  如果按键序列被定义为这样的宏，它将被执行。  否则，它将作为普通的键入键序列进行处理。
+
+将此变量设置得太高可能会减慢您的打字速度。  将其设置得太低可能会导致难以足够快地键入宏。
+
+@vindex viper-ex-style-motion
+@item viper-ex-style-motion t
+如果您希望 @kbd{l,h} 交叉线等，请将其设置为 @code{nil}。@xref{Movement and Markers}，了解更多信息。
+
+@vindex viper-ex-style-editing
+@item viper-ex-style-editing t
+将其设置为@code{nil}，如果您希望@kbd{C-h}和@key{DEL}在插入状态下不停在行首，@kbd{X}和@kbd{x}在Vi命令状态下跨行删除字符等。
+
+@vindex viper-ESC-moves-cursor-back
+@item viper-ESC-moves-cursor-back t
+@code{t}，从插入状态切换到vi状态时，光标向后移动1个字符。  如果@code{nil}，则光标停留在切换之前的位置。
+
+@vindex viper-always
+@item viper-always t
+@code{t} 表示：让 Viper 来决定何时必须在 Vi 状态、Insert 状态或 Emacs 状态下启动缓冲区。  这种启发式方法几乎在所有情况下都很有效。  @code{nil} 意味着您必须为每个缓冲区手动调用 @code{viper-mode} （或者您可以使用 @code{with-eval-after-load} 将 @code{viper-mode} 添加到适当的主模式挂钩）。
+
+必须在 Viper 自定义文件中设置此选项。
+
+@vindex viper-custom-file-name
+@item viper-custom-file-name "~/.emacs.d/viper"
+用于 Viper 特定定制的文件。如果需要，请更改此设置。  必须在加载 Viper 之前设置为 @file{.emacs}。  请注意，您必须将其设置为双引号内的字符串。
+
+@vindex viper-spell-function
+@item viper-spell-function 'ispell-region
+命令 @kbd{#c<move>} 用于拼写的函数。
+
+@findex viper-glob-function
+@item viper-glob-function
+该变量的值是用于扩展通配符的函数符号。  这是依赖于平台的。  默认情况下尝试设置此变量以适用于大多数 shell、MS Windows 等。但是，如果它不按您期望的方式工作，您应该编写自己的变量。以@file{viper-util.el}中的@code{viper-glob-unix-files}和@code{viper-glob-mswindows-files}为例。
+
+此功能用于扩展 Ex 命令@kbd{:e} 中的通配符。请注意，Viper 不支持 @kbd{:r} 和 @kbd{:w} 命令中的通配符，因为文件完成是一种更好的机制。
+
+@vindex ex-cycle-other-window
+@item ex-cycle-other-window t
+如果不是 @code{nil}，@kbd{:n} 和 @kbd{:b} 将循环浏览另一个窗口中的文件（如果存在）。
+
+@vindex ex-cycle-through-non-files
+@item ex-cycle-through-non-files nil
+@kbd{:n} 通常不会在缓冲区中循环。  设置此项也可以获取缓冲区。
+
+@vindex viper-want-emacs-keys-in-insert
+@item viper-want-emacs-keys-in-insert
+对于用户级别 1 和 2，此设置为 @code{nil}；对于用户级别 3 和 4，此设置为 @code{t}。指定级别 5 的用户可以随意设置此变量（此级别的默认值为 @code{t}）。  如果设置为@code{nil}，则在插入状态下提供完整的 Vi 兼容性。  确实不建议这样做，因为这会阻止您使用主要模式提供的特定于语言的功能。
+
+@vindex viper-want-emacs-keys-in-vi
+@item viper-want-emacs-keys-in-vi
+对于用户级别 1，该值设置为 @code{nil}；对于用户级别 2--4，该值设置为 @code{t}。在第 5 级，用户可以随意设置此变量（此级别的默认值是@code{t}）。如果设置为@code{nil}，则在 Vi 命令状态下提供完整的 Vi 兼容性。  将其设置为 @code{nil} 确实是一个坏主意，除非您是新手，因为这会妨碍使用主要模式提供的特定于语言的功能。
+
+@vindex viper-keep-point-on-repeat
+@item viper-keep-point-on-repeat t
+如果不是@code{nil}，则当用户通过键入句点重复上一个命令时，点不会移动。  这对于使用 @kbd{.} 键进行重复更改非常有用。
+
+@item viper-repeat-from-history-key 'f12
+用于调用宏@kbd{f12 1}和@kbd{f12 2}的前缀键重复倒数第二个和倒数第三个破坏性命令。这两个宏都绑定（作为 Viper 宏）到 @code{viper-repeat-from-history}，它检查调用它的第二个键，以查看要调用之前的哪个命令。  Viper 仅绑定 @kbd{f12 1} 和 @kbd{f12 2}，但用户可以在他/她的 Viper 自定义文件中绑定更多。 @xref{Vi Macros}，了解如何执行此操作。
+
+@vindex viper-keep-point-on-undo
+@item viper-keep-point-on-undo nil
+如果不是@code{nil}，Viper 在撤消命令时会尝试不移动点。相反，它会将光标短暂移动到发生更改的位置。  但是，如果窗口中没有看到撤消的文本片段，则点将移动到发生更改的位置。将其设置为@code{t}，看看您是否更喜欢它。
+
+@vindex viper-delete-backwards-in-replace
+@item viper-delete-backwards-in-replace nil
+如果不是@code{nil}，@key{DEL}键将在向后移动光标的同时删除字符。  如果@code{nil}，光标将向后移动而不删除任何内容。
+
+@vindex viper-replace-overlay-face
+@item viper-replace-overlay-face 'viper-replace-overlay-face
+在图形显示上，Viper 突出显示替换区域，而不是在末尾放置 @samp{$}。  该变量控制所谓的 @dfn{face} 用于突出显示该区域。
+
+默认情况下，@code{viper-replace-overlay-face} 在单色显示器上为替换内容加下划线，并在其上放置点画。  在彩色显示器上，替换区域用颜色突出显示。
+
+如果您对 Emacs 面有所了解并且不喜欢 Viper 如何突出显示替换区域，则可以通过指定新面来更改 @code{viper-replace-overlay-face}。  （Emacs 界面在 Emacs Lisp 参考中进行了描述。）在彩色显示器上，以下自定义方法通常最有效：
+@smallexample
+(set-face-foreground viper-replace-overlay-face "DarkSlateBlue")
+(set-face-background viper-replace-overlay-face "yellow")
+@end smallexample
+要获得可用颜色的完整列表，请计算表达式 @code{(defined-colors)}。  （将其输入缓冲区@file{*scratch*}，然后按@kbd{C-j}键。
+
+@vindex viper-replace-overlay-cursor-color
+@item viper-replace-overlay-cursor-color  "Red"
+光标位于替换区域内时的颜色。这仅对彩色显示有效，并且仅当 Emacs 作为 X 应用程序运行时有效。
+
+@vindex viper-insert-state-cursor-color
+@item viper-insert-state-cursor-color nil
+如果设置为有效颜色，则当 Viper 处于插入状态时，这将是光标颜色。
+
+@vindex viper-emacs-state-cursor-color
+@item viper-emacs-state-cursor-color nil
+如果设置为有效颜色，则当 Viper 处于 emacs 状态时，这将是光标颜色。
+
+@vindex viper-replace-region-end-symbol
+@item viper-replace-region-end-delimiter "$"
+用于标记替换区域结束的字符串。  它仅用于 TTY 或 @code{viper-use-replace-region-delimiters} 为非 @code{nil} 时。
+
+@vindex viper-replace-region-start-symbol
+@item viper-replace-region-start-delimiter  ""
+用于标记替换区域开始的字符串。  它仅用于 TTY 或 @code{viper-use-replace-region-delimiters} 为非 @code{nil} 时。
+
+@item viper-use-replace-region-delimiters
+如果非 @code{nil}，Viper 将始终使用 @code{viper-replace-region-end-delimiter} 和 @code{viper-replace-region-start-delimiter} 来界定替换区域，即使在彩色显示器上（这是不必要的）。  默认情况下，此变量仅在 TTY 或单色显示器上为非@code{nil}。
+
+@vindex viper-allow-multiline-replace-regions
+@item viper-allow-multiline-replace-regions t
+如果非@code{nil}，多行文本替换区域（例如由命令@kbd{c55w}、@kbd{3C}等生成的区域）将保留，直到用户退出替换模式。  在此变量设置为@code{nil}时，Viper 将模拟标准 Vi 行为，该行为仅支持行内替换区域（并且删除多行替换区域）。
+
+@vindex viper-toggle-key
+@item viper-toggle-key "\C-z"
+指定用于在 Emacs 和 Vi 之间切换的键。必须在您的 Viper 自定义文件中设置。  Viper 加载后无法以交互方式更改此变量。
+
+在插入状态下，该键充当到 Vi 状态的临时转义，即，它将设置 Viper，以便执行下一个命令，就像在 Vi 状态下键入一样。
+
+@vindex viper-buffer-search-char
+@item viper-buffer-search-char nil
+用于缓冲区搜索的键。  @xref{Viper Specials}，了解详情。
+
+@vindex viper-surrounding-word-function
+@item viper-surrounding-word-function 'viper-surrounding-word
+该变量的值是一个函数名称，用于确定鼠标单击的单词的构成。  这是由鼠标搜索和插入使用的。
+
+@vindex viper-search-face
+@item viper-search-face 'viper-search-face
+控制找到搜索模式时如何突出显示的变量。
+
+@vindex viper-vi-state-hook
+@item viper-vi-state-hook nil
+进入 Vi 命令状态后立即运行的无参数函数列表。
+
+@vindex viper-insert-state-hook
+@item viper-insert-state-hook nil
+插入状态相同。  该钩子也会在进入 Replace 状态后运行。
+
+@vindex viper-replace-state-hook
+@item viper-replace-state-hook  nil
+进入替换状态后（以及毕竟@code{viper-insert-state-hook}）后调用的（无参数）函数列表。
+
+@vindex viper-emacs-state-hook
+@item viper-emacs-state-hook nil
+从 Vi 状态切换到 Emacs 状态后立即调用的（无参数）函数列表。
+@end table
+
+@noindent
+您可以使用 Ex 命令 @kbd{:set} 在 Viper 中重置其中一些常量（当表中如此指示时）。  或者您可以在 Viper 自定义文件中包含这样的行：
+@example
+(setq viper-case-fold-search t)
+@end example
+
+@node Key Bindings
+@section 按键绑定
+
+@cindex key bindings
+@cindex keymaps
+Viper 允许您定义热键，即您可以将 F1、Help、PgDn 等键盘按键与 Emacs Lisp 函数（可能已经存在或您将编写的函数）关联起来。  在 Emacs 中，每个键都有一个“首选形式”。  例如，向上键的首选形式是 [up]，帮助键的首选形式是 [help]，撤消键的首选形式是 [f14]。您可以通过键入 @kbd{M-x describe-key-briefly} 然后键入您想要了解的键来查找键的首选形式。
+
+@vindex input-decode-map
+@vindex local-function-key-map
+在 X Window 系统下，每个键盘按键都会发出其首选形式，因此您只需键入
+
+@lisp
+(keymap-global-set "<f11>" 'calendar)                   ; L1, Stop
+(keymap-global-set "<f14>" 'undo)                       ; L4, Undo
+@end lisp
+
+@noindent
+绑定 L1（某些 SUN 工作站上存在的密钥），以便调用 Emacs 日历并绑定 L4，以便撤消更改。然而，在哑终端或 Xterm 窗口中，即使是标准箭头键也可能无法发出 Emacs 可以理解的正确信号。  要让 Emacs 了解这些键，您必须通过键入 @kbd{C-q} 然后键入键来找出它们发出的键序列（您应该首先切换到 Emacs 状态）。  然后，您可以使用 @code{input-decode-map} 将这些序列绑定到其首选形式，如下所示：
+
+@lisp
+(cond ((string= (getenv "TERM") "xterm")
+(define-key input-decode-map "\e[192z" [f11])    ; L1
+(define-key input-decode-map "\e[195z" [f14])    ; L4, Undo
+@end lisp
+
+上面说明了如何为 Xterm 执行此操作。  在 VT100 上，您必须将“xterm”替换为“vt100”，并更改按键序列（相同的按键可能在不同类型的终端上发出不同的序列）。
+
+上述键是全局的，因此它们会被主要模式和 Viper 本身定义的本地映射覆盖。  因此，如果您希望更改主要模式或 Viper 的绑定集，请阅读本文。
+
+@vindex viper-vi-global-user-map
+@vindex viper-insert-global-user-map
+@vindex viper-emacs-global-user-map
+希望指定自己的键绑定的 Viper 用户应该只关心以下三个键映射：@code{viper-vi-global-user-map} 用于 Vi 状态命令，@code{viper-insert-global-user-map} 用于插入状态命令，@code{viper-emacs-global-user-map} 用于 Emacs 状态命令（注意：对 @code{viper-emacs-global-user-map} 进行的 Emacs 状态自定义绑定由插入状态继承于 @emph{not}）。
+
+有关 Viper 键映射的更多信息，请参阅文件头 @file{viper.el}。如果您想更改 Viper 绑定，可以使用 @code{define-key} 命令来修改 @code{viper-vi-global-user-map}、@code{viper-insert-global-user-map} 和 @code{viper-emacs-global-user-map}，如下所述。  这些键映射中的每一个都会影响相应的 Viper 状态。键映射 @code{viper-insert-global-user-map} 也会影响 Viper 的替换状态。
+
+@noindent
+如果您想将一个键（例如 @kbd{C-v}）绑定到向下滚动页面的函数，并使 @kbd{0} 在当前缓冲区上显示信息，将其放入 Viper 自定义文件中即可在 Vi 状态下实现这一目的：
+@example
+(define-key viper-vi-global-user-map "\C-v" 'scroll-down)
+@end example
+@noindent
+要全局设置密钥，
+@example
+(define-key viper-emacs-global-user-map "\C-c m" 'smail)
+(define-key viper-vi-global-user-map "0" 'viper-info-on-file)
+@end example
+@noindent
+但请注意，此绑定可能会被其他键盘映射覆盖，因为全局键盘映射具有最低优先级。为了确保没有任何东西会覆盖 Emacs 状态下的绑定，您可以这样写：
+@example
+(define-key viper-emacs-global-user-map "\C-c m" 'smail)
+@end example
+@noindent
+要在插入状态下自定义 @kbd{C-h} 的绑定：
+@example
+(define-key viper-insert-global-user-map "\C-h"
+  'my-del-backwards-function)
+@end example
+@noindent
+
+每个 Emacs 命令键都会调用一些 Lisp 函数。  如果您启用了帮助，(@pxref{Rudimentary Changes}) @kbd{C-h k} 将向您显示每个特定按键的功能； @kbd{C-h b} 将显示所有绑定，@kbd{C-h m} 将提供有关有效的主要模式的信息。  如果未启用帮助，您仍然可以在 Vi 状态下通过在上述命令前加上 @kbd{\} 前缀来获取帮助，例如 @kbd{\ C-h k}（或者，如果 Emacs 在 X 下运行，您可以使用菜单栏中的帮助菜单）。
+
+Viper 用户还可以根据主要模式更改绑定。  与全局绑定一样，这可以针对三个主要 Viper 状态中的每一个单独完成。  为此，Viper 提供了函数@code{viper-modify-major-mode}。
+@findex viper-modify-major-mode
+
+要修改 @code{my-favorite-major-mode} 的 Emacs 状态下的键，用户需要创建一个稀疏键盘映射，例如 @code{my-fancy-map}，绑定该键映射中所需的任何键，然后将
+
+@example
+(viper-modify-major-mode 'dired-mode 'emacs-state my-fancy-map)
+@end example
+
+@noindent
+在您的 Viper 自定义文件中。  要在 Vi 和 Insert 状态中执行相同操作，您应该使用 @code{vi-state} 和 @code{insert-state}。  插入状态中的更改也会在替换状态中生效。  例如，假设用户想要在 Dired 模式下的 Vi 状态下使用 @kbd{dd} 来删除文件，使用 @kbd{u} 来取消标记文件等。Viper 自定义文件中的以下代码将完成这项工作：
+
+@example
+(setq my-dired-modifier-map (make-sparse-keymap))
+(define-key my-dired-modifier-map "dd" 'dired-flag-file-deletion)
+(define-key my-dired-modifier-map "u" 'dired-unmark)
+(viper-modify-major-mode 'dired-mode 'vi-state my-dired-modifier-map)
+@end example
+
+Vi 纯粹主义者可能希望在 Dired 模式下修改 Emacs 状态，以便 @kbd{k}、@kbd{l} 等在目录缓冲区中移动，就像在 Vi 中一样。  尽管不建议这样做，因为这些键绑定到有用的 Dired 函数，但可以通过以下代码完成该技巧：
+
+@example
+(setq my-dired-vi-purist-map (make-sparse-keymap))
+(define-key my-dired-vi-purist-map "k" 'viper-previous-line)
+(define-key my-dired-vi-purist-map "l" 'viper-forward-char)
+(viper-modify-major-mode 'dired-mode
+                         'emacs-state my-dired-vi-purist-map)
+@end example
+
+在主要模式下自定义键绑定的另一种方法是使用自定义小部件编辑列表@code{viper-major-mode-modifier-list}。
+@vindex viper-major-mode-modifier-list
+（此变量位于 Viper-misc 自定义组中。）此列表的元素是以下形式的三元组：(major-mode viper-state keymap)，其中键映射包含应该在给定主要模式和给定 viper-state 中处于活动状态的绑定。
+
+@findex @kbd{Ex map}
+通过使用 Ex 命令@kbd{:map} 和 @kbd{:map!} 定义 Vi 键盘宏，可以实现与键绑定更改类似的效果。  不同之处在于，多键 Vi 宏不会覆盖它们所绑定的键，除非快速连续键入这些键。  因此，对于宏，人们可以将普通键与宏一起使用。  如果需要对每种模式进行修改，用户可以尝试这两种方法，看看哪一种更方便。 @xref{Vi Macros}，了解详情。
+
+注意：在@emph{Emacs state}默认出现的主要模式中，上述修改可能不会立即发生（但只有在缓冲区切换到其他 Viper 状态然后返回 Emacs 状态之后）。  为了避免这种情况，应该将 @code{viper-change-state-to-emacs} 添加到该主要模式的适当钩子中。  （查看@file{viper.el}中的函数@code{viper-set-hooks}作为示例。）但是，如果您没有将@code{viper-always}设置为@code{nil}，则您可能不需要执行上述过程，因为Viper将处理最有用的默认值。
+
+@findex viper-add-local-keys
+@findex viper-zap-local-keys
+最后，Viper 有一个功能，可以让用户定义每个缓冲区绑定，即仅在某些特定缓冲区中有效的绑定。  与上述每模式绑定不同，每缓冲区绑定可以基于除主模式之外的考虑因素来定义。  这是通过函数 @code{viper-add-local-keys} 完成的，该函数允许指定仅在当前缓冲区中有效且针对特定 Viper 状态的绑定。  例如，
+@lisp
+(viper-add-local-keys 'vi-state '(("ZZ" .@: TeX-command-master)
+                                 ("ZQ" .@: viper-save-kill-buffer)))
+@end lisp
+@noindent
+重新定义 @kbd{ZZ} 以调用 @code{vi-state} 中的 @code{TeX-command-master} 和 @kbd{ZQ} 来保存然后终止当前缓冲区。  这些绑定仅在执行该命令的缓冲区中生效。  此函数的典型用途是从某个主要模式的挂钩中包含的函数内执行上述表达式。  例如，上面的表达式可以从函数@code{my-tex-init}调用，该函数可以添加到@code{tex-mode-hook}，如下所示：
+@lisp
+(add-hook 'tex-mode-hook 'my-tex-init)
+@end lisp
+@noindent
+当 TeX 模式启动时，会执行钩子并计算上面的 Lisp 表达式。  然后，在 Vi 命令模式下，对于 TeX 模式下的所有缓冲区，@kbd{ZZ} 和 @kbd{ZQ} 的绑定会发生变化。
+
+另一个有用的应用程序是在邮件模式缓冲区中将 @kbd{ZZ} 绑定到 @code{send-mail}（具体情况取决于您使用的邮件包，@code{rmail}、@code{mh-e}、@code{vm} 等。例如，以下是如何对@code{mh-e}（MH 的 Emacs 接口）执行此操作：
+@lisp
+(defun mh-add-vi-keys ()
+  "Set up ZZ for MH-e and XMH."
+  (viper-add-local-keys 'vi-state '(("ZZ" .@: mh-send-letter))))
+(add-hook 'mh-letter-mode-hook 'mh-add-vi-keys)
+@end lisp
+
+您还可以使用 @code{viper-add-local-keys} 通过分别传递符号 @code{insert-state} 和 @code{emacs-state} 作为参数来设置插入状态和 Emacs 状态下的每个缓冲区绑定。与全局绑定一样，对 Emacs 状态进行的自定义本地绑定不会被插入状态继承。
+
+在极少数情况下，本地密钥可能会被错误添加。  通常这是通过调用添加本地键的主要模式来间接完成的（例如，@code{shell-mode}重新定义@key{RET}）。  在这种情况下，退出错误的主要模式不会让您摆脱不需要的本地密钥，因为这些密钥是 Viper 状态和当前缓冲区的本地密钥，而不是主要模式的本地密钥。在这种情况下，补救措施是输入@kbd{M-x viper-zap-local-keys}。
+
+关于 Viper 特定的绑定就这么多了。 @xref{Customization,,Customization,emacs,The GNU Emacs Manual}，以及 Emacs 快速参考卡，了解有关 Emacs 中键绑定的一般信息。
+
+@node Packages that Change Keymaps
+@section 更改键盘映射的软件包
+@cindex C-c and Viper
+@cindex Viper and C-c
+
+@vindex viper-want-emacs-keys-in-vi
+@vindex viper-want-emacs-keys-in-insert
+@vindex viper-always
+Viper 旨在与 Emacs 的所有主要和次要模式共存。  这意味着这些模式设置的绑定通常可用于 Viper（除非您通过将 @code{viper-want-emacs-keys-in-vi} 和 @code{viper-want-emacs-keys-in-insert} 设置为 @code{nil} 明确禁止它们）。如果@code{viper-always}设置为@code{t}（这是默认值），Viper将尝试使每个缓冲区处于最适合该缓冲区的Viper状态。通常，这是 Vi 状态，但有时也可能是 Insert 状态或 Emacs 状态。
+
+一些主要模式绑定必然会被 Viper 覆盖。  事实上，在Vi状态下，大部分1字符键用于Vi风格的编辑。  这通常不会引起问题，因为大多数设计用于编辑文件的包通常不绑定此类键。  相反，他们使用以 @kbd{C-x} 和 @kbd{C-c} 开头的按键序列。  这就是为什么释放 @kbd{C-x} 和 @kbd{C-c} 对我们来说如此重要。对于特定于语言的主要模式来说，将 @key{TAB} 和 @kbd{C-j}（换行）键绑定到各种格式化功能是很常见的。  这非常有用，但 Vi 用户可能需要一些时间来适应。  如果您认为此功能不适合您，您可以按照前面的说明重新绑定这些键 (@pxref{Customization})。
+
+对于许多新手用户来说，绑定 @key{TAB} 是 Viper 最不寻常的方面之一。  在 Emacs 中，@key{TAB} 用于格式化文本和程序，非常有用。  例如，点击 @key{TAB} 会导致当前行根据上下文重新缩进。  在编程中，这一点非常重要，因为不正确的自动缩进会立即提醒程序员可能的错误。  例如，如果当前行上方某处缺少 @kbd{)} 或 @kbd{"}，则 @key{TAB} 可能会错误缩进该行。
+
+因此，Viper 不会更改 @key{TAB} 的标准 Emacs 绑定，从而牺牲 Vi 兼容性（级别 1 的用户除外）。  相反，在 Viper 中，选择键 @kbd{S-tab}（shift+ tab）来模拟 Vi 的 @key{TAB}。
+
+我们应该注意，在某些文本终端上，Shift 不会修改 @key{TAB} 键，因此 @kbd{S-tab} 的行为就像 @key{TAB} 一样。  在这种情况下，您必须将 @code{viper-insert-tab} 绑定到其他方便的键。
+
+一些软件包，特别是 Dired、Gnus、Info 等，为常用键（如 @key{SPC}、@kbd{x}、@kbd{d}、@kbd{v} 等）赋予特殊含义。  这意味着 Vi 命令状态不适合使用这些包。  幸运的是，这些模式在只读缓冲区上运行，并且不是为编辑文件而设计的，而是为了特殊目的的浏览、阅读新闻、邮件等，而 Vi 命令在这些情况下毫无意义。  因此，Viper 不会在此类主要模式上强制 Vi 状态，而是将它们带入 Emacs 状态。  例如，如果您想在缓冲区中进行 Vi 式搜索，则可以通过键入 @kbd{C-z} 切换到 Vi 状态（尽管通常，绑定到 @kbd{C-s} 的增量搜索在这些情况下就足够了）。  但如果您打算继续高效地使用这些主要模式，则应该切换回 Emacs 状态。  您也可以暂时切换到 Vi，仅执行一个命令。  这是通过输入 @kbd{C-c \} 来完成的。  （在其中一些模式中，@kbd{/} 和 @kbd{:} 被绑定为 Vi 风格，除非这些键执行基本职责。）
+
+@vindex viper-emacs-state-mode-list
+@vindex viper-insert-state-mode-list
+@vindex viper-vi-state-mode-list
+如果您希望某些主要模式出现在 Emacs 状态而不是 Vi 状态（但 Viper 不这么认为），您应该将这些主要模式放在 @code{viper-emacs-state-mode-list} 列表中，并从 @code{viper-vi-state-mode-list} 中删除它们。同样，您可以通过将 Viper 的插入状态放入 @code{viper-insert-state-mode-list} 来强制将其置于主模式。
+
+也可以将 Vi 强加于某些主要模式，即使它们可能将常用键绑定到专用命令。  这对于仅绑定少量公共密钥的模式可能有意义。  例如，Viper 通过使用自定义部分 (@pxref{Customization}) 中描述的 @code{viper-add-local-keys} 更改 @kbd{C-m} 和 @kbd{C-d} 的绑定来颠覆 Shell 模式。
+
+@findex viper-set-hooks
+@findex viper-mode
+@findex viper-harness-minor-mode
+@findex remove-hook
+@findex add-hook
+在某些情况下，某些 @emph{minor} 模式可能会覆盖 Vi 命令状态中的某些基本绑定。  这不是一个大问题，因为这种情况只会在开始时发生，即次要模式启动时。输入 @code{M-x viper-mode} 将纠正这种情况。  Viper 知道几种这样的次要模式并处理它们，因此上述技巧通常是不必要的。  如果您发现某些次要模式（例如 @code{nasty-mode}）会干扰 Viper，请将以下内容放入 Viper 自定义文件中应该可以解决问题：
+@lisp
+(viper-harness-minor-mode "nasty-mode")
+@end lisp
+@noindent
+@code{viper-harness-minor-mode} 的参数是有问题的次要模式的文件名，并删除了后缀 @file{.el} 和 @file{.elc}。
+
+哪个次要模式有问题可能并不总是很明显。  这里唯一的指导是查看定义您怀疑的次要模式的文件，例如 @file{nasty-mode.el}，并查看它是否有一个名为 @code{nasty-mode-map} 的变量。  然后检查是否有以下形式的语句
+@lisp
+(define-key nasty-mode-map key function)
+@end lisp
+@noindent
+绑定行为不当的键。  如果是这样，请使用上面的线来控制@code{nasty-mode}。  如果您的怀疑是错误的，那么如果您利用了不需要利用的次要模式，也不会造成任何伤害。
+
+建议利用那些不覆盖 Viper 键但仍具有自己的键盘映射的次要模式。  使次要模式 @code{my-mode} 与 Viper 兼容的一般方法是让文件 @file{my-mode.el} 包含以下代码：
+
+@lisp
+(when (fboundp 'viper-harness-minor-mode)
+  (let ((lib (file-name-sans-extension
+               (file-name-nondirectory load-file-name))))
+    (viper-harness-minor-mode lib)))
+@end lisp
+
+@node Viper Specials
+@section 毒蛇特价
+
+Viper 通过许多有用的功能扩展了 Vi。  这包括各种搜索功能、搜索字符串的历史记录、Ex 命令、插入和 Vi 的破坏性命令。  此外，Viper 支持文件名补全和历史记录、Ex 命令和变量的补全以及许多其他功能。  其中一些功能在本文档的其他地方进行了详细解释。  其他功能将在此处进行说明。
+
+@table @code
+@findex viper-buffer-search-enable
+@vindex viper-buffer-search-char
+@item (viper-buffer-search-enable)
+@itemx viper-buffer-search-char nil
+启用缓冲区搜索。  显式调用 @code{viper-buffer-search-enable} 将 @code{viper-buffer-search-char} 设置为 @kbd{g}。  或者，用户可以在他/她的 Viper 定制文件中将 @code{viper-buffer-search-char} 设置为用于缓冲区搜索的按键序列。  在这种情况下，无需调用@code{viper-buffer-search-enable}。
+
+@item viper-toggle-search-style
+该函数绑定到 @kbd{C-c /}，可以切换区分大小写和不区分大小写的搜索，还可以在普通搜索和通过正则表达式的搜索之间切换。  如果没有前缀参数，系统会询问用户要切换哪种模式。  使用前缀参数 1，这会切换区分大小写。  使用前缀参数 2，将切换正则表达式/普通搜索。
+
+@findex viper-set-searchstyle-toggling-macros
+然而，我们发现切换这些选项的最方便的方法是绑定一个 Vi 宏来绑定 @kbd{//} 来切换区分大小写，并绑定 @kbd{///} 来切换普通搜索。  因此，快速点击 @kbd{/} 两次会将 Viper 从区分大小写的搜索切换为不区分大小写的。  再次重复此操作将恢复原始状态。  同样，快速按 3⁣ 三次将使您从普通式搜索切换到通过正则表达式进行搜索。如果在第一个 @kbd{/} 之后点击除 @kbd{/} 之外的其他内容，或者第二个 @kbd{/} 跟随得不够快，那么 Viper 将发出通常的提示符 @kbd{/} 并等待输入，就像 Vi 中的平常一样。如果您不喜欢这种行为，您可以在 Viper 自定义文件中“取消记录”这些宏。  例如，如果您不喜欢上述功能，请将其放入文件中：
+@example
+(viper-set-searchstyle-toggling-macros 'undefine)
+@end example
+
+如果您不喜欢将此功能作为默认设置，但仍希望在某些主要模式中使用它，则可以首先全局取消设置它（如上所示），然后将其设置为所需的主要模式，如下所示：
+@example
+(viper-set-searchstyle-toggling-macros nil 'c-mode)
+(viper-set-searchstyle-toggling-macros nil 'lisp-mode)
+@end example
+
+@findex viper-set-emacs-state-searchstyle-macros
+@item Vi-isms in Emacs state
+有些人发现使用 Vi 风格的搜索键 @kbd{/} 来以 Viper 留在 emacs 状态的模式调用搜索很有用。  这些模式是：@code{dired-mode}、@code{mh-folder-mode}、@code{Info-mode} 和 @code{Buffer-menu-mode}（将来可能会添加更多模式）。  因此，在上述模式中，Viper 绑定了@kbd{/}，使其表现出 Vi 风格。  此外，在这些主要模式中，Viper 绑定 @kbd{:} 来调用 ex 风格命令，就像在 vi 状态中一样。  并且，如上所述，@kbd{//} 和 @kbd{///} 绑定到切换不区分大小写和正则表达式搜索的 Vi 风格宏。
+
+如果您不喜欢这些功能（我不太明白），您可以在 @code{viper-dired-modifier-map}（对于 Dired）或@code{viper-slash-and-colon-map}（对于其他模式）中取消绑定 @kbd{/} 和 @kbd{:}。
+@vindex viper-slash-and-colon-map
+@vindex viper-dired-modifier-map
+
+要在您认为不需要的主要模式下解除宏 @kbd{//} 和 @kbd{///} 的绑定，请使用非 @code{nil} 参数执行 @code{viper-set-emacs-state-searchstyle-macros}。  这可以通过提供前缀参数以交互方式完成，或者通过放置
+@example
+(viper-set-emacs-state-searchstyle-macros 'undefine)
+@end example
+在主模式的挂钩中（例如，@code{dired-mode-hook}）。 @xref{Vi Macros}，有关 Vi 宏的更多信息。
+
+@cindex headings
+@cindex sections
+@cindex paragraphs
+@cindex sentences
+@item viper-heading-start
+@itemx viper-heading-end
+@kbd{[[} 和 @kbd{]]} 的正则表达式。  请注意，Emacs 为段落和句子定义了正则表达式。  @xref{Paragraphs,,Paragraphs and Sentences,emacs,The GNU Emacs Manual}，了解详情。
+
+@findex viper-set-expert-level
+@item M-x viper-set-expert-level
+以交互方式更改您的用户级别。
+
+@vindex viper-smart-suffix-list
+@item viper-smart-suffix-list  '("" "tex" "c" "cc" "el" "p")
+Viper 在提示用户输入文件名时支持 Emacs 样式的文件完成。  然而，在许多情况下，同一目录可能包含具有相同前缀但不同后缀的文件，例如 prog.c、prog.o、paper.tex、paper.dvi。  在这种情况下，完成将在此期间停止。如果上面的变量是代表后缀的字符串列表，Viper将按照列出的顺序尝试这些后缀，并检查相应的文件是否存在。
+
+例如，如果完成停止于 @samp{paper.} 并且用户输入 @key{RET}，则 Viper 将检查文件 @file{paper.}、@file{paper.tex}、@file{paper.c} 等是否存在。它将获取第一个这样的文件。  如果不存在文件，Viper 将有机会通过键入适当的后缀来完成文件名。如果 @file{paper.} 是预期的文件名，则按回车键将接受它。
+
+要关闭此功能，请将上述变量设置为@code{nil}。
+
+@vindex viper-insertion-ring-size
+@cindex Insertion ring
+@item viper-insertion-ring-size  14
+Viper 会记住之前在“插入”和“替换”状态下插入的内容。几个这样的最近插入被保存在一个特殊的大小为@code{viper-insertion-ring-size}的字符串环中。如果您进入插入或替换状态，您可以通过键入 @kbd{C-c M-p} 或 @kbd{C-c M-n} 重新插入此环中的字符串。  前者将在较旧的插入方向上搜索环，后者将在较新的插入方向上搜索。  连续点击@kbd{C-c M-p}或@kbd{C-c M-n}将撤消之前从环中插入的内容，并在环上插入下一个项目。  如果需要更大的戒指尺寸，请更改 Viper 自定义文件中上述变量的值。
+
+由于输入这些按键序列可能很乏味，因此建议用户绑定一个功能键，例如@kbd{f31}，如下所示：
+@example
+(define-key viper-insert-global-user-map [f31]
+            'viper-insert-prev-from-insertion-ring)
+@end example
+这将 @kbd{f31} （在 Sun 工作站上通常是 @kbd{R11}）绑定到在插入历史记录中插入前一个字符串的函数。要以相反方向旋转历史记录，您可以将未使用的键绑定到 @code{viper-insert-next-from-insertion-ring} 或点击任意数字（1 到 9），然后点击 @kbd{f31}。
+
+不应将上述函数绑定到 @kbd{M-p} 或 @kbd{M-n}，因为这会干扰迷你缓冲区历史记录，并可能干扰其他主要模式。
+
+@vindex viper-command-ring-size
+@cindex Destructive command ring
+@cindex Destructive command history
+@item viper-command-ring-size  14
+Viper 会跟踪破坏性命令的最近历史记录，例如 @kbd{dw}、@kbd{i} 等。在 Vi 状态下，可以通过点击句点来重新执行最近的命令，就像在 Vi 中一样。然而，重复输入@kbd{C-c M-p}将导致Viper显示迷你缓冲区中先前的破坏性命令。  接下来的点击周期将执行最后显示的命令。键 @kbd{C-c M-n} 将以相反方向循环浏览命令历史记录。由于输入@kbd{C-c M-p}可能很乏味，因此将适当的功能绑定到键盘上未使用的功能键并使用该键会更方便。  例如，以下
+@example
+(define-key viper-vi-global-user-map [f31]
+            'viper-prev-destructive-command)
+@end example
+将键 @kbd{f31} （在 Sun 工作站上通常为 @kbd{R11}）绑定到按较旧命令的方向搜索命令历史记录的函数。  要沿相反方向搜索，您可以将未使用的键绑定到 @code{viper-next-destructive-command} 或按任意数字（1 到 9），然后按 @kbd{f31}。
+
+不应将上述函数绑定到 @kbd{M-p} 或 @kbd{M-n}，因为这会干扰迷你缓冲区历史记录，并可能干扰其他主要模式。
+
+@item viper-minibuffer-vi-face  'viper-minibuffer-vi-face
+@itemx viper-minibuffer-insert-face  'viper-minibuffer-insert-face
+@itemx viper-minibuffer-emacs-face  'viper-minibuffer-emacs-face
+这些面控制相应 Viper 状态下迷你缓冲区文本的外观。  您可以通过 Emacs 的自定义小部件更改这些面孔的外观，该小部件可通过菜单栏访问。
+
+Viper 位于此小部件中 @emph{Editing} 组的 @emph{Emulations} 自定义子组下。  所有 Viper 面孔都分组在 Viper 的 @emph{Highlighting} 自定义子组中。
+
+请注意，只有您输入的文本才会受到上述面孔的影响。提示和迷你缓冲区消息不受影响。
+
+不喜欢迷你缓冲区中的装饰的纯粹主义者总是可以通过放置来消灭它们
+@example
+(copy-face 'default 'viper-minibuffer-vi-face)
+(copy-face 'default 'viper-minibuffer-insert-face)
+(copy-face 'default 'viper-minibuffer-emacs-face)
+@end example
+在其 Viper 自定义文件中或通过自定义小部件，如上所述。  然而，在这种情况下，用户将不会在迷你缓冲区中获得任何有关当前 Viper 状态的指示。  （如果用户通过键入 @key{ESC} 或 @kbd{C-z} 意外切换到另一个 Viper 状态，这一点很重要）。
+
+@findex viper-go-away
+@item M-x viper-go-away
+让 Viper 从正在运行的 Emacs 实例的表面消失。  如果您的手指再次开始疼痛，@kbd{M-x viper-mode} 可能会拯救您。
+
+@findex toggle-viper-mode
+@item M-x toggle-viper-mode
+打开和关闭 Emacs Viperization。
+@end table
+
+@cindex Multifile documents and programs
+@findex @kbd{Ex RelatedFile}
+@findex @kbd{Ex PreviousRelatedFile}
+Viper 为多文件文档和程序提供一些支持。如果一个文档由多个文件组成，我们可以指定其中一个作为主文件，并将以下内容放在该文件的末尾：
+@lisp
+;; Local Variables:
+;; eval: (viper-setup-master-buffer "file1" "file2" "file3" "file4")
+;; End:
+@end lisp
+@noindent
+其中@code{file1}到@code{file4}是与主文件相关的文件名称。  下次访问主文件时，将评估命令@code{viper-setup-master-buffer}，并将上述文件与主文件关联。  然后，新的 Ex 命令@kbd{:RelatedFile}（缩写@: @kbd{:R}）将依次显示文件 1 至 4，以便您可以编辑它们。  如果文件不在任何 Emacs 缓冲区中，则会访问该文件。  命令@kbd{PreviousRelatedFile}（缩写为@kbd{:P}）以相反的方向遍历文件列表。
+
+这些命令类似于 @kbd{:n} 和 @kbd{:N}，但它们允许用户仅关注相关文件。
+
+请注意，只有主文件需要具有上述命令块。  还， ”;;”上面可以用其他一些标记代替。  分号对于 Lisp 程序很有用，因为它被认为是注释指示符。  对于 LaTeX，这可能是“%%%”，对于 C，上面的块应该被注释掉。
+
+尽管这些命令有时很有用，但它们无法替代 Emacs 强大的 @emph{tag table} 功能。  Emacs 标签原始接口中的 Viper @kbd{:tag} 命令。  @xref{Tags Tables,,,emacs, The GNU Emacs Manual}，有关标签的更多信息。
+
+@kindex S-mouse-1
+@kindex S-mouse-2
+@kindex META SHIFT button1up
+@kindex META SHIFT button2up
+以下两个命令通常与鼠标单击绑定，并且是 Viper 的一部分。  仅当 Emacs 作为 X Windows 下的应用程序运行时（或在 GNU Emacs 端口可用的其他一些窗口系统下），它们才起作用。  在 Xterm 窗口中调用 Emacs 时单击鼠标（使用 @code{emacs -nw}）不会产生任何作用。
+
+@table @code
+@cindex mouse
+@cindex mouse-search
+@findex viper-mouse-click-insert-word
+@findex viper-mouse-click-search-word
+@vindex viper-mouse-insert-key
+@item viper-mouse-search-key  (meta shift 1)
+该变量控制 Viper 的 @emph{mouse-search} 功能。  默认值表明，按住 Meta 和 Shift 键的同时单击鼠标按钮 1 应启动搜索鼠标指针下的区域（定义如下）。  该命令可以采用前缀参数，该参数指示要搜索的模式的出现。
+
+注意：在最初加载时，Viper 仅当鼠标操作尚未绑定到其他内容时才会绑定该鼠标操作。  如果您想使用鼠标搜索功能，并且 @kbd{Meta-Shift-mouse-1} 鼠标操作已绑定到其他内容，则可以通过将 @code{viper-mouse-search-key} 设置为 Viper 自定义文件中的其他内容来重新绑定鼠标搜索功能：
+@lisp
+(setq viper-mouse-search-key '(meta 1))
+@end lisp
+这会将鼠标搜索绑定到通过按 Meta 键并单击鼠标按钮 1 调用的操作。 @code{viper-mouse-search-key} 的允许值是包含鼠标按钮编号（1,2 或 3）以及单词“control”、“meta”和“shift”的任意组合的列表。
+
+如果请求的鼠标操作（例如，(meta 1)）已用于其他目的，那么您必须在设置 @code{viper-mouse-search-key} 后将以下命令放入 Viper 自定义文件中来确认您的意图：
+@lisp
+(viper-bind-mouse-search-key 'force)
+@end lisp
+
+您还可以通过 Emacs 的自定义小部件（输入@kbd{:customize}）以交互方式更改此设置。
+
+如下确定被选择作为要搜索的模式的区域。  如果通过单击调用搜索，Viper 会选择位于指针下“单词”开头（“单词”在 Vi 意义上理解）和该单词结尾之间的区域。  与 Vi 语言的唯一区别是，在 Lisp 主模式中，@samp{-} 被视为字母数字符号。  这样做是为了方便使用 Lisp 符号，这些符号中通常含有 @samp{-}。  另外，如果您单击不是单词分隔符（Vi 意义上）的非字母数字字符，则该字符也将被视为字母数字，前提是它与字母数字字符相邻（从任意一侧）。  这个有用的功能可以增加对通过鼠标单击选择的模式的控制。
+
+双击时，该区域由当前 Vi 的“Word”的开头（即最大的非分隔符文本块）和该“Word”的结尾（由 @kbd{E} 命令确定）确定。
+
+在三次单击时，该区域由单击发生的整行组成，并且删除了所有前导和尾随空格和制表符。
+
+@cindex mouse-insert
+@vindex viper-mouse-insert-key
+@item viper-mouse-insert-key (meta shift 2)
+该变量控制 Viper 的 @emph{mouse-insert} 功能。上述默认值表明，按住 Meta 和 Shift 键的同时单击鼠标按钮 2 应插入鼠标指针周围的区域。  定义该区域的规则与鼠标搜索的规则相同。  此命令采用可选的前缀参数，该参数指示要从缓冲区中捕获并插入多少个此类区域。  （如果单击三次，则忽略前缀参数。）
+
+注意：在最初加载时，Viper 仅当鼠标操作尚未绑定到其他内容时才会绑定该鼠标操作。  如果您想使用此功能并且默认鼠标操作已绑定，您可以通过将此命令放入 Viper 自定义文件中来重新绑定鼠标插入：
+@lisp
+(setq viper-mouse-insert-key '(meta 2))
+@end lisp
+如果您想将鼠标插入绑定到某个操作，即使该操作已在 Emacs 中用于其他目的，那么您应该在设置 @code{viper-mouse-insert-key} 后将此命令添加到您的 Viper 自定义文件中：
+@lisp
+(viper-bind-mouse-insert-key 'force)
+@end lisp
+
+该值也可以通过菜单栏上的 Emacs 自定义小部件进行更改。
+
+@vindex viper-multiclick-timeout
+@item viper-multiclick-timeout
+该变量控制为了鼠标搜索和鼠标插入而必须进行双击的速率。  默认情况下，该值设置为 @code{double-click-time}。
+@end table
+
+注：以上功​​能在最新活动帧的选定窗口中搜索并插入。  这意味着您可以单击另一个窗口或另一个框架，并在您刚刚离开的框架和窗口中完成搜索或插入。  这使得人们可以在多帧配置中使用这些功能。  然而，这可能需要一些时间来适应。  例如，如果您在框架 A 中键入，然后将鼠标移动到框架 B 并单击以调用鼠标搜索，则搜索（或插入）将在框架 A@. 中执行。要在框架 B 中执行搜索/插入，您首先必须将焦点转移到那里，直到您在框架 B 中键入字符或执行其他操作时才会发生这种情况 — 鼠标搜索不会转移焦点。
+
+如果您决定不喜欢上述功能并且始终希望在发生单击的帧中执行搜索/插入，请不要从其绑定的鼠标事件中绑定（并取消绑定，如有必要）@code{viper-mouse-catch-frame-switch}。
+
+鼠标搜索与 Vi 风格搜索集成，因此您可以使用 @kbd{n} 和 @kbd{N} 重复搜索。  还应该注意的是，Viper 中搜索的大小写敏感度由变量 @code{viper-case-fold-search} 控制，而鼠标搜索的大小写由 Emacs 变量 @code{case-fold-search} 控制，该变量的设置可能与 @code{viper-case-fold-search} 不同。  因此，鼠标搜索的区分大小写可能与通常的 Vi 风格搜索不同。
+
+最后，如果 Viper 确定要搜索或要插入的单词的方式不是您想要的，可以更改变量 @code{viper-surrounding-word-function} 来指示另一个用于从缓冲区中抓取单词的函数。  问题是您必须编写这样一个函数并让您的 Emacs 知道它。  @file{viper.el} 中的函数@code{viper-surrounding-word} 可以用作指导示例。
+
+@node Vi Macros
+@section Vi 宏
+
+@cindex Vi macros
+Viper 支持增强的 Vi 风格宏，也方便了 Emacs 风格宏的使用。  要定义临时宏，通常使用 Emacs 键盘宏工具更方便。  Emacs 键盘宏通常是匿名定义的，最新的宏可以通过键入 @kbd{C-x e}（或 @kbd{*}，如果 Viper 处于 Vi 状态）来执行。  如果您需要使用多个临时宏，Viper 可以让您将它们保存到寄存器（小写字母）中；然后可以通过在 Vi 状态下键入 @kbd{@@a} 来执行此类宏（如果宏之前已保存在寄存器 @kbd{a} 中）。 @xref{Macros and Registers}，了解详情。
+
+但是，如果您需要定期使用宏，则必须为其指定永久名称并保存。  Emacs 手册解释了如何执行此操作，但命名 Emacs 宏的调用与 Vi 的有很大不同。  首先，调用永久 Emacs 宏需要时间，因为它需要键入太多按键（无论如何，这不符合 Vi 用户的口味）。其次，将此类宏绑定到功能键以实现快速访问，会占用键盘上宝贵的空间。
+
+Vi 风格的宏在这方面更好，因为 Vi 允许用户重载按键序列的含义：如果此按键序列绑定到宏，则快速连续键入的按键将被特殊处理。
+
+Viper 通过常用的 Ex 命令@kbd{:map} 和 @kbd{:map!} 提供 Vi 风格的键盘宏。  这些宏在 Viper 中比在原始 Vi 和其他模拟器中强大得多。  这是因为 Viper 为强大的 Emacs 键盘宏工具实现了增强的 vi 风格界面。
+
+首先，任何 Emacs 命令都可以在定义宏时执行，而不仅仅是 Vi 命令。  特别是，用户可以通过 @kbd{M-x command-name} 或按键盘上的各种功能键来调用 Emacs 命令。  人们甚至可以使用鼠标，尽管这通常没有用并且不推荐（并且使用鼠标定义的宏不能保存在命令历史记录和启动文件中以供将来使用）。
+
+通过混合 Vi 和 Emacs 命令定义的宏表示为向量。  因此，当您看到一个命令时不要感到困惑（通常是通过 Ex 命令的历史记录）。  例如，如果通过键入 @kbd{l}、向上箭头键和 @kbd{M-x next-line} 来定义 @kbd{gg}，则其定义在 Emacs 中将如下所示：
+
+@example
+[l up (meta x) n e x t - l i n e return]
+@end example
+
+其次，Viper 宏是以 WYSIWYG 风格定义的。  这意味着命令会在您键入时执行，因此您可以准确地看到正在定义的内容。  第三，宏可以绑定到任意的键序列，而不仅仅是可打印的键。  例如，可以定义一个宏，通过按@kbd{f3}然后按@kbd{f2}功能键来调用该宏。  （@kbd{delete} 和 @kbd{backspace} 键被排除在外；此外，宏调用序列不能以 @key{ESC} 开头。其他一些键，例如 @kbd{f1} 和 @kbd{help}，不能绑定到 Emacs 下的宏，因为它们绑定在 @code{key-translation-map} 中，这会覆盖用户为键提供的任何其他绑定。一般来说，在@code{key-translation-map} 不能绑定到宏。）
+
+第四，在 Viper 中，可以定义特定于给定缓冲区、给定主要模式的宏，或为所有缓冲区定义的宏。  事实上，同一个宏名称可以有几种不同的定义：一种是全局的，多种主要模式的定义，以及多种特定缓冲区的定义。  特定于缓冲区的定义会覆盖特定于模式的定义，而模式特定的定义又会覆盖全局定义。
+
+似乎这还不够，Viper（通过其与 Emacs 宏的接口）允许用户定义要求确认甚至提示用户输入然后继续的键盘宏。  为此，应输入@kbd{C-x q}（用于确认）或@kbd{C-u C-x q}（用于提示）。详情请参阅@pxref{Keyboard Macro Query,,Customization,emacs,The GNU Emacs Manual}。
+
+当用户完成定义宏（通过键入 @kbd{C-x)} 完成，与 Vi 不同）时，系统会询问您是否希望该宏是全局的、特定于模式的或特定于缓冲区的。  您还将有机会将宏保存在 Viper 自定义文件中。这是保存宏并使其永久可用的最简单方法。  如果您徒手处理启动文件，以下是 Viper 如何保存上述宏，以便它仅在缓冲区 @code{my-buf} 中的 Viper 插入状态（和替换状态）下可用：
+
+@example
+(viper-record-kbd-macro "gg" 'insert-state
+       [l up (meta x) n e x t - l i n e return]
+       "my-buf")
+@end example
+
+@noindent
+要对 Vi 状态和具有主模式 @code{cc-mode} 的所有缓冲区执行相同操作，请使用：
+
+@example
+(viper-record-kbd-macro "gg" 'vi-state
+       [l up (meta x) n e x t - l i n e return]
+       'cc-mode)
+@end example
+
+@noindent
+宏名称和宏定义都是表示键盘上按键的符号向量。  某些键，例如 @kbd{\}、@kbd{ } 或数字键必须使用反斜杠转义。  修改后的键以列表的形式表示。  例如，按住Meta和Control并按@kbd{f4}表示为@kbd{(control meta f4)}。如果向量的所有成员都是可打印字符（或序列，例如 @kbd{\e}、@kbd{\t}、@key{ESC} 和 @key{TAB}），那么它们也可以表示为字符串：
+
+@example
+(viper-record-kbd-macro "aa" 'vi-state  "aaa\e"  "my-buffer")
+@end example
+
+@noindent
+因此，在 Vi 状态下快速输入 @kbd{aa} 会将 Viper 切换到插入状态（由于第一个 @kbd{a}），插入 @kbd{aa}，然后切换回 Vi 状态。  所有这些仅在名为@code{my-buffer}的缓冲区中生效。
+
+请注意，@code{viper-record-kbd-macro}的最后一个参数必须是字符串（缓冲区名称）、表示主模式的符号或@code{t}；后者表示要为所有缓冲区定义宏（这就是原始 Vi 中定义宏的方式）。
+
+为了方便起见，Viper 还允许您在 Emacs 状态下定义 Vi 风格的宏。  没有 Ex 命令（如 @kbd{:map} 和 @kbd{:map!}）来执行此操作，但用户可以在 Viper 自定义文件中包含这样的宏。唯一的问题是 @code{viper-record-kbd-macro} 命令应指定 @code{emacs-state} 而不是 @code{vi-state} 或 @code{insert-state}。
+
+@findex viper-unrecord-kbd-macro
+用户可以通过使用 Ex 命令 @kbd{:unmap} 和 @kbd{:unmap!} 或通过调用 @code{viper-unrecord-kbd-macro} 来摆脱宏。后者更强大，因为它甚至可以删除@code{emacs-state}中的宏。  然而，通常只有当用户需要删除 Viper 中已经预定义的宏时才需要 @code{viper-unrecord-kbd-macro}。语法是：
+@example
+(viper-unrecord-kbd-macro macro state)
+@end example
+@noindent
+第二个参数必须是 @code{vi-state}、@code{insert-state} 或 @code{emacs-state}。  第一个参数是宏的名称。  为了避免在指定现有宏的名称时出现错误，请键入 @kbd{M-x viper-describe-kbd-macros} 并使用此命令显示的列表中的名称。
+
+如果在宏定义过程中发生错误，Emacs 将中止该过程，并且必须重复该过程。  这与 Vi 类似，只不过在 Vi 中用户在宏实际运行之前并不知道存在错误。  所有这些意味着为了使定义成功，用户必须提前对流程进行一些简单的规划，以避免错误。  例如，如果要在 Vi 状态下将@kbd{gg}映射到@kbd{llll}，则必须确保当前行有足够的空间。  由于@kbd{l}向前移动光标，它可能会在到达行尾时发出错误信号，这将中止定义。
+
+仅在定义宏时才需要这些预防措施；它们将有助于避免重做工作的需要。  当宏实际运行时，执行过程中出现错误将简单地终止当前执行（但宏将保持映射状态）。
+
+宏名称可以是字符串或键向量。后者可以定义绑定到功能键上的宏，例如 @kbd{up} 或 @kbd{f13}。如果键盘上的功能键用完了，这将非常有用；可以这么说，它使 Viper 宏设施成为 @emph{keyboard doubler}。
+
+在其他地方（@pxref{Key Bindings}，了解详细信息），我们回顾了将功能键绑定到命令的标准 Emacs 机制。例如，
+
+@example
+(keymap-global-set "<f13>" 'repeat-complex-command)
+@end example
+
+@noindent
+将键 f13 绑定到重复最后一个 minibuffer 命令的 Emacs 函数。  然而，在 Viper 下，您仍然可以将该键用于其他目的，例如将该键的双击操作绑定到某个其他功能。  Emacs 不允许用户这样做，但 Viper 通过其键盘宏功能来做到这一点。  为此，请先输入 @kbd{:map }。  当系统要求您输入宏名称时，请按两次 f13，然后按 @key{RET} 或 @key{SPC}。
+
+Emacs 现在将通过实际执行 Vi 和 Emacs 命令来启动映射过程，以便您可以看到每次执行宏时会发生什么。  假设现在我们想要将按键序列@kbd{f13 f13}绑定到命令@code{eval-last-sexp}。  为此，我们可以键入 @kbd{M-x eval-last-sexp}，然后键入 @kbd{C-x )}。如果您积极响应 Viper 的提议，将此宏保存在 Viper 自定义文件中以供将来使用，则以下内容将插入到该文件中：
+
+@example
+(viper-record-kbd-macro [f16 f16] 'vi-state
+         [(meta x) e v a l - l a s t - s e x p]
+         'lisp-interaction-mode)
+@end example
+
+为了说明上述观点，Viper 提供了两个固定宏，默认情况下，它们绑定到 @kbd{[f12 \1]} 和 @kbd{[f12 \2]}（分别通过键入 @kbd{f12} 然后键入 @kbd{1} 和 @kbd{2} 来调用）。  这些宏是 Viper 命令环历史记录的有用快捷方式。  第一个宏将执行倒数第二个破坏性命令（最后一个命令像往常一样由 @kbd{.} 执行）。  第二个宏执行倒数第三个命令。
+
+如果您需要深入了解命令历史记录，则必须使用其他命令，如本节前面所述；或者你可以像这样绑定 @kbd{f12 \3} ：
+
+@example
+(viper-record-kbd-macro [f12 \3] 'vi-state
+                      [(meta x) r e p e a t - f r o m - h i s t o r y]
+                      t)
+@end example
+
+
+请注意，即使宏使用功能键 @kbd{f12}，该键实际上是免费的，仍然可以通过 @code{define-key} 或 @code{keymap-global-set} 绑定到某些 Emacs 函数。
+
+
+Viper 允许用户定义作为其他宏的前缀的宏名称。例如，可以将@kbd{[[}和@kbd{[[[[}定义为宏。如果您键入这些键的确切顺序然后暂停，Viper 将执行正确的宏。  但是，如果您不暂停并输入 @kbd{[[[[text}，则冲突将按如下方式解决。  如果只有一个键序列@kbd{[[}或@kbd{[[[[}具有适用于当前缓冲区的定义，那么实际上不存在冲突，并且将选择正确的宏。  如果两者都有适用的定义，则将执行找到的第一个定义。  通常这是名称较短的宏。  因此，在我们的例子中，@kbd{[[[[text}将导致宏@kbd{[[}被执行两次，然后剩余的键@kbd{t e x t}将被处理。
+
+当使用@kbd{:map}或@kbd{:map!}定义宏时，用户输入用于调用宏的实际键。  例如，如果它是宏名称的一部分，则应按实际键 @kbd{f6}；你做@emph{not}写@kbd{f 6}。  输入键时，Viper 将它们显示为字符串或向量（例如，@code{"abc"} 或 @code{[f6 f7 a]}）。  这同样适用于取消映射。  在 @kbd{:unmap} 或 @kbd{:unmap!} 命令中输入宏名称时按 @key{TAB} 将导致名称补全。  完成结果显示为字符串或向量。  然而，和以前一样，您实际上并没有键入补全中出现的 @samp{"}、@samp{[} 或 @samp{]}。  这些是元符号，指示相应的宏名称是向量还是字符串。
+
+与 Vi 的最后一个区别是：Vi 样式键盘宏不能用其他 Vi 样式键盘宏来定义（但命名的 Emacs 宏是可以的）。更准确地说，在定义或执行宏时，按键序列（如 Vi 宏）的特殊含义将被忽略。这是因为以这种方式创建无限循环太容易了。由于 Viper 宏比 Vi 的宏强大得多，因此不可能检测到此类循环。  实际上，这并不是真正的限制，而是一个特性。
+
+我们还应该注意到，Vi 宏在迷你缓冲区中被禁用，这有助于避免一些潜在的问题。
+
+用户必须键入按键才能将其识别为超时宏的速率由变量 @code{viper-fast-keyseq-timeout} 控制，默认为 200 毫秒。
+
+大多数情况下，Viper 自定义文件中定义的 Viper 宏可以在 X 和 TTY 模式之间共享。 TTY 的问题可能是那里的功能键生成事件序列而不是单个事件（如在窗口系统下）。 Emacs 将其中一些序列映射回逻辑键（例如，由箭头键生成的序列映射到 @kbd{up}、@kbd{left} 等）。  然而，并非所有功能键都以这种方式映射。绑定到包含此类未映射功能键的按键序列的宏必须为 TTY（并且可能为您可能使用的每种类型的 TTY）重新定义。  为此，请在适当的 TTY 设备上启动 Emacs，并像往常一样使用 @kbd{:map} 定义宏。
+
+@findex viper-describe-kbd-macros
+最后，Viper提供了一个功能，可以方便地显示当前定义的所有宏。  要查看所有宏及其定义，请输入 @kbd{M-x viper-describe-kbd-macros}。
+
+@node Commands
+@chapter 命令
+
+本节是由 @* @samp{maart@@cs.vu.nl} 等人创建的 Vi 参考的半自动鲍德勒化版本。  它可以在 Vi 档案中找到。  此参考已针对 Viper 进行了改编。
+
+@menu
+* Groundwork::                   文本约定和 Viper 基础知识
+* Text Handling::                移动、编辑、撤消。
+* Display::                      滚动。
+* File and Buffer Handling::     编辑、写作和退出。
+* Mapping::                      映射键、键盘宏
+* Shell Commands::               访问 Shell 命令、处理文本
+* Options::                      例如选项，@kbd{:set}命令
+* Emacs Related Commands::       元键、Windows
+* Mouse-bound Commands::         搜索和插入文本
+@end menu
+
+@node Groundwork
+@section 基础工作
+
+VI 命令集基于将运动命令与其他命令相结合的思想。  运动命令用作其他命令的文本区域说明符。我们将运动命令分为@dfn{point commands}和@dfn{line commands}。
+
+@cindex point commands
+点命令是：
+
+@quotation
+@kbd{h}, @kbd{l}, @kbd{0},  @kbd{$}, @kbd{w}, @kbd{W}, @kbd{b}, @kbd{B}, @kbd{e}, @kbd{E}, @kbd{(}, @kbd{)}, @kbd{/}, @kbd{?}, @kbd{`}, @kbd{f}, @kbd{F}, @kbd{t}, @kbd{T}, @kbd{%}, @kbd{;}, @kbd{,}, @kbd{^}
+@end quotation
+
+@cindex line commands
+行命令是：
+
+@quotation
+@kbd{j}, @kbd{k}, @kbd{+}, @kbd{-}, @kbd{H}, @kbd{M}, @kbd{L}, @kbd{@{}, @kbd{@}}, @kbd{G}, @kbd{'},  @kbd{[[}, @kbd{]]}, @kbd{[]}
+@end quotation
+@noindent
+
+文本删除命令 (@pxref{Deleting Text})、更改命令 (@pxref{Changing Text})，甚至 Shell 命令 (@pxref{Shell Commands}) 使用这些命令来描述要操作的文本区域。
+
+@cindex r and R region specifiers
+Viper 添加了两个区域描述符，@kbd{r} 和 @kbd{R}。  这些描述了 Emacs 区域 (@pxref{Basics})，但它们不是移动命令。
+
+命令描述使用尖括号 @samp{<>} 来指示元语法变量，因为使用简单文本的常规约定可能会与命令本身是字符的 Viper 混淆。  注意 @kbd{<} 移位命令和 @kbd{<count>} 一起被提及！
+
+@kindex <move>
+@kindex <a-z>
+@kindex <address>
+@cindex <move>
+@cindex <a-z>
+@cindex <address>
+@cindex movements
+@samp{<move>} 指的是上述移动命令，@samp{<a-z>} 指的是从 @samp{a} 到 @samp{z} 的寄存器或文本标记。  请注意，@samp{<move>} 是通过完整的移动命令来描述的，也就是说它们将进行计数，并且在其他方​​面的行为与正常的移动命令相同。
+@cindex Ex addresses
+@samp{<address>} 表示Ex线地址，包括
+
+@table @kbd
+@item .@: <No address>
+当前行
+@item .+n .-n
+为当前行添加或减去
+@item number
+实际行号，使用@kbd{.=}获取行号
+@item '<a-z>
+文本标记
+@item $
+最后一行
+@item x,y
+其中 x 和 y 是上述之一
+@cindex % (Ex address)
+@item %
+对于整个文件，与(1,$)相同。
+@item /<pat>/
+@itemx ?<pat>?
+带有模式 <pat> 的下一行或上一行。
+
+请注意，该模式允许包含换行符（插入为@kbd{C-qC-j}）。  因此，我们可以搜索跨越多行的模式。
+@end table
+
+@cindex % (Current file)
+请注意，Ex 命令 @kbd{:e} 和 @kbd{:r <shell-cmd>} 中使用@samp{%} 表示当前文件。  如果您希望命令中包含 @samp{%}，则必须将其转义为 @samp{\%}。  请注意，@kbd{:w}和常规@kbd{:r <file>}命令不支持元符号@samp{%}和@samp{#}，因为文件历史记录是更好的机制。
+@cindex # (Previous file)
+同样，@samp{#} 扩展到前一个文件。  前一个文件是 @kbd{:args} 列表中的第一个文件。  如果您只有一个窗口，则默认为 VI 意义上的上一个窗口。
+
+@kindex <args>
+@kindex <cmd>
+@cindex <args>
+@cindex <cmd>
+@noindent
+其他像 @samp{<args> -- arguments}、@samp{<cmd> -- command} 等应该相当明显。
+
+@noindent
+常见的字符包括：
+
+@cindex <cr>
+@cindex <esc>
+@cindex <lf>
+@cindex <ht>
+@cindex <sp>
+@table @kbd
+@item <sp>
+空间
+@item <ht>
+选项卡
+@item <lf>
+换行
+@item <esc>
+逃脱
+@item <cr>
+返回，输入
+@end table
+
+@cindex words
+@cindex WORDS
+@cindex char
+@cindex CHAR
+我们还使用 @samp{word} 表示字母数字/非字母数字单词，使用 @samp{WORD} 表示空格分隔的单词。  @samp{char} 指任何 @acronym{ASCII} 字符，@samp{CHAR} 指非空白字符。括号@samp{[]}表示可选参数； @samp{<count>} 也是可选的，通常默认为 1。@samp{<count>} 省略括号以避免混淆。
+
+Viper对Vi的话的想法与Vi略有不同。  首先，Viper 单词理解 Emacs 符号表。  因此，符号表中声明为字母数字的所有符号都可以自动成为 Viper 单词的一部分。  例如，当编辑包含欧洲、西里尔文、日语等文本的文本时，这非常有用。
+
+@vindex viper-syntax-preference
+@findex viper-set-syntax-preference
+@cindex syntax table
+其次，Viper 允许您通过自定义小部件（变量 @code{viper-syntax-preference}）更改语法首选项或通过交互执行 @code{viper-set-syntax-preference} 来偏离 Vi 的单词概念。
+
+默认情况下，Viper 语法首选项为 @code{reformed-vi}，这意味着 Viper 只考虑当前 Emacs 语法表指定为单词符号的那些符号（对于不同的主要模式可能有所不同）加上下划线符号 @kbd{_}，减去 Vi 中不被视为单词的符号（例如 @samp{,}、@samp{;} 等），但可以考虑作为各种 Emacs 主要模式的单词符号。  Reformed-Vi 的工作方式与 Vi 非常接近，并且它还可以识别其他字母表中的单词。  因此，这是最适合编辑文本的模式，并且可能满足您的所有需求。
+
+您还可以将 Viper 语法首选项设置为 @code{strict-vi}，这将导致 Viper 将所有非英语字母视为非单词符号。
+
+您还可以指定 @code{emacs} 作为您的首选项，这将使 Viper 使用与 Emacs 完全相同的单词概念。  特别是，在某些主要模式中，下划线可能不是单词的一部分。
+
+最后，如果@code{viper-syntax-preference}设置为@code{extended}，Viper单词将由被分类为字母数字@emph{or}作为符号部分的字符组成。  这对于编辑程序来说很方便。
+
+@code{viper-syntax-preference} 是一个局部变量，因此对于不同的主模式它可以有不同的值。  例如，在编程模式中，它可以具有值@code{extended}。  在单词包含特殊字符（例如欧洲（非英语）字母、西里尔字母等）的文本模式下，该值可以是 @code{reformed-vi} 或 @code{emacs}。如果您考虑对不同的主要模式使用不同的语法首选项，您应该执行，例如，
+
+@example
+(viper-set-syntax-preference nil "extended")
+@end example
+
+@noindent
+在适当的主要模式挂钩中。
+
+上述讨论仅涉及运动命令。  在正则表达式中，单词与 Emacs 中的单词保持相同。  也就是说，表达式 @code{\w}、@code{\>}、@code{\<} 等使用 Emacs 的单词概念，并且它们不查看变量 @code{viper-syntax-preference} 的值。  这是因为 Viper 避免更改语法表，以免妨碍设置这些表的各种主要模式。
+
+通常的 Emacs 约定用于指示控制字符，即 C-h 代表 Control-h。  @emph{Do not confuse this with a sequence of separate characters C, -, h!!!} @kbd{^} 本身，从未用于指示控制字符。
+
+@cindex Ex commands
+最后，我们注意到 Viper 的 Ex 风格命令可以在当前 Emacs 区域上运行。  这是通过在 @kbd{:} 之前输入数字参数来完成的。  例如，输入 @kbd{1:} 会提示您类似 @emph{:123,135} 的内容，假设当前区域从第 123 行开始，到第 135 行结束。无需输入行号，因为 Viper 会自动将它们插入到 Ex 命令前面。
+
+@node Text Handling
+@section 文本处理
+
+@menu
+* Move Commands::                移动、寻找
+* Marking::                      Viper 和 Emacs Mark 中的文本标记。
+* Appending Text::               文本插入、移动、放置
+* Editing in Insert State::      自动缩进、引用等
+* Deleting Text::                正在删除
+* Changing Text::                变更、替换、加入
+* Search and Replace::           搜索、查询替换、模式命令
+* Yanking::                      猛拉、查看寄存器
+* Undoing::                      多次撤消、备份
+@end menu
+
+@node Move Commands
+@subsection 移动命令
+
+@cindex movement commands
+@cindex searching
+@cindex textmarkers
+@cindex markers
+@cindex column movement
+@cindex paragraphs
+@cindex headings
+@cindex sections
+@cindex sentences
+@cindex matching parens
+@cindex paren matching
+@kindex %
+@kindex C-c /
+@kindex N
+@kindex n
+@kindex ?<cr>
+@kindex /<cr>
+@kindex ?<string>
+@kindex /<string>
+@kindex ''
+@kindex ``
+@kindex ]<a-z>
+@kindex [<a-z>
+@kindex '<a-z>
+@kindex `<a-z>
+@kindex m<a-z>
+@kindex []
+@kindex [[
+@kindex ]]
+@kindex @{
+@kindex @}
+@kindex (
+@kindex )
+@kindex M
+@kindex L
+@kindex H
+@kindex G
+@kindex E
+@kindex e
+@kindex B
+@kindex b
+@kindex W
+@kindex w
+@kindex ,
+@kindex ;
+@kindex T<char>
+@kindex F<char>
+@kindex t<char>
+@kindex f<char>
+@kindex |
+@kindex 0
+@kindex CR
+@kindex +
+@kindex -
+@kindex ^
+@kindex $
+@kindex C-p
+@kindex LF
+@kindex SPC
+@kindex C-n
+@kindex C-h
+@kindex h
+@kindex j
+@kindex k
+@kindex l
+@vindex viper-parse-sexp-ignore-comments
+
+@table @kbd
+@item <count>  h  C-h
+左侧 <count> 个字符。
+@item <count>  j  <lf> C-n
+<count> 行向下。
+@item <count>  l  <sp>
+右侧 <count> 个字符。
+@item <count>  k  C-p
+<count> 行向上。
+@item <count>  $
+从光标处到行尾 <count>。
+@item <count>  ^
+到第一个 CHAR <count> @minus{} 1 行下方。
+@item <count>  -
+到第一个 CHAR <count> 行以上。
+@item <count>  +  <cr>
+到第一个 CHAR <count> 行下方。
+@item  0
+到该行的第一个字符。
+@item <count> |
+至列<计数>
+@item <count>  f<char>
+<count> <char> 向右（查找）。
+@item <count>  t<char>
+直到右侧 <count> <char> 之前。
+@item <count>  F<char>
+<count> <char> 位于左侧。
+@item <count>  T<char>
+直到左侧 <count> <char> 之后。
+@item <count>  ;
+重复最近 @kbd{f t F T} <count> 次。
+@item <count>  ,
+以相反方向重复最近 @kbd{f t F T} <count> 次。
+@item <count>  w
+向前 <count> 字数。
+@item <count>  W
+向前 <count> 个字。
+@item <count>  b
+向后 <count> 个字。
+@item <count>  B
+向后 <count> 个字。
+@item <count>  e
+到单词 <count> 的末尾向前。
+@item <count>  E
+到 WORD <count> 的末尾向前。
+@item <count>  G
+转到第 <count> 行（默认文件结尾）。
+@item <count>  H
+从屏幕顶部（主页）开始的第 <count> 行。
+@item <count>  L
+到从屏幕底部开始的第 <count> 行（最后一行）。
+@item  M
+到屏幕的中线。
+@item <count>  )
+向前<count> 句。
+@item <count>  (
+向后<count>个句子。
+@item <count>  @}
+向前 <count> 段。
+@item <count>  @{
+向后 <count> 段。
+@item <count>  ]]
+到第 <count> 个标题。
+@item <count>  [[
+前往第 <count> 个上一个标题。
+@item <count>  []
+到第 <count> 个标题的末尾。
+@item  m<a-z>
+用字母标记光标位置。
+@item  `<a-z>
+说到做到。
+@item  '<a-z>
+到带有标记的行的第一个 CHAR。
+@item [<a-z>
+显示文本标记的内容。
+@item ]<a-z>
+显示寄存器的内容。
+@item  ``
+到最近一次绝对跳转之前的光标位置（例如@kbd{/}和@kbd{G}）。
+@item  ''
+到最新绝对跳转之前光标所在行的第一个 CHAR。
+@item <count>  /<string>
+到 <string> 第 <count> 次出现。
+@item <count>  /<cr>
+到上一个 @kbd{/ or ?} 中第 <count> 次出现 <string>。
+@item <count>  ?<string>
+到 <string> 的第 <count> 次出现。
+@item <count>  ?<cr>
+到上一个 @kbd{?@: or /} 中第 <count> 次出现的 <string>。
+@item  n
+重复最新的@kbd{/}@kbd{?}（下一个）。
+@item  N
+以相反方向重复最近的搜索。
+@item C-c /
+如果没有前缀参数，此命令会切换区分大小写/不区分大小写的搜索模式和普通/正则表达式搜索。  使用前缀参数 1，即 @kbd{1 C-c /}，可以切换区分大小写；使用前缀参数 2，切换普通搜索和使用正则表达式的搜索。  @xref{Viper Specials}，了解调用此函数的其他方法。
+@cindex vanilla search
+@cindex case-sensitive search
+@cindex case-insensitive search
+@item  %
+找到下一个括号/圆括号/大括号并转到其匹配项。默认情况下，Viper 会忽略括号内出现的方括号/小括号/大括号。  您可以通过在 Viper 自定义文件中将 @code{viper-parse-sexp-ignore-comments} 设置为 @code{nil} 来更改此设置。如果您快速点击@kbd{%%%}，也可以交互式切换此选项。
+
+@findex viper-set-parsing-style-toggling-macro
+后一个功能是作为 vi 样式键盘宏实现的。  如果你不需要这个宏，可以把
+
+@example
+(viper-set-parsing-style-toggling-macro 'undefine)
+@end example
+
+在您的 Viper 自定义文件中。
+
+@end table
+
+@node Marking
+@subsection 标记
+
+@cindex marking
+Emacs 标记在区域说明符 @kbd{r} 和 @kbd{R} 中引用。 @xref{Emacs Preliminaries}和@xref{Basics}，用于解释。  另请参阅@ref{Mark,,Mark,emacs,The GNU Emacs manual}，了解 Emacs 标记环的说明。
+
+@kindex m<a-z>
+@kindex m.
+@kindex m>
+@kindex m<
+@kindex m,
+@kindex m^
+@findex @kbd{Ex mark}
+@findex @kbd{Ex k}
+@kindex ''
+@kindex ``
+@kindex `<a-z>
+@kindex '<a-z>
+@table @kbd
+@item m<a-z>
+用指定的字母标记当前文件和位置。
+@item m .
+在点处设置 Emacs 标记 (@pxref{Emacs Preliminaries})。
+@item m ^
+将 Emacs 标记 (@pxref{Emacs Preliminaries}) 设置回上次使用 @kbd{m.} 命令设置的位置。  当您使用 @kbd{m.} 设置标记，但随后某些其他命令（例如 @kbd{L} 或 @kbd{G}）以您不喜欢的方式更改它时，这非常有用。
+@item m <
+在缓冲区的开头设置 Emacs 标记。
+@item m >
+在缓冲区末尾设置 Emacs 标记。
+@item m ,
+跳转到 Emacs 标记。
+@item :mark <char>
+使用名为 <char> 的文本标记来标记位置。  这是一个 Ex 命令。
+@item :k <char>
+与@kbd{:mark}相同。
+@item ``
+交换点和标记。
+@item ''
+交换点和标记并转到线上的第一个 CHAR。
+@item '<a-z>
+前往指定的毒蛇标记。
+@item `<a-z>
+转到指定的 Viper 标记并转到在线的第一个 CHAR。
+@end table
+
+@node  Appending Text
+@subsection 附加文本
+
+@xref{Options}，了解如何更改制表符和移位宽度大小。  请参阅 GNU Emacs 手册，或尝试@kbd{C-ha tabs}（如果您已打开 Emacs 帮助）。检查变量 @code{indent-tabs-mode} 以仅放入空格。另请参阅自动换行选项。
+
+@cindex inserting
+@cindex appending
+@cindex paste
+@cindex put
+@kindex C-c M-p
+@kindex C-c M-n
+@kindex .
+@kindex ]<a-z>
+@kindex [<a-z>
+@kindex P
+@kindex p
+@kindex "<a-z1-9>p
+@kindex "<a-z1-9>P
+@kindex >>
+@kindex ><move>
+@kindex O
+@kindex o
+@kindex i
+@kindex A
+@kindex a
+@table @kbd
+@item <count>  a
+光标后 <count> 次。
+@item <count>  A
+在行尾 <count> 次。
+@item <count>  i
+光标前 <count> 次（插入）。
+@item <count>  I
+该行第一个 CHAR 之前 <count> 次
+@item <count>  o
+在当前行下方新建一行（打开）。该计数仅在速度较慢的终端上有用。
+@item <count>  O
+在当前行上方的新行上。该计数仅在速度较慢的终端上有用。
+@item <count>  ><move>
+将 <count><move> 描述的行向右移动一个移位宽度（布局！）。
+@item <count>  >>
+Shift <count> 行向右移动一个shiftwidth。
+@item <count>  ["<a-z1-9>]p
+将（默认撤消）缓冲区的内容放在光标后 <count> 次。  寄存器将自动小写。
+@item <count>  ["<a-z1-9>]P
+将（默认撤消）缓冲区的内容放在光标之前 <count> 次。  登记册将
+@item [<a-z>
+显示文本标记的内容。
+@item ]<a-z>
+显示寄存器的内容。
+@item <count>  .
+重复上一个命令 <count> 次。  用于破坏性命令以及撤消。
+@item f1 1 and f1 2
+当@kbd{.}重复最后一个破坏性命令时，这两个宏重复倒数第二个和倒数第三个破坏性命令。  @xref{Vi Macros}，有关 Vi 宏的更多信息。
+@item C-c M-p and C-c M-n
+在 Vi 状态下，这些命令有助于细读 Vi 破坏性命令的历史记录。连续键入 @kbd{C-c M-p} 会使 Viper 按照较旧命令的方向搜索历史记录，而按 @kbd{C-c M-n} 则按相反顺序搜索。  历史记录中的每个命令都显示在迷你缓冲区中。  然后可以通过键入句点来执行显示的命令。
+
+由于键入上述按键序列可能很乏味，因此可以将执行阅读的功能绑定到 Viper 自定义文件中未使用的键盘按键。  @xref{Viper Specials}，了解详情。
+@end table
+
+@node Editing in Insert State
+@subsection 在插入状态下编辑
+
+@cindex Insert state
+Minibuffer可以像Insert状态一样进行编辑，并且可以随意切换Insert/Replace/Vi状态。一些用户更喜欢迷你缓冲区中简单的 Emacs 感觉。  为此，将 @code{viper-vi-style-in-minibuffer} 设置为 @code{nil}。
+
+@kindex C-u
+@kindex C-w
+@kindex C-v
+@table @kbd
+@item C-v
+剥夺下一个字符的特殊含义（引用）。
+@item C-h
+一字符回来。
+@item C-w
+回一言。
+@item C-u
+返回到当前行更改的开头。
+@end table
+
+@node Deleting Text
+@subsection 删除文本
+
+您应该注意文本删除的一个区别。  这个区别来自 Emacs，并被 Viper 采用，因为我们发现它非常有用。  在 Vi 中，如果您删除一行，然后再删除另一行，那么如果您使用 @samp{p} 命令，这两次删除将被分开并分别放回原处。  在 Emacs（和 Viper）中，由其他命令进行的一系列连续删除 @emph{not interrupted} 会集中在一起，因此删除的文本会累积起来并可以作为一个块放回原处。  如果要中断一系列删除操作，以便新删除的文本可以与先前删除的文本分开放回，则应该执行非删除操作，例如，将光标向任意方向移动一个字符。
+
+@cindex shifting text
+@kindex <<
+@kindex <<move>
+@kindex D
+@kindex dd
+@kindex d<move>
+@kindex X
+@kindex x
+@table @kbd
+@item <count>  x
+删除光标下和光标后的 <count> 个字符。
+@item <count>  X
+删除光标之前的 <count> 个字符。
+@item <count>  d<move>
+删除从点到端点<count><move>。
+@item <count>  dd
+删除 <count> 行。
+@item  D
+其余的线。
+@item <count>  <<move>
+将 <count><move> 描述的行向左移动一个移位宽度（布局！）。
+@item <count>  <<
+Shift <count> 行向左移动一个shiftwidth。
+@end table
+
+@node Changing Text
+@subsection 更改文本
+
+@cindex joining lines
+@cindex changing case
+@cindex quoting regions
+@cindex substitution
+@kindex C-c M-p
+@kindex C-c M-n
+@kindex #q<move>
+@kindex #C<move>
+@kindex #c<move>
+@kindex &
+@kindex \&
+@findex @kbd{Ex substitute/<pat>/<repl>/<f>}
+@findex @kbd{Ex s/<pat>/<repl>/<f>}
+@findex @kbd{Ex copy [z]}
+@findex @kbd{Ex t [z]}
+@findex @kbd{Ex move [z]}
+@kindex J
+@kindex ~
+@kindex =<move>
+@kindex C
+@kindex cc
+@kindex c<move>
+@kindex S
+@kindex s
+@kindex R
+@kindex r<char>
+@table @kbd
+@item <count>  r<char>
+将 <count> 个字符替换为 <char>；没有 <esc>。
+@item <count>  R
+覆盖该行的其余部分，追加更改 @var{count} @minus{} 1 次。
+@item <count>  s
+替换 <count> 个字符。
+@item <count>  S
+更改 <count> 行。
+@item <count>  c<move>
+从 <count><move> 的起点更改为终点。
+@item <count>  cc
+更改 <count> 行。
+@item <count>  C
+该行的其余部分和 <count> @minus{} 1 下一行。
+@item <count>  =<move>
+重新缩进移动所描述的区域。
+@item <count>  ~
+切换小写和大写。
+@item <count>  J
+连接 <count> 行（默认 2）。
+@item  :[x,y]s/<pat>/<repl>/<f>
+用 <repl> 替换（在 x 到 y 行上）模式 <pat> （默认为最后一个模式）。  有用的标志 <f> 是 @samp{global} 的 @samp{g} （即，更改 <pat> 的每个非重叠出现）和 @samp{confirm} 的 @samp{c} （输入 @samp{y} 确认特定替换，否则输入 @samp{n} ）。  任何不等于 <space> <tab> 和 <lf> 的标点符号 CHAR 都可以用作分隔符，而不是 @kbd{/}。
+
+在 Emacs 中，@samp{\&} 代表最后一个匹配的表达式，因此 @kbd{s/[ab]+/\&\&/} 会将 @kbd{[ab]} 匹配的字符串加倍。与 Vi 不同，Viper 不会特殊对待 @samp{&}：而是使用 @samp{\&}。
+
+Viper 不会解析搜索模式，也不会扩展在那里找到的特殊符号（例如，@samp{~} 不会扩展为先前替换的结果）。
+
+注：@emph{The newline character (inserted as @kbd{C-qC-j}) can be used in <repl>}。
+@item  :[x,y]copy [z]
+将@kbd{x}和@kbd{y}之间的文本复制到@kbd{z}之后的位置。
+@item  :[x,y]t [z]
+与@kbd{:copy}相同。
+@item  :[x,y]move [z]
+将@kbd{x}和@kbd{y}之间的文本移动到@kbd{z}之后的位置。
+@item  &
+重复最新的 Ex 替换命令，例如 @kbd{:s/wrong/right}。
+@item :x,yp
+@itemx :g/Pat/p
+@itemx :v/Pat/p
+上述命令显示临时缓冲区中的某些缓冲区行。  上面的第一种形式显示@kbd{x}和@kbd{y}之间的缓冲区线。  第二个显示缓冲区中与给定模式匹配的行。  第三种形式显示 @emph{not} 与给定模式匹配的行。
+@item #c<move>
+将区域中的大写字符更改为小写。
+@item #C<move>
+将区域中的小写字符更改为大写。
+@item #q<move>
+在区域中每行的开头插入指定的字符串
+@item C-c M-p and C-c M-n
+在“插入”和“替换”状态下，这些键绑定到可细读先前在其他插入或替换命令中插入的文本历史记录的命令。  通过重复输入@kbd{C-c M-p}或@kbd{C-c M-n}，您将导致Viper将这些先前使用过的字符串一一插入。当插入新字符串时，前一个字符串将被删除。
+
+在 Vi 状态下，这些键绑定到读取破坏性 Vi 命令历史记录的功能。 @xref{Viper Specials}，了解详情。
+@end table
+
+@node Search and Replace
+@subsection 搜索和替换
+
+@xref{Groundwork}，用于 Ex 地址语法。  @xref{Options}，了解如何进行文字（非正则表达式）搜索以及如何阻止搜索环绕。
+
+@kindex &
+@findex @kbd{Ex substitute/<pat>/<repl>/<f>}
+@kindex Q
+@kindex #g<move>
+@findex @kbd{Ex v}
+@findex @kbd{Ex g}
+@findex @kbd{Ex global}
+@findex @kbd{Ex vglobal}
+@findex @kbd{Ex tag <name>}
+@kindex %
+@kindex N
+@kindex n
+@kindex g<move>
+@kindex ?<string>
+@kindex /<string>
+@table @kbd
+@item C-c /
+切换区分大小写的搜索。  使用前缀参数，切换普通/正则表达式搜索。
+@item <count>  /<string>
+到 <string> 第 <count> 次出现。
+
+Viper 不会解析搜索模式，也不会扩展在那里找到的特殊符号（例如，@samp{~} 不会扩展为先前替换的结果）。
+
+输入 @kbd{/} 或 @kbd{?} 后，所有常用的 Emacs 迷你缓冲区命令，例如 @kbd{M-p} 和 @kbd{M-n} 都可用。  此外，输入 @kbd{C-s} 将插入 Emacs 增量搜索命令使用的最后一个搜索字符串（除了本例之外，它在任何地方都绑定到 @kbd{C-s}）。
+
+@item <count>  ?<string>
+到 <string> 的第 <count> 次出现。
+@item <count>  g<move>
+搜索 move 描述的文本。  （默认关闭）
+@item n
+重复最新的@kbd{/}@kbd{?}（下一个）。
+@item N
+同上，方向相反。
+@item %
+找到下一个括号并转到其匹配项
+@cindex text processing
+@item :[x,y]g/<string>/<cmd>
+全局搜索 [从第 x 行到 y] 的 <string> 并在每次出现时执行 Ex <cmd>。
+@item :[x,y]v/<string>/<cmd>
+在不匹配的行上执行 <cmd>。
+@item #g<move>
+为该区域中的每一行执行最后一个键盘宏。 @xref{Macros and Registers}，了解更多信息。
+@item Q
+查询替换。
+@item :ta <name>
+在定义 <name> 的标记文件（文件、行）中搜索，然后转到它。
+@item  :[x,y]s/<pat>/<repl>/<f>
+用 <repl> 替换（在 x 到 y 行上）模式 <pat> （默认为最后一个模式）。  有用的标志 <f> 是 @samp{global} 的 @samp{g}（即，更改每个不重叠出现的 <pat>）和 @samp{confirm} 的 @samp{c}（输入 @samp{y} 确认特定替换，否则输入 @samp{n}）。  除了 6⁣ 之外，任何标点符号都可以用作分隔符，例如 <space>、<tab> 和 <lf>。
+
+注：@emph{The newline character (inserted as @kbd{C-qC-j}) can be used in <repl>}。
+@item  &
+重复最新的 Ex 替换命令，例如 @kbd{:s/wrong/right}。
+@item :global /<pattern>/<ex-command>
+@itemx :g /<pattern>/<ex-command>
+在所有匹配 <pattern> 的行上执行 <ex-command>。
+@item :vglobal /<pattern>/<ex-command>
+@itemx :v /<pattern>/<ex-command>
+对所有不匹配 <pattern> 的行执行 <ex-command>。
+@end table
+
+@node Yanking
+@subsection 扬金
+
+@cindex cut and paste
+@cindex paste
+@kindex P
+@kindex p
+@kindex "<a-z1-9>p
+@kindex "<a-z1-9>P
+@kindex ]<a-z>
+@kindex [<a-z>
+@kindex m<a-z>
+@kindex Y
+@kindex yy
+@kindex "<A-Z>y<move>
+@kindex "<a-z>y<move>
+@kindex y<move>
+@kindex yank
+@findex @kbd{Ex yank}
+@table @kbd
+@item <count>  y<move>
+从 <count><move> 的开始位置拖动到结束位置。
+@item <count>  "<a-z>y<move>
+从 <count><move> 的开始位置拉到结束位置以进行注册。
+@item <count>  "<A-Z>y<move>
+从 <count><move> 的开头拉到端点并附加到寄存器。
+@item <count>  yy
+<count> 行。
+@item <count>  Y
+同上（不过应该等于 0）。
+@item  m<a-z>
+用字母标记光标位置。
+@item [<a-z>
+显示文本标记的内容。
+@item ]<a-z>
+显示寄存器的内容。
+@item <count>  ["<a-z1-9>]p
+将（默认撤消）缓冲区的内容放在光标后 <count> 次。  寄存器将自动小写。
+@item <count>  ["<a-z1-9>]P
+将（默认撤消）缓冲区的内容放在光标之前 <count> 次。  登记册将
+@end table
+
+@node Undoing
+@subsection 撤销
+
+@cindex undo
+@cindex backup files
+@findex @kbd{Ex rec}
+@findex @kbd{Ex e!}
+@findex @kbd{Ex q!}
+@kindex .
+@kindex U
+@kindex u
+@table @kbd
+@item  u U
+撤消最新的更改。
+@item  .
+重复撤消。
+@item :q!
+不写就退出 Vi。
+@item :e!
+重新编辑混乱的文件。
+@item :rec
+从自动保存中恢复文件。  Viper 还会创建附加有 @samp{~} 的备份文件。
+@end table
+
+@node Display
+@section 展示
+
+@cindex scrolling
+@kindex zM
+@kindex zL
+@kindex zH
+@kindex z<cr>
+@kindex z.
+@kindex z-
+@kindex z<cr>
+@kindex C-b
+@kindex C-f
+@kindex C-u
+@kindex C-d
+@kindex C-y
+@kindex C-e
+@kindex C-l
+@kindex C-g
+@table @kbd
+@item C-g
+在用户级别 1，给出文件名、状态、当前行号和相对位置。@* 在用户级别 2 及更高级别，中止当前命令。
+@item C-c g
+给出文件名、状态、当前行号和相对位置——所有用户级别。
+@item C-l
+刷新屏幕。
+@item <count> C-e
+在底部显示 <count> 行以上，光标保持不动（如果可能）。
+@item <count> C-y
+在顶部显示 <count> 行，光标保持原状（如果可能）。
+@item <count> C-d
+向下滚动 <count> 行（默认为上一次滚动的行数；初始化：半页）。
+@item <count> C-u
+向上滚动 <count> 行（默认为上一次滚动的行数；初始化：半页）。
+@item <count> C-f
+向前 <count> 页。
+@item <count> C-b
+<count> 向后翻页（在旧版本中，@kbd{C-b} 仅适用于无计数）。
+@item <count> z<cr>
+@itemx zH
+将第 <count> 行放在窗口顶部（默认为当前行）。
+@item <count> z-
+@itemx zL
+将第 <count> 行放在窗口底部（默认为当前行）。
+@item <count> z.
+@itemx zM
+将第 <count> 行放在窗口中央（默认为当前行）。
+@end table
+
+
+@node File and Buffer Handling
+@section 文件和缓冲区处理
+
+@cindex multiple files
+在所有文件处理命令中，应在输入文件名之前键入空格。  如果您需要键入修饰符，例如 @kbd{>>} 或 @kbd{!}，请不要在命令和修饰符之间放置任何空格。
+
+请注意，许多 Ex 命令（例如 @kbd{:w}）接受命令参数。  效果是命令将开始作用于当前区域。  例如，如果当前区域跨越第 11 行到第 22 行，那么如果您键入 @kbd{1:w}，您将在迷你缓冲区中看到 @samp{:11,22w}。
+
+@kindex v
+@kindex V
+@findex @kbd{Ex args}
+@findex @kbd{Ex rew}
+@kindex C-^
+@findex @kbd{Ex e!@: [<files>]}
+@findex @kbd{Ex e [<files>]}
+@findex @kbd{Ex edit [<files>]}
+@findex @kbd{Ex edit!@: [<files>]}
+@findex @kbd{Ex q!}
+@findex @kbd{Ex q}
+@findex @kbd{Ex quit}
+@findex @kbd{Ex quit!}
+@findex @kbd{Ex f}
+@findex @kbd{Ex rec}
+@findex @kbd{Ex r}
+@findex @kbd{Ex read}
+@findex @kbd{Ex pre}
+@kindex ZZ
+@findex @kbd{Ex wq}
+@findex @kbd{Ex w <file>}
+@findex @kbd{Ex w!@: <file>}
+@findex @kbd{Ex w >> <file>}
+@findex @kbd{Ex write <file>}
+@findex @kbd{Ex write!@: <file>}
+@findex @kbd{Ex write >> <file>}
+@findex @kbd{Ex W}
+@findex @kbd{Ex WW}
+@findex @kbd{Ex Write}
+@findex @kbd{Ex WWrite}
+@findex @kbd{Ex WWrite}
+@findex @kbd{Ex x}
+@findex @kbd{Ex x!}
+@findex @kbd{Ex suspend}
+@findex @kbd{Ex stop}
+@findex @kbd{Ex n [<count> | <file>]}
+@findex @kbd{Ex cd [<dir>]}
+@findex @kbd{Ex pwd}
+@table @kbd
+@item :q
+退出缓冲区，除非已修改。
+@item :q!
+退出缓冲区而不检查。  在 Viper 中，这两个命令是相同的。  如果退出访问文件的修改缓冲区，则需要确认。
+@item :suspend
+@itemx :stop
+暂停毒蛇
+@item :[x,y] w
+写入文件。  Viper 确保最后的换行符始终添加到缺少该换行符的任何文件中。  这是通过将 Emacs 变量 @code{require-final-newline} 设置为 @code{t} 来完成的。  如果您不喜欢此功能，请使用 @code{setq-default} 将 @code{require-final-newline} 设置为 @code{nil}。  这必须在 Viper 自定义文件中完成。
+@item :[x,y] w <name>
+写入文件<名称>。
+@item :[x,y] w>> <name>
+将缓冲区附加到文件<名称>。  @kbd{w} 和 @kbd{>>} 之间不应有空格。  在 @kbd{>>} 之后输入空格，看看会发生什么。
+@item :w!@: <name>
+覆盖文件<名称>。  在 Viper 中，@kbd{:w} 和 @kbd{:w!} 相同。写入现有文件（如果这不是缓冲区正在访问的文件）或写入只读文件需要确认。
+@item :x,y w <name>
+将 x 到 y 行写入文件 <name>。
+@item :wq
+写入文件并杀死缓冲区。
+@item :r <file> [<file> ...]
+将文件读入缓冲区，将其内容插入到当前行之后。
+@item :xit
+与@kbd{:wq}相同。
+@item :Write
+@itemx :W
+保存所有未保存的缓冲区，要求确认。
+@item :WWrite
+@itemx :WW
+与 @kbd{W} 类似，但不要求确认。
+@item ZZ
+保存当前缓冲区并杀死它。  如果用户级别为1，则保存所有文件并杀死Emacs。  杀死 Emacs 是错误的使用方式，所以你应该尽快切换到更高的用户级别。
+@item :x [<file>]
+保存并终止缓冲区。
+@item :x!@: [<file>]
+@kbd{:w![<file>]}和@kbd{:q}。
+@item :pre
+保留文件---自动保存缓冲区。
+@item :rec
+从自动保存中恢复文件。
+@item :f [<file>]
+如果不带参数，则打印当前访问文件的文件名和字符/行信息。  使用参数，将当前访问的文件名设置为@file{file}。
+@item :cd [<dir>]
+将工作目录设置为 <dir> （默认主目录）。
+@item :pwd
+打印当前工作目录。
+@item :e [+<cmd>] <files>
+编辑文件。  如果没有给出文件名，则编辑当前缓冲区访问的文件。  如果缓冲区被修改或磁盘上的文件被更改，请要求确认。  与 Vi 不同，Viper 允许 @kbd{:e} 接受多个参数。第一个文件的编辑方式与 Vi 中相同。  其余的可以通过通常的 Emacs 方式访问。
+@item :e!@: [+<cmd>] <files>
+重新编辑文件。  如果没有文件名，则重新编辑当前文件。在 Viper 中，与 Vi 不同，@kbd{e!} 与 @kbd{:e} 相同。  在这两种情况下，都会要求用户确认是否存在丢弃对缓冲区的更改的危险。
+@item :q!
+不写就退出 Vi。
+@item C-^
+编辑备用（通常是前一个）文件。
+@item :rew
+过时的
+@item :args
+列出未在任何地方显示的文件以及下一个的计数
+@item :n [count]  [+<cmd>] [<files>]
+编辑 <count> 文件，或编辑文件。  计数来自@kbd{:args}。
+@item :N [count] [+<cmd>] [<files>]
+与@kbd{:n}类似，但变量@code{ex-cycle-other-window}的含义相反。
+@item :b
+切换到另一个缓冲区。  如果@code{ex-cycle-other-window}是@code{t}，则切换到另一个窗口。  支持缓冲区完成。变量@code{viper-read-buffer-function}控制实际使用哪个函数来读取缓冲区名称。  默认值为 @code{read-buffer}，但 Emacs 中也提供更好的替代方案（例如 @code{ido-read-buffer}）。
+@vindex viper-read-buffer-function
+@item :B
+与@kbd{:b}类似，但@code{ex-cycle-other-window}的含义相反。
+@item :<address>r <name>
+将文件<名称>读入缓冲区中<地址>行之后。
+@item v, V, C-v
+在当前或另一个窗口或另一个框架中编辑文件。  文件名输入到迷你缓冲区中。  支持文件完成和历史记录。
+@end table
+
+@node Mapping
+@section 测绘
+
+@cindex key bindings
+@cindex key mapping
+@kindex ]<a-z>
+@kindex [<a-z>
+@kindex #g<move>
+@kindex *
+@kindex @@!<a-z>
+@kindex @@#
+@kindex @@@@
+@kindex @@<a-z>
+@findex @kbd{Ex unmap <char>}
+@findex @kbd{Ex map <char> <seq>}
+@findex @kbd{Ex unmap!@: <char>}
+@findex @kbd{Ex map!@: <char> <seq>}
+@table @kbd
+@item :map <string>
+开始定义 Vi 风格的键盘宏。例如，键入 @kbd{:map www}，然后键入 @kbd{:!wc %}，然后键入 @kbd{C-x )} 将导致 @kbd{www} 对当前文件运行 wc（Vi 将 @samp{%} 替换为当前文件名）。
+@item C-x )
+完成键盘宏的定义。在 Viper 中，此命令完成定义所有键盘宏的过程，无论它们是 Emacs 风格还是 Vi 风格。这与 Vi 不同，需要允许 WYSIWYG 映射键盘宏并允许在宏中使用功能键和任意 Emacs 函数。
+@item :unmap <string>
+剥夺 <string> 在 Vi 状态下的映射。
+@item :map!@: <string>
+映射插入状态的宏。
+@item :unmap!@: <string>
+剥夺 <string> 在插入状态下的映射（参见@kbd{:unmap}）。
+@item @@<a-z>
+在Vi状态下，将寄存器的内容作为命令执行。
+@item @@@@
+在 Vi 状态下，重复上次寄存器命令。
+@item @@#
+在Vi状态下，开始键盘宏。  以 @@<a-z> 结尾。  这会将宏放入正确的寄存器中。  寄存器将自动小写。 @xref{Macros and Registers}，了解更多信息。
+@item @@!<a-z>
+在Vi状态下，拉动匿名宏进行注册
+@item *
+在 Vi 状态下，执行匿名宏（由 C-x( 和 C-x ) 定义）。
+@item C-x e
+与 @kbd{*} 类似，但适用于所有 Viper 状态。
+@item #g<move>
+为该区域中的每一行执行最后一个键盘宏。 @xref{Macros and Registers}，了解更多信息。
+@item [<a-z>
+显示文本标记的内容。
+@item ]<a-z>
+显示寄存器的内容。
+@end table
+
+@node Shell Commands
+@section 外壳命令
+
+@cindex % (Current file)
+Ex shell 命令中使用符号 @samp{%} 来表示当前文件。  如果您希望命令中包含 @samp{%}，则必须将其转义为 @samp{\%}。
+@cindex @samp{%} (Ex address)
+但是，如果 0⁣ 是第一个字符，则它代表整个文件的地址。
+@cindex @samp{#} (Previous file)
+同样，@samp{#} 扩展到前一个文件。  前一个文件是 @kbd{:args} 列表中的第一个文件。  如果您有一个窗口，则默认为 VI 意义上的前一个文件。
+
+符号@samp{%}和@samp{#}也用在Ex命令@kbd{:e}和@kbd{:r <shell-cmd>}中。  命令 @kbd{:w} 和常规 @kbd{:r <file>} 命令不支持这些元符号，因为文件历史记录是更好的机制。
+
+@cindex shell commands
+@findex @kbd{Ex <address>r <name>}
+@findex @kbd{Ex <address>r !<cmd>}
+@findex @kbd{!<cmd>}
+@findex @kbd{!!<cmd>}
+@findex @kbd{!<move><cmd>}
+@findex @kbd{Ex w !<cmd>}
+@findex @kbd{Ex x,y w !<cmd>}
+@findex @kbd{Ex !!@: <args>}
+@findex @kbd{Ex !<cmd>}
+@findex @kbd{Ex sh}
+@findex @kbd{Ex make}
+@table @kbd
+@item :sh
+在另一个窗口中执行子shell
+@item :[x,y]!<cmd>
+执行 shell <cmd> [在 x 到 y 行； % 被当前文件替换，\% 更改为 %
+@item :[x,y]!!@: [<args>]
+重复最后一个 shell 命令[并附加 <args>]。
+@item :!<cmd>
+只需执行命令并将结果显示在缓冲区中。
+@item :!!@: <args>
+重复上一个 shell 命令并附加 <args>
+@item <count> !<move><cmd>
+shell 执行 <cmd>，使用标准输入由 <count><move> 描述的行，接下来标准输出将替换这些行（想想 @samp{cb}、@samp{sort}、@samp{nroff} 等）。
+@item <count> !!<cmd>
+将 <count> 行作为 shell <cmd> 的标准输入，然后让标准输出替换这些行。
+@item :[x,y] w !<cmd>
+让 x 到 y 行作为 <cmd> 的标准输入（注意 @kbd{w} 和 @kbd{!} 之间的 <sp>）。
+@item :<address>r !<cmd>
+将 <cmd> 的输出放在 <address> 行之后（默认当前）。
+@item :<address>r <name>
+将文件 <名称> 读入缓冲区中 <地址> 行之后的内容（默认当前）。
+@item :make
+在当前目录下运行make命令。
+@end table
+
+@node Options
+@section 选项
+
+@cindex Vi options
+@findex @kbd{Ex set <option>=<value>}
+@findex @kbd{Ex set no<option>}
+@findex @kbd{Ex set <option>}
+@findex @kbd{Ex set ws}
+@findex @kbd{Ex set wrapscan}
+@findex @kbd{Ex set wm=<count>}
+@findex @kbd{Ex set wrapmargin=<count>}
+@findex @kbd{Ex set ts=<count>}
+@findex @kbd{Ex set tabstop=<count>}
+@findex @kbd{Ex set tab-stop-local=<count>}
+@findex @kbd{Ex set sm}
+@findex @kbd{Ex set showmatch}
+@findex @kbd{Ex set sw=<count>}
+@findex @kbd{Ex set shiftwidth=<count>}
+@findex @kbd{Ex set sh=<string>}
+@findex @kbd{Ex set shell=<string>}
+@findex @kbd{Ex set ro}
+@findex @kbd{Ex set readonly}
+@findex @kbd{Ex set magic}
+@findex @kbd{Ex set ic}
+@findex @kbd{Ex set ignorecase}
+@findex @kbd{Ex set ai}
+@findex @kbd{Ex set autoindent}
+@table @kbd
+@cindex autoindent
+@item autoindent
+@itemx ai
+自动缩进：在追加模式下，在 <cr> 之后，光标将直接移动到上一行第一个字符的下方。此设置仅影响当前缓冲区。
+@item autoindent-global
+@itemx ai-global
+与@code{autoindent}相同，但影响所有缓冲区。
+@item noautoindent
+@itemx noai
+取消自动缩进。
+@item noautoindent-global
+@itemx noai-g
+取消全局自动缩进。
+@cindex case and searching
+@item ignorecase
+@itemx ic
+ignorecase：搜索时不区分大小写。
+@item noignorecase
+@itemx noic
+取消忽略大小写。
+@cindex literal searching
+@item magic
+@itemx ma
+搜索中使用的正则表达式； nomagic 意味着没有正则表达式。
+@item nomagic
+@item noma
+取消魔法。
+@cindex readonly files
+@item readonly
+@itemx ro
+readonly：该文件不可更改。如果用户尝试写入此文件，将请求确认。
+@item noreadonly
+@itemx noro
+取消只读。
+@cindex shell
+@item shell=<string>
+@itemx sh=<string>
+shell：用于 shell 转义的程序（默认@samp{$SHELL}（默认@file{/bin/sh}））。
+@cindex layout
+@cindex shifting text
+@item shiftwidth=<count>
+@itemx sw=<count>
+shiftwidth：给出shiftwidth（默认8个位置）。
+@cindex paren matching
+@cindex matching parens
+@item showmatch
+@itemx sm
+showmatch：每当您附加 @kbd{)} 时，Vi 都会显示其匹配项（如果它位于同一页面上）；也与@kbd{@{} and @kbd{@}}。  如果没有匹配，Vi 会发出蜂鸣声。
+@item noshowmatch
+@itemx nosm
+取消表演赛。
+@cindex changing tab width
+@cindex tabbing
+@item tabstop=<count>
+@itemx ts=<count>
+tabstop：<ht>的长度；警告：这仅在编辑器中，在编辑器之外 <ht> 有其正常长度（默认 8 个位置）。此设置仅影响当前缓冲区。
+@item tabstop-global
+@itemx ts-g
+与@code{tabstop}相同，但影响所有缓冲区。
+@cindex auto fill
+@cindex word wrap
+@item wrapmargin=<count>
+@itemx wm=<count>
+wrapmargin：在追加模式下，每当右边界的 <wm> 列中有 <sp> 或 <ht> 时，Vi 会自动放置一个 <lf>。
+@cindex searching
+@item wrapscan
+@itemx ws
+wrapscan：搜索时，结尾被认为是文件开头的@samp{stuck}。
+@item nowrapscan
+@itemx nows
+取消包裹扫描。
+@item :set <option>
+打开<选项>。
+@item :set no<option>
+关闭<选项>。
+@item :set <option>=<value>
+将 <选项> 设置为 <值>。
+@end table
+
+@node Emacs Related Commands
+@section Emacs 相关命令
+
+@kindex M-y
+@kindex C-y
+@kindex C-x C-f
+@kindex C-x o
+@kindex C-x 2
+@kindex C-x 1
+@kindex C-x 0
+@kindex C-z
+@kindex C-\
+@kindex C-c\
+@table @kbd
+@item C-\
+在 Vi 或 Insert 状态下开始 Meta 命令。  最常用的形式是 C-\ x (M-x)。
+
+注意：Emacs 将 @kbd{C-\} 绑定到一个函数，该函数提供在多语言环境中更改键盘输入法的功能。  Viper 会覆盖此绑定。  不过，仍然可以通过在 Vi 命令状态下键入 @kbd{\ C-\} 和在插入状态下键入 @kbd{C-z \ C-\} 来切换输入法。或者您可以使用菜单栏上的 MULE 菜单。
+@item C-z
+在插入和替换状态下，准备 Viper 接受下一个命令并执行它，就像 Viper 处于 Vi 状态一样。  然后返回插入状态。
+
+Vi状态下，切换到Emacs状态；在Emacs状态下，切换到Vi状态。
+@item C-c \
+在单个命令的持续时间内切换到 Vi 状态。  然后又回到原来的Viper状态。  适用于 Vi、Insert、Replace 和 Emacs 状态。
+@item C-x0
+关闭窗口
+@item C-x1
+关闭其他窗口
+@item C-x2
+分割窗口
+@item C-xo
+在窗口之间移动
+@item C-xC-f
+Emacs find-file，在插入状态下有用
+@item C-y
+放回最后删除的文本。  与 Vi 的 @kbd{p} 类似，但也可以在插入和替换状态下工作。  此命令在 Vi 命令状态下不起作用，因为此绑定被用于其他操作。
+@item M-y
+撤消最后一个@kbd{C-y}并从杀戮环中放置另一个杀戮。使用此命令，您可以尝试不同的杀戮，直到找到您需要的杀戮。
+@end table
+
+@node Mouse-bound Commands
+@section 鼠标绑定命令
+
+以下两个鼠标操作通常绑定到 Viper 中的特殊搜索和插入命令：
+
+@kindex S-mouse-1
+@kindex S-mouse-2
+@kindex META button1up
+@kindex META button2up
+@table @kbd
+@item S-mouse-1
+按住 Shift 并单击鼠标按钮 1 将开始搜索鼠标指针下的区域。该命令可以采用前缀参数。  注意：仅当此鼠标操作尚未绑定到其他内容时，Viper 才会设置此绑定。 @xref{Viper Specials}，了解更多信息。
+
+@item S-mouse-2
+按住 Shift 并单击鼠标按钮 2 将在鼠标指针周围插入一个区域。该命令还可以采用前缀参数。注意：仅当此鼠标操作尚未绑定到其他内容时，Viper 才会设置此绑定。 @xref{Viper Specials}，了解更多详情。
+@end table
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Acknowledgments
+@unnumbered 致谢
+
+Viper，以前称为 VIP-19，由 Michael Kifer 编写。  Viper 基于 Masahiko Sato 的原始 VIP 包和 Aamod Sane 的 VIP 4.4 增强版。  本手册是 VIP 4.4 手册的改编版，而 VIP 4.4 手册又基于 Sato 的 VIP 3.5 手册。
+
+网络上的许多贡献者指出了错误并提出了许多有用的功能。  Scott Bronson 和 Samuel Padgett 贡献的补丁已合并到此代码中。  以下是一份完整的贡献者列表：
+
+@example
+aaronl@@vitelus.com (Aaron Lehmann),
+ahg@@panix.com (Al Gelders),
+amade@@diagram.fr (Paul-Bernard Amade),
+ascott@@fws214.intel.com (Andy Scott),
+bronson@@trestle.com (Scott Bronson),
+cook@@biostat.wisc.edu (Tom Cook),
+csdayton@@midway.uchicago.edu (Soren Dayton),
+dave@@hellgate.utah.edu,
+dm@@scs.cs.nyu.edu (David Mazieres),
+dominik@@strw.LeidenUniv.nl (Carsten Dominik),
+dwallach@@cs.princeton.edu (Dan Wallach),
+dwight@@toolucky.llnl.gov (Dwight Shih),
+dxc@@xprt.net (David X Callaway),
+edmonds@@edmonds.home.cs.ubc.ca (Brian Edmonds),
+gin@@mo.msk.ru (Golubev I.N.),
+gviswana@@cs.wisc.edu (Guhan Viswanathan),
+gvr@@halcyon.com (George V. Reilly),
+hatazaki@@bach.convex.com (Takao Hatazaki),
+hpz@@ibmhpz.aug.ipp-garching.mpg.de (Hans-Peter Zehrfeld),
+irie@@t.email.ne.jp (Irie Tetsuya),
+jackr@@dblues.engr.sgi.com (Jack Repenning),
+jamesm@@bga.com (D.J. Miller II),
+jjm@@hplb.hpl.hp.com (Jean-Jacques Moreau),
+jl@@cse.ogi.edu (John Launchbury),
+jobrien@@hchp.org (John O'Brien),
+johnw@@borland.com (John Wiegley),
+kanze@@gabi-soft.fr (James Kanze),
+kin@@isi.com (Kin Cho),
+kwzh@@gnu.org (Karl Heuer),
+lindstro@@biostat.wisc.edu (Mary Lindstrom),
+lektu@@terra.es (Juanma Barranquero),
+lennart.borgman.073@@student.lu.se (Lennart Borgman),
+minakaji@@osaka.email.ne.jp (Mikio Nakajima),
+Mark.Bordas@@East.Sun.COM (Mark Bordas),
+meyering@@comco.com (Jim Meyering),
+martin@@xemacs.org (Martin Buchholz),
+mbutler@@redfernnetworks.com (Malcolm Butler),
+mveiga@@dit.upm.es (Marcelino Veiga Tuimil),
+paulk@@summit.esg.apertus.com (Paul Keusemann),
+pfister@@cs.stonybrook.edu (Hanspeter Pfister),
+phil_brooks@@MENTORG.COM (Phil Brooks),
+pogrell@@informatik.hu-berlin.de (Lutz Pogrell),
+pradyut@@cs.uchicago.edu (Pradyut Shah),
+roderick@@argon.org (Roderick Schertler),
+rxga@@ulysses.att.com,
+sawdey@@lcse.umn.edu (Aaron Sawdey),
+simonb@@prl.philips.co.uk (Simon Blanchard),
+spadgett1@@nc.rr.com (Samuel Padgett),
+stephen@@farrell.org (Stephen Farrell),
+storm@@cua.dk (Kim F. Storm),
+sudish@@MindSpring.COM (Sudish Joseph),
+schwab@@issan.informatik.uni-dortmund.de (Andreas Schwab)
+terra@@diku.dk (Morten Welinder),
+thanh@@informatics.muni.cz (Han The Thanh),
+toma@@convex.convex.com,
+vrenjak@@sun1.racal.com (Milan Vrenjak),
+whicken@@dragon.parasoft.com (Wendell Hicken),
+zapman@@cc.gatech.edu (Jason Zapman II),
+@end example
+
+@node Key Index
+@unnumbered 关键指标
+
+@printindex ky
+
+@node Function Index
+@unnumbered 功能索引
+
+@printindex fn
+
+@node Variable Index
+@unnumbered 变量索引
+
+@printindex vr
+
+@node Package Index
+@unnumbered 包装索引
+
+@printindex pg
+
+@node Concept Index
+@unnumbered 概念索引
+
+@printindex cp
+
+@bye

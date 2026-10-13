@@ -34,7 +34,7 @@ MENU_ENTRY_RE = re.compile(r'^(\s*\*\s+.*?(?:::|\.)\s*)(.*)$')
 
 VERBATIM_START = re.compile(
     r'^\s*@(example|smallexample|lisp|smalllisp|verbatim|ignore|tex|html|'
-    r'iftex|ifhtml|ifxml|ifdocbook|ifplaintext|iflatex|ifnottex)\b')
+    r'iftex|ifhtml|ifxml|ifdocbook|ifplaintext|iflatex|ifnottex|macro|rmacro)\b')
 VERBATIM_END = re.compile(r'^\s*@end\s+(\w+)')
 
 # 行首为这些命令时是“结构行”（原样保留）；其余（如 @samp/@xref/@code

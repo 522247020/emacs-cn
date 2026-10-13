@@ -1,0 +1,2852 @@
+\输入 texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename ../../info/idlwave.info
+@settitle IDLWAVE 用户手册
+@documentlanguage en
+@include docstyle.texi
+@synindex ky cp
+@syncodeindex vr cp
+@syncodeindex fn cp
+@set VERSION 6.1
+@set EDITION 6.1
+@set IDLVERSION 6.3
+@set NSYSROUTINES 4346
+@set DATE April, 2007
+@set AUTHOR J.D. Smith & Carsten Dominik
+@set MAINTAINER J.D. Smith
+@c %**end of header
+@finalout
+
+@copying
+此文件记录了 IDLWAVE，这是一种使用 Emacs 编辑 IDL 文件并与作为子进程运行的 IDL shell 交互的主要模式。
+
+这是 IDLWAVE @value{VERSION} 的 IDLWAVE 用户手册的第 @value{EDITION} 版。
+
+版权所有 @copyright{} 1999--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs editing modes
+@direntry
+* IDLWAVE: (idlwave).            IDL 文件的主要模式和 shell。
+@end direntry
+
+@titlepage
+@title IDLWAVE 用户手册
+@subtitle Emacs 主要模式和 IDL 的 shell
+@subtitle 版本@value{EDITION}、@value{DATE}
+@author by J.D. Smith & Carsten Dominik
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top IDLWAVE
+
+IDLWAVE is a package which supports editing source code written in the
+Interactive Data Language (IDL), and running IDL as an inferior shell.
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Introduction::                 IDLWAVE 是什么，不是什么
+* IDLWAVE in a Nutshell::        一页快速入门指南
+* Getting Started::              教程
+* The IDLWAVE Major Mode::       IDL程序编辑模式
+* The IDLWAVE Shell::            IDL作为劣等程序运行的模式
+* Acknowledgments::              谁做了什么
+* Sources of Routine Info::      IDLWAVE 如何知道例程 XYZ
+* HTML Help Browser Tips::
+* Configuration Examples::       用户为王
+* Windows and macOS::            什么仍然有效，以及如何有效
+* Troubleshooting::              当好电脑变坏时
+* GNU Free Documentation License::  本文档的许可证。
+* Index::                        快速访问
+
+@detailmenu
+--- 详细节点列表 ---
+
+入门（教程）
+
+* Lesson I---Development Cycle::
+* Lesson II---Customization::
+* Lesson III---User Catalog::
+
+IDLWAVE 主模式
+
+* Code Formatting::              让代码看起来漂亮
+* Routine Info::                 调用顺序和关键字列表
+* Online Help::                  一键从源头获取帮助
+* Completion::                   完成例程名称和关键字
+* Routine Source::               寻找常规，简单的方法
+* Resolving Routines::           强制 Shell 编译例程
+* Code Templates::               频繁的代码构造
+* Abbreviations::                常用命令缩写
+* Actions::                      更改大小写、填充、结束检查
+* Doc Header::                   插入标准标头
+* Motion Commands::              浏览程序的结构
+* Misc Options::                 不适合其他地方的东西
+
+代码格式化
+
+* Code Indentation::             体现逻辑结构
+* Continued Statement Indentation::
+* Comment Indentation::          注释行的特殊缩进
+* Continuation Lines::           跨行分割语句
+* Syntax Highlighting::          字体锁定支持
+* Octals and Highlighting::      为什么“123会导致问题
+
+在线帮助
+
+* Help with HTML Documentation::
+* Help with Source::
+
+完成
+
+* Case of Completed Words::      完整单词案例
+* Object Method Completion and Class Ambiguity::   obj->方法，什么？
+* Object Method Completion in the Shell::
+* Class and Keyword Inheritance::   obj->方法，_EXTRA=e
+* Structure Tag Completion::     完成状态.Tag
+
+行动
+
+* Block Boundary Check::         END 语句正确吗？
+* Padding Operators::            在 @samp{=} 等周围加强空间
+* Case Changes::                 强制使用大写关键字
+
+IDLWAVE 外壳
+
+* Starting the Shell::           如何将 IDL 作为子进程启动
+* Using the Shell::              与 Shell 交互工作
+* Commands Sent to the Shell::
+* Debugging IDL Programs::
+* Examining Variables::
+* Custom Expression Examination::
+
+调试 IDL 程序
+
+* A Tale of Two Modes::
+* Debug Key Bindings::
+* Breakpoints and Stepping::
+* Compiling Programs::
+* Walking the Calling Stack::
+* Electric Debug Mode::
+
+日常信息来源
+
+* Routine Definitions::          IDL 例程定义的地方。
+* Routine Information Sources::   那么 IDLWAVE 如何知道...
+* Catalogs::
+* Load-Path Shadows::            在几个地方定义的例程
+* Documentation Scan::           扫描 IDL 手册
+
+目录
+
+* Library Catalogs::
+* User Catalog::
+
+@end detailmenu
+@end menu
+
+@node Introduction
+@chapter 介绍
+@cindex Introduction
+@cindex CORBA (Common Object Request Broker Architecture)
+@cindex Interface Definition Language
+@cindex Interactive Data Language
+@cindex @file{cc-mode.el}
+@cindex @file{idl.el}
+@cindex @file{idl-shell.el}
+@cindex Feature overview
+
+IDLWAVE 是一个软件包，支持编辑以交互式数据语言 (IDL) 编写的源文件，并将 IDL 作为下级 shell@footnote{IDLWAVE can also be used for editing source files for the related WAVE/CL language, but with only limited support.} 运行。  它是 IDL 附带的 IDLDE 开发环境的功能丰富的替代品，并利用 Emacs 的全部功能使 IDL 程序的编辑和运行变得更容易、更快速、更结构化。
+
+IDLWAVE 由两个主要部分组成：编辑 IDL 源文件的主要模式 (@code{idlwave-mode}) 和作为下级 shell 运行 IDL 程序的模式 (@code{idlwave-shell-mode})。  尽管一种模式可以单独使用，但两种模式紧密配合以形成完整的开发环境。  以下是 IDLWAVE 功能的简要总结：
+
+@itemize @bullet
+@item 
+智能代码缩进和自动格式化。
+@item 
+三级语法突出显示支持。
+@item 
+上下文相关显示 1000 多个本机 IDL 例程的调用序列和关键字，可扩展到任何其他数量的本地例程，并且已经可用于许多预扫描库。
+@item 
+快速、上下文相关的在线 HTML 帮助，或未记录例程的源头帮助。
+@item 
+上下文相关的例程名称、关键字、系统变量、类名称等的完成。
+@item 
+轻松插入代码模板和常见结构的缩写。
+@item 
+自动更正以执行各种可定制的编码标准。
+@item 
+逻辑块的完整性检查和自动终止。
+@item 
+具有使用可能性排名的常规名称空间冲突搜索。
+@item 
+支持@file{imenu}。
+@item 
+文档支持。
+@item 
+将 IDL 作为低级 Shell 运行，具有历史搜索、命令行编辑以及 IDL 源缓冲区中存在的所有完成和例程信息功能。
+@item 
+全面处理断点调试、交互式设置断点条件以及轻松单步调试代码。
+@item 
+直接从源缓冲区编译、执行和交互式单键调试程序。
+@item 
+调用堆栈的快速、源引导导航，具有变量检查等。
+@item 
+单击鼠标即可检查变量和表达式。
+@item 
+还有很多很多...
+@end itemize
+
+@c Dead links, 2014/06.
+@ignore
+@ifnottex
+@cindex Screenshots
+Here are a number of screenshots showing IDLWAVE in action:
+
+@itemize @bullet
+@item
+@uref{https://github.com/jdtsmith/idlwave/screenshots/emacs_21_nav.gif,An IDLWAVE buffer}
+@item
+@uref{https://github.com/jdtsmith/idlwave/screenshots/emacs_21_keys.gif,A keyword being completed}
+@item
+@uref{https://github.com/jdtsmith/idlwave/screenshots/emacs_21_help.gif,Online help text.}
+@item
+@uref{https://github.com/jdtsmith/idlwave/screenshots/emacs_21_ri.gif,Routine information displayed}
+@item
+@uref{https://github.com/jdtsmith/idlwave/screenshots/emacs_21_bp.gif,Debugging code
+stopped at a breakpoint}
+@end itemize
+@end ifnottex
+@end ignore
+
+IDLWAVE 是 Chris Chase 编写的 @file{idl.el} 和 @file{idl-shell.el} 文件的遥远后继者。  由于名称空间与 CORBA 的 @code{idl-mode}（在 Emacs 中定义的文件 @file{cc-mode.el}）发生冲突，必须重命名模式和文件。
+
+在本手册中，每个部分都以相关用户选项列表结尾。不要被可用选项的数量所迷惑：在大多数情况下，默认设置就可以了。  此处列出了变量，以确保您知道在想要更改任何内容时应该在哪里查找。  有关特定变量的作用以及如何配置它的完整描述，请参阅该变量的文档字符串（可通过 @kbd{C-h v} 获得）。  附录中还给出了一些配置示例。
+
+@node IDLWAVE in a Nutshell
+@chapter IDLWAVE 简而言之
+@cindex Summary of important commands
+@cindex IDLWAVE in a Nutshell
+@cindex Nutshell, IDLWAVE in a
+
+@subheading 编辑 IDL 程序
+
+@multitable @columnfractions .15 .85
+@item @key{TAB}
+@tab Indent the current line relative to context.
+@item @kbd{C-M-\}
+@tab Re-indent all lines in the current region.
+@item @kbd{C-M-q}
+@tab Re-indent all lines in the current routine.
+@item @kbd{C-u @key{TAB}}
+@tab Re-indent all lines in the current statement.
+@item @kbd{M-@key{RET}}
+@tab Start a continuation line, splitting the current line at point.
+@item @kbd{M-;}
+@tab Start new comment at line beginning or after code, or (un)comment
+突出显示的区域。
+@item @kbd{M-q}
+@tab Fill the current comment paragraph.
+@item @kbd{C-c ?}
+@tab Display calling sequence and keywords for the procedure or function call
+在点上。
+@item @kbd{M-?}
+@tab Load context sensitive online help for nearby routine, keyword, etc.
+@item @kbd{M-@key{TAB}}
+@tab Complete a procedure name, function name or keyword in the buffer.
+@item @kbd{C-c C-i}
+@tab Update IDLWAVE's knowledge about functions and procedures.
+@item @kbd{C-c C-v}
+@tab Visit the source code of a procedure/function.
+@item @kbd{C-u C-c C-v}
+@tab Visit the source code of a procedure/function in this buffer.
+@item @kbd{C-c C-h}
+@tab Insert a standard documentation header.
+@item @kbd{C-c @key{RET}}
+@tab Insert a new timestamp and history item in the documentation header.
+@end multitable
+
+@subheading 运行 IDLWAVE Shell，调试程序
+
+@multitable @columnfractions .15 .85
+@item @kbd{C-c C-s}
+@tab Start IDL as a subprocess and/or switch to the shell buffer.
+@item @key{Up}, @kbd{M-p}
+@tab Cycle back through IDL command history.
+@item @key{Down},@kbd{M-n}
+@tab Cycle forward.
+@item @kbd{@key{TAB}}
+@tab Complete a procedure name, function name or keyword in the shell buffer.
+@item @kbd{C-c C-d C-c}
+@tab Save and compile the source file in the current buffer.
+@item @kbd{C-c C-d C-e}
+@tab Compile and run the current region.
+@item @kbd{C-c C-d C-x}
+@tab Go to next syntax error.
+@item @kbd{C-c C-d C-v}
+@tab Switch to electric debug mode.
+@item @kbd{C-c C-d C-b}
+@tab Set a breakpoint at the nearest viable source line.
+@item @kbd{C-c C-d C-d}
+@tab Clear the nearest breakpoint.
+@item @kbd{C-c C-d [}
+@tab Go to the previous breakpoint.
+@item @kbd{C-c C-d ]}
+@tab Go to the next breakpoint.
+@item @kbd{C-c C-d C-p}
+@tab Print the value of the expression near point in IDL.
+@end multitable
+
+@subheading 常用设置在@file{.emacs}
+@lisp
+;; Change the indentation preferences
+;; Start autoloading routine info after 2 idle seconds
+(setq idlwave-init-rinfo-when-idle-after 2)
+;; Pad operators with spaces
+(setq idlwave-do-actions t
+      idlwave-surround-by-blank t)
+;; Syntax Highlighting
+(add-hook 'idlwave-mode-hook 'turn-on-font-lock)
+;; Automatically start the shell when needed
+(setq idlwave-shell-automatic-start t)
+;; Bind debugging commands with CONTROL and SHIFT modifiers
+(setq idlwave-shell-debug-modifiers '(control shift))
+@end lisp
+
+@html
+<A NAME="TUTORIAL"></A>
+@end html
+
+@node Getting Started
+@chapter 入门（教程）
+@cindex Quick-Start
+@cindex Tutorial
+@cindex Getting Started
+
+@menu
+* Lesson I---Development Cycle::
+* Lesson II---Customization::
+* Lesson III---User Catalog::
+@end menu
+
+@node  Lesson I---Development Cycle
+@section 第一课：开发周期
+
+本教程的目的是指导您使用 IDLWAVE@. 完成一个非常基本的开发周期，我们将把一个简单的程序粘贴到缓冲区中，并使用 shell 来编译、调试和运行它。  途中我们将使用许多重要的 IDLWAVE 命令。  但请注意，IDLWAVE 的功能比此处介绍的要多得多，可以通过阅读整个手册或在离您最近的 IDLWAVE 专家的肩膀上徘徊几天来发现这些功能。
+
+假设您可以访问带有完整 IDLWAVE 软件包（包括在线帮助）的 Emacs。  我们还假设您熟悉 Emacs 并且可以阅读 Emacs 中按键的术语（特别是，@kbd{C} 代表 @key{CONTROL}，@kbd{M} 代表 @key{META}（通常 @key{ALT} 键具有此功能））。
+
+通过键入以下内容打开新的源文件：
+
+@example
+@kbd{C-x C-f tutorial.pro @key{RET}}
+@end example
+
+将弹出该文件的缓冲区，它应该处于 IDLWAVE 模式，在编辑窗口正下方的模式行中指示。  此外，菜单栏应包含 @samp{IDLWAVE}。
+
+现在剪切并粘贴以下代码，该代码也可在 IDLWAVE 发行版中用作 @file{tutorial.pro}。
+
+@example
+function daynr,d,m,y
+  ;; compute a sequence number for a date
+  ;; works 1901-2099.
+  if y lt 100 then y = y+1900
+  if m le 2 then delta = 1 else delta = 0
+  m1 = m + delta*12 + 1
+  y1 = y * delta
+  return, d + floor(m1*30.6)+floor(y1*365.25)+5
+end
+
+function weekday,day,month,year
+  ;; compute weekday number for date
+  nr = daynr(day,month,year)
+  return, nr mod 7
+end
+
+pro plot_wday,day,month
+  ;; Plot the weekday of a date in the first 10 years of this century.
+  years = 2000,+indgen(10)
+  wdays = intarr(10)
+  for i=0,n_elements(wdays)-1 do begin
+      wdays[i] =  weekday(day,month,years[i])
+  end
+  plot,years,wdays,YS=2,YT="Wday (0=Sunday)"
+end
+@end example
+
+缩进可能看起来很有趣，因为它与您使用的设置不同，因此在每行中使用 @key{TAB} 键自动将其对齐（或者更快地，使用 @kbd{C-x h} @emph{select} 整个缓冲区，并使用 @kbd{C-M-\} 缩进整个区域）。  如果您设置了对字体锁定的支持，请注意不同的语法元素如何以不同的颜色突出显示。
+
+让我们来看看 IDLWAVE@. 的两个特定编辑功能。将光标放在 @code{for} 循环的 @code{end} 语句后面，然后按 @key{SPC}。  IDLWAVE 闪烁回到块的开头，并自动将通用 @code{end} 更改为特定的 @code{endfor}（只要变量 @code{idlwave-expand-generic-end} 打开；@pxref{Lesson II---Customization}）。  现在将光标放在要拆分的任何行中，然后按@kbd{M-@key{RET}}。该行在光标位置处分割，并处理了延续 @samp{$} 和缩进。  使用 @kbd{C-/} 撤消最后的更改。
+
+程序 @code{plot_wday} 应该绘制 21 世纪前 10 年中给定日期的星期几。  与大多数代码一样，存在一些错误，我们将使用 IDLWAVE 来帮助我们修复这些错误。
+
+首先，让我们启动 IDLWAVE shell。  您可以使用命令 @kbd{C-c C-s} 来执行此操作。  Emacs 窗口将拆分或弹出另一个窗口以显示在 shell 交互缓冲区中运行的 IDL。  键入一些命令，例如 @code{print,!PI} 来说服自己，您可以像在终端中一样工作，或者使用 IDLDE@. 使用箭头键循环浏览命令历史记录。  我们现在玩得开心吗？
+
+现在返回源窗口并输入 @kbd{C-c C-d C-c} 来编译程序。  如果您观察 shell 缓冲区，您会看到 IDLWAVE 为您输入了@samp{.run "tutorial.pro"}。  但是编译失败，因为@samp{years=...}行中有一个逗号。  有错误的行会突出显示，并且光标位于错误处，因此请删除逗号（您应该只需要点击@kbd{Delete}！）。  使用与之前相同的击键再次编译。  请注意，该文件会自动为您保存。  这次一切都应该工作正常，并且您应该看到三个例程编译。
+
+现在我们想使用该命令来绘制 1 月 1 日是星期几。  我们可以自己输入完整的命令，但为什么要这么做呢？  返回 shell 窗口，输入 @samp{plot_} 并点击 @key{TAB}。  经过一段延迟后（当 IDLWAVE 初始化其例程信息数据库时，如有必要），窗口将拆分以显示它知道的以该字符串开头的所有过程，@w{@code{plot_wday}} 应该是其中之一。  保存缓冲区提醒 IDLWAVE 有关此新例程的信息。用鼠标中键单击 @code{plot_wday}，它将被复制到 shell 缓冲区，或者如果您愿意，可以将 @samp{w} 添加到 @samp{plot_} 以使其明确（取决于您系统上安装的以 @samp{plot_} 开头的其他例程），再次点击 @key{TAB}，完整的例程名称将完成。  现在提供两个参数：
+
+@example
+plot_wday,1,1
+@end example
+
+@noindent and press @key{RET}.  This fails with an error message telling
+您要绘制的 @code{YT} 关键字不明确。  允许的关键字又是什么？  返回源窗口并将光标放入“plot”行并按@kbd{C-c ?}。  这显示了绘图例程的例程信息窗口，其中包含关键字列表以及参数列表。  哦，我们想要@code{YTITLE}。  解决这个问题。使用@kbd{C-c C-d C-c}重新编译。  使用@kbd{C-c C-s}跳回到shell，按@key{UP}箭头调用上一个命令并再次执行。
+
+这次我们得到了一个图，但它非常丑陋：所有的点都用一条线连接起来。  嗯，有没有办法让@code{plot}使用符号来代替？  那个关键词是什么？  将光标放在绘图线上的逗号后面（通常在此处键入关键字），然后点击@kbd{M-@key{Tab}}。  出现一长串情节关键字。  啊哈，就在那里，@code{PSYM}。  单击鼠标中键将其插入。  还为您提供了 @samp{=} 标志。  现在 @code{PSYM} 的值应该是多少？  将光标放在关键字上或关键字之后，按 @kbd{M-?} 获取在线帮助（或者，您可以右键单击完成列表中的彩色关键字本身）。  将弹出一个浏览器，显示 @code{PYSM} 关键字的 HTML 文档。好的，我们使用钻石=4。  解决这个问题，重新编译（你现在知道命令了：@kbd{C-c C-d C-c}），返回到 shell（如果它消失了，你知道该怎么做：@kbd{C-c C-s}）并再次执行。  现在情况看起来不错。
+
+让我们尝试不同的一天。  愚人节怎么样？
+
+@example
+plot_wday,1,4
+@end example
+
+哎呀，这看起来非常错误。  愚人节不可能全部都是星期五！我们的程序中有一个错误，可能是在 @code{daynr} 函数中。让我们在最后一行放置一个断点。  将光标定位在@samp{return, d+...}行并按@kbd{C-c C-d C-b}。  IDL 设置断点（如您在 shell 窗口中看到的那样），并指示断线。  回到shell缓冲区，重新执行前面的命令。 IDL 在有断点的行处停止。  现在按住 SHIFT 键并用鼠标中键单击其中的几个变量：@samp{d}、@samp{y}、@samp{m}、@samp{y1} 等。也许 @code{d} 不是正确的类型。  CONTROL-SHIFT 中键单击它以获取帮助。  嗯，它是一个整数，所以这不是问题。  啊哈，@samp{y1} 为零，但它应该是年份，具体取决于 delta。  按住 Shift 键并单击 @samp{delta} 可以看到它是 0。下面，我们看到有问题的行： @samp{y1=y*delta...} 乘法应该是减号！按@kbd{q}退出调试模式，并将该行修改为：
+
+@example
+y1 = y - delta
+@end example
+
+现在删除所有断点：@kbd{C-c C-d C-a}。  重新编译并重新运行该命令。  现在一切都应该工作正常。  那些闰年怎么样？更改代码以绘制 100 年，您会看到每 28 年，工作日的顺序就会重复一次。
+
+@node  Lesson II---Customization
+@section 第二课：定制
+
+Emacs 可能是有史以来最可定制的软件，如果您不利用它来使 IDLWAVE 适应您自己的喜好，那将是一种耻辱。  自定义 Emacs 或 IDLWAVE 是通过在主目录中的 @file{.emacs} 文件中设置 Lisp 变量来完成的——但不要沮丧；大多数情况下，您可以直接复制此处给出的示例并进行操作。
+
+我们首先使用一个布尔变量。  这些是您打开或关闭的变量，很像复选框。  值为 @samp{t} 表示开启，值为 @samp{nil} 表示关闭。  将以下行复制到您的 @file{.emacs} 文件中，退出并重新启动 Emacs。
+
+@lisp
+(setq idlwave-reserved-word-upcase t)
+@end lisp
+
+打开此选项后，您在 IDL 源缓冲区中输入的每个保留字将在您在该字后按 @key{SPC} 或 @key{RET} 时转换为大写。  尝试一下！  @samp{if} 更改为@samp{IF}，@samp{begin} 更改为@samp{BEGIN}。  如果您不喜欢这种行为，请再次从 @file{.emacs} 文件中删除该选项并重新启动 Emacs。
+
+您可能对 IDL 代码有自己的缩进首选项。  例如，有些人可能更喜欢从边缘稍微缩进 IDL 程序的主块，并仅使用 3 个空格作为 @code{BEGIN} 和 @code{END} 之间的缩进。  在 @file{.emacs} 中尝试以下几行：
+
+@lisp
+(setq idlwave-main-block-indent 1)
+(setq idlwave-block-indent 3)
+(setq idlwave-end-offset -3)
+@end lisp
+
+重新启动 Emacs，并使用 @kbd{C-c h} 和 @kbd{C-M-\} 重新缩进我们在本教程第一部分中开发的程序。  您可能希望将这些行保留在 @file{.emacs} 中，并根据您的喜好调整值。  如果您想获取有关这些变量的更多信息，请输入，例如 @kbd{C-h v idlwave-main-block-indent @key{RET}}。  要查找可以自定义哪些变量，请在本手册中查找标记为 @samp{User Option:} 的项目。
+
+如果您似乎无法掌握 @file{.emacs} 中的 Lisp 自定义，还有另一种更用户友好的方法来自定义所有 IDLWAVE 变量。  您可以通过 @file{.pro} 缓冲区之一的 IDLWAVE 菜单（菜单项 @code{Customize->Browse IDLWAVE Group}）访问它。  在这里，您将看到按类别分组的所有各种变量。  您可以导航层次结构（例如，使用 @samp{IDLWAVE Code Formatting->Idlwave Abbrev And Indent Action->Idlwave Expand Generic End} 打开 @code{END} 扩展），阅读变量，更改它们，然后“保存以供将来的会话使用”。  这些变量很少需要自定义，但您可以使用它们对 IDLWAVE 的功能进行相当大的控制。
+
+您可能还会发现用于调试命令的键绑定太长且复杂。  我们经常听到这样的抱怨：“我真的需要通过 @kbd{C-c C-d C-c} 的手指练习来运行一个简单的命令吗？”由于 Emacs 规则和约定，默认情况下无法设置较短的绑定，但您可以轻松启用它们。  首先，有一种方法可以将单次扫描中的所有调试命令分配给另一个更简单的组合。  唯一的问题是我们必须使用 Emacs 不需要的其他重要命令。  一个不错的选择是通过按住@key{CONTROL}和@key{SHIFT}同时按下单个字符来执行调试命令：@kbd{C-S-b}用于设置断点，@kbd{C-S-c}用于编译当前源文件，@kbd{C-S-a}用于删除所有断点（尝试一下，更容易）。  您可以通过以下方式启用此功能：
+
+@lisp
+(setq idlwave-shell-debug-modifiers '(shift control))
+@end lisp
+
+@noindent If you have a special keyboard with, for example, a
+@key{SUPER} 键，您甚至可以缩短它：
+
+@lisp
+(setq idlwave-shell-debug-modifiers '(super))
+@end lisp
+
+@noindent to get compilation on @kbd{S-c}.  Often, a modifier key like
+@key{SUPER} 或 @key{HYPER} 已绑定或可以绑定到键盘上其他未使用的键；请查阅您的系统文档。
+
+您还可以将特定命令分配给按键。  您必须在 @emph{mode-hook} 中执行此操作，这是一个在设置新的 IDLWAVE 缓冲区时运行的特殊函数。  按键定制的可能性是无限的。  这里我们将功能键f4-f8设置为常用的调试命令。
+
+@lisp
+;; First for the source buffer
+(add-hook 'idlwave-mode-hook
+   (lambda ()
+    (local-set-key [f4] 'idlwave-shell-retall)
+    (local-set-key [f5] 'idlwave-shell-break-here)
+    (local-set-key [f6] 'idlwave-shell-clear-current-bp)
+    (local-set-key [f7] 'idlwave-shell-cont)
+    (local-set-key [f8] 'idlwave-shell-clear-all-bp)))
+;; Then for the shell buffer
+(add-hook 'idlwave-shell-mode-hook
+   (lambda ()
+    (local-set-key [f4] 'idlwave-shell-retall)
+    (local-set-key [f5] 'idlwave-shell-break-here)
+    (local-set-key [f6] 'idlwave-shell-clear-current-bp)
+    (local-set-key [f7] 'idlwave-shell-cont)
+    (local-set-key [f8] 'idlwave-shell-clear-all-bp)))
+@end lisp
+
+@node  Lesson III---User Catalog
+@section 第三课：用户和图书馆目录
+
+我们已经在本教程的第一部分中使用了例程信息显示。  这是使用 @kbd{C-c ?} 调用的，并显示有关光标位置附近的 IDL 例程的信息。  为您自己的例程以及 JHUAPL 或 IDL-Astro 库等主要库中的大量代码提供相同类型的信息不是很好吗？  在许多情况下，您可能已经拥有此信息。  库目录中名为 @file{.idlwave_catalog} 的文件包含该目录中例程的扫描信息；许多流行的图书馆都附带了这些预先扫描的“图书馆目录”。用户可以通过以下两种方式之一扫描自己的例程：使用提供的工具扫描目录并构建自己的 @file{.idlwave_catalog} 文件，或者使用内置方法创建单个“用户目录”，我们将在此处显示。  @xref{Catalogs}，了解有关选择使用哪种方法的更多信息。
+
+要构建用户目录，请从菜单栏中的 IDLWAVE 条目中选择@code{Routine Info/Select Catalog Directories}。  如有必要，请先使用 @kbd{C-c C-s} (@pxref{Starting the Shell}) 启动 shell。 IDLWAVE 将查找 IDL @code{!PATH} 变量并提供路径上的目录列表。  只需选择全部（或任何您想要的；默认情况下不会选择包含现有图书馆目录的目录），然后单击 @samp{Scan&Save} 按钮。  然后去喝杯咖啡，同时 IDLWAVE 收集搜索路径上每个 IDL 例程的信息。  所有这些信息都写入文件@file{~/.emacs.d/idlwave/idlusercat.el}，并且从现在开始，每当您使用 IDLWAVE@. 时，您可能会发现有必要在本地库发生更改时重建目录，或者为这些目录构建库目录。  对您知道位于库中的任何例程或部分例程名称调用例程信息 (@kbd{C-c ?}) 或完成 (@kbd{M-@key{TAB}})。  例如，如果您已扫描 IDL-Astro 库：
+
+@example
+    a=readf@kbd{M-@key{TAB}}
+@end example
+
+扩展为“readfits(”。然后尝试
+
+@example
+    a=readfits(@kbd{C-c ?}
+@end example
+
+你得到：
+
+@example
+Usage:    Result = READFITS(filename, header, heap)
+...
+@end example
+
+我希望你能坚持到这里。  现在您已准备好使用 IDLWAVE@. 在此过程中您将想要更改其他内容，并了解有关本简短教程中未讨论的可能性的更多信息。  阅读手册，查看有趣变量的文档字符串（使用@kbd{C-h v idlwave<-variable-name> @key{RET}}）并在新闻组@code{comp.lang.idl-pvwave}上询问其余问题。
+
+@node The IDLWAVE Major Mode
+@chapter IDLWAVE 主模式
+@cindex IDLWAVE major mode
+@cindex Major mode, @code{idlwave-mode}
+
+IDLWAVE主要模式支持编辑IDL源文件。  在本章中，我们将描述该模式的主要功能以及如何自定义它们。
+
+@menu
+* Code Formatting::              让代码看起来漂亮
+* Routine Info::                 调用顺序和关键字列表
+* Online Help::                  一键从源头获取帮助
+* Completion::                   完成例程名称和关键字
+* Routine Source::               寻找常规，简单的方法
+* Resolving Routines::           强制 Shell 编译例程
+* Code Templates::               频繁的代码构造
+* Abbreviations::                常用命令缩写
+* Actions::                      更改大小写、填充、结束检查
+* Doc Header::                   插入标准标头
+* Motion Commands::              浏览程序的结构
+* Misc Options::                 不适合其他地方的东西
+@end menu
+
+@node Code Formatting
+@section 代码格式化
+@cindex Code formatting
+@cindex Formatting, of code
+
+@menu
+* Code Indentation::             体现逻辑结构
+* Continued Statement Indentation::
+* Comment Indentation::          注释行的特殊缩进
+* Continuation Lines::           跨行分割语句
+* Syntax Highlighting::          字体锁定支持
+* Octals and Highlighting::      为什么“123会导致问题
+@end menu
+
+IDL 语言早期源于 FORTRAN，现代采用 C 语言实现，并且在其 25 年以上的历史中自由借用了许多矢量和其他语言的功能，继承了一种不寻常的语法元素组合。  如果任凭自己的想法，新手 IDL 程序员常常会编写出非常难以阅读且无法适应的代码。  通过研究用于编码样式指针的可用 IDL 代码库可以收集到很多信息，但是，由于 IDL 语法元素的多样性，复制这种样式充其量也可能具有挑战性。  幸运的是，IDLWAVE 非常了解 IDL 代码的结构，并为您处理几乎所有格式问题。  将其配置为符合您的编码标准后，您可以依靠它来帮助保持代码整洁和有组织。
+
+
+@node Code Indentation
+@subsection 代码缩进
+@cindex Code indentation
+@cindex Indentation
+
+与所有 Emacs 编程模式一样，IDLWAVE 执行代码缩进。 @key{TAB} 键相对于上下文缩进当前行。 @key{LFD} 插入换行符并缩进新行。  缩进由许多变量控制。  IDLWAVE 缩进块（在 @code{PRO}/@code{FUNCTION}/@code{BEGIN} 和 @code{END} 之间）和续行​​。
+
+@cindex Foreign code, adapting
+@cindex Indentation, of foreign code
+@kindex C-M-\
+要重新缩进大部分代码（例如，当使用以不同约定编写的外来代码时），请在标记相关代码后使用 @kbd{C-M-\} (@code{indent-region})。  有用的标记命令是@kbd{C-x h}（整个文件）或@kbd{C-M-h}（当前子程序）。  命令 @kbd{C-M-q} 重新缩进整个当前例程。  @xref{Actions}，了解如何对外部代码施加额外的格式约定的信息。
+
+@defopt idlwave-main-block-indent (@code{2})
+主要代码块的额外缩进。  这是该程序单元的 FUNCTION/PRO 语句和 END 语句之间的块。
+@end defopt
+
+@defopt idlwave-block-indent (@code{3})
+额外的缩进应用于块行。  如果你改变这个，你可能也想改变@code{idlwave-end-offset}。
+@end defopt
+
+@defopt idlwave-end-offset (@code{-3})
+额外缩进应用于块 END 行。  等于负 @code{idlwave-block-indent} 的值将使 END 行与块 BEGIN 行对齐。
+@end defopt
+
+@node Continued Statement Indentation
+@subsection 继续声明缩进
+@cindex Indentation, continued statement
+@cindex Continued statement indentation
+连续行（在以 @code{$} 结尾的行之后）可以接收相对于主级别的固定缩进偏移量，但在某些情况下，IDLWAVE 可以使用特殊形式的缩进，从而更自然地对齐连续语句。  为连续例程定义语句和调用计算特殊缩进，将括号括起来（如函数调用、结构/类定义、显式结构或列表等）以及连续赋值。  尝试与相关开始标点符号后的第一个非空白字符对齐 (@code{,},@code{(},@code{@{},@code{[},@code{=}).  For lines without any non-comment characters on the line with the opening punctuation, the continued line(s) are aligned just past the punctuation.  An example:
+
+@example
+function foo, a, b,  $
+              c, d
+  bar =  sin( a + b + $
+              c + d)
+end
+@end example
+@noindent
+
+这种特殊的连续语句缩进的唯一缺点是它会消耗更多空间，例如，对于长函数名或赋值的左侧：
+
+@example
+function thisfunctionnameisverylongsoitwillleavelittleroom, a, b, $
+                                                            c, d
+@end example
+
+您可以通过设置变量 @code{idlwave-max-extra-continuation-indent} 来指示 IDLWAVE 何时避免使用这种特殊的连续缩进，该变量指定超出要容忍的基本缩进的最大附加缩进，否则默认为距封闭缩进的固定偏移量（偏移量的大小在 @code{idlwave-continuation-indent} 中设置）。  作为一种特殊情况，假设您因为需要空间而继续，则不带任何参数或关键字的例程调用的延续将 @emph{not} 对齐续行。
+
+此外，由于在具有特殊连续缩进的连续语句中，缩进级别可能有些动态，特别是当 0⁣ 很小时，键 @kbd{C-u @key{TAB}} 将重新缩进当前语句中的所有行。请注意，@code{idlwave-indent-to-open-paren}（如果非 @code{nil}）会覆盖 @code{idlwave-max-extra-continuation-indent} 限制（仅限括号），强制它们始终对齐。
+
+
+@defopt idlwave-continuation-indent (@code{2})
+额外缩进应用于正常的连续行。
+@end defopt
+
+@defopt idlwave-max-extra-continuation-indent (@code{20})
+特殊连续允许的最大附加缩进（在基本连续缩进之上）。  要有效禁用特殊连续缩进，请设置为 @code{0}。  要持续启用它，请设置为一个较大的数字（如@code{100}）。  请注意，在嵌套括号语句之外，长连续语句中的缩进永远不会逐行减少。
+@end defopt
+
+@defopt idlwave-indent-to-open-paren (@code{t})
+非@code{nil}表示将连续行缩进到最里面的左括号，无论是否满足@code{idlwave-max-extra-continuation-indent}限制。
+@end defopt
+
+@node Comment Indentation
+@subsection 注释缩进
+@cindex Comment indentation
+@cindex Hanging paragraphs
+@cindex Paragraphs, filling
+@cindex Paragraphs, hanging
+
+在 IDL 中，以 @samp{;} 开头的行称为 @emph{comment lines}。注释行缩进如下：
+
+@multitable @columnfractions .1 .90
+@item @code{;;;}
+@tab The indentation of lines starting with three semicolons remains
+不变。
+@item @code{;;}
+@tab Lines starting with two semicolons are indented like the surrounding code.
+@item @code{;}
+@tab Lines starting with a single semicolon are indented to a minimum column.
+@end multitable
+
+@noindent
+从第 0 列开始的注释缩进永远不会改变。
+
+@defopt idlwave-no-change-comment
+以该正则表达式开头的注释的缩进不会更改。
+@end defopt
+
+@defopt idlwave-begin-line-comment
+锚定在行首的注释。
+@end defopt
+
+@defopt idlwave-code-comment
+以此正则表达式开头的注释会缩进，就好像它是 IDL 代码的一部分一样。
+@end defopt
+
+@node Continuation Lines
+@subsection 延续线和填充
+@cindex Continuation lines
+@cindex Line splitting
+@cindex String splitting
+@cindex Splitting, of lines
+
+@kindex M-RET
+在 IDL 中，除非前面有 @samp{$}，否则换行符会终止语句。  如果您想开始续行，请使用@kbd{M-@key{RET}}，它会调用命令@code{idlwave-split-line}。它插入连续字符@samp{$}，终止该行并缩进新行。  还可以在字符串内部调用命令 @kbd{M-@key{RET}} 来在该点拆分它，在这种情况下使用 @samp{+} 连接运算符。
+
+@cindex Filling
+@cindex @code{auto-fill-mode}
+@cindex Hanging paragraphs
+当填充注释段落时，IDLWAVE 会重载正常的填充函数，并使用一个函数来创建 IDL 例程标头中常用的悬挂段落。  当@code{auto-fill-mode}打开时（用@kbd{C-c C-a}切换），注释将自动填充。  如果段落的第一行包含 @code{idlwave-hang-indent-regexp} 的匹配项（默认情况下是破折号空格），则后续行将在其后面对齐，如下例所示。
+
+@example
+@group
+;=================================
+; x - an array containing
+;     lots of interesting numbers.
+;
+; y - another variable where
+;     a hanging paragraph is used
+;     to describe it.
+;=================================
+@end group
+@end example
+
+@kindex M-q
+您还可以随时使用 @kbd{M-q} 重新填写评论段落。如上例所示，注释分隔行由一个或多个 @samp{;} 后跟一个或多个字符 @samp{+=-_*} 组成，按原样保留。
+
+@defopt idlwave-fill-comment-line-only (@code{t})
+非@code{nil}表示自动填充仅在注释行上运行。
+@end defopt
+
+@defopt idlwave-auto-fill-split-string (@code{t})
+非 @code{nil} 表示自动填充将使用 IDL @samp{+} 运算符分割字符串。
+@end defopt
+
+@defopt idlwave-split-line-string (@code{t})
+非@code{nil}意味着@code{idlwave-split-line}将与@samp{+}分割字符串。
+@end defopt
+
+@defopt idlwave-hanging-indent (@code{t})
+非 @code{nil} 表示注释段落缩进到段落第一行中 @code{idlwave-hang-indent-regexp} 匹配给出的悬挂缩进下方。
+@end defopt
+
+@defopt idlwave-hang-indent-regexp (@code{"- "})
+正则表达式匹配注释段落第一行中悬挂缩进的位置。
+@end defopt
+
+@defopt idlwave-use-last-hang-indent (@code{nil})
+非@code{nil} 表示使用@code{idlwave-indent-regexp} 线上的最后一个匹配项。
+@end defopt
+
+@node Syntax Highlighting
+@subsection 语法高亮
+@cindex Syntax highlighting
+@cindex Highlighting of syntax
+@cindex Font lock
+
+关键字、注释、字符串等的突出显示。@: 可以通过 @code{font-lock} 来完成。  如果您正在使用 @code{global-font-lock-mode}，或者在任何其他缓冲区中打开 @code{font-lock-mode}，它也应该自动在 IDLWAVE 缓冲区中工作。  如果您希望按模式单独调用字体锁定，则可以在 @code{idlwave-mode} 中使用 @file{.emacs} 中的以下行强制执行它：
+
+@lisp
+(add-hook 'idlwave-mode-hook 'turn-on-font-lock)
+@end lisp
+
+@noindent IDLWAVE supports 3 increasing levels of syntax highlighting.
+变量@code{font-lock-maximum-decoration}决定选择哪个级别。  可以使用变量 @code{idlwave-default-font-lock-items} 选择特殊标记的各个类别来突出显示。
+
+@defopt idlwave-default-font-lock-items
+应在默认字体级别 2 上字体化的项目。
+@end defopt
+
+@node Octals and Highlighting
+@subsection 八进制和突出显示
+@cindex Syntax highlighting, Octals
+@cindex Highlighting of syntax, Octals
+
+罕见的语法突出显示问题是由 IDL 中八进制数的极其不幸的表示法导致的：@code{"123}。  这个不成对的引号非常难以解析，因为它可以在一行中与任意数量的字符串混合。  Emacs 会错误地将其识别为字符串，并且以下代码行的突出显示可能会失真，因为该字符串永远不会终止。
+
+解决此问题的一种方法是通过在注释中提供右引号来自行终止错误识别的字符串：
+
+@example
+  string("305B) + $ ;" <--- for font-lock
+   ' is an Angstrom.'
+@end example
+
+@noindent A far better solution is to abandon this notation for octals
+完全，并使用 IDL 提供的更明智的替代方案：
+
+@example
+   string('305'OB) + ' is an Angstrom.'
+@end example
+
+@noindent This simultaneously solves the font-lock problem and is more
+与十六进制数字的表示法一致，例如@code{'C5'XB}。
+
+@node Routine Info
+@section 日常信息
+@cindex Routine info
+@cindex Updating routine info
+@cindex Scanning buffers for routine info
+@cindex Buffers, scanning for routine info
+@cindex Shell, querying for routine info
+
+@kindex C-c C-i
+IDL 与一千多个过程、函数和对象方法捆绑在一起，大型库通常包含数百甚至数千个（每个库都有几个到几十个关键字和参数）。  这个庞大的命令集可能会让人很难记住您使用的例程的调用顺序和关键字，但 IDLWAVE 可以提供帮助。  它从各种来源建立日常信息；事实上，IDLWAVE 对系统上 @samp{.pro} 例程的了解比 IDL 本身还要多！  它维护所有内置例程的列表，以及调用序列和关键字@footnote{This list is created by scanning the IDL manuals and might contain (very few) errors.  Please report any errors to the maintainer, so that they can be fixed.}。  它还扫描 Emacs 缓冲区中的例程定义，查询 IDLWAVE-Shell 以获取有关当前在那里编译的例程的信息，并自动定位库和用户创建的目录。  此信息会自动更新，因此通常应该是最新的。  要强制全局更新并刷新例程信息，请使用@kbd{C-c C-i} (@code{idlwave-update-routine-info})。
+
+@kindex C-c ?
+要显示有关例程的信息，请按 @kbd{C-c ?}，这将调用命令 @code{idlwave-routine-info}。  当当前光标位置位于过程或函数的名称或参数列表中时，将显示有关例程的信息。  例如，考虑以下行中指示的光标位置：
+
+@example
+plot,x,alog(x+5*sin(x) + 2),
+  |  |   |   |   |  |  |    |
+  1  2   3   4   5  6  7    8
+@end example
+
+@cindex Default routine, for info and help
+在位置 1,2 和 8 上，将显示有关 @samp{plot} 过程的信息。  在位置 3,4 和 7 上，将描述 @samp{alog} 函数，而位置 5 和 6 将研究 @samp{sin} 函数。
+
+当您请求有关对象方法的例程信息，并且该方法存在于多个类中时，IDLWAVE 会查询该对象的类，除非该类已通过 @samp{->} 运算符 (@pxref{Object Method Completion and Class Ambiguity}) 上的文本属性已知，或者已显式包含在调用中（例如 @code{a->myclass::Foo}）。
+
+@cindex Calling sequences
+@cindex Keywords of a routine
+@cindex Routine source information
+显示的描述包含调用序列、关键字列表和该例程的源位置。  它看起来像这样：
+
+@example
+Usage:    XMANAGER, NAME, ID
+Keywords: BACKGROUND CATCH CLEANUP EVENT_HANDLER GROUP_LEADER
+          JUST_REG MODAL NO_BLOCK
+Source:   SystemLib   [LCSB] /soft1/idl53/lib/xmanager.pro
+@end example
+
+@cindex Categories, of routines
+@cindex Load-path shadows
+@cindex Shadows, load-path
+@cindex IDL variable @code{!PATH}
+@cindex @code{!PATH}, IDL variable
+@cindex IDL variable @code{!DIR}
+@cindex @code{!DIR}, IDL variable
+
+如果此例程的定义存在于 IDLWAVE 可访问的多个文件中，则多个 @samp{Source} 行将指向不同的文件。  这可能表明您的例程正在隐藏系统库例程，这可能是也可能不是您想要的 (@pxref{Load-Path Shadows})。  有关调用序列和关键字的信息源自列出的第一个来源。仅当您扫描了本地 IDL 目录或使用预先扫描的库 (@pxref{Catalogs}) 时，库例程才可用。源条目由一个@emph{source category}、一组@emph{flags} 以及到@emph{source file} 的路径组成。  存在以下默认类别：
+
+@multitable @columnfractions .15 .85
+@item @i{System}
+@tab A system routine of unknown origin.  When the system library has
+被扫描为目录 (@pxref{Catalogs}) 的一部分，该类别将自动拆分为接下来的两个。
+@item @i{Builtin}
+@tab A builtin system routine with no source code available.
+@item @i{SystemLib}
+@tab A library system routine in the official lib directory @file{!DIR/lib}.
+@item @i{Obsolete}
+@tab A library routine in the official lib directory @file{!DIR/lib/obsolete}.
+@item @i{Library}
+@tab A routine in a file on IDL's search path @code{!PATH}.
+@item @i{Other}
+@tab Any other routine with a file not known to be on the search path.
+@item @i{Unresolved}
+@tab An otherwise unknown routine the shell lists as unresolved
+（参考，但未编译）。
+@end multitable
+
+在库目录 (@pxref{Library Catalogs}) 中发现的任何例程都将显示创建期间分配的类别，例如 @samp{NasaLib}。  对于未通过这种方式发现的例程，您可以使用变量 @code{idlwave-special-lib-alist} 根据例程的文件名创建其他类别。
+
+@cindex Flags, in routine info
+@cindex Duplicate routines
+@cindex Multiply defined routines
+@cindex Routine definitions, multiple
+标志 @code{[LCSB]} 指示 IDLWAVE 有关文件的信息来源：来自库目录 (@w{@code{[L---]}})、来自用户目录 (@w{@code{[-C--]}}、来自 IDL Shell (@w{@code{[--S-]}}) 或来自 Emacs 缓冲区 (@w{@code{[---B]}})。组合是可能的（在缓冲区中访问的已编译库例程可能会读取 @w{@code{[L-SB]}}）。如果文件包含多个定义对于同一例程，文件名将以 @samp{(Nx)} 为前缀，其中 @samp{N} 是定义的数量。
+
+@cindex Online Help from the routine info buffer
+@cindex Active text, in routine info
+@cindex Inserting keywords, from routine info
+@cindex Source file, access from routine info
+@file{*Help*} 例程信息缓冲区中的一些文本将处于活动状态（当鼠标移到其上时会突出显示）。  通常，单击鼠标右键会调用在线帮助查找，单击鼠标中键会插入关键字或访问文件：
+
+@multitable @columnfractions 0.15 0.85
+@item @i{Usage}
+@tab If online help is installed, a click with the @emph{right} mouse
+@i{Usage:} 行上的按钮将访问例程 (@pxref{Online Help}) 的帮助。
+@item @i{Keyword}
+@tab Online help about keywords is also available with the
+@emph{right} 鼠标按钮。  使用 @emph{middle} 鼠标按钮单击关键字会将该关键字插入到调用 @code{idlwave-routine-info} 的缓冲区中。  单击时按住 @key{SHIFT} 还会添加初始 @samp{/}。
+@item @i{Source}
+@tab Clicking with the @emph{middle} mouse button on a @samp{Source} line
+找到例程的源文件并在另一个窗口中访问它。在同一行上再次单击会切换回调用 @kbd{C-c ?} 的缓冲区。  如果使用@emph{right}鼠标按钮，缓冲区将不会访问源代码，而是会显示在在线帮助窗口中。
+@item @i{Classes}
+@tab The @i{Classes} line is only included in the routine info window if
+当前类继承自其他类。  您可以使用 @emph{middle} 鼠标按钮单击来显示继承链上其他类中当前方法的例程信息（如果那里存在这样的方法）。
+@end multitable
+
+@defopt idlwave-resize-routine-help-window (@code{t})
+非 @code{nil} 表示调整 Routine-info @file{*Help*} 窗口的大小以适合内容。
+@end defopt
+
+@defopt idlwave-special-lib-alist
+匹配特殊库目录的正则表达式列表。
+@end defopt
+
+@defopt idlwave-rinfo-max-source-lines (@code{5})
+“例程信息”窗口中显示的源文件的最大数量。
+@end defopt
+
+
+@html
+<A NAME="ONLINE_HELP"></A>
+@end html
+@node Online Help
+@section 在线帮助
+
+@cindex Online Help
+@cindex @file{idlw-help.txt}
+@cindex @file{idlw-help.el}
+@cindex Installing online help
+@cindex Online Help, Installation
+@cindex Speed, of online help
+@cindex XML Help Catalog
+
+对于 IDL 系统例程，IDL@. 提供了大量文档，IDLWAVE 可以根据本地上下文非常快速、准确地访问该文档的 HTML 版本。  这比使用 IDL 在线帮助应用程序要快 1⁣，因为 IDLWAVE 通常可以让您直接到达文档中的正确位置（例如，例程的特定关键字），而无需任何额外的浏览和滚动。
+
+为了使此在线帮助正常工作，需要 HTML 版本的 IDL 文档。  从 IDL 6.2 开始，HTML 文档以及基于 XML 的例程信息目录直接随 IDL 一起分发。  默认情况下，IDLWAVE 会自动尝试将此 XML 目录转换为 Emacs 更容易理解的格式，并将此信息缓存在您的 @code{idlwave_config_directory}（默认情况下@file{~/.emacs.d/idlwave/}）中。  如果 XML 目录比当前缓存的版本新，它还会重新扫描。  您可以使用菜单项@code{IDLWAVE->Routine Info->Rescan XML Help Catalog}强制重新扫描。
+
+在 IDL 6.2 之前，HTML 帮助不随 IDL 一起分发，并且不是独立 IDLWAVE 分发的一部分，而是必须单独下载。  这不再是必要的：所有帮助和例行信息均由 IDL 版本 6.2 及更高版本提供。
+
+有多种用于显示 HTML 帮助的选项：请参见下文。通过使用例程文档标题和/或例程源，还可以获取没有 HTML 文档的例程帮助。
+
+@kindex M-?
+在任何 IDL 程序中（或者，与大多数 IDLWAVE 命令一样，在 IDL Shell 中），按 @kbd{M-?} (@code{idlwave-context-help})，或单击 @kbd{S-mouse-3} 访问上下文相关的在线帮助。  以下位置是公认的帮助上下文：
+
+@cindex Context, for online help
+@multitable @columnfractions .25 .75
+@item @i{Routine names}
+@tab The name of a routine (function, procedure, method).
+@item @i{Keyword Parameters}
+@tab A keyword parameter of a routine.
+@item @i{System Variables}
+@tab System variables like @code{!DPI}.
+@item @i{System Variable Tags}
+@tab System variables tags like @code{!D.X_SIZE}.
+@item @i{IDL Statements}
+@tab Statements like @code{PRO}, @code{REPEAT}, @code{COMPILE_OPT}, etc.
+@item @i{IDL Controls}
+@tab Control structures like @code{FOR}, @code{SWITCH}, etc.
+@item @i{Class names}
+@tab A class name in an @code{OBJ_NEW} call.
+@item @i{Class Init Keywords}
+@tab Beyond the class name in an @code{OBJ_NEW} call.
+@item @i{Executive Command}
+@tab An executive command like @code{.RUN}.  Mostly useful in the shell.
+@item @i{Structure Tags}
+@tab Structure tags like @code{state.xsize}
+@item @i{Class Tags}
+@tab Class tags like @code{self.value}.
+@item @i{Default}
+@tab The routine that would be selected for routine info display.
+@end multitable
+
+@cindex @code{OBJ_NEW}, special online help
+请注意，@code{OBJ_NEW} 函数的特殊之处在于，显示的帮助取决于光标位置。  如果光标位于 @samp{OBJ_NEW} 上，则说明此功能。  如果它位于引号内的类名上，则会提取该类的文档。如果光标位于参数列表中任意位置的 @emph{after} 类名，则目标是相应 @code{Init} 方法及其关键字的文档。
+
+除了 IDLWAVE 缓冲区或 shell 之外，还有两个地方可以访问在线帮助。
+
+@itemize @bullet
+@item 
+可以通过“例程信息”显示屏访问例程和关键字的在线帮助。  用 @kbd{mouse-3} 单击某个项目即可查看相应的帮助 (@pxref{Routine Info})。
+@item 
+当使用补全并且 Emacs 弹出一个包含可能补全的 @file{*Completions*} 缓冲区时，在补全项目上单击 @kbd{mouse-3} 会调用该项目的帮助 (@pxref{Completion})。  在线系统文档中提供帮助的项目（相对于@:仅程序源本身）将被强调（例如，蓝色）。
+@end itemize
+@noindent
+在这两种情况下，蓝色的面表示该项目已记录在 IDL 手册中，但将尝试直接访问原始源文件中的非蓝色项目。
+
+
+@menu
+* Help with HTML Documentation::
+* Help with Source::
+@end menu
+
+@node Help with HTML Documentation
+@subsection HTML 文档帮助
+@cindex HTML Help
+@cindex Help using HTML manuals
+@cindex IDL manual, HTML version
+@cindex IDL Assistant
+
+使用 HTML 文档的帮助是通过内置的 Emacs 命令 @code{browse-url} 调用的，该命令在您选择的浏览器中显示相关的帮助主题。  从版本 6.2 开始，IDL 附带帮助浏览器@emph{IDL Assistant}，默认情况下使用该浏览器在所有支持的平台上显示在线帮助。  该浏览器提供主题搜索和索引，现在也是默认和推荐的 IDLWAVE 帮助浏览器。  变量@code{idlwave-help-use-assistant}控制是否使用该浏览器。  请注意，由于 Assistant 的限制，在 IDLWAVE 中调用帮助和 IDL 中的@code{? topic} 将导致 Assistant 的两个运行副本。
+
+除了 IDL Assistant 之外，还有许多浏览器可供选择，它们具有不同的优点和缺点。  变量 @code{idlwave-help-browser-function} 控制发送到哪个浏览器帮助（只要未设置 @code{idlwave-help-use-assistant}）。  此函数用于在本地设置变量@code{browse-url-browser-function}，仅用于 IDLWAVE 帮助。  自定义后一个变量以查看您的系统提供哪些浏览器选择。  某些浏览器（例如 EWW (@pxref{Top, EWW,, eww, The Emacs Web Wowser Manual})）在 Emacs 中运行，并使用 Emacs 缓冲区来显示 HTML 帮助。  这很方便，尤其是在小型显示器上，图像甚至可以在较新的 Emacs 版本上内嵌显示。  然而，使用外部浏览器（例如 Mozilla）通常可以获得更好的格式化结果。  IDLWAVE 假设任何包含“w3”的浏览器功能都显示在本地缓冲区中。  如果您使用的是另一个 Emacs 本地浏览器，但情况并非如此，请设置变量 @code{idlwave-help-browser-is-local}。
+
+对于 IDL 6.2 或更高版本，确保设置变量 @code{idlwave-system-directory} (@pxref{Catalogs}) 非常重要。  确保这一点的一种简单方法是运行 IDL Shell (@kbd{C-c C-s})。  它将查询该目录，并将结果缓存到文件中以供后续使用。
+
+@xref{HTML Help Browser Tips}，了解有关选择和配置浏览器以与 IDL 的 HTML 帮助系统配合使用的更多信息。
+
+@defopt idlwave-html-system-help-location @file{help/online_help}
+系统提供的 HTML 帮助目录的相对目录，相对于 @code{idlwave-system-directory} 考虑。  与 IDL 6.2 及更高版本相关。  不应该改变。
+@end defopt
+
+@defopt idlwave-html-help-location @file{/usr/local/etc/}
+@file{idl_html_help} HTML 目录所在的目录。对于 IDL 6.2 及更高版本已过时并被忽略（改为使用@code{idlwave-html-system-help-location}）。
+@end defopt
+
+@defopt idlwave-help-use-assistant @code{t}
+如果设置，则尽可能使用 IDL Assistant 来获取在线 HTML 帮助，否则使用 @code{idlwave-help-browser-function} 中指定的浏览器功能。
+@end defopt
+
+@defopt idlwave-help-browser-function
+用于显示 IDLWAVE HTML 帮助的浏览器功能。  应该是可用于设置@code{browse-url-browser-function}的功能之一，参见。
+@end defopt
+
+@defopt idlwave-help-browser-is-local
+@code{idlwave-help-browser-function} 中选择的浏览器是否在本地 Emacs 缓冲区或窗口中运行？  如果函数包含“-w3”，则默认为@code{t}。
+@end defopt
+
+@defopt idlwave-help-link-face
+IDLWAVE 在线帮助链接的界面。
+@end defopt
+
+@node Help with Source
+@subsection 来源帮助
+@cindex Help using routine source
+
+@cindex Source code, as online help
+@cindex DocLib header, as online help
+对于 HTML 手册中未记录的例程（例如个人例程或库例程），源代码本身用作帮助文本。  如果可以在（或多或少）标准 DocLib 文件标头中找到请求的信息，IDLWAVE 将显示标头（如果适用，向下滚动到关键字）。  否则，将显示例程定义语句 (@code{pro}/@code{function})。  搜索的 doclib 标头部分包括 @samp{NAME} 和 @samp{KEYWORDS}。  可以通过自定义 @code{idlwave-help-doclib-name} 和 @code{idlwave-help-doclib-keyword} 变量来添加本地化支持。
+
+@cindex Structure tags, in online help
+@cindex Class tags, in online help
+如果启用了结构标签补全 (@pxref{Structure Tag Completion})，还可以提供类结构标签 (@code{self.TAG}) 和通用结构标签的帮助。  这是通过访问类或结构定义源本身内的标签来实现的。  内置系统类标签的帮助不可用。
+
+帮助窗口通常显示在同一框架中，但可以在单独的框架中弹出。  以下命令可用于在帮助系统中导航以查找源文件：
+
+@multitable  @columnfractions .15 .85
+@item @kbd{@key{SPACE}}
+@tab Scroll forward one page.
+@item @kbd{@key{RET}}
+@tab Scroll forward one line.
+@item @kbd{@key{DEL}}
+@tab Scroll back one page.
+@item @kbd{h}
+@tab Jump to DocLib Header of the routine whose source is displayed
+作为帮助。
+@item @kbd{H}
+@tab Jump to the first DocLib Header in the file.
+@item @kbd{.} @r{(Dot)}
+@tab Jump back and forth between the routine definition (the
+@code{pro}/@code{function} ​​语句）以及 DocLib 标头中帮助项的描述。
+@item @kbd{F}
+@tab Fontify the buffer like source code.  See the variable @code{idlwave-help-fontify-source-code}.
+@item @kbd{q}
+@tab Kill the help window.
+@end multitable
+
+
+@defopt idlwave-help-use-dedicated-frame (@code{nil})
+非@code{nil}表示如果可能的话，使用单独的框架来提供在线帮助。
+@end defopt
+
+@defopt idlwave-help-frame-parameters
+特殊在线帮助框架的框架参数。
+@end defopt
+
+@defopt idlwave-max-popup-menu-items (@code{20})
+弹出菜单中每个窗格的最大项目数。
+@end defopt
+
+@defopt idlwave-extra-help-function
+正常求助失败时呼叫求助的功能。
+@end defopt
+
+@defopt idlwave-help-fontify-source-code (@code{nil})
+非@code{nil}表示 fontify 源代码显示为帮助。
+@end defopt
+
+@defopt idlwave-help-source-try-header (@code{t})
+非@code{nil}表示在显示源文件时尝试在例程头中查找帮助。
+@end defopt
+
+@defopt idlwave-help-doclib-name (@code{"name"})
+doclib 标题中不区分大小写的标题词用于定位 @emph{name} 部分。  可以是正则表达式，例如 @code{"\\(name\\|nom\\)"}。
+@end defopt
+
+@defopt idlwave-help-doclib-keyword (@code{"KEYWORD"})
+doclib 标题中不区分大小写的标题词用于定位 @emph{keywords} 部分。  可以是正则表达式。
+@end defopt
+
+
+@node Completion
+@section 完成
+@cindex Completion
+@cindex Keyword completion
+@cindex Method completion
+@cindex Object method completion
+@cindex Class name completion
+@cindex Function name completion
+@cindex Procedure name completion
+
+@kindex M-TAB
+@kindex C-c C-i
+IDLWAVE 提供类名称、例程名称、关键字、系统变量、系统变量标签、类结构标签、常规结构标签和文件名的补全。  与许多编程模式一样，完成绑定到 @kbd{M-@key{TAB}}（或者在 IDLWAVE Shell 中简单地定义为 @kbd{@key{TAB}}；@pxref{Using the Shell}）。  完成使用与例程信息完全相同的内部信息，因此在必要时（很少）可以使用 @kbd{C-c C-i} (@code{idlwave-update-routine-info}) 进行更新。
+
+完成功能是上下文相关的，并根据点的位置确定要完成的内容。  以下是示例行以及当光标位于标有 @samp{_} 的位置时 @kbd{M-@key{TAB}} 将尝试完成的内容：
+
+@example
+plo_                    @r{Procedure}
+x = a_                  @r{Function}
+plot,xra_               @r{Keyword of @code{plot} procedure}
+plot,x,y,/x_            @r{Keyword of @code{plot} procedure}
+plot,min(_              @r{Keyword of @code{min} function}
+obj -> a_               @r{Object method (procedure)}
+a[2,3] = obj -> a_      @r{Object method (function)}
+x = obj_new('IDL_       @r{Class name}
+x = obj_new('MyCl',a_   @r{Keyword to @code{Init} method in class @code{MyCl}}
+pro A_                  @r{Class name}
+pro _                   @r{Fill in @code{Class::} of first method in this file}
+!v_                     @r{System variable}
+!version.t_             @r{Structure tag of system variable}
+self.g_                 @r{Class structure tag in methods}
+state.w_                @r{Structure tag, if tag completion enabled}
+name = 'a_              @r{File name (default inside quotes)}
+@end example
+
+@cindex Completion, ambiguity
+@cindex Completion, forcing function name
+完成不明确的唯一地方是过程/函数 @emph{keywords} 与 @emph{functions}。  在@samp{plot,x,_}之后，IDLWAVE将始终采用@samp{plot}的关键字。  然而，函数在这里也是可能的完成。  您可以使用前缀 arg：@kbd{C-u M-@key{TAB}} 强制在此类位置完成函数名称。
+
+给出两个前缀参数 (@kbd{C-u C-u M-@key{TAB}}) 会提示输入正则表达式以在要完成的命令中进行搜索。  例如，以这种方式完成空行将允许您搜索与正则表达式匹配的过程。
+
+@cindex Scrolling the @file{*Completions*} window
+@cindex Completion, scrolling
+@cindex Completion, Online Help
+@cindex Online Help in @file{*Completions*} buffer
+如果完成列表太长而无法容纳@file{*Completions*}窗口，可以通过重复按@kbd{M-@key{TAB}}滚动窗口。  单击项目上的 @kbd{mouse-3} 可以获得每个可能完成的在线帮助（如果已安装）。  系统在线帮助（来自 IDL 手册）可用的项目将被强调（例如，蓝色）。  对于其他项目，相应的源代码或 DocLib 标头将用作帮助文本。
+
+@cindex Completion, canceling
+@cindex Canceling completion
+完成不是阻塞操作；您可以自由地继续编辑、输入命令，或者在完成操作期间忽略 @file{*Completions*} 缓冲区。  然而，如果最近的命令完成，@kbd{C-g} 将删除缓冲区并恢复窗口配置。  您还可以随时删除缓冲区，不会产生任何负面后果。
+
+@defopt idlwave-keyword-completion-adds-equal (@code{t})
+非@code{nil}表示完成后自动在完成的关键字后添加@samp{=}。
+@end defopt
+
+@defopt idlwave-function-completion-adds-paren (@code{t})
+非@code{nil}表示完成后自动在完成的函数后添加@samp{(}。  值 2 表示还添加右括号并将光标定位在两者之间。
+@end defopt
+
+@defopt idlwave-completion-restore-window-configuration (@code{t})
+非@code{nil}表示成功完成后恢复窗口配置。
+@end defopt
+
+@defopt idlwave-highlight-help-links-in-completion (@code{t})
+非@code{nil}表示可以使用系统帮助的突出显示完成。
+@end defopt
+
+@menu
+* Case of Completed Words::      完整单词案例
+* Object Method Completion and Class Ambiguity::   obj->方法，什么？
+* Object Method Completion in the Shell::
+* Class and Keyword Inheritance::   obj->方法，_EXTRA=e
+* Structure Tag Completion::     完成状态.Tag
+@end menu
+
+@node  Case of Completed Words
+@subsection 完整单词的情况
+@cindex Case of completed words
+@cindex Mixed case completion
+IDL 是一种不区分大小写的语言，因此大小写仅是样式问题。  IDLWAVE 有助于保持已完成项目的一致外壳样式。  已完成单词的情况由缓冲区中已有的内容确定。  例外的是，当被补全的部分单词全部小写时，补全也将是小写。  如果至少有一个字符为大写，则字符串将以大写或混合大小写完成，具体取决于变量 @code{idlwave-completion-case} 的值。  默认情况下，过程、函数和关键字使用大写，对象类名称和方法使用大小写混合，类似于 IDL 手册中的约定。  例如，要为类和方法之外的例程启用混合大小写完成，您需要在该变量中添加一个条目，例如 @code{(routine . preserve)}。  为了能够完全控制已完成项目的情况，独立于缓冲区上下文，请将 @code{idlwave-completion-force-default-case} 设置为非 @code{nil}。
+
+@defopt idlwave-completion-case
+设置完整单词的大小写（大写/小写/大写/混合大小写...）的关联列表。
+@end defopt
+
+@defopt idlwave-completion-force-default-case (@code{nil})
+非@code{nil}表示完成将始终遵循@code{idlwave-completion-case}中的设置。  当@code{nil}（默认）时，无论@code{idlwave-completion-case}中的设置如何，完全小写的字符串将始终完成为小写。
+@end defopt
+
+@defopt idlwave-complete-empty-string-as-lower-case (@code{nil})
+非@code{nil} 表示空字符串被视为小写以完成。
+@end defopt
+
+@node  Object Method Completion and Class Ambiguity
+@subsection 对象方法完成和类歧义
+@cindex Object methods
+@cindex Class ambiguity
+@cindex @code{self} object, default class
+如果没有对象的类，则无法唯一确定对象方法。由于类在调用源中几乎总是被省略（根据需要获得基于对象的编程的真正好处），IDLWAVE 将所有类中的所有可用方法视为可能的方法名称补全。  包含该方法的 @emph{all} 已知类中当前方法的关键字组合列表将被视为关键字补全。  在@file{*Completions*}缓冲区中，匹配的类将显示在每个项目旁边（请参阅选项@code{idlwave-completion-show-classes}）。  作为一种特殊情况，当位于 IDLWAVE 缓冲区中时，名为 3⁣ 的对象的类始终被视为当前例程的类。  所有继承类也被考虑。
+
+@cindex Forcing class query.
+@cindex Class query, forcing
+您还可以使用前缀 arg 来调用 @code{idlwave-complete}：@kbd{C-u M-@key{TAB}}。  然后，IDLWAVE 将提示您参加课程，以缩小可能完成的课程数量。  可以配置变量 @code{idlwave-query-class} 以使此类提示成为所有方法的默认提示（不推荐），或者选择性地用于完成关键字数量太大的非常常见的方法（例如，@code{Init,SetProperty,GetProperty}）。
+
+@cindex Saving object class on @code{->}
+@cindex @code{->}
+在为特定语句指定类后（例如，完成方法时），IDLWAVE 可以在编辑会话的其余部分记住它。  同一语句中的后续完成（例如关键字）可以重用此类信息。  这是通过在方法调用运算符 @samp{->} 上放置一个文本属性来实现的，之后该运算符将以不同的方式显示（默认为粗体）。  变量 @code{idlwave-store-inquired-class} 可用于关闭或打开它。
+
+@defopt idlwave-completion-show-classes (@code{1})
+非@code{nil}表示完成对象方法和关键字时，在@file{*Completions*}缓冲区中最多显示那么多类。
+@end defopt
+
+@defopt idlwave-completion-fontify-classes (@code{t})
+非@code{nil}表示在完成缓冲区中对类进行字体化。
+@end defopt
+
+@defopt idlwave-query-class (@code{nil})
+关联列表管理完成期间对象类的查询。
+@end defopt
+
+@defopt idlwave-store-inquired-class (@code{t})
+非@code{nil}表示将方法调用的类存储为@samp{->}上的文本属性。
+@end defopt
+
+@defopt idlwave-class-arrow-face
+面对突出显示对象操作符箭头@samp{->}，它携带已保存的类文本属性。
+@end defopt
+
+@node Object Method Completion in the Shell
+@subsection Shell 中的对象方法完成
+@cindex Method Completion in Shell
+在 IDLWAVE Shell (@pxref{The IDLWAVE Shell}) 中，调用方法的对象具有特殊属性：它们必须作为变量存在，因此可以确定它们的类（例如，使用 @code{obj_class()} 函数）。  在 Shell 中，当在方法例程中尝试完成、例程信息或联机帮助时，将发送查询以确定对象的类。  如果此查询成功，找到的类将用于选择适当的完成、例程信息或帮助。  如果不成功，将使用所有已知类的信息（如缓冲区中的信息）。
+
+@node   Class and Keyword Inheritance
+@subsection 类和关键字继承
+@cindex Inheritance, class
+@cindex Keyword inheritance
+@cindex Inheritance, keyword
+
+类继承影响在 IDL 中调用哪些方法@. 从一个或多个超类继承方法的类的对象可以通过定义自己的同名方法来覆盖该方法，通过在其版本中调用其超类的方法来扩展该方法，或者不做任何修改直接继承该方法。 IDLWAVE 在完成和例程信息显示期间检查类定义，并记录它找到的所有继承信息。只要变量 @code{idlwave-support-inheritance} 为非 @code{nil}，如果与方法 (@pxref{Routine Info}) 的调用序列合适，就会显示此信息。
+
+在许多类方法中，@emph{keyword}继承（@code{_EXTRA}和@code{_REF_EXTRA}）与类继承和方法重写一起使用。  例如，在 @code{SetProperty} 方法中，该技术允许单个调用 @code{obj->SetProperty} 来设置整个类继承链的属性。  这通常被称为@emph{chaining}，其特征是像@w{@code{self->MySuperClass::SetProperty,_EXTRA=e}}这样的链式方法调用。
+
+IDLWAVE 可以适应类和关键字继承之间的这种特殊协同作用：如果在方法的关键字参数中检测到 @code{_EXTRA} 或 @code{_REF_EXTRA}，则正在考虑的方法的超类版本的所有关键字都可以包含在补全中。  当然，不能保证这种类型的关键字链接确实发生，但对于某些方法来说，这是一个非常方便的假设。  变量 @code{idlwave-keyword-class-inheritance} 可用于配置哪些方法以这种简单的类驱动方式处理关键字继承。  默认情况下，只有 @code{Init} 和 @code{(Get|Set)Property} 是。  完成缓冲区将根据关键字的原始类来标记关键字。
+
+@defopt idlwave-support-inheritance (@code{t})
+非@code{nil}表示在完成、在线帮助等过程中考虑继承。
+@end defopt
+
+@defopt idlwave-keyword-class-inheritance
+用于匹配方法的正则表达式列表，将使用简单的类驱动关键字继承来完成补全。
+@end defopt
+
+@node    Structure Tag Completion
+@subsection 结构标签完成
+@cindex Completion, structure tag
+@cindex Structure tag completion
+
+在许多程序中，尤其是那些涉及小部件的程序中，大型结构（例如 @samp{state} 结构）用于在例程之间进行通信。  能够以与 @samp{self} 对象 (@pxref{Object Method Completion and Class Ambiguity}) 的实例变量（标签）相同的方式完成结构标签非常方便。  用于结构标签完成的附加代码以可加载完成模块的形式提供：@file{idlw-complete-structtag.el}。  结构中的标记补全非常不明确（比 @samp{self} 补全更不明确），因此 @code{idlw-complete-structtag} 做出了一个不寻常且非常具体的假设：完全相同的变量名称用于引用程序所有部分中的结构。  IDL 语言完全没有强制执行这一点，但这是一种典型的约定。  如果您始终引用具有相同变量名称的相同结构（例如，@samp{state}），则可以使用从同一文件中的定义读取的结构标签来完成。
+
+默认情况下不启用结构标记完成。  要启用它，只需将以下内容添加到您的@file{.emacs}：
+
+@lisp
+(with-eval-after-load 'idlwave
+  (require 'idlw-complete-structtag))
+@end lisp
+
+启用后，您还可以使用常用方法 (@pxref{Online Help}) 访问有关结构标签的在线帮助。  此外，将查询 shell 中的结构变量以获取标记名称，类似于查询 shell 中的对象变量以获取方法名称。所以，例如：
+
+@example
+IDL> st.[Tab]
+@end example
+
+@noindent will complete with all structure fields of the structure
+@code{st}.
+
+@node Routine Source
+@section 常规来源
+@cindex Routine source file
+@cindex Module source file
+@cindex Source file, of a routine
+@kindex C-c C-v
+除了点击例程信息窗口中的@i{Source:}行之外，还有另一种方法可以快速访问例程的源文件。  命令 @kbd{C-c C-v} (@code{idlwave-find-module}) 请求模块名称，提供与 @code{idlwave-routine-info} 使用的相同的默认值，取自附近的缓冲区内容。  在迷你缓冲区中，指定完整的例程名称（包括任何类部分）。  IDLWAVE 将在另一个窗口中显示源文件，该窗口位于相关例程处。  您还可以通过使用单个前缀 (@kbd{C-u C-c C-v}) 或便捷绑定 @kbd{C-c C-t}，将其限制为仅当前缓冲区中的例程，并具有完成功能和上下文相关的默认值。
+
+@cindex Buffers, killing
+@cindex Killing autoloaded buffers
+由于使用 IDLWAVE 将例程的源代码放入缓冲区非常容易，因此有时会创建太多访问不同 IDL 源文件的缓冲区。  特殊命令@kbd{C-c C-k} (@code{idlwave-kill-autoloaded-buffers}) 可用于轻松删除这些缓冲区。
+
+@node Resolving Routines
+@section 解决例程
+@cindex @code{RESOLVE_ROUTINE}
+@cindex Compiling library modules
+@cindex Routines, resolving
+
+键序列@kbd{C-c =}调用命令@code{idlwave-resolve}并将行@samp{RESOLVE_ROUTINE, '@var{routine_name}'}发送到IDL以解析（编译）它。  要解析的默认例程取自上下文，但您有机会对其进行编辑。  通常这不是必需的，因为 IDL 会自动发现其路径上的例程。
+
+@code{idlwave-resolve} 是使库模块处于 IDLWAVE 例程信息收集功能范围内的一种方法。  更好的方法是在目录中保留常规信息 (@pxref{Catalogs})。模块上的例程信息将可用，无需先编译模块，甚至无需运行 shell。
+
+@xref{Sources of Routine Info}，了解有关 IDLWAVE 收集例程数据的方式以及如何更新此信息的更多信息。
+
+@node Code Templates
+@section 代码模板
+@cindex Code templates
+@cindex Templates
+
+IDLWAVE可以将IDL代码模板插入到缓冲区中。  对于一些模板，这是通过直接键绑定完成的：
+
+@multitable @columnfractions .15 .85
+@item @kbd{C-c C-c}
+@tab @code{CASE} statement template
+@item @kbd{C-c C-f}
+@tab @code{FOR} loop template
+@item @kbd{C-c C-r}
+@tab @code{REPEAT} loop template
+@item @kbd{C-c C-w}
+@tab @code{WHILE} loop template
+@end multitable
+
+所有代码模板也可用作缩写 (@pxref{Abbreviations})。
+
+@node Abbreviations
+@section 缩写
+@cindex Abbreviations
+
+存在特殊缩写以便快速输入常用命令。  通过在缓冲区中输入文本并按 @key{SPC} 或 @key{RET} 可以扩展 Emacs 缩写。  用于插入代码模板的特殊缩写均以@samp{\}（反斜杠）开头，或者可选地以@code{idlwave-abbrev-start-char}中的任何其他字符集开头。  IDLWAVE 确保缩写仅在应有的位置扩展（即不在字符串或注释中），并允许在缩写扩展后移动点：对于将标记定位在括号内等非常有用。
+
+为代码模板和其他有用的项目预先定义了特殊缩写。  要访问完整的缩写列表，请使用 @kbd{M-x idlwave-list-abbrevs}。
+
+模板缩写：
+
+@multitable @columnfractions .15 .85
+@item @code{\pr}
+@tab @code{PROCEDURE} template
+@item @code{\fu}
+@tab @code{FUNCTION} template
+@item @code{\c}
+@tab @code{CASE} statement template
+@item @code{\f}
+@tab @code{FOR} loop template
+@item @code{\r}
+@tab @code{REPEAT} loop template
+@item @code{\w}
+@tab @code{WHILE} loop template
+@item @code{\i}
+@tab @code{IF} statement template
+@item @code{\elif}
+@tab @code{IF-ELSE} statement template
+@end multitable
+
+字符串缩写：
+
+@multitable @columnfractions .15 .85
+@item @code{\ap}
+@tab @code{arg_present()}
+@item @code{\b}
+@tab @code{begin}
+@item @code{\cb}
+@tab @code{byte()}
+@item @code{\cc}
+@tab @code{complex()}
+@item @code{\cd}
+@tab @code{double()}
+@item @code{\cf}
+@tab @code{float()}
+@item @code{\cl}
+@tab @code{long()}
+@item @code{\co}
+@tab @code{common}
+@item @code{\cs}
+@tab @code{string()}
+@item @code{\cx}
+@tab @code{fix()}
+@item @code{\e}
+@tab @code{else}
+@item @code{\ec}
+@tab @code{endcase}
+@item @code{\ee}
+@tab @code{endelse}
+@item @code{\ef}
+@tab @code{endfor}
+@item @code{\ei}
+@tab @code{endif else if}
+@item @code{\el}
+@tab @code{endif else}
+@item @code{\en}
+@tab @code{endif}
+@item @code{\er}
+@tab @code{endrep}
+@item @code{\es}
+@tab @code{endswitch}
+@item @code{\ew}
+@tab @code{endwhile}
+@item @code{\g}
+@tab @code{goto,}
+@item @code{\h}
+@tab @code{help,}
+@item @code{\ik}
+@tab @code{if keyword_set() then}
+@item @code{\iap}
+@tab @code{if arg_present() then}
+@item @code{\ine}
+@tab @code{if n_elements() eq 0 then}
+@item @code{\inn}
+@tab @code{if n_elements() ne 0 then}
+@item @code{\k}
+@tab @code{keyword_set()}
+@item @code{\n}
+@tab @code{n_elements()}
+@item @code{\np}
+@tab @code{n_params()}
+@item @code{\oi}
+@tab @code{on_ioerror,}
+@item @code{\or}
+@tab @code{openr,}
+@item @code{\ou}
+@tab @code{openu,}
+@item @code{\ow}
+@tab @code{openw,}
+@item @code{\p}
+@tab @code{print,}
+@item @code{\pt}
+@tab @code{plot,}
+@item @code{\pv}
+@tab @code{ptr_valid()}
+@item @code{\re}
+@tab @code{read,}
+@item @code{\rf}
+@tab @code{readf,}
+@item @code{\rt}
+@tab @code{return}
+@item @code{\ru}
+@tab @code{readu,}
+@item @code{\s}
+@tab @code{size()}
+@item @code{\sc}
+@tab @code{strcompress()}
+@item @code{\sl}
+@tab @code{strlowcase()}
+@item @code{\sm}
+@tab @code{strmid()}
+@item @code{\sn}
+@tab @code{strlen()}
+@item @code{\sp}
+@tab @code{strpos()}
+@item @code{\sr}
+@tab @code{strtrim()}
+@item @code{\st}
+@tab @code{strput()}
+@item @code{\su}
+@tab @code{strupcase()}
+@item @code{\t}
+@tab @code{then}
+@item @code{\u}
+@tab @code{until}
+@item @code{\wc}
+@tab @code{widget_control,}
+@item @code{\wi}
+@tab @code{widget_info()}
+@item @code{\wu}
+@tab @code{writeu,}
+@end multitable
+
+@noindent You can easily add your own abbreviations or override existing
+使用便捷函数 @code{idlwave-define-abbrev} 在模式挂钩中使用 @code{define-abbrev} 进行缩写：
+
+@lisp
+(add-hook 'idlwave-mode-hook
+          (lambda ()
+            (idlwave-define-abbrev "wb" "widget_base()"
+                     (idlwave-keyword-abbrev 1))
+            (idlwave-define-abbrev "ine" "IF N_Elements() EQ 0 THEN"
+                     (idlwave-keyword-abbrev 11))))
+@end lisp
+
+请注意缩写（此处为@emph{wb}）及其扩展（@emph{widget_base()}）如何作为参数给出，以及@code{idlwave-keyword-abbrev}（此处为@emph{1}）的单个参数指定扩展时将点向后移动多远（在本示例中，将其放在括号之间）。
+
+缩写以大写或小写扩展，具体取决于变量 @code{idlwave-abbrev-change-case}，对于保留字模板，@code{idlwave-reserved-word-upcase} (@pxref{Case Changes})。
+
+@defopt idlwave-abbrev-start-char (@code{"\"})
+用于在缩写模式下启动缩写的单个字符串。请注意可能会自然地与缩写字符串一起出现的常见字符。
+@end defopt
+
+@defopt idlwave-abbrev-move (@code{t})
+非@code{nil}表示缩写钩子可以移动点，例如，结束在函数调用的括号之间。
+@end defopt
+
+@node Actions
+@section 行动
+@cindex Actions
+@cindex Coding standards, enforcing
+
+@emph{Actions} 是特殊的格式化命令，在编写代码时会自动执行，以检查程序的结构或强制执行编码标准。  默认情况下，IDLWAVE 中实现的大多数操作都是关闭的，假设普通用户希望按照自己编写的方式编写代码。  但是，如果您是一个懒惰的打字员并希望您的代码遵守某些标准，那么操作可能会有所帮助。
+
+可以通过三种方式应用操作：
+
+@itemize @bullet
+@item 
+某些操作会在键入时直接应用。  例如，按 @samp{=} 可以运行检查以确保该运算符被空格包围，并在必要时插入这些空格。  在保留字后按@key{SPC}可以调用命令将该字更改为大写。
+@item 
+当使用 @key{TAB} 重新缩进一行时，可以将操作应用于整行。  为了实现这一点，变量@code{idlwave-do-actions}必须是非@code{nil}。
+@item 
+@cindex Foreign code, adapting
+@cindex Actions, applied to foreign code
+操作还可以应用于较大的代码段，例如，将外部代码转换为您自己的样式。  为此，请标记代码的相关部分并执行@kbd{M-x expand-region-abbrevs}。  有用的标记命令是@kbd{C-x h}（整个文件）或@kbd{C-M-h}（当前子程序）。 @xref{Code Indentation}，了解如何调整代码缩进的信息。
+@end itemize
+
+@defopt idlwave-do-actions (@code{nil})
+非@code{nil}表示在缩进时执行操作。  各个动作设置如下所述并单独设置。
+@end defopt
+
+@menu
+* Block Boundary Check::         END 语句正确吗？
+* Padding Operators::            在 @samp{=} 等周围加强空间
+* Case Changes::                 强制使用大写关键字
+@end menu
+
+@node Block Boundary Check
+@subsection 块边界检查
+@cindex Block boundary check
+@cindex @code{END} type checking
+@cindex @code{END}, automatic insertion
+@cindex @code{END}, expanding
+@cindex Block, closing
+@cindex Closing a block
+
+每当您键入 @code{END} 语句时，IDLWAVE 都会找到相应的块开头，并且光标会闪烁回到该位置一秒钟。  如果您输入了特定的@code{END}，例如@code{ENDIF}或@code{ENDCASE}，如果该终止符与它终止的块的类型不匹配，您会收到警告。
+
+设置变量 @code{idlwave-expand-generic-end} 以使所有通用 @code{END} 语句自动扩展为适当的类型。  您还可以输入 @kbd{C-c ]} 通过插入适当的 @code{END} 语句来关闭当前块。
+
+@defopt idlwave-show-block (@code{t})
+非@code{nil}表示点闪烁以阻止@code{idlwave-show-begin}开始。
+@end defopt
+
+@defopt idlwave-expand-generic-end (@code{t})
+非@code{nil}表示将通用END扩展为ENDIF/ENDELSE/ENDWHILE等。
+@end defopt
+
+@defopt idlwave-reindent-end (@code{t})
+非@code{nil}表示在键入 END 后重新缩进行。
+@end defopt
+
+@node Padding Operators
+@subsection 填充运算符
+@cindex Padding operators with spaces
+@cindex Operators, padding with spaces
+@cindex Space, around operators
+
+某些运算符可以自动被空格包围。  当键入运算符时或稍后缩进行时，可能会发生这种情况。 IDLWAVE 可以填充运算符 @samp{<}、@samp{>}、@samp{,}、@samp{=} 和 @samp{->}，以及修改后的赋值运算符（@samp{AND=}、@samp{OR=} 等）。  该功能默认关闭。如果您想打开它，请自定义变量@code{idlwave-surround-by-blank}和@code{idlwave-do-actions}并将两者都打开。  您还可以使用模式挂钩中的函数 @code{idlwave-action-and-binding} 为其他运算符定义类似的操作。例如，要强制 @samp{+} 和 @samp{*} 运算符的空格填充（当然，在字符串和注释之外），请在 @file{.emacs} 中尝试此操作
+
+@lisp
+(add-hook 'idlwave-mode-hook
+  (lambda ()
+     (setq idlwave-surround-by-blank t)  ; Turn this type of actions on
+     (idlwave-action-and-binding "*" '(idlwave-surround 1 1))
+     (idlwave-action-and-binding "+" '(idlwave-surround 1 1))))
+@end lisp
+
+请注意，以单词开头的修改赋值运算符（@samp{AND=}、@samp{OR=}、@samp{NOT=}等）@: 需要识别前导空格（例如，@code{vAND=4} 将被解释为变量@code{vAND}）。  另请注意，由于 @code{>} 和 @code{>=} 都是有效的运算符，因此在键入它们时不可能将两者都用空格包围。  与 @code{&} 和 @code{&&} 类似。  对于这些，我们做出了妥协：填充放置在左侧，如果键入较长的运算符，填充也放置在右侧（否则您必须插入空格来自己填充右侧，或者如果@code{idlwave-do-actions}打开，则只需按 Tab 键即可重新填充所有内容）。
+
+@defopt idlwave-surround-by-blank (@code{nil})
+非@code{nil}表示启用@code{idlwave-surround}。  如果非 @code{nil}、@samp{=}、@samp{<}、@samp{>}、@samp{&}、@samp{,}、@samp{->} 和修改后的赋值运算符（@samp{AND=}、@samp{OR=} 等）@: 被@code{idlwave-surround} 用空格包围。
+@end defopt
+
+@defopt idlwave-pad-keyword (@code{t})
+非 @code{nil} 表示在关键字赋值中用空格填充 @samp{=}。
+@end defopt
+
+@node Case Changes
+@subsection 案例变更
+@cindex Case changes
+@cindex Upcase, enforcing for reserved words
+@cindex Downcase, enforcing for reserved words
+
+通过自定义变量 @code{idlwave-abbrev-change-case} 和 @code{idlwave-reserved-word-upcase}，可以使用操作来更改保留字或扩展缩写的大小写。  如果您想自动更改其他单词的大小写，请将类似以下内容放入您的 @file{.emacs} 文件中：
+
+@lisp
+(add-hook 'idlwave-mode-hook
+  (lambda ()
+     ;;  Capitalize system vars
+     (idlwave-action-and-binding idlwave-sysvar '(capitalize-word 1) t)
+     ;;  Capitalize procedure name
+     (idlwave-action-and-binding "\\<\\(pro\\|function\\)\\>[ \t]*\\<"
+                                 '(capitalize-word 1) t)
+     ;;  Capitalize common block name
+     (idlwave-action-and-binding "\\<common\\>[ \t]+\\<"
+                                 '(capitalize-word 1) t)))
+@end lisp
+
+有关更多信息，请参阅函数 @code{idlwave-action-and-binding} 的文档字符串。  有关在例程、关键字、类和方法完成时控制其大小写的信息，请参阅@ref{Completion}。
+
+@defopt idlwave-abbrev-change-case (@code{nil})
+非 @code{nil} 表示所有缩写都将强制为大写或小写。  有效值为 @code{nil}、@code{t} 和 @code{down}。
+@end defopt
+
+@defopt idlwave-reserved-word-upcase (@code{nil})
+非@code{nil}表示保留字将通过缩写扩展变为大写。
+@end defopt
+
+
+@node Doc Header
+@section 文档标题
+@cindex Documentation header
+@cindex DocLib header
+@cindex Modification timestamp
+@cindex Header, for file documentation
+@cindex Timestamp, in doc header.
+@cindex Changelog, in doc header.
+
+@kindex C-c C-h
+@kindex C-c C-m
+命令@kbd{C-c C-h}将标准例程标头插入缓冲区，其中包含用于文档的常用字段（可以使用@code{idlwave-file-header}指定不同的标头）。  关键字之一是@samp{MODIFICATION HISTORY}，可以在其下记录对例程的更改。  命令@kbd{C-c C-m}跳转到当前例程或文件的@samp{MODIFICATION HISTORY}，并插入带有时间戳的用户名。
+
+@defopt idlwave-file-header
+文档标题模板或包含它的文件的路径。
+@end defopt
+
+@defopt idlwave-header-to-beginning-of-file (@code{nil})
+非@code{nil}表示文档标题将始终位于文件开头。
+@end defopt
+
+@defopt idlwave-timestamp-hook
+用于更新函数时间戳的钩子函数。
+@end defopt
+
+@defopt idlwave-doc-modifications-keyword
+与日志文档命令一起使用的修改关键字。
+@end defopt
+
+@defopt idlwave-doclib-start
+匹配文档库标题开头的正则表达式。
+@end defopt
+
+@defopt idlwave-doclib-end
+匹配文档库标题开头的正则表达式。
+@end defopt
+
+@node Motion Commands
+@section 动作命令
+@cindex Motion commands
+@cindex Program structure, moving through
+@cindex Code structure, moving through
+@cindex @file{Imenu}
+@cindex Function definitions, jumping to
+@cindex Procedure definitions, jumping to
+
+IDLWAVE 支持@file{Imenu}，这个包可以通过弹出选择轻松跳转到当前文件中函数和过程的定义。  要将 @file{Imenu} 绑定到鼠标按下，请在 @file{.emacs} 中使用：
+
+@lisp
+(define-key global-map [S-down-mouse-3] 'imenu)
+@end lisp
+
+@cindex @file{Speedbar}, Emacs package
+
+此外，@file{Speedbar} 支持可以方便地导航 IDL 例程文件的源代码树，快速进入例程定义。  参见@code{Tools->Display Speedbar}。
+
+有几个命令可以让您快速浏览 IDL 程序的结构：
+
+@multitable @columnfractions .15 .85
+@item @kbd{C-M-a}
+@tab Beginning of subprogram
+@item @kbd{C-M-e}
+@tab End of subprogram
+@item @kbd{C-c @{}
+@tab Beginning of block (stay inside the block)
+@item @kbd{C-c @}}
+@tab End of block (stay inside the block)
+@item @kbd{C-M-n}
+@tab Forward block (on same level)
+@item @kbd{C-M-p}
+@tab Backward block (on same level)
+@item @kbd{C-M-d}
+@tab Down block (enters a block)
+@item @kbd{C-M-u}
+@tab Backward up block (leaves a block)
+@item @kbd{C-c C-n}
+@tab Next Statement
+@end multitable
+
+
+@node Misc Options
+@section 杂项选项
+@cindex Hooks
+
+@defopt idlwave-help-application
+外部应用程序为编程提供参考帮助。
+@end defopt
+
+@defopt idlwave-startup-message (@code{t})
+非@code{nil}表示首次调用@code{idlwave-mode}'时显示启动消息。
+@end defopt
+
+@defopt idlwave-mode-hook
+正常的钩子。  当缓冲区放入@code{idlwave-mode}时执行。
+@end defopt
+
+@node The IDLWAVE Shell
+@chapter IDLWAVE 外壳
+@cindex IDLWAVE shell
+@cindex Major mode, @code{idlwave-shell-mode}
+@cindex IDL, as Emacs subprocess
+@cindex Subprocess of Emacs, IDL
+@cindex Comint, Emacs package
+@cindex Windows
+@cindex macOS
+
+IDLWAVE shell 是 Emacs 的主要模式，它允许将 IDL 程序作为 Emacs 的下级进程运行，并与缓冲区中的 IDLWAVE 主要模式密切合作。  它可用于与 IDL 交互工作，在 Emacs 缓冲区中编译和运行 IDL 程序并调试这些程序。  IDLWAVE shell 构建于 @file{comint} 之上，@file{comint} 是一个处理与 IDL 程序通信的 Emacs 软件包。不幸的是，Windows 版 IDL 没有命令提示符版本，因此不允许与 Emacs 交互，因此 IDLWAVE shell 目前仅在 Unix 和 macOS 下工作。
+
+@menu
+* Starting the Shell::           如何将 IDL 作为子进程启动
+* Using the Shell::              与 Shell 交互工作
+* Commands Sent to the Shell::
+* Debugging IDL Programs::
+* Examining Variables::
+* Custom Expression Examination::
+@end menu
+
+@node Starting the Shell
+@section 启动外壳程序
+@cindex Starting the shell
+@cindex Shell, starting
+@cindex Dedicated frame, for shell buffer
+@cindex Frame, for shell buffer
+@cindex Subprocess of Emacs, IDL
+
+@kindex C-c C-s
+IDLWAVE shell 可以使用命令@kbd{M-x idlwave-shell}启动。  在@code{idlwave-mode}中，函数绑定到@kbd{C-c C-s}。  它创建一个缓冲区@file{*idl*}，用于与 shell 交互。  如果 shell 已经在运行，@kbd{C-c C-s} 将简单地切换到 shell 缓冲区。  命令 @kbd{C-c C-l} (@code{idlwave-shell-recenter-shell-window}) 显示 shell 窗口而不选择它。  当另一个命令尝试向 shell 发送命令时，shell 也可以自动启动。  要启用自动启动，请将变量 @code{idlwave-shell-automatic-start} 设置为 @code{t}。
+
+为了为 IDLWAVE shell 缓冲区创建一个单独的帧，请使用前缀参数调用 @code{idlwave-shell}：@kbd{C-u C-c C-s} 或 @kbd{C-u C-c C-l}。  如果您始终需要 shell 窗口的专用框架，请配置变量@code{idlwave-shell-use-dedicated-frame}。
+
+要在没有 IDLWAVE 缓冲区的情况下直接从 shell 提示符启动快速 IDLWAVE shell（例如，作为在 xterm 内运行的替代），请使用以下内容定义系统别名：
+
+@example
+emacs -geometry 80x32 -eval "(idlwave-shell 'quick)"
+@end example
+
+如果您希望 Emacs 进程直接在终端窗口内运行，请将 @samp{-geometry 80x32} 选项替换为 @samp{-nw}。
+
+@cindex ENVI
+@cindex IDL> Prompt
+
+要将 IDLWAVE 与 ENVI 或其他更改 @samp{IDL> } 提示符的自定义包一起使用，您必须更改 @code{idlwave-shell-prompt-pattern}（默认为 @samp{"^ ?IDL> "}）。  通常，您只需将此表达式中的 @samp{IDL} 替换为您看到的提示即可。  同时匹配 ENVI 和 IDL 提示的合适模式是@samp{"^ ?\\(ENVI\\|IDL\\)> "}。
+
+@defopt idlwave-shell-explicit-file-name (@file{idl})
+这是运行 IDL 的命令。
+@end defopt
+
+@defopt idlwave-shell-command-line-options
+用于调用 IDL 程序的命令行选项列表。
+@end defopt
+
+@defopt idlwave-shell-prompt-pattern
+用于匹配行首 IDL 提示的正则表达式。
+@end defopt
+
+@defopt idlwave-shell-process-name
+与 IDL 进程关联的名称。
+@end defopt
+
+@defopt idlwave-shell-automatic-start  (@code{nil})
+非@code{nil}表示尝试调用 idlwave-shell（如果尚未运行）。
+@end defopt
+
+@defopt idlwave-shell-initial-commands
+初始命令，以换行符分隔，发送到 IDL。
+@end defopt
+
+@defopt idlwave-shell-save-command-history (@code{t})
+非@code{nil}表示保留会话之间的命令历史记录。
+@end defopt
+
+@defopt idlwave-shell-command-history-file (@file{~/.emacs.d/idlwave/.idlwhist})
+保存 idlwave shell 的命令历史记录的文件。除非它是绝对路径，否则它会进入@code{idlwave-config-directory}。
+@end defopt
+
+@defopt idlwave-shell-use-dedicated-frame (@code{nil})
+非@code{nil}表示IDLWAVE应该使用特殊的帧来显示shell缓冲区。
+@end defopt
+
+@defopt idlwave-shell-use-dedicated-window (@code{nil})
+非@code{nil}表示为 shell 使用专用窗口，注意不要将其替换为其他缓冲区。
+@end defopt
+
+@defopt idlwave-shell-frame-parameters
+专用 idlwave-shell 框架的框架参数。
+@end defopt
+
+@defopt idlwave-shell-raise-frame (@code{t})
+非 @code{nil} 表示 @code{idlwave-shell} 提升显示 shell 窗口的框架。
+@end defopt
+
+@defopt idlwave-shell-temp-pro-prefix
+编译区域时使用的临时 IDL 文件的前缀。
+@end defopt
+
+@cindex Hooks
+@defopt idlwave-shell-mode-hook
+用于自定义 @code{idlwave-shell-mode} 的挂钩。
+@end defopt
+
+@node Using the Shell
+@section 使用外壳
+@cindex Comint
+@cindex Shell, basic commands
+
+IDLWAVE shell 的工作方式与 Emacs 中其他 shell 模式相同。  它提供命令历史记录、命令行编辑和作业控制。  @key{UP} 和 @key{DOWN} 箭头循环浏览输入历史记录，就像在 X 终端@footnote{This is different from normal Emacs/Comint behavior, but more like an xterm.  If you prefer the default comint functionality, check the variable @code{idlwave-shell-arrows-do-history}.} 中一样。  历史记录在 emacs 和 IDL 会话之间保留。  以下是常用命令的列表：
+
+@multitable @columnfractions .12 .88
+@item @key{UP}, @kbd{M-p}
+@tab Cycle backwards in input history
+@item @key{DOWN}, @kbd{M-n}
+@tab Cycle forwards in input history
+@item @kbd{M-r}
+@tab Previous input matching a regexp
+@item @kbd{M-s}
+@tab Next input matching a regexp
+@item @kbd{return}
+@tab Send input or copy line to current prompt
+@item @kbd{C-c C-a}
+@tab Beginning of line; skip prompt
+@item @kbd{C-c C-u}
+@tab Kill input to beginning of line
+@item @kbd{C-c C-w}
+@tab Kill word before cursor
+@item @kbd{C-c C-c}
+@tab Send ^C
+@item @kbd{C-c C-z}
+@tab Send ^Z
+@item @kbd{C-c C-\}
+@tab Send ^\
+@item @kbd{C-c C-o}
+@tab Delete last batch of process output
+@item @kbd{C-c C-r}
+@tab Show last batch of process output
+@item @kbd{C-c C-l}
+@tab List input history
+@end multitable
+
+除了这些标准 @file{comint} 命令之外，@code{idlwave-shell-mode} 还提供许多相同的命令，这些命令可简化 IDLWAVE 缓冲区中可用的 IDL 代码的编写。  这包括缩写、在线帮助和完成。  @xref{Routine Info}、@ref{Online Help}、@ref{Completion}，了解有关这些命令的更多信息。
+
+@cindex Completion, in the shell
+@cindex Routine info, in the shell
+@cindex Online Help, in the shell
+@multitable @columnfractions .12 .88
+@item @kbd{@key{TAB}}
+@tab  Completion of file names (between quotes and after executive
+命令@samp{.run}和@samp{.compile}）、例程名称、类名称、关键字、系统变量、系统变量标签等（@code{idlwave-shell-complete}）。
+@item @kbd{M-@key{TAB}}
+@tab Same as @key{TAB}
+@item @kbd{C-c ?}
+@tab Routine Info display (@code{idlwave-routine-info})
+@item @kbd{M-?}
+@tab IDL online help on routine (@code{idlwave-routine-info-from-idlhelp})
+@item @kbd{C-c C-i}
+@tab Update routine info from buffers and shell
+(@code{idlwave-update-routine-info})
+@item @kbd{C-c C-v}
+@tab Find the source file of a routine (@code{idlwave-find-module})
+@item @kbd{C-c C-t}
+@tab Find the source file of a routine in the currently visited file
+(@code{idlwave-find-module-this-file}).
+@item @kbd{C-c =}
+@tab Compile a library routine (@code{idlwave-resolve})
+@end multitable
+
+@defopt idlwave-shell-arrows-do-history (@code{t})
+非 @code{nil} 表示 @key{UP} 和 @key{DOWN} 箭头像 xterm 一样在命令历史记录中移动。
+@end defopt
+
+@defopt idlwave-shell-comint-settings
+IDLWAVE Shell 中 comint 变量的特殊设置列表。
+@end defopt
+
+@defopt idlwave-shell-file-name-chars
+文件名中允许的字符，作为字符串。  用于文件名补全。
+@end defopt
+
+@defopt idlwave-shell-graphics-window-size
+由特殊IDLWAVE命令弹出的IDL图形窗口的大小。
+@end defopt
+
+@cindex Input mode
+@cindex Character input mode (Shell)
+@cindex Line input mode (Shell)
+@cindex Magic spells, for input mode
+@cindex Spells, magic
+IDLWAVE 在行输入模式下工作：您可以使用 Emacs 提供的所有功能编写完整的命令行。  当您按 @key{RET} 时，整行将发送到 IDL@. 有时需要发送单个字符（不带换行符），例如当 IDL 程序正在等待使用 @code{GET_KBRD} 函数输入单个字符时。您可以使用命令 @kbd{C-c C-x} (@code{idlwave-shell-send-char}) 将单个字符发送到 IDL。  当您按 @kbd{C-c C-y} (@code{idlwave-shell-char-mode-loop}) 时，IDLWAVE 会运行一个阻塞循环，该循环接受字符并立即将它们发送到 IDL@.。可以使用 @kbd{C-g} 退出循环。  当当前 IDL 命令完成时，它也会自动终止。  检查下面描述的两个变量的文档，了解使 IDL 程序触发输入模式自动切换的方法。
+
+@defopt idlwave-shell-use-input-mode-magic (@code{nil})
+非@code{nil} 表示 IDLWAVE 应检查输出中的输入模式拼写。
+@end defopt
+
+@defopt idlwave-shell-input-mode-spells
+与输入模式的魔法咒语匹配的三个正则表达式。
+@end defopt
+
+@node Commands Sent to the Shell
+@section 发送到 Shell 的命令
+@cindex Commands in shell, showing
+@cindex Showing commands in shell
+
+IDLWAVE 缓冲区和 shell 交互非常紧密。  除了在 @code{IDL>} 提示符下输入的正常命令之外，许多其他特殊命令也会发送到 shell，有时作为调用关键命令、菜单项或工具栏按钮的直接结果，但也作为缓冲区和 shell 之间正常信息更新流的一部分自动发送。
+
+发送的命令包括 @code{breakpoint}、@code{.step} 和其他调试命令 (@pxref{Debugging IDL Programs})、@code{.run} 和其他编译语句 (@pxref{Compiling Programs})、检查命令如@code{print} 和 @code{help} (@pxref{Examining Variables}) 以及其他旨在保持有关正在运行的 shell 的信息的特殊用途命令。
+
+默认情况下，大部分后台 shell 输入和输出对用户隐藏，但这是可配置的。  自定义变量 @code{idlwave-abbrev-show-commands} 允许您配置发送到 shell 的命令显示在那里。  有关分离 @emph{examine} 命令输出的相关自定义，请参阅@ref{Examining Variables}。
+
+@defopt idlwave-shell-show-commands (@code{'(run misc breakpoint)})
+发送时在 shell 中回显的命令类型列表。  可能的值是 @code{run}（代表 @code{.run}、@code{.compile} 和其他运行命令），@code{misc}（代表较少使用的命令，如 @code{window}、@code{retall}、@code{close} 等），@code{breakpoint}（代表断点设置和清除命令），@code{debug}（代表其他调试、单步执行和继续命令）。  此外，如果将该变量设置为单个符号 @code{'everything}，则会显示所有丰富的 shell 输入（这可能仅对调试目的有用）。注意：  对于通过副作用产生输出的隐藏命令，该输出保持隐藏状态（例如，单步执行 @code{print} 命令）。作为特殊情况，输出中的任何错误消息都会显示（例如，单步执行错误）。
+@end defopt
+
+@node Debugging IDL Programs
+@section 调试 IDL 程序
+@cindex Debugging
+@cindex Key bindings for debugging
+@cindex Toolbar
+
+程序可以直接从 Emacs 中的源缓冲区进行编译、运行和调试，遍历任意深度嵌套的代码、打印表达式并一路跳过调用堆栈。  IDLWAVE 通过为 @code{breakpoint}、@code{.step}、@code{.run} 等命令提供功能齐全、按键/菜单/工具栏驱动的界面，使编译和调试 IDL 程序变得不再那么麻烦。它甚至可以执行 IDL 本身不支持的复杂调试操作（例如继续到光标处的行）。
+
+IDLWAVE shell 在 shell 缓冲区和当前 Emacs 会话的所有 IDL 代码缓冲区中安装键绑定，因此调试命令在这两个位置都有效（在 shell 中，命令对最后编译的文件进行操作）。  在支持它的 Emacs 版本上，还安装了调试工具栏。  可以使用 @kbd{C-c C-d C-t} (@code{idlwave-shell-toggle-toolbar}) 切换工具栏显示。
+
+
+@defopt idlwave-shell-use-toolbar (@code{t})
+非@code{nil}表示在所有 IDL 相关缓冲区中使用调试工具栏。
+@end defopt
+
+@menu
+* A Tale of Two Modes::
+* Debug Key Bindings::
+* Breakpoints and Stepping::
+* Compiling Programs::
+* Walking the Calling Stack::
+* Electric Debug Mode::
+@end menu
+
+
+@node A Tale of Two Modes
+@subsection 两种模式的故事
+@cindex Electric Debug Mode
+@cindex Debugging Interface
+
+IDLWAVE 中提供的许多调试、编译和检查命令可通过两个不同的界面同时使用：原始的多键命令界面和新的电动调试模式。  它们提供的功能相似，但与它们交互的方式却截然不同。  主要区别在于，在电动调试模式下，源缓冲区被设为只读，并且使用单次击键来单步执行、检查表达式、设置和删除断点等。相同的变量、前缀参数和设置适用于这两个版本，并且两者可以互换使用。默认情况下，当命中断点时，将启用电动调试模式。首先描述传统的界面。  @xref{Electric Debug Mode}，了解有关该模式的更多信息。  请注意，可以通过自定义变量 @code{idlwave-shell-automatic-electric-debug} 来防止自动激活电气调试模式。
+
+@node Debug Key Bindings
+@subsection 调试键绑定
+@kindex C-c C-d
+@cindex Key bindings
+
+默认情况下，标准调试键绑定始终在前缀键 @kbd{C-c C-d} 上可用，因此，例如，使用 @kbd{C-c C-d C-b} 设置断点，并使用 @kbd{C-c C-d C-c} 编译源文件。  您还可以轻松配置 IDLWAVE 以使用其他命令未使用的一个或多个修饰键来代替前缀 @kbd{C-c C-d}（尽管这些绑定通常也可用；请参阅 @code{idlwave-shell-activate-prefix-keybindings}）。  例如，如果您在 @file{.emacs} 中包含：
+
+@lisp
+(setq idlwave-shell-debug-modifiers '(control shift))
+@end lisp
+
+@noindent a breakpoint can then be set by pressing @kbd{b} while holding down
+@kbd{shift} 和 @kbd{control} 键，即 @kbd{C-S-b}。  编译源文件将在 @kbd{C-S-c} 上进行，删除断点 @kbd{C-S-d} 等。在本章的剩余部分中，我们将假设 @kbd{C-c C-d} 绑定处于活动状态，但如果在 @code{idlwave-shell-debug-modifiers} 变量 (@pxref{Lesson II---Customization}) 中给出修饰符，则每个绑定都将具有等效的快捷方式。  默认情况下，还可以使用一种更简单、更快速的运行代码调试方式；参见@ref{Electric Debug Mode}。
+
+@defopt idlwave-shell-prefix-key (@kbd{C-c C-d})
+调试映射的前缀键@code{idlwave-shell-mode-prefix-map}。
+@end defopt
+
+@defopt idlwave-shell-activate-prefix-keybindings (@code{t})
+非@code{nil}表示调试命令将绑定到前缀键，如@kbd{C-c C-d C-b}。
+@end defopt
+
+@defopt idlwave-shell-debug-modifiers (@code{nil})
+用于 shell 和源缓冲区中调试命令的附加、替代绑定的修饰键列表。  可以是 @code{control}、@code{meta}、@code{super}、@code{hyper}、@code{alt} 和 @code{shift} 中的一个或多个。
+@end defopt
+
+@node Breakpoints and Stepping
+@subsection 断点和单步执行
+@cindex Breakpoints
+@cindex Stepping
+@cindex Execution, controlled
+
+@kindex C-c C-d C-b
+@kindex C-c C-d C-b
+IDLWAVE 可帮助您设置断点并单步执行代码。  在源缓冲区的当前行中设置断点是通过 @kbd{C-c C-d C-b} (@code{idlwave-shell-break-here}) 完成的。  如果前缀 arg 为 1（即 @kbd{C-1 C-c C-d C-b}），断点将获得 @code{/ONCE} 关键字，这意味着它将在第一次使用后被删除。如果数字前缀大于 1（例如 @kbd{C-4 C-c C-d C-b}），则断点仅在命中 @code{nth} 时才处于活动状态。使用单个非数字前缀（即 @kbd{C-u C-c C-d C-b}），提示输入一个条件：要计算的 IDL 表达式，并且仅在为 true 时才触发断点。  要清除当前行中的断点，请使用@kbd{C-c C-d C-d} (@code{idlwave-clear-current-bp})。  当从 shell 窗口执行时，IDL 当前停止的断点将被删除。  要清除所有断点，请使用@kbd{C-c C-d C-a} (@code{idlwave-clear-all-bp})。  断点也可以禁用和重新启用：@kbd{C-c C-d C-\} (@code{idlwave-shell-toggle-enable-current-bp})。
+
+断点行在源代码中突出显示或用图标指示（条件断点、之后断点和其他断点类型有不同的图标）。默认情况下禁用的断点为 @emph{grayed out}。  请注意，IDL 将断点尽可能靠近您指定的行或在您指定的行之后。  IDLWAVE 会向 shell 查询已设置的实际断点位置，因此可能不会标记您指定的确切行。  您可以使用 @kbd{C-c C-d C-l} 重新同步断点列表并随时更新显示（例如，如果您在命令行上添加或删除一些断点）。
+
+在最近的 IDLWAVE 版本中，当鼠标移到断点行上时，断点行会突出显示，并弹出一个工具提示来描述断点详细信息。  断点行上的 @kbd{mouse-3} 会弹出断点操作菜单，包括清除、禁用以及添加或更改断点条件或“之后”断点计数。
+
+一旦程序停止在某处，您就可以单步执行它。  最重要的步进命令是 @kbd{C-c C-d C-s} 执行一行 IDL 代码（“步入”）； @kbd{C-c C-d C-n} 单步执行，将过程和函数调用视为单步（“跳过”）； @kbd{C-c C-d C-h} 继续执行到光标处的行，@kbd{C-c C-d C-r} 继续执行。  @xref{Commands Sent to the Shell}，有关显示或隐藏 shell 接收的断点和单步执行命令的信息。  以下是断点和单步命令的摘要：
+
+@multitable @columnfractions .23 .77
+@item @kbd{C-c C-d C-b}
+@tab Set breakpoint (@code{idlwave-shell-break-here})
+@item @kbd{C-c C-d C-i}
+@tab Set breakpoint in module named here (@code{idlwave-shell-break-in})
+@item @kbd{C-c C-d C-d}
+@tab Clear current breakpoint (@code{idlwave-shell-clear-current-bp})
+@item @kbd{C-c C-d C-a}
+@tab Clear all breakpoints (@code{idlwave-shell-clear-all-bp})
+@item @kbd{C-c C-d [}
+@tab Go to the previous breakpoint (@code{idlwave-shell-goto-previous-bp})
+@item @kbd{C-c C-d ]}
+@tab Go to the next breakpoint (@code{idlwave-shell-goto-next-bp})
+@item @kbd{C-c C-d C-\}
+@tab Disable/Enable current breakpoint (@code{idlwave-shell-toggle-enable-current-bp})
+@item @kbd{C-c C-d C-j}
+@tab Set a breakpoint at the beginning of the enclosing routine.
+@item @kbd{C-c C-d C-s}
+@tab Step, into function calls (@code{idlwave-shell-step})
+@item @kbd{C-c C-d C-n}
+@tab Step, over function calls (@code{idlwave-shell-stepover})
+@item @kbd{C-c C-d C-k}
+@tab Skip one statement (@code{idlwave-shell-skip})
+@item @kbd{C-c C-d C-u}
+@tab Continue to end of block (@code{idlwave-shell-up})
+@item @kbd{C-c C-d C-m}
+@tab Continue to end of function (@code{idlwave-shell-return})
+@item @kbd{C-c C-d C-o}
+@tab Continue past end of function (@code{idlwave-shell-out})
+@item @kbd{C-c C-d C-h}
+@tab Continue to line at cursor position (@code{idlwave-shell-to-here})
+@item @kbd{C-c C-d C-r}
+@tab Continue execution to next breakpoint, if any (@code{idlwave-shell-cont})
+@item @kbd{C-c C-d C-up}
+@tab Show higher level in calling stack (@code{idlwave-shell-stack-up})
+@item @kbd{C-c C-d C-down}
+@tab Show lower level in calling stack (@code{idlwave-shell-stack-down})
+@end multitable
+
+所有这些命令在电动调试模式下都有等效命令，该模式提供更快的单键访问 (@pxref{Electric Debug Mode})。
+
+IDL 当前停止的行（在断点、停止和错误等处）用颜色覆盖或箭头标记，具体取决于 @code{idlwave-shell-mark-stop-line} 中的设置。  如果使用覆盖面来标记停止线（默认情况下），则在单步执行代码时，面颜色会暂时更改为灰色，直到 IDL 完成下一个命令并移至新行。
+
+@defopt idlwave-shell-mark-breakpoints (@code{t})
+非@code{nil}表示在源文件缓冲区中标记断点。  该值表示首选方法。  有效值为 @code{nil}、@code{t}、@code{face} 和 @code{glyph}。
+@end defopt
+
+@defopt idlwave-shell-breakpoint-face
+如果 @code{idlwave-shell-mark-breakpoints} 的值为 @code{face}，则源代码中断点行的面。
+@end defopt
+
+@defopt idlwave-shell-breakpoint-popup-menu (@code{t})
+是否弹出菜单并在断点行上显示工具提示说明。
+@end defopt
+
+@defopt idlwave-shell-mark-stop-line (@code{t})
+非@code{nil}表示标记IDL当前停止的源代码行。  该值指定首选方法。  有效值为 @code{nil}、@code{t}、@code{arrow} 和 @code{face}。
+@end defopt
+
+@defopt idlwave-shell-overlay-arrow (@code{">"})
+如果在 @code{idlwave-shell-mark-stop-line} 中配置，则在执行停止的源代码行处显示覆盖箭头。
+@end defopt
+
+@defopt idlwave-shell-stop-line-face
+如果在 @code{idlwave-shell-mark-stop-line} 中配置，则突出显示 IDL 停止处的源代码行。
+@end defopt
+
+
+@node Compiling Programs
+@subsection 编译程序
+@cindex Compiling programs
+@cindex Programs, compiling
+@cindex Default command line, executing
+@cindex Executing a default command line
+
+@kindex C-c C-d C-c
+为了在 IDLWAVE shell 下编译当前缓冲区，请按 @kbd{C-c C-d C-c} (@code{idlwave-save-and-run})。  首先保存当前缓冲区，然后将命令 @samp{.run path/to/file} 发送到 shell。  您还可以从 shell 缓冲区执行@kbd{C-c C-d C-c}，在这种情况下，最近编译的缓冲区将被保存并重新编译。
+
+在开发或调试程序时，常常需要多次执行同一命令行。  一个方便的方法是 @kbd{C-c C-d C-y} (@code{idlwave-shell-execute-default-command-line})。该命令首先通过关闭所有文件并返回到主解释器级别来将 IDL 从中断执行状态重置。  然后，默认命令行将发送到 shell。  要编辑默认命令行，请使用前缀参数调用@code{idlwave-shell-execute-default-command-line}：@kbd{C-u C-c C-d C-y}。  如果未设置默认命令行（或者您给出两个前缀参数），则发送 @code{comint} 输入历史记录中的最后一个命令。
+
+@kindex C-c C-d C-e
+@cindex Compiling regions
+对于快速编译并运行当前标记的区域作为主级别程序@kbd{C-c C-d C-e}（@code{idlwave-shell-run-region}）非常有用。  创建一个临时文件，其中包含当前区域的内容（附加 @code{END}），并从 shell 运行。
+
+@node Walking the Calling Stack
+@subsection 遍历调用堆栈
+@cindex Calling stack, walking
+
+在调试程序时，检查调用当前例程的上下文非常有用，例如帮助理解传递的参数的值。  为了方便地做到这一点，您需要检查调用堆栈。  如果执行在程序深处的某处停止，您可以使用命令 @kbd{C-c C-d C-@key{UP}} (@code{idlwave-shell-stack-up}) 和 @kbd{C-c C-d C-@key{DOWN}} (@code{idlwave-shell-stack-down})，或相应的工具栏按钮，在调用堆栈中向上或向下移动。  shell 窗口的模式行将使用类似 @samp{[-3:MYPRO]} 的标签指示堆栈中的位置。  该堆栈位置处的 IDL 代码行将突出显示。  如果继续执行，IDLWAVE将自动返回到当前级别。 @xref{Examining Variables}，了解如何检查更高调用堆栈级别上的变量和表达式的值的信息。
+
+@html
+<A NAME="EDEBUG"></A>
+@end html
+@node Electric Debug Mode
+@subsection 电动调试模式
+@cindex Electric Debug Mode
+@cindex @samp{*Debugging*}
+
+即使启用了方便的调试键前缀，使用需要多次击键的命令，重复步进、变量检查 (@pxref{Examining Variables}) 和其他调试活动也可能会很尴尬且缓慢。  幸运的是，有一种更好的方法，其灵感来自 lisp e-debug 模式，并且可以通过 @emph{Electric Debug Mode} 获得。  默认情况下，一旦遇到断点，就会启用此次要模式。  显示执行已停止的行的缓冲区切换到电动调试模式。  此模式在模式线中显示为 @samp{*Debugging*}，并且在点处停止的线有不同的面（默认为紫色，如果颜色可用）。  该缓冲区被设置为只读，并且启用了最常用调试命令的单字符绑定。  这些字符命令（可通过 @kbd{C-?} 获得其列表）是：
+
+@multitable @columnfractions .2 .8
+@item @kbd{a}
+@tab Clear all breakpoints (@code{idlwave-shell-clear-all-bp})
+@item @kbd{b}
+@tab Set breakpoint, @kbd{C-u b} for a conditional break, @kbd{C-n b} for nth hit (@code{idlwave-shell-break-here})
+@item @kbd{d}
+@tab Clear current breakpoint (@code{idlwave-shell-clear-current-bp})
+@item @kbd{e}
+@tab Prompt for expression to print (@code{idlwave-shell-clear-current-bp}).
+@item @kbd{h}
+@tab Continue to the line at cursor position (@code{idlwave-shell-to-here})
+@item @kbd{i}
+@tab Set breakpoint in module named here (@code{idlwave-shell-break-in})
+@item @kbd{[}
+@tab Go to the previous breakpoint in the file (@code{idlwave-shell-goto-previous-bp})
+@item @kbd{]}
+@tab Go to the next breakpoint in the file
+(@code{idlwave-shell-goto-next-bp})
+@item @kbd{\}
+@tab Disable/Enable current breakpoint (@code{idlwave-shell-toggle-enable-current-bp})
+@item @kbd{j}
+@tab Set breakpoint at beginning of enclosing routine (@code{idlwave-shell-break-this-module})
+@item @kbd{k}
+@tab Skip one statement (@code{idlwave-shell-skip})
+@item @kbd{m}
+@tab Continue to end of function (@code{idlwave-shell-return})
+@item @kbd{n}
+@tab Step, over function calls (@code{idlwave-shell-stepover})
+@item @kbd{o}
+@tab Continue past end of function (@code{idlwave-shell-out})
+@item @kbd{p}
+@tab Print expression near point or in region with @kbd{C-u p} (@code{idlwave-shell-print})
+@item @kbd{q}
+@tab End the debugging session and return to the Shell's main level
+(@code{idlwave-shell-retall})
+@item @kbd{r}
+@tab Continue execution to next breakpoint, if any (@code{idlwave-shell-cont})
+@item @kbd{s} 或 @kbd{@key{SPACE}}
+@tab Step, into function calls (@code{idlwave-shell-step})
+@item @kbd{t}
+@tab Print a calling-level traceback in the shell
+@item @kbd{u}
+@tab Continue to end of block (@code{idlwave-shell-up})
+@item @kbd{v}
+@tab Turn Electric Debug Mode off
+(@code{idlwave-shell-electric-debug-mode})
+@item @kbd{x}
+@tab Examine expression near point (or in region with @kbd{C-u x})
+带有检查类型的快捷方式。
+@item @kbd{z}
+@tab Reset IDL (@code{idlwave-shell-reset})
+@item @kbd{+} 或 @kbd{=}
+@tab Show higher level in calling stack (@code{idlwave-shell-stack-up})
+@item @kbd{-} 或 @kbd{_}
+@tab Show lower level in calling stack (@code{idlwave-shell-stack-down})
+@item @kbd{?}
+@tab Help on expression near point or in region with @kbd{C-u ?}
+(@code{idlwave-shell-help-expression})
+@item @kbd{C-?}
+@tab Show help on the commands available.
+@end multitable
+
+大多数单字符电动调试绑定使用等效多个键命令的最终击键（当然仍然可用），但有些不同（例如，@kbd{e}、@kbd{t}、@kbd{q}、@kbd{x}）。有些有额外的方便绑定（例如用于步进的@kbd{@key{SPACE}}）。  本节中描述的用于电动调试绑定调用的命令的所有前缀和其他参数选项仍然有效。  例如，@kbd{C-u b} 设置条件断点，就像对 @kbd{C-u C-c C-d C-b} 所做的那样。
+
+您可以随时使用 @kbd{C-c C-d C-v} （@kbd{v} 在该模式下将其关闭）或从“调试”菜单在缓冲区中切换电动调试模式。  通常该模式会在适当的时间启用和禁用，但有时您可能想在调试文件的同时编辑文件，或者切换到该模式以方便设置大量断点。
+
+要快速放弃调试会话并返回到 Shell 主级别的正常编辑，请使用 @kbd{q} (@code{idlwave-shell-retall})。这会禁用所有 IDLWAVE 缓冲区中的电动调试模式@footnote{Note that this binding is not symmetric: @kbd{C-c C-d C-q} is bound to @code{idlwave-shell-quit}, which quits your IDL session.}。  使用 @kbd{C-?} 可以获得命令快捷键的帮助。  如果您发现此模式妨碍您，可以通过将变量 @code{idlwave-shell-automatic-electric-debug} 设置为 @code{nil} 或 @code{'breakpoint} 来防止其自动激活。  如果您希望在遇到运行时错误时也能使用方便的电动调试快捷方式，请设置为@code{t}。
+
+@defopt idlwave-shell-automatic-electric-debug (@code{'breakpoint})
+当遇到断点或运行时错误时是否自动进入电动调试模式，然后在达到 $MAIN$ 级别时在所有缓冲区中禁用它（通过正常程序执行或重新启动）。  除了代表从不的@code{nil}和代表断点和错误的@code{t}之外，还可以使用@code{'breakpoint}（默认值）以仅在断点暂停时启用它。
+@end defopt
+
+@defopt idlwave-shell-electric-stop-color (Violet)
+处于电动调试模式时停止线覆盖的默认颜色。
+@end defopt
+
+@defopt idlwave-shell-electric-stop-line-face
+用于停止线的面。  默认为与模型线类似的面，颜色为@code{idlwave-shell-electric-stop-color}。
+@end defopt
+
+@defopt idlwave-shell-electric-zap-to-file (@code{t})
+如果设置，进入电动调试模式时，选择显示停止点的文件的窗口。  这会远离 shell 窗口，但对于立即单步执行等很有用。
+@end defopt
+
+@html
+<A NAME="EXAMINE"></A>
+@end html
+@node Examining Variables
+@section 检查变量
+@cindex @code{PRINT} expressions
+@cindex @code{HELP}, on expressions
+@cindex Expressions, printing & help
+@cindex Examining expressions
+@cindex Printing expressions
+@cindex Mouse binding to print expressions
+
+@kindex C-c C-d C-p
+您是否发现自己反复键入，例如 @code{print,n_elements(x)} 和类似的语句来提醒自己代码或命令行中变量和表达式的类型/大小/结构/值/等@:？  IDLWAVE 有一套特殊命令来自动执行这些类型的变量或表达式检查。  它们的工作方式是向 shell 发送格式化为包含指定表达式的语句，并且可以通过多种方式进行访问。
+
+这些@emph{examine}命令可以随时在 shell 或缓冲区中使用（只要 shell 正在运行），并且当由于触发的断点或错误而在缓冲区中停止执行时，或者在 IDLWAVE shell 中编写长命令时，这些命令非常有用。  在后一种情况下，命令被发送到 shell 并且其输出可见，但所组成的命令中的要点保持不变：您可以检查正在构建的命令的组成部分，而无需中断构建过程！  您甚至可以在 shell 窗口中从较旧的输入或输出中打印任意表达式；可以检查您看到的任何表达式、变量、数字或函数。
+
+如果变量 @code{idlwave-shell-separate-examine-output} 不是 @code{nil}（默认值），则所有检查输出都将发送到特殊的 @file{*Examine*} 缓冲区，而不是 shell。  先前检查命令的输出保存在该缓冲区中。  在该缓冲区中，@kbd{c}清除内容，@kbd{q}隐藏缓冲区。
+
+两个最基本的检查命令绑定到 @kbd{C-c C-d C-p} 来打印该点的表达式，以及 @kbd{C-c C-d ?} 来调用该表达式的帮助@footnote{Available as @kbd{p} and @kbd{?} in Electric Debug Mode (@pxref{Electric Debug Mode})}。  point 处的表达式可以是数组表达式或函数调用，也可以是一对括号的内容。  所选表达式会突出显示，同时生成的输出会在 shell 或单独的输出缓冲区中突出显示。  使用前缀参数调用上述命令将使用当前区域作为表达式，而不是使用当前区域。这对于检查复杂的多行表达式非常有用。  两个前缀参数 (@kbd{C-u C-u C-c C-d C-p}) 将提示输入要直接打印的表达式。  默认情况下，调用 print 时，只会打印长数组的初始部分，最多 4⁣。
+
+为了提高速度和便利性，鼠标绑定允许您单击表达式并检查它们的值。  使用 @kbd{S-mouse-2} 打印表达式，使用 @kbd{C-M-mouse-2} 调用帮助（即，您需要在单击鼠标中键的同时按住 @key{META} 和 @key{CONTROL}）。  如果您只需单击，将以与上述相同的方式选择最接近的表达式。  您还可以 @emph{drag} 鼠标来准确突出显示要检查的特定表达式或子表达式。对于自定义表达式检查和强大的可自定义弹出检查选择，@xref{Custom Expression Examination}。
+
+@cindex Printing expressions, on calling stack
+@cindex Restrictions for expression printing
+相同的变量检查命令适用于 IDL Shell 和 IDLWAVE 缓冲区，甚至适用于调用堆栈更高级别的变量。  例如，如果您停在例程中的断点处，则可以检查其调用例程内的变量和表达式的值，依此类推，一直到调用堆栈。只需向上移动堆栈，然后打印您看到的变量（@pxref{Walking the Calling Stack}，了解有关逐步返回调用堆栈的信息）。  以下限制适用于除当前级别之外的所有级别：
+
+@itemize @bullet
+@item 
+数组表达式必须使用 @samp{[ ]} 索引分隔符。  带有 @samp{( )} 的标识符将被解释为函数调用。
+@item 
+@cindex ROUTINE_NAMES, IDL procedure
+注意：在调用堆栈的较高级别上打印表达式的值使用 @emph{unsupported} IDL 例程 @code{ROUTINE_NAMES}，该例程在 IDL@. Caveat Examinor 的未来版本中可能可用，也可能不可用。
+@end itemize
+
+@defopt idlwave-shell-expression-face
+@code{idlwave-shell-expression-overlay} 的面。允许您为 IDL 打印的表达式选择字体、颜色和其他属性。
+@end defopt
+
+@defopt idlwave-shell-output-face
+@code{idlwave-shell-output-overlay} 的面。允许您在检查表达式时为 IDL 的最新输出选择字体、颜色和其他属性。”
+@end defopt
+
+@defopt idlwave-shell-separate-examine-output (@code{t})
+如果非@code{nil}，则将检查命令的输出重定向到特殊的@file{*Examine*}缓冲区，而不是在shell本身中。
+@end defopt
+
+@defopt idlwave-shell-max-print-length (200)
+检查数组表达式时要打印的前导数组条目的最大数量。
+@end defopt
+
+@node Custom Expression Examination
+@section 自定义表达检查
+@cindex Expressions, custom examination
+@cindex Custom expression examination
+
+可能的变量和表达式检查命令的种类是无穷无尽的（例如，只需查看 @code{widget_info()} 的关键字列表）。  IDLWAVE 并没有尝试将它们全部包含在内，而是提供了两种简单的方法来自定义您自己的命令，其中包括一个特殊的鼠标检查命令，以及两个用于生成您自己的检查键和鼠标绑定的宏。
+
+@kbd{C-S-mouse-2} 上提供了最强大、最灵活的鼠标检查命令。  就像所有其他鼠标检查命令一样，它允许单击或拖动表达式选择，但它不是将硬编码命令发送到 shell，而是弹出一个可自定义的检查函数选择列表以供选择，并使用 @code{idlwave-shell-examine-alist} 变量 @footnote{In Electric Debug Mode (@pxref{Electric Debug Mode}), the key @kbd{x} provides a single-character shortcut interface to the same examine functions for the expression at point or marked by the region.} 配置。  该变量是一个键值对列表（Emacs 中的@emph{alist}），其中键给出了要为检查命令显示的名称，值是命令字符串本身，其中文本@code{___}（三个下划线）将在发送到 shell 之前替换为所选表达式。一个例子可能是键 @code{Structure Help} 和值 @code{help,___,/STRUCTURE}。  在这种情况下，系统会提示您 @emph{Structure Help}，这可能会将 @code{help,var,/STRUCTURE} 之类的内容发送到 shell 进行输出。 @code{idlwave-shell-examine-alist} 默认配置有大量检查命令，但您可以轻松自定义它以添加您自己的命令。
+
+除了配置弹出鼠标命令可用的功能之外，您还可以轻松创建自己的自定义绑定以使用两个便捷宏@code{idlwave-shell-examine}和@code{idlwave-shell-mouse-examine}检查表达式。它们创建基于键盘或鼠标的自定义变量检查，共享内置检查命令的所有相同属性。这两个函数都采用单个字符串参数，共享 @code{idlwave-shell-examine-alist} 值的语法，例如：
+
+@lisp
+(add-hook 'idlwave-shell-mode-hook
+          (lambda ()
+            (idlwave-shell-define-key-both [s-down-mouse-2]
+                                 (idlwave-shell-mouse-examine
+                                  "print, size(___,/DIMENSIONS)"))
+            (idlwave-shell-define-key-both [f9] (idlwave-shell-examine
+                                       "print, size(___,/DIMENSIONS)"))
+            (idlwave-shell-define-key-both [f10] (idlwave-shell-examine
+                                        "print,size(___,/TNAME)"))
+            (idlwave-shell-define-key-both [f11] (idlwave-shell-examine
+                                        "help,___,/STRUCTURE"))))
+@end lisp
+
+@noindent Now pressing @key{f9}, or middle-mouse dragging with the
+按下@key{SUPER}键，将打印附近或突出显示的表达式的尺寸。  按 @key{f10} 将给出类型字符串，而 @key{f11} 将显示附近结构的内容。  正如您所看到的，可能性是有限的。
+
+@defopt idlwave-shell-examine-alist
+检查命令列表，其中的键命名命令并显示在选择弹出窗口中，值是在所有 @code{___}（三个下划线）实例被指示的表达式替换后要发送的自定义 IDL 检查命令字符串。
+@end defopt
+
+@node Acknowledgments
+@chapter 致谢
+@cindex Acknowledgments
+@cindex Maintainer, of IDLWAVE
+@cindex Authors, of IDLWAVE
+@cindex Contributors, to IDLWAVE
+@cindex Email address, of Maintainer
+@cindex Thanks
+
+@noindent
+IDLWAVE 软件包的主要贡献者是：
+
+@itemize @minus
+@item 
+@uref{mailto:chase@@att.com, @b{Chris Chase}}，原作者。 Chris 编写了@file{idl.el} 和@file{idl-shell.el} 并维护了它们好几年。
+
+@item 
+@uref{mailto:dominik@@astro.uva.nl, @b{Carsten Dominik}} 负责从 3.0 版开始的软件包，在此期间他彻底修改了几乎所有内容，用许多新功能对 IDLWAVE 进行了现代化改造，并开发了手册。
+
+@item 
+@uref{mailto:jdsmith@@as.arizona.edu, @b{J.D. Smith}}，当前的维护者，从版本 4.10 开始，帮助塑造了对象方法完成和版本 4.x 中引入的大多数新功能，并为 IDLWAVE 版本 5.x 和 6.x 引入了许多新功能。
+@end itemize
+
+@noindent
+以下人员也通过补丁、想法、错误报告和建议为 IDLWAVE 的开发做出了贡献。
+
+@itemize @minus
+@item 
+乌尔里克·迪考 <dickow__at__nbi.dk>
+@item 
+埃里克·E·多斯 (Eric E. Dors) <edors__at__lanl.gov>
+@item 
+斯坦·维达尔·H·豪根 <s.v.h.haugan__at__astro.uio.no>
+@item 
+大卫·休内莫尔德 <dph__at__space.mit.edu>
+@item 
+凯文·伊沃里 <Kevin.Ivory__at__linmpi.mpg.de>
+@item 
+迪克·杰克逊 <dick__at__d-jackson.com>
+@item 
+刘旭勇 <liu__at__stsci.edu>
+@item 
+西蒙·马歇尔 <Simon.Marshall__at__esrin.esa.it>
+@item 
+克雷格·马克沃特 <craigm__at__cow.physicals.wisc.edu>
+@item 
+洛朗·穆尼耶 <mugnier__at__onera.fr>
+@item 
+卢博斯·波赫曼 <lubos__at__rsinc.com>
+@item 
+鲍勃·波特曼 <portmann__at__al.noaa.gov>
+@item 
+帕特里克·M·瑞安 <pat__at__jaameri.gsfc.nasa.gov>
+@item 
+马蒂·里巴 <ryba__at__ll.mit.edu>
+@item 
+菲尔·威廉姆斯 <williams__at__irc.chmcc.org>
+@item 
+菲尔·斯特恩 <sterne__at__dublin.llnl.gov>
+@item 
+保罗·索伦森 <aardvark62__at__msn.com>
+@end itemize
+
+Doug Dirks 在提供关键的 IDL XML 目录以支持 IDL v6.2 及更高版本的 HTML 帮助方面发挥了重要作用，Ali Bahrami 提供了与 IDL Assistant 交互的脚本和文档。
+
+@noindent
+谢谢大家！
+
+@node Sources of Routine Info
+@appendix 日常信息来源
+
+@cindex Sources of routine information
+在@ref{Routine Info}和@ref{Completion}中，我们展示了IDLWAVE如何显示例程的调用顺序和关键字，并完成例程名称和关键字。  为了使这些功能发挥作用，IDLWAVE 必须了解可访问的例程。
+
+@menu
+* Routine Definitions::          IDL 例程定义的地方。
+* Routine Information Sources::   那么 IDLWAVE 如何知道...
+* Catalogs::
+* Load-Path Shadows::            在几个地方定义的例程
+* Documentation Scan::           扫描 IDL 手册
+@end menu
+
+@node Routine Definitions
+@appendixsec 例程定义
+@cindex Routine definitions
+@cindex IDL variable @code{!PATH}
+@cindex @code{!PATH}, IDL variable
+@cindex @code{CALL_EXTERNAL}, IDL routine
+@cindex @code{LINKIMAGE}, IDL routine
+@cindex External routines
+
+@noindent Routines which can be used in an IDL program can be defined in
+几个地方：
+
+@enumerate
+@item 
+@emph{Builtin routines} 在 IDL 本身内部定义。  此类例程的源代码不可用，但可以通过 IDL 文档了解。
+@item 
+@emph{part of the current program} 的例程是在用户显式编译的文件中定义的。  该文件可能位于也可能不位于 IDL 搜索路径上。
+@item 
+@emph{Library routines} 在位于 IDL 搜索路径上的文件中定义。  当第一次调用库例程时，IDL 将查找源文件并动态编译它。  库例程的一个特殊子类别是随 IDL 分发的 @emph{system routines}，通常可在 IDL 分发的 @file{lib} 子目录中找到。
+@item 
+用其他语言（如 Fortran 或 C）编写的外部例程可以使用 @code{CALL_EXTERNAL} 调用，通过 @code{LINKIMAGE} 链接到 IDL，或作为动态加载模块 (DLM) 包含在内。  目前，IDLWAVE 无法提供此类外部例程的例程信息和完成，除非通过查询 Shell 来获取调用信息（仅限 DLM）。
+@end enumerate
+
+@node Routine Information Sources
+@appendixsec 常规信息来源
+@cindex Routine info sources
+@cindex Builtin list of routines
+@cindex Updating routine info
+@cindex Scanning buffers for routine info
+@cindex Buffers, scanning for routine info
+@cindex Shell, querying for routine info
+
+@noindent To maintain the most comprehensive information about all IDL
+作为系统上的例程，IDLWAVE 从许多来源收集数据：
+
+@enumerate
+
+@item 
+它有一个 @emph{builtin list}，其中包含有关 IDL 附带的例程的信息。  IDLWAVE @value{VERSION} 随一系列 @value{NSYSROUTINES} 例程和对象方法一起分发，反映了 IDL 版本 @value{IDLVERSION}。  从 IDL v6.2 开始，例程信息以 IDLWAVE 扫描的 XML 目录的形式直接与 IDL 一起分发。以前，此列表是通过扫描 IDL 手册来生成文件@file{idlw-rinfo.el} 来创建的。
+
+@item 
+IDLWAVE @emph{scans} 当前 Emacs 会话中的所有 @emph{buffers} 用于例程定义。  当用户首次请求例程信息或完成时，这是自动完成的。  每个新缓冲区和更改后保存的每个缓冲区也会被扫描。  可以随时使用命令 @kbd{C-c C-i} (@code{idlwave-update-routine-info}) 重新扫描所有缓冲区。
+
+@item 
+如果您在 Emacs 会话中运行 IDLWAVE-Shell，则编译例程及其参数的 IDLWAVE 将为 @emph{query the shell}。  当用户首次请求例程信息或完成时，这种情况会自动发生。  每次使用 @kbd{C-c C-d C-c} 编译 Emacs 缓冲区时，都会查询该文件的例程信息。  尽管很少需要，但命令 @kbd{C-c C-i} (@code{idlwave-update-routine-info}) 可用于显式更新 shell 例程数据。
+
+@item 
+许多流行的库都附带已扫描到 @emph{library catalogs} (@pxref{Library Catalogs}) 的常规信息。  用户也可以使用提供的 @file{idlwave_catalog} 工具构建这些每个目录的目录文件。  它们会被 IDLWAVE 自动发现。
+
+@item 
+IDLWAVE 可以扫描选定的源文件目录并将结果存储在单个 @emph{user catalog} 文件中，该文件将像 @file{idlw-rinfo.el} 一样自动加载。 @xref{User Catalog}，了解如何以这种方式扫描文件的信息。
+@end enumerate
+
+加载所有例程和目录信息可能是一个耗时的过程，尤其是在慢速网络上。  根据系统和网络配置，可能需要长达 30 秒的时间（尽管在本地快速系统上通常只需几秒）。  为了最大限度地减少会话中第一次完成或例行信息命令时的等待时间，IDLWAVE 使用 Emacs 空闲时间分六个步骤进行初始化，并在中间接受用户输入。  如果这妨碍了您，请将变量 @code{idlwave-init-rinfo-when-idle-after} 设置为 0（零）。库和用户目录中记录的例程越多，加载速度就越慢，因此减少此数量有助于缩短加载时间。
+
+@defopt idlwave-init-rinfo-when-idle-after (@code{10})
+自动初始化例程信息之前的空闲时间秒数。
+@end defopt
+
+@defopt idlwave-scan-all-buffers-for-routine-info (@code{t})
+非@code{nil}表示更新信息时扫描所有缓冲区中的IDL程序。
+@end defopt
+
+@defopt idlwave-query-shell-for-routine-info (@code{t})
+非@code{nil}表示查询 shell 以获取有关已编译例程的信息。
+@end defopt
+
+@defopt idlwave-auto-routine-info-updates
+控制在什么情况下例行信息自动更新。
+@end defopt
+
+@html
+<A NAME="CATALOGS"></A>
+@end html
+@node Catalogs
+@appendixsec 目录
+@cindex Catalogs
+
+@emph{Catalogs} 是包含各个例程扫描信息的文件，包括参数和关键字、调用序列、文件路径、类和过程与@: 函数类型等。它们代表了一种将可用于 IDL 系统例程 (@pxref{Routine Info}) 的内部内置信息扩展到其他源集合的方法。
+
+从版本 5.0 开始，IDLWAVE@. 提供两种类型的目录：传统的 @emph{user catalog} 和较新的 @emph{library catalogs}。  尽管它们可以互换使用，但图书馆目录更加灵活，也是首选。  在极少数情况下，用户目录可能是首选——请阅读下文。  两种类型的目录可以共存而不会引起问题。
+
+为了方便目录系统，IDLWAVE 存储从 shell 收集的有关 IDL 搜索路径的信息，并可以自动或按需写出此信息（菜单@code{Debug->Save Path Info}）。  在没有用于发现路径信息的 shell 的系统上（例如，Windows），必须在 @code{idlwave-library-path} 中指定库路径，以允许定位库目录，并为用户目录扫描设置目录（@pxref{User Catalog} 了解有关此变量的更多信息）。  请注意，在 shell 运行之前，IDLWAVE 只能通过查阅@code{idlwave-path-file}（@file{~/.emacs.d/idlwave/idlpath.el}，默认情况下）指向的文件来了解 IDL 搜索路径。  如果启用@code{idlwave-auto-write-path}（这是默认设置），则每当 IDLWAVE shell 启动时都会写出路径。
+
+@defopt idlwave-auto-write-path  (@code{t})
+当 !PATH 和 !DIR 路径发生变化以及 Shell 关闭时，会自动从 IDL 中写出有关这些路径的信息。  需要这些路径来定位图书馆目录。
+@end defopt
+
+@defopt idlwave-library-path
+Windows 和 macOS 的 IDL 库路径@. 在 Unix/macOS 下，运行时将从 Shell 获取。
+@end defopt
+
+@defopt idlwave-system-directory
+Windows 和 macOS@. 的 IDL 系统目录 还需要查找 IDL v6.2 及更高版本的 HTML 帮助和 IDL Assistant。  在 Unix/macOS 下，如果运行，将从 Shell 获取并记录。
+@end defopt
+
+@defopt idlwave-config-directory (@file{~/.emacs.d/idlwave})
+IDLWAVE 保存配置信息、用户目录（如果有）和 XML 目录的缓存扫描（IDL v6.2 及更高版本）的默认路径。
+@end defopt
+
+@menu
+* Library Catalogs::
+* User Catalog::
+@end menu
+
+@html
+<A NAME="LIBRARY_CATALOGS"></A>
+@end html
+@node Library Catalogs
+@appendixsubsec 图书馆目录
+@cindex @file{.idlwave_catalog}
+@cindex Library catalogs
+@cindex @code{idlwave_catalog}
+
+库目录由名为 @file{.idlwave_catalog} 的文件组成，这些文件存储在包含 @code{.pro} 例程文件的目录中。  它们在 IDL 搜索路径上被发现，并在读取例程信息时自动加载。  每个目录文件都记录了在该目录中找到的例程——每个目录一个目录。  每个目录都有一个与之关联的库名称（例如，@emph{AstroLib}）。  当找到目录时，该名称将简短显示，并在其记录的例程的例程信息中显示。
+
+默认情况下，许多流行的例程库都附带 IDLWAVE 目录文件，因此将被自动发现。  使用 IDLWAVE@. 提供的工具从外部将库目录扫描到 Emacs。每个目录都可以独立于其他目录重新扫描。通过通用源存储库，可以轻松地在系统范围内提供目录，提供统一的常规信息，并减轻用户的扫描负担（他们甚至可能不知道他们正在使用扫描的目录）。  由于所有目录都是独立的，因此可以自动重新扫描它们以收集更新，例如在 @file{cron} 作业中。扫描比使用内置用户目录方法快得多。  一个小缺点是：每次 IDLWAVE 启动时都会扫描整个 IDL 搜索路径以查找目录文件，如果通过慢速网络访问 IDL 例程，这可能会很慢。
+
+用于创建库目录的 Perl 工具随 IDLWAVE 一起分发：@code{idlwave_catalog}。  它可以非常简单地称为：
+@example
+idlwave_catalog MyLib
+@end example
+
+@noindent This will scan all directories recursively beneath the current and
+用 @file{.idlwave_catalog} 文件填充它们，并用名称库“MyLib”标记在那里找到的例程。  完整的使用信息：
+
+@example
+Usage: idlwave_catalog  [-l] [-v] [-d] [-s] [-f] [-h] libname
+       libname - Unique name of the catalog (4 or more alphanumeric
+                 characters).
+            -l - Scan local directory only, otherwise recursively
+                 catalog all directories at or beneath this one.
+            -v - Print verbose information.
+            -d - Instead of scanning, delete all .idlwave_catalog files
+                 here or below.
+            -s - Be silent.
+            -f - Force overwriting any catalogs found with a different
+                 library name.
+            -h - Print this usage.
+@end example
+
+要重新加载 IDL 路径上的库目录，请使用 @code{idlwave-update-routine-info} 的单个前缀强制更新系统例程信息：@kbd{C-u C-c C-i}。
+
+@defopt idlwave-use-library-catalogs  (@code{t})
+是否搜索并加载图书馆目录。  如果加载性能存在问题和/或不需要目录，请禁用。
+@end defopt
+
+@node User Catalog
+@appendixsubsec 用户目录
+@cindex User catalog
+@cindex IDL library routine info
+@cindex Windows
+@cindex macOS
+@cindex IDL variable @code{!DIR}
+@cindex @code{!DIR}, IDL variable
+
+用户目录是旧的常规目录系统。  它在 Emacs 中生成，并存储在用户主目录中的单个文件中（默认为@file{.emacs.d/idlwave/idlusercat.el}）。  尽管图书馆目录更灵活，但可能有理由更喜欢用户目录，包括：
+
+@itemize @bullet
+@item 扫描是 Emacs 内部的，因此您不需要可用的 Perl
+安装，就像安装图书馆目录一样。
+@item 可用于扫描用户无写入权限的目录
+特权。
+@item 简单的基于小部件的路径选择。
+@end itemize
+
+但默认情况下，用户目录中没有可用的常规信息；用户必须主动完成扫描。  此外，这种类型的目录要么全有，要么全无：如果单个例程发生更改，则必须重新扫描整个目录才能更新它。  创建用户目录也比扫描图书馆目录慢得多。
+
+您可以扫描当前已知路径上的任何目录。  在Windows下，您需要在变量@code{idlwave-library-path}中指定IDL搜索路径，并在变量@code{idlwave-system-directory}中指定IDL目录的位置（@code{!DIR}系统变量的值），如下@footnote{The initial @samp{+} leads to recursive expansion of the path, just like in IDL}：
+
+@lisp
+(setq idlwave-library-path
+        '("+c:/RSI/IDL56/lib/" "+c:/user/me/idllibs"))
+(setq idlwave-system-directory "c:/RSI/IDL56/")
+@end lisp
+
+@noindent Under GNU/Linux and UNIX, these values will be automatically
+从 IDLWAVE shell 收集（如果运行）。
+
+然后可以使用命令@kbd{M-x idlwave-create-user-catalog-file}（或菜单项@samp{IDLWAVE->Routine Info->Select Catalog Directories}）来创建用户目录。  它会弹出一个小部件，您可以在其中选择搜索路径上的部分或全部目录。  已经包含库目录的目录标有@samp{[LIB]}，并且不需要扫描（尽管这样做没有什么坏处，除了用于复制的额外内存之外）。
+
+选择目录后，单击小部件中的@w{@samp{[Scan & Save]}}按钮即可扫描所选目录中的所有文件，并写出生成的例程信息。  为了使用目录选择更新库信息，请使用双前缀参数调用命令 @code{idlwave-update-routine-info}：@w{@kbd{C-u C-u C-c C-i}}。  这将重新扫描先前选择的目录中的文件，写入用户目录文件的更新版本并重建 IDLWAVE 的内部列表。  如果您提供三个前缀参数@w{@kbd{C-u C-u C-u C-c C-i}}，更新将通过后台作业@footnote{Unix systems only, I think.}完成。  您可以继续工作，图书馆目录准备好后将重新读取。  如果您发现需要经常更新用户目录，您应该考虑为您的例程构建一个库目录 (@pxref{Library Catalogs})。
+
+@defopt idlwave-special-lib-alist
+与特殊库目录匹配的正则表达式列表，用于在例程信息显示中进行标记。
+@end defopt
+
+@node Load-Path Shadows
+@appendixsec 加载路径阴影
+@cindex Load-path shadows
+@cindex Shadows, load-path
+@cindex Duplicate routines
+@cindex Multiply defined routines
+@cindex Routine definitions, multiple
+@cindex Application, testing for shadowing
+@cindex Buffer, testing for shadowing
+
+IDLWAVE 可以编译在多个文件中（重新）定义的例程列表。  由于一个定义将根据首先编译的文件隐藏（隐藏）其他定义，因此这种多个定义称为“加载路径阴影”。  IDLWAVE 有几个例程来扫描加载路径阴影。  输出被放入特殊缓冲区@file{*Shadows*}。  输出的格式与例程信息缓冲区 (@pxref{Routine Info}) 的源部分相同。  例程的不同定义按 @emph{likelihood of use} 排序。  因此，如果毫无戒心的命令使用该例程，您很可能会得到第一个条目。  在列出阴影之前，您应该按 @kbd{C-c C-i} 确保常规信息是最新的。  以下是不同的例程（也可在菜单@samp{IDLWAVE->Routine Info}中找到）：
+
+@table @asis
+@item @kbd{M-x idlwave-list-buffer-load-path-shadows}
+此命令检查当前缓冲区中定义的所有例程的名称是否与 IDLWAVE@. 可访问的其他例程存在遮蔽冲突。该命令还有一个键绑定：@kbd{C-c C-b}
+@item @kbd{M-x idlwave-list-shell-load-path-shadows}.
+检查 shell 下编译的所有例程是否有阴影。  当您编写完整的应用程序时，这非常有用。  只需编译应用程序，使用 @code{RESOLVE_ALL} 编译代码使用的任何例程，使用 @kbd{C-c C-i} 更新 IDLWAVE 内的例程信息，然后检查阴影。
+@item @kbd{M-x idlwave-list-all-load-path-shadows}
+此命令检查 IDLWAVE 可访问的所有例程是否存在冲突。
+@end table
+
+为了使这些命令充分发挥作用，您需要扫描用户目录或库目录中的整个加载路径。  此外，IDLWAVE 应该能够区分系统库文件（通常安装在 @file{/usr/local/rsi/idl/lib} 中）和任何特定于站点或用户特定的文件。  因此，此类本地文件不应安装在 IDL 目录的 @file{lib} 目录内。  出于许多其他原因，这也是可取的。
+
+@cindex Windows
+@cindex IDL variable @code{!DIR}
+@cindex @code{!DIR}, IDL variable
+Windows 用户还必须将变量 @code{idlwave-system-directory} 设置为 IDL@. 中 @code{!DIR} 系统变量的值 IDLWAVE 将 @file{lib} 附加到该变量的值，并假定在该路径上找到的所有文件都是系统例程。
+
+查明特定例程在加载路径上是否有多个定义的另一种方法是例程信息显示 (@pxref{Routine Info})。
+
+@node Documentation Scan
+@appendixsec 文件扫描
+@cindex @file{get_html_rinfo}
+@cindex @file{idlw-rinfo.el}
+@cindex Scanning the documentation
+@cindex Perl program, to create @file{idlw-rinfo.el}
+
+@strong{Starting with version 6.2, IDL is distributed directly with HTML online help, and an XML-based catalog of routine information}。  这使得使用工具 @file{get_html_rinfo} 扫描手册及其生成的 @file{idlw-rinfo.el} 文件（如此处所述）完全没有必要。  该信息保留在此处，供希望生成旧 IDL 版本帮助目录的用户使用。
+
+
+IDLWAVE 从 IDL 手册中获取有关系统例程的知识。  文件 @file{idlw-rinfo.el} 包含 IDL 系统例程的例程信息，以及 HTML 文档相关部分的链接。  IDLWAVE 的在线帮助功能需要提供 HTML 版本的 IDL 手册；默认情况下，HTML 文档不随 IDLWAVE 一起分发，但必须单独下载。
+
+HTML 文件和相关图像可以使用免费的 Microsoft HTML Help Workshop 从随 IDL 分发的 @file{idl.chm} HTMLHelp 文件生成。  如果幸运的话，IDLWAVE 的维护者将始终可以访问最新版本的 IDL 并提供更新。  IDLWAVE 发行版还包含 Perl 程序 @file{get_html_rinfo}，它通过扫描 IDL 文档生成的 HTML 文档来构造 @file{idlw-rinfo.el} 文件。有关如何使用 @file{get_html_rinfo} 的说明位于程序本身中。
+
+@node HTML Help Browser Tips
+@appendix HTML 帮助浏览器提示
+@cindex Browser Tips
+
+有多种浏览器可用于显示 IDLWAVE 提供的在线 HTML 帮助（从版本 5.0 开始）。  自 IDL v6.2（单一跨平台 HTML 帮助浏览器）开始，@emph{IDL Assistant} 随 IDL@. 一起分发。如果此帮助浏览器可用，则它是首选，也是默认设置。  默认情况下启用的变量@code{idlwave-help-use-assistant}控制是否使用此帮助浏览器。  如果您使用 IDL Assistant，则此处的提示不相关。
+
+由于 IDLWAVE 在许多不同的系统类型上运行，因此不可能进行单一浏览器配置，但有很多选择。  默认的@code{idlwave-help-browser-function}继承@code{browse-url-browser-function}中配置的浏览器。
+
+请注意，从帮助源重新编译的 HTML 文件包含对 @samp{Symbol} 字体的特定引用，默认情况下，普通编码中不允许使用该字体（从技术上讲，它是无效的）。  虽然它只会影响一些符号，但您可以按照说明欺骗基于 Mozilla 的浏览器识别 @samp{Symbol}
+@c This page is 11 years old.  Is it still relevant?
+@uref{http://hutchinson.belmont.ma.us/tth/Xfonts.html, here}。  完成此修复后，HTML 帮助页面看起来几乎与 PDF 等效页面相同（但可以添加书签、作为历史浏览、搜索等）。
+
+@c Not updated in over a decade.
+@c Maybe you want to recommend eww these days.
+@ignore
+@noindent Individual platform recommendations:
+
+@itemize @bullet
+@item Unix/macOS: The @uref{http://www.w3m.org,@code{w3m}} browser
+and its associated
+@uref{http://emacs-w3m.namazu.org/,@code{emacs-w3m}} emacs mode
+provide in-buffer browsing with image display, and excellent speed and
+formatting.  Both the Emacs mode and the browser itself must be
+downloaded separately.  To use this browser, include
+
+@lisp
+(setq idlwave-help-browser-function 'w3m-browse-url)
+@end lisp
+
+in your @file{.emacs}.  Setting a few other nice @code{w3m} options
+cuts down on screen clutter:
+
+@lisp
+(setq w3m-use-tab nil
+      w3m-use-header-line nil
+      w3m-use-toolbar nil)
+@end lisp
+
+If you use a dedicated frame for help, you might want to add the
+following, to get consistent behavior with the @kbd{q} key:
+
+@lisp
+;; Close my help window when w3m closes.
+(defadvice w3m-close-window (after idlwave-close activate)
+  (if (boundp 'idlwave-help-frame)
+      (idlwave-help-quit)))
+@end lisp
+
+Note that you can open the file in an external browser from within
+@code{w3m} using @kbd{M}.
+@end itemize
+@end ignore
+
+@node Configuration Examples
+@appendix 配置举例
+@cindex Configuration examples
+@cindex Example configuration
+@cindex @file{.emacs}
+@cindex Default settings, of options
+@cindex Interview, with the maintainer
+
+@noindent
+@b{Question:} 您的软件包中拥有所有这些复杂的配置选项，但是哪些@emph{you} 作为维护者实际在您自己的配置中设置？
+
+@noindent
+@b{Answer:} 不多，除了自定义键绑定之外。  我以看起来最好的方式设置了大多数默认值。  但是，默认设置不会启用以下功能：
+
+@itemize @minus
+@item 
+当毫无戒心的用户使用时，它们并不是不言自明的（即太神奇）。
+@item 
+太侵扰了。
+@item 
+无法在所有 Emacs 安装上正常工作。
+@item 
+打破广泛使用的标准。
+@item 
+使用功能键或其他非标准键。
+@item 
+纯粹是个人定制，例如附加键绑定和库名称。
+@end itemize
+
+@noindent To see what I mean, here is the @emph{entire} configuration
+老维护者在他的 @file{.emacs} 中有：
+
+@lisp
+(setq idlwave-shell-debug-modifiers '(control shift)
+      idlwave-store-inquired-class t
+      idlwave-shell-automatic-start t
+      idlwave-main-block-indent 2
+      idlwave-init-rinfo-when-idle-after 2
+      idlwave-help-dir "~/lib/emacs/idlwave"
+      idlwave-special-lib-alist '(("/idl-astro/" . "AstroLib")
+                                  ("/jhuapl/" . "JHUAPL-Lib")
+                                  ("/dominik/lib/idl/" . "MyLib")))
+@end lisp
+
+然而，如果您是 Emacs 高级用户并且希望 IDLWAVE 以完全不同的方式工作，您几乎可以更改它的每个方面。  这是 IDLWAVE@. 更广泛配置的示例，用户为王！
+
+@example
+;;; Settings for IDLWAVE mode
+
+(setq idlwave-block-indent 3)           ; Indentation settings
+(setq idlwave-main-block-indent 3)
+(setq idlwave-end-offset -3)
+(setq idlwave-continuation-indent 1)
+(setq idlwave-begin-line-comment "^;[^;]")  ; Leave ";" but not ";;"
+                                            ; anchored at start of line.
+(setq idlwave-surround-by-blank t)      ; Turn on padding ops =,<,>
+(setq idlwave-pad-keyword nil)          ; Remove spaces for keyword '='
+(setq idlwave-expand-generic-end t)     ; convert END to ENDIF etc...
+(setq idlwave-reserved-word-upcase t)   ; Make reserved words upper case
+                                        ; (with abbrevs only)
+(setq idlwave-abbrev-change-case nil)   ; Don't force case of expansions
+(setq idlwave-hang-indent-regexp ": ")  ; Change from "- " for auto-fill
+(setq idlwave-show-block nil)           ; Turn off blinking to begin
+(setq idlwave-abbrev-move t)            ; Allow abbrevs to move point
+(setq idlwave-query-class '((method-default . nil) ; No query for method
+                            (keyword-default . nil); or keyword completion
+                            ("INIT" . t)           ; except for these
+                            ("CLEANUP" . t)
+                            ("SETPROPERTY" .t)
+                            ("GETPROPERTY" .t)))
+
+;; Using w3m for help (must install w3m and emacs-w3m)
+(autoload 'w3m-browse-url "w3m" "Interface for w3m on Emacs." t)
+(setq idlwave-help-browser-function 'w3m-browse-url
+      w3m-use-tab nil ; no tabs, location line, or toolbar
+      w3m-use-header-line nil
+      w3m-use-toolbar nil)
+
+;; Close my help window or frame when w3m closes with 'q'.
+(defadvice w3m-close-window (after idlwave-close activate)
+  (if (boundp 'idlwave-help-frame)
+      (idlwave-help-quit)))
+
+;; Some setting can only be done from a mode hook.  Here is an example:
+(add-hook 'idlwave-mode-hook
+  (lambda ()
+    (setq case-fold-search nil)          ; Make searches case sensitive
+    ;; Run other functions here
+    (font-lock-mode 1)                   ; Turn on font-lock mode
+    (idlwave-auto-fill-mode 0)           ; Turn off auto filling
+    (setq idlwave-help-browser-function 'browse-url-w3)
+
+    ;; Pad with 1 space (if -n is used then make the
+    ;; padding a minimum of n spaces.)  The defaults use -1
+    ;; instead of 1.
+    (idlwave-action-and-binding "=" '(idlwave-expand-equal 1 1))
+    (idlwave-action-and-binding "<" '(idlwave-surround 1 1))
+    (idlwave-action-and-binding ">" '(idlwave-surround 1 1 '(?-)))
+    (idlwave-action-and-binding "&" '(idlwave-surround 1 1))
+
+    ;; Only pad after comma and with exactly 1 space
+    (idlwave-action-and-binding "," '(idlwave-surround nil 1))
+    (idlwave-action-and-binding "&" '(idlwave-surround 1 1))
+
+    ;; Pad only after '->', remove any space before the arrow
+    (idlwave-action-and-binding "->"  '(idlwave-surround 0 -1 nil 2))
+
+    ;; Set some personal bindings
+    ;; (In this case, makes ',' have the normal self-insert behavior.)
+    (local-set-key "," 'self-insert-command)
+    (local-set-key [f5] 'idlwave-shell-break-here)
+    (local-set-key [f6] 'idlwave-shell-clear-current-bp)
+
+    ;; Create a newline, indenting the original and new line.
+    ;; A similar function that does _not_ reindent the original
+    ;; line is on "\C-j" (The default for emacs programming modes).
+    (local-set-key "\n" 'idlwave-newline)
+    ;; (local-set-key "\C-j" 'idlwave-newline) ; My preference.
+
+    ;; Some personal abbreviations
+    (define-abbrev idlwave-mode-abbrev-table
+      (concat idlwave-abbrev-start-char "wb") "widget_base()"
+      (idlwave-keyword-abbrev 1))
+    (define-abbrev idlwave-mode-abbrev-table
+      (concat idlwave-abbrev-start-char "on") "obj_new()"
+      (idlwave-keyword-abbrev 1))
+    ))
+
+;;; Settings for IDLWAVE SHELL mode
+
+(setq idlwave-shell-overlay-arrow "=>")        ; default is ">"
+(setq idlwave-shell-use-dedicated-frame t)     ; Make a dedicated frame
+(setq idlwave-shell-prompt-pattern "^WAVE> ")  ; default is "^IDL> "
+(setq idlwave-shell-explicit-file-name "wave")
+(setq idlwave-shell-process-name "wave")
+(setq idlwave-shell-use-toolbar nil)           ; No toolbar
+
+;; Most shell interaction settings can be done from the shell-mode-hook.
+(add-hook 'idlwave-shell-mode-hook
+          (lambda ()
+            ;; Set up some custom key and mouse examine commands
+            (idlwave-shell-define-key-both [s-down-mouse-2]
+                                 (idlwave-shell-mouse-examine
+                                  "print, size(___,/DIMENSIONS)"))
+            (idlwave-shell-define-key-both [f9] (idlwave-shell-examine
+                                       "print, size(___,/DIMENSIONS)"))
+            (idlwave-shell-define-key-both [f10] (idlwave-shell-examine
+                                        "print,size(___,/TNAME)"))
+            (idlwave-shell-define-key-both [f11] (idlwave-shell-examine
+                                        "help,___,/STRUCTURE"))))
+@end example
+
+@html
+<A NAME="WINDOWS_MAC"></A>
+@end html
+@node Windows and macOS
+@appendix Windows 和 macOS
+@cindex Windows
+@cindex macOS
+
+IDLWAVE 是在 UNIX 系统上开发的。  然而，由于 Emacs 的可移植性，IDLWAVE 的大部分内容也可以在不同的操作系统下运行，例如 Windows（使用 NTEmacs）。
+
+唯一真正的问题是，没有 IDL for Windows 的命令行版本可供 IDLWAVE 与之交互。  因此，IDLWAVE Shell 无法工作，您必须依赖 IDLDE 来运行和调试您的程序。  然而，使用 Emacs/IDLWAVE 编辑 IDL 源文件可以提供所有附加功能，包括例行信息、完成和快速在线帮助。  只需在 @file{.emacs} 文件中指定少量附加信息：在 UNIX 系统上，通过与 IDL 程序对话自动收集路径名。
+
+以下是 Windows 系统所需的附加配置的示例。  我假设 IDLWAVE 已安装在 @w{@samp{C:\Program Files\IDLWAVE}} 中，IDL 已安装在 @w{@samp{C:\RSI\IDL63}} 中。
+
+@lisp
+;; location of the lisp files (only needed if IDLWAVE is not part of
+;; your default X/Emacs installation)
+(setq load-path (cons "c:/program files/IDLWAVE" load-path))
+
+;; The location of the IDL library directories, both standard,  and your own.
+;; note that the initial "+" expands the path recursively
+(setq idlwave-library-path
+        '("+c:/RSI/IDL63/lib/" "+c:/path/to/my/idllibs" ))
+
+;; location of the IDL system directory (try "print,!DIR")
+(setq idlwave-system-directory "c:/RSI/IDL63/")
+
+@end lisp
+
+@noindent Furthermore, Windows sometimes tries to outsmart you; make
+请务必检查以下事项：
+
+@itemize @bullet
+@item 当您下载 IDLWAVE 发行版时，请确保保存
+文件名为 @file{idlwave.tar.gz}.
+@item M-@key{TAB}切换正在运行的程序---使用@key{ESC}-@key{TAB}
+反而。
+@item 其他尚未命名的问题...
+@end itemize
+
+想要使用 IDLWAVE 上下文感知 HTML 帮助的 Windows 用户可以跳过浏览器并直接使用 HTMLHelp 功能。 @xref{Help with HTML Documentation}。
+
+@html
+<A NAME="TROUBLE"></A>
+@end html
+@node Troubleshooting
+@appendix 故障排除
+@cindex Troubleshooting
+
+虽然 IDLWAVE 通常安装和工作没有困难，但下面记录了一些常见问题及其解决方案。
+
+@enumerate
+
+@item @strong{Whenever an IDL error occurs or a breakpoint is hit, I get
+当我尝试在某些 IDLWAVE 缓冲区中输入任何内容时出现错误或奇怪的行为。}
+
+这是 @emph{feature}，而不是错误。  您位于@emph{Electric Debug Mode} (@pxref{Electric Debug Mode})。  您应该在模式行中看到@code{*Debugging*}。  缓冲区是只读的，所有调试和检查命令都可以通过单次击键获得； @kbd{C-?} 列出了这些快捷方式。  使用@kbd{q}退出模式，如果您不想在断点@dots{}上进入电动调试，请自定义变量@code{idlwave-shell-automatic-electric-debug}，但您确实应该在禁用它之前尝试一下！  您还可以自定义此变量以在遇到错误时进入调试模式。
+
+@item @strong{I get errors like @samp{Searching for program: no such
+文件或目录、idl} 尝试启动 IDL shell 时。}
+
+IDLWAVE 需要知道 IDL 的位置才能将其作为进程运行。默认情况下，它尝试简单地以 @samp{idl} 的形式调用它，这假定这样的可执行文件位于您的搜索路径上。  您需要确保 @samp{idl} 位于您的 @samp{$PATH} 上，或者使用变量 @code{idlwave-shell-explicit-file-name} 指定 idl 程序的完整路径名。  请注意，在 macOS 上将 Emacs 作为 Aqua 应用程序运行时，您可能需要在两个位置设置 shell 搜索路径：请参阅下一个主题。
+
+@item @strong{IDLWAVE is disregarding my @samp{IDL_PATH} which I set
+在 macOS 下}
+
+如果您直接将 Emacs 作为 Aqua 应用程序运行，而不是从控制台 shell 运行，则环境不是从常用的 shell 配置文件（例如 @file{.cshrc}）设置的，而是从文件 @file{~/.MacOSX/environment.plist} 设置的。  要么在其中包含您的路径设置，要么从 shell 启动 Emacs 和 IDLWAVE。
+
+@item @strong{@kbd{M-@key{TAB}} doesn't complete words, it switches
+我的桌面上有 Windows。}
+
+你的系统正在捕获 @kbd{M-@key{TAB}} 并将其用于自己的邪恶目的：Emacs 永远不会看到击键。  在许多 Unix 系统上，您可以重新配置窗口管理器以使用另一个按键序列在窗口之间切换。  另一种选择是使用等效序列@kbd{@key{ESC}-@key{TAB}}。
+
+@item @strong{When stopping at breakpoints or errors, IDLWAVE does not
+似乎突出显示了源中的相关行。}
+
+IDLWAVE 扫描错误和停止消息并突出显示正确文件中的停止位置。  但是，如果您更改了系统变量@samp{!ERROR_STATE.MSG_PREFIX}，则无法正确解析这些消息。  不要那样做。
+
+@item @strong{IDLWAVE doesn't work correctly when using ENVI.}
+
+尽管 IDLWAVE 并不是根据 ENVI 编写的，但只要您更新它正在查找的提示（默认情况下@samp{IDL> }），它就可以很好地工作。  您可以使用变量 @code{idlwave-shell-prompt-pattern} (@pxref{Starting the Shell}) 来执行此操作，例如，在您的 @file{.emacs} 中：
+
+@lisp
+(setq idlwave-shell-prompt-pattern "^\r? ?\\(ENVI\\|IDL\\)> ")
+@end lisp
+
+@item @strong{Attempts to set breakpoints fail: no breakpoint is
+在 IDLWAVE 缓冲区中指示。}
+
+IDL 从 IDLv5.5 开始更改了其断点报告格式。  支持新格式的 IDLWAVE 第一个版本是 IDLWAVE v4.10。  如果您有旧版本并使用 IDL >v5.5，则需要升级和/或确保在 Emacs 加载路径上找到最新版本的 IDLWAVE（请参阅下一个条目）。  您可以通过 @kbd{C-h v idlwave-mode-version @key{RET}} 列出正在使用的版本。
+
+@item @strong{I installed a new version of IDLWAVE, but the old
+版本仍在使用}或@strong{IDLWAVE works, but when I tried to install the optional modules @file{idlw-roprompt.el} or @file{idlw-complete-structtag}, I get errors like @samp{Cannot open load file}}。
+
+问题是您的 Emacs 找不到您安装的 IDLWAVE 版本。  Emacs 可能会附带 IDLWAVE 的较旧捆绑副本，这很可能是正在使用的。您需要确保您的 Emacs @emph{load-path} 包含 IDLWAVE 安装目录（@file{/usr/local/share/emacs/site-lisp}，默认情况下）、@emph{before} Emacs 的默认搜索目录。  您可以通过将以下内容放入 @file{.emacs} 中来实现此目的：
+
+@lisp
+(setq load-path (cons "/usr/local/share/emacs/site-lisp" load-path))
+@end lisp
+
+@noindent You can check on your load-path value using @kbd{C-h v
+IDLWAVE 缓冲区中的 load-path @key{RET}} 和 @kbd{C-h m} 应该显示 Emacs 正在使用的版本。
+
+@item @strong{IDLWAVE is screwing up the formatting of my @file{.idl} files.}
+
+实际上，这根本不是 IDLWAVE，而是@samp{idl-mode}，一种与 CORBA 接口定义语言无关的编程模式（您应该在模式行中看到@samp{(IDL)}，而不是@samp{(IDLWAVE)}）。  一种解决方案：不要将文件命名为 ⁣​​3⁣，而是命名为 ⁣​​4⁣。另一个解决方案：通过将以下内容添加到 @file{.emacs} 中，确保 @file{.idl} 文件加载 IDLWAVE 而不是 @samp{idl-mode}：
+
+@lisp
+(setcdr (rassoc 'idl-mode auto-mode-alist) 'idlwave-mode)
+@end lisp
+
+@item @strong{The routine info for my local routines is out of date!}
+
+IDLWAVE 从不同位置收集日常信息 (@pxref{Routine Information Sources})。  在缓冲区中访问的文件中的例程或在 shell 中编译的文件中的例程应该是最新的。  对于其他例程，信息仅与最近的扫描一样最新。  如果您有一组快速变化的例程，并且您希望为其提供最新的例程信息，则一种强大的技术是使用库目录工具@samp{idlwave_catalog}。  只需在您的 @samp{cron} 文件中添加一行（@samp{crontab -e} 将允许您在某些系统上编辑此内容），如下所示
+
+@example
+45 3 * * 1-5 (cd /path/to/myidllib; /path/to/idlwave_catalog MyLib)
+@end example
+
+@noindent where @samp{MyLib} is the name of your library.  This will
+每周晚上凌晨 3:45 重新扫描 @file{/path/to/myidllib} 或以下的所有 @file{.pro} 文件。  您甚至可以使用此方法扫描站点范围的图书馆，并且所有用户都可以获得最新信息。由于扫描速度非常快，因此影响很小。
+
+@item @strong{All the Greek-font characters in the HTML help are
+显示为拉丁字符！}
+
+不幸的是，RSI 的 HTMLHelp 文件尝试切换到 @samp{Symbol} 字体来显示希腊字符，这实际上并不是 HTML@. 中允许执行此操作的方法。对于某些浏览器，有一个“解决方法”：@xref{HTML Help Browser Tips}。
+
+@item @strong{In the shell, my long commands are truncated at 256 characters!}
+
+在 XTerm 中运行 IDL 时实际上也会发生这种情况。  有几种解决方法： @code{define_key,/control,'^d'}（例如，在您的 @file{$IDL_STARTUP} 文件中）将禁用 @samp{EOF} 字符并给予您 512 个字符的限制。  但是，您将无法使用 @kbd{C-d} 退出 shell。  另一种可能性是@code{!EDIT_INPUT=0}，它给你一个@emph{infinite}限制（好吧，内存有限的限制），但禁用后台小部件事件的处理（那些将@code{/NO_BLOCK}传递给@code{XManager}的事件）。
+
+@item @strong{When I invoke IDL HTML help on a routine, the page which
+已加载一页，例如，对于@code{CONVERT_COORD}，我得到@code{CONTOUR}。}
+
+您的帮助索引与您下载的 HTML 帮助包不匹配。  如果您使用的版本早于最新的 HTML 帮助包，则需要确保下载“降级工具包”。  每个 IDL 版本都会出现一个新的帮助包（假设文档已更新）。从 IDL 6.2 开始，HTML 帮助及其目录随 IDL 一起分发，因此永远不应不一致。
+
+@end enumerate
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Index
+@unnumbered 指数
+@printindex cp
+
+@bye

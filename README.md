@@ -1,0 +1,129 @@
+# Chinese Localized GNU Emacs (Emacs 中文版)
+
+A Chinese-localized build of **GNU Emacs 31.1**, where the visible user
+interface, documentation strings, menus, prompts and even the Texinfo
+manuals are translated into Simplified Chinese.  Command names, function
+names, key sequences and Lisp symbols are kept as-is on purpose so that
+everything keeps working.
+
+> 中文说明见 [README.zh-CN.md](README.zh-CN.md)。
+
+## What is translated
+
+| Surface | Example |
+| --- | --- |
+| Echo-area messages, errors, warnings | `Beginning of buffer → 缓冲区开头` |
+| Minibuffer prompts | `Find file → 查找文件` |
+| Menu bar / tool bar / pop-up menus | `文件`、`编辑`、`打开文件…` |
+| `M-x` completion annotations (marginalia) | docstring first line |
+| Key pop-up (`which-key`) descriptions | `Find file → 查找文件`, `prefix → 前缀` |
+| `tabulated-list` headers | `Package → 软件包` |
+| Full docstrings for `C-h f` / `C-h v` / `C-h k` / `C-h m` | |
+| Startup screen, mode names, Customize widgets, yes/no prompts | |
+
+### Translated manuals (`C-h r` / `C-h i`)
+
+| Manual | Info name |
+| --- | --- |
+| Emacs Manual | `(emacs)` |
+| Emacs Lisp Reference Manual | `(elisp)` |
+| Emacs Lisp Intro | `(eintr)` |
+| Org Manual | `(org)` |
+| …and the manuals under `doc/misc` | |
+
+The manuals are machine translated with a Texinfo-aware pipeline that
+preserves all markup and keeps node names in English so cross-references
+keep working.
+
+## Download and install
+
+Prebuilt tarballs are produced by the CI (GitHub/Gitea Releases).  Pick the
+one matching your distribution — Emacs is dynamically linked, so the
+`libxml2`/glibc/soname must match:
+
+| Artifact | For |
+| --- | --- |
+| `emacs-cn-debian-x86_64.tar.zst` | Debian / Ubuntu |
+| `emacs-cn-arch-x86_64.tar.zst` | Arch / Manjaro / Omarchy |
+
+```sh
+# extract (the install prefix is compiled in, so extract to /)
+sudo tar --zstd -xf emacs-cn-<distro>-x86_64.tar.zst -C /
+
+# or use the helper, which also installs missing runtime libs and a
+# launcher command
+sh install.sh emacs-cn-<distro>-x86_64.tar.zst
+
+emacs-cn -nw
+```
+
+> The build prefix is fixed at build time (`/opt/emacs-cn` by default, or
+> `$HOME/.local/emacs-cn`).  `install.sh` auto-detects it from the tarball.
+
+## Build from source
+
+```sh
+git clone https://github.com/<you>/emacs-cn.git
+cd emacs-cn
+
+sh ci/install-deps.sh                 # Arch (pacman) or Debian/Ubuntu (apt)
+PREFIX=$HOME/.local/emacs-cn sh ci/build-emacs.sh
+```
+
+`ci/build-emacs.sh` applies the Chinese UI data, the translated manuals, and
+falls back to a non-native-compiled build if `libgccjit` is missing.
+
+## Repository layout
+
+```
+emacs-cn/
+├── src/                     # GNU Emacs 31.1 source with the localization applied
+│   └── lisp/international/
+│       ├── chinese-l10n.el        # runtime localization framework
+│       └── chinese-l10n-data.el   # ~65k UI strings / docstrings
+├── l10n/                    # extraction / translation / data generation
+│   ├── texi-translate.py        # Texinfo manual translator
+│   └── manual-zh/               # translated manuals (*.texi)
+├── ci/
+│   ├── install-deps.sh          # build deps for Arch / Debian / Ubuntu
+│   ├── build-emacs.sh           # configure + build + package
+│   ├── apply-l10n.sh            # apply code localization
+│   ├── apply-manual-zh.sh       # apply translated manuals
+│   └── update-emacs.sh          # upgrade to a new upstream ref
+├── .github/workflows/build.yml  # GitHub Actions
+├── .gitea/workflows/build.yml   # Gitea Actions (action-free)
+├── install.sh                   # install a prebuilt tarball
+└── README.zh-CN.md
+```
+
+## How it works
+
+* **C hooks** — `message3` / `vmessage` / `Fformat_message` /
+  `print_error_message` consult the `chinese-l10n-table` hash table, so
+  messages, errors and `format-message` output are translated.
+* **Lisp framework** (`chinese-l10n.el`) — prompts, keymaps, `easy-menu`
+  menus, which-key, marginalia, `widget` tags, mode names, and the
+  `documentation` / `documentation-property` output.
+* **Translation pipeline** (`l10n/`) — extracts UI strings and manuals,
+  translates them via an online engine with placeholder protection, and
+  generates `chinese-l10n-data.el` and the translated `.texi`.
+
+## Update Emacs
+
+```sh
+sh ci/update-emacs.sh emacs-31   # fetch upstream, re-apply the localization
+```
+
+## License
+
+* The GNU Emacs source is distributed under the GNU General Public License,
+  version 3 or later (see `src/COPYING`).
+* The translated manuals derive from the Emacs manuals, which are under the
+  GNU Free Documentation License 1.3 or later (see `src/doc/*/doclicense.texi`).
+* The localization tooling and translation data in this repository are
+  released under the same terms as Emacs.
+
+## Contributing
+
+Corrections to the translation are welcome: edit the relevant dictionary
+entry or `.texi` file, or improve `l10n/` and regenerate.

@@ -1,0 +1,487 @@
+\输入texinfo
+@setfilename ../../info/semantic.info
+@set TITLE  Semantic Manual
+@set AUTHOR Eric M. Ludlam, David Ponce, and Richard Y. Kim
+@settitle @value{TITLE}
+@documentlanguage en
+@include docstyle.texi
+
+@c *************************************************************************
+@c @ Header
+@c *************************************************************************
+
+@c Merge all indexes into a single index for now.
+@c We can always separate them later into two or more as needed.
+@syncodeindex vr cp
+@syncodeindex fn cp
+@syncodeindex ky cp
+@syncodeindex pg cp
+@syncodeindex tp cp
+
+@c @footnotestyle separate
+@c @paragraphindent 2
+@c @@smallbook
+@c %**end of header
+
+@copying
+本手册记录了语义库和实用程序。
+
+版权所有 @copyright{} 1999--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* Semantic: (semantic).          源代码解析器库和实用程序。
+@end direntry
+
+@titlepage
+@center @titlefont{Semantic}
+@sp 4
+@center by @value{AUTHOR}
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+@page
+
+@macro semantic{}
+@i{Semantic}
+@end macro
+
+@macro keyword{kw}
+@anchor{\kw\}
+@b{\kw\}
+@end macro
+
+@c *************************************************************************
+@c @ Document
+@c *************************************************************************
+@contents
+
+@node top
+@top @value{TITLE}
+
+@semantic{} is a suite of Emacs libraries and utilities for parsing
+源代码。  其核心是一个词法分析器和两个用 Emacs Lisp 编写的解析器生成器（@code{bovinator} 和 @code{wisent}）。
+@semantic{} provides a variety of tools for making use of the parser
+输出，包括用于代码导航和完成的用户命令，以及 imenu、speedbar、whichfunc、eldoc、hippie-expand 和 Emacs 的其他几个部分的增强功能。
+
+要发送错误报告或参与有关语义的讨论，请通过以下 URL 使用邮件列表 cedet-semantic@@sourceforge.net：@url{https://lists.sourceforge.net/lists/listinfo/cedet-semantic}
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* Introduction::
+* Using Semantic::
+* Semantic Internals::
+* Glossary::
+* GNU Free Documentation License::
+* Index::
+@end menu
+
+@node Introduction
+@chapter 介绍
+
+本章概述了 @semantic{} 及其目标。
+
+通常，Emacs 使用正则表达式（和语法表）来分析源代码，以达到语法突出显示等目的。  这种方法虽然简单高效，但也有其局限性：粗略地说，它只是在编程语言的上下文中“猜测”每段源代码的含义，而不是严格“理解”它。
+
+@semantic{} provides a new infrastructure to analyze source code using
+@dfn{parsers} 而不是正则表达式。  它包含两个内置解析器生成器（一个名为 @code{Bovine} 的 @acronym{LL} 生成器和一个名为 @code{Wisent} 的 @acronym{LALR} 生成器，均用 Emacs Lisp 编写），以及几种常见编程语言的解析器。  它还可以利用 @dfn{external parsers}---GNU Global 和 GNU IDUtils 等程序。
+
+@semantic{} provides a uniform, language-independent @acronym{API} for
+访问解析器输出。  其他 Emacs Lisp 程序可以使用此输出来实现“语法感知”行为。  @semantic{} 本身包含几个这样的实用程序，包括用于导航、搜索和完成源代码的用户级 Emacs 命令。
+
+下图说明了@semantic{}包的结构：
+
+@table @strong
+@item 请注意：
+全大写的单词是 @semantic{} 本身提供的单词。其他是当前或未来的语言或应用程序，不与 @semantic{} 一起分发。
+@end table
+
+@example
+                                                             Applications
+                                                                 and
+                                                              Utilities
+                                                                -------
+                                                               /       \
+               +---------------+    +--------+    +--------+
+         C --->| C      PARSER |--->|        |    |        |
+               +---------------+    |        |    |        |
+               +---------------+    | COMMON |    | COMMON |<--- SPEEDBAR
+      Java --->| JAVA   PARSER |--->| PARSE  |    |        |
+               +---------------+    | TREE   |    | PARSE  |<--- SEMANTICDB
+               +---------------+    | FORMAT |    | API    |
+    Scheme --->| SCHEME PARSER |--->|        |    |        |<--- ecb
+               +---------------+    |        |    |        |
+               +---------------+    |        |    |        |
+   Texinfo --->| TEXI.  PARSER |--->|        |    |        |
+               +---------------+    |        |    |        |
+
+                    ...                ...           ...         ...
+
+               +---------------+    |        |    |        |
+   Lang. Y --->| Y      Parser |--->|        |    |        |<--- app. ?
+               +---------------+    |        |    |        |
+               +---------------+    |        |    |        |<--- app. ?
+   Lang. Z --->| Z      Parser |--->|        |    |        |
+               +---------------+    +--------+    +--------+
+@end example
+
+@menu
+* Semantic Components::
+@end menu
+
+@node Semantic Components
+@section 语义成分
+
+在本节中，我们将更详细地描述 @semantic{} 的主要组件以及它们如何相互作用。
+
+解析源代码文件的第一步是将其分解为基本组件。  这一步称为词法分析：
+
+@example
+        syntax table, keywords list, and options
+                         |
+                         |
+                         v
+    input file  ---->  Lexer   ----> token stream
+@end example
+
+@noindent
+词法分析器的输出是组成文件的标记列表。  下一步是实际的解析，如下所示：
+
+@example
+                    parser tables
+                         |
+                         v
+    token stream --->  Parser  ----> parse tree
+@end example
+
+@noindent
+最终结果，即解析树，是 @semantic{} 语言语法的内部表示。  @semantic{} 为 Emacs Lisp 程序提供了@acronym{API} 来访问解析树。
+
+解析大文件可能需要几秒钟或更长时间。  默认情况下，
+@semantic{} automatically caches parse trees by saving them in your
+@file{.emacs.d}目录。  当您重新访问先前解析的文件时，解析树会自动从此缓存中重新加载，以节省时间。  @xref{SemanticDB}。
+
+@node Using Semantic
+@chapter 使用语义
+
+@include sem-user.texi
+
+@node Semantic Internals
+@chapter 语义内部结构
+
+本章概述了@semantic{}的内部结构。应用程序开发人员或语法开发人员通常不需要此信息；它对于想要更多地了解 @semantic{} 工作原理的黑客来说非常有用。
+
+@menu
+* Parser code::           用于解析器的代码
+* Tag handling::          用于操作标签的代码
+* Semanticdb Internals::  语义数据库中使用的代码
+* Analyzer Internals::    代码分析器中使用的代码
+* Tools::                 用户工具中使用的代码
+@ignore
+* Tests::                Code used for testing
+@end ignore
+@end menu
+
+@node Parser code
+@section 解析器代码
+
+@semantic{} parsing code is spread across a range of files.
+
+@table @file
+@item semantic.el
+核心基础设施设置用于解析的缓冲区，并具有所有核心解析例程。  大多数解析例程都是可重载的，因此实际的实现可能在其他地方。
+
+@item semantic/edit.el
+基于用户编辑的增量重分析。
+
+@item semantic/grammar.el
+@itemx semantic-grammar.wy
+不同语法语言的解析器，以及 Emacs 中编辑语法的主要模式。
+
+@item semantic/lex.el
+用于实现词法分析器的基础设施。  提供用于为特定功能创建单独分析器的宏，以及将它们组合在一起的方法。
+
+@item semantic/lex-spp.el
+词汇符号预处理器的基础设施。  这是为了实现 C 预处理器而编写的，但也可用于其他词法预处理器。
+
+@item semantic/grammar.el
+@itemx semantic/bovine/grammar.el
+“牛”语法。  这是为以下内容编写的第一个语法模式
+@semantic{} and is useful for creating simple parsers.
+
+@item semantic/wisent.el
+@itemx semantic/wisent/wisent.el
+@itemx semantic/wisent/grammar.el
+Bison 到 Emacs 的端口。  该基础设施允许您为 @semantic{} 创建基于 LALR 的解析器。
+
+@item semantic/debug.el
+用于调试语法的基础设施。
+
+@item semantic/util.el
+用于操作标签的各种实用程序，例如描述点下的标签、添加标签以及所有重要的@code{semantic-something-to-tag-table}。
+
+@end table
+
+@node Tag handling
+@section 标签处理
+
+标签表示缓冲区中找到的单个项目，例如函数或变量。  标签处理是在多个源文件中处理的。
+
+@table @file
+@item semantic/tag.el
+基本标签创建、查询、克隆、绑定和取消绑定。
+
+@item semantic/tag-write.el
+将标签或标签列表写入流。  保存标签列表时，@file{semanticdb-file.el} 使用这些例程。
+
+@item semantic/tag-file.el
+与标签关联的文件。  转到标签、包含文件和原型文件。
+
+@item semantic/tag-ls.el
+标签的语言相关功能，例如父计算、槽保护以及抽象、虚拟、静态和叶等其他状态。
+
+@item semantic/dep.el
+包括文件处理。  包含包含路径概念以及在包含路径中查找文件名的例程。
+
+@item semantic/format.el
+将标签转换为格式良好且彩色的字符串。  使用 @code{semantic-test-all-format-tag-functions} 测试不同的输出选项。
+
+@item semantic/find.el
+在标签表中查找匹配不同条件的标签。一旦数据库转换为更简单的标签表，@file{semanticdb-find.el}就会使用这些例程。
+
+@item semantic/sort.el
+以不同的方式对标签列表进行排序。  包括向前或向后对简单的标签列表进行排序。  包括基于属性的分箱标签（bucketize），以及对同一事物的多个引用的标签采用。
+
+@item semantic/doc.el
+从标签附近捕获文档注释。
+
+@end table
+
+@node Semanticdb Internals
+@section 语义数据库内部结构
+
+@acronym{Semanticdb} 复杂性肯定是一个问题。  这是一个需要尝试解决的相当棘手的问题。
+
+@table @file
+@item semantic/db.el
+定义一个 @dfn{database} 和一个 @dfn{table} 基类。  您可以实例化这些类并使用它们，但它们不是持久的。
+
+该文件还提供对@code{semanticdb-minor-mode}的支持，它自动将文件与数据库中的表关联起来，以便当缓冲区不在内存中时标签为@emph{saved}。
+
+数据库和表还提供适用的缓存信息和缓存刷新系统。  语义数据库搜索例程使用缓存来保存计算复杂的数据结构。
+
+最后，它提供了@dfn{project root}的概念。  它是一个文件可以与项目的根相关联的系统，因此如果您有目录和源文件的树，它可以找到根，并允许标签搜索跨越该目录层次结构中的所有可用数据库。
+
+@item semantic/db-file.el
+提供基本表的子类，以便可以将其保存到磁盘。  实现将标签解除绑定/重新绑定到缓冲区并将其写入文件所需的所有代码。
+
+@item semantic/db-el.el
+实现一种特殊类型的 @dfn{system} 数据库，该数据库使用 Emacs 内部结构来执行查询。
+
+@item semantic/db-ebrowse.el
+实现一个系统数据库，该数据库使用 Ebrowse 将文件解析为可查询标签名称的表。  查找过程中成功的标签命中会导致 @semantic{} 拾取并解析参考文件以获取完整的详细信息。
+
+@item semantic/db-find.el
+用于搜索组 @semantic{} 数据库并处理搜索结果格式的基础设施。
+
+@item semantic/db-ref.el
+跟踪交叉引用。  重新解析缓冲区时需要交叉引用，并且必须提醒其他表任何依赖的缓存可能需要刷新。  参考文献采用包含文件的形式。
+
+@end table
+
+@node Analyzer Internals
+@section 分析仪内部结构
+
+@semantic{} 分析器是一个复杂的引擎，已分解为多个模块。  当 @semantic{} 分析器失败时，从 @code{semantic-analyze-debug-assist} 开始，然后深入研究其中一些文件。
+
+@table @file
+@item semantic/analyze.el
+用于定义 @dfn{current context} 的核心分析器。  当前上下文是一个对象，其中包含对本地上下文各方面的引用，包括当前前缀以及定义前缀含义的标签列表。
+
+@item semantic/analyze/complete.el
+提供@code{semantic-analyze-possible-completions}。
+
+@item semantic/analyze/debug.el
+分析器调试器。  当尝试配置所有内容时很有用。
+
+@item semantic/analyze/fcn.el
+分析仪所需的各种支持功能。
+
+@item semantic/ctxt.el
+本地上下文解析器。  包含可重载函数，用于在不同范围之间移动、获取局部变量以及收集完成时使用的当前前缀。
+
+@item semantic/scope.el
+计算缓冲区中某个位置的@dfn{scope}。  由于各种原因（例如 C++ using 语句），作用域包括局部变量和作用域中的标记列表。
+
+@item semantic/db-typecache.el
+类型缓存是@code{semanticdb}的一部分，但主要由分析器用来查找数据类型和复杂名称。  类型缓存跨源文件绑定，并为数据类型名称构建主查找表。
+
+@item semantic/ia.el
+交互式分析器功能。  根据分析器的结果执行补全或查找的简单例程。  这些例程旨在作为应用程序编写者的示例，但实际上非常有用。
+
+@item semantic/ia-sb.el
+Speedbar 支持分析器、显示上下文信息和完成列表。
+
+@end table
+
+@node Tools
+@section 工具
+
+这些文件包含供用户使用的各种工具。
+
+@table @file
+@item semantic/idle.el
+@semantic{} 的空闲调度程序。  管理编辑后的重新解析缓冲区以及空闲时间的大型工作任务。  包括显示摘要帮助和弹出完成的模式。
+
+@item semantic/senator.el
+@semantic{} 导航器。  提供多种基于活动标签表在缓冲区中移动的方法。
+
+@item semantic/decorate.el
+一种根据解析器的详细信息装饰标签的次要模式。包括函数的上划线，或基于保护的着色类字段。
+
+@item semantic/decorate/include.el
+包含文件的装饰模式，可帮助用户为其包含文件设置解析。
+
+@item semantic/complete.el
+高级完成提示读取迷你缓冲区中或内联缓冲区中的标签名称。
+
+@item semantic/imenu.el
+Imenu 支持在 imenu 中使用 @semantic{} 标签。
+
+@item semantic/mru-bookmark.el
+基于标签的自动书签。  根据标签名称跳转到您之前去过的位置。
+
+@item semantic/sb.el
+支持在 Speedbar 中使用 @semantic{} 标签。
+
+@item semantic/util-modes.el
+一堆小的次要模式，公开语义解析器状态的各个方面。  包括@code{semantic-stickyfunc-mode}。
+
+@item semantic/chart.el
+根据解析生成的统计数据绘制一些图表。
+
+@end table
+
+@c These files seem to not have been imported from CEDET.
+@ignore
+@node Tests
+@section Tests
+
+@table @file
+
+@item semantic-utest.el
+Basic testing of parsing and incremental parsing for most supported
+languages.
+
+@item semantic-ia-utest.el
+Test the semantic analyzer's ability to provide smart completions.
+
+@item semantic-utest-c.el
+Tests for the C parser's lexical pre-processor.
+
+@item semantic-regtest.el
+Regression tests from the older Semantic 1.x API.
+
+@end table
+@end ignore
+
+@node Glossary
+@appendix 词汇表
+
+@table @asis
+@item BNF
+在语义 1.4 中，BNF 文件表示“Bovine Normal Form”，即用于 1.4 解析器生成器的语法文件。  这是巴科斯-诺尔范式的一种发挥，事实证明它太令人困惑了。
+
+@item 牛科动物
+表示牛解析器解析文件时发生的情况的动词。
+
+@item 牛拉姆达
+在 bovine 或 LL 解析器中，bovine lambda 是当一组特定的匹配规则成功匹配缓冲区中的文本时执行的函数。
+
+@item 牛解析器
+使用 bovine 解析器生成器的解析器。  它是一个适合小型简单语言的LL解析器。
+
+@item 语境
+
+@item 左旋受体
+
+@item 词法分析器
+一个通过词法分析将文本转换为标记流的程序。  词法分析器通常会创建字符串、符号、关键字和标点符号，并去除空格和注释。
+
+@item 二
+
+@item 非终结符
+非终结符或简单的非终结符代表一类语法上等效的分组。  非终结符名称用于编写语法规则。
+
+@item 可过载
+一些函数是通过@code{define-overload}定义的。这些可以通过...重载。
+
+@item 解析器
+将 @b{tokens} 转换为 @b{tags} 的程序。
+
+@item 标签
+标签是语言文件中某些实体的表示，例如函数、变量或包含语句。  在语义上，单词标签的使用方式与 etags 或 ctags 工具的使用方式相同。
+
+标签通常通过覆盖绑定到缓冲区，或者它只是指定文件中的字符位置。
+
+@item 代币
+从词法分析器返回的单个原子项。  它表示在缓冲区中找到的一些字符集。
+
+@item 令牌流
+词法分析器的输出以及解析器的输入。
+
+@item 明智的解析器
+使用wisent解析器生成器的解析器。  它是 Bison 到 Emacs Lisp 的端口。  它是一个适合复杂语言的LALR解析器。
+@end table
+
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Index
+@unnumbered 指数
+@printindex cp
+
+@iftex
+@contents
+@summarycontents
+@end iftex
+
+@bye
+
+@c Following comments are for the benefit of ispell.
+
+@c LocalWords: alist API APIs arg argc args argv asis assoc autoload Wisent
+@c LocalWords: bnf bovinate bovinates LALR
+@c LocalWords: bovinating bovination bovinator bucketize
+@c LocalWords: cb cdr charquote checkcache cindex CLOS
+@c LocalWords: concat concocting const ctxt Decl defcustom
+@c LocalWords: deffn deffnx defun defvar destructor's dfn diff dir
+@c LocalWords: doc docstring EDE EIEIO elisp emacsman emph enum
+@c LocalWords: eq Exp EXPANDFULL expression fn foo func funcall
+@c LocalWords: ia ids ifinfo imenu imenus init int isearch itemx java kbd
+@c LocalWords: keymap keywordtable lang languagemode lexer lexing Ludlam
+@c LocalWords: menubar metaparent metaparents min minibuffer Misc mode's
+@c LocalWords: multitable NAvigaTOR noindent nomedian nonterm noselect
+@c LocalWords: nosnarf obarray OLE OO outputfile paren parsetable POINT's
+@c LocalWords: popup positionalonly positiononly positionormarker pre
+@c LocalWords: printf printindex Programmatically pt quotemode
+@c LocalWords: ref regex regexp Regexps reparse resetfile samp sb
+@c LocalWords: scopestart SEmantic semanticdb setfilename setq
+@c LocalWords: settitle setupfunction sexp sp SPC speedbar speedbar's
+@c LocalWords: streamorbuffer struct subalist submenu submenus
+@c LocalWords: subsubsection sw sym texi texinfo titlefont titlepage
+@c LocalWords: tok TOKEN's toplevel typemodifiers uml unset untar
+@c LocalWords: uref usedb var vskip xref yak

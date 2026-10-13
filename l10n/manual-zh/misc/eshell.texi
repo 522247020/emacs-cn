@@ -1,0 +1,2320 @@
+\输入 texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename ../../info/eshell.info
+@settitle Eshell：Emacs Shell
+@documentlanguage en
+@include docstyle.texi
+@defcodeindex cm
+@syncodeindex vr fn
+@c %**end of header
+
+@copying
+本手册适用于 Eshell（Emacs shell）。
+
+版权所有 @copyright{} 1999--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* Eshell: (eshell).              在 Emacs Lisp 中实现的命令 shell。
+@end direntry
+
+@titlepage
+@sp 4
+@c The title is printed in a large font.
+@center @titlefont{User's Guide}
+@sp 1
+@center @titlefont{to}
+@sp 1
+@center @titlefont{Eshell: The Emacs Shell}
+@ignore
+@sp 2
+@center release 2.4
+@c -release-
+@end ignore
+@sp 3
+@center John Wiegley & Aidan Gauland
+@c -date-
+
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@c ================================================================
+@c                   The real text starts here
+@c ================================================================
+
+@ifnottex
+@node Top
+@top Eshell
+
+Eshell is a shell-like command interpreter implemented in Emacs Lisp.
+It invokes no external processes except for those requested by the
+user.  It is intended to be an alternative to the IELM (@pxref{Lisp
+Interaction, , , emacs, The Emacs Editor}) REPL@footnote{Short for
+``Read-Eval-Print Loop''.} for Emacs @emph{and} with an interface
+similar to command shells such as @command{bash}, @command{zsh},
+@command{rc}, or @command{4dos}.
+@c This manual is updated to release 2.4 of Eshell.
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Introduction::              Emacs Shell 简介。
+* Entry Points::
+* Commands::
+* Expansion::
+* Input/Output::
+* Interaction::
+* Extension modules::
+* Bugs and ideas::               已知的问题和未来的想法。
+* GNU Free Documentation License::  本文档的许可证。
+* Concept Index::
+* Function and Variable Index::
+* Command Index::
+* Key Index::
+@end menu
+
+@node Introduction
+@chapter 介绍
+@section 什么是埃壳？
+@cindex what is Eshell?
+@cindex Eshell, what it is
+
+Eshell 是用 Emacs Lisp 编写的 @dfn{command shell}。  它所做的一切都使用 Emacs 的工具来完成。  这意味着 Eshell 与 Emacs 本身一样可移植。  这也意味着与 Lisp 代码的协作是自然且无缝的。
+
+什么是命令外壳？  要正确理解 shell 的作用，有必要想象一下计算机为您做了什么。  基本上，计算机是一种工具；为了使用该工具，您必须告诉它做什么，或者给它“命令”。这些命令有多种形式，例如用鼠标单击屏幕的某些部分。  但这只是命令输入的一种形式。
+
+到目前为止，表达您希望计算机执行的操作的最通用方法是使用一种名为 @dfn{script} 的缩写语言。  在脚本中，不是告诉计算机“请列出我的文件”，而是编写一个标准的缩写命令字---@samp{ls}。  在命令 shell 中键入 @samp{ls} 是告诉计算机列出文件的脚本方式。@footnote{This is comparable to viewing the contents of a folder using a graphical display.}
+
+只有当您意识到有很多不同的方式来列出文件时，这种方法的真正灵活性才会显现出来。  也许您希望它们按名称排序、按日期排序、按相反顺序排序或按类型分组。  大多数图形浏览器都有简单的方法来表达这一点。  但是，如果只显示几个文件，或者只显示满足特定条件的文件呢？  在非常复杂和特定的情况下，使用鼠标或指点设备来表达请求变得太困难。  正是这些类型的请求可以使用命令 shell 轻松解决。
+
+例如，如果您想要列出硬盘驱动器上每个大小超过 100 KB 并且超过六个月没有被查看过的 Word 文件，该怎么办？  当您清理硬盘驱动器时，这是一个很好的删除候选列表。  但是您是否尝试过向计算机询问这样的列表？  没有办法啊！  至少，不使用命令 shell 是不行的。
+
+命令 shell 的作用是让您更好地控制计算机为您执行的操作。  并不是每个人都需要如此多的控制，而且它确实是有代价的：学习必要的脚本命令来表达你想要完成的事情。  复杂的查询（例如上面的示例）需要时间来学习。  但如果您发现自己足够频繁地使用计算机，从长远来看，这是值得的。您经常使用的任何工具都值得花时间学习掌握它。
+@footnote{For the understandably curious, here is what that command
+看起来像：但不要让它欺骗你；一旦你知道发生了什么，事情就比看起来容易了：@code{ls -lt **/*.doc(Lk+100aM+6)}.}
+
+@menu
+* Contributors to Eshell::       曾经帮助过的人！
+@end menu
+
+@node Contributors to Eshell
+@section Eshell 贡献者
+@cindex contributors
+@cindex authors
+
+欢迎为 Eshell 做出贡献。  我处理这个项目的时间有限，但我很乐意将您贡献给我的任何代码添加到这个包中。
+
+以下人员为 Eshell 做出了贡献。
+
+@itemize @bullet
+@item 
+约翰·威格利 (John Wiegley) 是 Eshell 的原作者。
+
+@item 
+Eli Zaretskii 使 Eshell 无需异步子进程支持即可运行。  这对于 MS-DOS 来说很重要，因为它没有这样的支持。
+
+@item 
+Miles Bader 在移植到 Emacs 21 期间贡献了许多修复程序。
+
+@item 
+Stefan Monnier 解决了困扰他的问题，这当然让所有人的情况都变得更好。
+
+@item 
+Gerd Moellmann 还在与 Emacs 21 的初始集成过程中帮助修复了错误。
+
+@item 
+Alex Schroeder 贡献了在覆盖文件之前交互式查询用户的代码。
+@end itemize
+
+除此之外，还有很多人发送了建议、想法、请求、错误报告和鼓励。  多谢！  没有您，就不会有 Eshell 的新版本。
+
+@node Entry Points
+@chapter 切入点
+@cindex starting Eshell
+@cindex Eshell, starting
+
+Eshell根据情况提供了几种不同的启动方式。
+
+@menu
+* Interactive Shell::
+* One-Off Commands::
+* Scripts::
+@end menu
+
+@node Interactive Shell
+@section 交互式外壳
+@cindex interactive session
+
+使用 Eshell 最常见的方法是通过交互式 shell。  您可以通过 @code{eshell} 命令启动它：
+
+@deffn Command eshell &optional arg
+启动新的交互式 Eshell 会话，或切换到已活动的会话。  确切的行为取决于 @var{arg} 的值（交互式地，前缀参数）：
+
+@table @asis
+
+@item @code{nil} 或省略
+启动或切换到默认 Eshell 会话。  这是输入 @kbd{M-x eshell @key{RET}} 时的行为。
+
+@item 一个数字
+使用指定编号启动或切换到 Eshell 会话（例如@: @samp{*eshell*<2>}）。
+
+@item 还要别的吗
+启动一个新的 Eshell 会话，无论另一个会话是否已存在。
+
+@end table
+@end deffn
+
+@node One-Off Commands
+@section 一次性命令
+@cindex command invocation, from anywhere
+
+您还可以从 Emacs 中的任何位置运行单独的 Eshell 命令：
+
+@deffn Command eshell-command command &optional output-target error-target
+执行 Eshell 命令字符串@var{command} 并在缓冲区中显示输出。  如果@var{output-target}是@code{t}（交互式地，使用前缀参数），则将命令的标准输出写入当前缓冲区。  如果@code{nil}，则将输出写入新的输出缓冲区。  对于任何其他值，输出到该 Eshell 目标 (@pxref{Redirection})。
+
+@var{error-target} 与 @var{output-target} 类似，不同之处在于它控制写入标准错误的位置，而 @code{nil} 值表示将标准错误写入与标准输出相同的位置。  （要抑制标准错误，您可以写入 Eshell 虚拟目标@file{/dev/null}。）
+
+当命令以@kbd{&}结尾时，Eshell将异步评估该命令。  否则，它将等待命令完成执行。
+@end deffn
+
+@defun eshell-command-result command &optional status-var
+执行 Eshell 命令字符串@var{command}并返回结果，就像在交互式会话中使用变量@code{$$} (@pxref{Variables}) 一样。  如果@var{status-var}是一个符号，该函数会将其设置为命令的退出状态（就像在交互式会话中使用变量@code{$?}一样）。
+@end defun
+
+@node Scripts
+@section 脚本
+@cindex scripts
+
+@cmindex source
+@cmindex .
+与其他 shell 一样，您可以创建 Eshell @dfn{scripts}。  Eshell 脚本只是一个包含一系列命令的文件，这些命令将被执行，就像您在交互式 Eshell 会话中一次输入一个命令一样。  您可以使用 @command{source} 从 Eshell 中调用这些脚本，这将在子 shell 中运行脚本。  如果您希望在 @emph{current} Eshell 环境中运行脚本，请使用 @code{.} 命令。
+
+与别名 (@pxref{Aliases}) 一样，Eshell 脚本可以接受任意数量的参数。  在脚本中，您可以使用特殊变量 @code{$0}、@code{$1}、@dots{}、@code{$9} 和 @code{$*} 引用这些变量。
+
+您还可以从 Eshell 外部调用 Eshell 脚本：
+
+@deffn Command eshell-execute-file file &optional args output-target error-target
+执行@var{file}中包含的Eshell命令，将可选的@var{args}列表传递给脚本。  如果@var{output-target}是@code{t}（交互式地，使用前缀参数），将命令输出写入当前缓冲区。  如果 @code{nil}，请勿将输出写入任何地方。对于任何其他值，输出到相应的 Eshell 目标 (@pxref{Redirection})。
+
+@var{error-target} 与 @var{output-target} 类似，不同之处在于它控制写入标准错误的位置，而 @code{nil} 值表示将标准错误写入与标准输出相同的位置。  （要抑制标准错误，您可以写入 Eshell 虚拟目标@file{/dev/null\}。）
+@end deffn
+
+@cindex batch scripts
+@defun eshell-batch-file
+您可以在 Eshell 脚本文件的解释器指令中使用此函数，使脚本可以从 Emacs 外部执行：
+
+@example
+#!/usr/bin/env -S emacs --batch -f eshell-batch-file
+@end example
+
+与调用 Eshell 脚本的其他方法一样，您可以在命令行上向脚本传递额外的参数。
+@end defun
+
+@node Commands
+@chapter 命令
+
+在命令 shell 中，一切都是通过调用命令来完成的。  本章介绍 Eshell 中的命令调用，包括命令历史记录和调用脚本文件中的命令。
+
+与常规系统 shell 不同，Eshell 从不直接调用内核函数，例如 @code{exec(3)}。  相反，它使用 Emacs Lisp 库中提供的 Lisp 函数。  它通过将输入行转换为可调用的 Lisp 形式来实现这一点。@footnote{To see the Lisp form that will be invoked, type this as the Eshell prompt: @kbd{eshell-parse-command 'echo hello'}}
+
+@menu
+* Invocation::
+* Arguments::
+* Built-ins::
+* Variables::
+* Aliases::
+* Remote Access::
+* Control Flow::
+@end menu
+
+@node Invocation
+@section 祈求
+Eshell 既是一个命令 shell，又是一个 Emacs Lisp @acronym{REPL}。  因此，您可以通过两种不同的方式调用命令：在 @dfn{command form} 或在 @dfn{Lisp form} 中。
+
+您可以使用分号 (@code{;}) 在一行上分隔多个命令调用，依次执行每个命令。  您还可以使用 @code{&&} 或 @code{||} 分隔命令。  当使用@code{&&}时，只有第一个命令成功时，Eshell才会执行第二个命令（即@:的退出状态为0）；使用@code{||}，只有第一个命令失败时，Eshell 才会执行第二个命令。
+
+后跟“&”号 (@code{&}) 的命令调用将在后台运行。  Eshell 没有作业控制，因此您无法挂起或后台运行当前进程，也无法将后台进程置于前台。  也就是说，从 Eshell 调用的后台进程可以像 Emacs 中的任何其他后台进程一样进行控制。
+
+如果命令异常退出，Eshell 将在下一个提示符中显示其退出代码。
+
+@subsection 命令形式
+命令形式看起来与其他 shell 中的命令形式非常相似。  命令由用空格分隔的参数组成；第一个参数是要运行的命令，任何后续参数都将传递给该命令。
+
+@example
+~ $ echo hello
+hello
+@end example
+
+@cindex order of looking for commands
+@cindex command lookup order
+该命令可以是 Elisp 函数或外部命令。 Eshell 按以下顺序查找命令：
+
+@enumerate
+@item 
+作为命令别名 (@pxref{Aliases})
+
+@item 
+作为内置命令 (@pxref{Built-ins})
+
+@item 
+作为外部程序
+
+@item 
+作为一个普通的 Lisp 函数
+@end enumerate
+
+@vindex eshell-prefer-lisp-functions
+如果您更喜欢使用普通 Lisp 函数而不是外部程序，请将选项 @code{eshell-prefer-lisp-functions} 设置为 @code{t}。  这将交换最后两项的查找顺序。  您还可以通过在名称前添加 @kbd{*} 来强制 Eshell 将命令作为外部程序来查找，例如 @code{*@var{command}} (@pxref{Built-ins})。
+
+您还可以将命令形式组合成带有大括号 (@code{@{@}}) 的子命令。  这允许您使用子命令的输出作为另一个命令的参数，或在控制流语句中 (@pxref{Control Flow})。
+
+@example
+~ $ echo @{echo hello; echo there@}
+hellothere
+@end example
+
+@subsection 口齿不清形式
+Lisp 形式看起来就像普通的 Emacs Lisp 代码，因为它就是这样。  因此，您可以使用 Emacs Lisp 程序通常可用的任何语法 (@pxref{Top, , , elisp, The Emacs Lisp Reference Manual})。
+
+@example
+~ $ (format "hello, %s" user-login-name)
+hello, user
+@end example
+
+此外，您可以将 @emph{combine} 命令形式和 Lisp 形式一起组合成单个语句，让您使用最方便表达意图的任何形式。
+
+@example
+~ $ ls *.patch > (format-time-string "%F.log")
+@end example
+
+此命令将与 glob 模式 @code{*.patch} (@pxref{Globbing}) 匹配的所有文件的列表写入名为 @code{@var{current-date}.log} (@pxref{Redirection}) 的文件。
+
+@node Arguments
+@section 论点
+当调用外部命令（以及许多内置的 Eshell 命令）时，Eshell 会将命令接收的参数展平，因此将列表作为参数传递会将元素“传播”到多个参数中：
+
+@example
+~ $ printnl (list 1 2) 3
+1
+2
+3
+@end example
+
+@subsection 引用和转义
+与其他 shell 一样，您可以通过在字符前添加反斜杠 (@samp{\}) 或用撇号 (@samp{''}) 或双引号 (@samp{""}) 将字符串括起来来转义特殊字符和空格。对于具有管道 (@samp{|}) 或方括号（@samp{[} 或 @samp{]}）等特殊字符的文件名尤其需要，它们可能是远程文件名的一部分。  此外，引用或转义参数将阻止其在传递给 Lisp 函数时转换为数字。
+
+当您在任何引号之外使用 @samp{\} 转义字符时，结果是紧随其后的文字字符。  例如，@code{\$10} 表示文字字符串@code{$10}。
+
+双引号内的大多数字符没有特殊含义。然而，@samp{\}、@samp{"}和@samp{$}仍然是特殊的；要转义它们，请如上所述使用反斜杠。  因此，如果变量 @var{answer} 的值为 @code{42}，则 @code{"The answer is: \"$@var{answer}\""} 返回字符串 @code{The answer is: "42"}。  但是，当转义没有特殊含义的字符时，结果是完整的 @code{\@var{c}} 序列。  例如，@code{"foo\bar"} 表示文字字符串@code{foo\bar}。
+
+此外，当转义换行符时，解析器将删除整个转义序列。  这使您可以跨多行继续命令：
+
+@example
+~ $ echo "foo\
+bar"
+foobar
+@end example
+
+在撇号内，转义的工作方式有所不同。  撇号之间的所有字符都有其字面意义，除了 @samp{'} 之外，它结束引用的字符串。  要插入文字撇号，您可以使用@samp{''}，因此@code{'It''s me'} 表示文字字符串@code{It's me}。
+
+在 Eshell 命令中使用扩展 (@pxref{Expansion}) 时，结果可能是任何数据类型。  为了确保结果始终是字符串，可以用双引号将扩展引起来。
+
+@subsection 类型转换
+当通过命令形式调用 Lisp 函数时，Eshell 会自动将看起来像数字的字符串参数转换为实际的 Lisp 数字，以便更轻松地处理数值。  您可以根据具体情况通过引用或转义参数来防止这种转换：
+
+@example
+~ $ type-of 1
+integer
+~ $ type-of "1"
+string
+@end example
+
+当以命令形式调用子命令时，Eshell 会将输出逐行拆分为列表。  此外，如果每一行看起来都像一个数字，那么 Eshell 会将它们标记为数字，以便将它们传递给 Lisp 函数会将它们转换为 Lisp 数字：
+
+@example
+~ $ cat numbers.txt
+01
+02
+03
+~ $ + $@@@{cat numbers.txt@}
+6
+@end example
+
+如果您发现此行为对于某些函数不方便，您可以告诉 Eshell 不要为该函数执行此转换：
+
+@example
+(put \\='find-file \\='eshell-no-numeric-conversions t)
+@end example
+
+@vindex eshell-convert-numeric-arguments
+您还可以通过将 @code{eshell-convert-numeric-arguments} 设置为 @code{nil} 来完全禁用此转换行为。
+
+@subsection 特殊参数类型
+除了字符串和数字之外，Eshell 还支持许多特殊的参数类型。  这些允许您引用各种其他 Emacs Lisp 数据类型，例如列表或缓冲区。
+
+@table @code
+
+@item #'@var{lisp-form}
+这是指引用的 Emacs Lisp 形式@var{lisp-form}。  虽然这看起来类似于函数的“尖引号”语法 (@pxref{Special Read Syntax, , , elisp, The Emacs Lisp Reference Manual})，但它对应于 @code{quote} 并且可用于任何引用形式。@footnote{Eshell would interpret a bare apostrophe (@code{'}) as the start of a single-quoted string.}
+
+@item `@var{lisp-form}
+这是指反引用的 Emacs Lisp 形式 @var{lisp-form} (@pxref{Backquote, , , elisp, The Emacs Lisp Reference Manual})。  与在 Emacs Lisp 中一样，您可以使用 @samp{,} 和 @samp{,@@} 来引用非常量值。
+
+@item #<buffer @var{name}>
+@itemx #<@var{name}>
+返回名为 @var{name} 的缓冲区。  这相当于 @samp{$(get-buffer-create "@var{name}")} (@pxref{Creating Buffers, , , elisp, The Emacs Lisp Reference Manual})。
+
+@item #<marker @var{position} @var{buffer-or-name}>
+返回缓冲区@var{buffer-or-name}中@var{position}处的标记。 @var{buffer-or-name} 可以是命名缓冲区的字符串，也可以是实际的缓冲区对象。  这大致相当于创建一个新标记并调用 @samp{$(set-marker marker @var{position} @var{buffer-or-name})} (@pxref{Moving Markers, , , elisp, The Emacs Lisp Reference Manual})。
+
+@item #<process @var{name}>
+返回名为@var{name}的进程。  这相当于 @samp{$(get-process "@var{name}")} (@pxref{Process Information, , , elisp, The Emacs Lisp Reference Manual})。
+
+@end table
+
+@node Built-ins
+@section 内置命令
+Eshell 提供了许多内置命令，其中许多命令实现了常见的命令行实用程序，但针对 Eshell 进行了增强。 （这些内置命令只是普通的 Lisp 函数，其名称以 @code{eshell/} 开头。）为了调用内置命令 @code{foo} 的外部变体，您可以调用 @code{*foo}。  通常，这不是必需的；如果命令的 Eshell 版本不支持特定选项，它将自动为您调用外部命令。
+
+一些内置 Eshell 命令提供常规 Emacs Lisp 函数的增强版本。  如果您想调用常规 Emacs Lisp 版本，您可以以 Lisp 形式编写命令 (@pxref{Invocation})。要以命令形式调用常规版本，可以使用@code{funcall}或@code{apply}，例如@: @samp{funcall #'compile "make all"} (@pxref{Calling Functions,,, elisp, GNU Emacs Lisp Reference Manual})。
+
+您可以检查 @code{which} 命令将应用什么：
+
+@example
+~ $ which ls
+eshell/ls is a compiled Lisp function in `em-ls.el'
+~ $ which *ls
+/bin/ls
+@end example
+
+如果你想放弃给定的内置命令，你可以声明一个别名（@pxref{Aliases}）。  例如：
+
+@example
+@group
+~ $ alias ls '*ls $@@*'
+~ $ which ls
+ls is an alias, defined as "*ls $@@*"
+@end group
+@group
+~ $ alias compile 'apply #''compile $*'
+~ $ which compile
+compile is an alias, defined as "apply #'compile $*"
+@end group
+@end example
+
+有些内置命令的行为与其外部对应命令不同，有些则没有外部对应命令。  当给定 @code{--help} 选项时，大多数都会打印一条使用消息。
+
+在某些情况下，可以通过用户设置来配置内置命令的行为，其中一些设置如下所述。  例如，某些命令具有两个用户设置，以允许它们在没有警告的情况下覆盖文件，并确保它们在覆盖文件之前始终进行提示。  如果两个设置均非@code{nil}，则命令始终会提示。  如果两个设置均为@code{nil}（默认），则命令会发出错误信号。
+
+@vindex eshell-default-target-is-dot
+有几个命令观察 @code{eshell-default-target-is-dot} 的值。  如果非 @code{nil}，则命令 @command{cp}、@command{mv} 和 @command{ln} 的默认目标是当前目录。
+
+一些命令是更多 Emacs 功能的包装器，可以作为 @code{eshell-xtra} 模块的一部分加载。  @xref{Extra built-in commands}。
+
+@menu
+* List of Built-ins::
+* Defining New Built-ins::
+@end menu
+
+@node List of Built-ins
+@subsection 内置命令列表
+
+@table @code
+
+@cmindex .
+@item . @var{file} [@var{argument}]@dots{}
+在当前环境中获取名为 @var{file} 的 Eshell 脚本，将任意 @var{arguments} 传递给脚本 (@pxref{Scripts})。  不要与命令 @command{source} 混淆，后者在子 shell 环境中获取文件。
+
+@cmindex addpath
+@item addpath
+@itemx addpath [-b] @var{directory}@dots{}
+将每个指定的 @var{directory} 添加到 @code{$PATH} 环境变量。  默认情况下，这会将目录添加到 @code{$PATH} 的末尾，按照它们在命令行上传递的顺序；通过传递 @code{-b} 或 @code{--begin}，Eshell 会将目录添加到开头。
+
+如果没有目录，则打印当前存储在 @code{$PATH} 中的目录列表。
+
+@cmindex alias
+@item alias
+@itemx alias @var{name} [@var{command}]
+定义一个名为 @var{name} 的别名并扩展到 @var{command}，将其添加到别名文件 (@pxref{Aliases})。  如果省略 @var{command}，则删除名为 @var{name} 的别名。  不带任何参数，列出所有当前定义的别名。
+
+@cmindex basename
+@item basename @var{filename}
+返回@var{filename}，不带其目录。
+
+@cmindex cat
+@item cat @var{file}@dots{}
+将 0⁣s 的内容连接到标准输出。  如果在管道中，或者任何文件不是常规文件、目录或符号链接，则此命令将恢复为系统对 @command{cat} 的定义。
+
+@cmindex cd
+@cindex directories, changing
+@item cd
+@itemx cd @var{directory}
+@itemx cd -[@var{n}]
+@itemx cd =[@var{regexp}]
+更改当前工作目录。  该命令可以采用多种形式：
+
+@table @code
+
+@item cd
+更改为用户的主目录。
+
+@item cd @var{directory}
+更改为指定的@var{directory}。
+
+@item cd -
+更改回之前的工作目录（与 @kbd{cd $-} 相同）。
+
+@item cd -@var{n}
+切换到目录堆栈的 @var{nth} 槽中的目录。
+
+@item cd =
+显示目录环。  每行都有编号。
+
+@item cd =@var{regexp}
+在目录环中搜索与正则表达式@var{regexp}匹配的目录，然后切换到该目录。
+
+@end table
+
+@vindex eshell-cd-shows-directory
+@vindex eshell-list-files-after-cd
+如果@code{eshell-cd-shows-directory}非@code{nil}，@command{cd}将报告它更改到的目录。  如果@code{eshell-list-files-after-cd}不是@code{nil}，则在更改目录后使用任何剩余参数调用@command{ls}。
+
+@cmindex clear
+@item clear [@var{scrollback}]
+将 Eshell 窗口的内容滚动到看不见的地方，留下一个空白窗口。  如果@var{scrollback}非@code{nil}，则回滚内容将被清除，与@command{clear-scrollback}一样。
+
+@cmindex clear-scrollback
+@item clear-scrollback
+清除Eshell窗口的回滚内容。  与命令@command{clear}不同，该命令删除Eshell缓冲区中的内容。
+
+@cmindex compile
+@item compile [-p | -i] [-m @var{mode-name}] @var{command}@dots{}
+运行外部命令，如果该命令将输出到屏幕并且不是管道或子命令的一部分，则将其输出发送到编译缓冲区。
+
+使用 @code{-p} 或 @code{--plain} 选项，始终将输出发送到 Eshell 缓冲区；类似地，使用 @code{-i} 或 @code{--interactive} 时，始终将输出发送到编译缓冲区。您还可以使用 @code{-m @var{mode-name}} 或 @code{--mode @var{mode-name}} 设置编译缓冲区的模式。
+
+@command{compile} 在定义别名时特别有用，以便以交互方式，输出显示在编译缓冲区中，但如果需要，您仍然可以将输出传送到其他地方。  例如，如果您的系统上有一个类似 grep 的命令，您可以为其定义一个别名，如下所示：@samp{alias mygrep 'compile --mode=grep-mode -- mygrep $*'}。
+
+@cmindex cp
+@item cp [@var{option}@dots{}] @var{source} @var{dest}
+@item cp [@var{option}@dots{}] @var{source}@dots{} @var{directory}
+将文件 @var{source} 复制到 @var{dest} 或 @var{source} 到 @var{directory}。
+
+@vindex eshell-cp-overwrite-files
+@vindex eshell-cp-interactive-query
+如果@code{eshell-cp-overwrite-files}非@code{nil}，则@command{cp}将覆盖文件而不发出警告。  如果@code{eshell-cp-interactive-query}非@code{nil}，则@command{cp}会在覆盖任何内容之前询问。
+
+@command{cp} 接受以下选项：
+
+@table @asis
+
+@item @code{-a}, @code{--archive}
+相当于@code{--no-dereference --preserve --recursive}。
+
+@item @code{-d}, @code{--no-dereference}
+复制时不要取消引用符号链接；相反，复制链接本身。
+
+@item @code{-f}, @code{--force}
+复制文件之前切勿提示确认。
+
+@item @code{-i}, @code{--interactive}
+如果目标已存在，则在复制文件之前提示确认。
+
+@item @code{-n}, @code{--preview}
+运行命令，但不要复制任何内容。  如果您想预览调用 @command{cp} 时将删除的内容，这非常有用。
+
+@item @code{-p}, @code{--preserve}
+复制时尝试保留文件属性。
+
+@item @code{-r}, @code{-R}, @code{--recursive}
+递归复制任何指定的目录及其内容。
+
+@item @code{-v}, @code{--verbose}
+复制之前打印每个文件的名称。
+
+@end table
+
+@cmindex date
+@item 日期 [@var{specified-time} [@var{zone}]]
+将当前本地时间打印为人类可读的字符串。  该命令是 Emacs Lisp 函数@code{current-time-string} (@pxref{Time of Day,,, elisp, GNU Emacs Lisp Reference Manual}) 的别名。
+
+@cmindex diff
+@item 差异 [@var{option}]@dots{} @var{old} @var{new}
+使用 Emacs 的内部 @code{diff} 比较文件 @var{old} 和 @var{new}（不要与 @code{ediff} 混淆）。  @xref{Comparing Files, , , emacs, The GNU Emacs Manual}。
+
+@vindex eshell-plain-diff-behavior
+如果@code{eshell-plain-diff-behavior}非@code{nil}，则该命令不使用Emacs的内部@code{diff}。  这与使用 @samp{alias diff '*diff $@@*'} 相同。
+
+@cmindex dirname
+@item 目录名 @var{filename}
+返回@var{filename}的目录部分。
+
+@cmindex dirs
+@cindex directory stack, listing
+@item 目录
+打印目录堆栈。  可以分别使用命令 @command{pushd} 和 @command{popd} 在堆栈中添加或删除目录。
+
+@cmindex du
+@item 杜 [@var{option}]@dots{} @var{file}@dots{}
+总结每个文件的磁盘使用情况，递归到目录中。
+
+@command{du} 接受以下选项：
+
+@table @asis
+
+@item @code{-a}, @code{--all}
+打印文件的大小，而不仅仅是目录。
+
+@item @code{--block-size=@var{size}}
+将大小打印为大小为 @var{size} 的块数。
+
+@item @code{-b}, @code{--bytes}
+打印文件大小（以字节为单位）。
+
+@item @code{-c}, @code{--total}
+最后打印尺寸的总计。
+
+@item @code{-d}, @code{--max-depth=@var{depth}}
+仅打印低于命令行参数 @var{depth} 或更少级别的目录（或带有 @code{--all} 的文件）的大小。
+
+@item @code{-h}, @code{--human-readable}
+以人类可读的格式打印大小，带有二进制前缀（因此 1 KB 是 1024 字节）。
+
+@item @code{-H}, @code{--si}
+以人类可读的格式打印大小，带有十进制前缀（因此 1 KB 是 1000 字节）。
+
+@item @code{-k}, @code{--kilobytes}
+以千字节为单位打印文件大小（如@code{--block-size=1024}）。
+
+@item @code{-L}, @code{--dereference}
+遍历文件时遵循符号链接。
+
+@item @code{-m}, @code{--megabytes}
+以兆字节为单位打印文件大小（如@code{--block-size=1048576}）。
+
+@item @code{-s}, @code{--summarize}
+不要递归到子目录（如 @code{--max-depth=0}）。
+
+@item @code{-x}, @code{--one-file-system}
+跳过驻留在不同文件系统上的任何目录。
+
+@end table
+
+@cmindex echo
+@item 回声[-n | -N] [@var{arg}]@dots{}
+打印每个 @var{arg} 的值。  默认情况下，它以 Lisp 友好的方式打印（因此该值对于使用 @command{echo} 的结果作为参数的 Lisp 命令很有用）。  如果传递单个参数，@command{echo} 会打印该参数；如果传递多个参数，它会打印所有参数的列表；否则，它打印空字符串。
+
+@vindex eshell-plain-echo-behavior
+如果 @code{eshell-plain-echo-behavior} 不是 @code{nil}，@command{echo} 将尝试表现得更像普通 shell 的 @command{echo}，将每个参数打印为字符串，并用空格分隔。
+
+您可以控制 @command{echo} 是否输出尾随换行符，使用 @code{-n} 禁用尾随换行符（默认行为）或使用 @code{-N} 启用它（@code{eshell-plain-echo-behavior} 为非 @code{nil} 时的默认值）。
+
+@cmindex env
+@item 环境 [@var{var}=@var{value}]@dots{} [@var{command}]@dots{}
+不带参数，打印当前环境变量。  如果将参数传递给该命令，则 @command{env} 会将参数作为命令执行。  如果您传递 @samp{@var{var}=@var{value}} 形式的任何初始参数，@command{env} 将在运行命令之前首先将 @var{var} 设置为 @var{value}。
+
+@cmindex eshell-debug
+@item eshell-调试[错误|表格|过程]@dots{}
+切换 Eshell 本身的调试信息。  您可以向此命令传递以下一个或多个参数：
+
+@itemize @bullet
+
+@item 
+@code{error}，在执行命令时启用/禁用 Eshell 捕获错误；
+
+@item 
+@code{form}，显示/隐藏缓冲区中的Eshell命令形式操作@code{*eshell last cmd*}；或者
+
+@item 
+@code{process}，显示/隐藏缓冲区@code{*eshell last cmd*}中的外部进程事件。
+
+@end itemize
+
+@cmindex exit
+@item 出口
+@vindex eshell-kill-on-exit
+退出Eshell并保存历史记录。  默认情况下，此命令会杀死 Eshell 缓冲区，但如果 @code{eshell-kill-on-exit} 是 @code{nil}，则缓冲区只是被埋葬。
+
+@cmindex export
+@item 导出 [@var{name}=@var{value}]@dots{}
+使用 Bash 的 @command{export} 等输入设置环境变量，如 @samp{export @var{var1}=@var{val1} @var{var2}=@var{val2} @dots{}} 中所示。
+
+@cmindex funcall
+@item funcall @var{function} [@var{arg}]@dots{}
+使用指定的参数调用 @var{function}（@var{function} 可以是命名 Lisp 函数的符号或字符串）。  当您想要使用 Eshell 的命令形式 (@pxref{Invocation}) 调用普通 Lisp 函数时，即使可能存在同名的外部程序，此命令也很有用。
+
+@cmindex grep
+@item grep [@var{arg}]@dots{}
+@cmindex agrep
+@itemx agrep [@var{arg}]@dots{}
+@cmindex egrep
+@itemx egrep [@var{arg}]@dots{}
+@cmindex fgrep
+@itemx fgrep [@var{arg}]@dots{}
+@cmindex rgrep
+@itemx rgrep [@var{arg}]@dots{}
+@cmindex glimpse
+@itemx 一瞥[@var{arg}]@dots{}
+@command{grep} 命令与 GNU @command{grep} 兼容，但在 @code{grep-mode} 中打开编译缓冲区。 @xref{Grep Searching, , , emacs, The GNU Emacs Manual}。
+
+@vindex eshell-plain-grep-behavior
+如果@code{eshell-plain-grep-behavior}非@code{nil}，那么这些命令不会使用打开编译缓冲区，而是将输出打印到Eshell的缓冲区。  这与使用 @samp{alias grep '*grep $@@*'} 相同，但此设置适用于您需要为其创建单独别名的所有内置命令。
+
+@cmindex history
+@item 历史[@var{n}]
+@itemx 历史 [-arw] [@var{filename}]
+打印 Eshell 的输入历史记录。  使用数字参数@var{n}，此命令打印历史记录中的@var{n}最新项目。或者，您可以指定以下选项：
+
+@table @asis
+
+@item @code{-a}, @code{--append}
+将新的历史记录项追加到历史记录文件中。
+
+@item @code{-r}, @code{--read}
+从历史文件中读取历史记录项并将其附加到当前 shell 的历史记录中。
+
+@item @code{-w}, @code{--write}
+将当前历史列表写入历史文件。
+
+@end table
+
+@cmindex info
+@item 信息 [@var{manual} [@var{item}]@dots{}]
+浏览可用的信息文档。  不带任何参数，浏览顶级菜单。  否则，显示 @var{manual} 的手册，选择 @var{item} 的菜单条目。
+
+该命令与外部 @command{info} 命令相同，但使用 Emacs 的内部信息阅读器。  @xref{Misc Help, , , emacs, The GNU Emacs Manual}。
+
+@cmindex jobs
+@cindex processes, listing
+@item 职位
+使用函数 @code{list-processes} 列出 Emacs 进程的子进程（如果有）。
+
+@cmindex kill
+@cindex processes, signaling
+@item 杀死 [-@var{signal}] [@var{pid} | @var{process}]
+杀死进程。  采用 PID 或进程对象和可选的 @var{signal} 说明符，该说明符可以是数字或信号名称。
+
+@cmindex listify
+@item 列出 [@var{arg}]@dots{}
+将参数作为单个列表返回。  对于单个参数，如果它已经是一个列表，则按原样返回它，否则将其包装在列表中。  对于多个参数，返回所有参数的列表。
+
+@cmindex ln
+@item ln [@var{option}]@dots{} @var{target} [@var{link-name}]
+@itemx ln [@var{option}]@dots{} @var{target}@dots{} @var{directory}
+创建指向名为 @var{link-name} 的指定 @var{target} 的链接，或创建指向 @var{directory} 中的多个 @var{targets} 的链接。
+
+@vindex eshell-ln-overwrite-files
+@vindex eshell-ln-interactive-query
+如果@code{eshell-ln-overwrite-files}非@code{nil}，@command{ln}将覆盖文件而不发出警告。  如果@code{eshell-ln-interactive-query}非@code{nil}，则@command{ln}将在覆盖文件之前询问。
+
+@command{ln} 接受以下选项：
+
+@table @asis
+
+@item @code{-f}, @code{--force}
+在链接目标之前切勿提示确认。
+
+@item @code{-i}, @code{--interactive}
+如果源已存在，则在链接到项目之前提示确认。
+
+@item @code{-n}, @code{--preview}
+运行命令，但不要移动任何东西。  如果您想预览调用 @command{ln} 时链接的内容，这非常有用。
+
+@item @code{-s}, @code{--symbolic}
+创建符号链接而不是硬链接。
+
+@item @code{-v}, @code{--verbose}
+在链接之前打印每个文件的名称。
+
+@end table
+
+@cmindex locate
+@item 定位@var{arg}@dots{}
+Emacs 的 @code{locate} 函数的别名，它只是运行外部 @command{locate} 命令并解析结果。 @xref{Dired and Find, , , emacs, The GNU Emacs Manual}。
+
+@vindex eshell-plain-locate-behavior
+如果@code{eshell-plain-locate-behavior}非@code{nil}，则不使用Emacs的内部@code{locate}。  这与使用 @samp{alias locate '*locate $@@*'} 相同。
+
+@cmindex ls
+@item 
+列出有关每个@var{file}的信息，包括任何指定目录的内容。  如果未指定 @var{file}，则列出当前目录的内容。
+
+@vindex eshell-ls-initial-args
+用户选项 @code{eshell-ls-initial-args} 包含要包含在对 @command{ls} 的任何调用中的参数列表。  例如，您可以包含选项 @option{-h} 以始终使用更易于阅读的格式。
+
+@vindex eshell-ls-use-colors
+如果@code{eshell-ls-use-colors}非@code{nil}，则目录的内容根据文件类型和状态进行颜色编码。  这些颜色和用于标识其相应文件的正则表达式可以通过 @w{@kbd{M-x customize-group @key{RET} eshell-ls @key{RET}}} 进行自定义。
+
+
+
+@table @asis
+
+@item @code{-a}, @code{--all}
+列出所有文件，包括以 @samp{.} 开头的文件。
+
+@item @code{-A}, @code{--almost-all}
+与 @code{--all} 类似，但不列出当前目录 (@file{.}) 或父目录 (@file{..})。
+
+@item @code{-c}, @code{--by-ctime}
+按上次状态更改时间对文件进行排序，最新的文件在前。
+
+@item @code{-C}
+按列列出条目。
+
+@item @code{-d}, @code{--directory}
+列出目录条目而不是其内容。
+
+@item @code{-h}, @code{--human-readable}
+以人类可读的格式打印大小，带有二进制前缀（因此 1 KB 是 1024 字节）。
+
+@item @code{-H}, @code{--si}
+以人类可读的格式打印大小，带有十进制前缀（因此 1 KB 是 1000 字节）。
+
+@item @code{-I@var{pattern}}, @code{--ignore=@var{pattern}}
+
+
+@item @code{-k}, @code{--kilobytes}
+
+
+@vindex eshell-ls-date-format
+@item @code{-l}
+使用长列表格式显示每个文件的详细信息。  用户选项 @code{eshell-ls-date-format} 确定使用此选项时日期的显示方式。  日期是使用函数 @code{format-time-string} (@pxref{Time Parsing,,, elisp, GNU Emacs Lisp Reference Manual}) 生成的。
+
+@item @code{-L}, @code{--dereference}
+
+
+@item @code{-n}, @code{--numeric-uid-gid}
+以数字方式显示 UID 和 GID，而不是使用它们的名称。
+
+@item @code{-r}, @code{--reverse}
+
+
+@item @code{-R}, @code{--recursive}
+
+
+@item @code{-s}, @code{--size}
+以块为单位显示每个文件的大小。
+
+@vindex eshell-ls-default-blocksize
+@item @code{-S}
+按文件大小排序，最大的文件排在前面。  用户选项 @code{eshell-ls-default-blocksize} 确定使用此选项显示文件大小时使用的默认块大小。
+
+@item @code{-t}
+按修改时间排序，最新的文件在前。
+
+@item @code{-u}
+按上次访问时间排序，最新文件排在最前面。
+
+@item @code{-U}
+不对结果进行排序。  相反，按目录顺序列出条目。
+
+@item @code{-x}
+按行而不是按列列出条目。
+
+@item @code{-X}
+按文件扩展名的字母顺序排序。
+
+@item @code{-1}
+每行列出一个文件。
+
+@end table
+
+@cmindex make
+@item 使[@var{arg}]@dots{}
+异步运行时，运行 @command{make} 到 @code{compile}（例如，@samp{make &}）。  @xref{Compilation, , , emacs, The GNU Emacs Manual}。  否则调用外部 @command{make} 命令。
+
+@cmindex man
+@item 男人[@var{arg}]@dots{}
+使用 Emacs @code{man} 命令显示手册页。 @xref{Man Page, , , emacs, The GNU Emacs Manual}。
+
+@cmindex mkdir
+@item mkdir [-p] @var{directory}@dots{}
+创建新目录。  使用 @code{-p} 或 @code{--parents}，也会自动创建任何必要的父目录。
+
+@cmindex mv
+@item mv [@var{option}]@dots{} @var{source} @var{dest}
+@itemx mv [@var{option}]@dots{} @var{source}@dots{} @var{directory}
+将文件 @var{source} 重命名为 ⁣​​1⁣ 或将 @var{source} 移动到 @var{directory}。
+
+@vindex eshell-mv-overwrite-files
+@vindex eshell-mv-interactive-query
+如果@code{eshell-mv-overwrite-files}非@code{nil}，@command{mv}将覆盖文件而不发出警告。  如果@code{eshell-mv-interactive-query}非@code{nil}，@command{mv}将在覆盖任何内容之前提示。
+
+@command{mv} 接受以下选项：
+
+@table @asis
+
+@item @code{-f}, @code{--force}
+在移动项目之前切勿提示确认。
+
+@item @code{-i}, @code{--interactive}
+如果目标已存在，则在移动项目之前提示确认。
+
+@item @code{-n}, @code{--preview}
+运行命令，但不要移动任何东西。  如果您想预览调用 @command{mv} 时将移动的内容，这非常有用。
+
+@item @code{-v}, @code{--verbose}
+在移动之前打印每个项目的名称。
+
+@end table
+
+@cmindex occur
+@item 发生 @var{regexp} [@var{nlines}]
+Emacs 的 @code{occur} 的别名。 @xref{Other Repeating Search, , , emacs, The GNU Emacs Manual}。
+
+@cmindex popd
+@cindex directory stack, removing from
+@item 波普德
+@item 弹出+@var{n}
+从目录堆栈中弹出一个目录并切换到堆栈中的另一个位置。  该命令可以采用以下形式：
+
+@table @code
+
+@item popd
+从目录堆栈中删除当前目录并更改到其下面的目录。
+
+@item popd +@var{n}
+从目录堆栈中删除当前目录，并更改为堆栈中的@var{nth}目录（从零开始计数）。
+
+@end table
+
+@cmindex printnl
+@item printnl [@var{arg}]@dots{}
+打印所有由换行符分隔的 @var{arg}。
+
+@cmindex pushd
+@cindex directory stack, adding to
+@item pushd
+@itemx pushd @var{directory}
+@itemx pushd +@var{n}
+将当前目录推入目录堆栈，然后切换到另一个目录。  该命令可以采用以下形式：
+
+@table @code
+
+@vindex eshell-pushd-tohome
+@item pushd
+将当前目录与堆栈顶部的目录交换。如果@code{eshell-pushd-tohome}非@code{nil}，则将当前目录压入堆栈并更改为用户的主目录（如@samp{pushd ~}）。
+
+@vindex eshell-pushd-dunique
+@item pushd @var{directory}
+将当前目录压入堆栈并更改为@var{directory}。  如果@code{eshell-pushd-dunique}非@code{nil}，则仅将唯一的目录添加到堆栈中。
+
+@vindex eshell-pushd-dextract
+@item pushd +@var{n}
+切换到目录堆栈中的@var{nth}目录（从零开始计数），然后通过将@var{nth}之前的任何元素移动到底部来“旋转”堆栈。  如果@code{eshell-pushd-dextract}不是@code{nil}，则@samp{pushd +@var{n}}会将第@var{n}目录弹出到堆栈顶部。
+
+@end table
+
+@cmindex pwd
+@item pwd
+打印当前工作目录。
+
+@cmindex rm
+@item rm [@var{option}]@dots{} @var{item}@dots{}
+删除文件、缓冲区、进程或 Emacs Lisp 符号，具体取决于每个 @var{item} 的类型。
+
+@vindex eshell-rm-interactive-query
+@vindex eshell-rm-removes-directories
+如果@code{eshell-rm-interactive-query}非@code{nil}，@command{rm}将在删除任何内容之前提示。  如果@code{eshell-rm-removes-directories}非@code{nil}，则@command{rm}也可以删除目录。  否则，需要@command{rmdir}。
+
+@command{rm} 接受以下选项：
+
+@table @asis
+
+@item @code{-f}, @code{--force}
+删除项目之前切勿提示确认。
+
+@item @code{-i}, @code{--interactive}
+删除每个项目之前提示确认。
+
+@item @code{-n}, @code{--preview}
+运行命令，但不要删除任何内容。  如果您想预览调用 @command{rm} 时将删除的内容，这非常有用。
+
+@item @code{-r}, @code{-R}, @code{--recursive}
+递归删除任何指定的目录及其内容。
+
+@item @code{-v}, @code{--verbose}
+删除前打印每件物品的名称。
+
+@end table
+
+@cmindex rmdir
+@item rmdir @var{directory}@dots{}
+如果目录为空，则将其删除。
+
+@cmindex set
+@item 设置 [@var{var} @var{value}]@dots{}
+设置变量值，使用函数 @code{set} 就像命令 (@pxref{Setting Variables,,, elisp, GNU Emacs Lisp Reference Manual}) 一样。 @var{var} 的值可以是一个符号，在这种情况下它指的是一个 Lisp 变量，也可以是一个字符串，指的是一个环境变量 (@pxref{Arguments})。
+
+@cmindex setq
+@item setq [@var{symbol} @var{value}]@dots{}
+设置变量值，使用函数 @code{setq} 就像命令 (@pxref{Setting Variables,,, elisp, GNU Emacs Lisp Reference Manual}) 一样。
+
+@cmindex source
+@item 源@var{file} [@var{argument}]@dots{}
+在子 shell 环境中获取名为 @var{file} 的 Eshell 脚本，将任何 @var{argument} 传递给脚本 (@pxref{Scripts})。  不要与命令@command{.}混淆，后者在当前环境中获取文件。
+
+@cmindex time
+@item 时间@var{command}@dots{}
+显示执行@var{command}期间经过的时间。
+
+@cmindex umask
+@item 掩码[-S]
+@itemx 掩码@var{mode}
+查看新创建的文件和目录的默认文件权限。  如果通过 @code{-S} 或 @code{--symbolic}，则以符号方式查看众数。  使用@var{mode}，将默认权限设置为此值。
+
+@cmindex unset
+@item 取消设置 [@var{var}]@dots{}
+取消设置一个或多个变量。  与@command{set}一样，@var{var}的值可以是一个符号，在这种情况下它指的是一个Lisp变量，或者是一个字符串，指的是一个环境变量。
+
+@cmindex wait
+@cindex processes, waiting for
+@item 等待 [-t 0⁣] [@var{process}]@dots{}
+等待直到每个指定的@var{process}都退出。  进程可以是进程对象 (@pxref{Processes, , , elisp, GNU Emacs Lisp Reference Manual}) 或整数 PID。  如果您经过 @code{-t} 或 @code{--timeout}，则最多等待几秒钟再退出。
+
+@cmindex which
+@item 其中@var{command}@dots{}
+对于每个@var{command}，确定它是什么类型的命令及其位置。
+
+@cmindex whoami
+@item 瓦阿米
+打印当前用户。  这个 Eshell 版本的 @command{whoami} 是连接感知的，因此对于远程目录，它将打印与该连接关联的用户。
+@end table
+
+@node Defining New Built-ins
+@subsection 定义新的内置命令
+虽然 Eshell 可以直接将 Lisp 函数作为命令运行，但为 Eshell 提供特殊的内置命令可能会更方便。  内置命令只是普通的 Lisp 函数，旨在从 Eshell 调用。  在定义现有函数的特定于 Eshell 的版本时，您可以为该函数指定一个以 @code{eshell/} 开头的名称，以便 Eshell 知道使用它。
+
+@defmac eshell-eval-using-options name macro-args options body@dots{}
+该宏使用一组命令行 @var{options} 处理命令 @var{name} 的 @var{macro-args} 列表。  如果参数解析成功，它将把结果值存储在本地符号中并执行@var{body}；任何剩余的参数将在本地 let 绑定变量 @code{args} 中可用。  返回值是@var{body}中最后一个表单的值。
+
+如果在@var{macro-args}中传递了未知选项并指定了外部命令（见下文），则该宏将为该命令启动一个进程，并抛出标签@code{eshell-external}，并将新进程作为其值。
+
+@var{options} 应该是一个以以下形式的一个或多个元素开头的列表，每个元素代表一个特定的命令行开关：
+
+@example
+(@var{short} @var{long} @var{value} @var{symbol} @var{help-string})
+@end example
+
+@table @var
+@item short
+该元素如果不是@code{nil}，则应该是用作短开关的字符，如@code{-@var{short}}。  该元素和 2⁣ 中至少有一个必须是非 3⁣。
+
+@item long
+该元素如果不是@code{nil}，则应该是用作长开关的字符串，如@code{--@var{long}}。
+
+@item value
+该元素是与选项关联的值。  它可以是：
+
+@table @asis
+@item @code{t}
+该选项需要在切换后指定一个值。
+
+@item @code{nil}
+该选项的值为 @code{t}。
+
+@item 还要别的吗
+该选项被赋予指定的值。
+@end table
+
+@item 象征
+该元素是将绑定到 @var{value} 的 Lisp 符号。  如果 @var{symbol} 是 @code{nil}，则指定此开关将改为调用 @code{eshell-show-usage}，因此适合像 @code{--help} 这样的选项。
+
+@item 帮助字符串
+该元素是选项的文档字符串，当调用 @code{eshell-show-usage} 时将显示该字符串。
+@end table
+
+在命令行开关元素列表之后，@var{options} 可以包含其他关键字参数来控制 @code{eshell-eval-using-options} 的行为方式。  其中一些需要争论，而另一些则不需要。  识别的关键词有：
+
+@table @code
+@item :external @var{string}
+如果 @var{macro-args} 中存在未知开关，请将 @var{string} 指定为要运行的外部命令。
+
+@item :usage @var{string}
+将 @var{string} 设置为命令文档字符串的初始部分。  它出现在列出选项之前。
+
+@item :post-usage @var{string}
+将 @var{string} 设置为命令文档字符串的（可选）尾随部分。  它出现在选项列表之后，但在有关关联外部命令的文档的最后部分（如果有）之前。
+
+@item :show-usage
+如果存在，则在不带参数调用命令时显示用法消息。
+
+@item :preserve-args
+通常，@code{eshell-eval-using-options} 会展平 @var{macro-args} 中的参数列表，并将每个参数转换为字符串。  如果存在此关键字，请避免这样做，而是保留原始参数。  这对于想要接受任意 Lisp 对象的命令很有用。
+
+@item :parse-leading-options-only
+如果存在，请勿在第一个位置参数之后解析破折号或切换参数。  相反，将它们本身视为位置参数。
+@end table
+
+例如，您可以像这样处理 @code{ls} 命令的选项子集：
+
+@example
+(eshell-eval-using-options
+ "ls" macro-args
+ '((?a  nil      nil show-all       "show all files")
+   (?I  "ignore" t   ignore-pattern "ignore files matching pattern")
+   (nil "help"   nil nil            "show this help message")
+ :external "ls"
+ :usage "[OPTION]... [FILE]...
+  List information about FILEs (the current directory by default).")
+ ;; List the files in ARGS somehow...
+ )
+@end example
+
+@end defmac
+
+@node Variables
+@section 变量
+@vindex eshell-prefer-lisp-variables
+由于 Eshell 是 Emacs @acronym{REPL} 和命令 shell 的组合，因此它可以引用来自两个不同来源的变量：普通 Emacs Lisp 变量以及环境变量。  默认情况下，在 Eshell 中使用变量时，它会首先在内置变量列表中查找，然后在环境变量列表中查找，最后在 Lisp 变量列表中查找。  如果您更喜欢使用 Lisp 变量而不是环境变量，可以将 @code{eshell-prefer-lisp-variables} 设置为 @code{t}。
+
+您可以通过几种不同的方式设置变量。  要设置 Lisp 变量，您可以使用命令 @samp{setq @var{name} @var{value}}，其工作方式与 Lisp 对应命令 (@pxref{Setting Variables, , , elisp, The Emacs Lisp Reference Manual}) 非常相似。  要设置环境变量，请使用@samp{export @var{name}=@var{value}}。  您还可以使用 @samp{set @var{variable} @var{value}}，如果 @var{variable} 是一个符号，它会设置一个 Lisp 变量；如果它是一个字符串 (@pxref{Arguments})，它会设置一个环境变量。  最后，您可以使用@samp{@var{name}=@var{value} @var{command} @dots{}}临时设置单个命令的环境变量。  这相当于：
+
+@example
+@{
+  export @var{name}=@var{value}
+  @var{command} @dots{}
+@}
+@end example
+
+@subsection 内置变量
+Eshell 知道一些内置变量：
+
+@table @code
+
+@vindex $PWD
+@vindex $+
+@item $PWD
+@itemx $+
+该变量始终包含当前工作目录。
+
+@vindex $OLDPWD
+@vindex $-
+@item $OLDPWD
+@itemx $-
+该变量始终包含先前的工作目录（最后一个 @code{cd} 命令之前的当前工作目录）。使用@code{$-}时，您还可以通过下标访问目录环中较旧的目录，例如@:@samp{$-[1]}指的是前一个工作目录@emph{before}。
+
+@vindex $PATH
+@item $PATH
+这指定了搜索可执行程序的目录。  它的值是一个字符串，对于 Unix 和 GNU 系统用 @code{":"} 分隔，对于 MS 系统用 @code{";"} 分隔。  该变量是连接感知的，因此每当您将当前目录更改为不同的主机 (@pxref{Remote Files, , , emacs, The GNU Emacs Manual}) 时，该值都会自动更新以反映该主机上的搜索路径。
+
+@vindex $UID
+@item $UID
+这将返回当前用户的有效 @acronym{UID}。  该变量是连接感知的，因此当当前目录是远程时，对于与该远程连接关联的用户，其值将为 @acronym{UID}。
+
+@vindex $GID
+@item $GID
+这将返回当前用户的有效 @acronym{GID}。  与 1⁣ 一样，此变量是连接感知的，因此当当前目录是远程时，对于与该远程连接关联的用户，其值将为 @acronym{GID}。
+
+@vindex $_
+@item $_
+这是指最后一个命令的最后一个参数。  通过下标，您可以访问最后一个命令的任何参数。  例如，@samp{$_[1]}指的是最后一个命令的第二个参数（不包括命令名称本身）。  要获取最后一个命令的所有参数，您可以使用索引范围，如 @samp{$_[..]} (@pxref{Dollars Expansion})。
+
+@vindex $$
+@item $$
+这是最后一个命令的结果。  对于外部命令，如果退出代码为 0，则为 @code{t}，否则为 @code{nil}。
+
+@vindex eshell-lisp-form-nil-is-failure
+@vindex $?
+@item $?
+该变量包含最后一个命令的退出代码。  如果最后一个命令是 Lisp 函数，则成功完成时为 0，否则为 1。  如果 @code{eshell-lisp-form-nil-is-failure} 不是 @code{nil}，则 Lisp 形式的命令（如 @samp{(@var{command} @var{args}@dots{})}）返回 @code{nil} 会将此变量设置为 2。
+
+@vindex $COLUMNS
+@vindex $LINES
+@item $COLUMNS
+@itemx $LINES
+这些变量分别表示当前在 Eshell 窗口中可见的列数和行数。  它们都被复制到环境中，因此从 Eshell 调用的外部命令可以参考它们来执行正确的操作。
+
+@vindex $INSIDE_EMACS
+@item $INSIDE_EMACS
+该变量向外部命令表明它们是从 Emacs 内部调用的，以便它们可以在必要时调整其行为。  默认情况下，其值为@code{@var{emacs-version},eshell}。  Emacs 的其他部分（例如 Tramp）可能会向该值添加额外的信息。
+
+@vindex $PAGER
+@item $PAGER
+此变量指示命令在希望对长输出进行分页时应使用的分页器。  如果非@code{nil}，其值为@code{comint-pager}；否则，它使用 @code{process-environment} 中的 @code{$PAGER} 的值。
+
+@end table
+
+@xref{Aliases}，对于别名定义中的内置变量@samp{$*}、@samp{$1}、@samp{$2}、@dots{}。
+
+@node Aliases
+@section 别名
+
+@findex eshell-read-aliases-list
+@vindex eshell-aliases-file
+别名是扩展为更长输入行的命令。  例如，@command{ll} 是@code{ls -l} 的常见别名。  要在 Eshell 中定义此别名，可以使用命令调用 @kbd{alias ll 'ls -l $@@*'};定义了这个之后，在 Eshell 中运行 @samp{ll foo} 实际上会运行 @samp{ls -l foo}。  通过 @command{alias} 命令定义（或删除）的别名会自动写入到 @code{eshell-aliases-file} 命名的文件中，您也可以直接编辑该文件。  完成此操作后，使用@w{@kbd{M-x eshell-read-aliases-list}}加载编辑后的别名。
+
+请注意，与 Bash 中的别名不同，参数必须显式处理。  在别名中，您可以使用特殊变量 @samp{$*}、@samp{$0}、@samp{$1}、@samp{$2} 等@: 来引用传递给别名的参数。
+
+@table @code
+
+@vindex $*
+@item $*
+这将扩展为传递给别名的参数列表。  例如，如果您运行 @code{my-alias 1 2 3}，则 @samp{$*} 将是列表 @code{(1 2 3)}。  请注意，由于此变量是一个列表，因此在别名中使用 @samp{$*} 会将此列表作为单个参数传递给别名命令。  因此，在定义别名时，通常应该使用 @samp{$@@*} 传递所有参数，将它们拼接到参数列表中 (@pxref{Dollars Expansion})。
+
+@vindex $0
+@item $0
+这将扩展为当前正在执行的别名的名称。
+
+@vindex $1, $2, @dots{}, $9
+@item $1, $2, @dots{}, $9
+这些变量扩展到传递给别名的第 n 个参数（从 1 开始）。  这使您可以有选择地使用别名的参数，因此 @kbd{alias mcd 'mkdir $1 && cd $1'} 会导致 @kbd{mcd foo} 创建并切换到名为 @samp{foo} 的目录。
+
+@end table
+
+@node Remote Access
+@section 远程访问
+@cindex remote access
+
+由于 Eshell 使用 Emacs 工具来实现其大部分功能，因此您可以透明地访问远程主机。  要连接到远程主机，只需输入 @code{cd} 即可：
+
+@example
+~ $ cd /ssh:user@@remote:
+/ssh:user@@remote:~ $
+@end example
+
+此外，内置 Eshell 命令 (@pxref{Built-ins}) 和普通 Lisp 函数接受远程文件名，因此即使不先显式连接也可以访问它们。  例如，要打印远程文件的内容，您可以键入@samp{cat /ssh:user@@remote:~/output.log}。  然而，这意味着当从远程目录使用内置命令或 Lisp 函数时，必须小心指定绝对文件名：@samp{cat /var/output.log} 将始终打印 @emph{local} @file{/var/output.log} 的内容，即使是从远程目录也是如此。  如果您觉得这种行为很烦人，您可以启用可选的电动正斜杠模块 (@pxref{Electric forward slash})。
+
+@vindex eshell-explicit-remote-commands
+运行命令时，您还可以通过在命令名称前添加远程标识符前缀（例如@: @samp{/ssh:user@@remote:whoami}）来显式使它们成为远程命令。  这将通过 SSH 连接为 @code{user@@remote} 运行命令 @code{whoami}，无论您当前的目录如何。  如果您想在 @emph{local} 计算机上显式运行命令，即使位于远程目录中，您也可以在命令名称前加上 @kbd{/local:} 前缀，例如 @samp{/local:whoami}。  无论哪种情况，您都可以指定程序的绝对路径，例如@: @samp{/ssh:user@@remote:/usr/bin/whoami}。  如果您需要引用一个文件名将被解释为显式远程命令的程序，您可以使用 @kbd{/:} 引用该名称，例如 @: @samp{/:/ssh:user@@remote:whoami} (@pxref{Quoted File Names,,, emacs, The GNU Emacs Manual})。  要完全禁用显式远程命令，您可以将选项 @code{eshell-explicit-remote-commands} 设置为 @code{nil}。
+
+@node Control Flow
+@section 控制流程
+由于 Eshell 命令无法（轻松）与 Lisp 形式结合，因此为了方便起见，Eshell 提供了面向命令的控制流语句。
+
+大多数 Eshell 的控制流语句都接受 @var{conditional}。这可以采取几种不同的形式。  如果 1⁣ 是美元展开式，则如果结果是非 2⁣ 值，则满足条件。  或者，@var{conditional} 可以是子命令，可以是命令形式，例如 @: @samp{@{@var{subcommand}@}}；或 Lisp 形式，例如@: @samp{(@var{lisp form})}。  在这种情况下，如果子命令的退出状态为 0，则满足条件。
+
+@table @code
+
+@item if @var{conditional} @var{true-subcommand}
+@itemx if @var{conditional} @var{true-subcommand} else @var{false-subcommand}
+如果满足@var{conditional}，则评估@var{true-subcommand}；否则，评估@var{false-subcommand}。  @var{true-subcommand} 和 @var{false-subcommand} 都应该是子命令，与 @var{conditional} 一样。
+
+您还可以将 @code{if}/@code{else} ​​形式链接在一起，例如：
+
+@example
+if @{[ -f file.txt ]@} @{
+  echo found file
+@} else if @{[ -f alternate.txt ]@} @{
+  echo found alternate
+@} else @{
+  echo not found!
+@}
+@end example
+
+@item unless @var{conditional} @var{false-subcommand}
+@itemx unless @var{conditional} @var{false-subcommand} else @var{true-subcommand}
+如果不满足@var{conditional}，则评估@var{false-subcommand}；否则，评估@var{true-subcommand}。  与上面一样，您也可以将 @code{unless}/@code{else} 形式链接在一起。
+
+@item while @var{conditional} @var{subcommand}
+重复评估@var{subcommand}，直到满足@var{conditional}。
+
+@item until @var{conditional} @var{subcommand}
+重复评估@var{subcommand}，直到满足@var{conditional}。
+
+@item for @var{var} in @var{sequence}@dots{} @var{subcommand}
+迭代 @var{sequence} 的每个元素，将该元素存储在 @var{var} 中并对 @var{subcommand} 求值。  如果@var{sequence}是@code{@var{begin}..@var{end}}形式的范围，则迭代@var{begin}和@var{end}之间的每个整数，不包括@var{end}。  如果 @var{sequence} 不是序列，则将其视为只有一个元素的列表。
+
+如果您指定多个 @var{sequences}，这将依次迭代它们中的每一个。
+
+@end table
+
+@node Expansion
+@chapter 扩张
+命令 shell 中的扩展有点像宏解析器中的宏扩展（例如 @command{cpp} 和 @command{m4}），但在命令 shell 中，它们很少用于常量，通常用于使用变量和字符串操作。@footnote{Eshell has no string-manipulation expansions because the Elisp library already provides many functions for this.} 例如，当执行该行时，行上的 @code{$@var{var}} 扩展为变量 @var{var} 的值。  扩展通常作为参数传递，但也可以用作命令。@footnote{E.g., entering just @samp{$@var{var}} at the prompt is equivalent to entering the value of @var{var} at the prompt.}
+
+您可以将扩展与常规字符串参数甚至其他扩展连接起来。  在最简单的情况下，当扩展返回一个字符串值时，这相当于普通的字符串连接；例如，@samp{$@{echo "foo"@}bar} 返回@samp{foobar}。  确切的行为取决于连接的每个值的类型：
+
+@table @asis
+
+@item 两个弦
+将两个值连接在一起。
+
+@item 一个或两个数字
+连接每个值的字符串表示形式。  如果任一值为数字，请尽可能将连接值标记为数字。
+
+@item 一个或两个（非@code{nil}）列表
+连接每个值的“相邻”元素（可能如上所述转换回数字）。  例如，@samp{$(list "a" "b")c} 返回@samp{("a" "bc")}。
+
+@item 还要别的吗
+连接每个值的字符串表示形式。
+
+@end table
+
+@menu
+* Dollars Expansion::
+* Globbing::
+* Argument Predication and Modification::
+@end menu
+
+@node Dollars Expansion
+@section 美元扩张
+与许多其他 shell 一样，您可以使用 @code{$} 扩展将各种值插入到 Eshell 调用中。  虽然 Eshell 的 @code{$} 扩展语法与其他 shell 的语法有一些相似之处，但也存在许多差异。  不要让这些相似之处让您产生一种虚假的熟悉感。
+
+当使用命令形式 (@pxref{Invocation}) 时，Eshell 将忽略任何前导 @code{nil} 值，因此如果 @var{foo} 为 @code{nil}，则 @samp{$@var{foo} echo hello} 相当于 @samp{echo hello}。
+
+@table @code
+
+@item $@var{var}
+扩展到绑定到 @var{var} 的值。  这是在命令调用中使用变量的主要方式。
+
+@item $"@var{var}"
+@item $'@var{var}'
+扩展到绑定到 @var{var} 的值。  当将变量名称与另一个值（例如 @samp{$"@var{var}"-suffix}）连接时，这对于消除变量名称的歧义很有用。
+
+@item $(@var{lisp})
+扩展为 S 表达式 @code{(@var{lisp})} 的求值结果。  就其本身而言，这与 @code{(@var{lisp})} 相同，但使用 @code{$} 时，它可以在双引号内或更长的字符串内使用，例如 @samp{/some/path/$(@var{lisp}).txt}。
+
+@item $@{@var{command}@}
+返回 @command{@var{command}} 的输出，它可以是任何有效的 Eshell 命令调用，甚至可能包含扩展。  与 @code{$(@var{lisp})} 类似，它与 @code{@{@var{command}@}} 单独使用时相同，但 @code{$} 允许它在双引号内使用或作为字符串的一部分。
+
+@vindex eshell-convert-numeric-arguments
+通常，输出是逐行分割的，返回一个列表（如果只有一行输出，则返回第一个元素）；如果 @code{eshell-convert-numeric-arguments} 不是 @code{nil} 并且输出的每一行看起来都像一个数字，则将每一行转换为数字。但是，当此扩展用双引号引起来时，它会以单个字符串形式返回输出。
+
+@item $<@var{command}>
+与 @samp{$@{@var{command}@}} 一样，评估 Eshell 命令调用 @command{@var{command}}，但将输出写入临时文件并返回文件名。
+
+@item $@var{expr}[@var{i@dots{}}]
+扩展到 @var{expr} 结果的第 @var{i} 元素，这是此处列出的上述形式之一的表达式。  如果提供多个​​索引，这将返回一个包含每个索引的元素的列表。  确切的行为取决于 @var{expr} 值的类型：
+
+@table @asis
+
+@item 一个序列
+扩展到序列 (@pxref{Sequences Arrays Vectors, , , elisp, The Emacs Lisp Reference Manual}) 的（从零开始）索引 @var{i} 处的元素。  如果 2⁣ 为负数，则 3⁣ 从末尾开始计数，因此 -1 指的是序列的最后一个元素。
+
+如果 @var{i} 是一个类似于 @code{@var{start}..@var{end}} 的范围，则会扩展为从索引 @var{start} 到 @var{end} 的子序列，其中 @var{end} 被排除在外 @footnote{This behavior is different from ranges in Bash (where both the start and end are included in the range), but matches the behavior of similar Emacs Lisp functions, like @code{substring} (@pxref{Creating Strings, , , elisp, The Emacs Lisp Reference Manual}).}。  @var{start}和/或@var{end}也可以省略，相当于整个列表的开始和/或结束。  例如，@samp{$@var{expr}[-2..]} 扩展到 @var{expr} 的最后两个值。
+
+@item 一个字符串
+在空白处拆分字符串，然后扩展到结果序列的第 0 个元素。  如上所述，@var{i}可以是像@code{@var{start}..@var{end}}这样的范围。
+
+@item 一个列表
+如果 0⁣ 是非数字值，则扩展到与列表中键 @code{"@var{i}"} 关联的值。  例如，如果 @var{var} 为 @samp{(("dog" . "fido") ("cat" . "felix"))}，则 @samp{$@var{var}[dog]} 扩展为 @code{"fido"}。  否则，其行为与序列相同；例如，@samp{$@var{var}[0]} 扩展为 @code{("dog" . "fido")}。  @xref{Association List Type, Association Lists, , elisp, The Emacs Lisp Reference Manual}。
+
+@item 还要别的吗
+发出错误信号。
+
+@end table
+
+还可以指定多组索引。  例如，如果@var{var}是@samp{((1 2) (3 4))}，则@samp{$@var{var}[0][1]}将扩展到@code{2}，即@:第一个列表成员的第二个元素（所有索引都是从零开始的）。
+
+@item $@var{expr}[@var{regexp} @var{i@dots{}}]
+如上所述（当@var{expr}扩展为字符串时），但使用@var{regexp}来分割字符串。  @var{regexp} 可以是数字以外的任何形式。  例如，@samp{$@var{var}[: 0]} 将返回以冒号分隔的字符串的第一个元素。
+
+@cindex length operator, in variable expansion
+@item $#@var{expr}
+这是@dfn{length operator}。  它扩展到 @var{expr} 结果的长度，即上述形式之一的表达式。  例如，@samp{$#@var{var}}返回变量@var{var}的长度，@samp{$#@var{var}[0]}返回变量@var{var}的第一个元素的长度。  同样，如果 6⁣ 的结果不是字符串或序列，则发出错误信号。
+
+@cindex splice operator, in variable expansion
+@item $@@@var{expr}
+这是@dfn{splice operator}。  它将 @var{expr}（上述形式之一的表达式）的元素“拼接”到结果参数列表中，很像 Emacs Lisp 中的 @samp{,@@} 标记 (@pxref{Backquote, , , elisp, The Emacs Lisp Reference Manual})。 @var{expr} 的元素成为与其周围其他参数处于同一级别的参数。  例如，如果 @var{numbers} 是列表 @code{(1 2 3)}，则：
+
+@example
+@group
+~ $ echo 0 $numbers
+(0
+ (1 2 3))
+@end group
+@group
+~ $ echo 0 $@@numbers
+(0 1 2 3)
+@end group
+@end example
+
+@end table
+
+@node Globbing
+@section 通配符
+Eshell 的通配符语法与 Zsh (@pxref{Filename Generation, , , zsh, The Z Shell Manual}) 非常相似。  来自 Bash 的用户仍然可以使用 Bash 风格的通配符，因为不存在不兼容性。
+
+@vindex eshell-glob-case-insensitive
+默认情况下，Glob 区分大小写，MS-DOS/MS-Windows 系统除外。  您可以通过 @code{eshell-glob-case-insensitive} 选项控制此行为。
+
+@vindex eshell-glob-splice-results
+默认情况下，Eshell 将 glob 的结果作为子列表展开到参数列表中。  您可以通过将 @code{eshell-glob-splice-results} 设置为非 @code{nil} 值来更改此设置以就地拼接结果。  如果您只想就地拼接一个 glob 供一次使用，则可以使用像 2⁣ 这样的子命令形式。 （相反，您可以通过 @samp{$@{listify @var{my-glob}@}} 将 glob 显式扩展为子列表。）
+
+您可以通过自定义组@code{eshell-glob} (@pxref{Easy Customization, , , emacs, The GNU Emacs Manual}) 进一步自定义 Eshell 中的通配符语法和行为。
+
+@table @samp
+
+@item *
+匹配任何字符串（包括空字符串）。  例如，@samp{*.el} 匹配任何具有 @file{.el} 扩展名的文件。
+
+@item ?
+匹配任何单个字符。  例如，@samp{?at} 匹配@file{cat} 和@file{bat}，但不匹配@file{goat}。
+
+@item **/
+匹配文件名中的零个或多个子目录。  例如，@samp{**/foo.el} 匹配@file{foo.el}、@file{bar/foo.el}、@file{bar/baz/foo.el} 等。请注意，这不能与同一文件名段中的任何其他模式组合，因此虽然允许使用@samp{foo/**/bar.el}，但不允许使用@samp{foo**/bar.el}。
+
+@item ***/
+与 @samp{**/} 类似，但也遵循符号链接。
+
+@cindex character sets, in Eshell glob patterns
+@cindex character classes, in Eshell glob patterns
+@item [ @dots{} ]
+定义@dfn{character set} (@pxref{Regexps, , , emacs, The GNU Emacs Manual})。  字符集匹配两个括号之间的字符；例如，@samp{[ad]} 匹配 @file{a} 和 @file{d}。  您还可以通过使用 @samp{-} 分隔开始和结束来在集合中包含字符范围。  因此，@samp{[a-z]} 匹配任何小写的 @acronym{ASCII} 字母。  请注意，与 Zsh 不同，字符范围按 Unicode 代码点顺序解释，而不是按区域设置相关的排序规则顺序解释。
+
+此外，您可以在字符集中包含 @dfn{character classes}。  @samp{[:} 和平衡 @samp{:]} 将字符类包含在字符集中。  例如，@samp{[[:alnum:]]} 匹配任何字母或数字。  @xref{Char Classes, , , elisp, The Emacs Lisp Reference Manual}，用于字符类列表。
+
+@cindex complemented character sets, in Eshell glob patterns
+@item [^ @dots{} ]
+定义@dfn{complemented character set}。  它的行为就像字符集一样，但匹配指定的任何字符@emph{except}。
+
+@cindex groups, in Eshell glob patterns
+@item ( @dots{} )
+定义@dfn{group}。  组与 @samp{(} 和 @samp{)} 之间的模式匹配。  请注意，组只能匹配单个文件名组件，因此组内的 @samp{/} 将发出错误信号。
+
+@item @var{x}|@var{y}
+在组内部，匹配 @var{x} 或 @var{y}。  例如，@samp{e(m|sh)-*} 匹配任何以 @file{em-} 或 @file{esh-} 开头的文件。
+
+@item @var{x}#
+匹配零个或多个 glob 模式 @var{x} 的副本。  例如，@samp{fo#.el} 匹配@file{f.el}、@file{fo.el}、@file{foo.el} 等。
+
+@item @var{x}##
+匹配 glob 模式 @var{x} 的一个或多个副本。  因此，@samp{fo##.el} 匹配@file{fo.el}、@file{foo.el}、@file{fooo.el} 等，但不匹配@file{f.el}。
+
+@item @var{x}~@var{y}
+匹配与模式 @var{x} 匹配但不与 @var{y} 匹配的任何内容。  例如，@samp{[[:digit:]]#~4?} 匹配@file{1} 和@file{12}，但不匹配@file{42}。  请注意，与 Zsh 不同，模式中只能使用单个 @samp{~} 运算符，并且它不能位于像 @samp{(@var{x}~@var{y})} 这样的组内部。
+
+@end table
+
+@node Argument Predication and Modification
+@section 参数预测和修改
+@cindex argument predication
+@cindex argument modification
+Eshell 支持 @dfn{argument predication} 来过滤 glob 的元素，并支持 @dfn{argument modification} 来操作参数值。这些类似于 Zsh (@pxref{Glob Qualifiers, , , zsh, The Z Shell Manual}) 中的 glob 限定符。
+
+谓词和修饰符在任何列表参数后面用 @samp{(@var{filters})} 引入，其中 @var{filters} 是谓词或修饰符的列表。  例如， @samp{*(.)} 扩展到当前目录中的所有常规文件，而 @samp{*(^@@:U^u0)} 扩展到不属于 @code{root} 所有的大写非符号链接。
+
+一些谓词和修饰符接受字符串参数，例如 @samp{*(u'@var{user}')}，它匹配 @var{user} 拥有的所有文件。这些参数必须由分隔符包围；您可以使用以下任意一对分隔符：@code{"@dots{}"}、@code{'@dots{}'}、@code{/@dots{}/}、@code{|@dots{}|}、@code{(@dots{})}、@code{[@dots{}]}、@code{<@dots{}>} 或 @code{@{@dots{}@}}。
+
+您可以通过自定义组@code{eshell-pred} (@pxref{Easy Customization, , , emacs, The GNU Emacs Manual}) 自定义 Eshell 中谓词和修饰符的语法和行为。
+
+@menu
+* Argument Predicates::
+* Argument Modifiers::
+@end menu
+
+@node Argument Predicates
+@subsection 参数谓词
+您可以使用参数谓词根据文件的各种属性来过滤文件名列表。  这在与通配符结合使用时最有用，但可以用于任何文件名列表。  Eshell 支持以下参数谓词：
+
+@table @asis
+
+@item @samp{/}
+匹配目录。
+
+@item @samp{.} @r{(Period)}
+匹配常规文件。
+
+@item @samp{@@}
+匹配符号链接。
+
+@item @samp{=}
+匹配插座。
+
+@item @samp{p}
+匹配命名管道。
+
+@item @samp{%}
+匹配块或字符设备。
+
+@item @samp{%b}
+匹配块设备。
+
+@item @samp{%c}
+匹配字符设备。
+
+@item @samp{*}
+匹配当前用户可以执行的常规文件。
+
+@item @samp{r}
+@item @samp{A}
+@item @samp{R}
+匹配其所有者 (@samp{r})、其组 (@samp{A}) 或世界 (@samp{R}) 可读的文件。
+
+@item @samp{w}
+@item @samp{I}
+@item @samp{W}
+匹配其所有者 (@samp{w})、其组 (@samp{I}) 或世界 (@samp{W}) 可写的文件。
+
+@item @samp{x}
+@item @samp{E}
+@item @samp{X}
+匹配可由其所有者 (@samp{x})、其组 (@samp{E}) 或世界 (@samp{X}) 可执行的文件。
+
+@item @samp{s}
+匹配设置了 setuid 标志的文件。
+
+@item @samp{S}
+匹配设置了 setgid 标志的文件。
+
+@item @samp{t}
+匹配设置了粘性位的文件。
+
+@item @samp{U}
+匹配当前有效用户 ID 拥有的文件。
+
+@item @samp{G}
+匹配当前有效组 ID 拥有的文件。
+
+@item @samp{l@option{[+-]}@var{n}}
+匹配带有 @var{n} 链接的文件。  使用@option{+}（或@option{-}），分别匹配具有多于（或少于）@var{n} 链接的文件。
+
+@item @samp{u@var{uid}}
+@item @samp{u'@var{user-name}'}
+匹配用户 ID @var{uid} 或用户名 @var{user-name} 拥有的文件。
+
+@item @samp{g@var{gid}}
+@item @samp{g'@var{group-name}'}
+匹配组 ID @var{gid} 或组名称 @var{group-name} 拥有的文件。
+
+@item @samp{a@option{[@var{unit}]}@option{[+-]}@var{n}}
+@item @samp{a@option{[+-]}'@var{file}'}
+匹配上次访问的文件正好是 @var{n} 天前。  使用@option{+}（或@option{-}），分别匹配超过（或少于）@var{n} 天前访问的文件。
+
+对于 @var{unit}，@var{n} 是该时间单位的数量，因此 @samp{aw-1} 匹配一周内上次访问的文件。  @var{unit} 可以是@samp{M}（每月 30 天）、@samp{w}（周）、@samp{h}（小时）、@samp{m}（分钟）或@samp{s}（秒）。
+
+如果指定了@var{file}，则与@file{file}的修改时间进行比较。  因此，@samp{a-'hello.txt'} 匹配上次访问 @file{hello.txt} 之后访问的所有文件。
+
+@item @samp{m@option{[@var{unit}]}@option{[+-]}@var{n}}
+@item @samp{m@option{[+-]}'@var{file}'}
+与@samp{a}类似，但检查修改时间。
+
+@item @samp{c@option{[@var{unit}]}@option{[+-]}@var{n}}
+@item @samp{c@option{[+-]}'@var{file}'}
+与@samp{a}类似，但检查状态更改时间。
+
+@item @samp{L@option{[@var{unit}]}@option{[+-]}@var{n}}
+与大小恰好为 @var{n} 字节的文件匹配。  使用@option{+}（或@option{-}），分别匹配大于（或小于）@var{n} 字节的文件。
+
+对于 @var{unit}，@var{n} 是该大小单位的数量，因此 @samp{Lm+5} 匹配大小大于 5 MiB 的文件。  @var{unit} 可以是以下字符之一（不区分大小写）：@samp{m}（兆字节）、@samp{k}（千字节）或@samp{p}（512 字节块）。
+
+@end table
+
+@samp{^} 和 @samp{-} 运算符本身不是参数谓词，但它们修改所有后续谓词的行为。 @samp{^} 反转后续谓词的含义，因此 @samp{*(^RWX)} 扩展到其权限不允许外界以任何方式访问它们（即读取、写入或修改它们）的所有文件。  当检查符号链接时，@samp{-}将后续谓词应用于链接的目标而不是链接本身。
+
+@node Argument Modifiers
+@subsection 参数修饰符
+您可以使用参数修饰符来操作参数值。  例如，您可以对列表进行排序、删除重复值、将单词大写等。所有参数修饰符都以 @samp{:} 为前缀，因此 @samp{$exec-path(:h:u:x/^\/home/)} 列出 @code{exec-path} 中元素的所有唯一父目录，不包括 @file{/home} 中的元素。
+
+@table @samp
+
+@item E
+重新计算该值作为 Eshell 参数。  例如，如果@var{foo}为@code{"$@{echo hi@}"}，则@samp{$foo(:E)}的结果为@code{hi}。
+
+@item L
+将值转换为小写。
+
+@item U
+将值转换为大写。
+
+@item C
+将值资本化。
+
+@item h
+将值视为文件名，获取目录名（“头”）。  例如，@samp{foo/bar/baz.el(:h)} 扩展为@samp{foo/bar/}。
+
+@item t
+将值视为文件名，获取基本名称（“尾部”）。例如，@samp{foo/bar/baz.el(:t)} 扩展为@samp{baz.el}。
+
+@item e
+将该值视为文件名，获取文件的最终扩展名（不包括点）。  例如，@samp{foo.tar.gz(:e)} 扩展为@code{gz}。
+
+@item r
+将该值视为文件名，获取不包括最终扩展名的文件名。  例如，@samp{foo/bar/baz.tar.gz(:r)} 扩展为@samp{foo/bar/baz.tar}。
+
+@item s/@var{pattern}/@var{replace}/
+将正则表达式 @var{pattern} 的第一个实例替换为 @var{replace}。  如果未找到匹配项，则发出错误信号。
+
+与采用字符串参数的其他修饰符一样，您可以使用不同的分隔符来分隔 @var{pattern} 和 @var{replace}，例如 @samp{s'@dots{}'@dots{}'}、@samp{s[@dots{}][@dots{}]}，甚至@samp{s[@dots{}]/@dots{}/}。
+
+@item gs/@var{pattern}/@var{replace}/
+将正则表达式 @var{pattern} 的所有实例替换为 @var{replace}。
+
+@item i/@var{pattern}/
+过滤值列表以仅包含与正则表达式@var{pattern}匹配的元素。
+
+@item x/@var{pattern}/
+过滤值列表以排除与正则表达式@var{pattern}匹配的所有元素。
+
+@item S
+@item S/@var{pattern}/
+使用正则表达式 @var{pattern} 作为分隔符分割值。  如果省略 @var{pattern}，则按空格分割。
+
+@item j
+@item j/@var{delim}/
+连接值列表，在每个值之间插入字符串 @var{delim}。  如果省略 @var{delim}，则使用单个空格作为分隔符。
+
+@item o
+按字典顺序升序对字符串列表进行排序，根据字符代码 (@pxref{Text Comparison, , , elisp, The Emacs Lisp Reference Manual}) 比较字符对。
+
+@item O
+按字典顺序降序对字符串列表进行排序。
+
+@item u
+从值列表中删除任何重复的元素。
+
+@item R
+反转值列表的顺序。
+
+@end table
+
+@node Input/Output
+@chapter 输入/输出
+由于 Eshell 不像大多数命令 shell 那样与终端通信，因此 IO 略有不同。
+
+@menu
+* Visual Commands::
+* Redirection::
+* Pipelines::
+@end menu
+
+@node Visual Commands
+@section 视觉命令
+如果您尝试从 Eshell 中运行非面向行的程序（例如使用 ncurses 的程序），您将只会得到垃圾输出，因为 Eshell 缓冲区不是终端仿真器。 Eshell 通过在 Emacs 的终端模拟器中运行此类程序来解决这个问题。
+
+@vindex eshell-visual-commands
+@vindex eshell-visual-subcommands
+@vindex eshell-visual-options
+需要终端才能正确显示输出的程序在本手册中被称为“可视命令”，因为它们不仅仅是面向行的。  您必须通过将它们添加到 @code{eshell-visual-commands} 来告诉 Eshell 哪些命令是可视的；对于仅对某些@emph{sub}命令可见的命令——例如，@samp{git log}但不是@samp{git status}——使用@code{eshell-visual-subcommands}；对于仅在传递某些选项时才可见的命令，请使用@code{eshell-visual-options}。
+
+注意：某些工具（例如 Git）默认使用分页器 @samp{less} 对其输出进行分页，但使用其 @samp{-F} 选项调用它。  如果输出长度小于一页，此选项会导致 @samp{less} 回显输出而不是对其进行分页。  例如，如果 @samp{git diff} 被定义为可视子命令，这会导致不良行为。如果输出足够大，它就会工作；如果输出长度小于一页，它就会失败。  如果您遇到这种情况，请搜索不带 @samp{-F} 选项调用 @samp{less} 的配置选项。  对于 Git，您可以使用 @samp{git config --global core.pager 'less -+F'} 来做到这一点。
+
+@vindex eshell-destroy-buffer-when-process-dies
+如果您希望在程序退出时杀死可视化程序创建的缓冲区，请将变量 @code{eshell-destroy-buffer-when-process-dies} 自定义为非 @code{nil} 值；默认值为@code{nil}。
+
+@node Redirection
+@section 重定向
+Eshell 中的重定向与其他命令 shell 中的重定向类似。  您可以使用输出重定向运算符@code{>}和@code{>>}，但尚不支持输入重定向。  在以下情况下，@var{fd}指定要重定向的文件描述符；如果未指定，则默认使用文件描述符 1（标准输出）。
+
+@table @code
+
+@item > @var{dest}
+@itemx @var{fd}> @var{dest}
+将输出重定向到@var{dest}，用新输出覆盖其内容。
+
+@item >> @var{dest}
+@itemx @var{fd}>> @var{dest}
+将输出重定向到@var{dest}，将其附加到@var{dest}的现有内容。
+
+@item >>> @var{dest}
+@itemx @var{fd}>>> @var{dest}
+将输出重定向到 @var{dest}，如果 @var{dest} 是缓冲区，则将其插入到当前标记处；如果 @var{dest} 是文件，则将其插入到文件的开头，否则与 @code{>>} 的行为相同。
+
+@item &> @var{dest}
+@itemx >& @var{dest}
+将标准输出和标准错误重定向到@var{dest}，用新输出覆盖其内容。
+
+@item &>> @var{dest}
+@itemx >>& @var{dest}
+将标准输出和标准错误重定向到@var{dest}，并将其附加到@var{dest}的现有内容。
+
+@item &>>> @var{dest}
+@itemx >>>& @var{dest}
+将标准输出和标准错误重定向到 @var{dest}，像使用 @code{>>> @var{dest}} 一样插入它。
+
+@item >&@var{other-fd}
+@itemx @var{fd}>&@var{other-fd}
+将文件描述符 @var{other-fd} 复制到 @var{fd}（如果未指定，则为 1）。  使用的顺序很重要，所以
+
+@example
+@var{command} > @var{file} 2>&1
+@end example
+
+将标准输出和标准错误重定向到 @var{file}，而
+
+@example
+@var{command} 2>&1 > @var{file}
+@end example
+
+仅将标准输出重定向到@var{file}（并通过标准输出的原始句柄将标准错误发送到显示器）。
+
+@end table
+
+Eshell 支持将输出重定向到几种不同类型的目标：
+
+@itemize @bullet
+
+@item
+文件，包括虚拟目标（见下文）；
+
+@item
+缓冲区（@pxref{Buffers, , , elisp, GNU Emacs Lisp Reference Manual}）；
+
+@item
+标记（@pxref{Markers, , , elisp, GNU Emacs Lisp Reference Manual}）；
+
+@item
+进程（@pxref{Processes, , , elisp, GNU Emacs Lisp Reference Manual}）；和
+
+@item
+符号 (@pxref{Symbols, , , elisp, GNU Emacs Lisp Reference Manual})。
+
+@end itemize
+
+@subsection 虚拟目标
+虚拟目标是将设备名称映射到功能。  Eshell 附带四个虚拟设备：
+
+@table @file
+
+@item /dev/null
+对传递给它的输出不执行任何操作。
+
+@item /dev/eshell
+将传递给它的文本写入显示器。
+
+@item /dev/kill
+将传递给它的文本添加到终止环。
+
+@item /dev/clip
+将传递给它的文本添加到剪贴板。
+
+@end table
+
+@vindex eshell-virtual-targets
+@vindex eshell-generic-target
+@findex eshell-output-object-to-target
+@findex eshell-close-target
+当然，您可以定义自己的虚拟目标。  这些是 @code{eshell-virtual-targets} 中的条目，格式为 @samp{(@var{filename} @var{output-function} @var{pass-mode})}。  第一个元素 @var{filename} 是设备名称，通常采用 @samp{"/dev/@var{name}"} 形式。  第二个，@var{output-function}，应该是一个函数：Eshell 将使用重定向的输出重复调用它。该参数也可以是 @code{eshell-generic-target} 实例。  在这种情况下，Eshell 将重复调用通用函数 @code{eshell-output-object-to-target} 并输出；一旦重定向完成，Eshell 将调用通用函数@code{eshell-close-target}，如果重定向命令成功则传递非@code{nil}。
+
+如果@var{pass-mode}非-@code{nil}，则Eshell会将重定向模式作为参数传递给@code{output-function}作为符号：@code{overwrite}代表@code{>}，@code{append}代表@code{>>}，或@code{insert}代表@code{>>>}。  在这种情况下， 9⁣ 应返回实际输出函数（普通函数或如上所述的 10⁣ ）。
+
+@defun eshell-function-target-create output-function &optional close-function
+为 Eshell 创建一个新的虚拟目标，该目标使用重定向的输出重复调用 @var{output-function}，如上所述。如果@var{close-function}是非@code{nil}，Eshell将在关闭目标时调用它，如果重定向命令成功则传递非@code{nil}。
+@end defun
+
+@node Pipelines
+@section 管道
+与大多数其他 shell 一样，Eshell 支持管道将一个命令的输出传递给下一个命令的输入。  您可以使用 @code{|} 运算符将一个命令的标准输出发送到另一个命令的标准输入。  例如，
+
+@example
+~ $ echo hello | rev
+olleh
+@end example
+
+要将一个命令的标准输出和标准错误发送到另一个命令的输入，可以使用 @code{|&} 运算符。
+
+@subsection 本机运行 Shell 管道
+当构建要移动大量数据的 shell 管道时，最好绕过 Eshell 自己的管道支持并使用操作系统 shell 的支持。  当使用 Eshell 的 TRAMP 集成在远程计算机上执行命令时，这一点尤其重要：使用远程 shell 的管道可以避免将数据复制到本地 Emacs 缓冲区，然后再通过管道流到本地 Emacs 缓冲区。
+
+Eshell 识别一种特殊的语法，可以更轻松地转换管道，从而绕过 Eshell 的管道。  在至少一个 @code{|}、@code{<} 或 @code{>} 前面加上星号将命令标记为适用于操作系统 shell。  为了防止意外调用此功能，还要求星号前面有空格或位于输入的开头。  例如，
+
+@example
+ cat *.ogg *| my-cool-decoder >file
+@end example
+
+执行此命令不会像通常那样将 *.ogg 文件中的所有数据或解码后的数据复制到 Emacs 缓冲区中。
+
+该命令被解释为扩展到下一个 @code{|} 字符，该字符前面没有跟随着空格的未转义星号，或者如果没有这样的字符，则解释为输入的末尾。因此，在下一个不带星号前缀的 @code{|} 之前发生的所有 @code{<} 和 @code{>} 重定向都隐式地带有（空格和）星号前缀。  一个例外是命令末尾的特定于 Eshell 的重定向被排除。  这允许这样的输入：
+
+@example
+ foo *| baz >#<buffer quux>
+@end example
+
+@noindent which is equivalent to input like this:
+
+@example
+ sh -c "foo | baz" >#<buffer quux>
+@end example
+
+@node Interaction
+@chapter 相互作用
+
+作为交互式 shell，Eshell 包含许多有助于与命令环境交互的功能。  此外，由于 Eshell 是 Emacs 的一部分，因此所有常用的 Emacs 命令也可以在 Eshell 中运行。
+
+@menu
+* Navigation::
+* Completion::
+* History::
+@end menu
+
+@node Navigation
+@section 导航
+
+@table @kbd
+
+@kindex C-c C-n
+@kindex C-c C-p
+@item C-c C-n
+@itemx C-c C-p
+将点移至下一个或上一个提示的输入开头。  使用前缀参数，移动到第 n 个下一个或上一个提示。
+
+@kindex C-c C-r
+@kindex C-M-l
+@item C-c C-r
+@itemx C-M-l
+将点移动到上一个命令输出的开头并将其显示在窗口顶部。  使用前缀参数，这也会将区域缩小到最后一个命令的输出。
+
+@end table
+
+@node Completion
+@section 完成
+Eshell 使用 pcomplete 包进行可编程完成，类似于其他命令 shell。  参数补全因前面的命令而异：例如，@command{rmdir} 可能的补全仅是目录，而 @command{rm} 的补全可以是目录 @emph{and} 文件。  Eshell 为内置函数和一些常见的外部命令提供了预定义的补全，您可以为任何命令定义自己的补全。
+
+@kindex TAB
+Eshell 补全也适用于 Lisp 形式和 glob 模式。  如果该点位于 Lisp 形式上，则 @key{TAB} 的行为类似于 @code{elisp-mode} 和 @code{lisp-interaction-mode} 中的补全。  对于全局模式，模式将从输入行中删除，并由补全替换。
+
+@kindex M-?
+如果您想查看可能完成的完整列表（例如，当它位于@code{completion-cycle-threshold}下方时），请按@kbd{M-?}。
+
+@subsection 完成
+Pcomplete是可编程完成的缩写，是最初为Eshell编写的完成库，但可用于其他模式下的命令完成@footnote{Command completion, as opposed to code completion, which is beyond the scope of pcomplete.}。
+
+补全被定义为名为 1⁣ 的函数（带有 0⁣），其中 2⁣ 是该函数为其提供补全的命令的名称；您还可以将函数命名为 ⁣​​3⁣ 来定义特定主要模式的完成。
+
+@node History
+@section 历史
+@cmindex history
+@vindex eshell-history-size
+@samp{history} 命令将历史记录环中保存的所有命令显示为编号列表。  如果历史环包含 @code{eshell-history-size} 命令，则这些数字在每次命令调用后都会发生变化，因此应在使用具有历史编号的扩展机制之前应用 @samp{history} 命令。
+
+历史环的第 n 个条目可以使用 @samp{!n} 命令应用。  如果 1⁣ 为负，则从历史环末尾开始计数。
+
+@cindex event designators
+@findex eshell-expand-history-references
+当启用历史事件指示符时（通过将 @code{eshell-expand-history-references} 添加到 @code{eshell-expand-input-functions}），@samp{!foo} 扩展到以 @code{foo} 开头的最后一个命令，@samp{!?foo} 扩展到包含 @code{foo} 的最后一个命令。  以 @code{foo} 开头的最后一个命令的第 n 个参数可以通过 @code{!foo:n} 访问。
+
+@vindex eshell-history-file-name
+@vindex eshell-history-append
+在每个会话开始时，历史记录都会从文件 @code{eshell-history-file-name} 加载到历史记录环中，并在每个会话结束时保存到该文件中。  默认历史记录保存行为是用会话的整个历史记录环覆盖历史文件。  如果@code{eshell-history-append}非@code{nil}，则将通过将会话中的新条目附加到历史文件来保存历史记录，这可以防止多个 Eshell 会话潜在的历史记录丢失。  与其他 shell（例如 Bash）不同，Eshell 目前无法配置为控制历史文件的大小。  特别是，当@code{eshell-history-append}为非@code{nil}时，文件的大小将不断增加，建议截断文件的方法是在Eshell会话中运行@samp{history -w}命令。
+
+由于默认的缓冲区导航和搜索键绑定仍然存在于 Eshell 缓冲区中，因此历史导航和搜索的命令绑定到不同的键：
+
+@table @kbd
+@kindex M-r
+@item M-r
+历史我搜索。  @kbd{M-r} 在输入历史记录中开始增量搜索。  搜索时，输入 @kbd{C-r} 移动到上一个匹配项，输入 @kbd{C-s} 移动到输入历史记录中的下一个匹配项。
+
+@kindex M-p
+@kindex M-n
+@item M-p
+@itemx M-n
+上一条和下一条历史记录线。  如果运行这些命令时输入行上有任何内容，它们将跳转到以该字符串开头的上一行或下一行。
+@end table
+
+@vindex eshell-history-isearch
+如果您想使用默认的 Isearch 键绑定来搜索输入历史记录，您可以将 @code{eshell-history-isearch} 自定义为 @code{t}。  例如，这使得 Eshell 缓冲区中的 @kbd{C-r} 和 @kbd{C-M-r} 仅在输入历史记录中搜索。  另外，如果@code{eshell-history-isearch}的值为@code{dwim}，则当该点在最后一个提示之后时，这些命令在历史记录中搜索，当该点在最后一个提示之前或之内时，这些命令在缓冲区中搜索。
+
+@node Extension modules
+@chapter 扩展模块
+Eshell 提供了定义扩展模块的工具，以便可以禁用和启用它们，而无需卸载和重新加载它们，并为模块提供公共父级自定义组。@footnote{ERC provides a similar module facility.}
+
+@menu
+* Optional modules::
+* Writing a module::
+@end menu
+
+@node Optional modules
+@section 可选模块
+
+@vindex eshell-modules-list
+除了默认启用的各种模块（如上所述）之外，Eshell 还提供了其他几个默认启用的模块 @emph{not} 。  如果您想启用这些，可以将它们添加到@code{eshell-modules-list}。
+
+@menu
+* Key rebinding::
+* Smart scrolling::
+* Electric forward slash::
+* Tramp extensions::
+* Extra built-in commands::
+@end menu
+
+@node Key rebinding
+@subsection 按键重新绑定
+
+该模块允许特殊的键绑定，仅当该点位于输入文本区域时才生效。  当用户编辑新的输入文本时，默认的键绑定模仿其他 shell 中使用的绑定。  要启用此模块，请将@code{eshell-rebind}添加到@code{eshell-modules-list}。
+
+@kindex C-u
+@kindex C-w
+@kindex C-p
+@kindex C-n
+例如，它绑定 @kbd{C-u} 来终止当前输入文本，并将 @kbd{C-w} 绑定到 @code{backward-kill-word}。  如果启用了历史记录模块，它还会绑定 @kbd{C-p} 和 @kbd{C-n} 在输入历史记录中移动。
+
+@vindex eshell-confine-point-to-input
+如果@code{eshell-confine-point-to-input}非@code{nil}，该模块会阻止某些命令导致点离开输入区域，例如@code{backward-word}、@code{previous-line}等。
+
+@node Smart scrolling
+@subsection 智能滚动
+
+该模块将普通、现代 shell 的功能与 Plan 9 的 9term 设计中固有的一些编辑/审查概念结合起来。要启用它，请将@code{eshell-smart}添加到@code{eshell-modules-list}。
+
+@itemize @bullet
+@item
+当您调用命令时，假定您想要读取该命令的输出。
+
+@item
+如果输出不是您想要的，则假定您需要编辑，然后重新提交该命令的改进版本。
+
+@item
+如果输出有效，按任何自插入字符键将跳转到缓冲区末尾并插入该字符，以便开始输入新命令。
+
+@item
+如果您表现出编辑前一个命令的意图（通过在其中移动），那么下一个自插入字符将插入*那里*，而不是在缓冲区的底部。
+
+@item
+如果您打算查看旧命令，例如 @kbd{M-p} 或 @kbd{M-r}，则在调用该命令之前，point 将跳转到缓冲区的底部。
+
+@item
+如果上述情况都没有发生（即@:您的点只是位于上一个命令上），您可以使用@kbd{SPC}和@kbd{BACKSPACE}（或@kbd{Delete}）向前和向后翻页@emph{through the output of the last command only}。  它将限制点和窗口的移动，以便始终显示最大输出量。
+
+@item
+当从命令生成输出时，窗口将不断地重新配置（直到它没有任何区别），以便始终向您显示命令的尽可能多的输出。如果您更改窗口大小、滚动等，就会发生这种情况。
+@end itemize
+
+@node Electric forward slash
+@subsection 电动正斜线
+
+为了帮助向远程命令提供绝对文件名参数，您可以将 @code{eshell-elecslash} 模块添加到 @code{eshell-modules-list}。  然后，输入 @kbd{/} 作为命令行参数的第一个字符将自动插入 TRAMP 前缀 @file{/method:host:}。  如果这不是您想要的（例如@:因为您想引用本地文件），您可以键入另一个@kbd{/}来撤消自动插入。  输入 @kbd{~/} 也会插入 TRAMP 前缀。  仅当@code{default-directory}是远程且命令是 Lisp 函数时，自动插入才适用。特别是，输入外部命令的参数不会插入前缀。
+
+结果是，在大多数情况下，向命令提供绝对文件名参数时，您应该会看到仅当您合理期望时才会自动插入 TRAMP 前缀。  这使您在输入命令行参数时不必跟踪命令是 Lisp 函数还是外部命令。  例如，假设您执行
+
+@example
+ cd /ssh:root@@example.com:
+ find /etc -name "*gnu*"
+@end example
+
+@noindent and in reviewing the output of the command, you identify a
+文件 @file{/etc/gnugnu} 应该移动到其他地方。  所以你输入
+
+@example
+ mv /etc/gnugnu /tmp
+@end example
+
+@noindent But since @command{mv} refers to the local Lisp function
+@code{eshell/mv}，不是远程shell命令，也就是说这是请求将本地文件@file{/etc/gnugnu}移动到本地@file{/tmp}目录中。  将 @code{eshell-elecslash} 添加到 @code{eshell-modules-list} 后，当您键入上述 @command{mv} 调用时，您将获得以下输入，这正是您想要的：
+
+@example
+ mv /ssh:root@@example.com:/etc/gnugnu /ssh:root@@example.com:/tmp
+@end example
+
+确定是否应插入 TRAMP 前缀的代码使用简单的启发法。  当前实现的一个限制是它仅检查输入最开始的命令是 Lisp 函数还是外部程序。  因此，当使用运算符 @code{&&}、@code{||}、@code{|} 和 @code{;} 链接命令时，电动正斜杠仅在第一个命令内有效。
+
+@node Tramp extensions
+@subsection 流浪汉扩展
+
+该模块添加了使用 TRAMP 来处理以不同用户身份运行其他命令的内置命令，替换了相应的外部命令。  要启用它，请将@code{eshell-tramp}添加到@code{eshell-modules-list}。
+
+@table @code
+
+@cmindex su
+@item su [- | -l] [@var{user}]
+使用 TRAMP 的 @command{su} 方法 (@pxref{Inline methods, , , tramp, The Tramp Manual}) 将当前用户更改为 @var{user}（如果未指定，则为 root）。  使用@code{-}、@code{-l}或@code{--login}提供登录环境。
+
+@cmindex sudo
+@item sudo [-u @var{user}] [-s | @var{command}@dots{}]
+@cmindex doas
+@itemx doas [-u @var{user}] [-s | @var{command}@dots{}]
+使用 TRAMP 的 @command{sudo} 或 @command{doas} 方法 (@pxref{Inline methods, , , tramp, The Tramp Manual}) 通过 @command{sudo} 或 @command{doas} 以 root 身份运行 @var{command}。  当指定 @code{-u @var{user}} 或 @code{--user @var{user}} 时，请改为运行命令 @var{user}。  使用 @code{-s} 或 @code{--shell}，启动 shell 而不是运行 @var{command}。
+
+@end table
+
+@node Extra built-in commands
+@subsection 额外的内置命令
+
+该模块提供了下面记录的几个额外的内置命令，主要用于在 Eshell 中处理字符串列表。  要启用它，请将@code{eshell-xtra}添加到@code{eshell-modules-list}。
+
+@table @code
+
+@cmindex count
+@item count @var{item} @var{seq} [@var{option}]@dots{}
+函数 @code{cl-count} (@pxref{Searching Sequences,,, cl, GNU Emacs Common Lisp Emulation}) 的包装器。  该命令可用于比较字符串列表。
+
+@cmindex expr
+@item expr @var{str} [@var{separator}] [@var{arg}]@dots{}
+使用 Calc 包实现 @command{expr}。 @xref{Top,,, calc, The GNU Emacs Calculator}。
+
+@cmindex ff
+@item ff @var{directory} @var{pattern}
+函数 @code{find-name-dired} (@pxref{Dired and Find, , , emacs, The Emacs Editor}) 的简写。
+
+@cmindex gf
+@item gf @var{directory} @var{regexp}
+函数 @code{find-grep-dired} (@pxref{Dired and Find, , , emacs, The Emacs Editor}) 的简写。
+
+@cmindex intersection
+@item intersection @var{list1} @var{list2} [@var{option}]@dots{}
+函数 @code{cl-intersection} (@pxref{Lists as Sets,,, cl, GNU Emacs Common Lisp Emulation}) 的包装器。  该命令可用于比较字符串列表。
+
+@cmindex mismatch
+@item mismatch @var{seq1} @var{seq2} [@var{option}]@dots{}
+函数 @code{cl-mismatch} (@pxref{Searching Sequences,,, cl, GNU Emacs Common Lisp Emulation}) 的包装器。  该命令可用于比较字符串列表。
+
+@cmindex set-difference
+@item set-difference @var{list1} @var{list2} [@var{option}]@dots{}
+函数 @code{cl-set-difference} (@pxref{Lists as Sets,,, cl, GNU Emacs Common Lisp Emulation}) 的包装器。  该命令可用于比较字符串列表。
+
+@cmindex set-exclusive-or
+@item set-exclusive-or @var{list1} @var{list2} [@var{option}]@dots{}
+函数 @code{cl-set-exclusive-or} (@pxref{Lists as Sets,,, cl, GNU Emacs Common Lisp Emulation}) 的包装器。  该命令可用于比较字符串列表。
+
+@cmindex substitute
+@item substitute @var{new} @var{old} @var{seq} [@var{option}]@dots{}
+函数 @code{cl-substitute} (@pxref{Sequence Functions,,, cl, GNU Emacs Common Lisp Emulation}) 的包装器。  该命令可用于比较字符串列表。
+
+@cmindex union
+@item union @var{list1} @var{list2} [@var{option}]@dots{}
+函数 @code{cl-union} (@pxref{Lists as Sets,,, cl, GNU Emacs Common Lisp Emulation}) 的包装器。  该命令可用于比较字符串列表。
+
+@end table
+
+@node Writing a module
+@section 编写模块
+
+Eshell 模块的定义与任何其他库相同，但有两个附加要求：首先，模块的源文件应命名为@file{em-@var{name}.el}；其次，模块必须定义一个自动加载的自定义组 (@pxref{Customization, , , elisp, The Emacs Lisp Reference Manual})，并将 @code{eshell-module} 作为父组。为了正确自动加载该组，您应该使用 @code{progn} 包装其定义，如下所示：
+
+@example
+;;;###autoload
+(progn
+(defgroup eshell-my-module nil
+  "My module lets you do very cool things in Eshell."
+  :tag "My module"
+  :group 'eshell-module))
+@end example
+
+即使您的模块中没有任何自定义选项，您仍然应该定义该组，以便 Eshell 可以将您的模块包含在 @code{eshell-modules-list} 的自定义界面中。
+
+@node Bugs and ideas
+@chapter 错误和想法
+@cindex reporting bugs and ideas
+@cindex bugs, how to report them
+@cindex author, how to reach
+@cindex email to the author
+@cindex FAQ
+@cindex problems, list of common
+@cindex known bugs
+@cindex bugs, known
+
+如果您发现错误或功能异常，请立即使用 @kbd{M-x report-emacs-bug} 报告。  这同样适用于功能请求。最好一次只讨论一件事。  如果您发现多个不相关的错误，请分别报告。
+
+@ignore
+If you have ideas for improvements, or if you have written some
+extensions to this package, I would like to hear from you.  I hope you
+find this package useful!
+@end ignore
+
+下面列出了 Eshell 2.4.2 版（Emacs 22 附带的版本）的一些已知问题。
+
+@table @asis
+@item 区分别名和函数
+
+允许使用与 Bash 兼容的语法，例如：
+
+@example
+alias arg=blah
+function arg () @{ blah $@@* @}
+@end example
+
+@item Pcomplete 有时会卡住
+
+您按 @key{TAB}，但不会出现任何补全，即使该目录有匹配的文件。  这种行为很少见。
+
+@item @samp{grep python $<rpm -qa>} 不起作用，但使用 @samp{*grep} 可以
+
+发生这种情况是因为 @code{grep} Lisp 函数立即返回，然后异步 @command{grep} 进程期望检查已被删除的临时文件。
+
+@item 继续后退格键不会向后滚动（在智能模式下）
+
+在进程调用期间点击空格（例如 @command{make}）将导致它跟踪输出的底部；但退格键不再向后滚动。
+
+@item 菜单支持已被删除，但从未放回
+
+@item 如果当前正在运行交互式进程，@kbd{M-!} 不起作用
+
+@item 杀死子进程时使用计时器而不是 @code{sleep-for}
+
+@item 不支持通过管道传输到 Lisp 函数
+
+以便以输入字符串作为参数重复调用管道右侧的 Lisp 命令。  这将需要更改 @code{eshell-do-pipelines} 来处理非进程目标。
+
+@item 不支持输入重定向
+
+请参阅上面的条目。
+
+@item 在 Windows 上运行不带参数的 @command{less} 时出现问题
+
+Eshell缓冲区中的结果是：
+
+@example
+Spawning child process: invalid argument
+@end example
+
+还创建了一个新的@command{less}缓冲区，其中没有任何内容@dots{}（大概它保存了@command{less}的输出）。
+
+如果从 Eshell 命令行调用 @command{less.exe}，则预期输出将写入缓冲区。
+
+请注意，这种情况发生在 Windows 2000 上的 NT-Emacs 20.6.1 上。 term.el 包和提供的 shell 都使用 @command{cmdproxy} 程序来运行 shell。
+
+@item 为 @command{cp} 实现 @samp{-r}、@samp{-n} 和 @samp{-s} 开关
+
+@item @samp{mv @var{dir} @var{file}.tar} 不删除目录
+
+这是因为 tar 选项 --remove-files 不会执行此操作。  这应该是 Eshell 的工作吗？
+
+@item 绑定 @code{standard-output} 和 @code{standard-error}
+
+这样，如果 Lisp 函数调用 @code{print}，一切都会按其应有的方式发生（尽管很慢）。
+
+@item 确保 Eshell 模式下语法表正确
+
+因此 @kbd{M-@key{DEL}} 以可预测的方式起作用，等等。
+
+@item 允许所有 Eshell 缓冲区共享相同的历史记录和列表目录
+
+@item 拆分@file{esh-var.el}中@samp{$}之后的文本解析
+
+使其类似于 @file{esh-arg.el} 的结构方式。然后添加@samp{$[?\n]}的解析。
+
+@item 按@kbd{M-@key{RET}}后，在运行下一个命令之前重新显示
+
+@item 参数谓词和修饰符应该在路径中的任何位置工作
+
+@example
+/usr/local/src/editors/vim $ vi **/CVS(/)/Root(.)  Invalid regexp:
+"Unmatched ( or \\("
+@end example
+
+使用 @command{zsh}，上面的 glob 将扩展到名为 @file{CVS} 的目录中名为 @file{Root} 的所有文件。
+
+@item 输入 @samp{echo $@{locate locate@}/bin@key{TAB}} 会导致 Lisp 错误
+
+也许它应该插入所有排列，并使其成为通配结果，因为否则在此处点击 return 将导致“（文件名列表）/bin”，这永远没有价值。  因此，使用@samp{ls $@{identity *.c@}~}只能备份@command{cat}C个文件。在这种情况下，为 3⁣ 指定一个别名命令名称 @command{glob} 会很有用。
+
+@item 一旦 @command{umask} 支持符号模式，就可以在 Lisp 中实现 @command{chmod}
+
+@item 创建@code{eshell-expand-file-name}
+
+这将使用数据表来转换诸如 @samp{~+}、@samp{...} 等内容。
+
+@item 将@file{em-smart.el}抽象为@file{smart-scroll.el}
+
+它实际上只需要：挂钩到输出过滤器和预命令挂钩，并具有输入结束和输入开始标记。并了解最后一个输出组是否“成功”。
+
+@item 允许完全保留 Eshell 的状态
+
+这包括：变量、历史记录、缓冲区、输入、目录堆栈等。
+
+@item 实现 D 作为参数谓词
+
+这意味着以点开头的文件应包含在全局匹配中。
+
+@item 谓词列表中的逗号应表示 OR
+
+目前，尚不支持此操作。
+
+@item @samp{(+ @key{RET} @key{SPC} @key{TAB}} 不会导致 @code{indent-according-to-mode} 发生
+
+@item 创建@code{eshell-auto-accumulate-list}
+
+这是一个命令列表，如果用户按 @kbd{RET}，则文本将暂存为下一个 Eshell 命令，而不是发送到当前的交互进程。
+
+@item 如果脚本中发生错误，则显示文件和行号
+
+@item 在@file{em-term.el}中启用直接处理输入代码
+
+@item 重复问题@samp{echo $@{find /tmp@}}
+
+当智能显示处于活动状态时，如果按住@kbd{RET}，一段时间后它就无法跟上并开始输出空行。  仅当涉及异步进程时才会发生@dots{}
+
+我认为问题在于 @code{eshell-send-input} 正在重置输入目标位置，因此，如果在接收到下一个 @kbd{RET} 时异步过程尚未完成，输入处理器会认为该输入是用于该过程的；当启用智能显示时，这将是最后一个命令行的文本！  这本身就是一个错误。
+
+在异步进程运行时按住@kbd{RET}，进程终止和@code{eshell-post-command-hook}运行之间会有一个点，这将导致@code{eshell-send-input}调用@code{eshell-copy-old-input}，然后将该文本作为要在进程之后运行的命令进行处理。  也许应该有一种方法可以在进程死亡和 @code{post-command-hook} 之间终止待处理的输入。
+
+@item 允许更积极的智能显示模式
+
+也许通过命令切换，这使得每个输出块成为智能显示块。
+
+@item 创建更多元变量
+
+@table @samp
+@item $!
+最后一个磁盘命令失败的原因，或者最后一个 Lisp 错误的文本。
+
+@item $=
+一个特殊的关联数组，它可以采用@samp{$=[REGEXP]}形式的引用。  它索引到目录环中。
+@end table
+
+@item Support zsh's ``Parameter Expansion'' syntax, i.e., @samp{$@{@var{name}:-@var{val}@}}
+
+@item Create a mode @code{eshell-browse}
+
+它将 Eshell 缓冲区视为轮廓。  折叠轮廓会隐藏所有输出文本。  再次折叠将仅显示每个目录中运行的第一个命令
+
+@item Allow other revisions of a file to be referenced using @samp{file@{rev@}}
+
+这将扩展 @code{eshell-expand-file-name}（见上文）。
+
+@item Print ``You have new mail'' when the ``Mail'' icon is turned on
+
+@item Implement @kbd{M-|} for Eshell
+
+@item Implement input redirection
+
+如果它是一个 Lisp 函数，输入重定向意味着@command{xargs}（在某种程度上@dots{}）。  如果添加了输入重定向，还需更新 @code{file-name-quote-list} 和分隔符列表。
+
+@item In @code{eshell-eval-using-options}, allow a @code{:complete} tag
+
+它将用于提供该命令的完成规则。  然后宏会自动定义完成函数。
+
+@item For @code{eshell-command-on-region}, apply redirections to the result
+
+因此 @samp{+ > 'blah} 会导致 @code{+} 的结果（使用当前区域的输入）插入到符号 @code{blah} 中。
+
+如果调用外部命令，则输入将作为标准输入发送，就像调用了 @samp{cat <region> |} 一样。
+
+如果调用 Lisp 命令或别名，则如果该行没有换行符，则会被空格分隔并作为参数传递给 Lisp 函数。  否则，将在换行符处进行划分。  因此，对一系列数字调用 @code{+} 会将它们相加； @code{min} 将显示最小的数字等。
+
+@item Write @code{eshell-script-mode} as a minor mode
+
+它将提供语法、缩写、突出显示和缩进支持，如@code{emacs-lisp-mode}和@code{shell-mode}。
+
+@item In the history mechanism, finish the Bash-style support
+
+这意味着 @samp{!n}、@samp{!#}、@samp{!:%} 和 @samp{!:1-} 与 @samp{!:1*} 分开。
+
+@item Support the -n command line option for @command{history}
+
+@item Implement @command{fc} in Lisp
+
+@item Specifying a frame as a redirection target should imply the currently active window's buffer
+
+@item Implement @samp{>@var{func-or-func-list}}
+
+这将允许“输出翻译器”，它采用一个修改输出的函数和一个目标。  设计一种与管道配合良好的语法，并且可以容纳多个函数（即 @samp{>'(upcase regexp-quote)} 或 @samp{>'upcase}）。
+
+@item Allow Eshell to read/write to/from standard input and output
+
+这是可选的，而不是总是使用 Eshell 缓冲区。这将允许它从命令行运行（也许）。
+
+@item Write a @command{help} command
+
+它将根据需要使用 @option{--help}、@option{-h} 或 @option{/?} 调用子命令。
+
+@item Implement @command{stty} in Lisp
+
+@item Support @command{rc}'s matching operator, e.g., @samp{~ (@var{list}) @var{regexp}}
+
+@item Implement @command{bg} and @command{fg} as editors of @code{eshell-process-list}
+
+在已经在后台的进程上使用 @command{bg} 没有任何作用。  指定重定向目标将替换（或添加）到当前正在使用的列表中。
+
+@item Have @command{jobs} print only the processes for the current shell
+
+@item How can Eshell learn if a background process has requested input?
+
+@item Make a customizable syntax table for redirects
+
+这样，用户可以将其更改为使用 rc 语法：@samp{>[2=1]}。
+
+@item Copy ANSI code handling from @file{term.el} into @file{em-term.el}
+
+使用户可以将字符逐个字符发送到底层进程。  最终，我应该能够完全放弃使用 term.el，因为除了 ANSI 代码处理之外的所有内容都已经是 Eshell 的一部分。  然后，在 MS-Windows 上也能正常工作（它没有 @file{/bin/sh}，尽管 @file{term.el} 尝试使用它）。
+
+@item Make the shell spawning commands be visual
+
+也就是说，使 (@command{su}、@command{bash}、@command{ssh} 等)@: 成为 @code{eshell-visual-commands} 的一部分。  唯一的例外是 shell 用于调用单个命令。  然后，行为应该基于该命令的内容。
+
+@item Create a smart viewing command named @command{open}
+
+这将搜索某种方式来打开其参数（类似于在 Windows 资源管理器中打开文件）。
+
+@item Alias @command{read} to be the same as @command{open}, only read-only
+
+@item Write a @command{tail} command which uses @code{view-file}
+
+它将指针移动到缓冲区的末尾，然后以频繁的间隔在该缓冲区中打开自动恢复模式——以及一个 @command{head} 别名，假定每行的上限为 @code{eshell-maximum-line-length} 字符。
+
+@item Make @command{dgrep} load @code{dired}, mark everything, then invoke @code{dired-do-search}
+
+@item Write @file{mesh.c}
+
+这将使用适当的参数运行 Emacs 以仅调用 Eshell。  这样，它就可以被列为登录 shell。
+
+@item Use an intangible @code{PS2} string for multi-line input prompts
+
+@item Auto-detect when a command is visual, by checking @code{TERMCAP} usage
+
+@item The first keypress after @kbd{M-x watson} triggers
+@code{eshell-send-input}
+
+@item Make @kbd{/} more electric
+
+@noindent so that it automatically expands and corrects file names,
+超出了 @code{em-elecslash} 模块的能力范围。  或者为 Pcomplete 自动扩展 @samp{/u/i/std@key{TAB}} 到 @samp{/usr/include/std@key{TAB}} 进行文件名补全。
+
+@item Write the @command{pushd} stack to disk along with @code{last-dir-ring}
+
+@item Add options to @code{eshell/cat} which would allow it to sort and uniq
+
+@item Implement @command{wc} in Lisp
+
+添加对句子、段落、页数等的计数支持。
+
+@item Once piping is added, implement @command{sort} and @command{uniq} in Lisp
+
+@item Implement @command{touch} in Lisp
+
+@item Implement @command{comm} in Lisp
+
+@item Implement an @command{epatch} command in Lisp
+
+这将调用 @code{ediff-patch-file} 或 @code{ediff-patch-buffer}，具体取决于其参数。
+
+@item Have an option such that @samp{ls -l} generates a dired buffer
+
+@item Write a version of @command{xargs} based on command rewriting
+
+也就是说，@samp{find X | xargs Y}将使用@samp{Y $@{find X@}}来表示。  也许可以更改 2⁣ 来执行这种即时重写。
+
+@item Write an alias for @command{less} that brings up a @code{view-mode} buffer
+
+这样用户可以按@key{SPC}和@key{DEL}，然后按@kbd{q}返回Eshell。  它相当于：@samp{X > #<buffer Y>; view-buffer #<buffer Y>}。
+
+@item Make @code{eshell-mode} as much a full citizen as @code{shell-mode}
+
+在 Emacs 中凡是特别注意到 @code{shell-mode} 的地方，都添加 @code{eshell-mode} 。
+
+@item Permit the umask to be selectively set on a @command{cp} target
+
+@item @kbd{M-@key{RET}} during a long command (using smart display) doesn't work
+
+因为它将光标保持在调用命令的位置。
+
+@end table
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Concept Index
+@unnumbered 概念索引
+
+@printindex cp
+
+@node Function and Variable Index
+@unnumbered 函数和变量索引
+
+@printindex fn
+
+@node Command Index
+@unnumbered 命令索引
+
+@printindex cm
+
+@node Key Index
+@unnumbered 关键指标
+
+@printindex ky
+
+@bye

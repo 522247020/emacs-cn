@@ -1,0 +1,5180 @@
+\输入 texinfo @c -*- 模式：texinfo；编码：utf-8 -*-
+@setfilename ../../info/tramp.info
+@c %**start of header
+@include docstyle.texi
+@c In the Tramp GIT, the version number and the bug report address
+@c are auto-frobbed from configure.ac.
+@include trampver.texi
+@settitle @value{tramp} @value{trampver} 用户手册
+@documentlanguage en
+@c %**end of header
+
+@c This is *so* much nicer :)
+@footnotestyle end
+
+@copying
+版权所有 @copyright{} 1999--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@c Entries for @command{install-info} to use.  We cannot use @value{tramp}.
+@dircategory Emacs network features
+@direntry
+* Tramp: (tramp).                透明远程访问，多协议 Emacs 通过 ssh 和 scp 远程文件访问。
+@end direntry
+
+@titlepage
+@title @value{tramp} @value{trampver} 用户手册
+@author by Daniel Pittman
+@author based on documentation by Kai Großjohann
+@end titlepage
+
+@contents
+
+
+@node Top, Overview, (dir), (dir)
+@top @value{tramp} @value{trampver} 用户手册
+
+该文件记录了@w{@value{tramp} @value{trampver}}，一个用于 Emacs 的远程文件编辑包。
+
+@value{tramp} 代表“透明远程（文件）访问，多协议”。  该软件包提供了一个简单、方便且一致的界面来透明地编辑远程文件，就像它们是本地文件一样。  这扩展到编辑、版本控制、@code{dired} 等等。
+
+您可以在网站@uref{@value{trampurl}} 上找到本文档的最新版本。
+
+@ifhtml
+The latest release of @value{tramp} is available for
+@uref{https://ftp.gnu.org/gnu/tramp/, download}, or you may see
+@ref{Obtaining @value{tramp}} for more details, including the Git
+server details.
+
+@value{tramp} also has a @uref{https://savannah.gnu.org/projects/tramp/,
+Savannah Project Page}.
+@end ifhtml
+
+有一个 @value{tramp} 的邮件列表，可在 @email{@value{tramp-bug-report-address}} 获取，并存档在 @uref{https://lists.gnu.org/r/tramp-devel/, the @value{tramp} Mail Archive}。
+
+@page
+@insertcopying
+
+@menu
+* Overview::                     @value{tramp} 能做什么，不能做什么。
+
+对于最终用户：
+
+* Obtaining @value{tramp}::              如何获得@value{tramp}。
+@ifset installchapter
+* Installation::                 使用 Emacs 安装 @value{tramp}。
+@end ifset
+* Quick Start Guide::            简短介绍如何使用@value{tramp}。
+* Configuration::                配置@value{tramp}以供使用。
+* Usage::                        @value{tramp} 操作概述。
+* Bug Reports::                  报告错误和问题。
+* Frequently Asked Questions::   邮件列表中的问题和解答。
+
+对于开发商来说：
+
+* Files directories and localnames:: 文件名、目录和本地名称如何被破坏和管理。
+* Traces and Profiles::          如何自定义轨迹。
+
+* GNU Free Documentation License::  本文档的许可证。
+* Function Index::               @value{tramp}函数。
+* Variable Index::               用户选项和变量。
+* Key Index::                    @value{tramp} 命令的按键绑定。
+* Concept Index::                每个概念都有一个项目。
+
+@detailmenu
+--- 详细节点列表 ---
+@c
+@ifset installchapter
+
+使用 Emacs 安装 @value{tramp}
+
+* System Requirements::          @value{tramp} 安装的先决条件。
+* Basic Installation::           安装步骤。
+* Installation parameters::      参数以便控制安装。
+* Testing::                      @value{tramp} 的测试套件。
+* Load paths::                   如何将 @value{tramp} 插入您的环境中。
+@end ifset
+
+配置@value{tramp}以供使用
+
+* Optional methods::             必须首先启用的可选方法。
+* Connection types::             与远程主机的连接类型。
+* Inline methods::               内联方法。
+* External methods::             外部方法。
+* GVFS-based methods::           基于 @acronym{GVFS} 的外部方法。
+* FUSE-based methods::           基于 @acronym{FUSE} 的外部方法。
+* Default Method::               选择默认方法。
+* Default User::                 选择默认用户。
+* Default Host::                 选择默认主机。
+* Multi-hops::                   使用多跃点连接到远程主机。
+* Firewalls::                    通过防火墙。
+* Customizing Methods::          使用非标准方法。
+* Customizing Completion::       选择用户/主机名 @c 完成的配置文件。
+* Password handling::            对多个连接重复使用密码。
+* Connection caching::           重用连接相关信息。
+* Predefined connection information:: 设置自己的连接相关信息。
+* Remote programs::              @value{tramp} 如何在远程主机上查找和使用程序@c。
+* Remote shell setup::           远程 shell 设置提示。
+* Ssh setup::                    ssh 设置提示。
+* FUSE setup::                   @acronym{FUSE} 设置提示。
+* Android shell setup::          Android shell 设置提示。
+* Kubernetes setup::             Kubernetes 设置提示。
+* Auto-save File Lock and Backup:: 自动保存、文件锁定和备份。
+* Keeping files encrypted::      通过加密保护远程文件。
+
+使用@value{tramp}
+
+* File name syntax::             @value{tramp} 文件名约定。
+@ifset unified
+* Change file name syntax::      替代文件名语法。
+@end ifset
+* File name completion::         文件名补全。
+* Ad-hoc multi-hops::            在文件名中声明多个跃点。
+* Home directories::             将 @file{~} 扩展到主目录。
+* Remote processes::             与其他 Emacs 软件包集成。
+* Cleanup remote connections::   清理远程连接。
+* Renaming remote files::        重命名远程文件。
+* Archive file names::           访问文件档案中的文件。
+
+文件名、目录和本地名称如何被破坏和管理
+
+* Temporary directory::          临时文件保存的地方。
+* Localname deconstruction::     将本地名称分解为其组件。
+* External packages::            与外部 Lisp 包集成。
+* Extension packages::           向 @value{tramp} 添加新方法。
+* New operations::               在 @value{tramp} 中处理进一步的操作。
+
+@end detailmenu
+@end menu
+
+
+@node Overview
+@chapter @value{tramp}概述
+@cindex overview
+
+@value{tramp} 用于从 Emacs 内透明地访问远程文件。  @value{tramp} 为远程文件提供简单、方便且一致的接口，就像它们是本地文件一样。  @value{tramp} 的透明度扩展到编辑、版本控制和@code{dired}。
+
+@value{tramp} 可以使用任意数量的访问方法访问远程主机，例如 @command{ssh}、@command{scp}、@command{telnet} 和相关程序。  如果这些程序可以成功传递 @acronym{ASCII} 个字符，@value{tramp} 就可以使用它们。  @value{tramp} 不要求或强制要求 8 位干净连接。
+
+@value{tramp} 最常见的访问方法是通过 @command{ssh}，它是 @command{ftp} 和其他旧访问方法的更安全的替代方案。
+
+MS Windows 操作系统上的 @value{tramp} 与 PuTTY 软件包集成，并使用 @command{plink} 程序。
+
+@value{tramp} 大部分情况下使用连接程序在后台透明地运行。  只要这些程序启用远程登录并可以使用终端，@value{tramp} 就可以对它们进行调整，以实现无缝和透明的访问。
+
+@value{tramp} 暂时将远程文件内容传输到本地主机进行编辑及相关操作。  @value{tramp} 还可以使用标准 Emacs 接口在主机之间传输文件，这是在 Emacs 中直接集成 @value{tramp} 的好处。
+
+@value{tramp} 可以使用任意数量的可用远程文件主机程序传输文件，例如 @command{rcp}、@command{scp}、@command{rsync} 或（在 MS Windows 下）@command{pscp}。  @value{tramp} 提供了指定这些程序并将其自定义为特定文件、主机或访问方法的简单方法。
+
+为了更快地传输小文件，@value{tramp} 支持使用 @command{mimencode} 或 @command{uuencode} 直接通过 shell 进行编码传输，前提是远程主机上有此类工具。
+
+
+@subsubheading @value{tramp} behind the scenes
+@cindex behind the scenes
+@cindex details of operation
+@cindex how it works
+
+通过 @value{tramp} 访问远程文件需要一系列操作，其中许多操作对用户来说是透明的。  然而，某些操作可能需要用户响应（例如输入密码或完成文件名）。  此处介绍了一种典型场景，即在远程主机上打开文件，以说明所涉及的步骤：
+
+@kbd{C-x C-f} 启动查找文件，输入 @value{tramp} 文件名的一部分，然后点击 @kbd{@key{TAB}} 完成。  如果这是第一次连接到该主机，则会发生以下情况：
+
+@itemize
+@item 
+@value{tramp}调用@samp{telnet @var{host}}或@samp{ssh -l @var{user} @var{host}}并建立一个外部进程来连接到远程主机。  @value{tramp} 通过 Emacs 缓冲区与进程通信，该缓冲区还显示来自远程主机的输出。
+
+@item 
+远程主机可能会提示输入缓冲区中的登录名（例如，@command{telnet}）。  另一方面，如果登录名包含在文件名部分中，则 @value{tramp} 发送登录名，后跟换行符。
+
+@item 
+然后，远程主机可能会提示输入密码或密码短语（对于@command{ssh}或@command{telnet}）。  @value{tramp} 在迷你缓冲区中显示密码提示。  @value{tramp} 然后将输入的任何内容发送到远程主机，后跟换行符。
+
+@item 
+@value{tramp} 现在等待 shell 提示或登录失败消息。
+
+如果 @value{tramp} 在超时期限（例如一分钟）内未收到任何消息，则 @value{tramp} 将返回一条有关未找到远程 shell 提示符的错误消息。  如果有来自远程主机的任何消息，@value{tramp} 将它们显示在缓冲区中。
+
+对于来自远程主机的任何 @samp{login failed} 消息，@value{tramp} 会中止登录尝试，并重复登录步骤。
+
+@item 
+成功登录后，如果 @value{tramp} 识别出来自远程主机的 shell 提示符，@value{tramp} 将通过关闭回显、设置 shell 提示符和其他日常琐事来准备 shell 环境。
+
+@strong{Note} 对于远程 shell，@value{tramp} 调用 @command{/bin/sh}。  远程主机必须识别 @samp{exec /bin/sh} 并执行适当的 shell。  该 shell 必须支持 Bourne shell 语法。
+
+@item 
+@value{tramp}执行@command{cd}和@command{ls}命令来查找远程主机上存在哪些文件。  @value{tramp} 有时使用 @command{echo} 进行通配。  @value{tramp} 使用 @command{test} 检查文件或目录是否可写。  在每个命令之后，@value{tramp}解析远程主机的输出以完成下一个操作。
+
+@item 
+远程文件名完成后，@value{tramp} 从远程主机传输文件内容。
+
+对于内联传输，@value{tramp} 发送命令，例如 @samp{mimencode -b /path/to/remote/file}，等待输出累积在缓冲区中，然后解码该输出以生成文件的内容。
+
+对于外部传输，@value{tramp} 发送如下命令：
+
+@example
+$ scp user@@host:/path/to/remote/file <TMP>/tramp.4711
+@end example
+
+@value{tramp} 将本地临时文件@file{<TMP>/tramp.4711}读入缓冲区，然后删除该临时文件。@footnote{@ref{Temporary directory}}
+
+@item 
+像平常一样编辑、修改、更改缓冲区内容，然后用@kbd{C-x C-s}保存缓冲区。
+
+@item 
+@value{tramp} 使用适当的内联或外部程序以相反的过程将缓冲区内容传输到远程主机。
+@end itemize
+
+我希望这能让您对使用 @value{tramp} 打开文件时幕后发生的情况有一个基本的了解。
+
+
+@c For the end user.
+@node Obtaining @value{tramp}
+@chapter 获得@value{tramp}
+@cindex obtaining @value{tramp}
+@cindex GNU ELPA
+@vindex tramp-version
+
+@value{tramp} 包含在 Emacs 中。
+
+@value{tramp} 也可以免费打包并在互联网上的 @uref{https://ftp.gnu.org/gnu/tramp/} 下载。  @value{tramp}的版本号可以通过变量@code{tramp-version}获得。对于已发布的 @value{tramp} 版本，这是一个三数字字符串，如“2.4.5”。
+
+与 Emacs 一起打包的 @value{tramp} 版本可能与相应的独立版本略有不同。  这是因为 Emacs 和 @value{tramp} 之间的发布日期并不总是能够同步。  此类版本号以 Emacs 版本号作为后缀，如“2.4.5.27.2”。  这意味着 @w{@value{tramp} 2.4.5} 已集成到 @w{Emacs 27.2} 中。  可以通过以下方式检索与 Emacs 打包的 @value{tramp} 版本的完整列表
+
+@vindex customize-package-emacs-version-alist
+@lisp
+(assoc 'Tramp customize-package-emacs-version-alist)
+@end lisp
+
+@value{tramp} 也可用作 @uref{https://elpa.gnu.org, GNU ELPA} 封装。  除了独立版本之外，@value{tramp} 的更多次要版本也将出现在 GNU ELPA 上，直到下一个 @value{tramp} 版本出现。  这些次要版本有一个四数字字符串，例如“2.4.5.1”。  最新@value{tramp} ELPA 软件包的手册位于@uref{https://elpa.gnu.org/packages/doc/tramp.html}。
+
+@value{tramp} 开发版本可在 Git 服务器上使用。开发版本包含新的和不完整的功能。  @value{tramp} 的开发版本始终是下一个版本的版本号，加上后缀“-pre”，如“2.4.4-pre”。
+
+从 Git 服务器获取 @value{tramp} 的一种方法是访问以下 URL 的 Savannah 项目页面，然后单击顶部导航栏中的 Git 链接。
+
+@noindent
+@uref{https://savannah.gnu.org/projects/tramp/}
+
+@noindent
+另一种方法是遵循下面的终端会话：
+
+@example
+@group
+$ cd ~/emacs
+$ git clone https://git.savannah.gnu.org/git/tramp.git
+@end group
+@end example
+
+@noindent
+从代理后面：
+
+@example
+@group
+$ git config --global http.proxy https://user:pwd@@proxy.server.com:8080
+$ git clone https://git.savannah.gnu.org/r/tramp.git
+@end group
+@end example
+
+@noindent
+@value{tramp} 开发者：
+
+@example
+$ git clone login@@git.sv.gnu.org:/srv/git/tramp.git
+@end example
+
+@noindent
+在执行上述命令之一后，@file{~/emacs/tramp} 将包含最新版本的 @value{tramp}。
+
+@noindent
+要从存储库获取更新，请使用 @code{git pull}：
+
+@example
+@group
+$ cd ~/emacs/tramp
+$ git pull
+@end group
+@end example
+
+@noindent
+按如下方式运行 @command{autoconf} 以生成最新的 @file{configure} 脚本：
+
+@example
+@group
+$ cd ~/emacs/tramp
+$ autoconf
+@end group
+@end example
+
+@ifset installchapter
+@c Installation chapter is necessary only in case of standalone
+@c installation.
+@include trampinst.texi
+@end ifset
+@ifclear installchapter
+有关如何安装 @value{tramp} 的更多信息，请参阅该目录中的文件 @file{INSTALL}。
+@end ifclear
+
+
+@node Quick Start Guide
+@chapter 简单介绍如何使用@value{tramp}
+@cindex quick start guide
+
+@value{tramp} 通过添加远程组件扩展了 Emacs 文件名语法。  远程文件名始终类似于 @file{@trampfn{method,user@@host,/path/to/file}}。
+
+您可以像使用普通文件一样使用远程文件，这意味着您可以通过 @kbd{C-x C-f 打开文件或目录
+@trampfn{method,user@@host,/path/to/file} @key{RET}}, edit the file,
+并保存它。  您还可以在文件操作中使用两个参数混合本地文件和远程文件，例如@code{copy-file}或@code{rename-file}。  最后，当您调用进程的缓冲区具有远程 @code{default-directory} 时，您甚至可以在远程主机上运行进程。
+
+
+@anchor{Quick Start Guide File name syntax}
+@section 文件名语法
+@cindex file name syntax
+
+远程文件名前面有 @code{method}、@code{user} 和 @code{host} 部分。  所有这些以及本地文件名部分都是可选的，如果缺少部分，则假定为默认值。  空本地文件名部分的默认值是远程用户的主目录。  因此，最短的远程文件名是@file{@trampfn{-,,}}。  出于语法原因，使用默认方法的 @samp{-} 表示法 @pxref{Default Method}。
+
+@code{method}部分描述了用于到达远程主机的连接方法，见下文。
+
+@code{user}部分是访问远程主机的用户名。对于@option{smb}方法，这也可能需要域名，在这种情况下，它被写为@code{user%domain}。
+
+@code{host} 部分必须是可以在本地主机上解析的主机名。  它可以是短主机名、完全限定域名、IPv4 或 IPv6 地址，@pxref{File name syntax}。  某些连接方法还支持要使用的端口的表示法，在这种情况下，它被写为@code{host#port}。
+
+
+@anchor{Quick Start Guide ssh and plink methods}
+@section 使用 @option{ssh} 和 @option{plink}
+@cindex method @option{ssh}
+@cindex @option{ssh} method
+@cindex method @option{plink}
+@cindex @option{plink} method
+
+如果本地主机运行 SSH 客户端，而远程主机运行 SSH 服务器，则最简单的远程文件名是 @file{@trampfn{ssh,user@@host,/path/to/file}}。  远程文件名 @file{@trampfn{ssh,,}} 在本地主机上打开与您自己的远程连接，并且通常用于测试 @value{tramp}。
+
+在 MS Windows 上，PuTTY 通常用作 SSH 客户端。  它的 @command{plink} 方法可用于打开与运行 @command{ssh} 服务器：@file{@trampfn{plink,user@@host,/path/to/file}} 的远程主机的连接。
+
+
+@anchor{Quick Start Guide su, sudo, doas, run0, androidsu and sg methods}
+@section 使用 @option{su}、@option{sudo}、@option{doas}、@option{run0}、@option{androidsu} 和 @option{sg}
+@cindex method @option{su}
+@cindex @option{su} method
+@cindex method @option{sudo}
+@cindex @option{sudo} method
+@cindex method @option{doas}
+@cindex @option{doas} method
+@cindex method @option{run0}
+@cindex @option{run0} method
+@cindex method @option{androidsu}
+@cindex @option{androidsu} method
+@cindex method @option{sg}
+@cindex @option{sg} method
+
+有时，需要在不同的权限下在本地主机上工作。  为此，您可以使用 @option{su} 或 @option{sudo} 连接方法。  如果您的系统是基于 @code{systemd} 的，则有 @option{run0} 连接方法。  在 OpenBSD 系统上，@option{doas} 连接方法提供相同的功能。  如果您的本地系统是 Android，请使用方法 @option{androidsu} 而不是 @option{su}。
+
+这些方法使用 @samp{root} 作为默认用户名，并使用 @code{(system-name)} 的返回值作为默认主机名。  因此，以 @file{@trampfn{sudo,,/path/to/file}} 的形式打开文件很方便。
+
+方法@option{sg}代表“切换组”；此处用户名用作要更改到的组。  默认主机名相同。
+
+
+@anchor{Quick Start Guide Combining ssh, plink, su, sudo, doas and run0 methods}
+@section 将 @option{ssh} 或 @option{plink} 与 @option{su}、@option{sudo}、@option{doas} 或 @option{run0} 组合
+@cindex method @option{ssh}
+@cindex @option{ssh} method
+@cindex method @option{plink}
+@cindex @option{plink} method
+@cindex method @option{su}
+@cindex @option{su} method
+@cindex method @option{sudo}
+@cindex @option{sudo} method
+@cindex method @option{doas}
+@cindex @option{doas} method
+@cindex method @option{run0}
+@cindex @option{run0} method
+
+如果 @option{su}、@option{sudo}、@option{doas} 或 @option{run0} 方法应在另一台主机上执行，则可以将其与前导 @option{ssh} 或 @option{plink} 方法组合。  这意味着 @value{tramp} 首先使用非管理凭据连接到另一台主机，然后更改该主机上的管理凭据。  在简单的情况下，语法类似于 @file{@trampfn{ssh@value{postfixhop}user@@host|sudo,,/path/to/file}}。 @xref{Ad-hoc multi-hops}。
+
+
+@anchor{Quick Start Guide sudoedit method}
+@section 使用@command{sudoedit}
+@cindex method @option{sudoedit}
+@cindex @option{sudoedit} method
+
+@option{sudoedit} 方法与 @option{sudo} 方法类似。然而，它是一个不同的实现：它不会在后台保持打开的会话运行。  这是出于安全原因；从背面来看，该方法的性能比@option{sudo}方法差，它仅限于@samp{localhost}，并且不支持外部进程。
+
+
+@anchor{Quick Start Guide smb method}
+@section 使用@command{smbclient}
+@cindex method @option{smb}
+@cindex @option{smb} method
+@cindex ms windows (with @option{smb} method)
+@cindex @command{smbclient}
+
+为了访问远程 MS Windows 主机或 Samba 服务器，需要使用 @command{smbclient} 客户端。  远程文件名语法为@file{@trampfn{smb,user%domain@@host,/path/to/file}}。  本地文件名的第一部分是远程主机导出的共享，在此示例中为@samp{path}。
+
+
+@anchor{Quick Start Guide GVFS-based methods}
+@section 使用基于 @acronym{GVFS} 的方法
+@cindex methods, gvfs
+@cindex gvfs-based methods
+@cindex method @option{sftp}
+@cindex @option{sftp} method
+@cindex method @option{afp}
+@cindex @option{afp} method
+@cindex method @option{dav}
+@cindex method @option{davs}
+@cindex @option{dav} method
+@cindex @option{davs} method
+@cindex method @option{mtp}
+@cindex @option{mtp} method
+
+在安装了@acronym{GVFS, the GNOME Virtual File System}的系统上，@value{tramp}可以使用其提供的方法。例如 @file{@trampfn{sftp,user@@host,/path/to/file}}、@file{@trampfn{afp,user@@host,/path/to/file}}（访问 Apple 的 AFP 文件系统）、@file{@trampfn{dav,user@@host,/path/to/file}}、@file{@trampfn{davs,user@@host,/path/to/file}}（用于 WebDAV 共享）和@file{@trampfn{mtp,device,/path/to/file}}（用于媒体设备）。
+
+
+@anchor{Quick Start Guide GNOME Online Accounts based methods}
+@section 使用基于 @acronym{GNOME} 在线帐户的方法
+@cindex @acronym{GNOME} Online Accounts
+@cindex method @option{gdrive}
+@cindex @option{gdrive} method
+@cindex google drive
+@cindex method @option{nextcloud}
+@cindex @option{nextcloud} method
+@cindex nextcloud
+
+基于@acronym{GVFS}的方法还包括@acronym{GNOME}在线帐户，它支持@option{Files}服务。  它们是 Google Drive 文件系统和 OwnCloud/NextCloud 文件系统。  对于 OwnCloud/NextCloud 文件，此处的文件名语法始终为 @file{@trampfn{gdrive,john.doe@@gmail.com,/path/to/file}}（@samp{john.doe@@gmail.com} 代表您的 Google Drive 帐户）或@file{@trampfn{nextcloud,user@@host#8081,/path/to/file}}（@samp{8081} 代表端口号）。
+
+
+@anchor{Quick Start Guide FUSE-based methods}
+@section 使用基于 @acronym{FUSE} 的方法
+@cindex methods, fuse
+@cindex fuse-based methods
+@cindex method @option{rclone}
+@cindex @option{rclone} method
+@cindex method @option{sshfs}
+@cindex @option{sshfs} method
+
+@acronym{FUSE, Filesystem in Userspace} 允许用户挂载虚拟文件系统。  它也被 @acronym{GVFS} 内部使用，但这里我们讨论不使用 @acronym{GVFS} API 的方法。
+
+访问系统存储的便捷方法是 @command{rclone} 程序。  如果您在 @command{rclone} 中以名称 @samp{storage} 配置了存储（例如），则可以通过远程文件名语法 @file{@trampfn{rclone,storage,/path/to/file}} 访问它。  不需要用户名。
+
+在安装了@command{sshfs}客户端挂载基于@command{sftp}的文件系统的本地主机上，可以使用此方法。  所有远程文件都可以通过本地安装点获得。 @value{tramp} 帮助挂载文件系统（如果尚未挂载），并且支持使用常用文件名语法@file{@trampfn{sshfs,user@@host,/path/to/file}} 进行访问。
+
+
+@anchor{Quick Start Guide Android}
+@section 使用安卓
+@cindex method @option{adb}
+@cindex @option{adb} method
+@cindex android
+
+通过 USB 连接到本地主机的 Android 设备可以通过 @command{adb} 命令进行访问。  不需要用户名或主机名。  文件名语法为@file{@trampfn{adb,,/path/to/file}}。
+
+
+@node Configuration
+@chapter 配置@value{tramp}
+@cindex configuration
+@cindex default configuration
+
+@value{tramp} 最初配置为使用 @command{scp} 程序连接到远程主机。  只需输入@kbd{C-x C-f}，然后输入文件名@file{@trampfn{scp,user@@host,/path/to/file}}。  详情请参阅@xref{Default Method}、@xref{Default User}、@xref{Default Host}。
+
+对于与远程 shell 行为相关的问题，@xref{Remote shell setup}。
+
+用于将连接类型和文件访问方法从默认值更改为其他几个选项之一，@xref{Connection types}。
+
+@strong{Note} 这些示例中描述的某些用户选项不会由 Emacs 自动加载。  所有示例都需要安装和加载@value{tramp}：
+
+@lisp
+@group
+(require 'tramp)
+(customize-set-variable 'tramp-verbose 6 "Enable remote command traces")
+@end group
+@end lisp
+
+对于用于配置 @value{tramp} 的函数，可以在 init 文件中使用以下子句：
+
+@lisp
+(with-eval-after-load 'tramp (tramp-change-syntax 'simplified))
+@end lisp
+
+@vindex enable-remote-dir-locals
+必须通过将 @code{enable-remote-dir-locals} 设置为非 @code{nil}、@xref{Directory Variables, , , emacs} 来启用通过远程目录上的目录局部变量更改其他变量。
+
+
+@menu
+* Optional methods::             必须首先启用的可选方法。
+* Connection types::             与远程主机的连接类型。
+* Inline methods::               内联方法。
+* External methods::             外部方法。
+* GVFS-based methods::           基于 @acronym{GVFS} 的外部方法。
+* FUSE-based methods::           基于 @acronym{FUSE} 的外部方法。
+* Default Method::               选择默认方法。在这里，我们也尝试帮助那些不知道哪种方法适合他们的人。
+* Default User::                 选择默认用户。
+* Default Host::                 选择默认主机。
+* Multi-hops::                   使用多跃点连接到远程主机。
+* Firewalls::                    通过防火墙。
+* Customizing Methods::          使用非标准方法。
+* Customizing Completion::       选择用户/主机名 @c 完成的配置文件。
+* Password handling::            对多个连接重复使用密码。
+* Connection caching::           重用连接相关信息。
+* Predefined connection information:: 设置自己的连接相关信息。
+* Remote programs::              @value{tramp} 如何在远程主机上查找和使用程序@c。
+* Remote shell setup::           远程 shell 设置提示。
+* Ssh setup::                    ssh 设置提示。
+* FUSE setup::                   @acronym{FUSE} 设置提示。
+* Android shell setup::          Android shell 设置提示。
+* Kubernetes setup::             Kubernetes 设置提示。
+* Auto-save File Lock and Backup:: 自动保存、文件锁定和备份。
+* Keeping files encrypted::      通过加密保护远程文件。
+@end menu
+
+
+@node Optional methods
+@section 必须首先启用的可选方法
+@cindex optional methods
+
+加载@value{tramp}后，并非所有方法都默认启用。其中一些不适用于本地主机。  其中一些是可选的，如果要使用它们，则必须启用它们。  对于本手册中描述的所有方法，当该方法是可选的时会注明。
+
+@deffn Command tramp-enable-method method
+该命令启用可选方法@var{method}，一个字符串。  该命令可以像 @kbd{M-x tramp-enable-method @key{RET} toolbox @key{RET}} 一样以交互方式调用，其中 @option{toolbox} 是可选方法。
+@end deffn
+
+如果您想永久启用可选方法，请将类似以下内容添加到您的 @file{.emacs} 文件中：
+
+@lisp
+(with-eval-after-load 'tramp (tramp-enable-method "toolbox"))
+@end lisp
+
+
+@node Connection types
+@section 与远程主机的连接类型
+@cindex connection types, overview
+
+@dfn{Inline method}和@dfn{external method}是两种基本类型的访问方法。  虽然它们都使用相同的远程 shell 访问程序，例如 @command{rsh}、@command{ssh} 或 @command{telnet}，但它们的文件访问方法有所不同。  选择正确的方法对于编辑文件、传输大文件或操作大量文件变得很重要。
+
+外部方法的性能通常优于内联方法，至少对于大文件而言。  这是由于内联传输时需要对数据进行编码和解码造成的。
+
+此规则的一个例外是基于 @option{scp} 的访问方法。  虽然这些方法在实际传输文件时确实具有更好的性能，但启动时加密协商的开销可能会掩盖文件传输时间的改进。
+
+外部方法的配置方式应使其不需要密码（使用 @command{ssh-agent} 或类似密码）。  现代 @command{scp} 实现提供了重用现有 @command{ssh} 连接的选项，@value{tramp} 默认启用（如果可用）。  如果不可能，您应该考虑@ref{Password handling}，否则每次复制操作都会提示您输入密码。
+
+
+@node Inline methods
+@section 内联方法
+@cindex inline methods
+@cindex methods, inline
+
+内联方法使用相同的登录连接来传输文件内容。  内联方法对于小文件来说既快速又简单。  它们取决于远程主机上合适的编码和解码程序的可用性。  对于本地源和目标，@value{tramp} 可以使用 Emacs 中此类程序的内置等效项。
+
+内联方法可以在外部传输程序不可用的情况下工作。  当在同一主机上的不同 @emph{user identities} 之间传输文件时，内联方法也适用。
+
+@cindex base-64 encoding
+@cindex base-64 encoding
+@cindex uu encoding
+@vindex tramp-remote-coding-commands
+@value{tramp} 检查远程主机@code{tramp-remote-coding-commands}中定义的命令之一的可用性和可用性。  @value{tramp} 使用它找到的第一个可靠命令。  @value{tramp}的搜索路径可以自定义，@pxref{Remote programs}。
+
+如果没有可用的命令，@value{tramp} 首先将一个小的 Perl 程序传输到远程主机，然后尝试使用该程序进行编码和解码。
+
+@vindex tramp-inline-compress-start-size
+@vindex tramp-inline-compress-commands
+为了提高大型文本文件的传输速度，@value{tramp} 可以在编码之前使用压缩。  用户选项 @code{tramp-inline-compress-start-size} 指定文件大小，超过该大小则使用此优化。  此功能取决于@code{tramp-inline-compress-commands}中定义的命令之一的可用性和可用性。
+
+@table @asis
+@cindex method @option{rsh}
+@cindex @option{rsh} method
+@item @option{rsh}
+
+@command{rsh} 是连接到本地网络内的主机的选项，因为 @command{rsh} 不如其他方法安全。应该没有理由使用它，因为 @command{ssh} 既是一个完整的替代品，又是无处不在的。
+
+@cindex method @option{ssh}
+@cindex @option{ssh} method
+@item @option{ssh}
+
+@command{ssh} 是比其他连接到远程主机更安全的选项。
+
+@command{ssh} 还可以采用额外的参数作为端口号。  例如，端口 42 上的主机被指定为 @file{host#42}（真实主机名、哈希符号，然后是端口号）。  这与将 2⁣ 传递给 3⁣ 命令相同。
+
+@cindex method @option{telnet}
+@cindex @option{telnet} method
+@item @option{telnet}
+
+使用 @command{telnet} 连接到远程主机与 @option{rsh} 方法一样不安全。
+
+@cindex method @option{su}
+@cindex @option{su} method
+@item @option{su}
+@cindex method @option{surs}
+@cindex @option{surs} method
+@item @option{surs}
+
+@command{su} 程序允许以另一个用户身份进行编辑，而不是连接到远程主机。  主机可以是 @samp{localhost} 或函数 @command{(system-name)} 返回的主机。 @xref{Multi-hops}，此行为的一个例外。
+
+方法@option{surs}与方法@option{su}相同，但它使用现代的@command{su-rs}程序。  可以在本手册中提到方法 @option{su} 的任何地方使用它。  @option{surs} 是可选方法，@pxref{Optional methods}。
+
+@cindex method @option{androidsu}
+@cindex @option{androidsu} method
+@item @option{androidsu}
+
+由于 @option{su} 方法和其他基于 shell 的方法的默认实现与 Android 用户中流行的非标准 @command{su} 实现以及随该系统分发的受限命令行实用程序发生冲突，因此为该系统提供了基本等效的 @option{androidsu} 方法，并针对其许多特性提供了解决方法，但不支持多跳。
+
+这是一个可选方法，@pxref{Optional methods}。  默认情况下，仅在 @code{android} 系统上启用它。
+
+@cindex method @option{sudo}
+@cindex @option{sudo} method
+@item @option{sudo}
+@cindex method @option{sudors}
+@cindex @option{sudors} method
+@item @option{sudors}
+
+与@option{su}方法类似，@option{sudo}使用@command{sudo}。 @command{sudo} 必须有足够的权限来启动 shell。
+
+出于安全原因，@option{sudo} 连接在预定义超时（默认为 5 分钟）后将被禁用。  这是可以改变的，@pxref{Predefined connection information}。
+
+方法@option{sudors}与方法@option{sudo}相同，但它使用现代的@command{sudo-rs}程序。  可以在本手册中提到方法 @option{sudo} 的任何地方使用它。 @option{sudors} 是可选方法，@pxref{Optional methods}。
+
+@cindex method @option{doas}
+@cindex @option{doas} method
+@item @option{doas}
+
+此方法在 OpenBSD 上使用，类似于 0⁣ 命令。  与 1⁣ 方法类似，@option{doas} 连接在预定义的超时后被禁用。
+
+@cindex method @option{run0}
+@cindex @option{run0} method
+@item @option{run0}
+
+@c This requires systemd 256.  Check with 'systemd-run --version'.
+此方法用于基于 @code{systemd} 的主机。  @option{run0} 连接也会在预定义的超时后被禁用。
+
+这是一个可选方法，@pxref{Optional methods}。
+
+@cindex method @option{sg}
+@cindex @option{sg} method
+@item @option{sg}
+
+@command{sg} 程序允许作为不同组进行编辑。  主机可以是 @samp{localhost} 或函数 @command{(system-name)} 返回的主机。  必须指定用户名，但它表示组名。  @xref{Multi-hops}，此行为的一个例外。
+
+@cindex method @option{sshx}
+@cindex @option{sshx} method
+@item @option{sshx}
+
+与 @option{ssh} 类似，但没有额外的身份验证提示。 @option{sshx} 使用 @samp{ssh -t -t -l @var{user} -o RemoteCommand='/bin/sh -i' @var{host}} 打开与“标准”登录 shell 的连接。  它支持更改远程登录 shell @command{/bin/sh}。
+
+@strong{Note} @option{sshx} 不会绕过身份验证问题。  例如，如果远程主机的主机密钥未知，@option{sshx}仍会询问“您确定要继续连接吗？”。  @value{tramp}无法处理此类问题。必须设置连接，以便可以在没有此类问题的情况下继续登录。
+
+当 @command{ssh} 触发有关分配伪 tty 的错误时，@option{sshx} 对于 MS Windows 用户很有用。  发生这种情况是因为缺少 shell 提示，导致@value{tramp}感到困惑。
+
+@option{sshx} 支持@samp{-p} 论点。
+
+@cindex method @option{krlogin}
+@cindex @option{krlogin} method
+@cindex kerberos (with @option{krlogin} method)
+@item @option{krlogin}
+
+这个方法也和@option{ssh}类似。  它仅使用 @command{krlogin -x} 命令进行远程主机登录。
+
+该方法是可选方法@pxref{Optional methods}。
+
+@cindex method @option{ksu}
+@cindex @option{ksu} method
+@cindex kerberos (with @option{ksu} method)
+@item @option{ksu}
+
+这是 Kerberos 套件中的另一种方法。  它的行为类似于@option{su}。  这是一个可选方法，@pxref{Optional methods}。
+
+@cindex method @option{plink}
+@cindex @option{plink} method
+@item @option{plink}
+
+@option{plink} 方法适用于使用 SSH@. PuTTY 实现的 MS Windows 用户，它使用 @samp{plink -ssh} 登录远程主机。  它支持更改远程登录 shell @command{/bin/sh}。
+
+检查该会话的 @samp{Share SSH connections if possible} 控件。
+
+@option{plink} 方法支持 @samp{-P} 参数。
+
+@cindex method @option{plinkx}
+@cindex @option{plinkx} method
+@item @option{plinkx}
+
+另一种方法是在 MS Windows 上使用 PuTTY，使用会话名称而不是主机名。  @option{plinkx} 调用@samp{plink -load @var{session} -t}。  必须在会话中定义用户名和端口号。  它支持更改远程登录 shell @command{/bin/sh}。
+
+检查该会话的 @samp{Share SSH connections if possible} 控件。
+@end table
+
+@noindent
+以下方法允许以不同的方式访问正在运行的容器：
+
+@table @asis
+@cindex method @option{docker}
+@cindex @option{docker} method
+@item @option{docker}
+
+Docker 容器的集成。  主机名可以是正在运行的容器的名称或 ID，由 @samp{docker ps} 返回。
+
+@vindex tramp-docker-program
+如果在@env{PATH}环境变量中找不到@command{docker}程序，您可以通过用户选项@code{tramp-docker-program}告诉@value{tramp}它的绝对路径。
+
+@cindex method @option{podman}
+@cindex @option{podman} method
+@item @option{podman}
+
+Podman 是 @option{docker} 的替代方案，如果需要，可以无根运行。
+
+@vindex tramp-podman-program
+如果在@env{PATH}环境变量中找不到@command{podman}程序，您可以通过用户选项@code{tramp-podman-program}告诉@value{tramp}它的绝对路径。
+
+@cindex method @option{kubernetes}
+@cindex @option{kubernetes} method
+@item @option{kubernetes}
+
+Kubernetes Pod 中容器的集成。  主机名是@samp{@var{pod}}，如果应使用显式容器名称，则主机名是@samp{@var{container}.@var{pod}}。  否则，将使用 Pod 中的第一个容器。  @samp{@var{pod}%@var{namespace}} 作为主机名允许使用默认名称空间之外的另一个名称空间。  这也可以与 @samp{@var{container}.} 前缀结合使用。
+
+@vindex tramp-kubernetes-program
+在内部，@value{tramp} 使用@command{kubectl} 程序。  如果您的 @env{PATH} 环境变量中没有找到该程序，您可以通过用户选项 @code{tramp-kubernetes-program} 告诉 @value{tramp} 它的绝对路径。
+
+该方法不支持用户名。
+
+@cindex method @option{toolbox}
+@cindex @option{toolbox} method
+@item @option{toolbox}
+@cindex method @option{distrobox}
+@cindex @option{distrobox} method
+@item @option{distrobox}
+
+分别集成 Toolbox 或 Distrobox 系统容器。主机名可以是容器的名称或 ID，由 @samp{toolbox list -c} 或 @samp{distrobox list} 返回。  如果没有主机名，将使用主机的默认 Toolbox 容器。  Distrobox 没有这样的默认设置。
+
+与其他基于容器的方法相反，这两种方法会启动已创建的容器（如果尚未运行）。
+
+@vindex tramp-toolbox-program
+@vindex tramp-distrobox-program
+如果在 @env{PATH} 环境变量中找不到 @command{toolbox} 或 @command{distrobox} 程序，您可以分别通过用户选项 @code{tramp-toolbox-program} 或 @code{tramp-distrobox-program} 告诉 @value{tramp} 它的绝对路径。
+
+这些是可选方法，@pxref{Optional methods}。  他们不支持用户名。
+
+@cindex method @option{flatpak}
+@cindex @option{flatpak} method
+@item @option{flatpak}
+
+Flatpak 沙箱的集成。  主机名可以是应用程序 ID、沙箱实例 ID 或 PID，由 @samp{flatpak ps} 返回。
+
+@vindex tramp-flatpak-program
+如果在@env{PATH}环境变量中找不到@command{flatpak}程序，您可以通过用户选项@code{tramp-flatpak-program}告诉@value{tramp}它的绝对路径。
+
+这是一个可选方法，@pxref{Optional methods}。  它不支持用户名。
+
+@cindex method @option{apptainer}
+@cindex @option{apptainer} method
+@item @option{apptainer}
+
+Apptainer 实例的集成。  主机名是实例名称，由 @samp{apptainer instance list} 返回。
+
+@vindex tramp-apptainer-program
+如果在@env{PATH}环境变量中找不到@command{apptainer}程序，您可以通过用户选项@code{tramp-apptainer-program}告诉@value{tramp}它的绝对路径。
+
+这是一个可选方法，@pxref{Optional methods}。  它不支持用户名。
+
+@cindex method @option{nspawn}
+@cindex @option{nspawn} method
+@item @option{nspawn}
+
+@code{systemd-nspawn} 实例的集成。  主机名是实例名称，由 @samp{machinectl list --all} 返回。
+
+@vindex tramp-nspawn-program
+在内部，@value{tramp} 使用@command{machinectl} 程序。  如果您的 @env{PATH} 环境变量中没有找到该程序，您可以通过用户选项 @code{tramp-nspawn-program} 告诉 @value{tramp} 它的绝对路径。
+
+这是一个可选方法，@pxref{Optional methods}。
+@end table
+
+
+@node External methods
+@section 外部方法
+@cindex methods, external
+@cindex external methods
+
+外部方法通过多个通道进行操作，使用远程 shell 连接执行某些操作，同时将文件传输委托给外部传输程序。
+
+外部方法节省了内联方法编码和解码的开销。
+
+@vindex tramp-copy-size-limit
+由于外部方法具有打开新通道的开销，因此小于 0⁣ 的文件仍然使用内联方法。  如果在多跳连接 (@pxref{Multi-hops}) 内部使用外部方法，则也会使用其固有的内联方法。
+
+@table @asis
+@cindex method @option{rcp}
+@cindex @option{rcp} method
+@cindex @command{rsh} (with @option{rcp} method)
+@item @option{rcp}
+
+该方法使用@command{rsh}和@command{rcp}命令连接到远程主机并传输文件。  这是可用的最快访问方法。
+
+另一种方法 @option{remcp} 使用 @command{remsh} 和 @command{rcp} 命令。
+
+@cindex method @option{scp}
+@cindex @option{scp} method
+@cindex @command{ssh} (with @option{scp} method)
+@item @option{scp}
+
+使用@command{ssh}进行连接和@command{scp}进行传输的组合是最安全的。  虽然性能很好，但对于较小的文件，它比内联方法慢。  尽管内联方法没有编码和解码的开销，但 2⁣ 的加密握手抵消了这些速度增益。
+
+基于 @option{ssh} 的方法支持 @samp{-p} 功能来指定端口号。  例如，@file{host#42}将参数列表中的@samp{-p 42}传递给@command{ssh}，将参数列表中的@samp{-P 42}传递给@command{scp}。
+
+@cindex method @option{rsync}
+@cindex @option{rsync} method
+@cindex @command{ssh} (with @option{rsync} method)
+@item @option{rsync}
+
+@command{ssh}连接命令与@command{rsync}传输命令相结合，与@option{scp}方法类似。
+
+当传输两个主机上都存在的文件时，@command{rsync} 的性能比 @command{scp} 好得多。  但是，如果在第一次文件传输期间文件仅存在于连接的一侧，则该优势就会丧失。
+
+此方法支持 @samp{-p} 参数。
+
+@cindex method @option{scpx}
+@cindex @option{scpx} method
+@cindex @command{ssh} (with @option{scpx} method)
+@item @option{scpx}
+
+@option{scpx} 对于避免登录 shell 问题很有用。  它的性能与@option{scp}相似。  @option{scpx} 使用@samp{ssh -t -t -l @var{user} -o RemoteCommand='/bin/sh -i' @var{host}} 打开连接。  它支持更改远程登录 shell @command{/bin/sh}。
+
+当 @command{ssh} 触发有关分配伪 tty 的错误时，@option{scpx} 对于 MS Windows 用户很有用。  发生这种情况是因为缺少 shell 提示，导致@value{tramp}感到困惑。
+
+此方法支持 @samp{-p} 参数。
+
+@cindex method @option{pscp}
+@cindex @option{pscp} method
+@cindex @command{plink} (with @option{pscp} method)
+@cindex @command{putty} (with @option{pscp} method)
+@item @option{pscp}
+@cindex method @option{psftp}
+@cindex @option{psftp} method
+@cindex @command{plink} (with @option{psftp} method)
+@cindex @command{putty} (with @option{psftp} method)
+@item @option{psftp}
+
+这些方法与@option{scp}或@option{sftp}类似，但它们使用@command{plink}命令连接到远程主机，并使用@command{pscp}或@command{psftp}来传输文件。这些程序是 PuTTY 的一部分，PuTTY 是 MS Windows 的 SSH 实现。
+
+他们支持更改远程登录 shell @command{/bin/sh}。
+
+检查该会话的 @samp{Share SSH connections if possible} 控件。
+
+这些方法支持 @samp{-P} 参数。
+
+@cindex method @option{dockercp}
+@cindex @option{dockercp} method
+@item @option{dockercp}
+@cindex method @option{podmancp}
+@cindex @option{podmancp} method
+@item @option{podmancp}
+
+这些方法与@option{docker}或@option{podman}类似，但它们使用命令@command{docker cp}或@command{podman cp}来传输大文件。
+
+这些复制命令不支持文件 glob，并且忽略用户名。
+
+@cindex method @option{fcp}
+@cindex @option{fcp} method
+@cindex @command{fsh} (with @option{fcp} method)
+@item @option{fcp}
+
+此方法与@option{scp}类似，但使用@command{fsh}进行连接，使用@command{fcp}进行文件传输。  @command{fsh/fcp}，@command{ssh}的前端，通过提交多个命令来重用@command{ssh}会话。  这避免了由于@command{scp}的安全连接而产生的启动开销。  内联方法也有类似的好处。
+
+用于此连接的命令是：@samp{fsh @var{host} -l @var{user} /bin/sh -i}
+
+@cindex method @option{fsh}
+@cindex @option{fsh} method
+
+@option{fsh} 没有内联方法，因为它提供的多路复用对于 @value{tramp} 没有用处。  @command{fsh} 连接到远程主机，@value{tramp} 保持该连接打开。
+
+这是一个可选方法，@pxref{Optional methods}。
+
+@cindex method @option{nc}
+@cindex @option{nc} method
+@cindex @command{telnet} (with @option{nc} method)
+@item @option{nc}
+
+使用 @command{telnet} 连接和 @command{nc} 传输文件有时是唯一适合访问路由器或 NAS 主机的组合。  这些哑设备具有严格限制的本地 shell，例如 2⁣，并且不托管任何其他编码或解码程序。
+
+这是一个可选方法，@pxref{Optional methods}。
+
+@cindex method @option{sudoedit}
+@cindex @option{sudoedit} method
+@item @option{sudoedit}
+
+@option{sudoedit} 方法有助于以本地主机上的不同用户身份编辑文件。  您可以将其视为 @value{tramp} 对 @command{sudoedit} 的实现。  与@option{sudo}方法相反，所有魔法文件名功能都是通过单个@command{sudo @dots{}}命令实现的。  目的是使编辑此类文件尽可能安全； Emacs 后台中不得运行任何可能受到 Emacs 内部攻击的会话。
+
+因此，外部流程未实施。
+
+此类远程文件名的主机名必须代表本地主机。由于默认值已经合适，因此建议不要在远程文件名中使用任何主机名，例如@file{@trampfn{sudoedit,,/path/to/file}}或@file{@trampfn{sudoedit,user@@,/path/to/file}}。
+
+与 @option{sudo} 方法一样，@option{sudoedit} 密码会在预定义的超时后过期。
+
+@cindex method @option{ftp}
+@cindex @option{ftp} method
+@item @option{ftp}
+
+当@value{tramp}使用@option{ftp}时，它将请求转发到Ange FTP@.指定的任何ftp程序。该外部程序必须能够处理来自@value{tramp}的请求。
+
+@cindex method @option{smb}
+@cindex @option{smb} method
+@cindex ms windows (with @option{smb} method)
+@cindex @command{smbclient}
+@item @option{smb}
+
+这种非本机 @value{tramp} 方法通过服务器消息块 (SMB) 网络协议连接到运行通常基于 @uref{https://www.samba.org/,,Samba} 或 MS Windows 的文件服务器的主机。
+
+在使用 @value{tramp} 时，使用 @command{smbclient} 需要进行一些调整：
+
+localname 中的第一个目录必须是远程主机上的共享名。
+
+由于某些 SMB 共享名称以 @code{$} 字符结尾，因此在指定这些共享时 @value{tramp} 必须使用 @code{$$} 以避免环境变量替换。
+
+当@value{tramp}未指定共享名称或使用通用远程目录@file{/}时，@command{smbclient}返回所有可用共享。
+
+由于 SMB 身份验证基于每个 SMB 共享，因此即使访问同一 SMB 主机上的不同共享，@value{tramp} 也会提示输入密码。  该提示可以被@ref{Password handling}抑制。
+
+为了适应 MS Windows 授权所需的用户名/域名语法，@value{tramp} 提供了 @code{user%domain} 格式的扩展语法（其中 @code{user} 是用户名，@code{%} 是百分号，@code{domain} 是 MS Windows 域名）。  一个例子：
+
+@example
+@trampfn{smb,daniel%BIZARRE@@melancholia,/daniel$$/.emacs}
+@end example
+
+其中，用户 @samp{daniel} 作为域用户连接到 MS Windows 域 @samp{BIZARRE} 中的 SMB 主机 @samp{melancholia}，以编辑位于主目录中的 @file{.emacs}（共享 @samp{daniel$}）。
+
+或者，对于本地 WINS 用户（而不是域用户），将域名替换为大写的本地主机名，如下所示：
+
+@example
+@trampfn{smb,daniel%MELANCHOLIA@@melancholia,/daniel$$/.emacs}
+@end example
+
+其中，用户 @samp{daniel} 作为本地用户连接到本地域 @samp{MELANCHOLIA} 中的 SMB 主机@samp{melancholia}，以编辑位于主目录中的 @file{.emacs}（共享 @samp{daniel$}）。
+
+对于 @command{smbclient} 身份验证，域名和用户名是可选的。  当未指定用户名时，@command{smbclient} 使用匿名用户（不提示输入密码）。  此行为与其他 @value{tramp} 方法不同，在其他方法中，本地用户名被替换。
+
+如果 Emacs 在 MS Windows 中的本地用户身份验证上下文下运行，则 @option{smb} 方法不可用。  但是，此类用户仍然可以使用 UNC 文件名而不是 @value{tramp} 访问远程文件：
+
+@example
+//melancholia/daniel$$/.emacs
+@end example
+
+UNC 文件名规范不允许像 @command{smbclient} 那样指定不同的用户名进行身份验证。
+
+@cindex method @option{adb}
+@cindex @option{adb} method
+@cindex android (with @option{adb} method)
+@item @option{adb}
+
+@vindex tramp-adb-program
+@vindex PATH@r{, environment variable}
+该方法使用Android Debug Bridge程序来访问Android设备。  Android 调试桥必须在本地安装才能使 @value{tramp} 正常工作。  一些 GNU/Linux 发行版提供 Android Debug Bridge 作为安装包。  或者，该程序作为 Android SDK@. 的一部分安装，@value{tramp} 通过 @env{PATH} 环境变量或用户选项 @code{tramp-adb-program} 中设置的绝对路径查找 @command{adb} 程序。
+
+@vindex tramp-adb-connect-if-not-connected
+仅当用户选项 @code{tramp-adb-connect-if-not-connected} 不是 @code{nil} 时，@value{tramp} 使用 @option{adb} 连接到 Android 设备。  否则，必须在 Emacs 外部建立连接。
+
+当单个 Android 设备连接到 @command{adb} 时，@value{tramp} 不需要远程文件名的主机名部分。 @value{tramp} 使用 @file{@trampfn{adb,,}} 作为默认名称。 @command{adb devices}，在 Emacs 外部的 shell 中运行，显示可用的主机名。
+
+@option{adb} 方法通常不需要用户名在 Android 设备上进行身份验证，因为它在 @command{adbd} 进程下运行。  但是，当指定用户名时，@value{tramp} 在语法中应用 @command{su}。  当身份验证不成功时，尤其是在未 root 的 Android 设备上，@value{tramp} 显示登录错误。
+
+对于通过 TCP/IP 连接的 Android 设备，可以使用 @file{device#42} 主机名语法指定端口号，或者 @value{tramp} 可以使用 @command{adb} 命令中声明的默认值。  端口号不适用于通过 USB@. 连接的 Android 设备
+
+@end table
+
+
+@node GVFS-based methods
+@section 基于@acronym{GVFS}的外部方法
+@cindex methods, gvfs
+@cindex gvfs-based methods
+@cindex dbus
+
+@acronym{GVFS} 是@acronym{GNOME} 桌面@uref{https://en.wikipedia.org/wiki/GVFS} 的虚拟文件系统。  @acronym{GVFS} 上的远程文件通过 @acronym{FUSE} 本地挂载，@value{tramp} 在内部使用此本地挂载目录。
+
+Emacs 使用 D-Bus 机制与 @acronym{GVFS}@. 进行通信 它必须是在 D-Bus 支持下编译的，@pxref{Top, , D-Bus, dbus}。
+
+@vindex tramp-gvfs-enabled
+@code{tramp-gvfs-enabled} 变量是非 @code{nil}，表示 @value{tramp} 可以使用基于 @acronym{GVFS} 的方法。
+
+@table @asis
+@cindex method @option{afp}
+@cindex @option{afp} method
+@item @option{afp}
+
+此方法用于使用 Apple 文件协议连接到远程主机以访问 macOS 卷上的文件。  @value{tramp} 访问语法需要前导卷（共享）名称，例如：@file{@trampfn{afp,user@@host,/volume}}。
+
+@cindex WebDAV
+@cindex method @option{dav}
+@cindex @option{dav} method
+@item @option{dav}
+@cindex method @option{davs}
+@cindex @option{davs} method
+@item @option{davs}
+
+@option{dav} 方法提供基于标准协议的 WebDAV 文件和目录的访问，例如 HTTP@. @option{davs} 执行相同的操作，但使用 SSL 加密。  两种方法都支持端口号。
+
+这些方法不支持作为要由 @acronym{GVFS} 安装的 WebDAV 卷的一部分的路径（对于 OwnCloud 或 NextCloud 文件名来说很常见）。  处理方法参见方法@option{nextcloud}。
+
+@cindex @acronym{GNOME} Online Accounts
+@cindex method @option{gdrive}
+@cindex @option{gdrive} method
+@cindex google drive
+@item @option{gdrive}
+
+通过 @option{gdrive} 方法可以访问您的 Google Drive 在线存储。  远程文件名的用户名和主机名是您的 Google 云端硬盘凭据的电子邮件地址，例如 @file{@trampfn{gdrive,john.doe@@gmail.com,/}}。  这些凭据必须填充到 Emacs 之外的 @command{Online Accounts} 应用程序中。
+
+由于 Google Drive 在内部使用神秘的 blob 文件名，因此 @value{tramp} 与文件的 @code{display-name} 配合使用。  如果同一目录中的两个文件具有相同的 @code{display-name}，这可能会产生意外的行为，必须避免这种情况。
+
+@cindex method @option{mtp}
+@cindex @option{mtp} method
+@cindex media
+@item @option{mtp}
+
+媒体设备，如手机、平板电脑、相机，可以通过 @option{mtp} 方法访问。  只需提供设备名称即可在文件名中指定主机。  但是，在访问该设备之前，该设备必须已通过 USB 连接。  可能的设备名称通过主机名补全@pxref{File name completion}可见。
+
+根据设备类型，访问可能是只读的。  某些设备可以以不同的名称并行访问，提供其文件系统的不同部分。
+
+当连接单个媒体设备时，@value{tramp} 不需要主机名作为远程文件名的一部分。  @value{tramp} 使用 @file{@trampfn{mtp,,}} 作为默认名称。
+
+@cindex method @option{nextcloud}
+@cindex @option{nextcloud} method
+@cindex nextcloud
+@item @option{nextcloud}
+
+顾名思义，方法 @option{nextcloud} 允许您访问 OwnCloud 或 NextCloud 托管的文件和目录。  与 @option{gdrive} 方法一样，您的凭据必须填充到 Emacs 之外的 @command{Online Accounts} 应用程序中。  该方法支持端口号。
+
+@cindex method @option{sftp}
+@cindex @option{sftp} method
+@item @option{sftp}
+
+此方法使用 @command{sftp} 来安全地访问远程主机。  @command{sftp} 是连接到出于安全原因拒绝 @command{ssh} 连接的主机的更安全选项。
+
+当您的 @command{ssh} 配置中有相应条目时，请执行 @emph{not} 设置 @option{RemoteCommand} 选项。
+
+@end table
+
+@defopt tramp-gvfs-methods
+此用户选项是 @acronym{GVFS}@. 的外部方法列表。默认情况下，此列表包括 @option{afp}、@option{dav}、@option{davs}、@option{gdrive}、@option{mtp}、@option{nextcloud} 和 @option{sftp}。  其他要包含的方法有 @option{ftp}、@option{http}、@option{https} 和 @option{smb}。  这些方法并不打算直接用作基于 13⁣ 的方法。  相反，它们被添加到此处是为了 @ref{Archive file names} 的利益。
+
+如果要使用基于@acronym{GVFS}的@option{ftp}或@option{smb}方法，必须将它们添加到@code{tramp-gvfs-methods}，并且必须分别将@code{tramp-ftp-method}或@code{tramp-smb-method}设置为@code{nil}来禁用相应的@value{tramp}包：
+
+@lisp
+@group
+(add-to-list 'tramp-gvfs-methods "ftp")
+(customize-set-variable 'tramp-ftp-method nil)
+@end group
+@end lisp
+@end defopt
+
+
+@node FUSE-based methods
+@section 基于@acronym{FUSE}的外部方法
+@cindex methods, fuse
+@cindex fuse-based methods
+
+除了@acronym{GVFS}之外，还有其他使用@acronym{FUSE}接口的虚拟文件系统。  远程文件通过 @acronym{FUSE} 本地挂载，@value{tramp} 在内部使用此本地挂载目录。  如果可能，@value{tramp} 将远程文件名映射到各自的本地文件名，并对它们应用文件名操作。  对于某些文件名操作，这是不可能的，否则 @value{tramp} 会模拟这些操作。
+
+@table @asis
+@cindex method @option{rclone}
+@cindex @option{rclone} method
+@item @option{rclone}
+
+@vindex tramp-rclone-program
+程序@command{rclone}允许访问云中的不同系统存储，请参阅@uref{https://rclone.org/}了解支持的系统列表。  如果在 @env{PATH} 环境变量中找不到 @command{rclone} 程序，您可以通过用户选项 @code{tramp-rclone-program} 告诉 @value{tramp} 它的绝对路径。
+
+必须在 Emacs 外部通过 @command{rclone config} 命令配置系统存储。  如果您在@command{rclone}中以名称@samp{storage}配置了存储（例如），则可以通过远程文件名访问它
+
+@example
+@trampfn{rclone,storage,/path/to/file}
+@end example
+
+用户名是 @command{rclone} 配置的一部分，远程文件名中不需要。  如果远程文件名中包含用户名，则该用户名将被忽略。
+
+通过 @option{rclone} 访问速度很慢。  如果您有访问系统存储的替代方法，则应该使用它。例如，参见@ref{GVFS-based methods}、方法@option{gdrive}和@option{nextcloud}。
+
+@cindex method @option{sshfs}
+@cindex @option{sshfs} method
+@item @option{sshfs}
+
+@vindex tramp-sshfs-program
+在安装了@command{sshfs}客户端来挂载基于@command{ssh}的@command{sftp}子系统的文件系统的本地主机上，可以使用此方法，参见@uref{https://github.com/libfuse/sshfs/blob/master/README.md}。  如果在 @env{PATH} 环境变量中找不到 @command{sshfs} 程序，您可以通过用户选项 @code{tramp-sshfs-program} 告诉 @value{tramp} 它的绝对路径。
+
+所有远程文件都可以通过本地安装点获得。 @value{tramp} 帮助安装文件系统（如果尚未安装）。  远程文件名语法是
+@trampfn{sshfs,user@@host#port,/path/to/file}.
+
+用户名和端口号是可选的。  此方法不支持密码处理，文件系统必须已安装，或者必须通过 ssh 密钥建立无密码连接。
+
+挂载点和挂载参数可以作为连接属性 @xref{Setup of sshfs method} 传递。
+
+@end table
+
+
+@node Default Method
+@section 选择默认方法
+@cindex default method
+
+在远程文件名中，使用默认方法由伪方法@option{-}、@pxref{File name syntax} 指示。
+
+@defopt tramp-default-method
+默认方法是传输文件。  用户选项 @code{tramp-default-method} 设置它。  @value{tramp} 使用此用户选项来确定未指定远程文件名的默认方法。
+
+@lisp
+(customize-set-variable 'tramp-default-method "ssh")
+@end lisp
+@end defopt
+
+@defopt tramp-default-method-alist
+可以通过用户选项@code{tramp-default-method-alist}为特定用户和主机组合自定义传输文件的默认方法。
+
+例如，以下两行指定对与 @samp{john} 匹配的所有用户名使用 @option{ssh} 方法，对与 @samp{lily} 匹配的所有主机名使用 @option{rsync} 方法。  第三行指定对主机 @samp{localhost} 上的用户 @samp{root} 使用 @option{su} 方法。
+
+@lisp
+@group
+(add-to-list 'tramp-default-method-alist '("" "john" "ssh"))
+(add-to-list 'tramp-default-method-alist '("lily" "" "rsync"))
+(add-to-list 'tramp-default-method-alist
+             '("\\`localhost\\'" "\\`root\\'" "su"))
+@end group
+@end lisp
+@end defopt
+
+@noindent
+对于大文件，外部方法的性能更快。  @pxref{Inline methods}。  @pxref{External methods}。
+
+选择访问方法还取决于安全环境。例如，使用明文密码传输的 @option{rsh} 和 @option{telnet} 方法不适合通过 Internet 连接。  安全远程连接应使用提供加密的@option{ssh}。
+
+
+@subsection 使用哪种方法？
+@cindex choosing the right method
+
+@value{tramp} 提供最大数量的选择以实现最大的灵活性。  选择哪种方法取决于主机、客户端、网络速度和安全上下文。
+
+首先使用内联方法。
+
+外部方法对于大文件可能更有效，但大多数 @value{tramp} 用户编辑小文件的频率高于大文件。
+
+启用压缩@code{tramp-inline-compress-start-size}，以通过内联方法提高大文件的性能。
+
+由于@command{ssh}已成为远程主机访问最常用的方法，并且具有最合理的安全协议，因此使用@option{ssh}方法。  编辑其他主机上的 @file{/etc/motd} 文件的典型 @option{ssh} 用法：
+
+@example
+@kbd{C-x C-f @trampfn{ssh,root@@otherhost,/etc/motd} @key{RET}}
+@end example
+
+如果 @option{ssh} 由于某种原因不可用，请寻找其他明显的选项。  对于 MS Windows，请尝试@option{plink}方法@footnote{This shouldn't be needed with recent @code{OpenSSH} versions for MS Windows.  Use method @option{sshx}.}。  对于 Kerberos，请尝试 @option{krlogin}。
+
+要使用 @option{su} 或 @option{sudo} 方法编辑本地文件，请尝试使用 @samp{root} 的简化语法：
+
+@example
+@kbd{C-x C-f @trampfn{su,,/etc/motd} @key{RET}}
+@end example
+
+对于编辑大文件，@option{scp} 比 @option{ssh} 更快。 @option{pscp} 比 @option{plink} 快。  但这种速度提升并不总是正确的。
+
+当通过@option{scp}在两个不同的远程主机之间复制大文件时，将@code{tramp-use-scp-direct-remote-copying}设置为非@code{nil}。
+
+
+@node Default User
+@section 选择默认用户
+@cindex default user
+
+@defopt tramp-default-user
+@value{tramp} 文件名可以省略用户名部分，因为 @value{tramp} 替换当前登录的用户名。  然而，这个替换可以被 @code{tramp-default-user} 覆盖。例如：
+
+@lisp
+(customize-set-variable 'tramp-default-user "root")
+@end lisp
+@end defopt
+
+@defopt tramp-default-user-alist
+@code{tramp-default-user-alist} 允许基于访问方法或主机名组合的多个默认用户值，而不是单个默认用户。  alist 可以保存多个值。  例如，仅使用 @samp{john} 作为域 @samp{somewhere.else} 的默认用户：
+
+@lisp
+@group
+(add-to-list 'tramp-default-user-alist
+             '("ssh" ".*\\.somewhere\\.else\\'" "john"))
+@end group
+@end lisp
+
+注意：@value{tramp} 将覆盖 Emacs 外部配置文件中指定的任何默认用户，例如 @file{~/.ssh/config}。要阻止 @value{tramp} 应用默认值，请将相应的列表条目设置为 @code{nil}：
+
+@lisp
+@group
+(add-to-list 'tramp-default-user-alist
+             '("ssh" "\\`here\\.somewhere\\.else\\'" nil))
+@end group
+@end lisp
+
+@code{tramp-default-user-alist} 中的最后一个条目应保留用于包罗万象或最常用的登录。
+
+@lisp
+@group
+(add-to-list 'tramp-default-user-alist
+             '(nil nil "jonas") t)
+@end group
+@end lisp
+@end defopt
+
+
+@node Default Host
+@section 选择默认主机
+@cindex default host
+
+@defopt tramp-default-host
+当省略主机名时，@value{tramp} 会替换 @code{tramp-default-host} 用户选项中的值。  它最初填充有运行 Emacs 的本地主机名。  默认方法、默认用户和默认主机可以被覆盖，如下所示：
+
+@lisp
+@group
+(custom-set-variables
+ '(tramp-default-method "ssh")
+ '(tramp-default-user "john")
+ '(tramp-default-host "target"))
+@end group
+@end lisp
+
+设置所有默认值后，@file{@trampfn{-,,}} 将通过方法 @option{ssh} 将 @value{tramp} 连接到 @samp{target} 上 John 的主目录。
+@end defopt
+
+@defopt tramp-default-host-alist
+@code{tramp-default-host-alist} 允许基于访问方法或用户名组合使用多个默认主机值，而不是单个默认主机。  alist 可以保存多个值。  虽然 @code{tramp-default-host} 在大多数情况下就足够了，但某些方法（如 @option{adb}）需要覆盖默认值。
+
+@option{nspawn} 的默认主机名是 @samp{.host}。  因此，@file{@trampfn{nspawn,,}}和@file{@trampfn{sudo,,}}具有相同的效果。
+@end defopt
+
+
+@node Multi-hops
+@section 使用多跳连接到远程主机
+@cindex multi-hop
+@cindex proxy hosts
+
+多跳是到达防火墙后面的主机或从堡垒主机内部到达外部世界的方法。  通过多跳，@value{tramp} 可以在每个跃点通过适当的用户/主机身份验证来协商这些跃点。  到目前为止，所有方法都是单跳类型，其中连接的起点和终点没有中间检查点。
+
+@defopt tramp-default-proxies-alist
+@code{tramp-default-proxies-alist} 指定要经过的代理主机。  该用户选项是由 @code{(@var{host} @var{user} @var{proxy})} 组成的三元组列表。
+
+第一个匹配是通过其传递文件名的代理主机和匹配@var{user}@@@var{host}的目标主机。  @var{host}和@var{user}是正则表达式或@code{nil}，解释为始终匹配的正则表达式。
+
+@var{proxy} 是文字 @value{tramp} 文件名，其本地名部分被忽略，方法和用户名部分是可选的。
+
+该方法必须是内联方法 (@pxref{Inline methods})。  如果@var{proxy}是@code{nil}，则无需额外的跳跃即可到达@var{user}@@@var{host}。
+
+例如，要以用户 @samp{bird} 的身份通过主机 @samp{bastion.your.domain} 到达本地域之外的远程主机：
+
+@lisp
+@group
+(add-to-list 'tramp-default-proxies-alist
+             '("\\." nil "@trampfn{ssh,bird@@bastion.your.domain,}"))
+(add-to-list 'tramp-default-proxies-alist
+             '("\\.your\\.domain\\'" nil nil))
+@end group
+@end lisp
+
+@strong{Note}: @code{add-to-list} 在列表的开头添加元素。  因此，最相关的规则必须排在列表的最后。
+
+代理主机可以在列表中级联。  如果有另一个名为 @samp{jump.your.domain} 的主机，它是唯一允许连接到 @samp{bastion.your.domain} 的主机，则：
+
+@lisp
+@group
+(add-to-list 'tramp-default-proxies-alist
+             '("\\`bastion\\.your\\.domain\\'"
+               "\\`bird\\'"
+               "@trampfn{ssh,jump.your.domain,}"))
+@end group
+@end lisp
+
+@var{proxy} 可以分别采用模式@code{%h} 或@code{%u} 来表示@var{host} 或@var{user}。  端口或域（如果它们是跃点文件名的一部分）不会通过这些模式进行扩展。
+
+要在域 @samp{your.domain} 中的远程主机上以 @samp{root} 身份登录，但对于非本地访问禁用以 @samp{root} 身份登录，则使用以下列表条目：
+
+@lisp
+@group
+(add-to-list 'tramp-default-proxies-alist
+             '("\\.your\\.domain\\'" "\\`root\\'" "@trampfn{ssh,%h,}"))
+@end group
+@end lisp
+
+打开@file{@trampfn{sudo,randomhost.your.domain,}}首先通过您帐户名下的@code{ssh}连接到@samp{randomhost.your.domain}，然后在该主机上执行@code{sudo -u root}。
+
+上例中的 @option{sudo} 方法的关键是在到达主机后应用于主机而不是本地主机。因此，@value{tramp} 检查此类跃点的主机名是否与前一跃点的主机名匹配。
+
+@var{host}、@var{user} 和 @var{proxy} 也可以采用 Lisp 形式。  这些形式在求值时必须返回字符串或@code{nil}。
+
+概括一下（来自前面的示例）：对于除本地主机之外的所有主机，首先通过 @command{ssh} 连接，然后应用 @command{sudo -u root}：
+
+@lisp
+@group
+(add-to-list 'tramp-default-proxies-alist
+             '(nil "\\`root\\'" "@trampfn{ssh,%h,}"))
+(add-to-list 'tramp-default-proxies-alist
+             `(,(regexp-quote (system-name)) nil nil))
+@end group
+@end lisp
+@end defopt
+
+通过跳跃涉及处理受限制的 shell，例如 @command{rbash}。  如果 @value{tramp} 被告知，那么它只会将它们用作代理。
+
+@defopt tramp-restricted-shell-hosts-alist
+运行受限 shell 的主机的正则表达式列表，例如 @command{rbash}。  @value{tramp} 将仅使用它们作为代理。
+
+要将上面示例中的堡垒主机指定为运行受限 shell：
+
+@lisp
+@group
+(add-to-list 'tramp-restricted-shell-hosts-alist
+             "\\`bastion\\.your\\.domain\\'")
+@end group
+@end lisp
+@end defopt
+
+
+@node Firewalls
+@section 通过防火墙
+@cindex http tunnel
+@cindex proxy hosts, http tunnel
+
+有时，无法直接到达远程主机。  防火墙可能会阻碍，可以通过代理服务器通过。
+
+OpenSSH 和 PuTTY 都支持此类代理设置，通过 @command{CONNECT} 命令使用 HTTP 隧道（符合 RFC 2616、2817 规范）。  使用HTTP 1.1或更高版本协议的代理服务器支持该命令。
+
+
+@subsection 使用 ssh 建立隧道
+
+@vindex ProxyCommand@r{, ssh option}
+对于@command{ssh}，您可以在@file{~/.ssh/config}中使用@option{ProxyCommand}条目：
+
+@example
+@group
+Host host.other.domain
+     ProxyCommand nc -X connect -x proxy.your.domain:3128 %h %p
+@end group
+@end example
+
+@code{nc}是BSD的netcat程序，它建立HTTP隧道。也可以使用具有此类功能的任何其他程序。
+
+在示例中，打开 @file{@trampfn{ssh,host.your.domain,}} 会通过端口 3128 上的 HTTP 代理服务器 @samp{proxy.your.domain}。
+
+
+@subsection 使用 PuTTY 建立隧道
+
+PuTTY 不需要外部程序，内置 HTTP 隧道支持。  在 PuTTY 配置程序中，为 @samp{host.your.domain} 创建一个会话。  在 @option{Connection/Data} 条目中，选择 @option{HTTP} 选项，并将 @samp{proxy.your.domain} 添加为 @option{Proxy hostname}，将 3128 添加为 @option{Port}。
+
+打开 @file{@trampfn{plinkx,host.your.domain,}} 会通过端口 3128 上的 HTTP 代理服务器 @samp{proxy.your.domain}。
+
+
+@node Customizing Methods
+@section 使用非标准方法
+@cindex customizing methods
+@cindex using non-standard methods
+@cindex create your own methods
+
+@vindex tramp-methods
+@code{tramp-methods} 变量当前有一个详尽的预定义方法列表。  该列表的任何部分都可以使用更合适的设置进行修改。  请参阅该变量的 Lisp 文档，可通过 @kbd{C-h v tramp-methods @key{RET}} 访问。
+
+在 ELPA 档案中，有多个此类扩展的示例。它们可以通过 Emacs 的包管理器安装。  这包括
+
+@table @samp
+@c @item anything-tramp
+@c @item counsel-tramp
+@c @item helm-tramp
+@c Contact Masashí Míyaura <masasam@users.noreply.github.com>
+
+@c @item ibuffer-tramp.el
+@c Contact Svend Sorensen <svend@@ciffer.net>
+
+@cindex method @option{incus}
+@cindex @option{incus} method
+@item incus-tramp
+Incus 容器的集成。  通过 @file{@trampfn{incus,user@@container,/path/to/file}}、@samp{user} 和 @samp{container} 访问容器的含义与 @option{docker} 方法相同。
+
+@cindex method @option{lxc}
+@cindex @option{lxc} method
+@item lxc-tramp
+LXC 容器的集成。  通过 @file{@trampfn{lxc,container,/path/to/file}} 访问容器，@samp{container} 与 @option{docker} 方法具有相同的含义。  @samp{user} 规范将被忽略。
+
+@cindex method @option{lxd}
+@cindex @option{lxd} method
+@item lxd-tramp
+LXD 容器的集成。  通过 @file{@trampfn{lxd,user@@container,/path/to/file}}、@samp{user} 和 @samp{container} 访问容器的含义与 @option{docker} 方法相同。
+
+@cindex method @option{git}
+@cindex @option{git} method
+@item magit-tramp
+使用 @code{magit} 浏览 Git 存储库。  版本化文件可通过 @file{@trampfn{git,rev@@root-dir,/path/to/file}} 访问。 @samp{rev} 是 Git 修订版，@samp{root-dir} 是根目录的虚拟主机名，在 @code{magit-tramp-hosts-alist} 中指定。
+
+@cindex method @option{hdfs}
+@cindex @option{hdfs} method
+@item tramp-hdfs
+访问hadoop/hdfs文件系统。  通过 @file{@trampfn{hdfs,user@@node,/path/to/file}} 访问文件，其中 @samp{user} 是您要使用的用户，@samp{node} 是 hadoop 服务器的名称。
+
+@c @cindex method @option{rpc}
+@c @cindex @option{rpc} method
+@c @item tramp-rpc
+@c This is a @value{tramp} backend of its own.  It uses a remote server
+@c process to serve the requests, which gains better performance.
+
+@cindex method @option{vagrant}
+@cindex @option{vagrant} method
+@item vagrant-tramp
+访问 vagrant box 的便捷方法。  它经常用于多跳文件名，如 @file{@trampfn{vagrant@value{postfixhop}box|sudo,box,/path/to/file}}，其中 @samp{box} 是 vagrant box 的名称。
+
+@end table
+
+
+@node Customizing Completion
+@section 选择用户/主机名补全的配置文件
+@cindex customizing completion
+@cindex selecting config files
+
+@vindex tramp-completion-function-alist
+@code{tramp-completion-function-alist} 使用预定义文件完成用户名和主机名 (@pxref{File name completion})。  对于每种方法，它都会保留一组配置文件和一个可以解析该文件的函数。  @code{tramp-completion-function-alist} 中的每个条目的形式为 (@var{method} ​​@var{pair1} @var{pair2} @dots{})。
+
+每个@var{pair}由(@var{function}@var{file})组成。 @var{function} 负责从 @var{file} 中提取用户名和主机名以完成。  有两个函数可以访问该变量：
+
+@defun tramp-get-completion-function method
+该函数返回 @var{method} 的完成函数列表。
+
+例子：
+@example
+@group
+(tramp-get-completion-function "rsh")
+
+     @result{} ((tramp-parse-rhosts "/etc/hosts.equiv")
+         (tramp-parse-rhosts "~/.rhosts"))
+@end group
+@end example
+@end defun
+
+@defun tramp-set-completion-function method function-list
+该函数将@var{function-list}设置为@var{method}的完成函数列表。
+
+例子：
+@example
+@group
+(tramp-set-completion-function "ssh"
+ '((tramp-parse-sconfig "/etc/ssh_config")
+   (tramp-parse-sconfig "~/.ssh/config")))
+
+     @result{} ((tramp-parse-sconfig "/etc/ssh_config")
+         (tramp-parse-sconfig "~/.ssh/config"))
+@end group
+@end example
+@end defun
+
+存在以下解析配置文件的预定义函数：
+
+@ftable @asis
+@item @code{tramp-parse-rhosts}
+
+该函数解析语法上等同于@file{~/.rhosts}的文件。  如果指定的话，它会返回主机名和用户名。
+
+@item @code{tramp-parse-shosts}
+
+该函数解析语法上等同于@file{~/.ssh/known_hosts}的文件。  由于此类文件中没有指定用户名，因此它只能返回主机名。
+
+@item @code{tramp-parse-sconfig}
+
+此函数返回由 @file{~/.ssh/config} 样式文件中的 @option{Host} 条目定义的主机昵称。
+
+@item @code{tramp-parse-shostkeys}
+
+目录 @file{/etc/ssh2/hostkeys/*} 和 @file{~/ssh2/hostkeys/*} 的 SSH2 解析。  主机以文件名 @file{hostkey_@var{portnumber}_@var{host-name}.pub} 进行编码。  用户名始终为@code{nil}。
+
+@item @code{tramp-parse-sknownhosts}
+
+另一种 SSH2 风格的目录解析，如 @file{/etc/ssh2/knownhosts/*} 和 @file{~/ssh2/knownhosts/*}。  在这种情况下，主机名被编码在文件名@file{@var{host-name}.@var{algorithm}.pub}中。  用户名始终为@code{nil}。
+
+@item @code{tramp-parse-hosts}
+
+专用于主机名@file{/etc/hosts}的函数。
+
+@item @code{tramp-parse-passwd}
+
+解析 @file{/etc/passwd} 用户名的函数。
+
+@item @code{tramp-parse-etc-group}
+
+解析 @file{/etc/group} 以获得组名称的函数。
+
+@item @code{tramp-parse-netrc}
+
+解析 @file{~/.netrc} 和 @file{~/.authinfo} 样式文件的函数。
+
+@end ftable
+
+要将具有自定义数据的自定义文件保存在自定义结构中，必须提供自定义函数。  该函数必须满足以下约定：
+
+@defun my-tramp-parse file
+@var{file} 必须是主机上的文件，或者@code{nil}。  该函数必须返回 (@var{user} @var{host}) 列表，这些列表被视为用户名和主机名的补全候选。
+
+例子：
+@example
+@group
+(my-tramp-parse "~/.my-tramp-hosts")
+
+     @result{} ((nil "toto") ("daniel" "melancholia"))
+@end group
+@end example
+@end defun
+
+
+@node Password handling
+@section 对多个连接重复使用密码
+@cindex passwords
+
+为了避免重复提示输入密码，请考虑使用本机缓存机制，例如 @command{ssh-agent} 代表 @option{ssh} 类方法，或 @command{pageant} 代表 @option{plink} 类方法。
+
+@value{tramp} 当本机解决方案无法满足需求时提供替代方案。
+
+
+@anchor{Using an authentication file}
+@subsection 使用身份验证文件
+
+@vindex auth-sources
+软件包@file{auth-source.el}最初是为No Gnus开发的，它从不同的来源读取密码，@xref{Help for users, , auth-source, auth}。  默认身份验证文件是@file{~/.authinfo}，但可以通过用户选项@code{auth-sources}更改。
+
+@noindent
+身份验证文件中的典型条目：
+
+@example
+machine melancholia port scp login daniel password geheim
+@end example
+
+该端口可以采用任何 @value{tramp} 方法（@pxref{Inline methods}、@pxref{External methods}）。  省略端口值匹配所有 @value{tramp} 方法。  @value{tramp} 文件名语法中使用的域和端口必须附加到计算机和登录项：
+
+@example
+machine melancholia#4711 port davs login daniel%BIZARRE password geheim
+@end example
+
+对于方法@option{doas}、@option{sudo}、@option{sudoedit}和@option{nspawn}，需要请求连接的用户的密码，而不是目标用户@footnote{On the local host, @code{run0} uses a graphical password agent.}的密码。  如果这些连接发生在本地主机上，则使用包含本地用户和本地主机的条目：
+
+@example
+machine @var{host} port sudo login @var{user} password secret
+@end example
+
+@var{user}和@var{host}是@code{(user-login-name)}和@code{(system-name)}返回的字符串。  如果其中一种方法通过多跳 (@pxref{Multi-hops}) 连接，则使用前一跳的凭据。
+
+@vindex auth-source-save-behavior
+如果不存在正确的条目，则会以交互方式读取密码。  成功登录（验证密码）后，Emacs 会保存相应的条目，以供支持此功能的 @code{auth-source} 后端进一步使用。  这可以通过将用户选项 @code{auth-source-save-behavior} 设置为 @code{nil} 来更改。
+
+@vindex auth-source-debug
+将 @code{auth-source-debug} 设置为 @code{t} 以调试消息。
+
+@vindex ange-ftp-netrc-filename
+@strong{Note} @file{auth-source.el} 不用于 @option{ftp} 连接，因为 @value{tramp} 将工作传递给 Ange FTP@. 例如，如果您想要使用 @file{~/.authinfo.gpg} 身份验证文件，则必须自定义 @code{ange-ftp-netrc-filename}：
+
+@lisp
+(customize-set-variable 'ange-ftp-netrc-filename "~/.authinfo.gpg")
+@end lisp
+
+如果您不想使用 @value{tramp} 密码的身份验证文件，请使用连接本地变量
+@ifinfo
+(@pxref{Connection Variables, , , emacs})
+@end ifinfo
+像这样：
+
+@lisp
+@group
+(connection-local-set-profile-variables
+ 'remote-without-auth-sources '((auth-sources . nil)))
+@end group
+
+@group
+(connection-local-set-profiles
+ '(:application tramp) 'remote-without-auth-sources)
+@end group
+@end lisp
+
+
+@anchor{Caching passwords}
+@subsection 缓存密码
+
+@value{tramp} 可以缓存输入的密码，并在需要时重复使用相同的用户或主机名，而与访问方法无关。
+
+@vindex auth-source-cache-expiry
+@code{auth-source-cache-expiry}@footnote{It overrides @code{password-cache-expiry}.} 设置记住密码的持续时间（以秒为单位）。  将 @code{auth-source-cache-expiry} 设置为 @code{nil} 以禁用过期。
+
+缓存的密码永远不会永久保存，也不会超出当前 Emacs 会话的生命周期，除非您以交互方式确认这一点。
+
+@vindex auth-source-do-cache
+将 @code{auth-source-do-cache} 设置为 @code{nil} 以禁用密码缓存。
+
+对于使用会话超时的连接，如 @option{sudo}、@option{doas} 和 @option{run0}，当会话过期 (@pxref{Predefined connection information}) 时，密码缓存将在 @value{tramp} 过期。  但是，只有当无法从持久身份验证文件或存储中检索密码时，这才有意义。
+
+
+@node Connection caching
+@section 重用连接相关信息
+@cindex caching
+
+@vindex tramp-persistency-file-name
+为了更快的初始连接时间，@value{tramp} 将以前的连接属性存储在用户选项 @code{tramp-persistency-file-name} 指定的文件中。
+
+@code{tramp-persistency-file-name} 的默认文件名为 @file{~/.emacs.d/tramp}。
+
+@value{tramp} 在 Emacs 启动期间读取此文件，并在退出 Emacs 时写入该文件。  删除 @value{tramp} 的此文件，以便在下次 Emacs 启动时重新创建一个新文件。
+
+将@code{tramp-persistency-file-name}设置为@code{nil}以禁用持久存储连接。
+
+当@value{tramp}检测到远程主机中操作系统版本的更改（通过命令@command{uname -sr}）时，它会刷新该主机的所有连接相关信息并创建一个新条目。
+
+
+@node Predefined connection information
+@section 设置自己的连接相关信息
+
+为了更精确的定制，可以手动覆盖@code{tramp-methods}指定的参数。
+
+@vindex tramp-connection-properties
+设置 @code{tramp-connection-properties} 以手动覆盖 @code{tramp-methods}。  此列表中的属性采用 @code{(@var{regexp} @var{property} @var{value})} 形式。  @var{regexp} 匹配远程文件名。  使用 @code{nil} 来匹配所有。 @var{property} 是属性名称，@var{value} 是属性值。
+
+@var{property} 是@code{tramp-methods} 中包含的任何方法特定参数。  @code{tramp-methods}中的参数键是符号名称@code{tramp-<foo>}。  要覆盖该属性，请使用字符串 @t{"<foo>"} 代替 @var{property}。  例如，这会更改远程 shell：
+
+@lisp
+@group
+(add-to-list 'tramp-connection-properties
+             (list (regexp-quote "@trampfn{ssh,user@@randomhost.your.domain,}")
+                   "remote-shell" "/bin/ksh"))
+@end group
+
+@group
+(add-to-list 'tramp-connection-properties
+             (list (regexp-quote "@trampfn{ssh,user@@randomhost.your.domain,}")
+                   "remote-shell-login" '("-")))
+@end group
+@end lisp
+
+@code{tramp-methods} 中的参数 @code{tramp-remote-shell} 和 @code{tramp-remote-shell-login} 现在具有远程主机的新值。
+
+@var{property} 也可以是 @code{tramp-persistency-file-name} 中找到的任何属性。
+
+
+@subsection 要覆盖的相关连接属性
+
+并非所有连接属性都需要更改。  这里列出了最相关的属性：
+
+@itemize
+@item @t{"login-program"}
+
+属性@t{"login-program"}存储用于连接到远程主机的程序。  有时，该程序在您的主机上可能有另一个名称，或者可能位于另一个路径中。  在这种情况下，您可以覆盖默认值，该值对于每种连接方法都是特殊的。  它用于@file{tramp-sh.el}的所有连接方法。
+
+@item @t{"login-args"}
+
+@t{"login-args"} 指定要传递给 @t{"login-program"} 的参数列表。  阅读 @code{tramp-methods} 如何构建这些列表的文档字符串。
+
+@item @t{"remote-shell"}
+
+该属性告诉 @value{tramp} 在远程主机上应用哪个远程 shell。  它用于@file{tramp-sh.el}的所有连接方法。  默认值为@t{"/bin/sh"}。
+
+@item @t{"remote-shell-login"}
+
+与 @t{"remote-shell"} 结合使用的属性。  它指定哪个 shell 参数触发登录 shell。  它的默认值是 @t{"-l"}，但有些 shell，如 @command{ksh}，更喜欢 @t{"-"}。
+
+@item @t{"session-timeout"}
+
+所有基于 @file{tramp-sh.el} 的方法都接受属性 @t{"session-timeout"}。  这是出于安全原因禁用连接后必须重新建立连接的时间（以秒为单位）@footnote{If there is a modified buffer, or a buffer under @code{auto-revert}, this is suppressed.}。  值为 3⁣ 会禁用此功能。  除了使用预定义值的 @option{sudo}、@option{doas} 和 @option{run0} 方法之外，大多数方法都不会设置此属性。
+
+@item @t{"~"}@*
+@t{"~user"}
+
+这是远程主机上的主目录。  设置此连接属性特别有助于无法扩展到远程主目录的方法，例如 @option{adb}、@option{rclone} 和 @option{sshfs}。  @ref{Home directories} 为例。
+
+@item @t{"tmpdir"}
+
+远程主机上的临时目录。  如果未指定，则对于@option{adb}和@option{androidsu}方法，默认值为@t{"/data/local/tmp"}，对于@option{smb}方法，默认值为@t{"/C$/Temp"}，否则为@t{"/tmp"}。  @xref{Temporary directory}。
+
+@item @t{"posix"}
+
+使用 @option{smb} 方法的连接检查远程主机是否支持 posix 命令。  如果远程主机运行 Samba，则它确认此功能。  然而，一些非常旧的 Samba 版本在实现中存在错误。  为了抑制这些主机的 posix 命令，属性 @t{"posix"} 应设置为 @code{nil}。
+
+该属性的默认值为@code{t}（未在@code{tramp-methods}中指定）。  如果远程主机运行本机 MS Windows，则此属性无效。
+
+@item @t{"mount-point"}
+
+挂载基于 @acronym{FUSE} 的文件系统的目录文件名。  该属性的默认值为@t{"<TMP>/tramp.method.user@@host#port"}（未在@code{tramp-methods}中指定）。  @ref{Temporary directory}。
+
+@item @t{"mount-args"}@*
+@t{"copyto-args"}@* @t{"moveto-args"}@* @t{"about-args"}
+
+这些属性为不同的 @option{rclone} 操作保留可选标志。  如果您想更改它们的值，请参阅 @code{tramp-methods} 中的默认值。
+@end itemize
+
+
+@node Remote programs
+@section @value{tramp} 如何查找并使用远程主机上的程序
+
+@value{tramp} 需要访问远程主机上的多个命令：@command{ls}、@command{test}、@command{find} 和 @command{cat}。
+
+此外，还有其他连接@ref{Inline methods}和@ref{External methods}所需的程序。
+
+为了提高远程文件访问的性能和准确性，@value{tramp} 使用@command{perl}（或@command{perl5}）和@command{grep}（如果可用）。
+
+@defopt tramp-remote-path
+@code{tramp-remote-path} 指定@value{tramp} 可以搜索@ref{Remote programs} 的远程目录路径。
+
+@vindex tramp-default-remote-path
+@value{tramp} 使用标准默认值，例如 @file{/bin} 和 @file{/usr/bin}，这对于大多数主机来说都是合理的。  为了适应主机和路径的差异，例如 Debian GNU/Linux 上的 @file{/bin:/usr/bin} 或 Solaris 上的 @file{/usr/xpg4/bin:/usr/ccs/bin:/usr/bin:/opt/developerstudio12.6/bin}，@value{tramp} 使用 @command{getconf PATH} 查询远程主机并更新符号 @code{tramp-default-remote-path}。
+
+对于主机出于安全原因保留模糊路径位置的情况，请手动将此类路径添加到本地 @file{.emacs} ，如下所示，以便 @value{tramp} 在连接时使用。
+
+@lisp
+(add-to-list 'tramp-remote-path "/usr/local/perl/bin")
+@end lisp
+
+@vindex tramp-own-remote-path
+查找远程路径的另一种方法是使用远程主机分配给远程用户的路径。  @value{tramp} 登录后通常不会保留此远程路径。  但是，@code{tramp-own-remote-path} 保留路径值，可用于更新@code{tramp-remote-path}。
+
+@lisp
+(add-to-list 'tramp-remote-path 'tramp-own-remote-path)
+@end lisp
+
+@strong{Note} 仅当您的远程 @command{/bin/sh} shell 支持登录参数 @samp{-l} 时，此功能才有效。
+@end defopt
+
+@code{tramp-remote-path} 也可以通过本地连接为每个主机设置
+@ifinfo
+变量，@xref{Connection Variables, , , emacs}。
+@end ifinfo
+@ifnotinfo
+变量。
+@end ifnotinfo
+您可以像这样定义自己的搜索目录：
+
+@lisp
+@group
+(connection-local-set-profile-variables
+ 'remote-path-with-bin
+ '((tramp-remote-path . ("~/bin" tramp-default-remote-path))))
+@end group
+
+@group
+(connection-local-set-profile-variables
+ 'remote-path-with-apply-pub-bin
+ '((tramp-remote-path . ("/appli/pub/bin" tramp-default-remote-path))))
+@end group
+
+@group
+(connection-local-set-profiles
+ '(:application tramp :machine "randomhost") 'remote-path-with-bin)
+@end group
+
+@group
+(connection-local-set-profiles
+ '(:application tramp :user "anotheruser" :machine "anotherhost")
+ 'remote-path-with-apply-pub-bin)
+@end group
+@end lisp
+
+当远程搜索路径更改时，必须重新计算本地 @value{tramp} 缓存。  要强制 @value{tramp} 重新计算，请调用 @kbd{M-x tramp-cleanup-this-connection @key{RET}} 或朋友 (@pxref{Cleanup remote connections})。
+
+
+@node Remote shell setup
+@section 远程 shell 设置提示
+
+
+@subsection 更改默认的远程或本地 shell
+@cindex zsh setup
+
+默认情况下，@value{tramp} 使用命令 @command{/bin/sh} 在远程主机上启动 shell。  这可以通过设置连接属性@t{"remote-shell"}来更改； @pxref{Predefined connection information}。  例如，如果您想在远程主机上使用 @command{/usr/bin/zsh}，您可以应用
+
+@lisp
+@group
+(add-to-list 'tramp-connection-properties
+             (list (regexp-quote "@trampfn{sshx,user@@host,}")
+                   "remote-shell" "/usr/bin/zsh"))
+@end group
+@end lisp
+
+这仅适用于允许覆盖远程登录 shell 的连接方法，例如 @option{sshx} 或 @option{plink}。 @xref{Inline methods}和@ref{External methods}，用于支持此功能的连接方法。
+
+@vindex tramp-sh-extra-args
+这种方法还有一个优点，即将应用 @code{tramp-sh-extra-args} 中的设置。  对于@command{zsh}，将避免由于设置 zle 选项而导致的 shell 提示符问题。对于@command{bash}，加载@file{~/.editrc}或@file{~/.inputrc}被抑制。
+
+类似的问题也可能发生在本地 shell @value{tramp} 用于创建进程的情况下。  默认情况下，它使用命令 @command{/bin/sh} 来执行此操作，该命令也可以是到另一个 shell 的链接。  为了覆盖它，您可以应用
+
+@vindex tramp-encoding-shell
+@lisp
+(customize-set-variable 'tramp-encoding-shell "/usr/bin/zsh")
+@end lisp
+
+这也使用@code{tramp-sh-extra-args}中的设置。
+
+@vindex RemoteCommand@r{, ssh option}
+@strong{Note}：如果您使用基于 @option{ssh} 的连接方法，请执行 @emph{not} 将 @command{ssh} 配置中的 @option{RemoteCommand} 选项设置为 @command{screen} 之类的内容。  如果使用，@option{RemoteCommand} 必须在远程主机上打开交互式 shell。  另一方面，一些基于@option{ssh}的方法，如@option{sshx}或@option{scpx}，会默默地覆盖配置文件的@option{RemoteCommand}选项。
+
+
+@subsection 其他远程 shell 设置提示
+@cindex remote shell setup
+@cindex @file{.profile} file
+@cindex @file{.login} file
+@cindex shell init files
+
+@value{tramp} 检查标准程序在常用位置的可用性。  常见的策略包括依次尝试@command{test -e}、@command{/usr/bin/test -e}和@command{/bin/test -e}。  @command{ls -d}是另一种方法。  但这些方法对这些新的登录模式没有帮助。
+
+当@value{tramp}遇到双因素登录或其他挑战问题时，例如输入出生日期或安全代码或密码，@value{tramp}需要更多配置步骤来适应它们。
+
+密码提示和密码短语提示之间的区别在于，密码用于完成登录，而密码提示用于授权访问本地身份验证信息，例如 ssh 密钥。
+
+没有一种配置可以适应登录安全性的所有变化，尤其是外来的变化。  但是，@value{tramp} 提供了一些调整来解决最常见的问题。
+
+@table @asis
+@vindex tramp-shell-prompt-pattern
+@item @code{tramp-shell-prompt-pattern}
+
+@code{tramp-shell-prompt-pattern} 是远程登录 shell 提示符，它可能与本地登录 shell 提示符@code{shell-prompt-pattern} 不同。  由于大多数主机使用相同的提示，因此 @value{tramp} 为两个提示设置相似的默认值。
+
+@vindex tramp-password-prompt-regexp
+@item @code{tramp-password-prompt-regexp}
+@vindex tramp-otp-password-prompt-regexp
+@item @code{tramp-otp-password-prompt-regexp}
+@vindex tramp-wrong-passwd-regexp
+@item @code{tramp-wrong-passwd-regexp}
+
+@value{tramp} 使用 @code{tramp-password-prompt-regexp} 来区分密码提示和密码短语提示。默认情况下，@code{tramp-password-prompt-regexp} 处理英语环境中的检测。  请参阅下面的本地化示例：
+
+@lisp
+@group
+(customize-set-variable
+ 'tramp-password-prompt-regexp
+ (concat
+  "^.*"
+  (regexp-opt
+   '("passphrase" "Passphrase"
+     ;; English
+     "password" "Password"
+     ;; Deutsch
+     "passwort" "Passwort"
+     ;; Français
+     "mot de passe" "Mot de passe")
+   t)
+  ".*:\0? *"))
+@end group
+@end lisp
+
+@vindex password-word-equivalents
+默认情况下，加载 @value{tramp} 时，此用户选项从 @code{password-word-equivalents} 初始化，通常向该用户选项添加新密码比更改此用户选项更方便。
+
+用户选项 @code{tramp-otp-password-prompt-regexp} 具有类似的用途，但用于一次性密码。  @value{tramp} 不会缓存这些密码以供重复使用。
+
+处理错误的密码提示可能需要类似的本地化，其中@value{tramp}使用@code{tramp-wrong-passwd-regexp}。
+
+@vindex tramp-terminal-type
+@vindex TERM@r{, environment variable}
+@item @code{tramp-terminal-type}
+
+@value{tramp} 使用用户选项 @code{tramp-terminal-type} 为其运行的 shell 设置远程环境变量 @env{TERM}。默认情况下，它是@t{"dumb"}，但可以更改。  哑终端最适合运行 @value{tramp} 的后台会话。  但是，运行交互式远程 shell 可能需要不同的设置。  这可以通过调整 @code{process-environment} 中的 @env{TERM} 环境变量来实现。
+
+@lisp
+@group
+(let ((process-environment
+       (cons "TERM=xterm-256color" process-environment)))
+  (shell))
+@end group
+@end lisp
+
+@vindex TERM@r{, environment variable}
+@vindex INSIDE_EMACS@r{, environment variable}
+@item 确定 @value{tramp} 会话
+
+有时，需要识别 shell 是否在 @value{tramp} 控制下运行。  环境变量 @env{TERM} 的设置将有所帮助：
+
+@example
+@group
+if test "$TERM" = "dumb"; then
+   @dots{}
+fi
+@end group
+@end example
+
+另一种可能性是检查环境变量@env{INSIDE_EMACS}。  与 Emacs 的所有子进程一样，这被设置为父 Emacs 的版本
+@ifinfo
+过程，@xref{Interactive Shell, , , emacs}。
+@end ifinfo
+@ifnotinfo
+过程。
+@end ifnotinfo
+@value{tramp} 将自己的包版本添加到该字符串中，可用于在劣质 shell 中进行进一步测试。  该环境变量的字符串看起来总是这样
+
+@example
+@group
+echo $INSIDE_EMACS
+@result{} 27.2,tramp:2.4.5
+@end group
+@end example
+
+@cindex unix command @command{tset}
+@cindex @command{tset} unix command
+@item @command{tset} 以及其他问题
+
+为了抑制终端类型的不当提示，@value{tramp} 在远程登录过程开始之前通过用户选项 @code{tramp-terminal-type} 设置 @env{TERM} 环境变量（见上文）。  这将使常见的 @command{tset} 相关提示静音。
+
+@value{tramp} 处理此类提示（通常由远程主机上的登录脚本触发）的策略是设置环境变量，以便没有提示中断 shell 初始化过程。
+
+@vindex tramp-actions-before-shell
+另一种方法是使用可以使用 @code{tramp-actions-before-shell} 识别此类问题的字符串来配置 @value{tramp}。  例子：
+
+@lisp
+@group
+(defconst my-tramp-prompt-regexp
+  "Enter the birth date of your mother:\\s-*"
+  "Regular expression matching my login prompt question.")
+@end group
+
+@group
+(defun my-tramp-action (proc vec)
+  "Enter \"19000101\" in order to give a correct answer."
+  (save-window-excursion
+    (with-current-buffer (tramp-get-connection-buffer vec)
+      (tramp-message vec 6 "\n%s" (buffer-string))
+      (tramp-send-string vec "19000101"))))
+@end group
+
+@group
+(add-to-list 'tramp-actions-before-shell
+             '(my-tramp-prompt-regexp my-tramp-action))
+@end group
+@end lisp
+
+@code{tramp-actions-before-shell} 中使用的正则表达式必须与连接缓冲区的末尾匹配。  由于性能原因，此搜索从缓冲区末尾开始，并且向后限制为 256 个字符。
+
+@item @file{.profile} 中用户和变量的名称冲突
+
+当用户名与本地文件中的变量名相同时，例如@file{.profile}，则@value{tramp}可能会发送错误的环境变量值。  为了避免错误的值，请将局部变量名称更改为与用户名不同的名称。  例如，如果用户名是@env{FRUMPLE}，则将变量名称更改为@env{FRUMPLE_DIR}。
+
+@item @file{.profile} 中的非 Bourne 命令
+
+当远程主机的 @file{.profile} 也用于 Bourne shell 以外的 shell 时，@file{.profile} 中命令的某些不兼容语法可能会在主机上的 Bourne shell 中触发错误，并且可能无法完成客户端的 @value{tramp} 连接。
+
+@file{.profile} 中 Bourne shell 不兼容语法的一个示例：使用 @command{export FOO=bar} 而不是 @command{FOO=bar; export FOO}。  远程登录后，@value{tramp} 在远程主机上执行 @command{/bin/sh} 期间将触发错误，因为 Bourne shell 无法识别@file{.profile}中输入的导出命令。
+
+同样，路径中的 (@samp{~}) 字符也会导致错误，因为 Bourne shell 不执行 (@samp{~}) 字符扩展。
+
+避免这些不兼容性的一种方法是使 @file{~/.shrc} 和 @file{~/.profile} Bourne shell 中的所有命令兼容，以便 @value{tramp} 可以完成与该远程设备的连接。为了适应在该远程上使用非 Bourne shell，请使用其他特定于 shell 的配置文件。  例如，bash 可以使用 @file{~/.bash_profile} 并忽略 @file{.profile}。
+
+@vindex INSIDE_EMACS@r{, environment variable}
+@vindex SHELLNAME@r{, environment variable}
+@vindex ESHELL@r{, environment variable}
+@item 交互式 shell 提示符
+
+@value{tramp} 在内部重新定义远程 shell 提示符以实现稳健的解析。  此重新定义会通过命令（例如 @kbd{M-x shell @key{RET}}）影响交互式远程 shell 中提示符的外观。  但是，可以使用这些环境变量将此类提示重置为更具可读性和可识别性。
+
+@value{tramp} 在启动脚本文件@file{~/.emacs_SHELLNAME}中设置@env{INSIDE_EMACS}环境变量。
+
+@env{SHELLNAME} 是 @code{bash} 或等效的 shell 名称。  通过在 @file{.emacs} 中设置环境变量 @env{ESHELL} 来更改它，如下所示：
+
+@lisp
+(setenv "ESHELL" "bash")
+@end lisp
+
+然后重新设置@file{~/.emacs_SHELLNAME}中的提示字符串，如下：
+
+@example
+@group
+# Reset the prompt for remote @value{tramp} shells.
+if [ "$@{INSIDE_EMACS/*tramp*/tramp@}" == "tramp" ] ; then
+   PS1="[\u@@\h \w]$ "
+fi
+@end group
+@end example
+
+@ifinfo
+@xref{Interactive Shell, , , emacs}.
+@end ifinfo
+
+@cindex unix command @command{nc}
+@cindex @command{nc} unix command
+@item @command{busybox} / @command{nc}
+
+@value{tramp}的@option{nc}方法使用@command{nc}命令安装并执行监听器，如下所示（参见@code{tramp-methods}）：
+
+@example
+$ nc -l -p 42
+@end example
+
+上述命令行语法已随 @command{busybox} 版本而更改。  如果@command{nc}拒绝@samp{-p}参数，则按如下方式覆盖：
+
+@lisp
+@group
+(add-to-list 'tramp-connection-properties
+             `(,(regexp-quote "192.168.0.1")
+               "remote-copy-args" (("-l") ("%r"))))
+@end group
+@end lisp
+
+@noindent
+其中 @samp{192.168.0.1} 是远程主机 IP 地址 (@pxref{Predefined connection information})。
+
+@end table
+
+
+@node Ssh setup
+@section ssh 设置提示
+
+最常见的 @value{tramp} 连接系列基于 OpenSSH 的 @command{ssh} 或 @command{scp}，或者 MS Windows 上 PuTTY 的 @command{plink} 或 @command{pscp}。  下面给出一些配置建议。
+
+
+@subsection 使用 ssh 配置包含主机名补全
+
+@vindex Include@r{, ssh option}
+@findex tramp-set-completion-function
+@findex tramp-get-completion-function
+OpenSSH 配置文件可以使用 @option{Include} 选项来配置更多配置文件。  默认 @value{tramp} 主机名补全忽略此选项。  但是，您可以自行配置。
+
+鉴于，您的 @file{~/.ssh/config} 文件包含以下选项：
+
+@example
+Include ~/.ssh/conf.d/*
+@end example
+
+@file{.emacs} 中的以下代码片段使用该目录中的所有文件来完成主机名：
+
+@lisp
+@group
+(tramp-set-completion-function
+ "ssh" (append (tramp-get-completion-function "ssh")
+               (mapcar (lambda (file) `(tramp-parse-sconfig ,file))
+                       (directory-files
+                        "~/.ssh/conf.d/"
+                        'full directory-files-no-dot-files-regexp))))
+@end group
+@end lisp
+
+此代码片段针对 @option{ssh} 方法执行此操作。  如果您将 @t{"ssh"} 替换为 @t{"scp"}，它也会为该方法（或您喜欢的任何其他方法）执行此操作。
+
+
+@subsection 检测会话环聊
+
+@vindex ServerAliveInterval@r{, ssh option}
+@vindex ServerAliveCountMax@r{, ssh option}
+@command{ssh} 当网络关闭时，本地主机上的会话将挂起。  @value{tramp} 无法安全地检测此类挂起。  可以使用 @file{~/.ssh/config} 中的以下设置将 OpenSSH 配置为终止此类挂起：
+
+@example
+@group
+Host *
+     ServerAliveInterval 5
+     ServerAliveCountMax 2
+@end group
+@end example
+
+相应的 PuTTY 配置位于 @option{Connection} 条目、@option{Seconds between keepalives} 选项中。  将其设置为 5。PuTTY 没有与 OpenSSH 的@option{ServerAliveCountMax} 等效的配置选项。
+
+
+@anchor{Using ssh connection sharing}
+@subsection 使用 ssh 连接共享
+
+@vindex ControlPath@r{, ssh option}
+@vindex ControlPersist@r{, ssh option}
+如果可能，@value{tramp} 默认使用 @option{ControlMaster=auto} OpenSSH 选项。  但是，在启动 @command{ssh} 会话时，它会覆盖 @option{ControlPath} 设置。  @value{tramp} 这样做是为了避免在 Emacs 会话之外打开的主会话不再打开时出现停顿。  这就是为什么即使已经打开了 @command{ssh}，@value{tramp} 也会再次提示输入密码。
+
+@vindex tramp-ssh-controlmaster-options
+某些 OpenSSH 版本支持 @option{ControlPersist} 选项，允许您设置 @option{ControlPath}，前提是变量 @code{tramp-ssh-controlmaster-options} 自定义如下：
+
+@lisp
+@group
+(customize-set-variable
+ 'tramp-ssh-controlmaster-options
+ (concat
+  "-o ControlPath=/tmp/ssh-ControlPath-%%r@@%%h:%%p "
+  "-o ControlMaster=auto -o ControlPersist=yes"))
+@end group
+@end lisp
+
+请注意@samp{%r}、@samp{%h} 和@samp{%p} 必须如何编码为@samp{%%r}、@samp{%%h} 和@samp{%%p}。
+
+@vindex tramp-use-connection-share
+仅当用户选项 @code{tramp-use-connection-share} 设置为 @code{t} 时，才会在 @code{tramp-ssh-controlmaster-options} 中使用预定义字符串，或迷惑自己的字符串。  如果 @file{~/.ssh/config} 文件针对上述行为进行了适当配置，则可以使用此 @code{nil} 设置抑制对 @command{ssh} 的任何更改：
+
+@lisp
+(customize-set-variable 'tramp-use-connection-share nil)
+@end lisp
+
+有时，无法对远程进程使用 OpenSSH 的 @option{ControlMaster} 选项。  这可能会导致不同进程读取数据时并发访问 OpenSSH 套接字，从而阻塞 Emacs。  在这种情况下，将 @code{tramp-use-connection-share} 设置为 @code{suppress} 将禁用共享访问。  不需要将此用户选项永久设置为@code{suppress}，在调用@code{make-process}之前绑定用户选项就足够了。  @value{tramp} 为 esxample 自行完成编译过程。
+
+@vindex ProxyCommand@r{, ssh option}
+@vindex ProxyJump@r{, ssh option}
+如果您在 @command{ssh} 配置中使用 @option{ProxyCommand} 或 @option{ProxyJump} 选项，@code{tramp-use-connection-share} 也应设置为 @code{nil} 或 @code{suppress}。
+
+为了使用@option{ControlMaster}选项，@value{tramp}必须检查@command{ssh}客户端是否支持此选项。  对于第一跳，这只能在本地主机上进行。  因此，@value{tramp} 不在代理主机上使用此选项。
+
+如果您想对其他跃点也使用此选项，则必须在代理主机上配置 @file{~/.ssh/config}：
+
+@example
+@group
+Host *
+     ControlMaster      auto
+     ControlPath        tramp.%C
+     ControlPersist     no
+@end group
+@end example
+
+检查 @samp{ssh_config(5)} 手册页您的代理主机是否支持这些选项。
+
+在 MS Windows 上，@code{tramp-use-connection-share} 默认设置为 @code{nil}，因为 MS Windows 和 MSYS2 实现的 @command{OpenSSH} 不正确支持此选项。
+
+在 PuTTY 中，您可以在 @option{Connection/SSH} 条目中启用 @option{Share SSH connections if possible} 选项来实现连接共享。  @code{tramp-use-connection-share} 必须设置为 @code{nil}。  如果@code{tramp-use-connection-share}设置为@code{t}或@code{suppress}，则分别使用选项@option{-share}或@option{-noshare}调用@command{plink}。
+
+
+@subsection 配置两个远程服务器之间的直接复制
+
+@vindex tramp-use-scp-direct-remote-copying
+@value{tramp} 通过外部方法在不同远程主机之间复制两个文件时使用临时本地副本。  此行为是由于身份验证问题@value{tramp} 无法充分处理造成的。  然而，对于@option{scp}连接来说，这是可以改变的。  当文件应在两个不同的远程主机@samp{source}和@samp{target}之间复制时，并且
+
+@itemize @minus
+@item 
+用户选项@code{tramp-use-scp-direct-remote-copying}非@code{nil}，
+
+@item 
+远程主机@samp{source}不使用@file{~/.ssh/config}中的@option{RemoteCommand}选项，
+
+@item 
+当从本地主机和主机 @samp{source} 看到时，远程主机 @samp{target} 显示相同的主机密钥，并且
+
+@item 
+在主机 @samp{source} 上运行的 @command{scp} 可以在不需要密码的情况下向主机 @samp{target} 进行身份验证，
+@end itemize
+
+@noindent
+@value{tramp} 在主机 @samp{source} 和 @samp{target} 之间应用直接远程复制，例如
+
+@example
+scp -p -T -R -q -r source:/path/to/file target:/path/to/another/file
+@end example
+
+这还可以保护您的本地临时目录在复制大文件时免遭溢出。
+
+如果这些条件不适用，并且@code{tramp-use-scp-direct-remote-copying}非@code{nil}，则使用选项@samp{-3}代替@samp{-R}。
+
+@c FIXME
+当 @value{tramp} 使用直接远程复制时，不会查阅密码缓存。
+
+
+@subsection Cygwin 和 MS Windows ssh 的问题
+@cindex cygwin, issues
+@cindex ms Windows, issues
+
+本节不完整。  请分享您的解决方案。
+
+@cindex ms windows and @command{ssh}
+@cindex ms windows and @command{ssh-agent}
+
+MS Windows 的 @command{ssh} 无法打开远程 TTY@. 请改用方法 @option{sshx} 或 @option{scpx}。  此外，它无法读取 ssh 私钥的密码。  使用 MS @code{ssh-agent}。
+
+@cindex method @option{sshx} with cygwin
+@cindex @option{sshx} method with cygwin
+
+Cygwin 的 @command{ssh} 仅适用于 Cygwin 版本的 Emacs。  要检查兼容性：输入@kbd{M-x eshell @key{RET}}，然后启动@kbd{ssh test.host @key{RET}}。  不兼容会触发此消息：
+
+@example
+Pseudo-terminal will not be allocated because stdin is not a terminal.
+@end example
+
+Cygwin 的某些旧版本的 @command{ssh} 使用 @option{sshx} 访问方法。  有关详细信息，请参阅 @uref{https://cygwin.com/faq/} 上的 Cygwin 常见问题解答。
+
+@cindex cygwin and @command{fakecygpty}
+@cindex @command{fakecygpty} and cygwin
+
+@uref{https://www.emacswiki.org/emacs/SshWithNTEmacs, the Emacs Wiki} 解释了如何使用帮助程序@command{fakecygpty} 来解决此问题。
+
+@cindex method @option{scpx} with cygwin
+@cindex @option{scpx} method with cygwin
+
+当使用 @option{scpx} 访问方法时，Emacs 可能会使用 MS Windows 文件命名来调用 @command{scp}，例如 @file{c:/foo}。  但是随 Cygwin 安装的 @command{scp} 版本不知道 MS Windows 文件命名，这导致它错误地查找名为 @samp{c} 的主机。
+
+解决方法：为 @option{scp} 编写一个包装脚本，将 Windows 文件名转换为 Cygwin 文件名。
+
+@cindex cygwin and @command{ssh-agent}
+@cindex @env{SSH_AUTH_SOCK} and emacs on ms windows
+@vindex SSH_AUTH_SOCK@r{, environment variable}
+
+在 MS Windows 上使用 cygwin @command{ssh-agent} 进行无密码交互时，@option{ssh} 方法取决于环境变量 @env{SSH_AUTH_SOCK}。  但是，当从桌面快捷方式启动 Emacs 并且身份验证失败时，不会设置此变量。
+
+一种解决方法是使用基于 MS Windows 的 SSH 代理，例如本机 MS @command{ssh-agent} 或 @command{Pageant}。  后者是 PuTTY 工具套件的一部分。
+
+后备方案是从 shell 启动 Emacs。
+
+
+@node FUSE setup
+@section @acronym{FUSE} 设置提示
+
+@acronym{FUSE} 文件系统默认安装在 @t{"<TMP>/tramp.method.user@@host#port"}。@footnote{@ref{Temporary directory}} 方法为 @t{"rclone"} 或 @t{"sshfs"}。  用户名和端口号是可选的。  如果文件系统已安装，则将按原样使用。  如果挂载点尚不存在，@value{tramp} 将创建此目录。
+
+挂载点可以被连接属性@t{"mount-point"}、@pxref{Predefined connection information}覆盖。例子：
+
+@lisp
+@group
+(add-to-list 'tramp-connection-properties
+             `(,(regexp-quote "@trampfn{sshfs,user@@host,}")
+               "mount-point"
+               ,(expand-file-name "sshfs.user@@host" user-emacs-directory)))
+@end group
+@end lisp
+
+@vindex tramp-fuse-unmount-on-cleanup
+用户选项 @code{tramp-fuse-unmount-on-cleanup} 当设置为非 @code{nil} 时，控制是否在连接清理或 Emacs 退出时卸载装载点。
+
+
+@anchor{Setup of rclone method}
+@subsection @option{rclone}设置
+@cindex rclone setup
+
+检查您的 @command{rclone} 程序是否已使用安装支持进行编译。  调用 @samp{rclone mount} 并检查是否有错误消息。
+
+有时，保存的配置会过期。  在这种情况下，您必须使用命令 @samp{rclone config reconnect @var{remote}:} 更新它，其中 @var{remote} 是您配置的系统存储的名称。
+
+@command{rclone}操作@command{mount}、@command{copyto}、@command{moveto}和@command{about}的默认参数在变量@code{tramp-methods}中声明为方法特定参数。  通常，它们不需要被覆盖。
+
+如果需要，可以将这些参数覆盖为连接属性 @t{"mount-args"}、@t{"copyto-args"}、@t{"moveto-args"} 和 @t{"about-args"}、@xref{Predefined connection information}。  它们都是字符串列表。
+
+请小心更改 @t{"--dir-cache-time"}，这可能会延迟文件的可见性。
+
+
+@anchor{Setup of sshfs method}
+@subsection @option{sshfs}设置
+@cindex sshfs setup
+
+方法 @option{sshfs} 在变量 @code{tramp-methods} 中声明挂载参数，并传递给 @command{sshfs} 命令。  这是一个字符串列表的列表，可以被连接属性@t{"mount-args"}、@xref{Predefined connection information}覆盖。
+
+此外，它还使用 @command{ssh} 命令声明运行远程进程的参数。  这些不需要改变。
+
+
+@node Android shell setup
+@section Android shell 设置提示
+@cindex android shell setup for ssh
+
+@value{tramp} 使用 @option{adb} 方法访问 Android 设备。 Android 设备通过 USB 连接提供受限的 shell 访问。  本地主机必须安装@command{adb}程序。  通常，打开文件@file{@trampfn{adb,,/}}就足够了。  然后您可以通过@code{dired}在文件系统中导航。
+
+或者，在 Android 设备上运行 @command{sshd} 进程的@code{Termux} 或 @code{SSHDroid} 等应用程序可以接受任何基于 @option{ssh} 的方法，前提是调整这些设置：
+
+@itemize
+@item 
+由于 Android 设备不提供 @command{/bin/sh}，因此必须为远程 shell 指定@command{sh}。  然后，@command{sh} 将使用以下设置调用设备上安装的任何 shell：
+
+@lisp
+@group
+(add-to-list 'tramp-connection-properties
+             (list (regexp-quote "192.168.0.26") "remote-shell" "sh"))
+@end group
+@end lisp
+
+@noindent
+其中 @samp{192.168.0.26} 是 Android 设备的 IP 地址。 （@pxref{Predefined connection information}）。
+
+@item 
+在 Android 设备上，目录名称以应用程序特定前缀为前缀，在 @code{Termux} 情况下为 @file{/data/data/com.termux/files/usr/bin} 而不是 @file{/usr/bin}。  您必须调整@code{tramp-remote-path}中的文件名，例如通过连接本地
+@ifinfo
+设置（@pxref{Connection Variables, , , emacs}）：
+@end ifinfo
+@ifnotinfo
+设置：
+@end ifnotinfo
+
+@lisp
+@group
+(connection-local-set-profile-variables
+ 'tramp-connection-local-termux-profile
+ `((tramp-remote-path
+    . ,(mapcar
+	(lambda (x)
+	  (if (stringp x) (concat "/data/data/com.termux/files" x) x))
+	(copy-tree tramp-remote-path)))))
+
+(connection-local-set-profiles
+ '(:application tramp :machine "192.168.0.26")
+ 'tramp-connection-local-termux-profile)
+@end group
+@end lisp
+
+@item 
+当Android设备不是@samp{rooted}时，为临时文件指定可写目录：
+
+@lisp
+(add-to-list 'tramp-connection-properties
+             (list (regexp-quote "192.168.0.26")
+		   "tmpdir" "/data/data/com.termux/files/home/tmp"))
+@end lisp
+
+@item 
+使用命令@kbd{C-x C-f打开远程连接
+@trampfn{ssh,192.168.0.26#2222,} @key{RET}}, where @command{sshd} is
+监听端口 @samp{2222}。
+
+要将相应的条目添加到 @file{~/.ssh/config} 文件（推荐），请使用以下命令：
+
+@example
+@group
+Host android
+     HostName 192.168.0.26
+     User root
+     Port 2222
+@end group
+@end example
+
+@noindent
+要使用主机名 @samp{android} 而不是上一示例中显示的 IP 地址，请按如下所示修复连接属性：
+
+@lisp
+@group
+(add-to-list 'tramp-connection-properties
+             (list (regexp-quote "android") "remote-shell" "sh"))
+(add-to-list 'tramp-connection-properties
+             (list (regexp-quote "android")
+		   "tmpdir" "/data/data/com.termux/files/home/tmp"))
+(connection-local-set-profiles
+ '(:application tramp :machine "android")
+ 'tramp-connection-local-termux-profile)
+@end group
+@end lisp
+
+@noindent
+使用更简洁的命令@kbd{C-x C-f打开远程连接
+@trampfn{ssh,android,} @key{RET}}.
+@end itemize
+
+
+@node Kubernetes setup
+@section Kubernetes 设置提示
+
+通过@option{kubernetes}方法，可以访问Kubernetes Pod中的容器。  主机名是由 @samp{kubectl get pods} 返回的 Pod 名称，如果应使用显式容器名称，则为 @samp{@var{container}.@var{pod}} 返回。  否则，将使用 Pod 中的第一个容器。
+
+有时，没有专用容器名称的主机的异步进程会显示类似 @samp{Defaulted container "container1" out of: container1, container2} 的警告。  可以通过将 pod 注释 @samp{kubectl.kubernetes.io/default-container} 设置为适当的值（本例中为@samp{container1}）来缓解这种情况。
+
+@vindex tramp-kubernetes-context
+@vindex tramp-kubernetes-namespace
+@value{tramp} 使用默认的 Kubernetes 上下文和命名空间。  如果要使用另一个上下文或命名空间，请分别配置用户选项@code{tramp-kubernetes-context}或@code{tramp-kubernetes-namespace}。  主机名中显式的 @samp{%@var{namespace}} 后缀优先。
+
+
+@node Auto-save File Lock and Backup
+@section 自动保存、文件锁定和备份配置
+@cindex auto-save
+@cindex file-lock
+@cindex backup
+
+@vindex backup-directory-alist
+为了避免 @value{tramp} 将 @samp{root} 拥有的备份文件保存到其他人可访问的位置，必须更改 @code{backup-directory-alist} 中的默认备份设置。
+
+这是文件可能会无意中暴露的场景。  默认情况下，Emacs 会将备份文件写入与原始文件相同的目录，除非更改为其他位置，例如 @file{~/.emacs.d/backups/}。  当使用受限文件@file{@trampfn{su,root@@localhost,/etc/secretfile}}时，@value{tramp}也会默认使用这样的目录。  秘密文件的备份文件现在由从 @value{tramp} 而非 @samp{root} 登录的用户拥有。
+
+当@code{backup-directory-alist}为@code{nil}（默认）时，不会出现此类问题。
+
+@vindex make-backup-files
+如果您不想使用远程文件的备份文件，请使用连接本地变量@code{make-backup-files}
+@ifinfo
+(@pxref{Connection Variables, , , emacs})
+@end ifinfo
+像这样：
+
+@lisp
+@group
+(connection-local-set-profile-variables
+ 'no-remote-backup-files '((make-backup-files . nil)))
+@end group
+
+@group
+(connection-local-set-profiles
+ '(:application tramp) 'no-remote-backup-files)
+@end group
+@end lisp
+
+@noindent
+禁用备份可以仅针对 @option{su} 和 @option{sudo} 方法：
+
+@lisp
+@group
+(connection-local-set-profiles
+ '(:application tramp :protocol "su") 'no-remote-backup-files)
+@end group
+
+@group
+(connection-local-set-profiles
+ '(:application tramp :protocol "sudo") 'no-remote-backup-files)
+@end group
+@end lisp
+
+@vindex tramp-backup-directory-alist
+另一种选择是创建更好的备份文件命名，将用户名和主机名作为文件名前缀。  例如，将 @file{/etc/secretfile} 转换为 @file{~/.emacs.d/backups/!su:root@@localhost:!etc!secretfile}，从现有用户选项 @code{backup-directory-alist} 设置 @value{tramp} 用户选项 @code{tramp-backup-directory-alist}。
+
+然后 @value{tramp} 备份到一个由 DIRECTORY 名称组成的前缀转换后的文件名。  仅当 DIRECTORY 是绝对本地文件名时，才会出现此文件名前缀。
+
+@noindent
+例子：
+
+@lisp
+@group
+(add-to-list 'backup-directory-alist
+             (cons "." "~/.emacs.d/backups/"))
+(customize-set-variable
+ 'tramp-backup-directory-alist backup-directory-alist)
+@end group
+@end lisp
+
+@noindent
+@file{@trampfn{su,root@@localhost,/etc/secretfile}} 的备份文件名为
+@ifset unified
+@file{@trampfn{su,root@@localhost,~/.emacs.d/backups/@c !su:root@@localhost:!etc!secretfile~}}.
+@end ifset
+@ifset separate
+@file{@trampfn{su,root@@localhost,~/.emacs.d/backups/@c ![su!root@@localhost]!etc!secretfile~}}.
+@end ifset
+
+@vindex auto-save-file-name-transforms
+正如备份文件一样，类似的文件命名问题也会影响自动保存远程文件。  自动保存的文件保存在用户选项@code{auto-save-file-name-transforms}指定的目录中。默认情况下，此目录设置为本地临时目录。  但在 Debian GNU/Linux 的某些版本中，这指向编译 Emacs 的源目录。  将此类值重置为有效目录。
+
+将@code{auto-save-file-name-transforms}设置为@code{nil}可将自动保存的文件保存到与原始文件相同的目录中。
+
+@vindex tramp-auto-save-directory
+或者，设置用户选项 @code{tramp-auto-save-directory} 将所有自动保存定向到该位置。
+
+@c Since Emacs 30.
+@vindex remote-file-name-inhibit-auto-save
+如果您想完全禁止自动保存远程文件，请将用户选项@code{remote-file-name-inhibit-auto-save}设置为非@code{nil}。
+
+@c Since Emacs 29.
+@vindex remote-file-name-inhibit-auto-save-visited
+@code{auto-save-mode} 的替代方案是 @code{auto-save-visited-mode}。  在此模式下，自动保存与显式保存相同。  如果您想对远程文件禁用此行为，请将用户选项 @code{remote-file-name-inhibit-auto-save-visited} 设置为非 @code{nil}。
+
+@vindex lock-file-name-transforms
+还有更多问题需要处理。  文件锁使用与自动保存文件类似的用户选项，称为@code{lock-file-name-transforms}。  默认情况下，此用户选项为@code{nil}，表示将文件锁保留在与原始文件相同的目录中。
+
+如果您更改 @code{lock-file-name-transforms} 以便在其他地方保留远程文件的文件锁，那么当文件从不同的 Emacs 会话或通过不同的远程连接并行更改时，您将失去 Emacs 的警告功能。  请小心此类设置。
+
+@vindex remote-file-name-inhibit-locks
+将 @code{remote-file-name-inhibit-locks} 设置为非 @code{nil} 根本可以防止创建远程锁定文件。
+
+@vindex tramp-allow-unsafe-temporary-files
+默认情况下，@value{tramp} 会要求确认是否必须将 @samp{root} 拥有的远程备份、自动保存或锁定文件写入本地临时目录。  如果您想抑制此确认问题，请将用户选项 @code{tramp-allow-unsafe-temporary-files} 设置为 @code{t}。
+
+
+@node Keeping files encrypted
+@section 通过加密保护远程文件
+@cindex Encrypt remote directories
+
+@strong{Note}：@value{tramp}中的文件加密是实验性的，请勿在生产系统中使用它！
+
+有时，需要保护位于远程目录（例如云存储）上的文件。  为此，您可以指示 @value{tramp} 加密复制到给定远程目录的所有文件，并在访问时解密这些文件。  这包括文件内容和文件名。
+
+@value{tramp} 透明地执行此操作。  尽管文件和文件名都在远程端加密，但它们可以在 Emacs 内部访问，因为它们不会被转换为这样。
+
+@cindex @command{encfs}
+@cindex @command{encfsctl}
+在内部，@value{tramp} 使用@command{encfs} 包。因此，只有在本地主机上安装此软件包后，此功能才可用。  @value{tramp} 不会永久保留 @samp{encfs mountpoint}。  相反，它使用 @command{encfsctl} 动态加密/解密文件和文件名。
+
+@deffn Command tramp-crypt-add-directory name
+此命令将现有远程目录 @var{name} 标记为加密。  该目录和所有子目录中的文件将在复制到该目录之前进行加密，并在从该目录复制之后进行解密。  文件和目录名称也将被加密。
+@end deffn
+
+@defopt tramp-crypt-encfs-program
+这是 @command{encfsctl} 程序的名称。  如果它不在您的 @env{PATH} 环境变量中，您可以在此处设置绝对路径。
+@end defopt
+
+@defopt tramp-crypt-encfs-option
+如果远程目录被标记为加密，则首次访问该目录中的文件时将通过 @command{encfs} 对其进行初始化。  该用户选项控制将选择哪个默认的@command{encfs}配置选项，可以是@t{"--standard"}或@t{"--paranoia"}。  有关详细信息，请参阅 @samp{encfs(1)} 手册页。
+
+然而，@value{tramp}必须适应这些配置集。  必须禁用 @option{chainedNameIV} 配置选项；否则@value{tramp}无法透明地处理文件名加密。
+@end defopt
+
+第一次访问加密的远程目录时，会创建受密码保护的 @option{encfs} 配置文件。  它保存在您的 @code{user-emacs-directory} 中，其中 url 编码的目录名称作为基本名称的一部分，并以 @file{encfs6.xml} 作为后缀。  例如，如果您将远程目录@file{@trampfn{nextcloud,user@@host,/path/to/dir}}标记为加密，则配置文件将在@code{user-emacs-directory}中保存为@file{tramp-%2Fnextcloud%3Auser%40host%3A%2Fpath%2Fto%2Fdir%2F.encfs6.xml}。  不要丢失该文件和相应的密码；否则无法解密您的加密文件。
+
+@defopt tramp-crypt-save-encfs-config-remote
+如果此用户选项为非@code{nil}（默认），则@option{encfs}配置文件@file{.encfs6.xml}也保存在加密的远程目录中。  这取决于您是否认为该文件的密码保护足够。  优点是，这样的远程目录可以由不同的 Emacs 会话、不同的用户访问，而无需在用户之间预先共享配置文件。
+@end defopt
+
+命令@command{encfsctl}是加密/解密的主力，每次调用都需要配置文件密码。因此，建议在 Emacs 中缓存此密码。  这可以使用 @code{auth-sources}、@pxref{Using an authentication file} 来完成。条目需要 url 编码的目录名称（计算机）、本地用户名（用户）和密码。  端口是可选的，如果给定它必须是字符串@t{"crypt"}。  上面的示例需要在身份验证文件中包含以下条目（@t{"yourname"} 是 @code{(user-login-name)} 的结果）：
+
+@example
+machine %2Fnextcloud%3Auser%40host%3A%2Fpath%2Fto%2Fdir%2F \
+        login yourname port crypt password geheim
+@end example
+
+如果您使用带有引号的本地名称部分的远程文件名，则该本地名称和相应的文件将不会被加密/解密。  如果您有加密的远程目录@file{@trampfn{nextcloud,user@@host,/path/to/dir}}，则该命令
+
+@example
+@kbd{C-x d @trampfn{nextcloud,user@@host,/path/to/dir}}
+@end example
+
+@noindent
+将显示带有纯文件名的目录列表，以及命令
+
+@example
+@kbd{C-x d @trampfn{nextcloud,user@@host,/:/path/to/dir}}
+@end example
+
+@noindent
+将显示带有加密文件名的目录列表，访问文件将显示其加密内容。  但是，强烈建议不要在同一目录中混合加密和未加密的文件。
+
+@deffn Command tramp-crypt-remove-directory name
+该命令应用于指示 @code{name} 中的文件不应再加密。  现有的加密文件和子目录将保持加密状态。
+@end deffn
+
+
+@node Usage
+@chapter 使用@value{tramp}
+@cindex using @value{tramp}
+
+@value{tramp} 透明地运行，访问远程文件就像访问本地文件一样。  然而，@value{tramp} 采用形式化的远程文件命名语法来透明地执行其功能。  该语法由许多部分组成，指定访问方法、身份验证、主机名和文件名。  Ange FTP 使用类似的语法。
+
+@cindex type-ahead
+
+与在 Emacs 中打开本地文件是瞬时的不同，在 @value{tramp} 中打开远程文件一开始会比较慢。  有时，在迷你缓冲区中出现输入密码或身份验证的提示之前，会出现明显的延迟。  在此间隙期间按下 @kbd{@key{RET}} 或其他键将由 Emacs 处理。  这种预先输入功能是 Emacs 的一项功能，在使用 @value{tramp} 时可能会导致错过提示。
+
+@menu
+* File name syntax::             @value{tramp} 文件名约定。
+@ifset unified
+* Change file name syntax::      替代文件名语法。
+@end ifset
+* File name completion::         文件名补全。
+* Ad-hoc multi-hops::            在文件名中声明多个跃点。
+* Home directories::             将 @file{~} 扩展到主目录。
+* Remote processes::             与其他 Emacs 软件包集成。
+* Cleanup remote connections::   清理远程连接。
+* Renaming remote files::        重命名远程文件。
+* Archive file names::           访问文件档案中的文件。
+@end menu
+
+
+@node File name syntax
+@section @value{tramp} 文件名约定
+@cindex file name syntax
+@cindex file name examples
+
+@file{@trampfn{method,user@@host,/path/to/file}} 使用方法 @var{method} 在远程主机 @var{host} 上为用户 @var{user} 打开文件 @var{/path/to/file}。
+
+@c We cannot use @trampfn{} in @item.
+@table @file
+@item @value{prefix}ssh@value{postfixhop}melancholia@value{postfix}.emacs
+对于位于主机 @samp{melancholia} 上主目录中的文件 @file{.emacs}，使用方法 @option{ssh}。
+
+@item @value{prefix}ssh@value{postfixhop}melancholia.danann.net@value{postfix}.emacs
+对于使用主机的完全限定域名指定的文件@file{.emacs}。
+
+@item @value{prefix}ssh@value{postfixhop}melancholia@value{postfix}~/.emacs
+对于使用波形符 @file{~} 指定的文件 @file{.emacs}，该文件已展开。
+
+@item @value{prefix}ssh@value{postfixhop}melancholia@value{postfix}~daniel/.emacs
+对于位于主机上@samp{daniel}主目录中的文件@file{.emacs}，@samp{melancholia}。  @file{~<user>} 构造扩展到远程主机上该用户的主目录。
+
+@item @value{prefix}ssh@value{postfixhop}melancholia@value{postfix}/etc/squid.conf
+对于主机@samp{melancholia}上的文件@file{/etc/squid.conf}。
+
+@end table
+
+@var{host} 可以采用 IPv4 或 IPv6 地址，如 @file{@trampfn{ssh,127.0.0.1,.emacs}} 或 @file{@trampfn{ssh,@value{ipv6prefix}::1@value{ipv6postfix},.emacs}} 中所示。
+@ifset unified
+出于语法原因，IPv6 地址必须嵌入方括号@file{@value{ipv6prefix}} 和@file{@value{ipv6postfix}} 中。
+@end ifset
+
+默认情况下，@value{tramp}将使用当前本地用户名作为登录远程主机的远程用户名。  使用正确的语法指定不同的名称将覆盖此默认行为：@file{@trampfn{method,user@@host,path/to/file}}。  用户名也可以从环境变量中获取，例如@file{@trampfn{method,@env{$MY_REMOTE_USER}@@host,path/to/file}}。
+
+@file{@trampfn{ssh,daniel@@melancholia,.emacs}} 用于主机 @samp{melancholia} 上 @samp{daniel} 主目录中的文件 @file{.emacs}，通过方法 @option{ssh} 访问。
+
+要指定端口号，请将 @file{#<port>} 附加到主机名。  例如：@file{@trampfn{ssh,daniel@@melancholia#42,.emacs}}。如果主机是 IPv6 地址，则端口将按如下方式附加：@file{@trampfn{ssh,@value{ipv6prefix}::1@value{ipv6postfix}#42,.emacs}}。
+
+所有方法、用户名、主机名、端口号和本地名部分都是可选的，@xref{Default Method}、@xref{Default User}、@xref{Default Host}。
+@ifset unified
+出于语法原因，默认方法必须由伪方法 @file{-} 指示。
+@end ifset
+
+@defvar tramp-method-regexp
+@defvarx tramp-user-regexp
+@defvarx tramp-host-regexp
+@defvarx tramp-port-regexp
+@defvarx tramp-localname-regexp
+
+这些正则表达式定义远程文件名组件的语法。
+
+方法名称必须在关联列表@code{tramp-methods}中定义。
+@end defvar
+
+
+@ifset unified
+@node Change file name syntax
+@section 替代文件名语法
+@cindex change file name syntax
+@cindex alternative file name syntax
+
+@ref{File name syntax} 中描述的语法是 @code{default} 语法，该语法在 Emacs 启动后有效。  然而，这可以改变。
+
+@deffn Command tramp-change-syntax syntax
+此命令更改 @value{tramp} 用于远程文件名的语法。  除了 1⁣ 值之外，@var{syntax} 还可以是
+
+@itemize
+@cindex simplified syntax
+@item @code{simplified}
+
+此远程文件名语法类似于 Ange FTP@. 使用的语法，远程文件名的格式为@file{@value{prefix}user@@host@value{postfix}path/to/file}。  @samp{user@@}部分是可选的，方法由@ref{Default Method}决定。
+
+@cindex separate syntax
+@item @code{separate}
+
+@clear unified
+@set separate
+@include trampver.texi
+这种远程文件名语法起源于 XEmacs 文本编辑器。远程文件名的格式为@file{@trampfn{method,user@@host,path/to/file}}。  @samp{method} 和 @samp{user@@} 部分是可选的。
+@clear separate
+@set unified
+@include trampver.texi
+@end itemize
+@end deffn
+
+@defvar tramp-file-name-regexp
+此变量保留与所选远程文件名语法匹配的正则表达式。  每次调用 @code{tramp-change-syntax} 后，其值都会发生变化。  但是，不建议在外部包中使用此变量，调用 @code{file-remote-p} 更合适。
+@ifinfo
+@pxref{Magic File Names, , , elisp}.
+@end ifinfo
+@end defvar
+@end ifset
+
+
+@node File name completion
+@section 文件名补全
+@cindex file name completion
+
+@value{tramp} 可以完成以下 @value{tramp} 文件名组成部分：方法名称、用户名、主机名和位于远程主机上的文件名。
+
+例如，输入 @kbd{C-x C-f @value{prefixwithspace} s @key{TAB}}，@value{tramp} 补全选项显示为
+
+@example
+@group
+@multitable @columnfractions .2 .2 .2 .2 .2
+@item @c
+  sbin/ @tab @c
+  @value{prefixhop}scp@value{postfix} @tab @c
+  @value{prefixhop}scpx@value{postfix} @tab @c
+  @value{prefixhop}sftp@value{postfix} @tab @c
+  @value{prefixhop}sg@value{postfix}
+@item @c
+  @value{prefixhop}smb@value{postfix} @tab @c
+  srv/ @tab @c
+  @value{prefixhop}ssh@value{postfix} @tab @c
+  @value{prefixhop}sshx@value{postfix} @tab @c
+  @value{prefixhop}su@value{postfix}
+@item @c
+  @value{prefixhop}sudo@value{postfix} @tab @c
+  sys/
+@end multitable
+@end group
+@end example
+
+@samp{@value{prefixhop}ssh@value{postfixhop}} 是相应方法的可能完成，@samp{sbin/} 代表本地主机上的目录@file{/sbin}。
+
+输入 @kbd{s h @value{postfixhop}} 以使迷你缓冲区完成到 @samp{@value{prefix}ssh@value{postfixhop}}。  输入 @kbd{@key{TAB}} 显示从 @file{~/.ssh/config} 文件中提取的主机名 @value{tramp}，例如：
+
+@example
+@group
+@multitable @columnfractions .5 .5
+@item @c
+  @value{prefixhop}ssh@value{postfixhop}127.0.0.1@value{postfix} @tab @c
+  @value{prefixhop}ssh@value{postfixhop}192.168.0.1@value{postfix}
+@item @c
+  @value{prefixhop}ssh@value{postfixhop}@value{ipv6prefix}::1@value{ipv6postfix}@value{postfix} @tab @c
+  @value{prefixhop}ssh@value{postfixhop}localhost@value{postfix}
+@item @c
+  @value{prefixhop}ssh@value{postfixhop}melancholia.danann.net@value{postfix} @tab @c
+  @value{prefixhop}ssh@value{postfixhop}melancholia@value{postfix}
+@end multitable
+@end group
+@end example
+
+从上面的列表中选择一个主机，然后继续填写该主机上的文件名。
+
+当配置 (@pxref{Customizing Completion}) 包含用户名时，完成列表也将考虑用户名。
+
+@vindex tramp-completion-use-auth-sources
+@code{auth-sources} 搜索 (@pxref{Using an authentication file}) 的结果将添加到完成候选中。  这种搜索可能很烦人，例如由于 @file{~/.authinfo.gpg} 身份验证文件的密码请求。  用户选项@code{tramp-completion-use-auth-sources}控制是否在完成期间执行此类搜索。
+
+@vindex tramp-completion-use-cache
+先前访问过的远程主机或持久保持连接的主机 (@pxref{Connection caching}) 将包含在完成列表中。  如果由于持久性文件中存在无效条目而想要禁止此完成，例如，如果主机配置经常更改，或者如果您经常将笔记本电脑插入不同的网络，则可以将用户选项 @code{tramp-completion-use-cache} 设置为 @code{nil}。  这是所有基于容器的方法的默认设置，例如 @option{docker} 或 @option{podman}。  如果您想对其他连接禁止这种情况，可以使用连接属性@t{"completion-use-cache"}、@xref{Predefined connection information}。  例子：
+
+@lisp
+@group
+(add-to-list 'tramp-connection-properties
+             (list "^/sshfs:" "completion-use-cache" nil))
+@end group
+@end lisp
+
+远程主机名完成后，远程主机上的文件名完成。  它的工作方式与本地主机文件完成相同，只是使用双斜杠 @file{//} 终止仅终止 @value{tramp} 文件名语法的文件名部分。  三斜杠代表默认行为。
+@ifinfo
+@xref{Minibuffer File, , , emacs}.
+@end ifinfo
+
+@noindent
+例子：
+
+@example
+@group
+@kbd{C-x C-f @trampfn{ssh,melancholia,/usr/local/bin//etc} @key{TAB}}
+     @print{} @trampfn{ssh,melancholia,/etc}
+
+@kbd{C-x C-f @trampfn{ssh,melancholia,//etc} @key{TAB}}
+     @print{} @trampfn{ssh,melancholia,/etc}
+
+@kbd{C-x C-f @trampfn{ssh,melancholia,/usr/local/bin///etc} @key{TAB}}
+     @print{} /etc
+@end group
+@end example
+
+
+@node Ad-hoc multi-hops
+@section 在文件名中声明多个跃点
+@cindex multi-hop, ad-hoc
+@cindex proxy hosts, ad-hoc
+
+@value{tramp} 文件名语法可以适应多个代理的临时规范，而无需使用 @code{tramp-default-proxies-alist} 配置设置 (@pxref{Multi-hops})。
+
+每个代理都是使用与远程主机规范相同的语法减去文件名部分来指定的。  每跳由 @samp{|} 分隔。  将代理从起始主机链接到目标远程主机名和文件名。  例如，跳过单个代理 @samp{bird@@bastion} 到 @samp{you@@remotehost} 上的远程文件：
+
+@example
+@c @kbd{C-x C-f @trampfn{ssh@value{postfixhop}bird@@bastion|ssh,you@@remotehost,/path} @key{RET}}
+@kbd{C-x C-f @value{prefix}ssh@value{postfixhop}bird@@bastion|@c
+ssh@value{postfixhop}you@@remotehost@value{postfix}/path @key{RET}}
+@end example
+
+每个涉及的方法都必须由 @value{tramp} 的 @code{tramp-sh} 后端处理。
+
+@value{tramp} 将临时定义作为临时记录添加到 @code{tramp-default-proxies-alist}，这些定义可在该 Emacs 会话期间重用。  与同一远程主机的后续 @value{tramp} 连接可以使用缩写形式 @file{@trampfn{ssh,you@@remotehost,/path}}。
+
+@anchor{tramp-show-ad-hoc-proxies}
+@defopt tramp-show-ad-hoc-proxies
+如果此用户选项为非@code{nil}，则临时定义将保留在远程文件名中，而不是显示缩写。  如果临时代理定义将在以后的 Emacs 会话中使用，并保存在recentf 和其他包的配置文件中，那么这非常有用。
+
+该选项的非@code{nil}设置仅在建立连接之前设置才有效。
+
+@lisp
+(customize-set-variable 'tramp-show-ad-hoc-proxies t)
+@end lisp
+@end defopt
+
+通过命令 @kbd{M-x tramp-cleanup-all-connections @key{RET}} (@pxref{Cleanup remote connections}) 从 @code{tramp-default-proxies-alist} 中删除临时定义。
+
+@anchor{tramp-save-ad-hoc-proxies}
+@defopt tramp-save-ad-hoc-proxies
+为了将临时定义自动保存在 @code{tramp-default-proxies-alist} 中以供将来的 Emacs 会话使用，请将 @code{tramp-save-ad-hoc-proxies} 设置为非 @code{nil}。  生成的用户选项 @code{tramp-default-proxies-alist} 保存在您的 @file{.emacs} 文件中。
+
+如果您在另一台主机上使用保存的带有缩写的临时代理定义的配置文件（例如通过分发 @code{recentf-save-file}），则还必须分发您的 @file{.emacs} 文件。
+
+@lisp
+(customize-set-variable 'tramp-save-ad-hoc-proxies t)
+@end lisp
+@end defopt
+
+临时代理可以采用模式 @code{%h} 或 @code{%u}，如 @code{tramp-default-proxies-alist} 中。  以下文件名扩展为主机 @samp{remotehost} 上的用户 @samp{root}，从主机 @samp{remotehost} 上的 @option{ssh} 会话开始：@file{@trampfn{ssh@value{postfixhop}%h|su,remotehost,}}。
+
+另一方面，如果尾随跃点未指定主机名，则将重用前一跃点的主机名。  因此，以下文件名相当于前面的示例：@file{@trampfn{ssh@value{postfixhop}remotehost|su,,}}.
+
+@defopt tramp-completion-multi-hop-methods
+当此列表包含多跳连接中的最后一个方法时，将查询远程主机以获取完成候选列表。  例如，这可以提供远程主机上正在运行的 docker 或 podman 容器的列表。
+
+@lisp
+(customize-set-variable 'tramp-completion-multi-hop-methods
+ `(,tramp-docker-method ,tramp-podman-method))
+@end lisp
+@end defopt
+
+临时规范的一个常见用例是访问具有适当权限的文件或目录，例如使用 @option{sudo} 方法。  命令@code{tramp-revert-buffer-with-sudo}（@kbd{C-x x @@}）和@code{tramp-dired-find-file-with-sudo}（@code{dired-mode}中的@kbd{@@}）支持这一点。
+
+@kindex C-x x @@
+@deffn Command tramp-revert-buffer-with-sudo
+该命令使用 @option{sudo} 权限访问当前缓冲区。缓冲区必须访问文件或@code{dired-mode}中的目录。
+@end deffn
+
+@kindex @@ @r{(in dired})
+@deffn Command tramp-dired-find-file-with-sudo
+在@code{dired-mode}中，访问该行指定的文件或目录。这是使用 @option{sudo} 权限执行的。
+@end deffn
+
+@defopt tramp-file-name-with-method
+@code{tramp-revert-buffer-with-sudo}和@code{tramp-dired-find-file-with-sudo}中使用的方法。  默认为 @option{sudo}，其他有效方法为 @option{su}、@option{doas}、@option{run0} 和 @option{ksu}。  该值可以在本地连接上设置。
+
+如果使用前缀参数@kbd{C-u}调用命令，则以交互方式读取选项的值。
+@end defopt
+
+这些方法默认使用用户 @samp{root}。  如果需要另一个用户，请在用户选项@code{tramp-default-user-alist} (@pxref{Default User}) 中添加适当的规则：
+
+@lisp
+(add-to-list 'tramp-default-user-alist '("sudo" "remotehost" "admin"))
+@end lisp
+
+
+@subsection 对同一目的地使用不同的代理
+
+@strong{Note}：此功能是实验性的，请勿在生产系统中使用它！
+
+有时，需要为同一个目标主机名指定不同的代理。  当本地主机在一段时间内位于不同的网络中时，同一目标可能会发生这种情况。  当远程目标由远程相同文件名指定时，也可能会发生这种情况，尽管根据所使用的代理意味着不同的主机。  一个典型的例子是 docker 容器，它们以相同的 docker 名称运行在不同的主机上。
+
+当用户选项@code{tramp-show-ad-hoc-proxies}为非@code{nil}时，可以并行使用这种临时多跳文件名。  下面，在远程主机@samp{host1}和@samp{host2}上分别有一个docker容器@samp{name}：
+
+@example
+@trampfn{ssh@value{postfixhop}user1@@host1|docker,name,}
+@trampfn{ssh@value{postfixhop}user2@@host2|docker,name,}
+@end example
+
+如果您使用缩写名称 @samp{@trampfn{docker,name,}}，则会扩展上次使用的代理定义。
+
+
+@node Home directories
+@section 将 @file{~} 扩展到主目录
+
+远程主机上的主目录可以键入波形符@file{~}。  如果可能，它们将扩展到远程主机上的远程用户的主目录。  例子：
+
+@example
+@group
+@trampfn{ssh,user@@host,~}
+@result{} @trampfn{ssh,user@@host,/home/user}
+@end group
+@end example
+
+这通常适用于类似 @option{ssh} 的方法和 @option{sudoedit}。  这些方法还允许其他用户扩展主目录，例如
+
+@example
+@group
+@trampfn{sudoedit,,~otheruser}
+@result{} @trampfn{sudoedit,root@@localhost,/home/otheruser}
+@end group
+@end example
+
+对于其他方法，只有在支持的情况下才能扩展主目录。例如 @option{sftp} 方法就会发生这种情况。  需要远程文件名中的共享目录（@option{afp}、@option{smb}）的方法，使用此共享目录的值作为主目录：
+
+@example
+@group
+@trampfn{smb,user@@host,~}
+@result{} @trampfn{smb,user@@host,/share}
+@end group
+@end example
+
+由于@value{tramp}无法提前知道要使用哪个共享目录，因此仅当共享目录已被使用时才能应用此扩展。
+
+方法@option{adb}、@option{rclone}和@option{sshfs}根本不支持主目录扩展。  但是，@value{tramp} 将主目录保留在缓存中。  因此，这些方法可以配置为通过连接属性 @xref{Predefined connection information} 扩展主目录。  例子：
+
+@lisp
+@group
+(add-to-list 'tramp-connection-properties
+             (list (regexp-quote "@trampfn{sshfs,user@@randomhost.your.domain,}")
+                   "~user" "/home/user"))
+@end group
+@end lisp
+
+当您的远程文件名不包含 @samp{user} 部分时，必须使用连接属性 @t{"~"} 代替。
+
+如果没有远程主目录并且您没有指定相应的连接属性，则应避免在文件名中使用 @file{~}。这意味着例如
+
+@itemize
+@item
+不要使用 @file{@trampfn{ssh,user@@host,}} 或 @file{@trampfn{ssh,user@@host,~/}} 等远程文件名。  请使用绝对本地名称部分，例如 @file{@trampfn{ssh,user@@host,/path/to/file}}。
+
+@item
+禁用@code{tramp-histfile-override}、@ref{Managing remote shell history}：
+
+@lisp
+(setopt tramp-histfile-override nil)
+@end lisp
+@end itemize
+
+
+@node Remote processes
+@section 与其他 Emacs 软件包集成
+@cindex @code{compile}
+@cindex @code{recompile}
+
+@value{tramp} 支持在远程主机上启动新的正在运行的进程以发现远程文件名。  远程主机上的 Emacs 包不需要针对 @value{tramp} 的使用进行特定修改。
+
+这种类型的集成不适用于 @option{ftp} 方法，并且不支持 @code{start-file-process} 中指定的 pty 关联。
+
+当变量 @code{default-directory} 为远程时，@code{process-file} 和 @code{start-file-process} 在远程主机上工作：
+
+@lisp
+@group
+(let ((default-directory "/ssh:remote.host:"))
+  (start-file-process "grep" (get-buffer-create "*grep*")
+                      "/bin/sh" "-c" "grep -e tramp *"))
+@end group
+@end lisp
+
+@vindex process-file-return-signal-string
+对于本地进程，当进程被中断时，@code{process-file}返回进程的退出代码或描述信号的字符串。  由于无法可靠地确定远程进程是否已被中断，因此@code{process-file}将始终返回其退出代码。  当用户选项 @code{process-file-return-signal-string} 为非 @code{nil} 时，@code{process-file} 将所有大于 128 的退出代码视为进程已中断的指示，并返回相应的字符串。
+
+此远程进程处理不适用于 @acronym{GVFS} (@pxref{GVFS-based methods})，因为远程文件系统安装在本地主机上，并且 @value{tramp} 通过更改 @code{default-directory} 来访问它。
+
+当在远程文件或目录缓冲区中执行命令时，@value{tramp}启动远程进程。  截至目前，这些软件包已集成到@value{tramp}：@file{shell.el}、@file{eshell.el}、@file{compile.el}（@code{compile}和@code{grep}等命令）和@file{gud.el}（@code{gdb}或@code{perldb}）。
+
+@vindex INSIDE_EMACS@r{, environment variable}
+@value{tramp} 始终修改远程进程的 @env{INSIDE_EMACS} 环境变量。  默认情况下，该环境变量显示 Emacs 版本。  @value{tramp} 添加了自己的版本字符串，因此它看起来像 @samp{27.2,tramp:2.4.5.1}。  但是，其他包也可能将其名称添加到此环境变量中，例如@samp{27.2,comint,tramp:2.4.5.1}。
+
+为了让 @value{tramp} 找到遥控器上的命令，必须可以通过首次连接时 @value{tramp} 设置的默认搜索路径访问该命令。  或者，使用绝对路径或扩展 @code{tramp-remote-path} (@pxref{Remote programs})：
+
+@lisp
+@group
+(add-to-list 'tramp-remote-path "~/bin")
+(add-to-list 'tramp-remote-path "/appli/pub/bin")
+@end group
+@end lisp
+
+@vindex tramp-remote-process-environment
+自定义用户选项 @code{tramp-remote-process-environment} 以适合远程主机的远程程序环境。 @code{tramp-remote-process-environment} 是结构类似于 @code{process-environment} 的字符串列表，其中每个元素都是@samp{ENVVARNAME=VALUE} 形式的字符串。
+
+为了避免与通过本地配置文件设置的本地主机环境变量（例如 @file{~/.profile}）发生任何冲突，请使用 @samp{ENVVARNAME=} 为远程环境取消设置它们。
+
+@noindent
+使用 @code{add-to-list} 添加条目：
+
+@lisp
+(add-to-list 'tramp-remote-process-environment "JAVA_HOME=/opt/java")
+@end lisp
+
+@vindex HISTORY@r{, environment variable}
+在受限远程主机上修改或删除 @code{tramp-remote-process-environment} 列表中已有的值可能不可行。  例如，某些系统管理员不允许更改 @env{HISTORY} 环境变量。  为了在使用 @value{tramp} 时适应此类限制，请在本地 @file{.emacs} 文件中通过以下代码修复 @code{tramp-remote-process-environment}：
+
+@lisp
+@group
+(let ((process-environment tramp-remote-process-environment))
+  (setenv "HISTORY" nil)
+  (setq tramp-remote-process-environment process-environment))
+@end group
+@end lisp
+
+@vindex ENV@r{, environment variable}
+设置 @env{ENV} 环境变量指示某些 shell 读取初始化文件。  默认情况下，@value{tramp} 禁用此功能。  您可以通过评估来覆盖此行为
+
+@lisp
+@group
+(let ((process-environment tramp-remote-process-environment))
+  (setenv "ENV" "$HOME/.profile")
+  (setq tramp-remote-process-environment process-environment))
+@end group
+@end lisp
+
+除了@code{tramp-remote-process-environment}之外，您还可以通过let-binding@code{process-environment}为各个远程进程调用设置环境变量。  @value{tramp} 应用@code{process-environment} 全局默认值中不存在的任何条目（如果@code{tramp-remote-process-environment} 设置发生冲突，则覆盖它们）。例如：
+
+@lisp
+@group
+(let ((process-environment (cons "HGPLAIN=1" process-environment)))
+  (process-file @dots{}))
+@end group
+@end lisp
+
+@vindex HGPLAIN@r{, environment variable}
+无论要调用的进程是本地进程还是远程进程，以这种方式进行的绑定都有效，因为 @value{tramp} 只会添加 @env{HGPLAIN} 设置，而本地进程将采用 @code{process-environment} 的整个值以及 @env{HGPLAIN} 的新值。
+
+@vindex tramp-propagate-emacsclient-tramp
+@vindex EMACSCLIENT_TRAMP@r{, environment variable}
+如果将用户选项 @code{tramp-propagate-emacsclient-tramp} 设置为非 @code{nil} 值，则环境变量 @env{EMACSCLIENT_TRAMP} 将设置为允许从远程主机上运行的进程调用 @command{emacsclient} 的值。 @xref{emacsclient Options, , , emacs}。
+
+要集成其他 Emacs 软件包以便 @value{tramp} 可以远程执行，请提交错误报告。  @xref{Bug Reports}。
+
+
+@subsection 运行创建本地 X11 窗口的远程程序
+
+@vindex DISPLAY@r{, environment variable}
+要允许远程程序在本地主机上创建 X11 窗口，请在本地 @file{.emacs} 文件中为远程主机设置 @env{DISPLAY} 环境变量，如下所示：
+
+@lisp
+@group
+(add-to-list 'tramp-remote-process-environment
+             (format "DISPLAY=%s" (getenv "DISPLAY")))
+@end group
+@end lisp
+
+@noindent
+@code{(getenv "DISPLAY")} 应返回本地主机可识别的名称，远程主机可以重定向 X11 窗口交互。  如果由于某种原因无法查询可识别的名称，则将 @code{(getenv "DISPLAY")} 替换为硬编码的固定名称。  请注意，此处使用 @samp{:0} 作为 X11 显示名称将无法按预期工作。
+
+@vindex ForwardX11@r{, ssh option}
+@vindex ForwardX11Trusted@r{, ssh option}
+另一种方法是在本地主机上的 @file{~/.ssh/config} 中指定 @option{ForwardX11 yes} 或 @option{ForwardX11Trusted yes}。  此外，将@code{tramp-use-connection-share}设置为@code{nil}（@pxref{Using ssh connection sharing}），以避免不必要的副作用。
+
+
+@anchor{Managing remote shell history}
+@subsection 管理远程 shell 历史记录
+@cindex shell history
+@vindex tramp-histfile-override
+@vindex HISTFILE@r{, environment variable}
+@vindex HISTFILESIZE@r{, environment variable}
+@vindex HISTSIZE@r{, environment variable}
+
+由于远程 shell 保存由 @value{tramp} 触发的波浪号扩展，shell 历史文件可能正在快速增长。 @value{tramp} 可以使用用户选项 @code{tramp-histfile-override} 抑制此行为。  当设置为 @code{t} 时，环境变量 @env{HISTFILE} 未设置，环境变量 @env{HISTFILESIZE} 和 @env{HISTSIZE} 设置为 0。请勿将其与 @command{bash} 5.0.0@: 一起使用，该版本存在导致 @command{bash} 死机的错误。
+
+或者，@code{tramp-histfile-override} 可以是字符串。然后将环境变量 @env{HISTFILE} 设置为此文件名。  使用 @file{/dev/null} 时要小心；当使用 @command{bash} 作为远程 shell 时，这可能会导致意外的结果。
+
+另一种方法是通过将@code{tramp-histfile-override}设置为@code{nil}来完全禁用@value{tramp}对@env{HISTFILE}的处理。  在这种情况下，可以通过将此 shell 代码放入 @file{.bashrc} 或 @file{.kshrc} 来关闭保存历史记录：
+
+@example
+@group
+if [ -f $HOME/.sh_history ] ; then
+   /bin/rm $HOME/.sh_history
+fi
+if [ "$@{HISTFILE-unset@}" != "unset" ] ; then
+   unset HISTFILE
+fi
+if [ "$@{HISTSIZE-unset@}" != "unset" ] ; then
+   unset HISTSIZE
+fi
+@end group
+@end example
+
+对于基于 @option{ssh} 的方法，将以下行添加到您的 @file{~/.ssh/environment} 中：
+
+@example
+HISTFILE=/dev/null
+@end example
+
+
+@subsection 在远程主机上运行 @code{shell}
+@cindex @code{shell}
+@vindex explicit-shell-file-name
+@vindex shell-history-file-name
+
+在具有不同操作系统的两个主机之间使用 @value{tramp} 时，将 @code{explicit-shell-file-name} 设置为适当的 shell 名称，例如 @samp{windows-nt} 和 @samp{gnu/linux}。  该选项确保远程 shell 程序的名称正确。
+
+当@code{explicit-shell-file-name}等于@code{nil}时，交互调用@code{shell}将提示输入shell名称。
+
+您可以使用连接本地变量为不同的远程主机设置不同的 @code{explicit-shell-file-name} 值。
+@ifinfo
+@xref{Connection Variables, , , emacs}.
+@end ifinfo
+
+@lisp
+@group
+(connection-local-set-profile-variables
+ 'remote-bash
+ '((explicit-shell-file-name . "/bin/bash")
+   (explicit-bash-args . ("-i"))))
+@end group
+
+@group
+(connection-local-set-profile-variables
+ 'remote-ksh
+ '((explicit-shell-file-name . "/bin/ksh")
+   (explicit-ksh-args . ("-i"))))
+@end group
+
+@group
+(connection-local-set-profiles
+ '(:application tramp :protocol "ssh" :machine "localhost")
+ 'remote-bash)
+@end group
+
+@group
+(connection-local-set-profiles
+ `(:application tramp :protocol "sudo"
+   :user "root" :machine ,(system-name))
+ 'remote-ksh)
+@end group
+@end lisp
+
+命令@code{shell}读取远程历史文件以初始化历史输入环。  您可以设置用户选项 @code{shell-history-file-name} 来指定获取哪个远程历史文件，或者是否完全禁止此操作。  它接受与@code{tramp-histfile-override}相同的值，请参阅@pxref{Managing remote shell history}。 @code{shell-history-file-name} 还接受 @code{shell} 缓冲区中的连接本地值。
+
+
+@subsection 在远程主机上运行 @code{shell-command}
+@cindex @code{shell-command}
+
+@code{shell-command} 在远程主机上同步或异步执行命令，并在本地主机的缓冲区中显示输出。  例子：
+
+@example
+@group
+@kbd{C-x C-f @trampfn{sudo,,} @key{RET}}
+@kbd{M-& tail -f /var/log/syslog.log @key{RET}}
+@end group
+@end example
+
+@command{tail}命令连续输出到本地缓冲区，其名称是变量@code{shell-command-buffer-name-async}的值。
+
+@kbd{M-x auto-revert-tail-mode @key{RET}} 运行类似，显示连续输出。
+
+@vindex shell-file-name
+@vindex shell-command-switch
+@code{shell-command} 使用用户选项 @code{shell-file-name} 和变量 @code{shell-command-switch} 来确定要运行哪个 shell。  对于远程主机，它们的默认值分别是@file{/bin/sh}和@option{-c}（@option{adb}方法除外，它使用@file{/system/bin/sh}）。  与上一节中的变量一样，这些变量可以通过连接局部变量进行更改。
+
+@vindex async-shell-command-width
+@vindex COLUMNS@r{, environment variable}
+@value{tramp} 关心异步 shell 命令的用户选项 @code{async-shell-command-width}。  它指定命令输出的显示列数。  对于同步 shell 命令，可以通过将环境变量 @env{COLUMNS} 添加到 @code{tramp-remote-process-environment} 来实现类似的效果。
+
+
+@subsection 在远程主机上运行 @code{eshell}
+@cindex @code{eshell}
+
+@value{tramp} 集成到 @file{eshell.el} 中，可在命令提示符下在远程主机上启用交互式 eshell 会话。您必须将模块 @code{eshell-tramp} 添加到 @code{eshell-modules-list}。  以下是在远程主机上打开 @kbd{M-x eshell @key{RET}} 后的示例交互：
+
+@example
+@group
+@b{~ $} cd @trampfn{sudo,,/etc} @key{RET}
+@b{@trampfn{sudo,root@@host,/etc} $} hostname @key{RET}
+host
+@b{@trampfn{sudo,root@@host,/etc} $} id @key{RET}
+uid=0(root) gid=0(root) groups=0(root)
+@b{@trampfn{sudo,root@@host,/etc} $} find-file shadow @key{RET}
+#<buffer shadow>
+@b{@trampfn{sudo,root@@host,/etc} $}
+@end group
+@end example
+
+@code{eshell} 添加了自定义 @code{su} 和 @code{sudo} 命令，为 @file{*eshell*} 缓冲区正确设置默认目录。 @value{tramp} 默默地用此目录的条目更新 @code{tramp-default-proxies-alist} (@pxref{Multi-hops})：
+
+@example
+@group
+@b{~ $} cd @trampfn{ssh,user@@remotehost,/etc} @key{RET}
+@b{@trampfn{ssh,user@@remotehost,/etc} $} find-file shadow @key{RET}
+File is not readable: @trampfn{ssh,user@@remotehost,/etc/shadow}
+@b{@trampfn{ssh,user@@remotehost,/etc} $} sudo find-file shadow @key{RET}
+#<buffer shadow>
+@end group
+
+@group
+@b{@trampfn{ssh,user@@remotehost,/etc} $} su - @key{RET}
+@b{@trampfn{su,root@@remotehost,/root} $} id @key{RET}
+uid=0(root) gid=0(root) groups=0(root)
+@b{@trampfn{su,root@@remotehost,/root} $}
+@end group
+@end example
+
+
+@anchor{Running a debugger on a remote host}
+@subsection 在远程主机上运行调试器
+@cindex @file{gud.el} file
+@cindex @code{gdb}
+@cindex @code{perldb}
+
+@file{gud.el} 为符号提供统一的接口
+@ifinfo
+调试器 (@pxref{Debuggers, , , emacs})。
+@end ifinfo
+@ifnotinfo
+调试器。
+@end ifnotinfo
+@value{tramp} 可以通过使用远程文件名调用 @code{gdb} 在远程主机上运行调试：
+
+@example
+@group
+@kbd{M-x gdb @key{RET}}
+@b{Run gdb (like this):} gdb -i=mi @trampfn{ssh,host,~/myprog} @key{RET}
+@end group
+@end example
+
+由于远程@code{gdb}和@code{gdb-inferior}进程不属于远程主机上的同一个进程组，因此会出现警告，可以忽略：
+
+@example
+&"warning: GDB: Failed to set controlling terminal: Operation not permitted\n"
+@end example
+
+@noindent
+因此，要调试的进程的 I/O 将会受到限制。
+
+相对文件名基于远程默认目录。  当@file{myprog.pl}存在于@file{@trampfn{ssh,host,/home/user}}时，有效调用包括：
+
+@example
+@group
+@kbd{M-x perldb @key{RET}}
+@b{Run perldb (like this):} perl -d myprog.pl @key{RET}
+@end group
+@end example
+
+仅远程文件名的本地部分（例如 @command{perl -d /home/user/myprog.pl}）是不可能的。
+
+要调试的程序的参数必须是文字，可以采用相对或绝对路径，但不能采用远程路径。
+
+
+@anchor{Running remote processes on MS Windows hosts}
+@subsection 在 MS Windows 主机上运行远程进程
+@cindex @command{winexe}
+@cindex @command{powershell}
+
+@strong{Note}：这是一个实验性功能。
+
+Samba 套件中的程序 @command{winexe} 在远程 MS Windows 主机上运行进程，@value{tramp} 将其用于 @code{make-process}、@code{process-file} 和 @code{start-file-process}。  它不适用于远程 Samba 服务器。
+
+@c FIXME: Verify powershell version.
+@vindex tramp-smb-winexe-program
+@code{tramp-smb-winexe-program} 指定本地@command{winexe} 程序。  远程 MS Windows 主机上的 Powershell V2.0 需要运行从 @value{tramp} 触发的进程。
+
+@c https://woshub.com/enable-remote-access-to-admin-shares-in-workgroup/
+远程 MS Windows 主机上的远程用户必须是该远程 MS Windows 主机的本地计算机管理员组的成员。由于 @command{winexe} 使用该远程 MS Windows 主机的管理共享 @file{ADMIN$}，因此远程 MS Windows 主机必须是 Active Directory 域的一部分，或者必须禁用远程 UAC（远程连接的用户帐户控制）。  后者可以通过在 MS Windows 注册表中将 @samp{HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\ LocalAccountTokenFilterPolicy} 参数创建为 DWORD（32 位）且值为 1 来实现。
+
+检查默认的远程临时文件目录是否可用。否则，更改它，例如（使用改编的@t{"user"}和@t{"host"}）：
+
+@lisp
+(add-to-list 'tramp-connection-properties
+             (list (regexp-quote "host")
+		   "tmpdir" "/Users/user/AppData/Local/Temp"))
+@end lisp
+
+@noindent
+@xref{Predefined connection information}.
+
+不支持从 stdin 重定向。
+
+@vindex auto-revert-remote-files
+如果您使用带有单独错误缓冲区的远程异步进程，则必须确保远程文件可以自动恢复。  将用户选项 @code{auto-revert-remote-files} 设置为非 @code{nil} 值。
+
+@vindex tramp-smb-connection-local-powershell-profile
+@vindex tramp-smb-prompt
+@cindex @file{.emacs_powershell} file
+@code{shell} 和 @code{shell-command} 配置为在远程 MS Windows 主机上使用 @command{powershell}。  如果您想更改此设置，请考虑使用除@code{tramp-smb-connection-local-powershell-profile}之外的其他连接本地配置文件。
+
+如果您运行远程 @code{shell}，您可能会考虑将以下行添加到本地 @file{~/.emacs_powershell} 文件中：
+
+@smallexample
+function prompt @{ "PS " + ((Get-Location).Path | Convert-Path) + "> " @}
+@end smallexample
+
+@noindent
+请注意，配置的提示必须匹配@code{tramp-smb-prompt}。
+
+如果运行远程 @code{shell-command}，则必须使用 @command{powershell} 语法。  例如，如果您想从 @code{dired} 运行 shell 命令，请使用命令 @t{"(ls * ).Name"} 而不是 @t{"ls"}。
+
+
+@subsection 远程过程连接类型
+@vindex process-connection-type
+@vindex tramp-process-connection-type
+
+异步进程的行为根据是否使用伪 tty 而有所不同。  这是由变量 @code{process-connection-type} 控制的，它可以是 @code{t} 或 @code{pty}（使用伪 tty），或者 @code{nil} 或 @code{pipe}（不要使用）。 @value{tramp} 基于在远程主机上运行 shell，这需要伪 tty。  因此，它声明了变量@code{tramp-process-connection-type}，它为远程进程携带此信息。  它的默认值为@code{t}，无需更改。  远程伪 tty 的名称由函数 @code{process-tty-name} 返回。
+
+如果由@code{start-file-process}启动的远程进程应该@emph{not}使用伪tty，则可以通过将@code{process-connection-type}设置为@code{nil}或@code{pipe}来请求。  启动的进程仍然有一个伪 tty，但一些终端属性已更改，例如禁止将回车符转换为换行符。
+
+函数 @code{make-process} 允许使用 @code{:connection-type} 关键字显式控制。  如果不使用此关键字，则应用 @code{process-connection-type} 的值。
+
+
+@subsection 异步远程进程的进程属性
+@cindex Asynchronous remote processes
+
+如果可用，@value{tramp} 将流程属性添加到异步属性的流程对象。  但是，不保证所有这些属性都已设置。
+
+@itemize
+@item @code{remote-tty}
+
+这是 a @var{process} 在远程主机上使用的终端的名称，即用于读取和写入的终端。
+
+@item @code{remote-pid}
+
+在远程主机上执行的命令的进程 ID。  这在远程发送信号时使用。
+
+@item @code{remote-command}
+
+通过@code{make-process}或@code{start-file-process}调用的远程命令，字符串列表（程序及其参数）。  这不会显示 @value{tramp} 在命令周围生成的额外 shell 糖，为了看到这一点，您必须检查 @value{tramp} @ref{Traces and Profiles, traces}。
+@end itemize
+
+@findex list-system-processes
+@findex process-attributes
+函数@code{list-system-processes}和@code{process-attributes}返回有关各自远程主机上的系统进程的信息。  为了检索此信息，他们使用命令 @command{ps}，由以下常量驱动：
+
+@defvr Constant tramp-process-attributes-ps-args
+这是调用 @command{ps} 时使用的参数（字符串）列表。默认值适用于 GNU/Linux 远程主机。
+@end defvr
+
+@defvr Constant tramp-process-attributes-ps-format
+这是 cons cells @code{(@var{key} . @var{type})} 的列表，用于解释 @command{ps} 输出。  @var{key} 是@code{process-attributes} 输出中使用的键加上键@code{pid}，@var{type} 是@command{ps} 返回的相应值。  它可以是
+
+
+@multitable {@bullet{} @code{numberp}} {--- a string of @var{number} width, can contain spaces}
+@item @bullet{} @code{numberp} @tab --- a number
+@item @bullet{} @code{stringp} @tab --- a string without spaces
+@item @bullet{} @var{number}
+@tab --- a string of @var{number} width, can contain spaces
+@item @bullet{} @code{nil} @tab --- a string until end of line
+@end multitable
+
+默认值适用于 GNU/Linux 远程主机。
+@end defvr
+
+例如，如果 @code{tramp-process-attributes-ps-args} 被声明为 @code{("-eww" "-o" "pid,euid,euser,egid,egroup,comm:40,state")}，则相应 @command{ps} 命令的输出将如下所示
+
+@smallexample
+@group
+    PID  EUID EUSER     EGID EGROUP   COMMAND                                  S
+      1     0 root         0 root     systemd                                  S
+   1610     0 root         0 root     NFSv4 callback                           S
+   @dots{}
+@end group
+@end smallexample
+
+对应的@code{tramp-process-attributes-ps-format}值为
+
+@smallexample
+@group
+@code{((pid . numberp) (euid . numberp) (user . stringp)
+ (egid . numberp) (group . stringp) (comm . 40) (state . stringp))}
+@end group
+@end smallexample
+
+@vindex tramp-adb-connection-local-default-ps-profile
+@vindex tramp-adb-connection-local-default-ps-variables
+@vindex tramp-connection-local-bsd-ps-profile
+@vindex tramp-connection-local-bsd-ps-variables
+@vindex tramp-connection-local-busybox-ps-profile
+@vindex tramp-connection-local-busybox-ps-variables
+@vindex tramp-connection-local-darwin-ps-profile
+@vindex tramp-connection-local-darwin-ps-variables
+@code{tramp-process-attributes-ps-args} 和 @code{tramp-process-attributes-ps-format} 的默认值可以被连接局部变量覆盖。
+@ifinfo
+@xref{Connection Variables, , , emacs}.
+@end ifinfo
+这已经由 @value{tramp} 为 @option{adb} 方法完成，请参阅 @code{tramp-adb-connection-local-default-ps-profile} 和 @code{tramp-adb-connection-local-default-ps-variables}。
+
+对于远程 BSD 系统、远程 macOS 系统以及使用 @command{busybox} 实现的远程 @command{ps} 命令，还有另外三组预定义的连接本地变量。  它们被称为 @code{tramp-connection-local-*-ps-profile} 和 @code{tramp-connection-local-*-ps-variables}。  像使用它们一样
+
+@lisp
+@group
+(connection-local-set-profiles
+ '(:application tramp :machine "mybsdhost")
+ 'tramp-connection-local-bsd-ps-profile)
+@end group
+@end lisp
+
+@cindex @code{proced}
+@vindex proced-show-remote-processes
+如果您想在调用 @code{proced} 时查看远程系统进程列表，请将用户选项 @code{proced-show-remote-processes} 设置为非 @code{nil}，或者当缓冲区具有远程 @code{default-directory} 时，使用负参数（如 @kbd{C-u - M-x proced @key{RET}}）调用该命令。
+
+
+@anchor{Improving performance of asynchronous remote processes}
+@subsection 提高异步远程进程的性能
+@cindex Asynchronous remote processes
+@findex make-process
+@findex start-file-process
+
+@value{tramp} 的@code{make-process} 和@code{start-file-process} 的实现在每次进程调用时都需要大量的初始化开销。  这是连接远程主机时处理交互式对话框（例如提供密码）和初始环境设置所必需的。
+
+有时，这是不需要的。  直接运行命令就足够了，而不是启动远程 shell 并随后运行该命令。  @value{tramp} 通过 @code{make-process} 和 @code{start-file-process} 的替代实现来支持这一点。这是由连接局部变量@code{tramp-direct-async-process}触发的，
+@ifinfo
+@xref{Connection Variables, , , emacs},
+@end ifinfo
+必须设置为非 @code{nil} 值。  例子：
+
+@lisp
+@group
+(connection-local-set-profile-variables
+ 'remote-direct-async-process
+ '((tramp-direct-async-process . t)))
+@end group
+
+@group
+(connection-local-set-profiles
+ '(:application tramp :machine "remotehost")
+ 'remote-direct-async-process)
+@end group
+@end lisp
+
+这为主机@samp{remotehost}启用了直接异步进程。如果您想为通过相同方法（例如 @option{ssh}）连接的所有远程主机启用直接异步进程，请改用
+
+@lisp
+@group
+(connection-local-set-profiles
+ '(:application tramp :protocol "ssh")
+ 'remote-direct-async-process)
+@end group
+@end lisp
+
+如果远程主机通过多跳 (@pxref{Multi-hops}) 连接，则无法在@value{tramp}中使用直接异步进程。  在这种情况下，@value{tramp}退回到其经典实现。
+
+此外，这种方法还有以下局限性：
+
+@itemize
+@item
+它仅适用于 @file{tramp-adb.el}、@file{tramp-container.el}、@file{tramp-sh.el} 和 @file{tramp-sshfs.el} 中定义的某些连接方法。
+
+@item
+它不支持交互式用户身份验证。  对于基于 @option{ssh} 的方法，可以通过使用 @command{ssh-agent} 等密码代理、使用公钥身份验证或使用 @option{ControlMaster} 选项来避免这种情况。@* 其他交互式身份验证请求（例如一次性密码或安全密钥确认消息）也不起作用。
+
+@item
+它不能应用于基于 @option{ssh} 的方法，该方法使用 @option{RemoteCommand} 选项。
+
+@item
+它无法通过@code{interrupt-process}杀死。
+
+@item
+它不通过 @code{process-tty-name} 报告远程终端名称。
+
+@item
+它不设置进程属性@code{remote-pid}。  因此，信号无法发送到该远程进程；它们被发送到本地进程，由本地进程建立连接。
+
+@item
+当命令太长时，它会失败。  这可能发生在具有长目录名的目录上，或者当必须设置的远程 @env{PATH} 和/或其他环境变量太长时。
+@end itemize
+
+为了获得更好的性能，建议在运行 @code{make-process} 或 @code{start-file-process} 时将 @code{tramp-verbose} 绑定到 0。  此外，您可以将 @code{tramp-use-connection-share} 设置为 @code{nil}，以绕过 @value{tramp} 对 @option{ControlMaster} 选项的处理，并在 @file{~/.ssh/config}、@pxref{Using ssh connection sharing} 中使用您自己的设置。
+
+@c Since Emacs 30.
+@strong{Note}：在之前的@value{tramp}版本中，这是由连接属性@t{"direct-async-process"}触发的。  这仍然受支持，但已弃用，并将在未来的 @value{tramp} 版本中删除。
+
+@strong{Note}：对于 @option{ssh} 和 @option{scp} 方法，@value{tramp} 不会忠实地将二进制序列传递给进程。  您可以通过更改相应的连接参数 (@pxref{Predefined connection information}) 来更改此设置
+
+@lisp
+(add-to-list 'tramp-connection-properties (list "/ssh:" "direct-async" t))
+@end lisp
+
+
+@node Cleanup remote connections
+@section 清理远程连接
+@cindex cleanup
+
+@value{tramp} 提供了多种刷新远程连接的方法。
+
+@deffn Command tramp-cleanup-connection vec &optional keep-debug keep-password
+此命令刷新所有与连接相关的对象。  @var{vec} 是远程连接的内部表示。  当以交互方式调用时，此命令会列出迷你缓冲区中的活动远程连接。  每个连接的格式为@file{@trampfn{method,user@@host,}}。
+
+刷新远程连接还会清除密码缓存（@pxref{Password handling}）、文件缓存、连接缓存（@pxref{Connection caching}）和最近的缓存
+@ifinfo
+缓存 (@pxref{File Conveniences, , , emacs})。
+@end ifinfo
+@ifnotinfo
+缓存。
+@end ifnotinfo
+它还删除会话计时器 (@pxref{Predefined connection information}) 和连接缓冲区。
+
+如果@var{keep-debug}非@code{nil}，则保留调试缓冲区。  非 @code{nil} @var{keep-password} 保留密码缓存。
+@end deffn
+
+@deffn Command tramp-cleanup-this-connection
+刷新当前缓冲区的远程连接对象，与@code{tramp-cleanup-connection}中相同。
+@end deffn
+
+@deffn Command tramp-cleanup-all-connections
+刷新所有活动的远程连接对象，与@code{tramp-cleanup-connection}中相同。  此命令还删除临时代理定义 (@pxref{Ad-hoc multi-hops})。
+@end deffn
+
+@deffn Command tramp-cleanup-all-buffers
+就像@code{tramp-cleanup-all-connections}一样，除了杀死与远程连接相关的所有缓冲区之外，所有远程连接和临时代理定义也会被清除。
+@end deffn
+
+@deffn Command tramp-cleanup-some-buffers
+与@code{tramp-cleanup-all-buffers}类似，其中所有远程连接和临时代理定义都被清除。  然而，仅当@code{tramp-cleanup-some-buffers-hook}中的函数之一返回@code{t}时，额外的缓冲区才会被终止。
+@end deffn
+
+@defopt tramp-cleanup-some-buffers-hook
+该钩子中的函数确定在调用 @code{tramp-cleanup-some-buffers} 时是否终止远程缓冲区。  默认情况下，链接到远程文件的远程缓冲区、远程 @code{dired} 缓冲区以及与远程进程相关的缓冲区都会被清理。
+@end defopt
+
+@deffn Command tramp-cleanup-bufferless-connections
+与@code{tramp-cleanup-all-connections}类似，远程连接和临时代理定义被刷新，但仅限于不存在关联缓冲区的那些连接（Tramp 内部缓冲区除外）。
+
+此命令有助于在关闭远程文件缓冲区后修剪连接，而无需通过 @code{tramp-cleanup-connection} 进行挑选或通过 @code{tramp-cleanup-all-connections} 清除所有连接。
+@end deffn
+
+
+@node Renaming remote files
+@section 重命名远程文件
+@cindex save remote files
+
+有时，需要保护访问给定远程主机的缓冲区的文件内容。  例如，如果本地主机更改其网络集成，并且无法再访问远程主机，则可能会发生这种情况。
+
+@deffn Command tramp-rename-files source target
+将所有缓冲区中的访问文件名从 @var{source} 替换为 @var{target}。  @var{source} 是远程目录名称，也可以包含本地名称部分。  @var{target} 是@var{source} 替换为的目录名称。  通常，@var{target}是另一台主机上的远程目录名称，但它也可以是本地目录名称。  如果@var{target}没有本地部分，则使用@var{source}中的本地部分。
+
+如果@var{target}是@code{nil}，则根据@code{tramp-default-rename-alist}中的第一个匹配来选择。  如果以交互方式调用，则提供此匹配作为选择的初始值。
+
+在所有具有 @code{buffer-file-name} 匹配 @var{source} 的缓冲区上，通过将 @var{source} 替换为 @var{target} 来修改此名称。  这是通过调用@code{set-visited-file-name}来应用的。  提示新的@code{buffer-file-name}在迷你缓冲区中进行修改。  缓冲区被标记为已修改，并且必须显式保存。
+
+如果用户选项@code{tramp-confirm-rename-file-names}为@code{nil}，则无需确认即可更改文件名。  这需要 @code{tramp-default-rename-alist} 中的匹配条目。
+
+与 @var{source} 标识的远程连接相关的远程缓冲区（未访问文件或正在访问与 @var{source} 不匹配的文件）不会被修改。
+
+交互地，如果前缀参数非 2⁣，则从 1⁣ 中选择@var{target}，而无需确认。
+
+由@var{source}标识的远程连接由@code{tramp-cleanup-connection}刷新。
+@end deffn
+
+@deffn Command tramp-rename-these-files target
+将访问文件名替换为@var{target}。  当前缓冲区必须与远程连接相关。  在访问具有相同目录名的文件的所有缓冲区中，缓冲区文件名都会更改。
+
+交互地，如果前缀参数非 2⁣，则从 1⁣ 中选择@var{target}，而无需确认。
+@end deffn
+
+@defopt tramp-default-rename-alist
+重命名远程缓冲区文件名的默认目标。  这是一个 cons cells @code{(source . target)} 的列表。  第一个匹配项指定用于通过@code{tramp-rename-files}从源重命名缓冲区文件名的目标。  @code{source} 是一个正则表达式，用于匹配远程文件名。  @code{target} 必须是目录名称，可以是远程目录（包括@value{tramp}默认推断的远程目录，例如@file{@trampfn{method,user@@host,}}）。
+
+@code{target}可以包含格式说明符@code{%m}、@code{%u}或@code{%h}，在调用@code{tramp-rename-files}时分别替换为@code{source}的方法名、用户名或主机名。
+
+@code{source} 也可以是 Lisp 形式，对其进行求值。  结果必须是一个字符串（用作匹配的正则表达式）或 @code{nil}，它被解释为始终匹配的正则表达式。
+
+示例条目：
+
+@lisp
+@group
+("@trampfn{ssh,badhost,/path/to/dir/}"
+ . "@trampfn{ssh,goodhost,/path/to/another/dir/}")
+@end group
+@end lisp
+
+将触发将@samp{badhost}上的缓冲区文件名重命名为@samp{goodhost}，包括更改目录名称。
+
+@lisp
+("@trampfn{ssh,.+\\\\.company\\\\.org,}" @c
+. "@value{prefix}ssh@value{postfixhop}multi.hop|@c
+ssh@value{postfixhop}%h@value{postfix}")
+@end lisp
+
+通过 @file{@trampfn{ssh,multi.hop,}} 将所有连接路由到 @samp{company.org} 中的主机，这在公司网络外部使用 Emacs 时可能很有用。
+
+@lisp
+(nil . "~/saved-files/%m:%u@@%h/")
+@end lisp
+
+将所有远程文件保存在本地，目录名包括远程连接的方法名、用户名和主机名。
+@end defopt
+
+@defopt tramp-confirm-rename-file-names
+必须确认是否用@code{tramp-rename-files}或@code{tramp-rename-these-files}重命名缓冲区文件名。
+@end defopt
+
+
+@node Archive file names
+@section 存档文件名
+@cindex file archives
+@cindex archive file names
+@cindex method archive
+@cindex archive method
+
+@value{tramp} 还提供对文件档案内的文件的透明访问。  这仅在安装了@acronym{GVFS, the GNOME Virtual File System}、@pxref{GVFS-based methods}的主机上可行。  在内部，文件档案通过 @acronym{GVFS} @option{archive} 方法挂载。
+
+文件存档是类型 @file{/path/to/dir/file.EXT} 的常规文件。扩展名@samp{.EXT}标识文件存档的类型。  要使用 Dired 检查存档的内容，请像打开目录一样打开文件名（即打开@file{/path/to/dir/file.EXT/}）。  文件存档内的文件称为存档文件名，其名称为@file{/path/to/dir/file.EXT/dir/file}。
+
+大多数@ref{Magic File Names, , magic file name operations, elisp}都是针对存档文件名实现的，例外的是所有写入文件存档的操作以及处理相关操作。  因此，像这样的函数
+
+@lisp
+(copy-file "/path/to/dir/file.tar/dir/file" "/somewhere/else")
+@end lisp
+
+@noindent
+开箱即用。  对于文件名补全以及像 @code{dired} 或 @code{ediff} 这样也接受存档文件名的库来说也是如此。
+
+@vindex tramp-archive-suffixes
+文件档案由文件扩展名 @samp{.EXT} 标识。由于 @acronym{GVFS} 在内部使用库 @code{libarchive(3)}，因此该库接受的所有后缀也适用于存档文件名。  接受的后缀列在常量 @code{tramp-archive-suffixes} 中。  他们是
+
+@itemize
+@cindex @file{7z} file archive suffix
+@cindex file archive suffix @file{7z}
+@item @samp{.7z} ---
+7-Zip 档案
+
+@cindex @file{apk} file archive suffix
+@cindex file archive suffix @file{apk}
+@item @samp{.apk} ---
+Android 套件
+
+@cindex @file{ar} file archive suffix
+@cindex file archive suffix @file{ar}
+@item @samp{.ar} ---
+UNIX 归档器格式
+
+@cindex @file{cab} file archive suffix
+@cindex @file{CAB} file archive suffix
+@cindex file archive suffix @file{cab}
+@cindex file archive suffix @file{CAB}
+@item @samp{.cab}, @samp{.CAB} ---
+微软Windows橱柜
+
+@cindex @file{cpio} file archive suffix
+@cindex file archive suffix @file{cpio}
+@item @samp{.cpio} ---
+CPIO 档案
+
+@cindex @file{crate} file archive suffix
+@cindex file archive suffix @file{crate}
+@item @samp{.crate} ---
+货物（铁锈）包裹
+
+@cindex @file{deb} file archive suffix
+@cindex file archive suffix @file{deb}
+@item @samp{.deb} ---
+Debian 软件包
+
+@cindex @file{depot} file archive suffix
+@cindex file archive suffix @file{depot}
+@item @samp{.depot} ---
+HP-UX SD 库
+
+@cindex @file{epub} file archive suffix
+@cindex file archive suffix @file{epub}
+@item @samp{.epub} ---
+电子出版物
+
+@cindex @file{exe} file archive suffix
+@cindex file archive suffix @file{exe}
+@item @samp{.exe} ---
+自解压 Microsoft Windows EXE 文件
+
+@cindex @file{iso} file archive suffix
+@cindex file archive suffix @file{iso}
+@item @samp{.iso} ---
+ISO 9660 图像
+
+@cindex @file{jar} file archive suffix
+@cindex file archive suffix @file{jar}
+@item @samp{.jar} ---
+Java档案
+
+@cindex @file{lzh} file archive suffix
+@cindex @file{LZH} file archive suffix
+@cindex file archive suffix @file{lzh}
+@cindex file archive suffix @file{LZH}
+@item @samp{.lzh}, @samp{.LZH} ---
+Microsoft Windows 压缩的 LHA 档案
+
+@cindex @file{msu} file archive suffix
+@cindex @file{MSU} file archive suffix
+@cindex file archive suffix @file{msu}
+@cindex file archive suffix @file{MSU}
+@item @samp{.msu}, @samp{.MSU} ---
+Microsoft Windows 更新包
+
+@cindex @file{mtree} file archive suffix
+@cindex file archive suffix @file{mtree}
+@item @samp{.mtree} ---
+BSD mtree 格式
+
+@cindex @file{odb} file archive suffix
+@cindex @file{odf} file archive suffix
+@cindex @file{odg} file archive suffix
+@cindex @file{odp} file archive suffix
+@cindex @file{ods} file archive suffix
+@cindex @file{odt} file archive suffix
+@cindex file archive suffix @file{odb}
+@cindex file archive suffix @file{odf}
+@cindex file archive suffix @file{odg}
+@cindex file archive suffix @file{odp}
+@cindex file archive suffix @file{ods}
+@cindex file archive suffix @file{odt}
+@item @samp{.odb}, @samp{.odf}, @samp{.odg}, @samp{.odp}, @samp{.ods},
+@samp{.odt} --- OpenDocument 格式
+
+@cindex @file{pax} file archive suffix
+@cindex file archive suffix @file{pax}
+@item @samp{.pax} ---
+POSIX档案
+
+@cindex @file{rar} file archive suffix
+@cindex file archive suffix @file{rar}
+@item @samp{.rar} ---
+RAR 档案
+
+@cindex @file{rpm} file archive suffix
+@cindex file archive suffix @file{rpm}
+@item @samp{.rpm} ---
+红帽软件包
+
+@cindex @file{shar} file archive suffix
+@cindex file archive suffix @file{shar}
+@item @samp{.shar} ---
+壳牌档案
+
+@cindex @file{tar} file archive suffix
+@cindex @file{tbz} file archive suffix
+@cindex @file{tgz} file archive suffix
+@cindex @file{tlz} file archive suffix
+@cindex @file{txz} file archive suffix
+@cindex @file{tzst} file archive suffix
+@cindex file archive suffix @file{tar}
+@cindex file archive suffix @file{tbz}
+@cindex file archive suffix @file{tgz}
+@cindex file archive suffix @file{tlz}
+@cindex file archive suffix @file{txz}
+@cindex file archive suffix @file{tzst}
+@item @samp{.tar}, @samp{.tbz}, @samp{.tgz}, @samp{.tlz}, @samp{.txz},
+@samp{.tzst} ---（压缩）磁带档案
+
+@cindex @file{warc} file archive suffix
+@cindex file archive suffix @file{warc}
+@item @samp{.warc} ---
+网络档案
+
+@cindex @file{xar} file archive suffix
+@cindex file archive suffix @file{xar}
+@item @samp{.xar} ---
+macOS XAR 档案
+
+@cindex @file{xpi} file archive suffix
+@cindex file archive suffix @file{xpi}
+@item @samp{.xpi} ---
+XP安装Mozilla插件
+
+@cindex @file{xps} file archive suffix
+@cindex file archive suffix @file{xps}
+@item @samp{.xps} ---
+开放 XML 纸张规范 (OpenXPS) 文档
+
+@cindex @file{zip} file archive suffix
+@cindex @file{ZIP} file archive suffix
+@cindex file archive suffix @file{zip}
+@cindex file archive suffix @file{ZIP}
+@item @samp{.zip}, @samp{.ZIP} ---
+ZIP 档案
+@end itemize
+
+@vindex tramp-archive-compression-suffixes
+文件档案也可以被压缩，通过附加的压缩后缀来标识。  有效的压缩后缀列在常量@code{tramp-archive-compression-suffixes}中。  它们是 @samp{.bz2}、@samp{.gz}、@samp{.lrz}、@samp{.lz}、@samp{.lz4}、@samp{.lzma}、@samp{.lzo}、@samp{.uu}、@samp{.xz}、@samp{.Z} 和 @samp{.zst}。  有效的存档文件名是@file{/path/to/dir/file.tar.gz/dir/file}。  甚至连续几个后缀也是可能的，例如@file{/path/to/dir/file.tar.gz.uu/dir/file}。
+
+@vindex tramp-archive-all-gvfs-methods
+存档文件名可以是远程文件名，如@file{/ftp:anonymous@@ftp.gnu.org:/gnu/tramp/tramp-2.4.5.tar.gz/INSTALL}所示。由于所有文件操作都在内部映射到 @acronym{GVFS} 操作，因此 @code{tramp-gvfs} 支持的远程文件名性能更好，因为不必先下载文件存档的本地副本。  例如，@samp{/sftp:user@@host:@dots{}} 的性能优于类似的@samp{/scp:user@@host:@dots{}}。  有关 @code{tramp-gvfs} 支持的方法名称的完整列表，请参阅常量 @code{tramp-archive-all-gvfs-methods}。
+
+如果启用@code{url-handler-mode}，则可以通过 URL 访问档案，如@file{https://ftp.gnu.org/gnu/tramp/tramp-2.4.5.tar.gz/INSTALL}。  这允许复杂的文件操作，例如
+
+@lisp
+@group
+(progn
+  (url-handler-mode 1)
+  (ediff-directories
+   "https://ftp.gnu.org/gnu/tramp/tramp-2.4.4.tar.gz/tramp-2.4.4"
+   "https://ftp.gnu.org/gnu/tramp/tramp-2.4.5.tar.gz/tramp-2.4.5" ""))
+@end group
+@end lisp
+
+甚至可以访问文件档案中的文件档案，如
+
+@lisp
+@group
+(progn
+  (url-handler-mode 1)
+  (find-file
+   "https://ftp.debian.org/debian/pool/main/c/coreutils/\
+coreutils_8.28-1_amd64.deb/control.tar.gz/control"))
+@end group
+@end lisp
+
+@vindex tramp-archive-enabled
+为了禁用文件归档，您可以将以下形式添加到您的初始化文件中：
+
+@lisp
+(customize-set-variable 'tramp-archive-enabled nil)
+@end lisp
+
+
+@node Bug Reports
+@chapter 报告错误和问题
+@cindex bug reports
+
+@value{tramp} 的开发团队积极致力于解决错误和问题，并关注功能请求和建议。
+
+@value{tramp} 的邮件列表提供了有关使用 @value{tramp}、解决问题、讨论以及关于 @value{tramp} 的一般性讨论的更多建议和信息。
+
+@value{tramp} 的邮件列表受到审核，但即使是非订阅者也可以发帖以获得审核者批准。  有时，由于公共假期，此批准步骤可能需要长达 48 小时。
+
+@email{@value{tramp-bug-report-address}} 是邮件列表。发送到该地址的消息将发送给所有订阅者。  这是 @emph{not} 发送订阅请求的地址。
+
+要订阅邮件列表，请访问：@uref{https://lists.gnu.org/mailman/listinfo/tramp-devel/, the @value{tramp} Mail Subscription Page}。
+
+还有一个 @acronym{Gmane} 组，镜像邮件列表。它的名字是@samp{gmane.emacs.tramp}。
+
+@ifset installchapter
+在发送错误报告之前，请先运行测试套件@ref{Testing}。
+@end ifset
+
+@findex tramp-bug
+检查错误或问题是否已在 @xref{Frequently Asked Questions} 中得到解决。
+
+运行 @kbd{M-x tramp-bug @key{RET}} 生成一个缓冲区，其中包含系统详细信息以及 @value{tramp} 安装的详细信息。请在错误报告中包含这些详细信息。
+
+错误报告必须尽可能详细地描述重现问题所需的步骤。  这些详细信息必须包括远程主机的设置以及存在的任何特殊或独特条件。
+
+包括重现问题的最小测试用例。  这将有助于开发团队找到最佳解决方案，避免走无关的弯路。
+
+要排除与缓存相关的问题，请在运行测试之前刷新所有缓存，@pxref{Cleanup remote connections}。  或者，通常更适合分析，在以 @command{emacs -Q} 开头的干净 Emacs 会话中重现问题。  然后，@value{tramp} 不会加载持久性文件 (@pxref{Connection caching})，并且不使用 @file{auth-source.el} (@pxref{Password handling}) 中的密码。  @option{sudoedit}方法不会发生后者，否则将无法使用。
+
+如果您使用 GNU ELPA 版本的 @value{tramp}，则必须显式加载它，因为 @command{emacs -Q} 会忽略已安装的 ELPA 软件包。  调用（版本号改编）
+
+@example
+$ emacs -Q -l ~/.emacs.d/elpa/tramp-2.4.5.1/tramp-autoloads
+@end example
+
+在错误报告中包含 @value{tramp} 的消息时，请在重复处理错误的步骤之前，将 @file{~/.emacs} 文件中的详细级别增加到 6 (@pxref{Traces and Profiles, Traces})。  将 @file{*tramp/foo*} 和 @file{*debug tramp/foo*} 缓冲区的内容包含在错误报告中。  由于这些缓冲区可能包含与分析相关的非@acronym{ASCII}字符，因此请将缓冲区作为附件附加到错误报告中，而不是将它们内联放置。  这也是必要的，以避免在邮件传输过程中添加或删除换行符。
+
+如果您从 Emacs 发送消息，系统会询问您是否将这些缓冲区附加到错误报告中。  如果您使用外部邮件程序，则必须将这些缓冲区保存到文件中，并将它们附加到该邮件程序中。
+
+@strong{Note} 在此阶段不需要大于 6 的详细级别。  另请注意，详细级别为 6 或更高时，文件和目录的内容将包含在调试缓冲区中。在 @value{tramp} 中输入的密码永远不会包含在那里。
+
+如果您发现使用 @value{tramp} 和 @command{emacs -Q} 不会导致任何问题，您可以通过将其一分为二来检查您的初始化文件是否存在可疑配置。  即注释掉大约一半的init文件，然后检查调用@command{emacs}时是否仍然出现问题。  如果是，请注释掉一半仍处于活动状态的代码。否则，注释掉活动代码，并取消注释刚刚注释的代码。
+
+再次拨打@command{emacs}。  重复一遍，直到找到可疑的配置。
+
+
+@node Frequently Asked Questions
+@chapter 常见问题解答
+@cindex frequently asked questions
+@cindex FAQ
+
+@itemize @bullet
+@item
+正式名称是什么——“Tramp”或“@value{tramp}”？
+
+正式名称是“Tramp”。  这用于注释、文档字符串以及谈论 @value{tramp} 的任何地方。
+
+然而，由于历史原因，在 @value{tramp} 手册中，其格式为“@@sc@{Tramp@}”。
+@ifinfo
+@pxref{Smallcaps, , , texinfo}.
+@end ifinfo
+所以那里看起来不一样。
+
+
+@item
+最新的@value{tramp}在哪里？
+
+@value{tramp} 可从 GNU URL 获取：
+
+@noindent
+@uref{https://ftp.gnu.org/gnu/tramp/}
+
+@noindent
+@value{tramp} 的 GNU 项目页面位于此处：
+
+@noindent
+@uref{https://savannah.gnu.org/projects/tramp/}
+
+
+@item
+它适用于哪些系统？
+
+该软件包在 @w{Emacs 28}、@w{Emacs 29}、@w{Emacs 30} 和 @w{Emacs 31} 上成功运行。
+
+虽然 Unix 和类 Unix 系统是主要的远程目标，但 @value{tramp} 在连接到其他平台（例如 MS Windows 10/11）方面也同样成功。
+
+
+@item
+如何加速@value{tramp}？
+
+@value{tramp} 在后台执行许多操作，其中一些操作取决于网络速度、远程主机的响应速度和身份验证延迟。  在这些操作期间，@value{tramp} 的响应速度会变慢。  @value{tramp} 设置范围内的一些建议包括：
+
+@itemize @minus
+@item
+使用外部方法，例如 @option{scp}，对于大文件来说，它比内部方法更快。  将 @code{tramp-use-scp-direct-remote-copying} 设置为非 @code{nil}。
+
+@item
+保留文件@code{tramp-persistency-file-name}，这是@value{tramp}缓存有关主机和文件的远程信息的位置。  默认情况下启用缓存。  不要禁用它。
+
+@vindex remote-file-name-inhibit-cache
+如果远程文件未在 @value{tramp} 的控制之外独立更新，请将 @code{remote-file-name-inhibit-cache} 设置为 @code{nil}。如果远程目录或文件独立于@value{tramp}进行更新，则需要进行缓存清理。
+
+@item
+禁用版本控制以避免延迟：
+
+@lisp
+@group
+(setq vc-ignore-dir-regexp
+      (format "\\(%s\\)\\|\\(%s\\)"
+              vc-ignore-dir-regexp
+              tramp-file-name-regexp))
+@end group
+@end lisp
+
+如果这太过激进，因为您想远程使用版本控制，请将 @code{vc-handled-backends} 修剪为您关心的那些，例如：
+
+@lisp
+(setq vc-handled-backends '(SVN Git))
+@end lisp
+
+@vindex remote-file-name-inhibit-locks
+@item
+禁用文件锁。  如果您知道不同的 Emacs 会话不会修改同一远程文件，请将 @code{remote-file-name-inhibit-locks} 设置为 @code{t}。
+
+@vindex remote-file-name-inhibit-auto-save
+@item
+将自动保存文件保留在本地。  这已经是 Emacs 中的默认配置，不要更改它。  如果您想完全禁用远程文件的自动保存，请将@code{remote-file-name-inhibit-auto-save}设置为@code{t}，但请考虑一下后果！
+
+如果您想仅对选定的连接禁用自动保存（例如出于安全考虑），请使用连接局部变量来设置 @code{buffer-auto-save-file-name}。  例如，如果您想要禁用所有 @option{sudo} 连接的自动保存，请应用以下代码。
+@ifinfo
+@xref{Connection Variables, , , emacs}.
+@end ifinfo
+
+@lisp
+@group
+(connection-local-set-profile-variables
+ 'my-auto-save-profile
+ '((buffer-auto-save-file-name . nil)))
+@end group
+
+@group
+(connection-local-set-profiles
+ '(:application tramp :protocol "sudo")
+ 'my-auto-save-profile)
+@end group
+@end lisp
+
+@vindex auto-revert-remote-files
+@item
+禁用远程文件的自动恢复。  将 @code{auto-revert-remote-files} 设置为 @code{nil}。  这是默认设置。
+
+@vindex enable-remote-dir-locals
+@item
+禁用远程文件的目录本地变量。  将 @code{enable-remote-dir-locals} 设置为 @code{nil}。  这是默认设置。
+
+@vindex dired-check-symlinks
+@item
+禁用检查 @code{dired} 缓冲区中的符号链接有效性。 Emacs 使用 @code{file-truename} 操作对 @code{dired} 缓冲区中的符号链接进行字体化。  这可能会很慢。  从@w{Emacs 31}开始，有一个用户选项可以抑制这种情况。  它可以设置为本地连接。
+@ifinfo
+@xref{Connection Variables, , , emacs}.
+@end ifinfo
+
+@lisp
+@group
+(connection-local-set-profile-variables
+ 'my-dired-profile
+ '((dired-check-symlinks . nil)))
+@end group
+
+@group
+(connection-local-set-profiles
+ '(:application tramp :machine "remotehost")
+ 'my-dired-profile)
+@end group
+@end lisp
+
+@item
+如果可能，请使用直接异步进程。
+
+@item
+禁止读取@code{shell}中的远程历史文件。  将 @code{shell-history-file-name} 设置为 @code{t}。
+
+@item
+禁用过多的痕迹。  将 @code{tramp-verbose} 设置为 3 或更低，默认为 3。在寻找错误时暂时增加跟踪级别。
+
+@item
+使用具有 @value{tramp} 高级操作特定实现的包。  例如，GNU ELPA 包 @file{tramp-hlo} 为 @value{tramp} 的 @code{tramp-sh} 后端 (@pxref{New operations}) 实现了@code{dir-locals--all-files}、@code{locate-dominating-file} 和 @code{dir-locals-find-file} 的专用版本。
+@c The NonGNU ELPA package @file{tramp-rpc} implements an own
+@c @value{tramp} backend (@pxref{New operations}).
+@end itemize
+
+
+@item
+@value{tramp} 未连接到远程主机
+
+@value{tramp}无法连接到远程主机的三个主要原因：
+
+@itemize @minus
+@item
+提示中出现未知字符
+
+@value{tramp} 需要在远程主机上有一个清晰可识别的提示才能准确解析。  包含用于着色的转义序列的 Shell 提示会导致解析问题。  @ref{Remote shell setup} 用于使用正则表达式自定义提示检测。
+
+要检查远程主机的提示符是否被识别，请使用此测试：切换到@value{tramp}连接缓冲区@file{*tramp/foo*}，将光标放在缓冲区顶部，然后应用以下表达式：
+
+@example
+@kbd{M-: (re-search-forward (concat tramp-shell-prompt-pattern "$")) @key{RET}}
+@end example
+
+如果光标没有移动到缓冲区底部的提示符处，则@value{tramp} 无法识别该提示符。
+
+在远程主机上使用 zsh 时，请禁用 zsh 行编辑器，因为 zsh 并行使用左侧和右侧提示。  将以下行添加到 @file{~/.zshrc}：
+
+@example
+[[ $TERM == "dumb" ]] && unsetopt zle && PS1='$ ' && return
+@end example
+
+这使用 @code{tramp-terminal-type}、@t{"dumb"} 的默认值作为 @env{TERM} 环境变量的值。  如果您想对 @env{TERM} 使用其他值，请相应地更改 @code{tramp-terminal-type} 和此行。
+
+或者，您可以显式设置远程登录 shell。 @xref{Remote shell setup}，为了讨论该技术，
+
+在远程主机上使用 Fish shell 时，通过将以下内容添加到 @file{~/.config/fish/config.fish} 来禁用花式格式：
+
+@example
+@group
+function fish_prompt
+  if test $TERM = "dumb"
+     echo "\$ "
+  else
+     @dots{}
+  end
+end
+@end group
+@end example
+
+在远程主机上使用 WinSSHD 时，@value{tramp} 无法识别奇怪的提示设置。
+
+iTerm2 shell 集成也存在类似的问题，它在启动 shell 时发送专有的转义代码。  这可以通过更改 @file{~/.profile} 中的相应集成片段来抑制，如下所示：
+
+@example
+@group
+[ $TERM = "dumb" ] || \
+test -e "$@{HOME@}/.iterm2_shell_integration.bash" && \
+source "$@{HOME@}/.iterm2_shell_integration.bash"
+@end group
+@end example
+
+最后，bash 的 readline 不应该使用像 @samp{C-j} 这样的键绑定来命令。  在您的@file{~/.inputrc}中禁用此功能：
+
+@example
+@group
+$if term=dumb
+# Don't bind Control-J or it messes up @value{tramp}.
+$else
+"\C-j": next-history
+$endif
+@end group
+@end example
+
+@item
+登录后回显字符
+
+@value{tramp} 使用 @command{stty -echo} 命令抑制来自远程主机的回声。  但有时抑制来自远程主机的包含有害控制字符的欢迎消息为时已晚。  使用@option{sshx}或@option{scpx}方法可以避免这个问题，因为它们分配一个伪tty。  @xref{Inline methods}。
+
+@vindex tramp-chunksize
+@item
+@value{tramp} 停止传输长度超过 500 个字符的字符串
+
+将 @code{tramp-chunksize} 设置为 500 可以解决此问题，该问题与 HP-UX、FreeBSD 和 Tru64 Unix 系统上@code{process-send-string} 的错误实现有关。  请查阅 @code{tramp-chunksize} 的文档以了解何时需要这样做。
+
+对于@value{tramp}访问的文件，将@code{file-precious-flag}设置为@code{t}，以便通过首先保存到临时文件来使用校验和检查文件内容。
+@ifinfo
+@pxref{Saving Buffers, , , elisp}.
+@end ifinfo
+
+@lisp
+@group
+(add-hook
+ 'find-file-hook
+ (lambda ()
+   (when (file-remote-p default-directory)
+     (set (make-local-variable 'file-precious-flag) t))))
+@end group
+@end lisp
+@end itemize
+
+
+@item
+@value{tramp} 在 chroot 环境中失败
+
+@vindex tramp-local-host-regexp
+当连接到本地主机时，@value{tramp} 使用一些内部优化。  当 Emacs 在 chroot 环境中运行时，它们会失败。要禁用这些优化，请将用户选项 @code{tramp-local-host-regexp} 设置为 @code{nil}。
+
+
+@item
+@value{tramp} 在启动时阻止 Emacs
+
+@vindex remote-file-name-access-timeout
+有些包，如 @file{desktop.el} 或 @file{recentf.el}，在加载时访问远程文件。  如果请求的文件不可访问，@value{tramp} 可能会阻塞。  为了检查是否会发生这种情况，请在加载这些包之前通过 @code{access-file} 添加测试并设置适当的超时：
+
+@lisp
+@group
+(let ((remote-file-name-access-timeout 10))
+  (access-file "@file{@trampfn{method,user@@host,/path/to/file}}" "error"))
+@result{} nil
+@end group
+@end lisp
+
+结果@code{nil}表示成功。  如果文件不可访问，或者底层操作持续时间太长，@code{access-file} 返回错误。
+
+超时值（示例中为 10 秒）取决于您的偏好以及与远程主机的连接质量。如果尚未建立与远程主机的连接，并且需要交互式密码，则超时检查将无法正常工作。
+
+@c Since Emacs 30.
+@strong{Note}：在 Emacs 的最新版本中，两个软件包都已经应用了此检查。  您只需将 @code{remote-file-name-access-timeout} 自定义为所需的超时（以秒为单位）。
+
+
+@item
+@value{tramp} 支持 @acronym{SSH} 安全密钥吗？
+
+是的。  @command{OpenSSH} 通过特殊密钥类型 @option{*-sk} 添加了对 @acronym{FIDO} 硬件设备的支持。  @value{tramp} 支持它们的附加握手消息。  这至少需要 @command{OpenSSH} 8.2，以及 @acronym{FIDO} @acronym{U2F} 或 @acronym{FIDO2} 兼容的安全密钥，例如 yubikey、solokey、nintokey 或 titankey。
+@c @uref{https://docs.fedoraproject.org/en-US/quick-docs/using-yubikeys/}
+
+@strong{Note} 有报告称 @command{ssh-agent} 处理 FIDO2（住宅）密钥存在问题。  作为解决方法，您可以禁用此类键的 @command{ssh-agent}。
+
+
+@item
+@value{tramp} 支持指纹识别器吗？
+
+是的。  指纹读取器可用作基于 @option{sudo} 的登录的附加身份验证方法。  @value{tramp} 支持所需的附加握手消息@footnote{It supports fingerprint readers driven by @command{fprintd}.}。  如果指纹读取器没有及时识别指纹，身份验证将退回到请求密码。
+
+@vindex tramp-use-fingerprint
+如果用户选项@code{tramp-use-fingerprint}是@code{nil}，则@value{tramp}中断指纹请求，立即回退到密码身份验证。
+
+
+@item
+@value{tramp} 无法连接到运行 SMB1 连接协议的 Samba 或 MS Windows 主机
+
+@vindex tramp-smb-options
+默认情况下，最新版本的 @command{smbclient} 不支持旧的连接协议。  为了连接到这样的主机，请添加相应的选项：
+
+@lisp
+(add-to-list 'tramp-smb-options "client min protocol=NT1")
+@end lisp
+
+@strong{Note} 使用已弃用的连接协议会引发安全问题，因此只有在绝对必要时才应该这样做。
+
+
+@item
+文件名补全不适用于 @value{tramp}
+
+来自远程 shell 的 @acronym{ANSI} 转义序列可能会导致 @value{tramp} 解析远程缓冲区时出错。
+
+要测试是否属于这种情况，请打开远程 shell 并检查 @command{ls} 的输出是否为彩色。
+
+要禁用远程主机的 @acronym{ANSI} 转义序列，请禁用远程主机的 @file{.bashrc} 或 @file{.profile} 中的 @samp{--color=yes} 或 @samp{--color=auto}。  打开和关闭此别名以查看文件名补全是否有效。
+
+
+@item
+文件名补全在包含大量文件的目录中不起作用
+
+这可能与 globbing 有关，这是利用 shell 扩展通配符规范的能力，例如@samp{*.c}。  对于包含大量文件的目录，通配可能会超出 shell 对命令行长度的限制并挂起。  @value{tramp} 使用通配符。
+
+要测试通配符是否挂起，请在远程主机上打开 shell，然后运行 ​​@command{ls -d * ..?* > /dev/null}。
+
+测试时，确保远程 shell 与 @value{tramp} 连接到该主机时使用的 shell 相同（@command{/bin/sh}、@command{ksh} 或 @command{bash}）。
+
+
+@item
+@value{tramp}完成文件传输后如何收到通知？
+
+使用@file{~/.emacs}中的以下代码在读取或写入远程主机后使 Emacs 发出蜂鸣声。
+
+@vindex tramp-handle-write-region-hook
+@vindex tramp-handle-file-local-copy-hook
+@lisp
+(add-hook 'tramp-handle-write-region-hook 'beep)
+(add-hook 'tramp-handle-file-local-copy-hook 'beep)
+@end lisp
+
+
+@item
+使用 @samp{root} 权限时如何获得视觉警告？模式行中的主机指示？
+
+@cindex @value{tramp} theme
+@vindex tramp-theme-face-remapping-alist
+通过 Emacs 的包管理器从 GNU ELPA 安装 @file{tramp-theme}。通过@kbd{M-x load-theme @key{RET} tramp @key{RET}}启用它。  用户选项@code{tramp-theme-face-remapping-alist}中解释了进一步的定制。
+
+
+@item
+远程主机不理解目录列表的默认选项
+
+@vindex dired-listing-switches
+Emacs 根据本地主机计算 @command{dired} 选项。从@w{Emacs 30}开始，这些选项可以设置为连接本地。
+@ifinfo
+@xref{Connection Variables, , , emacs}.
+@end ifinfo
+
+@lisp
+@group
+(connection-local-set-profile-variables
+ 'my-dired-profile
+ '((dired-listing-switches . "-ahl")))
+@end group
+
+@group
+(connection-local-set-profiles
+ '(:application tramp :machine "remotehost")
+ 'my-dired-profile)
+@end group
+@end lisp
+
+@vindex dired-actual-switches
+在旧版 Emacsen 中，您可以使用钩子设置 @command{dired} 选项，如下所示：
+
+@lisp
+@group
+(add-hook
+ 'dired-before-readin-hook
+ (lambda ()
+   (when (string-equal
+           (file-remote-p default-directory 'host) "remotehost")
+     (setq dired-actual-switches "-ahl"))))
+@end group
+@end lisp
+
+
+@item
+@value{tramp} 不显示目录或文件，尽管它们是可读的
+
+@vindex tramp-use-file-attributes
+在内部，@value{tramp} 使用@command{ls} 或@command{stat} 等命令来确定文件权限。  当在远程主机上启用 @acronym{NFS4_ACL} 时，将使用更细粒度的信息，这些信息无法通过这些命令返回的权限字符串反映出来。  在这种情况下，将用户选项 @code{tramp-use-file-attributes} 设置为 @code{nil}。  这也可以按主机方式设置，如下所示：
+
+@lisp
+@group
+(connection-local-set-profile-variables
+ 'my-file-attributes-profile
+ '((tramp-use-file-attributes . nil)))
+@end group
+
+@group
+(connection-local-set-profiles
+ '(:application tramp :machine "remotehost")
+ 'my-file-attributes-profile)
+@end group
+@end lisp
+
+
+@item
+远程文件被丢弃到哪里？
+
+@vindex remote-file-name-inhibit-delete-by-moving-to-trash
+Emacs 可以垃圾文件而不是删除
+@ifinfo
+他们，@pxref{Misc File Ops, Trashing , , emacs}。
+@end ifinfo
+@ifnotinfo
+他们。
+@end ifnotinfo
+远程文件总是被丢弃到本地垃圾箱，除非用户选项@code{remote-file-name-inhibit-delete-by-moving-to-trash}不是@code{nil}，或者它是远程加密文件（@pxref{Keeping files encrypted}），无论如何都会被删除。
+
+@c Since Emacs 30.
+@vindex trash-directory
+如果要将远程文件删除到远程垃圾目录中，可以将用户选项 @code{trash-directory} 配置为连接本地值。
+@ifinfo
+@xref{Connection Variables, , , emacs}.
+@end ifinfo
+
+@lisp
+@group
+(connection-local-set-profile-variables
+ 'remote-trash-directory
+ '((trash-directory . "/sudo::~/.local/share/Trash")))
+@end group
+
+@group
+(connection-local-set-profiles
+ `(:application tramp :protocol "sudo" :machine ,system-name)
+ 'remote-trash-directory)
+@end group
+@end lisp
+
+@vindex XDG_DATA_HOME@r{, environment variable}
+如果 Emacs 配置为对垃圾目录使用 XDG 约定，则无法使用相应工具恢复远程文件，因为这些约定未指定远程路径。  如果需要，必须通过手动从 @file{$@{XDG_DATA_HOME@}/Trash/files/} 移动这些文件来恢复这些文件。
+
+
+@item
+输入@value{tramp}时如何缩短长文件名？
+
+采用其中几种方法来减少打字。  如果全名是@file{@trampfn{ssh,news@@news.my.domain,/opt/news/etc}}，那么：
+
+@enumerate
+
+@item
+使用简化语法：
+
+
+
+@lisp
+@group
+(customize-set-variable 'tramp-default-method "ssh")
+(tramp-change-syntax 'simplified)
+@end group
+@end lisp
+
+减少输入：@kbd{C-x C-f @code{@value{prefix}news@@news.my.domain@value{postfix}/opt/news/etc} @key{RET}}。
+
+@item
+
+
+
+
+@lisp
+@group
+(custom-set-variables
+ '(tramp-default-method "ssh")
+ '(tramp-default-user "news"))
+@end group
+@end lisp
+
+减少打字：@kbd{C-x C-f
+@trampfn{-,news.my.domain,/opt/news/etc} @key{RET}}.
+
+
+@trampfn{su,,} @key{RET}}.
+
+@item
+使用访问方法的配置选项：
+
+Programs used for access methods already offer powerful configurations (@pxref{Customizing Completion}).  对于@option{ssh}，配置文件@file{~/.ssh/config}：
+
+@example
+@group
+Host xy
+     HostName news.my.domain
+     User news
+@end group
+@end example
+
+减少输入：@kbd{C-x C-f @trampfn{ssh,xy,/opt/news/etc} @key{RET}}。
+
+
+
+@item
+
+
+
+
+@lisp
+(setenv "xy" "@trampfn{ssh,news@@news.my.domain,/opt/news/etc/}")
+@end lisp
+
+减少输入：@kbd{C-x C-f $xy @key{RET}}。
+
+
+
+@item Define own keys:
+
+
+
+@lisp
+@group
+(global-set-key
+ [(control x) (control y)]
+ (lambda ()
+   (interactive)
+   (find-file
+    (read-file-name
+     "Find @value{tramp} file: "
+     "@trampfn{ssh,news@@news.my.domain,/opt/news/etc/}"))))
+@end group
+@end lisp
+
+
+
+有关更全面的示例，请参阅@uref{https://www.emacswiki.org/emacs/TrampMode, the Emacs Wiki}。
+
+@item
+定义自己的缩写（1）：
+
+
+
+@lisp
+@group
+(add-to-list 'directory-abbrev-alist
+             '("^/xy" . "@trampfn{ssh,news@@news.my.domain,/opt/news/etc/}"))
+@end group
+@end lisp
+
+减少输入：@kbd{C-x C-f /xy @key{RET}}。
+
+@strong{Note} 该文件名无法在此处编辑，因为在迷你缓冲区中编辑时缩写不会扩展。此外，在 @key{TAB} 完成期间，缩写不会扩展。
+
+@item
+定义自己的缩写（2）：
+
+@code{abbrev-mode} 为迷你缓冲区中的编辑提供了额外的灵活性：
+
+@lisp
+@group
+(define-abbrev-table 'my-tramp-abbrev-table
+  '(("xy" "@trampfn{ssh,news@@news.my.domain,/opt/news/etc/}")))
+@end group
+
+@group
+(add-hook
+ 'minibuffer-setup-hook
+ (lambda ()
+   (abbrev-mode 1)
+   (setq local-abbrev-table my-tramp-abbrev-table)))
+@end group
+
+@group
+(advice-add 'minibuffer-complete
+ :before 'expand-abbrev)
+@end group
+@end lisp
+
+减少输入：@kbd{C-x C-f xy @key{TAB}}。
+
+迷你缓冲区可扩展以供进一步编辑。
+
+@item Use bookmarks:
+
+使用书签保存 @value{tramp} 文件名。
+@ifinfo
+@pxref{Bookmarks, , , emacs}.
+@end ifinfo
+
+使用 @value{tramp} 访问某个位置后，使用 @kbd{@key{menu-bar} @key{edit} @key{bookmarks} @key{set}} 将其保存为书签。
+
+要重新访问该书签：@kbd{@key{menu-bar} @key{edit} @key{bookmarks} @key{jump}}。
+
+@item Use recent files:
+
+@file{recentf} 记住去过的地方。
+@ifinfo
+@pxref{File Conveniences, , , emacs}.
+@end ifinfo
+
+将远程文件名保留在最近列表中，而无需通过远程访问检查其可访问性：
+
+@lisp
+(recentf-mode 1)
+@end lisp
+
+访问最近打开的文件：@kbd{@key{menu-bar} @key{file} @key{Open Recent}}。
+
+@item Use filecache:
+
+由于 @file{filecache} 会记住访问过的位置，因此将远程目录添加到缓存中：
+
+@lisp
+@group
+(with-eval-after-load 'filecache
+  (file-cache-add-directory
+    "@trampfn{ssh,news@@news.my.domain,/opt/news/etc/}"))
+@end group
+@end lisp
+
+然后使用 @kbd{C-x C-f C-@key{TAB}} 在迷你缓冲区中使用目录补全。
+
+@item Use bbdb:
+
+@file{bbdb} 具有针对 Ange FTP 文件的内置功能，该功能也适用于 @value{tramp} 文件名。
+@ifinfo
+@pxref{bbdb-ftp, Storing FTP sites in the BBDB, , bbdb}.
+@end ifinfo
+
+在 Emacs 中加载 @file{bbdb}：
+
+@lisp
+@group
+(require 'bbdb)
+(bbdb-initialize)
+@end group
+@end lisp
+
+使用 @kbd{M-x bbdb-create-ftp-site @key{RET}} 创建 BBDB 条目。然后在需要时指定方法和用户名。  示例：
+
+@example
+@group
+@kbd{M-x bbdb-create-ftp-site @key{RET}}
+@b{Ftp Site:} news.my.domain @key{RET}
+@b{Ftp Directory:} /opt/news/etc/ @key{RET}
+@b{Ftp Username:} ssh@value{postfixhop}news @key{RET}
+@b{Company:} @key{RET}
+@b{Additional Comments:} @key{RET}
+@end group
+@end example
+
+在 BBDB 缓冲区中，按 @kbd{F} 键访问条目。
+
+@end enumerate
+
+感谢 @value{tramp} 用户对这些食谱的贡献。
+
+
+@item
+为什么保存的临时多跳文件名在新的 Emacs 会话中不起作用？
+
+默认情况下，完成初始连接后，临时多跳文件名会被缩写。  这些缩写形式仅保留最后一跳，因此只有生成缩写形式的 Emacs 会话才能理解它。  @xref{Ad-hoc multi-hops}。
+
+例如，连接到@file{@trampfn{ssh,bird@@bastion|@c ssh@value{postfixhop}news@@news.my.domain,/opt/news/etc}}后，文件名变为@file{@trampfn{ssh,news@@news.my.domain,/opt/news/etc}}。如果缩写形式保存在书签、最近文件列表、bbdb 或类似文件中，则新的 Emacs 会话无法知道连接必须首先经过 @samp{bird@@bastion}。
+
+有两种机制可以处理这个问题。  第一个是将 @code{tramp-show-ad-hoc-proxies} 自定义为非 @code{nil} 值，这将禁用缩写。  然后，将显示并保存完全限定的临时多跳文件名。 @xref{tramp-show-ad-hoc-proxies}。
+
+或者，您可以将 @code{tramp-save-ad-hoc-proxies} 自定义为非 @code{nil} 值，这意味着保存如何扩展缩写的多跳文件名的信息。 @xref{tramp-save-ad-hoc-proxies}。
+
+
+@item
+如何使用 @value{tramp} 连接到远程 Emacs 会话？
+
+配置 Emacs 客户端
+@ifinfo
+(@pxref{Emacs Server, , , emacs}).
+@end ifinfo
+
+然后在远程主机上启动 Emacs Server：
+
+@lisp
+@group
+(require 'server)
+(setq server-host (system-name)
+      server-use-tcp t)
+(server-start)
+@end group
+@end lisp
+
+如果本地主机无法解析远程主机的@code{(system-name)}，请改用IP 地址。
+
+从远程主机将生成的文件 @file{~/.emacs.d/server/server} 复制到本地主机的同一位置。
+
+然后从命令行启动 Emacs 客户端：
+
+@example
+$ emacsclient @trampfn{ssh,user@@host,/file/to/edit}
+@end example
+
+@code{user} 和 @code{host} 指的是本地主机。
+
+要使 Emacs Client 成为其他程序的编辑器，请使用包装脚本@file{emacsclient.sh}：
+
+@example
+@group
+#!/bin/sh
+emacsclient @trampfn{ssh,$(whoami)@@$(hostname --fqdn),$1}
+@end group
+@end example
+
+@vindex EDITOR@r{, environment variable}
+然后更改环境变量@env{EDITOR}以指向包装器脚本：
+
+@example
+$ export EDITOR=/path/to/emacsclient.sh
+@end example
+
+
+@item
+如何判断缓冲区是否为远程缓冲区？
+
+@findex file-remote-p
+@vindex default-directory
+缓冲区局部变量 @code{default-directory} 说明了这一点。  如果形式@code{(file-remote-p default-directory)}返回非@code{nil}，则缓冲区是远程的。  请参阅 @code{file-remote-p} 的可选参数来确定远程连接的详细信息。
+
+
+@item
+当远程主机无法访问时如何保存文件？
+
+如果运行 Emacs 的本地计算机更改了其网络集成，则远程主机可能会变得无法访问。  例如，如果本地计算机在您的办公室和家之间移动而不重新启动 Emacs，就会发生这种情况。
+
+在这种情况下，命令@code{tramp-rename-files}可用于更改远程缓冲区的方法、主机和/或目录名称。  这允许通过另一个网络路径将它们的内容保存在同一位置，或者完全保存在其他地方（包括本地）。  @pxref{Renaming remote files}。
+
+
+@item
+如何防止@value{tramp}清除@code{recentf-list}？
+
+当@value{tramp}清理连接时，它会从@code{recentf-list}中删除相应的远程文件名。  这是必需的，因为无响应的远程主机可能会触发 @code{recentf} 一次又一次地连接该主机。
+
+如果您发现清理工作令人不安，因为 @code{recentf-list} 中的文件名对您来说很珍贵，您可以在 @file{~/.emacs} 中添加以下两种形式（在加载 @code{tramp} 和 @code{recentf} 包之后）：
+
+@vindex tramp-cleanup-connection-hook
+@vindex tramp-cleanup-all-connections-hook
+@lisp
+@group
+(remove-hook
+ 'tramp-cleanup-connection-hook
+ #'tramp-recentf-cleanup)
+@end group
+@group
+(remove-hook
+ 'tramp-cleanup-all-connections-hook
+ #'tramp-recentf-cleanup-all)
+@end group
+@end lisp
+
+
+@item
+我收到警告@samp{Tramp has been compiled with Emacs a.b, this is Emacs c.d}
+@item
+我收到错误@samp{tramp-file-name-handler: Invalid function: tramp-compat-with-mutex}
+
+@value{tramp} 附带不同 Emacs 版本的兼容性代码。  当您看到这样的消息（文本可能有所不同）时，您没有使用 Emacs 内置版本的 @value{tramp}，并且必须重新编译它。  如果您已经从 GNU ELPA 安装了 @value{tramp}，
+@ifset installchapter
+@xref{ELPA Installation}。  否则，@xref{Recompilation}。
+@end ifset
+@ifclear installchapter
+见@uref{@value{trampurl}#ELPA-Installation}。  否则，请参见@uref{@value{trampurl}#Recompilation}。
+@end ifclear
+
+
+@item
+我收到错误@samp{Remote file error: Forbidden reentrant call of Tramp}
+
+@vindex remote-file-error
+@vindex debug-ignored-errors
+当远程文件操作仍在运行时，计时器、进程过滤器和哨兵以及其他基于事件的功能可以随时运行。这可能会导致 @value{tramp} 阻塞。  当检测到这种情况时，就会触发此错误。  它应该在相应的函数中修复（发送错误报告会有所帮助），但目前您可以通过 @file{~/.emacs} 中的以下代码来抑制此错误：
+
+@lisp
+@group
+(setq debug-ignored-errors
+      (cons 'remote-file-error debug-ignored-errors))
+@end group
+@end lisp
+
+
+@item
+我收到错误@samp{Remote file error: Not a valid Tramp file name function `tramp-FOO-file-name-p'}
+
+@value{tramp} 更改了内部函数的签名。实现自己的 @value{tramp} 后端的外部包必须遵循此更改。  请将此问题报告给该包的作者。
+
+对于正在运行的会话，@value{tramp}禁用外部包，您可以继续工作。  如果您不想在激活 @value{tramp} 时看到此错误，可以在 @file{~/.emacs} 中使用与上面相同的代码来抑制它：
+
+@lisp
+@group
+(setq debug-ignored-errors
+      (cons 'remote-file-error debug-ignored-errors))
+@end group
+@end lisp
+
+
+@item
+通过 @option{ssh} 连接到远程主机时，出现错误 @samp{unix_listener: path "/very/long/path/.cache/emacs/tramp.XXX" too long for Unix domain socket}。
+
+@vindex small-temporary-file-directory
+默认情况下，@value{tramp} 使用目录 @file{~/.cache/emacs/} 创建 OpenSSH Unix 域套接字。  在 GNU/Linux 上，域套接字的最大路径长度（当前为 107 个字符）比普通文件低得多。
+
+您可以通过将用户选项@code{small-temporary-file-directory}设置为其他名称来更改此目录，例如
+
+@lisp
+@group
+(unless small-temporary-file-directory
+  (customize-set-variable
+   'small-temporary-file-directory
+   (format "/run/user/%d/emacs/" (user-uid)))
+  (make-directory small-temporary-file-directory t))
+@end group
+@end lisp
+
+@vindex XDG_RUNTIME_DIR@r{, environment variable}
+@t{"/run/user/UID"} 是环境变量 @env{XDG_RUNTIME_DIR} 的值，您可以通过 @code{(getenv "XDG_RUNTIME_DIR")} 使用它。
+
+
+@item
+我收到错误@samp{Method `gdrive' not supported by GVFS}。
+
+@samp{google-drive} 已在 @acronym{GNOME} 50 中禁用。目前尚不清楚是否以及何时重新启用。
+@c @uref{https://discourse.gnome.org/t/google-drive-in-gnome-50/34417}
+
+@item
+更改文件属性时如何忽略错误？
+
+@vindex tramp-inhibit-errors-if-setting-file-attributes-fail
+有时，例如在保存远程文件时，更改文件属性（如权限、时间戳或所有权）时会出现错误。如果可以忽略这些错误，请将用户选项 @code{tramp-inhibit-errors-if-setting-file-attributes-fail} 设置为非 @code{nil} 值。  这会将错误转换为警告。
+
+
+@item
+如何禁止其他包调用@value{tramp}？
+
+有些软件包无需用户输入远程文件名即可调用 @value{tramp}。  即使不应用远程文件语法，某些包也会自行启用@value{tramp}。  用户如何禁用此类功能。
+
+@itemize @minus
+@item
+@file{ido.el}
+
+禁用 @value{tramp} 文件名补全：
+
+@lisp
+(customize-set-variable 'ido-enable-tramp-completion nil)
+@end lisp
+
+@c Obsolete since Emacs 29.1.
+@item
+@file{rlogin.el}
+
+禁用远程目录跟踪模式：
+
+@lisp
+(rlogin-directory-tracking-mode -1)
+@end lisp
+@end itemize
+
+
+@item
+如何禁用@value{tramp}？
+
+@itemize @minus
+@item
+要将 Ange FTP 保留为默认远程文件访问包，请在@file{.emacs}中进行设置：
+
+@lisp
+(customize-set-variable 'tramp-default-method "ftp")
+@end lisp
+
+如果要启用Ange FTP的语法，请添加以下形式：
+
+@lisp
+(tramp-change-syntax 'simplified)
+@end lisp
+
+@vindex tramp-ignored-file-name-regexp
+@item
+要对某些相似的远程文件名停用 @value{tramp}，请将 @code{tramp-ignored-file-name-regexp} 设置为 @file{.emacs} 中的正确正则表达式。  @strong{Note}，我们不使用@code{customize-set-variable}，以避免加载@value{tramp}。
+
+@lisp
+(setq tramp-ignored-file-name-regexp "\\`/ssh:example\\.com:")
+@end lisp
+
+例如，如果您将虚拟文件系统挂载在本地主机的根目录上作为@file{/ssh:example.com:}，则这是必需的。
+
+@findex inhibit-remote-files
+@item
+要禁用 @value{tramp}（和 Ange FTP），请键入 @kbd{M-x inhibit-remote-files @key{RET}}。  您也可以将其添加到您的@file{.emacs}。
+
+@lisp
+(inhibit-remote-files)
+@end lisp
+
+@findex without-remote-files
+@item
+如果您编写的代码仅针对本地文件运行，则可以使用 @code{without-remote-files} 宏。
+
+@lisp
+(without-remote-files @dots{})
+@end lisp
+
+这提高了性能，因为许多原始文件名操作不再检查 @value{tramp} 文件名正则表达式。
+
+@findex tramp-unload-tramp
+@item
+要卸载 @value{tramp}，请输入 @kbd{M-x tramp-unload-tramp @key{RET}}。卸载 @value{tramp} 也会重置 Ange FTP 插件。
+@end itemize
+
+
+@item
+安格FTP和@value{tramp}有什么区别？
+
+不同之处在于，Ange FTP 使用@command{ftp} 在本地和远程主机之间传输文件，而@value{tramp} 使用@command{ssh} 和@command{scp} 的组合或其他类似工作的程序。
+@end itemize
+
+
+@c For the developer.
+@node Files directories and localnames
+@chapter 文件名、目录和本地名称如何被破坏和管理
+
+@menu
+* Temporary directory::          临时文件保存的地方。
+* Localname deconstruction::     将本地名称拆分为其组成部分。
+* External packages::            与外部 Lisp 包集成。
+* Extension packages::           向 @value{tramp} 添加新方法。
+* New operations::               在 @value{tramp} 中处理进一步的操作。
+@end menu
+
+
+@node Temporary directory
+@section 临时文件的保存位置
+
+@vindex temporary-file-directory
+在内部，@value{tramp} 使用 @t{"~/.cache/emacs"} 作为本地临时目录（如果存在）。  否则，使用 @code{temporary-file-directory} 的值，通常为 @t{"/tmp"}。
+
+@vindex tramp-compat-temporary-file-directory
+@vindex <TMP>
+该本地临时目录保存在常量@code{tramp-compat-temporary-file-directory}中。  在本手册中，我们使用 @t{"<TMP>"} 作为其值。
+
+对于@option{adb}方法，远程主机上的临时目录是@t{"/data/local/tmp"}，对于@option{smb}方法，是@t{"/C$/Temp"}，否则是@t{"/tmp"}。  对于某些方法，这可以自定义。
+
+@vindex tramp-temp-name-prefix
+临时文件的文件名前缀为@t{"tramp."}。  如果您想更改此前缀，例如因为您想识别包中由 @code{file-local-copy} 生成的临时文件，您可以临时绑定变量 @code{tramp-temp-name-prefix}：
+
+@example
+@group
+(let ((tramp-temp-name-prefix "my-prefix."))
+  (file-local-copy "@trampfn{ssh,,.emacs}"))
+@result{} "/tmp/my-prefix.HDfgDZ"
+@end group
+@end example
+
+
+@node Localname deconstruction
+@section 将本地名称拆分为其组成部分
+
+@value{tramp} 包重新定义了 lisp 函数 @code{file-name-directory} 和 @code{file-name-nondirectory} 以适应 @value{tramp} 所需的独特文件命名语法。
+
+替换解析文件名，使用本地名称的原始处理程序，获取结果，然后重新构建 @value{tramp} 文件名。  通过依赖本地名称的原始处理程序，@value{tramp}受益于针对原始处理程序的特定于平台的黑客攻击。
+
+
+@node External packages
+@section 与外部 Lisp 包集成
+
+一般情况下，不建议使用本手册中未描述的@value{tramp}函数和变量。  他们可能会在没有任何公告的情况下更改其签名和/或语义。
+
+
+@subsection 文件名补全
+
+@vindex non-essential
+有时，打开与远程主机的新连接并不方便，包括输入密码等。  例如，这对于提供文件名补全的包来说是很糟糕的。  这样的包可以向@value{tramp}发出信号，表明他们不希望它建立新的连接。  暂时使用变量 @code{non-essential} 并将其绑定到非 @code{nil} 值。
+
+@lisp
+@group
+(let ((non-essential t))
+  @dots{})
+@end group
+@end lisp
+
+
+@subsection 文件属性缓存
+
+@vindex process-file-side-effects
+保持远程文件属性的本地缓存与远程主机同步是一项耗时的操作。  刷新并重新查询这些属性可能会导致繁忙的远程主机上的 @value{tramp} 严重停止。
+
+要解决 @value{tramp} 响应能力下降的问题，请将 @code{process-file-side-effects} 设置为 @code{nil} 以阻止 @value{tramp} 刷新缓存。  这在 @code{process-file} 的调用者知道文件属性没有更改的情况下很有帮助。  let-bind 形式可以完成此操作：
+
+@lisp
+@group
+(let (process-file-side-effects)
+  @dots{})
+@end group
+@end lisp
+
+对于异步进程，@value{tramp} 使用进程哨兵来刷新文件属性缓存。  当 @code{start-file-process} 的调用者事先知道不会发生文件属性更改时，则应将进程哨兵设置为默认状态。  如果调用者定义了自己的进程哨兵，则@value{tramp}的进程哨兵将被覆盖。  调用者仍然可以使用以下代码刷新其进程哨兵中的文件属性缓存：
+
+@lisp
+@group
+(unless (memq (process-status proc) '(run open))
+  (dired-uncache remote-directory))
+@end group
+@end lisp
+
+由于@value{tramp}从根目录开始遍历子目录，因此将进程缓冲区的@code{default-directory}作为根目录很可能就足够了。
+
+
+@subsection 计时器、进程过滤器、进程哨兵、特殊事件、重新显示
+
+@vindex remote-file-error
+当 Emacs 等待向进程发送字符串或等待进程输出时，定时器随时异步运行。  他们可以运行任何远程文件操作，如果同一连接受到影响，这将与已经运行的远程文件操作发生冲突。  @value{tramp} 检测到这种情况，并引发 @code{remote-file-error} 错误。  定时器函数应该避免这种情况。  至少，它应该通过如下包装计时器函数体来保护自己免受此错误的影响：
+
+@lisp
+@group
+(ignore-error 'remote-file-error
+  @dots{})
+@end group
+@end lisp
+
+进程过滤器、进程哨兵、特殊事件处理程序和重新显示（更新模式行）也可能发生类似的问题。
+
+@strong{Note} @value{tramp} 会针对任何与连接相关的问题引发 @code{remote-file-error} 错误。  您可以使用上面的代码片段（或使用带有 @code{remote-file-error} 处理程序的 @code{condition-case} / @code{handler-bind} 表单）来防止所有此类问题。
+
+
+@node Extension packages
+@section 向 @value{tramp} 添加新方法
+
+有两种方法可以向@value{tramp}添加新方法：编写一个包含自己的文件名处理程序的新后端，或者使用现有的@code{tramp-sh-file-name-handler}添加新方法。  前者将发生在 @value{tramp} 存储库内，这里不讨论。  后者通常意味着新的 ELPA 包。 @pxref{Customizing Methods} 举一些例子。
+
+
+@subsection 编写自己的 ELPA 包
+
+外部 ELPA 包 @file{foo-tramp.el} 旨在提供新的 @value{tramp} 方法，例如 @option{foo}，必须将此新方法添加到变量 @code{tramp-methods}。  该变量是一个包含元素 @code{(@var{name} @var{param1} @var{param2} @dots{})} 的 alist。
+
+@var{name} 是方法名称，在本例中为 @t{"foo"}。 @var{param}@t{x} 是@code{(@var{key} @var{value})} 形式的一对。请参阅变量 @code{tramp-methods} 的文档字符串以了解可能的 @var{key} 和 @var{value}。  一个例子是
+
+@lisp
+@group
+(add-to-list
+ 'tramp-methods
+ `("foo"
+   (tramp-login-program ,foo-tramp-executable)
+   (tramp-login-args (("exec") ("%h") ("--") ("su - %u")))
+   (tramp-remote-shell "/bin/sh")
+   (tramp-remote-shell-args ("-i" "-c"))))
+@end group
+@end lisp
+
+在这个例子中，@code{foo-tramp-executable}是一个Lisp常量，它是@command{foo}的程序名称。
+
+如果参数没有静态值但必须在运行时计算，则可以使用格式说明符，如上例中的@t{"%h"}。  请参阅 @code{tramp-methods} 的文档字符串，哪些模式在哪个参数中扩展。  此外，可以通过变量 @code{tramp-extra-expand-args} 添加其他格式说明符。
+
+以下参数扩展 @code{tramp-sh} 后端的格式说明符：@code{tramp-copy-args}、@code{tramp-copy-env}、@code{tramp-copy-file-name}、@code{tramp-login-args}、@code{tramp-login-program}、@code{tramp-remote-copy-args}。
+
+上面的例子可以使用
+
+@lisp
+(tramp-login-program "%b")
+@end lisp
+
+您可以将 @code{tramp-extra-expand-args} 设置为连接本地值：
+
+@lisp
+@group
+(defun foo-tramp-get-login-program (vec)
+  "Return connection-local value of `tramp-login-program'."
+  @dots{})
+@end group
+
+@group
+(connection-local-set-profile-variables
+ 'foo-tramp-connection-local-default-profile
+ '((tramp-extra-expand-args
+    ?b (foo-tramp-get-login-program (car tramp-current-connection)))))
+
+(connection-local-set-profiles
+ '(:application tramp :protocol "foo")
+ foo-tramp-connection-local-default-profile)
+@end group
+@end lisp
+
+另一个初始化可以告诉@value{tramp}哪个是方法@option{foo}的默认用户名和主机名。  这是通过调用 @code{tramp-set-completion-function} 来完成的：
+
+@lisp
+@group
+(tramp-set-completion-function
+ "foo"
+ '((tramp-foo--completion-function @var{arg})))
+@end group
+@end lisp
+
+@code{tramp-foo--completion-function} 是一个函数，它返回完成候选者。  @var{arg}，一个字符串，是完成函数的参数，例如要读取的文件名。 @pxref{Customizing Completion} 了解详情。
+
+最后，为方法 @option{foo} 定义默认用户名或主机名也可能会有所帮助，以防远程文件名将其留空。这可以通过调用来执行
+
+@lisp
+@group
+(add-to-list 'tramp-default-user-alist '("foo" nil "root"))
+(add-to-list 'tramp-default-host-alist '("foo" nil "localhost"))
+@end group
+@end lisp
+
+@pxref{Default User} 和 @ref{Default Host} 解释用户选项 @code{tramp-default-user-alist} 和 @code{tramp-default-host-alist}。
+
+
+@subsection 使定制方法成为可选
+
+上一小节的设置在包@file{foo-tramp.el}中是全局的，这意味着它们在加载@code{foo-tramp}时被激活。  有时，希望在不加载整个包@code{foo-tramp}的情况下使这些设置可用，而是将新方法@option{foo}声明为仅可选方法。  在这种情况下，声明一个函数 @code{tramp-enable-foo-method} 来收集初始化。  该函数必须自动加载。
+
+@lisp
+@group
+;;;###autoload
+(defun tramp-enable-foo-method ()
+  (add-to-list 'tramp-methods '("foo" @dots{}))
+  (tramp-set-completion-function "foo" @dots{})
+  (add-to-list 'tramp-default-user-alist '("foo" @dots{}))
+  (add-to-list 'tramp-default-host-alist '("foo" @dots{})))
+@end group
+@end lisp
+
+然后，您可以通过调用@kbd{M-x tramp-enable-method @key{RET} foo @key{RET}}来激活方法@option{foo}。  @pxref{Optional methods}。
+
+
+@subsection 不加载包激活自定义方法
+
+如果您想在加载@value{tramp}后使方法@option{foo}已知，而不加载包@file{foo-tramp.el}，则必须自动加载函数@code{tramp-enable-foo-method}的实现。  在@file{foo-tramp.el}中添加以下代码：
+
+@lisp
+@group
+;;;###autoload
+(progn
+  (defun tramp-enable-foo-method ()
+    (add-to-list 'tramp-methods '("foo" @dots{}))
+    (tramp-set-completion-function "foo" @dots{})
+    (add-to-list 'tramp-default-user-alist '("foo" @dots{}))
+    (add-to-list 'tramp-default-host-alist '("foo" @dots{}))))
+
+;;;###autoload
+(with-eval-after-load 'tramp (tramp-enable-method "foo"))
+@end group
+@end lisp
+
+诀窍是将 @code{tramp-enable-foo-method} 的函数定义用 @code{progn} 包装为 @code{;;;###autoload} cookie。
+
+
+@node New operations
+@section 处理 @value{tramp} 中的进一步操作
+
+默认情况下，@value{tramp}处理@ref{Magic File Names, , Magic File Name Operations, elisp}中列出的基本操作。有时，主要出于性能原因，希望直接支持更复杂的操作。
+
+外部包包可以向@value{tramp}添加自己的操作实现，这避免了由于使用了解远程文件的基本操作而导致的性能开销。例如，它可以通过使用自己的 shell 脚本来实现这一点，该脚本通过每次调用一次往返来收集远程主机上的信息，用于这一非常特殊的目的。
+
+@defun tramp-add-external-operation operation function backend &optional arg-type
+这将 @var{operation} 的实现添加到 @value{tramp} 的后端 @var{backend}。  @var{function} 是新的实现。
+
+@var{operation} 和 @var{function} 均为功能符号。他们必须具有相同的参数列表。
+
+@var{backend}，也是一个符号，是@value{tramp}后端的功能名称（@code{tramp-ftp}除外）。  新的实现将仅应用于此后端。  例子：
+
+@lisp
+@group
+(defun my-test-operation (file)
+  (message "Original implementation for %s" file))
+@end group
+
+@group
+(defun my-handle-test-operation (file)
+  (message "Handler implementation for %s" file))
+@end group
+
+@group
+(tramp-add-external-operation
+ #'my-test-operation #'my-handle-test-operation 'tramp-sh)
+@end group
+@end lisp
+
+然后我们有不同的用例：
+
+@lisp
+@group
+;; Local file name.
+(my-test-operation "/a/b")
+@result{} "Original implementation for /a/b"
+@end group
+
+@group
+;; Remote file name, handled by `tramp-sh'.
+(my-test-operation "/ssh::/a/b")
+@result{} "Handler implementation for /ssh::/a/b"
+@end group
+
+@group
+;; Remote file name, handled by `tramp-gvfs'.
+(my-test-operation "/sftp::/a/b")
+@result{} "Original implementation for /sftp::/a/b"
+@end group
+@end lisp
+
+@findex with-parsed-tramp-file-name
+@var{function} 的实现方式与普通 @value{tramp} 后端处理程序类似，请参阅 @code{tramp-<backend>-handle-*} 和 @code{tramp-handle-*} 中的示例。  可以预期，第一个参数（或 4⁣，如果是 5⁣）具有远程文件名语法。  它应使用 @value{tramp} 内部宏和函数，例如 @code{with-parsed-tramp-file-name} 以及不同的缓存函数。
+
+@findex tramp-run-real-handler
+如果@var{function}必须调用原始函数，可以通过@code{tramp-run-real-handler}来完成。  该示例的实现可能如下所示：
+
+@lisp
+@group
+(defun my-handle-test-operation (file)
+  (message "Entry handler implementation for %s" file)
+  (tramp-run-real-handler #'my-test-operation (list file))
+  (message "Exit handler implementation for %s" file))
+@end group
+
+@group
+(my-test-operation "/ssh::/a/b")
+@result{} "Entry handler implementation for /ssh::/a/b
+   Original implementation for /ssh::/a/b
+   Exit handler implementation for /ssh::/a/b"
+@end group
+@end lisp
+
+如果相同的@var{function}应用于不同的@value{tramp}后端，则必须分别为每个后端调用@code{tramp-add-external-operation}。
+
+可选参数@var{arg-type}指定应使用@var{operation}的哪个参数来确定是否应调用处理程序@var{function}。  它可以是
+
+@itemize @minus
+@item @code{file}@*
+@var{operation}的第一个参数是要检查的远程文件名。  如果 @var{arg-type} 是 @code{nil}，则这是默认值。
+
+@item @code{default-directory}@*
+@code{default-directory} 是要检查的远程文件名。
+
+@item @code{process}@*
+@var{operation}第一个参数的进程缓冲区的@code{default-directory}（进程）是要检查的远程文件名。
+
+@item @code{tramp-file-name}@*
+@var{operation}第一个参数的@code{tramp-file-name}结构是要检查的远程文件名。
+@end itemize
+
+如果@var{operation}的第一个参数为nil，则@code{default-directory}是在@var{arg-type}为@code{file}或@code{process}时要检查的远程文件名。
+
+@findex tramp-file-name-for-operation
+如果@var{arg-type}是一个函数符号，它将使用与@code{tramp-file-name-for-operation}相同的参数来调用。  它必须返回一个字符串，它是要检查的远程文件名。
+
+上面的例子可以这样修改：
+
+@lisp
+@group
+(defun my-file-name-for-test-operation (operation &rest args)
+  (if (stringp (car args)) (car args) default-directory))
+@end group
+
+@group
+(tramp-add-external-operation
+ #'my-test-operation #'my-handle-test-operation 'tramp-sh
+ #'my-file-name-for-test-operation)
+@end group
+@end lisp
+@end defun
+
+@defun tramp-external-operation-p operation backend
+这会检查@value{tramp}的后端@var{backend}是否支持外部@var{operation}。  它返回注册为处理程序的函数，或@code{nil}。  例子：
+
+@lisp
+@group
+(tramp-external-operation-p
+ #'my-test-operation 'tramp-sh)
+@result{} my-handle-test-operation
+@end group
+
+@group
+(tramp-external-operation-p
+ #'my-test-operation 'tramp-gvfs)
+@result{} nil
+@end group
+@end lisp
+@end defun
+
+@defun tramp-remove-external-operation operation backend
+由 1⁣ 添加的 @var{operation} 的处理程序已从 @var{backend} 中删除。如果存在其他 @var{backend} 的 @var{operation} 处理程序，则保留它们。  例子：
+
+@lisp
+@group
+(tramp-remove-external-operation
+ #'my-test-operation 'tramp-sh)
+@end group
+@end lisp
+@end defun
+
+@findex tramp-expand-script
+用于 @code{tramp-sh} 后端的 Shell 脚本用作格式字符串。  他们必须遵守格式说明符的限制，如@code{tramp-expand-script}中所述。
+
+实现此机制的一个示例是 GNU ELPA 包@file{tramp-hlo}。它为 @value{tramp} 的 @code{tramp-sh} 后端实现了 @code{dir-locals--all-files}、@code{locate-dominating-file} 和 @code{dir-locals-find-file} 的专用版本。
+
+@c Another example is the NonGNU ELPA package @file{tramp-rpc}.  It
+@c provides an own @value{tramp} backend, using a server process on the
+@c remote host.
+
+
+@node Traces and Profiles
+@chapter 如何自定义轨迹
+@vindex tramp-verbose
+@vindex tramp-debug-to-file
+@vindex tramp-debug-command-messages
+@vindex tramp-debug-buffer-limit
+
+@value{tramp} 消息的详细级别范围为 0 到 10。 @value{tramp} 不显示所有消息；当 @code{tramp-verbose} 允许时，仅显示详细级别小于或等于 3 的内容。
+
+@noindent
+详细程度是
+
+@itemize @w{}
+@item @w{ 0}  Silent (no @value{tramp} messages at all)
+@item @w{ 1}  Errors
+@item @w{ 2}  Warnings
+@item @w{ 3}  Connection to remote hosts (default verbosity)
+@item @w{ 4}  Activities
+@item @w{ 5}  Internal
+@item @w{ 6}  Sent and received strings
+@item @w{ 7}  Connection properties
+@item @w{ 8}  File caching
+@item @w{ 9}  Test commands
+@item @w{10}  Traces (huge)
+@item @w{11}  Call traces (maintainer only)
+@end itemize
+
+当@code{tramp-verbose}大于或等于4时，消息也会写入@value{tramp}调试缓冲区@file{*debug tramp/foo*}。  此类调试缓冲区对于错误和问题分析至关重要。  对于 @value{tramp} 错误报告，将 @code{tramp-verbose} 级别设置为 6 (@pxref{Bug Reports})。
+
+调试缓冲区位于
+@ifinfo
+@ref{Outline Mode, , , emacs}.
+@end ifinfo
+@ifnotinfo
+轮廓模式。
+@end ifnotinfo
+在此缓冲区中，可以按消息级别过滤消息。  要查看详细程度高达 5 级的消息，请输入 @kbd{C-u 6 C-c C-q}。
+@ifinfo
+其他导航键在@ref{Outline Visibility, , , emacs}中描述。
+@end ifinfo
+
+@value{tramp} 在内部处理错误。  因此，要获得 Lisp 回溯，需要进行以下设置：
+
+@lisp
+@group
+(setq debug-on-error t
+      debug-on-signal t)
+@end group
+@end lisp
+
+@vindex tramp-error-show-message-timeout
+有时，@value{tramp} 会在出现错误时显示连接缓冲区以获取更多信息。  缓冲区显示 @code{tramp-error-show-message-timeout} 秒，或者直到输入事件到达。  您可以将此变量更改为另一个值。  如果它不是自然数（例如，@code{nil}），则不会显示缓冲区。
+
+@vindex warning-suppress-types
+@value{tramp}警告显示在弹出的@file{*Warnings*}缓冲区中。  如果您不想为每个 @value{tramp} 警告看到此缓冲区，请设置 @code{warning-suppress-types}：
+
+@lisp
+(setq warning-suppress-types '((tramp)))
+@end lisp
+
+如果 @code{tramp-verbose} 大于或等于 10，Lisp 回溯也会添加到 @value{tramp} 调试缓冲区，以防出现错误。
+
+在极少数情况下，@value{tramp} 可能会阻塞 Emacs。终止 Emacs 不允许检查调试缓冲区。  在这种情况下，您可以指示 @value{tramp} 将调试缓冲区镜像到文件：
+
+@lisp
+(customize-set-variable 'tramp-debug-to-file t)
+@end lisp
+
+调试缓冲区作为文件写入您的 @ref{Temporary directory}.  请谨慎使用此选项，因为它可能会降低 @value{tramp} 操作的性能。
+
+如果 @code{tramp-verbose} 大于或等于 11，则 @value{tramp} 函数调用跟踪将写入缓冲区 @file{*trace tramp/foo*}。
+
+当@code{tramp-debug-command-messages}非@code{nil}时，调试缓冲区包含详细级别为6的所有消息（发送和接收的字符串），以及函数@code{tramp-file-name-handler}的进入和退出消息。  这适用于 @value{tramp} 维护人员，分析远程命令以进行性能分析。
+
+如果 @code{tramp-verbose} 为高且 @value{tramp} 运行很长时间，则调试缓冲区可能会非常大。  如果缓冲区大小超过@code{tramp-debug-buffer-limit}（默认为 100MB），将会发出警告。  该用户选项可以根据您的需求进行调整；值 0 表示没有限制（无警告）。
+
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+
+@node Function Index
+@unnumbered 功能索引
+@printindex fn
+
+
+@node Variable Index
+@unnumbered 变量索引
+@printindex vr
+
+
+@node Key Index
+@unnumbered 关键指标
+@printindex ky
+
+
+@node Concept Index
+@unnumbered 概念索引
+@printindex cp
+
+@bye
+
+@c TODO:
+@c
+@c * Say something about the .login and .profile files of the remote
+@c   shells.
+@c
+@c * Explain how tramp.el works in principle: open a shell on a remote
+@c   host and then send commands to it.
+@c
+@c * Consistent small or capitalized words especially in menus.
+@c
+@c * Starting with Emacs 29, use 'setopt' in the examples.

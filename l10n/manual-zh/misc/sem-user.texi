@@ -1,0 +1,885 @@
+@c This is part of the Semantic manual.
+@c Copyright (C) 1999--2005, 2007, 2009--2026 Free Software Foundation,
+@c Inc.
+@c See file semantic.texi for copying conditions.
+
+您可以通过启用语义模式（全局次要模式）来开始使用 @semantic{}：输入 @kbd{M-x semantic-mode}，或打开 @samp{Tools} 菜单并单击名为 @samp{Source Code Parsers (Semantic)} 的菜单项。  @xref{Semantic mode}。
+
+当语义模式打开时，Emacs 会自动解析您访问的每个文件。  然后，您可以在这些缓冲区 (@pxref{Semantic mode user commands}) 中使用 @semantic{} 用户命令。  您还可以选择启用许多“助手”次要模式来保存标签、显示标签信息等。
+
+要在每次启动 Emacs 时启用语义模式，请将行 @code{(semantic-mode 1)} 添加到初始化文件中。  @xref{Init File,,,emacs,Emacs manual}。
+
+@menu
+* Semantic mode::        @semantic{} 的全局次要模式。
+* SemanticDB::           在会话之间缓存已解析的缓冲区。
+* Idle Scheduler::       @semantic{} 空闲时发生的操作。
+* Analyzer::             用于分析代码的语义工具。
+* Speedbar::             将 @semantic{} 与速度栏一起使用。
+* SymRef::               符号参考工具的接口。
+* MRU Bookmarks::        管理标签“书签”。
+* Sticky Func Mode::     在标题行中显示声明。
+* Highlight Func Mode::  突出显示当前函数声明。
+* Tag Decoration Mode::  装饰标签的次要模式。
+@end menu
+
+@node Semantic mode
+@section 语义模式
+@cindex Semantic mode
+
+语义模式是 @semantic{} 整体的全局次要模式。  启用后，您访问的每个文件都会自动解析，前提是在变量 @code{semantic-new-buffer-setup-functions} 中指定了其主要模式（此变量的默认值为 Emacs 包含的所有解析器设置解析，但如果安装其他解析器，您可以添加它）。
+
+在每个支持解析器的缓冲区中，有许多 @semantic{} 命令可用于导航、查询和编辑源代码。 @xref{Semantic mode user commands}。  启用语义模式还会在菜单栏上安装一个 @samp{Development} 菜单，其中包含许多这样的命令。
+
+此外，启用语义模式会打开某些辅助全局次要模式。  变量@code{semantic-default-submodes}决定启用哪些辅助模式；默认值是 SemanticDB 模式 (@pxref{SemanticDB}) 和全局语义空闲调度程序模式 (@pxref{Idle Scheduler})。  您还可以使用其模式功能（例如 @kbd{M-x semanticdb-minor-mode}）或通过 @samp{Development} 菜单单独切换辅助次要模式。  以下各节介绍了各种辅助次要模式。
+
+@defvar semantic-new-buffer-setup-functions
+该变量的值是一个函数列表，用于在缓冲区中设置 @semantic{} 解析。  每个元素的形式为@code{(@var{mode} . @var{fn})}，其中@var{mode}是缓冲区的@code{major-mode}值，@var{fn}是用于设置解析器的相应函数。  在主模式初始化之后（并且在模式钩子运行之后），@var{fn} 被调用，不带任何参数。
+
+默认值对所有受支持的主要模式（即 C、C++、Scheme、Javascript、Java、HTML、SRecode 和 Make）启用 @semantic{}，但如果您不想使用，可以从此列表中删除模式
+@semantic{} with them.
+@end defvar
+
+@defvar semantic-default-submodes
+该变量的值是一个符号列表，指定启用语义模式时要启用的辅助次要模式。  有效的模式符号是：
+
+@itemize
+@item @code{global-semantic-idle-scheduler-mode} (@pxref{Idle Scheduler}).
+@item @code{global-semanticdb-minor-mode} (@pxref{SemanticDB}).
+@item @code{global-semantic-idle-summary-mode} (@pxref{Idle Summary Mode}).
+@item @code{global-semantic-idle-completions-mode} (@pxref{Idle Completions Mode}).
+@item @code{global-semantic-highlight-func-mode} (@pxref{Highlight Func Mode}).
+@item @code{global-semantic-decoration-mode} (@pxref{Tag Decoration Mode}).
+@item @code{global-semantic-stickyfunc-mode} (@pxref{Sticky Func Mode}).
+@item @code{global-semantic-mru-bookmark-mode} (@pxref{MRU Bookmarks}).
+@end itemize
+@end defvar
+
+@menu
+* Semantic mode user commands::
+@end menu
+
+@node Semantic mode user commands
+@subsection 语义模式用户命令
+
+语义模式提供了许多用于以语言感知方式导航、查询和编辑源代码的命令。  这些命令通常作用于@dfn{tags}，这是当前编程语言认为“重要”的源代码单元（例如，C 编程语言中的函数）。
+
+这些命令可以在任何已解析的缓冲区中使用
+@semantic{}.  Several of them prompt for a tag name using the
+迷你缓冲区；这里，@kbd{TAB}键可用于完成标签名称。其他的则作用于 @dfn{current tag}，即标签位于（或附近）点。
+
+@table @kbd
+@item C-c , j
+提示输入当前文件中定义的标签，并将光标移至该标签 (@code{semantic-complete-jump-local})。
+
+@item C-c , J
+提示输入 Emacs 已解析的任何文件中定义的标签，并将指针移至该标签 (@code{semantic-complete-jump})。
+
+@item C-c , l
+显示当前标签可能完成的列表 (@code{semantic-analyze-possible-completions})。
+
+@item C-c , g
+提示输入标签，并显示调用它的标签列表 (@code{semantic-symref-symbol})。  这依赖于外部符号引用工具的存在。  @xref{SymRef}。
+
+@item C-c , G
+显示调用当前标签 (@code{semantic-symref}) 的标签列表。  这依赖于外部符号引用工具的存在。  @xref{SymRef}。
+
+@item C-c , p
+将点移动到上一个标签 (@code{senator-previous-tag})。
+
+@item C-c , n
+将点移动到下一个标签 (@code{senator-next-tag})。
+
+@item C-c , u
+将点“向上”移动一个参考点 (@code{senator-go-to-up-reference})。 “向上”的含义取决于语言；例如，在 C++ 中，这意味着移动到当前标记的父级。
+
+@item C-c , @key{SPC}
+显示点 (@code{semantic-complete-analyze-inline}) 处符号的可能完成列表。  这还会激活一组特殊的键绑定来选择完成：@key{RET}接受当前完成，@kbd{M-n}和@kbd{M-p}循环可能的完成，@key{TAB}尽可能完成然后循环，@kbd{C-g}或任何其他键中止完成。 @xref{Smart Completion}。
+
+@item C-c , C-w
+杀死当前标签 (@code{senator-kill-tag})。  这会删除该标签的文本，并将其放入终止环中。  您可以使用 @kbd{C-y} 检索文本。  这也会将标签放置在 @dfn{tag ring} 中，以便您可以使用下面的 @kbd{\C-c,\C-y} 将其拉出。
+
+@item C-c , M-w
+将当前标签复制到终止环以及标签环 (@code{senator-copy-tag})。
+
+@item C-c , C-y
+从标签环中拉出标签 (@code{senator-yank-tag})。
+
+@item C-c , r
+将当前标签复制到寄存器中 (@code{senator-copy-tag-to-register})。  使用可选参数，也将其杀死。  这允许您使用常用的寄存器命令插入或跳转到该标签。  @xref{Registers,,,emacs,Emacs manual}。
+
+@item C-c , @kbd{up}
+将当前标签与前一个标签调换 (@code{senator-transpose-tags-up})。
+
+@item C-c , @kbd{down}
+将当前标签与下一个标签调换 (@code{senator-transpose-tags-down})。
+@end table
+
+@node SemanticDB
+@section 语义数据库
+@cindex SemanticDB
+
+语义数据库（SemanticDB）缓存解析源代码文件的结果。  当您退出 Emacs 时，这些数据可以保存到磁盘，并在您随后重新访问相同的源代码文件时自动重新加载。  这样无需重新解析未修改的文件，从而节省了时间。
+
+SemanticDB 还提供了一个@acronym{API}，程序可以使用它来获取有关源代码标签的信息。  无需将原始源文件加载到内存中即可访问此信息。它还可用于创建备用“后端”，以备用磁盘格式存储标签信息。
+
+默认情况下，SemanticDB 与 Semantic 模式一起启用。  要禁用它，请将其从 @code{semantic-default-submodes} (@pxref{Semantic mode}) 中删除。  您还可以使用 @kbd{M-x global-semanticdb-minor-mode} 启用或禁用 SemanticDB。
+
+@deffn Command global-semanticdb-minor-mode
+切换 SemanticDB 模式。  启用后，解析的任何源代码
+@semantic{} is cached in a database.
+@end deffn
+
+SemanticDB 提供了大量可定制的选项，这些选项将在以下小节中进行描述。
+
+@menu
+* Semanticdb Tag Storage::
+* Semanticdb Search Configuration::
+* Changing Backends::
+* Create System Databases::
+@end menu
+
+@node Semanticdb Tag Storage
+@subsection Semanticdb 标签存储
+
+每次退出 Emacs 时，SemanticDB 缓存的任何数据都会保存在位于主目录中的目录 @file{.emacs.d/semanticdb/} 中。  在此目录中，缓存数据根据 SemanticDB 特定的文件名约定写入一组文件中。如果 SemanticDB 目录不存在，Emacs 首先询问您是否要创建它。
+
+您可以通过自定义变量@code{semanticdb-default-save-directory}来更改SemanticDB目录的名称。
+
+@deffn Option semanticdb-default-save-directory
+保存 SemanticDB 缓存文件的目录的名称。  如果值为 @code{nil}，SemanticDB 会将其数据保存到当前目录中的单个文件中，其文件名由 @code{semanticdb-default-file-name} 指定。
+@end deffn
+
+@deffn Option semanticdb-default-file-name
+当@code{semanticdb-default-save-directory}为@code{nil}时，保存SemanticDB的缓存文件的名称。
+@end deffn
+
+您可以通过自定义 @code{semanticdb-persistent-path} 强制 SemanticDB 仅保存某些文件中的数据，或完全禁止保存：
+
+@deffn Option semanticdb-persistent-path
+SemanticDB 缓存的有效路径列表。  每个元素应该是一个目录名称（字符串）；然后保存该目录中任何文件的解析数据。
+
+作为特殊例外，此变量的值可以是包含单个符号的列表：@code{never}、@code{always} 或 @code{project}。  符号@code{never}禁用在任何地方保存； @code{always} 使储蓄无处不在；和 5⁣ 启用基于变量 @code{semanticdb-project-predicate-functions} 的保存目录。
+
+默认值为@code{(always)}。
+@end deffn
+
+@defvar semanticdb-project-predicate-functions
+该变量的值是一个谓词列表，用于指示目录属于项目。  当@code{semanticdb-persistent-path}的值为@code{(project)}时，使用该列表。  如果列表为空，则所有路径都被视为有效。
+
+项目管理包，例如 EDE (@pxref{Top,,,ede,EDE manual})，可以使用 @dfn{add-hook} 添加自己的谓词到此变量。  这允许 SemanticDB 将标签缓存保存在它们控制的目录中。
+@end defvar
+
+@deffn Option semanticdb-save-database-functions
+保存数据库后异常钩子运行。  每个函数都使用一个参数来调用，该参数代表最近写入的数据库的对象。
+@end deffn
+
+@node Semanticdb Search Configuration
+@subsection Semanticdb 搜索配置
+
+当 @semantic{} 的另一部分（或另一个 Emacs 包使用
+@semantic{}) queries the SemanticDB library for a source code tag, the
+搜索不必限于当前文件中定义的标签。它可以包含在其他地方定义的标签，例如当前文件引用的 @dfn{header files} （例如，通过 C/C++ @code{#include} 指令）。  在执行搜索时，SemanticDB 库甚至可以自动访问其他文件并解析它们（如果需要）。
+
+变量 @code{semanticdb-find-default-throttle} 决定 SemanticDB 搜索源代码标签的积极程度。  @xref{Search Throttle}。
+
+SemanticDB 搜索的详细信息因语言而异。  例如，在 C/C++ 代码中，SemanticDB 根据 @code{#include} 指令是否使用 @code{""} 或 @code{<>} 文件名分隔符来区分 @dfn{project header files} 和 @dfn{system header files}。  SemanticDB 在 @dfn{system include path} (@pxref{Include paths}) 中查找系统标头。
+
+@menu
+* Search Throttle::      控制语义数据库搜索的发生方式。
+* Semanticdb Roots::     指定不同项目的根。
+* Include paths::        指定要搜索的目录。
+* Semanticdb search debugging commands::
+@end menu
+
+@node Search Throttle
+@subsubsection SemanticDB 搜索限制
+
+SemanticDB @dfn{search throttle} 确定 SemanticDB 搜索的积极程度。  它由变量@code{semanticdb-find-default-throttle}控制。  该变量的默认值旨在获得最大准确度，但会牺牲搜索时间。
+
+@semantic{} 包的其他部分，特别是不同的语言解析器，可能会更改 @code{semanticdb-find-default-throttle} 的值。  对于给定的主要模式，您可以覆盖它的值，如下所示：
+
+@example
+(setq-mode-local c-mode
+                 semanticdb-find-default-throttle
+                 '(project unloaded system recursive))
+@end example
+
+@defvar semanticdb-find-default-throttle
+@code{semanticdb-find} 例程的默认油门。限制控制符号查找的数据库表列表的详细程度。  该值是一个包含以下键的列表：
+
+@table @code
+@item file
+从中执行搜索的文件。  此选项在此仅是为了完整性，并假定始终处于打开状态。
+@item local
+包含来自同一本地目录的表。  这包括由文件名直接引用的文件，这些文件可能位于不同的目录中。
+@item project
+包含来自同一本地项目的表如果指定了@code{project}，则假定为@code{local}。
+@item unloaded
+如果内存中没有表，则加载它。  如果它也没有缓存在磁盘上，则获取源、解析它并创建表。
+@item system
+系统数据库中的表。  这些是来自系统头文件或等效语言的特定表。
+@item recursive
+对于基于包含的搜索，包含由包含的文件引用的表。
+@item omniscience
+包括无所不知或以某种方式知道一切的系统数据库。  全知数据库位于@code{semanticdb-project-system-databases}。  Emacs Lisp 系统@var{db} 是一个全知数据库。
+@end table
+@end defvar
+
+@node Semanticdb Roots
+@subsubsection SemanticDB 项目根源
+
+SemanticDB 搜索节流阀 (@pxref{Search Throttle}) 中的 @code{project} 设置告诉 SemanticDB 在当前单个代码项目中进行搜索。  对于@semantic{}的观点来说，@dfn{projects}是由它们的顶级目录决定的，即@dfn{project roots}；项目根目录的每个子目录都被视为同一项目的一部分。
+
+如果您使用EDE进行项目管理，它会自动设置项目根目录。  @xref{Top,,,ede,EDE manual}。  您也可以自己指定它们。
+
+@deffn Option semanticdb-project-roots
+该变量的值是作为项目根目录的目录（字符串）列表。  项目根目录的所有子目录都被视为同一项目的一部分。  该变量可以被@code{semanticdb-project-root-functions}覆盖。
+@end deffn
+
+@defvar semanticdb-project-root-functions
+该变量的值是用于确定给定目录的项目根的函数列表。  这些函数使用一个参数（目录名称）一次调用一个，并且必须返回 @code{nil}、一个字符串（项目根）或一个字符串列表（对于复杂系统，多个项目根）。  第一个非@code{nil}返回值（如果有）被视为项目根，覆盖@code{semanticdb-project-roots}。
+@end defvar
+
+@node Include paths
+@subsubsection 包括路径
+
+系统包含路径是查找源代码标签的标准位置，例如类 Unix 操作系统上的 @file{/usr/include} 中的 @dfn{header files} 及其子目录。
+
+您可以使用以下命令添加和删除系统包含路径：
+
+@deffn Command semantic-add-system-include dir &optional mode
+提示输入目录@var{dir}，并将其添加为当前主要模式的系统包含路径。  当以非交互方式调用时，可以使用 @var{mode} 参数指定主模式。
+@end deffn
+
+@deffn Command semantic-remove-system-include dir &optional mode
+提示输入目录@var{dir}，并将其从当前主模式（或@var{mode}）的系统包含路径中删除。
+@end deffn
+
+@deffn Command semantic-customize-system-include-path &optional mode
+自定义当前主要模式的系统包含路径（或@var{mode}）。
+@end deffn
+
+@defvar semanticdb-implied-include-tags
+包括给定模式的所有文件隐含的标签。  对于特定模式，您可以使用 @code{defvar-mode-local} 设置此变量，以便包含该模式的所有文件中存在的任何符号。
+@end defvar
+
+@c @xref{Search Optimization}, for more information on include paths.
+
+@node Semanticdb search debugging commands
+@subsubsection Semanticdb 搜索调试命令
+
+您可以使用 @kbd{M-x semanticdb-dump-all-table-summary} 查看将从给定缓冲区搜索的数据库列表。  您可以继续执行@kbd{M-x semanticdb-find-test-translate-path}，以确保正确发现路径中的特定表。或者，您可以使用 @kbd{M-x semanticdb-find-adebug-lost-includes} 获取遇到但在磁盘上找不到的包含文件列表 @semantic{}。
+
+@deffn Command semanticdb-dump-all-table-summary
+转储 Emacs 内存中所有数据库的列表。
+@end deffn
+
+@deffn Command semanticdb-find-test-translate-path &optional arg
+调用并输出@dfn{semanticdb-find-translate-path}的结果。  在显示的缓冲区中，您可以键入 @key{SPC} 来展开项目。  对于 @var{arg} 非 @code{nil}，指定 @var{brutish} 转换。
+@end deffn
+
+@deffn Command semanticdb-find-adebug-lost-includes
+翻译当前路径，然后显示丢失的包含内容。检查变量@code{semanticdb-find-lost-includes}。
+@end deffn
+
+最后，您可以使用以下命令测试显式搜索词：
+
+@deffn Command semantic-adebug-searchdb regex
+在语义数据库中搜索当前缓冲区的 @var{regex}。将结果显示为调试列表。
+@end deffn
+
+@node Changing Backends
+@subsection 改变后端
+
+如果您想使用其他形式的后端，您可以使用此变量来选择用于常规标签存储的后端类。
+
+默认是将数据库保存在平面文件中。  或者，您可以编写一个新的数据库后端，将标签存储到数据库或其他存储系统中。
+
+@defvar semanticdb-new-database-class
+为新文件创建的默认数据库类型。  这可以在每个文件的基础上进行更改，以便某些目录使用一种机制保存，而某些目录则通过不同的机制保存。
+@end defvar
+
+@node Create System Databases
+@subsection 创建系统数据库
+
+如果您支持的语言将系统库存储在随时可用的可解析源代码中，您可以为它们预先生成一次数据库文件，这些文件将反复用于摘要模式或分析器等工具。
+
+@deffn Command semanticdb-create-ebrowse-database dir
+为目录 @var{dir} 创建 Ebrowse 数据库。  数据库文件存储在 ~/.semanticdb 中，或者@code{semanticdb-default-system-save-directory}指定的目录中。
+@end deffn
+
+@node Idle Scheduler
+@section 空闲调度程序
+@cindex Idle Scheduler
+
+@dfn{Semantic Idle Scheduler} 是 @semantic{} 的一部分，在 Emacs 等待用户输入（空闲时间）时执行各种操作。  它的主要工作是在空闲时间执行缓冲区解析。  您还可以使用空闲调度程序来显示函数原型 (@pxref{Idle Summary Mode}) 或符号完成 (@pxref{Idle Completions Mode})。
+
+@deffn Command global-semantic-idle-scheduler-mode &optional arg
+此命令在每个状态下切换语义空闲调度程序模式
+@semantic{}-enabled buffer.  This minor mode ensures that the buffer
+只要 Emacs 空闲，就会自动重新解析。  如果有额外的空闲时间，它会运行由其他部分调度的作业
+@semantic{}, such as Semantic Idle Summary mode (@pxref{Idle Summary
+模式}）和语义空闲完成模式（@pxref{Idle Completions Mode}）。
+@end deffn
+
+@deffn Option semantic-idle-scheduler-idle-time
+该变量的值是语义空闲调度程序激活之前的空闲时间量（以秒为单位）。  默认值为 1。
+@end deffn
+
+@deffn Option semantic-idle-scheduler-verbose-flag
+如果此变量为非@code{nil}，则空闲调度程序会在运行时打印详细消息，这对于调试很有用。
+@end deffn
+
+@menu
+* Reparsing Options::           在空闲时间重新解析当前缓冲区。
+* Idle Working Options::        在空闲时间完成额外工作的选项。
+* Debugging Idle Time Issues::  如何生成良好的错误报告。
+* Idle Summary Mode::           显示光标下符号的原型。
+* Idle Completions Mode::       智能完成弹出帮助。
+@end menu
+
+@node Reparsing Options
+@subsection 重新解析选项
+
+当在空闲时间激活时，语义空闲调度程序会自动重新解析所有需要它的缓冲区。  任何到达的用户输入都会取消此操作，使 Emacs 返回到正常的编辑行为。
+
+@deffn Option semantic-idle-scheduler-max-buffer-size
+自动重新分析的缓冲区的最大大小（以字节为单位）。  如果该值小于或等于@var{0}，则无论缓冲区大小如何，都会自动重新分析缓冲区。
+@end deffn
+
+@deffn Option semantic-idle-scheduler-no-working-message
+如果非@code{nil}，则在重新解析时禁用工作消息的显示。
+@end deffn
+
+@deffn Option semantic-idle-scheduler-working-in-modeline-flag
+如果非@code{nil}，则在模式行中显示工作消息。  通常，重新解析会在迷你缓冲区中显示消息；这会将解析消息移至模型行。
+@end deffn
+
+@defvar semantic-before-idle-scheduler-reparse-hook
+这个正常的钩子在空闲调度程序开始重新解析之前运行。  如果任何钩子函数抛出错误，则该变量的值将重置为@code{nil}。  该钩子不受词汇错误的保护。
+@end defvar
+
+@defvar semantic-after-idle-scheduler-reparse-hook
+
+这个正常的钩子在空闲调度程序完成重新解析后运行。如果任何钩子抛出错误，该变量将重置为@code{nil}。该钩子不受词汇错误的保护。
+@end defvar
+
+@node Idle Working Options
+@subsection 空闲工作选项
+
+除了重新解析缓冲区之外，语义空闲调度程序还执行其他操作，包括以下操作：
+
+@itemize
+@item
+创建符号查找所需的包含路径缓存。
+@item
+创建数据类型缓存。
+@item
+将 SemanticDB 缓存保存到磁盘。
+@item
+推测性地解析与当前缓冲区相同的目录中的文件。
+@end itemize
+
+因为这项额外的工作相当耗时，所以只有在较长的空闲延迟后才进行。  以下功能控制空闲工作的执行方式。
+
+@deffn Option semantic-idle-scheduler-work-idle-time
+该变量的值是开始空闲工作之前的空闲时间量（以秒为单位）。  默认值为 60。
+@end deffn
+
+@deffn Option semantic-idle-work-parse-neighboring-files-flag
+如果该变量的值非@code{nil}，则语义空闲调度程序使用空闲工作时间来解析与当前缓冲区相同目录中的文件。  这提高了标签搜索的准确性，并在以后访问这些文件时节省时间，但代价是进行大量解析。  默认值为@code{t}。
+@end deffn
+
+@node Debugging Idle Time Issues
+@subsection 调试空闲时间问题
+
+如果您在空闲时间看到错误信号，则可能表明其他地方存在更严重的问题。  启用 @code{debug-on-error} 是不够的，因为空闲调度程序会抑制调试器。  相反，使用以下命令来调试错误：
+
+@deffn Command semantic-debug-idle-function
+在打开调试的情况下运行语义空闲函数。
+@end deffn
+
+@deffn Command semantic-debug-idle-work-function
+在打开调试的情况下运行语义空闲工作功能。
+@end deffn
+
+@node Idle Summary Mode
+@subsection 空闲摘要模式
+
+语义空闲摘要模式是一种次要模式，它在回显区域中显示该点符号的简短摘要，例如其函数原型。  其功能类似于 ElDoc 模式为 Emacs Lisp 提供的功能 (@pxref{Programming Language Doc,,,emacs,Emacs manual})。
+
+@deffn global-semantic-idle-summary-mode &optional arg
+此命令在所有状态下切换语义空闲摘要模式
+@semantic{}-enabled buffers.  You can also toggle it via the
+@samp{Development} 菜单中的@samp{Show Tag Summaries} 菜单项。
+@end deffn
+
+当语义空闲摘要模式处于活动状态时，该点标签的摘要将显示在回显区域中。  该显示发生在空闲时间期间，如 @code{semantic-idle-scheduler-idle-time} (@pxref{Idle Scheduler}) 所示。
+
+您可以通过设置 @code{idle-summary-current-symbol-info} 来重写获取当前标签显示的方法。
+
+@deffn Option semantic-idle-summary-function
+该变量的值应该是一个在空闲时调用以显示标签信息的函数。  有关有用函数的列表，请参阅变量 @code{semantic-format-tag-functions}。
+@end deffn
+
+@defvar semantic-idle-summary-out-of-context-faces
+该变量的值是一个字体锁定面列表，指示无用的摘要上下文。  这些通常是用于突出显示注释或字符串的面孔。  如果该点的文本具有这些面孔之一，则语义空闲摘要模式不会显示其通常的摘要。
+@end defvar
+
+@node Idle Completions Mode
+@subsection 空闲完成模式
+
+语义空闲完成模式是在空闲时间执行 @dfn{code completions} 的次要模式。  完成内容内联显示，并带有允许您循环选择不同选项的键绑定。
+
+语义空闲完成模式基于语义分析器 (@pxref{Analyzer}) 执行完成。
+
+@deffn global-semantic-idle-completions-mode &optional arg
+此命令在每个命令中切换语义空闲完成模式
+@semantic{}-enabled buffer.  You can also toggle it via the @samp{Show
+@samp{Development} 菜单中的“标记完成”菜单项。
+@end deffn
+
+如果该点的标记至少有一个完成，则语义空闲完成模式会内联显示该完成，即作为缓冲区文本的一部分（您可以通过自定义 @code{semantic-complete-inline-analyzer-idle-displayer-class} 来更改显示方法，如下所述）。  已完成的部分会突出显示，以表明它尚未正确插入到缓冲区中。  回显区域显示完成情况，以及是否还有其他可能的完成情况，如下所示：
+
+@example
+besselj [1 of 6 matches]
+@end example
+
+@noindent
+当显示完成时，以下键绑定生效：
+
+@table @kbd
+@item @key{RET}
+@itemx C-m
+接受当前完成 (@code{semantic-complete-inline-done})，将其放入缓冲区并将指针移动到已完成标记的末尾。
+@item M-n
+选择下一个可能的完成 (@code{semantic-complete-inline-down})。  新的完成内容内联显示，替换旧的完成内容。
+@item M-p
+选择先前可能的完成 (@code{semantic-complete-inline-up})。
+@item @key{TAB}
+@item C-i
+接受尽可能多的完成。  如果无法无歧义地接受其他补全，则选择下一个可能的补全 (@code{semantic-complete-inline-TAB})。
+@item C-g
+未完成就退出 (@code{semantic-complete-inline-quit})。
+@end table
+
+@noindent
+您还可以通过发出任何其他 Emacs 命令来退出内联完成。  然后完成文本从缓冲区中消失。
+
+@deffn Command semantic-complete-analyze-inline-idle
+这是用于执行内联代码完成的命令。  它在空闲时间由语义空闲完成模式调用，但您也可以自己调用。  它立即返回，使缓冲区处于内联完成状态。
+@end deffn
+
+@deffn Option semantic-complete-inline-analyzer-idle-displayer-class
+该变量的值决定了 @code{semantic-complete-analyze-inline-idle} 如何显示其完成情况。可能的值包括：
+
+@table @code
+@item semantic-displayer-ghost
+显示与缓冲区文本“内嵌”的补全，如上所述。  这是默认值。
+
+@item semantic-displayer-tooltip
+在工具提示中显示完成情况。
+
+@item semantic-displayer-traditional
+在单独的窗口中显示完成情况。
+@end table
+@end deffn
+
+@node Analyzer
+@section 分析仪
+@cindex Analyzer
+
+语义分析器是一个用于对源代码执行上下文分析的库。  它提供用于显示、完成和浏览源代码的用户命令。
+
+@menu
+* Smart Completion::        执行代码完成。
+* Smart Summary::           显示符号的帮助。
+* Smart Jump::              跳转到标签的定义。
+* Analyzer Debug::          调试分析仪的问题。
+@end menu
+
+@node Smart Completion
+@subsection 智能完成
+
+语义分析器可用于以考虑本地上下文的方式执行代码完成。  （除了本节中的用户命令之外，语义空闲完成模式还使用语义分析器。@xref{Idle Completions Mode}。）
+
+@deffn Command semantic-analyze-possible-completions context
+这是基于语义分析器的完成的最基本命令。以交互方式调用，它会显示该符号可能完成的列表。
+
+当从 Lisp 程序调用时，@code{semantic-analyze-possible-completions} 不显示完成列表。  参数 @var{context} 应该是缓冲区位置或上下文对象。  返回值是一个列表
+@semantic{} tag objects that complete the symbol for @var{context},
+基于以下标准：
+
+@itemize
+@item Elements currently in scope.
+@item Constants currently in scope.
+@item Elements matching the context's @code{:prefix}.
+@item Type of the completion matching the type of the context.
+@end itemize
+
+本节中记录的大多数其他命令在内部调用 @code{semantic-analyze-possible-completions}。
+@end deffn
+
+@deffn Command semantic-complete-analyze-inline
+当启用语义模式 (@pxref{Semantic mode user commands}) 时，此命令绑定到@kbd{C-c , @key{SPC}}。  它显示该符号在该点可能的补全列表，并激活一组特殊的键绑定来选择补全。
+
+您可以键入 @key{RET} 接受当前完成，按 @kbd{M-n} 和 @kbd{M-p} 循环显示可能的完成，按 @key{TAB} 尽可能完成，然后循环显示完成，然后按 @kbd{C-g} 或任何其他键中止完成。
+
+此命令类似于语义空闲完成模式执行的完成。  主要区别在于它是显式调用的，而语义空闲完成模式在空闲时间 (@pxref{Idle Completions Mode}) 期间完成。
+@end deffn
+
+@deffn Option semantic-complete-inline-analyzer-idle-displayer-class
+该变量的值决定了 @code{semantic-complete-analyze-inline} 如何显示其完成情况。可能的值包括：
+
+@table @code
+@item semantic-displayer-traditional
+在单独的窗口中显示完成情况。  这是默认值。
+
+@item semantic-displayer-ghost
+显示与缓冲区文本“内联”的完成，类似于语义空闲完成模式 (@pxref{Idle Completions Mode}) 的默认行为。
+
+@item semantic-displayer-tooltip
+在工具提示中显示完成情况。
+@end table
+@end deffn
+
+除了@code{semantic-complete-analyze-inline}之外，您还可以使用更简单的命令@code{semantic-ia-complete-symbol point}。  这与通常的 @kbd{M-@key{TAB}} (@code{complete-symbol}) 命令 (@pxref{Symbol Completion,,,emacs,Emacs manual}) 类似，只是它使用语义分析器。
+
+@deffn Command semantic-ia-complete-symbol point
+完成@var{point}处的当前符号。
+@end deffn
+
+@node Smart Summary
+@subsection 智能总结
+
+您可以使用以下命令来获取此时的代码信息：
+
+@deffn Command semantic-ia-show-summary pos
+在@var{pos}处显示符号的摘要。  交互调用时，@var{pos} 默认为点。
+@end deffn
+
+@deffn Command semantic-ia-show-doc pos
+显示@var{pos}处符号的代码级文档。交互调用时，@var{pos} 默认为点。
+@end deffn
+
+@deffn Command semantic-ia-describe-class typename
+提示输入数据类型的名称 @var{typename}，并显示其组成部分。  例如，如果所讨论的类型是类，则会显示方法和成员变量。
+@end deffn
+
+您还可以使用语义空闲摘要模式在空闲时间显示有关回显区域中当前符号的信息。  @xref{Idle Summary Mode}。
+
+@node Smart Jump
+@subsection 智能跳跃
+
+语义分析器可用于直接跳转到代码符号的定义。
+
+@deffn Command semantic-ia-fast-jump pos
+跳转到 @var{pos} 处符号的定义。  交互调用时，@var{pos} 默认为点。
+@end deffn
+
+@defun semantic-ia-fast-mouse-jump event
+跳转到鼠标事件@var{event}位置处符号的定义。  该命令旨在绑定到鼠标命令，如下所示：
+
+@example
+(keymap-global-set "S-<mouse-1>" 'semantic-ia-fast-mouse-jump)
+@end example
+@end defun
+
+这些命令通常比 @code{xref-find-definitions} 命令 (@pxref{Looking Up Identifiers,,,emacs,Emacs manual}) 更准确，因为语义分析器是上下文相关的。
+
+您还可以使用 @kbd{C-c , j} (@code{semantic-complete-jump-local}) 和 @kbd{C-c , J} (@code{semantic-complete-jump}) 来导航标签。 @xref{Semantic mode user commands}。  这些命令不使用语义分析器。
+
+@node Analyzer Debug
+@subsection 调试语义分析器
+
+如果语义分析器无法正确分析您的代码，您可以采取措施来识别并解决问题。  本节是根据 C/C++ 编写的，但应该与任何类型化语言相关。
+
+@subsubsection 第 1 步：检查上下文
+
+要检查当前上下文，请输入 @kbd{M-x semantic-analyze-current-context}。
+
+@deffn Command semantic-analyze-current-context pos
+分析@var{pos}处的上下文。  大多数其他语义分析器命令都使用此函数来获取给定缓冲区位置处的代码上下文。  返回值是一个 EIEIO 对象，描述 @var{pos} (@pxref{Top,,,eieio,EIEIO manual}) 处的上下文。
+
+当以交互方式调用时，它会显示一个 @file{*Semantic Context Analysis*} 缓冲区，其中包含当前点上下文的摘要。
+@end deffn
+
+@noindent
+@file{*Semantic Context Analysis*} 缓冲区的前缀部分列出了基于该点文本的标签。  如果它仅显示一个简单的字符串，则语义无法识别数据类型是什么。
+
+前缀列表中的第一项是链中的第一个查找失败，并且是调试工作重点关注的项。  例如：
+
+@example
+Context Type: #<semantic-analyze-context context>
+Bounds: (182 . 185)
+Prefix: Foo* bar
+        int bbb (const char* y)
+Prefix Types: class Foo @{@}
+--------
+-> Local Vars: int argc
+               char** argv
+@end example
+
+在此示例中，您可以看到前缀有两个完全找到的标签。在以下示例中，符号“bbb”不完整，无法找到：
+
+@example
+Context Type: #<semantic-analyze-context context>
+Bounds: (182 . 184)
+Prefix: Foo* bar
+        "bb"
+Prefix Classes: 'function
+                'variable
+Prefix Types: class Foo @{@}
+--------
+-> Local Vars: int argc
+               char** argv
+@end example
+
+@subsubsection 第 2 步：检查您的包含路径
+
+一旦您知道缺少的符号，请检查您的包含路径。  包含所需定义的标头或包含文件可能不在 @semantic{} 正在搜索的标头列表中。  要获得基本列表，您可以使用@kbd{M-x semanticdb-find-test-translate-path}。 @xref{Semanticdb search debugging commands}。
+
+如果项目应该加载但没有加载，或者如果您看到一些表中没有标签，那么您可能有一个错误设置的搜索限制 (@pxref{Search Throttle})。  例如，
+
+@example
+*#<semanticdb-table main.cpp (4 tags DIRTY)>
+*#<semanticdb-table foo.hh (0 tags DIRTY)>
+@end example
+
+这里，@semantic{}找到了@file{foo.hh}，但是有0个标签。  这可能是因为您设置了限制以避免读取和解析 Emacs 未访问过的文件。  要解决此问题，请访问该文件并让
+@semantic{} parse it.
+
+对于 C++，还要检查项目级文件的 @samp{#include} 语句是否使用引号，而不是尖括号；尖括号用于系统文件。
+
+@subsubsection 步骤 3：检查本地范围
+
+如果您的数据类型根据范围以某种方式缩写，例如来自 @code{using} 语句，则应确保所需的符号位于本地范围内。  使用 @kbd{M-x semantic-calculate-scope} 检查范围。  范围结构以 ADEBUG 模式显示，因此使用 @kbd{SPC} 展开不同的元素并查找您的符号。
+
+如果您的符号应该在范围内，但您找不到它，那么您可能在局部变量解析器或使用语句解析器中发现了语言支持错误。
+
+调用 @kbd{M-x bovinate} 应强制重置示波器，以防仅存在某些不良状态。
+
+@example
+ ] Name: Cache
+ ] Class: #'semantic-scope-cache
+ ] :table #<semanticdb-table testsubclass.cpp (13 tags DIRTY)>
+ ] tag createMoose : class moose
+ ] scopetypes 'nil
+ ] parents #<TAG LIST: 1 entries>
+ ] scope #<TAG LIST: 22 entries>
+ ] fullscope #<TAG LIST: 23 entries>
+ ] localvar #<TAG LIST: 6 entries>
+@end example
+
+在上面的示例输出中，@code{tag} 槽指定了此范围在源中的相关位置。  @code{Parents} 应包含任何范围内的父级，例如方法所属的类。 @code{Localvar} 应包含您的局部变量。  由于 @code{using} 语句等，@code{Scope} 应在范围内包含数据类型。
+
+@subsubsection 第四步：检查类型缓存
+
+对于像 C++ 这样的复杂类型语言，@semantic{} 创建一个类型缓存，或者一个包含所有各种数据类型的优化搜索表。类型缓存中的元素不遵守本地范围。  它仅包含完全限定名称。  您可以使用 @kbd{M-x semanticdb-typecache-dump} 检查类型缓存。
+
+如果您的数据类型不在类型缓存中，则可能存在一些解析错误或其他错误。  调用 @kbd{M-x bovinate} 应该会强制重置类型缓存，以防仅存在某些错误状态。
+
+@example
+]#<semanticdb-typecache /home/zappo/cedet/semantic/tests/testsubclass.cpp>
+   ] Name: /home/zappo/cedet/semantic/tests/testsubclass.cpp
+   ] Class: #'semanticdb-typecache
+   ] filestream 'nil
+   ] includestream #<TAG LIST: 84 entries>
+   ] stream 'nil
+   ] dependants 'nil
+@end example
+
+在上面的例子中，@kbd{M-x semanticdb-typecache-dump}的输出被扩展了一级。  @code{filestream} 槽应包含当前文件中的数据类型。  @code{includestream} 应包含所有包含的头文件中的所有数据类型。
+
+@code{dependants} 槽将指定依赖于该槽的其他文件。
+
+@subsubsection 第五步：检查解析器
+
+转到未找到的标签所在的位置。  您可以调用 @kbd{M-x bovinate}，并查看原始标签结构的转储。  要查看可导航树，请使用 @kbd{M-x semantic-adebug-bovinate} 代替。  然后您可以查看以确保您的标签已被正确解析。
+
+如果没有，那么您可能发现了解析器错误。  要了解 @semantic{} 如何处理您的文件，请输入 @kbd{M-x global-semantic-show-unmatched-syntax-mode}。  这会导致它无法解析的任何语法都带有红色下划线。
+
+如果您的类型不可解析，可能有以下几个原因：
+
+@enumerate
+@item
+如果类型定义中使用了 MACRO 关键字，您可能需要更新 @code{semantic-lex-c-preprocessor-symbol-map} 来解释它。
+
+@item
+或者也许解析器需要修复。
+@end enumerate
+
+@node Speedbar
+@section 速度条
+@cindex speedbar
+
+您可以将 @semantic{} 与 Speedbar 集成。 @xref{Speedbar,,,emacs,Emacs manual}。  为此，请将以下行添加到您的初始化文件中：
+
+@example
+(with-eval-after-load 'speedbar (require 'semantic/sb))
+@end example
+
+@noindent
+或者，另一种选择：
+
+@example
+(require 'semantic/sb)
+@end example
+
+安装后，Speedbar 将使用 @semantic{} 查找并显示标签。  @semantic{} 中的标签比普通 Speedbar 标签显示更多详细信息，例如函数参数和返回类型。
+
+此外，您可以使用 Speedbar 显示语义分析器 (@pxref{Analyzer}) 的输出。  为此，请转至 Speedbar 菜单上的 @samp{Display} 菜单项，然后选择 @samp{Analyze}；或输入@kbd{M-x semantic-speedbar-analysis}。
+
+@deffn Command semantic-speedbar-analysis
+在语义分析模式下启动 Speedbar。
+@end deffn
+
+在语义分析模式下，Speedbar 显示有关本地上下文的信息，例如当前函数、本地参数和变量以及前缀（当前符号）的详细信息。  每个条目都有一个 @samp{<i>} 按钮；单击此按钮会显示内容摘要
+@semantic{} knows about that variable or type.  The Speedbar also
+显示此时可能完成的列表。
+
+@node SymRef
+@section 符号参考
+@cindex symref
+
+@semantic{} can interface with external @dfn{symbol reference tools},
+例如 GNU Global 和 GNU Idutils。  这些工具提供有关不同标签或符号出现位置的信息。
+
+默认情况下，@semantic{}尝试寻找可以使用的最佳外部符号引用工具。  支持的工具有 GNU Global、GNU Idutils、CScope 和 Grep（后备方法）。  为了获得最佳结果，请使用 GNU Global。  但是，@semantic{} 不会为您管理 GNU 全局表；你必须自己管理它们。
+
+@defvar semantic-symref-tool
+该变量的值是一个符号，决定要使用的外部符号引用工具。  默认值 @code{detect} 表示寻找最佳可用工具。  其他可能的值包括 @code{global}、@code{idutils}、@code{cscope} 和 @code{grep}。  请注意，@code{grep} 比其他的慢得多。
+@end defvar
+
+显示符号引用的命令是@kbd{C-c , g}（@code{semantic-symref-symbol}和@kbd{C-c , G}（@code{semantic-symref}））。只要启用语义模式（@pxref{Semantic mode user commands}），这些键绑定就可用。
+
+@deffn Command semantic-symref-symbol sym
+此命令（通常绑定到 @kbd{C-c , g}）提示输入符号名称，并使用外部引用工具查找对该标签的引用。
+@end deffn
+
+@deffn Command semantic-symref
+该命令（通常绑定到@kbd{C-c , G}）使用外部引用工具来查找对当前标签的引用。
+@end deffn
+
+@code{semantic-symref-symbol} 和 @code{semantic-symref} 都在单独的缓冲区中显示符号引用列表。  这些条目按文件和函数名称组织。  在每个函数名称旁边的 @samp{[+]} 上键入 @key{RET} 会“展开”该条目，列出对该函数中出现的目标符号的所有引用。在参考行上键入 @kbd{RET} 会跳转到该参考。
+
+@node MRU Bookmarks
+@section MRU 书签模式
+@cindex @code{semantic-mru-bookmark-mode}
+
+语义 MRU 书签模式是一种次要模式，可跟踪您编辑过的标签，以便您稍后快速返回到它们（MRU 代表“最近使用的”）。
+
+@deffn Command global-semantic-mru-bookmark-mode &optional arg
+全局切换语义 MRU 书签模式。  仅当当前缓冲区已设置用于解析时才能打开次要模式。  对于参数 @var{arg}，如果 @var{arg} 为正，则打开次要模式，否则关闭。
+@end deffn
+
+语义 MRU 书签模式会记录您编辑的每个标签。然后，您可以输入 @kbd{C-x B} (@code{semantic-mrub-switch-tags}) 返回到标签。  此命令提示输入标签名称，并填写已编辑标签的名称；在提示符下，您可以使用 @kbd{M-p} 和 @kbd{M-n} 按上次修改时间的顺序循环浏览标签。
+
+@node Sticky Func Mode
+@section 粘滞功能模式
+
+语义粘性函数次要模式显示标题行，该标题行在文本区域的最上面一行显示函数或标记的声明行。  这使您可以始终保持该声明行在视图中，即使它滚动到屏幕的“顶部”之外。
+
+此外，单击标题行上的 @kbd{mouse-1} 会打开一个上下文菜单，其中包含用于复制、删除或缩小到该标签的菜单项。
+
+@deffn Command global-semantic-stickyfunc-mode &optional arg
+在所有启用语义的缓冲区中切换语义粘性功能模式。使用可选参数 @var{arg}，如果 @var{arg} 为正则启用，否则禁用。
+@end deffn
+
+@defvar semantic-stickyfunc-sticky-classes
+该变量的值是语义粘性函数模式使其“粘性”的标签类列表。  默认为@code{'(function type)}，表示函数声明和类型声明。  其他可能的标签类别有 @code{variable}、@code{include} 和 @code{package}。
+@end defvar
+
+@node Highlight Func Mode
+@section 高亮功能模式
+@cindex @code{semantic-highlight-func-mode}
+
+语义突出显示函数次要模式突出显示当前函数或标记的声明行（也就是说，描述构造的其余部分的第一行）。
+
+此外，单击突出显示的声明行上的 @kbd{mouse-3} 将打开一个上下文菜单，其中包含用于复制、删除或缩小到该标记的菜单项。
+
+语义突出显示功能模式突出显示的标签类别与@code{semantic-stickyfunc-sticky-classes}给出的标签类别相同。 @xref{Sticky Func Mode}。
+
+@defun global-semantic-highlight-func-mode &optional arg
+在所有启用语义的缓冲区中切换语义突出显示功能模式。  使用可选参数 @var{arg}，如果 @var{arg} 为正则启用，否则禁用。
+@end defun
+
+@deffn Face semantic-highlight-func-current-tag-face
+该面用于在语义突出显示功能模式下突出显示声明行。
+@end deffn
+
+@node Tag Decoration Mode
+@section 标签装饰模式
+@cindex @code{semantic-decoration-mode}
+
+语义标签装饰模式根据每个标签的某些任意特征“装饰”每个标签。  装饰是使用变量@code{semantic-decoration-styles}指定的。
+
+@deffn Command global-semantic-decoration-mode &optional arg
+在所有启用语义的缓冲区中切换语义标签装饰模式。使用可选参数 @var{arg}，如果 @var{arg} 为正则启用，否则禁用。
+@end deffn
+
+@defvar semantic-decoration-styles
+该变量的值是语义标签装饰模式的装饰样式列表。  此列表中的每个元素应采用 @code{(@var{name} . @var{flag})} 形式，其中 @var{name} 是样式名称（符号），如果启用样式，@var{flag} 则为非 @code{nil}。
+
+有以下样式可供选择：
+
+@table @code
+@item semantic-tag-boundary
+在每个长标签（不包括原型）前面放置一个上划线。
+
+@item semantic-decoration-on-private-members
+突出显示指定为私有的类成员。
+
+@item semantic-decoration-on-protected-members
+突出显示被指定为受保护的类成员。
+
+@item semantic-decoration-on-includes
+突出显示包含的类成员。  单击突出显示的包含语句将打开一个用于配置的上下文菜单
+@semantic{} includes.
+@end table
+@end defvar
+
+要启用或禁用特定装饰，请使用此函数：
+
+@deffn Command semantic-toggle-decoration-style name &optional arg
+提示输入装饰风格@var{name}，然后打开或关闭它。使用前缀参数@var{arg}，如果为正则打开，否则关闭。如果启用了装饰风格，则返回非@code{nil}。
+@end deffn
+
+@deffn Face semantic-tag-boundary-face
+面向 @code{semantic-tag-boundary} 装饰风格的长标签。
+@end deffn
+
+@deffn Face semantic-decoration-on-private-members-face
+@code{semantic-decoration-on-private-members} 装饰风格的私有范围标签的面。
+@end deffn
+
+@deffn Face semantic-decoration-on-protected-members-face
+@code{semantic-decoration-on-protected-members} 装饰风格中受保护标签的面。
+@end deffn
+
+@deffn Face semantic-decoration-on-includes
+面向不处于其他状态、采用 @code{semantic-decoration-on-includes} 装饰风格的包含。
+@end deffn
+
+@deffn Face semantic-decoration-on-unknown-includes
+无法在 @code{semantic-decoration-on-includes} 装饰风格中找到的包含的面。
+@end deffn
+
+@deffn Face semantic-decoration-on-unparsed-includes
+面向尚未解析的包含，采用 @code{semantic-decoration-on-includes} 装饰风格。
+@end deffn
+
+@subsection 创造新装修模式
+
+您可以使用以下函数创建新类型的装饰：
+
+@defun define-semantic-decoration-style name doc &rest flags
+使用@var{name}定义新的装饰风格。 @var{doc} 是描述装饰风格@var{name} 的文档字符串。它被附加到自动生成的文档字符串中。还可以指定可选的 @var{flags} 列表。  标志为： @code{:enabled} <value> - 指定 @var{name} 的默认启用值。
+
+
+这定义了两个新的重载函数，分别称为 @code{NAME-p} 和 @code{NAME-highlight}，您必须分别在函数 @code{NAME-p-default} 和 @code{NAME-highlight-default} 中提供默认实现。  这些函数会传递一个标签。  @code{NAME-p} 必须返回非 @code{nil} 以指示该标签应由 @code{NAME-highlight} 修饰。
+
+要将主要装饰放在标签 @code{NAME-highlight} 上，请使用语义装饰库中的 @dfn{semantic-set-tag-face}、@dfn{semantic-set-tag-intangible} 等函数。
+
+要在标签上添加其他类型的装饰，@code{NAME-highlight}必须使用@dfn{semantic-decorate-tag}，以及此库中找到的语义装饰@var{api}的其他功能。
+@end defun

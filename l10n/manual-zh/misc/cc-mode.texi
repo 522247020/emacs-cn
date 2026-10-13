@@ -1,0 +1,5583 @@
+\输入texinfo
+@c Notes to self regarding line handling:
+@c
+@c Empty lines are often significant before @end directives; avoid them.
+@c
+@c Empty lines before and after @example directives are significant in
+@c info output but not in TeX.  Empty lines inside @example directives
+@c are significant.
+
+@c Conventions for formatting examples:
+@c o  If the example contains empty lines then put the surrounding empty
+@c    lines inside the @example directives.  Put them outside otherwise.
+@c o  Use @group inside the example only if it shows indentation where
+@c    the relation between lines inside is relevant.
+@c o  Format line number columns like this:
+@c     1: foo
+@c     2: bar
+@c       ^ one space
+@c    ^^ two columns, right alignment
+@c o  Check line lengths in TeX output; they can typically be no longer
+@c    than 70 chars, 60 if the paragraph is indented.
+
+@comment TBD: Document the finer details of statement anchoring?
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@comment %**start of header (This is for running Texinfo on a region)
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@comment How to make the various output formats:
+@comment (Thanks to Robert Chassell for supplying this information.)
+@comment Note that Texinfo 4.7 (or later) is needed.
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@ignore
+In each of the following pairs of commands, the first generates a
+version with cross references pointing to the GNU Emacs manuals,
+the second with them pointing to the XEmacs manuals.
+    ## Info output
+    makeinfo cc-mode.texi
+    makeinfo -DXEMACS cc-mode.texi
+
+    ## DVI output
+    ## You may need to set up the environment variable TEXINPUTS so
+    ## that tex can find the file texinfo.tex - See the tex
+    ## manpage.
+    texi2dvi cc-mode.texi
+    texi2dvi -t "@set XEMACS " cc-mode.texi
+
+    ## HTML output.  (The --no-split parameter is optional)
+    makeinfo --html --no-split cc-mode.texi
+    makeinfo --html --no-split -DXEMACS cc-mode.texi
+
+    ## Plain text output
+    makeinfo --fill-column=70 --no-split --paragraph-indent=0 \
+      --no-headers --output=cc-mode.txt cc-mode.texi
+    makeinfo --fill-column=70 --no-split --paragraph-indent=0 \
+      --no-headers --output=cc-mode.txt -DXEMACS cc-mode.texi
+
+    ## DocBook output
+    makeinfo --docbook --no-split --paragraph-indent=0 \
+      cc-mode.texi
+    makeinfo --docbook --no-split --paragraph-indent=0 \
+      -DXEMACS cc-mode.texi
+
+    ## XML output
+    makeinfo --xml --no-split --paragraph-indent=0 \
+      cc-mode.texi
+    makeinfo --xml --no-split --paragraph-indent=0 \
+      -DXEMACS cc-mode.texi
+
+    #### (You must be in the same directory as the viewed file.)
+
+      ## View DVI output
+      xdvi cc-mode.dvi &
+
+      ## View HTML output
+      mozilla cc-mode.html
+@end ignore
+
+@comment No overfull hbox marks in the dvi file.
+@finalout
+
+@setfilename  ../../info/ccmode.info
+@settitle CC 模式手册
+@documentlanguage en
+@include docstyle.texi
+@footnotestyle end
+
+@c The following four macros generate the filenames and titles of the
+@c main (X)Emacs manual and the Elisp/Lispref manual.  Leave the
+@c Texinfo variable 'XEMACS' unset to generate a GNU Emacs version, set it
+@c to generate an XEmacs version, e.g., with
+@c "makeinfo -DXEMACS cc-mode.texi".
+@ifset XEMACS
+@macro emacsman
+xemacs
+@end macro
+@macro emacsmantitle
+XEmacs User's Manual
+@end macro
+@macro lispref
+lispref
+@end macro
+@macro lispreftitle
+XEmacs Lisp Reference Manual
+@end macro
+@end ifset
+
+@ifclear XEMACS
+@macro emacsman
+emacs
+@end macro
+@macro emacsmantitle
+GNU Emacs Manual
+@end macro
+@macro lispref
+elisp
+@end macro
+@macro lispreftitle
+GNU Emacs Lisp Reference Manual
+@end macro
+@end ifclear
+
+
+@macro ccmode
+CC Mode
+@end macro
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@comment @setchapternewpage odd !! we don't want blank pages !!
+@comment %**end of header (This is for running Texinfo on a region)
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@comment
+@comment Texinfo manual for CC Mode
+@comment Generated from the original README file by Krishna Padmasola
+@comment <krishna@earth-gw.njit.edu>
+@comment
+@comment Authors:
+@comment Barry A. Warsaw
+@comment Martin Stjernholm
+@comment Alan Mackenzie
+@comment
+@comment Maintained by Martin Stjernholm and Alan Mackenzie <bug-cc-mode@gnu.org>
+@comment
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@comment Define an index for syntactic symbols.
+@c Version for Texinfo <= 4.x
+@ifclear txicommandconditionals
+@ifnottex @c In texi2dvi, the @defindex would create an empty cc-mode.ss
+          @c For Info, unlike tex, @syncodeindex needs a matching @defindex.
+@defindex ss
+@end ifnottex
+@end ifclear
+@c Version for Texinfo >= 5.x
+@ifset txicommandconditionals
+@defindex ss
+@end ifset
+
+@comment Combine key, syntactic symbol and concept indices into one.
+@syncodeindex ss cp
+@syncodeindex ky cp
+
+@copying
+本手册适用于 Emacs 中的 CC 模式。
+
+版权所有 @copyright{} 1995--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@comment Info directory entry for use by install-info.  The indentation
+@comment here is by request from the FSF folks.
+@dircategory Emacs editing modes
+@direntry
+* CC Mode: (ccmode).             用于编辑 C、C++、Objective-C、Java、Pike、AWK 和 CORBA IDL 代码的 Emacs 模式。
+@end direntry
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@comment TeX title page
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@titlepage
+@sp 10
+
+@center @titlefont{CC Mode 5.35}
+@sp 2
+@center A GNU Emacs mode for editing C and C-like languages
+@sp 2
+@center Barry A. Warsaw, Martin Stjernholm, Alan Mackenzie
+
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+
+本手册是从 cc-mode.texi 生成的，它随 Emacs 一起分发，或者可以从 @url{https://savannah.gnu.org/projects/emacs/} 下载。
+@end titlepage
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@comment The Top node contains the master menu for the Info file.
+@comment This appears only in the Info file, not the printed manual.
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@summarycontents
+@contents
+
+
+@ifnottex
+@node    Top
+@top @ccmode{}
+
+@ccmode{} is a GNU Emacs mode for editing files containing C, C++,
+Objective-C, Java, CORBA IDL (and the variants PSDL and CIDL), Pike
+and AWK code.  It provides syntax-based indentation, font locking, and
+has several handy commands and some minor modes to make the editing
+easier.  It does not provide tools to look up and navigate between
+functions, classes, etc.; there are other packages for that.
+
+@insertcopying
+@end ifnottex
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@menu
+* Introduction::
+* Overview::
+* Getting Started::
+* Commands::
+* Font Locking::
+* Config Basics::
+* Custom Filling and Breaking::
+* Custom Auto-newlines::
+* Clean-ups::
+* Indentation Engine Basics::
+* Customizing Indentation::
+* Custom Macros::
+* Odds and Ends::
+* Sample Init File::
+* Performance Issues::
+* Limitations and Known Bugs::
+* FAQ::
+* Updating CC Mode::
+* Mailing Lists and Bug Reports::
+* GNU Free Documentation License::
+* Command and Function Index::
+* Variable Index::
+* Concept and Key Index::
+
+@detailmenu
+--- 详细节点列表 ---
+
+命令
+
+* Indentation Commands::
+* Comment Commands::
+* Movement Commands::
+* Filling and Breaking::
+* Minor Modes::
+* Electric Keys::
+* Auto-newlines::
+* Hungry WS Deletion::
+* Subword Movement::
+* Other Commands::
+
+字体锁定
+
+* Font Locking Preliminaries::
+* Faces::
+* Doc Comments::
+* Wrong Comment Style::
+* Misc Font Locking::
+* AWK Mode Font Locking::
+
+配置基础知识
+
+* CC Hooks::
+* Style Variables::
+* Styles::
+
+风格
+
+* Built-in Styles::
+* Choosing a Style::
+* Adding Styles::
+* Guessing the Style::
+* File Styles::
+
+自定义自动换行符
+
+* Hanging Braces::
+* Hanging Colons::
+* Hanging Semicolons and Commas::
+
+悬挂支架
+
+* Custom Braces::
+
+压痕引擎基础知识
+
+* Syntactic Analysis::
+* Syntactic Symbols::
+* Indentation Calculation::
+
+句法符号
+
+* Function Symbols::
+* Class Symbols::
+* Conditional Construct Symbols::
+* Switch Statement Symbols::
+* Brace List Symbols::
+* Enum Symbols::
+* External Scope Symbols::
+* Paren List Symbols::
+* Literal Symbols::
+* Multiline Macro Symbols::
+* Objective-C Method Symbols::
+* Java Symbols::
+* Constraint Symbols::
+* Statement Block Symbols::
+* K&R Symbols::
+
+自定义缩进
+
+* c-offsets-alist::
+* Interactive Customization::
+* Line-Up Functions::
+* Custom Line-Up::
+* Other Indentation::
+
+阵容功能
+
+* Brace/Paren Line-Up::
+* List Line-Up::
+* Operator Line-Up::
+* Comment Line-Up::
+* Misc Line-Up::
+
+
+自定义宏
+
+* Macro Backslashes::
+* Macros with ;::
+* Noise Macros::
+* Indenting Directives::
+
+@end detailmenu
+@end menu
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Introduction
+@chapter 介绍
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@cindex BOCM
+@cindex history
+@cindex @file{awk-mode.el}
+@cindex @file{c-mode.el}
+@cindex @file{c++-mode.el}
+
+欢迎使用 @ccmode{}，这是一个 GNU Emacs 模式，用于编辑包含 C、C++、Objective-C、Java、CORBA IDL（以及变体 CORBA PSDL 和 CIDL）、Pike 和 AWK 代码的文件。  该模式的化身源自 @file{c-mode.el}（也称为“无聊的旧 C 模式”或 BOCM @t{:-)}、@file{c++-mode.el} 版本 2，Barry Warsaw 自 1992 年以来一直在维护该模式，以及 @file{awk-mode.el}，这是 (X)Emacs 基础中长期被忽视的模式。
+
+1997 年底，Martin Stjernholm 加入 Barry 的 @ccmode{} 维护者团队，并实施了 Pike 支持。  2000 年，Martin 接任，成为唯一的维护者。  2001 年，Alan Mackenzie 加入该团队，在 5.30 版本中实现了 AWK 支持。  @ccmode{} 最初并不包含对其语言的字体锁定支持；这是5.30版本中添加的。
+
+本手册描述了 @ccmode{}
+@comment The following line must appear on its own, so that the
+版本 5.35。
+@comment Release.py script can update the version number automatically
+
+@ccmode{} supports the editing of C, C++, Objective-C,
+Java、CORBA 接口定义语言、Pike@footnote{A C-like scripting language with its roots in the LPC language used in some MUD engines.  See @uref{https://pike.lysator.liu.se/}.} 和 AWK 文件。  通过这种方式，您可以轻松地设置一致的字体锁定和编码样式以用于编辑所有这些语言，尽管 AWK 尚未像其他语言那样统一集成。
+
+@findex c-mode
+@findex c++-mode
+@findex objc-mode
+@findex java-mode
+@findex idl-mode
+@findex pike-mode
+@findex awk-mode
+请注意，该包的名称是“@ccmode{}”，但没有顶级@code{cc-mode}入口点。  @ccmode{} 中的所有变量、命令和函数都以 @code{c-@var{thing}} 为前缀，并提供了 @code{c-mode}、@code{c++-mode}、@code{objc-mode}、@code{java-mode}、@code{idl-mode}、@code{pike-mode} 和 @code{awk-mode} 入口点。  该封装旨在替代 @file{c-mode.el}、@file{c++-mode.el} 和 @file{awk-mode.el}。
+
+特别感谢 Krishna Padmasola 将原始 @file{README} 文件转换为 Texinfo 格式的工作。  我还要感谢所有 @ccmode{} 受害者，他们在 @ccmode{} 开发的早期测试阶段提供了巨大帮助。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Overview
+@comment  node-name,  next,  previous,  up@cindex organization of the manual
+@chapter 手册概述
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@noindent
+该手册以几个介绍性章节开始（包括这一章）。
+
+@noindent
+本手册的下一部分描述了日常@emph{use}
+@ccmode{} (as contrasted with how to customize it).
+
+@itemize @bullet
+@item 
+“命令”一章详细描述了如何使用（几乎）@ccmode{} 的所有功能。  从这里到手册后面的相应部分有大量的交叉引用，告诉您如何自定义这些功能。
+
+@item 
+“字体锁定”描述了如何将“语法突出显示”应用于缓冲区。  主要是背景信息，第一次阅读时可以跳过。
+@end itemize
+
+@noindent
+本手册的下一部分描述了如何 @emph{customize}
+@ccmode{}.  Typically, an overview of a topic is given at the chapter
+级别，然后各节和小节越来越详细地描述材料。
+
+@itemize @bullet
+@item 
+“配置基础知识”一章告诉您@emph{how}编写自定义：无论是在钩子中，在样式中，在两者中，还是两者都不中，具体取决于您的需要。  它描述了 @ccmode{} 样式系统并列出了 @ccmode{} 提供的标准样式。
+
+@item 
+接下来的几章将详细介绍如何定制@ccmode{}的各种功能。
+
+@item 
+最后，有一个示例 @file{.emacs} 片段，它可能会帮助您创建自己的自定义。
+@end itemize
+
+@noindent
+手册以“这个和那个”结尾，这些东西与前面的任何部分都不能完全吻合。
+
+@itemize @bullet
+@item 
+两章讨论了 @ccmode{} 的性能和已知的错误/限制。
+
+@item 
+常见问题解答包含常见问题和疑问的列表。
+
+@item 
+接下来的两章将告诉您如何联系@ccmode{}项目：无论是更新@ccmode{}还是提交错误报告。
+@end itemize
+
+@noindent
+最后，还有惯用的指数。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Getting Started
+@chapter 入门
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+如果您使用 Emacs 或 XEmacs 获得了此版本的 @ccmode{}，那么它开箱即用应该可以正常工作。  但请注意，您可能没有最新的 @ccmode{} 版本，并且可能想要升级您的副本（见下文）。
+
+您可能应该首先浏览整个命令章节 (@pxref{Commands}) 以大致了解 @ccmode{} 的功能。
+
+尝试了一些命令后，您可能会不喜欢其中的某些方面
+@ccmode{}'s default configuration.  Here is an outline of how to
+更改@ccmode{}新手最常想要更改的一些设置：
+
+@table @asis
+@item c-基本偏移量
+这个 Lisp 变量保存一个整数，列数 @ccmode{} 缩进嵌套代码。  要将此值设置为 6，请自定义 @code{c-basic-offset} 或将其放入您的 @file{.emacs} 中：
+
+@example
+(setq c-basic-offset 6)
+@end example
+
+@item （缩进）样式
+由 @ccmode{} 创建的缩进的基本“形状”——默认情况下，这是 @code{gnu} 样式（Java 和 AWK 缓冲区除外）。  可用样式的列表及其描述可以在@ref{Built-in Styles}中找到。  @ccmode{}样式系统的完整规范，包括如何创建您自己的样式，可以在章节@ref{Styles}中找到。  要将样式设置为 @code{linux}，请自定义 @code{c-default-style} 或将其放入@file{.emacs}：
+
+@example
+(setq c-default-style '((java-mode . "java")
+                        (awk-mode . "awk")
+                        (other . "linux")))
+@end example
+
+@item 电压痕
+通常，当您输入“标点符号”字符（例如 @samp{;} 或 @samp{@{}, @ccmode{} instantly reindents the current line.  This can be disconcerting until you get used to it.  To disable @dfn{electric indentation} in the current buffer, type @kbd{C-c C-l}.  Type the same thing to enable it again.  To have electric indentation disabled by default, put the following into your @file{.emacs} file@footnote{There is no ``easy customization'' facility for making this change.}:）时
+
+@example
+(setq-default c-electric-flag nil)
+@end example
+
+@noindent
+这个和其他类似“次要模式”的详细信息出现在第 @ref{Minor Modes} 部分。
+
+@item 使 @key{RET} 键缩进新行
+@key{RET} 的标准 Emacs 绑定只是添加了一个新行。  如果您希望它也重新缩进新行，请重新绑定键。  请注意，如果相关的键盘映射尚不存在，重新绑定的操作将会失败——因此我们需要将操作延迟到 @ccmode{} 加载之后。  将以下代码放入您的 @file{.emacs} 中：
+
+@example
+(defun my-make-CR-do-indent ()
+  (define-key c-mode-base-map "\C-m" 'c-context-line-break))
+(add-hook 'c-initialization-hook 'my-make-CR-do-indent)
+@end example
+
+@noindent
+这个例子演示了一个非常强大的 @ccmode{} （和 Emacs）工具的使用，即钩子。  @ref{CC Hooks} 中描述了@ccmode{} 的钩子的使用。
+@end table
+
+所有这些设置都应该发生在您的 @file{.emacs} @emph{before} 任何 @ccmode{} 缓冲区加载中——特别是在任何 @code{desktop-read} 调用之前。
+
+随着您更好地了解该模式，您可能希望对配置进行更大的更改。  为此，您应该开始阅读章节@ref{Config Basics}。
+
+如果您要升级现有的 @ccmode{} 安装，请参阅 @file{README} 文件了解安装详细信息。  特别是，如果您要编辑 AWK 文件，@file{README} 描述了如何配置 (X)Emacs，以便 @ccmode{} 将取代可能随 (X)Emacs 提供的过时的 @code{awk-mode.el}。
+@ccmode{} might not work with older versions of Emacs or XEmacs.  See
+@uref{https://www.nongnu.org/cc-mode/} 的 @ccmode{} 发行说明，了解有关 Emacs 版本和包兼容性的最新信息 (@pxref{Updating CC Mode})。
+
+@deffn Command c-version
+@findex version @r{(c-)}
+您可以通过访问 C 文件并输入 @kbd{M-x c-version @key{RET}} 来了解您正在使用的 @ccmode{} 版本。  您应该在回显区域中看到此消息：
+
+@example
+Using CC Mode version 5.XX
+@end example
+
+@noindent
+其中 @samp{XX} 是次要版本号。
+@end deffn
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Commands
+@chapter 命令
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+本章详细说明了 CC 模式的所有命令，因此几乎包含了 @emph{use} @ccmode{} 所需了解的所有内容（与配置它相比）。  这里的@dfn{Commands}表示控制键序列和@dfn{electric keys}，这些字符例如@samp{;}，除了将自身插入到缓冲区之外，还可以执行其他操作。
+
+您可能很想回顾一下
+@ifset XEMACS
+@ref{Lists,,,@emacsman{}, @emacsmantitle{}},
+@end ifset
+@ifclear XEMACS
+@ref{Moving by Parens,,,@emacsman{}, @emacsmantitle{}},
+@end ifclear
+它描述了用于移动大括号和圆括号结构的命令。
+
+
+@menu
+* Indentation Commands::
+* Comment Commands::
+* Movement Commands::
+* Filling and Breaking::
+* Minor Modes::
+* Electric Keys::
+* Auto-newlines::
+* Hungry WS Deletion::
+* Subword Movement::
+* Other Commands::
+@end menu
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Indentation Commands
+@comment node-name, next, previous,up
+@section 缩进命令
+@cindex indentation
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+以下命令重新缩进 C 结构。  请注意，当您更改编码风格时，无论是交互方式还是通过其他方式，您的文件都会自动重新缩进 @emph{not}。  您将需要执行以下命令之一才能查看更改的效果。
+
+@cindex GNU indent program
+此外，像 @code{c-hanging-*} 和 @code{c-cleanup-list} (@pxref{Custom Auto-newlines}) 这样的变量只会影响动态代码的格式化方式。  更改大括号的“悬挂度”然后重新缩进，不会将大括号移动到不同的行。  为此，您最好使用像 GNU @code{indent} 这样的外部程序，它会重新排列大括号位置等。
+
+预处理器指令被处理为来自其他代码的语法空白，即它们可以散布在任何地方而不影响周围代码的缩进，就像注释一样。
+
+默认情况下，宏定义内的代码仍会进行语法分析，以便您在那里获得相对缩进，就像相同的代码位于宏外部时一样。  然而，由于没有关于语法上下文的提示，即宏是否扩展为表达式、某些语句，或者可能扩展为整个函数，因此语法识别可能是错误的。  不过，大多数时候 @ccmode{} 都能正确地计算出来。
+
+有些宏在调用时“有自己的分号”。  要正确缩进下一行，而不是作为延续行，@xref{Macros with ;}。
+
+重新缩进大段代码可能需要很长时间。  什么时候
+@ccmode{} reindents a region of code, it is essentially equivalent to
+在该区域的每一行上点击@key{TAB}。
+
+这些命令缩进代码：
+
+@table @asis
+@item @kbd{@key{TAB}} (@code{c-indent-command})
+@kindex TAB
+@findex c-indent-command
+@findex indent-command @r{(c-)}
+该命令缩进当前行。  这就是您正常使用时需要了解的全部信息。
+
+@code{c-indent-command} 根据 @code{c-syntactic-indentation} (@pxref{Indentation Engine Basics}) 的设置执行不同的操作：
+
+@itemize @bullet
+@item 
+当它是非 @code{nil} 时（通常是），该命令根据其语法上下文缩进该行。  使用前缀参数 (@kbd{C-u @key{TAB}})，它将重新缩进从行的左边距开始的整个表达式@footnote{this is only useful for a line starting with a comment opener or an opening brace, parenthesis, or string quote.}。
+
+@item 
+当它为 @code{nil} 时，该命令会将该行缩进额外的 @code{c-basic-offset} 列。  前缀参数充当乘数。  裸前缀 (@kbd{C-u @key{TAB}}) 相当于 @minus{}1，从缩进中删除 @code{c-basic-offset} 列。
+@end itemize
+
+精确的行为由几个变量修改：使用@code{c-tab-always-indent}，您可以使@key{TAB}在某些情况下插入空白——@code{c-insert-tab-function}然后精确定义这将是哪种“空白”。  如果您希望在缩进中使用真正的 @samp{tab} 字符，请将标准 Emacs 变量 @code{indent-tabs-mode} 设置为 @code{t}，如果您只想使用空格，则将标准 Emacs 变量 @code{nil} 设置为 @code{nil}。  @xref{Just Spaces,,,@emacsman{},
+@emacsmantitle{}}.
+
+@defopt c-tab-always-indent
+@vindex tab-always-indent @r{(c-)}
+@cindex literal
+该变量修改 @key{TAB} 的操作方式。
+@itemize @bullet
+@item 
+当它为 @code{t} （默认值）时，@key{TAB} 只是缩进当前行。
+@item 
+当它为 @code{nil} 时，@key{TAB} 仅当 point 位于该行第一个非空白字符的左侧时（重新）缩进该行。否则，它会在点处插入一些空格（制表符或同等数量的空格；见下文）。
+@item 
+如果有其他值，该行将重新缩进。  此外，如果点位于字符串或注释内，则会插入一些空格。
+@end itemize
+@end defopt
+
+@defopt c-insert-tab-function
+@vindex insert-tab-function @r{(c-)}
+@findex tab-to-tab-stop
+当如上所述插入“一些空格”时，实际发生的是调用存储在 @code{c-insert-tab-function} 中的函数。  通常，这是 @code{insert-tab}，它插入一个真正的制表符或等效数量的空格（取决于 @code{indent-tabs-mode}）。  然而，有些人将 @code{c-insert-tab-function} 设置为 @code{tab-to-tab-stop} 以便在缩进时获得硬制表位。
+@end defopt
+@end table
+
+@noindent
+接下来五个命令的缩进类型取决于 @code{c-syntactic-indentation} (@pxref{Indentation Engine Basics}) 的设置：
+@itemize @bullet
+@item 
+当它为非@code{nil}（默认值）时，命令根据其语法上下文缩进行；
+@item 
+当它为 0 时，它们只是将每行缩进与前一个非空行相同的量。  在这种情况下，缩进区域的命令不是很有用。
+@end itemize
+
+@table @asis
+@item @kbd{C-M-q} (@code{c-indent-exp})
+@kindex C-M-q
+@findex c-indent-exp
+@findex indent-exp @r{(c-)}
+缩进整个平衡大括号或括号表达式。  请注意，该点必须位于要缩进的表达式的左大括号或括号上。
+
+@item @kbd{C-c C-q} (@code{c-indent-defun})
+@kindex C-c C-q
+@findex c-indent-defun
+@findex indent-defun @r{(c-)}
+缩进包含点的整个顶级函数、类或宏定义。  它使点保持不变。  此函数不能用于重新缩进嵌套大括号构造，例如嵌套类或函数，或者 Java 方法。  重新缩进的顶级构造必须是完整的，即它必须同时具有开始大括号和结束大括号。
+
+@item @kbd{C-M-\} (@code{indent-region})
+@kindex C-M-\
+@findex indent-region
+缩进任意代码区域。  这是一个标准 Emacs 命令，专为 @ccmode{} 缓冲区中的 C 代码而定制。  当然，请注意，该点和标记必须描绘出您要缩进的区域。
+
+@item @kbd{C-M-h} (@code{c-mark-function})
+@kindex C-M-h
+@findex c-mark-function
+@findex mark-function @r{(c-)}
+虽然严格来说不是缩进命令，但这对于将当前顶级函数或类定义标记为当前区域非常有用。  与 0⁣ 一样，该命令在顶级构造上运行，不能用于标记 Java 方法。
+@end table
+
+这些变量在缩进代码时也很有用：
+
+@defopt indent-tabs-mode
+这是一个标准 Emacs 变量，用于控制行缩进的组成方式。  当它为非@code{nil}时，可以在行缩进中使用制表符，否则仅使用空格。
+@end defopt
+
+@defopt c-progress-interval
+@vindex progress-interval @r{(c-)}
+当缩进大段代码时，此变量控制显示进度消息的频率。  将此变量设置为 @code{nil} 以禁止进度消息，或将其设置为整数，即显示进度消息的频率（以秒为单位）。
+@end defopt
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Comment Commands
+@section 评论命令
+@cindex comments (insertion of)
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+当本节中的命令添加注释分隔符时，它们根据注释样式 (@pxref{Minor Modes}) 的设置使用行注释或块注释。
+
+@table @asis
+@item @kbd{C-c C-c} (@code{comment-region})
+@kindex C-c C-c
+@findex comment-region
+此命令注释掉从该区域开始的行。  如果参数为负，则执行相反的操作：从这些行中删除注释分隔符。  @xref{Multi-Line Comments,,, emacs, GNU Emacs Manual}，了解更详细的信息。  @code{comment-region} 实际上并不是 @ccmode{} 的一部分；为了方便起见，它被赋予了 @ccmode{} 绑定。
+
+@item @kbd{M-;}（@code{comment-dwim} 或 @code{indent-for-comment}）
+@kindex M-;
+@findex comment-dwim
+@findex indent-for-comment
+如果当前行末尾还没有注释，则插入注释@footnote{The name of this command varies between (X)Emacs versions.}。  然后按照@code{comment-column}重新缩进注释
+@ifclear XEMACS
+(@pxref{Options for Comments,,, emacs, GNU Emacs Manual})
+@end ifclear
+@ifset XEMACS
+(@pxref{Comments,,, xemacs, XEmacs User's Manual})
+@end ifset
+以及下面的变量。  最后，将点放置在评论开头之后。  @kbd{C-u M-;} 删除当前行上的所有注释及其前面的任何空格。  这是一个标准的 Emacs 命令，但 @ccmode{} 通过两个变量对其进行了一些增强：
+
+@defopt c-indent-comment-alist
+@vindex indent-comment-alist @r{(c-)}
+@vindex comment-column
+此样式变量允许您更改 @kbd{M-;} 放置注释的列，具体取决于该行上的代码类型，以及可能的前一行上任何类似注释的缩进。它是一个关联列表，将不同类型的行映射到描述应如何处理它们的操作。  如果列表中不存在某种行类型，则该行将缩进到@code{comment-column}指定的列。
+
+有关此变量的完整描述，请参阅文档字符串（使用 @kbd{C-h v c-indent-comment-alist}）。
+@end defopt
+
+@defopt c-indent-comments-syntactically-p
+@vindex indent-comments-syntactically-p @r{(c-)}
+通常，当此样式变量为 @code{nil} 时，@kbd{M-;} 将根据 @code{c-indent-comment-alist} 缩进仅注释行，就像缩进其他代码在注释之前的行一样。但是，如果您希望它像 @key{TAB} 一样用于仅注释行，您可以通过将 @code{c-indent-comments-syntactically-p} 设置为非 @code{nil} 来实现。
+
+如果 @code{c-indent-comments-syntactically-p} 不是 @code{nil}，则根本不会针对仅限注释的行查询 @code{c-indent-comment-alist}。
+@end defopt
+@end table
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Movement Commands
+@section 移动命令
+@cindex movement
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@ccmode{} contains some useful commands for moving around in C code.
+
+@table @asis
+@item @kbd{C-M-a} (@code{c-beginning-of-defun})
+@itemx @kbd{C-M-e} (@code{c-end-of-defun})
+@findex c-beginning-of-defun
+@findex c-end-of-defun
+@vindex c-defun-tactic
+@vindex defun-tactic @r{(c-)}
+
+移至当前或下一个函数的开头或结尾。  具有大括号块的其他构造（例如结构或类）在这里也算作“函数”。  要移动多个功能，您可以为这些命令指定重复计数。
+
+函数的开始位于其标头。  函数的结尾位于其右大括号之后，或者在不以大括号结束的构造的分号（例如 @code{struct}）之后。  这两个命令尝试将点留在靠近函数实际开始或结束的行的开头。  这有时会导致点根本不动。
+
+默认情况下，如果点在其中开始，这些命令将识别 @dfn{declaration scope} 中包含的函数，例如 C++ @code{class} 或 @code{namespace} 构造。  如果 3⁣ 未能在当前声明范围内找到函数的开头或结尾，它将搜索封闭的范围。  如果您希望@ccmode仅识别顶层@footnote{this was @ccmode{}'s behavior prior to version 5.32.}的函数，请将@code{c-defun-tactic}设置为@code{t}。
+
+这些函数类似于 Emacs 内置命令 @code{beginning-of-defun} 和 @code{end-of-defun}，只不过它们消除了 defun 的顶级左大括号必须位于零列中的约束。  @xref{Defuns,,,@emacsman{},
+@emacsmantitle{}}, for more information.
+
+@item @kbd{C-M-a}（AWK 模式）(@code{c-awk-beginning-of-defun})
+@itemx @kbd{C-M-e}（AWK 模式）(@code{c-awk-end-of-defun})
+@kindex C-M-a @r{(AWK Mode)}
+@kindex C-M-e @r{(AWK Mode)}
+@findex c-awk-beginning-of-defun
+@findex awk-beginning-of-defun @r{(c-)}
+@findex c-awk-end-of-defun
+@findex awk-end-of-defun @r{(c-)}
+移至当前或下一个 AWK defun 的开头或结尾。  这些命令可以采用前缀参数，它们的功能完全等同于@code{beginning-of-defun}和@code{end-of-defun}。
+
+AWK 模式@dfn{defuns} 是模式/操作对（其中任一可能是隐式的）或用户定义的函数。  正如某些模式所建议的那样，将 @samp{@{} and @samp{@}} （如果有的话）放在零列中，在 AWK 模式中既没有必要也没有帮助。
+
+@item @kbd{M-a} (@code{c-beginning-of-statement})
+@itemx @kbd{M-e} (@code{c-end-of-statement})
+@kindex M-a
+@kindex M-e
+@findex c-beginning-of-statement
+@findex c-end-of-statement
+@findex beginning-of-statement @r{(c-)}
+@findex end-of-statement @r{(c-)}
+移至最内层 C 语句的开头或结尾。  如果 point 已经存在，则移动到语句的下一个开头或结尾，即使这意味着移动到一个块中。  （使用 @kbd{C-M-b} 或 @kbd{C-M-f} 在平衡块上移动。）前缀参数 @var{n} 表示在 @var{n} 语句上移动。
+
+如果点位于注释或跨行以上的字符串内或旁边，则这些命令按句子而不是语句移动。
+
+当从程序中调用时，这些函数采用三个可选参数：重复计数、搜索语法上下文的最远缓冲区位置限制，以及指示是否在注释和多行字符串中或附近进行句子移动的标志。
+
+@item @kbd{C-c C-u} (@code{c-up-conditional})
+@kindex C-c C-u
+@findex c-up-conditional
+@findex up-conditional @r{(c-)}
+返回到包含预处理器的条件，留下标记。  前缀参数充当重复计数。  使用否定参数时，前进到包含预处理器条件的末尾。
+
+@samp{#elif} 的处理方式类似于 @samp{#else} 后跟 @samp{#if}，因此函数在向后移动时会在它们处停止，但在向前移动时不会停止。
+
+此键序列未绑定在 AWK 模式中，该模式没有预处理器语句。
+
+@item @kbd{M-x c-up-conditional-with-else}
+@findex c-up-conditional-with-else
+@findex up-conditional-with-else @r{(c-)}
+各种 @code{c-up-conditional} 也停靠在 @samp{#else} 线。  通常这些行会被忽略。
+
+@item @kbd{M-x c-down-conditional}
+@findex c-down-conditional
+@findex down-conditional @r{(c-)}
+前进到下一个嵌套预处理器条件，留下标记。  前缀参数充当重复计数。  如果参数为负，则向后移动到上一个嵌套的预处理器条件。
+
+@samp{#elif} 的处理方式类似于 @samp{#else} 后跟 @samp{#if}，因此函数在前进时会在它们处停止，但在后退时不会停止。
+
+@item @kbd{M-x c-down-conditional-with-else}
+@findex c-down-conditional-with-else
+@findex down-conditional-with-else @r{(c-)}
+各种 @code{c-down-conditional} 也停靠在 @samp{#else} 线。  通常这些行会被忽略。
+
+@item @kbd{C-c C-p} (@code{c-backward-conditional})
+@itemx @kbd{C-c C-n} (@code{c-forward-conditional})
+@kindex C-c C-p
+@kindex C-c C-n
+@findex c-backward-conditional
+@findex c-forward-conditional
+@findex backward-conditional @r{(c-)}
+@findex forward-conditional @r{(c-)}
+在预处理器条件中向后或向前移动，留下标记。  前缀参数充当重复计数。  如果有消极的论点，则朝相反的方向前进。
+
+这些键序列未绑定在 AWK 模式中，该模式没有预处理器语句。
+
+@item @kbd{M-x c-backward-into-nomenclature}
+@findex c-backward-into-nomenclature
+@findex backward-into-nomenclature @r{(c-)}
+@findex forward-into-nomenclature @r{(c-)}
+一种流行的编程风格，特别是对于诸如 C++ 之类的面向对象语言，是以混合大小写格式编写符号，其中每个单词的第一个字母大写，并且不使用下划线分隔。  例如，@samp{SymbolsWithMixedCaseAndNoUnderlines}。
+
+这些命令向后或向前移动到下一个大写单词的开头。  使用前缀参数@var{n}，移动@var{n}次。如果 2⁣ 为负，则向相反方向移动。
+
+请注意，这两个命令已被 @code{subword-mode} 取代，您应该使用它。  @xref{Subword Movement}。  它们可能会从 @ccmode{} 的未来版本中删除。
+@end table
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Filling and Breaking
+@comment  node-name,  next,  previous,  up
+@section 填充和断行命令
+@cindex text filling
+@cindex line breaking
+@cindex comment handling
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+由于注释和字符串文字中有很多普通文本，
+@ccmode{} provides features to edit these like in text mode.  The goal
+就是无缝地做到这一点，即只要有一段普通文本，您就可以使用自动填充模式、句子和段落移动、段落填充、自适应填充等@:，而无需考虑太多。
+@ccmode{} keeps the indentation, fixes suitable comment line prefixes,
+等等。
+
+您可以配置注释填充和断开的确切方式，以及 Emacs 自动填充的位置 (@pxref{Custom Filling and Breaking})。  通常，样式系统 (@pxref{Styles}) 会为您进行设置，因此您可能不必费心。
+
+@findex auto-fill-mode
+@cindex Auto Fill mode
+@cindex paragraph filling
+默认情况下，换行符的处理（几乎）相同，无论它们是通过自动填充模式（@pxref{Auto Fill,,,@emacsman{}, @emacsmantitle{}}）、段落填充（例如，使用@kbd{M-q}）还是显式使用@kbd{M-j}或类似方法进行。  在字符串文字中，新行的缩进与前一个非空行相同。@footnote{You can change this default by setting the @code{string} syntactic symbol (@pxref{Syntactic Symbols} and @pxref{Customizing Indentation})}。
+
+@table @asis
+@item @kbd{M-q} (@code{c-fill-paragraph})
+@kindex M-q
+@findex c-fill-paragraph
+@findex fill-paragraph @r{(c-)}
+@cindex Javadoc markup
+@cindex Pike autodoc markup
+此命令填充多行字符串文字以及块和线样式注释。  在 Java 缓冲区中，Javadoc 标记字被识别为段落开头。  在 Pike 模式下，以相同的方式识别面向行的 Pike autodoc 标记字。
+
+块注释的开头 (@code{/*}) 和结尾 (@code{*/}) 的格式保持填充前的状态。  即，如果起始者或结束者在自己的线上，则它保持在自己的线上；相反，如果分隔符的行上有注释文本，则它会保留该文本中的至少一个单词。
+
+该命令替换 @ccmode{} 缓冲区中的 @code{fill-paragraph}。
+
+@item @kbd{M-j} (@code{c-indent-new-comment-line})
+@kindex M-j
+@findex c-indent-new-comment-line
+@findex indent-new-comment-line @r{(c-)}
+这会在点处中断当前行并缩进新行。  如果点位于注释中，则新行将获得正确的注释行前缀。  如果点位于宏内部，则在换行符之前插入反斜杠。  它是 @code{indent-new-comment-line} 的替代品。
+
+@item @kbd{M-x c-context-line-break}
+@findex c-context-line-break
+@findex context-line-break @r{(c-)}
+插入适合上下文的换行符：如果该点位于注释内，则新行将获得合适的缩进和注释行前缀，例如 @code{c-indent-new-comment-line}。  在正常代码中，它的缩进就像 @code{newline-and-indent} 一样。  在宏中，它的作用类似于 2⁣，但另外插入并可选择对齐行结尾反斜杠，以便宏保持完整。 @xref{Custom Macros}，有关反斜杠对齐的详细信息。  在字符串中，仅当字符串位于宏@footnote{In GCC, unescaped line breaks within strings are valid.} 内时才会插入反斜杠。
+
+默认情况下，此函数未绑定到键，但它旨在用于 @kbd{RET} 键。  如果您喜欢 @code{newline-and-indent} 在 @kbd{RET} 上的行为，您应该考虑切换到此函数。  @xref{Sample Init File}。
+
+@item @kbd{M-x c-context-open-line}
+@findex c-context-open-line
+@findex context-open-line @r{(c-)}
+这对于@kbd{C-o} (@kbd{M-x open-line}) 就像@code{c-context-line-break}对于@kbd{RET}一样。  即，它的工作方式与 @code{c-context-line-break} 类似，但会在插入的换行符之前留下点。
+@end table
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Minor Modes
+@section 小调
+@cindex Minor Modes
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@ccmode{} contains several minor-mode-like features that you might
+在编写新代码或编辑旧代码时发现有用：
+
+@table @asis
+@item 评论风格
+这指定注释命令（例如@kbd{M-;}）是否插入块注释或行注释@footnote{You can emphasize non-default style comments in your code by giving their delimiters @code{font-lock-warning-face}.  @xref{Wrong Comment Style}.}。
+@item 电动模式
+启用此功能后，某些可见字符会在键入时重新格式化。  这通常很有用，但在编辑格式混乱的代码时可能会很麻烦。  它也可能会令人不安，特别是对于刚接触 @ccmode{} 的用户来说。
+@item 自动换行模式
+这会自动在您可能想要自己键入的位置插入换行符，例如，在键入 @samp{@}} 后。  当电动模式被禁用时，其动作被抑制。
+@item 饥饿删除模式
+这使您可以使用单个键删除连续的空白块：例如，当您想要备份并在最后一个语句之后写入注释时，自动换行刚刚插入的换行符和缩进。
+@item 子字模式
+此模式使 @kbd{M-f} (@code{forward-word}) 和 @kbd{M-b} (@code{backward-word}) 等基本单词移动命令将傻大写符号的部分视为不同的单词。例如，@samp{NSGraphicsContext} 被视为三个单词@samp{NS}、@samp{Graphics} 和@samp{Context}。
+@item 句法缩进模式
+启用此功能后（通常是这样），缩进命令（例如 @kbd{C-j}）会根据语法结构缩进代码行。  否则，一行简单地缩进到与前一行相同的水平，并且@kbd{@key{TAB}}以@code{c-basic-offset}的步长调整缩进。
+@end table
+
+有关这些次要模式如何工作的完整详细信息，请参见 @ref{Electric Keys}、@ref{Auto-newlines}、@ref{Hungry WS Deletion}、@ref{Subword Movement} 和 @ref{Indentation Engine Basics}。
+
+您可以打开和关闭这些次要模式，并且可以配置@ccmode{}，以便它以您最喜欢的组合启动（@pxref{Sample Init File}）。  默认情况下，初始化缓冲区时，注释样式将设置为默认的主要模式、电动模式和语法缩进模式，但其他三种模式被禁用。
+
+@ccmode{} displays the current state of the first five of these minor
+通过将字符附加到主模式名称来在模式行上添加模式：@samp{/} 或 @samp{*} 指示注释样式（分别为行或块），并用一个字母表示每个已启用的其他次要模式 - @samp{l} 表示电动模式，@samp{a} 表示自动换行模式，@samp{h} 表示饥饿删除模式，@samp{w} 表示子字模式。如果注释样式是块并且启用了所有其他模式，您会看到@samp{C/*lahw}@footnote{The @samp{C} would be replaced with the name of the language in question for the other languages @ccmode{} supports.}。
+
+以下是切换这些模式的命令：
+
+@table @asis
+@item @kbd{C-c C-k} (@code{c-toggle-comment-style})
+@kindex C-c C-k
+@findex c-toggle-comment-style
+@findex toggle-comment-style @r{(c-)}
+在线条样式和块样式之间切换注释样式。  在只有其中一种样式的模式（例如 AWK 模式）中，此函数不执行任何操作。
+
+@item @kbd{C-c C-l} (@code{c-toggle-electric-state})
+@kindex C-c C-l
+@findex c-toggle-electric-state
+@findex toggle-electric-state @r{(c-)}
+切换电动小调模式。  当该命令关闭该模式时，它还会抑制自动换行模式。
+
+@item @kbd{C-c C-a} (@code{c-toggle-auto-newline})
+@kindex C-c C-a
+@findex c-toggle-auto-newline
+@findex toggle-auto-newline @r{(c-)}
+切换自动换行次要模式。  当该命令打开该模式时，它还会启用电动小调模式。
+
+@item @kbd{M-x c-toggle-hungry-state}
+@findex c-toggle-hungry-state
+@findex toggle-hungry-state @r{(c-)}
+切换饥饿删除次要模式@footnote{Prior to @ccmode{} 5.31, this command was bound to @kbd{C-c C-d}.}。
+
+@item @kbd{M-x c-toggle-auto-hungry-state}
+@findex c-toggle-auto-hungry-state
+@findex toggle-auto-hungry-state @r{(c-)}
+切换自动换行和饥饿删除次要模式@footnote{Prior to
+@ccmode{} 5.31, this command was bound to @kbd{C-c C-t}.}.
+
+@item @kbd{C-c C-w} (@code{M-x subword-mode})
+@kindex C-c C-w
+@findex subword-mode
+切换子字模式。
+
+@item @kbd{M-x c-toggle-syntactic-indentation}
+@findex c-toggle-syntactic-indentation
+@findex toggle-syntactic-indentation @r{(c-)}
+切换语法缩进模式。
+@end table
+
+上述所有切换函数的共同点是，如果以编程方式调用它们，则它们采用可选的数字参数。  对于@code{c-toggle-comment style}，正值将选择块注释，负值将选择行注释。  对于其他功能，正值将打开次要模式（或在@code{c-toggle-auto-hungry-state}的情况下同时打开次要模式），负值将关闭次要模式（或它们）。
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Electric Keys
+@section 电钥匙和关键字
+@cindex electric characters
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+大多数标点符号键都提供 @dfn{electric} 行为：除了插入自身之外，它们还执行一些其他操作，例如重新缩进行。  这种重新缩进可以让您不必在键入 @samp{@}} 后手动重新缩进一行。  一些关键字，例如@code{else}，也会触发电动动作。
+
+您可以通过禁用电动小模式 (@pxref{Minor Modes}) 来抑制此处描述的电动行为。
+
+所有这些键的共同点是，它们仅在正常代码中使用时才会表现出电气行为（与在字符串文字或注释中键入相反）。  仅当 0⁣ 具有非 @code{nil} 值（默认情况下）时，才会导致重新缩进。
+
+这些键和关键字是：
+@c ACM, 2004/8/24:  c-electric-pound doesn't check c-s-i: this is more
+@c like a bug in the code than a bug in this document.  It'll get
+@c fixed in the code sometime.
+
+@table @kbd
+@item #
+@kindex #
+@findex c-electric-pound
+@findex electric-pound @r{(c-)}
+@vindex c-electric-pound-behavior
+@vindex electric-pound-behavior @r{(c-)}
+当作为行上的第一个非空白字符而不是在宏定义内键入时，磅（绑定到 @code{c-electric-pound}）是电的。  在这种情况下，将参考变量 @code{c-electric-pound-behavior} 来了解电气行为。  该变量采用列表值，尽管当前定义的唯一元素是 @code{alignleft}，它告诉该命令强制 @samp{#} 字符进入零列。  这对于输入预处理器宏定义很有用。
+
+磅在 AWK 缓冲区中不是电子的，其中 @samp{#} 开始注释，并且像任何典型的可打印字符一样绑定到 @code{self-insert-command}。
+@c ACM, 2004/8/24:  Change this (and the code) to do AWK comment
+@c reindentation.
+
+@item *
+@kindex *
+@itemx /
+@kindex /
+@findex c-electric-star
+@findex electric-star @r{(c-)}
+@findex c-electric-slash
+@findex electric-slash @r{(c-)}
+当您分别将星号（绑定到 @code{c-electric-star}）或斜线（@code{c-electric-slash}）作为 C 样式块注释开启符 (@samp{/*}) 或 C++ 行注释开启符 (@samp{//}) 的第二个组件键入时，会导致重新缩进，但前提是注释开启符是行中的第一个内容（即，前面只有空格）。
+
+此外，您可以配置@ccmode{}，以便在块注释内的行开头键入斜杠将终止注释。  您无需启用电动小调模式即可获得此行为。  @xref{Clean-ups}。
+
+在 AWK 模式下，@samp{*} 和 @samp{/} 不分隔注释并且不是电动的。
+
+@item <
+@kindex <
+@itemx >
+@kindex >
+@findex c-electric-lt-gt
+@findex electric-lt-gt @r{(c-)}
+小于或大于符号（绑定到 @code{c-electric-lt-gt}）在两种情况下是电的：当它是 C++ @samp{template} 声明中的尖括号（以及其他语言中的类似构造）时，以及当它是 C++ 样式流运算符中两个 @kbd{<} 或 @kbd{>} 字符中的第二个时。  无论哪种情况，该行都会重新缩进。  C @samp{#include} 指令中的尖括号不是电动的。
+
+@item (
+@kindex (
+@itemx )
+@kindex )
+@findex c-electric-paren
+@findex electric-paren @r{(c-)}
+普通括号字符 @samp{(} 和 @samp{)}（绑定到 @code{c-electric-paren}）重新缩进当前行。  这对于自动对齐参数列表的右括号很有用。
+
+您还可以将 @ccmode{} 配置为在函数名称和刚刚键入的 @samp{(} 之间自动插入一个空格，并在键入 @samp{)} 后自动将其删除（如果参数列表为空）。  您无需启用电动小调模式即可获得这些操作。  @xref{Clean-ups}。
+
+@item @{
+@kindex @{
+@itemx @}
+@kindex @}
+@findex c-electric-brace
+@findex electric-brace @r{(c-)}
+键入大括号（绑定到 @code{c-electric-brace}）会重新缩进当前行。  此外，如果启用了自动换行次要模式，则可能会插入一个或多个换行符。  @xref{Auto-newlines}。此外，在某些情况下，您可以配置 @ccmode{} 来压缩自动换行模式插入的多余空格。 @xref{Clean-ups}。
+
+@item :
+@kindex :
+@findex c-electric-colon
+@findex electric-colon @r{(c-)}
+输入冒号（绑定到 @code{c-electric-colon}）会重新缩进当前行。  此外，如果启用了自动换行次要模式，则可能会插入一个或多个换行符。  @xref{Auto-newlines}。  如果您在这样的自动换行符之后立即键入第二个冒号，则默认情况下两个冒号之间的空格将被删除，留下一个 C++ 作用域运算符。  @xref{Clean-ups}。
+
+如果您愿意，可以在单个操作中插入 @samp{::}，从而避免所有这些虚假的重新缩进、换行和清理。 @xref{Other Commands}。
+
+@item ;
+@kindex ;
+@itemx ,
+@kindex ,
+@findex c-electric-semi&comma
+@findex electric-semi&comma @r{(c-)}
+键入分号或逗号（绑定到 @code{c-electric-semi&comma}）会重新缩进当前行。  此外，如果启用自动换行次要模式，则可能会插入换行符。  @xref{Auto-newlines}。此外，您可以配置 @ccmode{} ，以便当自动换行符在 @samp{@}} 之后插入空格时，当您在其后键入分号或逗号时，它将再次删除。  @xref{Clean-ups}。
+
+@end table
+
+@deffn Command c-electric-continued-statement
+@findex electric-continued-statement @r{(c-)}
+
+某些关键字是电动的，当它们前面只有一行空格时会导致重新缩进。  这些关键字是那些继续先前语句而不是开始新语句的关键字：@code{else}、@code{while}、@code{catch}（仅在 C++ 和 Java 中）和 @code{finally}（仅在 Java 中）。
+
+一个例子：
+
+@example
+@group
+for (i = 0; i < 17; i++)
+  if (a[i])
+    res += a[i]->offset;
+else
+@end group
+@end example
+
+这里，@code{else}应该像前面的@code{if}一样缩进，因为它延续了该语句。 @ccmode{} 会在 @code{else} 完整输入后自动重新缩进，因为只有这样才能决定它是新语句还是前面 @code{if} 的延续。
+
+@vindex abbrev-mode
+@findex abbrev-mode
+@cindex Abbrev mode
+@ccmode{} uses Abbrev mode (@pxref{Abbrevs,,,@emacsman{}, @emacsmantitle{}})
+来实现这一点。  因此，除了 IDL 模式外，它在所有语言模式中默认打开，因为 CORBA IDL 没有任何语句。
+@end deffn
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Auto-newlines
+@section 自动换行插入
+@cindex auto-newline
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+当您启用 @dfn{Auto-newline minor mode} (@pxref{Minor Modes}) 时，当您键入左大括号或右大括号、冒号、分号或逗号时，@ccmode{} 会自动为您插入换行符（在某些语法上下文中）。  有时，换行符会出现在您键入的字符之前，有时会出现在其之后，有时两者都会出现。
+
+自动换行仅在满足以下条件时触发：
+
+@itemize @bullet
+@item
+自动换行次要模式已启用，如模型行上模式名称后面的指示符 @samp{a} 所示（例如 @samp{C/a} 或 @samp{C/la}）。
+
+@item
+该字符是在行尾键入的，或者后面只有空格，并且可能有 @samp{\} 转义换行符。
+
+@item
+该角色尚未在自己的行上。  （这仅适用于插入换行符@emph{before}字符。）
+
+@item
+@cindex literal
+@cindex syntactic whitespace
+该字符不是在文字 @footnote{A @dfn{literal} is defined as any comment, string, or preprocessor macro definition.  These constructs are also known as @dfn{syntactic whitespace} since they are usually ignored when scanning C code.} 内键入的。
+
+@item
+没有向命令提供数字参数（即，它是正常键入的，没有 @kbd{C-u} 前缀）。
+@end itemize
+
+您可以配置插入换行符的精确环境 (@pxref{Custom Auto-newlines})。  通常，样式系统 (@pxref{Styles}) 会为您进行设置，因此您可能不必费心。
+
+有时，@ccmode{} 会在您不需要的位置插入自动换行符，例如当您要输入 @samp{;} 时，在 @samp{@}} 之后插入。饥饿删除在这里可以有所帮助（@pxref{Hungry WS Deletion}），或者您可以激活适当的@dfn{clean-up}，这将在您键入@samp{;}后删除多余的空格。  @xref{Clean-ups}，完整描述。  另请参阅@ref{Electric Keys}，了解按键列出的清理摘要。
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Hungry WS Deletion
+@section 大量删除空白
+@cindex hungry-deletion
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+如果要删除该点处的整个空白块，可以使用@dfn{hungry deletion}。  这会在单个操作中删除点之前或点之后的所有连续空格。这里的“空白”包括制表符和换行符，但不包括注释或预处理器命令。  饥饿删除可以显着减少您必须按删除键的次数，例如，当您在前一行上犯了错误并且已经按了@kbd{C-j}时。
+
+饥饿删除是一个简单的功能，但有些人发现非常有用。  事实上，您可能会发现自己想要在 @strong{all} 编辑模式中使用它！
+
+宽松地说，在下文中，@dfn{@key{DEL}} 表示“退格键”，@dfn{@key{DELETE}} 表示“前进删除键”。  这将在下面更详细地讨论。
+
+您可以通过两种不同的方式使用饥饿删除：
+
+@table @asis
+@item 将@dfn{Hungry Delete Mode}与@kbd{@key{DEL}}和@kbd{C-d}一起使用
+在这里，您可以使用 @kbd{M-x c-toggle-hungry-state}@footnote{Prior to @ccmode{} 5.31, this command was bound to @kbd{C-c C-d}.  @kbd{C-c C-d} is now the default binding for @code{c-hungry-delete-forward}.} (@pxref{Minor Modes}) 切换饥饿删除次要模式。这使得 @kbd{@key{DEL}} 和 @kbd{C-d} 进行向后和向前饥饿删除。
+
+@table @asis
+@item @kbd{@key{DEL}} (@code{c-electric-backspace})
+@kindex DEL
+@findex c-electric-backspace
+@findex electric-backspace @r{(c-)}
+当您按下 @kbd{@key{DEL}} 键时，默认情况下会运行此命令。  当饥饿删除模式启用时，它会向后删除任意数量的空白。  否则，或者当与前缀参数或文字 (@pxref{Auto-newlines}) 一起使用时，该命令只会以通常的方式向后删除。  （更准确地说，它调用变量 @code{c-backspace-function} 中包含的函数，并向其传递前缀参数（如果有）。）
+
+@item @code{c-backspace-function}
+@vindex c-backspace-function
+@vindex backspace-function @r{(c-)}
+@findex backward-delete-char-untabify
+当 @code{c-electric-backspace} 没有“电动”删除前面的空格时，会调用该钩子。  默认值为@code{backward-delete-char-untabify}（@pxref{Deletion,,,@lispref{}, @lispreftitle{}}，删除单个字符的函数。
+
+@item @kbd{C-d} (@code{c-electric-delete-forward})
+@kindex C-d
+@findex c-electric-delete-forward
+@findex electric-delete-forward @r{(c-)}
+该函数默认绑定到 @kbd{C-d}，其工作方式与 @code{c-electric-backspace} 类似，但是是向前的。  当它不对后面的空格进行“电动”删除时，它或多或少只是执行 @code{delete-char} 操作。  （严格来说，它使用前缀参数调用@code{c-delete-function}中的函数。）
+
+@item @code{c-delete-function}
+@vindex c-delete-function
+@vindex delete-function @r{(c-)}
+@findex delete-char
+当 @code{c-electric-delete-forward} 没有“电动”删除后面的空格时，会调用该钩子。  默认值为@code{delete-char}。
+@end table
+
+@item 使用不同的绑定
+使用饥饿删除的另一种（较新且推荐的）方法是直接通过按键序列执行@code{c-hungry-delete-backwards}和@code{c-hungry-delete-forward}，而不是使用次要模式切换。
+
+@table @asis
+@item @kbd{C-c C-@key{DEL}}，或@kbd{C-c @key{DEL}} (@code{c-hungry-delete-backwards})
+@kindex C-c C-Backspace
+@kindex C-c Backspace
+@kindex C-c C-DEL
+@kindex C-c DEL
+@findex c-hungry-delete-backwards
+@findex hungry-delete-backwards @r{(c-)}
+向后删除任意数量的空格（无论是否启用饥饿删除模式）。  该命令绑定到 @kbd{C-c C-@key{DEL}} 和 @kbd{C-c @key{DEL}}，因为更自然的命令 @kbd{C-c C-@key{DEL}} 有时很难在字符终端@footnote{This command was formerly known as @code{c-hungry-backspace}.} 上键入。
+
+@item @kbd{C-c C-d}、@kbd{C-c C-@key{DELETE}} 或 @kbd{C-c @key{DELETE}} (@code{c-hungry-delete-forward})
+@kindex C-c C-d
+@kindex C-c C-Delete
+@kindex C-c Delete
+@findex c-hungry-delete-forward
+@findex hungry-delete-forward @r{(c-)}
+向前删除任意数量的空格（无论是否启用饥饿删除模式）。  该命令绑定到 @kbd{C-c C-@key{Delete}} 和 @kbd{C-c @key{Delete}} 的原因与上面 @key{DEL} 相同。
+@end table
+@end table
+
+@kindex Delete
+@kindex Backspace
+
+当我们上面讨论 @kbd{@key{DEL}} 和 @kbd{@key{Delete}} 时，我们实际上并没有将它们连接到通常称为 @key{Backspace} 和 @key{Delete} 的物理按键。  这两个键的默认绑定取决于您使用的 (X)Emacs 的风格。
+
+@findex c-electric-delete
+@findex electric-delete @r{(c-)}
+@findex c-hungry-delete
+@findex hungry-delete @r{(c-)}
+@vindex delete-key-deletes-forward
+在 XEmacs 20.3 及更高版本中，@key{Backspace} 键绑定到 @code{c-electric-backspace}，@key{Delete} 键绑定到 @code{c-electric-delete}。  您可以通过设置变量 @code{delete-key-deletes-forward}（一个标准 XEmacs 变量）来控制删除的方向。
+@c This variable is encapsulated by XEmacs's (defsubst delete-forward-p ...).
+当该变量非@code{nil}时，@code{c-electric-delete}将使用@code{c-electric-delete-forward}进行向前删除，否则使用@code{c-electric-backspace}进行向后删除。  类似地，@kbd{C-c @key{Delete}}和@kbd{C-c C-@key{Delete}}绑定到@code{c-hungry-delete}，@code{c-hungry-delete}以相同的方式由@code{delete-key-deletes-forward}控制。
+
+@findex normal-erase-is-backspace-mode
+
+Emacs 21 及更高版本会根据您的环境自动将 @key{Backspace} 和 @key{Delete} 绑定到 @kbd{DEL} 和 @kbd{C-d}，并且 @ccmode{} 将这些绑定扩展到 @kbd{C-c C-@key{Backspace}} 等。如果您需要通过 @code{normal-erase-is-backspace-mode} 更改绑定，那么 @ccmode{} 也会相应地调整其扩展绑定。
+
+在早期的 (X)Emacs 版本中，@ccmode{} 不直接绑定 @key{Backspace} 或 @key{Delete}。  仅绑定键码 @kbd{DEL} 和 @kbd{C-d}，并且由默认绑定将物理键映射到它们。  如果默认值不合适，您可能需要自行修改。
+
+正确设置 @key{Backspace} 和 @key{Delete} 键有时可能很棘手。  如果您在 GNU Emacs 中遇到此问题，@ref{DEL Does Not Delete,,,emacs, GNU Emacs Manual} 中的信息可能会有所帮助。
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Subword Movement
+@section 子词移动和编辑
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@cindex nomenclature
+@cindex subword
+尽管有 GNU 编码标准，但仍然流行通过混合大小写字母来命名符号，例如 @samp{GtkWidget}、@samp{EmacsFrameClass} 或 @samp{NSGraphicsContext}。  这里我们将这些大小写混合的符号称为@dfn{nomenclatures}。  此外，命名法的每个大写（或完全大写）部分称为 @dfn{subword}。  以下是一些示例：
+
+@multitable {@samp{NSGraphicsContext}} {@samp{NS}, @samp{Graphics}, and @samp{Context}}
+@c This could be converted to @headitem when we require Texinfo 4.7
+@iftex
+@item @b{Nomenclature}
+  @tab @b{Subwords}
+@end iftex
+@ifnottex
+@item Nomenclature
+  @tab Subwords
+@item ---------------------------------------------------------
+@end ifnottex
+@item @samp{GtkWindow}
+  @tab @samp{Gtk} and @samp{Window}
+@item @samp{EmacsFrameClass}
+  @tab @samp{Emacs}, @samp{Frame}, and @samp{Class}
+@item @samp{NSGraphicsContext}
+  @tab @samp{NS}, @samp{Graphics}, and @samp{Context}
+@end multitable
+
+子词次要模式用识别命名法中的子词并将其视为单独单词的变体替换了基本的面向单词的移动和编辑命令：
+
+@findex c-forward-subword
+@findex forward-subword @r{(c-)}
+@findex c-backward-subword
+@findex backward-subword @r{(c-)}
+@findex c-mark-subword
+@findex mark-subword @r{(c-)}
+@findex c-kill-subword
+@findex kill-subword @r{(c-)}
+@findex c-backward-kill-subword
+@findex backward-kill-subword @r{(c-)}
+@findex c-transpose-subwords
+@findex transpose-subwords @r{(c-)}
+@findex c-capitalize-subword
+@findex capitalize-subword @r{(c-)}
+@findex c-upcase-subword
+@findex upcase-subword @r{(c-)}
+@findex c-downcase-subword
+@findex downcase-subword @r{(c-)}
+@multitable @columnfractions .20 .40 .40
+@c This could be converted to @headitem when we require Texinfo 4.7
+@iftex
+@item     @b{Key}     @tab @b{Word oriented command} @tab @b{Subword oriented command}
+@end iftex
+@ifnottex
+@item     Key         @tab Word oriented command     @tab Subword oriented command
+@item ----------------------------------------------------------------------------
+@end ifnottex
+@item @kbd{M-f}   @tab @code{forward-word}       @tab @code{c-forward-subword}
+@item @kbd{M-b}   @tab @code{backward-word}      @tab @code{c-backward-subword}
+@item @kbd{M-@@}  @tab @code{mark-word}          @tab @code{c-mark-subword}
+@item @kbd{M-d}   @tab @code{kill-word}          @tab @code{c-kill-subword}
+@item @kbd{M-@key{DEL}} @tab @code{backward-kill-word} @tab @code{c-backward-kill-subword}
+@item @kbd{M-t}   @tab @code{transpose-words}    @tab @code{c-transpose-subwords}
+@item @kbd{M-c}   @tab @code{capitalize-word}    @tab @code{c-capitalize-subword}
+@item @kbd{M-u}   @tab @code{upcase-word}        @tab @code{c-upcase-subword}
+@item @kbd{M-l}   @tab @code{downcase-word}      @tab @code{c-downcase-subword}
+@end multitable
+
+请注意，如果您在 @file{.emacs} 或类似位置更改了面向单词的命令的键绑定，则您配置的键也将用于相应的面向子字​​的命令。
+
+输入 @kbd{C-c C-w} 可打开和关闭子字模式。  要使该模式自动打开，请将以下代码放入您的@file{.emacs}中：
+
+@example
+(add-hook 'c-mode-common-hook
+          (lambda () (subword-mode 1)))
+@end example
+
+作为奖励，您还可以通过键入 @kbd{M-x subword-mode} 在非 @ccmode{} 缓冲区中使用 @code{subword-mode}。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Other Commands
+@section 其他命令
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+以下是不适合其他地方的各种其他命令：
+
+@table @asis
+@item @kbd{C-c .} (@code{c-set-style})
+@kindex C-c .
+@findex c-set-style
+@findex set-style @r{(c-)}
+切换到当前缓冲区中指定的样式。  像这样使用：
+
+@example
+@kbd{C-c . @var{style-name} @key{RET}}
+@end example
+
+您可以按照正常方式使用 @key{TAB} 来完成样式名称。  请注意，所有样式名称都不区分大小写，即使是您自己定义的样式名称也是如此。
+
+以这种方式设置样式会 @emph{not} 自动重新缩进您的文件。  有关可用于查看更改效果的命令，请参阅@ref{Indentation Commands} 和 @ref{Filling and Breaking}。
+
+有关@ccmode{}样式系统的详细信息，请参阅@ref{Styles}。
+
+@item @kbd{C-c :} (@code{c-scope-operator})
+@kindex C-c :
+@findex c-scope-operator
+@findex scope-operator @r{(c-)}
+在 C++ 中，有时还需要插入双冒号作用域运算符而不执行冒号插入的电子行为。 @kbd{C-c :} 就是这样做的。
+
+@item @kbd{C-c C-z} (@code{c-display-defun-name})
+@kindex C-c C-z
+@findex c-display-defun-name
+@findex display-defun-name @r{(c-)}
+显示迷你缓冲区中当前的函数名称（如果有）。此外，如果给出了前缀参数，则将函数名称推送到终止环。  如果没有当前函数，@code{c-display-defun-name} 什么也不做。  在 Emacs 中，如果将可自定义选项 @code{isearch-allow-scroll} 设置为非 @code{nil}，则可以在交互式搜索过程中使用此命令。 @xref{Not Exiting Isearch,,,emacs, GNU Emacs Manual}。
+
+@item @kbd{C-c C-\} (@code{c-backslash-region})
+@kindex C-c C-\
+@findex c-backslash-region
+@findex backslash-region @r{(c-)}
+此函数在当前区域中插入并对齐或删除行尾反斜杠。  这些通常用于多行宏。
+
+如果没有前缀参数，它会插入任何缺失的反斜杠并根据 @code{c-backslash-column} 和 @code{c-backslash-max-column} 变量对齐它们。  使用前缀参数，它会删除所有反斜杠。
+
+该函数不会修改区域开头的空白行。  如果该区域在行的开头结束，则它始终删除上一行末尾的反斜杠（如果有）。
+
+要自定义此命令的精确工作方式，@ref{Custom Macros}。
+@end table
+
+@noindent
+如果您经常编辑多行宏，推荐的换行功能 @code{c-context-line-break} (@pxref{Filling and Breaking}) 特别有用。  当在宏内部使用时，它会自动在行尾插入并调整强制反斜杠以将宏保持在一起，并将点保留在代码的右侧缩进列中。  因此，您几乎可以像在其他地方一样在宏中编写代码，而不必担心尾部的反斜杠。
+
+@table @asis
+@item @kbd{C-c C-e} (@code{c-macro-expand})
+@kindex C-c C-e
+@findex c-macro-expand
+@findex macro-expand @r{(c-)}
+此命令使用适当的外部预处理器程序扩展该区域中的 C、C++、Objective C 或 Pike 宏。  通常它会在临时缓冲区中显示输出，但如果给它一个前缀 arg（带有 @kbd{C-u C-c C-e}），它将用扩展覆盖原始区域。
+
+该命令在任何其他模式下都不起作用，并且按键序列不受这些其他模式的约束。
+
+@code{c-macro-expand} 实际上并不是 @ccmode{} 的一部分，尽管它绑定到 @ccmode{} 键序列。  如果您需要帮助设置它或遇到其他问题，您可以阅读其源代码或在标准 (X)Emacs 论坛中寻求帮助。
+@end table
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Font Locking
+@chapter 字体锁定
+@cindex font locking
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@cindex Font Lock mode
+
+@ccmode{} provides font locking for its supported languages by
+提供与字体锁定模式一起使用的模式。  这意味着您可以在注释、字符串、关键字和类型等各个语法部分上获得不同的面孔，这对于一眼区分它们和发现语法错误非常有帮助。  @xref{Font Lock,,, emacs, GNU Emacs Manual}，用于启用字体锁定的方法
+@ccmode{} buffers.
+
+@strong{Please note:} AWK 模式下的字体锁定当前未与 @ccmode{} 的其余部分集成。  只有本章的最后一部分@ref{AWK Mode Font Locking}适用于 AWK@.，其他部分适用于其他语言。
+
+@menu
+* Font Locking Preliminaries::
+* Faces::
+* Doc Comments::
+* Wrong Comment Style::
+* Misc Font Locking::
+* AWK Mode Font Locking::
+@end menu
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Font Locking Preliminaries
+@section 字体锁定预备知识
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+大多数 @ccmode{} 语言的字体锁定是由 @ccmode{} 5.30 版本之前的 Font Lock 包直接提供的。在向 @ccmode{} 的过渡中，模式已被完全重新设计，并统一应用于除 AWK 模式之外的所有语言，就像缩进规则一样（当然，每种语言仍然有其自身的一些特性）。  由于这些语言以前具有完全独立的字体锁定模式，这意味着现在大多数语言都有点不同。
+
+@ccmode{} 中字体锁定的主要目标是准确性，为识别各种结构提供可靠的帮助。  有些（如字符串和注释）很容易识别，而另一些（如声明和类型）可能非常棘手。  @ccmode{} 可以竭尽全力正确识别声明和强制转换，尤其是当标准模式无法识别类型时。  这是一个要求相当高的分析，在较旧的硬件上可能会很慢，因此可以通过使用变量 @code{font-lock-maximum-decoration} (@pxref{Font Lock,,, emacs, GNU Emacs Manual}) 选择较低的装饰级别来禁用它。
+
+@vindex font-lock-maximum-decoration
+
+装饰级别的使用如下：
+
+@enumerate
+@comment 1
+@item 
+最小字体锁定：仅 Fontify 注释、字符串和预处理器指令（在使用 cpp 的语言中）。
+
+@comment 2
+@item 
+快速字体锁定：除了1级之外，字体化关键字、简单类型和易于识别的声明。  变量@code{*-font-lock-extra-types}（其中@samp{*}是语言的名称）用于识别类型（见下文）。  像 Javadoc 这样的文档注释根据 @code{c-doc-comment-style} (@pxref{Doc Comments}) 进行字体化。
+
+如果您认为字体锁定太慢，请使用此选项。  它是与旧字体锁定模式中的级别 3 最接近的对应级别。
+
+@comment 3
+@item 
+准确的字体锁定：与级别 2 类似，但使用不同的方法，可以更准确地识别类型和声明。  仍然使用 @code{*-font-lock-extra-types} 变量，但在大多数情况下用户定义的类型无论如何都能被正确识别。  因此，这些变量应该具有相当的限制性，并且不包含不确定的模式。
+
+@cindex Lazy Lock mode
+@cindex Just-in-time Lock mode
+
+此级别专为相当现代的硬件和字体锁定支持模式（例如延迟锁定或即时锁定模式）而设计，这些模式仅对实际显示的部分进行字体显示。  即使在现代硬件上，立即对整个缓冲区进行字体化也很容易变得非常慢。 @xref{Font Lock,,,@emacsman{}, @emacsmantitle{}}。
+@end enumerate
+
+@cindex user defined types
+@cindex types, user defined
+
+由于用户定义的类型很难识别，您可以提供额外的正则表达式来匹配您使用的类型：
+
+@defopt c-font-lock-extra-types
+@defoptx c++-font-lock-extra-types
+@defoptx objc-font-lock-extra-types
+@defoptx java-font-lock-extra-types
+@defoptx idl-font-lock-extra-types
+@defoptx pike-font-lock-extra-types
+对于每种语言都有一个变量 @code{*-font-lock-extra-types}，其中 @samp{*} 代表相关语言。  它包含一个正则表达式列表，该列表与应被识别为类型的标识符相匹配，例如，@samp{\\sw+_t}识别所有以@samp{_t}结尾的标识符，就像C代码中的惯例一样。  每个正则表达式不应匹配多个标识符。
+
+默认值包含标准运行时库中许多难以识别的类型的正则表达式，以及标准类型命名约定的模式，例如 C 和 C++ 中的 @samp{_t} 后缀。 Java、Objective-C 和 Pike 约定类名以大写字母开头，因此这些语言中有相应的模式。
+
+尽管这些变量的名称如此，但它们不仅用于字体化，而且还用于 @ccmode{} 需要识别类型的其他地方。
+@end defopt
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Faces
+@section 面孔
+@cindex faces
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@ccmode{} attempts to use the standard faces for programming languages
+尽可能符合其预期目的。  目前不提供额外的面，除了 emacsen 的替代面 @code{c-invalid-face} 不提供 @code{font-lock-warning-face} 之外。
+
+@itemize @bullet
+@item 
+@vindex font-lock-comment-face
+普通注释的字体为@code{font-lock-comment-face}。
+
+@item 
+@vindex font-lock-doc-face
+@vindex font-lock-doc-string-face
+@vindex font-lock-comment-face
+被识别为文档 (@pxref{Doc Comments}) 的注释将获得 @code{font-lock-doc-face} (Emacs) 或 @code{font-lock-doc-string-face} (XEmacs)（如果这些面存在）。  如果没有，则使用 @code{font-lock-comment-face}。
+
+@item 
+@vindex font-lock-string-face
+字符串和字符文字在 @code{font-lock-string-face} 中进行字体化。
+
+@item 
+@vindex font-lock-keyword-face
+关键字的字体为@code{font-lock-keyword-face}。
+
+@item 
+@vindex font-lock-function-name-face
+@code{font-lock-function-name-face} 用于声明和定义中的函数名称以及这些上下文中的类。  它还用于带有参数的预处理器定义。
+
+@item 
+@vindex font-lock-variable-name-face
+声明和定义中的变量以及此类变量上下文中的其他标识符，得到@code{font-lock-variable-name-face}。  它还用于不带参数的预处理器定义。
+
+@item 
+@vindex font-lock-constant-face
+@vindex font-lock-reference-face
+内置常量如果存在则以 @code{font-lock-constant-face} 字体表示，否则以 @code{font-lock-reference-face} 字体表示。  与前面的两个面孔相反，它用在表达式中的名称上，而不是用在声明中，即使其中某个地方碰巧有 @samp{const} 。
+
+@item 
+@vindex font-lock-type-face
+@code{font-lock-type-face} 放置在类型上下文中的类型（预定义的和用户定义的）和类上。
+
+@item 
+@vindex font-lock-constant-face
+@vindex font-lock-reference-face
+标签标识符如果存在则获取@code{font-lock-constant-face}，否则获取@code{font-lock-reference-face}。
+
+@item 
+范围构造的名称限定符和标识符的字体类似于标签。
+
+@item 
+文档注释中的特殊标记也像标签一样被字体化。
+
+@item 
+@vindex font-lock-preprocessor-face
+@vindex font-lock-builtin-face
+@vindex font-lock-reference-face
+预处理器指令如果存在（即 XEmacs），则获取 @code{font-lock-preprocessor-face}。  在 Emacs 中，他们得到 @code{font-lock-builtin-face} 或 @code{font-lock-reference-face}，因为缺乏更接近的等价物。
+
+@item 
+@vindex font-lock-warning-face
+@vindex c-invalid-face
+@vindex invalid-face @r{(c-)}
+某些类型的语法错误在 Emacs 中用 @code{font-lock-warning-face} 来表示。  在较旧的 XEmacs 版本中，没有相应的标准面，因此使用了特殊的 @code{c-invalid-face}，默认情况下定义为清晰突出。
+
+请注意，它不用于 @samp{#error} 或 @samp{#warning} 指令，因为它们本身并不是语法错误。
+@end itemize
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Doc Comments
+@section 文档注释
+@cindex documentation comments
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+有多种工具可以在源代码中提供文档作为特殊结构化的注释，例如 Java 中的标准 Javadoc 工具。
+@ccmode{} provides an extensible mechanism to fontify such comments and
+其中的特殊标记。
+
+@defopt c-doc-comment-style
+@vindex doc-comment-style @r{(c-)}
+这是一个样式变量，指定要识别的文档注释样式，例如，@code{javadoc} 表示 Javadoc 注释。
+
+该值也可能是样式列表，在这种情况下，所有样式都会被同时识别（大概具有不冲突的标记提示）。
+
+该值也可以是一个关联列表，用于为不同的语言指定不同的注释样式。  然后在 alist 中查找主模式的符号，如果找到，该元素的值将按上述方式解释。  如果未找到，则查找符号 @code{other} 并使用其值。
+
+@code{c-doc-comment-style} 的默认值为 @w{@code{((java-mode . javadoc) (pike-mode . autodoc) (c-mode . gtkdoc))}}。
+
+请注意，@ccmode{} 使用此变量来设置处理字体化等的其他变量。这是在模式初始化或切换到设置此变量的样式时完成的。  因此，如果您以其他方式更改它，例如，在 CC 模式缓冲区中交互地更改它，您将需要执行 @kbd{M-x java-mode} （或您当前使用的任何模式）来重新初始化。
+
+@findex c-setup-doc-comment-style
+@findex setup-doc-comment-style @r{(c-)}
+另请注意，当 @ccmode{} 启动时，其他变量会在模式挂钩运行之前被修改。  如果您在模式挂钩中更改此变量，则必须随后调用 @code{c-setup-doc-comment-style} 来重做该工作。
+@end defopt
+
+@ccmode{} currently provides handing of the following doc comment
+款式：
+
+@table @code
+@item javadoc
+@cindex Javadoc markup
+Javadoc注释，Java中的标准工具。
+
+@item autodoc
+@cindex Pike autodoc markup
+对于 Pike autodoc 标记，Pike 中的标准。
+
+@item gtkdoc
+@cindex GtkDoc markup
+对于 GtkDoc 标记，在 Gnome 社区中广泛使用。
+
+@item doxygen
+@cindex Doxygen markup
+对于 Doxygen 标记，可与 C、C++、Java 和各种其他语言一起使用。
+@end table
+
+上述内容绝不是完整的。  如果您希望看到对其他文档注释样式的支持，请告诉我们 (@pxref{Mailing Lists and Bug Reports})。
+
+您还可以编写自己的文档注释字体化支持以与 @code{c-doc-comment-style} 一起使用：提供变量或函数 @code{*-font-lock-keywords}，其中 @samp{*} 是您要在 @code{c-doc-comment-style} 中使用的名称。  如果它是一个变量，它会被添加到 @code{font-lock-keywords} 之前。  如果它是一个函数，则会在模式初始化时调用它，并将结果添加到前面。  有关示例，请参阅@file{cc-fonts.el}中的@code{javadoc-font-lock-keywords}。  在有限的范围内，甚至可以用其他面孔来字体化文档注释中的结构。  有关示例，请参阅 @file{cc-fonts-el} 末尾的 pike autodoc 注释样式。
+
+如果您添加对其他文档评论样式的支持，请考虑贡献它：发送注释至@email{bug-cc-mode@@gnu.org}。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Wrong Comment Style
+@comment  node-name,  next,  previous,  up
+@section 标记“错误”风格的评论
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@ccmode{}支持的大多数语言都有两种注释风格，即块注释和行注释。  您的项目可能对其中之一有如此强烈的偏好，以至于您希望清楚地标记“错误”风格的注释。
+
+您可以通过设置默认注释样式（如有必要）（@pxref{Minor Modes}）并将可自定义选项@code{c-mark-wrong-style-of-comment}设置为非@code{nil}来让@ccmode{}执行此操作。
+
+@defvar c-mark-wrong-style-of-comment
+@vindex mark-wrong-style-of-comment (c-)
+当此可自定义选项为非@code{nil}时，非默认样式的注释分隔符将使用@code{font-lock-warning-face}字体化。
+@end defvar
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Misc Font Locking
+@comment  node-name,  next,  previous,  up
+@section 各种字体锁定
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+一些编译器，特别是 GCC，允许字符 @samp{$} 成为 C、C++ 和 Objective C 语言中标识符的组成部分。CC 模式默认接受这些 @samp{$} 字符，并像其他任何字符一样对它们出现的标识符进行字体化。
+
+但是，您正在使用的编译器或您的项目编码标准可能不允许此类使用。  在这种情况下，您可以将 @code{c-warn-ids-with-dollar} 设置为非 @code{nil}。  这会导致这些无效标识符的字体被区别对待。
+
+@defvar c-warn-ids-with-dollar
+@vindex warn-ids-with-dollar (c-)
+当此自定义选项为非 @code{nil} 时，包含 @samp{$} 字符的标识符将使用 @code{font-lock-warning-face} 进行字体化。
+@end defvar
+
+在某些语言中，特别是在 C++ 中，存在语法上不明确的构造——它们可以是声明或表达式，而 @ccmode{} 无法确定是哪一个。  通常这样的构造是由两个标识符包围的运算符 @samp{*} 或 @samp{&} 之一。
+
+经验表明，当这样的构造是一个声明时，通常会使用恰好触及其中一个标识符的运算符来编写它，例如：
+
+@example
+foo *bar
+@end example
+或者
+@example
+foo& bar
+@end example
+
+。  此类代码是否字体化取决于@code{c-asymmetry-fontification-flag}的设置。
+
+@defvar c-asymmetry-fontification-flag
+@vindex asymmetry-fontification-flag @r{(c-)}
+当 @code{c-asymmetry-fontification-flag} 为非 @code{nil} 时（默认情况下），像上面这样的代码（在运算符之前或之后有空格，但不能两者都存在）被字体化为声明。  当变量为@code{nil}时，这样的构造将获得默认面。
+@end defvar
+
+当构造是一个表达式时，运算符前后通常都会有空格，或者周围根本没有空格，例如：
+
+@example
+foo * bar
+@end example
+或者
+@example
+foo&bar
+@end example
+.
+
+此类代码不会被定义为声明。  （通常，标识符不会获得非默认面孔。）
+
+为了清楚起见，我们强调本节中的“不对称”规则仅适用于 CC 模式无法以任何其他方式消除构造的歧义时。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    AWK Mode Font Locking
+@comment  node-name,  next,  previous,  up
+@section AWK 模式字体锁定
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+AWK 模式中字体锁定的总体外观与任何其他编程模式非常相似。  @xref{Faces for Font Lock,,,elisp, GNU Emacs Lisp Reference Manual}。
+
+然而，以下面在 AWK 模式中以非标准方式使用：
+
+@table @asis
+@item @code{font-lock-variable-name-face}
+该面用于变量声明。  由于 AWK 中未声明变量，因此该面用于代替 AWK 系统变量（例如 @code{NF}）和“特殊文件名”（例如 @code{"/dev/stderr"}）。
+
+@item @code{font-lock-builtin-face} (Emacs)/@code{font-lock-preprocessor-face} ​​(XEmacs)
+该面通常用于 @ccmode{} 中的预处理器指令。 AWK 中没有这样的东西，因此这个面被用于标准函数（例如 @code{match}）。
+
+@item @code{font-lock-string-face}
+除了用于字符串，包括可本地化字符串（由 @samp{"} 和 @samp{_"} 分隔）之外，该面还用于 AWK 正则表达式（由 @samp{/} 分隔）。
+
+@item @code{font-lock-warning-face} (Emacs)/@code{c-invalid-face} ​​(XEmacs)
+该面突出显示了以下语法上无效的 AWK 结构：
+
+@itemize @bullet
+@item 
+未终止的字符串或正则表达式。  这里，开始分隔符（@samp{"}或@samp{/}或@samp{_"}）显示在@code{font-lock-warning-face}中。  当在缓冲区中输入新的字符串/正则表达式时，当警告面作为终止构造的持续提醒时，这一点最为明显。
+
+AWK 模式对未终止字符串/正则表达式的字体设置与其他模式不同：只有到行尾的文本才被字体化为字符串（正确处理转义换行符），而不是到下一个字符串引用的文本。
+
+@item 
+调用用户函数时，函数名称和左括号之间有空格。  函数名称的最后一个字符和左括号会突出显示。  此字体锁定规则将虚假地突出显示有效的串联表达式，其中标识符位于括号表达式之前。  很遗憾。
+
+@item 
+@samp{\} 后面的空白看起来像是转义的换行符。  @samp{\} 突出显示。
+@end itemize
+@end table
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Config Basics
+@comment  node-name,  next,  previous,  up
+@chapter 配置基础知识
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@cindex Emacs Initialization File
+@cindex Configuration
+您可以通过设置 Lisp 变量并调用（或许还可以编写）Lisp 函数@footnote{DON'T PANIC!!!  This isn't difficult.} 来配置@ccmode{}，这通常是通过向 Emacs 初始化文件添加代码来完成的。  该文件可能是 @file{site-start.el} 或 @file{.emacs} 或 @file{init.el} 或 @file{default.el} 或其他文件。  @xref{Init File,,,@emacsman{}, @emacsmantitle{}}。  为了简洁起见，我们在本手册的其余部分中将此文件称为“your @file{.emacs}”。
+
+其中几个变量（当前为 16 个）统称为 @dfn{style variables}。  @ccmode{} 提供了一种特殊的机制，称为 @dfn{styles} ，可以更轻松地将这些变量设置为一组，将设置从一种样式“继承”到另一种样式，等等。  样式变量仍然是普通的 Lisp 变量，其值可以独立于样式系统读取和更改。  @xref{Style Variables}。
+
+您可以通过多种方式编写代码，具体取决于您想要的精确效果——本页下面将进一步介绍它们。如果您是@ccmode{}的新手，我们建议您从最简单的方法开始，“顶级命令或自定义界面”。
+
+如果您通过以下几种方式进行的设置存在冲突，则优先采用此列表中最新出现的方式：
+@c Version of list for Texinfo <= 4.x
+@ifclear txicommandconditionals
+@itemize @w{}
+@item 
+@table @asis
+@item 风格
+@itemx 文件样式@footnote{In earlier versions of @ccmode{}, a File Style setting took precedence over any other setting apart from a File Local Variable setting.}
+@itemx 顶级命令或“自定义界面”
+@itemx 钩
+@itemx 
+@end table
+@end itemize
+@end ifclear
+@c Version of list for Texinfo >= 5.x
+@ifset txicommandconditionals
+@itemize @w{}
+@item 风格
+@item 文件样式@footnote{In earlier versions of @ccmode{}, a File Style setting took precedence over any other setting apart from a File Local Variable setting.}
+@item 顶级命令或“自定义界面”
+@item 钩
+@item 
+@end itemize
+@end ifset
+
+
+以下是编写配置设置的不同方法的摘要：
+
+@table @asis
+@item 顶级命令或“自定义界面”
+最简单的是，您可以在 @file{.emacs} 文件的顶层编写 @code{setq} 和类似的命令。  当您加载 @ccmode{} 缓冲区时，它会根据这些全局值初始化其配置（至少，对于您已为其指定值的那些设置），因此运行这些 @code{setq} 命令是有意义的，@emph{before} @ccmode{} 首先初始化 — 特别是在调用 @code{desktop-read} (@pxref{Saving Emacs Sessions,,, emacs, GNU Emacs Manual}) 之前。  例如，您可以这样设置 c-basic-offset：
+
+@example
+(setq c-basic-offset 4)
+@end example
+
+
+@c The following note really belongs in the Emacs manual.
+
+
+
+
+
+
+@item 挂钩
+
+
+@example
+@group
+(defun my-c-mode-hook ()
+  (setq c-basic-offset 3))
+(add-hook 'c-mode-hook 'my-c-mode-hook)
+
+(defun my-java-mode-hook ()
+  (setq c-basic-offset 6))
+(add-hook 'java-mode-hook 'my-java-mode-hook)
+@end group
+@end example
+
+
+
+@item 风格
+
+@ccmode{} buffer, either the one you have selected or a default.
+@ccmode{} is delivered with several existing styles.  Additionally,
+
+
+@example
+(setq c-default-style '((java-mode . "java")
+                        (awk-mode . "awk")
+                        (other . "free-group-style")))
+@end example
+
+
+
+@item 
+
+
+@item 文件样式
+
+
+@item 
+
+
+@example
+@group
+(defun my-c-mode-hook ()
+  (c-set-style
+   (if (and (buffer-file-name)
+            (string-match "/usr/src/linux" (buffer-file-name)))
+       "linux"
+     "free-group-style")))
+(add-hook 'c-mode-hook 'my-c-mode-hook)
+@end group
+@end example
+
+
+
+@example
+@group
+(defun my-turn-on-auto-newline ()
+  (c-toggle-auto-newline 1))
+(add-hook 'c-mode-common-hook 'my-turn-on-auto-newline)
+@end group
+@end example
+@end table
+
+@menu
+* CC Hooks::
+* Style Variables::
+* Styles::
+@end menu
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    CC Hooks
+@section 挂钩
+@cindex mode hooks
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@c The node name is "CC Hooks" rather than "Hooks" because of a bug in
+@c some older versions of Info, e.g., the info.el in GNU Emacs 21.3.
+@c If you go to "Config Basics" and hit <CR> on the xref to "CC
+@c Hooks" the function Info-follow-reference searches for "*Note: CC
+@c Hooks" from the beginning of the page.  If this node were instead
+@c named "Hooks", that search would spuriously find "*Note:
+@c Hooks(elisp)" and go to the wrong node.
+
+@ccmode{} provides several hooks that you can use to customize the
+适合您的编码风格的模式。  主钩子是@code{c-mode-common-hook}；通常，您会将大部分自定义设置放在这里。  此外，每种语言模式都有自己的钩子，允许您针对不同的@ccmode{}语言单独微调设置，并且有一个包初始化钩子。  最后，还有@code{c-special-indent-hook}，它使您能够解决异常压痕问题。  它在@ref{Other Indentation}中有描述，而不是这里。  所有这些钩子都遵守标准 Emacs 约定。
+
+当您打开缓冲区时，@ccmode{} 首先使用当前活动样式 (@pxref{Styles}) 对其进行初始化。  然后它调用 @code{c-mode-common-hook}，最后调用特定于语言的钩子。  因此，在这些钩子中完成的任何样式设置都将覆盖@code{c-default-style}设置的样式。
+
+@defvar c-initialization-hook
+@vindex initialization-hook @r{(c-)}
+当 @ccmode{} 初始化时，每个 Emacs 会话仅运行一次 Hook。这是在任何 @ccmode{} 键映射中更改键绑定（或添加新键绑定）的好地方。  @xref{Sample Init File}。
+@end defvar
+
+@defvar c-mode-common-hook
+@vindex mode-common-hook @r{(c-)}
+所有语言的通用钩子。  它在特定于语言的挂钩之前立即运行。
+@end defvar
+
+@defvar c-mode-hook
+@defvarx c++-mode-hook
+@defvarx objc-mode-hook
+@defvarx java-mode-hook
+@defvarx idl-mode-hook
+@defvarx pike-mode-hook
+@defvarx awk-mode-hook
+语言特定模式挂钩。  当您进入该语言模式时，相应的程序将作为最后一件事运行。
+@end defvar
+
+虽然这些钩子是@ccmode{}中定义的变量，但您可以在加载@ccmode{}的代码之前给它们赋值——事实上，这是使用@code{c-initialization-hook}的唯一方法。  当 @ccmode{} 加载时，它们的值不会被覆盖。
+
+以下是一个简化示例，说明您可以在 @file{.emacs} 文件中添加内容，以便在编辑任何 @ccmode{} 语言时执行操作。  有关通过挂钩自定义 Emacs 的更多信息，请参阅 Emacs 手册。 @xref{Sample Init File}，获取更完整的示例 @file{.emacs} 文件。
+
+@example
+(defun my-c-mode-common-hook ()
+  ;; my customizations for all of c-mode and related modes
+  (no-case-fold-search)
+  )
+(add-hook 'c-mode-common-hook 'my-c-mode-common-hook)
+@end example
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Style Variables
+@section 样式变量
+@cindex styles
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@cindex style variables
+@ccmode{}的样式系统控制的变量称为@dfn{style variables}。  请注意，样式变量是普通的 Lisp 变量，由样式系统初始化；您可以随时更改它们的值（例如，在挂钩函数中）。  样式系统在某种程度上还可以设置其他变量。  @xref{Styles}。
+
+@dfn{Style variables} 有几种特殊处理方式：
+
+@itemize @bullet
+@item 
+默认情况下，样式变量是缓冲区局部变量。  但是，可以通过在初始化 @ccmode{} 之前将 @code{c-style-variables-are-local-p} 设置为 @code{nil} 来将它们设为全局。
+
+@item 
+@vindex c-old-style-variable-behavior
+@vindex old-style-variable-behavior @r{(c-)}
+任何样式变量的默认全局绑定（有两个例外 - 见下文）是特殊符号 @code{set-from-style}。  当样式系统初始化样式变量的缓冲区本地副本时
+@ccmode{} buffer, if its global binding is still that symbol then it
+将从当前样式设置。  否则它将保留其全局默认值@footnote{This is a big change from versions of
+@ccmode{} earlier than 5.26, where such settings would get overridden
+除非采取特殊的预防措施，否则由样式系统决定。  由于它违反直觉且令人困惑，特别是对于新手用户来说，这一点已被更改。  如果您的配置依赖于旧的覆盖行为，您可以将变量 @code{c-old-style-variable-behavior} 设置为非 @code{nil}.}。  例如，当您在 @file{.emacs} (@pxref{Config Basics}) 的顶层使用 @code{setq} 设置变量时，就会发生这种“否则”情况。
+
+@item 
+样式变量 @code{c-offsets-alist} (@pxref{c-offsets-alist}) 是一个关联列表，其中每个语法符号都有一个元素。  它的处理方式与其他样式变量略有不同。  它的默认全局绑定是空列表@code{nil}，而不是@code{set-from-style}。  在样式系统初始化之前，您可以通过调用 @code{c-set-offset} (@pxref{c-offsets-alist}) 将各个元素添加到 @code{c-offsets-alist}，就像使用 @code{setq} 设置其他样式变量一样。  当样式系统稍后初始化 @code{c-offsets-alist} 的缓冲区本地副本时，这些元素将占上风。
+
+@item 
+样式变量 @code{c-special-indent-hook} 也以特殊方式处理。  样式只能向此挂钩添加功能，而不能删除它们，因此您在其上放置的任何全局设置始终会保留@footnote{This did not change in version 5.26.}。  您在样式定义中赋予此变量的值可以是函数或函数列表。
+
+@item 
+当样式系统首次初始化时，样式变量的全局绑定会在特殊的 @code{user} 样式中被捕获。 @xref{Built-in Styles}，了解详情。
+@end itemize
+
+样式变量为：@* @code{c-indent-comment-alist}、@code{c-indent-comments-syntactically-p} (@pxref{Indentation Commands});@* @code{c-doc-comment-style} (@pxref{Doc Comments});@* @code{c-block-comment-prefix}、@code{c-comment-prefix-regexp} (@pxref{Custom Filling and Breaking});@* @code{c-hanging-braces-alist} (@pxref{Hanging Braces});@*@code{c-hanging-colons-alist} (@pxref{Hanging Colons});@*@code{c-hanging-semi&comma-criteria} (@pxref{Hanging Semicolons and Commas});@*@code{c-cleanup-list} (@pxref{Clean-ups});@*@code{c-basic-offset} (@pxref{Customizing Indentation});@*@code{c-offsets-alist} (@pxref{c-offsets-alist});@*@code{c-comment-only-line-offset} (@pxref{Comment Line-Up});@*@code{c-special-indent-hook}, @code{c-label-minimum-indentation} (@pxref{Other Indentation});@* @code{c-backslash-column}，@code{c-backslash-max-column}（@pxref{Custom Macros}）。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Styles
+@section 风格
+@cindex styles
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@dfn{style} 我们指的是代码的布局——比如一段代码需要缩进多少列，左大括号是否缩进到它所包含的代码的水平，或者引入它的结构的水平，或者“挂起”在行尾。
+
+大多数人只需要编辑一些定义明确且一致的样式格式的代码。  例如，他们的组织可能会强加一种“受祝福的”风格，所有程序员都必须遵守。  同样，从事 GNU 软件工作的人也必须使用 GNU 编码风格。有些商店更宽松，允许多种编码风格，并且随着程序员的来来去去，可能会使用多种风格。  因此，@ccmode{} 使您可以方便地设置称为 @dfn{styles} 的自定义逻辑分组，为任何特定样式关联单个名称，并非常轻松地开始使用这些样式编辑新的或现有的代码。
+
+作为自己编写样式定义的替代方法，您可以
+@ccmode{} @dfn{guess} (at least part of) your style by looking at an
+已经格式化了您的代码片段，@ref{Guessing the Style}。
+
+@menu
+* Built-in Styles::
+* Choosing a Style::
+* Adding Styles::
+* Guessing the Style::
+* File Styles::
+@end menu
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Built-in Styles
+@subsection 内置样式
+@cindex styles, built-in
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+如果幸运的话，@ccmode{} 的内置样式之一可能正是您正在寻找的。  这些都是：
+
+@table @code
+@item gnu
+@cindex GNU style
+受自由软件基金会支持的 GNU 程序中 C 代码的编码风格。
+
+@item k&r
+@cindex K&R style
+C 代码的经典 Kernighan 和 Ritchie 风格。  如果您正在寻找他们的书《C 编程语言》第二版中使用的样式，请查看 @code{stroustrup} 样式。
+
+@item bsd
+@cindex BSD style
+也被称为“奥尔曼风格”，以埃里克·奥尔曼 (Eric Allman) 命名。
+
+@item whitesmith
+@cindex Whitesmith style
+因早期商业 C 编译器 Whitesmiths C 附带的示例而流行。
+
+@item stroustrup
+@cindex Stroustrup style
+C++ 代码的经典 Stroustrup 风格。
+
+@item ellemtel
+@cindex Ellemtel style
+流行的 C++ 编码标准由“C++ 编程、规则和建议”定义，Erik Nyquist 和 Mats Henricson，Ellemtel@footnote{This document is available at @uref{https://www.doc.ic.ac.uk/lab/cplus/c++.rules/} among other places.}。
+@c N.B.  This URL was still valid at 2005/8/28  (ACM).
+
+@item linux
+@cindex Linux style
+Linux（内核）的 C 编码标准。
+
+@item python
+@cindex Python style
+Python 扩展模块的 C 编码标准@footnote{Python is a high level scripting language with a C/C++ foreign function interface. For more information, see @uref{https://www.python.org/}.}。
+
+@item java
+@cindex Java style
+用于编辑 Java 代码的样式。  请注意，当您输入 @code{java-mode} 时，@code{c-default-style} 的默认值会安装此样式。
+
+@item awk
+@cindex AWK style
+编辑 AWK 代码的样式。  请注意，当您输入 @code{awk-mode} 时，@code{c-default-style} 的默认值会安装此样式。
+
+@item user
+@cindex User style
+这是您创造的特殊风格。  它包含所有样式变量的工厂默认值，这些变量可通过使用自定义界面进行的自定义修改或通过在 @file{.emacs} 文件 (@pxref{Config Basics}) 的顶层写入 @code{setq}s 和 @code{c-set-offset}s 进行修改。  样式系统在初始化过程中创建此样式，之后不会对其进行修改。
+@end table
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Choosing a Style
+@subsection 选择风格
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+当你创建一个新的缓冲区时，它的样式将从@code{c-default-style}开始设置。  出厂默认样式为 @code{gnu}，但在 Java 和 AWK 模式下为 @code{java} 和 @code{awk}。
+
+请记住，如果您在样式系统初始化 (@pxref{Config Basics}) 之前使用自定义界面或在 @file{.emacs} 文件的顶层设置样式变量，则此设置将覆盖样式系统赋予该变量的设置。
+
+要以交互方式设置缓冲区的样式，请使用命令 @kbd{C-c .} (@pxref{Other Commands})。  要从文件的局部变量列表中设置它，@ref{File Styles}。
+
+@defopt c-default-style
+@vindex default-style @r{(c-)}
+此变量指定在新缓冲区中默认安装哪种样式。  它采用样式名称字符串或主要模式符号与样式名称的关联列表：
+
+@enumerate
+@item
+当@code{c-default-style}是字符串时，它必须是现有的样式名称。  此样式将用于所有模式。
+
+@item
+当@code{c-default-style}是关联列表时，查找模式语言以查找样式名称字符串。
+
+@item
+如果@code{c-default-style}是关联列表，其中未找到模式语言模式，则查找特殊符号@samp{other}。  如果找到，则使用关联的样式。
+
+@item
+如果未找到 @samp{other} 则使用 @samp{gnu} 样式。
+@end enumerate
+
+在所有情况下，都会安装 @code{c-default-style} 中描述的样式，@emph{before} 会运行语言挂钩，因此您始终可以通过在语言模式挂钩或 @code{c-mode-common-hook} 中显式调用 @code{c-set-style} 来覆盖此设置。
+
+@code{c-default-style}的标准值为@w{@code{((java-mode . "java") (awk-mode . "awk") (other . "gnu"))}}。
+@end defopt
+
+@defvar c-indentation-style
+@vindex indentation-style @r{(c-)}
+该变量始终包含缓冲区的当前样式名称（字符串形式）。
+@end defvar
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Adding Styles
+@subsection 添加和修改样式
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+如果没有任何内置样式合适，您可能需要创建一个新的 @dfn{style definition}，可能基于现有样式。  为此，请将新样式的设置放入具有以下格式的列表中；然后该列表可以作为参数传递给函数@code{c-add-style}。  您可以在@ref{Sample Init File}中查看样式定义的示例。
+
+@cindex style definition
+@c @defvr {List} style definition
+@table @asis
+@item 样式定义列表的结构
+([@var{base-style}] [(@var{variable} . @var{value}) @dots{}])
+
+可选的@var{base-style}（如果存在）必须是一个字符串，它是此样式继承的@dfn{base style}的名称。  样式定义中最多允许有 1 个@var{base-style}。  如果未指定 @var{base-style}，则样式将从工厂默认值表@footnote{This table is stored internally in the variable c-fallback-style.} 继承。  所有样式最终都继承自这个内部表。  样式循环会产生错误。  预先存在的样式列表可以在@ref{Built-in Styles}中看到。
+
+点对 (@var{variable} . @var{value}) 每个由一个变量和稍后激活样式时要设置的值组成。@footnote{Note that if the variable has been given a value by the Customization interface or a @code{setq} at the top level of your @file{.emacs}, this value will override the one the style system tries to give it. @xref{Config Basics}.} 该变量可以是
+@ccmode{} style variable or an arbitrary Emacs variable.  In the
+后一种情况，它是由 @ccmode{} 样式系统设置为缓冲区本地的 @emph{not} 。
+@c @end defvr
+
+点对列表中的两个变量被特殊对待：
+
+@table @code
+@item c-offsets-alist
+该值又是形式为点对的列表
+
+@example
+(@r{@var{syntactic-symbol}} . @r{@var{offset}})
+@end example
+
+如@ref{c-offsets-alist}中所述。  这些被传递给 @code{c-set-offset} 因此不需要设置样式中的每个语法符号，只需设置那些与继承样式不同的符号即可。
+
+@item c-special-indent-hook
+该值使用 @code{add-hook} 添加到 @code{c-special-indent-hook}，因此保留其上已有的任何函数。  如果该值是一个列表，则列表的每个元素都会添加@code{add-hook}。
+@end table
+@end table
+
+样式保存在 @code{c-style-alist} 变量中，但切勿直接修改此变量。  相反，@ccmode{}为此目的提供了函数@code{c-add-style}。
+
+@defun c-add-style stylename description &optional set-p
+@findex add-style @r{(c-)}
+添加或更新名为 @var{stylename} 的样式，即字符串。 @var{description} 是上述形式的新样式定义。  如果 @var{stylename} 已存在于 @code{c-style-alist} 中，则将其替换为 @var{description}。  （请注意，此替换是完全的。旧样式已 @emph{not} 合并到新样式中。）否则，将添加新样式。
+
+如果可选的⁣​​0⁣非@code{nil}，则新样式也会应用于当前缓冲区。  不推荐使用此功能，并且可能会在未来版本中从 @ccmode{} 中删除。您应该使用 @code{c-set-style} 代替。
+
+示例 @file{.emacs} 文件提供了如何添加和自动设置新样式的具体示例。  @xref{Sample Init File}。
+@end defun
+
+@defvar c-style-alist
+@vindex style-alist @r{(c-)}
+这是保存样式定义的变量。  不应该直接改变；使用 @code{c-add-style} 代替。
+@end defvar
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Guessing the Style
+@subsection 猜测风格
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+您可以通过检查已格式化的代码缓冲区来获取 @ccmode{} 到 @dfn{guess} 您的样式，而不是指定样式。  然后，@ccmode{}确定缓冲区中遇到的每个语法符号（@pxref{Indentation Engine Basics}）的“最频繁”偏移量（@pxref{c-offsets-alist}）以及c-basic-offset（@pxref{Customizing Indentation}）的“最频繁”值，然后将当前样式与这些“猜测”合并以形成新样式。  这种组合风格被称为@dfn{guessed style}。
+
+为此，请在样本缓冲区上调用 @code{c-guess} （或其他 5 个猜测命令之一）。  分析您的代码可能需要一些时间。
+
+然后，您可以使用 @code{c-guess-install} 在任何 @ccmode{} 缓冲区中设置猜测的样式。  您可以使用 @code{c-guess-view} 显示样式，并通过将其复制到 @file{.emacs} 中来保留它以供将来使用，最好是在编辑后使用。
+
+@table @asis
+@item @kbd{M-x c-guess-no-install}
+@itemx @kbd{M-x c-guess-buffer-no-install}
+@itemx @kbd{M-x c-guess-region-no-install}
+@findex c-guess-no-install
+@findex c-guess-buffer-no-install
+@findex c-guess-region-no-install
+@findex guess-no-install @r{(c-)}
+@findex guess-buffer-no-install @r{(c-)}
+@findex guess-region-no-install @r{(c-)}
+这些命令分析当前缓冲区的一部分并从中猜测样式。
+
+检查的缓冲区部分是区域 (@code{c-guess-region-no-install})、整个缓冲区 (@code{c-guess-buffer-no-install}) 或前 @code{c-guess-region-max} 字节 (@code{c-guess-no-install})。
+
+这些命令中的每一个都可以指定一个可选的前缀参数。  这指示 @ccmode{} 在形成猜测风格之前将新的猜测与当前的猜测相结合。
+@end table
+
+@table @asis
+@item @kbd{M-x c-guess}
+@itemx @kbd{M-x c-guess-buffer}
+@itemx @kbd{M-x c-guess-region}
+@findex c-guess
+@findex c-guess-buffer
+@findex c-guess-region
+@findex guess @r{(c-)}
+@findex guess-buffer @r{(c-)}
+@findex guess-region @r{(c-)}
+这些命令分析当前缓冲区的一部分，从中猜测样式，然后将猜测的样式安装到缓冲区上。  根据缓冲区的绝对文件名为猜测的样式指定一个名称，然后您可以使用 @kbd{C-c .} 在任何 @ccmode{} 缓冲区上设置此样式。
+
+检查的缓冲区部分是区域 (@code{c-guess-region})、整个缓冲区 (@code{c-guess-buffer}) 或前 @code{c-guess-region-max} 字节 (@code{c-guess})。
+
+这些命令中的每一个都可以指定一个可选的前缀参数。  这指示 @ccmode{} 在形成猜测风格之前将新的猜测与当前的猜测相结合。
+@end table
+
+@defopt c-guess-region-max
+@vindex guess-region-max @r{(c-)}
+该变量默认为 50000，是 c-guess 和 c-guess-no-install 检查的缓冲区部分的大小（以字节为单位）。  如果设置为@code{nil}，则检查整个缓冲区。
+@end defopt
+
+@defopt c-guess-offset-threshold
+@vindex guess-offset-threshold @r{(c-)}
+该变量默认为 10，是最大偏移量，无论是向外还是向内，分析过程都会考虑到这一点。任何大于此的偏移量都将被忽略。  如果没有限制，请将此变量设置为较大的数字。
+@end defopt
+
+@table @asis
+@item @kbd{M-x c-guess-install}
+@findex c-guess-install
+@findex guess-install @r{(c-)}
+
+将当前缓冲区的样式设置为猜测的样式。  这会提示您输入一个可选的新样式名称以赋予猜测的样式。  默认情况下，该名称基于缓冲区的绝对文件名。  然后您可以像使用其他样式一样使用此样式。
+
+@item @kbd{M-x c-guess-view}
+@findex c-guess-view
+@findex guess-view @r{(c-)}
+在临时缓冲区中显示最近猜测的样式。  该显示采用 @code{c-add-style} 形式 (@pxref{Adding Styles}) 的形式，可以轻松复制到您的 @file{.emacs}。  您可能想先编辑它。
+
+猜测样式的显示包含以下元素：
+
+@table @asis
+@item 占位符名称
+您应该将其替换为您自己的样式名称。
+@item 家长风格
+猜测开始时当前的样式，猜测的样式从中继承（@pxref{Config Basics}）未猜测的设置。
+@item 猜测的偏移量
+这些是猜测过程的核心结果。  每个都标有注释。
+@item 继承的偏移量
+这些是从父样式接管的语法偏移量。  为了避免将来可能发生的冲突，您应该删除这些偏移量或父样式名称。
+@end table
+@end table
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    File Styles
+@subsection 文件样式
+@cindex styles, file local
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@cindex file local variables
+
+Emacs 手册描述了如何通过在文件末尾包含 @dfn{file local variable} 块 (@pxref{File Variables,, Local Variables in Files,@emacsman{},
+@emacsmantitle{}}).
+
+到目前为止，您只看到了用于设置样式的功能界面
+@ccmode{}, and this can't be used here.  @ccmode{} fills the gap by
+提供两个变量以在文件的局部变量列表中使用。不要在其他地方使用它们！  这些允许您在每个文件的基础上自定义样式：
+
+@defvar c-file-style
+@vindex file-style @r{(c-)}
+将此变量设置为“局部变量”列表中的样式名称字符串。从现在开始，当您访问该文件时，@ccmode{} 将自动使用 @code{c-set-style} 将文件的样式设置为该样式。
+@end defvar
+
+@defvar c-file-offsets
+@vindex file-offsets @r{(c-)}
+将此变量（在局部变量列表中）设置为与@code{c-offsets-alist}格式相同的关联列表。  从现在开始，当您访问该文件时，@ccmode{} 将使用 @code{c-set-offset} 自动建立这些偏移量。
+@end defvar
+
+请注意，文件样式设置（即 @code{c-file-style}）在文件偏移设置（即 @code{c-file-offsets}）@footnote{Also, if either of these are set in a file's local variable section, all the style variable values are made local to that buffer, even if @code{c-style-variables-are-local-p} is @code{nil}.  Since this variable is virtually always non-@code{nil} anyhow, you're unlikely to notice this effect.} 之前应用。
+
+如果您通过文件局部变量机制设置任何变量，则该设置优先于所有其他设置，甚至是模式挂钩中的设置 (@pxref{CC Hooks})。  变量的任何单独设置都将覆盖通过 @code{c-file-style} 或 @code{c-file-offsets} 所做的设置。
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Custom Filling and Breaking
+@chapter 自定义填充和断行
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+由于注释和字符串文字中有很多普通文本，
+@ccmode{} provides features to edit these like in text mode.  It does
+这是通过挂钩不同的换行函数并根据需要调整相关变量来实现的。
+
+@vindex c-comment-prefix-regexp
+@vindex comment-prefix-regexp @r{(c-)}
+@cindex comment line prefix
+@vindex comment-start
+@vindex comment-end
+@vindex comment-start-skip
+@vindex paragraph-start
+@vindex paragraph-separate
+@vindex paragraph-ignore-fill-prefix
+@vindex adaptive-fill-mode
+@vindex adaptive-fill-regexp
+@vindex adaptive-fill-first-line-regexp
+为了使 Emacs 识别注释并将其中的文本视为普通段落，@ccmode{} 创建了几个标准变量@footnote{@code{comment-start}, @code{comment-end}, @code{comment-start-skip}, @code{paragraph-start}, @code{paragraph-separate}, @code{paragraph-ignore-fill-prefix}, @code{adaptive-fill-mode}, @code{adaptive-fill-regexp}, and @code{adaptive-fill-first-line-regexp}.} 缓冲区本地变量，并根据语言语法和注释行前缀修改它们。
+
+@defopt c-comment-prefix-regexp
+@vindex comment-prefix-regexp @r{(c-)}
+此样式变量包含用于识别 @dfn{comment line prefix} 的正则表达式，它是注释中每一行的行装饰。  该变量要么是注释行前缀本身，要么（更常见）是针对不同语言具有不同值的关联列表。  在 alist 中查找主要模式的符号以获取该语言的正则表达式，如果未找到，则查找特殊符号 @samp{other} 。
+
+当注释行被 @kbd{M-j} 等分割时，@ccmode{} 会在新行的开头插入相邻行的注释行前缀。  c-comment-prefix-regexp 的默认值是 @samp{//+\\|\\**}，它匹配 C++ 风格的行注释，例如
+
+@example
+// blah blah
+@end example
+
+@noindent
+前面有两个或多个斜杠，以及第二行和后续的 C 风格块注释，例如
+
+@example
+@group
+/*
+ * blah blah
+ */
+@end group
+@end example
+
+@noindent
+每行开头有零个或多个星星。  如果更改此变量，请确保它仍然与行注释的注释起始符（即 @code{//}）@emph{and} 块注释内的行前缀匹配。
+
+@findex c-setup-paragraph-variables
+@findex setup-paragraph-variables @r{(c-)}
+另请注意，由于 @ccmode{} 使用 @code{c-comment-prefix-regexp} 的值在模式初始化时设置其他几个变量，因此如果您只是在 @ccmode{} 缓冲区内更改它，则不会有任何效果。  您还需要调用命令 @code{c-setup-paragraph-variables} 来更新其他变量。  如果您在模式挂钩中修改 @code{c-comment-prefix-regexp} 也是如此，因为 @ccmode{} 在调用挂钩之前已经设置了这些变量。
+@end defopt
+
+在注释中，@ccmode{} 使用@code{c-comment-prefix-regexp} 来调整注释中其他行的行前缀。
+
+@vindex adaptive-fill-mode
+@cindex Adaptive Fill mode
+@ccmode{} uses adaptive fill mode (@pxref{Adaptive Fill,,, emacs, GNU
+Emacs 手册}) 使 Emacs 在填充段落时正确保留行前缀。  这也使得 Emacs 保留文本缩进 @emph{inside} 注释行前缀。  例如，在以下评论中，两个段落都将用保持完整的文本左边距填充：
+
+@example
+@group
+/* Make a balanced b-tree of the nodes in the incoming
+ * stream.  But, to quote the famous words of Donald E.
+ * Knuth,
+ *
+ *     Beware of bugs in the above code; I have only
+ *     proved it correct, not tried it.
+ */
+@end group
+@end example
+
+@findex c-setup-filladapt
+@findex setup-filladapt @r{(c-)}
+@findex filladapt-mode
+@vindex filladapt-mode
+@cindex Filladapt mode
+还可以使用其他自适应填充包，特别是 Kyle E. Jones 的 Filladapt 包@footnote{It's available from @uref{https://elpa.gnu.org/packages/filladapt.html}.  As of version 2.12, it does however lack a feature that makes it work suboptimally when @code{c-comment-prefix-regexp} matches the empty string (which it does by default).  A patch for that is available from @uref{https://www.nongnu.org/cc-mode/,, the CC Mode web site}.}，
+@c 2005/11/22:  The above is still believed to be the case.
+它可以很好地处理项目符号列表之类的事情。  有一个方便的函数 @code{c-setup-filladapt} 可以调整 Filladapt 中的相关变量以在 @ccmode{} 中使用。  从模式挂钩调用它，例如，在 @file{.emacs} 中使用类似的内容：
+
+@example
+(defun my-c-mode-common-hook ()
+  (c-setup-filladapt)
+  (filladapt-mode 1))
+(add-hook 'c-mode-common-hook 'my-c-mode-common-hook)
+@end example
+
+@defopt c-block-comment-prefix
+@vindex block-comment-prefix @r{(c-)}
+@vindex c-comment-continuation-stars
+@vindex comment-continuation-stars @r{(c-)}
+通常，为注释内的新行插入的注释行前缀是从注释中的其他行推导出来的。  然而，有一种情况是没有关于前缀应该是什么样子的提示，即当块注释第一次被破坏时。  这个样式变量@footnote{In versions before 5.26, this variable was called @code{c-comment-continuation-stars}.  As a compatibility measure,
+@ccmode{} still uses the value on that variable if it's set.} is used
+然后作为评论前缀。  默认为@samp{* }@footnote{Actually, this default setting of @code{c-block-comment-prefix} typically gets overridden by the default style @code{gnu}, which sets it to blank.  You can see the line splitting effect described here by setting a different style, e.g., @code{k&r} @xref{Choosing a Style}.}，即进行注释
+
+@example
+/* Got O(n^2) here, which is a Bad Thing. */
+@end example
+
+@noindent
+闯入
+
+@example
+@group
+/* Got O(n^2) here, which
+ * is a Bad Thing. */
+@end group
+@end example
+
+请注意，通过在 @code{c-block-comment-prefix} 中放置前导空格来调整缩进是不起作用的，因为 @ccmode{} 仍然使用正常的缩进引擎来缩进行。  因此，修复缩进的正确方法是自定义 @code{c} 语法符号。  它默认为@code{c-lineup-C-comments}，它处理最常见注释样式的缩进，请参阅@ref{Line-Up Functions}。
+@end defopt
+
+@defopt c-ignore-auto-fill
+@vindex ignore-auto-fill @r{(c-)}
+当启用自动填充模式时，@ccmode{}可以根据换行符发生的上下文选择性地忽略它，例如，永远不会在字符串文字内自动换行。  该变量采用不同上下文的符号列表，其中不应发生自动填充：
+
+@table @code
+@item string
+在字符串或字符文字内。
+@item c
+在 C 风格的块注释中。
+@item c++
+在 C++ 风格的行注释中。
+@item cpp
+在预处理器指令内。
+@item code
+其他任何地方，即在正常代码中。
+@end table
+
+默认情况下，@code{c-ignore-auto-fill}设置为@code{(string cpp code)}，这意味着当激活自动填充模式时，自动填充仅发生在注释中。  从字面上看，通常需要对换行符进行显式控制。  在预处理器指令中，换行符之前必要的 @samp{\} 转义字符不会自动插入，因此自动换行符会产生无效代码。  在普通代码中，换行符通常由代码中的某些逻辑结构决定，而不是最后一个空白字符，因此自动换行符在当前实现中会产生较差的结果。
+@end defopt
+
+@vindex comment-multi-line
+如果在注释内且 @code{comment-multi-line}（@pxref{Auto Fill,,,@emacsman{}, @emacsmantitle{}} 为非 @code{nil}），则保留缩进和行前缀。如果在注释内且 @code{comment-multi-line} 为 @code{nil}，则在下一行开始相同类型的新注释，并根据注释进行缩进。
+
+请注意，启动时@ccmode{} 将@code{comment-multi-line} 设置为@code{t}。  原因是 @kbd{M-j} 可能会为逻辑上应被视为一条注释的文本生成单行块注释序列，而段落处理代码的其余部分（例如 @kbd{M-q} 和 @kbd{M-a}）无法处理这一问题，这将导致不一致的行为。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Custom Auto-newlines
+@chapter 自定义自动换行符
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@ccmode{} determines whether to insert auto-newlines in two basically
+不同的方式，取决于刚刚输入的字符：
+
+@table @asis
+@item 大括号和冒号
+@ccmode{} first determines the syntactic context of the brace or colon
+(@pxref{Syntactic Symbols})，然后在列表中查找相应的元素。  该元素指定在何处放置换行符：这是大括号或冒号之前和之后的任意组合。  如果未找到 alist 元素，则会在大括号之前和之后插入换行符，但不会在冒号周围插入换行符。  @xref{Hanging Braces}和@ref{Hanging Colons}。
+
+@item 分号和逗号
+变量 @code{c-hanging-semi&comma-criteria} 包含一个函数列表，这些函数确定是否在新键入的分号或逗号后插入换行符。  @xref{Hanging Semicolons and Commas}。
+@end table
+
+这些配置变量的名称包含 @samp{hanging} 因为它们让您 @dfn{hang} 相关字符。  当引入 C 结构的字符出现在其他代码之后的行尾时，该字符被称为 @dfn{hang on the right}，并用换行符与其引入的结构分隔开，如以下中的左大括号：
+
+@example
+@group
+while (i < MAX) @{
+    total += entry[i];
+    entry [i++] = 0;
+@}
+@end group
+@end example
+
+@noindent
+一个字符 @dfn{hangs on the left} 当它出现在该结构结束后的行开头时，就像上面的右大括号一样。
+
+下一章“清理”描述了如何配置@ccmode{}以在某些特定情况下删除这些自动添加的换行符。  @xref{Clean-ups}。
+
+@menu
+* Hanging Braces::
+* Hanging Colons::
+* Hanging Semicolons and Commas::
+@end menu
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Hanging Braces
+@section 悬挂支架
+@cindex hanging braces
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+要指定要自动换行的大括号类型，请设置样式变量 @code{c-hanging-braces-alist}。  本节描述其结构和语义。  @ref{Style Variables} 中给出了如何设置它的详细信息，以及它与 CC 模式风格系统的关系。
+
+假设您想要在以下 @samp{@{}: 之后（但不是之前）自动换行
+
+@example
+if (foo < 17) @{
+@end example
+
+@noindent
+首先，您需要找到大括号的 @dfn{syntactic context}——在大括号之前键入 @key{RET} 使其独占一行@footnote{Also insert a @samp{\} at the end of the previous line if you're in AWK Mode.}，然后键入 @kbd{C-c C-s}。  这会告诉你类似的信息：
+
+@example
+((substatement-open 1061))
+@end example
+
+@noindent
+所以这里你需要将条目@code{(substatement-open . (after))}放入@code{c-hanging-braces-alist}。
+
+如果您不希望特定语法符号有任何自动换行符，请将其放入@code{c-hanging-braces-alist}：
+
+@example
+(brace-entry-open)
+@end example
+
+如果某些大括号语法符号不在@code{c-hanging-brace-alist}中，则默认将其条目视为@code{(before after)}——在大括号之前和之后插入换行符。  您可以在此列表中指定一个函数来代替“之前/之后”列表——当自动换行符依赖于大括号周围的代码时，这非常有用。
+
+@defopt c-hanging-braces-alist
+@vindex hanging-braces-alist @r{(c-)}
+
+该变量是一个关联列表，它将语法符号映射到插入换行符的位置列表。  @xref{Association Lists,,,@lispref{}, @lispreftitle{}}。  每个元素的键是语法符号，关联的值是 @code{nil}、列表或函数。
+
+@table @asis
+@item 关键：句法符号
+此列表中可用作键的语法符号有 @code{brace-list-intro}、@code{statement-cont}、@code{inexpr-class-open}、@code{inexpr-class-close} 以及所有 @code{*-open} 和 @code{*-close} 符号。  @xref{Syntactic Symbols}，有关这些语法符号的更详细描述，除了 @code{inexpr-class-open} 和 @code{inexpr-class-close} 之外，它们不是实际的语法符号。  以任何其他值作为键的元素都会被忽略。
+
+Java中匿名内部类的大括号被赋予了特殊符号@code{inexpr-class-open}和@code{inexpr-class-close}，以便可以将它们与普通类的大括号@footnote{The braces of anonymous classes produce a combination of @code{inexpr-class}, and @code{class-open} or @code{class-close} in normal indentation analysis.}区分开来。
+
+请注意，Pike 模式下的聚合结构 @samp{(@{}, @samp{@})}、@samp{([}、@samp{])} 和 @samp{(<}、@samp{>)} 在这方面不算作大括号列表，即使它们用于正常缩进目的也是如此。  目前无法在这些结构上设置自动换行符。
+
+@item 关联值：“ACTION”列表或函数
+与该关联列表中的每个语法符号关联的值称为@var{action}，它可以是列表或返回列表的函数。  @xref{Custom Braces}，了解如何将函数用作悬挂的大括号@var{action}。
+
+列表@var{action}（或者当@var{action}是函数时返回的列表）包含符号@code{before}和@code{after}的某种组合，指示@ccmode{}在哪里放置与插入的大括号相关的换行符。  因此，如果列表仅包含符号 @code{after}，则大括号将挂在该行的右侧，如下所示：
+
+@example
+// here, open braces always 'hang'
+void spam( int i ) @{
+    if( i == 7 ) @{
+        dosomething(i);
+    @}
+@}
+@end example
+
+当列表同时包含 @code{after} 和 @code{before} 时，大括号将单独出现在一行上，如上例中的右大括号所示。  该列表也可以为空，在这种情况下，换行符不会在大括号之前或之后添加。
+@end table
+
+如果 @code{c-hanging-braces-alist} 中完全缺少语法符号，则其处理方式与 @var{action} 相同，列表中包含 @code{before} 和 @code{after}，因此默认情况下大括号会独占一行。
+
+例如，@code{c-hanging-braces-alist}的默认值为：
+
+@example
+((brace-list-open)
+ (brace-entry-open)
+ (statement-cont)
+ (substatement-open after)
+ (block-close . c-snug-do-while)
+ (extern-lang-open after)
+ (namespace-open after)
+ (module-open after)
+ (composition-open after)
+ (inexpr-class-open after)
+ (inexpr-class-close before))
+@end example
+
+@noindent which says that @code{brace-list-open},
+@code{brace-entry-open} 和 @code{statement-cont}@footnote{Brace lists inside statements, such as initializers for static array variables inside functions in C, are recognized as @code{statement-cont}.  All normal substatement blocks are recognized with other symbols.} 大括号应均挂在右侧，并允许后续文本与大括号位于同一行。  此外，@code{substatement-open}、@code{extern-lang-open} 和@code{inexpr-class-open} 大括号应挂在右侧，但后续文本应位于下一行。对于 @code{inexpr-class-close} 大括号则相反；它们不会挂起，但以下文本将在同一行继续。  在这里，在 @code{block-close} 条目中，您还可以看到使用函数作为 @var{action} 的示例。  在所有其他情况下，大括号本身放在一条线上。
+@end defopt
+
+@menu
+* Custom Braces::
+@end menu
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Custom Braces
+@subsection 定制支架悬挂
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@vindex c-hanging-braces-alist
+@vindex hanging-braces-alist @r{(c-)}
+@cindex action functions
+语法符号并不是唯一可以自定义的地方
+@ccmode{} with the lisp equivalent of callback functions.  Remember
+@var{action}s 通常是包含符号 @code{before} 和 @code{after} (@pxref{Hanging Braces}) 的某种组合的列表。为了获得更大的灵活性，您可以通过在 @code{c-hanging-braces-alist} 中为语法符号指定 @dfn{action function} 来指定大括号“hanginess”；该函数通常通过查看大括号附近的代码来确定大括号的“悬挂度”。
+
+@cindex customization, brace hanging
+使用两个参数调用动作函数：大括号的语法符号（例如，@code{substatement-open}）和插入大括号的缓冲区位置。  点在进入动作函数时未定义，但函数必须保留它（例如，通过使用@code{save-excursion}）。  返回值应该是一个包含 @code{before} 和 @code{after} 的某种组合的列表，不包括它们（即 @code{nil}）。
+
+@defvar c-syntactic-context
+@vindex syntactic-context @r{(c-)}
+在调用缩进或大括号悬挂 @var{action} 函数期间，该变量被绑定到完整的语法分析列表。例如，这可能是@samp{((block-close 73))}。  永远不要自己给@code{c-syntactic-context}赋值——这会破坏@ccmode{}的正常功能。
+
+该变量还在其他三种情况下绑定： (i)@w{ }调用 c-hanging-semi&comma-criteria 函数时 (@pxref{Hanging Semicolons and Commas})； (ii)@w{ }调用排队功能时 (@pxref{Custom Line-Up})； (iii)@w{ }调用 c-special-indent-hook 函数时 (@pxref{Other Indentation})。
+@end defvar
+
+例如，@ccmode{}本身使用此功能来动态确定关闭“do-while”构造的大括号的悬垂性：
+
+@example
+void do_list( int count, char** atleast_one_string )
+@{
+    int i=0;
+    do @{
+        handle_string( atleast_one_string[i] );
+        i++;
+    @} while( i < count );
+@}
+@end example
+
+@ccmode{} assigns the @code{block-close} syntactic symbol to the
+关闭 @code{do} 结构的大括号，通常我们希望 @code{block-close} 大括号后面的行以单独的行开始。  然而，对于“do-while”结构，我们希望 @code{while} 子句跟在右大括号后面。  为此，我们将 @code{block-close} 符号与 @var{action} 函数 @code{c-snug-do-while} 相关联：
+
+@example
+(defun c-snug-do-while (syntax pos)
+  "Dynamically calculate brace hanginess for do-while statements."
+  (save-excursion
+    (let (langelem)
+      (if (and (eq syntax 'block-close)
+               (setq langelem (assq 'block-close c-syntactic-context))
+               (progn (goto-char (cdr langelem))
+                      (if (= (following-char) ?@{)
+                          (forward-sexp -1))
+                      (looking-at "\\<do\\>[^_]")))
+          '(before)
+        '(before after)))))
+@end example
+
+@findex c-snug-do-while
+@findex snug-do-while @r{(c-)}
+该函数只是查看大括号是否关闭了“do-while”子句，如果是，则返回列表 @samp{(before)} 指示应在大括号之前插入换行符，而不是在大括号之后。在所有其他情况下，它返回列表 @samp{(before after)} ，以便大括号单独出现在一行上。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Hanging Colons
+@section 悬冒号
+@cindex hanging colons
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@cindex customization, colon hanging
+@vindex c-hanging-colons-alist
+@vindex hanging-colons-alist @r{(c-)}
+
+使用类似于大括号悬挂 (@pxref{Hanging Braces}) 的机制，还可以使用样式变量 @code{c-hanging-colons-alist} 来悬挂冒号：当键入冒号时，@ccmode 确定其语法上下文，在列表 @code{c-changing-colons-alist} 中查找并相应地插入最多两个换行符。  然而，在这里，如果 @ccmode 未能在列表中找到语法符号的条目，则不会在新输入的冒号周围插入换行符。
+
+@defopt c-hanging-colons-alist
+@vindex hanging-colons-alist @r{(c-)}
+
+@table @asis
+@item 关键：句法符号
+适合作为该关联列表中的键的语法符号是：@code{case-label}、@code{label}、@code{access-label}、@code{member-init-intro} 和 @code{inher-intro}。  @xref{Syntactic Symbols}。  以任何其他值作为键的元素都会被忽略。
+
+@item 关联值：“ACTION”列表
+这里的@var{action}只是一个包含符号@code{before}和@code{after}组合的列表。  与 @code{c-hanging-braces-alist} 不同，不支持 @var{actions} 等功能；似乎没有任何需要它们。
+@end table
+@end defopt
+
+在 C++ 中，双冒号用作作用域运算符，但由于这些冒号总是紧邻出现，因此它们之前和之后的换行符由不同的机制控制，在中称为 @dfn{clean-ups}
+@ccmode{}.  @xref{Clean-ups}, for details.
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Hanging Semicolons and Commas
+@section 悬挂分号和逗号
+@cindex hanging semicolons
+@cindex hanging commas
+@cindex customization, semicolon newlines
+@cindex customization, comma newlines
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@defopt c-hanging-semi&comma-criteria
+@vindex hanging-semi&comma-criteria @r{(c-)}
+该样式变量采用函数列表；当您键入分号或逗号时，它们会被调用。  这些函数按顺序调用，不带参数。  当输入这些函数时，点就在新插入的@samp{;}或@samp{,}之后，并且它们必须保留点（例如，通过使用@code{save-excursion}）。  在调用期间，变量@code{c-syntactic-context}绑定到当前行@footnote{This was first introduced in @ccmode{} 5.31.}@pxref{Custom Braces}的语法上下文。  这些函数本身并不插入换行符，而是指示 @ccmode{} 是否这样做。它们应该返回以下值之一：
+
+@table @code
+@item t
+将在 @samp{;} 或 @samp{,} 之后插入换行符，并且不再调用列表中的任何函数。
+@item stop
+不再调用列表中的函数，也不再插入换行符。
+@item nil
+尚未做出任何决定，将调用列表中的下一个函数。
+@end table
+
+请注意，自动换行永远不会插入 @emph{before} 分号或逗号。  如果在没有做出决定的情况下调用列表中的每个函数，则不会添加换行符。
+
+在 AWK 模式下，该变量默认设置为 @code{nil}。  在其他模式中，默认值是包含单个函数@code{c-semi&comma-inside-parenlist}的列表。  除了那些分隔 @code{for} 子句语句之外，这会在所有分号之后插入换行符。
+@end defopt
+
+@defun c-semi&comma-no-newlines-before-nonblanks
+@findex semi&comma-no-newlines-before-nonblanks @r{(c-)}
+这是标准函数的示例，由 @ccmode{} 提供。  当后续行非空白时，它可以防止在分号之后插入换行符。  否则，它不会做出任何决定。  要使用此函数，请将此函数添加到 @code{c-hanging-semi&comma-criteria} 列表的前面。
+
+@example
+(defun c-semi&comma-no-newlines-before-nonblanks ()
+  (save-excursion
+    (if (and (= (c-last-command-char) ?\;)
+	     (zerop (forward-line 1))
+	     (bolp)      ; forward-line has funny behavior at eob.
+	     (not (looking-at "^[ \t]*$")))
+	'stop
+      nil)))
+@end example
+@end defun
+
+@defun c-semi&comma-inside-parenlist
+@findex semi&comma-inside-parenlist @r{(c-)}
+@defunx c-semi&comma-no-newlines-for-oneline-inliners
+@findex semi&comma-no-newlines-for-oneline-inliners @r{(c-)}
+函数 @code{c-semi&comma-inside-parenlist} 可以防止将换行符插入到 @code{for} 语句的括号列表中。  除了上述@code{c-semi&comma-no-newlines-before-nonblanks}之外，
+@ccmode{} also comes with the criteria function
+@code{c-semi&comma-no-newlines-for-oneline-inliners}，它会抑制单行内联方法定义中分号后的换行符（例如，在 C++ 或 Java 中）。
+@end defun
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Clean-ups
+@chapter 清理工作
+@cindex clean-ups
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@dfn{Clean-ups} 是在特定情况下删除（或例外地添加）空白的机制，并且是对冒号和大括号悬挂的补充。  您可以通过将其符号添加到 @code{c-cleanup-list} 来启用清理，例如，如下所示：
+
+@example
+(add-to-list 'c-cleanup-list 'space-before-funcall)
+@end example
+
+从表面上看，清理似乎与 @code{c-hanging-*-alist} 变量提供的功能重叠。  然而，清理用于“事后”调整代码，即在构造中的空格晚于键入时进行调整。
+
+大多数清理都会删除自动插入的换行符，并且仅在打开自动换行符次要模式时才处于活动状态。  其他人将一直工作。  请注意，仅当构造的各个组件之间仅出现空白时，以及（除了 0⁣ 之外）当构造未出现在文字 (@pxref{Auto-newlines}) 中时，才会执行清理。
+
+@defopt c-cleanup-list
+@vindex cleanup-list @r{(c-)}
+@cindex literal
+
+您可以通过设置样式变量@code{c-cleanup-list}来配置@ccmode{}的清理，它是清理符号的列表。  默认情况下，@ccmode{} 仅清理 @code{scope-operator} 构造，这是正确的 C++ 支持所必需的。
+@end defopt
+
+这些清理仅在启用电动和自动换行次要模式时才有效：
+
+@c TBD: Would like to use some sort of @deffoo here; @table indents a
+@c bit too much in dvi output.
+@table @code
+@item brace-else-brace
+通过将整个构造放在一行上来清理 @samp{@} else @{} 构造。  当输入 @samp{else} 后的左大括号时，就会进行清理。  例如，这个：
+
+@example
+@group
+void spam(int i)
+@{
+    if( i==7 ) @{
+        dosomething();
+    @}
+    else
+    @{
+@end group
+@end example
+
+@noindent
+键入最后一个左大括号后，显示如下：
+
+@example
+@group
+void spam(int i)
+@{
+    if( i==7 ) @{
+        dosomething();
+    @} else @{
+@end group
+@end example
+
+@item brace-elseif-brace
+与 @code{brace-else-brace} 清理类似，但这会清理 @samp{@} else if (...) @{} 构造。  例如：
+
+@example
+@group
+void spam(int i)
+@{
+    if( i==7 ) @{
+        dosomething();
+    @}
+    else if( i==3 )
+    @{
+@end group
+@end example
+
+@noindent
+输入最后一个左括号后，显示如下：
+
+@example
+@group
+void spam(int i)
+@{
+    if( i==7 ) @{
+        dosomething();
+    @} else if(
+@end group
+@end example
+
+@noindent
+在输入最后一个左大括号后，如下所示：
+
+@example
+@group
+void spam(int i)
+@{
+    if( i==7 ) @{
+        dosomething();
+    @} else if( i==3 ) @{
+@end group
+@end example
+
+@item brace-catch-brace
+与 @code{brace-elseif-brace} 类似，但在 C++ 和 Java 模式下清理 @samp{@} catch (...) @{}。
+
+@item empty-defun-braces
+清理不包含主体的顶级函数或类定义后面的大括号。  键入右大括号时会进行清理。因此如下：
+
+@example
+@group
+class Spam
+@{
+@}
+@end group
+@end example
+
+@noindent
+当输入右大括号时会转换成这样：
+
+@example
+@group
+class Spam
+@{@}
+@end group
+@end example
+
+@item defun-close-semi
+当顶级函数或类定义跟在右大括号后面时，清除它们的终止分号。  键入分号时会进行清理。  例如，以下内容：
+
+@example
+@group
+class Spam
+@{
+...
+@}
+;
+@end group
+@end example
+
+@noindent
+当输入分号时会被转换成这样：
+
+@example
+@group
+class Spam
+@{
+...
+@};
+@end group
+@end example
+
+@item list-close-comma
+清理数组和聚合初始值设定项中大括号后面的逗号。键入逗号时会进行清理。  逗号之前的空格就像 @code{defun-close-semi} 中分号之前的空格一样。
+
+@item scope-operator
+清理双冒号，它可能指定跨多行的 C++ 作用域运算符@footnote{Certain C++ constructs introduce ambiguous situations, so @code{scope-operator} clean-ups might not always be correct.  This usually only occurs when scoped identifiers appear in switch label tags.}。  当输入第二个冒号时会进行清理。  当您编辑 C++ 代码时，您总是需要将 @code{scope-operator} 放在 @code{c-cleanup-list} 中。
+
+@item one-liner-defun
+通过删除代码前后的空格来清理由 defun 大括号括起来的单行代码。  当键入右大括号时会进行清理。  如果设置了变量 @code{c-max-one-liner-length}，则仅当结果行不长于该变量的值时才会进行清理。
+
+例如，考虑以下 AWK 代码：
+
+@example
+@group
+BEGIN @{
+    FS = "\t" # use <TAB> as a field separator
+@}
+@end group
+@end example
+
+@noindent
+当输入右大括号时，它会被压缩为以下内容：
+
+@example
+@group
+BEGIN @{FS = "\t"@} # use <TAB> as a field separator
+@end group
+@end example
+
+@defopt c-max-one-liner-length
+@vindex max-one-liner-length @r{(c-)}
+将触发清理@code{one-liner-defun}的结果行的最大长度。  该长度是整行的长度，包括任何前导空格和任何尾随注释。  其默认值为 80。如果该值为零或@code{nil}，则没有限制。
+@end defopt
+@end table
+
+无论是否启用了电动次要模式或自动换行次要模式，以下清理在 @code{c-cleanup-list} 上发生时始终处于活动状态：
+
+@table @code
+@item space-before-funcall
+在函数名称和函数调用的左括号之间插入一个空格。  这会按照 GNU 编码标准规定的风格生成函数调用，例如 @samp{signal@w{ }(SIGINT, SIG_IGN)} 和 @samp{abort@w{ }()}。  键入左括号时会进行清理。  此清理不应在 AWK 模式下激活，因为这样的空格在语法上对于用户定义的函数是无效的。
+
+@item compact-empty-funcall
+清理函数名称和无参数函数调用的左括号之间的所有空格。  如果您更喜欢带有参数的函数的 GNU 函数调用风格，但认为它只是一个空括号对时看起来很难看，那么它通常与 @code{space-before-funcall} 一起使用。  也就是说，你会得到@samp{signal (SIGINT, SIG_IGN)}，但是@samp{abort()}。  键入右括号时会进行清理。
+
+@item comment-close-slash
+在块注释内时，当您在行首（即紧接注释前缀之后）键入斜杠时终止注释。此清理操作会删除斜杠之前的空格，如果需要，还会插入一个星号来完成标记 @samp{*/}。  如果您只想插入文字 @samp{/}，请在这种情况下键入 @kbd{C-q /}。
+@end table
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Indentation Engine Basics
+@chapter 压痕引擎基础知识
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+本章将简要介绍 @ccmode{} 如何缩进代码行。了解所使用的缩进模型很有帮助，这样您就知道如何根据您的个人编码风格自定义@ccmode{}。  所有细节都在@ref{Customizing Indentation}中。
+
+@ccmode{} has an indentation engine that provides a flexible and
+自定义缩进的通用机制。  当@ccmode{}缩进一行代码时，它将计算分为两个步骤：
+
+@enumerate
+@item
+@cindex syntactic symbol
+@cindex anchor position
+它分析该行以确定它的 @dfn{syntactic symbol(s)} （它正在查看的语言构造类型）和它的 @dfn{anchor position} （@ccmode{} 将相对于该行缩进的文件中较早的位置）。  例如，锚点位置可能是前一行中左大括号的位置。  @xref{Syntactic Analysis}。
+@item
+@cindex offsets
+@cindex indentation offset specifications
+它在配置中查找语法符号以获得相应的@dfn{offset(s)}。  符号@code{+}，意思是“将此行再缩进一层”，是典型的偏移量。  @ccmode{} 然后将这些偏移量应用到锚点位置，给出线条的缩进。  @ref{c-offsets-alist} 中描述了不同类型的偏移。
+@end enumerate
+
+在特殊情况下，这里描述的语法定向缩进可能会带来麻烦而不是有帮助。  您可以通过将 @code{c-syntactic-indentation} 设置为 @code{nil} 来禁用它。  （以交互方式设置变量，@ref{Minor Modes}）。
+
+@defopt c-syntactic-indentation
+@vindex syntactic-indentation @r{(c-)}
+当它是非@code{nil}（默认情况下）时，代码的缩进是根据其语法结构完成的。  当它为@code{nil}时，每一行都缩进到与前一行相同的水平，并且@kbd{TAB}（@code{c-indent-command}）以@code{c-basic-offset}的步长调整缩进。  当前样式 (@pxref{Config Basics}) 对缩进没有影响，与缩进相关的任何变量也没有影响，甚至@code{c-special-indent-hook}也没有影响。
+@end defopt
+
+@menu
+* Syntactic Analysis::
+* Syntactic Symbols::
+* Indentation Calculation::
+@end menu
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Syntactic Analysis
+@section 句法分析
+@cindex syntactic analysis
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@cindex syntactic element
+@cindex syntactic context
+缩进一行代码时 @ccmode{} 所做的第一件事是通过调用 @code{c-guess-basic-syntax} 来分析该行，确定该行上（第一个）构造的语法上下文。  虽然此函数主要在内部使用，但有时在 Line-up 函数 (@pxref{Custom Line-Up}) 或 @code{c-special-indent-hook} (@pxref{Other Indentation}) 上的函数中也很有用。
+
+@defun c-guess-basic-syntax
+@findex guess-basic-syntax @r{(c-)}
+确定当前行的语法上下文。
+@end defun
+
+@dfn{syntactic context} 是@dfn{syntactic elements} 的列表，其中每个语法元素依次是列表@footnote{In
+@ccmode 5.28 and earlier, a syntactic element was a dotted pair; the
+cons 是句法符号， cdr 是锚位置。为了兼容性的原因，传递给排队函数的参数仍然具有这种点对形式（@pxref{Custom Line-Up}）。}这是一个简短而典型的示例：
+
+@example
+((defun-block-intro 1959))
+@end example
+
+@cindex syntactic symbol
+@noindent
+每个语法元素中的第一个元素始终是@dfn{syntactic symbol}。  它描述了已识别的构造类型，例如@code{statement}、@code{substatement}、@code{class-open}、@code{class-close}等@xref{Syntactic Symbols}，以获得当前识别的语法符号及其语义的完整列表。  其余条目是与识别的构造相关的各种数据；可能有零个或多个。
+
+@cindex anchor position
+从概念上讲，一行代码总是相对于缓冲区中较高的某个位置缩进（通常是前一行的缩进）。  该位置是句法元素中的@dfn{anchor position}。  如果语法元素列表中的语法符号后面有一个条目，那么它就是 @code{nil} 或该锚点位置。
+
+这是一个例子。  假设我们有以下代码作为 C++ 缓冲区@footnote{The line numbers in this and future examples don't actually appear in the buffer, of course!}中唯一的代码：
+
+@example
+ 1: void swap( int& a, int& b )
+ 2: @{
+ 3:     int tmp = a;
+ 4:     a = b;
+ 5:     b = tmp;
+ 6: @}
+@end example
+
+@noindent
+我们可以使用 @kbd{C-c C-s} (@code{c-show-syntactic-information}) 来报告当前行的语法分析：
+
+@table @asis
+@item @kbd{C-c C-s} (@code{c-show-syntactic-information})
+@kindex C-c C-s
+@findex c-show-syntactic-information
+@findex show-syntactic-information @r{(c-)}
+该命令计算当前行的语法分析并将其显示在迷你缓冲区中。  该命令还突出显示锚点位置。
+@end table
+
+在本示例的第 4 行运行此命令，我们会在 echo 区域@footnote{With a universal argument (i.e., @kbd{C-u C-c C-s}) the analysis is inserted into the buffer as a comment on the current line.} 中看到：
+
+@example
+((statement 35))
+@end example
+
+@noindent
+第 3 行的 @code{int} 的 @samp{i} 将突出显示。  这告诉我们该行是一个语句，并且它相对于缓冲区位置 35（突出显示的位置）缩进。  如果您将点移动到第 3 行并点击 @kbd{C-c C-s}，您将看到：
+
+@example
+((defun-block-intro 29))
+@end example
+
+@noindent
+这表明 @samp{int} 行是顶级函数块中的第一个语句，并且相对于缓冲区位置 29 缩进，该位置是函数头后面的大括号。
+
+这是另一个例子：
+
+@example
+ 1: int add( int val, int incr, int doit )
+ 2: @{
+ 3:     if( doit )
+ 4:         @{
+ 5:             return( val + incr );
+ 6:         @}
+ 7:     return( val );
+ 8: @}
+@end example
+
+@noindent
+在第 4 行点击 @kbd{C-c C-s} 给出：
+
+@example
+((substatement-open 46))
+@end example
+
+@cindex substatement
+@cindex substatement block
+@noindent
+它告诉我们这是一个大括号，@emph{opens}是一个子语句块。@footnote{A @dfn{substatement} is the line after a conditional statement, such as @code{if}, @code{else}, @code{while}, @code{do}, @code{switch}, etc.  A @dfn{substatement block} is a brace block following one of these conditional statements.}
+
+@cindex comment-only line
+句法上下文可以包含多个元素，并且句法元素不需要有锚位置。  最常见的例子是 @dfn{comment-only line}：
+
+@example
+ 1: void draw_list( List<Drawables>& drawables )
+ 2: @{
+ 3:         // call the virtual draw() method on each element in list
+ 4:     for( int i=0; i < drawables.count(), ++i )
+ 5:     @{
+ 6:         drawables[i].draw();
+ 7:     @}
+ 8: @}
+@end example
+
+@noindent
+在本例的第 3 行点击 @kbd{C-c C-s} 给出：
+
+@example
+((comment-intro) (defun-block-intro 46))
+@end example
+
+@noindent
+你可以看到句法上下文包含两个句法元素。  请注意，第一个元素 @samp{(comment-intro)} 没有锚点位置。
+
+@cindex label line
+有一些特殊的方法来处理以标签开头的行。  如果该行上没有标签，这样的行会获得以 @code{label} 或 @code{substatement-label} 开头的语法元素，而不是它本来应具有的元素。
+
+此外，以标签（或注释）开头的行永远不会是后面一行的锚点位置。  相反，该锚点位置是标记行之前同一嵌套级别的最新行，没有前导标签或注释。  如果没有这样的行，则包含左大括号或括号（不以标签或注释开头）的最新行提供锚点位置。  在这种情况下，带有语法符号 @code{defun-block-intro}、@code{statement-block-intro} 或其他一些“-intro”符号的额外语法元素被插入到语法上下文中，以允许使用该锚点位置正确缩进后面的行。
+
+这些约定允许样式专门缩进标签，也许可以通过比周围代码缩进更少的方式来赋予它们更大的可见性。
+
+例如，在以下 pike 片段中：
+
+@example
+ 1: int a()
+ 2: @{
+ 3:   foo: @{
+ 4:     bar: if (t)
+ 5:         x;
+ 6:       y;
+ 7:     @}
+ 8:     y;
+ 9: @}
+@end example
+
+@noindent
+第 4 行获取语法上下文
+
+@example
+((defun-block-intro 9) (label 9))
+@end example
+
+@noindent
+其中位置 9 是第 2 行的大括号，是第 4 行之前没有标签的最新行。
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Syntactic Symbols
+@section 句法符号
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@cindex syntactic symbols, brief list
+@vindex c-offsets-alist
+@vindex offsets-alist @r{(c-)}
+本节是 @code{c-offsets-alist} 样式变量中出现的语法符号的完整列表，以及简要说明。  上一节 (@pxref{Syntactic Analysis}) 说明了什么是语法符号以及缩进引擎如何使用它们。
+
+这些符号的更详细描述以及它们所应用的源代码片段出现在下面小节的示例中。  请注意，为了简洁起见，与大多数句法符号相关的锚点位置是@emph{not}指定的@footnote{These are briefly specified in comments in @code{(defvar c-offsets-alist ...)} in the source file @file{cc-vars.el}}。  如有疑问，请在相关行上输入@kbd{C-c C-s}——这会突出显示锚点位置。
+
+@ssindex -open symbols
+@ssindex -close symbols
+@ssindex -intro symbols
+指示大括号结构的语法符号遵循通用命名约定。  当一行以左大括号或右大括号开头时，其语法符号将分别包含后缀 @code{-open} 或 @code{-close}。  大括号块构造中的第一行将包含后缀 @code{-intro}。
+
+@ssindex -intro symbols
+@ssindex -cont symbols
+在可以跨越多行的结构中，通常会区分引入该结构的第一行和延续该结构的行。  指示这些行的语法符号将分别包含后缀 @code{-intro} 或 @code{-cont}。
+
+了解这一切如何工作的最佳方法是查看一些示例。  请记住，您可以使用 @kbd{C-c C-s} 查看任何源代码行的语法。
+
+@table @code
+@item string
+在多行字符串内。  @ref{Literal Symbols}。
+@item c
+在多行 C 样式块注释内。  @ref{Literal Symbols}。
+@item defun-open
+打开顶级函数定义的大括号。  @ref{Function Symbols}。
+@item defun-close
+结束顶级函数定义的大括号。  @ref{Function Symbols}。
+@item defun-block-intro
+顶级 defun 中的第一行。  @ref{Function Symbols}。
+@item class-open
+打开类定义的大括号。  @ref{Class Symbols}。
+@item class-close
+结束类定义的大括号。  @ref{Class Symbols}。
+@item inline-open
+打开类内内联方法的大括号。  @ref{Class Symbols}。
+@item inline-close
+关闭类内内联方法的大括号。  @ref{Class Symbols}。
+@item func-decl-cont
+函数定义的参数列表和函数左大括号之间的区域（不包括 K&R 参数声明）。  在 C 中，除了空格和注释之外，您不能在此区域中放置任何内容，但是在 C++ 和 Java 中，@code{throws} 声明和其他内容可以出现在此处。  @ref{Literal Symbols}。 @c @emph{FIXME!!!  Can it not
+@c go somewhere better?}
+@item knr-argdecl-intro
+K&R C 参数声明的第一行。  @ref{K&R Symbols}。
+@item knr-argdecl
+K&R C 参数声明中的后续行。  @ref{K&R Symbols}。
+@item topmost-intro
+“最顶层”定义中的第一行。  @ref{Function Symbols}。
+@item topmost-intro-cont
+最上面的定义延续行。  仅用于未被其他符号覆盖的部分，例如@code{func-decl-cont}和@code{knr-argdecl}。  @ref{Function Symbols}。
+@item constraint-cont
+C++20 最顶层概念或requires 子句的延续行。 @ref{Constraint Symbols}。
+@item annotation-top-cont
+最上面的定义延续行，其中所有先前的项目都是注释。  @ref{Java Symbols}。
+@item member-init-intro
+成员初始化列表中的第一行。  @ref{Class Symbols}。
+@item member-init-cont
+随后的成员初始化列表行。  @ref{Class Symbols}。
+@item class-field-cont
+类/结构等定义中第一行的延续行。 @ref{Class Symbols}。
+@item inher-intro
+多重继承列表的第一行。  @ref{Class Symbols}。
+@item inher-cont
+随后的多重继承线。  @ref{Class Symbols}。
+@item block-open
+语句块左大括号。  @ref{Literal Symbols}。
+@item block-close
+语句块右大括号。  @ref{Conditional Construct Symbols}。
+@item brace-list-open
+静态数组列表的左大括号。  @ref{Brace List Symbols}。
+@item brace-list-close
+静态数组列表的右大括号。  @ref{Brace List Symbols}。
+@item brace-list-intro
+开场后第一行@samp{@{} in a static array list. @ref{Brace List Symbols}.
+@item brace-list-entry
+静态数组列表中的后续行。  @ref{Brace List Symbols}。
+@item brace-entry-open
+静态数组列表中的后续行，其中该行以左大括号开头。  @ref{Brace List Symbols}。
+@item enum-open
+枚举列表的左大括号。  @ref{Brace List Symbols}。
+@item enum-close
+枚举列表的右大括号。  @ref{Brace List Symbols}。
+@item enum-intro
+开场后第一行@samp{@{} in an enum list.  @ref{Brace List Symbols}.
+@item enum-entry
+枚举中的后续行。  @ref{Brace List Symbols}。
+@item statement
+一份声明。  @ref{Function Symbols}。
+@item statement-cont
+声明的延续。  @ref{Function Symbols}。
+@item annotation-var-cont
+语句的延续，其中所有先前的项目都是注释。  @ref{Java Symbols}。
+@item statement-block-intro
+新语句块中的第一行。  @ref{Conditional Construct Symbols}。
+@item statement-case-intro
+case 块中的第一行。  @ref{Switch Statement Symbols}。
+@item statement-case-open
+case 块中以大括号开头的第一行。  @ref{Switch Statement Symbols}。
+@item substatement
+条件或循环结构之后的第一行。 @ref{Conditional Construct Symbols}。
+@item substatement-open
+打开子语句块的大括号。  @ref{Conditional Construct Symbols}。
+@item substatement-label
+条件或循环结构之后的第一行（如果它是标签）。 @ref{Conditional Construct Symbols}。
+@item case-label
+@code{switch} 块中的标签。  @ref{Switch Statement Symbols}。
+@item access-label
+C++ 访问控制标签。  @ref{Class Symbols}。
+@item label
+任何其他标签。  @ref{Literal Symbols}。
+@item do-while-closure
+结束 @code{do}-@code{while} 结构的 @code{while} 行。 @ref{Conditional Construct Symbols}。
+@item else-clause
+@code{if}-@code{else} 构造的 @code{else} 线。 @ref{Conditional Construct Symbols}。
+@item catch-clause
+@code{try}-@code{catch} 构造的 @code{catch} 或 @code{finally}（在 Java 中）行。  @ref{Conditional Construct Symbols}。
+@item comment-intro
+一行仅包含评论介绍。  @ref{Literal Symbols}。
+@item arglist-intro
+参数列表中的第一行。  @ref{Paren List Symbols}。
+@item arglist-cont
+当没有参数跟在 arglist 左括号同一行时，后续参数列表行。  @ref{Paren List Symbols}。
+@item arglist-cont-nonempty
+当至少一个参数与 arglist 左括号位于同一行时，后续参数列表行。  @ref{Paren List Symbols}。
+@item arglist-close
+参数列表的单独右括号。  @ref{Paren List Symbols}。
+@item stream-op
+继续流运算符的行（仅限 C++）。  @ref{Literal Symbols}。 @c @emph{FIXME!!!  Can this not be moved somewhere better?}
+@item inclass
+该行嵌套在类定义内。  @ref{Class Symbols}。
+@item cpp-macro
+预处理器宏定义的开始。  @ref{Literal Symbols}。
+@item cpp-define-intro
+如果设置了 0⁣，则为多行预处理器宏内的第一行。  @ref{Multiline Macro Symbols}。
+@item cpp-macro-cont
+如果 @code{c-syntactic-indentation-in-macros} 是 @code{nil}，则多行预处理器宏内的所有行。 @ref{Multiline Macro Symbols}。
+@item friend
+C++ 友元声明。  @ref{Class Symbols}。
+@item objc-method-intro
+Objective-C 方法定义的第一行。  @ref{Objective-C Method Symbols}。
+@item objc-method-args-cont
+Objective-C 方法定义的延续行。  @ref{Objective-C Method Symbols}。
+@item objc-method-call-cont
+继续 Objective-C 方法调用的行。  @ref{Objective-C Method Symbols}。
+@item extern-lang-open
+打开 @code{extern} 块的大括号（例如 @code{extern "C" @{...@}}）。  @ref{External Scope Symbols}。
+@item extern-lang-close
+闭合 @code{extern} 块的大括号。  @ref{External Scope Symbols}。
+@item inextern-lang
+类似于 @code{inclass} 语法符号，但在 @code{extern} 块内使用。  @ref{External Scope Symbols}。
+@item namespace-open
+@itemx namespace-close
+@itemx innamespace
+这些类似于上面的三个 @code{extern-lang} 符号，但针对 C++ 命名空间块返回。  @ref{External Scope Symbols}。
+@item module-open
+@itemx module-close
+@itemx inmodule
+与上面类似，但是针对 CORBA IDL @code{module} 块。 @ref{External Scope Symbols}。
+@item composition-open
+@itemx composition-close
+@itemx incomposition
+与上面类似，但是对于 CORBA CIDL @code{composition} 块。 @ref{External Scope Symbols}。
+@item template-args-cont
+C++ 模板参数列表延续。  @ref{Class Symbols}。
+@item inlambda
+类似于 @code{inclass} 语法符号，但在 lambda（即匿名）函数内部使用。  用于 C++ 和 Pike 模式。 @ref{Statement Block Symbols}。
+@item lambda-intro-cont
+lambda 函数头的延续行，即 @code{lambda} 关键字和函数体之间的行。  仅在派克模式下使用。 @ref{Statement Block Symbols}。
+@item inexpr-statement
+表达式内的语句块。  gcc C 和 C++ 扩展已被识别。  它还用于 Pike 中将语句块作为参数的特殊函数。  @ref{Statement Block Symbols}。
+@item inexpr-class
+表达式内的类定义。  这用于 Java 中的匿名类。  它还用于 Java 中的匿名数组初始值设定项。  @ref{Java Symbols}。
+@end table
+
+@menu
+* Function Symbols::
+* Class Symbols::
+* Conditional Construct Symbols::
+* Switch Statement Symbols::
+* Brace List Symbols::
+* Enum Symbols::
+* External Scope Symbols::
+* Paren List Symbols::
+* Literal Symbols::
+* Multiline Macro Symbols::
+* Objective-C Method Symbols::
+* Java Symbols::
+* Constraint Symbols::
+* Statement Block Symbols::
+* K&R Symbols::
+@end menu
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Function Symbols
+@subsection 功能符号
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+此示例显示了典型的函数声明。
+
+@example
+ 1: void
+ 2: swap( int& a, int& b )
+ 3: @{
+ 4:     int tmp = a;
+ 5:     a = b;
+ 6:     b = tmp;
+ 7:     int ignored =
+ 8:         a + b;
+ 9: @}
+@end example
+
+@ssindex topmost-intro
+@ssindex topmost-intro-cont
+@ssindex defun-open
+@ssindex defun-close
+@ssindex defun-block-intro
+第 1 行显示了 @code{topmost-intro}，因为它是引入顶级构造的第一行。  第 2 行是顶级构造引入的延续，因此它具有语法@code{topmost-intro-cont}。  第 3 行显示了 @code{defun-open}，因为它是打开顶级函数定义的大括号。  第 9 行是相应的 @code{defun-close}，因为它包含结束顶级函数定义的大括号。  第 4 行是 @code{defun-block-intro}，即，它是大括号块的第一行，包含在顶级函数定义中。
+
+@ssindex statement
+@ssindex statement-cont
+第 5、6 和 7 行都给出了 @code{statement} 语法，因为它们没有太多特别之处。  但请注意，第 8 行给出了 @code{statement-cont} 语法，因为它延续了上一行开始的语句。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Class Symbols
+@subsection 类相关符号
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+下面是一个示例，说明了一些 C++ 类语法符号：
+
+@example
+ 1: class Bass
+ 2:     : public Guitar,
+ 3:       public Amplifiable
+ 4: @{
+ 5: public:
+ 6:     Bass()
+ 7:         : eString( new BassString( 0.105 )),
+ 8:           aString( new BassString( 0.085 )),
+ 9:           dString( new BassString( 0.065 )),
+10:           gString( new BassString( 0.045 ))
+11:     @{
+12:         eString.tune( 'E' );
+13:         aString.tune( 'A' );
+14:         dString.tune( 'D' );
+15:         gString.tune( 'G' );
+16:     @}
+17:     friend class Luthier;
+18: @};
+@end example
+
+@ssindex class-open
+@ssindex class-close
+与前面的示例一样，第 1 行具有 @code{topmost-intro} 语法。然而，这里，第 4 行打开 C++ 类定义的大括号被分配了 @code{class-open} 语法。  请注意，在 C++ 中，类、结构体和联合在语法上本质上是等效的（并且在语义上非常相似），因此将上例中的 @code{class} 关键字替换为 @code{struct} 或 @code{union} 仍会导致第 4 行 @footnote{This is the case even for C and Objective-C@.  For consistency, structs in all supported languages are syntactically equivalent to classes.  Note however that the keyword @code{class} is meaningless in C and Objective-C.} 的语法为 @code{class-open}。类似地，第 18 行指定了 @code{class-close} 语法。
+
+请注意，@code{class-open}和@code{class-close}句法元素有两个锚点。  第一个是语句开头的位置，第二个是定义构造的关键字的位置（例如@code{class}）。  这些通常是相同的位置，但当语句以 @code{template} （C++ 模式）或 @code{generic} （Java 模式）或类似的开头时，它们会有所不同。
+
+@ssindex inher-intro
+@ssindex inher-cont
+第 2 行引入了该类的继承列表，因此为其分配了 @code{inher-intro} 语法，而延续继承列表的第 3 行则给出了 @code{inher-cont} 语法。
+
+@ssindex access-label
+@ssindex inclass
+在第 5 行点击 @kbd{C-c C-s} 显示以下分析：
+
+@example
+((inclass 58) (access-label 58))
+@end example
+
+@noindent
+该行的主要语法符号是@code{access-label}，因为这是一个标签关键字，用于指定 C++ 中的访问保护。  然而，由于这一行也是类定义中的顶级构造，因此分析实际上显示了两个语法符号。  分配给该行的另一个语法符号是@code{inclass}。同样，第 6 行给出了 @code{inclass} 和 @code{topmost-intro} 语法：
+
+@example
+((inclass 58) (topmost-intro 60))
+@end example
+
+@ssindex member-init-intro
+@ssindex member-init-cont
+第 7 行引入了 C++ 成员初始化列表，因此给出了 @code{member-init-intro} 语法。  请注意，在这种情况下，它被 @emph{not} 分配为 @code{inclass}，因为这不被视为顶级构造。  第 8 行到第 10 行都被分配了@code{member-init-cont}，因为它们延续了第 7 行开始的成员初始化列表。
+
+@cindex in-class inline methods
+@ssindex inline-open
+@ssindex inline-close
+第11行的分析有点复杂：
+
+@example
+((inclass 58) (inline-open))
+@end example
+
+该行被分配了 @code{inline-open} 和 @code{inclass} 的语法，因为它打开了 @dfn{in-class} C++ 内联方法定义。  这与 C++ 内联函数的概念不同但又相关，因为它的定义发生在封闭类定义内，这在 C++ 中意味着该函数应该内联。但是，如果 @code{Bass} 构造函数的定义出现在类定义之外，则该构造函数将被赋予 @code{defun-open} 语法，即使关键字 @code{inline} 出现在方法名称之前，如下所示：
+
+@example
+ 1: class Bass
+ 2:     : public Guitar,
+ 3:       public Amplifiable
+ 4: @{
+ 5: public:
+ 6:     Bass();
+ 7: @};
+ 8:
+ 9: inline
+10: Bass::Bass()
+11:     : eString( new BassString( 0.105 )),
+12:       aString( new BassString( 0.085 )),
+13:       dString( new BassString( 0.065 )),
+14:       gString( new BassString( 0.045 ))
+15: @{
+16:     eString.tune( 'E' );
+17:     aString.tune( 'A' );
+18:     dString.tune( 'D' );
+19:     gString.tune( 'G' );
+20: @}
+@end example
+
+@ssindex friend
+返回到前面的示例，第 16 行给出了 @code{inline-close} 语法，第 12 行给出了 @code{defun-block-open} 语法，第 13 行到第 15 行都给出了 @code{statement} 语法。  第 17 行很有趣，因为它的句法分析列表包含三个元素：
+
+@example
+((inclass 58) (topmost-intro 380) (friend))
+@end example
+
+@code{friend} 和 @code{inline-open} 语法符号是没有锚位置的修饰语。
+
+@ssindex class-field-cont
+在以下示例中，第 1 行获取语法 @code{topmost-intro}，第 2 行获取语法 @code{((inclass 1) (topmost-intro 1))} 。  第 3、4 和 5 行的语法为 @code{(class-field-cont 18 12)} 而不是 @code{topmost-intro-cont}。  当 @code{topmost-intro-cont} 倾向于将元素直接留在其类型下方时，这使得更容易缩进几个以逗号分隔的字段的定义类型。  @xref{Function Symbols}。  锚点是类型和封闭类的大括号的位置。
+
+@example
+ 1. struct foo @{
+ 2.     long
+ 3.         a,
+ 4.         b,
+ 5.         c;
+ 6. @};
+@end example
+
+@ssindex template-args-cont
+模板定义引入了另一个语法符号：
+
+@example
+ 1: ThingManager <int,
+ 2:    Framework::Callback *,
+ 3:    Mutex> framework_callbacks;
+@end example
+
+这里，第 1 行被分析为 00，但第 2 行和第 3 行都被分析为 11 行。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Conditional Construct Symbols
+@subsection 条件构造符号
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+这是一个（完全人为的）示例，说明了如何将语法分配给各种条件结构：
+
+@example
+ 1: void spam( int index )
+ 2: @{
+ 3:     for( int i=0; i<index; i++ )
+ 4:     @{
+ 5:         if( i == 10 )
+ 6:             do_something_special();
+ 7:         else
+ 8:           silly_label:
+ 9:             do_something( i );
+10:     @}
+11:     do @{
+12:         another_thing( i-- );
+13:     @}
+14:     while( i > 0 );
+15: @}
+@end example
+
+仅讨论说明新语法符号的行。
+
+@ssindex substatement-open
+@ssindex statement-block-intro
+@ssindex block-close
+第 4 行有一个大括号，用于打开条件的子语句块。  因此，它被分配了 @code{substatement-open} 语法，并且由于第 5 行是子语句块中的第一行，因此它被分配了 @code{statement-block-intro} 语法。  第 10 行包含关闭内部子语句块的大括号，因此语法为 @code{block-close}@footnote{@code{block-open} is used only for ``free-standing'' blocks, and is somewhat rare (@pxref{Literal Symbols} for an example.)}。  第 13 行的处理方式相同。
+
+@ssindex substatement
+第 6 行和第 9 行也是条件语句的子语句，但由于它们不开始块，所以它们被赋予 @code{substatement} 语法而不是 @code{substatement-open}。
+
+@ssindex substatement-label
+第 8 行包含一个标签，通常给出 @code{label} 语法。然而，这个有点特殊，因为它位于条件及其子语句之间。  它被分析为 @code{substatement-label} ，让您以不同于普通标签的方式处理这种相当奇怪的情况。
+
+@ssindex else-clause
+@ssindex catch-clause
+第 7 行以 @code{else} 开头，与第 5 行的 @code{if} 语句匹配。因此，它被赋予 @code{else-clause} 语法，并锚定在匹配的 @code{if} 上。  C++ 和 Java 中的 @code{try}-@code{catch} 结构也以这种方式处理，除了 @code{catch} 和（在 Java 中）@code{finally} 标记为 @code{catch-clause}。
+
+@ssindex do-while-closure
+第 14 行上关闭 @code{do} 条件的 @code{while} 结构如果单独出现在一行上，则被赋予特殊语法 @code{do-while-closure}。  请注意，如果 @code{while} 与前面的右大括号出现在同一行，则该行仍将具有 @code{block-close} 语法。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Switch Statement Symbols
+@subsection Switch 语句符号
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Switch 语句有自己的一组语法符号。  这是一个例子：
+
+@example
+ 1: void spam( enum Ingredient i )
+ 2: @{
+ 3:     switch( i ) @{
+ 4:     case Ham:
+ 5:         be_a_pig();
+ 6:         break;
+ 7:     case Salt:
+ 8:         drink_some_water();
+ 9:         break;
+10:     default:
+11:         @{
+12:             what_is_it();
+13:             break;
+14:         @}
+15:     @}
+14: @}
+@end example
+
+@ssindex case-label
+@ssindex statement-case-intro
+@ssindex statement-case-open
+这里，第 4、7 和 10 行都分配了 @code{case-label} 语法，而第 5 和 8 行分配了 @code{statement-case-intro}。  第 11 行的处理方式略有不同，因为它包含一个打开块的大括号；它具有 @code{statement-case-open} 语法。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Brace List Symbols
+@subsection 大括号列表符号
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@cindex brace lists
+有一组语法符号用于识别大括号列表内的结构。  大括号列表被定义为聚合初始值设定项列表，例如可以静态初始化结构数组。  请注意，@code{enum} 构造（自 2024-09 起）不再被解析为大括号列表。  相反，它现在有自己的语法符号。  @ref{Enum Symbols}。  Pike 中的三个特殊聚合结构 @code{(@{ @})}、@code{([ ])} 和 @code{(< >)} 也被视为大括号列表。  一个例子：
+
+@example
+ 1: static char* ingredients[] =
+ 2: @{
+ 3:     "Ham",
+ 4:     "Salt",
+ 5:     NULL
+ 6: @};
+@end example
+
+@ssindex brace-list-open
+@ssindex brace-list-intro
+@ssindex brace-list-close
+@ssindex brace-list-entry
+按照约定，本示例中的第 2 行分配了 @code{brace-list-open} 语法，第 3 行分配了 @code{brace-list-intro} 语法。  同样，第 6 行指定了 @code{brace-list-close} 语法。  然而，第 4 行和第 5 行被分配了 @code{brace-list-entry} 语法，就像此初始值设定项列表中的所有后续行一样。
+
+@ssindex brace-entry-open
+您的静态初始化程序可能正在初始化嵌套结构，例如：
+
+@example
+ 1: struct intpairs[] =
+ 2: @{
+ 3:     @{ 1, 2 @},
+ 4:     @{
+ 5:         3,
+ 6:         4
+ 7:     @}
+ 8:     @{ 1,
+ 9:       2 @},
+10:     @{ 3, 4 @}
+11: @};
+@end example
+
+在这里，您已经看到了第 1、2、3 和 11 行的分析。在第 4 行，事情变得有趣了；该行被分配了 @code{brace-entry-open} 语法符号，因为它是一个以左大括号开头的大括号列表条目行。  第 5 行和第 6 行非常标准，第 7 行如您所料是 @code{brace-list-close}。与第 10 行一样，第 8 行再次被指定为 @code{brace-entry-open}。第 9 行被指定了两个句法元素，@code{brace-list-intro}，锚点位于 @samp{@{} of line 8@footnote{This extra syntactic element was introduced in @ccmode{} 5.33.1 to allow extra flexibility in indenting the second line of such a construct.  You can preserve the behavior resulting from the former syntactic analysis by giving @code{brace-list-entry} an offset of @code{c-lineup-under-anchor} (@pxref{Misc Line-Up}).}, and @code{brace-list-entry} anchored on the @samp{1} of line 8.
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Enum Symbols
+@subsection 枚举符号
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@cindex enum symbols
+有一组句法符号来表征 @code{enum} 结构的组成部分。  这些非常类似于大括号列表符号@footnote{Indeed an @code{enum} used to be parsed with these other symbols.  The two types of construct were separated in 2024-09 to make it easier to give an @code{enum} indentation like that of a @code{class}.} (@pxref{Brace List Symbols})。
+
+@example
+ 1: enum test
+ 2: @{
+ 3:   GOOD,
+ 4:   BETTER,
+ 5:   BEST
+ 6: @};
+@end example
+
+@ssindex enum-open
+@ssindex enum-intro
+@ssindex enum-close
+@ssindex enum-entry
+第 2 行指定了 @code{enum-open} 语法，第 6 行指定了 @code{enum-close}。  第 3 行的第一个枚举元素分配为 @code{enum-intro} 语法，第 4 行和第 5 行的其余元素分配为 @code{enum-entry}。
+
+当第一个枚举元素跟在 @samp{@{} of the @code{enum}, all on the opening line of the construct, the parsing is a little more involved. 之后时
+
+@example
+ 1: enum test @{ GOOD,
+ 2:   BETTER,
+ 3:   BEST
+ 4: @};
+@end example
+
+这里，第 2 行被分配了一个包含两个元素的语法上下文：@code{enum-intro} 锚定在第 1 行缩进的开头，@code{enum-entry} 锚定在第 1 行的第一个元素 @code{GOOD}。如您所料，第 3 行是 @code{enum-entry}，第 4 行是 @code{enum-close}。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    External Scope Symbols
+@subsection 外部范围符号
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+外部语言定义块也有自己的语法符号。  在这个例子中：
+
+@example
+ 1: extern "C"
+ 2: @{
+ 3:     int thing_one( int );
+ 4:     int thing_two( double );
+ 5: @}
+@end example
+
+@ssindex extern-lang-open
+@ssindex extern-lang-close
+@ssindex inextern-lang
+@ssindex inclass
+@noindent
+第 2 行给出了 @code{extern-lang-open} 语法，而第 5 行给出了 @code{extern-lang-close} 语法。  对第 3 行的分析得出：
+
+@example
+((inextern-lang) (topmost-intro 14))
+@end example
+
+@noindent
+其中 @code{inextern-lang} 是一个与 @code{inclass} 用途类似的修饰符。
+
+还有各种其他顶级块，例如 @code{extern}，它们都以相同的方式处理，只是符号以引入块的关键字命名。  例如，C++ 命名空间块具有三个符号 @code{namespace-open}、@code{namespace-close} 和 @code{innamespace}。  目前公认的顶级块是：
+
+@table @asis
+@item @code{extern-lang-open}, @code{extern-lang-close}, @code{inextern-lang}
+C 和 C++ 中的@code{extern} 块。@footnote{These should logically be named @code{extern-open}, @code{extern-close} and @code{inextern}, but that isn't the case for historical reasons.}
+
+@item @code{namespace-open}, @code{namespace-close}, @code{innamespace}
+@ssindex namespace-open
+@ssindex namespace-close
+@ssindex innamespace
+C++ 中的@code{namespace} 块。
+
+@item @code{module-open}, @code{module-close}, @code{inmodule}
+@ssindex module-open
+@ssindex module-close
+@ssindex inmodule
+CORBA IDL 中的@code{module} 块。
+
+@item @code{composition-open}, @code{composition-close}, @code{incomposition}
+@ssindex composition-open
+@ssindex composition-close
+@ssindex incomposition
+CORBA CIDL 中的@code{composition} 块。
+@end table
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Paren List Symbols
+@subsection 括号（参数）列表符号
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+许多语法符号与括号列表（又称参数列表）相关联，如函数声明和函数调用中所示。  这个例子说明了这些：
+
+@example
+ 1: void a_function( int line1,
+ 2:                  int line2 );
+ 3:
+ 4: void a_longer_function(
+ 5:     int line1,
+ 6:     int line2
+ 7:     );
+ 8:
+ 9: void call_them( int line1, int line2 )
+10: @{
+11:     a_function(
+12:         line1,
+13:         line2
+14:         );
+15:
+16:     a_longer_function( line1,
+17:                        line2 );
+18: @}
+@end example
+
+@ssindex arglist-intro
+@ssindex arglist-close
+第 5 行和第 12 行被分配了 @code{arglist-intro} 语法，因为它们是左括号后面的第一行，而第 7 行和第 14 行被分配了 @code{arglist-close} 语法，因为它们包含关闭参数列表的括号。
+
+@ssindex arglist-cont-nonempty
+@ssindex arglist-cont
+继续参数列表的行可以分配两个语法符号之一。  例如，第 2 行和第 17 行被指定为 @code{arglist-cont-nonempty} 语法。  这意味着它们继续一个参数列表，但是包含打开列表的括号的行是左括号后面的@emph{not empty}。  将其与分配了 @code{arglist-cont} 语法的第 6 行和第 13 行进行对比。  这是因为打开参数列表的括号是该行的最后一个字符。
+
+具有 @code{arglist-intro}、@code{arglist-cont-nonempty} 和 @code{arglist-close} 的语法元素包含两个缓冲区位置：锚位置（声明或语句的开头）和左括号的位置。后一个位置可用于排队功能 (@pxref{Line-Up Functions})。
+
+请注意，没有 @code{arglist-open} 语法。  这是因为任何打开参数列表的括号（出现在单独的行上）都会被分配 @code{statement-cont} 语法。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Literal Symbols
+@subsection 注释字符串标签和宏符号
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+此 C++ 示例说明了一些先前未涵盖的杂项语法符号：
+
+@example
+ 1: void Bass::play( int volume )
+ 2: const
+ 3: @{
+ 4:     /* this line starts a multiline
+ 5:      * comment.  This line should get 'c' syntax */
+ 6:
+ 7:     char* a_multiline_string = "This line starts a multiline \
+ 8: string.  This line should get 'string' syntax.";
+ 9:
+10:   note:
+11:     @{
+12: #ifdef LOCK
+13:         Lock acquire();
+14: #endif // LOCK
+15:         slap_pop();
+16:         cout << "I played "
+17:              << "a note\n";
+18:     @}
+19: @}
+@end example
+
+此示例中需要注意的行包括：
+
+@itemize @bullet
+@item 
+@ssindex func-decl-cont
+第 2 行分配了 @code{func-decl-cont} 语法。
+
+@item 
+@ssindex comment-intro
+第 4 行分配了 @code{defun-block-intro} @emph{and} @code{comment-intro} 语法。  具有 @code{comment-intro} 的句法元素没有锚点。  它总是伴随着另一种确实存在的句法元素。
+
+@item 
+@ssindex c
+第 5 行指定了 @code{c} 语法。
+
+@item 
+@cindex syntactic whitespace
+第 6 行，即使它只包含空格，也被分配为 @code{defun-block-intro}。  请注意，第 4 行和第 5 行注释的出现不会导致第 6 行被分配 @code{statement} 语法，因为注释被视为 @dfn{syntactic whitespace}，在分析代码时会被忽略。
+
+@item 
+@ssindex string
+第 8 行指定了 @code{string} 语法。
+
+@item 
+@ssindex label
+第 10 行指定了 @code{label} 语法。
+
+@item 
+@ssindex block-open
+第 11 行分配了 @code{block-open} 以及 @code{statement} 语法。  @code{block-open} 句法元素没有锚位置，因为它总是与另一个有锚位置的句法元素一起出现。
+
+@item 
+@ssindex cpp-macro
+除了正常语法符号（分别为 1⁣ 和 2⁣）之外，第 12 行和第 14 行还分配了 @code{cpp-macro} 语法。  通常 @code{cpp-macro} 配置为取消正常的语法上下文，以使所有预处理器指令坚持第一列，但如果您希望预处理器指令像代码的其余部分一样缩进，则可以轻松更改。  与 @code{comment-intro} 一样，具有 @code{cpp-macro} 的句法元素不包含锚位置。
+
+@item 
+@ssindex stream-op
+第 17 行指定了 @code{stream-op} 语法。
+@end itemize
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Multiline Macro Symbols
+@subsection 多行宏符号
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@cindex multiline macros
+@cindex syntactic whitespace
+@ssindex cpp-define-intro
+@ssindex cpp-macro-cont
+多行预处理器宏定义通常像其他代码一样处理，即根据宏内前面行的语法分析来缩进其中的行。  宏定义内的第一行（即 cpp 指令本身的起始行之后的行）为 @code{cpp-define-intro}。  在这个例子中：
+
+@example
+ 1: #define LIST_LOOP(cons, listp)                         \
+ 2:   for (cons = listp; !NILP (cons); cons = XCDR (cons)) \
+ 3:     if (!CONSP (cons))                                 \
+ 4:       signal_error ("Invalid list format", listp);     \
+ 5:     else
+@end example
+
+@noindent
+第 1 行给出语法符号 @code{cpp-macro}。  cpp 指令的第一行始终给出该符号。  第 2 行给出了 @code{cpp-define-intro}，这样您就可以为整个宏体提供一些额外的缩进。  然后将第 3 行到第 5 行作为正常代码进行分析，即第 3 行和第 4 行上的 @code{substatement} 以及第 5 行上的 @code{else-clause}。
+
+可以使用 @code{c-syntactic-indentation-in-macros} (@pxref{Custom Macros}) 关闭宏内部的语法分析。  在这种情况下，第 2 行到第 5 行都将被赋予 @code{cpp-macro-cont}，其锚点位置指向启动 cpp 指令 @footnote{This is how @ccmode{} 5.28 and earlier analyzed macros.} 的 @code{#}。
+
+@xref{Custom Macros}，有关宏处理的更多信息。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Objective-C Method Symbols
+@subsection Objective-C 方法符号
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+在 Objective-C 缓冲区中，为各种消息调用结构分配了三个附加语法符号。  这是一个说明这些的示例：
+
+@example
+ 1: - (void)setDelegate:anObject
+ 2:           withStuff:stuff
+ 3: @{
+ 4:     [delegate masterWillRebind:self
+ 5:               toDelegate:anObject
+ 6:               withExtraStuff:stuff];
+ 7: @}
+@end example
+
+@ssindex objc-method-intro
+@ssindex objc-method-args-cont
+@ssindex objc-method-call-cont
+这里，第 1 行分配了 @code{objc-method-intro} 语法，第 2 行分配了 @code{objc-method-args-cont} 语法。  第 5 行和第 6 行都指定了 @code{objc-method-call-cont} 语法。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Java Symbols
+@subsection Java符号
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Java 有一个匿名类的概念，它看起来像这样：
+
+@example
+ 1:  @@Test
+ 2:  public void watch(Observable o) @{
+ 3:      @@NonNull
+ 4:      Observer obs = new Observer() @{
+ 5:          public void update(Observable o, Object arg) @{
+ 6:              history.addElement(arg);
+ 7:          @}
+ 8:      @};
+ 9:      o.addObserver(obs);
+ 10: @}
+@end example
+
+@ssindex inexpr-class
+@code{new} 运算符后面的大括号打开匿名类。除了普通类中使用的 @code{inclass} 符号之外，第 5 行和第 8 行还分配了 @code{inexpr-class} 语法。  因此，该类将像普通类一样缩进，并为 @code{inexpr-class} 添加缩进。  @code{inexpr-class} 句法元素没有锚位置。
+
+@ssindex annotation-top-cont
+@ssindex annotation-var-cont
+第 2 行被指定为 @code{annotation-top-cont} 语法，因为它是最上面的介绍的延续，并且在当前行之前有一个注释符号。  类似地，第 4 行被分配了 @code{annotation-var-cont} 语法，因为它是变量声明的延续，其中声明之前是注释。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Constraint Symbols
+@subsection C++ 约束符号
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+C++20 标准引入了 @dfn{concepts} 和 @dfn{requirements} 的概念，其典型实例如下所示：
+
+@example
+ 1: template <typename T>
+ 2: requires
+ 3:   requires (T t) @{
+ 4:     @{ ++t; @}
+ 5:   @}
+ 6:   && std::is_integral<T>
+ 7:   int foo();
+@end example
+
+@ssindex constraint-cont
+第 1 行分配了熟悉的@code{topmost-intro}。  第 2 行得到 @code{topmost-intro-cont}，这是引入 @dfn{requires clause} 的关键字。  第 3、6 和 7 行分配了语法 @code{constraint-cont}，是第 2 行开始的 require 子句的延续。第 4 和 5 行获得语法 @code{defun-block-intro} 和 @code{defun-close}，将其视为函数的一部分进行分析。
+
+请注意，第 3 行的 @code{requires} 开始于 @dfn{requires expression}，而不是 require 子句，因此其组件未分配为 @code{constraint-cont}。  参见@url{https://en.cppreference.com/w/cpp/language/requires}。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Statement Block Symbols
+@subsection 语句块符号
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+在某些情况下，可能会在表达式内使用语句块。  一种是使用 gcc 扩展的 C 或 C++ 代码，例如：
+
+@example
+ 1: int res = (@{
+ 2:         int y = foo (); int z;
+ 3:         if (y > 0) z = y; else z = - y;
+ 4:         z;
+ 5:     @});
+@end example
+
+@ssindex inexpr-statement
+第 2 行和第 5 行除了在普通块中获得的符号之外，还获得了 @code{inexpr-statement} 语法。  因此，@code{inexpr-statement} 上的缩进被添加到正常语句块缩进中。  @code{inexpr-statement} 句法元素不包含锚位置。
+
+C++11 的 lambda 表达式涉及语句内的块。  例如：
+
+@example
+ 1:  std::for_each(someList.begin(), someList.end(), [&total](int x) @{
+ 2:                                                     total += x;
+ 3:                                                 @});
+@end example
+
+这里，lambda 表达式从第 1 行的左括号开始，到第 3 行的右大括号结束。第 2 行，除了熟悉的 @code{defun-block-intro} 语法元素之外，还以 @code{inlambda} 元素为前缀，该元素通常用于将整个 lambda 表达式缩进到左括号下方。
+
+在 Pike 代码中，还有一些其他情况会在语句内出现块，如下所示：
+
+@example
+ 1: array itgob()
+ 2: @{
+ 3:     string s = map (backtrace()[-2][3..],
+ 4:                     lambda
+ 5:                         (mixed arg)
+ 6:                     @{
+ 7:                         return sprintf ("%t", arg);
+ 8:                     @}) * ", " + "\n";
+ 9:     return catch @{
+10:             write (s + "\n");
+11:         @};
+12: @}
+@end example
+
+@ssindex inlambda
+@ssindex lambda-intro-cont
+第 4 行到第 8 行包含一个 lambda 函数，@ccmode{} 通过 @code{lambda} 关键字识别该函数。  如果函数参数列表单独放在一行（如第 5 行），则它将获得 @code{lambda-intro-cont} 语法。  函数体被处理为内联方法体，并添加了 @code{inlambda} 语法符号。  这意味着第 6 行得到 @code{inlambda} 和 @code{inline-open}，第 8 行得到 @code{inline-close}@footnote{You might wonder why it doesn't get @code{inlambda} too.  It's because the closing brace is relative to the opening brace, which stands on its own line in this example.  If the opening brace was hanging on the previous line, then the closing brace would get the @code{inlambda} syntax too to be indented correctly.}。
+
+@ssindex inexpr-statement
+第 9 行，@code{catch} 是一个特殊函数，以语句块作为参数。  该块使用 @code{inexpr-statement} 语法作为表达式内语句进行处理，就像上面的 gcc 扩展 C 示例一样。  另一个类似的特殊函数@code{gauge}也是这样处理的。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    K&R Symbols
+@subsection K&R 符号
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@ssindex knr-argdecl-intro
+@ssindex knr-argdecl
+另外两个语法符号可以出现在旧式非原型 C 代码中@footnote{a.k.a.@: K&R C, or Kernighan & Ritchie C}：
+
+@example
+ 1: int add_three_integers(a, b, c)
+ 2:      int a;
+ 3:      int b;
+ 4:      int c;
+ 5: @{
+ 6:     return a + b + c;
+ 7: @}
+@end example
+
+这里，第 2 行是参数声明列表中的第一行，因此给出了 @code{knr-argdecl-intro} 语法符号。  后续行（即本例中的第 3 行和第 4 行）给出了 @code{knr-argdecl} 语法。
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Indentation Calculation
+@section 压痕计算
+@cindex indentation
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+行的缩进是根据语法上下文计算的 (@pxref{Syntactic Analysis})。
+
+首先，找到一个缓冲区位置，其列将作为缩进计算的基础。  它是第一个句法元素中的锚点位置，提供了所使用的锚点位置。  如果没有句法元素具有锚位置，则使用零列。
+
+其次，在 @code{c-offsets-alist} 样式变量 (@pxref{c-offsets-alist}) 中查找每个语法元素中的语法符号，该变量是语法符号和应用于这些符号的偏移量的关联列表。  这些偏移量与基础列一起添加以生成新的缩进列。
+
+让我们使用上面的两个代码示例来看看它是如何工作的。  这是我们的第一个例子：
+
+@example
+ 1: void swap( int& a, int& b )
+ 2: @{
+ 3:     int tmp = a;
+ 4:     a = b;
+ 5:     b = tmp;
+ 6: @}
+@end example
+
+假设点位于第 3 行，我们按 @key{TAB} 键重新缩进该行。  该行的语法上下文是：
+
+@example
+((defun-block-intro 29))
+@end example
+
+@noindent
+由于缓冲区位置 29 是列表中的第一个也是唯一的锚位置，因此 @ccmode{} 会转到那里并询问当前列。  该大括号位于第 0 列，因此 @ccmode{} 使用 @samp{0} 作为基列。
+
+接下来，@ccmode{}在@code{c-offsets-alist}样式变量中查找@code{defun-block-intro}。  假设它找到了值 @samp{4}；它将其添加到基础列@samp{0}，产生 4 个空格的连续缩进。
+
+由于该行的列表中只有一个语法元素，因此缩进计算已完成，该行的总缩进为 4 个空格。
+
+这是另一个例子：
+
+@example
+ 1: int add( int val, int incr, int doit )
+ 2: @{
+ 3:     if( doit )
+ 4:         @{
+ 5:             return( val + incr );
+ 6:         @}
+ 7:     return( val );
+ 8: @}
+@end example
+
+如果我们在上面的示例中在第 4 行点击 @kbd{TAB}，则会执行相同的基本过程，尽管语法上下文存在差异。  该行的上下文是：
+
+@example
+((substatement-open 46))
+@end example
+
+这里， @ccmode{} 转到缓冲区位置 46，即第 3 行 @code{if} 中的 @samp{i}。该字符位于该行的第四列中，因此基础列是 @samp{4}。  然后@ccmode{}在@code{c-offsets-alist}中查找@code{substatement-open}符号。  假设它找到值 @samp{4}。  它与基础列一起添加，并为该行产生 8 个空格的缩进。
+
+很简单吧？
+
+实际上，它比这更复杂一些，因为 @code{c-offsets-alist} 上的条目可能比简单的偏移量要多得多。 @xref{c-offsets-alist}，查看完整故事。
+
+无论如何，该模式通常只是做正确的事情，而无需您考虑这么多细节。  但是，在自定义缩进时，了解所使用的一般缩进模型会很有帮助。
+
+当您配置 @ccmode{} 时，您可能需要将变量 @code{c-echo-syntactic-information-p} 设置为非 @code{nil} ，以便当您点击 @kbd{TAB} 时，语法上下文和计算出的偏移量始终会在迷你缓冲区中回显。
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Customizing Indentation
+@chapter 自定义缩进
+@cindex customization, indentation
+@cindex indentation
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+自定义缩进的主要变量是样式变量@code{c-offsets-alist}，它为每个语法符号提供一个@dfn{offset}（缩进规则）。  其结构和语义在@ref{c-offsets-alist}中有完整描述。  设置变量的各种方法，包括使用
+@ccmode{} style system, are described in @ref{Config Basics} and its
+部分，特别是@ref{Style Variables}。
+
+@code{c-offsets-alist} 中最简单且最常用的“偏移”设置是 @code{c-basic-offset} 的倍数：
+
+@defopt c-basic-offset
+@vindex basic-offset @r{(c-)}
+该样式变量保存缩进级别之间的基本偏移量。它的出厂默认值为 4，但所有内置样式都会自行将其设置为 2（对于 @code{gnu} 样式）和 8（对于 @code{bsd}、@code{linux} 和 @code{python} 样式）之间的某个值。
+@end defopt
+
+您可以在 @code{c-offsets-alist} 中进行的最灵活的“偏移”设置是一个排列函数（甚至是它们的列表），可以是由 @ccmode{} (@pxref{Line-Up Functions}) 提供的函数，也可以是您自己编写的函数 (@pxref{Custom Line-Up})。
+
+最后，在 @ref{Other Indentation} 中，您将找到最后的工具：缩进一行后调用的钩子。  您可以在此处安装函数以对任何行的缩进进行临时调整。
+
+@menu
+* c-offsets-alist::
+* Interactive Customization::
+* Line-Up Functions::
+* Custom Line-Up::
+* Other Indentation::
+@end menu
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    c-offsets-alist
+@section c-偏移量列表
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+本节解释样式变量@code{c-offsets-alist}的结构和语义，它是配置缩进的主要变量。  有关如何设置的详细信息及其与
+@ccmode{}'s style system are given in @ref{Style Variables}.
+
+@defopt c-offsets-alist
+@vindex offsets-alist @r{(c-)}
+这是一个将偏移量与每个语法符号相关联的列表。  这个@dfn{offset}是一个规则，指定如何缩进其语法上下文与符号匹配的行。  @xref{Syntactic Analysis}。
+
+请注意，@ccmode{}缓冲区中此列表的缓冲区本地绑定包含@emph{every}语法符号的条目。  它的全局绑定及其在样式规范中的设置通常只包含几个条目。  @xref{Style Variables}。
+
+与任何特定语法符号关联的偏移量规范可以是整数、变量名、向量、函数或 lambda 表达式、另一个语法符号、列表或以下特殊符号之一：@code{+}、@code{-}、@code{++}、@code{--}、@code{*} 或 @code{/}。  下面详细描述这些值的含义。
+
+这是 @code{c-offsets-alist} 的示例片段，显示了其中一些类型的偏移量：
+
+@example
+((statement . 0)
+ (substatement . +)
+ (cpp-macro . [0])
+ (topmost-intro-cont . c-lineup-topmost-intro-cont)
+ (statement-block-intro . (add c-lineup-whitesmith-in-block
+                               c-indent-multi-line-block))
+ @dots{}
+@*)
+@end example
+@end defopt
+
+@deffn Command c-set-offset (@kbd{C-c C-o})
+@findex set-offset @r{(c-)}
+@kindex C-c C-o
+此命令更改 @code{c-offsets-alist} 当前绑定中语法符号的条目，或者如果该语法符号还没有条目，则插入一个新条目。
+
+您可以在 @ccmode{} 缓冲区中交互地使用 @code{c-set-offset} 对缩进设置进行实验性更改。 @kbd{C-c C-o} 提示您输入要更改的语法符号（默认为当前行的语法符号）和新的偏移量（默认为当前偏移量）。
+
+以编程方式使用时，@code{c-set-offset}带有两个参数：@var{symbol}，要更改的语法元素符号和@var{offset}，该语法元素的新偏移量。  您可以调用 @file{.emacs} 中的命令来更改 @code{c-offsets-alist} (@pxref{Style Variables}) 的全局绑定；您可以在钩子函数中使用它来对当前样式进行更改。  @ccmode{}本身在初始化样式时使用此函数。
+@end deffn
+
+@cindex offset specification
+@code{c-offsets-alist} 中的“偏移规格”可以是以下任意一种：
+
+@table @asis
+@item 一个整数
+该整数指定相对偏移量。  所有相对偏移@footnote{The syntactic context @code{@w{((defun-block-intro 2724) (comment-intro))}} would likely have two relative offsets.}将被加在一起并用于计算相对于缓冲区中较早的锚点位置的缩进。  @xref{Indentation Calculation}，了解详情。  大多数时候，使用 @code{+} 等特殊符号之一可能比使用整数（除了零）更好。
+
+@item 符号 @code{+}、@code{-}、@code{++}、@code{--}、@code{*} 或 @code{/} 之一
+这些特殊符号描述了 @code{c-basic-offset} 倍数的相对偏移量：
+
+通过根据 @code{c-basic-offset} 定义样式的缩进，您可以更改给予缩进级别的空白量，同时保持代码的基本形状相同。  以下是特殊符号对应的值：
+
+@table @code
+@item +
+@code{c-basic-offset}乘以1
+@item -
+@code{c-basic-offset}次@minus{}1
+@item ++
+@code{c-basic-offset} 乘以 2
+@item --
+@code{c-basic-offset}次@minus{}2
+@item *
+@code{c-basic-offset} 乘以 0.5
+@item /
+@code{c-basic-offset}倍@minus{}0.5
+@end table
+
+@item A vector
+向量的第一个元素是一个整数，设置绝对缩进列。  这将覆盖任何先前计算的缩进，但不会覆盖稍后在缩进行的语法上下文中根据语法元素计算的相对缩进。  @xref{Indentation Calculation}。  向量中第一个元素之外的任何元素都将被忽略。
+
+@item A function or lambda expression
+该函数将被调用，并且其返回值将被评估为偏移量规范。  当需要更多上下文而不仅仅是语法符号来获得所需的缩进时，函数非常有用。  @xref{Line-Up Functions} 和 @ref{Custom Line-Up}，了解有关它们的详细信息。
+
+@item Another syntactic symbol
+将使用其他语法符号的偏移量。  这对于确保两个不同的语法符号导致相同的缩进非常有用。  默认情况下，@code{enum-open} 的值为 @code{class-open}。
+
+@item A symbol with a variable binding
+如果符号还具有函数绑定，则函数优先于变量。  否则使用变量的值。  它必须是整数（用作相对偏移量）或向量（绝对偏移量）。
+
+@item A list
+偏移量也可以是一个包含多个偏移量规范的列表；这些被递归地评估和组合。  列表通常仅在某些偏移量是排列函数时才有用。  一种常见的策略是依次调用一系列函数，直到其中一个函数识别出它适合源代码行并返回非 0 值。
+
+当偏移量组合时，@code{nil}值始终被忽略。列表的第一个元素指定组合剩余元素的非 1⁣ 偏移量的方法：
+
+@table @code
+@item first
+使用第一个不计算为 @code{nil} 的偏移量。  不会评估列表的后续元素。
+@item min
+使用所有偏移量中的最小值。  一切都必须是相对的或绝对的；它们不能混合。
+@item max
+使用所有偏移量中的最大值。  一切都必须是相对的或绝对的；它们不能混合。
+@item add
+将所有评估的偏移量加在一起。  其中一个可能是绝对的，在这种情况下，结果也是绝对的。  在这种情况下，列表中绝对偏移量之前的任何相对偏移量都将被忽略。
+@end table
+
+作为兼容性措施，如果第一个元素不是上述任何一个，那么它也将被视为偏移量规范，并且整个列表将根据方法 @code{first} 进行组合。
+@end table
+
+@vindex c-strict-syntax-p
+@vindex strict-syntax-p @r{(c-)}
+如果偏移规范的计算结果为@code{nil}，则使用相对偏移 0（零）@footnote{There is however a variable @code{c-strict-syntax-p} that when set to non-@code{nil} will cause an error to be signaled in that case.  It's now considered obsolete since it doesn't work well with some of the alignment functions that return @code{nil} instead of zero.  You should therefore leave @code{c-strict-syntax-p} set to @code{nil}.}。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Interactive Customization
+@section 互动定制
+@cindex customization, interactive
+@cindex interactive customization
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+作为如何自定义缩进的示例，让我们更改此示例的样式@footnote{In this and subsequent examples, the original code is formatted using the @samp{gnu} style unless otherwise indicated.  @xref{Styles}.}：
+
+@example
+@group
+ 1: int add( int val, int incr, int doit )
+ 2: @{
+ 3:   if( doit )
+ 4:     @{
+ 5:       return( val + incr );
+ 6:     @}
+ 7:   return( val );
+ 8: @}
+@end group
+@end example
+
+@noindent
+到：
+
+@example
+@group
+ 1: int add( int val, int incr, int doit )
+ 2: @{
+ 3:   if( doit )
+ 4:   @{
+ 5:     return( val + incr );
+ 6:   @}
+ 7:   return( val );
+ 8: @}
+@end group
+@end example
+
+换句话说，我们想要更改在条件之后打开块的大括号的缩进，以便大括号在条件下对齐，而不是缩进。  请注意，我们要更改的结构从第 4 行开始。要更改行的缩进，我们需要查看哪些语法符号会影响该行的偏移量计算。  在第 4 行点击 @kbd{C-c C-s} 会产生：
+
+@example
+((substatement-open 44))
+@end example
+
+@noindent
+所以我们知道，要更改左大括号的偏移量，我们需要更改 @code{substatement-open} 语法符号的缩进。
+
+要以交互方式执行此操作，只需按 @kbd{C-c C-o}。  这会提示您更改语法符号，从而提供合理的默认值。在本例中，默认值是@code{substatement-open}，这正是我们要更改的语法符号！
+
+按回车键后，@ccmode{} 将提示您输入新的偏移值，旧值作为默认值。  本例中的默认值是 @samp{+}，但我们不希望有额外的缩进，因此输入 @samp{0} 和 @kbd{RET}。  这会将偏移量 0 与语法符号 @code{substatement-open} 相关联。
+
+要快速检查更改，只需按 @kbd{C-c C-q} (@code{c-indent-defun}) 重新缩进整个函数。  该示例现在应如下所示：
+
+@example
+@group
+ 1: int add( int val, int incr, int doit )
+ 2: @{
+ 3:   if( doit )
+ 4:   @{
+ 5:     return( val + incr );
+ 6:   @}
+ 7:   return( val );
+ 8: @}
+@end group
+@end example
+
+请注意，我们只需更改第 4 行的左大括号偏移量即可。  由于其他受影响的行相对于第 4 行缩进，因此它们会按照您期望的方式自动缩进。  对于更复杂的示例，这可能并不总是有效。  一般采取的方法是始终开始调整文件中较高行的偏移量，然后重新缩进并查看是否有任何后续行需要进一步调整。
+
+@c Move this bit to "Styles" (2005/10/7)
+@deffn Command c-set-offset symbol offset
+@findex set-offset @r{(c-)}
+@kindex C-c C-o
+这是绑定到 @kbd{C-c C-o} 的命令。  它提供了一种便捷的方式来设置 @code{c-offsets-alist} 上的偏移量，既可以交互（参见上面的示例），也可以通过模式挂钩设置。
+
+以编程方式使用时，它需要两个参数：@var{symbol}是要更改的语法元素符号，@var{offset}是该语法元素的新偏移量。
+@end deffn
+@c End of MOVE THIS BIT.
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Line-Up Functions
+@section 阵容功能
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@cindex line-up function
+@cindex indentation function
+通常，在某些情况下，语法符号上的简单偏移设置不足以获得所需的缩进 - 例如，您可能希望将右括号与匹配的左括号对齐，而不是相对于其“锚点”缩进。  @ccmode{} 通过 @dfn{line-up functions} 提供了这种灵活性。
+
+@ref{c-offsets-alist} 中描述了将排列函数与语法符号关联起来的方式。  @ccmode{} 附带了许多针对常见情况的预定义阵容函数。  如果这些都不能满足您的要求，您可以自己编写。  @xref{Custom Line-Up}。有时，通过向 @code{c-special-indent-hook} (@pxref{Other Indentation}) 添加函数来调整标准缩进会更容易。
+
+排列函数尚未针对 AWK 缓冲区进行调整或使用它们进行测试。  其中一些可能会偶然起作用。  为 AWK 模式编写自定义阵容函数应该不会有任何问题。
+
+@ref{Custom Line-Up} 中完整描述了排队函数的调用约定。  粗略地说，返回值要么是一个偏移量本身（例如 @code{+} 或 @code{[0]}），另一个排队函数，要么是 @code{nil}，意思是“这个函数在这种情况下不合适 - 尝试另一个”。  @xref{c-offsets-alist}。
+
+下面的小节描述了所有标准的排队功能，按排队所围绕的标记类型进行分类。  对于每个函数，都有一个“适用于”列表，指示该函数要与哪些语法符号一起使用。
+
+@macro workswith
+@emph{Works with:@ }
+@end macro
+@ifinfo
+@unmacro workswith
+@macro workswith
+Works with:
+@end macro
+@end ifinfo
+
+@macro sssTBasicOffset
+<--> @i{c-basic-offset}
+@end macro
+
+@macro sssTsssTBasicOffset
+<--><--> @i{c-basic-offset}
+@end macro
+
+@macro hereFn{func}
+<- @i{\func\}
+@end macro
+
+@c The TeX backend seems to insert extra spaces around the argument. :P
+@iftex
+@unmacro hereFn
+@macro hereFn{func}
+<-@i{\func\}@c
+@end macro
+@end iftex
+
+@menu
+* Brace/Paren Line-Up::
+* List Line-Up::
+* Operator Line-Up::
+* Comment Line-Up::
+* Misc Line-Up::
+@end menu
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Brace/Paren Line-Up
+@subsection 大括号和圆括号排列函数
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+这里的排列函数计算大括号、圆括号和大括号块内语句的缩进。
+
+@defun c-lineup-close-paren
+@findex lineup-close-paren @r{(c-)}
+如果左括号后面跟着代码，则将右括号排列在其相应的左括号下方。  如果左括号结束其行，则不添加缩进。  例如。：
+
+@example
+@group
+main (int,
+      char **
+     )                @hereFn{c-lineup-close-paren}
+@end group
+@end example
+
+@noindent
+和
+
+@example
+@group
+main (
+    int, char **
+)                     @hereFn{c-lineup-close-paren}
+@end group
+@end example
+
+作为一种特殊情况，如果大括号块与参数列表的左括号位于同一行，则缩进为 @code{c-basic-offset} 而不是左括号列。  有关此“DWIM”措施的进一步讨论，请参阅@code{c-lineup-arglist}。
+
+@workswith All @code{*-close} symbols.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@anchor{c-lineup-arglist-close-under-paren}
+@defun c-lineup-arglist-close-under-paren
+@findex lineup-arglist-close-under-paren @r{(c-)}
+将 @code{arglist-close} 语法符号设置为此排列函数，以便关闭参数列表的括号将在打开参数列表的括号下方排列。  它还可以与 @code{arglist-cont} 和 @code{arglist-cont-nonempty} 一起使用，将左括号下括号内的所有行对齐。
+
+作为一种特殊情况，如果大括号块与参数列表的左括号位于同一行，则缩进仅为 @code{c-basic-offset}。  有关此“DWIM”措施的进一步讨论，请参阅@code{c-lineup-arglist}。
+
+@workswith Almost all symbols, but are typically most useful on
+@code{arglist-close}、@code{brace-list-close}、@code{enum-close}、@code{arglist-cont} 和 @code{arglist-cont-nonempty}。
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-indent-one-line-block
+@findex indent-one-line-block @r{(c-)}
+额外缩进一行块 @code{c-basic-offset}。  例如。：
+
+@example
+@group
+if (n > 0)
+    @{m+=n; n=0;@}      @hereFn{c-indent-one-line-block}
+@sssTBasicOffset{}
+@end group
+@end example
+
+@noindent
+和
+
+@example
+@group
+if (n > 0)
+@{                     @hereFn{c-indent-one-line-block}
+    m+=n; n=0;
+@}
+@end group
+@end example
+
+该块可以被任何类型的括号字符包围。如果该行不是以单行块开头，则返回 @code{nil}，这使得该函数可以在列表表达式中使用。
+
+@workswith Almost all syntactic symbols, but most useful on the
+@code{-open} 符号。
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-indent-multi-line-block
+@findex indent-multi-line-block @r{(c-)}
+多行块额外缩进 @code{c-basic-offset}。  例如。：
+
+@example
+@group
+int *foo[] = @{
+    NULL,
+    @{17@},             @hereFn{c-indent-multi-line-block}
+@end group
+@end example
+
+@noindent
+和
+
+@example
+@group
+int *foo[] = @{
+    NULL,
+        @{             @hereFn{c-indent-multi-line-block}
+        17
+        @},
+    @sssTBasicOffset{}
+@end group
+@end example
+
+该块可以被任何类型的括号字符包围。如果该行不以多行块开头，则返回 @code{nil}，这使得该函数可在列表表达式中使用。
+
+@workswith Almost all syntactic symbols, but most useful on the
+@code{-open} 符号。
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-runin-statements
+@findex lineup-runin-statements @r{(c-)}
+按照编码标准排列语句，将块中的第一个语句与块左大括号@footnote{Run-in style doesn't really work too well.  You might need to write your own custom line-up functions to better support this style.}放在同一行。  例如。：
+
+@example
+@group
+int main()
+@{ puts ("Hello!");
+  return 0;           @hereFn{c-lineup-runin-statements}
+@}
+@end group
+@end example
+
+如果左大括号后面没有要对齐的语句，则返回 @code{nil}。  这使得该函数可以在列表表达式中使用。
+
+@workswith The @code{statement} syntactic symbol.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-inexpr-block
+@findex lineup-inexpr-block @r{(c-)}
+这可以与表达式内块符号一起使用，将整个块缩进到构造开始的列。  例如，对于 Java 匿名类，这会将类排列在 @samp{new} 关键字下，而在 Pike 中，它将 lambda 函数体排列在 @samp{lambda} 关键字下。  如果该块不是此类构造的一部分，则返回 @code{nil}。
+
+@workswith @code{inlambda}, @code{inexpr-statement},
+@code{inexpr-class}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-after-whitesmith-blocks
+@findex lineup-after-whitesmith-blocks @r{(c-)}
+补偿怀特史密斯风格的块缩进。  由于方式
+@ccmode{} calculates anchor positions for normal lines inside blocks,
+此功能对于这些行获得正确的 Whitesmith 风格缩进是必要的。  考虑以下示例：
+
+@example
+@group
+int foo()
+    @{
+    a;
+    x;                 @hereFn{c-lineup-after-whitesmith-blocks}
+@end group
+@end example
+
+@example
+@group
+int foo()
+    @{
+        @{
+        a;
+        @}
+    x;                 @hereFn{c-lineup-after-whitesmith-blocks}
+@end group
+@end example
+
+事实上，在后一种情况下，带有 @code{x} 的行前面是 Whitesmith 风格的缩进块，而不是第一个，这一事实不应影响其缩进。  但由于在这种情况下 CC 模式使用前一个语句的缩进作为锚点位置，如果 @code{statement} 的偏移量简单地设置为零，则在第二种情况下 @code{x} 会缩进太多。
+
+此阵容函数通过检测锚点位置是否位于左括号字符来纠正这种情况。  在这种情况下，它会相对于周围的块缩进，就像 0⁣ 一样。
+
+@workswith @code{brace-list-entry}, @code{brace-entry-open},
+@code{enum-entry}, @code{statement}, @code{arglist-cont}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-whitesmith-in-block
+@findex lineup-whitesmith-in-block @r{(c-)}
+以 Whitesmith 风格在块内排列线条。  它的完成方式在左括号悬挂和不悬挂时都有效。  例如。：
+
+@example
+@group
+something
+    @{
+    foo;              @hereFn{c-lineup-whitesmith-in-block}
+    @}
+@end group
+@end example
+
+@noindent
+和
+
+@example
+@group
+something @{
+    foo;              @hereFn{c-lineup-whitesmith-in-block}
+    @}
+@sssTBasicOffset{}
+@end group
+@end example
+
+在第一种情况下，缩进保持不变，在第二种情况下添加了 0⁣。
+
+@workswith @code{defun-close}, @code{defun-block-intro},
+@code{inline-close}、@code{block-close}、@code{brace-list-close}、@code{brace-list-intro}、@code{enum-close}、@code{enum-intro}、@code{statement-block-intro}、@code{arglist-intro}、@code{arglist-cont-nonempty}、@code{arglist-close} 和所有 @code{in*} 符号，例如@code{inclass}和@code{inextern-lang}。
+@end defun
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    List Line-Up
+@subsection 列出阵容功能
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+这里的排列函数计算形成项目列表的行的缩进，通常用逗号分隔。
+
+函数@ref{c-lineup-arglist-close-under-paren}主要用于缩进右括号，对于括号内包含的行也很有用。
+
+@defun c-lineup-arglist
+@findex lineup-arglist @r{(c-)}
+将当前参数行排列在第一个参数下方。
+
+作为一种特殊情况，如果与左括号位于同一行的参数以大括号开头，则缩进仅为 @code{c-basic-offset}。  这旨在作为包含语句块的宏等情况下的“DWIM”度量，例如：
+
+@example
+@group
+A_VERY_LONG_MACRO_NAME (@{
+        some (code, with + long, lines * in[it]);
+    @});
+@sssTBasicOffset{}
+@end group
+@end example
+
+这样做的部分原因是它更符合代码块的处理方式，部分原因是它近似于早期 CC 模式版本的行为，由于不准确的分析往往会以这种方式缩进此类情况。
+
+@workswith @code{arglist-cont-nonempty}, @code{arglist-close}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-arglist-intro-after-paren
+@findex lineup-arglist-intro-after-paren @r{(c-)}
+在周围括号或大括号块的左括号后面对齐一行。
+
+@workswith @code{defun-block-intro}, @code{brace-list-intro},
+@code{enum-intro}, @code{statement-block-intro}, @code{statement-case-intro}, @code{arglist-intro}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-2nd-brace-entry-in-arglist
+@findex lineup-2nd-brace-entry-in-arglist (c-)
+当第一行也包含在 arglist 或大括号 @emph{on that line} 中时，将大括号块的第二个条目排列在第一个条目下方。
+
+换句话说，处理如下：
+
+@example
+@group
+set_line (line_t @{point_t@{0.4, 0.2@},
+                  point_t@{0.2, 0.5@},       @hereFn{brace-list-intro}
+                  .....@});
+         ^ enclosing parenthesis.
+@end group
+@end example
+
+
+该示例的中间行将具有包含三个语法符号的语法上下文：@code{arglist-cont-nonempty}、@code{brace-list-intro} 和 @code{brace-list-entry} (@pxref{Brace List Symbols})。
+
+此函数旨在用于列表中。  如果正在分析的构造与前面的构造不同，则该函数返回@code{nil}。否则，它返回函数 @code{c-lineup-arglist-intro-after-paren}，调用者随后使用该函数来执行缩进。
+
+@workswith{} @code{brace-list-intro}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-item-after-paren-at-boi
+@findex lineup-item-after-paren-at-boi (c-)
+当括号是其行中最左边的非空格字符时，在同一行的第一个条目下与左括号对齐。例如：
+
+@example
+@group
+template <typename T>
+requires
+    ( requires (T t) @{ ++t; @}
+      && Baz<T>)      @hereFn{constraint-cont}
+int foo();
+@end group
+@end example
+
+
+此函数旨在用于列表中。  如果正在分析的构造不符合上述描述，则该函数返回 nil。  否则它返回一个包含缩进的向量。
+
+@workswith{} @code{brace-list-intro}, @code{enum-intro},
+@code{constraint-cont}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-class-decl-init-+
+@findex lineup-class-decl-init-+ (c-)
+在以下情况下，将标识符中的类（等）初始值设定项的第二个条目 @code{c-basic-offset} 字符排列起来：
+@enumerate
+@item
+类型是类、结构、联合等@:（但不是枚举）；
+@item
+类型声明中有一个大括号块，指定它；和
+@item
+初始化器的第一个元素与其左大括号位于同一行。
+@end enumerate
+
+换句话说，我们有这样的构造：
+
+@example
+@group
+struct STR @{
+    int i; float f;
+@} str_1 = @{1, 1.7@},
+    str_2 = @{2,
+         3.1          @hereFn{brace-list-intro}
+    @};
+    @sssTBasicOffset{}
+@end group
+@end example
+
+
+请注意，@code{brace-list-intro}行的语法上下文也有一个带有符号@code{brace-list-entry} (@pxref{Brace List Symbols}) 的语法元素。
+
+此函数旨在用于列表中。  如果上述结构不存在，则该函数返回@code{nil}，允许使用不同的偏移量规范来缩进该行。
+
+@workswith{} @code{brace-list-intro}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-class-decl-init-after-brace
+@findex lineup-class-decl-init-after-brace (c-)
+在以下情况下，将类（等）初始值设定项的第二个条目在左大括号后对齐：
+@enumerate
+@item
+类型是类、结构、联合等@:（但不是枚举）；
+@item
+类型声明中有一个大括号块，指定它；和
+@item
+初始化器的第一个元素与其左大括号位于同一行。
+@end enumerate
+
+换句话说，我们有这样的构造：
+
+@example
+@group
+struct STR @{
+    int i; float f;
+@} str_1 = @{1, 1.7@},
+    str_2 = @{2,
+             3.1      @hereFn{brace-list-intro}
+    @};
+@end group
+@end example
+
+
+请注意，@code{brace-list-intro}行的语法上下文也有一个带有符号@code{brace-list-entry} (@pxref{Brace List Symbols}) 的语法元素。  另请注意，该函数通过返回符号 @code{c-lineup-arglist-intro-after-paren} 来工作，调用者随后使用该符号来执行缩进。
+
+此函数旨在用于列表中。  如果上述结构不存在，则该函数返回@code{nil}，允许使用不同的偏移量规范来缩进该行。
+
+@workswith{} @code{brace-list-intro}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-multi-inher
+@findex lineup-multi-inher @r{(c-)}
+将 C++ 多重继承子句和成员初始值设定项中的类排列在一起。  例如。：
+
+@example
+@group
+Foo::Foo (int a, int b):
+    Cyphr (a),
+    Bar (b)           @hereFn{c-lineup-multi-inher}
+@end group
+@end example
+
+@noindent
+和
+
+@example
+@group
+class Foo
+    : public Cyphr,
+      public Bar      @hereFn{c-lineup-multi-inher}
+@end group
+@end example
+
+@noindent
+和
+
+@example
+@group
+Foo::Foo (int a, int b)
+    : Cyphr (a)
+    , Bar (b)         @hereFn{c-lineup-multi-inher}
+@end group
+@end example
+
+@workswith @code{inher-cont}, @code{member-init-cont}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-java-inher
+@findex lineup-java-inher @r{(c-)}
+排列 Java 实现和扩展声明。  如果类名与 @samp{implements}/@samp{extends} ​​关键字位于同一行，则它们会相互排列。  否则，通过在关键字列中添加 @code{c-basic-offset} 来缩进它们。例如。：
+
+@example
+@group
+class Foo
+    extends
+        Bar           @hereFn{c-lineup-java-inher}
+    @sssTBasicOffset{}
+@end group
+@end example
+
+@noindent
+和
+
+@example
+@group
+class Foo
+    extends Cyphr,
+            Bar       @hereFn{c-lineup-java-inher}
+@end group
+@end example
+
+@workswith @code{inher-cont}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-java-throws
+@findex lineup-java-throws @r{(c-)}
+排列 Java 抛出声明。  如果异常名称与 throws 关键字位于同一行，则它们会相互排列。否则，通过将 @code{c-basic-offset} 添加到 @samp{throws} 关键字的列来缩进它们。  如果 @samp{throws} 关键字本身没有挂起，它也会从函数声明开始处缩进 @code{c-basic-offset}。  例如。：
+
+@example
+@group
+int foo()
+    throws            @hereFn{c-lineup-java-throws}
+        Bar           @hereFn{c-lineup-java-throws}
+@sssTsssTBasicOffset{}
+@end group
+@end example
+
+@noindent
+和
+
+@example
+@group
+int foo() throws Cyphr,
+                 Bar,    @hereFn{c-lineup-java-throws}
+                 Vlod    @hereFn{c-lineup-java-throws}
+@end group
+@end example
+
+@workswith @code{func-decl-cont}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-template-args
+@findex lineup-template-args @r{(c-)}
+将模板参数列表的参数彼此对齐，但仅限于第一个参数与开头 @samp{<} 位于同一行的情况。
+
+为了允许在列表表达式中使用此函数，如果第一行没有模板参数，则返回 @code{nil}。
+
+@workswith @code{template-args-cont}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-template-args-indented-from-margin
+@findex lineup-template-args-indented-from-margin (c-)
+从包含 < 的行的左侧边距缩进模板参数行 @code{c-basic-offset}。
+
+@workswith @code{template-args-cont}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-ObjC-method-call
+@findex lineup-ObjC-method-call @r{(c-)}
+对于 Objective-C 代码，像 Emacs Lisp 模式对函数参数那样排列选择器参数：转到消息接收者之后的位置，如果位于行尾，则从左括号缩进当前行 c-basic-offset 列；否则，您将查看第一个方法调用参数的第一个字符，因此将当前行与它对齐。
+
+@workswith @code{objc-method-call-cont}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-ObjC-method-args
+@findex lineup-ObjC-method-args @r{(c-)}
+对于 Objective-C 代码，请将分隔参数的冒号对齐。  当前行的冒号与第一行的冒号对齐。
+
+@workswith @code{objc-method-args-cont}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-ObjC-method-args-2
+@findex lineup-ObjC-method-args-2 @r{(c-)}
+与 @code{c-lineup-ObjC-method-args} 类似，但将当前行的冒号与上一行的冒号对齐。
+
+@workswith @code{objc-method-args-cont}.
+@end defun
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Operator Line-Up
+@subsection 操作员阵容功能
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+这里的排队函数通过将其与前一行上的某些内容对齐来计算以运算符开头的行的缩进。
+
+@defun c-lineup-argcont
+@findex lineup-argcont @r{(c-)}
+排列一个持续的论点。  例如。：
+
+@example
+@group
+foo (xyz, aaa + bbb + ccc
+          + ddd + eee + fff);  @hereFn{c-lineup-argcont}
+@end group
+@end example
+
+只有像这样的连续行才会被触及，在参数开始的行上返回 @code{nil} 。
+
+在 gcc @code{asm} 块中，@code{:} 被识别为参数分隔符，但当然仅在操作数规范之间，而不是在操作数的表达式中。
+
+@workswith @code{arglist-cont}, @code{arglist-cont-nonempty}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-argcont-+
+@findex lineup-argcont-+ (c-)
+在上一行的当前嵌套级别上，从第一个参数的开头缩进连续参数 @code{c-basic-offset} 空格。
+
+@example
+@group
+foo (xyz, uvw, aaa + bbb + ccc
+         + ddd + eee + fff);    <- c-lineup-argcont-+
+     <-->                          c-basic-offset
+@end group
+@end example
+
+只有像这样的连续行才会被触及，@code{nil} 在作为参数开始的行上返回。
+
+在 gcc @code{asm} 块中，@code{:} 被识别为参数分隔符，但当然仅在操作数规范之间，而不是在操作数的表达式中。
+
+@workswith @code{arglist-cont}, @code{arglist-cont-nonempty}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-arglist-operators
+@findex lineup-arglist-operators @r{(c-)}
+在左括号下排列以中缀运算符开头的行。在不以运算符开头的行上返回 @code{nil}，将这些情况留给其他队列函数。  例子：
+
+@example
+@group
+if (  x < 10
+   || at_limit (x,     @hereFn{c-lineup-arglist-operators}
+                list)  @hereFn{c-lineup-arglist-operators@r{ returns nil}}
+   )
+@end group
+@end example
+
+由于此函数对没有中缀运算符的行不起作用，因此您通常希望将其与其他一些阵容设置一起使用，例如，如下所示（@code{arglist-close}设置只是获得一致样式的建议）：
+
+@example
+(c-set-offset 'arglist-cont
+              '(c-lineup-arglist-operators 0))
+(c-set-offset 'arglist-cont-nonempty
+              '(c-lineup-arglist-operators c-lineup-arglist))
+(c-set-offset 'arglist-close
+              '(c-lineup-arglist-close-under-paren))
+@end example
+
+@workswith @code{arglist-cont}, @code{arglist-cont-nonempty}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-assignments
+@findex lineup-assignments @r{(c-)}
+将当前行排列在语句中第一行的赋值运算符之后。  如果没有，则返回 @code{nil} 以允许与其他队列函数堆叠。  如果当前行也包含赋值运算符，请尝试将其与第一个运算符对齐。
+
+@workswith @code{topmost-intro-cont}, @code{statement-cont},
+@code{arglist-cont}, @code{arglist-cont-nonempty}.
+
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-math
+@findex lineup-math @r{(c-)}
+与 @code{c-lineup-assignments} 类似，但如果第一行没有找到赋值运算符，则使用 @code{c-basic-offset} 缩进。  即，该函数与指定列表 @code{(c-lineup-assignments +)} 相同。  提供它是为了与旧配置兼容。
+
+@workswith @code{topmost-intro-cont}, @code{statement-cont},
+@code{arglist-cont}, @code{arglist-cont-nonempty}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-ternary-bodies
+@findex lineup-ternary-bodies @r{(c-)}
+排列三元运算符的 true 和 false 分支（即 @code{?:}）。  更准确地说，如果该行以冒号开头，而冒号是所述运算符的一部分，则将其与相应的问号对齐。  例如：
+
+@example
+@group
+return arg % 2 == 0 ? arg / 2
+                    : (3 * arg + 1);    @hereFn{c-lineup-ternary-bodies}
+@end group
+@end example
+
+@workswith @code{arglist-cont}, @code{arglist-cont-nonempty} and
+@code{statement-cont}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-cascaded-calls
+@findex lineup-cascaded-calls @r{(c-)}
+将“级联调用”排列在彼此下方。  如果该行以 @code{->} 或 @code{.} 开头，并且前一行以一个或多个函数调用结束，且前面有相同的标记，则箭头将与这些标记中的第一个标记对齐。  例如。：
+
+@example
+@group
+r = proc->add(17)->add(18)
+        ->add(19) +         @hereFn{c-lineup-cascaded-calls}
+  offset;                   @hereFn{c-lineup-cascaded-calls@r{ (inactive)}}
+@end group
+@end example
+
+在任何其他情况下，都会返回 @code{nil} 以允许在列表表达式中使用。
+
+@workswith @code{topmost-intro-cont}, @code{statement-cont},
+@code{arglist-cont}, @code{arglist-cont-nonempty}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-streamop
+@findex lineup-streamop @r{(c-)}
+排列 C++ 流运算符（即 @samp{<<} 和 @samp{>>}）。
+
+@workswith @code{stream-op}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-string-cont
+@findex lineup-string-cont @r{(c-)}
+将连续的字符串排在其继续的字符串下方。  从这个意义上来说，连续字符串是指一个字符串直接跟在另一个字符串之后。  例如。：
+
+@example
+@group
+result = prefix + "A message "
+                  "string.";    @hereFn{c-lineup-string-cont}
+@end group
+@end example
+
+@code{nil} 在其他情况下返回，以允许与其他阵容函数堆叠。
+
+@workswith @code{topmost-intro-cont}, @code{statement-cont},
+@code{arglist-cont}, @code{arglist-cont-nonempty}.
+@end defun
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Comment Line-Up
+@subsection 评论队列功能
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+这里的阵容函数计算几种类型的注释结构的缩进。
+
+@defun c-lineup-C-comments
+@findex lineup-C-comments @r{(c-)}
+排列 C 块注释延续行。  使用各种启发式方法来处理大多数常见的评论样式。  一些例子：
+
+@example
+@group
+/*                 /**               /*
+ * text             * text             text
+ */                 */               */
+@end group
+@end example
+
+@example
+@group
+/* text            /*                /**
+   text            ** text            ** text
+*/                 */                 */
+@end group
+@end example
+
+@example
+@group
+/**************************************************
+ * text
+ *************************************************/
+@end group
+@end example
+
+@vindex comment-start-skip
+@example
+@group
+/**************************************************
+    Free form text comments:
+ In comments with a long delimiter line at the
+ start, the indentation is kept unchanged for lines
+ that start with an empty comment line prefix.  The
+ delimiter line is whatever matches the
+ @code{comment-start-skip} regexp.
+**************************************************/
+@end group
+@end example
+
+样式变量 @code{c-comment-prefix-regexp} 用于识别注释行前缀，例如 @samp{*} 通常在注释中的每一行开始。
+
+@workswith The @code{c} syntactic symbol.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-comment
+@findex lineup-comment @r{(c-)}
+根据样式变量@code{c-comment-only-line-offset}排列注释行。  如果注释与上一行的注释开头对齐，则保留该对齐方式。
+
+@defopt c-comment-only-line-offset
+@vindex comment-only-line-offset @r{(c-)}
+此样式变量指定线条的额外偏移量。  它可以包含以下形式的整数或 cons 单元格
+
+@example
+(@r{@var{non-anchored-offset}} . @r{@var{anchored-offset}})
+@end example
+
+@noindent
+其中 @var{non-anchored-offset} 是给予非零列锚定线的偏移量，@var{anchored-offset} 是给予零列锚定线的偏移量。  仅整数作为值相当于@code{(@r{@var{value}} . -1000)}。
+@end defopt
+
+@workswith @code{comment-intro}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-knr-region-comment
+@findex lineup-knr-region-comment @r{(c-)}
+将“K&R 区域”中的注释与声明对齐。  这是函数或类头与块开头之间的区域。  例如。：
+
+@example
+@group
+int main()
+/* Called at startup. */  @hereFn{c-lineup-knr-region-comment}
+@{
+  return 0;
+@}
+@end group
+@end example
+
+如果在任何其他情况下调用，则返回 @code{nil}，这在列表表达式中很有用。
+
+@workswith @code{comment-intro}.
+@end defun
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Misc Line-Up
+@subsection 杂项阵容功能
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+这里的阵容功能是不属于任何早期类别的零碎东西。
+
+@defun c-lineup-dont-change
+@findex lineup-dont-change @r{(c-)}
+此排列功能使线条保持在其已有的任何缩进处；将其视为阵容的恒等函数。
+
+@workswith Any syntactic symbol.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-under-anchor
+
+在其锚点正下方对齐一条线。  这类似于@samp{0}，只是忽略任何先前计算的偏移量贡献。
+
+@workswith Any syntactic symbol which has an anchor point.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-cpp-define
+@findex lineup-cpp-define @r{(c-)}
+根据宏前面的结构的缩进排列宏延续行。  例如。：
+
+@example
+@group
+const char msg[] =    @hereFn{@r{The beginning of the preceding construct.}}
+  \"Some text.\";
+
+#define X(A, B)  \
+do @{             \    @hereFn{c-lineup-cpp-define}
+  printf (A, B); \
+@} while (0)
+@end group
+@end example
+
+@noindent
+和：
+
+@example
+@group
+int dribble() @{
+  if (!running)       @hereFn{@r{The beginning of the preceding construct.}}
+    error(\"Not running!\");
+
+#define X(A, B)    \
+  do @{             \  @hereFn{c-lineup-cpp-define}
+    printf (A, B); \
+  @} while (0)
+@end group
+@end example
+
+如果@code{c-syntactic-indentation-in-macros}非@code{nil}，该函数返回宏起始行的相对缩进，以允许与其他偏移量进行累加。  例如，在以下情况下，@code{cpp-define-intro} 与来自 @samp{do @{} that hangs on the @samp{#define} line: 的 @code{statement-block-intro} 组合
+
+@example
+@group
+const char msg[] =
+  \"Some text.\";
+
+#define X(A, B) do @{ \
+  printf (A, B);     \  @hereFn{c-lineup-cpp-define}
+  this->refs++;      \
+@} while (0)             @hereFn{c-lineup-cpp-define}
+@end group
+@end example
+
+@noindent
+和：
+
+@example
+@group
+int dribble() @{
+  if (!running)
+    error(\"Not running!\");
+
+#define X(A, B) do @{ \
+    printf (A, B);   \  @hereFn{c-lineup-cpp-define}
+    this->refs++;    \
+  @} while (0)           @hereFn{c-lineup-cpp-define}
+@end group
+@end example
+
+在每个示例的两行上，@code{c-lineup-cpp-define} 返回的相对缩进分别为零和二。  然后将它们添加到 @code{statement-block-intro} 在这两种情况下给出的两列缩进中。
+
+如果相对缩进为零，则返回 @code{nil}。  这在列表表达式中非常有用，可以指定顶层的默认缩进。
+
+如果 @code{c-syntactic-indentation-in-macros} 是 @code{nil} 那么此函数将保持当前缩进，但空行（忽略结尾反斜杠）除外，它从宏中最近的前一个非空行获取缩进。  如果宏中没有这样的行，则缩进将从其前面的构造中获取，如上所述。
+
+@workswith @code{cpp-define-intro}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-gcc-asm-reg
+@findex lineup-gcc-asm-reg @r{(c-)}
+将 gcc asm 寄存器排列在上一行的寄存器下方。
+
+@example
+@group
+    asm ("foo %1, %0\n"
+         "bar %0, %1"
+         : "=r" (w),
+           "=r" (x)
+         :  "0" (y),
+            "1" (z));
+@end group
+@end example
+
+@samp{x} 行与 @samp{w} 行上 @samp{:} 之后的文本对齐，与 @samp{y} 下的 @samp{z} 类似。
+
+这仅在 @samp{asm} 或 @samp{__asm__} 块中完成，并且仅针对提到的那些行。  在其他任何地方都会返回 @code{nil} 。  通常的安排是在​​ arglist 队列开始时将此例程作为额外功能，例如：
+
+@example
+(c-lineup-gcc-asm-reg c-lineup-arglist)
+@end example
+
+@workswith @code{arglist-cont}, @code{arglist-cont-nonempty}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-topmost-intro-cont
+@findex lineup-topmost-intro-cont @r{(c-)}
+对齐声明延续行零或一个缩进步骤@footnote{This function is mainly provided to mimic the behavior of CC Mode 5.28 and earlier where this case wasn't handled consistently so that those lines could be analyzed as either topmost-intro-cont or statement-cont.  It's used for @code{topmost-intro-cont} by default, but you might consider using @code{+} instead.}。  对于定义之前的行，使用零。  对于其他行，将 @code{c-basic-offset} 添加到缩进中。  例如。：
+
+@example
+@group
+int
+neg (int i)           @hereFn{c-lineup-topmost-intro-cont}
+@{
+    return -i;
+@}
+@end group
+@end example
+
+@noindent
+和
+
+@example
+@group
+struct
+larch                 @hereFn{c-lineup-topmost-intro-cont}
+@{
+    double height;
+@}
+    the_larch,        @hereFn{c-lineup-topmost-intro-cont}
+    another_larch;    @hereFn{c-lineup-topmost-intro-cont}
+@sssTBasicOffset{}
+@end group
+@end example
+
+@noindent
+和
+
+@example
+@group
+struct larch
+the_larch,            @hereFn{c-lineup-topmost-intro-cont}
+    another_larch;    @hereFn{c-lineup-topmost-intro-cont}
+@end group
+@end example
+
+@workswith @code{topmost-intro-cont}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-class-field-cont
+@findex lineup-class-field-cont (c-)
+将连续行缩进零或一个 @code{c-basic-offset} 步。这用于类/结构等构造中的连续行。  对于遵循模板规范的声明，使用零步。  其他结构缩进一级。
+
+@workswith @code{class-field-cont}.
+@end defun
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Custom Line-Up
+@section 自定义阵容功能
+@cindex customization, indentation functions
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+自定义缩进最灵活的方法是编写自定义排列函数，并将它们与特定的语法符号 (@pxref{c-offsets-alist}) 相关联。  根据您想要的效果，编写 @code{c-special-indent-hook} 函数可能比编写队列函数 (@pxref{Other Indentation}) 更好。
+
+@ccmode{} comes with an extensive set of predefined line-up functions,
+并非所有这些都被默认样式使用。  所以你想要的功能很可能已经存在。  @xref{Line-Up Functions}，查看它们的列表。  如果您编写自己的阵容函数，那么从这些预定义函数之一开始工作可能是个好主意，可以在文件 @file{cc-align.el}.h 中找到该函数。  如果您编写了一个您认为普遍有用的排队函数，非常欢迎您贡献它；请联系@email{bug-cc-mode@@gnu.org}。
+
+队列函数传递一个参数，即语法元素（见下文）。  在调用时，点将位于缩进行上的某个位置。  返回值是 @code{c-offsets-alist} 偏移量规范：例如，整数、符号（如 @code{+}）、向量、@code{nil}@footnote{Returning @code{nil} is useful when the offset specification for a syntactic element is a list containing the line-up function (@pxref{c-offsets-alist}).}，甚至另一个排列函数。  这些的完整细节在@ref{c-offsets-alist}中。
+
+排列函数不得移动点或更改缓冲区的内容（临时除外）。  然而，它们可以执行 @dfn{hidden buffer changes} 操作，即设置用于缓存目的的文本属性等。在它们运行时，缓冲区撤消记录被禁用。
+
+作为参数传递给排列函数的语法元素是以下形式的 cons 单元
+
+@example
+(@r{@var{syntactic-symbol}} . @r{@var{anchor-position}})
+@end example
+
+@noindent
+@c FIXME!!! The following sentence might be better omitted, since the
+@c information is in the cross reference "Syntactic Analysis".  2005/10/2.
+其中 @var{syntactic-symbol} 是调用该函数的符号，@var{anchor-position} 是触发语法符号 (@pxref{Syntactic Analysis}) 的构造的锚点位置（如果有）。  这个 cons 单元是 @ccmode{} 5.28 及更早版本中用来表示线条的句法元素的方式。  阵容功能仍然通过此 cons 单元，以便保持与旧配置的兼容性。  将来，我们可能决定转换为使用完整列表格式——您可以使用下面描述的访问函数（@code{c-langelem-sym}等）@:为此准备设置。
+
+@vindex c-syntactic-element
+@vindex syntactic-element @r{(c-)}
+@vindex c-syntactic-context
+@vindex syntactic-context @r{(c-)}
+一些句法符号，例如 @code{arglist-cont-nonempty}，在句法元素中包含更多信息：通常除了锚位置之外还有其他可能有趣的位置。  该信息无法通过传递的参数访问，该参数是一个 cons 单元。  相反，您可以从变量 @code{c-syntactic-element} 获取此信息，该变量动态绑定到完整的语法元素。  变量 @code{c-syntactic-context} 也可能很有用：它动态绑定到完整的语法上下文。  @xref{Custom Braces}。
+
+@ccmode{} provides a few functions to access parts of syntactic
+以更抽象的方式呈现元素。  除了使代码更易于阅读之外，它们还隐藏了 line-up 函数参数中使用的旧 cons 单元格形式与 0⁣ 和其他地方使用的新列表形式之间的区别。  其功能是：
+
+@defun c-langelem-sym langelem
+@findex langelem-sym @r{(c-)}
+返回@var{langelem}中的语法符号。
+@end defun
+
+@defun c-langelem-pos langelem
+@findex langelem-pos @r{(c-)}
+返回 @var{langelem} 中的锚点位置，如果没有则返回 @code{nil} 中的锚点位置。
+@end defun
+
+@defun c-langelem-col langelem &optional preserve-point
+@findex langelem-col @r{(c-)}
+返回 @var{langelem} 中锚点位置的列。  也将点移动到该位置，除非 1⁣ 是非 2⁣。
+@end defun
+
+@defun c-langelem-2nd-pos langelem
+@findex langelem-2nd-pos @r{(c-)}
+返回@var{langelem}中的次要位置，如果没有则返回@code{nil}。
+
+请注意，如果@var{langelem}采用旧的 cons 单元格形式，则该函数的返回值始终为@code{nil}。  因此，该函数仅在用于取自 @code{c-syntactic-element} 或 @code{c-syntactic-context} 的语法元素时才有意义。
+@end defun
+
+有时，您可能需要使用缩进行以外的一行的语法上下文。  您可以通过（暂时）将点移动到这条线上并调用 @code{c-guess-basic-syntax} (@pxref{Syntactic Analysis}) 来确定这一点。
+
+自定义排列函数可以像您喜欢的那样简单或复杂，并且出现在 @code{c-offsets-alist} 中的任何语法符号都可以有一个与之关联的自定义排列函数。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Other Indentation
+@section 其他特殊压痕
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+配置您在不终止 @samp{;}、@pxref{Macros with ;} 的情况下调用的宏。
+
+以下是有关缩进的剩余细节：
+
+@defopt c-label-minimum-indentation
+@vindex label-minimum-indentation @r{(c-)}
+在 @samp{gnu} 样式 (@pxref{Built-in Styles}) 中，代码块内的行施加最小缩进。  最小缩进由该样式变量控制。  默认值为 1。
+
+@findex c-gnu-impose-minimum
+@findex gnu-impose-minimum @r{(c-)}
+函数 @code{c-gnu-impose-minimum} 强制执行最小缩进。  它必须出现在 @code{c-special-indent-hook} 上才能工作。
+@end defopt
+
+@defopt c-special-indent-hook
+@vindex special-indent-hook @r{(c-)}
+这个样式变量是一个标准的钩子变量，在每行缩进 @ccmode{} 后调用。  仅当@code{c-syntactic-indentation}非@code{nil}（默认情况下为@pxref{Indentation Engine Basics}）时才会调用它。  您可以在这个钩子上放置一个函数来执行您的风格所要求的任何特殊缩进或临时行调整，例如向类定义中的构造函数或析构函数声明添加额外的缩进等。有时最好编写一个自定义的排列函数 (@pxref{Custom Line-Up})。
+
+当缩进引擎调用此钩子时，变量 @code{c-syntactic-context} 绑定到当前语法上下文（即，通过在源代码行上键入 @kbd{C-c C-s} 得到的内容。@xref{Custom Braces}。）。  请注意，您不应在 @code{c-special-indent-hook} 函数内更改点或标记，即，您可能希望将函数包装在 @code{save-excursion}@footnote{The numerical value returned by @code{point} will change if you change the indentation of the line within a @code{save-excursion} form, but point itself will still be over the same piece of text.} 中。
+
+在样式定义中设置 @code{c-special-indent-hook} 的处理方式与其他变量略有不同——样式只能向此钩子添加函数，而不能删除它们。  @xref{Style Variables}。
+@end defopt
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Custom Macros
+@chapter 自定义宏
+@cindex macros
+@cindex preprocessor directives
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+C、C++ 和 Objective C（由@code{#define}引入）中的预处理器宏具有与主语言不同的语法——例如，宏声明不是以分号终止的，如果它超过一行，则必须使用反斜杠转义其中的换行符。  @ccmode{} 有一些操作这些命令的命令，请参阅@ref{Macro Backslashes}。
+
+通常，多行宏中的行相对于彼此缩进，就像它们是代码一样。  您可以通过设置以下用户选项来抑制此行为：
+
+@defopt c-syntactic-indentation-in-macros
+@vindex syntactic-indentation-in-macros @r{(c-)}
+在宏内部启用语法分析，这是默认设置。  如果这是@code{nil}，则宏定义内的所有行都将被分析为@code{cpp-macro-cont}。
+@end defopt
+
+有时您可能想要缩进特定指令（例如，@code{#pragma}），就像它们是语句一样。  为此，请参阅@ref{Indenting Directives}。
+
+因为宏可以扩展为任何内容，所以在调用位置附近 @ccmode{} 只能试探性地缩进和字体化代码。有时它会弄错。  通常，您应该尝试设计宏，以便在调用它们时它们“看起来像普通代码”。然而，有两种情况非常常见，因此 @ccmode{} 会专门处理它们：即某些宏不需要（或不得）后跟 @samp{;} 时，以及某些宏（或编译器指令）扩展为空时。  您需要配置@ccmode{}才能正确处理这些宏，请参阅@ref{Macros with ;}和@ref{Noise Macros}。
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@menu
+* Macro Backslashes::
+* Macros with ;::
+* Noise Macros::
+* Indenting Directives::
+@end menu
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node     Macro Backslashes
+@comment  node-name,  next,  previous,  up
+@section 自定义宏反斜杠
+@cindex @code{#define}
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@ccmode{} provides some tools to help keep the line continuation
+宏中的反斜杠干净整洁。  他们的精确动作是通过以下变量定制的：
+
+@defopt c-backslash-column
+@vindex backslash-column @r{(c-)}
+@defoptx c-backslash-max-column
+@vindex backslash-max-column @r{(c-)}
+这些变量控制多行宏中行连续反斜杠的对齐列。  它们由自动插入或对齐此类反斜杠的函数使用，例如 @code{c-backslash-region} 和 @code{c-context-line-break}。
+
+@code{c-backslash-column} 指定反斜杠的最小列。  如果宏中的任何行超过此列，则该行中的下一个制表位（即 @code{tab-width} 的下一个倍数）将用作所有反斜杠的对齐列，以便它们保留在单个列中。  然而，如果任何行超过@code{c-backslash-max-column}，则宏其余部分中的反斜杠将保留在该列中，以便太长的行“突出”。
+
+切勿将这些变量设置为 @code{nil}。  如果要禁用反斜杠的自动对齐，请使用@code{c-auto-align-backslashes}。
+@end defopt
+
+@defopt c-auto-align-backslashes
+@vindex auto-align-backslashes @r{(c-)}
+如果非@code{nil}，则自动对齐插入的续行反斜杠。  当自动插入续行反斜杠作为多行宏中的换行符时（例如，通过 @code{c-context-line-break}），如果设置了此标志，它们将与同一宏中的其他反斜杠对齐。
+
+如果 @code{c-auto-align-backslashes} 是 @code{nil}，则自动插入的反斜杠前面有一个空格，并且仅当您显式调用命令 @code{c-backslash-region} (@kbd{C-c C-\}) 时，反斜杠才会对齐。
+@end defopt
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node Macros with ;
+@comment  node-name,  next,  previous,  up
+@section 带分号的宏
+@cindex macros with semicolons
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+当您调用宏时，不需要（或不得）后跟分号 @dfn{macros with semicolons} 的宏非常常见。  这些可能会导致@ccmode{}将下一行错误地解析为@code{statement-cont}（@pxref{Function Symbols}），从而错误地缩进它。  在顶层，在 defun 开始之前的宏调用可能会导致 @code{c-beginning-of-defun} (@kbd{C-M-a}) 找不到当前函数的正确开始。
+
+您可以通过指定哪些宏带有分号来防止这些情况。  这样的宏是否有参数列表并不重要：
+
+@defopt c-macro-names-with-semicolon
+@vindex macro-names-with-semicolon @r{(c-)}
+该缓冲区局部变量指定哪些宏具有分号。设置其值后，需要调用@code{c-make-macro-with-semi-re}才能生效。  应将其设置为以下值之一：
+
+@table @asis
+@item 零
+没有带分号的宏。
+@item 字符串列表
+每个字符串都是带有分号的宏名称。  这里只允许有效的 @code{#define} 名称。  例如，要设置默认值，您可以将以下内容写入@file{.emacs}：
+
+@example
+(setq c-macro-names-with-semicolon
+      '("Q_OBJECT" "Q_PROPERTY" "Q_DECLARE" "Q_ENUMS"))
+@end example
+
+@item 正则表达式
+这与带有分号的宏的每个符号相匹配。  它不能与任何不是有效 @code{#define} 名称的字符串匹配。  例如：
+
+@example
+(setq c-macro-names-with-semicolon
+      "\\<\\(CLEAN_UP_AND_RETURN\\|Q_[[:upper:]]+\\)\\>")
+@end example
+@end table
+@end defopt
+
+@defun c-make-macro-with-semi-re
+@findex make-macro-with-semi-re @r{(c-)}
+每次在主模式函数运行后更改 @code{c-macro-names-with-semicolon} 的值时，调用此（非交互式）函数来设置内部变量。  它不带任何参数，并且它的返回值没有任何意义。  在模式钩子运行后，该函数由 @ccmode{} 的初始化代码调用。
+@end defun
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Noise Macros
+@section 噪声宏
+@cindex noise macros
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+在@ccmode{}、@dfn{noise macros}中，是展开为空的宏，或者是编译器指令（例如GCC的@code{__attribute__}），它们在C（等）语言的语法中不起任何作用。  一些噪声宏后面跟着括号中的参数（可能是可选的），其他则不是。
+
+噪声宏很容易混淆 @ccmode{} 对函数头的分析，导致它们的字体错误，甚至缩进错误。  您可以通过指定构成噪声宏的标识符来防止这种混淆。
+
+@defopt c-noise-macro-names
+@vindex noise-macro-names @r{(c-)}
+该变量是噪声宏的名称列表，这些宏从来没有带括号的参数。  每个元素都是一个字符串，并且必须是有效的标识符。  或者，变量可以是与此类宏的名称匹配的正则表达式。  这样的噪声宏被 @ccmode{} 视为空白。  它也不能在 @code{c-noise-macro-with-parens-names} 中或与 @code{c-noise-macro-with-parens-names} 匹配。
+@end defopt
+
+@defopt c-noise-macro-with-parens-names
+@vindex noise-macro-with-parens-names @r{(c-)}
+该变量是噪声宏名称的列表，可以选择在括号中包含参数。  列表中的每个元素都是一个字符串，并且必须是有效的标识符。  或者，变量可以是与此类宏的名称匹配的正则表达式。  这样的噪声宏一定不能也在@code{c-noise-macro-names}中，或者与@code{c-noise-macro-names}匹配。  出于性能原因，此类噪声宏（包括任何带括号的参数）会经过特殊处理，但仅在声明上下文@footnote{If this restriction causes your project difficulties, please get in touch with @email{bug-cc-mode@@gnu.org}.}中使用时才会进行处理。
+
+传统上，两个编译器指令@code{__attribute__}和@code{__declspec}是在@ccmode{}中专门处理的；例如，它们使用 font-lock-keyword-face 进行字体化。  您不需要在 @code{c-noise-macro-with-parens-names} 中包含这些指令，但这样做是可以的。
+@end defopt
+
+@defun c-make-noise-macro-regexps
+@findex make-noise-macro-regexps @r{(c-)}
+在主模式函数运行后更改 @code{c-noise-macro-names} 或 @code{c-noise-macro-with-parens-names} 的值时，调用此（非交互式）函数来设置内部变量。  在模式钩子运行后，该函数由 @ccmode{} 的初始化代码调用。
+@end defun
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Indenting Directives
+@section 缩进指令
+@cindex Indenting Directives
+@cindex Indenting #pragma
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+有时您可能希望缩进特定的预处理器指令（例如，@code{#pragma}），就像它们是语句一样。  为此，首先设置 @code{c-cpp-indent-to-body-directives} 以包含指令名称，然后使用 @code{c-toggle-cpp-indent-to-body} 启用“缩进正文”功能。
+
+@defopt c-cpp-indent-to-body-directives
+@vindex cpp-indent-to-body-directives (c-)
+该变量是 CPP 指令名称的列表（不包括引入的@samp{#}），它将像语句一样缩进。每个元素都是一个字符串，并且必须是有效的标识符。  默认值为@code{("pragma")}。
+
+如果您向此变量添加更多指令，或从中删除指令，而“缩进正文”处于活动状态，则需要通过调用 @code{c-toggle-cpp-indent-to-body} 重新启用该功能，以使这些更改生效@footnote{Note that the removal of directives doesn't work satisfactorily on XEmacs or on very old versions of Emacs}。
+@end defopt
+
+@defun c-toggle-cpp-indent-to-body
+@findex toggle-cpp-indent-to-body (c-)
+使用@kbd{M-x c-toggle-cpp-indent-to-body}，您可以启用或禁用“缩进正文”功能。  当以编程方式调用时，它需要一个可选的数字参数。  正值将启用该功能，零或负值将禁用该功能。
+
+您应该在调用此函数之前设置@code{c-cpp-indent-to-body-directives}，因为该函数设置取决于该变量的内部状态。
+@end defun
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Odds and Ends
+@chapter 什物
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+不适合其他任何地方的内容都记录在这里。
+
+@defopt c-require-final-newline
+@vindex require-final-newline @r{(c-)}
+控制保存文件时是否强制执行最终换行符。该值是一个关联列表，为每种语言模式指定在模式初始化时赋予 @code{require-final-newline} (@pxref{Saving Buffers,,,@lispref{}, @lispreftitle{}}) 的值。  如果关联列表中不存在某种语言，CC 模式将不会触及该语言缓冲区中的@code{require-final-newline}。
+
+默认情况下，在强制源文件应以换行符结尾的语言中，将 @code{require-final-newline} 设置为 @code{t}。它们是 C、C++ 和 Objective-C。
+@end defopt
+
+@defopt c-echo-syntactic-information-p
+@vindex echo-syntactic-information-p @r{(c-)}
+如果非 @code{nil}，当前行的语法分析将在缩进时显示在回显区域中（除非 @code{c-syntactic-indentation} 是 @code{nil}）。  当找出要修改哪些语法符号以获得所需的缩进时，这非常有用。
+@end defopt
+
+@defopt c-report-syntactic-errors
+@vindex report-syntactic-errors @r{(c-)}
+如果非 @code{nil}，则会报告某些语法错误，并带有丁和消息，例如，当缩进 @code{else} 时，没有对应的 @code{if}。
+
+但请注意，@ccmode{} 并没有做出任何特殊的努力来检查语法错误；这是编译器的工作。  它之所以能够报告像上面这样的情况，是因为它无法找到正确的锚定位置来缩进这种情况下的行。
+@end defopt
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Sample Init File
+@appendix 示例初始化文件
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+下面是一个示例 .emacs 文件片段，可能会对您有所帮助。只需复制该区域并将其粘贴到您的 .emacs 文件中即可。  您可能想要更改一些实际值。
+
+@verbatim
+;; Make a non-standard key binding.  We can put this in
+;; c-mode-base-map because c-mode-map, c++-mode-map, and so on,
+;; inherit from it.
+(defun my-c-initialization-hook ()
+  (define-key c-mode-base-map "\C-m" 'c-context-line-break))
+(add-hook 'c-initialization-hook 'my-c-initialization-hook)
+
+;; offset customizations not in my-c-style
+;; This will take precedence over any setting of the syntactic symbol
+;; made by a style.
+(setq c-offsets-alist '((member-init-intro . ++)))
+
+;; Create my personal style.
+(defconst my-c-style
+  '((c-tab-always-indent        . t)
+    (c-comment-only-line-offset . 4)
+    (c-hanging-braces-alist     . ((substatement-open after)
+                                   (brace-list-open)))
+    (c-hanging-colons-alist     . ((member-init-intro before)
+                                   (inher-intro)
+                                   (case-label after)
+                                   (label after)
+                                   (access-label after)))
+    (c-cleanup-list             . (scope-operator
+                                   empty-defun-braces
+                                   defun-close-semi))
+    (c-offsets-alist            . ((arglist-close . c-lineup-arglist)
+                                   (substatement-open . 0)
+                                   (case-label        . 4)
+                                   (block-open        . 0)
+                                   (knr-argdecl-intro . -)))
+    (c-echo-syntactic-information-p . t))
+  "My C Programming Style")
+(c-add-style "PERSONAL" my-c-style)
+
+;; Customizations for all modes in CC Mode.
+(defun my-c-mode-common-hook ()
+  ;; set my personal style for the current buffer
+  (c-set-style "PERSONAL")
+  ;; other customizations
+  (setq tab-width 8
+        ;; this will make sure spaces are used instead of tabs
+        indent-tabs-mode nil)
+  ;; we like auto-newline, but not hungry-delete
+  (c-toggle-auto-newline 1))
+(add-hook 'c-mode-common-hook 'my-c-mode-common-hook)
+@end verbatim
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Performance Issues
+@appendix 性能问题
+@cindex performance
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@comment FIXME: (ACM, 2003/5/24).  Check whether AWK needs mentioning here.
+
+C 及其衍生语言是高度复杂的生物。  通常，会出现不明确的代码情况，需要 @ccmode{} 扫描缓冲区的大部分以确定语法上下文。  这种病态代码可能会导致 @ccmode{} 的性能相当糟糕。  本节深入介绍 @ccmode{} 的运行方式、它如何与某些编码风格交互以及可以使用什么来提高性能。
+
+总体目标是在任何交互操作中 @ccmode{} 不应该太慢（即花费不到一秒）。也就是说，它被调整为限制单个操作中的最大响应时间，这有时会以批量操作（例如重新缩进整个块）为代价。  如果您发现 @ccmode{} 在某些情况下逐渐变得越来越慢，可能是随着文件大小的增大或您正在编辑的宏或注释变大，那么很可能是某些东西无法正常工作。  您应该考虑报告它，除非它是本节中提到的内容。
+
+因为@ccmode{}必须从当前插入点向后扫描缓冲区，并且因为C的语法在向后方向上解析相当困难，所以@ccmode{}经常尝试在缓冲区中找到最近的位置，从该位置开始向前扫描（通常是某种左括号或右括号）。  该位置距离当前插入点越远，速度就越慢。
+
+@findex beginning-of-defun
+在 @ccmode{} 的早期版本中，我们过去建议将顶级构造@footnote{E.g., a function in C, or outermost class definition in C++ or Java.} 的左大括号放入最左边的列中。  更早些时候，这曾经是一个严格的 Emacs 约束，如 @code{beginning-of-defun} 函数中所体现的那样。  @ccmode 现在可以更好地缓存语法信息，因此当它不在第 0 列中时搜索这样的大括号所造成的延迟是最小的，除非您刚刚在文件中移动了很长一段距离。
+
+@vindex defun-prompt-regexp
+@vindex c-Java-defun-prompt-regexp
+@vindex Java-defun-prompt-regexp @r{(c-)}
+关于 Java 模式中的 @code{defun-prompt-regexp} 的特别注意事项：常见的样式是将函数和类的左大括号挂在行的右侧，这对于 Emacs 方法来说效果不佳。  @ccmode{}带有一个常量@code{c-Java-defun-prompt-regexp}，它试图定义一个可用于这种风格的正则表达式，但它存在问题。  在某些情况下，它可能会导致@code{beginning-of-defun}挂起@footnote{This has been observed in Emacs 19.34 and XEmacs 19.15.}。  因此，默认情况下不使用它，但如果您喜欢冒险，可以在模式挂钩中将 @code{defun-prompt-regexp} 设置为它。  无论如何，设置并依赖 @code{defun-prompt-regexp} 肯定会减慢速度，因为 (X)Emacs 会进行大量正则表达式搜索，所以无论哪种方式你都可能会受到打击！
+
+@ccmode{} maintains a cache of the opening parentheses of the blocks
+围绕该点，并且当该点移动时它会调整该缓存。  这意味着在糟糕的情况下，在新的环境中缩进一行可能需要相当长的时间，但之后只要该点不移得太远，它就会变得很快。  点移动得越远，缓存的用处就越小。  由于编辑通常是在“块”中完成的，而不是在彼此相距很远的单行上完成的，因此即使代码不适合 Emacs 查找 defun 启动的方法，缓存通常也能提供良好的性能。
+
+@vindex c-enable-xemacs-performance-kludge-p
+@vindex enable-xemacs-performance-kludge-p @r{(c-)}
+XEmacs 用户可以将变量 @code{c-enable-xemacs-performance-kludge-p} 设置为非 @code{nil}。  这告诉@ccmode{}使用XEmacs特定的内置函数，在某些情况下，可以比@code{beginning-of-defun}更快地定位最上面的左大括号。  初步测试表明，对于悬挂这些大括号的样式（例如，大多数 JDK 派生的 Java 样式），此 hack 可以将核心语法解析例程的性能提高 3 到 60 倍。  然而，对于 @emph{do} 符合 Emacs 推荐的将顶级大括号放在零列中的样式的样式，这种 hack 可能会降低性能。  因此，该变量默认设置为 @code{nil}，因为 Emacs 友好的样式应该更常见（并且受到鼓励！）。  请注意，此变量在 Emacs 中不起作用，因为必要的内置函数不存在（截至 2007 年 2 月撰写本文时，Emacs 22.1 中）。
+
+文本属性用于加速跳过语法空白，即注释和预处理器指令。  第一次在巨大的宏定义之后缩进一行可能会很慢，但之后文本属性就位并且应该很快（即使在您编辑了文件的其他部分然后移回之后）。
+
+字体锁定可能会占用 CPU 资源，尤其是在装饰级别 3 上完成的字体锁定，它试图非常准确。  请注意，该级别设计为与字体锁定支持模式一起使用，该模式仅对实际显示的文本进行字体显示，即延迟锁定或即时锁定模式，因此请确保使用其中之一。  对具有数千行的整个缓冲区进行字体化通常需要一分钟多的时间。  这是一个众所周知的弱点；这个想法是它永远不应该发生。
+
+加速字体锁定的最有效方法是通过适当设置 @code{font-lock-maximum-decoration} 将装饰级别降低到 2。  该级别的设计目标是在不牺牲性能的情况下尽可能美观。  @xref{Font Locking Preliminaries}，了解更多信息。
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Limitations and Known Bugs
+@appendix 限制和已知错误
+@cindex limitations
+@cindex bugs
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@itemize @bullet
+@item 
+@ccmode{} doesn't support trigraphs.  (These are character sequences
+比如@samp{??(}，它代表@samp{[}。  它们可以追溯到某些字符集没有 C 所需的所有字符的时代，现在已经完全过时了。）
+
+@item 
+无法在已键入的行上应用自动换行符设置 (@pxref{Auto-newlines})。  这只是一个简化交互式编辑的功能。
+
+稍微概括一下这个问题：@ccmode{}并不打算以某种或多或少类似于批处理的方式用作旧代码的重新格式化程序。  除了 @code{c-indent-region} 等某些函数之外，它仅适合交互式地使用来编辑新代码。  目前无意改变这一目标。
+
+如果您想重新格式化旧代码，您可能最好使用其他工具，例如 @ref{Top, , GNU indent, indent, The `indent' Manual}，它比 @ref{Top, , GNU indent, indent, The `indent' Manual} 具有更强大的重新格式化功能
+@ccmode{}.
+
+@item 
+对 C++ 模板（在尖括号中）的支持尚未完成。当在声明中使用非嵌套模板时，@ccmode{} 缩进它并锁定它 OK@. 表达式中使用的模板，而嵌套模板则效果不佳。  有时，解决方法是在输入结束 @samp{>} 后重新格式化表达式。
+
+@item 
+在 @dfn{k&r region}（老式 C 函数声明的一部分，指定其参数类型，位于参数列表和左大括号之间）中，最多应有 20 个顶级圆括号和中括号对。  出于性能原因施加此限制。  如果违反，源文件可能会错误缩进或字体化。
+
+@item 
+加载@ccmode{}时，有时会出现以下错误消息：
+
+@example
+File mode specification error: (void-variable c-font-lock-keywords-3)
+@end example
+
+这是由于 (X)Emacs 某些版本中函数 @code{eval-after-load} 中的错误所致。  当包含 (X)Emacs 的目录路径中存在符号链接时，它就会显现出来。  作为解决方法，请尽早将以下内容放入您的 @file{.emacs} 文件中：
+
+@example
+(defun my-load-cc-fonts ()
+  (require "cc-fonts"))
+(add-hook 'c-initialization-hook 'my-load-cc-fonts)
+@end example
+@end itemize
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    FAQ
+@appendix 常见问题解答
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@itemize @bullet
+@item 
+@emph{How can I change the indent level from 4 spaces to 2 spaces?}
+
+设置变量@code{c-basic-offset}。  @xref{Getting Started}。
+
+@item 
+@kindex RET
+@kindex C-j
+@emph{Why does/doesn't the @kbd{@key{RET}} key indent the new line?}
+
+Emacs 的约定过去是 @kbd{RET} 仅添加换行符，@kbd{C-j} 添加换行符并缩进。  在 Emacs-24.4 中，这个约定被颠倒了。
+
+如果您使用较旧的 Emacs 并且您也希望 @kbd{@key{RET}} 执行此操作，请将其添加到您的 @code{c-initialization-hook} 中：
+
+@example
+(define-key c-mode-base-map "\C-m" 'c-context-line-break)
+@end example
+
+@xref{Getting Started}。  这是一个非常常见的问题。
+
+@item 
+@emph{How do I get block comments in my C++ files?}
+
+以交互方式，使用 @kbd{C-c C-k} 更改注释样式。 @xref{Minor Modes}。
+
+例如，要为 gdb 项目中的文件配置此设置，您可以像这样修改 C++ 模式挂钩：
+
+@example
+(defun my-c++-mode-hook ()
+  (if (string-match "/gdb/" (buffer-file-name))
+      (c-toggle-comment-style 1)))
+(add-hook 'c++-mode-hook 'my-c++-mode-hook)
+@end example
+
+@item 
+@emph{How do I stop my C++ lambda expressions being indented way over to the right?}
+
+现在这是默认设置，因此您无需执行任何操作。  要恢复之前的默认设置，将 lambda 表达式缩进到引入它们的构造的右侧，请将与 @code{inlambda} 关联的偏移量从 0 更改为 @code{c-lineup-inexpr-block}。  例如，如果您要在挂钩函数中设置偏移量，则可能会包含以下行：
+
+@example
+(c-set-offset 'inlambda 'c-lineup-inexpr-block)
+@end example
+
+有关进行此设置的不同方法的详细信息，@ref{Config Basics}。
+
+@item 
+@emph{How do I stop my code jumping all over the place when I type?}
+
+使用 @kbd{C-c C-l} 停用“电动小调模式”。  @xref{Getting Started}。
+
+@item 
+@kindex C-x h
+@kindex C-M-\
+@emph{How do I reindent the whole file?}
+
+访问该文件并点击 @kbd{C-x h} 标记整个缓冲区。  然后点击@kbd{C-M-\}。  @xref{Indentation Commands}。
+
+@item 
+@kindex C-M-q
+@kindex C-M-u
+@emph{How do I reindent the current block?}
+
+首先移动到用 @kbd{C-M-u} 打开块的大括号，然后用 @kbd{C-M-q} 重新缩进该表达式。  @xref{Indentation Commands}。
+
+@item 
+@emph{I put @code{(c-set-offset 'substatement-open 0)} in my @file{.emacs} file but I get an error saying that @code{c-set-offset}'s function definition is void.  What's wrong?}
+
+这意味着在调用 @code{c-set-offset} 时，@ccmode{} 尚未加载到您的 Emacs 会话中，很可能是因为 @ccmode{} 正在自动加载。  不要将 @code{c-set-offset} 行放入顶级 @file{.emacs} 文件中，而是将其放入 @code{c-initialization-hook} (@pxref{CC Hooks}) 中，或者直接修改 @code{c-offsets-alist} ：
+
+@example
+(setq c-offsets-alist '((substatement-open . 0)))
+@end example
+
+@item 
+@cindex open paren in column zero
+@emph{I have an open paren character at column zero inside a comment or multiline string literal, and it causes the fontification and/or indentation to go haywire.  What gives?}
+
+这是由于 (X)Emacs 中的临时规则，此类开放括号始终以 defun 开头（翻译为 @ccmode{} 语言中的函数、类、命名空间或任何其他顶级块结构）。
+@ifset XEMACS
+@xref{Defuns,,, xemacs, XEmacs User's Manual}，了解详情。
+@end ifset
+@ifclear XEMACS
+@xref{Left Margin Paren,,, emacs, GNU Emacs Manual}，了解详细信息（@xref{Defuns,,, emacs, GNU Emacs Manual}，在 Emacs 20 手册中）。
+@end ifclear
+
+这种启发式方法内置于 (X)Emacs 的核心语法分析例程中，因此这并不是一个真正的 @ccmode{} 问题。  然而，在 Emacs 21.1 中，可以将其关闭@footnote{Using the variable @code{open-paren-in-column-0-is-defun-start}.} 和 @ccmode{} 也可以这样做，因为它有自己的系统来跟踪块。
+
+@end itemize
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Updating CC Mode
+@appendix 获取最新的 CC 模式版本
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@ccmode{} has been standard with all versions of Emacs since 19.34 and
+自 19.16 起使用 XEmacs。
+
+@cindex web site
+由于发布时间表的偏差，所有这些 Emacsen 可能都有旧版本的 @ccmode{}，因此应该升级。  访问
+@ccmode{} source code, as well as more detailed information on Emacsen
+兼容性等@:都可以在网站上找到：
+
+@quotation
+@uref{https://www.nongnu.org/cc-mode/}
+@end quotation
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Mailing Lists and Bug Reports
+@appendix 邮件列表和提交错误报告
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@kindex C-c C-b
+@findex c-submit-bug-report
+@findex submit-bug-report @r{(c-)}
+要报告错误，请使用 @kbd{C-c C-b}（绑定到 @code{c-submit-bug-report}）命令。  这提供了我们重现您的问题所需的重要信息。  确保包含简洁但完整的代码示例。  请尝试将您的示例简化为重现问题所需的基本代码，并包含暴露错误所需的准确步骤。  如果您认为 @emph{before} 您的错误示例中出现的任何代码可能会影响我们重现它的能力，请特别确保包含其中的任何代码。
+
+请尝试在未加载任何自定义项的 Emacs 实例中产生问题（即，以 @samp{-q --no-site-file} 参数启动）。  如果它在那里工作正常，则问题可能是由您自己或站点配置中的错误自定义引起的。  在这种情况下，如果您隔离触发该错误的 Emacs Lisp 代码并将其包含在您的报告中，我们将不胜感激。
+
+@cindex bug report mailing list
+使用 @code{c-submit-bug-report} 报告错误会将其归档到 GNU Bug Tracker 的 @url{https://debbugs.gnu.org} 中，然后将其发送到 @email{bug-cc-mode@@gnu.org}。  您还可以将报告、其他问题和建议（荣誉？@: @t{;-)}）发送到该地址。这是一个邮件列表，您可以加入或浏览其中的存档；请参阅 @uref{https://www.nongnu.org/cc-mode/} 网站了解更多详细信息。
+
+@cindex announcement mailing list
+如果您想获取新 @ccmode{} 版本的公告，请将消息正文中的单词 @emph{subscribe} 发送至 @email{cc-mode-announce-request@@lists.sourceforge.net}。  也可以从网站订阅。  公告还将发布到 Usenet 新闻组 @code{gnu.emacs.sources}、@code{comp.emacs}、@code{comp.emacs.xemacs}、@code{comp.lang.c}、@code{comp.lang.c++}、@code{comp.lang.objective-c}、@code{comp.lang.java.softwaretools}、@code{comp.lang.idl} 和 @code{comp.lang.awk}。
+@c There is no newsgroup for Pike.  :-(
+
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+
+@c Removed the tentative node "Mode Initialization" from here, 2005/8/27.
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Command and Function Index
+@unnumbered 命令和功能索引
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+由于大多数 @ccmode{} 命令前面都带有字符串 @samp{c-}，因此每个命令都出现在其 @code{c-@var{thing}} 名称和 @code{@var{thing} (c-)} 名称下。
+@iftex
+@sp 2
+@end iftex
+@printindex fn
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Variable Index
+@unnumbered 变量索引
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+由于大多数 @ccmode{} 变量都以字符串 @samp{c-} 开头，因此每个变量都出现在其 @code{c-@var{thing}} 名称和 @code{@var{thing} (c-)} 名称下。
+@iftex
+@sp 2
+@end iftex
+@printindex vr
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@node    Concept and Key Index
+@unnumbered 概念及关键指标
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@printindex cp
+
+
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@comment Epilogue.
+@comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+@bye

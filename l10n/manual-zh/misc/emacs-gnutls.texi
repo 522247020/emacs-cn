@@ -1,0 +1,156 @@
+\输入 texinfo @c -*-texinfo-*-
+
+@set VERSION 0.3
+
+@setfilename ../../info/emacs-gnutls.info
+@settitle Emacs GnuTLS 集成 @value{VERSION}
+@documentlanguage en
+@include docstyle.texi
+
+@copying
+该文件描述了 Emacs GnuTLS 集成。
+
+版权所有 @copyright{} 2012--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs network features
+@direntry
+* Emacs GnuTLS: (emacs-gnutls).  Emacs GnuTLS 集成。
+@end direntry
+
+@titlepage
+@title Emacs GnuTLS 集成
+@author by Ted Zlatanov
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top Emacs GnuTLS
+This manual describes the Emacs GnuTLS integration.
+
+GnuTLS is a library that establishes encrypted @acronym{SSL} or
+@acronym{TLS} connections.  Emacs supports it through the
+@file{gnutls.c} and @file{gnutls.h} C files and the @file{gnutls.el}
+Emacs Lisp library.
+
+@insertcopying
+
+@menu
+* Overview::                    Overview of the GnuTLS integration.
+* Help For Users::
+* Help For Developers::
+* GNU Free Documentation License::  The license for this documentation.
+* Function Index::
+* Variable Index::
+@end menu
+@end ifnottex
+
+@node Overview
+@chapter 概述
+
+GnuTLS 库是 Emacs 的可选附加组件。  通过它，任何 Emacs Lisp 程序都可以建立使用 @dfn{Secure Socket Layer} (@acronym{SSL}) 和 @dfn{Transport Layer Security} (@acronym{TLS}) 协议的加密网络连接。  使用@acronym{SSL}和@acronym{TLS}建立连接的过程尽可能自动化和透明。
+
+用户当前只有几个自定义选项：日志级别、优先级字符串、信任文件列表以及 Diffie-Hellman 密钥交换中使用的最小位数。  有关每个 Emacs 库至少需要 83 个可定制变量的传言因此被证明是错误的。
+
+@node Help For Users
+@chapter 对用户的帮助
+
+从用户的角度来看，GnuTLS 集成没有任何意义。  它适用于任何使用 @code{open-protocol-stream} 或 @code{open-network-stream} (@pxref{Network,, Network Connections, elisp, The Emacs Lisp Reference Manual}) 的 Emacs Lisp 代码。  这两个函数是等效的，第一个函数是第二个函数的别名。
+
+有一种方法可以通过调用 @code{gnutls-available-p} 来查明 GnuTLS 是否可用。  这在 W32 (Windows) 平台上有点棘手，但如果您在与 Emacs 相同的目录中拥有 GnuTLS DLL（感谢 Eli Zaretskii，可从 @url{https://sourceforge.net/projects/ezwinports/files/} 获得），则应该没问题。
+
+@defun gnutls-available-p
+如果 GnuTLS 在该 Emacs 实例中可用，则该函数返回非 @code{nil}，否则返回 @code{nil}。  如果 GnuTLS 可用，则该值是已安装的 GnuTLS 库支持的 GnuTLS 功能列表，这取决于库版本。  功能的含义记录在该函数的文档字符串中。
+@end defun
+
+哦，但有时事情会出错。  预算不平衡、电视广告撒谎，甚至 TLS 和 SSL 连接也可能无法正常工作。  好吧，在最后一种情况下有一些事情要做。
+
+@defvar gnutls-log-level
+@code{gnutls-log-level} 变量设置日志级别。  1 是冗长的。  2 非常冗长。  5 太疯狂了。  疯狂的！  将其设置为 1 或 2 并在 @file{*Messages*} 缓冲区中查找调试信息。
+@end defvar
+
+@defvar gnutls-algorithm-priority
+@code{gnutls-algorithm-priority} 变量设置 GnuTLS 优先级字符串。  这是全局的，而不是每个主机名（尽管 @code{gnutls-negotiate} 支持每个连接的优先级字符串，因此可以在需要时完成）。  详情请参阅@uref{https://www.gnu.org/software/gnutls/documentation.html, GnuTLS documentation}和@uref{https://gnutls.org/manual/html_node/Priority-Strings.html, GnuTLS priority string syntax and description}。
+@end defvar
+
+@defvar gnutls-trustfiles
+@code{gnutls-trustfiles} 变量是信任文件列表（颁发机构的证书）。  这是全局的，而不是每个主机名（尽管 @code{gnutls-negotiate} 支持每个连接一个信任文件，因此可以在需要时完成）。  信任文件可以采用 PEM 或 DER 格式，并且可以在大多数 Unix 发行版中找到示例。  默认情况下，按此顺序尝试以下位置： @file{/etc/ssl/certs/ca-certificates.crt} 适用于 Debian、Ubuntu、Gentoo 和 Arch Linux； @file{/etc/pki/tls/certs/ca-bundle.crt} 适用于 Fedora 和 RHEL； @file{/etc/ssl/ca-bundle.pem} 对于 SUSE； @file{/usr/ssl/certs/ca-bundle.crt} 对于 Cygwin； @file{/usr/local/share/certs/ca-root-nss.crt} 适用于 FreeBSD@. 您可以轻松地将 @code{gnutls-trustfiles} 自定义为其他内容，但如果您这样做，请告诉我们，以便我们进行更改以使该平台的其他用户受益。
+@end defvar
+
+@defvar gnutls-verify-error
+@code{gnutls-verify-error} 变量允许您验证所有连接的 SSL/TLS 服务器证书或按主机名。  目前默认为@code{nil}，但稍后可能会更改为@code{t}，这意味着所有证书都将得到验证。
+
+当前有两项检查可用，即证书是否由 @code{gnutls-trustfiles} 定义的受信任机构颁发，以及主机名是否与证书匹配。  @code{t} 启用这两项检查，但您也可以使用 @code{:trustfiles} 和 @code{:hostname} 单独启用它们。
+
+由于与 GnuTLS 库的低级交互，当前无法询问是否可以接受证书。  您必须查看 @file{*Messages*} 缓冲区。
+@end defvar
+
+@defvar gnutls-min-prime-bits
+@code{gnutls-min-prime-bits} 变量是一个非常奇特的自定义，适用于您想要拒绝使用特定大小以下的密钥进行握手的情况。  如果您不确定是否需要它，那么您就不需要。  留下它@code{nil}。
+@end defvar
+
+@node Help For Developers
+@chapter 对开发人员的帮助
+
+GnuTLS 库会在编译时自动检测。  您应该看到它在 @code{configure} 输出中启用。  如果没有，请按照标准过程找出 Emacs 编译未选取系统库的原因。  在 W32 (Windows) 平台上，安装最新版本的 DLL 就足够了。
+
+只需使用@code{open-protocol-stream}或@code{open-network-stream}（两者是等效的，第一个是第二个的别名）。您不必直接使用 @file{gnutls.el} 函数。但你可以用 @code{open-gnutls-stream} 测试它们。
+
+@defun open-gnutls-stream name buffer host service &optional parameters
+该函数创建一个连接到特定@var{host}和@var{service}（端口号或服务名称）的缓冲区。  强制参数及其语法与 @code{open-network-stream} (@pxref{Network,, Network Connections, elisp, The Emacs Lisp Reference Manual}) 的相同。  连接过程称为@var{name}（如有必要，请使其唯一）。  该函数返回连接过程。
+
+可选的 @var{parameters} 参数是关键字和值的列表。  目前唯一有效的关键字是 @code{:client-certificate}、@code{:nowait} 和 @code{:coding}。
+
+传递 @w{@code{:client certificate t}} 会触发使用 @file{auth-source} 库查找与 @var{host} 和 @var{service} 匹配的客户端证书。  任何生成的客户端证书都会向下传递到较低的 TLS 层。  @file{.authinfo} 用于指定每服务器密钥的格式在 @ref{Help for users,,auth-source, auth, Emacs auth-source Library} 中描述。
+
+传递@w{@code{:nowait t}}意味着套接字应该是异步的，并且连接过程将在 TLS 协商发生之前返回给调用者。
+
+由于历史原因，@var{parameters} 也可以是一个符号，其解释与传递包含 @code{:nowait} 和该符号值的列表相同。
+
+调用示例：
+
+@lisp
+;; open a HTTPS connection
+(open-gnutls-stream "tls" "tls-buffer" "yourserver.com" "https")
+
+;; open a IMAPS connection
+(open-gnutls-stream "tls" "tls-buffer" "imap.gmail.com" "imaps")
+@end lisp
+
+@end defun
+
+@findex gnutls-asynchronous-parameters
+如果用@var{nowait}调用，进程会立即返回（在连接到服务器之前）。  在这种情况下，进程对象被告知在使用 @code{gnutls-asynchronous-parameters} 函数协商连接时要使用哪些参数。
+
+函数@code{gnutls-negotiate}一般没什么用，它可能会根据需要而改变，所以请参阅@file{gnutls.el}了解详细信息。
+
+@defun gnutls-negotiate spec
+请参阅 @file{gnutls.el} 了解 @var{spec} 的详细信息和用法，但如果可能，请勿依赖此函数的接口。
+@end defun
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Function Index
+@unnumbered 功能索引
+@printindex fn
+
+@node Variable Index
+@unnumbered 变量索引
+@printindex vr
+
+@bye
+
+@c End:

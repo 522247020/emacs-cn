@@ -1,0 +1,240 @@
+\输入 texinfo @c -*-texinfo-*-
+
+@setfilename ../../info/sasl.info
+
+@set VERSION 0.2
+@settitle Emacs SASL 库@value{VERSION}
+@documentlanguage en
+@include docstyle.texi
+
+@copying
+该文件描述了 Emacs SASL 库，版本@value{VERSION}。
+
+版权所有 @copyright{} 2000, 2004--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs network features
+@direntry
+* SASL: (sasl).                  Emacs SASL 库。
+@end direntry
+
+
+@titlepage
+@ifset WEBHACKDEVEL
+@title Emacs SASL 库@value{VERSION}（开发版本）
+@end ifset
+@ifclear WEBHACKDEVEL
+@title Emacs SASL 库@value{VERSION}
+@end ifclear
+
+@author by Daiki Ueno
+@page
+
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+
+@node Top
+@top Emacs SASL
+
+SASL 是一个通用接口，用于在使用不同协议的应用程序之间共享多种身份验证机制。
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* Overview::                     Emacs SASL 库是什么。
+* How to use::                   向您的应用程序添加身份验证支持。
+* Data types::
+* Back end drivers::              编写自己的驱动程序。
+* GNU Free Documentation License::   本文档的许可证。
+* Index::
+* Function Index::
+* Variable Index::
+@end menu
+
+@node Overview
+@chapter 概述
+
+@sc{sasl} 是@dfn{Simple Authentication and Security Layer} 的缩写。该标准记录在 RFC2222 中。  它提供了一种向各种应用程序协议添加身份验证支持的简单方法。
+
+该库的顶层接口受到 Java @sc{sasl} 应用程序接口的启发。  它定义了一系列身份验证机制驱动程序的抽象 (@ref{Back end drivers})。
+
+后端驱动程序被设计为尽可能接近身份验证机制。  您可以从实现的任何地方访问附加配置信息。
+
+@node How to use
+@chapter 如何使用
+
+（还没写）。
+
+要使用 Emacs SASL 库，请在应用程序的开头评估以下表达式。
+
+@lisp
+(require 'sasl)
+@end lisp
+
+如果您想在运行时检查 sasl.el 是否存在，您可以列出所需函数的自动加载设置。
+
+@node Data types
+@chapter 数据类型
+
+可以使用三种数据类型来承载协商的安全层——机制、客户端参数和认证步骤。
+
+@menu
+* Mechanisms::
+* Clients::
+* Steps::
+@end menu
+
+@node Mechanisms
+@section 机制
+
+机制（@code{sasl-mechanism}对象）是@sc{sasl}认证机制驱动程序的模式。
+
+@defvar sasl-mechanisms
+机制名称列表。
+@end defvar
+
+@defun sasl-find-mechanism mechanisms
+
+寻找适当的机制。该函数比较 @var{mechanisms} 和 @code{sasl-mechanisms} 然后返回适当的 @code{sasl-mechanism} 对象。
+
+@example
+(let ((sasl-mechanisms '("CRAM-MD5" "DIGEST-MD5")))
+  (setq mechanism (sasl-find-mechanism server-supported-mechanisms)))
+@end example
+
+@end defun
+
+@defun sasl-mechanism-name mechanism
+返回机制的名称，一个字符串。
+@end defun
+
+如果要编写身份验证机制驱动程序（@ref{Back end drivers}），请使用@code{sasl-make-mechanism}并正确修改@code{sasl-mechanisms}和@code{sasl-mechanism-alist}。
+
+@defun sasl-make-mechanism name steps
+分配一个 @code{sasl-mechanism} 对象。该函数采用两个参数——机制名称和认证函数列表。
+
+@example
+(defconst sasl-anonymous-steps
+  '(identity                            ;no initial response
+    sasl-anonymous-response))
+
+(put 'sasl-anonymous 'sasl-mechanism
+     (sasl-make-mechanism "ANONYMOUS" sasl-anonymous-steps))
+@end example
+
+@end defun
+
+@node Clients
+@section 客户
+
+客户端（@code{sasl-client}对象）用四个参数初始化——机制、用户名、服务名称和服务器名称。
+
+@defun sasl-make-client mechanism name service server
+准备一个@code{sasl-client}对象。
+@end defun
+
+@defun sasl-client-mechanism client
+返回客户端的机制（@code{sasl-mechanism}对象）。
+@end defun
+
+@defun sasl-client-name client
+返回客户端的授权名称，一个字符串。
+@end defun
+
+@defun sasl-client-service client
+返回客户端的服务名称，一个字符串。
+@end defun
+
+@defun sasl-client-server client
+返回客户端的服务器名称，一个字符串。
+@end defun
+
+如果您想指定其他配置属性，请使用@code{sasl-client-set-property}。
+
+@defun sasl-client-set-property client property value
+将给定的属性/值添加到客户端。
+@end defun
+
+@defun sasl-client-property client property
+返回客户端的属性值。
+@end defun
+
+@defun sasl-client-set-properties client plist
+破坏性地设置客户端的属性。第二个参数是新的属性列表。
+@end defun
+
+@defun sasl-client-properties client
+返回客户端配置的整个属性列表。
+@end defun
+
+@node Steps
+@section 步骤
+
+步骤（@code{sasl-step}对象）是身份验证“步骤”的抽象，它保存响应值和身份验证过程的下一个入口点（后者不可访问）。
+
+@defun sasl-step-data step
+返回 @var{step} 保存的数据，一个字符串。
+@end defun
+
+@defun sasl-step-set-data step data
+将@var{data}字符串存储到@var{step}。
+@end defun
+
+要获得初始响应，您应该使用第二个参数 @code{nil} 调用函数 @code{sasl-next-step}。
+
+@example
+(setq name (sasl-mechanism-name mechanism))
+@end example
+
+此时我们可以发送启动 SASL 身份验证协议交换的命令。  例如，
+
+@example
+(process-send-string
+ process
+ (if (sasl-step-data step)              ;initial response
+     (format "AUTH %s %s\r\n" name (base64-encode-string (sasl-step-data step) t))
+   (format "AUTH %s\r\n" name)))
+@end example
+
+要继续身份验证过程，您所要做的就是连续调用@code{sasl-next-step}。
+
+@defun sasl-next-step client step
+执行身份验证步骤。第一次 @var{step} 应设置为 @code{nil}。
+@end defun
+
+@node Back end drivers
+@chapter 后端驱动程序
+
+（还没写）。
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Index
+@unnumbered 指数
+@printindex cp
+
+@node Function Index
+@unnumbered 功能索引
+@printindex fn
+
+@node Variable Index
+@unnumbered 变量索引
+@printindex vr
+
+@summarycontents
+@contents
+@bye
+
+@c End:

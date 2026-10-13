@@ -1,0 +1,604 @@
+\输入texinfo
+@setfilename ../../info/edt.info
+@settitle Emacs 的 EDT 模拟
+@documentlanguage en
+@include docstyle.texi
+
+@copying
+此文件记录了 Emacs 的 EDT 模拟包。
+
+版权所有 @copyright{} 1986、1992、1994--1995、1999--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* EDT: (edt).                    EDT 编辑器的 Emacs 模拟。
+@end direntry
+
+@titlepage
+@title EDT 仿真用户手册
+@author Kevin Gallagher
+@author @email{kevin.gal@@verizon.net}
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top Emacs EDT emulation
+This manual describes the Emacs EDT package, which provides emulation
+of DEC's EDT editor.
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Overview::                 EDT 包概述。
+* Supported terminals::      支持的终端/键盘。
+* Starting emulation::       如何开始。
+* Platform-specific notes::  特定于某些平台的注释。
+* Differences::              此 EDT 模拟与真实的 EDT 有什么不同？
+* Highlights::               一些亮点以及与原始 Emacs EDT 模拟的比较。
+* Customizing::              自定义仿真。
+* GNU Free Documentation License::   本手册的许可证。
+@end menu
+
+@node Overview
+@chapter EDT 套餐概述
+
+本手册介绍 Emacs 的 EDT Emulation 4.0 版本。它具有复制几乎所有 EDT 键盘模式行为的特殊功能。  它设置了与 EDT@. 中的默认键盘和功能键绑定紧密匹配的默认键盘和功能键绑定，并提供支持，以便用户可以根据自己的喜好重新配置大多数键盘和功能键绑定。
+
+4.0 版包含多项增强功能 (@pxref{Changes})。
+
+@menu
+* Quick start::              如何开始使用 EDT。
+* Changes::                  4.0版本有什么新内容。
+* Goals::                    此一揽子计划的目标。
+@end menu
+
+@node Quick start
+@section 如何开始使用 EDT
+
+要启动 EDT 仿真，首先启动 Emacs，然后输入 @kbd{M-x edt-emulation-on} 开始仿真。  初始化完成后，状态行下方将显示以下消息，通知您模拟已启用：“默认 EDT 键盘映射已激活”。
+
+每次启动 Emacs 会话时，通过将以下行添加到您的 @file{.emacs} 文件中，您可以让 EDT 仿真自动启动：
+
+@example
+(add-hook 'emacs-startup-hook 'edt-emulation-on)
+@end example
+
+@noindent @strong{Important:} Be sure to read the rest of this manual.
+它包含有关 EDT 仿真的行为方式以及如何根据您的喜好对其进行自定义的非常有用的信息。
+
+@noindent The EDT emulation consists of the following files:
+
+@itemize
+
+@item 
+@file{edt.texi}---本手册。
+
+@item 
+@file{edt-user.el}---示例自定义文件（位于 Emacs 发行版的 etc 目录中）。
+
+@item 
+@file{edt.el}---EDT仿真功能和默认配置。
+
+@item 
+@file{edt-lk201.el}---内置支持 DEC LK-201 键盘。
+
+@item 
+@file{edt-vt100.el}---内置支持 DEC VT-100（及以上）终端。
+
+@item 
+@file{edt-pc.el}---MS-DOS 下对 PC 101 键盘的内置支持。
+
+@item 
+@file{edt-mapper.el}---为没有内置支持的键盘创建 EDT LK-201 映射文件。
+
+@end itemize
+
+@node Changes
+@section 4.0 版本的新增功能
+
+4.0 版包含以下增强功能：
+
+@enumerate
+
+@item 
+现在支持窗口顶部和底部的滚动边距。 （该设计是从@file{tpu-extras.el}复制的。）默认情况下，启用此功能，并将上边距设置为窗口的 10%，将下边距设置为窗口的 15%。  要更改这些设置，您可以调用 @file{.emacs} 文件中的函数 @code{edt-set-scroll-margins}。  例如，以下行
+
+@example
+(edt-set-scroll-margins "20%" "25%")
+@end example
+
+@noindent sets the top margin to 20% of the window and the bottom margin
+到窗口的 25%。  要禁用此功能，请将每个边距设置为 0%。您还可以在 EDT 仿真处于活动状态时以交互方式调用 @code{edt-set-scroll-margins} 来更改该会话的设置。
+
+@strong{Please note:} 设置滚动边距的另一种方法是使用 Emacs 自定义功能直接设置以下两个变量：@code{edt-top-scroll-margin} 和 @code{edt-bottom-scroll-margin}。
+
+输入 Emacs @code{customize} 命令。  首先选择 @samp{Editing} 组，然后选择 @samp{Emulations} 组。最后，选择 @samp{Edt} 组并按照说明进行操作。
+
+@item 
+现在支持 @samp{SUBS} 命令并默认绑定到 @kbd{GOLD-Enter}。  （此设计复制自@file{tpu-edt.el}。）请注意，在 EDT 仿真的早期版本中，@kbd{GOLD-Enter} 被分配给 Emacs 函数@code{query-replace}。  @code{query-replace} 的绑定已移至@kbd{GOLD-/}。  如果您希望将 @code{query-replace} 恢复为 @kbd{GOLD-Enter}，请使用 EDT 用户自定义文件 @file{edt-user.el} 来执行此操作 (@pxref{Customizing})。
+
+@item 
+如果您使用 X 服务器访问工作站，请观察@file{edt-mapper.el} 生成的初始化文件现在将包含 X 服务器供应商的名称。  对于那些可以从多种类型的 X Server 访问其 Unix 帐户的人来说，这很方便。由于不同的 X 服务器通常需要不同的 EDT 模拟初始化文件，因此 @file{edt-mapper.el} 现在将生成这些不同的初始化文件并以不同的名称保存它们。然后，会自动正确加载正在使用的特定 X 服务器的正确初始化文件。
+
+@item 
+此外，@file{edt-mapper.el} 现在能够绑定 @acronym{ASCII} 键序列，前提是 @acronym{ASCII} 键序列前缀已被 Emacs 识别为前缀。  由于提供了此支持，一些终端/键盘/窗口系统配置（在 @code{input-decode-map} 中的 Emacs 中没有内置一套完整的合理功能键绑定）仍然可以配置为与 EDT 仿真一起使用。  （注意：在极少数情况下，这无法正常工作。特别是，如果 Emacs 将键序列中前导 @acronym{ASCII} 字符的子集识别为具有现有绑定，则该方法不起作用。例如，如果键盘 7 (@key{KP7}) 键生成序列 @samp{@key{ESC}Ow} 并且 @samp{@key{ESC}O} 已绑定到某个函数，则在被告知按 @key{KP7} 时按 @key{KP7} @file{edt-mapper.el} 将导致 @file{edt-mapper.el} 错误地将 @samp{@key{ESC}O} 映射到 @key{KP7} 以及 @samp{w} 映射到 @key{KP8}。 如果您遇到这种情况，则可能是 Emacs 中对键盘的支持存在错误 @strong{or} 是您终端的 Unix termcap/terminfo 支持中的错误@strong{or} 您正在使用的终端仿真软件中存在错误。）
+
+@item 
+@code{edt-quit} 函数（默认绑定到 @kbd{GOLD-q}）已被修改，以在存在与文件相关的缓冲区修改时警告用户。现在，它警告用户，如果用户在未保存这些缓冲区的情况下退出，这些修改将会丢失。
+
+@end enumerate
+
+@node Goals
+@section 该计划的目标
+
+@enumerate
+
+@item 
+紧密模拟 EDT 键盘模式命令，以便当前的 EDT 用户会发现 Emacs 的使用非常简单、舒适，并且学习曲线很小。
+
+@item 
+让用户无需了解太多 Emacs Lisp 即可轻松自定义 EDT 模拟键绑定。
+
+@item 
+可以轻松地在原始 EDT 默认绑定和用户自定义 EDT 绑定之间切换，而无需退出 Emacs。
+
+@item 
+提供对 EDT 中不支持的一些 TPU/EVE 功能的支持。
+
+@item 
+提供一种简单的方法来恢复 @strong{all} 原始 Emacs 键绑定，就像它们在首次调用 EDT 模拟之前存在的那样。
+
+@item 
+在 Emacs 支持突出显示标记文本的所有平台上，支持在 EDT 模拟中突出显示标记文本。
+
+@item 
+首次调用仿真时，以交互方式处理大多数终端配置的终端配置。
+
+@item 
+支持 MS-DOS 下的 PC AT 键盘。
+
+@end enumerate
+
+@node Supported terminals
+@chapter 支持的终端/键盘
+
+通过 @code{edt-mapper} 函数支持在 Window 系统下使用的键盘。  第一次在窗口系统下调用仿真时，@code{edt-mapper} 函数会自动运行，并提示用户确定仿真将使用哪些键作为 EDT 期望的标准键盘和功能键（例如，@key{PF1}、@key{PF2}、@key{KP0}、@key{KP1}、@key{F1}、@key{F2} 等）。  每次调用仿真时，此配置都会保存到磁盘读取。
+
+在不运行窗口管理器的面向字符的连接中，提供了对以下终端/键盘的内置支持：
+
+@enumerate
+
+@item 
+DEC VT-100 系列及更高版本。  这包括表现良好的 VT 克隆和模拟器。  如果您使用 VT 系列终端，请确保在调用 emacs 之前正确设置 @env{TERM} 环境变量。
+
+@item 
+MS-DOS 下的 PC AT 键盘。
+
+@end enumerate
+
+请务必阅读@ref{Platform-specific notes}，看看这些注释是否适用于您。
+
+@node Starting emulation
+@chapter 如何开始
+
+启动 Emacs 并输入@kbd{M-x edt-emulation-on}开始模拟。  初始化完成后，状态行下方将显示以下消息，通知您模拟已启用：“默认 EDT 键盘映射已激活”。
+
+每次启动 Emacs 会话时，通过将以下行添加到您的 @file{.emacs} 文件中，您可以让 EDT 仿真自动启动：
+
+@example
+(add-hook 'emacs-startup-hook 'edt-emulation-on)
+@end example
+
+随附的参考表（稍后）列出了默认的 EDT 仿真键绑定。  也可以通过按 @key{PF2}、@kbd{GOLD-H} 或 @samp{HELP}（在 EDT 默认模式下）从 Emacs 中在线访问此表。
+
+在 EDT 仿真 (@pxref{Customizing}) 中自定义按键绑定非常容易。  自定义内容放置在名为 @file{edt-user.el} 的文件中。  Emacs @file{etc/} 目录包含一个示例。  如果在 EDT 仿真初始化期间在您的 Emacs 加载路径中找到 @file{edt-user.el}，则状态行下方将显示以下消息，指示仿真已启用，并通过您自己的自定义增强：“用户 EDT 自定义键盘映射处于活动状态”。
+
+启用后，您可以轻松地在自定义 EDT 仿真键绑定和默认 EDT 仿真键绑定之间来回切换。  （查看示例 @file{edt-user.el} 文件中与 @kbd{GOLD-Z} 的绑定。）关闭仿真也很容易（通过命令 @code{edt-emulation-off}）。  这样做可以完全恢复调用仿真之前有效的原始键绑定。
+
+Emacs 将按键绑定到 @acronym{ASCII} 控制字符，真正的 EDT@. 也是如此。当 EDT 键绑定和 Emacs 键绑定发生冲突时，默认情况下 EDT 模拟会保留默认的 Emacs 键绑定。  如果您是顽固的 EDT 用户，您可能不喜欢这个。  @ref{Control keys} 部分解释了如何更改此设置，以便 EDT 到 @acronym{ASCII} 控制字符的绑定覆盖默认的 Emacs 绑定。
+
+@node Platform-specific notes
+@chapter 特定平台的注释
+
+@menu
+* Sun workstations::   运行 X 的 Sun 工作站。
+* MS-DOS::             运行 MS-DOS 的 PC 用户。
+* GNU/Linux::          运行 GNU/Linux 的 PC 用户。
+* Unix::               在 Unix 系统上使用 @key{NumLock} 代替 @key{PF1} 键。
+@end menu
+
+@node Sun workstations
+@section 运行 X 的 Sun 工作站
+
+某些早期的 Sun 键盘没有与小键盘按键分开的箭头键。  很难模拟完整的 EDT 键盘并仍然保留此类键盘上箭头键的使用。
+
+然而，Sun Type 5 和其他更新的 Sun 键盘确实有单独的箭头键。  这使它们成为建立合理的 EDT 键盘模拟的候选者。
+
+根据系统上安装的 X 版本的配置，您可能会发现键盘按键的默认 X 键名不允许 Emacs 将部分或全部键盘按键解释为除箭头键、数字键、@key{Home}、@key{PageUp} 等之外的其他键。Sun 和 HP 都对键盘按键进行了奇怪的键盘符号分配。
+
+在大多数情况下，X Windows 命令 @code{xmodmap} 可用于纠正问题。  下面是一个示例 @file{.xmodmaprc} 文件，它可以在使用配置有 Sun Type 5 键盘的较旧 SunOS 版本的 Sun 工作站配置上纠正此问题：
+
+@example
+! File:  .xmodmaprc
+!
+! Set up Sun Type 5 keypad for use with the Emacs EDT Emulation
+!
+keycode  53 = KP_Divide
+keycode  54 = KP_Multiply
+keycode  57 = KP_Decimal
+keycode  75 = KP_7
+keycode  76 = KP_8
+keycode  77 = KP_9
+keycode  78 = KP_Subtract
+keycode  97 = KP_Enter
+keycode  98 = KP_4
+keycode  99 = KP_5
+keycode 100 = KP_6
+keycode 101 = KP_0
+keycode 105 = F24
+keycode 119 = KP_1
+keycode 120 = KP_2
+keycode 121 = KP_3
+keycode 132 = KP_Add
+@end example
+
+如果 @file{edt-mapper.el} 无法将您的键盘按键识别为唯一键，请使用命令 @samp{xmodmap -pke} 获取实际键代码和映射到它们的键符号的列表，然后生成与上面类似的您自己的自定义 @file{.xmodmaprc}。
+
+接下来，将 @file{.xmodmaprc} 输入 @code{xmodmap} 命令，所有 Sun Type 5 键盘按键现在都可以配置为模拟 LK-201 键盘（除了 @key{,} 键）。  在此示例中，该行
+
+@example
+keycode 105 = F24
+@end example
+
+@noindent changes the X Windows name of the keypad @key{NumLock} key to
+在内部称为 @key{F24} 键。  这样做可以将其配置为充当 @key{PF1} (@key{GOLD}) 键。
+
+此更改的副作用是您将不再拥有 @key{NumLock} 键。  如果您在 X 下使用其他需要 @key{NumLock} 键的软件，请检查您的键盘并查找您不使用的键盘并将其重新定义为 @key{NumLock} 键。基本上，您需要清除 @key{NumLock} 键作为修饰符的分配，将其分配给您选择的键，然后将其添加回作为修饰符。  （@ref{Unix} 有关如何执行此操作的更多帮助。）
+
+@node MS-DOS
+@section 运行 MS-DOS 的 PC 用户
+
+默认情况下，F1 配置为模拟 @key{PF1} (@key{GOLD}) 键。但是，如果您加载随 MS-Kermit 分发的免费软件 TSR，则可以使用 @key{NumLock} 来代替，调用 @samp{gold.com}。  它曾经发布在一个名为 @file{gold22.zip} 的文件中，并附带源代码以及可加载的二进制图像。  （有关更多信息，请参阅 Emacs @file{lisp/emulation} 目录中的 @file{edt-pc.el}。）
+
+@node GNU/Linux
+@section 运行 GNU/Linux 的 PC 用户
+
+默认的 X 服务器配置因 GNU/Linux 的发行版和版本而异。  如果您的系统无法将键盘按键识别为不同的按键，请更改 NumLock 状态，根据具体情况打开或关闭它，然后重试。  如果这不能解决您的问题，您可能需要使用 @code{xmodmap} 修改 X 键符号映射。
+
+在 Intel PC 上的一个发行版上，以下 @file{.xmodmaprc} 可以很好地设置。
+
+@example
+! File:  .xmodmaprc
+!
+! Set up PC keypad under GNU/Linux for the Emacs EDT Emulation
+!
+clear  mod2
+keycode  77 = F12
+keycode  96 = Num_Lock Pointer_EnableKeys
+add mod2 = Num_Lock
+@end example
+
+在此示例中，将文件输入 @code{xmodmap} 命令后，PC @key{NumLock} 键盘按键将可配置为模拟 @key{PF1} 键。  PC 键盘现在可以模拟 LK-201 键盘（减去逗号键），这是 DEC 终端 VT-200 及更高版本提供的标准键盘。  此 @file{.xmodmaprc} 文件切换 @key{F12} 和 @key{NumLock} 键的角色。  它已经在 Red Hat GNU/Linux 5.2 上进行了测试。  其他版本的 GNU/Linux 可能需要不同的密钥代码。  （@ref{Unix} 有关如何执行此操作的更多帮助。）
+
+@strong{Please note:} 请记住，可能需要将 @key{NumLock} 置于一个位置 (ON) 或另一个位置 (OFF)，PC 键盘才能正确模拟 LK-201 键盘。
+
+@node Unix
+@section 在 Unix 系统上使用 @key{NumLock} 作为 @key{PF1} 键的一般注意事项
+
+要使物理 @key{NumLock} 键可在 EDT 仿真中使用，需要对默认 X Window 设置进行一些修改。  由于键码分配因系统而异，因此需要进行一些调查以了解如何在特定系统上执行此操作。
+
+您需要查看使用“-pm”开关调用的 @code{xmodmap} 生成的输出。  例如，在 PC 上的 Red Hat GNU/Linux 5.2 上，运行 @samp{xmodmap -pm} 时我们会得到以下输出：
+
+@example
+xmodmap:  up to 2 keys per modifier, (keycodes in parentheses):
+
+shift       Shift_L (0x32),  Shift_R (0x3e)
+lock        Caps_Lock (0x42)
+control     Control_L (0x25),  Control_R (0x6d)
+mod1        Alt_L (0x40),  Alt_R (0x71)
+mod2        Num_Lock (0x4d)
+mod3
+mod4
+mod5        Scroll_Lock (0x4e)
+@end example
+
+@noindent Note that Num_Lock is assigned to the modifier @samp{mod2}.  This is
+是什么隐藏了 Num_Lock 不被 Emacs 看到。
+
+现在，@samp{xmodmap -pke} 产生：
+
+@example
+   .
+   .
+   .
+keycode  77 = Num_Lock Pointer_EnableKeys
+   .
+   .
+   .
+keycode  96 = F12
+   .
+   .
+   .
+@end example
+
+@noindent So, in Red Hat GNU/Linux 5.2 on a PC, Num_Lock generates keycode 77.
+采取以下步骤：
+
+@enumerate
+@item 
+清除Num_Lock对mod2的分配；
+@item 
+交换分配给 F12 和 Num_Lock 的键码；
+@item 
+将 Num_Lock 分配回 mod2。
+@end enumerate
+
+@noindent The @file{.xmodmaprc} file looks like this:
+
+@example
+! File:  .xmodmaprc
+!
+! Set up PC keypad under GNU/Linux for the Emacs EDT Emulation
+!
+clear  mod2
+keycode  77 = F12
+keycode  96 = Num_Lock Pointer_EnableKeys
+add mod2 = Num_Lock
+@end example
+
+因此，执行 @samp{xmodmap .xmodmaprc} 后，按下物理 @key{F12} 键看起来就像按下 X@. 的 Num_Lock 键。此外，按下物理 @key{NumLock} 键看起来就像按下@key{F12} 键到 X。
+
+现在，当按下物理 @key{NumLock} 键时，@file{edt-mapper.el} 将看到 @samp{f12}，从而允许将 @key{NumLock} 键用作 EDT @key{PF1} (@key{GOLD}) 键。
+
+@node Differences
+@chapter 此 EDT 模拟与真实的 EDT 有什么不同？
+
+一般来说，您会发现 EDT 的这种模拟复制了大部分（但不是全部）EDT 最常用的键盘模式编辑功能和行为。  它并不完美，但大多数尝试过该模拟的 EDT 用户都认为它足够好，足以让顽固的 EDT 用户轻松转向使用 Emacs。
+
+以下列出了 EDT 与 GNU Emacs EDT 仿真之间最重要的差异。  该列表很短，但如果您要有效地使用 EDT 仿真，则必须了解这些差异。
+
+@enumerate
+
+@item 
+输入重复计数的方式与 EDT 中略有不同。
+
+EDT 允许用户在输入接受重复计数的命令之前输入重复计数。  例如，使用真实EDT时，依次按@kbd{GOLD 5 KP1}这三个键，将使光标向当前方向移动5个字。  这在 Emacs 中@strong{not} 确实有效！
+
+Emacs 提供了两种输入重复计数的方法，并且都不涉及使用 @key{GOLD} 键。  首先，可以使用 @key{ESC} 键在 Emacs 中输入重复计数。  例如，依次按下这些键@kbd{ESC 1 0 KP1}，将使光标向当前方向移动 10 个字。  其次，Emacs 提供了另一个名为 @code{universal-argument} 的命令，可用于执行相同的操作。通常，在 Emacs 中，该值绑定为 @kbd{C-u}。
+
+@item 
+支持 @strong{not} EDT 的线路模式命令和无键盘模式命令（有一个重要的例外；请参阅 @ref{Highlights} 中的第 8 项）。  尽管乍一看这似乎是一个很大的遗漏，但内置 Emacs 命令集提供了更丰富的功能集，足以弥补这一遗漏。
+
+要输入未绑定到按键的 Emacs 命令，您可以按 @kbd{GOLD KP7} 或 @key{DO} 键。  Emacs 将显示自己的命令提示符“M-x”。这代表按键 @kbd{Meta-x}，其中 @key{Meta} 是特殊的 Shift 键。  @key{Alt} 键通常被映射为 @key{Meta} 键。  因此，您也可以通过按 @kbd{Meta-x} 来调用此提示。输入序列 @kbd{ESC x} 也会调用提示符。
+
+@item 
+在 Emacs 支持文本突出显示的系统上，所选文本会突出显示 @strong{only}。
+
+@item 
+就像在 TPU/EVE 中一样，@key{ENTER} 键和 @strong{not} 用于在编辑器提示您输入时终止输入。  相反，使用 @key{RETURN} 键。  （@key{KP4} 和 @key{KP5}（方向键）确实会终止 @samp{FIND} 命令的输入，就像在 EDT 中一样。）
+
+@end enumerate
+
+@node Highlights
+@chapter 一些亮点以及与原始 Emacs EDT 模拟的比较
+
+@enumerate
+
+@item 
+支持 EDT 定义键盘命令 (@code{edt-define-key})，并且在启用 EDT 控制序列绑定或使用示例 @file{edt-user.el} 自定义文件时，在默认 EDT 模式下绑定到 @kbd{C-k}。  支持 TPU/EVE learn 命令，但在默认 EDT 模式下未绑定到密钥，但绑定在示例 @file{edt-user.el} 文件中。
+
+与 TPU/EVE 学习命令不同，TPU/EVE 学习命令使用一个键开始学习序列 @kbd{C-l}，并使用另一个键来记住该序列 @kbd{C-r}，此版本的学习命令 (@code{edt-learn}) 充当开始和记住学习序列的切换。
+
+许多使用 Define 键和 learn 命令更改键含义的用户希望能够恢复原始键绑定，而无需退出并重新启动 emacs。  因此提供了一个恢复键命令来做到这一点。  调用时，它会提示您按下希望恢复上次替换的键定义的键。  当启用 EDT 控制序列绑定或使用示例 @file{edt-user.el} 自定义文件时，它在默认 EDT 模式下绑定到 @kbd{GOLD C-k}。
+
+@item 
+方向支持完全支持。
+
+@item 
+当 EDT 模拟关闭时，所有原始 Emacs 绑定都会完全恢复。  因此，例如，如果同事来到您的终端帮助您解决软件问题，并且对您的 EDT 模拟绑定完全困惑，只需在 @samp{M-x} 提示符下输入命令 @code{edt-emulation-off}，原始 Emacs 绑定就会恢复。  要恢复 EDT 模拟，只需输入 @code{edt-emulation-on}。
+
+@item 
+用户自定义 EDT 绑定与默认 EDT 绑定分开。  人们可以在自定义 EDT 绑定和默认 EDT 绑定之间来回切换。
+
+@item 
+@file{edt.el} 中的 Emacs 函数尝试在实际情况下模拟相应 EDT 键盘模式命令的确切行为。  在某些情况下，模拟并不精确，但我们希望您会同意它足够接近。  在极少数情况下，我们选择使用 Emacs 的方式来处理事情。  如前所述，我们不模拟 EDT @samp{SUBS} 命令。  相反，我们选择使用 Emacs @code{query-replace} 函数，我们发现它更容易使用。
+
+@item 
+Emacs 使用分配给 @code{page-delimiter} 的正则表达式来确定标记分页符的内容。  这通常是 @samp{^\f}，这会导致 @code{edt-page} 命令忽略不在行首的换页符。  为了准确模拟 EDT @samp{PAGE} 命令，当 EDT 仿真打开时，页面分隔符设置为 @samp{\f}，而当 EDT 仿真关闭时，将页面分隔符设置为 @samp{^\f}。  但是，由于某些用户更喜欢 Emacs 的分页符定义，或者可能希望保留分页符的自定义定义，因此可以通过以下方式覆盖 EDT 定义：
+
+@example
+(setq edt-keep-current-page-delimiter t)
+@end example
+
+@noindent in your @file{.emacs} file.  Or, you can used the Emacs customize
+命令更改其设置。
+
+@item 
+终端窗口的一部分的 EDT 定义被硬连线为其唯一的 24 行窗口中的 16 行（EDT @samp{SECT} 命令绑定到 @key{KP8}）。  这是一次窗口的三分之二。  由于 Emacs 与 TPU/EVE 一样，可以处理大小不是 24 行的多个窗口，因此这里使用的节的定义已修改为当前窗口的三分之二。  （与 3⁣ 仿真相比，您可能更喜欢 @code{edt-scroll-window} 函数。）
+
+@item 
+涉及单词实体的光标移动和删除与 EDT@. 相同，这最重要的是，给顽固的 EDT 用户一种宾至如归的感觉。  此外，还为那些喜欢根据自己的喜好一次按一个单词自定义移动的用户提供了 EDT @samp{SET ENTITY WORD} 命令的模拟。
+
+@item 
+支持 EDT 的 @samp{FIND} 和 @samp{FNDNXT}。
+
+@item 
+支持 EDT 的 @samp{APPEND}、@samp{REPLACE} 和 @samp{SUBS} 命令。
+
+@item 
+支持@samp{CHNGCASE}。  如果 @samp{SELECT} 处于活动状态，它适用于单个字符或选定的文本。  此外，还提供了两个新命令：@code{edt-lowercase} 和 @code{edt-uppercase}。如果 @samp{SELECT} 处于活动状态，它们可以处理单个 @strong{words} 或选定的文本。
+
+@item 
+支持换页和制表符插入命令。
+
+@item 
+提供了新命令@code{edt-duplicate-word}。  如果您尝试一下，您可能会发现它非常有用，并且可能想知道如果没有它您将如何相处！  它在示例 @file{edt-user.el} 自定义文件中分配给 @kbd{C-j}。
+
+@item 
+支持 TPU/EVE 的矩形剪切和粘贴功能（最初来自 EVE-Plus 软件包）。  但与 TPU/EVE 版本不同的是，这些版本支持插入和覆盖模式。  在默认 EDT 模式下，这七个矩形函数绑定到 @key{F7}、@key{F8}、@kbd{GOLD-F8}、@key{F9}、@kbd{GOLD-F9}、@key{F10} 和 @kbd{GOLD-F10}。
+
+@item 
+原始的 EDT 仿真包设置了许多默认的常规和 GOLD 绑定。  我们试图保留其中的大部分（但不是全部！）@:，因此原始仿真包的用户会感觉更自在。
+
+尽管如此，仍然有许多黄金键序列没有绑定任何功能。  这些是用于您自己的定制的主要候选者。
+
+此外，@file{edt.el} 中有几个命令未绑定到任何键。因此，您会发现值得查看@file{edt.el}以查找您可能希望添加到个人自定义绑定中的功能。
+
+@item 
+VT200/VT300系列终端窃取功能键@key{F1}至@key{F5}以供自己使用。  它们不会生成发送到主机的信号。  因此，@file{edt.el} 不会将任何默认绑定分配给@key{F1} 到@key{F5}。
+
+此外，当按下@key{F6}键（@samp{^C}或@samp{^Y}，不记得是哪个）时，我们的VT220终端会生成中断，而不是手册中记录的字符序列。  因此，如果您的终端的行为方式相同，则将 Emacs 命令绑定到 @key{F6} 将不起作用。
+
+@item 
+与 VT100 一样，VT220 终端没有 @key{ESC}、@key{BS} 或 @key{LF} 键。  因此，默认 EDT 绑定采用标准 DEC 约定，即在 VT200 系列（及更高版本）终端上将 @key{F11}、@key{F12} 和 @key{F13} 键分配给与 VT100 终端上绑定到 @key{ESC}、@key{BS} 和 @key{LF} 相同的 EDT 功能。
+
+@item 
+每个用户通过使用私有 @file{edt-user.el} 文件，可以非常轻松地自定义个人 EDT 模拟绑定。
+
+@item 
+支持 EDT @samp{SELECT} 和 @samp{RESET} 功能。但是，与 EDT 不同，按 2⁣ 取消文本选择会重置当前方向的现有设置。
+
+我们还提供了类似于 TPU/EVE 的单一 @samp{SELECT/RESET} 函数版本，称为 @code{edt-toggle-select}，它使 EDT @samp{SELECT} 函数成为切换开关。  也就是说，如果选择打开，再次按 @samp{SELECT} 将关闭选择（取消选择）。  此函数在示例 @file{edt-user.el} 自定义文件中使用。
+
+@item 
+支持 EDT 滚动边距，但默认情况下处于禁用状态。 （@ref{Scroll margins} 有关如何启用它们的说明。）
+
+@end enumerate
+
+@node Customizing
+@chapter 自定义仿真
+
+大多数 EDT 用户有时会创建一些自定义键绑定，或使用其他人的自定义键绑定，他们开始依赖这些键绑定，就像它们是内置绑定一样。  此 GNU Emacs 的 EDT 仿真旨在简化自定义绑定。
+
+如果您希望自定义 EDT 仿真以使用您自己的一些键绑定，则需要在您自己的私有 lisp 目录中创建 @file{edt-user.el} 的私有版本。  Emacs @file{etc/} 目录包含一个示例，供您用作模板和想法。
+@c This seems to be untrue.
+@ignore
+There are two sample files @file{edt-user.el1} and @file{edt-user.el2}
+for you to use as templates and for ideas.  Look at @file{edt-user.el1}
+first.  Unless you will be using two or more very different types of
+terminals on the same system, you need not look at @file{edt-user.el2}.
+@end ignore
+
+首先，您需要有自己的私有 lisp 目录，例如 @file{~/lisp}，并且您应该将其添加到 Emacs 加载路径中。
+
+@strong{Please note:} 一些站点有不同的加载路径要求，因此如果您的站点有此类特殊需求，则上述说明可能需要进行一些修改。
+
+@menu
+* Init file::             创建您自己的 @file{edt-user.el} 文件。
+* Words::                 指定单词实体。
+* Control keys::          启用 EDT 控制键序列绑定。
+* Scroll margins::        设置滚动边距。
+@end menu
+
+@node Init file
+@section 创建您自己的 @file{edt-user.el} 文件
+
+Emacs @file{etc/} 目录中提供了示例 @file{edt-user.el} 文件。  您应该使用它作为指南来了解如何根据自己的喜好自定义 EDT 模拟绑定。  用于识别 LK-201 键盘和功能键组的名称为：
+
+@example
+Keypad Keys:
+                PF1 PF2 PF3 PF4
+                KP7 KP8 KP9 KP-
+                KP4 KP5 KP6 KP,
+                KP1 KP2 KP3
+                KP0     KPP KPE
+@end example
+
+@example
+Arrow Keys:
+                LEFT RIGHT DOWN UP
+@end example
+
+@example
+Function Keys:
+                F1 F2 F3 F4 F5  F6 F7 F8 F9 F10  F11 F12 F13 F14
+                HELP DO  F17 F18 F19 F20
+
+                FIND   INSERT   REMOVE
+                SELECT PREVIOUS NEXT
+@end example
+
+注意：许多 VT-200 及以上终端会窃取功能键 @key{F1} 到 @key{F5} 进行终端设置控制，并且按下后不会向主机发送任何内容。  因此，自定义这些键的绑定可能不适合您。
+
+执行 EDT 模拟自定义绑定的三个基本函数是：@code{edt-bind-key}、@code{edt-bind-gold-key} 和 @code{edt-bind-function-key}。
+
+前两个用于将功能绑定到大多数键盘上的标准按键。  这使得它们独立于键盘，从而可以为文件 @file{edt.el} 中的所有终端定义这些键绑定。
+
+第一个，@code{edt-bind-key}，通常用于将 emacs 命令绑定到控制键，尽管有些人也用它来将命令绑定到其他键。  （例如，有些人用它将 VT200 很少使用的反勾键 (@samp{`}) 绑定到功能 @samp{ESC-prefix}，因此它的行为就像@key{ESC} 键。）第二个功能@code{edt-bind-gold-key} 用于将 emacs 命令绑定到涉及字母数字键、特殊字符键和控制键的黄金键序列。
+
+第三个函数@code{edt-bind-function-key}与终端相关，并在终端特定文件中定义（例如参见@file{edt-vt100.el}）。  它用于将 emacs 命令绑定到 LK-201 功能键、键盘按键以及这些按键的金色序列。
+
+@node Words
+@section 指定单词实体
+
+变量 @code{edt-word-entities} 用于模拟 EDT 的 @samp{SET ENTITY WORD} 命令。  它包含本身被视为单词的字符列表。  如果用户未在他/她的 @file{.emacs} 文件中定义 @code{edt-word-entities}，则将其设置为仅包含 @key{TAB} 的 EDT 默认值。
+
+字符按其数值而不是字符串存储在列表中。  Emacs 支持多种方法来指定字符的数值。  一种方法是使用问号：@samp{?A} 表示@samp{A} 的数值，@samp{?/} 表示@samp{/} 的数值，依此类推。  一些不可打印的字符有特殊的表示：
+
+@example
+?\b  specifies  BS, C-h
+?\t  specifies  TAB, C-i
+?\n  specifies  LFD, C-j
+?\v  specifies  VTAB, C-k
+?\f  specifies  FF, C-l
+?\r  specifies  CR, C-m
+?\e  specifies  ESC, C-[
+?\\  specifies  \
+@end example
+
+以下是一些示例：
+
+@example
+(setq edt-word-entities '(?\t ?- ?/)) ; specifies TAB, - , and /
+(setq edt-word-entities '(?\t)        ; specifies TAB, the default
+@end example
+
+@noindent You can also specify characters by their decimal ASCII values:
+
+@example
+(setq edt-word-entities '(9 45 47))   ; specifies TAB, - , and /
+@end example
+
+@node Control keys
+@section 启用 EDT 控制键序列绑定
+
+如果 EDT 键绑定和 Emacs 键绑定发生冲突，则默认保留默认 Emacs 键绑定。  一些顽固的 EDT 用户可能不喜欢这样。  因此，如果在用户的 @file{.emacs} 文件中将变量 @code{edt-use-EDT-control-key-bindings} 设置为 true，则默认的 EDT 模拟模式将启用大多数原始 EDT 控制键序列绑定。  如果您想这样做，请将以下行添加到您的 @file{.emacs} 文件中：
+
+@example
+(setq edt-use-EDT-control-key-bindings t)
+@end example
+
+@node Scroll margins
+@section 设置滚动边距
+
+现在支持窗口顶部和底部的滚动边距。 （该设计是从@file{tpu-extras.el}复制的。）默认情况下，启用此功能，并将上边距设置为窗口的 10%，将下边距设置为窗口的 15%。  要更改这些设置，您可以调用 @file{.emacs} 文件中的函数 @code{edt-set-scroll-margins}。  例如，以下行
+
+@example
+(edt-set-scroll-margins "20%" "25%")
+@end example
+
+@noindent sets the top margin to 20% of the window and the bottom margin
+到窗口的 25%。  要禁用此功能，请将每个边距设置为 0%。您还可以在 EDT 仿真处于活动状态时以交互方式调用 @code{edt-set-scroll-margins} 来更改该会话的设置。
+
+@strong{Please note:} 设置滚动边距的另一种方法是使用 Emacs 自定义功能直接设置以下两个变量：@code{edt-top-scroll-margin} 和 @code{edt-bottom-scroll-margin}。
+
+输入 Emacs @code{customize} 命令。  首先选择 @samp{Editing} 组，然后选择 @samp{Emulations} 组。最后，选择 @samp{Edt} 组并按照说明进行操作。
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@bye

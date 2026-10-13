@@ -1,0 +1,806 @@
+\输入texinfo
+@c %**start of header
+@setfilename ../../info/rcirc.info
+@settitle 循环手册
+@documentlanguage en
+@include docstyle.texi
+@c %**end of header
+
+@copying
+版权所有 @copyright{} 2006--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs network features
+@direntry
+* Rcirc: (rcirc).                Internet 中继聊天 (IRC) 客户端。
+@end direntry
+
+@titlepage
+@title 循环手册
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top rcirc Manual
+
+@code{rcirc} is an Emacs IRC client.
+
+IRC (Internet Relay Chat) is a multi-user chat protocol.  Users
+communicate with each other in real-time.  Communication occurs both in
+topic channels which are collections of many users, or privately, with
+just one other user.
+
+@insertcopying
+
+@end ifnottex
+
+@menu
+* Basics::
+* Reference::
+* Fighting Information Overload::
+* Hacking and Tweaking::
+* GNU Free Documentation License::
+* Key Index::
+* Variable Index::
+* Index::
+
+@detailmenu
+--- 详细节点列表 ---
+
+基础知识
+
+* Internet Relay Chat::
+* Getting started with rcirc::
+
+参考
+
+* rcirc commands::
+* Useful IRC commands::
+* Configuration::
+
+对抗信息过载
+
+* Channels::
+* People::
+* Keywords::
+* Notices::
+
+黑客和调整
+
+* Skipping /away messages using handlers::
+* Using fly spell mode::
+* Scrolling conservatively::
+* Changing the time stamp format::
+* Defining a new command::
+
+@end detailmenu
+@end menu
+
+@node Basics
+@chapter 基础知识
+
+本章包含 IRC（互联网中继聊天）的简要介绍，以及 @code{rcirc} 的快速教程。
+
+@menu
+* Internet Relay Chat::
+* Getting started with rcirc::
+@end menu
+
+@node Internet Relay Chat
+@section 互联网中继聊天
+@cindex internet relay chat
+@cindex irc
+
+@cindex channel
+@dfn{Internet Relay Chat} (IRC) 是一种通过互联网进行即时通信的形式。  它主要设计用于称为频道的论坛中的群组（多对多）通信，但也允许一对一通信。
+
+@cindex instant messaging, comparison
+@cindex server
+@cindex network
+与大多数即时通讯 (IM) 系统相反，用户通常不连接到中央服务器。  相反，用户连接到网络中的随机服务器，服务器将消息从一台服务器转发到下一台服务器。
+
+这是一个典型的例子：
+
+@cindex redirection to random servers
+当您连接到 Libera.Chat 网络 (@code{https://libera.chat}) 时，您将 IRC 客户端指向服务器@code{irc.libera.chat}。  该服务器会将您的客户端重定向到网络上的随机服务器，例如@code{zirconium.libera.chat}。
+
+@cindex channel name
+@cindex # starts a channel name
+连接后，您可以向连接到同一网络的所有其他用户发送消息，并且可以加入同一网络上的所有频道。  例如，您可以加入 @code{#emacs} 和 @code{#rcirc} 通道。  （通常，通道名称以哈希字符开头。）
+
+一旦您加入频道，您输入的任何内容都会广播给同一频道上的所有其他用户。
+
+@cindex addressing other people
+@cindex other people, addressing them
+@cindex talk to other people
+如果您想专门称呼某人，例如作为问题的答案，通常会在消息前面加上昵称，后跟冒号，如下所示：
+
+@example
+deego: fsbot rules!
+@end example
+
+@cindex nick completion
+@cindex completion of nicks
+@vindex rcirc-cycle-completion-flag
+@kindex TAB
+由于这种情况很常见，因此您可以使用 @key{TAB} 来完成缺口补全。默认情况下，rcirc 将使用默认的完成系统，但您可以启用 @code{rcirc-cycle-completion-flag} 来循环缺刻。
+
+@node Getting started with rcirc
+@section 开始使用 rcirc
+@cindex getting started
+@cindex connecting to a server
+
+@cindex irc command
+使用命令 @kbd{M-x irc} 使用默认值进行连接。 @xref{Configuration}，如果您想更改默认值。
+
+如果您不想使用默认值，请使用@kbd{C-u M-x irc}，例如，如果您想连接到不同的网络，或使用不同的昵称连接到同一网络。  这将提示您四件事：
+
+@table @asis
+@cindex server, connecting
+@cindex Libera.Chat network
+@item IRC服务器
+您想连接到哪个服务器？  特定网络中的所有服务器都是等效的。  某些网络使用循环系统，其中单个服务器将新连接重定向到网络中的随机服务器。  @code{irc.libera.chat} 就是 Libera.Chat 网络的这样一个服务器。  Libera.Chat 的目的是“在志愿者的基础上提供免费开源软件和同行指导项目的社区平台等服务”，并在 Freenode IRC 网络治理和政策发生变化后于 2021 年 6 月被选为 GNU 项目和自由软件基金会 IRC 频道的官方主页。  GNU 和 FSF 对此的公告位于 @uref{https://lists.gnu.org/archive/html/info-gnu/2021-06/msg00005.html}、@uref{https://lists.gnu.org/archive/html/info-gnu/2021-06/msg00007.html} 和 @uref{https://lists.gnu.org/archive/html/info-gnu-emacs/2021-06/msg00000.html}。
+
+@cindex port, connecting
+@cindex 6667, default IRC port
+@item IRC 端口
+所有网络连接都需要端口。  正如 Web 服务器和客户端默认使用端口 80 一样，IRC 默认使用端口 6667。  您很少需要使用不同的端口。
+
+@cindex nick, connecting
+@cindex changing nick
+@cindex name changes
+@item IRC 尼克
+@vindex user-login-name
+每个用户都需要一个在线手柄。  如果您选择的昵称已被使用，您将被自动分配一个略有不同的昵称。  如果您的 @code{user-login-name} 是 @code{alex}，并且该昵称已被使用，则您可能会被分配昵称 @code{alex`}。
+
+@cindex channels, connecting
+@cindex initial channels
+@cindex startup channels
+@item IRC 频道
+连接时要加入的以空格分隔的频道列表。如果您只想与同一网络上的朋友进行一对一对话，则无需加入任何频道。  如果您是 Libera.Chat 网络的新用户，请加入 @code{#emacs}（有关 Emacs 的所有内容的频道），或加入 @code{#rcirc}（有关 @code{rcirc} 的频道）。
+@end table
+
+@cindex server buffer
+当您回答完这些问题后，@code{rcirc} 将创建一个服务器缓冲区，其名称类似于 @file{*irc.libera.chat*}，并为您想要加入的每个通道创建一个通道缓冲区。
+
+@kindex RET
+@cindex talking
+@cindex communicating
+要在频道中讲话，只需在频道缓冲区中输入您想说的话，然后按@key{RET}。
+
+@kindex C-c C-c
+@cindex multiline messages
+@cindex messages, multiple lines
+@cindex pasting multiple lines
+@cindex edit message before sending
+如果要粘贴多行（例如源代码），可以使用 @kbd{C-c C-c} 在单独的缓冲区中编辑消息。  使用 @kbd{C-c C-c} 完成编辑。  不过，您仍然需要按 @key{RET} 才能发送。  一般来说，IRC 用户不喜欢人们粘贴超过四行代码，因此请谨慎使用。
+
+@comment This section copied from the Channels section.
+@comment All index markers should point to the original!
+一旦您连接到多个通道，或者一旦您将注意力转向 Emacs 中的其他缓冲区，您可能希望收到当前不可见的通道中的任何活动的通知。  您所需要做的就是使用 @kbd{M-x rcirc-track-minor-mode} 切换通道跟踪。要使其永久化，请将以下内容添加到您的初始化文件中：
+
+@example
+(rcirc-track-minor-mode 1)
+@end example
+
+使用 @kbd{C-c C-@key{SPC}} 切换到这些缓冲区。
+
+@vindex rcirc-track-ignore-server-buffer-flag
+如果用户希望忽略服务器缓冲区中的事件，请将 0⁣ 设置为非 1⁣ 值。
+
+@node Reference
+@chapter 参考
+@cindex reference
+
+这是手册的参考部分。  它并不完整。  有关 @code{rcirc} 功能的完整列表，请使用 Emacs 内置文档。
+
+@menu
+* rcirc commands::
+* Useful IRC commands::
+* Configuration::
+@end menu
+
+@node rcirc commands
+@section rcirc 命令
+@cindex rcirc commands
+@cindex commands
+
+@kindex C-h m
+这是您可以在 @code{rcirc} 中使用的命令列表。  它并不完整。  要获得完整列表，请在 @code{rcirc} 缓冲区中按 @kbd{C-h m}。
+
+除了使用常规 Emacs 键绑定之外，您还可以通过将它们键入 @code{rcirc} 缓冲区来调用它们。
+
+@cindex call commands
+@cindex typing commands
+@cindex commands
+例如，您可以在 @code{rcirc} 缓冲区中键入此命令，然后按 @key{RET}，而不是使用命令 @kbd{C-c C-j} 加入新频道：
+
+@example
+/join #emacs
+@end example
+
+@cindex / starts a command
+@cindex messages starting with a slash disappear
+@cindex disappearing messages if starting with a slash
+@cindex slash hides message
+这就是为什么不能以斜杠开始消息的原因。  您必须在命令前面添加一个空格，或者重写您的消息才能将其发送到频道。
+
+@cindex multiple words as parameters
+@cindex string delimiters
+@cindex quotes
+@cindex double-quotes
+许多命令都带有参数。  IRC 命令通常忽略字符串分隔符。  撇号和双引号在 IRC 中都没有特殊含义。
+
+@example
+/nick "alex schroeder"
+@end example
+
+这将尝试将您的昵称更改为@code{"alex}。  通常这会失败，因为双引号字符不是有效的缺刻字符。
+
+@cindex case insensitive commands
+这些命令不区分大小写。
+
+@cindex new command
+@cindex unknown command
+@cindex command unknown
+如果 @code{rcirc} 不知道某个命令，它只会被发送到服务器。  下一节中列出了一些有用的命令。
+
+@table @kbd
+@item C-c C-j
+@kindex C-c C-j
+@cindex /join
+@cindex join channels
+@cindex other channels
+@cindex rooms, joining
+@cindex discussion, joining
+这会加入一个通道，例如 @code{#rcirc} 或 @code{#emacs}。  在大多数网络上，任何人都可以创建新频道。  例如，如果您想与一些朋友交谈，您所要做的就是同意有效的频道名称并加入该频道。  （还有@code{/join #emacs}。）
+
+@item C-c C-p
+@kindex C-c C-p
+@cindex /part
+@cindex part a channel
+@cindex leave a channel
+@cindex disconnect from a channel
+@cindex stop talking on a channel
+@cindex kill channel buffer
+这将离开当前频道。  您可以选择提供不同的频道名称和分手原因。  当你杀死一个通道缓冲区时，你会自动分开相应的通道。 （还有@code{/part #emacs you are too weird!}。）
+
+@item C-c C-r
+@kindex C-c C-r
+@cindex /nick
+@cindex change name
+@cindex nick changing
+@cindex rename yourself
+@cindex other name
+这会将您的昵称更改为其他名称。  您的昵称在网络中必须是唯一的。  大多数网络不允许快速连续进行过多的昵称更改，并且对昵称中的有效字符有限制。  （还有@code{/nick alex-test}）
+
+@item C-c C-w
+@kindex C-c C-w
+@cindex /whois
+@cindex who are these people
+@cindex identifying people
+@cindex channels other people are on
+@cindex what channels people are on
+为您提供有关昵称的一些基本信息。  这通常包括人们正在使用的其他频道。  （还有@code{/whois fsbot}。）
+
+@item C-c C-q
+@kindex C-c C-q
+@cindex /query
+@cindex starting a private conversation
+@cindex one-to-one conversation
+@cindex talk privately
+@cindex private conversation
+@cindex contact one person only
+@cindex query a person
+与同一网络上的另一个人开始一对一对话。  将为该对话创建一个新的缓冲区。  它的工作原理就像一个只有两名成员的频道。  （还有@code{/query fsbot}。）
+
+@item C-c @key{RET}
+@kindex C-c RET
+@cindex /msg
+@cindex single message
+@cindex message sending
+这会向昵称发送一条消息。  与@kbd{C-c C-q} 一样，会创建一个新的缓冲区，其中将显示来自另一方的响应。  （还有@code{/msg nickserv identify secret}。）
+
+@item C-c C-x
+@kindex C-c C-x
+@cindex /quit
+@cindex quit
+@cindex disconnect
+@cindex kill connection
+@cindex connection end
+@cindex part all channels
+@cindex end connection
+@cindex server buffer killing
+@cindex reason for quitting
+这会断开与服务器的连接并断开所有通道。  您可以选择提供退出原因。  当您终止服务器缓冲区时，您会自动退出服务器并分开所有通道。  （还有@code{/quit ZZZzzz...}。）
+
+@item /reconnect
+@cindex /reconnect
+@cindex reconnect
+@cindex lost connection
+@cindex disconnecting servers, reconnecting
+这会在您失去连接后重新连接。
+
+如果您使用笔记本电脑聊天，那么您可能熟悉这个问题：当您的笔记本电脑进入睡眠状态并稍后唤醒时，您的 IRC 客户端不会意识到它已断开连接。  客户端需要花费几分钟时间才确定连接实际上已丢失。  简单的解决方案是使用@kbd{M-x rcirc}。  问题是，这会打开一个 @emph{additional} 连接，因此每个通道缓冲区都会有两个副本，一个是死的，一个是活的。
+
+因此，一种选择是 @code{/reconnect} 命令。
+
+另一种方法是将@code{rcirc-reconnect-delay}设置为大于0的值，并允许rcirc在检测到连接已关闭时重新连接。  默认情况下，它会在放弃之前尝试执行三次（由@code{rcirc-reconnect-attempts}指定）。
+@end table
+
+@node Useful IRC commands
+@section 有用的 IRC 命令
+@cindex irc commands
+@cindex commands
+
+如前所述，如果 @code{rcirc} 不知道某个命令，它只会被发送到服务器。  一些这样的命令几乎在所有 IRC 服务器上都可用，例如：
+
+@table @code
+@item /away
+@cindex /away
+@cindex away status
+@cindex pause status
+@cindex unavailable status
+@cindex set away status
+如果您提供原因，这会将您的状态设置为“离开”，如果您不提供原因，则会将您的状态设置为“回来”。  人们可以使用 @kbd{C-c C-w} 命令来检查您的状态。  示例：@code{/away food}。
+@end table
+
+@cindex irc resources
+@cindex help about irc
+典型的 IRC 服务器实现更多命令。  您可以在 @uref{https://www.irchelp.org/, the Internet Relay Chat (IRC) help archive} 在线阅读有关 IRC 奇妙世界的更多信息。
+
+@node Configuration
+@section 配置
+@cindex configuring rcirc
+
+您可以更改这些变量以根据您的喜好配置 @code{rcirc}。
+
+@table @code
+@item rcirc-server-alist
+@vindex rcirc-server-alist
+@cindex channels, configuration
+@cindex initial channels, configuration
+@cindex startup channels, configuration
+@cindex servers, configuration
+@cindex initial servers, configuration
+@cindex startup servers, configuration
+该变量包含默认连接的服务器列表以及要使用的关键字参数。  关键字参数是可选的。  如果您不提供任何内容，将使用下面记录的默认值。
+
+最重要的参数是 @code{:channels} 参数。  它控制您连接到服务器后默认加入的频道。
+
+以下是如何设置它的示例：
+
+@example
+(add-to-list 'rcirc-server-alist
+             '("otherworlders.org"
+               :channels ("#FUDGE" "#game-design")))
+@end example
+
+默认情况下，您将连接到 @code{rcirc} 支持通道：@code{irc.libera.chat} 上的@code{#rcirc}。
+
+@table @code
+@item :nick
+这会覆盖@code{rcirc-default-nick}。
+
+@item :port
+这会覆盖@code{rcirc-default-port}。
+
+@item :user-name
+这会覆盖@code{rcirc-default-user-name}。
+
+@item :full-name
+这会覆盖@code{rcirc-default-full-name}。
+
+@item :channels
+这描述了连接到服务器时要加入哪些频道。如果不存在，则不会自动连接任何频道。
+
+@end table
+
+@item rcirc-default-nick
+@vindex rcirc-default-nick
+该变量用于默认昵称。  它默认为@code{user-login-name}返回的登录名。
+
+@example
+(setopt rcirc-default-nick "kensanata")
+@end example
+
+@item rcirc-default-port
+@vindex rcirc-default-port
+@cindex port
+该变量包含要连接的默认端口。  默认为 6667，很少需要更改。
+
+@item rcirc-default-user-name
+@vindex rcirc-default-user-name
+@cindex user name
+该变量包含要向服务器报告的默认用户名。它默认为@code{user-login-name}返回的登录名，就像@code{rcirc-default-nick}一样。
+
+@item rcirc-default-full-name
+@vindex rcirc-default-full-name
+@cindex full name
+@cindex real name
+@cindex surname
+该变量用于设置您在 IRC@. 上的“真实姓名”，它默认为 @code{user-full-name} 返回的名称。  如果您想隐藏您的全名，您可能需要将其设置为某个化名。
+
+@example
+(setopt rcirc-default-full-name "Curious Minds Want To Know")
+@end example
+
+@item rcirc-authinfo
+@vindex rcirc-authinfo
+@cindex authentication
+@cindex identification
+@cindex nickserv
+@cindex login
+该变量是一个列表，用于在网络上自动识别您自己的身份。  每个子列表都以正则表达式开头，该正则表达式与您要连接的服务器地址进行比较。  列表中的第二个元素是表示要使用的方法的符号，后跟该方法所需的参数。
+
+这是一个示例来说明如何设置它：
+
+@example
+(setopt rcirc-authinfo
+        '(("Libera.Chat" nickserv "bob" "p455w0rd")
+          ("Libera.Chat" chanserv "bob" "#bobland" "passwd99")
+          ("bitlbee" bitlbee "robert" "sekrit")))
+@end example
+
+以下是有效的方法符号及其所需的参数：
+
+@table @code
+@item nickserv
+@cindex nickserv authentication
+如果您在连接到网络时需要按如下方式识别自己的身份，请使用此符号：@code{/msg nickserv identify secret}。  必要的参数是您想要使用的昵称以及要使用的密码。
+
+在使用此方法之前，您必须注册您的昵称并为其选择一个密码。  请联系@code{nickserv}并查看详细信息。  （例如，使用 @code{/msg nickserv help}。）
+
+如果您不想在配置中对密码进行硬编码，则可以将密码设置为关键字 @code{:auth-source}。 @xref{Top,,,auth, Emacs auth-source Library} 有关 Emacs 如何以及从何处获取密码的详细信息。
+
+@item chanserv
+@cindex chanserv authentication
+如果您想加入特定频道并需要按如下方式表明自己的身份，请使用此符号：@code{/msg chanserv identify #underground secret}。  必要的参数是您想要使用的昵称和频道，以及要使用的密码。
+
+在您可以使用此方法之前，渠道联系人必须告诉您要使用的密码。  请联系@code{chanserv}并查看详细信息。 （例如，使用 @code{/msg chanserv help}。）
+
+@item bitlbee
+@cindex bitlbee authentication
+如果您需要在 Bitlbee 通道中识别自己的身份，请使用此符号，如下所示：@code{identify secret}。  必要的参数是您想要使用的昵称以及要使用的密码。
+
+@cindex gateway to other IM services
+@cindex instant messaging, other services
+@cindex Jabber
+@cindex AIM
+@cindex ICQ
+@cindex MSN
+@cindex Yahoo!
+Bitlbee 的作用类似于 IRC 服务器，但实际上它是许多其他即时消息服务的网关。  您可以在本地安装 Bitlbee 或使用公共 Bitlbee 服务器。  在那里，您需要创建一个带有密码的帐户。  这是您需要为 bitlbee 身份验证方法提供的昵称和密码。
+
+稍后，您将告诉 Bitlbee 您在所有其他即时消息服务上的帐户和密码，Bitlbee 将使您登录。@code{rcirc} 需要知道的只是登录您的 Bitlbee 帐户。  不要将 Bitlbee 帐户与所有其他帐户混淆。
+
+@item sasl
+@cindex sasl authentication
+如果您想使用 @acronym{SASL} 身份验证，请使用此符号。  必要的参数是您想要使用的昵称以及要使用的密码。
+
+@item certfp
+@cindex certfp authentication
+如果您想使用 CertFP 身份验证，请使用此符号。  必要的参数是密钥的路径以及与帐户关联的客户端证书的路径。  CertFP 身份验证需要 @acronym{TLS} 连接。
+
+@end table
+
+@end table
+
+@node Fighting Information Overload
+@chapter 对抗信息过载
+@cindex information overload
+
+这是手册中针对在线忙碌人士的部分。  有数百人的支持渠道。  尝试跟踪这些渠道中的对话可能是一项艰巨的任务。  本章将告诉您 @code{rcirc} 如何提供帮助。
+
+@menu
+* Channels::
+* People::
+* Keywords::
+* Notices::
+@end menu
+
+@node Channels
+@section 渠道
+@cindex channels
+@cindex modeline
+
+@comment This section copied to the Getting started with rcirc section
+@kindex C-c C-SPC
+@vindex rcirc-track-minor-mode
+@cindex switching channels
+@cindex tracking activity
+@cindex active channel
+@cindex abbreviated channel names
+@cindex modeline tracks activity
+大多数人都希望在他们加入的频道上有发言时收到通知，特别是当他们被直接处理时。  有一个全局次要模式可以为您进行这种跟踪。  您所需要做的就是使用 @kbd{M-x rcirc-track-minor-mode} 将其打开。要使其永久化，请将以下内容添加到您的初始化文件中：
+
+@example
+(rcirc-track-minor-mode 1)
+@end example
+
+当其他人在当前隐藏的缓冲区中说话时（没有窗口显示它们），模式行现在将向您显示缩写的频道或昵称。  使用 @kbd{C-c C-@key{SPC}} 切换到这些缓冲区。
+
+@cindex rcirc-track-abbreviate-flag
+默认情况下，通道名称是缩写的，将 @code{rcirc-track-abbreviate-flag} 设置为非 @code{nil} 值。  如果 IRC 活动不是在模式行中而是在其他地方跟踪，这可能会很有趣。
+
+@vindex rcirc-mode-hook
+如果您不想立即加载@code{rcirc}，您可以延迟激活此模式：
+
+@example
+(add-hook 'rcirc-mode-hook
+          (lambda ()
+            (rcirc-track-minor-mode 1)))
+@end example
+
+@cindex busy channels
+如果您加入了非常活跃的支持渠道，则跟踪活动不再有用。  该频道将始终处于活动状态。  使用 @kbd{C-c C-@key{SPC}} 切换到活动通道不再按预期工作。
+
+@kindex C-c C-l
+@cindex low priority channels
+解决方案是将此通道标记为低优先级通道。使用 @kbd{C-c C-l} 使当前通道成为低优先级通道。低优先级通道具有模型行指示器“LowPri”。除非您使用 @kbd{C-u} 前缀，否则 @kbd{C-c C-@key{SPC}} 不会切换到低优先级频道。
+
+@kindex C-c TAB
+@cindex ignored channels
+如果您希望某个通道永远不会出现在模型行中，那么您必须忽略它。  使用 @kbd{C-c @key{TAB}} 忽略当前通道。
+
+@node People
+@section 人们
+@cindex people, how to ignore
+@cindex nicks, how to ignore
+@cindex friends
+@cindex buddies
+@cindex trolls
+
+对于挑剔的 IRC 用户来说，最重要的命令是@code{/ignore}。  这是网上最大的均衡器：如果有人激怒了你，就忽略他们。
+
+这当然是一个粗略的全有或全无的解决方案。  不要害怕，@code{rcirc} 提供了替代方案：您可以“照亮”您的好友，并“暗淡”某些您不想完全忽略的其他昵称。
+
+@table @code
+@item /ignore
+@cindex /ignore
+@cindex ignoring other people
+@cindex trolls, ignoring
+@cindex hide some posts
+@cindex idiots online
+如果您提供了一个缺口，此命令会切换该缺口的忽略状态。如果您不提供昵称，该命令会列出您忽略的所有昵称。  您猜对了，被忽略的昵称的所有消息都会被忽略。由于只有“操作员”才能将人们从频道中踢出，因此忽略命令通常是对付网上一些更令人讨厌的家伙的唯一方法。  示例：@code{/ignore rudybot}。
+
+@item /bright
+@cindex /bright
+@cindex highlight other people
+@cindex friends, highlight
+@cindex buddies, highlight
+@cindex nicks, highlight
+@cindex brighten nicks
+此命令会切换刻痕的明亮状态（如果您提供了刻痕）。如果您不提供缺刻，该命令会列出所有“亮化”的缺刻。  所有由亮化昵称发出的消息都——你猜对了——变亮了。  为你的朋友使用这个。  示例：@code{/bright rcy}。
+
+@item /dim
+@cindex /dim
+@cindex soft-ignore other people
+@cindex obnoxious people online
+@cindex rabble online
+如果您提供了缺口，此命令会切换缺口的暗淡状态。  如果您不提供缺刻，该命令会列出所有“变暗”的缺刻。所有由暗号昵称发出的消息都——你猜对了——变暗了。  将此用于无聊的人和机器人。  如果您正在跟踪频道活动，则灰色昵称的消息将不会注册为活动。  示例：@code{/dim fsbot}。
+@end table
+
+
+@node Keywords
+@section 关键词
+@cindex keywords
+
+在繁忙的频道上，您可能希望忽略所有活动（使用 @kbd{C-c @key{TAB}}）并仅监视某些关键字。  以下命令允许您突出显示某些关键字：
+
+@table @code
+@item /keyword
+@cindex /keyword
+此命令会切换关键字的突出显示（如果您提供了一个关键字）。  如果您不提供关键字，则会列出当前关键字。  示例：@code{/keyword manual}。
+@end table
+
+@node Notices
+@section 通知
+@cindex part notices, how to omit
+@cindex join notices, how to omit
+@cindex quit notices, how to omit
+@cindex nick notices, how to omit
+
+@kindex C-c C-o
+@cindex low priority channels
+在繁忙的频道中，您可能对所有正在进行的加入、分离、退出和重命名不感兴趣。  您可以使用 @kbd{C-c C-o} 省略这些通知。
+
+@vindex rcirc-omit-responses
+@cindex away notices, how to omit
+您可以通过 @code{rcirc-omit-responses} 变量控制忽略哪些通知。  以下是如何省略离开消息的示例：
+
+@example
+(setopt rcirc-omit-responses '("JOIN" "PART" "QUIT" "NICK" "AWAY"))
+@end example
+
+@vindex rcirc-omit-threshold
+请注意，如果相关昵称最近处于活动状态，则不会忽略这些消息。  毕竟，您不想继续与刚刚离开的人交谈。  这就是为什么 @code{rcirc} 检查缓冲区中最近的行以确定昵称是否已处于活动状态，并且仅在昵称尚未处于活动状态时才忽略消息。  @code{rcirc} 考虑的窗口由 @code{rcirc-omit-threshold} 变量控制。
+
+@vindex rcirc-omit-unless-requested
+除非用户手册要求，否则默认情况下可以省略某些消息。  例如，如果您不想显示@code{TOPIC}和@code{NAMES}消息，重新连接后，可以将@code{rcirc-omit-unless-requested}配置为隐藏：
+
+@example
+(setopt rcirc-omit-unless-requested '("TOPIC" "NAMES"))
+@end example
+
+现在，仅在通过 @code{rcirc-cmd-name} 命令请求后才会显示 NAMES。
+
+@node Hacking and Tweaking
+@chapter 黑客和调整
+@cindex hacking and tweaking
+
+以下是您可以配置 @code{rcirc} 的一些示例。
+
+@menu
+* Skipping /away messages using handlers::
+* Using fly spell mode::
+* Scrolling conservatively::
+* Changing the time stamp format::
+* Defining a new command::
+* Using rcirc with bouncers::
+* Dealing with Bridge Bots::
+@end menu
+
+@node Skipping /away messages using handlers
+@section 使用处理程序跳过 @code{/away} 消息
+@cindex /away messages
+
+@cindex handlers
+@cindex status codes
+IRC 协议指定如何将某些事件从服务器发送到客户端。  这些事件有编号，并使用所谓的处理程序进行处理。  您可以通过利用 @code{rcirc} 采用的命名约定来覆盖现有处理程序。
+
+以下是如何阻止 @code{rcirc} 打印 @code{/away} 消息。由于 @code{rcirc} 没有定义 301 处理程序，因此在定义处理程序之前不需要 require @code{rcirc}：
+
+@example
+(defun rcirc-handler-301 (process cmd sender args)
+  "/away message handler.")
+@end example
+
+@node Using fly spell mode
+@section 使用飞行法术模式
+@cindex fly spell
+@cindex spelling
+@cindex spell-checking as you type
+@cindex automatic spelling
+@vindex rcirc-mode-hook
+
+以下代码激活 @code{rcirc} 缓冲区的 Fly Spell 模式：
+
+@example
+(add-hook 'rcirc-mode-hook (lambda ()
+                             (flyspell-mode 1)))
+@end example
+
+@xref{Spelling, , Flyspell mode, emacs, The GNU Emacs Manual}，了解详情。
+
+@node Scrolling conservatively
+@section 保守地滚动
+@cindex input line
+@cindex scrolling
+@vindex scroll-conservatively
+@vindex rcirc-mode-hook
+
+IRC 缓冲区不断增长。  如果您希望始终看到尽可能多的内容，则可能需要在窗口底部显示提示。  以下代码片段使用 @code{scroll-conservatively} 的本地值来实现此目的：
+
+@example
+(add-hook 'rcirc-mode-hook
+          (lambda ()
+            (set (make-local-variable 'scroll-conservatively)
+                 8192)))
+@end example
+
+@xref{Scrolling, , Scrolling conservatively, emacs, The GNU Emacs Manual}，了解详情。
+
+@node Changing the time stamp format
+@section 更改时间戳格式
+@cindex time stamp
+@cindex date time
+@cindex format time stamp
+@vindex rcirc-time-format
+@vindex rcirc-log-time-format
+
+@code{rcirc-time-format} 是用于时间戳的格式。  以下是将日期包含在时间戳中的方法：
+
+@example
+(setopt rcirc-time-format "%Y-%m-%d %H:%M ")
+@end example
+
+对于日志文件，可以使用 @code{rcirc-log-time-format} 用户选项指定不同的时间格式。
+
+@findex rcirc-when
+如果您不希望始终使用详细的时间格式，可以使用 @code{rcirc-when} 命令显示该消息的完整时间戳。
+
+@node Defining a new command
+@section 定义新命令
+@cindex defining commands
+@cindex commands, defining
+@cindex new commands, defining
+
+这是一个简单的新命令@code{/sv}。  有了它，您可以夸耀您的 IRC 客户端。  它展示了如何使用 @code{rcirc-define-command} 定义新命令。
+
+@findex rcirc-define-command
+我们正在等待该命令的定义，直到加载@code{rcirc}，因为@code{rcirc-define-command}尚不可用，并且如果不加载@code{rcirc}，该命令无论如何也不会给我们带来多大好处。
+
+@smallexample
+(with-eval-after-load 'rcirc
+  (rcirc-define-command sv ()
+    "Boast about rcirc."
+    (interactive "i")
+    (rcirc-send-message process target "I use " rcirc-id-string)))
+@end smallexample
+
+@node Using rcirc with bouncers
+@section 将 rcirc 与保镖一起使用
+@cindex bouncer
+
+一些保镖会复用与各种服务器的连接，但必须修改昵称和频道名称才能使其正常工作。  @code{irc.libera.chat} 上的通道@code{#emacs} 变为@code{#emacs/irc.libera.chat}。
+
+@vindex rcirc-nick-filter
+@vindex rcirc-channel-filter
+选项 @code{rcirc-nick-filter} 和 @code{rcirc-channel-filter} 可用于使这种感觉更自然。  当设置为功能时，这些将用于更改昵称和频道名称的显示方式。  修复上述示例的简单配置可能是：
+
+@smallexample
+(defun my/rcirc-remove-suffix (STR)
+  "Remove suffixes from STR."
+  (save-match-data
+    (if (string-match "/[[:alpha:]]+?\\'" str)
+        (substring str 0 (match-beginning 0))
+      str)))
+
+(setopt rcirc-nick-filter #'my/rcirc-remove-suffix
+        rcirc-channel-filter #'local/rcirc-soju-suffix)
+@end smallexample
+
+@node Dealing with Bridge Bots
+@section 处理桥接机器人
+@cindex bridge
+
+IRC 通道“桥接”到其他网络（例如 XMPP、Matrix 等）的情况越来越普遍。有时，该软件可以很好地将每个非 IRC 用户映射到 IRC 用户，但通常情况下却做不到。  在这种情况下，您可能会收到类似以下的消息：
+
+@example
+@verbatim
+09:47 <bridge> <john> I am not on IRC
+@end verbatim
+@end example
+
+其中@samp{bridge}是负责在网络之间来回发送消息的机器人，@samp{john}是不同网络上某人的用户名。  请注意，机器人会在聊天缓冲区中显示的消息 (@verb{|<john> I am not on IRC|}) 中指出这一点。
+
+@vindex rcirc-bridge-bot-alist
+如果这让您烦恼，用户选项 @code{rcirc-bridge-bot-alist} 可能有用。  它包含对这些类型的“桥接机器人”的用户以及他们如何格式化消息的描述。  为了处理上面的例子，我们可以将用户选项设置为：
+
+@example
+(setopt rcirc-bridge-bot-alist
+        '(("bridge" . "<\\(.+?\\)>[[:space:]]+")))
+@end example
+
+如果存在当前用户的条目，@code{rcirc} 将采用关联的正则表达式并尝试在消息字符串中查找匹配项。  如果它设法找到任何内容，则会从消息中删除匹配的表达式。  正则表达式必须至少包含一组与桥接消息的用户名匹配的组。然后，这将用于替换桥接机器人的用户名。
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+
+@node Key Index
+@unnumbered 关键指标
+@printindex ky
+
+@node Variable Index
+@unnumbered 变量索引
+@printindex vr
+
+@node Index
+@unnumbered 指数
+@printindex cp
+
+@bye

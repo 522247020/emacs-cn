@@ -1,0 +1,3116 @@
+\输入 texinfo @c -*-texinfo-*-
+@setfilename ../../info/cl.info
+@settitle Common Lisp 扩展
+@documentlanguage en
+@include docstyle.texi
+@include emacsver.texi
+
+@copying
+该文件记录了 GNU Emacs Common Lisp 仿真包。
+
+版权所有 @copyright{} 1993, 2001--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs lisp libraries
+@direntry
+* CL-Lib: (cl).                  Emacs Lisp 的部分 Common Lisp 支持。
+@end direntry
+
+@finalout
+
+@titlepage
+@sp 6
+@center @titlefont{Common Lisp Extensions}
+@sp 4
+@center For GNU Emacs Lisp
+@sp 1
+@center as distributed with Emacs @value{EMACSVER}
+@sp 5
+@center Dave Gillespie
+@center daveg@@synaptics.com
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top GNU Emacs Common Lisp Emulation
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Overview::              基础知识、用法、组织、命名约定。
+* Printing::              使用 @code{cl-prin1} 进行人性化打印。
+* Program Structure::     Arglists，@code{cl-eval-when}。
+* Predicates::            类型谓词和相等谓词。
+* Control Structure::     赋值、条件、块、循环。
+* Macros::                解构、编译器宏。
+* Declarations::          @code{cl-proclaim}、@code{cl-declaim} 等
+* Symbols::               属性列表，创建符号。
+* Numbers::               谓词、函数、随机数。
+* Sequences::             映射、函数、搜索、排序。
+* Lists::                 函数、替换、集合、关联。
+* Structures::            @code{cl-defstruct}.
+* Assertions::            断言和类型检查。
+
+附录
+* Efficiency Concerns::             提示和技巧。
+* Common Lisp Compatibility::       与斯蒂尔的所有已知差异。
+* Porting Common Lisp::             移植 Common Lisp 代码的提示。
+* Obsolete Features::               过时的功能。
+* GNU Free Documentation License::  本文档的许可证。
+
+索引
+* Function Index::                  每个记录功能的条目。
+* Variable Index::                  每个记录变量的条目。
+* Concept Index::                   每个概念都有一个条目。
+@end menu
+
+@node Overview
+@chapter 概述
+
+@noindent
+本文档描述了一组从 Common Lisp 借用的 Emacs Lisp 工具。  这里详细描述了所有设施。  虽然本文档不假设您事先了解 Common Lisp，但它确实假设您对 Emacs Lisp 有基本的熟悉。
+
+Common Lisp 是一种庞大的语言，Common Lisp 系统往往庞大且极其复杂。  相比之下，Emacs Lisp 在为程序员提供的 Lisp 功能选择上相当简约。随着 Emacs Lisp 程序员数量的增长，以及他们编写的应用程序变得更加雄心勃勃，很明显，Emacs Lisp 可以从 Common Lisp 的许多便利中受益。
+
+@dfn{CL-Lib} 包向 Emacs Lisp 添加了许多 Common Lisp 函数和控制结构。  虽然不是 100% 完整的 Common Lisp 实现，但它添加了足够的功能，使 Emacs Lisp 编程变得更加方便。
+
+由于各种原因，该包中省略了一些 Common Lisp 功能：
+
+@itemize @bullet
+@item 
+相对于 Emacs Lisp 程序员的好处而言，某些功能过于复杂或庞大。  CLOS 和 Common Lisp 流是这一组的很好的例子。  （单独的包 EIEIO 实现了 CLOS 功能的子集。@xref{Top, , Introduction, eieio, EIEIO}。）
+
+@item 
+其他功能如果不修改 Emacs Lisp 解释器本身就无法实现，例如多个返回值、不区分大小写的符号和复数。该包通常不会尝试模拟这些功能。
+
+@end itemize
+
+该软件包最初由 Dave Gillespie, @file{daveg@@synaptics.com} 编写，完全重写了 Cesar Quiroz 于 1986 年编写的 @file{cl.el} 软件包。  我们已尽力确保每个函数的定义都高效、简洁，并且对 Emacs 环境的其余部分的影响最小。  Stefan Monnier 添加了文件 @file{cl-lib.el} 并合理化了 Emacs 24.3 的命名空间。
+
+@menu
+* Usage::                 如何使用这个包。
+* Organization::          包的组件文件。
+* Naming Conventions::    函数名称的注释。
+@end menu
+
+@node Usage
+@section 用法
+
+@noindent
+该软件包随 Emacs 一起分发，因此无需安装任何其他文件即可开始使用它。  使用此包中功能的 Lisp 代码应该简单地在开头包含：
+
+@example
+(require 'cl-lib)
+@end example
+
+@noindent
+如果您经常使用此包中的功能，您可能希望将这样的语句添加到您的初始化文件中。
+
+仅使用此包中的宏的代码可以将以上内容括在 @code{eval-when-compile} 中。  在内部，该库分为几个文件，@pxref{Organization}.  您的代码应该只加载主 @file{cl-lib} 文件，该文件将根据需要加载其他文件。
+
+@node Organization
+@section 组织
+
+@noindent
+Common Lisp 包分为四个主要文件：
+
+@table @file
+@item cl-lib.el
+这是主文件，包含基本功能和有关包的信息。  这个文件比较紧凑。
+
+@item cl-extra.el
+该文件包含更大、更复杂或不寻常的函数。
+
+@item cl-seq.el
+该文件包含大多数用于操作序列或列表的高级函数，例如@code{cl-delete-if}和@code{cl-assoc}。
+
+@item cl-macs.el
+该文件包含宏而不是函数的功能。宏在编译调用方时展开，而不是在运行时展开，因此宏通常只需要在字节编译器运行时（或在未编译的代码中使用宏时）出现。  这个包的大部分宏都被隔离在@file{cl-macs.el}中，这样它们就不会占用内存，除非你正在编译。
+@end table
+
+文件 @file{cl-lib.el} 包含其他三个文件中的函数和宏所需的所有 @code{autoload} 命令。您所要做的就是 @code{(require 'cl-lib)}，@file{cl-lib.el} 将在需要时拉入其他文件。
+
+还有另一个文件 @file{cl.el}，它是 Emacs 24.3 之前的此包的主要入口点。  如今，它已被@file{cl-lib.el} 取代。  两者提供相同的功能（在大多数情况下），但使用不同的函数名称（事实上，@file{cl.el}主要只是定义@file{cl-lib.el}定义的别名）。  其中 @file{cl-lib.el} 定义了一个名为 @code{cl-first} 的函数，@file{cl.el} 使用相同的名称，但没有 @samp{cl-} 前缀，例如本例中的 @code{first}。  但也有一些例外。  首先，诸如 9⁣ 之类的函数，其中无前缀版本已用于标准 Emacs Lisp 函数。  在这种情况下，@file{cl.el}版本会添加@samp{*}后缀，例如@code{defun*}。  其次，有一些过时的功能仅在 @file{cl.el} 中实现，而不是在 @file{cl-lib.el} 中实现，因为它们已被其他标准 Emacs Lisp 功能取代。最后，在极少数情况下，旧 @file{cl.el} 版本的行为方式与 @file{cl-lib.el} 版本不完全相同。 @xref{Obsolete Features}。
+@c There is also cl-mapc, which was called cl-mapc even before cl-lib.el.
+@c But not autoloaded, so maybe not much used?
+
+旧文件 @file{cl.el} 以及更旧的 @file{cl-compat.el} 已被弃用，并将在 Emacs 的未来版本中删除。  使用它们的任何现有代码都应更新为使用 @file{cl-lib.el} 代替。
+
+@node Naming Conventions
+@section 命名约定
+
+@noindent
+除非另有说明，此包定义的所有函数都具有与其 Common Lisp 对应函数相同的调用约定，并且名称是 Common Lisp 的名称加上 @samp{cl-} 前缀。
+
+包中的内部函数和变量名称以@code{cl--}为前缀。  以下是以 @code{cl-} 为前缀的函数的完整列表，这些函数是从 Common Lisp 中获取的 @emph{not}：
+
+@example
+cl-callf           cl-callf2          cl-defsubst
+cl-letf            cl-letf*
+@end example
+
+@node Printing
+@chapter 印刷
+
+@noindent
+本章介绍了 Emacs Lisp 的 @dfn{printing} 的一些增强功能，即以文本形式表示 Lisp 对象的操作。此处记录的函数旨在为人类读者提供比标准打印函数（例如 @code{prin1} 和 @code{princ} (@pxref{Output Functions,,,elisp,GNU Emacs Lisp Reference Manual})）更多的输出。
+
+其中一些函数有一个参数@var{stream}；这指定如何处理打印产生的字符。  例如，它可能是缓冲区、标记、@code{nil}（表示使用标准输出）或@code{t}（使用回显区域）。  @xref{Output Streams,,,elisp,GNU Emacs Lisp Reference Manual}，完整描述。
+
+@defvar cl-print-readably
+当此变量为非 @code{nil} 时，@code{cl-prin1} 和此处描述的其他函数尝试生成稍后可由 Lisp 阅读器读取的输出 (@pxref{Input Functions,,,elisp,GNU Emacs Lisp Reference Manual})。
+@end defvar
+
+@defvar cl-print-compiled
+该变量控制如何打印字节编译函数。  有效值为：
+@table @code
+@item nil
+默认值：仅打印内部十六进制标识符。
+@item static
+打印内部十六进制标识符以及函数的常量向量。
+@item disassemble
+字节码被反汇编。
+@item raw
+函数的原始形式由 @code{prin1} 打印。
+@end table
+
+有时，在输出上设置一个按钮，允许您反汇编该函数。  参见@code{cl-print-compile-button}。
+@end defvar
+
+@defvar cl-print-compile-button
+当此变量为非 @code{nil} 并且字节编译函数已打印到缓冲区时，您可以用鼠标单击或在该输出上键入 @key{RET} 来反汇编代码。  当 @code{cl-print-compiled} 设置为 @code{disassemble} 时，这不适用。
+@end defvar
+
+@defvar cl-print-string-length
+缩写之前要打印的字符串的最大长度。  默认值 @code{nil} 表示没有限制。
+
+当 CL 打印函数缩写字符串时，它们会打印字符串的前 @code{cl-print-string-length} 字符，后跟 ``@enddots{}''。  当打印到缓冲区时，您可以单击鼠标或在此省略号上键入 @key{RET} 来展开字符串。
+
+该变量仅在 @code{cl-prin*} 函数中有效，在 @code{prin1} 等原语中无效。
+@end defvar
+
+@defun cl-prin1 object &option stream
+@code{cl-print1} 根据其类型和上述设置在 @var{stream} 上打印 @var{object}（见上文）。  变量 @code{print-length} 和 @code{print-level} 以及其他标准 Emacs 设置也会影响打印 (@pxref{Output Variables,,,elisp,GNU Emacs Lisp Reference Manual})。
+@end defun
+
+@defun cl-prin1-to-string object
+此函数与 @code{cl-prin1} 类似，不同之处在于输出字符作为字符串从该函数返回，而不是传递到流。
+@end defun
+
+@defun cl-print-to-string-with-limit print-function value limit
+该函数返回一个字符串，其中包含 @var{value} 的打印表示形式。  它尝试使用 @code{print-level}、@code{print-length} 和 @code{cl-print-string-length} 依次进行更严格的设置来获取返回字符串的长度在 @var{limit} 个字符以内。  它使用@var{print-function}来打印，一个函数应该接受参数@var{value}和一个流（见上文），并且应该尊重@code{print-length}、@code{print-level}和@code{cl-print-string-length}。  @var{limit} 可以是 @code{nil} 或零，在这种情况下，将调用@var{print-function}，并将这些设置绑定到 @code{nil}；它也可以是 @code{t}，在这种情况下，@var{print-function} 将以其当前值被调用。
+
+将此函数与 @code{cl-prin1} 一起使用可打印一个对象，可能会使用一个或多个省略号来缩写该对象以适应大小限制。
+@end defun
+
+@defun cl-print-object object stream
+此函数在 @var{stream} 上打印 @var{object}（见上文）。  它实际上是一个@code{cl-defgeneric} (@pxref{Generic Functions,,,elisp,GNU Emacs Lisp Reference Manual})，它是为@var{object}的几种类型定义的。  通常，您只需调用 @code{cl-prin1} 来打印 @var{object} 而不是直接调用此函数。
+
+您可以将其他类型的 @var{object} 写为 @code{cl-print-object} @code{cl-defmethod}s，从而扩展 @code{cl-prin1}。  如果这样的方法使用省略号，您还应该为相同类型编写一个 @code{cl-print-object-contents} 方法。  有关这些方法的示例，请参阅 Emacs 源目录中的@file{emacs-lisp/cl-print.el}。
+@end defun
+
+@defun cl-print-object-contents object start stream
+此函数将从 @var{start} 开始的 @var{stream} 中的省略号替换为它所代表的部分打印的 @var{object} 中的文本。  它也是为多种类型的@var{object}定义的@code{cl-defgeneric}。  @var{stream} 是包含带有省略号的文本的缓冲区。  @var{start} 以取决于类型的方式指定省略号的起始位置；它将从省略号上的文本属性获得，并由 @code{cl-print-insert-ellipsis} 放置在那里。
+@end defun
+
+@defun cl-print-insert-ellipsis object start stream
+该函数将省略号（``@dots{}''）打印到@var{stream}（见上文）。  当 2⁣ 是缓冲区时，省略号将被赋予 @code{cl-print-ellipsis} 文本属性。  text 属性的值将包含状态（包括 @var{start}），以便稍后打印 @var{object} 的省略部分。  如果整个 @var{object} 被忽略，@var{start} 应该是 @code{nil}，否则它应该是 @var{object} 内部的索引或其他指针，稍后可以传递给 @code{cl-print-object-contents}。
+@end defun
+
+@defvar cl-print-expand-ellipsis-function
+该变量保存一个在当前缓冲区中扩展省略号的函数。  该函数有四个参数：@var{begin}和@var{end}，它们是省略号的边界； @var{value}，是省略号上 @code{cl-print-ellipsis} 文本属性的值（通常由 @code{cl-prin1} 提前设置）；和@var{line-length}，所需的输出最大长度。  它的返回值是展开文本后的缓冲区位置。
+@end defvar
+
+@deffn Command cl-print-expand-ellipsis &optional button
+该命令扩展点处的省略号。  非交互地，如果@var{button}非@code{nil}，它应该是一个缓冲区位置或由@code{cl-print-insert-ellipsis}（@pxref{Buttons,,,elisp,GNU Emacs Lisp Reference Manual}）制作的按钮，它指示省略号的位置。  返回值是展开文本后的缓冲区位置。
+@end deffn
+
+@node Program Structure
+@chapter 程序结构
+
+@noindent
+本节描述该包与整个程序有关的功能：函数的高级参数列表和 @code{cl-eval-when} 构造。
+
+@menu
+* Argument Lists::        @code{&key}, @code{&aux}, @code{cl-defun}, @code{cl-defmacro}.
+* Time of Evaluation::    @code{cl-eval-when} 构造。
+@end menu
+
+@node Argument Lists
+@section 参数列表
+@cindex &key
+@cindex &aux
+
+@noindent
+Emacs Lisp 的函数参数列表表示法是 Common Lisp 表示法的子集。  除了熟悉的 @code{&optional} 和 @code{&rest} 标记之外，Common Lisp 还允许您为可选参数指定默认值，并且还提供了附加标记 @code{&key} 和 @code{&aux}。
+
+由于参数解析是 Emacs 内置的，因此该包无法无缝实现 Common Lisp 参数列表。相反，这个包定义了几种 Lisp 形式的替代形式，如果您需要 Common Lisp 参数列表，则必须使用它们。
+
+@defmac cl-defun name arglist body@dots{}
+这种形式与常规的 @code{defun} 形式相同，除了 @var{arglist} 可以是完整的 Common Lisp 参数列表。  此外，函数体包含在一个名为 2⁣ 的隐式块中； @pxref{Blocks and Exits}。
+@end defmac
+
+@defmac cl-iter-defun name arglist body@dots{}
+这种形式与常规的 @code{iter-defun} 形式相同，除了 @var{arglist} 可以是完整的 Common Lisp 参数列表。  此外，函数体包含在一个名为 2⁣ 的隐式块中； @pxref{Blocks and Exits}。
+@end defmac
+
+@defmac cl-defsubst name arglist body@dots{}
+这就像 @code{cl-defun} 一样，只不过定义的函数会自动声明为 @code{inline}，即，对它的调用可能会被字节编译器扩展为内联代码。这类似于 2⁣ 形式； @code{cl-defsubst} 使用不同的方法（编译器宏），该方法适用于所有版本的 Emacs，并且还会生成更多内容
+@c For some examples,
+@c see https://lists.gnu.org/r/emacs-devel/2012-11/msg00009.html
+高效的内联扩展。  特别是，@code{cl-defsubst} 尽可能在编译时安排对关键字参数、默认值等的处理。
+@end defmac
+
+@cindex &allow-other-keys
+@defmac cl-defmacro name arglist body@dots{}
+这与常规 @code{defmacro} 形式相同，只是 @var{arglist} 可以是完整的 Common Lisp 参数列表。  支持 @code{&environment} 关键字，如 Steele 的书 @cite{Common Lisp, the Language} 中所述。 @code{&whole} 关键字仅在解构列表中受支持（见下文）；顶级 @code{&whole} 无法使用当前的 Emacs Lisp 解释器实现。宏扩展器主体包含在一个名为 @var{name} 的隐式块中。
+@end defmac
+
+@defmac cl-function symbol-or-lambda
+这与常规 @code{function} 形式相同，除了如果参数是 @code{lambda} 形式，则该形式可以使用完整的 Common Lisp 参数列表。
+@end defmac
+
+此外，此包中定义的所有语法中包含 @var{arglist} 的形式（例如 @code{cl-flet} 和 @code{cl-labels}）都允许完整的 Common Lisp 参数列表。
+
+请注意，必须使用 @emph{not} 才能访问函数中的大多数 CL 功能。这些特征始终存在； @code{cl-defun} 与 @code{defun} 的唯一区别是其更灵活的参数列表和隐式块。
+
+Common Lisp 参数列表的完整形式是
+
+@example
+(@var{var}@dots{}
+ &optional (@var{var} @var{initform} @var{svar})@dots{}
+ &rest @var{var}
+ &key ((@var{keyword} @var{var}) @var{initform} @var{svar})@dots{}
+ &aux (@var{var} @var{initform})@dots{})
+@end example
+
+五个参数列表部分中的每一个都是可选的。  @var{svar}、@var{initform}和@var{keyword}部分是可选的；如果省略，则@samp{(@var{var})}可以简单地写成@samp{@var{var}}。
+
+第一部分由零个或多个 @dfn{required} 参数组成。这些参数必须始终在函数调用中指定；就所需参数而言，Emacs Lisp 和 Common Lisp 之间没有区别。
+
+第二部分由 @dfn{optional} 参数组成。  这些参数可以在函数调用中指定；如果不是，则 @var{initform} 指定参数使用的默认值。 （没有 @var{initform} 意味着使用 @code{nil} 作为默认值。）@var{initform} 使用已建立的前面参数的绑定进行评估； @code{(a &optional (b (1+ a)))} 匹配一个或两个参数，第二个参数默认为 1 加第一个参数。  如果指定了 @var{svar}，则它是一个辅助变量，如果指定了可选参数，则绑定到 @code{t}；如果省略了参数，则绑定到 @code{nil}。如果您不使用 @var{svar}，那么您的函数将无法判断它是在不带参数的情况下调用的，还是使用作为参数显式传递的默认值调用的。
+
+第三部分由单个 @dfn{rest} 参数组成。  如果传递给函数的参数多于必需参数和可选参数所占的参数，那么这些额外的参数将被收集到一个列表中并绑定到“rest”参数变量。 Common Lisp 的@code{&rest} 相当于Emacs Lisp 的@code{&rest}。 Common Lisp 在宏上下文中接受 @code{&body} 作为 @code{&rest} 的同义词；这个包一直接受它。
+
+第四部分由 @dfn{keyword} 参数组成。  这些是可选参数，它们是通过名称指定的，而不是在参数列表中按位置指定的。  例如，
+
+@example
+(cl-defun foo (a &optional b &key c d (e 17)))
+@end example
+
+@noindent
+定义一个可以用一个、两个或多个参数调用的函数。  前两个参数以通常的方式绑定到 @code{a} 和 @code{b}。  其余参数必须是 @code{:c}、@code{:d} 或 @code{:e} 形式的对，后跟要绑定到相应参数变量的值。 （名称以冒号开头的符号称为 @dfn{keywords}，它们以与 @code{nil} 和 @code{t} 相同的方式自引用。）
+
+例如，调用 @code{(foo 1 2 :d 3 :c 4)} 将五个参数分别设置为 1、2、4、3 和 17。  如果同一关键字在函数调用中出现多次，则第一次出现的优先级高于后面的。  请注意，如果不指定可选参数@code{b}，则无法指定关键字参数，因为@code{(foo 1 :c 2)}会将@code{b}绑定到关键字@code{:c}，然后发出错误信号，因为@code{2}不是有效关键字。
+
+您还可以显式指定关键字参数；它不必只是以冒号为前缀的变量名。  例如，
+
+@example
+(cl-defun bar (&key (a 1) ((baz b) 4)))
+@end example
+
+@noindent
+
+指定将变量 @code{a} 设置为默认值 1 的关键字 @code{:a}，以及将变量 @code{b} 设置为默认值 4 的关键字 @code{baz}。在这种情况下，由于 @code{baz} 不是自引用，因此必须在函数调用中显式引用它，如下所示：
+
+@example
+(bar :a 10 'baz 42)
+@end example
+
+@cindex &allow-other-keys
+通常，将无法识别的关键字传递给函数是错误的，例如 @code{(foo 1 2 :c 3 :goober 4)}。  您可以要求 Lisp 忽略无法识别的关键字，方法是在参数列表的关键字部分后添加标记 @code{&allow-other-keys}，或者在调用中指定值为非 @code{nil} 的 @code{:allow-other-keys} 参数。  如果函数同时使用 @code{&rest} 和 @code{&key}，则“rest”参数将绑定到调用中出现的关键字列表。  例如：
+
+@example
+(cl-defun find-thing (thing thing-list &rest rest &key need &allow-other-keys)
+  (or (apply 'cl-member thing thing-list :allow-other-keys t rest)
+      (if need (error "Thing not found"))))
+@end example
+
+@noindent
+该函数接受 @code{:need} 关键字参数，但也接受传递给 @code{cl-member} 函数的其他关键字参数。  @code{allow-other-keys} 用于防止 @code{find-thing} 和 @code{cl-member} 抱怨参数中彼此的关键字。
+
+参数列表的第五部分由 @dfn{auxiliary variables} 组成。  这些根本不是真正的参数，而只是在函数执行期间绑定到 @code{nil} 或指定的 @var{initforms} 的变量。  除了风格品味问题之外，以下两个功能之间没有区别：
+
+@example
+(cl-defun foo (a b &aux (c (+ a b)) d)
+  @var{body})
+
+(cl-defun foo (a b)
+  (let ((c (+ a b)) d)
+    @var{body}))
+@end example
+
+@cindex destructuring, in argument list
+参数列表支持@dfn{destructuring}。  在 Common Lisp 中，解构仅允许使用 @code{defmacro}；这个包也允许使用 @code{cl-defun} 和其他参数列表。在解构中，任何参数变量（上例中的@var{var}）都可以替换为变量列表，或更一般地说，递归参数列表。  相应的参数值必须是一个列表，其元素与此递归参数列表匹配。例如：
+
+@example
+(cl-defmacro dolist ((var listform &optional resultform)
+                     &rest body)
+  @dots{})
+@end example
+
+这表示 @code{dolist} 的第一个参数必须是包含两个或三个项目的列表；如果除了这个列表之外还有其他参数，它们也会存储在@code{body}中。  常规参数列表中允许的所有功能都允许在这些递归参数列表中。此外，子句 @samp{&whole @var{var}} 允许出现在递归参数列表的前面。  它将 @var{var} 绑定到匹配的整个列表；因此 @code{(&whole all a b)} 匹配两个事物的列表，@code{a} 绑定到第一个事物，@code{b} 绑定到第二个事物，@code{all} 绑定到列表本身。  （Common Lisp 也允许在顶级 @code{defmacro} 参数列表中使用 @code{&whole}，但 Emacs Lisp 不支持这种用法。）
+
+解构的最后一个特征是参数列表可以是点状的，因此参数列表@code{(a b . c)}在功能上等同于@code{(a b &rest c)}。
+
+如果优化质量 @code{safety} 设置为 0 (@pxref{Declarations})，则会禁用对错误数量的参数和无效关键字参数的错误检查。  默认情况下，参数列表经过严格检查。
+
+@node Time of Evaluation
+@section 评估时间
+
+@noindent
+通常，字节编译器实际上并不执行它编译的文件中的表单。  例如，如果一个文件包含@code{(setq foo t)}，则编译该文件的行为实际上不会将@code{foo}设置为@code{t}。即使 @code{setq} 是顶级形式（即未包含在 @code{defun} 或其他形式中）也是如此。  但有时，您希望在编译时评估某些顶级表单。例如，编译器在编译时有效地评估 @code{defmacro} 形式，以便文件的后续部分可以引用定义的宏。
+
+@defmac cl-eval-when (situations@dots{}) forms@dots{}
+该形式控制何时对 body @var{forms} 进行求值。 @var{situations} 列表可以包含任意一组符号 @code{compile}、@code{load} 和 @code{eval}（或其冗长的 ANSI 等效项，@code{:compile-toplevel}、@code{:load-toplevel} 和 @code{:execute}）。
+
+@code{cl-eval-when} 表单的处理方式有所不同，具体取决于它是否被编译为顶级表单。具体来说，如果它是由诸如 @code{byte-compile-file} 之类的命令编译的，该命令编译文件或代码缓冲区，并且它出现在文件的顶层或顶层 @code{progn} 中，则它会得到特殊对待。
+
+对于已编译的顶级@code{cl-eval-when}，如果@code{compile}位于@var{situations}列表中，则在编译时执行主体@var{forms}；如果@code{load}位于@var{situations}列表中，则将@var{forms}写入文件（在加载时执行）。
+
+对于非编译的顶级表单，只有@code{eval}情况是相关的。  （这包括解释器执行的表单、使用 @code{byte-compile} 而不是 @code{byte-compile-file} 编译的表单，以及非顶级表单。）如果指定了 @code{eval}，则 @code{cl-eval-when} 的作用类似于 @code{progn}，如果未指定，则类似于 @code{nil}（忽略主体 @var{forms}）。
+
+当 @code{cl-eval-when} 嵌套时，规则变得更加微妙；请参阅斯蒂尔（第二版）了解可怕的细节（以及一些可怕的例子）。
+
+一些简单的例子：
+
+@example
+;; Top-level forms in foo.el:
+(cl-eval-when (compile)           (setq foo1 'bar))
+(cl-eval-when (load)              (setq foo2 'bar))
+(cl-eval-when (compile load)      (setq foo3 'bar))
+(cl-eval-when (eval)              (setq foo4 'bar))
+(cl-eval-when (eval compile)      (setq foo5 'bar))
+(cl-eval-when (eval load)         (setq foo6 'bar))
+(cl-eval-when (eval compile load) (setq foo7 'bar))
+@end example
+
+当 @file{foo.el} 编译时，这些变量将在编译过程中设置：
+
+@example
+foo1  foo3  foo5  foo7      ; 'compile'
+@end example
+
+当 @file{foo.elc} 加载时，这些变量将被设置：
+
+@example
+foo2  foo3  foo6  foo7      ; 'load'
+@end example
+
+如果 @file{foo.el} 未编译加载，这些变量将被设置：
+
+@example
+foo4  foo5  foo6  foo7      ; 'eval'
+@end example
+
+如果这七个@code{cl-eval-when}位于@code{defun}内，那么前三个将相当于@code{nil}，而后四个将相当于相应的@code{setq}。
+
+请注意，@code{(cl-eval-when (load eval) @dots{})} 在所有上下文中都等效于@code{(progn @dots{})}。  编译器将某些顶级形式视为@code{defmacro}（排序）和@code{require}，就像它们包装在@code{(cl-eval-when (compile load eval) @dots{})}中一样。
+@end defmac
+
+Emacs 包含两种与 @code{cl-eval-when} 相关的特殊形式。 @xref{Eval During Compile,,,elisp,GNU Emacs Lisp Reference Manual}。其中之一，@code{eval-when-compile}，并不完全等同于任何@code{cl-eval-when}构造，如下所述。
+
+另一种形式 @code{(eval-and-compile @dots{})} 与 @samp{(cl-eval-when (compile load eval) @dots{})} 完全相同。
+
+@defmac eval-when-compile forms@dots{}
+@var{forms} 在编译时评估；在执行时，这种形式的作用就像结果值的带引号的常量。  在顶层使用时，@code{eval-when-compile} 就像 @samp{eval-when (compile eval)} 一样。  在其他上下文中，出于效率或其他原因，@code{eval-when-compile} 允许在编译时对代码进行一次评估。
+
+这种形式类似于真正 Common Lisp 的 @samp{#.} 语法。
+@end defmac
+
+@defmac cl-load-time-value form
+@var{form} 在加载时评估；在执行时，这种形式的作用就像结果值的带引号的常量。
+
+早期的 Common Lisp 有一个与此类似的 @samp{#,} 语法，但 ANSI Common Lisp 用 @code{load-time-value} 替换了它，并赋予了它更明确的语义。
+
+在编译文件中， @code{cl-load-time-value} 安排在加载 @file{.elc} 文件时对 @var{form} 进行求值，然后将其用作带引号的常量。  在@code{byte-compile}而不是@code{byte-compile-file}编译的代码中，效果与@code{eval-when-compile}相同。  在未编译的代码中，@code{eval-when-compile}和@code{cl-load-time-value}的行为与@code{progn}完全相同。
+
+@example
+(defun report ()
+  (insert "This function was executed on: "
+          (current-time-string)
+          ", compiled on: "
+          (eval-when-compile (current-time-string))
+          ;; or '#.(current-time-string) in real Common Lisp
+          ", and loaded on: "
+          (cl-load-time-value (current-time-string))))
+@end example
+
+@noindent
+字节编译后，上述 defun 将在 @file{.elc} 文件中生成以下代码（当然，或其编译后的等效代码）：
+
+@example
+(setq --temp-- (current-time-string))
+(defun report ()
+  (insert "This function was executed on: "
+          (current-time-string)
+          ", compiled on: "
+          '"Wed Oct 31 16:32:28 2012"
+          ", and loaded on: "
+          --temp--))
+@end example
+@end defmac
+
+@node Predicates
+@chapter 谓词
+
+@noindent
+本节描述用于测试各种事实是真是假的函数。
+
+@menu
+* Type Predicates::       @code{cl-typep}、@code{cl-deftype} 和 @code{cl-coerce}。
+* Derived Types::         @code{cl-deftype}.
+* Equality Predicates::   @code{cl-equalp}.
+@end menu
+
+@node Type Predicates
+@section 类型谓词
+
+@defun cl-typep object type
+检查 @var{object} 是否属于 @var{type} 类型，其中 @var{type} 是 Common Lisp 使用的排序类型名称（带引号）。  例如，@code{(cl-typep foo 'integer)}相当于@code{(integerp foo)}。
+@end defun
+
+上述函数的 @var{type} 参数可以是一个符号，也可以是一个以符号开头的列表。
+
+@itemize @bullet
+@item
+如果类型名称是符号，Emacs 将 @samp{-p} 附加到符号名称以形成用于测试类型的谓词函数的名称。  （在适当的时候使用名称以 @samp{p} 而不是 @samp{-p} 结尾的内置谓词。）
+
+@item
+类型符号@code{t}代表所有类型的并集。 @code{(cl-typep @var{object} t)} 始终为真。  同样，类型符号 @code{nil} 根本不代表任何东西，而 @code{(cl-typep @var{object} nil)} 始终为 false。
+
+@item
+类型符号@code{null}代表符号@code{nil}。因此@code{(cl-typep @var{object} 'null)}等价于@code{(null @var{object})}。
+
+@item
+类型符号 @code{atom} 表示所有不是 cons cell 的对象。  因此@code{(cl-typep @var{object} 'atom)}等价于@code{(atom @var{object})}。
+
+@item
+类型符号@code{real}是@code{number}的同义词，@code{fixnum}是@code{integer}的同义词。
+
+@item
+类型符号 @code{character} 和 @code{string-char} 匹配 0 到 255 范围内的整数。
+
+@item
+类型列表@code{(integer @var{low} @var{high})}表示@var{low}和@var{high}之间的所有整数（含）。  任一边界可以是单个整数的列表以指定独占限制，也可以是 @code{*} 指定无限制。  因此，类型 4⁣ 等价于 5⁣。
+
+@item
+同样，以 @code{float}、@code{real} 或 @code{number} 开头的列表表示属于特定范围内的该类型的数字。
+
+@item
+以 @code{and}、@code{or} 和 @code{not} 开头的列表形成类型的组合。  例如，@code{(or integer (float 0 *))}表示所有整数或非负浮点数对象。
+
+@item
+以 @code{member} 或 @code{cl-member} 开头的列表表示对象 @code{eql} 为以下任意值。  例如，@code{(member 1 2 3 4)}相当于@code{(integer 1 4)}，@code{(member nil)}相当于@code{null}。
+
+@item
+@code{(satisfies @var{predicate})} 形式的列表表示当以该对象作为参数调用时 @var{predicate} 返回 true 的所有对象。
+@end itemize
+
+以下函数和宏（不是技术上的谓词）与 @code{cl-typep} 相关。
+
+@defun cl-coerce object type
+该函数尝试将@var{object}转换为指定的@var{type}。  如果@var{object}已经是@code{cl-typep}确定的那种类型，则简单地返回它。  否则，将进行某些类型的转换：如果@var{type}是任何序列类型（@code{string}、@code{list}等）@:，则@var{object}将在可能的情况下转换为该类型。  如果@var{type}是@code{character}，那么长度为1的字符串和具有单字符名称的符号可以被强制。  如果 @var{type} 是 @code{float}，则可以在支持浮点数的 Emacs 版本中强制转换整数。  在所有其他情况下，@code{cl-coerce} 表示错误。
+@end defun
+
+@node Derived Types
+@section 派生类型
+
+@defmac cl-deftype name arglist [docstring] [decls] forms@dots{}
+该宏定义了一个名为 @var{name} 的新类型。以这种方式定义的类型称为 @dfn{derived types}。  它在很多方面与@code{defmacro}相似；当遇到 @var{name} 作为类型名称时，将对主体 @var{forms} 进行求值，并应返回与该类型等效的类型说明符。  @var{arglist} 是 @code{cl-defmacro} 接受的那种 Common Lisp 参数列表。  类型说明符 @samp{(@var{name} @var{args}@dots{})} 通过使用这些参数调用扩展器来扩展；类型符号 @samp{@var{name}} 通过调用不带参数的扩展器来扩展。  @var{arglist} 的处理方式与 @code{cl-defmacro} 相同，除了没有显式默认值的可选参数使用 @code{*} 而不是 @code{nil} 作为“默认”默认值。  一些例子：
+
+@example
+(cl-deftype null () '(satisfies null))    ; predefined
+(cl-deftype list () '(or null cons))      ; predefined
+(cl-deftype unsigned-byte (&optional bits)
+  (list 'integer 0 (if (eq bits '*) bits (1- (ash 1 bits)))))
+(unsigned-byte 8)  @equiv{}  (integer 0 255)
+(unsigned-byte)  @equiv{}  (integer 0 *)
+unsigned-byte  @equiv{}  (integer 0 *)
+@end example
+
+@noindent
+最后一个示例展示了如何在需要时实现 Common Lisp @code{unsigned-byte} 类型说明符；这个包默认不实现@code{unsigned-byte}。
+@end defmac
+
+@code{cl-typecase} (@pxref{Conditionals}) 和@code{cl-check-type} (@pxref{Assertions}) 宏也使用类型名称。  @code{cl-map}、@code{cl-concatenate} 和 @code{cl-merge} 函数采用类型名称参数来指定要返回的序列的类型。  @xref{Sequences}。
+
+与 Common Lisp 相反，CL-Lib 支持使用派生类型作为方法专用器。  这带来了一个重要的警告：派生类型对于 Emacs 来说太灵活了，无法自动找出哪种类型是另一种类型的子类型，因此当多个方法适用于给定参数值并且其中一个或多个方法的特化器是派生类型时，方法的顺序定义不明确。  为了使顺序更加明确，派生类型定义可以使用 @var{decls} 参数显式声明它是其他类型的子类型：
+
+@example
+(cl-deftype unsigned-byte (&optional bits)
+  (list 'integer 0 (if (eq bits '*) bits (1- (ash 1 bits)))))
+
+(cl-deftype unsigned-8bits ()
+  "Unsigned 8-bits integer."
+  (declare (parents unsigned-byte))
+  '(unsigned-byte 8))
+@end example
+
+@node Equality Predicates
+@section 等式谓词
+
+@noindent
+该包定义了 Common Lisp 谓词 @code{cl-equalp}。
+
+@defun cl-equalp a b
+该函数是 @code{equal} 的更灵活的版本。  特别是，它比较字符串时不区分大小写，并且比较数字时不考虑类型（因此 @code{(cl-equalp 3 3.0)} 为 true）。  向量和 cons 是递归比较的。  所有其他对象都按 @code{equal} 进行比较。
+
+这个函数在几个方面与 Common Lisp @code{equalp} 不同。  首先，Common Lisp 的 @code{equalp} 比较 @emph{characters} 时也不区分大小写，这在这个包中是不切实际的，因为 Emacs 不区分整数和字符。  为了与 Emacs Lisp 中字符串不太像向量的想法保持一致，这个包的 @code{cl-equalp} 也不会将字符串与整数向量进行比较。
+@end defun
+
+另请注意，Common Lisp 函数 @code{member} 和 @code{assoc} 使用 @code{eql} 来比较元素，而 Emacs Lisp 遵循 MacLisp 传统，对这两个函数使用 @code{equal}。函数 @code{cl-member} 和 @code{cl-assoc} 使用 @code{eql}，如 Common Lisp 中一样。  标准 Emacs Lisp 函数 @code{memq} 和 @code{assq} 使用 @code{eq}，标准 @code{memql} 使用 @code{eql}。
+
+@node Control Structure
+@chapter 控制结构
+
+@noindent
+以下各节中描述的功能实现了各种高级控制结构，包括对标准 @code{setf} 设施的扩展，以及许多循环和条件结构。
+
+@menu
+* Assignment::              @code{cl-psetq}形式。
+* Generalized Variables::   广义变量的扩展。
+* Variable Bindings::       @code{cl-progv}, @code{cl-flet}, @code{cl-macrolet}.
+* Conditionals::            @code{cl-case}, @code{cl-typecase}.
+* Blocks and Exits::        @code{cl-block}, @code{cl-return}, @code{cl-return-from}.
+* Iteration::               @code{cl-do}, @code{cl-dotimes}, @code{cl-dolist}, @code{cl-do-symbols}.
+* Loop Facility::           Common Lisp @code{loop} 宏。
+* Multiple Values::         @code{cl-values}、@code{cl-multiple-value-bind} 等
+* Macro-Writing Macros::    @code{cl-with-gensyms}, @code{cl-once-only}.
+@end menu
+
+@node Assignment
+@section 任务
+
+@noindent
+@code{cl-psetq} 形式与 @code{setq} 类似，只不过多个赋值是并行完成的，而不是顺序完成的。
+
+@defmac cl-psetq [symbol form]@dots{}
+这种特殊形式（实际上是宏）用于同时分配给多个变量。  仅给出一个@var{symbol}和@var{form}，它与@code{setq}具有相同的效果。  给定几个@var{symbol}和@var{form}对，它预先评估所有@var{form}，然后存储相应的变量。
+
+@example
+(setq x 2 y 3)
+(setq x (+ x y)  y (* x y))
+x
+     @result{} 5
+y                     ; @r{@code{y} was computed after @code{x} was set.}
+     @result{} 15
+(setq x 2 y 3)
+(cl-psetq x (+ x y)  y (* x y))
+x
+     @result{} 5
+y                     ; @r{@code{y} was computed before @code{x} was set.}
+     @result{} 6
+@end example
+
+@code{cl-psetq} 最简单的用法是@code{(cl-psetq x y y x)}，它交换两个变量的值。  （@code{cl-rotatef}形式提供了一种更方便的交换两个变量的方法；@pxref{Modify Macros}。）
+
+@code{cl-psetq} 始终返回@code{nil}。
+@end defmac
+
+@node Generalized Variables
+@section 广义变量
+@cindex generalized variable
+
+@dfn{generalized variable} 或 @dfn{place form} 是 Lisp 内存中可以存储值的众多位置之一。  最简单的位置形式是常规 Lisp 变量。  但是列表的 @sc{car} 和 @sc{cdr}、数组的元素、符号的属性以及许多其他位置也是存储 Lisp 值的地方。  有关基本信息，@pxref{Generalized Variables,,,elisp,GNU Emacs Lisp Reference Manual}。该包提供了一些与广义变量相关的附加功能。
+
+@menu
+* Setf Extensions::     额外@code{setf}名额。
+* Modify Macros::       @code{cl-rotatef}、@code{cl-letf}、@code{cl-callf} 等
+@end menu
+
+@node Setf Extensions
+@subsection Setf 扩展
+
+一些标准（例如，@code{car}）和 Emacs 特定的（例如，@code{window-point}）Lisp 函数默认支持@code{setf}。该包为几个附加函数定义了 @code{setf} 处理程序：
+
+@itemize
+@item
+该包的功能：
+@example
+cl-rest        cl-subseq      cl-get         cl-getf
+cl-caaar@dots{}cl-cddddr          cl-first@dots{}cl-tenth
+@end example
+
+@noindent
+请注意，对于 @code{cl-getf} （与 @code{nthcdr} 一样），函数的列表参数本身必须是有效的 @var{place} 形式。
+
+@c Currently commented out in cl.el.
+@ignore
+@item
+A call of the form @code{(apply '@var{func} @dots{})} or
+@code{(apply (function @var{func}) @dots{})}, where @var{func}
+is a @code{setf}-able function whose store function is ``suitable''
+in the sense described in Steele's book; since none of the standard
+Emacs place functions are suitable in this sense, this feature is
+only interesting when used with places you define yourself with
+@code{define-setf-method} or the long form of @code{defsetf}.
+@xref{Obsolete Setf Customization}.
+@end ignore
+
+@c FIXME?  Is this still true?
+@item
+宏调用，在这种情况下，宏将被展开，并且 @code{setf} 将应用于结果形式。
+@end itemize
+
+@node Modify Macros
+@subsection 修改宏
+
+@noindent
+该包定义了许多对广义变量进行操作的宏。  即使 @var{place} 只是一个变量名，许多内容也是有趣且有用的。
+
+@defmac cl-psetf [place form]@dots{}
+该宏对于 @code{setf} 就像@code{cl-psetq} 对于 @code{setq} 一样：当涉及多个 @var{place} 和 @var{form} 时，分配是并行发生的，而不是顺序发生的。具体来说，从左到右评估所有子表单，然后完成所有分配（以未定义的顺序）。
+@end defmac
+
+@defmac cl-pushnew x place @t{&key :test :test-not :key}
+该宏将 @var{x} 插入存储在 @var{place} 中的列表的前面，但前提是 @var{x} 尚未出现在列表中。可选关键字参数的解释方式与 @code{cl-adjoin} 相同。  @xref{Lists as Sets}。
+@end defmac
+
+@defmac cl-shiftf place@dots{} newvalue
+该宏将 @var{place} 左移一位，移入 @var{newvalue} 的值（可以是任何 Lisp 表达式，而不仅仅是广义变量），并返回从第一个 @var{place} 移出的值。  因此，@code{(cl-shiftf @var{a} @var{b} @var{c} @var{d})} 等价于
+
+@example
+(prog1
+    @var{a}
+  (cl-psetf @var{a} @var{b}
+            @var{b} @var{c}
+            @var{c} @var{d}))
+@end example
+
+@noindent
+除了 0⁣、@var{b} 和 @var{c} 的子形式实际上仅按表面顺序计算一次。
+@end defmac
+
+@defmac cl-rotatef place@dots{}
+该宏以循环方式将 @var{place} 向左旋转 1。因此，@code{(cl-rotatef @var{a} @var{b} @var{c} @var{d})} 等价于
+
+@example
+(cl-psetf @var{a} @var{b}
+          @var{b} @var{c}
+          @var{c} @var{d}
+          @var{d} @var{a})
+@end example
+
+@noindent
+除了子表单的评估之外。  @code{cl-rotatef} 始终返回@code{nil}。  请注意，@code{(cl-rotatef @var{a} @var{b})} 可以方便地交换@var{a} 和@var{b}。
+@end defmac
+
+为此包发明了以下宏；它们在 Common Lisp 中没有类似物。
+
+@defmac cl-letf (bindings@dots{}) forms@dots{}
+该宏类似于 @code{let}，但适用于广义变量而不仅仅是符号。  每个@var{binding}应该是@code{(@var{place} @var{value})}的形式；保存@var{place}的原始内容，将@var{value}存储在其中，然后执行主体@var{form}。  之后，@var{places} 将恢复为原来保存的内容。  即使 @var{form} 由于 @code{throw} 或错误而不规则退出，也会发生这种清理。
+
+例如，
+
+@example
+(cl-letf (((point) (point-min))
+          (a 17))
+     @dots{})
+@end example
+
+@noindent
+将当前缓冲区中的点移动到缓冲区的开头，并将 @code{a} 绑定到 17（就像普通的 @code{let} 一样，因为 @code{a} 只是一个常规变量）。  当物体退出后，@code{a}被设置回其原始值，并且点被移回其原始位置。
+
+请注意，@code{(point)}上的@code{cl-letf}不太像@code{save-excursion}，因为后者有效地保存了一个跟踪缓冲区中插入和删除的标记。  实际上，@code{cl-letf} 或 @code{(point-marker)} 更接近这种行为。  （@code{point}和@code{point-marker}相当于@code{setf}位置；每个位置都接受整数或标记作为存储值。）
+
+与 0⁣ 的情况一样，@var{value} 形式按照它们出现的顺序进行计算，但绑定的顺序未指定。因此，避免在单个 3⁣ 形式中多次绑定相同的 2⁣ 。
+
+由于广义变量看起来像列表，因此在 @code{cl-letf} 中使用 @samp{foo} 代替 @samp{(foo nil)} 作为 @var{binding} 的简写形式在 @code{cl-letf} 中是不明确的，并且是不允许的。
+
+然而，@var{binding}说明符可以是单元素列表@samp{(@var{place})}，这与@samp{(@var{place} @var{place})}类似。  换句话说，@var{place}在进入身体时不受干扰，而@code{cl-letf}的唯一作用是在之后恢复@var{place}的原始值。
+
+请注意，在这种情况下，事实上几乎在所有情况下，@var{place} 都必须在 @code{cl-letf} 主体之外有一个明确定义的值。本质上只有一个例外，即 @var{place} 是一个带有指定 @var{value} 的普通变量（例如上例中的 @code{(a 17)}）。
+
+@end defmac
+
+@defmac cl-letf* (bindings@dots{}) forms@dots{}
+该宏对于 @code{cl-letf} 就像 @code{let*} 对于 @code{let} 一样：它按顺序而不是并行顺序进行绑定。
+@end defmac
+
+@defmac cl-callf @var{function} @var{place} @var{args}@dots{}
+这是“通用”修改宏。  它调用 @var{function}，它应该是不带引号的函数名称、宏名称或 lambda。它将 @var{place} 和 @var{args} 作为参数传递，并将结果赋回给 @var{place}。  例如，@code{(incf @var{place} @var{n})}可以实现为@code{(cl-callf + @var{place} @var{n})}。更多示例：
+
+@example
+(cl-callf abs my-number)
+(cl-callf concat (buffer-name) "<" (number-to-string n) ">")
+(cl-callf cl-union happy-people (list joe bob) :test 'same-person)
+@end example
+
+再次注意 @code{cl-callf} 是标准 Common Lisp 的扩展。
+@end defmac
+
+@defmac cl-callf2 @var{function} @var{arg1} @var{place} @var{args}@dots{}
+该宏类似于 @code{cl-callf}，只不过 @var{place} 是 @var{function} 的 @emph{second} 参数而不是第一个。  例如，@code{(push @var{x} @var{place})}相当于@code{(cl-callf2 cons @var{x} @var{place})}。
+@end defmac
+
+@code{cl-callf} 和 @code{cl-callf2} 宏充当其他宏（如 @code{cl-pushnew}）的构建块。 @code{cl-letf}和@code{cl-letf*}宏用于符号宏的处理； @pxref{Macro Bindings}。
+
+
+@node Variable Bindings
+@section 变量绑定
+@cindex variable binding
+
+@noindent
+这些 Lisp 形式绑定到变量和函数名称，类似于 Lisp 的内置 @code{let} 形式。
+
+@xref{Modify Macros}，对于也与变量绑定相关的@code{cl-letf}和@code{cl-letf*}形式。
+
+@menu
+* Dynamic Bindings::      @code{cl-progv}形式。
+* Function Bindings::     @code{cl-flet}和@code{cl-labels}。
+* Macro Bindings::        @code{cl-macrolet}和@code{cl-symbol-macrolet}。
+@end menu
+
+@node Dynamic Bindings
+@subsection 动态绑定
+@cindex dynamic binding
+
+@noindent
+标准 @code{let} 形式绑定名称在编译时已知的变量。  @code{cl-progv} 形式提供了一种绑定变量的简单方法，这些变量的名称是在运行时计算的。
+
+@defmac cl-progv symbols values forms@dots{}
+这种形式在运行时计算的一组变量上建立 @code{let} 样式的变量绑定。  表达式 @var{symbols} 和 @var{values} 被求值，并且必须分别返回符号和值的列表。  这些符号在主体 @var{form}s 的持续时间内绑定到相应的值。如果@var{values}短于@var{symbols}，则最后几个符号绑定到@code{nil}。如果@var{symbols}短于@var{values}，则忽略多余的值。
+@end defmac
+
+@node Function Bindings
+@subsection 函数绑定
+@cindex function binding
+
+@noindent
+这些形式对函数而不是变量进行类似于 0⁣ 的绑定。
+
+@defmac cl-flet (bindings@dots{}) forms@dots{}
+这种形式为函数而不是值建立 @code{let} 样式的绑定。  每个@var{binding}必须是以下两种形式之一的列表：@w{@code{(@var{name} @var{expr})}}或@w{@code{(@var{name} @var{arglist} @var{body}@dots{})}}。  @var{name} 是函数的名称，@var{expr} 是一个表达式，它返回对应的 @var{name} 应绑定到的函数值，@var{arglist} 和 @var{body} 是参数列表和要绑定到 @var{name} 的函数体。  在@var{forms}内，对函数@var{name}的任何引用都使用@var{bindings}提供的局部定义，而不是全局定义。
+
+对函数名称的“引用”要么是对该函数的调用，要么是使用由@code{function}引用的名称传递给@code{mapcar}。
+
+绑定在范围上是词汇的。  这意味着对命名函数的所有引用必须物理地出现在@var{forms}内。
+
+@code{cl-flet} 定义的函数可以使用 @code{cl-defun} 支持的完整 Common Lisp 参数表示法；此外，函数体被包含在一个隐式块中，就像通过 @code{cl-defun} 一样。 @xref{Program Structure}。
+
+请注意，该宏的 @file{cl.el} 版本的行为略有不同。  特别是，它的绑定是动态的而不是词汇的。  @xref{Obsolete Macros}。
+@end defmac
+
+@defmac cl-labels (bindings@dots{}) forms@dots{}
+@code{cl-labels} 形式类似于 @code{cl-flet}，只是函数绑定可以是递归的。  作用域是词法的，但是如果 @code{lexical-binding} 是 @code{t}，则只能捕获闭包中的函数。 @xref{Closures,,,elisp,GNU Emacs Lisp Reference Manual}和@ref{Selecting Lisp Dialect,,,elisp,GNU Emacs Lisp Reference Manual}。
+
+词法作用域意味着对命名函数的所有引用必须物理地出现在 @code{cl-labels} 形式的主体内。  引用既可以出现在 @code{cl-labels} 本身的主体 @var{forms} 中，也可以出现在函数本身的主体中。  因此，@code{cl-labels}可以定义局部递归函数，或相互递归的函数集。
+
+请注意，该宏的 @file{cl.el} 版本的行为略有不同。  @xref{Obsolete Macros}。
+@end defmac
+
+@node Macro Bindings
+@subsection 宏绑定
+@cindex macro binding
+
+@noindent
+这些形式创建本地宏和“符号宏”。
+
+@defmac cl-macrolet (bindings@dots{}) forms@dots{}
+这种形式类似于@code{cl-flet}，但用于宏而不是函数。  每个 @var{binding} 都是与 @code{cl-defmacro} 的参数具有相同形式的列表（即宏名称、参数列表和宏扩展器形式）。  该宏被相应地定义为在 @code{cl-macrolet} 的主体内使用。
+
+由于宏的性质，@code{cl-macrolet} 始终具有词法作用域。  @code{cl-macrolet} 绑定只会影响物理上出现在主体 @var{forms} 内的调用，可能是在主体中扩展其他宏之后。  @code{cl-macrolet} 绑定宏的调用在全局环境中扩展。
+@end defmac
+
+@defmac cl-symbol-macrolet (bindings@dots{}) forms@dots{}
+这种形式创建了@dfn{symbol macros}，它们是看起来像变量引用而不是函数调用的宏。  每个@var{binding}都是一个列表@samp{(@var{var} @var{expansion})}；主体 @var{forms} 中对 @var{var} 的任何引用都会被 @var{expansion} 替换。
+
+@example
+(setq bar '(5 . 9))
+(cl-symbol-macrolet ((foo (car bar)))
+  (incf foo))
+bar
+     @result{} (6 . 9)
+@end example
+
+符号宏的 @code{setq} 与 @code{setf} 的处理方式相同。即，上面的@code{(setq foo 4)}相当于@code{(setf foo 4)}，后者又扩展为@code{(setf (car bar) 4)}。  相同符号的 @code{let} （或 @code{let*}、@code{lambda}、...）绑定将局部隐藏符号宏，就像 Common Lisp 中的情况一样。
+
+符号宏没有与 @code{defmacro} 类似的东西；所有符号宏都是本地的。  @code{cl-symbol-macrolet} 的典型用法是在另一个宏的扩展中：
+
+@example
+(cl-defmacro my-dolist ((x list) &rest body)
+  (cl-with-gensyms (var)
+    (list 'cl-loop 'for var 'on list 'do
+          (cl-list* 'cl-symbol-macrolet
+                    (list (list x (list 'car var)))
+                    body))))
+
+(setq mylist '(1 2 3 4))
+(my-dolist (x mylist) (incf x))
+mylist
+     @result{} (2 3 4 5)
+@end example
+
+@noindent
+在此示例中，@code{my-dolist}宏类似于@code{dolist} (@pxref{Iteration})，除了变量@code{x}成为对列表元素的真正引用。  此处显示的 @code{my-dolist} 调用扩展为
+
+@example
+(cl-loop for G1234 on mylist do
+      (cl-symbol-macrolet ((x (car G1234)))
+        (incf x)))
+@end example
+
+@noindent
+进而扩展到
+
+@example
+(cl-loop for G1234 on mylist do (incf (car G1234)))
+@end example
+
+@xref{Loop Facility}，用于描述 @code{cl-loop} 宏。该包定义了一个非标准的 @code{in-ref} 循环子句，其工作方式与 @code{my-dolist} 非常相似。
+@end defmac
+
+@node Conditionals
+@section 条件句
+@cindex conditionals
+
+@noindent
+这些条件形式增强了 Emacs Lisp 的简单 @code{if}、@code{and}、@code{or} 和 @code{cond} 形式。
+
+@defmac cl-case keyform clause@dots{}
+该宏计算@var{keyform}，然后将其与各个@var{clause}中列出的键值进行比较。  与该键匹配的子句将被执行；比较是通过@code{eql}完成的。  如果没有子句匹配，则 @code{cl-case} 形式返回 @code{nil}。  子句的形式为
+
+@example
+(@var{keylist} @var{body-forms}@dots{})
+@end example
+
+@noindent
+其中 @var{keylist} 是键值列表。  如果只有一个值，并且它不是 cons 单元格或符号 @code{nil} 或 @code{t}，则它可以单独用作 @var{keylist}，而无需包含在列表中。  @code{cl-case} 形式中的所有键值必须是不同的。  最后的子句可以使用@code{t}代替@var{keylist}来指示如果其他子句都不匹配则应采用的默认子句。  （符号 @code{otherwise} 也可以代替 @code{t} 被识别。要创建与实际符号 @code{t}、@code{nil} 或 @code{otherwise} 匹配的子句，请将符号括在列表中。）
+
+例如，此表达式读取击键，然后执行四件事之一，具体取决于它是 @samp{a}、@samp{b}、@key{RET} 或 @kbd{C-j} 还是其他任何内容。
+
+@example
+(cl-case (read-char)
+  (?a (do-a-thing))
+  (?b (do-b-thing))
+  ((?\r ?\n) (do-ret-thing))
+  (t (do-other-thing)))
+@end example
+@end defmac
+
+@defmac cl-ecase keyform clause@dots{}
+该宏与 @code{cl-case} 类似，只不过如果键与任何子句都不匹配，则会发出错误信号，而不是简单地返回 @code{nil}。
+@end defmac
+
+@defmac cl-typecase keyform clause@dots{}
+该宏是 @code{cl-case} 的一个版本，用于检查类型而不是值。  每个@var{clause}的形式为@samp{(@var{type} @var{body}@dots{})}。  @xref{Type Predicates}，用于类型说明符的描述。  例如，
+
+@example
+(cl-typecase x
+  (integer (munch-integer x))
+  (float (munch-float x))
+  (string (munch-integer (string-to-number x)))
+  (t (munch-anything x)))
+@end example
+
+类型说明符 @code{t} 匹配任何类型的对象；单词 @code{otherwise} 也是允许的。  要使一个子句匹配多种类型中的任何一种，请使用 @code{(or @dots{})} 类型说明符。
+@end defmac
+
+@defmac cl-etypecase keyform clause@dots{}
+该宏与 @code{cl-typecase} 类似，只不过如果键与任何子句都不匹配，则会发出错误信号，而不是简单地返回 @code{nil}。
+@end defmac
+
+@node Blocks and Exits
+@section 封锁和出口
+@cindex block
+@cindex exit
+
+@noindent
+Common Lisp @dfn{blocks} 提供了与 @code{catch} 和 @code{throw} 非常相似的非本地退出机制，具有词法作用域。这个包实际上根据@code{catch}实现了@code{cl-block}；然而，如果块体实际上并不 @code{cl-return-from} 块，则词法作用域允许字节编译器省略代价高昂的 @code{catch} 步骤。
+
+@defmac cl-block name forms@dots{}
+@var{forms} 的计算就如同通过 @code{progn} 一样。  然而，如果@var{forms}中的任何一个执行@code{(cl-return-from @var{name})}，它们都会跳出并直接从@code{cl-block}形式返回。 @code{cl-block} 返回最后一个 @var{form} 的结果，除非出现 @code{cl-return-from} 。
+
+@code{cl-block}/@code{cl-return-from} ​​机制与 @code{catch}/@code{throw} 机制非常相似。  主要区别在于块@var{name}是未计算的符号，而不是在运行时计算为标签的形式（例如带引号的符号）；而且块总是具有词法作用域的。在动态作用域 @code{catch} 中，从 @code{catch} 主体调用的函数也可以从 @code{throw} 到 @code{catch}。  这不是 @code{cl-block} 的选项，其中引用块名称的 @code{cl-return-from} 必须实际出现在构成块主体的 @var{forms} 中。它们可能不会出现在其他被调用的函数中，尽管它们可能出现在宏扩展或主体中的 12 中。  块名称和 @code{catch} 名称形成独立的名称空间。
+
+在真正的 Common Lisp 中，@code{defun} 和 @code{defmacro} 用与函数或宏同名的隐式块包围函数或扩展器主体。  这在 Emacs Lisp 中不会发生，但该包提供了 @code{cl-defun} 和 @code{cl-defmacro} 形式，它们确实创建了隐式块。
+
+该包定义的 Common Lisp 循环结构（例如 @code{cl-loop} 和 @code{cl-dolist}）也像 Common Lisp 中一样创建隐式块。
+
+因为它们是根据 Emacs Lisp 的 @code{catch} 和 @code{throw} 实现的，所以块具有与实际 @code{catch} 构造相同的开销（大约两次函数调用）。  但是，如果该块实际上不包含任何跳转到它的 @code{cl-return} 或 @code{cl-return-from} 调用，则字节编译器将优化掉 @code{catch}。  这意味着不使用 @code{cl-return} 的 @code{cl-do} 循环和 @code{cl-defun} 函数无需支付支持它的开销。
+@end defmac
+
+@defmac cl-return-from name [result]
+该宏从名为 @var{name} 的块返回，该块必须是一个（未计算的）符号。  如果指定了 1⁣ 形式，则会对其进行求值以产生从 2⁣ 返回的结果。否则，返回@code{nil}。
+@end defmac
+
+@defmac cl-return [result]
+该宏与@code{(cl-return-from nil @var{result})} 完全相同。像 @code{cl-do} 和 @code{cl-dolist} 这样的常见 Lisp 循环隐式地将自身包含在 @code{nil} 块中。
+@end defmac
+
+@c FIXME?  Maybe this should be in a separate section?
+@defmac cl-tagbody &rest labels-or-statements
+该宏执行语句，同时允许将控制转移到用户定义的标签。  @var{labels-or-statements} 的每个元素可以是标签（整数或符号），也可以是 cons-cell（语句）。  这种区别是在宏观扩张之前做出的。语句按顺序执行，丢弃任何返回值。任何语句都可以随时将控制权转移到带有特殊形式 @code{(go @var{label})} 的标签之一后面的语句。标签具有词法范围和动态范围。
+@end defmac
+
+
+@node Iteration
+@section 迭代
+@cindex iteration
+
+@noindent
+这里描述的宏提供了更复杂的高级循环结构来补充 Emacs Lisp 的基本循环形式 (@pxref{Iteration,,,elisp,GNU Emacs Lisp Reference Manual})。
+
+@defmac cl-loop forms@dots{}
+该软件包既支持简单、老式的 @code{loop} 含义，也支持极其强大且灵活的功能（称为 @dfn{Loop Facility} 或 @dfn{Loop Macro}）。  下一节将讨论这种更先进的设施； @pxref{Loop Facility}。这里描述了@code{loop}的简单形式。
+
+如果 @code{cl-loop} 后面跟着零个或多个 Lisp 表达式，那么 @code{(cl-loop @var{exprs}@dots{})} 只是创建一个无限循环，一遍又一遍地执行表达式。  该循环包含在隐式 @code{nil} 块中。  因此，
+
+@example
+(cl-loop (foo)  (if (no-more) (return 72))  (bar))
+@end example
+
+@noindent
+完全等于
+
+@example
+(cl-block nil (while t (foo)  (if (no-more) (return 72))  (bar)))
+@end example
+
+如果任何表达式是普通符号，则循环将被解释为循环宏规范，如下所述。 （这在实践中不是限制，因为上述表示法中的普通符号将简单地访问并丢弃变量的值。）
+@end defmac
+
+@defmac cl-do (spec@dots{}) (end-test [result@dots{}]) forms@dots{}
+该宏创建一个通用迭代循环。  每个 @var{spec} 的形式为
+
+@example
+(@var{var} [@var{init} [@var{step}]])
+@end example
+
+该循环的工作原理如下：首先，每个 @var{var} 都绑定到关联的 @var{init} 值，就像通过 @code{let} 形式一样。  然后，在循环的每次迭代中，对 3⁣ 进行求值；如果为 true，则循环结束。  否则，对主体 @var{forms} 进行求值，然后将每个 @var{var} 设置为关联的 @var{step} 表达式（就好像通过 @code{cl-psetq} 形式），并开始下一次迭代。  一旦@var{end-test}变为真，@var{result}形式就会被求值（@var{var}仍然绑定到它们的值）以产生@code{cl-do}返回的结果。
+
+整个 @code{cl-do} 循环包含在隐式 @code{nil} 块中，以便您可以随时使用 @code{(cl-return)} 跳出循环。
+
+如果没有 @var{result} 形式，则循环返回 @code{nil}。如果给定的 @var{var} 没有 @var{step} 形式，则它会绑定到其 @var{init} 值，但在 @code{cl-do} 循环期间不会进行其他修改（除非代码显式修改它）；这种情况只是在循环周围放置 @code{(let ((@var{var} @var{init})) @dots{})} 的简写。  如果@var{init}也被省略，则默认为@code{nil}，在这种情况下，可以使用普通的@samp{@var{var}}代替@samp{(@var{var})}，再次与@code{let}进行类比。
+
+这个例子（来自 Steele）说明了一个循环，该循环将函数 0⁣ 应用于列表 @code{foo} 和 @code{bar} 中的连续值对；它相当于调用@code{(cl-mapcar 'f foo bar)}。  请注意，此循环根本没有主体 @var{forms}，其所有工作都是作为循环其余部分的副作用执行的。
+
+@example
+(cl-do ((x foo (cdr x))
+        (y bar (cdr y))
+        (z nil (cons (f (car x) (car y)) z)))
+     ((or (null x) (null y))
+      (nreverse z)))
+@end example
+@end defmac
+
+@defmac cl-do* (spec@dots{}) (end-test [result@dots{}]) forms@dots{}
+这对于 @code{cl-do} 就像@code{let*}对于@code{let} 一样。  特别是，初始值就像由 @code{let*} 而不是 @code{let} 绑定一样，并且步骤就像由 @code{setq} 而不是 @code{cl-psetq} 一样分配。
+
+这是上面循环的另一种编写方式：
+
+@example
+(cl-do* ((xp foo (cdr xp))
+         (yp bar (cdr yp))
+         (x (car xp) (car xp))
+         (y (car yp) (car yp))
+         z)
+  ((or (null xp) (null yp))
+   (nreverse z))
+  (push (f x y) z))
+@end example
+@end defmac
+
+@defmac cl-dolist (var list [result]) forms@dots{}
+这与标准 Emacs Lisp 宏 @code{dolist} 完全相同，但用隐式 @code{nil} 块包围循环。
+@end defmac
+
+@defmac cl-dotimes (var count [result]) forms@dots{}
+这与标准 Emacs Lisp 宏 @code{dotimes} 完全相同，但用隐式 @code{nil} 块包围循环。执行主体时，@var{var}依次绑定到从零（含）到@var{count}（不含）的整数。  然后
+@c FIXME lispref does not state this part explicitly, could move this there.
+@var{result} 形式使用 @var{var} 进行评估，@var{var} 绑定到已完成的迭代总数（即 @code{(max 0 @var{count})}），以获得循环形式的返回值。  不推荐使用 @var{result}。
+@end defmac
+
+@defmac cl-do-symbols (var [obarray [result]]) forms@dots{}
+该循环迭代所有保留的符号。  如果指定了 @var{obarray} 并且不是 @code{nil}，则它将循环遍历该 obarray 中的所有符号。  对于每个符号，主体 @var{forms} 通过绑定到该符号的 @var{var} 进行评估。  以未指定的顺序访问符号。  然后，对 @var{result} 形式（如果有）进行求值（将 @var{var} 绑定到 @code{nil}）以获得返回值。  该循环由隐式 @code{nil} 块包围。
+@end defmac
+
+@defmac cl-do-all-symbols (var [result]) forms@dots{}
+这与 @code{cl-do-symbols} 相同，只是省略了 @var{obarray} 参数；它总是迭代默认的 obarray。
+@end defmac
+
+@xref{Mapping over Sequences}，用于迭代向量或列表的更多函数。
+
+@node Loop Facility
+@section 循环设施
+@cindex loop facility
+
+@noindent
+对 Lisp 传统循环结构的一个常见抱怨是，它们要么过于简单且有限，例如 @code{dotimes} 或 @code{while}，要么过于难以阅读和晦涩，例如 Common Lisp 的 @code{do} 循环。
+
+为了解决这个问题，Common Lisp 添加了一个名为“循环设施”或“@code{loop}宏”的构造，它具有易于使用但非常强大且富有表现力的语法。
+
+@menu
+* Loop Basics::            @code{cl-loop} 宏，基本子句结构。
+* Loop Examples::          @code{cl-loop} 宏的工作示例。
+* For Clauses::            由@code{for}或@code{as}引入的子句。
+* Iteration Clauses::      @code{repeat}、@code{while}、@code{thereis} 等
+* Accumulation Clauses::   @code{collect}、@code{sum}、@code{maximize} 等
+* Other Clauses::          @code{with}, @code{if}, @code{initially}, @code{finally}.
+@end menu
+
+@node Loop Basics
+@subsection 循环基础知识
+
+@noindent
+@code{cl-loop} 宏本质上在 Lisp 中创建了一种迷你语言，专门用于描述循环。  虽然按照常规 Lisp 的标准来看，这种语言看起来有点奇怪，但事实证明它非常容易学习并且非常适合其用途。
+
+由于@code{cl-loop}是一个宏，因此循环语言的所有解析都在字节编译时进行；已编译的 @code{cl-loop} 与手写的等效 @code{while} 循环一样高效。
+
+@defmac cl-loop clauses@dots{}
+循环结构由一系列 @var{clause} 组成，每个@var{clause} 由@code{for} 或@code{do} 等符号引入。  子句简单地串在 @code{cl-loop} 的参数列表中，并带有最少的额外括号。  各种类型的子句指定初始化，例如临时变量的绑定、循环中要执行的操作、单步操作和最终清理。
+
+Common Lisp 指定了循环中子句的某种一般顺序：
+
+@example
+(loop @var{name-clause}
+      @var{var-clauses}@dots{}
+      @var{action-clauses}@dots{})
+@end example
+
+@var{name-clause} 可以选择为循环周围的隐式块指定名称。  默认情况下，隐式块被命名为@code{nil}。  @var{var-clauses} 指定在循环期间应绑定哪些变量，以及在整个循环过程中应如何修改或迭代它们。  @var{action-clauses}是循环期间要做的事情，例如计算、收集和返回值。
+
+Emacs 版本的 @code{cl-loop} 宏对子句的顺序限制较少，但如果将变量绑定子句 @code{with}、@code{for} 和 @code{repeat} 放在操作子句之前，事情的表现将最可预测。  与 Common Lisp 一样，@code{initially} 和 @code{finally} 子句可以去任何地方。
+
+循环通常默认返回 @code{nil}，但您可以使用累积子句（如 @code{collect}）、结束测试子句（如 @code{always}）或显式 @code{return} 子句跳出隐式块，从而使循环返回一个值。 （因为循环体包含在隐式块中，所以您还可以使用常规 Lisp @code{cl-return} 或 @code{cl-return-from} 来跳出循环。）
+@end defmac
+
+以下各节给出了一些循环宏实际运行的示例，并详细描述了特定的循环子句。有关更多讨论和示例，请参阅斯蒂尔的第二版。
+
+@node Loop Examples
+@subsection 循环示例
+
+@noindent
+在列出允许的完整子句集之前，让我们看几个示例循环，以了解 @code{cl-loop} 语言。
+
+@example
+(cl-loop for buf in (buffer-list)
+         collect (buffer-file-name buf))
+@end example
+
+@noindent
+该循环使用 @code{buffer-list} 返回的列表迭代所有 Emacs 缓冲区。  对于每个缓冲区@var{buf}，它调用@code{buffer-file-name}并将结果收集到一个列表中，然后从@code{cl-loop}构造返回。结果是 Emacs 内存中所有缓冲区的文件名列表。  单词 @code{for}、@code{in} 和 @code{collect} 是 @code{cl-loop} 语言中的保留字。
+
+@example
+(cl-loop repeat 20 do (insert "Yowsa\n"))
+@end example
+
+@noindent
+该循环在当前缓冲区中插入短语“Yowsa”二十次。
+
+@example
+(cl-loop until (eobp) do (munch-line) (forward-line 1))
+@end example
+
+@noindent
+该循环在每一行调用@code{munch-line}，直到缓冲区末尾。  如果 point 已经位于缓冲区末尾，则循环立即退出。
+
+@example
+(cl-loop do (munch-line) until (eobp) do (forward-line 1))
+@end example
+
+@noindent
+此循环与上面的循环类似，只是 @code{munch-line} 始终至少被调用一次。
+
+@example
+(cl-loop for x from 1 to 100
+         for y = (* x x)
+         until (>= y 729)
+         finally return (list x (= y 729)))
+@end example
+
+@noindent
+这个更复杂的循环搜索平方为 729 的数字 @code{x}。为了安全起见，它只检查 @code{x} 值不超过 100；删除短语 @samp{to 100} 将导致循环无限制地向上计数。  第二个@code{for}子句将@code{y}定义为循环内@code{x}的平方；每次循环时都会重新计算 @code{=} 符号后面的表达式。  @code{until} 子句给出了终止循环的条件，@code{finally} 子句说明了循环结束时要执行的操作。 （这个特定的例子写得不够简洁，只是为了说明。）
+
+请注意，即使此循环包含三个子句（两个 @code{for} 和一个 @code{until}），这三个子句本身就足以定义循环，但它仍然创建一个循环，而不是某种三重嵌套循环。  如果您想要嵌套循环，则必须显式嵌套 @code{cl-loop} 构造。
+
+@node For Clauses
+@subsection 对于条款
+
+@noindent
+大多数循环由一个或多个 @code{for} 子句控制。 @code{for} 子句同时描述要绑定的变量、这些变量在循环期间如何步进，以及通常基于这些变量的结束条件。
+
+单词@code{as}是单词@code{for}的同义词。  该单词后面跟着一个变量名称，然后是一个类似 @code{from} 或 @code{across} 的单词，描述所需的迭代类型。在 Common Lisp 中，短语 @code{being the} 有时位于迭代类型之前；在此软件包中，@code{being} 和 @code{the} 都是可选的。  单词 @code{each} 是 @code{the} 的同义词，其后面的单词可以是单数或复数：@samp{for x being the elements of y} 或 @samp{for x being each element of y}。  您使用哪种形式纯粹是风格问题。
+
+该变量被绑定在循环周围，就像通过 @code{let} 一样：
+
+@example
+(setq i 'happy)
+(cl-loop for i from 1 to 10 do (do-something-with i))
+i
+     @result{} happy
+@end example
+
+@table @code
+@item for @var{var} from @var{expr1} to @var{expr2} by @var{expr3}
+这种类型的 @code{for} 子句创建一个计数循环。  三个子术语中的每一个都是可选的，但必须至少有一个术语，以便该子句被标记为计数子句。
+
+这三个表达式分别是变量的起始值、结束值和步长值。  默认情况下，循环向上计数（@var{expr3} 必须为正数），从 @var{expr1} 到 @var{expr2}（含）。  如果省略 @code{from} 项，则循环从零开始计数；如果省略 @code{to} 项​​，循环将永远计数而不会停止（当然，除非被其他循环子句停止）；如果省略 @code{by} 项，则循环以 1 为步长进行计数。
+
+您可以将单词 @code{from} 替换为 @code{upfrom} 或 @code{downfrom} 来指示循环的方向。  同样，您可以将 @code{to} 替换为 @code{upto} 或 @code{downto}。例如，@samp{for x from 5 downto 1} 执行五次，@code{x} 依次执行从 5 到 1 的整数。另外，您可以将 @code{to} 替换为 @code{below} 或 @code{above}，它们分别类似于 @code{upto} 和 @code{downto}，只不过它们是独占限制而不是包含限制：
+
+@example
+(cl-loop for x to 10 collect x)
+        @result{} (0 1 2 3 4 5 6 7 8 9 10)
+(cl-loop for x below 10 collect x)
+        @result{} (0 1 2 3 4 5 6 7 8 9)
+@end example
+
+@code{by} 值始终为正，即使对于向下计数循环也是如此。  向下循环需要某种 @code{from} 值； @samp{for x downto 5} 本身并不是一个有效的循环子句。
+
+@item for @var{var} in @var{list} by @var{function}
+该子句依次迭代 @var{var} @var{list} 的所有元素。  如果指定 @code{by} 项，则使用 @var{function} 来遍历列表，而不是 @code{cdr}；它必须是一个带有一个参数的函数。  例如：
+
+@example
+(cl-loop for x in '(1 2 3 4 5 6) collect (* x x))
+        @result{} (1 4 9 16 25 36)
+(cl-loop for x in '(1 2 3 4 5 6) by 'cddr collect (* x x))
+        @result{} (1 9 25)
+@end example
+
+@item for @var{var} on @var{list} by @var{function}
+该子句在 @var{list} 的所有 cons 单元格上迭代 @var{var}。
+
+@example
+(cl-loop for x on '(1 2 3 4) collect x)
+        @result{} ((1 2 3 4) (2 3 4) (3 4) (4))
+@end example
+
+@item for @var{var} in-ref @var{list} by @var{function}
+这就像一个常规的 @code{in} 子句，但是 @var{var} 变成了对列表元素的 @code{setf} 可用“引用”，而不仅仅是一个临时变量。  例如，
+
+@example
+(cl-loop for x in-ref my-list do (incf x))
+@end example
+
+@noindent
+就地增加 @code{my-list} 的每个元素。  该子句是标准 Common Lisp 的扩展。
+
+@item for @var{var} across @var{array}
+该子句在 @var{array} 的所有元素上迭代 @var{var}，这些元素可以是向量或字符串。
+
+@example
+(cl-loop for x across "aeiou"
+         do (use-vowel (char-to-string x)))
+@end example
+
+@item for @var{var} across-ref @var{array}
+该子句迭代数组，并使用 @var{var} 对元素的 @code{setf} 可用引用；见上文@code{in-ref}。
+
+@item for @var{var} being the elements of @var{sequence}
+该子句迭代 @var{sequence} 的元素，这些元素可以是列表、向量或字符串。  由于类型必须在运行时确定，因此这比 1⁣ 或 2⁣ 效率稍低。  该子句后面可能跟着附加项 @samp{using (index @var{var2})} ，以使 @var{var2} 绑定到元素的连续索引（从 0 开始）。
+
+该子句类型取自旧版本的 @code{loop} 宏，并且在现代 Common Lisp 中不存在。  不支持旧宏的 @samp{using (sequence @dots{})} 术语。
+
+@item for @var{var} being the elements of-ref @var{sequence}
+该子句迭代一个序列，并使用 @var{var} 对元素的 @code{setf} 可用引用；见上文@code{in-ref}。
+
+@item for @var{var} being the symbols [of @var{obarray}]
+该子句迭代符号，或者遍历所有内部符号，或者遍历 @var{obarray} 中的所有符号。  循环执行时将 @var{var} 依次绑定到每个符号。  以未指定的顺序访问符号。
+
+举个例子，
+
+@example
+(cl-loop for sym being the symbols
+         when (fboundp sym)
+         when (string-match "^map" (symbol-name sym))
+         collect sym)
+@end example
+
+@noindent
+返回名称以 @samp{map} 开头的所有函数的列表。
+
+Common Lisp 单词 @code{external-symbols} 和 @code{present-symbols} 也可以识别，但相当于 Emacs Lisp 中的 @code{symbols}。
+
+由于较小的实现限制，在给定 @code{cl-loop} 中使用多个 @code{for} 子句迭代符号、哈希表、键映射、覆盖或间隔将不起作用。  幸运的是，这样做很少有用。  将这些类型的子句之一与其他子句（如 3⁣ 或 4⁣）混合使用是 @emph{is} 有效的。
+
+@item for @var{var} being the hash-keys of @var{hash-table}
+@itemx for @var{var} being the hash-values of @var{hash-table}
+该子句迭代 @var{hash-table} 中的条目，并将 @var{var} 绑定到每个键或值。  @samp{using} 子句可以将第二个变量绑定到相反的部分。
+
+@example
+(cl-loop for k being the hash-keys of h
+               using (hash-values v)
+         do
+         (message "key %S -> value %S" k v))
+@end example
+
+@item for @var{var} being the key-codes of @var{keymap}
+@itemx for @var{var} being the key-bindings of @var{keymap}
+该子句迭代 @var{keymap} 中的条目。迭代不会输入嵌套的键盘映射，但会输入继承的（父）键盘映射。 @code{using} 子句可以同时访问代码和绑定。
+
+@example
+(cl-loop for c being the key-codes of (current-local-map)
+               using (key-bindings b)
+         do
+         (message "key %S -> binding %S" c b))
+@end example
+
+
+@item for @var{var} being the key-seqs of @var{keymap}
+该子句迭代由 @var{keymap} 及其嵌套键映射定义的所有键序列，其中 @var{var} 接受向量值。  每次迭代都会重复使用字符串或向量，因此如果您希望永久保留它们，则必须复制它们。  您还可以添加 @samp{using (key-bindings @dots{})} 子句来获取命令绑定。
+
+@item for @var{var} being the overlays [of @var{buffer}] @dots{}
+该子句迭代缓冲区的“覆盖”（子句 @code{extents} 与 @code{overlays} 同义）。  如果省略 2⁣ 项，则使用当前缓冲区。该子句还接受可选的 @samp{from @var{pos}} 和 @samp{to @var{pos}} 术语，将该子句限制为与指定区域重叠的覆盖。
+
+@item for @var{var} being the intervals [of @var{object}] @dots{}
+此子句迭代具有常量文本属性的缓冲区或字符串的所有间隔。  变量 @var{var} 将绑定到起始位置和结束位置，其中一个起始位置始终等于前一个结束位置。  该子句允许使用 @code{of}、@code{from}、@code{to} 和 @code{property} 术语，其中后一个术语将搜索限制为仅指定的属性。  @code{of} 项可以指定缓冲区或字符串。  @xref{Text Properties,,,elisp}。
+
+@item for @var{var} being the frames
+该子句迭代所有 Emacs 框架。  子句 @code{screens} 是 @code{frames} 的同义词。  从 @code{selected-frame} 开始按 @code{next-frame} 顺序访问帧。
+
+@item for @var{var} being the windows [of @var{frame}]
+该子句迭代当前帧或指定 @var{frame} 的窗口（在 Emacs 意义上）。  它从 @code{selected-window} 开始按 @code{next-window} 顺序访问窗口（如果指定 @var{frame}，则从 @code{frame-selected-window} 开始）。该子句以与 @code{next-window} 相同的方式处理迷你缓冲区窗口。  为了获得更大的灵活性，请考虑使用 @code{walk-windows} 代替。
+
+@item for @var{var} being the buffers
+该子句迭代 Emacs 中的所有缓冲区。  它相当于@samp{for @var{var} in (buffer-list)}。
+
+@item for @var{var} = @var{expr1} then @var{expr2}
+该子句进行一般迭代。  第一次循环时，@var{var} 将绑定到 @var{expr1}。  在第二次和后续迭代中，它将通过评估 @var{expr2} （可能指 @var{var} 的旧值）来设置。  例如，这两个循环实际上是相同的：
+
+@example
+(cl-loop for x on my-list by 'cddr do @dots{})
+(cl-loop for x = my-list then (cddr x) while x do @dots{})
+@end example
+
+请注意，这种类型的 @code{for} 子句并不意味着任何类型的终止条件；上面的示例将其与 @code{while} 子句结合起来，以告知何时结束循环。
+
+如果省略 @code{then} 项，@var{expr1} 将同时用于初始设置和后续设置：
+
+@example
+(cl-loop for x = (random) when (> x 0) return x)
+@end example
+
+@noindent
+该循环不断从 @code{(random)} 函数中获取随机数，直到得到一个正数，然后返回该正数。
+@end table
+
+如果连续包含多个 @code{for} 子句，则会按顺序处理它们（就像按 @code{let*} 和 @code{setq} 一样）。您可以使用单词 @code{and} 来链接子句，在这种情况下，它们会并行处理（就像通过 @code{let} 和 @code{cl-psetq} 一样）。
+
+@example
+(cl-loop for x below 5 for y = nil then x collect (list x y))
+        @result{} ((0 nil) (1 1) (2 2) (3 3) (4 4))
+(cl-loop for x below 5 and y = nil then x collect (list x y))
+        @result{} ((0 nil) (1 0) (2 1) (3 2) (4 3))
+@end example
+
+@noindent
+在第一个循环中，@code{y}是根据前一个子句刚刚设置的@code{x}的值设置的；在第二个循环中，@code{x}和@code{y}同时设置，因此@code{y}是根据上一次循环留下的@code{x}值设置的。
+
+@cindex destructuring, in cl-loop
+@code{cl-loop}宏的另一个功能是@emph{destructuring}，其概念与@code{defmacro} (@pxref{Argument Lists}) 提供的解构类似。任何 @code{for} 子句的 @var{var} 部分都可以作为变量列表而不是单个变量给出。  循环执行期间产生的值必须是列表；列表中的值存储在相应的变量中。
+
+@example
+(cl-loop for (x y) in '((2 3) (4 5) (6 7)) collect (+ x y))
+        @result{} (5 9 13)
+@end example
+
+在循环解构中，如果值多于变量，则忽略尾随值；如果变量多于值，则尾随变量将获得值@code{nil}。如果@code{nil}用作变量名，则忽略相应的值。  解构可以嵌套，并且允许像 2⁣ 这样的变量的点列表，例如处理 alist
+
+@example
+(cl-loop for (key . value) in '((a . 1) (b . 2))
+         collect value)
+        @result{} (1 2)
+@end example
+
+@node Iteration Clauses
+@subsection 迭代子句
+
+@noindent
+除了 0⁣ 子句之外，还有其他几个循环子句控制循环的运行方式。  它们可以单独使用，也可以与一个或多个 @code{for} 子句结合使用。
+
+@table @code
+@item repeat @var{integer}
+该子句只是使用内部临时变量计数到指定的数字。  循环
+
+@example
+(cl-loop repeat (1+ n) do @dots{})
+(cl-loop for temp to n do @dots{})
+@end example
+
+@noindent
+是相同的，只是第二个强制您为实际上不会使用的变量选择一个名称。
+
+@item while @var{condition}
+当指定条件（任何 Lisp 表达式）变为 @code{nil} 时，该子句停止循环。  例如，以下两个循环是等效的，除了围绕第二个循环的隐式 @code{nil} 块：
+
+@example
+(while @var{cond} @var{forms}@dots{})
+(cl-loop while @var{cond} do @var{forms}@dots{})
+@end example
+
+@item until @var{condition}
+当指定条件为真（即非@code{nil}）时，该子句停止循环。
+
+@item always @var{condition}
+当指定条件为@code{nil} 时，该子句停止循环。与@code{while}不同，它使用@code{return nil}停止循环，这样@code{finally}子句就不会被执行。  如果所有条件均非@code{nil}，则循环返回@code{t}：
+
+@example
+(if (cl-loop for size in size-list always (> size 10))
+    (only-big-sizes)
+  (some-small-sizes))
+@end example
+
+@item never @var{condition}
+该子句类似于 @code{always}，不同之处在于，如果所有条件均为 false，则循环返回 @code{t}，否则返回 @code{nil}。
+
+@item thereis @var{condition}
+当指定的形式为非@code{nil}时，该子句停止循环；在这种情况下，它返回非 1⁣ 值。  如果所有值都是@code{nil}，则循环返回@code{nil}。
+
+@item iter-by @var{iterator}
+该子句迭代指定形式（迭代器对象）中的值。  参见 (@pxref{Generators,,,elisp,GNU Emacs Lisp Reference Manual})。
+@end table
+
+@node Accumulation Clauses
+@subsection 累积条款
+
+@noindent
+这些子句导致循环累积有关指定 Lisp @var{form} 的信息。  累积的结果将从循环中返回，除非被 @code{return} 子句覆盖。
+
+@table @code
+@item collect @var{form}
+该子句将 @var{form} 的值收集到一个列表中。  @code{collect} 的几个示例出现在本手册的其他地方。
+
+单词 @code{collecting} 是 @code{collect} 的同义词，其他累积子句也是如此。
+
+@item append @var{form}
+该子句使用 @code{append} 将值列表收集到结果列表中。
+
+@item nconc @var{form}
+该子句通过破坏性地修改列表而不是复制列表来将值列表收集到结果列表中。
+
+@item concat @var{form}
+该子句将指定的 @var{form} 的值连接成一个字符串。  （它和下面的子句是标准 Common Lisp 的扩展。）
+
+@item vconcat @var{form}
+该子句将指定 @var{form} 的值连接成一个向量。
+
+@item count @var{form}
+该子句计算指定的 @var{form} 计算为非 @code{nil} 值的次数。
+
+@item sum @var{form}
+该子句累积指定 @var{form} 的值的总和，该值必须计算为数字。
+
+@item maximize @var{form}
+该子句累加指定 @var{form} 的最大值，该值必须计算为数字。  如果 @code{maximize} 执行零次，则返回值未定义。
+
+@item minimize @var{form}
+该子句累加指定 @var{form} 的最小值。
+@end table
+
+累加子句后面可以跟 @samp{into @var{var}}，以使数据被收集到变量 @var{var}（在循环期间自动绑定 @code{let}），而不是未命名的临时变量。  此外，@code{into} 累积不会自动暗示返回值。  循环必须使用某种显式机制（例如 @code{finally return}）来返回累积结果。
+
+多个相同类型的累加子句累加到同一位置是有效的。  来自斯蒂尔：
+
+@example
+(cl-loop for name in '(fred sue alice joe june)
+         for kids in '((bob ken) () () (kris sunshine) ())
+         collect name
+         append kids)
+        @result{} (fred bob ken sue alice joe kris sunshine june)
+@end example
+
+@node Other Clauses
+@subsection 其他条款
+
+@noindent
+本节描述其余的循环子句。
+
+@table @code
+@item with @var{var} = @var{value}
+该子句将变量绑定到循环周围的值，但否则在循环期间保留该变量。  以下循环基本上是等效的：
+
+@example
+(cl-loop with x = 17 do @dots{})
+(let ((x 17)) (cl-loop do @dots{}))
+(cl-loop for x = 17 then x do @dots{})
+@end example
+
+当然，变量 @var{var} 可能会在循环的其余部分中用于某些目的。  例如：
+
+@example
+(cl-loop for x in my-list  with res = nil  do (push x res)
+         finally return res)
+@end example
+
+此循环将 @code{my-list} 的元素插入到 @code{res} 中累积的新列表的前面，然后在循环末尾返回列表 @code{res}。  其效果与 @code{collect} 子句类似，但由于元素被推到 @code{res} 的前面而不是末尾，因此列表被反转。
+
+如果省略 @code{=} 项，变量将初始化为 @code{nil}。  （因此上例中的@samp{= nil}是不必要的。）
+
+默认情况下，@code{with} 进行的绑定是连续的，就像@code{let*} 一样。  就像@code{for}子句一样，@code{with}子句可以与@code{and}链接，以导致由@code{let}进行绑定。
+
+@item if @var{condition} @var{clause}
+仅当指定条件为 true 时，该子句才会执行后面的循环子句。  下面的@var{clause}应该是累加、@code{do}、@code{return}、@code{if}或@code{unless}子句。多个子句可以通过用 @code{and} 分隔来链接。这些子句后面可能跟着 @code{else} 以及条件为假时要执行的一个或多个子句。  整个结构后面可以选择单词 @code{end} （可用于消除嵌套 @code{if} 中的 @code{else} 或 @code{and} 的歧义）。
+
+条件形式的实际非@code{nil}值可通过“then”部分中的名称@code{it}获得。  例如：
+
+@example
+(setq funny-numbers '(6 13 -1))
+     @result{} (6 13 -1)
+(cl-loop for x below 10
+         if (oddp x)
+           collect x into odds
+           and if (memq x funny-numbers) return (cdr it) end
+         else
+           collect x into evens
+         finally return (vector odds evens))
+        @result{} [(1 3 5 7 9) (0 2 4 6 8)]
+(setq funny-numbers '(6 7 13 -1))
+     @result{} (6 7 13 -1)
+(cl-loop <@r{same thing again}>)
+        @result{} (13 -1)
+@end example
+
+请注意使用 @code{and} 将两个子句放入“then”部分，其中一个子句本身就是一个 @code{if} 子句。  还要注意，@code{end}虽然通常是可选的，但在这里是必要的，以明确@code{else}指的是最外面的@code{if}子句。  在第一种情况下，循环返回 @var{x} 奇数和偶数值列表的向量。  在第二种情况下，奇数 7 是 6 之一，因此循环提前返回；实际返回值基于 @code{memq} 调用的结果。
+
+@item when @var{condition} @var{clause}
+该子句只是@code{if}的同义词。
+
+@item unless @var{condition} @var{clause}
+@code{unless}子句与@code{if}类似，只是条件的含义相反。
+
+@item named @var{name}
+该子句为循环周围的隐式块提供了除 0⁣ 以外的名称。  @var{name} 是用作块名称的符号。
+
+@item initially [do] @var{forms}@dots{}
+该关键字引入一个或多个 Lisp 形式，这些形式将在循环本身开始之前执行（但在 @code{for} 或 @code{with} 请求的任何变量已绑定到其初始值之后）。  @code{initially}子句可以出现在任何地方；如果有多个，则按照它们在循环中出现的顺序执行。  关键字 @code{do} 是可选的。
+
+@item finally [do] @var{forms}@dots{}
+这引入了 Lisp 形式，它将在循环结束后执行（例如，根据 @code{for} 或 @code{while} 的请求）。 @code{initially} 和 @code{finally} 子句可以出现在循环构造中的任何位置，但它们分别在循环的开始或结束时执行（按指定的顺序）。
+
+@item finally return @var{form}
+这表示循环完成后应该执行@var{form}以获得返回值。  （如果没有这个或其他一些子句，如@code{collect}或@code{return}，循环将简单地返回@code{nil}。）当执行@var{form}时，由@code{for}、@code{with}或@code{into}绑定的变量仍将包含其最终值。
+
+@item do @var{forms}@dots{}
+单词“0”后面可以跟任意数量的 Lisp 表达式，这些表达式在循环体中作为隐式“1”执行。  本节中的许多示例都说明了 @code{do} 的用法。
+
+@item return @var{form}
+该子句使循环立即返回。  下面的 Lisp 形式被评估以给出循环形式的返回值。  @code{finally} 子句（如果有）不会执行。当然，@code{return}通常用在@code{if}或@code{unless}内部，因为它在顶级循环子句中的使用意味着循环永远不会多次“循环”。
+
+子句 @samp{return @var{form}} 相当于 @samp{do (cl-return @var{form})}（或者 @code{cl-return-from}，如果循环已命名）。  不过，@code{return}子句的实现效率更高一些。
+@end table
+
+虽然没有高级方法可以将用户扩展添加到 @code{cl-loop}，但此包确实提供了两个名为 @code{cl-loop-handler} 和 @code{cl-loop-for-handler} 的属性，这两个属性分别是当遇到给定符号作为顶级循环子句或 @code{for} 子句时调用的函数。  有关详细信息，请参阅文件@file{cl-macs.el}中的源代码。
+
+该包的 @code{cl-loop} 宏与 Common Lisp 的宏兼容，只是未实现一些功能：@code{loop-finish} 和数据类型说明符。  当然，迭代键盘映射、覆盖、间隔、帧、窗口和缓冲区的 @code{for} 子句是 Emacs 特定的扩展。
+
+@node Multiple Values
+@section 多重价值
+@cindex multiple values
+
+@noindent
+Common Lisp 函数可以返回零个或多个结果。  相比之下，Emacs Lisp 函数总是返回一个结果。  这个包没有尝试模拟 Common Lisp 的多个返回值；返回多个值的 Common Lisp 函数的 Emacs 版本要么仅返回第一个值（如 @code{cl-compiler-macroexpand}），要么返回值列表。这个包@emph{does}为处理多个值的 Common Lisp 函数定义了占位符，但在 Emacs Lisp 中这些函数只是对列表进行操作。例如，@code{cl-values} 形式是 Emacs 中@code{list} 的同义词。
+
+@defmac cl-multiple-value-bind (var@dots{}) values-form forms@dots{}
+此形式计算 @var{values-form}，它必须返回一个值列表。  然后它将 @var{var} 绑定到这些各自的值，就像通过 @code{let} 一样，然后执行主体 @var{forms}。如果 @var{var} 的数量多于值，则额外的 @var{var} 会绑定到 @code{nil}。  如果 @var{var} 少于值，则忽略多余的值。
+@end defmac
+
+@defmac cl-multiple-value-setq (var@dots{}) form
+此形式计算 @var{form}，它必须返回一个值列表。然后它将 @var{var} 设置为这些各自的值，就像 @code{setq} 一样。  额外的 @var{var} 或值的处理方式与 @code{cl-multiple-value-bind} 中相同。
+@end defmac
+
+由于在 Emacs Lisp 中完美的模拟是不可行的，因此该包选择使其尽可能简单和可预测。
+
+@node Macro-Writing Macros
+@section 宏编写宏
+
+@noindent
+该软件包包含两个经典的 Common Lisp 宏编写宏，以帮助使复杂的宏更易于阅读。
+
+@defmac cl-with-gensyms names@dots{} body
+该宏扩展为执行 @var{body} 的代码，其中 @var{names} 中的每个变量都绑定到一个新的未驻留符号，或者用 Common Lisp 的说法是 @dfn{gensym}。  对于需要多个 gensym 的宏，使用 @code{cl-with-gensyms} 可以缩短代码并使意图更清晰。  比较：
+
+@example
+(defmacro my-macro (foo)
+  (let ((bar (gensym "bar"))
+        (baz (gensym "baz"))
+        (quux (gensym "quux")))
+    `(let ((,bar (+ @dots{})))
+       @dots{})))
+
+(defmacro my-macro (foo)
+  (cl-with-gensyms (bar baz quux)
+    `(let ((,bar (+ @dots{})))
+       @dots{})))
+@end example
+@end defmac
+
+@defmac cl-once-only ((variable form)@dots{}) body
+该宏主要是为了帮助宏程序员确保宏用户提供的形式通过其扩展仅计算一次，即使计算形式的结果将出现多次。  较少情况下，此宏用于确保宏程序员提供的表单仅被评估一次。
+
+每个@var{variable}可以用来指代@var{body}中评估@var{form}的结果。  在评估 5⁣ 期间，@code{cl-once-only} 将每个 @var{variable} 绑定到新的未驻留符号。  然后，@code{cl-once-only}将最终的扩展包装在代码中以评估每个@var{form}并将结果绑定到相应的未驻留符号。  因此，当宏编写者将 @var{variable} 的值替换到扩展中时，它们实际上是指评估 @var{form} 的结果，而不是 @var{form} 本身。  另一种表达方式是，每个 11 都绑定到计算 12 的（单一）结果的表达式。
+
+最常见的情况是 @var{variable} 是正在编写的宏的参数之一，因此 @code{(variable variable)} 可以缩写为 @code{variable}。
+
+例如，考虑这个宏：
+
+@example
+(defmacro my-list (x y &rest forms)
+  (let ((x-result (gensym))
+        (y-result (gensym)))
+    `(let ((,x-result ,x)
+           (,y-result ,y))
+       (list ,x-result ,y-result ,x-result ,y-result
+             (progn ,@@forms))))
+@end example
+
+在像 @w{@code{(my-list (pop foo) @dots{})}} 这样的调用中，到 @code{x-result} 的中间绑定可确保 @code{pop} 不会执行两次。  但结果是代码相当复杂：读者必须跟踪 @code{x-result} 实际上如何意味着宏调用的第一个参数，并且需要使用多个 gensym 来避免 @code{(progn ,@@forms)} 捕获变量，这进一步模糊了事情。  @code{cl-once-only} 负责处理这些细节：
+
+@example
+(defmacro my-list (x y &rest forms)
+  (cl-once-only (x y)
+    `(list ,x ,y ,x ,y
+           (progn ,@@forms))))
+@end example
+@end defmac
+
+@node Macros
+@chapter 宏
+
+@noindent
+该包实现了 @code{defmacro} 的各种 Common Lisp 功能，例如解构、@code{&environment} 和 @code{&body}。  由于技术困难，顶级@code{&whole}未针对@code{defmacro}实现。 @xref{Argument Lists}。
+
+用户可以通过以下宏进行解构：
+
+@defmac cl-destructuring-bind arglist expr forms@dots{}
+该宏扩展为执行@var{forms}的代码，@var{arglist}中的变量绑定到@var{expr}返回的值列表。  @var{arglist} 可以包含 @code{cl-defmacro} 参数列表允许的所有功能，包括解构。  （不允许使用 @code{&environment} 关键字。）如果 @var{expr} 返回参数数量错误或关键字参数不正确的列表，则宏扩展将发出错误信号。
+@end defmac
+
+@cindex compiler macros
+@cindex define compiler macros
+该软件包还包括 Common Lisp @code{define-compiler-macro} 工具，它允许您为函数定义编译时扩展和优化。
+
+@defmac cl-define-compiler-macro name arglist forms@dots{}
+这种形式与@code{defmacro}类似，只不过它只在编译时扩展对@var{name}的调用； Lisp 解释器处理的调用不会被扩展，也不会被 @code{macroexpand} 函数扩展。
+
+参数列表可以以 @code{&whole} 关键字和变量开头。  该变量绑定到宏调用形式本身，即绑定到 @samp{(@var{name} @var{args}@dots{})} 形式的列表。如果宏扩展器返回此形式不变，则编译器将其视为普通函数调用。  这使得编译器宏可以作为函数特殊情况的优化器，而无需处理复杂的情况。
+
+例如，以下是作为此包的标准部分出现的定义的简化版本：
+
+@example
+(cl-define-compiler-macro cl-member (&whole form a list &rest keys)
+     (if (and (null keys)
+              (eq (car-safe a) 'quote)
+              (not (floatp (cadr a))))
+         (list 'memq a list)
+       form))
+@end example
+
+@noindent
+在 2⁣ 是非浮点常量的常见情况下，此定义导致 @code{(cl-member @var{a} @var{list})} 更改为对更快的 @code{memq} 的调用；如果 @var{a} 是其他内容，或者调用中有任何关键字参数，则原始 @code{cl-member} 调用保持不变。  （@code{cl-member} 的实际编译器宏优化了许多其他情况，包括常见的 @code{:test} 谓词。）
+@end defmac
+
+@defun cl-compiler-macroexpand form
+该函数类似于 @code{macroexpand}，只不过它扩展的是编译器宏而不是常规宏。  如果它不是对已定义编译器宏的函数的调用，或者该编译器宏决定通过返回其 @code{&whole} 参数来进行平分，则它会返回 @var{form} 不变。  与@code{macroexpand}一样，它会反复膨胀，直到达到无法进一步膨胀的形式。
+@end defun
+
+@xref{Macro Bindings}，用于描述用于创建“本地”宏定义的 @code{cl-macrolet} 和 @code{cl-symbol-macrolet} 形式。
+
+@node Declarations
+@chapter 声明
+
+@noindent
+Common Lisp 包含一个复杂而强大的“声明”机制，允许您向编译器提供有关将存储在特定变量中的数据类型以及这些变量和函数的使用方式的特殊提示。  该包定义了所有 Common Lisp 声明形式的版本：@code{proclaim}、@code{declaim} 和 @code{the}。
+
+大多数 Common Lisp 声明目前在 Emacs Lisp 中不起作用。  例如，字节码系统几乎没有机会从类型信息中受益。
+@ignore
+and @code{special} declarations are redundant in a fully
+dynamically-scoped Lisp.
+@end ignore
+当启用字节编译器优化时，一些声明是有意义的，因为它们是默认的。  否则这些声明将被有效地忽略。
+
+@defun cl-proclaim decl-spec
+该函数记录由@var{decl-spec}指定的“全局”声明。  由于 1⁣ 是一个函数，因此 2⁣ 会被求值，因此通常应该被引用。
+@end defun
+
+@defmac cl-declaim decl-specs@dots{}
+该宏与 @code{cl-proclaim} 相似，不同之处在于它接受任意数量的 @var{decl-spec} 参数，并且这些参数未求值且未加引号。  @code{cl-declaim} 宏还将 @code{(cl-eval-when (compile load eval) @dots{})} 放在声明周围，以便它们在编译时和运行时注册。  （这一点至关重要，因为通常声明会影响编译器处理包含 @code{cl-declaim} 形式的文件其余部分的方式。）
+@end defmac
+
+@defmac cl-the type form
+@code{cl-the} 返回 @code{form} 的值，首先检查（如果优化设置允许）它的类型为 @code{type}。  未来的字节编译器优化也可能利用此信息来提高运行时效率。
+
+例如，@code{mapcar} 可以映射列表和数组。  编译器很难将@code{mapcar}展开为内联循环，除非它提前知道序列是列表还是数组。  使用@code{(mapcar 'car (cl-the vector foo))}，未来的编译器将有足够的信息来内联扩展循环。目前，Emacs Lisp 会将上述代码视为与 @code{(mapcar 'car foo)} 完全相同。
+@end defmac
+
+@code{cl-proclaim} 或 @code{cl-declaim} 中的每个 @var{decl-spec} 都应该是一个以符号开头的列表，该符号表明它是什么类型的声明。  该包目前支持 @code{special}、@code{inline}、@code{notinline}、@code{optimize} 和 @code{warn} 声明。  （@code{warn} 声明是标准 Common Lisp 的扩展。）其他 Common Lisp 声明，例如 @code{type} 和 @code{ftype}，将被默默忽略。
+
+@table @code
+@item special
+@c FIXME ?
+由于 Emacs Lisp 中的所有变量都是“特殊”的（在 Common Lisp 意义上），因此 @code{special} 声明只是建议性的。  它们只是告诉字节编译器，有意引用指定的变量，而没有将其绑定在函数体中。  编译器通常会对此类引用发出警告，因为它们可能是对局部变量的引用的印刷错误。
+
+在顶层上下文中，通常写 @code{(defvar @var{var})} 比写 @code{(cl-declaim (special @var{var}))} 更好，因为 @code{defvar} 使你的意图更清晰。
+
+@item inline
+@code{inline} @var{decl-spec} 列出了一个或多个函数，只要编译器能够安排，其函数体就应该“内联”扩展为调用函数。  例如，函数@code{cl-acons}被这个包声明为@code{inline}，这样在用户函数中调用时，@code{(cl-acons @var{key} @var{value} @var{alist})}的形式就会直接扩展为@code{(cons (cons @var{key} @var{value}) @var{alist})}，从而节省函数调用。
+
+以下声明都是等效的。  请注意，@code{defsubst} 形式是定义函数并同时将其声明为内联的便捷方法。
+
+@example
+(cl-declaim (inline foo bar))
+(cl-eval-when (compile load eval)
+  (cl-proclaim '(inline foo bar)))
+(defsubst foo (@dots{}) @dots{})       ; instead of defun
+@end example
+
+@strong{Please note:} 该声明在包含源文件完成后仍然有效。  使用它来请求内联您定义的函数是正确的，但使用它来请求内联外部函数是不礼貌的。
+
+@item notinline
+@code{notinline} 声明列出了毕竟不应该内联的函数；它取消了之前的 @code{inline} 声明。
+
+@item optimize
+该声明控制编译器执行的优化程度。
+
+单词 @code{optimize} 后跟任意数量的列表，例如 @code{(speed 3)} 或 @code{(safety 2)}。  Common Lisp 定义了几种优化“品质”；该包忽略除 3⁣ 和 @code{safety} 之外的所有内容。  质量的值应该是 0 到 3 之间的整数，0 表示“不重要”，3 表示“非常重要”。两种质量的默认级别均为 1。
+
+在此包中，@code{speed}质量与@code{byte-optimize}标志相关联，对于@code{(speed 0)}，该标志设置为@code{nil}，对于更高的设置，设置为@code{t}； @code{safety} 质量与 @code{byte-compile-delete-errors} 标志相关联，对于 @code{(safety 3)} 设置为 @code{nil}，对于所有较低设置设置为 @code{t}。  （后一个标志控制是否允许编译器优化其唯一副作用可能是发出错误信号的代码，例如，当不知道 @code{foo} 是否会在运行时绑定时，将 @code{(progn foo bar)} 重写为 @code{bar} 。）
+
+请注意，即使使用 @code{(safety 0)} 进行编译，Emacs 字节码系统也会提供足够的检查以防止造成真正的损害。  例如，除非 Emacs 本身存在严重错误，否则 Emacs 不会仅仅因为完全优化的 Lisp 程序中的错误而因分段错误而崩溃。
+
+@code{optimize} 声明通常用在文件的顶级 @code{cl-proclaim} 或 @code{cl-declaim} 中。
+
+@item warn
+该声明控制字节编译器生成何种类型的警告。  单词@code{warn}后面跟着任意数量的“警告质量”，其形式与优化质量类似。  目前支持的警告类型有@code{redefine}、@code{callargs}、@code{unresolved}、@code{free-vars}；在当前系统中，值 0 将禁用这些警告，任何更高的值将启用它们。有关更多详细信息，请参阅变量 @code{byte-compile-warnings} 的文档。
+@end table
+
+@node Symbols
+@chapter 符号
+
+@noindent
+该包定义了 Emacs Lisp 中缺少的几个与符号相关的功能。
+
+@menu
+* Property Lists::        @code{cl-get}, @code{cl-remprop}, @code{cl-getf}, @code{cl-remf}.
+* Creating Symbols::      @code{cl-gentemp}.
+@end menu
+
+@node Property Lists
+@section 房产清单
+
+@noindent
+这些函数增强了标准 Emacs Lisp 函数 @code{get} 和 @code{put}，用于操作附加到符号的属性。还有一些函数可以将属性列表用作不附加到特定符号的一流数据结构。
+
+@defun cl-get symbol property &optional default
+此函数与 @code{get} 类似，不同之处在于，如果未找到该属性，则 @var{default} 参数提供返回值。 （Emacs Lisp @code{get} 函数始终使用 @code{nil} 作为默认值；此包的 @code{cl-get} 相当于 Common Lisp 的 @code{get}。）
+
+@code{cl-get} 函数是 @code{setf} 可用的；当以这种方式使用时，允许但忽略 @var{default} 参数。
+@end defun
+
+@defun cl-remprop symbol property
+此函数从 @var{symbol} 的属性列表中删除 @var{property} 的条目。  如果确实找到并删除了该属性，则返回 true 值；如果不存在此类属性，则返回 @code{nil}。 （这个函数最初可能在 Emacs 中被省略，因为由于 @code{get} 不允许 @var{default}，所以很难区分缺失的属性和值为 @code{nil} 的属性；因此，对于大多数用途来说，将属性设置为 @code{nil} 与 @code{cl-remprop} 足够接近。）
+@end defun
+
+@defun cl-getf place property &optional default
+该函数扫描列表 @var{place} ，就好像它是一个属性列表，即交替属性名称和值的列表。  如果找到@var{place}的偶数元素，即@code{eq}到@var{property}，则返回后面的奇数元素。否则，返回@var{default}（如果没有给出默认值，则返回@code{nil}）。
+
+尤其，
+
+@example
+(get sym prop)  @equiv{}  (cl-getf (symbol-plist sym) prop)
+@end example
+
+使用 @code{cl-getf} 作为 @code{setf} 位置是有效的，在这种情况下，其 @var{place} 参数本身必须是有效的 @code{setf} 位置。在此上下文中，@var{default} 参数（如果有）将被忽略。效果是更改（通过@code{setcar}）列表中对应于@var{property}的值单元格，或者如果属性尚不存在，则将新的属性-值对添加到列表中。
+
+@example
+(put sym prop val) @equiv{} (setf (cl-getf (symbol-plist sym) prop) val)
+@end example
+
+@code{get} 和 @code{cl-get} 函数也是 @code{setf} 可用的。忽略 @code{default} 的事实有时很有用：
+
+@example
+(incf (cl-get 'foo 'usage-count 0))
+@end example
+
+这里，符号 @code{foo} 的 @code{usage-count} 属性如果存在则递增，否则设置为 1（递增的 0）。
+
+当不用作 @code{setf} 形式时，@code{cl-getf} 只是一个常规函数，其 @var{place} 参数实际上可以是任何 Lisp 表达式。
+@end defun
+
+@defmac cl-remf place property
+该宏从存储在 @var{place} 的属性列表中删除 @var{property} 的属性值对，@var{place} 是任何支持 @code{setf} 的位置表达式。  如果找到该属性，则返回 true。  请注意，如果 @var{property} 恰好出现在列表中的第一个，这将有效地执行 @code{(setf @var{place} (cddr @var{place}))}，而如果它出现在后面，则仅使用 @code{setcdr} 来拼接属性和值单元格。
+@end defmac
+
+@node Creating Symbols
+@section 创建符号
+@cindex gensym
+
+@defun cl-gentemp &optional x
+此函数类似于内置的 @code{gensym}，只不过它生成一个新的 @emph{interned} 符号。  如果生成的符号已经存在，该函数将不断增加计数器并重试，直到生成新符号。
+@end defun
+
+该包自动创建 @code{&key} 参数说明符调用的所有关键字，并且不鼓励使用关键字作为与关键字参数无关的数据，因此不提供相关函数 @code{defkeyword} （用于创建自引用关键字符号）。
+
+@node Numbers
+@chapter 数字
+
+@noindent
+本节定义了一些简单的 Common Lisp 对 Emacs Lisp 中未包含的数字的操作。
+
+@menu
+* Predicates on Numbers::        @code{cl-digit-char-p}等
+* Numerical Functions::          @code{cl-floor}、@code{cl-ceiling} 等
+* Random Numbers::               @code{cl-random}, @code{cl-make-random-state}.
+* Implementation Parameters::    @code{cl-most-positive-float}等
+@end menu
+
+@node Predicates on Numbers
+@section 数字谓词
+
+@noindent
+如果数字参数的指定条件为真，这些函数将返回 @code{t}，否则返回 @code{nil}。
+
+@defun cl-digit-char-p char radix
+测试 @var{char} 是否为指定 @var{radix} 中的数字（默认为 10）。  如果是，则返回@var{radix}中数字@var{char}的数值。
+@end defun
+
+@node Numerical Functions
+@section 数值函数
+
+@noindent
+这些函数对数字执行各种算术运算。
+
+@defun cl-gcd &rest integers
+此函数返回参数的最大公约数。对于一个参数，它返回该参数的绝对值。对于零参数，它返回零。
+@end defun
+
+@defun cl-lcm &rest integers
+此函数返回参数的最小公倍数。对于一个参数，它返回该参数的绝对值。对于零参数，它返回一。
+@end defun
+
+@defun cl-isqrt integer
+该函数计算其整数参数的“整数平方根”，即小于或等于参数真实平方根的最大整数。
+@end defun
+
+@defun cl-floor number &optional divisor
+对于一个参数，@code{cl-floor}返回两个数字的列表：参数向下舍入（朝负无穷大）为整数，而“余数”必须加回第一个返回值才能再次产生参数。  如果参数是整数@var{x}，则结果始终是列表@code{(@var{x} 0)}。如果参数是浮点数，则第一个结果是 Lisp 整数，第二个结果是 0（含）和 1（不包括）之间的 Lisp 浮点数。
+
+使用两个参数，@code{cl-floor} 将 @var{number} 除以 @var{divisor}，并以两个数字的列表形式返回商的下限和相应的余数。  如果@code{(cl-floor @var{x} @var{y})}返回@code{(@var{q} @var{r})}，则@code{@var{q}*@var{y} + @var{r} = @var{x}}，其中@var{r}介于0（包含）和@var{r}（不包含）之间。  另请注意，@code{(cl-floor @var{x})} 与@code{(cl-floor @var{x} 1)} 完全相同。
+
+该函数与 Common Lisp 的 @code{floor} 函数完全兼容，只是它以列表形式返回两个结果，因为 Emacs Lisp 不支持多值函数。
+@end defun
+
+@defun cl-ceiling number &optional divisor
+该函数实现了 Common Lisp @code{ceiling} 函数，该函数与 @code{floor} 类似，只不过它将参数或参数的商向上舍入到正无穷大。余数将在 0 和负 @var{r} 之间。
+@end defun
+
+@defun cl-truncate number &optional divisor
+该函数实现了 Common Lisp @code{truncate} 函数，该函数与 @code{floor} 类似，只不过它将参数或参数的商舍入为零。  因此，如果参数或商为正，则它相当于 @code{cl-floor}，否则相当于 @code{cl-ceiling}。  余数与 @var{number} 具有相同的符号。
+@end defun
+
+@defun cl-round number &optional divisor
+该函数实现了 Common Lisp @code{round} 函数，该函数与 @code{floor} 类似，只不过它将参数或参数的商舍入为最接近的整数。在平局的情况下（自变量或商正好是两个整数的中间），它四舍五入到偶数。
+@end defun
+
+@defun cl-mod number divisor
+该函数返回与@code{cl-floor}的第二个返回值相同的值。
+@end defun
+
+@defun cl-rem number divisor
+该函数返回与@code{cl-truncate}的第二个返回值相同的值。
+@end defun
+
+@defun cl-parse-integer string &key start end radix junk-allowed
+该函数实现了 Common Lisp @code{parse-integer} 函数。  它从 @var{start} 和 @var{end} 之间的 @var{string} 子字符串解析指定 @var{radix} 中的整数。  任何前导和尾随空白字符都将被忽略。  如果 @var{start} 和 @var{end} 之间的子字符串无法解析为整数，则该函数会发出错误信号，除非 @var{junk-allowed} 是非 @code{nil}。
+@end defun
+
+@node Random Numbers
+@section 随机数
+
+@noindent
+该包还提供了 Common Lisp 随机数生成器的实现。  它使用自己的加法同余算法，该算法更有可能给出统计上干净的结果
+@c FIXME?  Still true?
+比许多操作系统提供的简单生成器的随机数。
+
+@defun cl-random number &optional state
+该函数返回一个小于 0⁣ 且类型相同（整数或浮点数）的随机非负数。 @var{state} 参数应该是一个 @code{random-state} 对象，用于保存随机数生成器的状态。  作为副作用，该函数会修改此状态对象。  如果省略@var{state}，则默认为内部变量@code{cl--random-state}，其中包含预初始化的默认@code{random-state}对象。  （由于 Emacs 进程中的任意数量的程序都可能以交错方式访问@code{cl--random-state}，因此由此生成的序列对于所有意图和目的都将是不可重现的。）
+@end defun
+
+@defun cl-make-random-state &optional state
+该函数创建或复制一个 @code{random-state} 对象。如果省略@var{state}或@code{nil}，则返回@code{cl--random-state}的新副本。  这是一个副本，因为未来对 @code{(cl-random @var{n})} 和 @code{(cl-random @var{n} @var{s})} 的调用序列（其中 @var{s} 是新的随机状态对象）将返回相同的随机数序列。
+
+如果 @var{state} 是 @code{random-state} 对象，则此函数返回该对象的副本。  如果 @var{state} 是 @code{t}，则此函数返回从日期和时间播种的新 @code{random-state} 对象。  作为 Common Lisp 的扩展，@var{state} 也可以是一个整数，在这种情况下，新对象是从该整数作为种子的；每个不同的整数种子将产生完全不同的随机数序列。
+
+将 @code{random-state} 对象打印到缓冲区或文件，然后使用 @code{read} 将其读回是有效的。  如果程序希望使用稍后可以重现以进行调试的伪随机数序列，则可以调用 @code{(cl-make-random-state t)} 来获取新序列，然后将该序列打印到文件中。  当程序稍后重新运行时，它可以从文件中读取原始运行的随机状态。
+@end defun
+
+@defun cl-random-state-p object
+如果 1⁣ 是 @code{random-state} 对象，则该谓词返回 @code{t}，否则返回 @code{nil}。
+@end defun
+
+@node Implementation Parameters
+@section 实施参数
+
+@noindent
+该包定义了几个与浮点数有关的有用常量。
+
+它通过以各种方式执行计算机的浮点运算来确定它们的值。  由于此操作可能很慢，因此初始化它们的代码保存在一个单独的函数中，必须在使用参数之前调用该函数。
+
+@defun cl-float-limits
+该函数确保 Common Lisp 浮点参数（如 @code{cl-most-positive-float}）已被初始化。  在调用之前，这些参数具有未指定的值。如果参数已经初始化，函数立即返回。
+@end defun
+
+由于真正的 Common Lisp 支持最多四种不同类型的浮点数，因此它具有常量族，如 @code{most-positive-single-float}、@code{most-positive-double-float}、@code{most-positive-long-float} 等。  该包仅使用一组常量，因为 Emacs 只有一种浮点数，即 IEEE binary64 浮点格式。 @xref{Float Basics,,,elisp,GNU Emacs Lisp Reference Manual}。
+
+@defvar cl-most-positive-float
+这个常数等于 Lisp float 可以容纳的最大有限值。对于 IEEE 二进制 64 格式，这等于 @code{(- (expt 2 1024) (expt 2 971))}，等于 @code{1.7976931348623157e+308}。
+@end defvar
+
+@defvar cl-most-negative-float
+这个常数等于 Lisp 浮点数可以容纳的最大负有限值。对于 IEEE binary64 格式，这等于@code{(- cl-most-positive-float)}。
+@end defvar
+
+@defvar cl-least-positive-normalized-float
+这个常数等于最小的正 Lisp 浮点，即 @dfn{normalized}，即具有全精度。对于 IEEE binary64 格式，这等于 @code{(expt 2 -1022)}，等于 @code{2.2250738585072014e-308}。
+@end defvar
+
+@defvar cl-least-positive-float
+该常量等于大于零的最小 Lisp 浮点值。对于 IEEE binary64 格式，如果支持次正规数，则等于 @code{5e-324}（等于 @code{(expt 2 -1074)}），否则等于 @code{cl-least-positive-normalized-float}。
+@end defvar
+
+@defvar cl-least-negative-float
+该常数是 @code{cl-least-positive-float} 的负值。
+@end defvar
+
+@defvar cl-least-negative-normalized-float
+该常数是 @code{cl-least-positive-normalized-float} 的负值。
+@end defvar
+
+@defvar cl-float-epsilon
+这个常数是最小的正 Lisp 浮点数，可以与 1.0 相加以产生不同的值。  由于四舍五入，在 1.0 上添加一个较小的数字将再次产生 1.0。  对于 IEEE 二进制 64 格式，这等于 @code{(expt 2 -52)}，等于 @code{2.220446049250313e-16}。
+@end defvar
+
+@defvar cl-float-negative-epsilon
+这是可以从 1.0 中减去以产生不同值的最小正值。  对于 IEEE 二进制 64 格式，这等于 @code{(expt 2 -53)}，等于 @code{1.1102230246251565e-16}。
+@end defvar
+
+@node Sequences
+@chapter 序列
+
+@noindent
+Common Lisp 定义了许多对 @dfn{sequences} 进行操作的函数，这些函数可以是列表、字符串或向量。 Emacs Lisp 包含其中一些，特别是 1⁣ 和 2⁣；这个包定义了其余的大部分内容。
+
+@menu
+* Sequence Basics::           所有序列函数共享的参数。
+* Mapping over Sequences::    @code{cl-mapcar}、@code{cl-map}、@code{cl-maplist} 等
+* Sequence Functions::        @code{cl-subseq}、@code{cl-remove}、@code{cl-substitute} 等
+* Searching Sequences::       @code{cl-find}、@code{cl-count}、@code{cl-search} 等
+* Sorting Sequences::         @code{cl-sort}, @code{cl-stable-sort}, @code{cl-merge}.
+@end menu
+
+@node Sequence Basics
+@section 序列基础知识
+
+@noindent
+许多序列函数都采用关键字参数； @pxref{Argument Lists}。  所有关键字参数都是可选的，如果指定，则可以按任何顺序出现。
+
+@code{:key} 参数应该传递给 @code{nil} 或一个参数的函数。  这个关键函数用作过滤器，通过它可以看到序列的元素；例如，@code{(cl-find x y :key 'car)}类似于@code{(cl-assoc x y)}。它搜索列表中 @sc{car} 等于 @code{x} 的元素，而不是搜索等于 @code{x} 本身的元素。如果省略@code{:key}或@code{nil}，则滤波器实际上是恒等函数。
+
+@code{:test} 和 @code{:test-not} 参数应该是 @code{nil} 或两个参数的函数。  测试函数用于比较两个序列元素，或者将搜索值与序列元素进行比较。  （这两个值按照与派生它们的原始序列函数参数相同的顺序传递给测试函数，或者，如果它们都来自同一序列，则按照它们在该序列中出现的顺序相同。） @code{:test} 参数指定一个必须返回 true（非 @code{nil}）以指示匹配的函数；相反，您可以使用 @code{:test-not} 给出一个返回 @emph{false} 来指示匹配的函数。  默认测试函数是@code{eql}。
+
+许多采用 @var{item} 和 @code{:test} 或 @code{:test-not} 参数的函数也有 @code{-if} 和 @code{-if-not} 变体，其中传递 @var{predicate} 函数而不是 @var{item}，并且如果谓词在其上返回 true（或在 @code{-if-not} 的情况下返回 false），则序列元素匹配。  例如：
+
+@example
+(cl-remove 0 seq :test '=)  @equiv{}  (cl-remove-if 'zerop seq)
+@end example
+
+@noindent
+从序列 @code{seq} 中删除所有零。
+
+某些操作可以作用于参数序列的子序列；这些函数采用 @code{:start} 和 @code{:end} 参数，分别默认为零和序列的长度。只有 @var{start}（包含）和 @var{end}（不包含）之间的元素才会受到该操作的影响。  @var{end} 参数可以传递给 @code{nil} 来表示序列的长度；否则，@var{start}和@var{end}都必须是整数，其中@code{0 <= @var{start} <= @var{end} <= (length @var{seq})}。如果函数采用两个序列参数，则第一个参数的限制由关键字 @code{:start1} 和 @code{:end1} 定义，第二个参数的限制由关键字 @code{:start2} 和 @code{:end2} 定义。
+
+一些函数接受 @code{:from-end} 参数（如果非 @code{nil}），则导致操作从右到左遍历序列，而不是从左到右；以及 @code{:count} 参数，指定要删除或以其他方式处理的元素的最大整数数量。
+
+序列函数不保证对各个元素调用 @code{:test}、@code{:test-not} 和 @code{:key} 函数的顺序。  因此，依赖这些函数的副作用是一个坏主意。  例如，@code{:from-end}可能会导致序列实际上被反向扫描，或者可能会向前扫描，但计算结果“就像”向后扫描一样。  （某些函数，如 @code{cl-mapcar} 和 @code{cl-every}、@emph{do} 准确指定了函数调用的顺序，因此在这些情况下副作用是完全可以接受的。）
+
+字符串可能包含“文本属性”以及字符数据。  除非另有说明，否则序列函数是否保留文本属性是未定义的。  例如，@code{(cl-remove ?A @var{str})} 可能会也可能不会保留从 @var{str} 复制到结果中的字符的属性。
+
+@node Mapping over Sequences
+@section 序列映射
+
+@noindent
+这些函数“映射”您在列表或数组的元素上指定的函数。  它们都是内置函数@code{mapcar}主题的变体。
+
+@defun cl-mapcar function seq &rest more-seqs
+该函数在其参数序列中的连续并行元素集上调用@var{function}。  给定一个 @var{seq} 参数，它相当于 @code{mapcar}；给定 @var{n} 序列，它使用每个序列的第一个元素作为 @var{n} 参数调用函数，以生成结果列表的第一个元素，然后使用第二个元素，依此类推。  一旦最短序列用完，映射就会停止。  参数序列可以是列表、字符串和向量的任意混合；返回序列始终是一个列表。
+
+Common Lisp 的 @code{mapcar} 接受多个参数，但仅适用于列表； Emacs Lisp 的 @code{mapcar} 接受单个序列参数。  该包的 @code{cl-mapcar} 作为两者的兼容超集。
+@end defun
+
+@defun cl-map result-type function seq &rest more-seqs
+该函数将 @var{function} 映射到参数序列上，就像 @code{cl-mapcar} 一样，但它返回类型为 @var{result-type} 的序列而不是列表。  @var{result-type} 必须是以下符号之一：@code{vector}、@code{string}、@code{list}（在这种情况下，效果与@code{cl-mapcar}相同）或@code{nil}（在这种情况下，结果将被丢弃，@code{cl-map} 返回@code{nil}）。
+@end defun
+
+@defun cl-maplist function list &rest more-lists
+该函数在其每个参数列表上调用 @var{function}，然后在这些列表的 @sc{cdr} 上调用，依此类推，直到最短列表用完。  结果以列表的形式返回。  因此，@code{cl-maplist}类似于@code{cl-mapcar}，只不过它传入的是列表指针本身而不是前进指针的@sc{car}。
+@end defun
+
+@defun cl-mapc function seq &rest more-seqs
+该函数与 @code{cl-mapcar} 类似，只不过 @var{function} 返回的值被忽略并丢弃，而不是收集到列表中。  @code{cl-mapc}的返回值是@var{seq}，即第一个序列。  这个函数比 Emacs 原语@code{mapc}更通用。  （请注意，即使在 @file{cl.el} 中，该函数也被称为 @code{cl-mapc}，而不是您可能期望的 @code{mapc*}。）
+@c https://debbugs.gnu.org/6575
+@end defun
+
+@defun cl-mapl function list &rest more-lists
+该函数类似于@code{cl-maplist}，只不过它丢弃了@var{function}返回的值。
+@end defun
+
+@defun cl-mapcan function seq &rest more-seqs
+该函数类似于 0⁣，只不过它使用 1⁣ 连接返回值（必须是列表），而不是简单地将它们收集到列表中。
+@end defun
+
+@defun cl-mapcon function list &rest more-lists
+该函数与 @code{cl-maplist} 类似，只不过它使用 @code{nconc} 连接返回值。
+@end defun
+
+@defun cl-some predicate seq &rest more-seqs
+该函数依次对@var{seq}的每个元素调用@var{predicate}；如果 2⁣ 返回非 3⁣ 值，则 4⁣ 返回该值，否则返回 5⁣。给定几个序列参数，它会并行地遍历序列，直到用完最短的序列，就像@code{cl-mapcar}中一样。  您可以依赖从左到右访问元素的顺序，并且一旦@var{predicate}返回非@code{nil}，映射就会立即停止。
+@end defun
+
+@defun cl-every predicate seq &rest more-seqs
+该函数依次对序列的每个元素调用@var{predicate}；一旦@var{predicate}为任何元素返回@code{nil}，它就返回@code{nil}，或者如果谓词对于所有元素都为真，则返回@code{t}。
+@end defun
+
+@defun cl-notany predicate seq &rest more-seqs
+该函数依次对序列的每个元素调用@var{predicate}；一旦@var{predicate}为任何元素返回非@code{nil}值，它就返回@code{nil}，或者如果谓词对于所有元素为@code{nil}，则返回@code{t}。
+@end defun
+
+@defun cl-notevery predicate seq &rest more-seqs
+该函数依次对序列的每个元素调用@var{predicate}；一旦 @var{predicate} 对于任何元素返回 @code{nil} ，或者如果谓词对于所有元素都为真，则返回 @code{nil} ，它就会返回非 @code{nil} 值。
+@end defun
+
+@defun cl-reduce function seq @t{&key :from-end :start :end :initial-value :key}
+该函数返回对 @var{seq} 的第一个和第二个元素调用 @var{function} 的结果，然后使用该结果和 @var{seq} 的第三个元素调用 @var{function}，然后使用该结果和 @var{seq} 的第四个元素，依此类推。
+
+这是一个例子。  假设@var{function}是@code{*}并且@var{seq}是列表@code{(2 3 4 5)}。  列表的前两个元素与@code{(* 2 3) = 6}组合；它与下一个元素@code{(* 6 4) = 24}组合，并与最后一个元素@code{(* 24 5) = 120}组合。  请注意，@code{*}函数恰好是自归约的，因此@code{(* 2 3 4 5)}与显式调用@code{cl-reduce}具有相同的效果。
+
+如果 @code{:from-end} 为真，则归约是右关联而不是左关联：
+
+@example
+(cl-reduce '- '(1 2 3 4))
+        @equiv{} (- (- (- 1 2) 3) 4) @result{} -8
+(cl-reduce '- '(1 2 3 4) :from-end t)
+        @equiv{} (- 1 (- 2 (- 3 4))) @result{} -2
+@end example
+
+如果指定了@code{:key}，则它是一个只有一个参数的函数，依次在每个序列元素上调用该函数。
+
+如果指定了@code{:initial-value}，它将有效地添加到序列的前面（或者在@code{:from-end}的情况下添加到后面）。 @code{:key} 函数将 @emph{not} 应用于初始值。
+
+如果序列（包括初始值）只有一个元素，则返回该元素而无需调用 @var{function}。如果序列为空（并且没有初始值），则不带参数调用 @var{function} 来获取返回值。
+@end defun
+
+所有这些映射操作都可以用 @code{cl-loop} 宏方便地表达。  在编译代码中，@code{cl-loop} 会更快，因为它将循环生成为内联代码，没有函数调用。
+
+@node Sequence Functions
+@section 序列函数
+
+@noindent
+本节描述了许多用于操作序列的 Common Lisp 函数。
+
+@defun cl-subseq sequence start &optional end
+该函数返回参数@var{sequence}的给定子序列，它可以是列表、字符串或向量。索引 @var{start} 和 @var{end} 必须在范围内，并且 @var{start} 必须不大于 @var{end}。  如果省略@var{end}，则默认为序列的长度。  返回值始终是一个副本；它不与@var{sequence}共享结构。
+
+作为 Common Lisp 的扩展，@var{start} 和/或 @var{end} 可以为负，在这种情况下，它们表示距序列末尾的距离。  这是为了与 Emacs 的 @code{substring} 函数兼容。  请注意，@code{cl-subseq} 是@emph{only} 序列函数，允许负的@var{start} 和@var{end}。
+
+您可以在 @code{cl-subseq} 形式上使用 @code{setf} 将指定范围的元素替换为另一个序列中的元素。替换就像通过 2⁣ 完成的，如下所述。
+@end defun
+
+@defun cl-concatenate result-type &rest seqs
+该函数将参数序列连接在一起，形成 @var{result-type} 类型的结果序列，即符号 @code{vector}、@code{string} 或 @code{list} 之一。  参数始终会被复制，即使在 @code{(cl-concatenate 'list '(1 2 3))} 等结果与参数相同的情况下也是如此。
+@end defun
+
+@defun cl-fill seq item @t{&key :start :end}
+该函数用值 @var{item} 填充序列的元素（或序列的指定部分）。
+@end defun
+
+@defun cl-replace seq1 seq2 @t{&key :start1 :end1 :start2 :end2}
+该函数将 @var{seq2} 的一部分复制到 @var{seq1} 的一部分。序列@var{seq1}未被拉伸或调整大小；复制的数据量只是源序列和目标（子）序列中较短的一个。  该函数返回@var{seq1}。
+
+如果 @var{seq1} 和 @var{seq2} 是 @code{eq}，则即使开始和结束参数指示的区域重叠，替换也将正确工作。  但是，如果 @var{seq1} 和 @var{seq2} 是共享存储但不是 @code{eq} 的列表，并且开始和结束参数指定重叠区域，则效果未定义。
+@end defun
+
+@defun cl-remove item seq @t{&key :test :test-not :key :count :start :end :from-end}
+这将返回 @var{seq} 的副本，其中删除了所有与 @var{item} 匹配的元素。  在某些情况下，结果可能与@code{eq}到@var{seq}共享存储，但原始的@var{seq}不会被修改。  @code{:test}、@code{:test-not} 和 @code{:key} 参数定义所使用的匹配测试；默认情况下，元素@code{eql}到@var{item}被删除。  @code{:count} 参数指定可以删除的匹配元素的最大数量（仅删除最左边的 @var{count} 匹配项）。  @code{:start} 和 @code{:end} 参数指定 @var{seq} 中将删除元素的区域；该区域之外的元素不会被匹配或删除。  @code{:from-end} 参数如果为 true，则表示应从序列末尾而不是开头删除元素（仅当还指定 @var{count} 时才重要）。
+@end defun
+
+@defun cl-delete item seq @t{&key :test :test-not :key :count :start :end :from-end}
+这将删除 @var{seq} 中与 @var{item} 匹配的所有元素。这是一种破坏性操作。  由于 Emacs Lisp 不支持可拉伸字符串或向量，因此这与这些序列类型的 @code{cl-remove} 相同。  在列表上，如果需要保留原始列表，@code{cl-remove} 将复制列表，而 @code{cl-delete} 将拼接部分参数列表。比较 @code{append} 和 @code{nconc}，它们是 Emacs Lisp 中类似的非破坏性和破坏性列表操作。
+@end defun
+
+@findex cl-remove-if
+@findex cl-remove-if-not
+@findex cl-delete-if
+@findex cl-delete-if-not
+面向谓词的函数 @code{cl-remove-if}、@code{cl-remove-if-not}、@code{cl-delete-if} 和 @code{cl-delete-if-not} 的定义类似。
+
+@defun cl-remove-duplicates seq @t{&key :test :test-not :key :start :end :from-end}
+该函数返回 @var{seq} 的副本，其中删除了重复元素。  具体来说，如果序列中的两个元素根据 @code{:test}、@code{:test-not} 和 @code{:key} 参数匹配，则仅保留最右边的元素。  如果@code{:from-end}为真，则保留最左边的一个。  如果指定了@code{:start}或@code{:end}，则仅检查或删除该子序列中的元素。
+@end defun
+
+@defun cl-delete-duplicates seq @t{&key :test :test-not :key :start :end :from-end}
+该函数从 @var{seq} 中删除重复元素。  它是 @code{cl-remove-duplicates} 的破坏性版本。
+@end defun
+
+@defun cl-substitute new old seq @t{&key :test :test-not :key :count :start :end :from-end}
+该函数返回 @var{seq} 的副本，其中所有与 @var{old} 匹配的元素都替换为 @var{new}。  @code{:count}、@code{:start}、@code{:end} 和 @code{:from-end} 参数可用于限制替换的数量。
+@end defun
+
+@defun cl-nsubstitute new old seq @t{&key :test :test-not :key :count :start :end :from-end}
+这是@code{cl-substitute}的破坏性版本；它使用 @code{setcar} 或 @code{aset} 执行替换，而不是返回序列的更改副本。
+@end defun
+
+@findex cl-substitute-if
+@findex cl-substitute-if-not
+@findex cl-nsubstitute-if
+@findex cl-nsubstitute-if-not
+函数 @code{cl-substitute-if}、@code{cl-substitute-if-not}、@code{cl-nsubstitute-if} 和 @code{cl-nsubstitute-if-not} 的定义类似。  对于这些，给出 @var{predicate} 来代替 @var{old} 参数。
+
+@node Searching Sequences
+@section 搜索序列
+
+@noindent
+这些函数搜索序列中的元素或子序列。 （另见@code{cl-member}和@code{cl-assoc}；@pxref{Lists}。）
+
+@defun cl-find item seq @t{&key :test :test-not :key :start :end :from-end}
+该函数在 @var{seq} 中搜索与 @var{item} 匹配的元素。如果找到匹配项，则返回匹配的元素。  否则，它返回@code{nil}。  它返回最左边的匹配，除非 @code{:from-end} 为 true，在这种情况下它返回最右边的匹配。  @code{:start} 和 @code{:end} 参数可用于限制搜索元素的范围。
+@end defun
+
+@defun cl-position item seq @t{&key :test :test-not :key :start :end :from-end}
+该函数类似于 @code{cl-find}，只不过它返回匹配项序列中的整数位置，而不是项本​​身。  该位置相对于整个序列的开头，即使 @code{:start} 不为零。  如果没有找到匹配的元素，该函数返回@code{nil}。
+@end defun
+
+@defun cl-count item seq @t{&key :test :test-not :key :start :end}
+该函数返回 @var{seq} 与 @var{item} 匹配的元素数量。  结果始终是非负整数。
+@end defun
+
+@findex cl-find-if
+@findex cl-find-if-not
+@findex cl-position-if
+@findex cl-position-if-not
+@findex cl-count-if
+@findex cl-count-if-not
+@code{cl-find-if}、@code{cl-find-if-not}、@code{cl-position-if}、@code{cl-position-if-not}、@code{cl-count-if} 和 @code{cl-count-if-not} 函数的定义类似。
+
+@defun cl-mismatch seq1 seq2 @t{&key :test :test-not :key :start1 :end1 :start2 :end2 :from-end}
+该函数比较@var{seq1}和@var{seq2}的指定部分。  如果它们的长度相同并且相应的元素匹配（根据@code{:test}、@code{:test-not}和@code{:key}），则函数返回@code{nil}。  如果存在不匹配，该函数将返回第一个不匹配元素的索引（相对于@var{seq1}）。  这将是最左边的一对不匹配的元素，或者是两个否则匹配的序列中较短的一个耗尽的位置。
+
+如果@code{:from-end}为真，则从@code{(1- @var{end1})}和@code{(1- @var{end2})}开始从右到左比较元素。如果序列不同，则返回一加上最右边差异的索引（相对于@var{seq1}）。
+
+一个有趣的例子是 @code{(cl-mismatch str1 str2 :key 'upcase)}，它不区分大小写地比较两个字符串。
+@end defun
+
+@defun cl-search seq1 seq2 @t{&key :test :test-not :key :from-end :start1 :end1 :start2 :end2}
+该函数在@var{seq2}中搜索与@var{seq1}（或由@code{:start1}和@code{:end1}指定的部分）匹配的子序列。  仅考虑完全落在 @code{:start2} 和 @code{:end2} 定义的区域内的匹配。返回值是最左侧匹配项的最左侧元素的索引，相对于 @var{seq2} 的开头，如果未找到匹配项，则为 @code{nil} 的开头。  如果 @code{:from-end} 为 true，该函数会查找 @emph{rightmost} 匹配子序列。
+@end defun
+
+@node Sorting Sequences
+@section 排序顺序
+
+@defun cl-sort seq predicate @t{&key :key}
+该函数将 @var{seq} 排序为递增顺序，通过使用 @var{predicate} 比较元素对来确定。  当且仅当其第一个参数小于（不等于）其第二个参数时，@var{predicate} 应返回 true（非 @code{nil}）。  例如，@code{<}和@code{string-lessp}分别是适合对数字和字符串进行排序的谓词函数； @code{>} 会将数字按降序而不是升序排序。
+
+该函数与 Emacs 内置的 @code{sort} 不同，它可以操作任何类型的序列，而不仅仅是列表。  此外，它还接受 @code{:key} 参数，该参数用于预处理输入到 @var{predicate} 函数的数据。  例如，
+
+@example
+(setq data (cl-sort data 'string-lessp :key 'downcase))
+@end example
+
+@noindent
+将 @var{data}（字符串序列）按字母顺序递增排序，不考虑大小写。  @code{car} 的 @code{:key} 函数对于对关联列表进行排序很有用。  但它应该只是一个简单的访问器，因为它在当前的实现中被大量使用。
+
+@code{cl-sort} 函数具有破坏性；它通过以适当的方式实际重新排列 @sc{cdr} 指针来对列表进行排序。
+@end defun
+
+@defun cl-stable-sort seq predicate @t{&key :key}
+该函数对 @var{seq} @dfn{stably} 进行排序，这意味着在 @var{predicate} 方面相等的两个元素保证不会因排序而重新排列其原始顺序。
+
+实际上，@code{cl-sort} 和 @code{cl-stable-sort} 在 Emacs Lisp 中是等效的，因为底层的 @code{sort} 函数默认是稳定的。  但是，此包保留将来对 @code{cl-sort} 使用不稳定方法的权利。
+@end defun
+
+@defun cl-merge type seq1 seq2 predicate @t{&key :key}
+该函数通过交错元素来合并两个序列 @var{seq1} 和 @var{seq2}。  结果序列的类型为@var{type}（在@code{cl-concatenate}的意义上），其长度等于两个输入序列的长度之和。  序列可能会被破坏性地修改。  @var{seq1} 和 @var{seq2} 中的元素顺序在交织中得以保留；两个序列的元素通过@var{predicate}（在@code{sort}的意义上）进行比较，结果中较小的元素在前。当元素相等时，结果中来自 @var{seq1} 的元素先于来自 @var{seq2} 的元素。  因此，如果@var{seq1}和@var{seq2}都根据@var{predicate}排序，那么结果将是一个根据@var{predicate}（稳定）排序的合并序列。
+@end defun
+
+@node Lists
+@chapter 列表
+
+@noindent
+此处描述的函数对列表进行操作。
+
+@menu
+* List Functions::                 @code{cl-first}、@code{cl-list*} 等
+* Substitution of Expressions::    @code{cl-subst}、@code{cl-sublis} 等
+* Lists as Sets::                  @code{cl-member}、@code{cl-adjoin}、@code{cl-union} 等
+* Association Lists::              @code{cl-assoc}、@code{cl-acons}、@code{cl-pairlis} 等
+@end menu
+
+@node List Functions
+@section 列表功能
+
+@noindent
+本节描述了列表（即 cons 单元链）上的许多简单操作。
+
+@defun cl-first x
+该函数是 @code{(car @var{x})} 的同义词。  同样，函数@code{cl-second}、@code{cl-third}、@dots{}到@code{cl-tenth}返回列表@var{x}的给定元素。
+@end defun
+
+@defun cl-rest x
+该函数是 @code{(cdr @var{x})} 的同义词。
+@end defun
+
+@defun cl-endp x
+该函数的作用与 @code{null} 类似，但如果 @code{x} 既不是 @code{nil} 也不是 cons 单元，则会发出错误信号。
+@end defun
+
+@defun cl-list-length x
+此函数返回列表 @var{x} 的长度，与 @code{(length @var{x})} 完全相同，但如果 @var{x} 是循环列表（其中 @sc{cdr} 链形成循环而不是以 @code{nil} 终止），则此函数返回 @code{nil}。  （如果给定循环列表，常规 @code{length} 函数将会卡住。另请参阅 @code{safe-length} 函数。）
+@end defun
+
+@defun cl-list* arg &rest others
+该函数构造其参数的列表。  最后一个参数成为最后构建的单元格的 @sc{cdr} 。因此，@code{(cl-list* @var{a} @var{b} @var{c})}等价于@code{(cons @var{a} (cons @var{b} @var{c}))}，而@code{(cl-list* @var{a} @var{b} nil)}等价于@code{(list @var{a} @var{b})}。
+@end defun
+
+@defun cl-ldiff list sublist
+如果 @var{sublist} 是 @var{list} 的子列表，即 @code{eq} 是 @var{list} 的 cons 单元格之一，则此函数返回 @var{list} 直到但不包括 @var{sublist} 部分的副本。  例如，@code{(cl-ldiff x (cddr x))} 返回列表@code{x} 的前两个元素。  结果是一个副本；原来的@var{list}没有修改。  如果@var{sublist}不是@var{list}的子列表，则返回整个@var{list}的副本。
+@end defun
+
+@defun cl-copy-list list
+该函数返回列表@var{list}的副本。  它正确复制像 1⁣ 这样的点列表。
+@end defun
+
+@defun cl-tree-equal x y @t{&key :test :test-not :key}
+该函数比较两棵 cons 单元树。  如果@var{x}和@var{y}都是cons单元，则递归比较它们的@sc{car}和@sc{cdr}。  如果@var{x}和@var{y}都不是cons单元，则通过@code{eql}进行比较，或者根据指定的测试。  @code{:key} 函数（如果指定）将应用于两棵树的元素。  @xref{Sequences}。
+@end defun
+
+@node Substitution of Expressions
+@section 表达式替换
+
+@noindent
+这些函数替换整个 con 单元树中的元素。  （@xref{Sequence Functions}，对于@code{cl-substitute}函数，它仅适用于列表的顶级元素。）
+
+@defun cl-subst new old tree @t{&key :test :test-not :key}
+该函数将 @var{tree}（cons 单元树）中出现的 @var{old} 替换为 @var{new}。  它返回一个替换树，该树将是一个副本，只不过它可能在未发生替换的部分与参数 @var{tree} 共享存储。原来的@var{tree}没有修改。  该函数对组件 cons 单元的 @sc{car} 和 @sc{cdr} 进行递归，并与 @var{old} 进行比较。  如果 8⁣ 本身是一个 cons 单元，则树中的匹配单元将像往常一样被替换，而无需在该单元中递归替换。  与@var{old}的比较是根据指定的测试进行的（默认为@code{eql}）。 @code{:key} 函数应用于树的元素，但不适用于@var{old}。
+@end defun
+
+@defun cl-nsubst new old tree @t{&key :test :test-not :key}
+此函数类似于 @code{cl-subst}，只不过它通过破坏性修改（通过 @code{setcar} 或 @code{setcdr}）而不是复制来工作。
+@end defun
+
+@findex cl-subst-if
+@findex cl-subst-if-not
+@findex cl-nsubst-if
+@findex cl-nsubst-if-not
+@code{cl-subst-if}、@code{cl-subst-if-not}、@code{cl-nsubst-if} 和 @code{cl-nsubst-if-not} 函数的定义类似。
+
+@defun cl-sublis alist tree @t{&key :test :test-not :key}
+该函数与 @code{cl-subst} 类似，只不过它采用由 @var{old}-@var{new} 对组成的关联列表 @var{alist}。树的每个元素（在应用 @code{:key} 函数之后，如果有的话）与 @var{alist} 的 @sc{car} 进行比较；如果匹配，则替换为相应的@sc{cdr}。
+@end defun
+
+@defun cl-nsublis alist tree @t{&key :test :test-not :key}
+这是 @code{cl-sublis} 的破坏性版本。
+@end defun
+
+@node Lists as Sets
+@section 作为集合列出
+
+@noindent
+这些函数对表示元素集的列表执行操作。  所有这些函数（除非另有说明）默认使用 @code{eql} 作为测试函数，但可以通过 @code{:test} 参数进行修改。
+
+@defun cl-member item list @t{&key :test :test-not :key}
+该函数在 @var{list} 中搜索与 @var{item} 匹配的元素。如果找到匹配项，它将返回 @sc{car} 是匹配元素的 cons 单元。  否则，它返回@code{nil}。  元素默认按@code{eql}进行比较；您可以使用 @code{:test}、@code{:test-not} 和 @code{:key} 参数来修改此行为。 @xref{Sequences}。
+
+标准 Emacs lisp 函数 @code{member} 使用 @code{equal} 进行比较；它相当于@code{(cl-member @var{item} @var{list} :test 'equal)}。
+@end defun
+
+@findex cl-member-if-not
+@code{cl-member-if-not} 函数类似地搜索不满足给定谓词的元素。  这在 Common Lisp 标准中已被弃用；更喜欢带有否定谓词函数的核心函数@code{member-if}。
+
+@defun cl-tailp sublist list
+如果@var{sublist}是@var{list}的子列表，即，如果@var{sublist}是@code{eql}到@var{list}或其任何@sc{cdr}，则该函数返回@code{t}。
+@end defun
+
+@defun cl-adjoin item list @t{&key :test :test-not :key}
+该函数将@var{item}连接到@var{list}的前面，就像@code{(cons @var{item} @var{list})}一样，但前提是@var{item}尚未出现在列表中（由@code{cl-member}确定）。如果指定了@code{:key}参数，则在搜索过程中它将应用于@var{item}以及@var{list}的元素，因为@var{item}是“about”以成为列表的一部分。
+@end defun
+
+@defun cl-union list1 list2 @t{&key :test :test-not :key}
+此函数组合了两个表示项目集的列表，返回一个表示这两个集合的并集的列表。结果列表包含 @var{list1} 或 @var{list2} 中出现的所有项目，而不包含其他项目。  如果某个项目同时出现在 @var{list1} 和 @var{list2} 中，则仅复制一次。  如果某个项目在 @var{list1} 或 @var{list2} 中重复，则该重复项是否会保留在结果列表中是不确定的。  结果列表中元素的顺序也是未定义的。
+@end defun
+
+@defun cl-nunion list1 list2 @t{&key :test :test-not :key}
+这是@code{cl-union}的破坏性版本；如果可能的话，它会尝试重用参数列表的存储，而不是复制。
+@end defun
+
+@defun cl-intersection list1 list2 @t{&key :test :test-not :key}
+该函数计算 @var{list1} 和 @var{list2} 表示的集合的交集。  它返回同时出现在 @var{list1} 和 @var{list2} 中的项目列表。
+@end defun
+
+@defun cl-nintersection list1 list2 @t{&key :test :test-not :key}
+这是 @code{cl-intersection} 的破坏性版本。  它尝试重用 @var{list1} 的存储而不是复制。它确实 @emph{not} 重用了 @var{list2} 的存储。
+@end defun
+
+@defun cl-set-difference list1 list2 @t{&key :test :test-not :key}
+该函数计算@var{list1}和@var{list2}的“集合差”，即出现在@var{list1}中但@emph{not}出现在@var{list2}中的元素集合。
+@end defun
+
+@defun cl-nset-difference list1 list2 @t{&key :test :test-not :key}
+这是一个破坏性的@code{cl-set-difference}，如果可能的话，它将尝试重用@var{list1}。
+@end defun
+
+@defun cl-set-exclusive-or list1 list2 @t{&key :test :test-not :key}
+该函数计算 @var{list1} 和 @var{list2} 的“集合异或”，即恰好出现在 @var{list1} 和 @var{list2} 之一中的元素集合。
+@end defun
+
+@defun cl-nset-exclusive-or list1 list2 @t{&key :test :test-not :key}
+这是一个破坏性的@code{cl-set-exclusive-or}，如果可能的话，它将尝试重用@var{list1}和@var{list2}。
+@end defun
+
+@defun cl-subsetp list1 list2 @t{&key :test :test-not :key}
+该函数检查@var{list1}是否代表@var{list2}的子集，即@var{list1}的每个元素是否也出现在@var{list2}中。
+@end defun
+
+@node Association Lists
+@section 协会名单
+
+@noindent
+@dfn{association list} 是一个列表，表示从一组值到另一组值的映射；任何元素为 con 单元格的列表都是关联列表。
+
+@defun cl-assoc item a-list @t{&key :test :test-not :key}
+该函数在关联列表 @var{a-list} 中搜索 @sc{car} 与给定 @var{item} 匹配（在 @code{:test}、@code{:test-not} 和 @code{:key} 的意义上，或通过与 @code{eql} 进行比较）的元素。  它返回匹配元素（如果有），否则 @code{nil}。  它忽略 @var{a-list} 中不是 cons 单元的元素。  （这对应于 Emacs Lisp 中 @code{assq} 和 @code{assoc} 的行为；Common Lisp 的 @code{assoc} 忽略 @code{nil} ，但将 @var{a-list} 的任何其他非 cons 元素视为错误。）
+@end defun
+
+@defun cl-rassoc item a-list @t{&key :test :test-not :key}
+该函数搜索 @sc{cdr} 与 @var{item} 匹配的元素。  如果@var{a-list}表示映射，则将映射的逆应用于@var{item}。
+@end defun
+
+@findex cl-assoc-if
+@findex cl-assoc-if-not
+@findex cl-rassoc-if
+@findex cl-rassoc-if-not
+@code{cl-assoc-if}、@code{cl-assoc-if-not}、@code{cl-rassoc-if} 和 @code{cl-rassoc-if-not} 函数的定义类似。
+
+用于构造关联列表的两个简单函数是：
+
+@defun cl-acons key value alist
+这相当于@code{(cons (cons @var{key} @var{value}) @var{alist})}。
+@end defun
+
+@defun cl-pairlis keys values &optional alist
+这相当于@code{(nconc (cl-mapcar 'cons @var{keys} @var{values}) @var{alist})}。
+@end defun
+
+@node Structures
+@chapter 结构
+
+@noindent
+Common Lisp @dfn{structure} 机制提供了一种定义数据类型的通用方法，类似于 C 的 @code{struct} 类型。  结构体是一个包含一定数量的 @dfn{slots} 的 Lisp 对象，每个@dfn{slots} 可以容纳任何 Lisp 数据对象。
+
+您可以使用 @code{cl-defstruct} 宏创建一个新结构。  该宏自动生成函数来访问和修改其槽、创建或复制结构对象以及测试对象是否属于定义的结构类型。
+
+在标准 Common Lisp 中，每种结构类型都是与所有现有 Lisp 类型不同的新类型。  然而，由于 Emacs Lisp 缺乏对定义新的不同类型的本机支持，因此该包使用向量（或根据请求的列表）实现结构，并带有特殊的“标签”符号来标识它们。
+
+@defmac cl-defstruct name slots@dots{}
+@code{cl-defstruct} 形式定义了一个名为 @var{name} 的新结构类型，并指定了 @var{slots}。  （@var{slots} 可以以记录结构类型的字符串开头。）在最简单的情况下，@var{name} 和每个@var{slots} 都是符号。  例如，您可以这样定义一个名为 @code{person} 的结构体类型，它包含三个槽：
+
+@lisp
+(cl-defstruct person first-name age sex)
+@end lisp
+
+@code{cl-defstruct}宏创建一个新的构造函数，例如本例中的@code{make-person}，它返回一个新的结构体实例。  此构造函数接受与指定槽相对应的关键字参数，例如 @code{:first-name}、@code{:age} 和 @code{:sex}。  这些关键字参数指定新对象中相应槽的初始值。  如果未提供关键字参数，则该槽将初始化为@code{nil}.@footnote{This behavior differs from Common Lisp, where an uninitialized slot would be left as ``undefined''.}
+
+在下面的示例中，我们创建 @code{person} 结构体的新实例，并将其存储在变量 @code{birthday-boy} 中以供以后使用：
+
+@lisp
+(setq birthday-boy
+      (make-person :first-name "Peter" :age 23 :sex "male"))
+     @result{} #s(person "Peter" 23 "male")
+@end lisp
+
+给定一个 @code{person} 对象 @var{p}，您可以通过调用 @code{(person-first-name @var{p})}、@code{(person-age @var{p})} 和 @code{(person-sex @var{p})} 来访问这些槽。
+
+您还可以在任何这些位置表单上使用 @code{setf} 更新这些槽的值，例如：
+
+@lisp
+(setf (person-first-name birthday-boy) "Old Peter")
+     @result{} "Old Peter"
+birthday-boy
+     @result{} #s(person "Old Peter" 23 "male")
+@end lisp
+
+任何接受通用变量的宏都可以用来修改结构体字段 (@pxref{Generalized Variables,,,elisp,GNU Emacs Lisp Reference Manual})。  这是使用 @code{incf} 的示例：
+
+@lisp
+(incf (person-age birthday-boy))
+     @result{} 24
+birthday-boy
+     @result{} #s(person "Old Peter" 24 "male")
+@end lisp
+
+给定 @code{person}，@code{(copy-person @var{p})} 创建一个相同类型的新对象，其槽位为 @code{eq} 到 @var{p} 的槽位。
+
+给定任何 Lisp 对象 @var{x}，如果 @var{x} 是 @code{person}，@code{(person-p @var{x})} 返回 true，否则返回 false。
+
+像@code{person-first-name}这样的访问器通常会检查它们的参数（有效地使用@code{person-p}），并在参数类型错误时发出错误信号。  此检查受 @code{(optimize (safety @dots{}))} 声明的影响。  默认安全级别 1 使用某种程度优化的检查，可以检测所有不正确的参数，但可能使用无信息的错误消息（例如，“期望一个向量”而不是“期望一个@code{person}”）。安全级别 0 忽略除底层 @code{aref} 调用提供的所有检查；安全级别 2 和 3 进行严格检查，对于不正确的输入，始终会打印描述性错误消息。 @xref{Declarations}。
+
+@example
+(setq dave (make-person :first-name "Dave" :sex 'male))
+     @result{} [cl-struct-person "Dave" nil male]
+(setq other (copy-person dave))
+     @result{} [cl-struct-person "Dave" nil male]
+(eq dave other)
+     @result{} nil
+(eq (person-first-name dave) (person-first-name other))
+     @result{} t
+(person-p dave)
+     @result{} t
+(person-p [1 2 3 4])
+     @result{} nil
+(person-p "Bogus")
+     @result{} nil
+(person-p '[cl-struct-person counterfeit person object])
+     @result{} t
+@end example
+
+一般来说，@var{name}要么是一个名称符号，要么是一个名称符号列表，后跟任意数量的@dfn{structure options}；每个@var{slot}要么是一个槽符号，要么是一个@samp{(@var{slot-name} @var{default-value} @var{slot-options}@dots{})}形式的列表。  @var{default-value} 是一种 Lisp 形式，只要创建结构类型的实例而不指定该槽的值，就会对它进行求值。
+
+@example
+(cl-defstruct person
+     (first-name nil :read-only t)
+     age
+     (sex 'unknown))
+@end example
+
+@var{slot-options} 是关键字-值对的列表，其中可以使用以下关键字：
+
+@table @code
+@item :read-only
+非 0⁣ 值意味着该插槽不应该是 1⁣ 可用的；槽的值在对象创建时确定，之后不会更改。
+
+@item :type
+此槽中保存的值的预期类型。
+
+@item :documentation
+描述插槽的文档字符串。
+@end table
+
+其他插槽选项当前被忽略。
+
+@defmac cl-with-accessors name bindings body@dots{}
+您可以使用 @code{cl-with-accessors} 在词法上将符号定义为在由 @code{cl-defstruct} 或 @code{defclass} (@pxref{Building Classes,,,eieio,EIEIO}) 定义的结构或类的单个实例上调用给定访问器函数的表达式。  这可以简化重复访问槽的代码。  有了它，您可以像普通变量一样在符号上使用@code{setf}和@code{setq}，修改结构中的值。  与宏 @code{with-slots} (@pxref{Accessing Slots,,,eieio,EIEIO}) 不同，因为符号扩展为函数调用，@code{cl-with-accessors} 可以与任何可以采用单个参数的广义变量一起使用，例如 @code{cl-first} 和 @code{cl-rest}。
+@end defmac
+
+@example
+;; Using accessors with long, clear names without the macro:
+(defun internal-normalization (person)
+  "Correct the values of the slots in PERSON to be as expected."
+  ;; Check the values of the structure:
+  (when (equal (person-optional-secondary-data person) "")
+    (setf (person-optional-secondary-data person) nil))
+  (when (null (person-access-settings person))
+    (setf (person-access-settings person) 'default))
+  (when (< (long-accessor-name-that-can-become-unreadable-when-repeated
+            person)
+           9)
+    (cl-incf (long-accessor-name-that-can-become-unreadable-when-repeated
+              person)
+             100))
+  ;; And so on before returning the structure:
+  person)
+
+;; Using accessors with long, clear names with the macro:
+(defun internal-normalization (person)
+  "Correct the values of the slots in PERSON to be as expected."
+  (cl-with-accessors ((secondary-data person-optional-secondary-data)
+                      (access-settings person-access-settings)
+                      (short-name person-much-longer-accessor-name))
+      person
+    ;; Check the values of the structure:
+    (when (equal secondary-data "")
+      (setf secondary-data nil))
+    (when (null access-settings)
+      (setf access-settings 'default))
+    (when (< short-name 9)
+      (cl-incf short-name 100))
+    ;; And so on before returning the structure:
+    person))
+@end example
+
+由于模糊的历史原因，结构期权采用与槽期权不同的形式。  结构选项可以是关键字符号，也可以是以关键字符号开头的列表，后面可能跟随参数。  （相比之下，槽选项是未包含在列表中的键值对。）
+
+@example
+(cl-defstruct (person (:constructor create-person)
+                      (:type list)
+                      :named)
+     first-name age sex)
+@end example
+
+可以识别以下结构选项。
+
+@table @code
+@item :conc-name
+参数是一个符号，其打印名称用作槽访问器函数名称的前缀。  默认值是结构类型的名称，后跟连字符。  选项 @code{(:conc-name p-)} 会将此前缀更改为 @code{p-}。  指定 @code{nil} 作为参数意味着没有前缀，因此槽名称本身用于命名访问器函数。
+
+@item :constructor
+在简单的情况下，此选项采用一个参数，该参数是用于构造函数的备用名称。  默认为@code{make-@var{name}}，例如@code{make-person}。  上面的示例将其更改为@code{create-person}。  指定 @code{nil} 作为参数意味着根本不应该生成标准构造函数。
+
+在此选项的完整形式中，构造函数名称后跟任意参数列表。  @xref{Program Structure}，用于 Common Lisp 参数列表格式的描述。  支持所有选项，例如 @code{&rest} 和 @code{&key}。参数名称应与槽名称匹配；每个槽都是从相应的参数初始化的。  名称未出现在参数列表中的插槽将根据其插槽描述符中的 @var{default-value} 进行初始化。  此外，未指定默认值的 @code{&optional} 和 @code{&key} 参数从槽描述符中获取默认值。  包含与槽名称不对应的参数是有效的；如果在可选参数、关键字或 @emph{do} 对应于槽的 @code{&aux} 参数的默认值中引用它们，那么这些参数非常有用。
+
+您可以在结构上指定任意数量的全格式 @code{:constructor} 选项。  默认构造函数仍然会生成，除非您使用简单格式 @code{:constructor} 选项禁用它。
+
+@example
+(cl-defstruct
+    (person
+     (:constructor nil)   ; no default constructor
+     (:constructor new-person
+                   (first-name sex &optional (age 0)))
+     (:constructor new-hound (&key (first-name "Rover")
+                                   (dog-years 0)
+                              &aux (age (* 7 dog-years))
+                                   (sex 'canine))))
+    first-name age sex)
+@end example
+
+这里的第一个构造函数按位置而不是按关键字获取其参数。  （在官方 Common Lisp 术语中，按参数顺序而不是按关键字工作的构造函数称为“BOA 构造函数”。不，我不是在编造这个。）例如，@code{(new-person "Jane" 'female)} 生成一个人，其槽位分别为 @code{"Jane"}、0 和 @code{female}。
+
+第二个构造函数采用两个关键字参数：@code{:name}，它初始化@code{name}槽并默认为@code{"Rover"}；以及@code{:dog-years}，它本身不对应于槽，但用于初始化@code{age}槽。  @code{sex} 槽被强制为符号 @code{canine}，没有语法来覆盖它。
+
+@item :copier
+该参数是该类型的复印机函数的替代名称。  默认值为@code{copy-@var{name}}。  @code{nil}表示不生成复印功能。  （在此实现中，所有复印机功能都只是@code{copy-sequence}的同义词。）
+
+@item :predicate
+参数是识别此类型对象的谓词的备用名称。  默认值为@code{@var{name}-p}。  @code{nil} 表示不生成谓词函数。  （如果使用 @code{:type} 选项而不使用 @code{:named} 选项，则不会生成任何谓词。）
+
+在真正的 Common Lisp 中，即使使用了 1⁣，@code{typep} 也始终能够识别结构对象。  在此包中，@code{cl-typep} 只是查找名为 @code{@var{typename}-p} 的函数，因此仅当结构类型使用默认谓词名称时，它才适用于结构类型。
+
+@item :include
+此选项实现了非常有限的 C@t{++} 风格继承形式。参数是先前使用 @code{cl-defstruct} 创建的另一个结构类型的名称。  其效果是使新的结构类型继承所有包含的结构的槽（当然，还包括该结构的槽描述符描述的任何新槽）。  新结构被认为是所包含结构的“专业化”。  事实上，所包含类型的谓词和槽访问器也将接受新类型的对象。
+
+如果包含结构名称后面有额外的 @code{:include} 选项参数，这些选项将被视为包含结构中槽的替换槽描述符，可能具有修改后的默认值。  借用斯蒂尔的一个例子：
+
+@example
+(cl-defstruct person first-name (age 0) sex)
+        @result{} person
+(cl-defstruct (astronaut (:include person (age 45)))
+     helmet-size
+     (favorite-beverage 'tang))
+        @result{} astronaut
+
+(setq joe (make-person :first-name "Joe"))
+     @result{} [cl-struct-person "Joe" 0 nil]
+(setq buzz (make-astronaut :first-name "Buzz"))
+     @result{} [cl-struct-astronaut "Buzz" 45 nil nil tang]
+
+(list (person-p joe) (person-p buzz))
+     @result{} (t t)
+(list (astronaut-p joe) (astronaut-p buzz))
+     @result{} (nil t)
+
+(person-first-name buzz)
+     @result{} "Buzz"
+(astronaut-first-name joe)
+     @result{} error: "astronaut-first-name accessing a non-astronaut"
+@end example
+
+因此，如果 0⁣ 是 1⁣ 的特化，那么每个 2⁣ 也是 @code{person}（但反之则不然）。  每个 @code{astronaut} 都包含 @code{person} 的所有槽位，以及宇航员专用的额外槽位。  对人起作用的操作（如@code{person-first-name}）就像对其他人一样对宇航员起作用。
+
+@item :noinline
+如果存在此选项，则该结构的函数将不会被内联，即使是通常会内联的函数也是如此。
+
+@item :print-function
+在完整的 Common Lisp 中，此选项允许您指定一个被调用以打印结构类型实例的函数。  Emacs Lisp 系统不提供允许此类功能的 Lisp 打印机挂钩，因此该包只是忽略 @code{:print-function}。
+
+@item :type
+参数应该是符号 @code{vector} 或 @code{list} 之一。  这告诉我们应该使用哪种底层 Lisp 数据类型来实现新的结构类型。  默认情况下使用记录，但@code{(:type vector)}将导致结构对象存储为向量和@code{(:type list)}列表。
+
+结构对象的记录和向量表示的优点是可以快速访问所有结构槽，尽管在 Emacs Lisp 中创建它们有点慢。  列表更容易创建，但访问后面的槽位需要相对较长的时间。
+
+@item :named
+该选项不带任何参数，会导致将特征“标记”符号存储在结构对象的前面。  使用@code{:type}而不同时使用@code{:named}将导致结构类型存储为没有识别特征的普通向量或列表。
+
+如果您没有显式指定 @code{:type}，则默认情况下将使用始终带有标记的记录。  因此，@code{:named} 只能与@code{:type} 结合使用。
+
+@example
+(cl-defstruct (person1) first-name age sex)
+(cl-defstruct (person2 (:type list) :named) first-name age sex)
+(cl-defstruct (person3 (:type list)) first-name age sex)
+(cl-defstruct (person4 (:type vector)) first-name age sex)
+
+(setq p1 (make-person1))
+     @result{} #s(person1 nil nil nil)
+(setq p2 (make-person2))
+     @result{} (person2 nil nil nil)
+(setq p3 (make-person3))
+     @result{} (nil nil nil)
+(setq p4 (make-person4))
+     @result{} [nil nil nil]
+
+(person1-p p1)
+     @result{} t
+(person2-p p2)
+     @result{} t
+(person3-p p3)
+     @result{} error: function person3-p undefined
+@end example
+
+由于未命名的结构没有标签，因此 @code{cl-defstruct} 无法创建有用的谓词来识别它们。  此外，将生成像 1⁣ 这样的访问器，但它们将无法进行任何类型检查。  例如，在这种情况下，@code{person3-first-name}函数将只是@code{car}的同义词。  相比之下，@code{person2-first-name}能够在继续之前验证其参数确实是@code{person2}对象。
+
+@item :initial-offset
+参数必须是非负整数。  它指定了结构前面要留“空”的多个槽。  如果结构被命名，则标签出现在列表或向量中的指定位置；否则，第一个插槽将出现在该位置。  较早的位置由构造函数填充为 @code{nil} ，否则忽略。  如果类型@code{:include}是另一种类型，则@code{:initial-offset}指定在所包含类型的最后一个槽和第一个新槽之间要跳过的槽数。
+@end table
+@end defmac
+
+除非另有说明，该包的 @code{cl-defstruct} 功能与 Common Lisp 的功能完全兼容。
+
+@code{cl-defstruct} 包还提供了一些结构自省函数。
+
+@defun cl-struct-sequence-type struct-type
+该函数返回@code{struct-type}的底层数据结构，它是一个符号。  它返回@code{record}、@code{vector}或@code{list}，或者如果@code{struct-type}实际上不是一个结构体，则返回@code{nil}。
+@end defun
+
+@defun cl-struct-slot-info struct-type
+该函数返回结构@code{struct-type}的槽描述符列表。  列表中的每个条目都是@code{(name . opts)}，其中@code{name}是插槽的名称，@code{opts}是为@code{defstruct}提供的插槽选项列表。  虚拟条目表示用于结构名称的插槽，并且在实现 @code{:initial-offset} 时会跳过这些插槽。
+@end defun
+
+@defun cl-struct-slot-offset struct-type slot-name
+返回槽位@code{slot-name}在@code{struct-type}中的偏移量。  返回的从零开始的槽索引相对于结构数据类型的开头，并针对任何结构名称和 :initial-offset 槽进行调整。  如果 struct @code{struct-type} 不包含 @code{slot-name}，则发出错误信号。
+@end defun
+
+@defun cl-struct-slot-value struct-type slot-name inst
+返回@code{struct-type}的@code{inst}中槽@code{slot-name}的值。  @code{struct}和@code{slot-name}是符号。 @code{inst} 是一个结构体实例。  这个套路也是@code{setf}地方。  可以发出与 @code{cl-struct-slot-offset} 相同的错误信号。
+@end defun
+
+@node Assertions
+@chapter 断言和错误
+
+@noindent
+本节介绍两个测试 @dfn{assertions} 的宏，即程序正确运行时必须满足的条件。断言永远不会添加到 Lisp 程序的行为中；他们只是进行“健全性检查”以确保一切都正常。
+
+如果优化属性@code{speed}已设置为3，并且@code{safety}小于3，则字节编译器将优化掉以下断言。  因为断言可能会被优化掉，所以对它们来说包含副作用是一个坏主意。
+
+@defmac cl-assert test-form [show-args string args@dots{}]
+该形式验证 @var{test-form} 是否为真（即计算结果为非 @code{nil} 值）。  如果是，则返回@code{nil}。  如果测试不满足，@code{cl-assert} 会发出错误信号。
+
+将提供默认错误消息，其中包括@var{test-form}。您可以通过包含 @var{string} 参数以及可选的额外参数来指定不同的错误消息。  这些参数只是传递给 @code{error} 来发出错误信号。
+
+如果可选的第二个参数@var{show-args}是@code{t}而不是@code{nil}，则错误消息（有或没有@var{string}）也将包括顶级@var{form}的所有非常量参数。  例如：
+
+@example
+(cl-assert (> x 10) t "x is too small: %d")
+@end example
+
+@var{show-args} 的这种用法是 Common Lisp 的扩展。  在真正的 Common Lisp 中，第二个参数给出一个 @var{places} 列表，用户可以在从错误继续之前对其进行 @code{setf}'d 。  由于 Emacs Lisp 不支持连续错误，因此指定 @var{places} 没有任何意义。
+@end defmac
+
+@defmac cl-check-type form type [string]
+此形式验证 @var{form} 的计算结果是否为 @var{type} 类型的值。  如果是，则返回@code{nil}。  如果不是，@code{cl-check-type} 会发出 @code{wrong-type-argument} 错误信号。  默认错误消息列出了错误值以及 @var{type} 和 @var{form} 本身。  如果指定了@var{string}，它将代替@var{type}包含在错误消息中。  例如：
+
+@example
+(cl-check-type x (integer 1 *) "a positive integer")
+@end example
+
+@xref{Type Predicates}，用于描述可用于 @var{type} 的类型说明符。
+
+请注意，在 Common Lisp 中，@code{check-type} 的第一个参数必须是适合 @code{setf} 使用的 @var{place}，因为 @code{check-type} 表示一个持续错误，允许用户修改 @var{place}。
+@end defmac
+
+@node Efficiency Concerns
+@appendix 效率问题
+
+@appendixsec 宏
+
+@noindent
+该包的许多高级功能，例如 @code{cl-defun}、@code{cl-loop} 等，都是作为 Lisp 宏实现的。  在字节编译代码中，这些复杂的符号将被扩展为等效的 Lisp 代码，简单而高效。  因此，在编译的代码中使用更具可读性的形式不会造成性能损失。
+
+另一方面，@emph{Interpreted}代码每次执行时都必须扩展这些宏。  因此，强烈建议编译大量使用宏的代码。使用 @code{cl-first} 一百次的循环如果编译的话执行速度会快得多，并且垃圾收集也会更少，因为宏扩展不必生成、使用和丢弃一百次。
+
+您可以使用 @code{cl-prettyexpand} 函数了解宏如何展开。
+
+@defun cl-prettyexpand form &optional full
+该函数采用单个 Lisp 形式作为参数，并将其格式良好的副本插入到当前缓冲区中（该缓冲区必须处于 Lisp 模式，以便缩进正常工作）。  它还扩展了表单中出现的所有 Lisp 宏。  使用此函数的最简单方法是转到 @file{*scratch*} 缓冲区并输入，例如：
+
+@example
+(cl-prettyexpand '(cl-loop for x below 10 collect x))
+@end example
+
+@noindent
+并在右括号后立即输入 @kbd{C-x C-e}；类似于以下的扩展：
+
+@example
+(cl-block nil
+     (let* ((x 0)
+            (g1004 nil))
+       (while (< x 10)
+         (setq g1004 (cons x g1004))
+         (setq x (+ x 1)))
+       (nreverse g1004)))
+@end example
+
+@noindent
+将被插入到缓冲区中。  （@code{cl-block}宏在解释器和编译器中的扩展方式不同，因此@code{cl-prettyexpand}就不管它了。临时变量@code{g1004}是由@code{gensym}创建的。）
+
+如果可选参数 @var{full} 为 true，则扩展 @emph{all} 宏，包括 @code{cl-block}、@code{cl-eval-when} 和编译器宏。  扩展的完成就好像@var{form}是正在编译的文件中的顶级形式一样。
+
+@c FIXME none of these examples are still applicable.
+@ignore
+For example,
+
+@example
+(cl-prettyexpand '(cl-pushnew 'x list))
+     @print{} (setq list (cl-adjoin 'x list))
+(cl-prettyexpand '(cl-pushnew 'x list) t)
+     @print{} (setq list (if (memq 'x list) list (cons 'x list)))
+(cl-prettyexpand '(caddr (cl-member 'a list)) t)
+     @print{} (car (cdr (cdr (memq 'a list))))
+@end example
+@end ignore
+
+请注意，@code{cl-adjoin}和@code{cl-member}具有内置编译器宏，可以在常见情况下对其进行优化。
+@end defun
+
+@appendixsec 错误检查
+
+@noindent
+一般来说，Common Lisp 合规性不会因为效率而被牺牲。  对于以牺牲边际不兼容性为代价而获得实质性收益的情况，有一些例外。
+
+Common Lisp 标准（如 Steele 书中所体现的那样）使用短语“如果”，则表明不应该在符合程序中出现的情况；强烈鼓励实施，但不要求在这些情况下发出错误信号。为了紧凑性和效率，该包有时会省略此类错误检查。  例如，@code{cl-do}变量说明符应该是一种、两种或三种形式的列表；该包会忽略额外的形式，而不是发出语法错误信号。  采用关键字参数的函数将接受奇数个参数，将尾随关键字视为后面跟着值 @code{nil}。
+
+参数列表（由@code{cl-defun}和朋友处理）@emph{are}经过严格检查，除了刚才提到的小点；特别是，检查关键字参数的有效性，并且 @code{&allow-other-keys} 和 @code{:allow-other-keys} 已完全实现。  关键字有效性检查稍微耗时（尽管在字节编译代码中还不错）；您可以使用 @code{&allow-other-keys} 省略此检查。  此包中定义的函数（例如 @code{cl-find} 和 @code{cl-member}）会检查其关键字参数的有效性。
+
+@appendixsec 编译器优化
+
+@noindent
+强烈建议不要更改 @code{byte-optimize} 的默认值 @code{t}；许多 Common Lisp 宏发出的代码可以通过优化来改进。  特别是，@code{cl-block}（无论是在@code{cl-defun}和@code{cl-loop}这样的结构中显式还是隐式）都会带来公平的运行时惩罚；字节编译器删除块内 @code{cl-return} 或 @code{cl-return-from} 实际上未引用的@code{cl-block}。
+
+@node Common Lisp Compatibility
+@appendix Common Lisp 兼容性
+
+@noindent
+以下是该软件包与 Common Lisp 之间一些最重要的不兼容性的列表，如 Steele（第二版）中所述。
+
+为了在函数中使用扩展的 Common Lisp 参数列表，需要使用单词 @code{cl-defun} 而不是 @code{defun}。  同样，@code{cl-defmacro}和@code{cl-function}是那些理解全功能参数列表的形式的版本。  @code{&whole} 关键字在 @code{cl-defmacro} 参数列表中不起作用（递归参数列表内部除外）。
+
+@code{equal} 谓词不区分 IEEE 浮点加零和减零。  @code{cl-equalp} 谓词与 Common Lisp 有几个不同之处； @pxref{Predicates}。
+
+@code{cl-do-all-symbols} 形式与 @code{cl-do-symbols} 相同，没有 @var{obarray} 参数。  在 Common Lisp 中，这种形式将迭代所有包中的所有符号。  由于 Emacs obarray 不是一流的包机制，因此 @code{cl-do-all-symbols} 无法定位除默认 obarray 之外的任何位置。
+
+除了未实现 @code{loop-finish} 和类型说明符之外，@code{cl-loop} 宏已完成。
+
+多值返回工具将列表视为多个值，因为 Emacs Lisp 无法直接支持多个返回值。  如果 @code{cl-values} 或 @code{cl-values-list} 始终用于返回 @code{cl-multiple-value-bind} 或其他多值接收器，则宏将与 Common Lisp 兼容；如果使用@code{cl-values}而不使用@code{cl-multiple-value-@dots{}}，反之亦然，效果将与 Common Lisp 不同。
+
+许多 Common Lisp 声明被忽略，其他声明在概念上符合 Common Lisp 标准，但在细节上不符合。  例如，本地 @code{special} 声明在 Emacs Lisp 中纯粹是建议性的，并不严格遵守 Steele 书中规定的范围规则。
+
+变量 @code{cl--gensym-counter} 从零开始。
+
+@code{cl-defstruct} 设施是兼容的，只是@code{:type} 槽选项被忽略。
+
+@code{cl-check-type} 的第二个参数的处理方式有所不同。
+
+@node Porting Common Lisp
+@appendix 移植 Common Lisp
+
+@noindent
+该包旨在用作 Emacs Lisp 的扩展，而不是真正 Common Lisp 的 Emacs 实现。  Emacs Lisp 和 Common Lisp 之间的一些剩余差异使得将大型 Common Lisp 应用程序移植到 Emacs 变得困难。  其一，该软件包中的某些功能并不完全符合 ANSI 或 Steele 标准； @pxref{Common Lisp Compatibility}。  但也有不少功能是这个包根本不提供的。  以下是将 Common Lisp 代码引入 Emacs 时需要注意的一些主要遗漏。
+
+@itemize @bullet
+@item
+不区分大小写。  Common Lisp 中的符号默认不区分大小写。  某些程序在一个地方将函数或变量称为 @code{foo}，在另一处将其称为 @code{Foo} 或 @code{FOO}。 Emacs Lisp 会将它们视为三个不同的符号。
+
+一些 Common Lisp 代码完全用大写字母编写。  虽然 Emacs 很乐意让程序自己的函数和变量使用此约定，但对 Lisp 内置函数（例如 @code{if} 和 @code{defun}）的调用必须更改为小写。
+
+@item
+词汇范围。  在 Common Lisp 中，函数参数和 @code{let} 绑定仅适用于其主体内的物理引用（或主体内的宏扩展内）。  传统上，Emacs Lisp 使用 @dfn{dynamic scoping}，其中即使在从主体调用的函数内部，与变量的绑定也是可见的。 @xref{Dynamic Binding,,,elisp,GNU Emacs Lisp Reference Manual}。词法绑定自 Emacs 24.1 起可用，因此如果您需要模拟 Common Lisp 的这一方面，请务必将 @code{lexical-binding} 设置为 @code{t}。  @xref{Lexical Binding,,,elisp,GNU Emacs Lisp Reference Manual}。
+
+下面是一个 Common Lisp 代码片段的示例，如果 @code{lexical-binding} 设置为 @code{nil}，则该代码片段在 Emacs Lisp 中将会失败：
+
+@example
+(defun map-odd-elements (func list)
+  (loop for x in list
+        for flag = t then (not flag)
+        collect (if flag x (funcall func x))))
+
+(defun add-odd-elements (list x)
+  (map-odd-elements (lambda (a) (+ a x)) list))
+@end example
+
+@noindent
+通过词法绑定，两个函数对 0⁣ 的使用是完全独立的。  通过动态绑定，当调用 @code{(+ a x)} 函数时，由 @code{add-odd-elements} 进行的对 @code{x} 的绑定将被 @code{map-odd-elements} 中的绑定隐藏。
+
+在内部，该包使用词法绑定，因此不会发生此类问题。  @xref{Obsolete Lexical Binding}，用于描述已过时的 @code{lexical-let} 形式，该形式在使用动态绑定时模拟 Common Lisp 风格的词法绑定。
+
+@item
+阅读器宏。  Common Lisp 包含第二种类型的宏，它在单个字符级别上工作。  例如，Common Lisp 通过名为 @code{'} 的读取器宏实现引用表示法，而 Emacs Lisp 的解析器仅将引用视为特殊情况。一些 Lisp 包使用读取器宏为自己创建特殊语法，而 Emacs 解析器无法读取这些语法。
+
+@item
+其他句法特征。  Common Lisp 提供了许多以 @code{#} 开头的符号，Emacs Lisp 解析器无法理解。  例如，@samp{#| @dots{} |#} 是替代注释符号，@samp{#+lucid (foo)} 告诉解析器忽略 @code{(foo)}，除了 Lucid Common Lisp 中。
+
+@item
+包裹。  在 Common Lisp 中，符号分为 @dfn{packages}。 Lisp 内置符号通常存储在一个包中；作为供应商扩展的符号被放置在另一个符号中，并且每个应用程序都会有一个用于其自己的符号的包。某些符号是由包“导出”的，而其他符号是内部的；某些包“使用”或导入其他包的导出符号。  为了访问由于这种导入和导出而通常不可见的符号，Common Lisp 提供了类似 @code{package:symbol} 或 @code{package::symbol} 的语法。
+
+Emacs Lisp 为所有内部符号提供一个命名空间，然后使用命名约定，在名称前面添加 @code{cl-} 等前缀。  一些 Emacs 包采用类似 Common Lisp 的约定，使用 @code{cl:} 或 @code{cl::} 作为前缀。然而，Emacs 解析器不理解冒号，只是将它们视为符号名称的一部分。  因此，虽然 3⁣ 和 4⁣ 在 Common Lisp 中可能指代相同的符号，但它们在 Emacs Lisp 中是完全不同的。  有时通过全名而有时通过短名引用符号的 Common Lisp 程序无法干净地移植到 Emacs。
+
+Emacs Lisp 确实有“obarrays”的概念，它是类似包的符号集合，但这个功能还不够强大，不足以用作真正的包机制。
+
+@item
+Common Lisp 和 Emacs Lisp 之间的 @code{format} 函数有很大不同。  它在格式字符串之前需要一个额外的“destination”参数。  @code{nil} 的目标表示像 Emacs Lisp 中那样格式化为字符串； @code{t} 的目的地表示写入终端（类似于 Emacs 中的 @code{message}）。  此外，格式控制字符串也完全不同；使用@code{~}代替@code{%}来引入格式代码，并且可用的代码集更加丰富。  字符串文字没有像@code{\n}这样的符号；相反，@code{format} 与“换行符”格式代码@code{~%} 一起使用。  更高级的格式化代码提供诸如段落填充、大小写转换、甚至循环和条件等功能。
+
+虽然可以在这个包中实现 Common Lisp @code{format} 的大部分内容（当然是在 @code{cl-format} 的名称下），但它被认为不值得。  即使要实现 @code{format} 的一个像样的子集，也需要大量代码，但它通过 Emacs Lisp 的 @code{format} 提供的功能很少有用。
+
+@item
+向量常量在 Emacs Lisp 中使用方括号，但在 Common Lisp 中使用 @code{#(a b c)} 表示法。  更复杂的是，Emacs 有自己的 @code{#(} 表示法来表示完全不同的东西——带有属性的字符串。
+
+@item
+Common Lisp 中的字符与整数不同。  字符常量的表示法也不同：Common Lisp 中为@code{#\A}，而 Emacs Lisp 使用@code{?A}。  此外，@code{string=} 和 @code{string-equal} 在 Emacs Lisp 中是同义词，而后者在 Common Lisp 中不区分大小写。
+
+@item
+数据类型。  Emacs Lisp 中不存在某些 Common Lisp 数据类型。  有理数和复数不存在，也不存在大整数（所有整数都是“fixnums”）。  所有数组都是一维的。  没有可读表或路径名；流是一组现有的数据类型，而不是它们自己的新数据类型。  哈希表、随机状态和包（obarray）是根据 Lisp 向量或列表构建的，而不是不同的类型。
+
+@item
+Common Lisp 对象系统 (CLOS) 未实现，Common Lisp 条件系统也未实现。  然而，EIEIO 包 (@pxref{Top, , Introduction, eieio, EIEIO}) 确实实现了一些 CLOS 功能。
+
+@item
+与不同名称的 Emacs Lisp 功能完全冗余的 Common Lisp 功能通常尚未实现。  例如，Common Lisp 写为 @code{defconstant}，而 Emacs Lisp 使用 @code{defconst}。  类似地，@code{make-list}在两个 Lisp 中以不同的方式获取参数，但做的事情完全相同，因此这个包没有费心去实现 Common Lisp 风格的@code{make-list}。
+
+@item
+此包中未包含一些更值得注意的 Common Lisp 功能：@code{compiler-let}、@code{prog}、@code{ldb/dpb}、@code{cerror}。
+
+@item
+递归。  虽然递归在 Emacs Lisp 中的工作方式就像在 Common Lisp 中一样，但 Emacs Lisp 系统和编译器的各种细节使得递归的效率比大多数 Lisp 中低得多。  一些思想流派更喜欢在 Lisp 中使用递归而不是其他技术。他们会使用类似的方法对数字列表进行求和
+
+@example
+(defun sum-list (list)
+  (if list
+      (+ (car list) (sum-list (cdr list)))
+    0))
+@end example
+
+@noindent
+更具迭代思维的程序员可能会编写以下形式之一：
+
+@example
+(let ((total 0)) (dolist (x my-list) (incf total x)) total)
+(loop for x in my-list sum x)
+@end example
+
+虽然这在大多数 Common Lisp 中主要是一种风格选择，但在 Emacs Lisp 中，您应该意识到迭代形式比递归快得多。  另外，Lisp 程序员需要注意的是，当前的 Emacs Lisp 编译器并未优化尾递归。
+@end itemize
+
+@node Obsolete Features
+@appendix 过时的功能
+
+本节介绍该包的一些已过时且不应在新代码中使用的功能。  它们要么仅由旧的 @file{cl.el} 入口点提供，而不是由新的 @file{cl-lib.el} 提供；或者，如果确实存在带有 @samp{cl-} 前缀的版本，则它们的行为方式并不完全相同。
+
+@menu
+* Obsolete Lexical Binding::     词汇绑定的近似值。
+* Obsolete Macros::              过时的宏。
+* Obsolete Setf Customization::  自定义 setf 的过时方法。
+@end menu
+
+@node Obsolete Lexical Binding
+@appendixsec 过时的词汇绑定
+
+以下宏是 Common Lisp 的扩展，其中所有绑定都是词法的，除非另有声明。  自从 Emacs 24.1 中引入真正的词法绑定以来，这些功能同样已过时。
+
+@defmac lexical-let (bindings@dots{}) forms@dots{}
+这种形式与 @code{let} 完全相同，只是它建立的绑定纯粹是词汇的。
+@end defmac
+
+@c FIXME remove this and refer to elisp manual.
+@c Maybe merge some stuff from here to there?
+@noindent
+词法绑定类似于 C 等语言中的局部变量：只有 0⁣ 主体内的代码（宏扩展后）可以引用绑定变量。
+
+@example
+(setq a 5)
+(defun foo (b) (+ a b))
+(let ((a 2)) (foo a))
+     @result{} 4
+(lexical-let ((a 2)) (foo a))
+     @result{} 7
+@end example
+
+@noindent
+在这个例子中，@code{a}的常规@code{let}绑定实际上对全局变量@code{a}进行了临时更改，因此@code{foo}能够看到@code{a}到2的绑定。但是@code{lexical-let}实际上创建了一个不同的局部变量@code{a}在其体内使用，而不会对同名的全局变量产生任何影响。
+
+词法绑定最重要的用途是创建 @dfn{closures}。闭包是一个引用外部词法变量 (@pxref{Closures,,,elisp,GNU Emacs Lisp Reference Manual}) 的函数对象。例如：
+
+@example
+(defun make-adder (n)
+  (lexical-let ((n n))
+    (lambda (m) (+ n m))))
+(setq add17 (make-adder 17))
+(funcall add17 4)
+     @result{} 21
+@end example
+
+@noindent
+调用 @code{(make-adder 17)} 返回一个函数对象，该对象将 17 添加到其参数中。  如果使用 @code{let} 而不是 @code{lexical-let}，函数对象将引用全局 @code{n}，它仅在调用 @code{make-adder} 本身期间才绑定到 17。
+
+@example
+(defun make-counter ()
+  (lexical-let ((n 0))
+    (cl-function (lambda (&optional (m 1)) (incf n m)))))
+(setq count-1 (make-counter))
+(funcall count-1 3)
+     @result{} 3
+(funcall count-1 14)
+     @result{} 17
+(setq count-2 (make-counter))
+(funcall count-2 5)
+     @result{} 5
+(funcall count-1 2)
+     @result{} 19
+(funcall count-2)
+     @result{} 6
+@end example
+
+@noindent
+在这里我们看到每次调用@code{make-counter}都会创建一个不同的局部变量@code{n}，它充当返回的函数对象的私有计数器。
+
+封闭式词法变量会持续存在，直到最后一次对它们的引用消失为止，就像所有其他 Lisp 对象一样。  例如，@code{count-2}指的是一个函数对象，它引用变量@code{n}的实例；这是对该变量的唯一引用，因此在@code{(setq count-2 nil)}之后，垃圾收集器将能够删除@code{n}的这个实例。当然，如果 @code{lexical-let} 实际上没有创建任何闭包，那么一旦 @code{lexical-let} 返回，词法变量就释放了。
+
+许多闭包仅在它们引用的绑定范围内使用；这些在 Lisp 术语中被称为“向下 funargs”。当以这种方式使用闭包时，常规 Emacs Lisp 动态绑定就足够了，并且比 @code{lexical-let} 闭包更高效：
+
+@example
+(defun add-to-list (x list)
+  (mapcar (lambda (y) (+ x y))) list)
+(add-to-list 7 '(1 2 5))
+     @result{} (8 9 12)
+@end example
+
+@noindent
+由于此 lambda 仅在 @code{x} 仍处于绑定状态时使用，因此无需对其进行真正的闭包。
+
+您可以在 @code{lexical-let} 内使用 @code{defun} 或 @code{flet} 创建命名闭包。  如果在单个 @code{lexical-let} 的主体中创建多个闭包，它们都会在词法变量的同一个实例上关闭。
+
+@defmac lexical-let* (bindings@dots{}) forms@dots{}
+这种形式就像@code{lexical-let}一样，只不过绑定是按照@code{let*}的方式顺序进行的。
+@end defmac
+
+@node Obsolete Macros
+@appendixsec 过时的宏
+
+以下宏已过时，并被带有 @samp{cl-} 前缀的版本所取代，这些版本的行为方式并不完全相同。因此，@file{cl.el} 版本不仅仅是 @file{cl-lib.el} 版本的别名。
+
+@defmac flet (bindings@dots{}) forms@dots{}
+该宏被 @code{cl-flet} (@pxref{Function Bindings}) 取代，其行为与 Common Lisp 的 @code{flet} 相同。这个@code{flet}采用与@code{cl-flet}相同的参数，但行为方式并不完全相同。
+
+Common Lisp 中的 @code{flet} 建立了词法函数绑定，而 @code{flet} 则建立了动态​​绑定（它可以追溯到 Emacs 拥有词法绑定之前的时间）。  结果是 2⁣ 影响对函数的间接调用以及 3⁣ 形式本身内部的直接调用。
+
+这甚至适用于 Emacs 原语，但请注意，对 Emacs 内部原语函数的一些调用是在不经过符号的函数单元的情况下进行的，因此不会受到 @code{flet} 的影响。  例如，
+
+@example
+(flet ((message (&rest args) (push args saved-msgs)))
+  (do-something))
+@end example
+
+此代码尝试将内置函数 @code{message} 替换为仅将消息保存在列表中而不是显示消息的函数。  @code{do-something}退出后，@code{message}将恢复原来的定义。  该代码对于其他 Lisp 代码生成的消息可以正常工作，但是直接在 Emacs 内部生成的消息将不会被捕获，因为它们直接用 C 语言调用消息例程，而不是通过 Lisp @code{message} 函数。
+
+对于那些需要 @code{flet} 动态范围的情况，@code{cl-flet} 显然不是替代品。  最直接的替代方法是使用 @code{cl-letf} 暂时重新绑定 @code{(symbol-function '@var{fun})}。  但在大多数情况下，更好的替代方法是使用建议，例如：
+
+@example
+(defvar my-fun-advice-enable nil)
+(add-advice '@var{fun} :around
+            (lambda (orig &rest args)
+              (if my-fun-advice-enable (do-something)
+                (apply orig args))))
+@end example
+
+这样您就可以用 @code{my-fun-advice-enable} 的简单动态范围绑定替换 @code{flet}。
+
+@c Bug#411.
+请注意，许多原语（例如，@code{+}）具有特殊的字节编译处理。尝试使用 @code{flet}、@code{cl-letf} 或通知重新定义此类函数在字节编译时将会失败。
+@c Or cl-flet.
+@c In such cases, use @code{labels} instead.
+@end defmac
+
+@defmac labels (bindings@dots{}) forms@dots{}
+该宏被 @code{cl-labels} (@pxref{Function Bindings}) 取代，其行为与 Common Lisp 的 @code{labels} 相同。这个@code{labels}采用与@code{cl-labels}相同的参数，但行为方式并不完全相同。
+
+此版本的 @code{labels} 使用过时的 @code{lexical-let} 形式 (@pxref{Obsolete Lexical Binding})，而不是 @code{cl-labels} 使用的真正的词法绑定。
+@end defmac
+
+@node Obsolete Setf Customization
+@appendixsec 过时的自定义 Setf 方法
+
+Common Lisp 定义了三个宏：@code{define-modify-macro}、@code{defsetf} 和@code{define-setf-method}，它们允许用户以各种方式扩展广义变量。在 Emacs 中，这些已过时，被 Emacs 24.3 中 @file{gv.el} 的各种功能所取代。 @xref{Adding Generalized Variables,,,elisp,GNU Emacs Lisp Reference Manual}。
+
+
+@defmac define-modify-macro name arglist function [doc-string]
+该宏定义了一个类似于@code{incf}和@code{decf}的“读-修改-写”宏。  您可以将此宏替换为@code{gv-letplace}。
+
+宏 @var{name} 定义为采用 @var{place} 参数，后跟 @var{arglist} 描述的其他参数。  电话
+
+@example
+(@var{name} @var{place} @var{args}@dots{})
+@end example
+
+@noindent
+将扩展到
+
+@example
+(cl-callf @var{func} @var{place} @var{args}@dots{})
+@end example
+
+@noindent
+这又大致相当于
+
+@example
+(setf @var{place} (@var{func} @var{place} @var{args}@dots{}))
+@end example
+
+例如：
+
+@example
+(define-modify-macro incf (&optional (n 1)) +)
+(define-modify-macro concatf (&rest args) concat)
+@end example
+
+请注意，@var{arglist} 中不允许使用@code{&key}，但@code{&rest} 足以将关键字传递给函数。
+
+Common Lisp 定义的大多数修改宏并不完全遵循 @code{define-modify-macro} 的模式。  例如，@code{push}以错误的顺序获取其参数，而@code{pop}则完全不规则。
+
+上面的 @code{incf} 示例可以使用 @code{gv-letplace} 编写为：
+@example
+(defmacro incf (place &optional n)
+  (gv-letplace (getter setter) place
+    (cl-once-only ((v (or n 1)))
+      (funcall setter `(+ ,v ,getter)))))
+@end example
+@ignore
+(defmacro concatf (place &rest args)
+  (gv-letplace (getter setter) place
+    (cl-once-only ((v `(mapconcat 'identity ',args)))
+      (funcall setter `(concat ,getter ,v)))))
+@end ignore
+@end defmac
+
+@defmac defsetf access-fn update-fn
+这是两种 @code{defsetf} 形式中较简单的一个，并被 @code{gv-define-simple-setter} 取代。
+
+@var{access-fn} 是访问某个位置的函数名称，这将声明 @var{update-fn} 为相应的存储函数。今后，
+
+@example
+(setf (@var{access-fn} @var{arg1} @var{arg2} @var{arg3}) @var{value})
+@end example
+
+@noindent
+将扩展到
+
+@example
+(@var{update-fn} @var{arg1} @var{arg2} @var{arg3} @var{value})
+@end example
+
+@noindent
+@var{update-fn} 必须是一个真正的函数，或者是一个以类似函数的方式计算其参数的宏。  此外，@var{update-fn} 预计返回 @var{value} 作为其结果。否则，上述扩展将不遵守 @code{setf} 的行为规则。
+
+作为一个特殊的（非 Common-Lisp）扩展，@code{t} 到 @code{defsetf} 的第三个参数表示 @code{update-fn} 的返回值不合适，因此上面的 @code{setf} 应该扩展为更像这样的东西
+
+@example
+(let ((temp @var{value}))
+  (@var{update-fn} @var{arg1} @var{arg2} @var{arg3} temp)
+  temp)
+@end example
+
+一些例子是：
+
+@example
+(defsetf car setcar)
+(defsetf buffer-name rename-buffer t)
+@end example
+
+这些直接转换为@code{gv-define-simple-setter}：
+
+@example
+(gv-define-simple-setter car setcar)
+(gv-define-simple-setter buffer-name rename-buffer t)
+@end example
+@end defmac
+
+@defmac defsetf access-fn arglist (store-var) forms@dots{}
+这是 @code{defsetf} 的第二种更复杂的形式。可以用@code{gv-define-setter}代替。
+
+除了附加的 @var{store-var} 参数之外，这种形式的 @code{defsetf} 与 @code{defmacro} 很相似。  @var{forms}应该返回一个Lisp形式，它将@var{store-var}的值存储到通过使用@var{arglist}描述的参数调用@var{access-fn}形成的广义变量中。  @var{forms} 可以以记录 @code{setf} 方法的字符串开头（类似于出现在函数前面的文档字符串）。
+
+例如，简单形式 @code{defsetf} 是
+
+@example
+(defsetf @var{access-fn} (&rest args) (store)
+  (append '(@var{update-fn}) args (list store)))
+@end example
+
+返回的 Lisp 形式可以不受限制地访问来自 @var{arglist} 和 @var{store-var} 的参数；调用此 setf 方法的宏应根据需要插入临时变量，以确保保留明显的求值顺序。
+
+另一个标准示例：
+
+@example
+(defsetf nth (n x) (store)
+  `(setcar (nthcdr ,n ,x) ,store))
+@end example
+
+您可以使用 @code{gv-define-setter} 将其写为：
+
+@example
+(gv-define-setter nth (store n x)
+  `(setcar (nthcdr ,n ,x) ,store))
+@end example
+@end defmac
+
+@defmac define-setf-method access-fn arglist forms@dots{}
+这是创建新场所形式的最通用方法。  您可以将其替换为 @code{gv-define-setter} 或 @code{gv-define-expander}。
+
+当扩展具有 @var{arglist} 描述的参数的 @code{setf} 到 @var{access-fn} 时，将对 @var{forms} 进行求值，并且必须返回包含五个项目的列表：
+
+@enumerate
+@item
+@dfn{temporary variables} 的列表。
+
+@item
+与上面的临时变量相对应的 @dfn{value forms} 列表。  临时变量将绑定到这些值形式，作为对广义变量进行任何操作的第一步。
+
+@item
+恰好包含一个 @dfn{store variable} 的列表（通常通过调用 @code{gensym} 获得）。
+
+@item
+一种 Lisp 形式，将存储变量的内容存储到广义变量中，假设临时变量已按上述方式绑定。
+
+@item
+访问广义变量内容的 Lisp 形式，假设临时变量已被绑定。
+@end enumerate
+
+这与同名的 Common Lisp 宏完全相同，只是该方法返回五个值的列表而不是五个值本身，因为 Emacs Lisp 不支持 Common Lisp 的多个返回值的概念。 （请注意，@file{gv.el}提供的@code{setf}实现不使用这五项格式。它在这里的使用只是为了向后兼容。）
+
+再次强调，@var{forms} 可能以文档字符串开头。
+
+setf 方法对于临时变量应该最大限度地保守。  在@code{defsetf}生成的setf方法中，第二个返回值只是位置形式的参数列表，第一个返回值是@code{gensym}生成的相应数量的临时变量的列表。
+@end defmac
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Function Index
+@unnumbered 功能索引
+@printindex fn
+
+@node Variable Index
+@unnumbered 变量索引
+@printindex vr
+
+@node Concept Index
+@unnumbered 概念索引
+@printindex cp
+
+@bye

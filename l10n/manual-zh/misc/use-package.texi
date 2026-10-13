@@ -1,0 +1,1712 @@
+\输入 texinfo @c -*- texinfo -*-
+@c %**start of header
+@setfilename ../../info/use-package.info
+@settitle 使用包用户手册
+@documentlanguage en
+@set USEP_VER 2.4.5
+@set USEP_DIST as distributed with Emacs @value{EMACSVER}
+@include docstyle.texi
+@syncodeindex vr cp
+@syncodeindex fn cp
+@include emacsver.texi
+@c %**end of header
+
+@copying
+本手册适用于使用包@value{USEP_VER} @value{USEP_DIST}。
+
+版权所有 @copyright{} 2022--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* use-package: (use-package).  Emacs 的声明式包配置。
+@end direntry
+
+@finalout
+@titlepage
+@title 使用包用户手册
+@subtitle 对于版本USEP_VER
+@author John Wiegley & Stefan Kangas
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top use-package User Manual
+
+The @code{use-package} macro allows you to set up package customization
+in your init file in a declarative way.  It reduces the need for
+repetitive boilerplate code by handling many common customization tasks
+for you.  These include binding keys, setting hooks, customizing user
+options and faces, setting up autoloading, and more.  It also helps you
+keep Emacs startup fast, even when you use many (even hundreds) of
+packages.
+
+Note that use-package is not a package manager.  While it provides
+convenient integration with Emacs's built-in package manager, its
+primary purpose is to help with configuring and loading packages, not
+with downloading, upgrading, or installing them.
+
+@insertcopying
+
+@menu
+* Basic Concepts::              Basic concepts of use-package.
+* Getting Started::             A gentle introduction to use-package.
+* Loading Packages::            How and when packages are loaded.
+* Configuring Packages::        Package configuration keywords.
+* Installing packages::         Ensuring packages are available.
+* Byte-compiling::              Byte-compiling your init file.
+* Troubleshooting::             What to do when there's trouble.
+
+Appendices
+* Keyword extensions::          Adding new use-package keywords.
+* History::                     History and acknowledgments.
+* GNU Free Documentation License::  The license for this manual.
+
+Index
+* Index::
+@end menu
+@end ifnottex
+
+@c ----------------------------------------------------------------------------
+@node Basic Concepts
+@chapter 基本概念
+
+use-package 提供了 @code{use-package} 宏，简化了 Emacs 中包的定制和使用。  它的创建有几个基本原因，每个原因都推动了设计。  了解这些原因可能有助于使其中一些决策更加清晰：
+
+@cindex reasons for developing use-package
+@enumerate
+@item 
+允许将包的所有配置详细信息收集到一个位置，从而更容易复制、禁用或将其移动到 init 文件中的其他位置。
+
+@item 
+减少重复和重复的样板文件，将几种常见做法捕获为简单的关键字，既易于使用又直观。
+
+@item 
+使Emacs的启动时间尽可能短，同时不牺牲所使用的附加包的数量。
+
+@item 
+确保启动期间遇到的错误仅禁用引发错误的包，并尽可能少地禁用其他包，从而使 Emacs 尽可能接近完全正常运行。
+
+@item 
+允许对您的初始化文件进行字节编译，以便您在启动时看到的任何警告或错误都是有意义的。  这样，即使字节编译不用于速度（参见上面第 3 条），它仍然可以用作健全性检查。
+@end enumerate
+
+值得注意的是，use-package 并不是要取代标准自定义命令@w{@kbd{M-x customize}} (@pxref{Easy Customization,,, emacs, GNU Emacs Manual})。  相反，它被设计为与它一起工作，以完成Customize无法完成的事情。
+
+@c ----------------------------------------------------------------------------
+@node Getting Started
+@chapter 入门
+@cindex quick-start instructions
+
+本章提供了快速开始使用 use-package 的说明和示例。  在本手册中，我们说初始化文件中对 @code{use-package} 宏的每次调用都是 @dfn{declaration}，以突出其语法的声明性本质。
+
+要无条件加载名为 @samp{foo} 的包，请将以下声明添加到您的 init 文件中：
+
+@lisp
+(use-package foo)
+@end lisp
+
+@noindent
+此声明相当于使用 @code{require} (@pxref{Named Features,,, elisp, GNU Emacs Lisp Reference Manual})，添加了一些特定于使用包的错误处理。就像 @code{require} 一样，它需要安装包 @samp{foo} 并可通过 @code{load-path} (@pxref{Installing packages}) 使用。
+
+要评估加载的某些 Lisp @emph{before} @samp{foo} 包，请使用 @code{:init} 关键字：
+
+@lisp
+@group
+(use-package foo
+  :init
+  (setq foo-variable t))
+@end group
+@end lisp
+
+类似地，@code{:config}可用于执行代码@emph{after}加载包。  在延迟加载的情况下 (@pxref{Loading Packages})，此执行会推迟到实际加载之后。  正如您所期望的，您可以同时使用 @code{:init} 和 @code{:config}：
+
+@lisp
+@group
+(use-package foo
+  :init
+  (setq foo-variable t)
+  :config
+  (foo-mode 1))
+@end group
+@end lisp
+
+上述声明将立即加载 @samp{foo} 包。  在大多数情况下，这是不必要或不可取的，因为这会减慢 Emacs 的启动速度。  相反，您应该尝试进行设置，以便仅在实际需要时才加载包（这称为“自动加载”）。  如果您已经安装了 @acronym{GNU} @acronym{ELPA} 中提供自己的自动加载的软件包，通常只需说：
+
+@lisp
+@group
+(use-package foo
+  :defer t)
+@end group
+@end lisp
+
+@noindent
+这将避免加载包。  现在，当您运行任何自动加载的命令时，包 @samp{foo} 会自动加载。  （默认情况下，包中的哪些命令被标记为自动加载是包作者的决定。）
+
+在某些情况下，您可能需要或想要提供自己的自动加载。下面更复杂的示例从包 @file{color-moccur.el} 中自动加载命令 @code{isearch-moccur} 和 @code{isearch-all}，并在全局和 @code{isearch-mode-map} 中绑定键。  当使用这两个命令之一时，将加载包。  此时，@code{moccur-edit} 也被加载，以允许编辑 @code{moccur} 缓冲区。
+
+@lisp
+@group
+(use-package color-moccur
+  :commands (isearch-moccur isearch-all)
+  :bind (("M-s O" . moccur)
+         :map isearch-mode-map
+         ("M-o" . isearch-moccur)
+         ("M-O" . isearch-moccur-all))
+  :init
+  (setq isearch-lazy-highlight t)
+  :config
+  (use-package moccur-edit))
+@end group
+@end lisp
+
+有些软件包会建议您可以使用现成的 @code{use-package} 声明。  在可能的情况下，复制它们并以此作为起点是个好主意。
+
+这应该足以让您开始了！
+
+@c ----------------------------------------------------------------------------
+@node Loading Packages
+@chapter 加载包
+@cindex loading packages with use-package
+
+在 use-package 可以加载 Emacs Lisp 包之前，它必须位于 @code{load-path} 上的目录中。  当您使用内置的 @code{install-package} 命令安装软件包时，它会自动为您执行此操作。  Emacs 附带的软件包（内置软件包）始终可用。
+
+有些软件包有多个库。  在这些情况下，您可能需要多个 @code{use-package} 声明来确保包正确加载。  对于复杂的配置，您可能还需要对同名的包进行多个声明。
+
+use-package 可以与 @samp{package.el} 连接以在 Emacs 启动时安装软件包。  @xref{Installing packages}，了解详情。
+
+@menu
+* Loading basics::               如何以及何时加载包。
+* Deferring loading::            稍后加载包。
+* Forcing loading::              立即加载包。
+* Conditional loading::          有条件地加载包。
+* Loading sequentially::         按顺序加载包。
+* The @code{emacs} package::     自定义内置变量。
+* Load dependencies::            没有依赖项就不要加载。
+* Manual installation::          加载手动安装的包。
+@end menu
+
+@node Loading basics
+@section use-package 如何以及何时加载包
+
+对 @code{use-package} 宏的调用将立即加载包，或者在第一次使用包时（通过自动加载）。  在最简单的情况下，@code{use-package} 声明在求值时加载一个包。@footnote{This happens both at run-time and at compile-time.  @xref{Byte-compiling}.} 如果该声明位于您的 init 文件中，则每次启动 Emacs 时都会自动发生这种情况。
+
+例如，下面的声明立即加载库 @code{foo}，就像 @code{require} 一样：
+
+@lisp
+(use-package foo)
+@end lisp
+
+@noindent
+如果库 @samp{foo} 在您的 @code{load-path} 中不可用，则声明会向 @samp{*Messages*} 缓冲区记录一条警告。
+
+@cindex package vs library
+@c So, confusingly, (use-package foo) actually means to use the
+@c _library_ foo.el, not all of the _package_ foo's libraries?
+@c Should this be explicitly explained here?
+请注意，“包”与 Emacs Lisp“库”不同。上面的声明告诉 use-package 加载 @emph{library} @file{foo.el}，在绝大多数情况下，它也驻留在名为 @code{foo} 的 @emph{package} 中。  但是包 @code{foo} 也可能包含一个名为 @file{foo-extra.el} 的库。  如果该库没有自动加载，您将需要一个单独的 @code{use-package} 声明以确保在需要时加载它。  本手册经常会互换使用术语“包”和“库”，因为这种区别通常并不重要，但在这种情况下您应该记住它。
+
+关于如何以及何时加载包的详细信息可能因包而异。  如有疑问，请参阅软件包文档以了解详细信息。
+
+@node Deferring loading
+@section 推迟包加载
+@cindex deferring loading of package
+
+@cindex autoloading packages
+@cindex loading lazily
+@cindex lazy loading of packages
+在到目前为止我们看到的示例中，use-package 在每次启动 Emacs 时都会加载包，即使该包从未被使用过。  这将使 Emacs 的启动速度变慢。  因此，use-package 允许以这样的方式进行设置：仅在首次使用某些包的命令时才加载包（使用 @kbd{M-x} 或通过某些键绑定）。  这是基于自动加载的，其完整描述超出了本手册的范围。  @xref{Autoload,,, elisp, GNU Emacs Lisp Reference Manual}，查看完整故事。
+
+@cindex triggers, for loading packages
+某些 @code{use-package} 关键字提供自动加载 @dfn{triggers} 功能，可在发生某些事件时加载包。  例如，@code{:hook}关键字设置一个触发器，在运行指定的钩子时触发，然后自动加载包。  其他触发关键字（所有这些都将在本手册后面进行描述）是 @code{:commands}、@code{:bind}、@code{:bind*}、@code{:bind-keymap}、@code{:bind-keymap*}、@code{:mode} 和 @code{:interpreter}。
+
+@subheading @code{:defer} 关键字
+
+@findex :defer
+如果您没有指定任何自动加载关键字，use-package 将回退到立即加载包（通常在 Emacs 启动时）。  这可以使用 @code{:defer} 关键字覆盖。它需要一个布尔参数：非 1⁣ 值意味着停止立即加载此包。  下面是使用 @code{:defer} 推迟加载包 @samp{foo} 的示例：
+
+@lisp
+@group
+(use-package foo
+  :defer t)
+@end group
+@end lisp
+
+像这样单独使用 @code{:defer t} 很少有用。通常，您只会将其与 @code{:config} (@pxref{Lisp Configuration}) 或 @code{:ensure} (@pxref{Installing packages}) 等关键字一起使用。
+
+@subheading 推迟加载直到空闲 N 秒
+
+@findex :defer@r{, with a numeric argument}
+您还可以向 @w{@code{:defer}} 提供数字参数 @var{n} 来指定在 Emacs 空闲 @var{n} 秒后应加载包（如果尚未加载）。  例如，使用以下命令在 30 秒空闲时间后加载 use-package @samp{foo}：
+
+@lisp
+@group
+(use-package foo
+  :defer 30)
+@end group
+@end lisp
+
+@subheading 何时使用@code{:defer}
+
+使用自动加载关键字时，无需同时使用@code{:defer}。  在这种情况下添加它并没有什么坏处，也许是为了更加清晰，但它是多余的。
+
+如果 use-package 没有为您创建任何自动加载，您应该使用 @code{:defer} 强制延迟加载。  例如，您可能知道某些其他包已经执行某些操作以使您的包在适当的时间加载。  当您使用 @code{package-install} 安装软件包时通常会出现这种情况，因为以这种方式安装的软件包通常总是已经设置了自己的自动加载。
+
+@subheading 将 @w{@code{:defer t}} 设置为默认值
+
+@cindex defer loading by default
+@cindex lazy loading by default
+@vindex use-package-always-defer
+如果将用户选项 @code{use-package-always-defer} 自定义为非 @code{nil}，则 @code{use-package} 宏的行为就像始终指定 @w{@code{:defer t}} 一样。  可以使用 @w{@code{:defer nil}} 或 @w{@code{:demand t}} (@pxref{Forcing loading}) 覆盖单个声明。
+
+@node Forcing loading
+@section 强制立即加载包
+@cindex forcing immediate loading
+
+@findex :demand
+可以使用 @code{:demand t} 覆盖自动加载触发关键字的存在，这会强制立即加载包。  因此，即使您使用自动加载关键字，例如 @code{:bind} (@pxref{Key bindings})，添加 @code{:demand} 也会强制立即进行加载。  它还将避免为绑定键创建自动加载，因为它是多余的。
+
+如果您同时指定 @w{@code{:demand t}} 和 @w{@code{:defer t}}，则 @code{:defer} 关键字优先。
+
+@node Conditional loading
+@section 有条件地加载包
+@cindex conditional loading
+@cindex loading conditions
+
+@findex :if
+@findex :when
+@findex :unless
+@code{:if}、@code{:when} 和 @code{:unless} 关键字表示包的加载和初始化。  它们都接受一个参数，即一种在运行时评估的 Emacs Lisp 形式。
+
+如果 @code{:if} 关键字的参数计算结果为非 @code{nil}，则将加载并初始化包。  @code{:when} 关键字作为 @code{:if} 的别名提供。  最后，@code{:unless}关键字是@code{:if}的逆，因此@w{@code{:unless foo}}与@w{@code{:if (not foo)}}的含义相同。
+
+例如，如果您只想在图形 Emacs 会话中加载 @samp{foo}，则可以使用以下命令：
+
+@lisp
+@group
+(use-package foo
+  :if (display-graphic-p))
+@end group
+@end lisp
+
+@subheading 一些常见的用例
+
+以下是条件加载的一些常见情况以及如何实现它们。
+
+@c FIXME: Too many redundant examples?  E.g., why do we need both an
+@c example for system-type and window-system? or both of the last 2
+@c examples?
+@itemize
+
+@item 
+操作系统
+
+以下示例仅在 GNU/Linux 上加载包。  有关其他有效值，请参阅 @code{system-type} 的文档字符串。
+
+@lisp
+:if (eq system-type 'gnu/linux)
+@end lisp
+
+@item 
+窗系统
+
+下面的示例仅在 macOS 和 X@. 上加载包，请参阅 @code{window-system} 的文档字符串以获取有效值。
+
+@lisp
+:if (memq window-system '(ns x))
+@end lisp
+
+@item 
+安装包
+
+以下示例仅在安装 @samp{foo} 软件包时加载软件包。
+
+@lisp
+:if (package-installed-p 'foo)
+@end lisp
+
+@item 
+@code{load-path} 的图书馆
+
+下面的示例仅当 @file{foo.el} 在 @code{load-path} 中可用时才加载包（例如，如果您手动安装了该文件）：
+
+@lisp
+:if (locate-library "foo.el")
+@end lisp
+@end itemize
+
+@subheading 使条件加载影响@code{:preface}和@code{:ensure}
+
+@cindex conditional loading before @code{:preface} or @code{:ensure}
+如果您需要使 use-package 表单有条件，以便条件甚至出现在 @code{:ensure} (@pxref{Install package}) 或 @code{:preface} (@pxref{Preface keyword}) 之前，请在 @code{use-package} 表单本身周围使用 @code{when}。  例如：
+
+@lisp
+@group
+(when (memq window-system '(mac ns))
+  (use-package foo
+    :ensure t))
+@end group
+@end lisp
+
+@node Loading sequentially
+@section 按顺序加载包
+@cindex loading a package after other packages
+
+@findex :after
+有时，只有在加载另一个包之后才配置一个包才有意义，因为某些变量或函数直到那时才在范围内。  这可以通过 @code{:after} 关键字来实现，它可以对加载发生时的确切条件进行相当丰富的描述。  @code{:after} 关键字将指示包名称的符号、此类符号的列表或选择器列表作为参数（见下文）。
+
+以下是使用 @acronym{GNU} @acronym{ELPA} 包 @file{hydra}、@file{ivy} 和 @file{ivy-hydra} 的示例。  请注意，@file{ivy-hydra} 始终会最后加载：
+
+@lisp
+(use-package hydra)
+
+(use-package ivy)
+
+@group
+(use-package ivy-hydra
+  :after (ivy hydra))
+@end group
+@end lisp
+
+在这种情况下，因为声明是按照它们出现的顺序进行计算的，所以使用 @code{:after} 并不是严格必要的。  但是，如果要自动加载 @samp{hydra} 和 @samp{ivy}，则使用 @code{:after} 可以保证 @samp{ivy-hydra} 在实际需要时不会被加载。  通过使用@code{:after}，即使声明的顺序发生变化，上面的代码也将起作用。  这意味着在初始化文件中移动内容不太可能破坏内容。
+
+@subheading 使用 @code{:after} 选择器
+
+@findex :all@r{, (with @code{:after})}
+@findex :any@r{, (with @code{:after})}
+@cindex list of selectors, for @code{:after}
+@code{:after} 关键字还接受选择器列表。  默认情况下，@w{@code{:after (foo bar)}}与@w{@code{:after (:all foo bar)}}相同，这意味着在@code{foo}和@code{bar}都已加载之前，不会发生给定包的加载。  以下是一些其他可能性：
+
+@verbatim
+:after (foo bar)
+:after (:all foo bar)
+:after (:any foo bar)
+:after (:all (:any foo bar) (:any baz quux))
+:after (:any (:all foo bar) (:all baz quux))
+@end verbatim
+
+当您嵌套选择器时，例如在@w{@code{(:any (:all foo bar) (:all baz quux))}}中，这意味着当@code{foo}和@code{bar}都已加载时，或者当@code{baz}和@code{quux}都已加载时，将加载包。
+
+@cindex @code{use-package-always-defer}, with @code{:after}
+将 @code{use-package-always-defer} 设置为非 @code{nil} 值以及使用 @code{:after} 关键字时请注意。  在这种情况下，您需要指定如何加载声明的包：例如，通过某些@code{:bind}（@pxref{Global keybindings}）。  如果您没有使用注册自动加载的关键字之一，例如 @code{:bind} 或 @code{:hook} (@pxref{Hooks})，并且您的包管理器不提供自动加载，则如果您不将 @code{:demand t} 添加到这些声明中，您的包可能永远不会被加载。
+
+@node The @code{emacs} package
+@section 自定义内置变量
+@cindex customizing built-in variables
+
+一些用户希望将所有自定义内容放在使用包声明中，即使是始终可用的变量、挂钩和选项，而无需加载任何包。@footnote{In other words, they are either preloaded in Emacs or defined in Emacs's C sources.}
+
+为此，您可以使用 no-op @samp{emacs} 包：
+
+@lisp
+@group
+(use-package emacs
+  :init
+  (setq custom-file "~/.emacs.d/emacs-custom.el")
+  (load custom-file)
+  (setq frame-title-format "%b")
+  :custom
+  (use-short-answers t))
+@end group
+@end lisp
+
+该声明利用了 @w{@code{(featurep 'emacs)}} 始终返回 true 的事实，除此之外没有任何特殊含义。它只是提供了一种组织自定义的方法，而无需加载任何内容。
+
+@node Load dependencies
+@section 如果缺少依赖项则阻止加载
+@cindex prevent loading package if dependencies are missing
+
+@findex :requires
+虽然 @code{:after} 关键字会延迟加载直到加载依赖项，但如果在评估 @code{use-package} 声明时依赖项不可用，稍微简单一点的 @code{:requires} 关键字 @emph{never} 会加载包。  在这种情况下，“可用”意味着如果 5⁣ 计算结果为非 6⁣ 值，则 4⁣ 可用。  例如：
+
+@lisp
+@group
+(use-package abbrev
+  :requires foo)
+@end group
+@end lisp
+
+@noindent
+这与：
+
+@lisp
+@group
+(use-package abbrev
+  :if (featurep 'foo))
+@end group
+@end lisp
+
+为了方便起见，可以指定此类包的列表：
+
+@lisp
+@group
+(use-package abbrev
+  :requires (foo bar baz))
+@end group
+@end lisp
+
+对于更复杂的逻辑，例如@code{:after}支持的逻辑，只需使用@code{:if}和适当的Lisp表达式即可。
+
+@node Manual installation
+@section 手动安装包
+
+当手动安装软件包时，如果没有 Emacs 的内置软件包管理器 (@file{package.el})，它显然不会帮助您设置自动加载或将其添加到您的 @code{load-path}。  你必须自己做。  然而，use-package 使这变得更方便。
+
+@menu
+* Load path::                    使用自定义 @code{load-path}。
+* Manual autoloads::             手动设置自动加载。
+@end menu
+
+@node Load path
+@subsection 设置自定义@code{load-path}
+@cindex custom @code{load-path} for loading a package
+@cindex @code{load-path}, add directories for loading a package
+
+手动安装软件包时，您必须确保其库在您的 @code{load-path} 上可用。  @xref{Lisp Libraries,,, emacs, GNU Emacs Manual}，了解有关包加载的更多详细信息。
+
+@findex :load-path
+@code{:load-path} 关键字提供了一种将目录添加到加载路径的便捷方法。  它接受符号、函数、字符串或字符串列表作为参数。  如果将目录指定为相对文件名，则会相对于 @code{user-emacs-directory} 展开。
+
+例如：
+
+@lisp
+@group
+(use-package org
+  :load-path "site-lisp/org/lisp/"
+  :commands org-mode)
+@end group
+@end lisp
+
+当使用符号或函数提供动态生成的目录列表时，您必须将此定义告知字节编译器，以便该值在字节编译时可用。这是通过使用特殊形式 @code{eval-and-compile}（与 @code{eval-when-compile}、@pxref{Eval During Compile,,, elisp, GNU Emacs Lisp Reference Manual} 相反）来完成的。  此外，该值固定为编译期间的值。  如果该操作成本较高，则不必在每次启动时都重复该操作。  例如：
+
+@lisp
+@group
+(eval-and-compile
+  (defun ess-site-load-path ()
+    (shell-command-to-string "find ~ -path ess/lisp")))
+@end group
+
+@group
+(use-package ess-site
+  :load-path (lambda () (list (ess-site-load-path)))
+  :commands R)
+@end group
+@end lisp
+
+@node Manual autoloads
+@subsection 手动设置自动加载
+
+软件包通常会记录手动安装时如何设置自动加载。  如果是这样，请按照这些说明进行操作。否则，您可能需要手动设置它们。
+
+@cindex autoloads for packages, setting up manually
+@cindex package autoloads, setting up manually
+
+@findex :commands
+@findex :autoload
+要自动加载交互式命令，请使用 @code{:commands} 关键字，该关键字接受一个符号或符号列表作为其参数。  它为这些命令创建自动加载（这会推迟模块的加载，直到使用这些命令为止）。
+
+@code{:autoload} 关键字采用与 @code{:commands} 相同的参数，但用于自动加载非交互式函数。这是一个例子：
+
+@lisp
+@group
+(use-package org-crypt
+  :autoload org-crypt-use-before-save-magic)
+@end group
+@end lisp
+
+@c ----------------------------------------------------------------------------
+@node Configuring Packages
+@chapter 配置包
+@cindex configure packages using @code{use-package}
+@cindex customize package configuration
+
+本章介绍了@code{use-package}提供的各种关键字来帮助您配置包。
+
+@menu
+* Lisp Configuration::           使用 Lisp 配置包。
+* Key bindings::                 制作您自己的按键绑定。
+* Hooks::                        向钩子添加函数。
+* Modes and interpreters::       自动启用模式。
+* Magic handlers::               使用正则表达式启用模式。
+* User options::                 设置用户选项。
+* Faces::                        定制面孔。
+* Hiding minor modes::           整理模式线。
+@end menu
+
+@node Lisp Configuration
+@section 使用 Lisp 代码配置包
+@cindex configure package using Lisp forms
+
+添加自定义项的最常用方法是 @code{:preface}、@code{:init} 和 @code{:config} 关键字。  它们都接受一个或多个 Emacs Lisp 表单，直到下一个关键字，并按顺序进行评估。  这允许您将任意 Lisp 代码添加到您的 @code{use-package} 声明中。
+
+这些关键字之间的唯一区别在于评估它们的时间。
+
+@menu
+* Preface keyword::              首先评估代码。
+* Init keyword::                 在加载包之前评估代码。
+* Config keyword::               加载包后评估代码。
+* Best practices::               何时使用@code{:config}、@code{:init}和@code{:preface}。
+@end menu
+
+@node Preface keyword
+@subsection 首先评估@code{:preface}
+
+@findex :preface
+除了 1⁣ 和 @code{:ensure} 之外，@code{:preface} 部分先于其他部分进行评估。  它可用于建立函数和变量定义，从而：
+
+@enumerate
+@item 
+让字节编译器高兴：它不会抱怨定义未知的函数。
+
+@item 
+定义将在 @code{:if} 测试中使用的函数和变量。
+@end enumerate
+
+请注意，@code{:preface} 中指定的内容都会在加载时和字节编译时进行评估，以确保 Lisp 评估器和字节编译器都能看到定义。  因此，您应该避免 @code{:preface} 形式产生任何副作用，并将它们限制为符号声明和定义。
+
+@node Init keyword
+@subsection @code{:init} 在加载包之前评估
+
+@findex :init
+@code{:init} 部分在包加载之前进行评估。  请注意，@code{:init} 表单是无条件运行的——即使您的系统上恰好不存在该包。  因此，您必须记住将 @code{:init} 代码限制为无论哪种方式都会成功的代码；将其余部分放入 @code{:config} 部分。  @code{:init} 也总是在包加载之前发生，无论 @code{:config} 是否被推迟。
+
+@node Config keyword
+@subsection @code{:config} 在加载包后评估
+
+@findex :config
+@code{:config} 部分在包加载后进行评估。  如果立即加载包，则此操作会立即发生，但如果延迟加载 (@pxref{Loading Packages})，则会推迟到包加载后。
+
+一般来说，您应该使 @code{:init} 表单尽可能简单和快速，并将尽可能多的内容放入 @code{:config} 部分。  这样，延迟加载可以帮助您的 Emacs 尽快启动。
+
+@node Best practices
+@subsection 何时使用@code{:preface}、@code{:config}和@code{:init}？
+@cindex tips for using @code{:preface}, @code{:config}, @code{:init}
+
+如果可能，最好避免 @code{:preface}、@code{:config} 和 @code{:init}。  相反，更喜欢自动加载关键字，例如 @code{:bind} (@pxref{Key bindings})、@code{:hook} (@pxref{Hooks}) 和 @code{:mode} (@pxref{Modes and interpreters})，因为它们会为您设置自动加载，而无需任何样板代码。例如，考虑以下声明：
+
+@lisp
+@group
+(use-package foo
+  :init
+  (add-hook 'some-hook 'foo-mode))
+@end group
+@end lisp
+
+@noindent
+这有两个问题。  首先，它会在启动时无条件加载包@samp{foo}，这会使速度变慢。  您可以通过添加 @w{@code{:defer t}} 来解决此问题：
+
+@lisp
+@group
+(use-package foo
+  :defer t
+  :init
+  (add-hook 'some-hook 'foo-mode))
+@end group
+@end lisp
+
+@noindent
+这更好，因为 @samp{foo} 现在仅在实际需要时加载（即，当钩子 @samp{some-hook} 运行时）。
+
+第二个问题是您必须编写大量样板文件。  在这种情况下，情况可能并没有那么糟糕，但避免这种情况正是 use-package 所允许的。  因此，在这种情况下，更好的选择是使用 @code{:hook} (@pxref{Hooks})，这也意味着 @w{@code{:defer t}}。  从而将上面的内容简化为：
+
+@lisp
+@group
+(use-package foo
+  :hook some-hook)
+@end group
+@end lisp
+
+现在 use-package 将为您设置自动加载，并且您的 Emacs 启动时间不会受到任何影响。
+
+@node Key bindings
+@section 键绑定
+
+@cindex binding keys for package commands
+@cindex key bindings for package commands
+加载包时常见的一件事是将键绑定到该模块内的命令。  如果没有 use-package，这将使用 @code{keymap-local-set}、@code{keymap-global-set} 和各种自动加载的组合来完成。  通过 use-package，您可以使用 @code{:bind} 关键字来简化此过程，如本节中所述。
+
+@menu
+* Global keybindings::           您可以在任何地方使用的绑定。
+* Binding in keymaps::           特定模式的绑定。
+* Binding to a keymap::          将按键绑定到键盘映射。
+* Binding to repeat-maps::       绑定重复键。
+* Displaying keybindings::       显示个人按键绑定。
+@end menu
+
+@node Global keybindings
+@subsection 全局键绑定
+@cindex global keybindings
+
+@findex :bind
+要全局绑定键，@code{:bind}关键字将单个 cons 或 cons 列表作为其参数。  每个 cons 的形式为 @w{@code{(@var{key} . @var{command})}}，其中 @var{key} 是指示要绑定的键的字符串，@var{command} 是命令的名称（符号）。  键的语法与 @code{kbd} 函数使用的语法类似（请参阅 @ref{Init Rebinding,,, emacs, GNU Emacs Manual}，了解更多信息）。
+
+@subheading 将 @code{:bind} 与单个缺点一起使用
+
+这是使用单个 cons 的示例：
+
+@lisp
+@group
+(use-package ace-jump-mode
+  :bind ("C-." . ace-jump-mode))
+@end group
+@end lisp
+
+@noindent
+这做了两件事：首先，它为 @code{ace-jump-mode} 命令创建自动加载，并推迟加载 @code{ace-jump-mode} 包，直到您实际使用它为止。  其次，它将键 @code{C-.} 全局绑定到该命令。
+
+@subheading 将 @code{:bind} 与 cons 列表一起使用
+
+下面是使用 @code{:bind} 和 cons 列表的示例：
+
+@lisp
+@group
+(use-package hi-lock
+  :bind (("M-o l" . highlight-lines-matching-regexp)
+         ("M-o r" . highlight-regexp)
+         ("M-o w" . highlight-phrase)))
+@end group
+@end lisp
+
+@noindent
+这会将三个按键序列绑定到相应的命令。
+
+@subheading 使用特殊键
+@cindex binding function keys with @code{:bind}
+@cindex @code{:bind}, and function keys
+
+@c FIXME: TAB vs [tab] -- is letter-case important?  In general, these
+@c are two different keys: one is an ASCII character, the other a
+@c function key on GUI frames.
+在键字符串内，特殊键如 @kbd{TAB} 或 @kbd{F1}--@kbd{F12} 必须写在尖括号内，例如 @code{"C-<up>"}。
+@c FIXME: ``Some combinations''? which ones?
+独立的特殊键（和一些组合）可以写在方括号中，例如@ @code{[tab]}而不是@code{"<tab>"}。
+
+示例：
+
+@lisp
+@group
+(use-package helm
+  :bind (("M-x" . helm-M-x)
+         ("M-<f5>" . helm-find-files)
+         ([f10] . helm-buffers-list)
+         ([S-f10] . helm-recentf)))
+@end group
+@end lisp
+
+@subheading 重新映射命令
+@cindex remapping commands with @code{:bind}
+@cindex @code{:bind}, and remapping of commands
+
+使用 @code{:bind} 和 @code{bind-key} 重新映射命令可以按预期工作，因为当绑定是向量时，它会直接传递到 @code{define-key}。  @xref{Remapping Commands,,, elisp, GNU Emacs Lisp Reference Manual}，有关命令重新映射的更多信息。例如，以下声明会将@code{fill-paragraph}（默认绑定到@kbd{M-q}）重新绑定到@code{unfill-toggle}：
+
+@lisp
+@group
+(use-package unfill
+  :bind ([remap fill-paragraph] . unfill-toggle))
+@end group
+@end lisp
+
+@c FIXME: Should the below be an Appendix?
+@subheading @code{:bind} 在幕后做了什么
+@cindex @code{:bind}, internals
+
+要了解 @code{:bind} 在幕后的作用，考虑一个示例可能会很有用：
+
+@lisp
+@group
+(use-package ace-jump-mode
+  :bind ("C-." . ace-jump-mode))
+@end group
+@end lisp
+
+@noindent
+这可以用 @code{:commands} 和 @code{:init} 关键字以更详细的方式表达：
+
+@lisp
+@group
+(use-package ace-jump-mode
+  :commands ace-jump-mode
+  :init
+  (bind-key "C-." 'ace-jump-mode))
+@end group
+@end lisp
+
+@noindent
+甚至不使用 @code{:commands} 关键字，我们也可以像这样编写上面的内容：
+
+@lisp
+@group
+(use-package ace-jump-mode
+  :defer t
+  :init
+  (autoload 'ace-jump-mode "ace-jump-mode" nil t)
+  (bind-key "C-." 'ace-jump-mode))
+@end group
+@end lisp
+
+尽管这三种形式都是等效的，但第一种形式通常是最好的，因为它可以节省一些打字时间。
+
+@node Binding in keymaps
+@subsection 本地键盘映射中的按键绑定
+@cindex local keybindings
+
+@findex :map@r{, inside} :bind
+与将键绑定到键映射略有不同，绑定键 @emph{within} 是仅在加载包后才存在的本地键映射。  @code{use-package} 通过 @code{:map} 修饰符支持此功能，将本地键盘映射绑定到：
+
+@lisp
+@group
+(use-package helm
+  :bind (:map helm-command-map
+         ("C-c h" . helm-execute-persistent-action)))
+@end group
+@end lisp
+
+@noindent
+这样做的效果是等到 @code{helm} 加载完毕，然后在 Helm 的本地键盘映射 @code{helm-command-map} 中将键序列 @kbd{C-c h} 绑定到 @code{helm-execute-persistent-action}。
+
+可以指定 @code{:map} 的多次使用。  第一次使用 @code{:map} 之前发生的任何绑定都将应用于全局键盘映射：
+
+@lisp
+@group
+(use-package term
+  :bind (("C-c t" . term)
+         :map term-mode-map
+         ("M-p" . term-send-up)
+         ("M-n" . term-send-down)
+         :map term-raw-map
+         ("M-o" . other-window)
+         ("M-p" . term-send-up)
+         ("M-n" . term-send-down)))
+@end group
+@end lisp
+
+@node Binding to a keymap
+@subsection 绑定到键盘映射
+@cindex binding keys to keymaps
+
+通常 @code{:bind} 期望命令是将从给定包自动加载的函数。  但是，如果这些命令之一实际上是键盘映射，则这不起作用，因为键盘映射不是函数，并且无法使用内置 @code{autoload} 函数自动加载。
+
+当您使用 @code{defvar-keymap} 定义键盘映射时，您可以通过在键盘映射定义 (@pxref{Creating Keymaps,,, elisp, GNU Emacs Lisp Reference Manual}) 中包含 @code{:prefix t} 来添加所需的功能定义。
+
+例如：
+
+@lisp
+@group
+(defvar-keymap foo-command-map
+ :doc "A keymap that returns a function"
+ :prefix t
+ "A" #'foo-command-a
+ "B" #'foo-command-b)
+
+(use-package foo
+  :bind (("C-c p" . foo-command-map)))
+@end group
+@end lisp
+
+@noindent
+将为按键序列 @code{"C-c p A"} 和包 @code{foo} 的 @code{"C-c p B"} 创建绑定。
+
+@findex :bind-keymap
+或者，为了处理这种情况，@code{use-package} 提供了 @code{:bind} 的一个特殊的、有限的变体，称为 @code{:bind-keymap}。  唯一的区别是 @code{:bind-keymap} 绑定的“命令”必须是包中定义的键盘映射，而不是交互函数。  这是通过生成自定义代码在幕后处理的，该代码加载包含键盘映射的包，然后在第一次加载后重新执行按键，以将该按键重新解释为前缀键。
+
+例如：
+
+@lisp
+@group
+(use-package foo
+  :bind-keymap ("C-c p" . foo-command-map))
+@end group
+@end lisp
+
+@node Binding to repeat-maps
+@subsection 绑定到重复映射
+@cindex keybinding for @code{repeat-mode} keymaps
+
+@findex :repeat-map@r{, inside} :bind
+@cindex @code{repeat-mode} and use-package, using
+本地键盘映射内绑定的一种特殊情况是当该键盘映射被 @code{repeat-mode} (@pxref{Repeating,,, emacs, GNU Emacs Manual}) 使用时。  这些键盘映射通常是专门为此定义的。  使用 @code{:repeat-map} 关键字，并向其传递它定义的映射的名称，将绑定该映射内的所有以下键，并（默认情况下）将每个绑定命令的 @code{repeat-map} 属性设置为该映射。
+
+以下示例创建一个名为 @code{git-gutter+-repeat-map} 的键盘映射，在其中进行四个绑定，然后将每个绑定命令（@code{git-gutter+-next-hunk}、@code{git-gutter+-previous-hunk}、@code{git-gutter+-stage-hunks} 和 @code{git-gutter+-revert-hunk}）的 @code{repeat-map} 属性设置为该键盘映射。
+
+@lisp
+@group
+(use-package git-gutter+
+  :bind
+  (:repeat-map git-gutter+-repeat-map
+   ("n" . git-gutter+-next-hunk)
+   ("p" . git-gutter+-previous-hunk)
+   ("s" . git-gutter+-stage-hunks)
+   ("r" . git-gutter+-revert-hunk)))
+@end group
+@end lisp
+
+@findex :exit@r{, inside} :repeat-map@r{ and} :bind
+@cindex binding commands used at end of repeat series
+在 @code{:repeat-map} 范围内指定 @code{:exit} 将阻止设置 @code{repeat-map} 属性，以便可以在重复映射内使用该命令，但使用后重复映射将不再可用。  这对于经常在一系列重复命令末尾使用的命令很有用。  例子：
+
+@lisp
+@group
+(use-package git-gutter+
+  :bind
+  (:repeat-map my/git-gutter+-repeat-map
+   ("n" . git-gutter+-next-hunk)
+   ("p" . git-gutter+-previous-hunk)
+   ("s" . git-gutter+-stage-hunks)
+   ("r" . git-gutter+-revert-hunk)
+   :exit
+   ("c" . magit-commit-create)
+   ("C" . magit-commit)
+   ("b" . magit-blame)))
+@end group
+@end lisp
+
+@findex :continue@r{, inside} :repeat-map@r{ and} :bind
+指定 @code{:continue} @emph{forces} 设置 @code{repeat-map} 属性（就像 @emph{not} 指定 @code{:exit} 一样），因此上面的代码片段相当于：
+
+@lisp
+@group
+(use-package git-gutter+
+  :bind
+  (:repeat-map my/git-gutter+-repeat-map
+   :exit
+   ("c" . magit-commit-create)
+   ("C" . magit-commit)
+   ("b" . magit-blame)
+   :continue
+   ("n" . git-gutter+-next-hunk)
+   ("p" . git-gutter+-previous-hunk)
+   ("s" . git-gutter+-stage-hunks)
+   ("r" . git-gutter+-revert-hunk)))
+@end group
+@end lisp
+
+@findex :continue-only@r{, inside} :repeat-map@r{ and} :bind
+@cindex binding commands that only continue repeat series
+在 @code{:repeat-map} 的范围内指定 @code{:continue-only} 将使命令继续活动的重复序列，但从不启动它。  这是通过使用键盘映射设置每个命令的 @code{repeat-continue} 属性（而不是 @code{repeat-map} 属性）来完成的。  这对于在重复序列时可用但不启动重复映射本身的命令很有用。例子：
+
+@lisp
+@group
+(use-package emacs
+  :bind
+  (:repeat-map
+   paragraph-repeat-map
+   ("@}" . forward-paragraph)
+   ("@{" . backward-paragraph)
+   ("]" . forward-paragraph)
+   ("[" . backward-paragraph)
+   :continue-only
+   ("h" . mark-paragraph)
+   ("w" . kill-region)
+   ("M-w" . kill-ring-save)
+   ("k" . kill-paragraph)
+   ("y" . yank)))
+@end group
+@end lisp
+
+@node Displaying keybindings
+@subsection 显示个人按键绑定
+@cindex display your keybindings
+
+@findex describe-personal-keybindings
+@code{:bind} 关键字使用 @samp{bind-key.el} 库中的 @code{bind-keys} 宏来设置键绑定。  它会跟踪您所做的所有键绑定，以便您可以将它们与默认键绑定分开显示。
+
+使用 @w{@kbd{M-x describe-personal-keybindings}} 查看您使用 @code{:bind} 关键字或 @code{bind-keys} 宏设置的所有键绑定。
+
+@node Hooks
+@section 挂钩
+
+@cindex hooks
+@findex :hook
+@code{:hook} 关键字允许向钩子添加函数。  它采用 @var{hooks} 形式的参数，指定要添加到一个或多个钩子的一个或多个函数。  出于 @code{:hook} 的目的，钩子变量的名称应始终排除 @samp{-hook} 后缀。它会自动为您附加，以节省一些打字时间。
+
+例如，考虑以下 @code{use-package} 声明，该声明为 @samp{company} 包中的 @code{company-mode} 设置自动加载，并将 @samp{company-mode} 添加到 @code{prog-mode-hook}：
+
+@lisp
+@group
+(use-package company
+  :commands company-mode
+  :init
+  (add-hook 'prog-mode-hook #'company-mode))
+@end group
+@end lisp
+
+使用@code{:hook}，可以简化为：
+
+@lisp
+@group
+(use-package company
+  :hook (prog-mode . company-mode))
+@end group
+@end lisp
+
+这里，@code{:hook}会自动为@code{company-mode}命令设置自动加载，因此不需要使用@code{:commands}。
+
+@code{:hook} 关键字还将假定您要添加的函数的名称与附加了 @samp{-mode} 的包名称相同。  考虑到这一点，您可以将上面的内容简化为等价的：
+
+@lisp
+@group
+(use-package company
+  :hook prog-mode)
+@end group
+@end lisp
+
+@cindex multiple hooks
+您还可以提供挂钩列表。  当应应用多个钩子时，以下示例都是等效的：
+
+@lisp
+@group
+(use-package company
+  :hook (prog-mode text-mode))
+@end group
+
+@group
+(use-package company
+  :hook ((prog-mode text-mode) . company-mode))
+@end group
+
+@group
+(use-package company
+  :hook ((prog-mode . company-mode)
+         (text-mode . company-mode)))
+@end group
+
+@group
+(use-package company
+  :commands company-mode
+  :init
+  (add-hook 'prog-mode-hook #'company-mode)
+  (add-hook 'text-mode-hook #'company-mode))
+@end group
+@end lisp
+
+要将多个函数添加到同一个钩子，请分别添加它们，如下所示：
+
+@lisp
+@group
+(use-package company
+  :hook ((prog-mode . company-mode)
+         (prog-mode . some-other-function)))
+@end group
+@end lisp
+
+使用 @code{:hook} 时的一个常见错误是忘记省略 @samp{-hook} 后缀，正如已经解释的那样，后缀是自动附加的。  因此，以下代码将不起作用，因为它尝试向不存在的 @code{prog-mode-hook-hook} 添加函数：
+
+@lisp
+@group
+;; DOES NOT WORK
+(use-package ace-jump-mode
+  :hook (prog-mode-hook . ace-jump-mode))
+@end group
+@end lisp
+
+@vindex use-package-hook-name-suffix
+如果您不喜欢这种行为，可以将用户选项 @code{use-package-hook-name-suffix} 自定义为 @code{nil}。  默认情况下，该变量的值为@samp{"-hook"}。
+
+使用 @code{:hook} 与 @code{:bind}、@code{:mode}、@code{:interpreter} 等一样，会导致被挂钩的函数隐式地被读取为 @code{:commands}。  这意味着他们将为该模块建立交互式 @code{autoload} 定义（如果尚未定义为函数），因此 @code{:defer t} 也由 @code{:hook} 隐含。
+
+@node Modes and interpreters
+@section 模式和解释器
+@cindex @code{auto-mode-alist} customization
+@cindex @code{interpreter-mode-alist} customization
+@cindex setting up major modes
+
+@findex :mode
+@findex :interpreter
+与 @code{:bind} 类似，您可以使用 @code{:mode} 和 @code{:interpreter} 在 @code{auto-mode-alist} 和 @code{interpreter-mode-alist} 变量 (@pxref{Auto Major Mode,,, elisp, GNU Emacs Lisp Reference Manual}) 内建立延迟绑定。任一关键字的说明符可以是 cons 单元格、cons 单元格列表、字符串或正则表达式。
+
+以下示例重现了默认的 @code{ruby-mode} 配置，与 Emacs 中的开箱即用配置完全相同。  当文件名与正则表达式@code{"\\.rb\\'"}（扩展名为@file{.rb}的文件）匹配时，或者文件的第一行（称为“shebang”）与字符串@code{"ruby"}匹配时，该模式会自动启用：
+
+@lisp
+@group
+(use-package ruby-mode
+  :mode "\\.rb\\'"
+  :interpreter "ruby")
+@end group
+@end lisp
+
+可以使用下面的声明来重现默认的 @code{python-mode} 配置。  请注意，在这种情况下，应加载的包与模式名称不同，因此我们必须使用 cons：
+
+@lisp
+@group
+;; The package is "python" but the mode is "python-mode":
+(use-package python
+  :mode ("\\.py\\'" . python-mode)
+  :interpreter ("python" . python-mode))
+@end group
+@end lisp
+
+@code{:mode} 和 @code{:interpreter} 关键字也接受正则表达式列表：
+
+@lisp
+@group
+(use-package foo
+  ;; Equivalent to "\\(ba[rz]\\)\\'":
+  :mode ("\\.bar\\'" "\\.baz\\'")
+  ;; Equivalent to "\\(foo[ab]\\)":
+  :interpreter ("fooa" "foob"))
+@end group
+@end lisp
+
+@node Magic handlers
+@section 魔术师
+@cindex @code{magic-mode-alist} customization
+
+@findex :magic
+@findex :magic-fallback
+与 @code{:mode} 和 @code{:interpreter} 类似，您还可以使用 @code{:magic} 和 @code{:magic-fallback} 来在文件开头与给定正则表达式匹配的情况下运行某些函数，就像将这些正则表达式添加到 @code{magic-mode-alist} 和 @code{magic-fallback-mode-alist} (@pxref{Auto Major Mode,,, elisp, GNU Emacs Lisp Reference Manual}) 中一样。  @code{:magic} 和 @code{:magic-fallback} 之间的区别在于后者的优先级低于 @code{:mode}。
+
+这是一个例子：
+
+@lisp
+@group
+(use-package pdf-tools
+  :magic ("%PDF" . pdf-view-mode)
+  :config
+  (pdf-tools-install :no-query))
+@end group
+@end lisp
+
+这会注册@code{pdf-view-mode}的自动加载命令，推迟@code{pdf-tools}的加载，并在缓冲区的开头与字符串@code{"%PDF"}匹配时运行@code{pdf-view-mode}。
+
+@node User options
+@section 用户选项
+@cindex customization of variables
+@cindex variable customizations
+@cindex user options, setting
+
+@findex :custom
+在 Emacs 中，您通常使用 @code{M-x customize} 接口 (@pxref{Easy Customization,,, emacs, GNU Emacs Manual}) 设置可自定义变量（用户选项）。  我们向大多数用户推荐此方法。但是，也可以使用 @code{:custom} 关键字在 @code{use-package} 声明中设置它们。
+
+@lisp
+@group
+(use-package comint
+  :defer t
+  :custom
+  (comint-buffer-maximum-size 20000 "Increase comint buffer size.")
+  (comint-prompt-read-only t "Make the prompt read only."))
+@end group
+@end lisp
+
+这比在 @code{:config} 块中使用 @code{setq} 更好，因为可自定义变量可能有一些与之关联的代码，当您为它们赋值时，Emacs 将执行这些代码。  （在 Emacs 29 及更高版本中，还有新的 @code{setopt} 宏可以为您执行此操作。）
+
+请注意，使用 @code{:custom} 自定义的值将 @emph{not} 保存在标准 Emacs @code{custom-file} (@pxref{Saving Customizations,,, emacs, GNU Emacs Manual}) 中。  因此，您应该使用 @code{:custom} 关键字 @emph{or} @w{@kbd{M-x customize-option}} 命令设置每个用户选项；后者将在 Emacs @code{custom-file} 中保存自定义值。  不要将两者用于同一个变量，因为这可能会导致 use-package 声明和 @code{custom-file} 中的值发生冲突，从而导致调试起来既棘手又乏味的问题。
+
+另请注意，如果您在字节编译的文件中使用@code{:custom}，则稍后加载或@code{require}@file{use-package}（例如，由于延迟加载）可能会产生一些意外结果：相应用户选项的值可能会重置回其初始值。  因此，我们建议不要使用 @file{use-package} 和 @code{:custom} 设置进行字节编译文件。
+
+@node Faces
+@section 面孔
+@cindex faces, setting
+@cindex customization of faces
+
+@findex :custom-face
+@code{:custom-face} 关键字允许自定义包的外观。  例子：
+
+@lisp
+@group
+(use-package eruby-mode
+  :custom-face
+  (eruby-standard-face ((t (:slant italic)))))
+@end group
+
+@group
+(use-package example
+  :custom-face
+  (example-1-face ((t (:foreground "LightPink"))))
+  (example-2-face ((t (:foreground "LightGreen")))))
+@end group
+
+@group
+(use-package zenburn-theme
+  :preface
+  (setq my/zenburn-colors-alist
+        '((fg . "#DCDCCC") (bg . "#1C1C1C") (cyan . "#93E0E3")))
+  :custom-face
+  (region ((t (:background ,(alist-get my/zenburn-colors-alist 'cyan)))))
+  :config
+  (load-theme 'zenburn t))
+@end group
+@end lisp
+
+与 @code{:custom} (@pxref{User options}) 类似，这允许在自定义 (@pxref{Saving Customizations,,, emacs, GNU Emacs Manual}) 之外配置可自定义的面。  使用两个系统配置同一个面孔可能会导致令人困惑的结果。
+
+@node Hiding minor modes
+@section 用“减少”和“快乐”隐藏次要模式
+@cindex hiding minor modes
+
+@code{use-package} 支持 @file{diminish} 和 @file{delight} 软件包，这两个软件包都可以删除或更改模式行中的次要模式字符串。  使用哪一个取决于您，但通常应该只使用其中一个，而不是同时使用。@footnote{When in doubt, you might as well use @file{diminish}.} 要使用其中任何一个，您必须首先安装@acronym{GNU} @acronym{ELPA} 中的相应软件包。
+
+@menu
+* Diminish::                     使用 Diminish 隐藏次要模式。
+* Delight::                      用 Delight 隐藏次要模式。
+@end menu
+
+@node Diminish
+@subsection 减少
+
+@findex :diminish
+当安装减少@footnote{The @file{diminish} package is installable from @acronym{GNU} @acronym{ELPA}.}时，您可以使用@code{:diminish}关键字。  如果未安装 @file{diminish}，则 @code{:diminish} 关键字不会执行任何操作。
+
+首先，将以下声明添加到 init 文件的开头。
+
+@lisp
+(use-package diminish :ensure t)
+@end lisp
+
+@noindent
+可选的 @w{@code{:ensure t}} 确保软件包已安装（如果尚未安装） (@pxref{Installing packages})。
+
+@code{:diminish} 关键字将一个次要模式符号、该符号的 cons 及其替换字符串或只是一个替换字符串作为其参数，在这种情况下，次要模式符号被猜测为末尾附加有 @samp{-mode} 的包名称：
+
+@lisp
+@group
+(use-package abbrev
+  :diminish abbrev-mode
+  :config
+  (if (file-exists-p abbrev-file-name)
+      (quietly-read-abbrev-file)))
+@end group
+@end lisp
+
+@node Delight
+@subsection 喜
+
+@findex :delight
+当安装@file{delight}@footnote{The @file{delight} package is installable from @acronym{GNU} @acronym{ELPA}.}时，您可以使用@code{:delight}关键字。  如果未安装 @file{delight}，则 @code{:delight} 关键字不会执行任何操作。
+
+首先，将以下声明添加到 init 文件的开头。
+
+@lisp
+(use-package delight :ensure t)
+@end lisp
+
+@noindent
+可选的 @w{@code{:ensure t}} 确保软件包已安装（如果尚未安装） (@pxref{Installing packages})。
+
+@code{:delight} 关键字将次要模式符号、替换字符串或带引号的模式行数据作为其参数（在这种情况下，次要模式符号被假定为末尾附加有 @samp{-mode} 的包名称），或者两者或两者的多个列表。 @xref{Mode Line Data,,, elisp, GNU Emacs Lisp Reference Manual}。  如果未提供参数，则完全隐藏默认模式名称。
+
+例如，以下内容隐藏 @samp{foo} 包中 @samp{foo-mode} 小模式的所有内容：
+
+@lisp
+@group
+(use-package foo
+  :delight)
+@end group
+@end lisp
+
+如果模式名称与附加 @samp{-mode} 的包名称不匹配，请提供一个符号。  例如，以下代码从模式行中隐藏 @code{auto-revert-mode}：
+
+@lisp
+@group
+;; Don't show anything for auto-revert-mode, which doesn't match
+;; its package name.
+(use-package autorevert
+  :delight auto-revert-mode)
+@end group
+@end lisp
+
+您还可以使用任意 Lisp 代码作为 @code{:delight} 的参数。例如，用当前缓冲区的值替换 @samp{foo-mode}：
+
+@lisp
+@group
+(use-package foo
+  :delight '(:eval buffer-file-name))
+@end group
+@end lisp
+
+下面是隐藏几个内置次要模式的示例：
+
+@lisp
+@group
+;; Completely hide visual-line-mode and change auto-fill-mode to " AF".
+(use-package emacs
+  :delight
+  (auto-fill-function " AF")
+  (visual-line-mode))
+@end group
+@end lisp
+
+@c ----------------------------------------------------------------------------
+@node Installing packages
+@chapter 自动安装包
+
+标准 Emacs 包管理器记录在 Emacs 手册 (@pxref{Package Installation,,, emacs, GNU Emacs Manual}) 中。  @code{use-package} 宏提供 @code{:ensure} 和 @code{:pin} 关键字，它们与包管理器交互以自动安装包。  @code{:vc}关键字可用于控制包源的下载方式；例如，来自远程主机 (@pxref{Fetching Package Sources,,, emacs, GNU Emacs Manual})。  如果您在多个系统上使用 init 文件，这一点尤其有用。
+
+@menu
+* Install package::
+* Pinning packages::
+* Other package managers::
+@end menu
+
+@node Install package
+@section 安装包
+@cindex installing packages from archives
+
+@findex :ensure
+@code{:ensure} 关键字使 use-package 要求 Emacs 包管理器安装某个包（如果您的系统上尚不存在该包）。
+
+例如：
+
+@lisp
+@group
+(use-package magit
+  :ensure t)
+@end group
+@end lisp
+
+如果您需要安装与 @code{use-package} 命名的软件包不同的软件包，您可以使用一个符号：
+
+@lisp
+@group
+(use-package tex
+  :ensure auctex)
+@end group
+@end lisp
+
+@vindex use-package-always-ensure
+如果您希望此行为对于所有包都是全局的，您可以将用户选项 @code{use-package-always-ensure} 自定义为非 @code{nil} 值：
+
+@lisp
+@group
+(require 'use-package-ensure)
+(setq use-package-always-ensure t)
+@end group
+@end lisp
+
+@noindent
+您可以通过在其声明中添加 @w{@code{:ensure nil}} 来覆盖单个包的上述设置。
+
+@findex :vc
+@code{:vc} 关键字可用于控制如何下载和/或安装软件包。  更具体地说，它允许人们直接从版本控制系统获取和更新包。  当想要安装不在任何包存档中的包时，这尤其方便。
+
+该关键字接受与@pxref{Fetching Package Sources,,, emacs, GNU Emacs Manual}中指定的相同参数，但不需要显式给出名称：它是从声明中推断出来的。  接受的属性列表由 @code{:rev} 关键字扩充，该关键字与 @code{package-vc-install} 的 @code{REV} 参数具有相同的形状。  值得注意的是 - 即使未指定 - @code{:rev} 默认检查软件包的最后一个版本。您可以使用 @code{:rev :newest} 查看最新的提交。  请注意，目前您无法使用 @code{:vc} 升级内置软件包。
+
+例如，
+
+@example
+@group
+(use-package bbdb
+  :vc "https://git.savannah.nongnu.org/git/bbdb.git")
+@end group
+@end example
+
+将使用 @code{package-vc-install} 检查最新版本的提交，同时
+
+@example
+@group
+(use-package bbdb
+  :vc (:url "https://git.savannah.nongnu.org/git/bbdb.git"
+       :rev :newest))
+@end group
+@end example
+
+会尝试从指定的远程安装包 @code{foo} 的最新提交。
+
+@vindex use-package-vc-prefer-newest
+或者，存在 @code{use-package-vc-prefer-newest} 用户选项以始终首选最新提交。
+
+@node Pinning packages
+@section 使用 @code{:pin} 固定包
+@cindex installing package from specific archive
+@cindex pinning a package to archive
+
+@findex :pin
+use-package 可以使用 @code{:pin} 关键字将 @dfn{pin} 包添加到特定存档。@footnote{The @code{:pin} keyword has no effect on Emacs versions older than 24.4.} 这允许您混合和匹配来自不同存档的包。  其主要用例是更喜欢安装来自 @acronym{GNU} @acronym{ELPA} 或 @acronym{NonGNU} @acronym{ELPA} 的软件包（分别由 @code{gnu} 和 @code{nongnu} 表示），同时从第三方存档安装特定软件包。
+
+例如：
+
+@lisp
+@group
+(use-package company
+  :ensure t
+  :pin gnu)   ; GNU ELPA
+@end group
+@end lisp
+
+@vindex use-package-always-pin
+不幸的是，第三方存档@acronym{MELPA}使用基于日期的版本控制方案，这意味着该存档中的包始终是首选。  如果您正在使用该存档，我们强烈建议您将 @code{use-package-always-pin} 自定义为 @code{nongnu}。  这可以保证您使用的是由其开发人员专门标记为发布的该软件包的版本，而不是开发快照。
+
+@cindex manual update of packages
+@c FIXME: This needs clarifying.  AFAIK, :ensure does not update packages.
+如果您想手动保持包更新并忽略上游更新，可以将其固定到@samp{manual}。  只要您没有自定义存储库以在 @code{package-archives} 变量中使用该名称，这就会起作用。
+
+例子：
+
+@lisp
+@group
+(use-package org
+  :ensure t
+  ;; ignore org-mode from upstream and use a manually installed version
+  :pin manual)
+@end group
+@end lisp
+
+如果您尝试将包固定到未使用 @code{package-archives} 配置的存档（特殊 @samp{manual} 存档除外），@code{use-package} 会发出错误信号。
+
+@node Other package managers
+@section 非标准包管理器
+@cindex non-standard package managers
+@cindex package managers, other than @file{package.el}
+@cindex installing using non-standard package managers
+
+默认情况下，use-package 假定您正在使用 Emacs 内置的 @file{package.el} 包管理器。  我们希望大多数用户会发现它足够强大，即使对于高级用例也是如此。
+
+@vindex use-package-ensure-function
+但是，某些用户可能更喜欢在特定情况或用例中使用第三方包管理器。  通过将用户选项 @code{use-package-ensure-function} 设置为函数名称，您可以指示 @code{:ensure} 使用不同的包管理器来安装包。
+
+有关更多详细信息，请参阅您正在使用的包管理器的文档。  如果遇到任何错误，通常最好直接向该包管理器的开发人员报告。
+
+@c ----------------------------------------------------------------------------
+@node Byte-compiling
+@chapter 字节编译你的初始化文件
+@cindex byte-compiling your init file
+
+一些用户可能希望对他们的 init 文件进行字节编译以使 Emacs 启动更快。  在大多数情况下不建议这样做，因为加速通常太小而不值得，并且如果字节编译文件过时，可能会导致混乱。  如果您仍然想这样做，本章将介绍如何操作。
+
+当文件被字节编译时，@code{use-package} 总是加载它可以加载的每个库。  这有助于消除有关未知变量和函数的虚假警告。
+
+@findex :defines
+@findex :functions
+@cindex silence byte-compilation warnings
+然而，有时这还不够。  在这些时候，使用 @code{:defines} 和 @code{:functions} 关键字引入虚拟变量和函数声明只是为了消除字节编译器警告。  例如：
+
+@lisp
+@group
+(use-package texinfo
+  :defines texinfo-section-list
+  :commands texinfo-mode
+  :init
+  (add-to-list 'auto-mode-alist '("\\.texi$" . texinfo-mode)))
+@end group
+@end lisp
+
+如果您需要消除缺少功能的警告，可以使用@code{:functions}：
+
+@lisp
+@group
+(use-package ruby-mode
+  :mode "\\.rb\\'"
+  :interpreter "ruby"
+  :functions inf-ruby-keys
+  :config
+  (defun my-ruby-mode-hook ()
+    (require 'inf-ruby)
+    (inf-ruby-keys))
+  (add-hook 'ruby-mode-hook 'my-ruby-mode-hook))
+@end group
+@end lisp
+
+@findex :no-require
+@cindex prevent a package from loading at compile-time
+@cindex package loading at byte-compilation time, prevent
+通常，@code{use-package}将在编译配置之前在编译时加载每个包，以确保任何必要的符号都在满足字节编译器的范围内。  有时这可能会导致问题，因为包可能有特殊的加载要求，而您想要使用 @code{use-package} 的目的就是向 @code{eval-after-load} 钩子添加配置。  在这种情况下，请使用 @code{:no-require} 关键字：
+
+@lisp
+@group
+(use-package foo
+  :no-require t
+  :config
+  (message "Evaluate this immediately after loading `foo'"))
+@end group
+@end lisp
+
+@c ----------------------------------------------------------------------------
+@node Troubleshooting
+@chapter 故障排除
+
+@cindex troubleshooting use-package
+@cindex debugging use-package
+如果在初始化或配置包时发生错误，这不会阻止 Emacs 加载。  相反，@code{use-package} 捕获错误并在特殊的 @file{*Warnings*} 弹出缓冲区中报告它，以便您可以在其他功能正常的 Emacs 中调试该情况。
+
+如果您在启动 Emacs 时遇到问题，可以向 Emacs 传递 @samp{--debug-init} 命令行标志。  @xref{Initial Options,,, emacs, GNU Emacs Manual}。  要在使用该标志时获取更多信息，请将以下内容添加到您的初始化文件中（这些选项记录在下面）：
+
+@lisp
+@group
+(when init-file-debug
+  (setq use-package-verbose t
+        use-package-expand-minimally nil
+        use-package-compute-statistics t
+        debug-on-error t))
+@end group
+@end lisp
+
+@cindex reporting bugs
+@cindex expanding macro, for troubleshooting
+由于 @code{use-package} 是一个宏，因此当您需要深入研究时，第一步通常是查看您的声明扩展为哪些 Emacs Lisp 代码。  您可以使用命令 @w{@kbd{M-x pp-macroexpand-last-sexp}}，或者将 use-package 声明包装在 @code{macroexpand} 中并对其进行评估。  最好将它们的输出包含在您提交使用包的任何错误中。
+
+@menu
+* Troubleshooting Options::
+* Gathering Statistics::
+* Disabling a package::
+@end menu
+
+@node Troubleshooting Options
+@section 排除故障时有帮助的选项
+@cindex options for troubleshooting
+@cindex troubleshooting, options that help
+
+@vindex use-package-expand-minimally
+默认情况下，use-package 将尝试捕获并报告在 init 文件中扩展 use-package 声明期间发生的错误。将用户选项 @code{use-package-expand-minimally} 自定义为非 @code{nil} 值以禁用此检查。
+
+@findex :catch
+可以使用 @code{:catch} 关键字在本地覆盖此行为。  如果@code{t}或@code{nil}，它启用或禁用在加载时捕获错误。  它也可以是一个带有两个参数的函数：遇到错误时正在处理的关键字和错误对象（由@code{condition-case}生成）。  例如：
+
+@lisp
+@group
+(use-package example
+  ;; Note that errors are never trapped in the preface, since
+  ;; doing so would hide definitions from the byte-compiler.
+  :preface (message "I'm here at byte-compile and load time")
+  :init (message "I'm always here at startup")
+  :config
+  (message "I'm always here after the package is loaded")
+  (error "oops")
+  ;; Don't try to (require 'example), this is just an example!
+  :no-require t
+  :catch (lambda (keyword err)
+           (message (error-message-string err))))
+@end group
+@end lisp
+
+评估上述表格将打印以下消息：
+
+@verbatim
+I'm here at byte-compile and load time
+I'm always here at startup
+Configuring package example...
+I'm always here after the package is loaded
+oops
+@end verbatim
+
+@node Gathering Statistics
+@section 收集统计数据
+@cindex gathering use-package statistics
+@cindex usage statistics for use-package
+
+@vindex use-package-verbose
+加载包时，如果您将 @code{use-package-verbose} 设置为 @code{t}，或者如果包的加载时间超过 0.1 秒，您将在 @code{*Messages*} 缓冲区中看到一条消息，指示此加载活动。  对于执行时间超过 0.1 秒的配置或@code{:config}块也会发生同样的情况。
+
+@vindex use-package-compute-statistics
+如果您想查看已加载的包数量、它们已达到初始化的哪个阶段以及它们花费了多少总时间（大致）的摘要，您可以将用户选项 @code{use-package-compute-statistics} 自定义为非 @code{nil} 值。  然后重新加载您的软件包（通常是重新启动 Emacs），以确保 use-package 可以收集所有软件包的统计信息。
+
+@cindex use-package-report
+运行命令@kbd{M-x use-package-report}查看结果。  显示的缓冲区是一个列表。  要根据特定列对行进行排序，请将光标移至该列并输入 @kbd{S}，或单击图形显示上缓冲区顶部的列名称。
+
+@findex use-package-reset-statistics
+要重置 use-package 为当前 Emacs 调用收集的所有统计信息，请运行命令 @kbd{M-x use-package-reset-statistics}。
+
+请注意，如果您直接在初始化文件中设置 @code{use-package-compute-statistics}，而不是使用 @code{customize}，则必须在加载 @code{use-package} 之后、任何 @code{use-package} 表单之前执行此操作。
+
+@node Disabling a package
+@section 禁用包
+@cindex disable package
+
+@findex :disabled
+@code{:disabled} 关键字禁止加载包及其所有自定义项。  相当于注释掉或删除定义。
+
+例如，您可以使用它来暂时禁用您遇到困难的包，或者避免加载您当前未使用的包。
+
+此示例禁用 @samp{foo} 包：
+
+@lisp
+@group
+(use-package foo
+  :disabled)
+@end group
+@end lisp
+
+当对 init 文件进行字节编译时，use-package 会完全忽略输出中禁用的声明，以使 Emacs 启动更快。
+
+@c ----------------------------------------------------------------------------
+@node Keyword extensions
+@appendix 关键词扩展
+@cindex keyword extension
+@cindex extending use-package keywords
+
+use-package 基于可扩展框架，使包作者可以轻松添加新关键字或修改现有关键字的行为。
+
+一些关键字扩展包含在 @code{use-package} 中，并且可以选择启用。
+
+@menu
+* use-package-ensure-system-package::
+* Creating an extension::
+@end menu
+
+@node use-package-ensure-system-package
+@appendixsec :使用包确保系统包
+
+@findex :ensure-system-package
+@code{:ensure-system-package} 关键字可让您确保某些可执行文件与包声明一起在您的系统上可用。@footnote{On macOS, your @code{exec-path} might be different if you are starting Emacs as a GUI app instead of from a shell.  If you find that Emacs on macOS cannot find some executables that you know are already installed, you could try the @uref{https://github.com/purcell/exec-path-from-shell,@samp{exec-path-from-shell}} package.}
+
+要使用此扩展，请在加载@code{use-package}后立即添加：
+
+@lisp
+(use-package use-package-ensure-system-package)
+@end lisp
+
+现在您可以使用 @code{:ensure-system-package} 关键字。这是一个用法示例：
+
+@lisp
+@group
+(use-package foo
+  :ensure-system-package foo)
+@end group
+@end lisp
+
+这将期望存在一个名为 @code{foo} 的全局二进制包。如果没有，它将使用您的系统包管理器尝试异步安装同名的二进制文件。  这需要 @acronym{GNU} @acronym{ELPA} 软件包 @uref{https://gitlab.com/jabranham/system-packages,@samp{system-packages}}，因此要使其工作，您必须先安装它。
+
+确保已安装的一种方法是将 @code{use-package} 与 @code{:ensure} 一起使用。
+
+@lisp
+@group
+(use-package system-packages
+  :ensure t)
+@end group
+@end lisp
+
+例如，在 Debian GNU/Linux 系统上，这将调用 @samp{apt-get install foo}。
+
+如果包的名称与二进制文件的名称不同，则可以使用 @code{(binary . package-name)} 形式的 cons。  例如：
+
+@lisp
+@group
+(use-package foo
+  :ensure-system-package
+  (foocmd . foo))
+@end group
+@end lisp
+
+在 Debian GNU/Linux 系统上，如果 Emacs 无法找到可执行文件 @code{foocmd}.@footnote{For manual testing, you could use the @code{executable-find} function, which is what @samp{system-packages} uses internally.}，则会调用 @code{apt install foo}
+
+@code{:ensure-system-package} 也可以采用 cons，其中 @code{cdr} 是一个字符串，如果找不到，将由 @code{(async-shell-command)} 调用来安装。  这不依赖于任何外部包。
+
+@lisp
+@group
+(use-package tern
+  :ensure-system-package (tern . "npm i -g tern"))
+@end group
+@end lisp
+
+要安装多个软件包，您可以传入一系列conses：
+
+@lisp
+@group
+(use-package ruby-mode
+  :ensure-system-package
+  ((rubocop     . "gem install rubocop")
+   (ruby-lint   . "gem install ruby-lint")
+   (ripper-tags . "gem install ripper-tags")
+   (pry         . "gem install pry")))
+@end group
+@end lisp
+
+最后，如果包依赖项不提供全局可执行文件，您可以通过提供如下字符串来检查文件是否存在，以确保包存在：
+
+@lisp
+@group
+(use-package dash-at-point
+  :if (eq system-type 'darwin)
+  :ensure-system-package
+  ("/Applications/Dash.app" . "brew cask install dash"))
+@end group
+@end lisp
+
+@code{:ensure-system-package} 将使用 @code{system-packages-install} 安装系统软件包，除非已指定自定义命令，在这种情况下，它将由 @code{async-shell-command} 逐字执行。
+
+用户选项 @code{system-packages-package-manager} 和 @code{system-packages-use-sudo} 受到尊重，但不适用于自定义命令。  如果需要，自定义命令应在命令中包含对 sudo 的调用。
+
+@node Creating an extension
+@appendixsec 如何创建扩展关键字
+@cindex extension keywords
+
+本节介绍如何创建新关键字。
+
+@enumerate
+@item 
+添加关键字。
+
+第一步是在 @code{use-package-keywords} 中的正确位置添加关键字。  该列表决定了扩展代码中事情发生的顺序。  您永远不应该更改此顺序，但它为您提供了一个框架，可以在其中决定何时触发关键字。
+
+@item 
+创建一个标准化器。
+
+规范化器的工作是获取参数列表（可能是@code{nil}），并将其转换为应出现在@code{use-package}使用的最终属性列表中的单个参数（仍然可以是列表）。
+
+通过定义以关键字命名的函数来为关键字定义规范化器，例如：
+
+@lisp
+@group
+(defun use-package-normalize/:pin (name-symbol keyword args)
+  (use-package-only-one (symbol-name keyword) args
+    (lambda (label arg)
+      (cond
+       ((stringp arg) arg)
+       ((symbolp arg) (symbol-name arg))
+       (t
+        (use-package-error
+         ":pin wants an archive name (a string)"))))))
+@end group
+@end lisp
+
+@item 
+创建一个处理程序。
+
+一旦有了规范化器，您必须为关键字创建一个处理程序。
+
+处理程序可以通过两种方式影响关键字的处理。  首先，他们可以在递归处理剩余关键字之前修改@code{state} plist，以影响关注状态的关键字（一个例子是状态关键字@code{:deferred}，不要与@code{use-package}关键字@code{:defer}混淆）。  然后，一旦处理了剩余的关键字并返回了它们的结果形式，处理程序就可以操纵、扩展或只是忽略这些形式。
+
+每个处理程序的任务是返回一个代表要插入的代码的@emph{list of forms}。  它不需要是一个 @code{progn} 列表，因为这是在其他地方自动处理的。因此，通常会看到使用 @code{use-package-concat} 在代码体之前或之后添加新功能的习惯用法，这样 @code{use-package} 扩展的结果只会发出所需的最少代码。
+
+这是一个示例处理程序：
+
+@lisp
+@group
+(defun use-package-handler/:pin (name-symbol keyword archive-name rest state)
+  (let ((body (use-package-process-keywords name-symbol rest state)))
+    ;; This happens at macro expansion time, not when the expanded code is
+    ;; compiled or evaluated.
+    (if (null archive-name)
+        body
+      (use-package-pin-package name-symbol archive-name)
+      (use-package-concat
+       body
+       `((push '(,name-symbol . ,archive-name)
+               package-pinned-packages))))))
+@end group
+@end lisp
+
+@item 
+测试一下。
+
+将关键字插入 @code{use-package-keywords} 并定义规范化器和处理程序后，您现在可以通过查看关键字的用法将如何扩展来测试关键字。  为此，请使用 @w{@kbd{M-x pp-macroexpand-last-sexp}} 并将光标设置在 @code{(use-package @dots{})} 表达式之后。
+@end enumerate
+
+@c ----------------------------------------------------------------------------
+@node History
+@appendix 历史和致谢
+
+use-package 是由 John Wiegley 编写的。  它的开发始于 2012 年，并于 2022 年合并到 Emacs 中，为 Emacs 29.1 的发布做准备。
+
+多年来，数十人通过错误报告、文档和代码为 use-package 做出了贡献。  他们太多，无法在此一一列举，但我们感谢他们所有人的贡献。
+
+本 Texinfo 手册由 Stefan Kangas 编写，是对旧的使用包手册和 @file{README} 的重大重写。
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Index
+@unnumbered 指数
+@printindex cp
+
+@bye

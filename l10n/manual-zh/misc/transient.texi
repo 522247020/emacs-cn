@@ -1,0 +1,2092 @@
+\输入 texinfo @c -*- texinfo -*-
+@c %**start of header
+@setfilename transient.info
+@settitle 临时用户和开发人员手册
+@documentencoding UTF-8
+@documentlanguage en
+@c %**end of header
+
+@copying
+@quotation
+版权所有 (C) 2018--2026 自由软件基金会, Inc.
+
+您可以根据自由软件基金会发布的 GNU 通用公共许可证（许可证的第 3 版）或（由您选择）任何更高版本的条款重新分发和/或修改本文档。
+
+分发本文档的目的是希望它有用，但不提供任何保证；甚至没有适销性或特定用途适用性的默示保证@. 有关更多详细信息，请参阅 GNU 通用公共许可证。
+
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* Transient: (transient).  瞬态命令。
+@end direntry
+
+@finalout
+@titlepage
+@title 临时用户和开发人员手册
+@subtitle 对于版本 0.13.3
+@author Jonas Bernoulli
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top Transient User and Developer Manual
+
+Transient is the library used to implement the keyboard-driven ``menus''
+in Magit.  It is distributed as a separate package, so that it can be
+used to implement similar menus in other packages.
+
+This manual can be bit hard to digest when getting started.  A useful
+resource to get over that hurdle is Psionic K's interactive tutorial,
+available at @uref{https://github.com/positron-solutions/transient-showcase}.
+
+@noindent
+This manual is for Transient version 0.13.3.
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Introduction::
+* Usage::
+* Modifying Existing Transients::
+* Defining New Commands::
+* Classes and Methods::
+* FAQ::
+* Keystroke Index::
+* Command and Function Index::
+* Variable Index::
+* Concept Index::
+* GNU General Public License::
+
+@detailmenu
+--- 详细节点列表 ---
+
+用法
+
+* Invoking Transients::
+* Aborting and Resuming Transients::
+* Common Suffix Commands::
+* Saving Values::
+* Using History::
+* Getting Help for Suffix Commands::
+* Enabling and Disabling Suffixes::
+* Other Commands::
+* Configuration::
+
+定义新命令
+
+* Technical Introduction::
+* Defining Transients::
+* Binding Suffix and Infix Commands::
+* Defining Suffix and Infix Commands::
+* Using Infix Arguments::
+* Using Prefix Scope::
+* Current Suffix Command::
+* Current Prefix Command::
+* Transient State::
+
+类和方法
+
+* Group Classes::
+* Group Methods::
+* Prefix Classes::
+* Suffix Classes::
+* Prefix Methods::
+* Suffix Methods::
+* Prefix Slots::
+* Suffix Slots::
+* Predicate Slots::
+
+@end detailmenu
+@end menu
+
+@node Introduction
+@chapter 介绍
+
+Transient 是用于在 Magit 中实现键盘驱动的@dfn{menus} 的库。  它作为一个单独的包分发，以便它可以用于在其他包中实现类似的菜单。
+
+刚开始使用时，本手册可能有点难以理解。  Psionic K 的交互式教程是克服这一障碍的有用资源，可在 @uref{https://github.com/positron-solutions/transient-showcase} 获取。
+
+@anchor{Some things that Transient can do}
+@heading Transient 可以做的一些事情
+
+@itemize
+@item 
+显示参数的当前状态
+@item 
+显示和管理模态绑定的生命周期
+@item 
+上下文用户界面
+@item 
+类似向导的交互式表单组合的流程控制
+@item 
+历史与坚持
+@item 
+用于控制 CLI 程序的渲染参数
+@end itemize
+
+@anchor{Complexity in CLI programs}
+@heading CLI 程序的复杂性
+
+复杂性往往会随着时间的推移而增加。  您如何管理命令的复杂性？  考虑一下简单的 shell 命令@samp{ls}。  它现在有超过 1 个命令行选项。  其中一些是布尔标志 (@samp{ls -l})。有些接受参数 (@samp{ls --sort=s})。  除非与其他标志配对，否则某些标志无效 (@samp{ls -lh})。  有些是相互排斥的。  有些 shell 命令甚至有如此多的选项，以至于引入了@emph{subcommands}（@samp{git branch}、@samp{git commit}），每个命令都有自己丰富的选项集（@samp{git branch -f}）。
+
+@anchor{Using Transient for composing interactive commands}
+@heading 使用 Transient 编写交互式命令
+
+交互式使用 Emacs 命令怎么样？  这些如何处理选项？  一种解决方案是制作同一命令的多个版本，因此您不需要这样做！  考虑：@samp{delete-other-windows} 与 @samp{delete-other-windows-vertically}（还有许多类似的例子）。
+
+某些 Emacs 命令只会提示您输入下一个“参数”(@samp{M-x switch-to-buffer})。  另一种常见的解决方案是使用通常以 @samp{C-u} 开头的前缀参数。  有时，这些本质上是明显的数字（@samp{C-u 4 M-x forward-paragraph}向前移动 4 段）。  但有时它们的功能是布尔“开关”（@samp{C-u C-SPACE}跳转到最后一个标记而不是仅仅设置它，@samp{C-u C-u C-SPACE}无条件设置标记）。  由于前缀选项的使用没有太多标准，因此您必须阅读命令的文档以找出可能性。
+
+但是，当 Emacs 命令变得具有真正庞大的选项和参数集、它们之间的依赖关系、大量选项值等时，这些简单的方法就无法扩展。  Transient 就是为了解决这个问题而设计的。  将其视为简单的前缀参数@samp{C-u}，@emph{raised to the power of 10}。  与@samp{C-u}一样，它是按键驱动的。  与 shell 一样，它支持布尔“标志”选项、带参数的选项，甚至带有自己的选项的“子命令”。  但是，精心设计的瞬态 @emph{guide} 无需搜索手册页或命令文档，而是直接将用户提供给相关选项集（甚至可能的值！），同时考虑到任何重要的预先存在的 Emacs 设置。  虽然对于像 @samp{ls} 这样的 shell 命令，只有一种方法可以“执行”（点击 @samp{Return}！），但瞬态可以使用与许多自记录 @emph{actions} 之一相关联的多个不同键来“执行”（想象一下键盘上有 5 个不同颜色的返回键！）。  瞬态使得导航和设置大型、复杂的命令选项和参数组变得容易。  甚至很有趣。  一旦你尝试过，就很难再回到@samp{C-u what can I do here again?}方式了。
+
+@node Usage
+@chapter 用法
+
+@menu
+* Invoking Transients::
+* Aborting and Resuming Transients::
+* Common Suffix Commands::
+* Saving Values::
+* Using History::
+* Getting Help for Suffix Commands::
+* Enabling and Disabling Suffixes::
+* Other Commands::
+* Configuration::
+@end menu
+
+@node Invoking Transients
+@section 调用瞬态
+
+@cindex invoking transients
+
+与任何其他命令一样，通过按绑定到该命令的键来调用瞬态前缀命令。  与其他命令的主要区别在于，瞬态前缀命令激活瞬态键盘映射，该映射临时绑定瞬态的中缀和后缀命令，并且这些绑定显示在菜单缓冲区中，该菜单缓冲区显示在新窗口中，直到退出菜单。当瞬态生效时，来自其他键盘映射的绑定可能会或可能不会被禁用。
+
+调用瞬态前缀命令后有两种可用的命令；中缀和后缀命令。  中缀命令设置一些值（然后显示在菜单缓冲区中），而不留下瞬态。  另一方面，后缀命令通常退出瞬态，并且它们可以使用中缀命令设置的值，即中缀@strong{arguments}。
+
+中缀命令也可以通过副作用设置某些值，例如通过设置某些变量的值，而不是设置后缀命令使用的参数。
+
+@node Aborting and Resuming Transients
+@section 中止和恢复瞬态
+
+@cindex aborting transients
+@cindex resuming transients
+
+@cindex quit transient
+要退出瞬态而不调用后缀命令，请按@kbd{C-g}。
+
+瞬态键映射中的键绑定可能比单个事件长。按下有效的前缀键后，所有绑定不以该前缀键开头的命令将暂时不可用并呈灰色显示。要中止前缀键，请按 @kbd{C-g} （在这种情况下，仅退出前缀键，但不会完全退出）。
+
+瞬态前缀命令可以绑定为另一个瞬态的后缀。  调用这样的后缀会用新的瞬态替换当前的瞬态，即，可用的绑定发生变化，菜单缓冲区中显示的信息也会相应更新。  当嵌套瞬态处于活动状态时按 @kbd{C-g} 只会退出最里面的瞬态，从而返回到上一个瞬态。
+
+另一方面，@kbd{C-q} 或 @kbd{C-z} 始终退出所有瞬态。  如果您使用后者，那么您可以稍后使用 @kbd{M-x transient-resume} 恢复瞬态堆栈。
+
+@table @asis
+@item @kbd{C-g} (@code{transient-quit-seq})
+@itemx @kbd{C-g} (@code{transient-quit-one})
+@kindex C-g
+@kindex C-g
+@findex transient-quit-seq
+@findex transient-quit-one
+该键退出当前活动的不完整键序列（如果有），否则退出当前瞬态。  退出当前瞬态时，它会返回到上一个瞬态（如果有）。
+@end table
+
+Transient 的前身将 @kbd{q} 而不是 @kbd{C-g} 绑定到退出命令。要了解如何恢复该绑定，请参阅 @code{transient-bind-q-to-quit} 的文档字符串。
+
+@table @asis
+@item @kbd{C-q} (@code{transient-quit-all})
+@kindex C-q
+@findex transient-quit-all
+此命令退出当前活动的不完整按键序列（如果有）和所有瞬态，包括活动瞬态和所有暂停的瞬态（如果有）。
+
+@item @kbd{C-z} (@code{transient-suspend})
+@kindex C-z
+@findex transient-suspend
+与@code{transient-quit-all} 一样，此命令退出不完整的按键序列（如果有）以及所有瞬变。  此外，它保存瞬态堆栈，以便可以轻松恢复（如果您快速需要执行“其他操作”并且堆栈比单个瞬态更深，和/或您已经更改了某些中缀参数的值，这特别有用）。
+
+请注意，一次只能保存一个瞬态堆栈。如果已保存另一个堆栈，则保存新堆栈将丢弃以前的堆栈。
+
+@item @kbd{M-x transient-resume}
+@findex transient-resume
+此命令恢复先前挂起的瞬态堆栈（如果有）。
+@end table
+
+@node Common Suffix Commands
+@section 常用后缀命令
+
+@cindex common suffix commands
+
+一些共享后缀命令在所有瞬态中都可用。  默认情况下，这些后缀命令不会永久显示在每个菜单中。这些命令中的大多数共享一个公共前缀键，按下该键会导致公共命令临时显示在活动菜单中。
+
+@defopt transient-show-common-commands
+此选项控制共享后缀命令是否与菜单特定的中缀和后缀命令一起永久显示。  默认情况下，共享命令不会永久显示，以避免浪费宝贵的空间并让用户因太多选择而不知所措。
+
+如果您希望始终看到这些命令，请将此选项设置为非 @code{nil} 值。  或者，可以使用 @code{transient-toggle-common} 仅为当前 Emacs 会话切换该值，如下所述。
+@end defopt
+
+@defopt transient-common-command-prefix
+此选项指定所有瞬态菜单中使用的前缀键，以调用大多数共享命令，这些命令在所有瞬态菜单中都可用。  默认情况下，这些绑定仅在按下该前缀键之后以及在使用有效的键绑定之前显示（但请参阅上一个选项）。
+
+由于历史原因，默认使用 @kbd{C-x}，但鼓励用户选择另一个键，最好是 Emacs 中不常用但对他们来说仍然方便的键。
+
+通常，当临时菜单处于活动状态时，用户无法调用未绑定在菜单本身中的命令。  对于这些菜单，如果 @kbd{C-x} 或其他常用前缀键用于常见菜单命令，则没关系。  然而，某些其他较新的菜单不会抑制在菜单本身之外建立的键绑定，并且在这些情况下，公共菜单命令的绑定可能会隐藏外部绑定。  例如，如果@code{transient-save}的菜单绑定遮蔽了@code{save-buffer}，则@kbd{C-x C-s}不能用于调用@code{save-buffer}。
+
+哪个键最合适取决于用户的偏好，但好的选择可能包括功能键和 @kbd{C-z}（对于许多键盘布局，@kbd{z} 就在 @kbd{x} 旁边，并且在瞬态菜单处于活动状态时调用 @code{suspend-frame} 无论如何都不是一个好主意）。
+@end defopt
+
+@table @asis
+@item @kbd{C-x t} (@code{transient-toggle-common})
+@kindex C-x t
+@findex transient-toggle-common
+此命令切换是否永久显示所有瞬变通用的通用命令，或者仅在键入不完整的前缀键序列@kbd{}后显示。  这仅影响当前的 Emacs 会话。
+@end table
+
+其他常用命令在前面或以下部分之一中进行了描述。
+
+@node Saving Values
+@section 保存价值
+
+@cindex saving values of arguments
+
+在瞬态中设置中缀参数后，用户可以保存这些参数以供将来调用。
+
+大多数瞬态在调用时都会以保存的参数开始。  不过，也有一些例外。  某些瞬态被设计为将它们使用的值存储在外部作为某些变量的缓冲区本地值。  再次调用此类瞬态将使用缓冲区本地值。 @footnote{@code{magit-diff} and @code{magit-log} are two prominent examples, and their handling of buffer-local values is actually a bit more complicated than outlined above and even customizable.}
+
+如果用户不保存该值而只是使用常规后缀命令退出，则该值仅保存到瞬态历史记录中。  当下次调用瞬态时，不会使用该值，但它很容易访问（参见@ref{Using History}）。
+
+选项 @code{transient-common-command-prefix} 控制以下绑定中使用的前缀键。  为了简单起见，默认值 @kbd{C-x} 如下所示。
+
+@table @asis
+@item @kbd{C-x s} (@code{transient-set})
+@kindex C-x s
+@findex transient-set
+此命令保存此 Emacs 会话的活动瞬态值。
+
+@item @kbd{C-x C-s} (@code{transient-save})
+@kindex C-x C-s
+@findex transient-save
+此命令跨 Emacs 会话永久保存活动瞬态值。
+
+@item @kbd{C-x C-k} (@code{transient-reset})
+@kindex C-x C-k
+@findex transient-reset
+该命令清除活动瞬态的设置和保存值。
+@end table
+
+@defopt transient-values-file
+此选项命名用于保存 Emacs 会话之间瞬态值的文件。
+@end defopt
+
+@node Using History
+@section 使用历史记录
+
+@cindex value history
+
+每次用户调用后缀命令时，瞬态的当前值都会保存到其历史记录中。  这些值可以循环使用，就像循环读取微型缓冲区中的用户输入的命令历史记录一样。
+
+选项 @code{transient-common-command-prefix} 控制以下绑定中使用的前缀键。  为了简单起见，默认值 @kbd{C-x} 如下所示。
+
+@table @asis
+@item @kbd{C-M-p} (@code{transient-history-prev})
+@itemx @kbd{C-x p}
+@kindex C-M-p
+@kindex C-x p
+@findex transient-history-prev
+此命令切换到用于活动瞬态的先前值。
+
+@item @kbd{C-M-n} (@code{transient-history-next})
+@itemx @kbd{C-x n}
+@kindex C-M-n
+@kindex C-x n
+@findex transient-history-next
+此命令切换到用于活动瞬态的下一个值。
+@end table
+
+除了瞬态范围的历史之外，中缀还可以有自己的历史。  当中缀使用迷你缓冲区读取用户输入时，用户可以使用常规迷你缓冲区历史命令来循环以前使用的值。  通常，与上述相同的键绑定到这些命令。
+
+瞬态的作者应该安排读取相同类型值的不同中缀命令也使用相同的历史键（参见@ref{Suffix Slots}）。
+
+当 Emacs 退出时，这两种历史记录都会保存到文件中。
+
+@defopt transient-save-history
+该选项控制退出 Emacs 时是否保存临时命令的历史记录。
+@end defopt
+
+@defopt transient-history-file
+此选项命名用于保存 Emacs 会话之间的瞬态历史记录及其中缀的文件。
+@end defopt
+
+@defopt transient-history-limit
+此选项控制在@code{transient-history-file}中保存历史记录时保留多少个历史元素。
+@end defopt
+
+@node Getting Help for Suffix Commands
+@section 获取后缀命令的帮助
+
+@cindex getting help
+
+瞬态可能有许多用户可能不熟悉的后缀和中缀。  为了让获得这些帮助变得简单，Transient 提供了直接从活动瞬态访问文档的功能。
+
+@table @asis
+@item @kbd{C-h} (@code{transient-help})
+@kindex C-h
+@findex transient-help
+该命令进入帮助模式。  当帮助模式处于活动状态时，键入一个键会显示有关该键通常绑定到的后缀命令的信息（而不是调用它）。  第二次按 @kbd{C-h} 显示有关 @emph{prefix} 命令的信息。
+
+键入按键后，瞬态堆栈将暂停，并显示有关后缀命令的信息。  在帮助缓冲区中键入 @kbd{q} 会隐藏该缓冲区并恢复瞬态状态。
+@end table
+
+显示哪种类型的文档取决于瞬态的定义方式。  对于表示命令行参数的中缀命令，最好显示相应的联机帮助页。  @code{transient-help} 然后尝试跳转到其中的正确位置。  还支持信息手册。  后备方法是显示命令的文档字符串，对于非中缀后缀，这通常是合适的。
+
+@node Enabling and Disabling Suffixes
+@section 启用和禁用后缀
+
+@cindex enabling suffixes
+@cindex disabling suffixes
+
+使用瞬态的包的用户群可能非常多样化。对于马吉特来说，情况确实如此。有些用户已经使用它和 Git 十年了，而其他用户现在才刚刚开始。
+
+@cindex levels
+出于这个原因，需要一种机制，作者可以使用它来沿着本质@dots{}所有频谱对瞬态的中缀和后缀进行分类。  我们使用术语 @dfn{levels} 来描述该机制。
+
+@cindex transient-level
+每个后缀命令都放置在一个级别上，每个瞬态都有一个级别（称为@dfn{transient-level}），它控制哪些后缀命令可用。  1 到 7（含）之间的整数是有效级别。对于后缀，0也有效；这意味着该后缀在任何级别都不显示。
+
+通过调用菜单并使用命令 @code{transient-set-level} 进入其“编辑”模式，可以交互地更改各个瞬态和/或其各个后缀的级别，如下所述。
+
+瞬态及其后缀的默认级别均为 4。 @code{transient-default-level} 选项仅控制瞬态的默认级别。  默认后缀级别始终为 4。瞬态的作者应该将某些后缀放置在较高的级别，如果他们预计大多数用户不会使用它，并且他们应该将非常重要的后缀放置在较低的级别，以便即使用户降低瞬态级别，它们仍然可用。
+
+@defopt transient-default-level
+此选项控制默认情况下可用的后缀级别。  它为用户未单独设置的瞬态设置瞬态级别。
+@end defopt
+
+@defopt transient-levels-file
+此选项命名用于在 Emacs 会话之间保留瞬态级别及其后缀的文件。
+@end defopt
+
+选项 @code{transient-common-command-prefix} 控制以下绑定中使用的前缀键。  为了简单起见，默认值 @kbd{C-x} 如下所示。
+
+@table @asis
+@item @kbd{C-x l} (@code{transient-set-level})
+@kindex C-x l
+@findex transient-set-level
+该命令进入编辑模式。  当编辑模式处于活动状态时，当前可用的所有中缀和后缀及其级别都会显示。  级别的颜色指示它们是否启用。  瞬态电平也会与一些使用信息一起显示。
+
+在编辑模式下，按下通常会调用某个后缀的键会提示用户输入后缀应放置的级别。
+
+帮助模式在编辑模式下可用。
+
+要更改瞬态电平，请再次按 @kbd{C-x l}。
+
+要退出编辑模式，请按@kbd{C-g}。
+
+请注意，编辑模式不会显示任何当前不可用的后缀。  例如，@code{magit-rebase} 根据变基是否已经在进行中而显示不同的后缀。  这些谓词也适用于编辑模式。
+
+因此，要控制在给定特定状态下哪些后缀可用，您必须确保该状态当前处于活动状态。
+
+@item @kbd{C-x a} (@code{transient-toggle-level-limit})
+@kindex C-x a
+@findex transient-toggle-level-limit
+此命令切换级别高于 @code{transient-default-level} 指定级别的后缀是否暂时可用。
+@end table
+
+@defun transient-set-default-level suffix level
+该函数将后缀COMMAND的默认级别设置为LEVEL@.
+
+如果后缀命令出现在多个菜单中，则一次一致地更改其在所有这些菜单中的级别可能是有意义的。  例如，@code{--gpg-sign}参数（使用命令@code{magit:--gpg-sign}实现）被绑定在所有创建提交的Magit菜单中。  有时签署其提交的用户会希望该参数在所有这些菜单中都可用，而对于从不签署的用户来说，它只是任何菜单中不必要的噪音。
+
+要始终使 @code{--gpg-sign} 可用，请使用：
+
+@lisp
+(transient-set-default-level 'magit:--gpg-sign 1)
+@end lisp
+
+要永远不使 @code{--gpg-sign} 可用，请使用：
+
+@lisp
+(transient-set-default-level 'magit:--gpg-sign 0)
+@end lisp
+
+这将设置此命令的后缀原型对象中的级别。如果命令是使用 @code{transient-define-argument}、@code{transient-define-infix} 和 @code{transient-define-suffix} 之一定义的，则命令只有后缀原型。  对于所有其他命令，这将发出错误信号。  （这是包作者应该使用这些函数之一来定义共享后缀命令，尤其是共享参数的原因之一。）
+
+如果用户使用 @kbd{C-x l} 更改特定菜单中的后缀级别，如上所示，那么这显然会影响默认值。
+
+还可以在特定菜单中设置后缀绑定的级别，无论是在使用 @code{transient-define-prefix,} 定义菜单时还是稍后使用 @code{transient-insert-suffix} 定义菜单时。  如果此类绑定指定了一个级别，那么它也会覆盖默认值。 （每个后缀的默认级别是一项新功能，因此您可能会经常遇到这种情况。）
+@end defun
+
+@node Other Commands
+@section 其他命令
+
+在小框架中调用瞬态时，瞬态窗口可能不会显示完整的缓冲区，因此需要使用以下命令进行滚动。  这些命令永远不会显示在瞬态窗口中，并且键绑定与其他缓冲区中的 @code{scroll-up-command} 和 @code{scroll-down-command} 相同。
+
+@deffn Command transient-scroll-up arg
+该命令将瞬态菜单窗口的文本向上滚动 @var{ARG} 行。  如果@var{ARG}是@code{nil}，那么它会滚动到接近全屏。  这是 @code{scroll-up-command} 的包装（参见）。
+@end deffn
+
+@deffn Command transient-scroll-down arg
+此命令将瞬态菜单窗口的文本向下滚动 @var{ARG} 行。  如果@var{ARG}是@code{nil}，那么它会滚动到接近全屏。  这是 @code{scroll-down-command} 的包装（参见）。
+@end deffn
+
+默认情况下以下命令不可用。  如果您想将它们用于所有菜单，请将它们绑定到@code{transient-map}。
+
+@deffn Command transient-copy-menu-text
+该命令将菜单缓冲区的内容复制到 Kill Ring。
+@end deffn
+
+@deffn Command transient-toggle-docstrings
+此命令在菜单中显示后缀描述（像往常一样）或在其位置显示相应文档字符串的第一行之间切换。  对于没有文档字符串的命令，始终显示后缀描述。  由于可能没有足够的空间来并排显示多个文档字符串，因此在显示文档字符串时使用单列。
+@end deffn
+
+@node Configuration
+@section 配置
+
+更多选项在@ref{Common Suffix Commands}、@ref{Saving Values}、@ref{Using History} 和@ref{Enabling and Disabling Suffixes} 中描述。
+
+@anchor{Essential Options}
+@subheading 基本选项
+
+@ref{Common Suffix Commands} 中记录了两个更重要的选项。
+
+@defopt transient-show-menu
+此选项控制是否以及何时显示瞬态菜单缓冲区。
+
+@itemize
+@item 
+如果@code{t}（默认值），则一旦调用瞬态前缀命令就会显示缓冲区。
+
+@item 
+如果@code{nil}，则除非用户通过按下不完整的前缀键序列明确请求，否则不会显示缓冲区。
+
+@item 
+如果是数字，则显示简短的一行摘要，而不是菜单缓冲区。  如果为零或负数，则甚至不会显示该摘要；仅显示按下的键本身。
+
+一旦用户通过按下不完整的前缀键序列明确请求缓冲区，就会显示缓冲区。  除非该值为零，否则菜单将在不活动的几秒后显示（使用绝对值）。
+@end itemize
+@end defopt
+
+@defopt transient-show-during-minibuffer-read
+此选项控制在使用迷你缓冲区读取用户输入时是否继续显示瞬态菜单。
+
+这仅与不关闭菜单的命令相关，例如设置中缀参数的命令。  如果命令退出菜单并使用迷你缓冲区，则无论此选项的值如何，菜单始终在进入迷你缓冲区之前关闭。
+
+当@code{nil}（默认值）时，在使用迷你缓冲区时隐藏菜单。当@code{t}时，继续显示菜单，但允许调整菜单窗口的大小，以确保可以显示完成候选。
+
+当@code{fixed}时，保持显示菜单并防止调整其大小，这可能导致无法显示完成候选。  如果您遇到这种情况，请考虑使用 @code{t} 或整数，如下所述。
+
+如果该值为 @code{fixed} 并且菜单窗口使用其框架的完整高度，则前者将被忽略，并且无论如何都允许调整大小。  这是必要的，因为各个菜单可能使用与 @code{transient-display-buffer-action} 指定的不同的异常显示操作（可能在侧窗口中显示该菜单）。
+
+当使用自动调整窗口大小的第三方模式时（例如，通过在@code{post-command-hook}上调用@code{balance-windows}），那么@code{fixed}（或@code{nil}）可能是比@code{t}更好的选择。
+
+该值也可以是整数，在这种情况下，行为取决于是否至少保留那么多行来显示除菜单窗口之外的窗口。  如果是这种情况，请显示菜单并保留该窗口的大小。  否则，如果数字为正数，则允许调整菜单窗口的大小，如果数字为负数，则隐藏菜单。
+@end defopt
+
+@defopt transient-read-with-initial-input
+此选项控制在从用户读取中缀参数的值时是否将最后一个历史元素用作初始迷你缓冲区输入。  如果@code{nil}，则没有初始输入，并且必须以与旧元素相同的方式访问第一个元素。
+@end defopt
+
+@defopt transient-enable-menu-navigation
+此选项控制是否在瞬态菜单缓冲区中启用导航命令，以及执行此操作时是否在回显区域中显示附加文档。
+
+如果该值为@code{verbose}（默认值），则有关该点命令的附加文档将显示在回显区域中。  如果这会导致菜单缓冲区中显示的相同文档在回显区域中重复，则 @code{verbose} 放弃这样做。  使用 @code{force-verbose} 来回显此类文档。使用 @code{t} 启用菜单导航，而不在回显区域中显示文档。
+
+当瞬态处于活动状态时，菜单缓冲区（默认情况下）不是当前缓冲区，因此需要使用专用命令来作用于该缓冲区本身。  如果此选项非零，则以下绑定可用：
+
+@itemize
+@item 
+@kbd{@key{UP}} 将光标移动到上一个后缀。
+@item 
+@kbd{@key{DOWN}} 将光标移动到下一个后缀。
+@item 
+@kbd{M-@key{RET}} 调用光标所在的后缀。
+@item 
+@kbd{mouse-1} 和 @kbd{mouse-2} 调用单击的后缀。
+@item 
+@kbd{C-s} 和 @kbd{C-r} 在菜单缓冲区中启动 isearch。
+@end itemize
+
+@kbd{mouse-1}和@kbd{mouse-2}结合在@code{transient-button-map}中。所有其他绑定都在 @code{transient-popup-navigation-map} 中。
+
+默认情况下，使用 @kbd{M-@key{RET}} 代替 @kbd{@key{RET}} 来调用后缀命令，因为如果瞬态允许调用非后缀，则用户可能希望前者执行没有瞬态处于活动状态时执行的操作。
+@end defopt
+
+@defopt transient-display-buffer-action
+该选项指定用于显示瞬态菜单缓冲区的操作。  菜单缓冲区使用 @code{(display-buffer @var{BUFFER} transient-display-buffer-action)} 显示在窗口中。
+
+该选项的值的形式为 @code{(@var{FUNCTION} . @var{ALIST})}，其中 @var{FUNCTION} 是一个函数或函数列表。  每个这样的函数应该接受两个参数：一个要显示的缓冲区和一个与@var{ALIST}形式相同的列表。  详情请参见@ref{Choosing Window,,,elisp,}。
+
+默认为：
+
+@lisp
+(display-buffer-in-side-window
+ (side . bottom)
+ (dedicated . t)
+ (inhibit-same-window . t))
+@end lisp
+
+这将在所选框架的底部显示窗口。有关替代方案，请参阅@ref{Buffer Display Action Functions,,,elisp,}和@ref{Buffer Display Action Alists,,,elisp,}。
+
+当您切换到不同的 ACTION 时，在大多数情况下，您应该保留 @code{dedicated} 和 @code{inhibit-same-window} 的 ALIST 条目。不要因为不确定是否需要而丢弃它们；如果您不确定，请保留它们。
+
+请注意，在显示瞬态缓冲区之前当前的缓冲区应保留为当前缓冲区。  如果合适的话，许多后缀命令都会作用于当前的缓冲区，并且如果瞬态缓冲区成为当前缓冲区，那么这将改变当前的缓冲区。  为此，@code{inhibit-same-window} 确保所选窗口不用于显示瞬态缓冲区。
+
+可以在另一个框架中显示窗口，但实际上这是否有效取决于窗口管理器。如果窗口管理器选择新窗口（Emacs 框架），那么不幸的是会更改当前的缓冲区。
+
+如果您更改此选项的值，那么您可能还需要更改 @code{transient-mode-line-format} 的值。
+
+如果在使用 @code{transient-define-prefix} 创建新前缀时传递 @code{:display-action}，则可以覆盖此用户选项。
+@end defopt
+
+@anchor{Accessibility Options}
+@subheading 辅助功能选项
+
+对于视障用户，我推荐以下配置。如果您需要更多指导或想分享您的经验，请随时与我联系。
+
+@lisp
+(setopt transient-enable-menu-navigation 'force-verbose)
+(setopt transient-navigate-to-group-descriptions t)
+(setopt transient-describe-menu t)
+(setopt transient-select-menu-window t)
+(setopt transient-force-single-column t)
+(setopt transient-prefer-reading-value t)
+(setopt transient-use-accessible-values t)
+(setopt transient-use-accessible-formats t)
+@end lisp
+
+此外，您还可以允许在临时菜单处于活动状态时运行用于读取当前文本的命令，例如：
+
+@lisp
+(define-key transient-predicate-map
+  [my-read-text-at-point] #'transient--do-stay)
+@end lisp
+
+@defopt transient-enable-menu-navigation
+此选项记录在上一个节点 (@ref{Essential Options}) 中。  您可能想要将值从 @code{verbose} 更改为 @code{force-verbose}，这会导致信息显示在回显区域中，即使它与菜单缓冲区中已显示的信息相同。  这对您是否有用取决于您的设置是否可以轻松读取回显区域中显示的最后一条消息。
+@end defopt
+
+@defopt transient-navigate-to-group-descriptions
+此选项控制菜单导航命令是否在组描述处停止。  如果您的输出方法通过读取文本来工作，您很可能希望启用此功能。
+
+如果 @code{transient-enable-menu-navigation} 是非 @code{nil}（默认情况下），@kbd{@key{UP}} 和 @kbd{@key{DOWN}} 会从一个后缀移动到另一个后缀。  当此选项也为非@code{nil}时，它们还会在组描述处停止。这很有用，因为它允许盲文和音频设备在此时输出组标题。
+@end defopt
+
+@defopt transient-describe-menu
+此选项控制是否在菜单缓冲区的开头插入有关菜单本身的简短描述。
+
+当它为非@code{nil}时，菜单缓冲区以简短描述开始。  理想情况下，这是一个专门为此目的而编写的字符串，但由于这是一项新功能，因此大多数菜单命令尚不提供该功能。  在这种情况下，前缀命令的文档字符串的第一行将用作后备。  如果值为 @code{docstring}，则即使描述可用，也会使用文档字符串。
+@end defopt
+
+@defopt transient-select-menu-window
+该选项控制显示临时菜单的窗口是否在显示后立即被自动选择。
+
+除了盲文和音频输出设备的用户之外，不鼓励启用此功能。  请注意，启用此功能或按需选择菜单窗口都是不必要的，以便能够在菜单中移动光标。  参见@code{transient-enable-menu-navigation}。
+@end defopt
+
+@defopt transient-force-single-column
+此选项控制是否强制使用单列显示后缀。  这对于使用大文本并且可能必须在二维中滚动的弱视用户可能很有用。  这对于盲人用户也很有用，因为它会导致后缀以更自然的顺序导航，因为相关命令通常显示在同一列中，但导航首先水平移动到同一行上的下一个项目。
+@end defopt
+
+@defopt transient-prefer-reading-value
+此选项控制是否优先读取新值而不是其他值选择方法。
+
+如果这是 @code{nil} （默认值），则某些参数在调用时会被直接禁用，而它们具有非 @code{nil} 值。  即，要从一个非 2⁣ 值切换到另一个非 3⁣ 值，必须调用此类命令两次。  对于恰好具有一小组可能值的其他参数，所有值都会始终显示，仅使用颜色来指示哪个值处于活动状态。  当调用这样的中缀命令时，它会循环到下一个值。
+
+此默认值不适用于视障用户。  如果此选项为非@code{nil}，则更多参数会立即读取新值，而不是在第一次调用时关闭，或者循环遍历值。
+@end defopt
+
+@defopt transient-use-accessible-values
+此选项控制是否以不依赖颜色的方式显示值。
+
+如果这是 @code{nil} （默认值），则使用颜色来传达参数的状态。  对于某些参数类型，状态仅以这种方式传达。  例如，启用的命令行开关使用某种明亮的颜色显示，禁用该参数会将颜色更改为灰色，而不更改显示的文本。
+
+此默认值不适用于视障用户。  如果该选项为非@code{nil}，则状态另外通过其他方式传达。  例如，开关后面要么是“启用”，要么是“禁用”。  状态的准确传达方式取决于中缀命令的类型。
+
+请注意，使用 Transient 的包可以定义自己的中缀命令类型，这可能会或可能不会涉及覆盖 Transient 的代码，该代码尊重这个新选项。  也就是说，需要一些时间才能一切都遵守此设置。
+@end defopt
+
+@defopt transient-use-accessible-formats
+此选项控制是否对菜单元素使用更易于访问的格式字符串。
+
+如果这是非@code{nil}，那么菜单元素的显示方式我希望比默认方式更适合视障用户。请提供反馈，以便我们共同努力改进这一点。
+
+默认情况下，使用元素的 @code{format} 槽指定的格式。当它不是 @code{nil} 时，则使用 @code{accessible-format} 槽来代替。后者实现的一项更改是，对于表示命令行参数的元素，参数及其值被移动到描述之前，从而可以更快地访问当前状态，同时仍然允许用户阅读描述，以防用户还不知道相关参数的作用。
+
+启用此功能还会导致在描述当前无法使用的命令的文本的最开头添加字符串“inapt”。  当使用默认格式时，命令不恰当的唯一视觉线索是代表它的完整文本呈灰色。  （作为此类 inapt 命令的一个示例，请考虑仅能对当前该点上的文件起作用的命令的情况，而当前该点上没有文件。）将字符串“inapt”放在最开头使用户有机会立即跳过不可用的命令，同时仍然让他们有机会继续阅读。
+@end defopt
+
+@anchor{Auxiliary Options}
+@subheading 辅助选项
+
+@defopt transient-mode-line-format
+该选项控制瞬态的菜单缓冲区是否有模式行、分隔行或两者都没有。
+
+如果@code{nil}，则缓冲区没有模式行。  如果缓冲区没有显示在回显区域的正上方，那么这可能不是一个好的值。
+
+如果 @code{line} （默认值）或自然数，则缓冲区没有模式线，但会在其位置绘制一条线。  如果使用数字，则指定线条的粗细。  在 termcap 框架上，我们无法绘制线条，因此 @code{line} 和数字是 @code{nil} 的同义词。
+
+线条的颜色用于指示是否允许使用非后缀以及它们是否退出瞬态。  @code{transient-key-noop}（如果不允许使用非后缀）、@code{transient-key-stay}（如果允许并且瞬态保持活动状态）或@code{transient-key-exit}（如果允许并且它们退出瞬态）的前景色用于绘制线条。
+
+如果在使用 @code{transient-define-prefix} 创建新前缀时传递 @code{:mode-line-format}，则可以覆盖此用户选项。
+
+否则，这可以是任何模式行格式。  详情请参见@ref{Mode Line Format,,,elisp,}。
+@end defopt
+
+@defopt transient-semantic-coloring
+此选项控制是否使用颜色来指示命令的瞬态行为。
+
+如果非@code{nil}，则每个后缀的键绑定都会被着色以指示它是否退出瞬态状态。  前缀的颜色使用当@code{transient-mode-line-format}的值为@code{line}时绘制的线来指示。
+@end defopt
+
+@defopt transient-highlight-mismatched-keys
+此选项控制是否应突出显示与相应命令行参数不匹配的中缀命令的键绑定。对于其他中缀命令，此选项无效。
+
+这主要是供临时菜单的作者使用的，并且默认情况下处于禁用状态。
+
+当此选项为非@code{nil}时，当仅指定长参数（例如，@code{--verbose}）但未指定简写（例如，@code{-v}）时，中缀参数的键绑定将突出显示。  在极少数情况下，指定了简写但键绑定不匹配，那么它会以不同的方式突出显示。
+
+在学习底层命令行工具的参数时，突出显示不匹配的键绑定非常有用；你不会想学习任何实际上不存在的速记法。
+
+使用面 @code{transient-mismatched-key} 和 @code{transient-nonstandard-key} 之一完成突出显示。
+@end defopt
+
+@defopt transient-substitute-key-function
+该函数用于修改按键绑定。  如果此选项的值为@code{nil}（默认值），则不执行替换。
+
+该函数使用一个参数（前缀对象）调用，并且必须返回一个键绑定描述，要么是它在 @code{key} 槽中找到的现有键描述，要么是替换前缀键的键描述。  它可以用于进行其他替换，但不鼓励这样做。
+
+例如，使用我的自定义键盘布局很难到达 @kbd{=}，因此我用 @kbd{(} 代替，使用针对 lisp 优化的布局很容易到达。
+
+@lisp
+(setq transient-substitute-key-function
+      (lambda (obj)
+        (let ((key (oref obj key)))
+          (if (string-match "\\`\\(=\\)[a-zA-Z]" key)
+              (replace-match "(" t t key 1)
+            key))))
+@end lisp
+@end defopt
+
+@defopt transient-align-variable-pitch
+此选项控制列是否在菜单缓冲区中按像素对齐。
+
+如果这是非@code{nil}，则列按像素对齐以支持可变间距字体。  键未对齐，因此您应该为 @code{transient-key} 面使用固定间距字体。  其他关键面孔继承自该面孔，除非使用的主题破坏了这种关系。
+
+此选项适用于对 @code{default} 面使用可变间距字体的用户。
+@end defopt
+
+@defopt transient-force-fixed-pitch
+此选项控制是否强制在菜单缓冲区中使用等宽字体。  即使您对 @code{default} 面使用比例字体，您可能仍然希望在菜单缓冲区中使用等宽字体。  将此选项设置为 @code{t} 会导致 @code{default} 重新映射到该缓冲区中的 @code{fixed-pitch}。
+@end defopt
+
+@anchor{Developer Options}
+@subheading 开发者选项
+
+这些选项主要面向开发人员。
+
+@defopt transient-detect-key-conflicts
+此选项控制在调用瞬态时是否应检测键绑定冲突。  如果是这样，则会导致错误，从而阻止使用瞬态。  因此，默认情况下会忽略冲突。
+
+无法提前确定冲突，即在定义瞬态时以及添加新后缀时，因为那时可能会出现误报。  多个后缀共享一个公共键绑定实际上是有效的，前提是这些后缀的谓词可以防止同时启用其中多个后缀。
+@end defopt
+
+@defopt transient-error-on-insert-failure
+此选项控制当@code{transient-insert-suffix}或@code{transient-append-suffix}未能将后缀插入现有前缀时是否发出错误信号。  默认情况下会显示警告。
+@end defopt
+
+@defopt transient-highlight-higher-levels
+此选项控制是否突出显示默认情况下不可用的后缀。
+
+当非@code{nil}时，如果后缀的级别高于4（默认为@code{transient-default-level}），则后缀的描述将突出显示。假设您已将该变量设置为 7，这会突出显示所有后缀，如果用户不进行相同的自定义，则这些后缀将无法使用。
+@end defopt
+
+@anchor{Hook Variables}
+@subheading 钩子变量
+
+@defvar transient-exit-hook
+该挂钩在退出瞬态菜单后运行，即使另一个瞬态菜单同时变为活动状态也是如此。
+@end defvar
+
+@defvar transient-post-exit-hook
+该挂钩在退出瞬态菜单后运行，前提是没有其他瞬态菜单同时变为活动状态。
+@end defvar
+
+@defvar transient-setup-buffer-hook
+该钩子在设置瞬态缓冲区时运行。当这个钩子运行时，该缓冲区是当前的并且是空的。
+@end defvar
+
+@node Modifying Existing Transients
+@chapter 修改现有瞬态
+
+@cindex modifying existing transients
+
+在某种程度上，瞬态可以交互地定制，请参见@ref{Enabling and Disabling Suffixes}。  本节说明如何以非交互方式进一步修改现有瞬态。  让我们从一个例子开始：
+
+@lisp
+(transient-append-suffix 'magit-patch-apply "-3"
+  '("-R" "Apply in reverse" "--reverse"))
+@end lisp
+
+这将插入一个新的中缀参数，以在绑定到 @code{magit-patch-apply} 中的 @code{-3} 的中缀参数后面切换 @code{--reverse} 参数。
+
+以下函数共享一些参数：
+
+@itemize
+@item 
+@var{PREFIX} 是一个瞬态前缀命令，一个符号。
+
+PREFIX 还可以是标识单独定义的组的符号，该符号可以包括在多个前缀中。  请参阅待办事项@.
+
+@item 
+@var{SUFFIX} 是瞬态中缀或后缀规范，其形式与 @code{transient-define-prefix} 所期望的形式相同。  请注意，中缀是一种特殊的后缀。  根据上下文，“后缀”表示“后缀（包括中缀）”或“非中缀后缀”。  这里指的是前者。  参见@ref{Suffix Specifications}。
+
+@var{SUFFIX}也可以是与@code{transient-define-prefix}所期望的形式相同的基团。  参见@ref{Group Specifications}。
+
+@item 
+@var{LOC} 是关键描述（由 @code{key-description} 返回并由 @code{kbd} 理解的字符串）、命令、标识所包含组的符号或指定坐标的向量。  例如，@code{[1 0 -1]} 标识第二组 (@code{1}) 的第一个子组 (@code{0}) 的最后一个后缀 (@code{-1})。
+
+如果@var{LOC}是一个向量，那么它可以用来标识一个组，而不仅仅是一个单独的后缀命令。  向量中的最后一个元素也可以是符号或键，在这种情况下，前面的元素必须与一个组匹配，并且在该组中查找最后一个元素。
+
+函数 @code{transient-get-suffix} 可用于确定某个坐标向量是否标识您希望它标识的后缀或组。  在复杂的情况下，可能需要查看内部布局表示，您可以使用函数 @code{transient--get-layout} 访问它。
+@end itemize
+
+这些函数对存储在 @var{PREFIX} 符号的 @code{transient--layout} 属性中的信息进行操作。  该树中的元素不是对象，但后缀的形式为 @code{(@var{CLASS} @var{PLIST})} ，组的形式为 @code{[CLASS PLIST CHILDREN]} 。  树的根部是一个元素 @code{[N nil CHILDREN]}，其中 @code{N} 是布局格式的版本，目前是并且希望在很长一段时间内都是如此 2。虽然该元素看起来像组向量，但在使用坐标向量识别组时该元素并不计数，即 @code{[0]} 是其第一个子元素，而不是根元素本身。
+
+@defun transient-insert-suffix prefix loc suffix &optional keep-other
+@end defun
+@defun transient-append-suffix prefix loc suffix &optional keep-other
+这些函数在 @var{LOC} 之前或之后将后缀或组 @var{SUFFIX} 插入到 @var{PREFIX} 中。
+
+从概念上讲，向瞬态前缀添加绑定类似于向键映射添加绑定，但由于多个后缀命令可以绑定到同一个键（前提是它们永远不会同时处于活动状态），因此情况变得复杂，请参阅@ref{Predicate Slots}。
+
+不幸的是，假阳性和假阴性都是可能的。要处理前者，请使用非 @code{nil} @var{KEEP-OTHER@.} 符号 @code{always} 可以防止误报的消除，在某些情况下，其他非 @code{nil} 值会失败。  为了处理假阴性，使用 @code{transient-remove-suffix} 单独删除冲突的绑定。
+@end defun
+
+@defun transient-replace-suffix prefix loc suffix
+该函数将@var{PREFIX}中@var{LOC}处的后缀或组替换为后缀或组@var{SUFFIX}。
+@end defun
+
+@defun transient-remove-suffix prefix loc
+此函数删除@var{PREFIX}中@var{LOC}处的后缀或组。
+@end defun
+
+@defun transient-get-suffix prefix loc
+该函数返回@var{PREFIX}中@var{LOC}处的后缀或组。  返回值具有上述形式。
+@end defun
+
+@defun transient-suffix-put prefix loc prop value
+该函数通过将其plist的@var{PROP}设置为@var{VALUE}来编辑@var{PREFIX}中@var{LOC}处的后缀或组。
+@end defun
+
+有些前缀命令共享后缀，后缀是单独的，然后在定义时包含在每个前缀中。  包含是通过引用完成的，默认情况下不内联包含的后缀组。  因此，例如，如果您更改 @code{magit-diff} (@code{d}) 中参数的键绑定，相同的更改也适用于 @code{magit-diff-refresh} (@code{D})。在极少数情况下，这是不可取的，请在更改包含的后缀之前使用@code{transient-inline-group}。
+
+@defun transient-inline-group PREFIX GROUP
+该函数通过将符号 GROUP 替换为 PREFIX@. 布局中的扩展布局，将包含的 GROUP 内联到 PREFIX 中
+@end defun
+
+如果这些函数中的大多数无法执行请求的修改，则它们不会发出错误信号。  如果在 @var{PREFIX} 中找不到 @var{LOC}，则插入新后缀的函数会显示警告，而不发出错误信号。  这样做的原因是建立键绑定（这就是我们本质上在这里尝试做的）不应该阻止其余配置的加载。  在这些函数中，默认情况下只有 @code{transient-get-suffix} 和 @code{transient-suffix-put} 发出错误信号。  如果您确实希望插入函数也发出错误信号，请将 @code{transient-error-on-insert-failure} 设置为 @code{t}。
+
+@node Defining New Commands
+@chapter 定义新命令
+
+@menu
+* Technical Introduction::
+* Defining Transients::
+* Binding Suffix and Infix Commands::
+* Defining Suffix and Infix Commands::
+* Using Infix Arguments::
+* Using Prefix Scope::
+* Current Suffix Command::
+* Current Prefix Command::
+* Transient State::
+@end menu
+
+@node Technical Introduction
+@section 技术介绍
+
+受前缀键和前缀参数的启发，Transient 实现了类似的抽象，涉及前缀命令、中缀参数和后缀命令。
+
+当用户调用瞬态前缀命令时，会激活瞬态（临时）键映射，该键映射绑定瞬态的中缀和后缀命令，并且控制瞬态状态的函数被添加到@code{pre-command-hook}和@code{post-command-hook}。  可用的后缀和中缀命令及其状态显示在菜单缓冲区中，直到通过调用后缀命令退出瞬态状态。
+
+调用中缀命令会导致其值发生更改。  如何完成此操作取决于 infix 命令的类型。  最简单的情况是中缀命令，它表示不带值的命令行参数。  调用此类中缀命令会导致开关打开或关闭。  更复杂的中缀命令可以使用迷你缓冲区从用户读取值。
+
+调用后缀命令通常会导致瞬态退出；瞬态键盘映射和挂钩函数被删除，菜单缓冲区不再显示有关（不再绑定）后缀命令的信息，设置了一些公共全局变量的值，同时取消设置了一些内部全局变量，最后实际调用了该命令。  后缀命令也可以配置为不退出瞬态。
+
+后缀命令可以（但不一定）使用中缀参数，就像任何命令可以选择使用或忽略前缀参数一样。  对于从瞬态调用的后缀命令，变量@code{transient-current-suffixes}和函数@code{transient-args}的用途与变量@code{prefix-arg}和@code{current-prefix-arg}的用途大致相同，这些用途是在使用@code{universal-argument}等命令设置前缀参数之后调用的任何命令。
+
+@cindex command dispatchers
+Transient 可用于实现简单的“命令调度程序”。  主要好处是用户可以在临时显示的缓冲区中看到所有可用的命令，可以将其视为“菜单”。这本身很有用，因为它使用户不必记住特定前缀键或命令之后的所有有效键。  Magit 的 @code{magit-dispatch} （在 @kbd{C-x M-g} 上）命令是使用 Transient 仅实现命令调度程序的示例。
+
+除此之外，Transient 还允许用户以交互方式将参数传递给命令。  这些参数可能比使用前缀参数时合理的复杂得多。  使用前缀参数可以控制命令的多个方面是有限的。  此外，某个前缀参数对于不同命令的含义可能完全不同，用户必须阅读文档来了解并记住某个前缀参数对于某个命令的含义。
+
+另一方面，瞬态后缀命令可以接受数十个不同的参数，而用户无需记住任何内容。使用 Transient 时，可以调用带有参数的命令，该命令与从 Lisp 中以非交互方式调用同一函数一样复杂。
+
+使用参数调用瞬态后缀命令类似于在启用了命令行完成和历史记录的 shell 中调用命令。  Transient 接口的一个好处是，它不仅在全局级别上记住历史记录（“该命令是使用这些参数调用的，之前它是使用其他参数调用的”），而且还独立记住各个参数的值。  参见@ref{Using History}。
+
+调用瞬态前缀命令后，@kbd{C-h @var{KEY}}可用于显示@kbd{@var{KEY}}绑定到的中缀或后缀命令的文档（请参阅@ref{Getting Help for Suffix Commands}），并且可以使用@kbd{C-x l @var{KEY}}从瞬态中删除中缀和后缀。  默认情况下禁用的中缀和后缀可以通过相同的方式启用。参见@ref{Enabling and Disabling Suffixes}。
+
+Transient 附带了对几种不同类型的专用中缀命令的支持。  例如，设置命令行选项的命令与仅切换布尔标志的命令具有不同的需求。此外，Transient 提供了用于定义新类型的抽象，这是 Transient 的作者没有预料到的（或者还没有抽出时间来实现）。
+
+请注意，后缀命令还支持常规前缀参数。  后缀命令甚至可以同时使用中缀和前缀参数调用。  如果您将命令作为瞬态前缀命令的后缀调用，但又想向其传递前缀参数，则首先调用前缀命令，只有在调用前缀参数之后，才最终调用后缀命令。  如果您首先提供前缀参数，那么这些参数将应用于前缀命令，而不是后缀命令。  同样，如果要在调用带有前缀参数的后缀命令之前更改中缀参数，请在调用前缀参数之前更改中缀参数。  换句话说，常规前缀参数始终适用于下一个命令，并且由于瞬态前缀、中缀和后缀命令只是常规命令，因此同样适用于它们。 （常规前缀键的行为有所不同，因为它们根本不是命令，而是不完整的键序列，并且不能用前缀命令中断它们。）
+
+@node Defining Transients
+@section 定义瞬态
+
+瞬态由一个前缀命令和至少一个后缀命令组成，但瞬态通常具有多个中缀和后缀命令。  下面的宏定义了瞬态前缀命令@strong{and}绑定瞬态的中缀和后缀命令。  换句话说，它定义了完整的瞬态，而不仅仅是用于调用该瞬态的瞬态前缀命令。
+
+@defmac transient-define-prefix name arglist [docstring] [keyword value]@dots{} group@dots{} [body@dots{}]
+该宏将 @var{NAME} 定义为瞬态前缀命令，并绑定瞬态的中缀和后缀命令。
+
+@var{ARGLIST} 是前缀命令采用的参数。 @var{DOCSTRING} 是文档字符串，是可选的。
+
+这些参数后面可以选择跟随关键字-值对。每个键必须是一个关键字符号，可以是 @code{:class} 或该类的构造函数支持的关键字参数。  如果未明确指定类，则使用 @code{transient-prefix} 类。
+
+@var{GROUP}s 添加中缀和后缀命令的键绑定，并指定这些绑定如何在菜单缓冲区中呈现。  必须至少指定一个 @var{GROUP}。  参见@ref{Binding Suffix and Infix Commands}。
+
+@var{BODY} 是可选的。  如果省略，则 @var{ARGLIST} 被忽略，函数定义变为：
+
+@lisp
+(lambda ()
+  (interactive)
+  (transient-setup 'NAME))
+@end lisp
+
+如果指定了@var{BODY}，则它必须以匹配@var{ARGLIST}的@code{interactive}形式开始，并且必须调用@code{transient-setup}。  但是，仅当满足某些条件时，它才可以调用该函数。
+
+@cindex scope of a transient
+所有瞬态都有一个（可能是@code{nil}）值，该值在调用后缀命令时导出，以便它们可以使用该值。对于某些瞬态，可能需要有一种辅助值，称为“范围”。  这样的范围通常以命令的 @code{interactive} 形式设置，并且必须传递给设置函数：
+
+@lisp
+(transient-setup 'NAME nil nil :scope SCOPE)
+@end lisp
+
+例如，@code{magit-branch-configure}瞬态的范围是正在配置变量的分支。
+@end defmac
+
+有时，多个前缀命令共享一组公共后缀。例如，虽然 @code{magit-diff} (@code{d}) 和 @code{magit-diff-refresh} (@code{D}) 提供不同的后缀来实际创建或更新 diff，但它们都提供相同的中缀参数来控制 diff 的格式。此类共享组应使用 @code{transient-define-group} 进行定义，然后通过在前缀定义中使用标识组的符号，将其包含在多个前缀中，否则您将使用组向量。  如果包含的组放置在前缀的顶层（而不是作为子组放在向量内部），则应引用该符号。
+
+@defmac transient-define-group name group@dots{}
+该宏定义一个或多个组并将它们存储在符号 NAME@. 中，GROUP 的形式与 @code{transient-define-prefix} 相同。
+@end defmac
+
+@node Binding Suffix and Infix Commands
+@section 绑定后缀和中缀命令
+
+宏@code{transient-define-prefix}用于定义瞬态。这定义了实际的瞬态前缀命令（参见@ref{Defining Transients}）并添加瞬态的中缀和后缀绑定，如下所述。
+
+用户和第三方包可以使用@code{transient-insert-suffix}（请参阅@ref{Modifying Existing Transients}）等函数添加其他绑定。  这些函数采用“后缀规范”作为其参数之一，其形式与@code{transient-define-prefix}中使用的规范相同。
+
+@anchor{Group Specifications}
+@subsection 组规格
+
+@cindex group specifications
+
+瞬态的后缀和中缀命令按组进行组织。分组控制如何在视觉上概述后缀的描述，而且还可以为一组后缀设置某些属性。
+
+存在多个组类，其中一些将后缀组织为子组。  在大多数情况下，不必显式指定类，但请参见@ref{Group Classes}。
+
+组是在调用 @code{transient-define-prefix} 时使用向量指定的。  因为组是使用向量表示的，所以我们不能使用方括号来指示可选元素，而是使用大括号来指示后者。
+
+组规范具有以下形式：
+
+@lisp
+[@{LEVEL@} @{DESCRIPTION@} @{KEYWORD VALUE@}... ELEMENT...]
+@end lisp
+
+@var{LEVEL} 是可选的，默认为 4。请参阅@ref{Enabling and Disabling Suffixes}。
+
+@var{DESCRIPTION} 是可选的。  如果存在，则将其用作组的标题。
+
+@var{KEYWORD}-@var{VALUE} 对是可选的。  每个关键字必须是关键字符号，可以是 @code{:class} 或该类的构造函数支持的关键字参数。
+
+@itemize
+@item 
+这些关键字之一 @code{:description} 相当于在向量的最开头指定 @var{DESCRIPTION}。  如果还使用了其他关键字，建议使用 @code{:description} 以保持一致性，否则建议使用 @var{DESCRIPTION}，因为它看起来更好。
+
+@item 
+同样，@code{:level} 等价于@var{LEVEL}。
+
+@item 
+其他重要的关键字包括 @code{:if...} 和 @code{:inapt-if...} 关键字。  这些关键字控制该组在某种情况下是否可用。
+
+例如，一组 @code{magit-rebase} 瞬态使用 @code{:if magit-rebase-in-progress-p}，其中包含在 rebase 正在进行时有用的后缀；另一个使用@code{:if-not magit-rebase-in-progress-p}，其中包含启动变基的后缀。
+
+这些谓词也可以用于单个后缀，并且仅记录一次，请参阅@ref{Predicate Slots}。
+
+@item 
+@code{:hide} 的值（如果非 @code{nil}）是一个谓词，用于控制默认情况下是否隐藏该组。  隐藏组后缀的键绑定应全部使用相同的前缀键。按该前缀键应暂时显示该组及其后缀，这假定使用如下谓词：
+
+@lisp
+(lambda ()
+  (eq (car transient--redisplay-key)
+      ?\C-c)) ; the prefix key shared by all bindings
+@end lisp
+
+@item 
+@code{:setup-children} 的值（如果非 @code{nil}）是一个函数，它采用一个参数（可能是子项列表），并且必须返回一个子项列表或一个空列表。  这可以用于以某种方式转换以正常方式定义的组的子项，也可以用于从头开始动态创建子项。
+
+返回的子级必须具有与存储在前缀的 @code{transient--layout} 属性中相同的形式，但使用 @code{transient-define-prefix} 所理解的相同形式通常更方便，如下所述。  如果您使用后一种方法，您可以使用 @code{transient-parse-suffixes} 和 @code{transient-parse-suffix} 函数将它们从方便的形式转换为预期的形式。  根据所使用的组类，@code{transient-parse-suffixes} 的 SUFFIXES 必须是组向量列表（对于@code{transient-columns}）或后缀列表列表（对于所有其他组类）。
+
+如果您显式指定子项，然后使用 @code{:setup-children} 对其进行转换，则将根据显式指定的子项照常确定组的类别。
+
+如果您没有显式指定子级，因此仅依赖 @code{:setup-children}，则必须使用 @code{:class} 指定该类。为了向后兼容，如果您不这样做，则使用 @code{transient-column} 并显示警告。  该警告最终将被错误取代。
+
+@lisp
+(transient-define-prefix my-finder-by-keyword ()
+  "Select a keyword and list matching packages."
+  ;; The real `finder-by-keyword' is more convenient
+  ;; of course, but that is not the point here.
+  [:class transient-columns
+   :setup-children
+   (lambda (_)
+     (transient-parse-suffixes
+      'my-finder-by-keyword
+      (let ((char (1- ?A)))
+        (mapcar                  ; a list ...
+         (lambda (partition)
+           (vconcat              ; of group vectors ...
+            (mapcar (lambda (elt)
+                      (let ((keyword (symbol-name (car elt))))
+                                 ; ... where each suffix is a list
+                        (list (format "%c" (cl-incf char))
+                              keyword
+                              (lambda ()
+                                (interactive)
+                                (finder-list-matches keyword)))))
+                    partition)))
+         (seq-partition finder-known-keywords 7)))))])
+@end lisp
+
+@item 
+布尔值 @code{:pad-keys} 参数控制组中包含的所有后缀的键是否右填充，从而有效地对齐描述。
+
+@item 
+如果关键字参数接受函数作为值，则可以使用 @code{lambda} 表达式。  作为特殊情况，还支持 @code{##} 宏（返回 @code{lambda} 表达式并在 @code{llama} 包中实现）。  在组规范内部，除了直接跟在关键字符号后面之外，任何地方都不支持使用 @code{##}。
+@end itemize
+
+@var{ELEMENT}要么是所有子组，要么是所有后缀和字符串。 （至少目前不存在允许将子组与同一级别的命令混合的组类型，尽管原则上没有什么可以阻止这一点。）
+
+如果 @var{ELEMENT} 不是子组，那么它们可以是指定命令和字符串的列表的混合。  字符串被逐字插入到缓冲区中。  空字符串可用于在后缀之间插入间隙，如果后缀概述为表格，则这特别有用。
+
+内部组规范，包括内部包含的后缀规范，不需要引用任何内容，无论如何引用都是无效的。  关键字后面的值可以使用 @code{,} 显式取消引用。  此功能是实验性的，应避免使用。
+
+后缀规范的形式记录在下一个节点中。
+
+@anchor{Suffix Specifications}
+@subsection 后缀规格
+
+@cindex suffix specifications
+
+当使用@code{transient-define-prefix}定义瞬态前缀命令时，瞬态的后缀和中缀命令被绑定，请参阅@ref{Defining Transients}。  这些命令被组织成组，请参阅@ref{Group Specifications}。  这里我们描述用于绑定单个后缀命令的形式。
+
+稍后使用@code{transient-insert-suffix}等函数绑定其他命令时也使用相同的形式，请参阅@ref{Modifying Existing Transients}。
+
+请注意，中缀是一种特殊的后缀。  根据上下文，“后缀”表示“后缀（包括中缀）”或“非中缀后缀”。  这里指的是前者。
+
+后缀规范具有以下形式：
+
+@lisp
+([LEVEL] [KEY [DESCRIPTION]] COMMAND|ARGUMENT [KEYWORD VALUE]...)
+@end lisp
+
+@var{LEVEL}、@var{KEY} 和@var{DESCRIPTION} 也可以使用@var{KEYWORD}、@code{:level}、@code{:key} 和@code{:description} 指定。  如果与 @var{COMMAND} 关联的对象设置了这些属性，则不必在此处指定它们。  然而，您无论如何都可以在这里指定它们，可能只是为了这个瞬态内部的绑定而覆盖对象的值。
+
+@itemize
+@item 
+@var{LEVEL} 是后缀级别，是 1 到 7 之间的整数。请参见 @ref{Enabling and Disabling Suffixes}。
+
+@item 
+KEY 是键绑定，是由 @code{describe-key} 返回并由 @code{kbd} 理解的格式的字符串。
+
+该格式比 @code{key-valid-p} 接受的格式更宽松。例如，更加宽松使得可以将切换 @code{-a} 命令行参数的键绑定编写为“-a”，而不必编写“- a”。  同样，可以添加额外的空格，在菜单中显示绑定时不会删除这些空格，这对于对齐目的很有用。
+
+@item 
+@var{DESCRIPTION} 是描述，可以是字符串，也可以是接受零个或一个参数（后缀对象）并返回字符串的函数。该函数应该是 lambda 表达式以避免歧义。  在某些情况下，绑定为函数的符号也可以工作，但为了安全起见，在这种情况下您应该使用 @code{:description}。
+@end itemize
+
+下一个元素是命令或参数。  这是在所有情况下唯一必需的参数。
+
+@itemize
+@item 
+@var{COMMAND} 应该是一个绑定为函数的符号，在调用包含前缀的命令时必须将其定义或至少自动加载为命令。
+
+任何命令都可以；它不需要有一个与之关联的对象（如果使用 @code{transient-define-suffix} 或 @code{transient-define-infix} 来定义它，就会出现这种情况）。
+
+COMMAND 也可以是 @code{lambda} 表达式。
+
+如上所述，与命令关联的对象可用于设置某些值的默认值，否则必须在后缀规范中设置这些值。  因此，如果没有对象，那么您必须确保指定 @var{KEY} 和 @var{DESCRIPTION}。
+
+作为一种特殊情况，如果您想要添加既未定义也未自动加载的命令，您可以使用如下解决方法：
+
+@lisp
+(transient-insert-suffix 'some-prefix "k"
+  '("!" "Ceci n'est pas une commande" no-command
+    :if (lambda () (featurep 'no-library))))
+@end lisp
+
+您还可以使用 @code{require} 和非 @code{nil} 值作为 @var{NOERROR} 来代替 @code{featurep}。
+
+@item 
+强制参数也可以是命令行参数、字符串。  在这种情况下，将定义并绑定匿名命令。
+
+除了字符串之外，它也可以是两个字符串的列表，在这种情况下，第一个字符串用作短参数（也可以使用@code{:shortarg}指定），第二个字符串用作长参数（也可以使用@code{:argument}指定）。
+
+仅长参数显示在菜单缓冲区中。  请参阅 @code{transient-detect-key-conflicts} 了解如何使用短参数。
+
+除非明确指定类，否则将根据长参数猜测适当的类。  如果参数以 @samp{=} 结尾（例如 @samp{--format=}），则使用 @code{transient-option}，否则使用 @code{transient-switch}。
+@end itemize
+
+最后，可以使用可选的 @var{KEYWORD}-@var{VALUE} 对指定详细信息。每个关键字必须是关键字符号，可以是 @code{:class} 或该类的构造函数支持的关键字参数。  参见@ref{Suffix Slots}。
+
+如果关键字参数接受函数作为值，则可以使用 @code{lambda} 表达式。  作为特殊情况，还支持 @code{##} 宏（返回 @code{lambda} 表达式并在 @code{llama} 包中实现）。在后缀绑定内部，除了直接跟在关键字符号后面之外，任何地方都不支持使用 @code{##}。
+
+@node Defining Suffix and Infix Commands
+@section 定义后缀和中缀命令
+
+@cindex defining suffix commands
+@cindex defining infix commands
+
+请注意，中缀是一种特殊的后缀。  根据上下文，“后缀”表示“后缀（包括中缀）”或“非中缀后缀”。
+
+@defmac transient-define-suffix name arglist [docstring] [keyword value]@dots{} body@dots{}
+该宏将@var{NAME}定义为瞬态后缀命令。
+
+@var{ARGLIST} 是命令采用的参数。 @var{DOCSTRING} 是文档字符串，是可选的。
+
+这些参数后面可以选择跟随关键字-值对。每个关键字必须是关键字符号，可以是 @code{:class} 或该类的构造函数支持的关键字参数。  如果未明确指定类，则使用 @code{transient-suffix} 类。
+
+@var{BODY} 必须以与 @var{ARGLIST} 匹配的 @code{interactive} 形式开头。中缀参数通常通过使用 @code{interactive} 内的 @code{transient-args} 来访问。
+@end defmac
+
+@defmac transient-define-infix name arglist [docstring] [keyword value]@dots{}
+该宏将@var{NAME}定义为瞬态中缀命令。
+
+@var{ARGLIST} 始终被忽略（但仍然是强制性的）并保留以供将来使用。  @var{DOCSTRING} 是文档字符串，是可选的。
+
+至少需要一对键值对。  所有瞬态中缀命令彼此都是@code{equal}（但不是@code{eq}）。  如果不提供至少一个关键字参数（通常是 @code{:argument} 或 @code{:variable}，具体取决于类），定义中缀命令是没有意义的。后缀类默认为@code{transient-switch}，可以使用@code{:class}关键字进行设置。
+
+函数定义始终是：
+
+@lisp
+(lambda ()
+  (interactive)
+  (let ((obj (transient-suffix-object)))
+    (transient-infix-set obj (transient-infix-read obj)))
+  (transient--show))
+@end lisp
+
+@code{transient-infix-read} 和 @code{transient-infix-set} 是通用函数。不同的中缀命令的行为不同，因为不同的中缀命令类的具体方法不同。  在极少数情况下，即使您定义了自己的中缀命令类，上述命令函数也可能不合适。  在这种情况下，您必须使用 @code{transient-define-suffix} 定义中缀命令，并使用 @code{t} 作为 @code{:transient} 关键字的值。
+@end defmac
+
+@defmac transient-define-argument name arglist [docstring] [keyword value]@dots{}
+该宏将@var{NAME}定义为瞬态中缀命令。
+
+这是 @code{transient-define-infix} 的别名。  仅使用此别名来定义实际设置中缀参数的中缀命令。要定义中缀命令（例如设置变量），请改用 @code{transient-define-infix}。
+@end defmac
+
+@node Using Infix Arguments
+@section 使用中缀参数
+
+下面描述的函数和变量允许后缀命令访问调用它们的瞬态值；这是其中缀参数的值。  这些变量在用户调用退出瞬态的后缀命令时但在实际调用该命令之前设置。
+
+调用后缀命令后返回命令循环时，参数将重置为@code{nil}（这会导致函数也返回@code{nil}）。
+
+与 Emacs 的前缀参数一样，建议（但不是强制）访问命令的 @code{interactive} 形式中的中缀参数。首选的方法是调用 @code{transient-args} 函数，该函数对于中缀参数的作用与 @code{prefix-arg} 用于前缀参数的作用大致相同。
+
+@defun transient-args prefix
+该函数返回瞬态前缀命令@var{PREFIX}的值。
+
+如果当前命令是从瞬态前缀命令@var{PREFIX}调用的，则它返回活动中缀参数。  如果当前命令不是从 @var{PREFIX} 调用的，则它将返回 @var{PREFIX} 的设置值、保存值或默认值。
+
+PREFIX 也可以是前缀列表。  如果没有激活的前缀，则使用第一个前缀的后备值。
+
+通用函数 @code{transient-prefix-value} 用于确定返回值。
+
+该函数旨在由后缀命令使用，无论它们是否从菜单调用。  它不适合在设置菜单及其后缀时使用，在这种情况下应使用 @code{transient-get-value}。
+@end defun
+
+@defun transient-get-value
+该函数返回现有前缀的值。
+
+该函数旨在在设置菜单及其后缀时使用。  它不适合在调用后缀命令时使用，无论是否来自菜单，在这种情况下应使用 @code{transient-args}。  换句话说，例如，在后缀 @code{:if*} 或 @code{:inapt-if*} 谓词和 @code{:description} 函数中使用它，但绝不能以其 @code{interactive} 形式或函数体使用。
+@end defun
+
+@defun transient-arg-value arg args
+该函数返回 @var{ARG} 的值，如 @var{ARGS} 中所示。
+
+对于开关，返回一个布尔值。  对于选项，值以字符串形式返回，使用空字符串作为空值，如果该选项未出现在 @var{ARGS} 中，则使用 @code{nil}。
+@end defun
+
+@defun transient-suffixes prefix
+该函数返回瞬态前缀命令@var{PREFIX}的后缀。  这是一个对象列表。  仅当您需要对象（而不只是它们的值）并且当前命令不是从 @var{PREFIX} 调用时，才应使用此函数。
+@end defun
+
+@node Using Prefix Scope
+@section 使用前缀范围
+
+某些瞬态具有某种次要值，称为范围。  可以使用 @code{transient-scope} 访问前缀的范围；类似于使用 @code{transient-args} 访问其值的方式。
+
+@defun transient-scope prefixes classes
+此函数返回活动或当前瞬态前缀命令的范围。
+
+如果可选 PREFIXES 和 CLASSES 均为 @code{nil}，则返回当前正在设置的前缀的范围，使此变体有用，例如在 @code{:if*} 谓词中。  如果没有设置前缀，但当前命令是从某个前缀调用的，则返回该前缀的范围。
+
+如果 PREFIXES 为非@code{nil}，则它必须是前缀命令或此类命令的列表。  如果 CLASSES 是非@code{nil}，它必须是前缀类或此类类的列表。  当从正文或后缀命令的 @code{interactive} 形式调用此函数时，PREFIXES 和/或 CLASSES 应该是非 @code{nil}。  如果其中一个不是@code{nil}，请按顺序尝试以下操作：
+
+@itemize
+@item 
+如果当前后缀命令是从出现在 PREFIXES 中的前缀调用的，则返回该前缀的范围。
+
+@item 
+如果当前后缀命令是从前缀调用的，并且其类派生自 CLASSES 之一，则返回该前缀的范围。
+
+@item 
+如果正在设置前缀并且它出现在 PREFIXES 中，则返回其范围。
+
+@item 
+如果正在设置前缀并且其类派生自 CLASSES 之一，则返回其范围。
+
+@item 
+最后尝试返回 PREFIXES@. 中第一个命令的默认范围，这仅在相应类定义中设置该插槽或使用其“transient-init-scope”方法时才有效。
+@end itemize
+
+如果没有前缀匹配，则返回@code{nil}。
+@end defun
+
+@node Current Suffix Command
+@section 当前后缀命令
+
+@defun transient-suffix-object command
+该函数返回与当前后缀命令关联的对象。
+
+每个后缀命令都与一个对象关联，该对象保存有关后缀的附加信息，例如其值（对于中缀命令，它是一种后缀命令）。
+
+该函数旨在由中缀命令调用，这些命令通常是@code{transient--default-infix-command}的别名，其定义如下：
+
+@lisp
+(defun transient--default-infix-command ()
+  (interactive)
+  (let ((obj (transient-suffix-object)))
+    (transient-infix-set obj (transient-infix-read obj)))
+  (transient--show))
+@end lisp
+
+（用户输入在@code{interactive}之外读取，以防止命令添加到@code{command-history}。）
+
+此类命令需要能够访问其关联对象，以指导 @code{transient-infix-read} 如何读取新值并存储读取的值。  其他后缀命令（包括非中缀命令）可能也需要该对象来指导其行为。
+
+即使后缀命令不是从瞬态调用的，此函数也会尝试返回与当前后缀命令关联的对象。  （对于某些后缀命令来说，这是有效的操作，而对于其他后缀命令则不是。）在这种情况下，如果未使用旨在定义此类命令的宏之一定义该命令，则可能会返回@code{nil}。
+
+可选参数 COMMAND 供内部使用。  如果您考虑在自己的代码中使用它，那么您可能应该使用它：
+
+@lisp
+(get COMMAND 'transient--suffix)
+@end lisp
+@end defun
+
+@defvar transient-current-suffixes
+调用此后缀命令的瞬态的后缀。  这是一个对象列表。  通常使用函数 @code{transient-args} 就足够了，它返回一个值列表。  在复杂的情况下，可能需要使用此变量，即，如果您需要访问值旁边的信息。
+@end defvar
+
+@node Current Prefix Command
+@section 当前前缀命令
+
+@defun transient-prefix-object
+此函数将当前前缀作为对象返回。
+
+当设置或刷新瞬态时（这涉及准备其后缀），变量 @code{transient--prefix} 可用于访问前缀对象。  因此，这就是必须在 @code{transient-format-description} 等后缀方法以及存储在 @code{description} 等后缀槽中的特定于对象的函数中使用的内容。
+
+当调用后缀命令时（即以其 0⁣ 形式和函数体），则必须使用变量 @code{transient-current-prefix} 来代替。
+
+需要两个不同的变量，因为任何前缀本身都可以用作另一个前缀的后缀，并且此类子前缀必须能够将自己与调用它们的前缀区分开来。
+
+常规后缀命令（不是前缀）不必关心这种区别，因此可以改用此函数。  在普通后缀的上下文中，它始终返回适当变量的值。
+@end defun
+
+@defvar transient-current-prefix
+调用此后缀命令的瞬态。  该值是一个 @code{transient-prefix} 对象，它保存与瞬态前缀命令相关的信息。
+@end defvar
+
+@defvar transient-current-command
+调用此后缀命令的瞬态。  该值是一个符号，瞬态前缀命令。
+@end defvar
+
+@defun transient-active-prefix &optional prefixes
+该函数返回活动的瞬态对象。  如果没有活动瞬态、未显示瞬态缓冲区以及活动瞬态暂停（例如，使用迷你缓冲区时），则返回@code{nil}。
+
+与 @code{transient-current-prefix} 不同，@code{transient-current-prefix} 仅在瞬态当前时由调用的命令直接运行的代码中永远是非 @code{nil} ，此函数也适合在异步代码中使用，例如计时器和回调（此函数的主要用例）。
+
+如果可选 PREFIXES 为非@code{nil}，则它必须是前缀命令符号或符号列表，在这种情况下，仅当活动瞬态对象与 PREFIXES@. 之一匹配时才返回
+@end defun
+
+@node Transient State
+@section 瞬态
+
+@cindex transient state
+
+调用瞬态前缀命令“激活”相应的瞬态，即，它使瞬态键盘映射生效，该映射绑定瞬态的中缀和后缀命令。
+
+瞬态处于活动状态时的默认行为如下：
+
+@itemize
+@item 
+调用中缀命令不会影响瞬态；瞬态保持活动状态。
+
+@item 
+调用（非中缀）后缀命令通过删除瞬态键盘映射并执行一些额外的清理来“停用”瞬态状态。
+
+@item 
+不允许调用绑定在除瞬态键盘映射之外的键盘映射中的命令，尝试这样做会导致警告。  这不会“停用”瞬态。
+@end itemize
+
+可以更改特定前缀的所有后缀和/或单个后缀的行为。  这些值几乎总是布尔值，但也可以使用某些称为“预命令”的函数。  这些函数被命名为@code{transient--do-VERB}，符号@code{VERB}可以用作简写。
+
+布尔值被解释为回答“调用此命令时瞬态是否保持活动状态？”的问题。  @code{t} 表示瞬态保持活动状态，而 @code{nil} 表示调用命令退出瞬态。
+
+请注意，当后缀是“子前缀”时，调用该命令始终会激活该子前缀，从而导致外部前缀不再处于活动状态并显示。  这里@code{t}表示当退出内层前缀时，外层前缀再次激活，而@code{nil}表示立即退出所有外层前缀。
+
+@itemize
+@item 
+可以通过将前缀的 @code{transient-non-suffix} 槽设置为布尔值、合适的预命令函数或此类函数的简写，为特定前缀设置非后缀的行为。  参见@ref{Pre-commands for Non-Suffixes}。
+
+@item 
+可以使用前缀的 @code{transient-suffixes} 槽来设置特定前缀的后缀的常见行为。
+
+此槽中指定的值 @strong{not} 会影响中缀。  因为它会影响常规后缀和子前缀，而它们有不同的需求，所以最好避免显式指定函数。
+
+@item 
+可以使用其 @code{transient} 插槽更改单个后缀的行为。  虽然通常最好使用布尔值，但对于此槽，显式指定函数有时是有意义的。
+
+请注意，可以在使用 @code{transient-define-suffix} 定义后缀命令时和/或在前缀定义中设置此槽。  如果在两个地方都设置了，则照常后者优先。
+@end itemize
+
+可用的预命令功能记录在以下小节中。  它们由@code{transient--pre-command}（@code{pre-command-hook}上的函数）调用，它们返回的值确定是否退出瞬态。  为此，使用常量 @code{transient--exit} 或 @code{transient--stay} 之一的值（这样我们就不必记住 @code{t} 是否表示“退出”或“停留”）。
+
+此外，这些函数可能会更改@code{this-command}的值（这解释了为什么必须使用@code{pre-command-hook}来调用它们），调用@code{transient-export}、@code{transient--stack-zap}或@code{transient--stack-push}；并设置 @code{transient--exitp}、@code{transient--helpp} 或 @code{transient--editp} 的值。
+
+为了完整起见，一些关于并发症的注释：
+
+@itemize
+@item 
+某些内置后缀命令的瞬态性使用 @code{transient-predicate-map} 指定。  这是一个特殊的键盘映射，它将命令绑定到前置命令（而不是键到命令），并优先于前缀的 @code{transient-suffix} 插槽，但不优先于后缀的 @code{transient} 插槽。
+
+@item 
+当子前缀处于活动状态时，我们几乎总是希望 @kbd{C-g} 将用户带回到“超级前缀”，即使其他后缀不这样做。  然而，在极少数情况下，这可能并不理想，在这种情况下 1⁣ 可以用作子前缀的 2⁣ 槽的值。
+@end itemize
+
+@anchor{Pre-commands for Infixes}
+@subheading 中缀的前置命令
+
+中缀的默认值是@code{transient--do-stay}。  这也是唯一对中缀有意义的函数，这就是为什么即使前缀的 @code{transient-suffix} 槽的值为 @code{t} 也使用此谓词。  在极少数情况下，人们可能想要使用其他东西，这可以通过直接设置中缀的 @code{transient} 插槽来完成。
+
+@defun transient--do-stay
+调用命令而不导出变量并保持瞬态。
+@end defun
+
+@anchor{Pre-commands for Suffixes}
+@subheading 后缀的前置命令
+
+默认情况下，调用后缀会导致瞬态退出。
+
+可以通过将其 @code{transient} 槽设置为布尔值（强烈推荐）或以下前置命令之一来更改单个后缀命令的行为。
+
+@defun transient--do-exit
+导出变量后调用该命令并退出瞬态。
+@end defun
+
+@defun transient--do-return
+导出变量后调用该命令，返回父前缀。  如果没有父前缀，则调用@code{transient--do-exit}。
+@end defun
+
+@defun transient--do-call
+导出变量后调用命令并保持瞬态。
+@end defun
+
+以下前置命令仅适用于子前缀。  没有必要显式使用这些谓词，因为会根据子前缀本身的 @code{transient} 槽的值自动选择正确的谓词。
+
+@defun transient--do-recurse
+调用transient前缀命令，准备返回外层transient。
+
+我们是否真正返回到父瞬态最终由每个调用的后缀控制。  该预命令与 @code{transient--do-stack} 的区别在于，它将 @code{transient-suffix} 槽的值更改为 @code{t}。
+
+如果没有父瞬态，则仅调用此命令并跳过第二步。
+@end defun
+
+@defun transient--do-stack
+调用瞬态前缀命令，堆叠活动瞬态。将活动瞬态推送到瞬态堆栈。
+
+除非显式使用 @code{transient--do-recurse}，否则该预命令将自动用于本身就是前缀的后缀，即子前缀。
+@end defun
+
+@defun transient--do-replace
+调用瞬态前缀命令，替换活动瞬态。不要将活动瞬态推入瞬态堆栈。
+
+除非显式使用 @code{transient--do-recurse}，否则该预命令将自动用于本身就是前缀的后缀，即子前缀。
+@end defun
+
+@defun transient--do-suspend
+暂停活动瞬态，保存瞬态堆栈。
+
+这由命令 @code{transient-suspend} 使用，也可以选择由“外部事件”（例如 @code{handle-switch-frame}）使用。  此类绑定应添加到@code{transient-predicate-map}。
+@end defun
+
+@anchor{Pre-commands for Non-Suffixes}
+@subheading 非后缀的前置命令
+
+默认情况下，无法调用非后缀（绑定在瞬态键映射旁边的其他键映射中的命令）。  尝试调用此类命令会导致警告，并且瞬态保持活动状态。
+
+如果您想要不同的行为，请设置瞬态前缀命令的 @code{transient-non-suffix} 槽。  该值应该是一个布尔值，回答以下问题：“是否允许调用非后缀命令？”、前置命令函数或此类函数的简写。
+
+如果值为@code{t}，则可以调用非后缀，当值为@code{nil}（默认）时，则不能调用它们。
+
+唯一的其他推荐值是@code{leave}。  如果使用它，则可以调用非后缀，但如果调用后缀，则退出瞬态。
+
+@defun transient--do-warn
+调用 @code{transient-undefined} 并保持短暂状态。
+@end defun
+
+@defun transient--do-stay
+调用命令而不导出变量并保持瞬态。
+@end defun
+
+@defun transient--do-leave
+调用命令而不导出变量并退出瞬态。
+@end defun
+
+@anchor{Special Pre-Commands}
+@subheading 特殊预命令
+
+@defun transient--do-quit-one
+如果处于活动状态，请退出帮助或编辑模式，否则退出活动瞬态。
+
+当用户按下 @kbd{C-g} 时使用。
+@end defun
+
+@defun transient--do-quit-all
+退出所有瞬态而不保存瞬态堆栈。
+
+当用户按下 @kbd{C-q} 时使用。
+@end defun
+
+@defun transient--do-suspend
+暂停活动瞬态，保存瞬态堆栈。
+
+当用户按下 @kbd{C-z} 时使用。
+@end defun
+
+@node Classes and Methods
+@chapter 类和方法
+
+@cindex classes and methods
+
+Transient 使用类和泛型函数来定义新类型的后缀和前缀命令，这些命令与现有类型类似，但在某些方面的行为有所不同。
+
+每个前缀、中缀和后缀命令都与一个对象相关联，该对象保存信息，控制其行为的某些方面。  这以两种方式发生。
+
+@itemize
+@item 
+将命令与某个类相关联就为该命令提供了类型。这使得可以使用通用函数来执行某些必须根据其作用的命令类型以不同方式完成的操作。
+
+这反过来又使得第三方可以添加新类型，而无需说服 Transient 的维护者，该新类型足够重要，足以证明向十几个左右的函数添加特殊情况是合理的。
+
+@item 
+将命令与对象相关联可以轻松存储特定于该特定命令的信息。
+
+例如，两个命令可能具有相同的类型，但显然它们的键绑定和描述仍然必须不同。
+
+一些槽的值是函数。  例如，@code{reader}槽包含一个用于读取中缀命令的新值的函数。  这些槽的值是常规函数。
+
+当函数应该根据命令的类型执行不同的操作时，即当某种类型的所有命令应该以相同的方式运行但与其他类型的行为不同时，使用通用函数。  当对象槽执行的任务甚至在同一类型的不同命令之间也可能不同时，将使用保存常规函数作为值的对象槽。
+@end itemize
+
+@menu
+* Group Classes::
+* Group Methods::
+* Prefix Classes::
+* Suffix Classes::
+* Prefix Methods::
+* Suffix Methods::
+* Prefix Slots::
+* Suffix Slots::
+* Predicate Slots::
+@end menu
+
+@node Group Classes
+@section 团体课程
+
+可以使用类规范开头的 @code{:class} 属性来指定组的类型，例如，在调用 @code{transient-define-prefix} 时使用 @code{[:class transient-columns ...]}。
+
+@itemize
+@item 
+抽象 @code{transient-child} 类是 @code{transient-group} （因此是所有组）以及 @code{transient-suffix} （因此是所有后缀和中缀命令）的基类。
+
+之所以存在此类，是因为某些组的元素（或“子项”）可以是其他组，而不是后缀和中缀命令。
+
+@item 
+抽象 @code{transient-group} 类是所有其他组类的超类。
+
+@item 
+@code{transient-column} 类是最简单的组。
+
+这是默认的“扁平”组。  如果未明确指定该类并且第一个元素不是向量（即不是组），则使用该类。
+
+此类将每个元素显示在单独的行上。
+
+@item 
+@code{transient-row} 类在一行上显示所有元素。
+
+@item 
+@code{transient-columns} 类显示按列组织的命令。
+
+直接元素必须是组，其元素必须是命令或字符串。  每个子组代表一列。  此类负责插入子组的元素。
+
+这是默认的“嵌套”组。  如果未明确指定该类并且第一个元素是向量（即组），则使用该类。
+
+@item 
+@code{transient-subgroups} 类包装其他组。
+
+直接元素必须是组，其元素必须是命令或字符串。  该组在子组之间插入空行。子组本身负责显示其元素。
+@end itemize
+
+@node Group Methods
+@section 分组方法
+
+@defun transient-setup-children group children
+此通用功能可用于设置子项或组。
+
+默认实现通常只是返回子级不变，但如果 1⁣ 的 @code{setup-children} 槽不是 @code{nil}，则它将以 @var{CHILDREN} 作为唯一参数调用该函数并返回值。
+
+子项以包含组或后缀规范的列表（可能为空）形式给出。  这些函数可以对子项进行任意更改，包括从头开始构建新的子项。
+@end defun
+
+@defun transient--insert-group group
+此通用函数格式化组及其元素并将结果插入到当前缓冲区（这是一个临时缓冲区）中。该缓冲区的内容稍后会插入到菜单缓冲区中。
+
+此函数调用的函数可能需要在调用瞬态的缓冲区中进行操作。  为此，他们可以暂时将 @code{transient--shadowed-buffer} 设置为当前缓冲区。
+@end defun
+
+@node Prefix Classes
+@section 前缀类
+
+Transient 本身为前缀命令提供了一个类，@code{transient-prefix}，但包作者可能希望定义专门的类。  这样做可以通过为某些通用函数实现专门的方法来更改使用该类的前缀命令集的行为（请参阅@ref{Prefix Methods}）。
+
+瞬态前缀命令的对象存储在命令符号的 @code{transient--prefix} 属性中。  当瞬态处于活动状态时，该对象的克隆将存储在变量 @code{transient--prefix} 中。  使用克隆是因为对活动瞬态对象所做的某些更改不应影响以后的调用。
+
+@node Suffix Classes
+@section 后缀类
+
+@itemize
+@item 
+所有后缀和中缀类都派生自@code{transient-suffix}，@code{transient-suffix}又派生自@code{transient-child}，@code{transient-group}也派生自@code{transient-group}（请参阅@ref{Group Classes}）。
+
+@item 
+所有中缀类都派生自抽象 @code{transient-infix} 类，而抽象类又派生自 @code{transient-suffix} 类。
+
+中缀是一种特殊类型的后缀。  主要区别在于中缀始终使用 @code{transient--do-stay} 前置命令，而非中缀后缀使用各种前置命令（请参阅 @ref{Transient State}）。  通过使用此类最容易实现这一点，尽管理论上可以定义一个不这样做的中缀类。  如果你这样做了，那么你就可以实现许多方法。
+
+此外，中缀和非中缀后缀通常使用不同的宏定义（参见@ref{Defining Suffix and Infix Commands}）。
+
+@item 
+用于表示参数的中缀命令的类应从抽象 @code{transient-argument} 类派生。
+
+@item 
+@code{transient-switch} 类（或派生类）用于表示命令行开关（不带值的参数）的中缀参数。
+
+@item 
+@code{transient-option} 类（或派生类）用于表示命令行选项（接受值的参数）的中缀参数。
+
+@item 
+@code{transient-switches} 类可用于一组互斥的命令行开关。
+
+@item 
+@code{transient-files} 类可用于 @samp{--} 参数，指示所有剩余参数都是文件。
+
+@item 
+用于表示变量的中缀命令的类应该派生自抽象 @code{transient-variable} 类。
+
+@item 
+@code{transient-information} 和 @code{transient-information*} 类的特殊之处在于，使用这些类的后缀不与命令关联，因此也不与任何键绑定关联。  此类后缀仅用于显示任意信息，并且后缀可以出现在任何地方。  仅显示的后缀规范采用以下形式：
+
+@lisp
+(:info DESCRIPTION [KEYWORD VALUE]...)
+(:info* DESCRIPTION [KEYWORD VALUE]...)
+@end lisp
+
+@code{:info} 和 @code{:info*} 关键字参数替换用于其他后缀类的 @code{:description} 关键字。  您可能想要设置的其他关键字参数包括 @code{:face}、谓词关键字（例如 @code{:if} 和 @code{:inapt-if}）和 @code{:format}。  默认情况下，@code{:format}的值包括@code{%k}，如果在包含组中填充键，则该类将替换为空字符串或空格。
+
+这两个类之间的唯一区别是 @code{:info*} 将其描述与后缀命令的描述对齐，而对于 @code{:info} ，描述会渗透到后缀显示其键绑定的区域。
+
+@item 
+@code{transient-lisp-variable} 类可用于显示和更改 Lisp 变量的值。  该类尚未完全具备功能，未来的改进很可能不会完全向后兼容。
+
+@item 
+@code{transient-cons-option} 类适用于 @code{transient-args} 应返回列表而不是字符串（参数）列表的情况。  可以在前缀定义中指定此类后缀，如下所示：
+
+@lisp
+(:cons OPTION :key KEY [KEYWORD VALUE]...)
+@end lisp
+
+OPTION 可以是字符串以外的东西，可能是关键字或其他符号，它用作 cons-cell 的 @code{car} 。  当使用这样的内联定义时，必须指定@code{:key}。  在大多数情况下，还应该指定@code{:reader}。  当单独定义这样的后缀时，必须使用 @code{:variable} 关键字参数指定“alist key”。
+
+这个类仍然是实验性的，未来的改进很可能不会完全向后兼容。
+
+@item 
+@code{transient-describe-target} 类由命令 @code{transient-describe} 使用。
+
+@item 
+@code{transient-value-preset} 类用于实现命令 @code{transient-preset}，该命令激活预设值。
+@end itemize
+
+Magit 定义了额外的类，它们可以作为示例，展示您无需修改​​ Transient 即可完成的奇特事情。  其中一些类可能会被泛化并添加到 Transient 中。  目前它们很容易发生变化并且没有记录。
+
+@node Prefix Methods
+@section 前缀方法
+
+要获取有关实现这些通用函数的方法的信息，请使用@code{describe-function}。
+
+@defun transient-init-value obj
+这个通用函数设置对象的初始值@var{OBJ}。前缀和后缀对象都存在方法。
+
+前缀对象的默认方法将 OBJ 的 @code{value} 槽的值设置为设置值、保存值或默认值。  为当前会话设置的值优先于保存的值，而保存的值又优先于默认值。
+
+默认值是使用通用函数 @code{transient-default-value} 确定的。  如果您需要更改前缀类的值的确定方式，通常只需实现该函数的方法就足够了。
+@end defun
+
+@defun transient-default-value obj
+此通用函数返回对象 @var{OBJ} 的默认值。前缀和后缀对象都存在方法。
+
+前缀对象的默认方法返回 @code{default-value} 槽的值（如果它是绑定的而不是函数）。  如果它是一个函数，则调用它来获取值。  如果槽未绑定，则返回@code{nil}。
+@end defun
+
+@defun transient-prefix-value obj
+此通用函数返回前缀对象 @var{OBJ} 的值。
+
+OBJ是一个原型对象，仅用于选择该通用函数的适当方法。  该函数不返回该对象的值。  相反，它从对象中提取相应命令的名称，并使用该名称从调用当前命令的前缀的后缀中收集当前值。  如果当前命令不是从识别的前缀调用的，则此方法返回设置、保存或默认值，如@code{transient-args}所述。
+
+此功能仅供@code{transient-args} 使用。  它没有定义为内部函数，因为第三方包可能定义自己的方法。  这并不意味着出于任何其他目的调用它是个好主意。
+
+中缀和后缀对象各自的通用函数被命名为@code{transient-infix-value}。
+@end defun
+
+@defun transient-init-scope obj
+这个通用函数设置对象@var{OBJ}的范围。  前缀和后缀对象都存在方法。
+
+所有前缀和后缀命令都会调用此函数，但除非实现具体方法，否则此函数将采用默认实现，即 noop。
+@end defun
+
+@code{transient-set-value}、@code{transient-save-value}、@code{transient-reset-value}、@code{transient--history-key}、@code{transient--history-push} 和 @code{transient--history-init} 是处理前缀对象值的其他通用函数。  请参阅他们的文档字符串以获取更多信息。
+
+@code{transient-show-help} 是为前缀命令实现的另一个通用函数。  默认方法使用 @code{describe-function} 有效地描述命令。
+
+@node Suffix Methods
+@section 后缀方法
+
+要获取有关实现这些通用函数的方法的信息，请使用@code{describe-function}。
+
+@anchor{Suffix Value Methods}
+@subsection 后缀值方法
+
+@defun transient-init-value obj
+这个通用函数设置对象的初始值@var{OBJ}。前缀和后缀对象都存在方法。
+
+对于 @code{transient-argument} 对象，此函数自行处理设置值。
+
+对于其他@code{transient-suffix}对象（包括@code{transient-infix}对象），这会调用@code{transient-default-value}并使用其返回的值，除非它是特殊值@code{eieio--unbound}，这表明没有默认值。  由于这就是 @code{transient-suffix} 对象的默认方法所做的事情，因此这两个函数对于这些类来说实际上都是 noop。
+
+如果您实现直接从 @code{transient-infix} 派生的类，则必须为此函数和/或 @code{transient-default-value} 实现专用方法。
+@end defun
+
+@defun transient-default-value obj
+此通用函数返回对象 @var{OBJ} 的默认值。前缀和后缀对象都存在方法。
+@end defun
+
+@defun transient-infix-read obj
+这个通用函数确定中缀对象@var{OBJ}的新值。
+
+这个函数仅仅决定了值； @code{transient-infix-set} 用于实际将新值存储在对象中。
+
+对于大多数中缀类，这是通过使用 @code{reader} 槽指定的读取器（使用下面描述的 @code{transient-infix-value} 方法）从用户读取值来完成的。
+
+对于某些中缀类，无需读取迷你缓冲区中的任何内容即可更改值，即，仅调用中缀命令即可根据先前的值确定新值应该是什么。
+@end defun
+
+@defun transient-prompt obj
+此通用函数返回用于读取中缀对象 @var{OBJ} 值的提示。
+@end defun
+
+@defun transient-infix-set obj value
+此通用函数将中缀对象@var{OBJ}的值设置为@var{VALUE}。
+@end defun
+
+@defun transient-infix-value obj
+该通用函数返回后缀对象@var{OBJ}的值。
+
+该函数由 @code{transient-args} （参见）调用，这意味着该函数是如何确定瞬态值的，以便调用的后缀命令可以使用它。
+
+目前大多数值都是字符串，但这并不是一成不变的。 @code{nil} 不是一个值，它的意思是“没有值”。
+
+通常只有中缀才有值，但请参阅 @code{transient-suffix} 的方法。
+@end defun
+
+@defun transient-init-scope obj
+这个通用函数设置对象@var{OBJ}的范围。  前缀和后缀对象都存在方法。
+
+范围实际上是瞬态前缀的属性，而不是单个后缀的属性。  但是，可以直接调用后缀命令，而不是从瞬态调用。  在这种情况下，如果后缀需要一个范围，那么它必须自行确定并将其存储在其 @code{scope} 槽中。
+
+所有前缀和后缀命令都会调用此函数，但除非实现了具体方法，否则这将陷入默认实现，即 noop。
+@end defun
+
+@anchor{Suffix Format Methods}
+@subsection 后缀格式方法
+
+@defun transient-format obj
+此通用函数格式化并返回 @var{OBJ} 进行显示。
+
+当调用此函数时，当前缓冲区是某个临时缓冲区。  如果您需要调用前缀命令的缓冲区为当前缓冲区，请暂时将 @code{transient--source-buffer} 设置为当前缓冲区。
+@end defun
+
+@defun transient-format-key obj
+此通用函数格式化 @var{OBJ} 的 @code{key} 以进行显示并返回结果。
+@end defun
+
+@defun transient-format-description obj
+此通用函数格式化 @var{OBJ} 的 @code{description} 以进行显示并返回结果。
+@end defun
+
+@defun transient-format-value obj
+此通用函数格式化 @var{OBJ} 的值以供显示并返回结果。
+@end defun
+
+@defun transient-show-help obj
+显示由 @var{OBJ} 表示的前缀、中缀或后缀命令的帮助。
+
+无论 OBJ 的类型如何，如果其 @code{show-help} 槽位非 @code{nil}，则它一定是一个函数，该函数以 OBJ 为唯一参数。  它必须准备、显示和返回一个缓冲区，并选择用于显示它的窗口。  @code{transient-show-help-window} 宏旨在用于此类函数。
+
+对于前缀，如果使用 @code{info-manual} 槽指定，则显示信息手册。  否则，如果使用 @code{man-page} 槽指定，则显示联机帮助页。  否则，显示命令的文档字符串。
+
+对于后缀，显示命令的文档字符串。
+
+对于中缀，如果指定了则显示联机帮助页。  否则显示命令的文档字符串。
+@end defun
+
+@defmac transient-with-help-window &rest body
+评估 BODY，将输出发送到 @code{*Help*} 缓冲区，并将其显示在窗口中。  选择帮助窗口，使帮助缓冲区成为当前缓冲区并返回它。
+@end defmac
+
+@defun transient-show-summary obj &optional return
+此通用函数显示，或者，如果可选 RETURN 为非@code{nil}，则返回有关鼠标所在位置或悬停的命令的简短摘要。
+
+当鼠标移动到命令上时以及当用户使用键盘导航到命令时（如果 0⁣ 的值为 @code{verbose}），将调用此函数。
+
+如果 OBJ 的 @code{summary} 槽是字符串，则使用该字符串。  如果 1⁣ 是一个函数，则使用 OBJ 作为唯一参数来调用该函数，并使用返回的字符串。  如果@code{summary}是或返回字符串或@code{nil}以外的其他内容，则不显示摘要。  如果@code{summary}是或返回@code{nil}，则使用文档字符串的第一行（如果有）。
+
+如果 RETURN 为非@code{nil}，则此函数返回摘要而不是显示它。  当需要工具提示时使用此功能。
+@end defun
+
+@node Prefix Slots
+@section 前缀槽
+
+@anchor{Value and Scope}
+@subheading 价值和范围
+
+@itemize
+@item 
+@code{default-value} 前缀的默认值。  使用关键字参数 @code{:value} （原文如此）在前缀定义中设置此槽。
+
+@item 
+@code{init-value} 负责设置对象值的函数。  如果绑定，则以该对象作为唯一参数来调用它。  通常这不是绑定的，在这种情况下，将调用对象的主要 @code{transient-init-value} 方法。
+
+@item 
+@code{history-key} 如果多个前缀命令应共享单个值，则必须将所有这些命令的此槽设置为相同的值。  你可能不想要这样。
+
+@item 
+@code{remember-value} 当调用后缀命令时，它可以消耗前缀的值（这取决于后缀槽@code{transient}和前缀槽@code{transient-suffix}和@code{transient-non-suffix}），然后该值会自动推送到前缀的值历史记录中。
+
+该插槽允许额外设置甚至保存该值，以便再次调用菜单时它成为初始值。
+
+除了 0⁣ 之外，该值还可以是以下符号之一：
+
+@itemize
+@item 
+@code{export} 设置导出时的值。  那是通常将值推入历史堆栈的时间。
+
+@item 
+@code{exit} 退出菜单时设置该值，除非使用唯一目的是退出菜单的命令来完成此操作。
+
+@item 
+@code{quit} 在退出菜单时设置该值，使用的命令的唯一目的就是执行此操作。
+@end itemize
+
+该值还可以是这些符号中的一个或多个的列表，并且还可以选择符号@code{save}。
+
+@itemize
+@item 
+@code{save} 不要仅仅设置该值，而是保存它，以便在将来的 Emacs 会话中使用它。  至少必须有一个其他符号与该符号一起使用。
+@end itemize
+
+该值也可以是（带引号的）变量，其值是如上所述的符号列表。  理想情况下应该使用一个选项，因为并非所有用户都会发现自动保存所需的值。
+
+@item 
+@code{incompatible} 列表的列表。  每个子列表指定一组互斥的参数。  启用这些参数之一会导致其他参数被禁用。  一个参数可以出现在多个子列表中。  参数必须以与相应后缀对象的 @code{argument} 或 @code{argument-format} 槽中使用的相同形式给出，通常类似于 @code{--switch} 或 @code{--option=%s}。  对于选项和 @code{transient-switches} 后缀，还可以匹配特定值，如 @code{transient-infix-value} 返回，例如 @code{--option=one}。
+
+@item 
+@code{scope} 对于某些瞬态，可能需要有一种辅助值，称为“范围”。  参见@code{transient-define-prefix}。
+@end itemize
+
+@anchor{Behavior}
+@subheading 行为
+
+@itemize
+@item 
+@code{transient-suffix}、@code{transient-non-suffix} 和 @code{transient-switch-frame} 在确定当前活动的瞬态前缀命令在调用后缀或任意非后缀命令时是否保持活动/瞬态时发挥作用。  参见@ref{Transient State}。
+
+@item 
+@code{refresh-suffixes} 通常，后缀对象和键盘映射仅在调用前缀时设置一次。  将其设置为 @code{t} 会导致在每个命令后重新创建它们。  这在使用 @code{:if...} 谓词时非常有用，并且由于某种原因需要重新运行这些谓词。  这样做的成本有点高，并且存在丢失状态的风险，因此默认情况下禁用此功能，但仍将其视为实验性的。
+
+@item 
+@code{environment} 用于在初始化、刷新或重新显示瞬态前缀菜单时建立环境的函数。这对于建立缓存很有用，以防多个后缀需要相同的昂贵工作。  所提供的函数至少使用一个参数来调用，即它为其建立环境的函数。  它必须 @code{funcall} 该函数不带参数。在初始化期间，第二个参数是正在初始化的前缀对象。  该插槽仍处于实验阶段。
+@end itemize
+
+@anchor{Appearance}
+@subheading 外貌
+
+@itemize
+@item 
+@code{display-action} 决定如何显示此前缀，覆盖 @code{transient-display-buffer-action}。  它应该具有相同的类型。
+
+@item 
+@code{mode-line-format} 是此前缀的模式行格式，覆盖 @code{transient-mode-line-format}。  它应该具有相同的类型。
+
+@item 
+@code{column-widths} 仅在 @code{transient-columns} 组内受到尊重，并允许在其不同实例之间对齐列。  整数列表。
+
+@item 
+@code{variable-pitch} 控制是否按像素进行对齐以考虑可变间距字符的使用，这很有用，例如在使用表情符号时。
+@end itemize
+
+@anchor{Documentation}
+@subheading 文档
+
+@itemize
+@item 
+@code{show-help}、@code{man-page} 或 @code{info-manual} 可用于指定前缀及其后缀的文档。  命令@code{transient-help}使用函数@code{transient-show-help}（see）来查找和使用这些值。
+
+@item 
+@code{suffix-description} 可用于指定为缺少描述的后缀提供后备描述的函数。  这是为了在实现新的前缀命令时临时使用，此时@code{transient-command-summary-or-name}是一个有用的值。
+
+@item 
+@code{description} 描述前缀的短字符串，用户可以选择将其显示在菜单缓冲区的顶部。  这应该比文档字符串的第一行更简洁，如果没有提供描述，则将其用作后备。
+@end itemize
+
+@anchor{Internal}
+@subheading 内部的
+
+这些插槽主要供内部使用。  不应在调用 @code{transient-define-prefix} 时设置它们。
+
+@itemize
+@item 
+@code{prototype} 当调用瞬态前缀命令时，该对象的克隆将存储在全局变量 @code{transient--prefix} 中，原型将存储在克隆的 @code{prototype} 槽中。
+
+@item 
+@code{command} 命令，符号。  每个瞬态前缀命令由一个命令（存储在符号的函数槽中）和一个对象（存储在同一符号的 @code{transient--prefix} 属性中）组成。
+
+@item 
+@code{level} 前缀命令的级别。  显示同级或更低层的后缀命令。  参见@ref{Enabling and Disabling Suffixes}。
+
+@item 
+@code{value} 前缀的可能已过时的值。  您应该使用函数@code{transient-get-value}，而不是直接访问此槽，它保证返回最新值。
+
+@item 
+@code{history} 和 @code{history-pos} 用于跟踪历史值。除非您实现自己的 @code{transient-infix-read} 方法，否则您不必处理这些插槽。
+
+@item 
+@code{unwind-suffix} 在内部使用，以确保即使在出现错误的情况下也能正确退出瞬态。
+@end itemize
+
+@node Suffix Slots
+@section 后缀槽位
+
+在这里，我们记录了大多数仅适用于后缀对象的插槽。  一些槽由后缀和组对象共享，它们记录在@ref{Predicate Slots}中。
+
+另请参阅@ref{Suffix Classes}。
+
+@anchor{Slots of @code{transient-child}}
+@subheading @code{transient-child} 的槽位
+
+这是@code{transient-suffix}和@code{transient-group}的抽象超类。  除了下面列出的槽之外，该类还定义了 @code{if*} 和 @code{inapt-if*} 槽（请参阅@ref{Predicate Slots}）和 @code{level} 槽（请参阅@ref{Enabling and Disabling Suffixes}）。
+
+@itemize
+@item 
+@code{parent} 父组的对象（如果有）。
+
+@item 
+@code{inactive} 如果后缀或组的 @code{:if*} 谓词返回 @code{nil}，则它不会显示在菜单中，但它必须保留在内部对象树中，以防谓词稍后返回 @code{t}，因此 @code{object} 必须再次出现在菜单中。  同样，组或后缀可能（可能只是暂时）由于其 @code{level} 而处于不活动状态。  @code{inactive} 插槽进行相应设置。  切勿自行设置。
+@end itemize
+
+以下两个插槽是实验性的。  如果它们是为一个组设置的，那么它们将应用于该组中的所有后缀，除了本身将同一插槽设置为非 @code{nil} 值的后缀。
+
+@itemize
+@item 
+@code{advice} 用于建议命令的函数。  该建议使用 @code{(apply advice command args)} 进行调用，即，它的行为类似于“周围”建议。
+
+@item 
+@code{advice*} 用于建议命令的函数。  与@code{advice}不同，这不仅建议命令主体，还建议其@code{interactive}规范。  如果两个槽都不是 @code{nil}，则@code{advice} 用于主体，@code{advice*} 用于@code{interactive} 形式。  当建议 @code{interactive} 规范时，使用 @code{(funcall advice #'advice-eval-interactive-spec spec)} 进行调用。
+@end itemize
+
+@anchor{Slots of @code{transient-suffix}}
+@subheading @code{transient-suffix} 的槽位
+
+@itemize
+@item 
+@code{key} 是键绑定，是由@code{describe-key} 返回并由@code{kbd} 理解的格式的字符串。
+
+该格式比 @code{key-valid-p} 接受的格式更宽松。例如，更加宽松使得可以将切换 @code{-a} 命令行参数的键绑定编写为“-a”，而不必编写“- a”。  同样，可以添加额外的空格，在菜单中显示绑定时不会删除这些空格，这对于对齐目的很有用。
+
+@item 
+@code{command} 命令，符号。
+
+@item 
+@code{transient} 是否保持瞬态。  参见@ref{Transient State}。
+
+@item 
+@code{format} 用于在菜单缓冲区中显示后缀的格式。它必须包含以下 % 占位符：
+
+@itemize
+@item 
+@code{%k} 为钥匙。
+@item 
+@code{%d} 用于描述。
+@item 
+@code{%v} 为中缀值。  非中缀后缀没有值。
+@end itemize
+
+@item 
+@code{description} 描述，可以是字符串或函数，使用零个或一个参数（后缀对象）调用，并返回一个字符串。
+
+@item 
+@code{face} 用于描述的面。  在简单的情况下，使用它比使用函数作为 @code{description} 并在其中添加样式更容易。  @code{face} 使用 @code{add-face-text-property} 附加。
+
+@item 
+@code{show-help} 用于显示后缀帮助的函数。  如果未指定，则前缀控制如何显示其后缀的帮助。  另请参见函数@code{transient-show-help}。
+
+@item 
+@code{summary} 除了菜单本身显示的文本之外，还要显示简短的说明。  如果这是 @code{nil}，则使用文档字符串的第一行。  如果非@code{nil}，则它必须是一个字符串或返回字符串或@code{nil}的函数。
+
+当将鼠标悬停在菜单中的元素时，此描述将显示为工具提示。  如果 @code{transient-enable-menu-navigation} 为 @code{verbose}，则在导航菜单时也会显示在回显区域中。
+
+通用函数 @code{transient-get-summary} 用于确定和格式化此描述。
+
+@item 
+@code{definition} 一个命令，当使用 @code{transient-define-suffix} 定义命令时省略主体时使用该命令。
+@end itemize
+
+@anchor{Slots of @code{transient-infix}}
+@subheading @code{transient-infix} 的槽位
+
+其中一些槽仅对某些子类有意义。无论如何，它们在这里定义是为了允许共享某些方法。
+
+@itemize
+@item 
+@code{argument} 长参数，例如@code{--verbose}。
+
+@item 
+@code{shortarg} 短参数，例如@code{-v}。
+
+@item 
+@code{value} 值。  不应直接访问。
+
+@item 
+@code{init-value} 负责设置对象值的函数。  如果绑定，则以该对象作为唯一参数来调用它。  通常这不是绑定的，在这种情况下，将调用对象的主要 @code{transient-init-value} 方法。
+
+@item 
+@code{unsavable} 后缀的值是否不保存为前缀的一部分。
+
+@item 
+@code{multi-value} 对于选项，选项是否可以有多个值。  如果这是非 @code{nil} ，则默认情况下使用 @code{completing-read-multiple} 读取值，如果您指定自己的读取器，则它应该使用该函数或类似函数读取值。
+
+支持的非 @code{nil} 值有：
+
+@itemize
+@item 
+使用 @code{rest} 表示可以有多个值的选项。  例如，对于指示所有剩余参数都是文件的 @code{--} 参数（例如 @code{git log -- file1 file2}），这很有用。
+
+在@code{transient-args}返回的列表中，这样的选项及其值由@code{(ARGUMENT . VALUES)}形式的单个列表表示。
+
+@item 
+使用 @code{repeat} 表示可以多次指定的选项。
+
+在@code{transient-args}返回的列表中，选项的每个实例及其值单独出现在通常的形式中，例如：@code{("--another-argument" "--option=first" "--option=second")}。
+@end itemize
+
+在这两种情况下，选项的值都必须使用与 @code{transient-args} 返回的格式相同的格式在前缀的默认值中指定，例如 @code{("--other" "--o=1" "--o=2" ("--" "f1" "f2"))}。
+
+@item 
+@code{always-read} 对于选项，是否在每次调用时读取值。如果这是@code{nil}，则具有值的选项将被简单地取消设置，并且必须再次调用以设置新值。
+
+@item 
+@code{allow-empty} 对于选项，空字符串是否是有效值。
+
+@item 
+@code{history-key} 用于存储历史记录的密钥。  默认为命令名称。  当多个中缀应共享相同的历史记录时，这非常有用，因为它们的值属于同一类型。
+
+@item 
+@code{reader} 该函数用于读取中缀的值。  不用于开关。  该函数采用三个参数：@var{PROMPT}、@var{INITIAL-INPUT} 和@var{HISTORY}，并且必须返回一个字符串。
+
+@item 
+@code{prompt} 读取值时使用的提示，可以是字符串，也可以是采用对象作为唯一参数并返回提示字符串的函数。
+
+@item 
+@code{choices} 有效值列表，或返回此类列表的函数。  后者没有针对 @code{transient-switches} 实现，因为我想不出用例。  这些选项的具体使用方式取决于后缀的类别。
+@end itemize
+
+@anchor{Slots of @code{transient-variable}}
+@subheading @code{transient-variable} 的槽位
+
+@itemize
+@item 
+@code{variable} 变量。
+@end itemize
+
+@anchor{Slots of @code{transient-switches}}
+@subheading @code{transient-switches} 的槽位
+
+@itemize
+@item 
+@code{argument-format} 显示格式。  必须包含 @code{%s}，用 @code{choices} 之一代替。  例如，@code{--%s-order}。
+
+@item 
+@code{argument-regexp} 用于匹配任一开关的正则表达式。例如，@code{\\(--\\(topo\\|author-date\\|date\\)-order\\)}。
+@end itemize
+
+@node Predicate Slots
+@section 谓词槽
+
+后缀和组对象共享两组谓词槽，它们根据某些状态控制组或后缀是否可用。  每组中只能同时使用一个插槽。  如果您使用多个插槽，则未定义使用哪个插槽。
+
+第一组中的谓词控制后缀是否出现在菜单中。
+
+@itemize
+@item 
+@code{if} 如果谓词返回非@code{nil}，则启用。
+@item 
+@code{if-not} 如果谓词返回 @code{nil} 则启用。
+@item 
+@code{if-non-nil} 如果变量的值为非@code{nil}，则启用。
+@item 
+@code{if-nil} 如果变量的值为 @code{nil} 则启用。
+@item 
+@code{if-mode} 如果主模式与值匹配则启用。
+@item 
+@code{if-not-mode} 如果主模式与值不匹配则启用。
+@item 
+@code{if-derived} 如果主模式源自值则启用。
+@item 
+@code{if-not-derived} 如果主模式不是从值派生的，则启用。
+@end itemize
+
+第二组中的谓词控制是否可以调用后缀。  不管怎样，后缀都会显示在菜单中，但是当它被认为“不合适”时，它会变灰以指示当前无法调用它。
+
+@itemize
+@item 
+@code{inapt-if} 如果谓词返回非@code{nil}，则不合适。
+@item 
+@code{inapt-if-not} 如果谓词返回@code{nil}，则不合适。
+@item 
+@code{inapt-if-non-nil} 如果变量的值为非@code{nil}，则不合适。
+@item 
+@code{inapt-if-nil} 如果变量的值为 @code{nil} 则不合适。
+@item 
+@code{inapt-if-mode} 如果主模式与值匹配则不合适。
+@item 
+@code{inapt-if-not-mode} 如果主模式与值不匹配，则不合适。
+@item 
+@code{inapt-if-derived} 如果主模式源自值，则不合适。
+@item 
+@code{inapt-if-not-derived} 如果主模式不是从值派生的，则不合适。
+@end itemize
+
+默认情况下，这些谓词在调用前缀命令时运行，但这可以使用 @code{refresh-suffixes} 前缀槽进行更改。参见@ref{Prefix Slots}。
+
+组和后缀类之间还共享一个槽，@code{level}。  与上面记录的槽一样，它是一个谓词，但它用于不同的目的。  该值必须是 1 到 7 之间的整数。 @code{level} 根据用户偏好控制后缀或组是否可用。参见@ref{Enabling and Disabling Suffixes}。
+
+@node FAQ
+@appendix 常问问题
+
+@anchor{Can I control how the menu buffer is displayed?}
+@appendixsec 我可以控制菜单缓冲区的显示方式吗？
+
+是的，参见@ref{Configuration}中的@code{transient-display-buffer-action}。  您还可以通过将 @code{:display-action} 传递给 @code{transient-define-prefix} 来控制菜单缓冲区的显示方式。
+
+@anchor{How can I copy text from the menu buffer?}
+@appendixsec 如何从菜单缓冲区复制文本？
+
+您可以使用鼠标在菜单缓冲区中选择文本，就像在大多数其他缓冲区中一样，通过单击 @code{mouse-1} 并在拖动时按住它。
+
+（在 v0.13.0 之前，上述需要额外的配置，并且拖动时区域不会可视化。现在情况不再如此，但解释了为什么以下内容曾经被认为是必要的。）
+
+或者，可以使用命令 @code{transient-copy-menu-text} 复制菜单缓冲区的完整内容。  您必须在 @code{transient-map} 中添加此命令的绑定。
+
+@lisp
+(keymap-set transient-map "C-c C-w" #'transient-copy-menu-text)
+@end lisp
+
+@anchor{How can I autoload prefix and suffix commands?}
+@appendixsec 如何自动加载前缀和后缀命令？
+
+如果您的软件包仅支持 Emacs 30，只需在定义前添加 @code{;;;###autoload} 即可。  如果您的软件包支持较旧的 Emacs 版本，则不幸的是您必须使用长格式自动加载注释，如@ref{Autoload,,,elisp,}中所述。
+
+@lisp
+;;;###autoload (autoload 'magit-dispatch "magit" nil t)
+(transient-define-prefix magit-dispatch ()
+  ...)
+@end lisp
+
+@anchor{How does Transient compare to prefix keys and universal arguments?}
+@appendixsec Transient 与前缀键和通用参数相比如何？
+
+参见@uref{https://github.com/magit/transient/wiki/Comparison-with-prefix-keys-and-universal-arguments}。
+
+@anchor{How does Transient compare to Magit-Popup and Hydra?}
+@appendixsec Transient 与 Magit-Popup 和 Hydra 相比如何？
+
+参见@uref{https://github.com/magit/transient/wiki/Comparison-with-other-packages}。
+
+@anchor{Why does @kbd{q} not quit popups anymore?}
+@appendixsec 为什么@kbd{q}不再退出弹出窗口？
+
+我同意 @kbd{q} 对于退出某些内容的命令来说是一个很好的绑定。这包括退出当前活动的任何瞬态，但也包括退出某些特定瞬态正在控制的任何内容。  例如，瞬态 1⁣ 将 2⁣ 绑定到关闭 3⁣ 的命令。
+
+因此，我必须决定 @kbd{q} 是否应该退出活动瞬态（就像 Magit-Popup 过去那样），或者 @kbd{C-g} 是否应该这样做，以便 @kbd{q} 可以在单个瞬态中绑定到对它们有意义的任何命令。  因为所有其他字母都已保留供单个瞬态使用，所以我决定不再为 @kbd{q} 破例。
+
+如果你想找回 @kbd{q} 的旧绑定，那么你可以这样做。  这样做比更改单个键绑定要复杂一些，因此我实现了一个函数 @code{transient-bind-q-to-quit} 来进行必要的更改。  有关详细信息，请参阅其文档字符串。
+
+@node Keystroke Index
+@appendix 击键索引
+
+@printindex ky
+
+@node Command and Function Index
+@appendix 命令和功能索引
+
+@printindex fn
+
+@node Variable Index
+@appendix 变量索引
+
+@printindex vr
+
+@node Concept Index
+@appendix 概念索引
+
+@printindex cp
+
+@node GNU General Public License
+@appendix GNU 通用公共许可证
+
+@include gpl.texi
+
+@bye

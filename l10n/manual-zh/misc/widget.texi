@@ -1,0 +1,2806 @@
+\输入 texinfo.tex
+@c %**start of header
+@setfilename ../../info/widget.info
+@settitle Emacs 小部件库
+@documentlanguage en
+@include docstyle.texi
+@syncodeindex fn cp
+@syncodeindex vr cp
+@syncodeindex ky cp
+@c %**end of header
+
+@copying
+版权所有 @copyright{} 2000--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs lisp libraries
+@direntry
+* Widget: (widget).              Emacs 定制工具使用的“widget”包。
+@end direntry
+
+
+@titlepage
+@title Emacs 小部件库
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@node Top
+@top Emacs 小部件库
+
+@insertcopying
+
+@menu
+* Introduction::
+* User Interface::
+* Programming Example::
+* Widgets Basics::
+* Setting Up the Buffer::
+* Working with Widgets::
+* Widgets and the Buffer::
+* Widget Gallery::
+* Defining New Widgets::
+* Inspecting Widgets::
+* Widget Minor Mode::
+* Utilities::
+* Customization::
+* Widget Wishlist::
+* GNU Free Documentation License::
+* Index::
+@end menu
+
+@node  Introduction
+@chapter 介绍
+
+大多数图形用户界面工具包提供了许多标准用户界面控件（有时称为“小部件”或“小工具”）。 Emacs 并不真正支持这样的东西，除了一个非常强大的文本“小部件”。  另一方面，Emacs 确实提供了必要的原语来在文本缓冲区中实现许多其他小部件。  @code{widget} 包简化了这项任务。
+
+@cindex basic widgets
+@cindex widgets, basic types
+基本的小部件是：
+
+@table @code
+@item link
+具有关联操作的文本区域。  用于嵌入文本中的超文本链接。
+@item push-button
+与链接类似，但用于独立按钮。
+@item editable-field
+可编辑的文本字段。  它可以是可变长度或固定长度。
+@item menu-choice
+允许用户从菜单中选择多个选项之一，其中每个选项本身就是一个小部件。  只有选定的选项在缓冲区中可见。
+@item radio-button-choice
+允许用户通过激活单选按钮来选择多个选项之一。  这些选项作为小部件实现。  所有选项都在缓冲区中可见，所选选项标记为已选择。
+@item item
+一个简单的常量小部件，用于 @code{menu-choice} 和 @code{radio-button-choice} 小部件。
+@item choice-item
+仅用于选择的按钮项目。  调用时，将要求用户从选择小部件中选择另一个选项。
+@item toggle
+一个简单的 @samp{on}/@samp{off} ​​开关。
+@item checkbox
+复选框 (@samp{[ ]}/@samp{[X]})。
+@item editable-list
+创建可编辑列表。  用户可以在列表中插入或删除项目。  每个列表项本身就是一个小部件。
+@end table
+
+现在，文本编辑器中对小部件的支持有什么可能的用途？我很高兴你问了。  答案是小部件对于实现表单很有用。  Emacs 中的 @dfn{form} 是一个缓冲区，用户应该在其中填写多个字段，每个字段都有特定的含义。  用户不应更改或删除字段之间的任何文本。  Emacs 中的表单示例包括 @file{forms} 包（当然）、自定义缓冲区、邮件和新闻撰写模式以及 @file{w3} 浏览器中的 @acronym{HTML} 表单支持。
+
+@cindex widget library, why use it
+对于程序员来说，使用 @code{widget} 包来实现表单的优点是：
+
+@enumerate
+@item
+支持比可编辑文本更复杂的字段。
+@item
+如果用户在文本字段中输入无效数据，您可以立即向他们提供反馈，有时还可以阻止输入无效数据。
+@item
+您可以拥有固定大小的字段，从而允许将多个字段排列在列中。
+@item
+查询或设置字段的值很简单。
+@item
+编辑发生在缓冲区中，而不是在迷你缓冲区中。
+@item
+使用该库的包具有统一的外观，使用户更容易学习。
+@item
+随着对嵌入式图形支持的改进，Widget 库将扩展为使用 GUI 功能。  这意味着您使用 Widget 库的代码也将自动使用新的图形功能。
+@end enumerate
+
+@node User Interface
+@chapter 用户界面
+
+表单由文档的只读文本和一些字段组成，其中每个字段包含两个部分：标签和值。  标签用于标识字段，因此文档可以引用@samp{foo field}，表示用@samp{Foo}标记的字段。  这是一个示例表格：
+
+@example
+Here is some documentation.
+
+Name: @i{My Name}     @strong{Choose}: This option
+Address:  @i{Some Place
+In some City
+Some country.}
+
+See also @b{_other work_} for more information.
+
+Numbers: count to three below
+@b{[INS]} @b{[DEL]} @i{One}
+@b{[INS]} @b{[DEL]} @i{Eh, two?}
+@b{[INS]} @b{[DEL]} @i{Five!}
+@b{[INS]}
+
+Select multiple:
+
+@b{[X]} This
+@b{[ ]} That
+@b{[X]} Thus
+
+Select one:
+
+@b{(*)} One
+@b{( )} Another One.
+@b{( )} A Final One.
+
+@b{[Apply Form]} @b{[Reset Form]}
+@end example
+
+此示例中的顶级小部件标记为 @samp{Name}、@samp{Choose}、@samp{Address}、@samp{_other work_}、@samp{Numbers}、@samp{Select multiple}、@samp{Select one}、@samp{[Apply Form]} 和 @samp{[Reset Form]}。  用户在表单中基本上可以执行两件事，即编辑可编辑文本字段和激活按钮。
+
+@section 可编辑文本字段
+
+在示例中，@samp{Name} 的值很可能显示在可编辑文本字段中，@samp{Numbers} 列表中每个成员的值也是如此。  所有正常的 Emacs 编辑操作都可用于编辑这些字段。  唯一的限制是您所做的每个更改都必须包含在单个可编辑文本字段中。例如，禁止将一个字段中间到另一字段中间的所有文本大写。
+
+可编辑文本字段由 @code{editable-field} 小部件创建。
+
+@code{:format} 关键字对于生成必要的文本很有用；例如，如果您为其指定值 @code{"Name: %v "}，则 @samp{Name: } 部分将在字段之前提供必要的分隔文本，而尾随空格将在字段之后提供分隔文本。  如果不包含 @code{:size} 关键字，该字段将延伸到行尾，并且终止换行符将在之后提供分隔。
+
+编辑文本字段用 @code{widget-field-face} 面突出显示，以便于查找。
+
+@section 按钮
+
+@cindex widget buttons
+@cindex button widgets
+缓冲区的某些部分具有关联的 @dfn{action}，可以通过标准键盘或鼠标命令将其变为 @dfn{invoked}。  这些部分称为@dfn{buttons}。  用于激活按钮的默认命令是@code{widget-button-press} 和@code{widget-button-click}。  用户通常使用按键（如@key{RET}）或鼠标按钮与按钮进行交互。
+
+有几种不同类型的按钮，所有这些按钮都出现在示例中：
+
+@table @emph
+@cindex option field tag
+@item 选项字段标签
+当您调用这些按钮之一时，系统会要求您在许多不同的选项之间进行选择。  这是编辑选项字段的方法。  选项字段由 @code{menu-choice} 小部件创建。  在示例中，@samp{@b{Choose}} 是选项字段标签。
+@item @samp{@b{[INS]}} 和 @samp{@b{[DEL]}} 按钮
+激活这些将从可编辑列表中插入或删除元素。该列表由 @code{editable-list} 小部件创建。
+@cindex embedded buttons
+@item 嵌入式按钮
+@samp{@b{_other work_}} 是嵌入式按钮的示例。  嵌入式按钮不与任何字段关联，但可以用于任何目的，例如实现超文本引用。  它们通常由 @code{link} 小部件创建。
+@item @samp{@b{[ ]}} 和 @samp{@b{[X]}} 按钮
+激活其中之一会将其转换为另一个。  这对于实现多项选择字段非常有用。  您可以使用 @code{checkbox} 小部件创建它们。
+@item @samp{@b{( )}} 和 @samp{@b{(*)}} 按钮
+任何时候只能选择 @code{radio-button-choice} 小部件中的一个单选按钮。  当您调用未选定的单选按钮之一时，它将被选中，并且先前选定的单选按钮将变为未选定状态。
+@item @samp{@b{[Apply Form]}} 和 @samp{@b{[Reset Form]}} 按钮
+这些是使用 @code{push-button} 小部件制作的显式按钮。  与 @code{link} 小部件的主要区别在于，按钮将尽可能显示为 GUI 按钮。
+@end table
+
+为了使它们更容易找到，按钮在缓冲区中以独特的外观进行强调，例如 @code{widget-button-face} 或 @code{widget-mouse-face}。
+
+@section 导航
+
+您可以使用所有普通的 Emacs 命令在表单缓冲区中移动，此外您还可以使用这些附加命令在小部件之间导航：@code{widget-forward} 和 @code{widget-backward}。
+
+@node Programming Example
+@chapter 编程实例
+
+@cindex widgets, programming example
+@cindex example of using widgets
+以下是实现用户界面示例的代码 (@pxref{User Interface})。
+
+@lisp
+(require 'widget)
+
+(eval-when-compile
+  (require 'wid-edit))
+
+(defvar widget-example-repeat)
+
+(defun widget-example ()
+  "Create the widgets from the Widget manual."
+  (interactive)
+  (switch-to-buffer "*Widget Example*")
+  (kill-all-local-variables)
+  (make-local-variable 'widget-example-repeat)
+  (let ((inhibit-read-only t))
+    (erase-buffer))
+  (remove-overlays)
+  (widget-insert "Here is some documentation.\n\n")
+  (widget-create 'editable-field
+                 :size 13
+                 :format "Name: %v " ; Text after the field!
+                 "My Name")
+  (widget-create 'menu-choice
+                 :tag "Choose"
+                 :value "This"
+                 :help-echo "Choose me, please!"
+                 :notify (lambda (widget &rest ignore)
+                           (message "%s is a good choice!"
+                                    (widget-value widget)))
+                 '(item :tag "This option" :value "This")
+                 '(choice-item "That option")
+                 '(editable-field :menu-tag "No option" "Thus option"))
+  (widget-create 'editable-field
+                 :format "Address: %v"
+                 "Some Place\nIn some City\nSome country.")
+  (widget-insert "\nSee also ")
+  (widget-create 'link
+                 :notify (lambda (&rest ignore)
+                           (widget-value-set widget-example-repeat
+                                             '("En" "To" "Tre"))
+                           (widget-setup))
+                 "other work")
+  (widget-insert
+    " for more information.\n\nNumbers: count to three below\n")
+  (setq widget-example-repeat
+        (widget-create 'editable-list
+                       :entry-format "%i %d %v"
+                       :notify
+                       (lambda (widget &rest ignore)
+                         (let ((old (widget-get widget
+                                                ':example-length))
+                               (new (length (widget-value widget))))
+                           (unless (eq old new)
+                             (widget-put widget ':example-length new)
+                             (message "You can count to %d." new))))
+                       :value '("One" "Eh, two?" "Five!")
+                       '(editable-field :value "three")))
+  (widget-insert "\n\nSelect multiple:\n\n")
+  (widget-create 'checkbox t)
+  (widget-insert " This\n")
+  (widget-create 'checkbox nil)
+  (widget-insert " That\n")
+  (widget-create 'checkbox
+                 :notify (lambda (&rest ignore) (message "Tickle"))
+                 t)
+  (widget-insert " Thus\n\nSelect one:\n\n")
+  (widget-create 'radio-button-choice
+                 :value "One"
+                 :notify (lambda (widget &rest ignore)
+                           (message "You selected %s"
+                                    (widget-value widget)))
+                 '(item "One") '(item "Another One.")
+                 '(item "A Final One."))
+  (widget-insert "\n")
+  (widget-create 'push-button
+                 :notify (lambda (&rest ignore)
+                           (if (= (length
+                                   (widget-value widget-example-repeat))
+                                  3)
+                               (message "Congratulation!")
+                             (error "Three was the count!")))
+                 "Apply Form")
+  (widget-insert " ")
+  (widget-create 'push-button
+                 :notify (lambda (&rest ignore)
+                           (widget-example))
+                 "Reset Form")
+  (widget-insert "\n")
+  (use-local-map widget-keymap)
+  (widget-setup))
+@end lisp
+
+@node Widgets Basics
+@chapter 小部件基础知识
+@cindex widget object
+小部件库处理小部件对象。  小部件对象具有其值可以是任何值的属性，可以是数字、字符串、符号、函数等。这些属性称为关键字，负责小部件在缓冲区中的表示方式，并控制用户或程序与其交互的方式。
+
+@cindex widget inheritance
+该库定义了多种小部件类型，并为您提供了一种定义新类型的方法。  此外，小部件可以从其他类型派生，从而创建某种小部件继承。  事实上，控件库中定义的所有控件共享一个公共父控件，即 @dfn{default} 控件。  在本手册中，当我们谈论默认行为时，我们通常指的是此 @code{default} 小部件定义的行为。 @xref{Widget Gallery}，用于每个定义的小部件的描述。
+
+定义从前一个类型派生的新类型并不一定要创建与指定类型工作方式非常不同的小部件。创建小部件时，您可以覆盖任何默认属性，包括控制小部件的函数。  也就是说，您可以在创建时专门化一个小部件，而不必将其定义为新类型的小部件。
+
+除了定义小部件的功能外，该库还提供创建小部件、查询和更改其属性、响应用户事件和销毁它们的功能。  以下部分描述了它们。
+
+@cindex widget value
+小部件的一个重要属性是它的 @dfn{value}。  所有小部件都可能有一个值，该值存储在所谓的@dfn{internal format}中。对于 Emacs 的其余部分，小部件以所谓的 @dfn{external format} 形式呈现其值。  两种格式可以相同或不同，每个小部件负责定义每种格式之间的转换应如何发生。
+
+@c FIXME: Briefly describe inline widgets?
+@c The inline concept is described elsewhere, and it's difficult to
+@c describe.
+
+value 属性对于几乎所有小部件来说都是一个重要的属性，对于 @code{editable-field} 小部件来说可能更重要。  这种类型的小部件允许用户通过 Emacs 中的常用编辑命令来编辑它们。  它们也可以通过编程方式进行编辑。 @strong{Important:} 在修改小部件的值之后，您可以 @emph{must} 调用@code{widget-setup}，然后才允许用户再次编辑小部件。  如果修改多个小部件，调用 @code{widget-setup} 一次就足够了。  当前仅当小部件包含编辑字段时才需要这样做，但将来对于其他小部件可能是必需的。
+
+@cindex widget properties
+如果您的应用程序需要将某些信息与小部件对象相关联，例如对正在编辑的项目的引用，则可以使用 @code{widget-put} 和 @code{widget-get} 函数来完成。  如图所示，属性名称是关键字，因此它们必须以 @samp{:} 开头。
+
+@node Setting Up the Buffer
+@chapter 设置缓冲区
+@cindex widget creation, widget conversion
+要在缓冲区中显示小部件，您必须创建它们。  小部件创建实际上是一个两步过程：转换和创建本身。  对于简单的项目，通常转换步骤并不重要，您只关心小部件的创建，因此请随意跳过转换描述，直到您真正需要了解它为止。
+
+小部件转换是涉及获取小部件规范并将其转换为 @dfn{widget} 对象的过程，适合使用其他小部件功能创建、查询和操作。小部件创建是获取小部件对象并将其实际插入缓冲区的过程。
+
+创建小部件最简单的函数是@code{widget-create}，它获取小部件规范并返回小部件对象。
+
+@defun widget-create type [ keyword argument ]@dots{} args
+创建并返回类型为 @var{type} 的小部件，并对其进行转换。
+
+@var{type} 是指定小部件类型的符号。  @var{keyword} 可能是小部件类型支持的属性之一，@var{argument} 指定该属性的值。  这些关键字参数可用于覆盖默认情况下属于 @var{type} 一部分的关键字参数，以及提供默认情况下 @var{type} 中不存在的其他属性。  @var{args} 保存用于创建 @var{type} 的附加信息，并且每个小部件类型负责以特定方式处理该信息。
+
+@var{type} 参数的语法在 @ref{Widget Gallery} 中进行了描述，并且在每个相关的小部件中进行了更详细的描述。
+@end defun
+
+还有其他用于创建小部件的函数，在使用复合小部件时非常有用。  也就是说，属于其他小部件一部分的小部件。
+
+@defun widget-create-child-and-convert parent type &rest args
+创建类型为 @var{type} 的小部件作为 @var{parent} 的子级。
+
+在创建它之前，使用@var{args}中提供的关键字参数转换@var{type}。
+@c FIXME: Is this description useful?
+添加 @code{:indent} 属性（除非它已存在），并将其设置为以下值的总和：来自 @var{parent} 的 @code{:indent} 和 @code{:offset} 以及来自 @var{type} 的 @code{:extra-offset}。
+
+返回一个小部件对象，其属性 @code{:parent} 设置为 @var{PARENT}。
+@end defun
+
+@defun widget-create-child parent type
+创建类型为 @var{type} 的小部件作为 @var{parent} 的子级。
+
+此函数类似于 @code{widget-create-child-and-convert} 但它不会转换 @var{type}，因此它需要一个已经转换的小部件。
+@end defun
+
+@defun widget-create-child-value parent type value
+创建类型为 @var{type} 的小部件作为 @var{parent} 的子级，值为 @var{value}。
+
+此函数类似于 @code{widget-create-child}，但它允许您为小部件指定一个值。
+
+将@var{value}转换为@var{type}指定的内部格式，并将其存储到@var{type}的@code{:value}属性中。这意味着，@var{value} 应采用外部格式，如 @var{type} 所指定。
+@end defun
+
+这里描述的所有这些创建函数都使用存储在 @code{:create} 属性中的函数。  因此，要修改小部件的创建逻辑，您可以提供不同的 @code{:create} 函数。
+
+当您完成创建小部件并准备好让用户与缓冲区交互时，请使用函数 @code{widget-setup}。
+
+@defun widget-setup
+设置当前缓冲区，以便可以编辑可编辑的小部件。
+
+这应该在创建所有小部件之后并在允许用户编辑它们之前调用。
+@end defun
+
+如前所述，所有这些函数都返回一个小部件对象。  可以使用以小部件为参数的小部件函数来查询和操作该小部件对象，直到使用可用于删除小部件的小部件函数将其删除。  即使您不保存返回的小部件对象，您仍然可以通过编程方式与小部件进行交互。  @xref{Working with Widgets}。
+
+@defun widget-delete widget
+删除小部件@var{widget}并将其从缓冲区中删除。
+@end defun
+
+@defun widget-children-value-delete widget
+删除小部件@var{widget}中的所有子项和按钮。
+
+此函数不会删除 @var{widget} 本身，只会删除存储在 @code{:children} 和 @code{:buttons} 属性中的小部件。  它还将这些属性设置为 @code{nil}。
+@end defun
+
+与创建机制一样，@code{:delete} 中存储的函数控制小部件的删除机制。
+
+此外，该库还提供了一种制作小部件副本的方法。
+
+@defun widget-copy widget
+制作 widget @var{widget} 的副本并返回它。
+
+它使用存储在 @var{widget} 的 @code{:copy} 属性中的函数并返回该函数返回的小部件。
+@end defun
+
+正如所讨论的，创建小部件时有一个转换步骤。  要在不实际创建小部件的情况下进行转换，可以使用 @code{widget-convert} 函数。
+
+@defun widget-convert type &rest args
+使用关键字参数@var{args}将@var{type}转换为小部件对象。
+
+返回一个适合创建的小部件对象。  在将相关小部件所需的参数放入 @code{:args} 属性后，它调用存储在 @code{:convert-widget} 属性中的函数。如果 @var{type} 具有 @code{:value} 属性，无论是最初还是在转换之后，此函数都会将 @code{:value} 中存储的值转换为内部格式，并将其存储到 @code{:value} 中。
+@end defun
+
+除了仅在缓冲区中创建小部件之外，使用纯文本也很有用。  对于插入文本，推荐的方法是使用 @code{widget-insert} 函数。
+
+@defun widget-insert &rest args
+在点处插入 @var{args}（字符串或字符）。
+
+使用 @code{insert} 执行插入，并传递 @var{args} 作为参数。  @xref{Insertion,,,elisp, the Emacs Lisp Reference Manual}，了解有关@var{args}的更多信息。
+
+生成的文本将是只读的。
+@end defun
+
+@node Working with Widgets
+@chapter 使用小部件
+本节介绍以通用方式查询和操作小部件所需的更重要的函数。  小部件可能具有用于与其交互的附加功能，这些功能在每个小部件的描述中进行了描述。  @xref{Widget Gallery}。
+
+@defun widgetp widget
+如果@var{widget}是一个小部件，则非@code{nil}。
+@end defun
+
+@defun widget-type widget
+返回小部件@var{widget}的类型，一个符号。
+
+此函数可用于找出 @var{widget} 代表哪种类型的小部件，即创建小部件时的小部件类型的名称。
+@end defun
+
+@defun widget-member widget property
+如果小部件@var{widget}具有属性@var{property}的值（甚至@code{nil}），则非@code{nil}。
+@end defun
+
+@defun widget-get widget property
+对于小部件@var{widget}，返回属性@var{property}的值。
+
+@var{property}应该是一个关键字，其值是@code{widget-put}最后为@var{property}设置的值。
+@end defun
+
+@defun widget-put widget property value
+对于小部件@var{widget}，将属性@var{property}设置为@var{value}。 @var{property} 应该是一个关键字，而 @var{value} 可以是任何东西。
+@end defun
+
+@defun widget-at &optional pos
+返回位置 @var{pos} 处的小部件，或者如果 @var{pos} 为 @code{nil} 则返回该点。
+@end defun
+
+@defun widget-field-at pos
+返回位置 POS 处的小部件字段，如果没有则返回 @code{nil}。
+@end defun
+
+@defun widget-apply widget property &rest args
+将 @var{property} 中存储的函数应用于 @var{widget}，并将 @var{args} 作为附加参数传递给函数。
+
+返回该函数调用的结果。
+@end defun
+
+@defun widget-value widget
+返回 @var{widget} 中包含的当前值。
+
+请注意，此函数返回的值可能与 @var{widget} 的 @code{:value} 属性中存储的值不同。  这是因为该函数从缓冲区中提取 @var{widget} 的当前值，并考虑到版本。
+
+使用 @code{:value-get} 函数获取后，返回的值为外部格式。
+
+在未初始化的小部件上调用此函数是错误的。
+@end defun
+
+@defun widget-value-set widget value
+将@var{widget}中包含的值设置为@var{value}。
+
+将 @var{value} 转换为内部格式，然后通过应用 @code{:value-set} 函数进行设置。
+
+使用无效的@var{value}（即@var{widget}无法表示的值）调用此函数是错误的。
+@end defun
+
+@defun widget-default-get widget
+返回小部件@var{widget}的默认外部值。
+
+默认值是存储在 @code{:value} 中的值，或者是对 @var{widget} 的参数应用 @code{:default-get} 函数的结果（存储在 @code{:args} 中）。  默认情况下会忽略 @code{nil} 的值，因此为了让小部件将 @code{nil} 作为值，它必须重写 @code{:default-get} 函数。
+@end defun
+
+@defun widget-type-default-get widget
+转换@var{widget}中的@code{:type}属性并返回其默认值。
+@end defun
+
+@defun widget-child-value-get widget
+返回@var{widget}中@code{:children}第一个成员的值。
+@end defun
+
+@defun widget-child-value-inline widget
+返回@var{widget}中@code{:children}第一个成员的内联值。
+
+内联值是存储在 @code{:value-inline} 中的函数返回的值。
+@end defun
+
+@defun widget-type-value-create widget
+为 @var{widget} 创建一个子部件，其类型存储在 @code{:type} 中。
+
+使用 @code{:value} 属性中的值创建子控件，并将新创建的控件存储在 @var{widget} 的 @code{:children} 属性中。
+
+存储在 @code{:type} 中的值应该是未转换的小部件类型。
+@end defun
+
+@defun widget-value-convert-widget widget
+从@code{:args}初始化@var{widget}的@code{:value}属性。
+
+将@code{:args}设置为@code{nil}并返回修改后的小部件@var{widget}。
+@end defun
+
+@defun widget-value-value-get widget
+返回小部件 @var{widget} 存储在 @code{:value} 中的值。
+
+这与使用 @code{widget-value} 获取 @var{widget} 的当前值不同，因为该函数从缓冲区中提取值。
+@end defun
+
+@defun widget-apply-action widget &optional event
+将@code{:action}中存储的函数应用到@var{widget}，以响应@var{event}。
+
+使用非活动小部件调用此函数是错误的。
+@end defun
+
+@defun widget-parent-action widget &optional event
+告诉@var{widget}的@code{:parent}处理@var{event}。
+
+可选的@var{event}是触发操作的事件。
+@end defun
+
+@defun widget-child-validate widget
+检查@var{widget}中@code{:children}的第一个成员是否有效。
+
+有效意味着小部件值通过了存储在 @code{:validate} 中的函数所做的检查。
+@end defun
+
+@defun widget-children-validate widget
+检查 @var{widget} 中的所有 @code{:children} 是否有效。
+
+成功时返回 @code{nil} ，或者第一个子项无效。
+@end defun
+
+@defun widget-type-match widget value
+如果 @var{VALUE} 与 @code{:type} 小部件的值匹配，则返回非 @code{nil}。
+
+与其他类型函数一样，存储在 @code{:type} 中的小部件应该是未转换的小部件。
+@end defun
+
+@defun widget-types-copy widget
+复制@var{widget}中的@code{:args}值并将其存储在@code{:args}中。
+
+通过对 @code{:args} 中存在的每个元素调用 @code{widget-copy} 来制作副本。  返回修改后的小部件@var{widget}。
+@end defun
+
+@defun widget-types-convert-widget widget
+转换@var{widget}中的@code{:args}值并将其存储在@code{args}中。
+
+返回修改后的小部件@var{widget}。
+@end defun
+
+@node Widgets and the Buffer
+@chapter 小部件和缓冲区
+本章描述特定于包含小部件的缓冲区的命令。
+
+@cindex widget keybindings
+@defvar widget-keymap
+包含用于包含小部件的缓冲区的有用绑定的键盘映射。
+
+将 @key{TAB} 绑定到 @code{widget-forward}，并将 @kbd{S-@key{TAB}} 和 @kbd{M-@key{TAB}} 绑定到 @code{widget-backward}。  它还将@key{RET}绑定到@code{widget-button-press}，并将@kbd{down-mouse-1}和@kbd{down-mouse-2}绑定到@code{widget-button-click}。
+@end defvar
+
+还有一个用于 Widget 库不需要处理的事件的键盘映射。
+
+@defvar widget-global-map
+@code{widget-button-press} 和 @code{widget-button-click} 当不在按钮上时使用的键盘映射。  默认情况下这是@code{global-map}。
+@end defvar
+
+除了这两个键盘映射之外，每个小部件还可以定义自己的键盘映射，当该小部件上发生事件时激活。
+
+@cindex widget navigation
+可以使用以下导航命令：
+
+@table @kbd
+@item @key{TAB}
+@deffn Command widget-forward count &optional suppress-echo
+向前移动点 @var{count} 按钮或编辑字段。  可选的 @var{suppress-echo} 参数禁止在回显区域中显示移动后最终位置的帮助回显文本（如果有）；在交互式调用中它始终是 @code{nil}。
+@end deffn
+@item M-@key{TAB}
+@itemx S-@key{TAB}
+@deffn Command widget-backward count &optional suppress-echo
+向后移动点 @var{count} 按钮或编辑字段。  可选的 @var{suppress-echo} 参数禁止在回显区域中显示移动后最终位置的帮助回显文本（如果有）；在交互式调用中它始终是 @code{nil}。
+@end deffn
+@end table
+
+@noindent
+默认情况下，选项卡可以将点放在不活动的小部件上。  要在切换时跳过不活动的小部件，请将用户选项 @code{widget-skip-inactive} 设置为非 @code{nil} 值。 @xref{Customization}。
+
+编辑 @code{editable-field} 小部件时，可以使用以下命令：
+
+@table @kbd
+@item C-e
+@deffn Command widget-end-of-line
+将点移动到字段末尾或行尾（以先到者为准）。
+@end deffn
+
+@item C-k
+@deffn Command widget-kill-line
+杀死到场尾或行尾，以先到者为准。
+@end deffn
+
+@item M-@key{TAB}
+@itemx C-M-i
+@deffn Command widget-complete
+完成此时可编辑字段的内容。
+@end deffn
+
+@item C-m
+@itemx @key{RET}
+@deffn Command widget-field-activate
+调用此时的可编辑字段。
+@end deffn
+@end table
+
+以下两个命令可以执行与按钮小部件（例如单选按钮或复选框）关联的操作：
+
+@table @kbd
+@item @key{RET}
+@itemx C-m
+@findex widget-button-press
+@deffn Command widget-button-press @var{pos} &optional @var{event}
+调用@var{pos}处的按钮，默认为point。
+
+调用意味着运行存储在 @code{:action} 属性中的函数。
+
+如果点不在按钮上，则调用 @code{widget-global-map} 中的绑定（默认为全局地图）。
+@end deffn
+
+@kindex mouse-2 @r{(on button widgets})
+@item mouse-2
+@findex widget-button-click
+@deffn Command widget-button-click @var{event}
+调用鼠标指针位置处的按钮。
+
+如果鼠标指针位于可编辑文本字段中，则调用 @code{widget-global-map} 中的绑定（默认为全局地图）。
+
+如果鼠标单击小部件，则调用存储在 @code{:mouse-down-action} 属性中的函数。
+@end deffn
+@end table
+
+@node Widget Gallery
+@chapter 小工具库
+@cindex widget syntax
+所有小部件都可以根据类型规范创建。  类型规范的一般语法是：
+
+@c FIXME: Add BNF reference here?  If yes, what reference?
+@example
+@var{name} ::= (@var{name} [@var{keyword} @var{argument}]... @var{args})
+     |   @var{name}
+@end example
+
+其中 @var{name} 是小部件名称，如 @code{define-widget} 所定义，@var{keyword} 是属性名称，@var{argument} 是该属性的值，@var{args} 以小部件特定方式解释。  @xref{Defining New Widgets}。
+
+@menu
+* Basic Types::
+* Sexp Types::
+@end menu
+
+@node Basic Types
+@section 基本类型
+
+@menu
+* default::
+* item::
+* link::
+* url-link::
+* info-link::
+* function-link::
+* variable-link::
+* face-link::
+* file-link::
+* emacs-library-link::
+* emacs-commentary-link::
+* push-button::
+* editable-field::
+* text::
+* menu-choice::
+* radio-button-choice::
+* choice-item::
+* toggle::
+* radio-button-toggle::
+* checkbox::
+* checklist::
+* editable-list::
+* group::
+* documentation-string::
+@end menu
+
+@node default
+@subsection @code{default} 小部件
+@findex default@r{ widget}
+小部件库中最基本的小部件是 @dfn{default} 小部件。  它为所有其他小部件提供基本行为，并且默认情况下，其所有属性都存在于派生小部件中。  您很少（如果有的话）有效地创建默认小部件，但在这里我们描述它的属性和行为，以便我们只能通过提及其他小部件专门的属性和行为来描述其他小部件。
+
+@deffn Widget default
+用作其他小部件的基础的小部件。
+
+它提供了本文中称为“默认情况下”的大部分功能。  如果您想从头开始定义一个新的小部件，请使用 @code{default} 小部件作为其基础。
+@end deffn
+
+@cindex keyword arguments
+以下关键字参数适用于所有小部件：
+
+@table @code
+@vindex create@r{ keyword}
+@item :create
+从头开始创建小部件的功能。
+
+该函数采用一个参数（一种小部件类型），并创建该类型的小部件，将其插入缓冲区中，然后返回一个小部件对象。
+
+默认情况下，它使用 @code{:format} 属性中提供的格式在该点插入小部件。
+
+@vindex delete@r{ keyword}
+@item :delete
+删除小部件的功能。
+
+该函数应该采用一个参数，即一个小部件，并且应该从缓冲区中删除该小部件的所有痕迹。
+
+默认值为：
+
+@defun widget-default-delete widget
+从缓冲区中删除@var{widget}。删除@var{widget}中的所有@code{:children}和@code{:buttons}。
+@end defun
+
+在大多数情况下，您不应更改此值，而应使用 @code{:value-delete} 进行任何额外的清理。
+
+@cindex internal format
+@cindex external format
+@vindex value@r{ keyword}
+@item :value
+这种类型的小部件的初始值。
+
+通常，小部件以两种格式表示其值：外部和内部。  外部格式是 Emacs 其余部分所看到的值，内部格式是小部件以特定于小部件的方式定义和使用的表示形式。
+
+对于某些小部件，两种格式可能相同，而对于其他小部件，两种格式可能不同，并且无法保证 @code{:value} 属性中存储的值具有哪种格式。  但是，当创建小部件或定义新小部件 (@pxref{Defining New Widgets}) 时，@code{:value} 应采用外部格式。
+
+@vindex value-to-internal@r{ keyword}
+@item :value-to-internal
+将值转换为内部格式的函数。
+
+该函数接受两个参数，一个小部件和一个外部值，并返回内部值。  创建小部件时，会在当前 @code{:value} 上调用该函数，并会在稍后使用 @code{widget-value-set} 设置的任何值上调用该函数。
+
+@vindex value-to-external@r{ keyword}
+@item :value-to-external
+将值转换为外部格式的函数。
+
+该函数接受两个参数，一个小部件和一个内部值，并以外部格式返回该值。
+
+@vindex value-create@r{ keyword}
+@item :value-create
+用于扩展格式字符串中的 @samp{%v} 转义符的函数。
+
+它将以小部件作为其参数来调用，并且应在缓冲区中插入小部件值的表示形式。
+
+@vindex value-delete@r{ keyword}
+@item :value-delete
+一个应该从缓冲区中删除小部件值的表示的函数。
+
+它将以小部件作为参数来调用。  它不必删除文本，但它应该释放标记并删除嵌套小部件（如果这些小部件未在 @code{:children} 或 @code{:buttons} 中列出）。
+
+默认情况下，这是一个无操作。
+
+@vindex value-get@r{ keyword}
+@item :value-get
+提取缓冲区中显示的小部件值的函数。
+
+@vindex value-set@r{ keyword}
+@item :value-set
+将小部件和值作为参数并重新创建它的函数。
+
+该值必须已经是小部件的内部格式。  默认情况下，它使用 @code{:delete} 函数删除小部件，并使用 @code{:create} 函数再次创建它。
+
+@vindex value-inline@r{ keyword}
+@item :value-inline
+接受小部件并返回其值的函数，内联。
+
+内联意味着如果小部件不是内联的（即它的 @code{:inline} 属性是 @code{nil}），则返回值将包装在列表中。
+
+@vindex default-get@r{ keyword}
+@item :default-get
+接受小部件并返回其默认值的函数。
+
+默认情况下，它只返回存储在@code{:value}中的值。
+
+@vindex format@r{ keyword}
+@item :format
+当您创建小部件时，该字符串将被插入到缓冲区中。可以使用以下 @samp{%} 转义：
+
+@table @samp
+@item %[
+@itemx %]
+里面的文本将被标记为按钮。
+
+默认情况下，文本将显示在 @code{widget-button-face} 中，并用括号括起来。
+
+@item %@{
+@itemx %@}
+里面的文本将以@code{:sample-face}指定的面显示。
+
+@item %v
+这将被替换为小部件值的缓冲区表示。  这是什么取决于小部件类型。
+
+@item %d
+在此插入@code{:doc}指定的字符串。
+
+@item %h
+与 @samp{%d} 类似，具有以下修改：如果文档字符串多于一行，它将添加一个按钮，该按钮将在仅显示第一行和显示全文之间切换。此外，如果小部件中没有 @code{:doc} 属性，它将检查 @code{:documentation-property} 属性。  如果它是 lambda 表达式，则会使用小部件的值作为参数来调用它，并且结果将用作文档文本。
+
+@item %t
+在此插入由 @code{:tag} 指定的字符串，如果没有标签，则插入值的 @code{princ} 表示形式。
+
+@item %%
+插入文字@samp{%}。
+@end table
+
+@vindex button-face@r{ keyword}
+@item :button-face
+用于突出显示格式中 %[ %] 内的文本的面。
+
+@vindex button-prefix@r{ keyword}
+@vindex button-suffix@r{ keyword}
+@item :button-prefix
+@itemx :button-suffix
+用作按钮小部件的前缀和后缀的字符串。
+
+默认情况下，值为 @code{widget-button-prefix} 和 @code{widget-button-suffix}。
+
+格式中 %[ %] 周围的文本。
+
+这些可以是
+@table @emph
+@item 零
+没有插入任何文字。
+
+@item 一个字符串
+该字符串按字面意思插入。
+
+@item 一个符号
+符号的值根据此表进行扩展。
+@end table
+
+@vindex doc@r{ keyword}
+@item ：文档
+由格式字符串中的 @samp{%d} 转义符插入的字符串。
+
+@vindex tag@r{ keyword}
+@item ：标签
+由格式字符串中的 @samp{%t} 转义符插入的字符串。
+
+@vindex tag-glyph@r{ keyword}
+@item :标签字形
+要使用的图像名称，而不是支持它的 Emacsen 上由 @code{:tag} 指定的字符串。
+
+@vindex help-echo@r{ keyword}
+@item :help-echo
+指定每当您使用 @code{widget-forward} 或 @code{widget-backward} 移动到小部件或将鼠标移到其上方（使用标准 @code{help-echo} 机制）时如何显示消息。
+
+该值可以是要显示的字符串，也可以是一个参数（小部件）的函数。  如果是一个函数，它应该返回一个要显示的字符串，或者一个计算结果为此类字符串的表单。
+
+@vindex follow-link@r{ keyword}
+@item :follow-link :follow-link
+指定如何解释小部件上的 @key{mouse-1} 单击。 @xref{Clickable Text,, Defining Clickable Text, elisp, the Emacs Lisp Reference Manual}。
+
+@vindex indent@r{ keyword}
+@item :缩进
+一个整数，指示缩进此小部件子项的空格的绝对数量。  它的值也可能是 @code{nil}，对应于值 0。
+
+默认 @code{:create} 函数和创建值本身的函数使用此属性作为小部件的基本布局机制。
+
+@vindex offset@r{ keyword}
+@item ：抵消
+一个整数，指示与此小部件相比要向小部件的孙子添加多少额外空间。
+
+@vindex extra-offset@r{ keyword}
+@item ：额外偏移
+一个整数，指示与此小部件相比要添加到小部件的子项的额外空格数。
+
+@vindex menu-tag@r{ keyword}
+@item :菜单标签
+当小部件用作 @code{menu-choice} 小部件中的选项时，菜单中使用的标签。
+
+@vindex menu-tag-get@r{ keyword}
+@item :菜单标签获取
+当小部件用作 @code{menu-choice} 小部件中的选项时，该函数接受小部件并返回标签。
+
+默认情况下，使用的标签将是 @code{:menu-tag} 或 @code{:tag} 属性（如果存在），或者是 @code{:value} 属性的 @code{princ} 表示形式（如果不存在）。
+
+@vindex match@r{ keyword}
+@item ：匹配
+应该是一个使用两个参数调用的函数，即小部件和外部值，并且如果小部件可以表示指定值，则应该返回非@code{nil}。
+
+@vindex validate@r{ keyword}
+@item ：证实
+该函数接受小部件作为参数，如果小部件的当前值对该小部件有效，则返回@code{nil}。
+
+否则，它应该返回包含无效数据的小部件，并将该小部件的 @code{:error} 属性设置为解释错误的字符串。
+
+默认情况下，它始终返回@code{nil}。
+
+@vindex tab-order@r{ keyword}
+@item :Tab 键顺序
+使用 @code{widget-forward} 或 @code{widget-backward} 指定小部件的遍历顺序。  这仅部分实施。
+@enumerate a
+@item 
+Tab 键顺序为 @code{-1} 的小部件将被忽略。
+
+@item 
+（未实现）当在具有 Tab 键顺序 @var{n} 的小部件上时，转到缓冲区中具有 Tab 键顺序 @var{n+1} 或 @code{nil}（以先到者为准）的下一个小部件。
+
+@item 
+当在没有指定 Tab 键顺序的小部件上时，转到缓冲区中具有正 Tab 键顺序的下一个小部件，或 @code{nil}
+@end enumerate
+
+@vindex parent@r{ keyword}
+@item ：父级
+嵌套小部件的父级（例如，@code{menu-choice} 项或@code{editable-list} 小部件的元素）。
+
+@vindex sibling-args@r{ keyword}
+@item :兄弟参数
+该关键字仅用于 @code{radio-button-choice} 或 @code{checklist} 的成员。  该值应该是额外关键字参数的列表，在创建与此项关联的 @code{radio-button} 或 @code{checkbox} 时将使用这些参数。
+
+@vindex completions-function@r{ keyword}
+@item : 完成功能
+接受一个小部件并返回该小部件的完成数据的函数，就像 @code{completion-at-point-functions} 一样。 @xref{Completion,,,elisp, the Emacs Lisp Reference Manual}。  @code{editable-field} 小部件使用它来提供补全。
+
+默认情况下，它会查找属性 @code{:completions}，它应该是一个完成表。  如果 @code{:completions} 是 @code{nil}，则它调用存储在 @code{:complete} 或 @code{:complete-function} 属性中的函数。
+
+@vindex format-handler@r{ keyword}
+@item :格式处理程序
+处理格式字符串中未知的 @samp{%} 转义的函数。
+
+它采用一个小部件和 @samp{%} 后面的字符作为参数。  您可以设置它以允许您的小部件在您自己的专用小部件中处理非标准转义。
+
+@findex widget-default-format-handler
+您最终应该调用 @code{widget-default-format-handler} 来处理未知的转义序列，它将处理 @samp{%h} 和任何未来的转义序列，并为未知的转义给出错误。
+
+@vindex button-face-get@r{ keyword}
+@item :button-face-get
+返回用于字体化小部件按钮的面的函数。
+
+获取一个小部件并返回该小部件的适当面。  默认情况下，它要么返回存储在 @code{:button-face} 属性中的面，要么从窗口小部件的父级调用 @code{:button-face-get} 函数（如果有）。
+
+@vindex mouse-face-get@r{ keyword}
+@item : 鼠标脸获取
+当鼠标指针悬停在小部件上时返回用于字体化小部件的面的函数。
+
+获取一个小部件并返回合适的面。  默认情况下，它要么返回存储在 @code{:mouse-face} 属性中的面，要么从窗口小部件的父级调用 @code{:button-face-get} 函数（如果有）。
+
+@vindex copy@r{ keyword}
+@item ：复制
+深度复制小部件类型的函数。
+
+它采用 widget 类型的浅拷贝作为参数（由 @code{copy-sequence} 创建），并返回一个深拷贝。  这样做的目的是避免组合小部件的不同实例共享嵌套属性。
+
+它的默认值是@code{identity}。
+
+@vindex active@r{ keyword}
+@item ：积极的
+接受一个小部件并在其处于活动状态时返回 @code{t} 的函数。
+
+如果一个小部件的 @code{:always-active} 属性是 @code{t}，则它可能实际上始终处于活动状态。
+
+@cindex active widget
+@cindex inactive widget
+@cindex activate a widget
+@cindex deactivate a widget
+小部件可以处于两种状态：活动，这意味着它们可以由用户修改，或非活动，这意味着它们不能被用户修改。可以通过以下代码查询或设置状态：
+
+@lisp
+;; Examine if @var{widget} is active or not.
+(if (widget-apply @var{widget} :active)
+    (message "Widget is active.")
+  (message "Widget is inactive.")
+
+;; Make @var{widget} inactive.
+(widget-apply @var{widget} :deactivate)
+
+;; Make @var{widget} active.
+(widget-apply @var{widget} :activate)
+@end lisp
+
+如果某个小部件或其任何祖先（通过点击 @code{:parent} 链接找到）已被停用，则该小部件处于非活动状态。  为了确保一个小部件真正处于活动状态，您必须激活它及其所有祖先。
+
+@lisp
+(while widget
+  (widget-apply widget :activate)
+  (setq widget (widget-get widget :parent)))
+@end lisp
+
+您可以通过检查 @code{:inactive} 关键字的值来检查小部件是否已处于非活动状态。  如果这是非@code{nil}，则小部件本身已被停用。  这与使用 @code{:active} 关键字不同，后者会告诉您小部件 @strong{or} 的任何祖先是否已被停用。  不要尝试直接设置 @code{:inactive} 关键字。  请改用 @code{:activate} @code{:deactivate} 函数。
+
+@vindex activate@r{ keyword}
+@item :激活
+获取小部件并使其处于活动状态以供用户修改的函数。
+
+@vindex deactivate@r{ keyword}
+@item ：停用
+获取小部件并使其对用户修改不活动的函数。
+
+如果您修改不活动的小部件，则应确保在修改后再次调用 :deactivate 函数。
+
+@vindex action@r{ keyword}
+@item ：行动
+函数接受一个小部件和一个可选的事件，并处理用户启动的事件。
+
+默认情况下，使用 @code{:notify} 函数向小部件的父级通知该事件。
+
+@vindex mouse-down-action@r{ keyword}
+@item :鼠标按下操作
+该函数接受一个小部件和一个事件（可选），并处理小部件上的鼠标单击。
+
+默认情况下，它不执行任何操作。
+
+@vindex notify@r{ keyword}
+@item ：通知
+每次更改小部件或嵌套小部件时调用的函数。
+
+使用两个或三个参数调用该函数。  第一个参数是小部件本身，第二个参数是已更改的小部件，第三个参数是导致更改的事件（如果有）。
+
+默认情况下，它将通知传递给小部件的父级。
+
+@vindex prompt-value@r{ keyword}
+@item :提示值
+提示在迷你缓冲区中输入值的函数。
+
+该函数应采用四个参数：一个小部件、一个提示（字符串）、一个值和一个布尔值，并且应返回用户输入的小部件的值。
+
+提示就是使用的提示。  该值是要使用的默认值，除非第四个参数是非@code{nil}，在这种情况下没有默认值。
+
+该函数应该使用该小部件最自然的方法读取值，并且不必检查它是否匹配。
+@end table
+
+@node item
+@subsection @code{item} 小部件
+@findex item@r{ widget}
+
+句法：
+
+@example
+@var{type} ::= (item [@var{keyword} @var{argument}]... @var{value})
+@end example
+
+一个有用的小部件，它保存恒定值，并且可以包含在其他小部件中。  它的超级组件是 @code{default} 小部件。
+
+从语法中可以看出， @code{item} 小部件是以特定方式处理 @var{args} 参数到 @code{widget-create} 的小部件之一。  如果存在，@var{value} 用于初始化 @code{:value} 属性。  创建后，它将值作为字符串插入缓冲区中。
+
+@noindent
+例子：
+
+@lisp
+(widget-create 'item :tag "Today is" :format "%t: %v\n"
+               (format-time-string "%d-%m-%Y"))
+@end lisp
+
+
+默认情况下，它具有以下属性：
+
+@table @code
+@item :convert-widget
+允许它处理@var{value}的函数。
+
+@item :value-create
+打印缓冲区中 @code{:value} 的表示。
+
+@item :value-get
+返回存储在@code{:value}中的值。
+
+@item :match
+如果某个值是 @code{equal} 到其 @code{:value}，则该值与 @code{item} 小部件匹配。
+
+@item :match-inline
+如果 @code{:value} 是值的子列表，则内联值与 @code{item} 小部件匹配。
+
+@item :action
+@code{item} 小部件通知自身一个事件。
+
+@item :format
+默认情况下，@code{item}小部件将其标签插入缓冲区中。
+@end table
+
+@node link
+@subsection @code{link} 小部件
+@findex link@r{ widget}
+
+句法：
+
+@example
+@var{type} ::= (link [@var{keyword} @var{argument}]...  [ @var{value} ])
+@end example
+
+代表嵌入链接的小部件。  它的超级组件是 @code{item} 小部件。
+
+@var{value}（如果存在）用于初始化 @code{:value} 属性。  该值应该是一个字符串，它将被插入到缓冲区中。
+
+@noindent
+例子：
+
+@lisp
+(widget-create 'link
+               :button-prefix ""
+               :button-suffix ""
+               :tag "Mail yourself"
+               :action #'(lambda (widget &optional _event)
+                           (compose-mail-other-window (widget-value widget)))
+               user-mail-address)
+@end lisp
+
+
+默认情况下，它具有以下属性：
+
+@table @code
+@item :button-prefix
+@code{widget-link-prefix} 的值。
+
+@item :button-suffix
+@code{widget-link-suffix} 的值。
+
+@item :keymap
+链接小部件的自定义键盘映射，以便它可以响应鼠标单击。
+
+@item :follow-link
+此属性允许链接遵循 @code{mouse-1-click-follows-link} 的值。  @xref{Clickable Text,,,elisp, the Emacs Lisp Reference Manual}。
+
+@item :format
+将链接按钮化，使其可点击。
+
+如果您覆盖此属性，则应确保提供 @samp{%[} 和 @samp{%]} 转义序列，以便链接可单击。
+
+@end table
+
+默认情况下，链接将显示在括号中。
+
+@node url-link
+@subsection @code{url-link} 小部件
+@findex url-link@r{ widget}
+
+句法：
+
+@example
+@var{type} ::= (url-link [@var{keyword} @var{argument}]...  @var{url})
+@end example
+
+代表网页链接的小部件。  它的超级组件是 @code{link} 小部件。
+
+它覆盖 @code{:action} 属性以打开指定的 @var{url}。
+
+@noindent
+例子：
+
+@lisp
+@group
+(widget-create 'url-link
+               :button-prefix ""
+               :button-suffix ""
+               ;; Return appropriate face.
+               :button-face-get (lambda (widget)
+                 (if (widget-get widget :visited)
+                     'link-visited
+                   'link))
+               :format "%[%t%]"
+               :tag "Browse this manual"
+               :action (lambda (widget &optional _event)
+                          (widget-put widget :visited t)
+                          ;; Takes care of redrawing the widget.
+                          (widget-value-set widget (widget-value widget))
+                          ;; And then call the original function.
+                          (widget-url-link-action widget))
+               "https://www.gnu.org/software/emacs/manual/html_mono/widget.html")
+@end group
+@end lisp
+
+@node info-link
+@subsection @code{info-link} 小部件
+@findex info-link@r{ widget}
+
+句法：
+
+@example
+@var{type} ::= (info-link [@var{keyword} @var{argument}]...  @var{address})
+@end example
+
+代表信息文件链接的小部件。  它的超级组件是 @code{link} 小部件。
+
+它会将 @code{:action} 属性重写为一个函数，以便在调用时在 @var{address} 上启动内置信息阅读器。
+
+@noindent
+例子：
+
+@lisp
+(widget-create 'info-link
+               :button-prefix ""
+               :button-suffix ""
+               :tag "Browse this manual"
+               "(widget) info-link")))
+@end lisp
+
+@node function-link
+@subsection @code{function-link} 小部件
+@findex function-link@r{ widget}
+句法：
+
+@example
+@var{type} ::= (function-link [@var{keyword} @var{argument}]...  @var{function})
+@end example
+
+代表 Emacs 函数链接的小部件。  它的超级组件是 @code{link} 小部件。
+
+它覆盖 @code{:action} 属性，以描述 @var{function} 的函数。
+
+@noindent
+例子：
+
+@lisp
+(widget-create 'function-link
+               :button-prefix ""
+               :button-suffix ""
+               :tag "Describe the function that gets called"
+               #'widget-function-link-action)
+@end lisp
+
+@node variable-link
+@subsection @code{variable-link} 小部件
+@findex variable-link@r{ widget}
+句法：
+
+@example
+@var{type} ::= (variable-link [@var{keyword} @var{argument}]...  @var{var})
+@end example
+
+代表 Emacs 变量链接的小部件。  它的超级组件是 @code{link} 小部件。
+
+它覆盖 @code{:action} 属性，以描述 @var{var} 的函数。
+
+@noindent
+例子：
+
+@lisp
+(widget-create 'variable-link
+               :button-prefix ""
+               :button-suffix ""
+               :tag "What setting controls button-prefix?"
+               'widget-button-prefix)
+@end lisp
+
+@node face-link
+@subsection @code{face-link} 小部件
+@findex face-link@r{ widget}
+句法：
+
+@example
+@var{type} ::= (face-link [@var{keyword} @var{argument}]...  @var{face})
+@end example
+
+代表 Emacs 界面链接的小部件。  它的超级组件是 @code{link} 小部件。
+
+它覆盖 @code{:action} 属性，以描述 @var{face} 的函数。
+
+@noindent
+例子：
+
+@lisp
+(widget-create 'face-link
+               :button-prefix ""
+               :button-suffix ""
+               :tag "Which face is this one?"
+               'widget-button)
+@end lisp
+
+@node file-link
+@subsection @code{file-link} 小部件
+@findex file-link@r{ widget}
+句法：
+
+@example
+@var{type} ::= (file-link [@var{keyword} @var{argument}]...  @var{file})
+@end example
+
+代表文件链接的小部件。  它的超级组件是 @code{link} 小部件。
+
+它覆盖 @code{:action} 属性，以查找文件 @var{file} 的函数。
+
+@noindent
+例子：
+
+@lisp
+(let ((elisp-files (directory-files user-emacs-directory t ".el$")))
+  (dolist (file elisp-files)
+    (widget-create 'file-link
+                   :button-prefix ""
+                   :button-suffix ""
+                   file)
+    (widget-insert "\n")))
+@end lisp
+
+@node emacs-library-link
+@subsection @code{emacs-library-link} 小部件
+@findex emacs-library-link@r{ widget}
+句法：
+
+@example
+@var{type} ::= (emacs-library-link [@var{keyword} @var{argument}]...  @var{file})
+@end example
+
+代表 Emacs Lisp 文件链接的小部件。  它的超级组件是 @code{link} 小部件。
+
+它覆盖 @code{:action} 属性，以查找文件 @var{file} 的函数。
+
+@noindent
+例子：
+
+@lisp
+(widget-create 'emacs-library-link
+               :button-prefix ""
+               :button-suffix ""
+               :tag "Show yourself, Widget Library!"
+               "wid-edit.el")
+@end lisp
+
+@node emacs-commentary-link
+@subsection @code{emacs-commentary-link} 小部件
+@findex emacs-commentary-link@r{ widget}
+句法：
+
+@example
+@var{type} ::= (emacs-commentary-link [@var{keyword} @var{argument}]...  @var{file})
+@end example
+
+一个小部件，表示 Emacs Lisp 文件的注释部分的链接。  它的超级组件是 @code{link} 小部件。
+
+它覆盖 @code{:action} 属性，以查找文件 @var{file} 并将点放在注释部分中的函数。
+
+@noindent
+例子：
+
+@lisp
+(widget-create 'emacs-commentary-link
+               :button-prefix ""
+               :button-suffix ""
+               :tag "Check our good friend Customize"
+               "cus-edit.el")
+@end lisp
+
+@node  push-button
+@subsection @code{push-button} 小部件
+@findex push-button@r{ widget}
+
+句法：
+
+@example
+@var{type} ::= (push-button [@var{keyword} @var{argument}]...  [ @var{value} ])
+@end example
+
+充当可按按钮的小部件。  它的超级组件是 @code{item} 小部件。
+
+@var{value}（如果存在）用于初始化 @code{:value} 属性。  该值应该是一个字符串，它将被插入到缓冲区中。
+
+默认情况下，它具有以下属性：
+@table @code
+@item :button-prefix
+空字符串。
+
+@item :button-suffix
+空字符串。
+
+@item :value-create
+插入按钮“开”和“关”状态的表示。
+
+该表示形式可以是存储在 @code{:tag-glyph} 属性中的图像，也可以是文本。  如果是文本，则可能是 @code{:tag} 属性的值，或小部件的 @code{:value} 的值，并被 @code{widget-push-button-prefix} 和 @code{widget-push-button-suffix} 包围。  @xref{Customization}。
+
+@item :format
+按钮化小部件，使其可点击。
+@end table
+
+@node editable-field
+@subsection @code{editable-field} 小部件
+@findex editable-field@r{ widget}
+
+句法：
+
+@example
+@var{type} ::= (editable-field [@var{keyword} @var{argument}]... [ @var{value} ])
+@end example
+
+用户可以编辑的小部件。  它的超级组件是 @code{default} 小部件。
+
+@var{value}（如果存在）用于初始化 @code{:value} 属性。  该值应该是一个字符串，它将被插入到字段中。  如果不存在，@code{:value} 是空字符串。
+
+@strong{Warning:} 在 @code{editable-field} 小部件中，可编辑字段不得与另一个小部件相邻——这是行不通的。您必须在中间放置一些文本。  要么将此文本作为 @code{editable-field} 小部件本身的一部分，要么将其与 @code{widget-insert} 一起插入。
+
+该小部件会覆盖或添加以下属性：
+
+@table @code
+@item :convert-widget
+就像 @code{item} 小部件一样，此函数允许它从 @var{value} 初始化 @code{:value}。
+
+@vindex keymap@r{ keyword}
+@vindex widget-field-keymap
+@item :keymap
+可编辑字段中使用的键盘映射。
+
+默认值是@code{widget-field-keymap}，它允许用户使用所有正常的编辑命令，即使缓冲区的主要模式抑制其中一些命令。  按@key{RET} 调用@code{:action} 指定的功能。
+
+@item :format
+默认情况下，它指定仅插入小部件的值。
+
+@strong{Warning:} 在 @code{editable-field} 小部件中，@samp{%v} 转义符之前必须有 @code{:format} 字符串中的其他文本（如果指定）。
+
+@vindex size@r{ keyword}
+@item :size
+可编辑字段的宽度。
+
+默认情况下，该字段将到达行尾。
+
+@vindex value-face@r{ keyword}
+@item :value-face
+用于突出显示可编辑字段的面。
+
+默认为@code{widget-field-face}、@pxref{User Interface}。
+
+@vindex secret@r{ keyword}
+@item :secret
+用于显示值的字符。
+
+例如，如果该字段包含密码或其他秘密信息，您可以将其设置为 @code{?*}。  默认情况下，这是@code{nil}，并且该值不是秘密的。
+
+@vindex valid-regexp@r{ keyword}
+@item :valid-regexp
+默认情况下，@code{:validate}函数会将字段的内容与该属性的值进行匹配。
+
+默认值是 @code{""} 匹配所有内容。
+
+@item :validate
+如果小部件的当前值与 @code{:valid-regexp} 值匹配，则返回 @code{nil}。
+
+@item :prompt-internal
+用于读取小部件值的函数，由 @code{:prompt-value} 函数使用。
+
+@item :prompt-history
+保存字段迷你缓冲区编辑历史的变量。
+
+@item :prompt-value
+该函数使用 @code{:prompt-internal} 函数和 @code{:prompt-history} 值提示输入字符串，并以外部格式返回用户响应。
+
+@item :action
+调用时，将指针移动到下一个字段。
+
+@item :value-create
+负责创建小部件的函数，尊重其 @code{:size} 和 @code{:value}。
+
+@item :value-set
+用于以编程方式修改小部件当前值的函数。
+
+@item :value-delete
+删除小部件使其无法再编辑的功能。
+
+@item :value-get
+返回小部件中当前文本的函数。
+
+它需要一个可选参数@var{no-truncate}。  如果 1⁣ 为零，则截断尾随空格。
+
+@item :match
+使小部件匹配任何字符串值的函数。
+@end table
+
+@node text
+@subsection @code{text} 小部件
+@findex text@r{ widget}
+
+句法：
+
+@example
+@var{type} ::= (text [@var{keyword} @var{argument}]... [ @var{value} ])
+@end example
+
+一个类似于 @code{editable-field} 小部件的小部件，但用于多行文本字段。  它的超级组件是 @code{editable-field} 小部件。
+
+它会覆盖以下属性：
+
+@table @code
+@item :format
+默认情况下，打印标签和值。
+
+@vindex widget-text-keymap
+@item :keymap
+默认为 @code{widget-text-keymap}，不会重新绑定 @key{RET} 键。
+@end table
+
+@node menu-choice
+@subsection @code{menu-choice} 小部件
+@findex menu-choice@r{ widget}
+
+句法：
+
+@example
+@var{type} ::= (menu-choice [@var{keyword} @var{argument}]... @var{type} ... )
+@end example
+
+代表选项菜单的小部件。  它的超级组件是 @code{default} 小部件。
+
+@var{type} 参数代表每个可能的选择。  小部件的值将是所选的 @var{type} 参数的值。
+
+它会覆盖或添加以下属性：
+
+@table @code
+@item :convert-widget
+负责转换每个可能选择的函数。
+
+@item :copy
+复制每个可能选择的函数。
+
+@item :format
+默认情况下，按钮化标签并显示值。
+
+@vindex void@r{ keyword}
+@item :void
+当值与任何指定的 @var{type} 参数不匹配时，小部件类型用作后备。
+
+默认情况下，这是一个 @code{item} 小部件。
+
+@vindex case-fold@r{ keyword}
+@item :case-fold
+如果 @code{nil} 在通过迷你缓冲区提示选择时不忽略大小写。
+
+默认情况下，其值为@code{t}。
+
+@vindex children@r{ keyword}
+@item :children
+一个列表，其 @sc{car} 是表示缓冲区中当前选择的类型的小部件。
+
+@vindex choice@r{ keyword}
+@item :choice
+当前选择的类型。
+
+@vindex args@r{ keyword}
+@item :args
+类型列表。
+
+@item :value-create
+插入小部件当前值的函数。
+
+与 @code{:match} 函数一样，它插入与小部件的值匹配的第一个选择。
+
+@item :value-get
+返回小部件第一个子项的值（请参阅上面 @code{:children} 的描述）。
+
+@item :value-inline
+返回小部件第一个子级的内联值。
+
+@item :default-get
+该小部件的默认值是第一个选择的默认值，以防 @code{:value} 丢失。
+
+这意味着，如果您想要 @code{menu-choice} 小部件的特定默认值，您应该在创建它时传递 @code{:value} 属性，或者安排选项，以便第一个可以保存您想要的默认值。
+
+@item :mouse-down-action
+如果可能并且需要的话，负责显示菜单的函数。
+
+@item :action
+负责为小部件获取新选择的函数。
+
+根据可用选项的数量，它可能会显示一个菜单或只是切换选项，甚至什么都不做。
+
+获得选择后，它会重新创建小部件并通知它。
+
+@item :validate
+如果小部件的值是有效的选择，则返回 @code{nil}。
+
+@item :match
+该小部件将匹配至少与指定的 @var{type} 参数之一匹配的任何值。
+
+@item :match-inline
+如果值与小部件匹配，则返回非 @code{nil} 的函数，同时考虑到 @code{:inline} 属性。
+@end table
+
+@node radio-button-choice
+@subsection @code{radio-button-choice} 小部件
+@findex radio-button-choice@r{ widget}
+
+句法：
+
+@example
+@var{type} ::= (radio-button-choice [@var{keyword} @var{argument}]...  @var{type} ... )
+@end example
+
+代表多个选项中的一个选择的小部件。  它的超级组件是 @code{default} 小部件。
+
+组件 @var{types} 指定选项，每个选项都有一个单选按钮。  小部件的值将是所选的 @var{type} 参数的值。
+
+它会覆盖以下属性：
+
+@table @code
+@item :convert-widget
+与其他复合小部件一样，该函数负责转换每个可用的选择。
+
+@item :copy
+复制每个可用选项的功能。
+
+@item :action
+一种检查是否按下任何单选按钮并激活按下的单选按钮的功能，可能会停用旧的单选按钮。  然后，它通知自己。
+
+@vindex entry-format@r{ keyword}
+@item :entry-format
+该字符串将为列表中的每个条目插入。可以使用以下 @samp{%} 转义：
+@table @samp
+@item %v
+替换为 @var{type} 小部件的缓冲区表示。
+@item %b
+替换为单选按钮。
+@item %%
+插入文字@samp{%}。
+@end table
+
+@item :format
+默认情况下，它插入其值。
+
+@vindex button-args@r{ keyword}
+@item :button-args
+要传递给单选按钮的关键字列表。  对于设置很有用，例如每个按钮的 @samp{:help-echo}。
+
+@vindex buttons@r{ keyword}
+@item :buttons
+代表单选按钮的小部件。
+
+@vindex children@r{ keyword}
+@item :children
+代表每种类型的小部件。
+
+@vindex choice@r{ keyword}
+@item :choice
+当前选择的类型。
+
+@vindex args@r{ keyword}
+@item :args
+类型列表。
+
+@item :value-create
+插入所有可用选项的函数。
+
+@item :value-get
+返回所选小部件的值。
+
+@item :value-set
+将值设置为其可用选项之一的函数。
+
+@item :value-inline
+返回子窗口小部件的内联值的函数。
+
+@item :offset
+默认情况下，该小部件的偏移量为 4。
+
+@item :validate
+该小部件验证当前值对其子级之一是否有效。
+
+@item :match
+该小部件匹配至少与指定的 @var{type} 参数之一匹配的任何值。
+
+@item :match-inline
+与 @code{:match} 函数类似，但考虑到内联值。
+@end table
+
+在使用函数 @code{widget-radio-add-item} 创建@code{radio-button-choice} 小部件后，您可以向它添加额外的单选按钮项。
+
+@defun widget-radio-add-item widget type
+添加到 @code{radio-button-choice} 小部件 @var{widget} 类型为 @var{type} 的新单选按钮项。
+@end defun
+
+请注意，在创建 @code{radio-button-choice} 小部件后添加的此类项目将在您调用 @code{widget-delete} 时正确销毁 @strong{not}。
+
+@node choice-item
+@subsection @code{choice-item} 小部件
+@findex choice-item@r{ widget}
+
+句法：
+
+@example
+@var{item} ::= (choice-item [@var{keyword} @var{argument}]... @var{value})
+@end example
+
+代表 @code{menu-choice} 小部件中的选择的小部件。  它的超级组件是 @code{item} 小部件。
+
+@var{value}（如果存在）用于初始化 @code{:value} 属性。
+
+它会覆盖以下属性：
+
+@table @code
+@item :action
+激活 @code{choice-item} 的按钮相当于激活父窗口小部件。
+
+@item :format
+默认情况下，它会按钮化标签（即其值）并在小部件的末尾添加换行符。
+@end table
+
+@node toggle
+@subsection @code{toggle} 小部件
+@findex toggle@r{ widget}
+
+句法：
+
+@example
+@var{type} ::= (toggle [@var{keyword} @var{argument}]...)
+@end example
+
+可以在两种状态之间切换的小部件。  它的超级组件是 @code{item} 小部件。
+
+该小部件有两种可能的状态，@samp{on}和@samp{off}，分别对应于@code{t}或@code{nil}值。
+
+@noindent
+例子：
+
+@lisp
+@group
+(widget-insert "Press the button to activate/deactivate the field: ")
+(widget-create 'toggle
+               :notify (lambda (widget &rest _ignored)
+                          (widget-apply widget-example-field
+                                        (if (widget-value widget)
+                                            :activate
+                                          :deactivate))))
+(widget-insert "\n")
+@end group
+@group
+(setq widget-example-field
+      (widget-create 'editable-field
+                     :deactivate (lambda (widget)
+                                   (widget-specify-inactive
+                                    widget
+                                    (widget-field-start widget)
+                                    (widget-get widget :to)))))
+(widget-apply widget-example-field :deactivate)))
+@end group
+@end lisp
+
+
+它会覆盖或添加以下属性：
+
+@table @code
+@item :format
+默认情况下，它会按钮化该值并在小部件的末尾添加换行符。
+
+@item :on
+代表 @samp{on} 状态的字符串。  默认情况下字符串@samp{on}。
+
+@item :off
+代表 @samp{off} 状态的字符串。  默认情况下字符串@samp{off}。
+
+@vindex on-glyph@r{ keyword}
+@item :on-glyph
+在支持此功能的 emacsen 上，用于代替 @samp{:on} 文本字符串的字形名称。
+
+@vindex off-glyph@r{ keyword}
+@item :off-glyph
+在支持此功能的 emacsen 上，用来代替 @samp{:off} 文本字符串的字形名称。
+
+@item :value-create
+用于根据其 @samp{:on} 或 @samp{:off} 状态创建小部件值的函数。
+
+@item :action
+切换小部件状态的函数。  切换后，它会通知自己。
+
+@item :match
+这个小部件可以匹配任何东西。
+@end table
+
+@node radio-button-toggle
+@subsection @code{radio-button-toggle} 小部件
+@findex radio-button-toggle@r{ widget}
+句法：
+
+@example
+@var{type} ::= (radio-button-toggle [@var{keyword} @var{argument}]...)
+@end example
+
+在 @code{radio} 小部件中使用的切换开关。
+
+它会覆盖以下属性：
+
+@table @code
+@item :button-prefix
+空字符串。
+
+@item :button-suffix
+空字符串。
+
+@item :on
+字符串“(*)”，表示 @samp{on} 状态。
+
+@item :off
+字符串“( )”，表示 @samp{off} 状态。
+
+@item :on-glyph
+代表 @samp{on} 状态的图像的名称。
+
+@item :off-glpyh
+代表 @samp{off} 状态的图像的名称。
+
+@item :format
+默认情况下，它按钮化其值。
+
+@item :notify
+通知其父级的函数。
+@end table
+
+@node checkbox
+@subsection @code{checkbox} 小部件
+@findex checkbox@r{ widget}
+
+句法：
+
+@example
+@var{type} ::= (checkbox [@var{keyword} @var{argument}]...)
+@end example
+
+代表切换小部件的小部件，带有复选框。  它的超级组件是 @code{toggle} 小部件。
+
+该小部件有两种可能的状态，@samp{selected}和@samp{unselected}，分别对应于@code{t}或@code{nil}值。
+
+它会覆盖或添加以下属性：
+
+@table @code
+@item :button-prefix
+空字符串。
+
+@item :button-suffix
+空字符串。
+
+@item :format
+默认情况下，按钮化该值。
+
+@item :on
+默认情况下，字符串“[X]”。
+
+@item :off
+默认情况下，字符串“[ ]”。
+
+@item :on-glyph
+状态为 @samp{on} 时使用的图像名称。
+
+@item :off-glyph
+状态为 @samp{off} 时使用的图像名称。
+
+@item :action
+切换复选框、通知父级并在 @samp{on} 状态下激活其同级的函数。
+@end table
+
+@node checklist
+@subsection @code{checklist} 小部件
+@findex checklist@r{ widget}
+
+句法：
+
+@example
+@var{type} ::= (checklist [@var{keyword} @var{argument}]...  @var{type} ... )
+@end example
+
+代表多项选择的小部件。  它的超级组件是 @code{default} 小部件。
+
+@var{type} 参数代表每个清单项目。  小部件的值将是一个包含所有检查的 @var{type} 参数值的列表。
+
+@noindent
+例子：
+
+@lisp
+(widget-create 'checklist
+               :notify (lambda (widget child &optional _event)
+                         (funcall
+                           (widget-value (widget-get-sibling child))
+                           'toggle))
+               :value (list 'tool-bar-mode 'menu-bar-mode)
+               '(item :tag "Tool-bar" tool-bar-mode)
+               '(item :tag "Menu-bar" menu-bar-mode))))
+@end lisp
+
+
+它会覆盖或添加以下属性：
+
+@table @code
+@item :convert-widget
+与其他复合小部件一样，该函数负责转换每个清单项目。
+
+@item :copy
+复制每个清单项目的功能。
+
+@item :format
+默认情况下，它插入其值。
+
+@vindex entry-format@r{ keyword}
+@item :entry-format
+该字符串将为列表中的每个条目插入。可以使用以下 @samp{%} 转义：
+@table @samp
+@item %v
+替换为 @var{type} 小部件的缓冲区表示。
+@item %b
+替换为复选框。
+@item %%
+插入文字@samp{%}。
+@end table
+
+@vindex button-args@r{ keyword}
+@item :button-args
+要传递到复选框的关键字列表。  对于设置很有用，例如每个复选框的@samp{:help-echo}。
+
+@vindex buttons@r{ keyword}
+@item :buttons
+代表复选框的小部件。
+
+@vindex children@r{ keyword}
+@item :children
+代表每种类型的小部件。
+
+@vindex args@r{ keyword}
+@item :args
+类型列表。
+
+@item :value-create
+该函数负责插入所有值。
+
+@item :value-get
+返回所选项目的所有值的函数。
+
+@item :validate
+确保所有选定子项均有效的函数。
+
+@item :match
+检查列表小部件将匹配一个列表，该列表的元素全部匹配至少一个指定的 @var{type} 参数。
+
+@item :match-inline
+与 @code{:match} 函数类似，但考虑到 @code{:inline} 属性。
+
+@vindex greedy@r{ keyword}
+@item :greedy
+通常，只有当项目完全符合规范中给出的顺序时，清单才会匹配。  通过将@code{:greedy}设置为非@code{nil}，它将允许项目以任何顺序出现。但是，如果您提取值，它们将按照清单中给出的顺序排列，即原始顺序被遗忘。
+@end table
+
+@node editable-list
+@subsection @code{editable-list} 小部件
+@findex editable-list@r{ widget}
+
+句法：
+
+@example
+@var{type} ::= (editable-list [@var{keyword} @var{argument}]... @var{type})
+@end example
+
+一个小部件，可以保存相同类型的小部件的可变列表，用@var{type}表示。  它的超级组件是 @code{default} 小部件。
+
+它会覆盖或添加以下属性：
+
+@table @code
+@item :convert-widget
+与其他复合小部件一样，有一个函数负责转换 @var{type} 中的每种类型。
+
+@item :copy
+复制@var{type}中给出的类型的函数。
+
+@vindex entry-format@r{ keyword}
+@item :entry-format
+该字符串将为列表中的每个条目插入。可以使用以下 @samp{%} 转义：
+@table @samp
+@item %v
+这将被 @var{type} 小部件的缓冲区表示替换。
+@item %i
+插入@b{[INS]}按钮，类型为@code{insert-button}的小部件。
+@item %d
+插入@b{[DEL]}按钮，类型为@code{delete-button}的小部件。
+@item %%
+插入文字@samp{%}。
+@end table
+
+@vindex insert-button-args@r{ keyword}
+@item :insert-button-args
+要传递给插入按钮的关键字参数列表。
+
+@vindex delete-button-args@r{ keyword}
+@item :delete-button-args
+要传递给删除按钮的关键字参数列表。
+
+@vindex append-button-args@r{ keyword}
+@item :append-button-args
+要传递到尾随插入按钮的关键字参数列表。
+
+@vindex buttons@r{ keyword}
+@item :buttons
+代表插入和删除按钮的小部件。
+
+@item :format
+默认情况下，插入其值并在 处添加一个插入按钮。
+
+这很有用，因此可以根据用户请求将新元素添加到列表中。
+
+@item :format-handler
+识别插入插入按钮的转义符的函数。
+
+@item :offset
+默认情况下，该小部件的偏移量为 12。
+
+@vindex children@r{ keyword}
+@item :children
+代表列表元素的小部件。
+
+@vindex args@r{ keyword}
+@item :args
+列表，其@sc{car}是列表元素的类型。
+
+@item :insert-before
+插入一个新的小部件作为 @code{editable-list} 小部件的子部件的函数。
+
+此函数会插入最近删除的子项（如果有）。  这很有用，以便用户可以轻松移动列表中的元素。  如果没有最近删除的子项，则会插入一个具有默认值的子项。
+
+@item :delete-at
+函数从窗口小部件中删除子级，并将其存储到 @code{:last-deleted} 列表中，以便在 @code{:insert-before} 函数执行时可以重新插入它。
+
+@item :value-create
+该函数负责插入所有值。
+
+@item :value-get
+返回包含子窗口小部件值的列表的函数。
+
+@item :validate
+如果所有子组件均已验证，则此小部件将进行验证。
+
+@item :match
+要匹配，该值必须是一个列表，并且所有列表成员都必须与指定的 @var{type} 匹配。
+
+@item :match-inline
+与 @code{:match} 函数类似，但考虑到内联值和小部件。
+@end table
+
+@node group
+@subsection @code{group} 小部件
+@findex group@r{ widget}
+
+句法：
+
+@example
+@var{type} ::= (group [@var{keyword} @var{argument}]... @var{type}...)
+@end example
+
+用于对其他小部件进行分组的小部件。  它的超级组件是 @code{default} 小部件。
+
+它的值是一个列表，每个 @var{type} 有一个成员。
+
+它会覆盖以下属性：
+
+@table @code
+@item :convert-widget
+与其他复合小部件一样，该函数负责转换 @var{type} 中的每个小部件。
+
+@item :copy
+复制@var{type}中给出的类型的函数。
+
+@item :format
+默认情况下，显示换行符及其值。
+
+@item :value-create
+创建其每个组件的函数。
+
+@item :value-get
+@code{editable-list} 小部件使用相同的函数。
+
+@item :default-get
+返回一个列表的函数，该列表的成员是它分组的每个小部件的默认值。
+
+@item :validate
+该小部件将验证其所有子部件是否均已验证。
+
+@item :match
+该小部件匹配与其每个组件相匹配的值。
+
+@item :match-inline
+与@code{:match}一样，但考虑到内联的小部件和值。
+@end table
+
+@node documentation-string
+@subsection @code{documentation-string} 小部件
+@findex documentation-string@r{ widget}
+句法：
+
+@example
+@var{type} ::= (documentation-string [@var{keyword} @var{argument}]... @var{value})
+@end example
+
+代表文档字符串的小部件。  它的超级组件是 @code{item} 小部件。
+
+它会覆盖或添加以下属性：
+
+@table @code
+@item :format
+默认情况下，插入其值。
+
+@item :value-create
+插入文档字符串的函数，如果文档很大，可能会隐藏部分文档。
+
+要显示或隐藏文档的其余部分，请使用 @code{visibility} 小部件。
+
+@item :action
+用于在事件发生时切换显示文档的功能。
+
+@item :visibility-widget
+符号，用于可见性小部件的小部件类型。
+
+默认情况下，这是符号 @code{visibility}。
+@end table
+
+@node Sexp Types
+@section 性别类型
+@cindex sexp types
+
+还提供了许多用于编辑 @dfn{s-expressions}（Lisp 类型）（简称 sexp）的小部件。  这些基本上属于本节中描述的几个类别。
+
+@menu
+* constants::
+* generic::
+* atoms::
+* composite::
+@end menu
+
+@node constants
+@subsection 恒定的小部件
+@cindex constant widgets
+
+@code{const} 小部件可以包含任何 Lisp 表达式，但禁止用户编辑它，它主要用作复合小部件之一的组件。
+
+@code{const} 小部件的语法是：
+
+@example
+@var{type} ::= (const [@var{keyword} @var{argument}]...  [ @var{value} ])
+@end example
+
+它的超级组件是 @code{item} 小部件。  @var{value}（如果存在）用于初始化 @code{:value} 属性，并且可以是任何 s 表达式。
+
+@deffn Widget const
+这将在缓冲区的不可变部分中显示任何有效的 s 表达式。
+
+它覆盖 @code{:prompt-value} 函数，以避免提示并仅返回小部件的值。
+@end deffn
+
+@code{const} 小部件有两种变体，即 @code{variable-item} 和 @code{function-item}。  它们应该分别包含带有变量或函数绑定的符号。  与 @code{const} 小部件的主要区别在于，它们允许用户查看符号的变量或函数文档。
+
+这是通过使用 @samp{%h} 格式转义并为每个小部件添加适当的 @code{:documentation-property} 函数来完成的。
+
+@deffn Widget variable-item
+绑定为变量的不可变符号。
+@end deffn
+
+@deffn Widget function-item
+绑定为函数的不可变符号。
+@end deffn
+
+@node generic
+@subsection 通用性爱小部件
+@cindex generic sexp widget
+
+@code{sexp} 小部件可以包含任何 Lisp 表达式，并允许用户在缓冲区中内联编辑它。
+
+@code{sexp} 小部件的语法是：
+
+@example
+@var{type} ::= (sexp [@var{keyword} @var{argument}]...  [ @var{value} ])
+@end example
+
+@deffn Widget sexp
+该小部件代表一个可编辑字段，可用于编辑任何有效的 s 表达式。
+
+@code{sexp} 小部件采用与 @code{editable-field} 小部件相同的关键字参数。  @xref{editable-field}。
+
+它的默认值为@code{nil}。
+@end deffn
+
+@deffn Widget restricted-sexp
+用于编辑仅限于某些值或类型的 Lisp 表达式的小部件。  它的超级组件是 @code{sexp} 小部件。
+
+它的工作方式与 sexp 小部件类似，但它会覆盖 @code{:match} 函数以匹配某些值。  要使用此小部件，您必须定义一个 @code{:match} 函数或提供一个 @code{:match-alternatives} 属性。  @code{:match-alternatives} 属性包含在检查给定值是否与小部件匹配时调用的谓词函数列表。  每个谓词函数都将使用一个参数（即要匹配的值）进行调用，并且在成功时应返回非@code{nil}。
+
+例如，@code{integer}小部件将@code{:match-alternatives}覆盖为@code{(integerp)}。
+@end deffn
+
+@node atoms
+@subsection 原子性爱小部件
+@cindex atomic sexp widget
+
+原子是不由其他 s 表达式组成的 s 表达式。例如，字符串、文件名或符号是原子，而列表是复合类型。  您可以使用本节中描述的小部件编辑原子的值。
+
+所有原子的语法是：
+
+@example
+@var{type} ::= (@var{construct} [@var{keyword} @var{argument}]...  [ @var{value} ])
+@end example
+
+@var{value}（如果存在）用于初始化 @code{:value} 属性，并且必须是与小部件类型相同的表达式。也就是说，例如，字符串小部件只能用字符串来初始化。
+
+所有原子小部件都采用与 @code{editable-field} 小部件相同的关键字参数。  @xref{editable-field}。
+
+@deffn Widget string
+一个可编辑的字段小部件，可以表示任何 Lisp 字符串。
+
+它通过 ispell 库和 @code{:complete} 属性提供补全。
+@end deffn
+
+@deffn Widget regexp
+可以表示正则表达式的可编辑字段小部件。
+
+覆盖 @code{:match} 和 @code{:validate} 属性以检查该值是否是有效的正则表达式。
+@end deffn
+
+@deffn Widget character
+可以代表字符的可编辑字段小部件。
+
+字符小部件以特殊的方式表示一些字符（例如换行符），以便用户更容易查看字符字段的内容。
+@end deffn
+
+@deffn Widget file
+用于编辑文件名的小部件。
+
+关键词：
+@table @code
+@item :completions
+向用户提供文件名补全。
+
+@item :prompt-value
+从迷你缓冲区读取文件名的函数。
+
+@vindex must-match@r{ keyword}
+@item :must-match
+如果将其设置为非@code{nil}，则在提示输入迷你缓冲区中的值时仅允许现有文件名。
+
+@item :match
+如果该值是字符串，并且名称为该字符串的文件是现有文件，或者如果 @code{:must-match} 是 @code{nil}，则小部件匹配。
+
+@item :validate
+如果小部件的值匹配，则该小部件有效。
+
+@end table
+@end deffn
+
+@deffn Widget directory
+用于编辑目录名称的小部件。
+
+它的超级组件是 @code{file} 小部件，并且它覆盖 @code{:completions} 属性，以仅为目录提供补全。
+@end deffn
+
+@deffn Widget symbol
+用于编辑 Lisp 符号的小部件。
+
+它的默认值是@code{nil}。
+@end deffn
+
+@deffn Widget function
+用于编辑 lambda 表达式或函数名称并提供补全功能的小部件。  它的超级组件是 @code{restricted-sexp} 小部件。
+@end deffn
+
+@deffn Widget variable
+用于编辑变量名称并提供补全功能的小部件。  它的超级组件是 @code{symbol} 小部件。
+@end deffn
+
+@deffn Widget integer
+用于在可编辑字段中编辑整数的小部件。  它的超级组件是 @code{restricted-sexp} 小部件。
+
+它的默认 @code{:value} 为 0。
+@end deffn
+
+@deffn Widget natnum
+用于编辑非负整数的小部件。  它的超级组件是 @code{restricted-sexp} 小部件。
+
+它的默认 @code{:value} 为 0。
+@end deffn
+
+@deffn Widget float
+用于编辑浮点数的小部件。  它的超级组件是 @code{restricted-sexp} 小部件。
+
+它的默认 @code{:value} 为 0.0。
+@end deffn
+
+@deffn Widget number
+用于编辑数字（浮点或整数）的小部件。  它的超级组件是 @code{restricted-sexp} 小部件。
+
+它的默认 @code{:value} 为 0.0。
+@end deffn
+
+@deffn Widget boolean
+用于编辑布尔值的小部件。  它的超级组件是 @code{toggle} 小部件。
+
+它的值可能是@code{nil}，表示假，或非@code{nil}，表示真。
+@end deffn
+
+@deffn Widget color
+用于编辑颜色名称的小部件。
+
+此外，还显示一个显示所选颜色（如果有）的示例。
+@end deffn
+
+@deffn Widget other
+该小部件可用作 @code{choice} 小部件中的最后一项，因为它匹配任何值。
+
+默认情况下，它的 super 是 @code{sexp} 小部件，其 @code{:value} 是 @code{other}。
+@end deffn
+
+@deffn Widget coding-system
+一个可以代表编码系统名称并提供补全功能的小部件。  @xref{Coding Systems,,,elisp, the Emacs Lisp Reference Manual}。  它的超级组件是 @code{symbol} 小部件。
+
+它的默认值为@code{undecided}。
+@end deffn
+
+@deffn Widget key
+代表按键序列的小部件。
+
+它使用特殊的键盘映射作为@code{:keymap}。
+@end deffn
+
+@node composite
+@subsection 复合性爱小部件
+@cindex composite sexp widgets
+
+复合小部件构造的语法是：
+
+@example
+@var{type} ::= (@var{construct} [@var{keyword} @var{argument}]...  @var{component}...)
+@end example
+
+@noindent
+其中每个@var{component}必须是一个小部件类型。  每个组件小部件将显示在缓冲区中，并且可由用户编辑。
+
+@deffn Widget cons
+用于编辑 cons-cell 值的小部件。  它的超级组件是 @code{group} 小部件。
+
+@code{cons} 小部件的值必须是 cons-cell，其 @sc{car} 和 @sc{cdr} 有两种指定类型。  它使用以下语法：
+
+@example
+@var{type} ::= (cons [@var{keyword} @var{argument}]...  @var{car-type} @var{cdr-type})
+@end example
+@end deffn
+
+@deffn Widget choice
+用于保存一组固定类型之一的值的小部件。  它的超级组件是 @code{menu-choice} 小部件。
+
+该小部件的语法如下：
+
+@example
+@var{type} ::= (choice [@var{keyword} @var{argument}]...  @var{type} ... )
+@end example
+
+@code{choice} 小部件的值可以是与任何 @var{types} 匹配的任何值。
+
+该小部件仅显示与当前选择对应的小部件。
+@end deffn
+
+@deffn Widget radio
+用于保存一组固定选项之一的值的小部件。  它的超级组件是 @code{radio-button-choice} 小部件。
+@end deffn
+
+@deffn Widget list
+用于编辑列表值的小部件。  它的超级组件是 @code{group} 小部件。
+
+@code{list} 小部件的值必须是一个列表，其元素类型与指定的组件类型匹配：
+
+@example
+@var{type} ::= (list [@var{keyword} @var{argument}]...  @var{component-type}...)
+@end example
+
+因此，例如， @code{(list string number)} 匹配两个元素的列表，第一个是字符串，第二个是数字。
+@end deffn
+
+@deffn Widget vector
+用于编辑矢量值的小部件。  它的超级组件是 @code{group} 小部件。
+
+@code{vector} 小部件类似于 @code{list} 小部件，但匹配向量而不是列表。  因此，例如， 2⁣ 匹配两个元素的向量，第一个是字符串，第二个是数字。
+@end deffn
+
+以上足以指定固定大小的列表和向量。  要获取可变长度列表和向量，您可以将 @code{choice}、@code{set} 或 @code{repeat} 小部件与 @code{:inline} 关键字一起使用。  如果复合小部件的任何组件设置了 @code{:inline} 关键字，则其值必须是一个列表，然后将其拼接到组合中。  例如，要指定一个列表，其第一个元素必须是文件名，其余元素应该是符号 @code{t} 或两个字符串（文件名），您可以使用以下小部件规范：
+
+@example
+(list file
+      (choice (const t)
+              (list :inline t
+                    :value ("foo" "bar")
+                    string string)))
+@end example
+
+这种类型的小部件的值将具有 @code{(file t)} 或 @code{(file @var{string} @var{string})} 的形式。
+
+@code{:inline}这个概念可能很难理解。  这确实很难实现，所以我建议您思考一下，而不是在这里试图解释它，从而让您更加困惑。
+
+@deffn Widget set
+用于保存固定集中的成员列表的小部件。  它的超级组件是 @code{checklist} 小部件。
+
+它的值是一个列表，其中的元素都属于给定的集合。  列表元素的顺序并不重要。
+
+语法如下：
+
+@example
+@var{type} ::= (set [@var{keyword} @var{argument}]...  @var{permitted-element} ... )
+@end example
+
+使用@code{const}指定每个允许的元素，如下所示：@code{(set (const a) (const b))}。
+@end deffn
+
+@deffn Widget repeat
+指定适合某种类型的任意数量的元素的列表。它的超级组件是 @code{editable-list} 小部件。
+
+@example
+@var{type} ::= (repeat [@var{keyword} @var{argument}]...  @var{type})
+@end example
+@end deffn
+
+@deffn Widget plist
+用于编辑属性列表的小部件。  它的超级组件是 @code{list} 小部件。
+
+它识别以下属性：
+
+@table @code
+@item :options
+@code{plist} 小部件的一组给定推荐键值。  每个选项都显示为清单项目。
+
+@item :key-type
+用于 plist 键的小部件类型。  默认情况下，它使用 @code{symbol} 小部件。
+
+@item :value-type
+用于 plist 值的小部件类型。  默认情况下，它使用 @code{sexp} 小部件。
+@end table
+@end deffn
+
+@deffn Widget alist
+用于编辑关联列表的小部件。  它的超级组件是 @code{list} 小部件。
+
+它识别与 @code{plist} 小部件相同的属性，不同之处在于 @code{:key-type} 默认使用 @code{sexp} 小部件。
+@end deffn
+
+大多数复合小部件不允许递归。  也就是说，所包含的小部件都不能与当前定义的类型相同。  为了允许这种类型的小部件，有 @code{lazy} 小部件。
+
+@deffn Widget lazy
+递归数据结构的基本小部件。  它的超级组件是 @code{default} 小部件。
+
+实例化时，它包含 @code{:type} 属性中指定的小部件类型的单个低级小部件。  它的值与这个劣质部件的值相同。
+@end deffn
+
+@node Defining New Widgets
+@chapter 定义新的小部件
+@cindex new widgets
+@cindex defining new widgets
+
+您可以使用@code{define-widget}定义专门的小部件。  它允许您为更复杂的小部件创建简写，包括指定组件小部件和关键字参数的新默认值。
+
+@defun define-widget name class doc &rest args
+定义一个名为 @var{name} 的新控件类型，该类型派生自 @var{class}。
+
+@var{name} 和 @var{class} 都应该是符号，@var{class} 应该是现有的小部件类型之一。
+
+第三个参数@var{doc}是小部件的文档字符串。
+
+@var{args} 应该是键值对，覆盖 @var{class} 的关键字值，或者为 @var{name} 添加新的可识别关键字。
+
+通常，您需要从现有的小部件类型派生，例如 @code{editable-field} 小部件或 @code{default} 小部件，但也可以通过将 @code{nil} 的值传递为 @var{class} 来从无派生。  请注意，如果您这样做，您将完全负责为您的小部件定义全新的默认行为。
+
+使用此函数后，以下两个调用将创建相同的小部件：
+
+@itemize @bullet
+@item
+@lisp
+(widget-create @var{name})
+@end lisp
+
+@item
+@lisp
+(apply widget-create @var{class} @var{args})
+@end lisp
+@end itemize
+
+@end defun
+
+使用@code{define-widget}只是将小部件类型的定义存储在@var{name}的@code{widget-type}属性中，这就是@code{widget-create}所使用的。
+
+如果您只想指定关键字的默认值而不进行复杂的转换，则可以使用 @code{identity} 作为转换函数。
+
+当定义新的小部件时， @code{:convert-widget} 属性可能很有用：
+
+@table @code
+@vindex convert-widget@r{ keyword}
+@item :convert-widget
+在创建该类型的小部件之前转换该小部件类型的函数。
+
+它将小部件类型作为参数，并返回转换后的小部件类型。  创建小部件时，会针对小部件类型和所有小部件的父类型（最先派生的类型）调用此函数。
+
+此处可以使用预定义函数 @code{widget-types-convert-widget} 和 @code{widget-value-convert-widget}。
+@end table
+
+@noindent
+例子：
+
+@lisp
+@group
+(defvar widget-ranged-integer-map
+  (let ((map (copy-keymap widget-keymap)))
+    (keymap-set map "<up>" #'widget-ranged-integer-increase)
+    (keymap-set map "<down>" #'widget-ranged-integer-decrease)
+    map))
+@end group
+
+@group
+(define-widget 'ranged-integer 'integer
+  "A ranged integer widget."
+  :min-value most-negative-fixnum
+  :max-value most-positive-fixnum
+  :keymap widget-ranged-integer-map)
+@end group
+
+@group
+(defun widget-ranged-integer-change (widget how)
+  "Change the value of the ranged-integer WIDGET, according to HOW."
+  (let* ((value (widget-value widget))
+         (newval (cond
+                  ((eq how 'up)
+                   (if (< (1+ value) (widget-get widget :max-value))
+                       (1+ value)
+                     (widget-get widget :max-value)))
+                  ((eq how 'down)
+                   (if (> (1- value) (widget-get widget :min-value))
+                       (1- value)
+                     (widget-get widget :min-value)))
+                  (t (error "HOW has a bad value"))))
+         (inhibit-read-only t))
+    (widget-value-set widget newval)))
+@end group
+
+@group
+(defun widget-ranged-integer-increase (widget)
+  "Increase the value of the ranged-integer WIDGET."
+  (interactive (list (widget-at)))
+  (widget-ranged-integer-change widget 'up))
+@end group
+
+@group
+(defun widget-ranged-integer-decrease (widget)
+  "Decrease the value of the ranged-integer WIDGET."
+  (interactive (list (widget-at)))
+  (widget-ranged-integer-change widget 'down))
+@end group
+@end lisp
+
+@node Inspecting Widgets
+@chapter 检查小部件
+@cindex widget browser
+
+在 @samp{wid-browse.el} 中有一个单独的包用于浏览小部件。  这是为了帮助想要检查小部件内容的程序员。  浏览器显示每个关键字的值，但使用某些关键字的链接，例如 @samp{:parent}，这避免了打印循环结构。
+
+@deffn Command widget-browse @var{widget}
+为 @var{widget} 创建一个小部件浏览器。
+
+交互调用时，提示输入@var{widget}。
+@end deffn
+
+@deffn Command widget-browse-other-window @var{widget}
+为 @var{widget} 创建一个小部件浏览器并将其显示在另一个窗口中。
+
+交互调用时，提示输入@var{widget}。
+@end deffn
+
+@deffn Command widget-browse-at @var{pos}
+为@var{pos}处的小部件创建一个小部件浏览器。
+
+交互调用时，使用点的位置。
+@end deffn
+
+此外，还有一个函数可以描述此时的小部件。
+
+@deffn Command widget-describe &optional widget-or-pos
+描述此时的小部件。
+
+当从 Lisp 调用时，@var{widget-or-pos} 可能是要描述的小部件或小部件所在的缓冲区位置。  如果@var{widget-or-pos}是@code{nil}，则要描述的小部件是该点的小部件。
+
+此命令设置一个帮助缓冲区，用于提供有关小部件的信息，主要是其 @code{:action} 和 @code{:mouse-down-action} 功能，并提供链接以使用上述 @code{widget-browse} 命令更详细地描述它。
+@end deffn
+
+@node  Widget Minor Mode
+@chapter 小部件次要模式
+@cindex widget minor mode
+
+有一个次要模式用于在主要模式中操作小部件，该模式不为小部件本身提供任何支持。  这主要是为了对程序员做实验有用。
+
+@deffn Command widget-minor-mode
+切换次要模式以遍历小部件。对于 arg，当且仅当 arg 为正数时才打开小部件模式。
+@end deffn
+
+@defvar widget-minor-mode-keymap
+@code{widget-minor-mode} 中使用的键盘映射。
+@end defvar
+
+@node  Utilities
+@chapter 公用事业
+@cindex utility functions for widgets
+
+在这里，我们描述了一些实用函数，这些函数在本手册的前面并没有真正占有一席之地。
+
+@defun widget-prompt-value widget prompt [ value unbound ]
+使用 @var{prompt} 提示输入与 @var{widget} 匹配的值。当前值假定为 22，除非 33 不是 44。
+
+在提示之前转换 @var{widget}，并在提示时使用 @code{:prompt-value} 函数。  该函数返回用户“答案”，如果该答案与小部件不匹配，则会出现错误，就像 2⁣ 函数一样。
+
+如果答案与小部件匹配，则返回答案。
+@end defun
+
+@defun widget-get-sibling widget
+获取 @var{widget} 应切换的项目。这仅对列表中的单选按钮或复选框有意义。
+@end defun
+
+@defun widget-choose title items &optional event
+提示用户从选项列表中选择一个项目。
+
+@var{title} 是选项列表的名称。  @var{items} 应该是一个菜单，其项目采用简单格式或扩展格式。 @xref{Defining Menus,, Defining Menus, elisp, the Emacs Lisp Reference Manual}。  与格式无关，您不必提供菜单标题，只需在 @var{title} 中传递所需的标题即可。  可选的@var{event}是输入事件。  如果@var{event}是鼠标事件并且@var{items}中的元素数量小于用户选项@code{widget-menu-max-size}，则@code{widget-choose}使用弹出菜单来提示用户。  否则，@code{widget-choose} 使用迷你缓冲区。
+
+当@var{items}是键盘映射菜单时，返回值是键向量中的符号，如@code{define-key}（@pxref{Changing Key Bindings,,,elisp, the Emacs Lisp Reference Manual}）的参数。  当 @var{items} 是一个列表，其可选项目的形式为 (@var{name} . @var{value}) （即简化格式）时，返回值是所选元素的 @var{value}。
+@end defun
+
+@defun widget-image-find image
+从 @var{image}、图像或不带扩展名的文件名创建图形按钮。
+
+如果 @var{image} 是文件名，则该文件应该位于 @code{widget-image-directory} 中，或者位于 @code{find-image} 可以找到它的位置。
+@end defun
+
+@defun widget-image-insert widget tag image
+作为 @var{widget} 的一部分，插入文本 @var{tag} 或图像 @var{image}（如果支持）。
+
+@var{image} 应如@code{widget-image-find} 中所述。
+@end defun
+
+@defun widget-echo-help pos
+在 @var{pos} 处显示小部件的帮助回显文本。
+
+使用 @code{:help-echo} 的值。  如果它是一个函数，则调用它来获取字符串。  否则，就这样了。
+@end defun
+
+@node  Customization
+@chapter 定制化
+本章介绍面向最终用户的 Widget 库的自定义选项。
+
+@deffn Face widget-documentation
+用于文档文本的面。
+@end deffn
+
+@deffn Face widget-field
+用于可编辑字段的面。
+@end deffn
+
+@deffn Face widget-button
+用于按钮的表面。
+@end deffn
+
+@deffn Face widget-button-pressed
+用于按下按钮的面。
+@end deffn
+
+@deffn Face widget-inactive
+用于非活动小部件的面。
+@end deffn
+
+@deffn Face widget-unselected
+用于未选择的小部件的面。  该面也用在单选按钮和复选框小部件的文本标签上。
+
+默认值继承自 @code{widget-inactive} 面。  如果您想在视觉上区分未选定的活动单选按钮或复选框小部件的标签与未选定的非活动小部件的标签，请将此面自定义为非默认值。
+@end deffn
+
+@defopt widget-mouse-face
+用于当鼠标指针移过按钮时突出显示按钮的面。
+
+默认值为@code{highlight}。
+@end defopt
+
+@defopt widget-image-directory
+Widget 应在其中查找图像的目录。
+
+小部件将在此处查找与为图像指定的名称相同的文件，其扩展名为 @file{.xpm}（如果支持）或@file{.xbm}。
+@end defopt
+
+@defopt widget-image-enable
+如果非@code{nil}，则允许图像出现在支持图像的显示器上。
+@end defopt
+
+@defopt widget-image-conversion
+将符号从图像格式转换为文件名后缀的列表。
+
+每个元素都是一个 cons 单元 (@var{format} . @var{suffix})，其中 @var{format} 是表示图像格式的符号，@var{suffix} 是其对应的后缀。
+@end defopt
+
+@defopt widget-button-prefix
+前缀按钮的字符串。
+@end defopt
+
+@defopt widget-button-suffix
+字符串为后缀按钮。
+@end defopt
+
+@defopt widget-push-button-prefix
+为按钮添加前缀的字符串。
+@end defopt
+
+@defopt widget-push-button-suffix
+后缀为按钮的字符串。
+@end defopt
+
+@defopt widget-link-prefix
+前缀链接的字符串。
+@end defopt
+
+@defopt widget-link-suffix
+字符串到后缀链接。
+@end defopt
+
+@defopt widget-choice-toggle
+如果非@code{nil}，则在只有两个选项时切换。
+
+默认情况下，其值为@code{nil}。
+@end defopt
+
+@defopt widget-skip-inactive
+如果非 @code{nil}，则在使用 @kbd{@key{TAB}} (@code{widget-forward}) 或 @kbd{S-@key{TAB}} (@code{widget-backward}，也绑定到 @kbd{M-@key{TAB}}) 在小部件之间导航时跳过不活动的小部件。
+
+默认情况下，其值为 @code{nil} 并且 Tab 键切换不会跳过不活动的小部件。
+@end defopt
+
+@defopt widget-documentation-links
+如果非@code{nil}，则添加指向文档字符串的超链接。
+@end defopt
+
+@defopt widget-documentation-link-regexp
+与文档字符串中的潜在链接匹配的正则表达式。  链接本身应该与第一组匹配。
+@end defopt
+
+@defopt widget-documentation-link-p
+用于测试字符串是否可用作链接的谓词函数。  该函数使用一个参数（一个字符串）调用，如果应该有该字符串的链接，则应返回非 0⁣ 。
+
+默认情况下，该值为@code{intern-soft}。
+@end defopt
+
+@defopt widget-documentation-link-type
+表示用于文档字符串中的链接的小部件类型的符号。
+
+默认情况下，该值为@code{documentation-link}。
+@end defopt
+
+@defopt widget-menu-max-size
+弹出菜单的最大大小。  默认情况下，其值为 40。
+
+如果函数要求您从大于此值的菜单中进行选择，它将使用迷你缓冲区。
+@end defopt
+
+@defopt widget-menu-max-shortcuts
+选择具有角色的项目最多可处理该项目。
+
+对于更大的数字，请使用迷你缓冲区。
+@end defopt
+
+@defopt widget-menu-minibuffer-flag
+是否使用minibuffer询问选择。
+
+如果 @code{nil}（默认值），则读取单个字符。
+@end defopt
+
+@node  Widget Wishlist
+@chapter 愿望清单
+@cindex todo
+
+@itemize @bullet
+@item
+应该可以使用@kbd{C-k}和@kbd{C-o}（由@sc{rms}建议）从列表中添加或删除项目。
+
+@item
+@samp{[INS]} 和 @samp{[DEL]} 按钮应替换为单个破折号 (@samp{-})。  破折号应该是一个按钮，当调用时，会询问您是否要添加或删除一个项目（@sc{rms}想要摆脱丑陋的按钮，破折号是我的想法）。
+
+@item
+@code{menu-choice} 标签应该更漂亮，类似于 Open Look 中的缩写菜单。
+
+@item
+完成@code{:tab-order}。
+
+@item
+使用字形和比例字体进行缩进。
+
+@item
+添加命令以向浏览器显示对象和类层次结构的概述。
+
+@item
+找到一种方法来禁用非活动小部件的鼠标突出显示。
+
+@item
+找到一种方法使字形看起来不活动。
+
+@item
+添加 @code{widget} 小部件以编辑小部件规格。
+
+@item
+找到实现可变长度列表的干净方法。参见 @code{TeX-printer-list} 的解释。
+
+@item
+@code{widget-prompt-value} 中的@kbd{C-h} 应提供特定于类型的帮助。
+
+@item
+添加一个 @code{mailto} 小部件。
+@end itemize
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Index
+@unnumbered 指数
+
+这是本手册中描述的所有概念、函数​​、命令、变量和小部件的按字母顺序列表。
+@printindex cp
+
+@bye

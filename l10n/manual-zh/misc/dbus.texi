@@ -1,0 +1,1725 @@
+\input texinfo @c -*- 编码：utf-8 -*-
+@setfilename ../../info/dbus.info
+@c %**start of header
+@settitle D-Bus的使用
+@documentlanguage en
+@include docstyle.texi
+@c @setchapternewpage odd
+@c %**end of header
+
+@syncodeindex vr cp
+@syncodeindex fn cp
+
+@copying
+版权所有 @copyright{} 2007--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs lisp libraries
+@direntry
+* D-Bus: (dbus).                 在 Emacs 中使用 D-Bus。
+@end direntry
+
+@titlepage
+@title 在 Emacs 中使用 D-Bus
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+
+@contents
+
+
+@node Top
+@top Emacs 中的 D-Bus 集成
+
+本手册记录了在 Emacs 中使用 D-Bus 的 API。  D-Bus 是一种消息总线系统，是应用程序之间相互通信的一种简单方式。  D-Bus 的概述可以在@uref{https://dbus.freedesktop.org/} 找到。
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* Overview::                     D-Bus 概述。
+* Inspection::                   检查 D-Bus 服务。
+* Type Conversion::              映射 Lisp 类型和 D-Bus 类型。
+* Synchronous Methods::          以阻塞方式调用方法。
+* Asynchronous Methods::         非阻塞调用方法。
+* Register Objects::             提供自己的服务。
+* Signals::                      发送和接收信号。
+* Alternative Buses::            替代巴士和环境。
+* Errors and Events::            错误和事件。
+* Monitoring Messages::          监控消息。
+* File Descriptors::             处理文件描述符。
+* Flatpak integration::          与 Flatpak 集成
+* Index::                        索引包括概念、函数​​、变量。
+
+* GNU Free Documentation License::  本文档的许可证。
+@end menu
+
+
+@node Overview
+@chapter D-Bus 概述
+@cindex overview
+
+D-Bus 是驻留在同一主机上的应用程序的进程间通信机制。  Emacs 在使用相应的库编译时使用它，请参阅配置选项@option{--with-dbus}。  在运行时，@code{(featurep 'dbusbind)} 形式表示 D-Bus 支持。
+
+D-Bus 通信基于@dfn{messages}。  消息中的数据以结构化方式承载，而不仅仅是字节流。
+
+通信是面向两种消息总线的连接：所谓的@dfn{system bus}和@dfn{session bus}。  在给定的机器上，始终有一个系统总线用于各种系统范围的通信，例如更改硬件配置。另一方面，会话总线始终与单个用户的会话相关。
+
+连接到总线的每个客户端应用程序都在总线上的 @dfn{unique name} 下注册。  该名称用于识别客户端应用程序。  这样一个独特的名称总是以冒号开头，看起来像@samp{:1.42}。
+
+此外，客户端应用程序可以将自身注册到所谓的@dfn{known name}，它是一系列由点分隔的标识符，如@samp{org.gnu.Emacs}所示。  如果多个应用程序注册到相同的已知名称，则这些注册将排队，并且只有已注册该已知名称的第一个应用程序才能通过该名称访问。  如果该应用程序与总线断开连接，则下一个排队的唯一名称将成为该已知名称的所有者。
+
+一个应用程序可以在其名称下安装一个或多个对象。此类对象由 @dfn{object path} 标识，它看起来类似于文件系统中的路径。  这种对象路径的一个例子是@samp{/org/gnu/Emacs/}。
+
+应用程序可能会向对象发送请求，这意味着发送带有某些数据作为输入参数的消息，并从该对象接收消息以及该消息的结果（输出参数）。  这样的请求在 D-Bus 中称为@dfn{method}。
+
+另一种通讯形式是@dfn{signals}。  底层消息从对象发出，并将由已注册此类信号的所有其他应用程序接收。
+
+对象支持的所有方法和信号都称为该对象的@dfn{interface}。  接口在 D-Bus 中以分层名称指定；一个对象可以支持多个接口。  这样的接口名称可以是@samp{org.gnu.Emacs.TextEditor}或@samp{org.gnu.Emacs.FileManager}。
+
+
+@node Inspection
+@chapter D-Bus 服务检查
+@cindex inspection
+
+@menu
+* Version::                      确定 D-Bus 版本。
+* Bus names::                    发现 D-Bus 名称。
+* Introspection::                了解 D-Bus 服务的详细信息。
+* Nodes and Interfaces::         检测对象路径和接口。
+* Methods and Signal::           应用功能。
+* Properties and Annotations::   关于接口还需要了解什么。
+* Arguments and Signatures::     最后的细节。
+@end menu
+
+
+@node Version
+@section D总线版本
+
+D-Bus 已经发展了多年。  新的 D-Bus 版本添加了新功能。  有两个变量可以确定所使用的 D-Bus 版本。
+
+@defvar dbus-compiled-version
+该变量是一个字符串，决定编译 D-Bus Emacs 的版本。  如果无法确定，则值为@code{nil}。
+@end defvar
+
+@defvar dbus-runtime-version
+要检查的另一个 D-Bus 版本是运行 Emacs 的 D-Bus 版本。  该字符串可以与 @code{dbus-compiled-version} 不同。如果无法在运行时确定，它也是@code{nil}。
+@end defvar
+
+
+@node Bus names
+@section 巴士名称
+
+有几个基本功能可以检查总线的注册名称。  它们在内部使用基本接口@samp{org.freedesktop.DBus}，总线的所有对象都支持该接口。
+
+@defun dbus-list-activatable-names &optional bus
+该函数返回 D-Bus 服务名称，可以为 @var{bus} 激活该服务名称。  它必须是关键字 @code{:system}（默认）或关键字 @code{:session}。  可激活的服务在服务注册文件中描述。  在 GNU/Linux 下，此类文件位于 @file{/usr/share/dbus-1/system-services/}（对于 @code{:system} 总线）或 @file{/usr/share/dbus-1/services/}。  可激活的服务不一定已经在 @var{bus} 处注册。
+
+结果是一个字符串列表，当根本没有可激活的服务名称时，该列表为@code{nil}。  例子：
+
+@lisp
+;; Check, whether the document viewer can be accessed via D-Bus.
+(member "org.gnome.evince.Daemon"
+        (dbus-list-activatable-names :session))
+@end lisp
+@end defun
+
+@defun dbus-list-names bus
+该函数返回在 D-Bus @var{bus} 注册的所有服务名称。  结果是一个字符串列表，当根本没有注册的服务名称时，该列表为@code{nil}。  众所周知的名称是像 @samp{org.freedesktop.DBus} 这样的字符串。  以 @samp{:} 开头的名称是服务的唯一名称。
+
+@var{bus} 必须是关键字 @code{:system} 或关键字 @code{:session}。
+@end defun
+
+@defun dbus-list-known-names bus
+该函数检索与@var{bus}中已知名称相对应的所有已注册服务。  如果服务不以 @samp{:} 开头，则该服务具有已知名称。  结果是一个字符串列表，当根本不存在已知名称时，该列表为@code{nil}。
+
+@var{bus} 必须是关键字 @code{:system} 或关键字 @code{:session}。
+@end defun
+
+@defun dbus-list-queued-owners bus service
+对于在 D-Bus @var{bus} 上以名称 @var{service} 注册的给定服务，此函数返回所有排队的唯一名称。  结果是一个字符串列表，或者当根本没有 @var{service} 的排队名称时为 @code{nil} 。
+
+@var{bus} 必须是关键字 @code{:system} 或关键字 @code{:session}。  @var{service} 必须是已知的服务名称字符串。
+@end defun
+
+@defun dbus-get-name-owner bus service
+对于在 D-Bus @var{bus} 上以名称 @var{service} 注册的给定服务，此函数返回名称所有者的唯一名称。  结果是一个字符串，或者当@var{service}没有名称所有者时为@code{nil}。
+
+@var{bus} 必须是关键字 @code{:system} 或关键字 @code{:session}。  @var{service} 必须是已知的服务名称字符串。
+@end defun
+
+@defun dbus-ping bus service &optional timeout
+此函数检查服务名称 @var{service} 是否已在 D-Bus @var{bus} 上注册。  如果 @var{service} 尚未启动，则尽可能自动启动。  结果是 @code{t} 或 @code{nil}。
+
+@var{bus} 必须是关键字 @code{:system} 或关键字 @code{:session}。  @var{service} 必须是字符串。  @var{timeout} 是一个非负整数，指定 @code{dbus-ping} 必须返回之前的最大毫秒数。  默认值为 25,000。例子：
+
+@lisp
+(message
+ "%s screensaver on board."
+ (cond
+  ((dbus-ping :session "org.gnome.ScreenSaver" 100) "Gnome")
+  ((dbus-ping :session "org.freedesktop.ScreenSaver" 100) "KDE")
+  (t "No")))
+@end lisp
+
+要检查 @var{service} 是否已经在运行而不自动启动它，您可以编写：
+
+@lisp
+(member service (dbus-list-known-names bus))
+@end lisp
+@end defun
+
+@defun dbus-get-unique-name bus
+@anchor{dbus-get-unique-name}
+该函数返回唯一的名称，Emacs 在 D-Bus @var{bus} 上注册时以字符串形式使用该名称。
+
+@var{bus} 必须是关键字 @code{:system} 或关键字 @code{:session}。
+@end defun
+
+
+@node Introspection
+@section 了解D-Bus服务的详细信息
+
+D-Bus 服务发布其接口。  这可以在运行时检索和分析，以便了解所使用的实现。
+
+生成的内省数据采用 XML 格式。  根内省元素始终是 @code{node} 元素。  它可能有一个 @code{name} 属性，表示接口内省的（绝对）对象路径。
+
+根 @code{node} 元素可以有 @code{node} 和 @code{interface} 子元素。  子 @code{node} 元素必须具有 @code{name} 属性，在这种情况下，它是根 @code{node} 元素的相对对象路径。
+
+@code{interface} 元素只有一个属性 @code{name}，它是该接口的全名。  默认接口 @samp{org.freedesktop.DBus.Introspectable} 始终存在。  例子：
+
+@example
+<node name="/org/bluez">
+  <interface name="org.freedesktop.DBus.Introspectable">
+    @dots{}
+  </interface>
+  <interface name="org.bluez.Manager">
+    @dots{}
+  </interface>
+  <interface name="org.bluez.Database">
+    @dots{}
+  </interface>
+  <interface name="org.bluez.Security">
+    @dots{}
+  </interface>
+  <node name="service_audio"/>
+  <node name="service_input"/>
+  <node name="service_network"/>
+  <node name="service_serial"/>
+</node>
+@end example
+
+@code{interface} 元素的子元素可以是 @code{method}、@code{signal} 和 @code{property} 元素。  @code{method} 元素代表周围接口的 D-Bus 方法。  该元素本身有一个 @code{name} 属性，显示方法名称。  子元素 @code{arg} 代表方法的参数。  例子：
+
+@example
+<method name="ResolveHostName">
+  <arg name="interface" type="i" direction="in"/>
+  <arg name="protocol" type="i" direction="in"/>
+  <arg name="name" type="s" direction="in"/>
+  <arg name="aprotocol" type="i" direction="in"/>
+  <arg name="flags" type="u" direction="in"/>
+  <arg name="interface" type="i" direction="out"/>
+  <arg name="protocol" type="i" direction="out"/>
+  <arg name="name" type="s" direction="out"/>
+  <arg name="aprotocol" type="i" direction="out"/>
+  <arg name="address" type="s" direction="out"/>
+  <arg name="flags" type="u" direction="out"/>
+</method>
+@end example
+
+@code{arg} 元素可以具有属性 @code{name}、@code{type} 和 @code{direction}。  @code{name} 属性是可选的。  @code{type} 属性代表 D-Bus 中参数的 @dfn{signature}。  有关 D-Bus 类型及其 Lisp 表示形式的讨论，请参阅@ref{Type Conversion}。@footnote{D-Bus signatures are explained in the D-Bus specification @uref{https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-signatures}.} @code{arg} 元素的 @code{direction} 属性只能是 @samp{in} 或 @samp{out}；如果省略，则默认为@samp{in}。
+
+@code{interface} 的@code{signal} 元素具有类似的结构。  @code{arg}子元素的@code{direction}属性在这里只能是@samp{out}；这也是默认值。例子：
+
+@example
+<signal name="StateChanged">
+  <arg name="state" type="i"/>
+  <arg name="error" type="s"/>
+</signal>
+@end example
+
+@code{property} 元素没有 @code{arg} 子元素。  它只有属性 @code{name}、@code{type} 和 @code{access}，这些属性都是必需的。  @code{access} 属性允许使用值 @samp{readwrite}、@samp{read} 和 @samp{write}。例子：
+
+@example
+<property name="Status" type="u" direction="read"/>
+@end example
+
+@code{annotation} 元素可以是 @code{interface}、@code{method}、@code{signal} 和 @code{property} 元素的子元素。  与可以在 D-Bus 对象的生命周期内更改其值的属性不同，注释是静态的。  它们通常用于 D-Bus 语言绑定的代码生成器。  例子：
+
+@example
+<annotation name="de.berlios.Pinot.GetStatistics" value="pinotDBus"/>
+@end example
+
+注释只有 @code{name} 和 @code{value} 属性，两者都必须是字符串。
+
+@defun dbus-introspect bus service path
+该函数返回@var{service}的所有接口和子节点，注册在总线@var{bus}的对象路径@var{path}处。
+
+@var{bus} 必须是关键字 @code{:system} 或关键字 @code{:session}。  @var{service} 必须是已知的服务名称，@var{path} 必须是有效的对象路径。  最后两个参数是字符串。  结果（即内省数据）是 XML 格式的字符串。  例子：
+
+@lisp
+(dbus-introspect
+ :system "org.freedesktop.Hal"
+ "/org/freedesktop/Hal/devices/computer")
+
+@result{} "<!DOCTYPE node PUBLIC
+    "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+    "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+    <node>
+      <interface name="org.freedesktop.Hal.Device">
+        <method name="GetAllProperties">
+          <arg name="properties" direction="out" type="a@{sv@}"/>
+        </method>
+        @dots{}
+        <signal name="PropertyModified">
+          <arg name="num_updates" type="i"/>
+          <arg name="updates" type="a(sbb)"/>
+        </signal>
+      </interface>
+      @dots{}
+    </node>"
+@end lisp
+
+此示例告诉我们，对象路径 @samp{/org/freedesktop/Hal/devices/computer} 处的服务 @samp{org.freedesktop.Hal} 提供接口 @samp{org.freedesktop.Hal.Device}（以及此处未记录的其他 2 个接口）。  该接口包含方法@samp{GetAllProperties}，它不需要输入参数，但返回一个字典条目（键值对）数组作为输出参数。每个字典条目都有一个字符串作为键，一个变体作为值。
+
+该接口还提供一个信号，它返回 2 个参数：一个整数和一个由字符串结构元素和 2 个布尔值组成的数组。@footnote{ The interfaces of the service @samp{org.freedesktop.Hal} are described in
+@c Previous link is gone.  Since HAL is now obsolete, this URL
+@c (unchanged in ~ 4 years) feels like it might go too...
+@uref{https://people.freedesktop.org/~dkukawka/hal-spec-git/hal-spec.html#interfaces, the HAL specification}.}
+@end defun
+
+@defun dbus-introspect-xml bus service path
+该函数的用途与函数 @code{dbus-introspect} 类似。  返回的值是一个已解析的 XML 树，可用于进一步分析。  例子：
+
+@lisp
+(dbus-introspect-xml
+ :session "org.freedesktop.xesam.searcher"
+ "/org/freedesktop/xesam/searcher/main")
+
+@result{} (node ((name . "/org/freedesktop/xesam/searcher/main"))
+    (interface ((name . "org.freedesktop.xesam.Search"))
+      (method ((name . "GetHitData"))
+        (arg ((name . "search")
+              (type . "s")
+              (direction . "in")))
+        (arg ((name . "hit_ids")
+              (type . "au")
+              (direction . "in")))
+        (arg ((name . "fields")
+              (type . "as")
+              (direction . "in")))
+        (arg ((name . "hit_data")
+              (type . "aav")
+              (direction . "out"))))
+      @dots{}
+      (signal ((name . "HitsAdded"))
+        (arg ((name . "search") (type . "s")))
+        (arg ((name . "count") (type . "u")))))
+    @dots{})
+@end lisp
+@end defun
+
+@defun dbus-introspect-get-attribute object attribute
+该函数返回 D-Bus 自省 @var{object} 的 @var{attribute} 值。  @var{object} 的值可以是使用 @code{dbus-introspect-xml} 检索的已解析 XML 树的任何子树。  @var{attribute} 必须是根据 D-Bus 规范中的属性名称的字符串。  例子：
+
+@lisp
+(dbus-introspect-get-attribute
+ (dbus-introspect-xml
+  :system "org.freedesktop.SystemToolsBackends"
+  "/org/freedesktop/SystemToolsBackends/UsersConfig")
+ "name")
+
+@result{} "/org/freedesktop/SystemToolsBackends/UsersConfig"
+@end lisp
+
+如果@var{object}没有@var{attribute}，则函数返回@code{nil}。
+@end defun
+
+
+@node Nodes and Interfaces
+@section 检测对象路径和接口
+
+D-Bus 对象要内省的第一个元素是进一步的对象路径和接口。
+
+@defun dbus-introspect-get-node-names bus service path
+该函数以字符串列表的形式返回对象路径 @var{path} 处 D-Bus @var{bus} 中 @var{service} 的所有节点名称。  例子：
+
+@lisp
+(dbus-introspect-get-node-names
+ :session "org.gnome.seahorse" "/org/gnome/seahorse")
+
+@result{} ("crypto" "keys")
+@end lisp
+
+节点名称代表 D-Bus @var{service} 相对于 @var{path} 的进一步对象路径。  在示例中，@samp{/org/gnome/seahorse/crypto}和@samp{/org/gnome/seahorse/keys}也是D-Bus服务@samp{org.gnome.seahorse}的对象路径。
+@end defun
+
+@defun dbus-introspect-get-all-nodes bus service path
+此函数返回对象路径 @var{path} 处 D-Bus @var{bus} 中 @var{service} 的所有节点名称。  它返回一个字符串列表，其中包含从 @var{path} 开始的 @var{service} 的所有对象路径。例子：
+
+@lisp
+(dbus-introspect-get-all-nodes :session "org.gnome.seahorse" "/")
+
+@result{} ("/" "/org" "/org/gnome" "/org/gnome/seahorse"
+    "/org/gnome/seahorse/crypto"
+    "/org/gnome/seahorse/keys"
+    "/org/gnome/seahorse/keys/openpgp"
+    "/org/gnome/seahorse/keys/openpgp/local"
+    "/org/gnome/seahorse/keys/openssh"
+    "/org/gnome/seahorse/keys/openssh/local")
+@end lisp
+@end defun
+
+@defun dbus-introspect-get-interface-names bus service path
+此函数返回对象路径 @var{path} 处 D-Bus @var{bus} 中@var{service} 的所有接口名称的列表字符串。  该列表将包含默认接口@samp{org.freedesktop.DBus.Introspectable}。
+
+另一个默认接口是@samp{org.freedesktop.DBus.Properties}。如果存在，@code{interface} 元素也可以有 @code{property} 子元素。  例子：
+
+@lisp
+(dbus-introspect-get-interface-names
+ :system "org.freedesktop.Hal"
+ "/org/freedesktop/Hal/devices/computer")
+
+@result{} ("org.freedesktop.DBus.Introspectable"
+    "org.freedesktop.Hal.Device"
+    "org.freedesktop.Hal.Device.SystemPowerManagement"
+    "org.freedesktop.Hal.Device.CPUFreq")
+@end lisp
+@end defun
+
+@defun dbus-introspect-get-interface bus service path interface
+此函数返回对象路径 @var{path} 处 D-Bus @var{bus} 中@var{service} 的 @var{interface}。  返回值是一个 XML 元素。  @var{interface} 必须是字符串并且是 @code{dbus-introspect-get-interface-names} 返回的列表的成员。  例子：
+
+@lisp
+(dbus-introspect-get-interface
+ :session "org.freedesktop.xesam.searcher"
+ "/org/freedesktop/xesam/searcher/main"
+ "org.freedesktop.xesam.Search")
+
+@result{} (interface ((name . "org.freedesktop.xesam.Search"))
+     (method ((name . "GetHitData"))
+       (arg ((name . "search") (type . "s") (direction . "in")))
+       (arg ((name . "hit_ids") (type . "au") (direction . "in")))
+       (arg ((name . "fields") (type . "as") (direction . "in")))
+       (arg ((name . "hit_data") (type . "aav") (direction . "out"))))
+     @dots{}
+     (signal ((name . "HitsAdded"))
+       (arg ((name . "search") (type . "s")))
+       (arg ((name . "count") (type . "u")))))
+@end lisp
+@end defun
+
+@noindent
+使用这些函数，可以从正在运行的系统检索所有内省数据：
+
+@lisp
+(progn
+  (pop-to-buffer "*introspect*")
+  (erase-buffer)
+  (dolist (service (dbus-list-known-names :session))
+    (dolist (path (dbus-introspect-get-all-nodes :session service "/"))
+      ;; We want to introspect only elements, which have more than
+      ;; the default interface "org.freedesktop.DBus.Introspectable".
+      (when (delete
+             "org.freedesktop.DBus.Introspectable"
+             (dbus-introspect-get-interface-names :session service path))
+        (insert (format "\nservice: \"%s\" path: \"%s\"\n" service path)
+                (dbus-introspect :session service path))
+        (redisplay t)))))
+@end lisp
+
+
+@node Methods and Signal
+@section 应用功能
+
+方法和信号是D-Bus的通信手段。  以下函数返回其规格。
+
+@defun dbus-introspect-get-method-names bus service path interface
+该函数返回对象路径 @var{path} 处 D-Bus @var{bus} 中 @var{interface} 或 @var{service} 的所有方法名称的字符串列表。  例子：
+
+@lisp
+(dbus-introspect-get-method-names
+ :session "org.freedesktop.xesam.searcher"
+ "/org/freedesktop/xesam/searcher/main"
+ "org.freedesktop.xesam.Search")
+
+@result{} ("GetState" "StartSearch" "GetHitCount" "GetHits" "NewSession"
+    "CloseSession" "GetHitData" "SetProperty" "NewSearch"
+    "GetProperty" "CloseSearch")
+@end lisp
+@end defun
+
+@defun dbus-introspect-get-method bus service path interface method
+此函数将 @var{interface} 的 @var{method} 作为 XML 元素返回。  它必须位于对象路径 @var{path} 处 D-Bus @var{bus} 中的@var{service}。  @var{method} 必须是字符串并且是 @code{dbus-introspect-get-method-names} 返回的列表的成员。例子：
+
+@lisp
+(dbus-introspect-get-method
+ :session "org.freedesktop.xesam.searcher"
+ "/org/freedesktop/xesam/searcher/main"
+ "org.freedesktop.xesam.Search" "GetHitData")
+
+@result{} (method ((name . "GetHitData"))
+     (arg ((name . "search") (type . "s") (direction . "in")))
+     (arg ((name . "hit_ids") (type . "au") (direction . "in")))
+     (arg ((name . "fields") (type . "as") (direction . "in")))
+     (arg ((name . "hit_data") (type . "aav") (direction . "out"))))
+@end lisp
+@end defun
+
+@defun dbus-introspect-get-signal-names bus service path interface
+该函数返回对象路径 @var{path} 处 D-Bus @var{bus} 中 @var{interface} 或 @var{service} 的所有信号名称的字符串列表。  例子：
+
+@lisp
+(dbus-introspect-get-signal-names
+ :session "org.freedesktop.xesam.searcher"
+ "/org/freedesktop/xesam/searcher/main"
+ "org.freedesktop.xesam.Search")
+
+@result{} ("StateChanged" "SearchDone" "HitsModified"
+    "HitsRemoved" "HitsAdded")
+@end lisp
+@end defun
+
+@defun dbus-introspect-get-signal bus service path interface signal
+此函数将 @var{interface} 的 @var{signal} 作为 XML 元素返回。  它必须位于对象路径 @var{path} 处 D-Bus @var{bus} 中的@var{service}。  @var{signal} 必须是字符串并且是 @code{dbus-introspect-get-signal-names} 返回的列表的成员。例子：
+
+@lisp
+(dbus-introspect-get-signal
+ :session "org.freedesktop.xesam.searcher"
+ "/org/freedesktop/xesam/searcher/main"
+ "org.freedesktop.xesam.Search" "HitsAdded")
+
+@result{} (signal ((name . "HitsAdded"))
+     (arg ((name . "search") (type . "s")))
+     (arg ((name . "count") (type . "u"))))
+@end lisp
+@end defun
+
+
+@node Properties and Annotations
+@section 关于接口还需要了解什么
+
+接口可以具有属性。  这些可以通过@samp{org.freedesktop.DBus.Properties}接口@footnote{See @uref{https://dbus.freedesktop.org/doc/dbus-specification.html#standard-interfaces-properties}}公开。也就是说，可以在元素的生命周期内检索和更改属性。
+
+通用接口是 @samp{org.freedesktop.DBus.Objectmanager}@footnote{See @uref{https://dbus.freedesktop.org/doc/dbus-specification.html#standard-interfaces-objectmanager}}，它只需一次调用即可返回给定服务的对象、其接口和属性。
+
+另一方面，注释是元素的静态值。通常，它们用于指示生成器如何从给定语言绑定的接口生成代码。
+
+@defun dbus-introspect-get-property-names bus service path interface
+此函数返回一个字符串列表，其中包含对象路径 @var{path} 处 D-Bus @var{bus} 中@var{interface} 或 @var{service} 的所有属性名称。  例子：
+
+@lisp
+(dbus-introspect-get-property-names
+ :session "org.kde.kded" "/modules/networkstatus"
+ "org.kde.Solid.Networking.Client")
+
+@result{} ("Status")
+@end lisp
+
+如果接口声明属性，则相应的元素也支持 @samp{org.freedesktop.DBus.Properties} 接口。
+@end defun
+
+@defun dbus-introspect-get-property bus service path interface property
+此函数将 @var{interface} 的 @var{property} 作为 XML 元素返回。  它必须位于对象路径 @var{path} 处 D-Bus @var{bus} 中的@var{service}。  @var{property} 必须是字符串并且是 @code{dbus-introspect-get-property-names} 返回的列表的成员。
+
+@var{property} 值可以通过函数 @code{dbus-introspect-get-attribute} 检索。  例子：
+
+@lisp
+(dbus-introspect-get-property
+ :session "org.kde.kded" "/modules/networkstatus"
+ "org.kde.Solid.Networking.Client" "Status")
+
+@result{} (property ((access . "read") (type . "u") (name . "Status")))
+
+(dbus-introspect-get-attribute
+ (dbus-introspect-get-property
+  :session "org.kde.kded" "/modules/networkstatus"
+  "org.kde.Solid.Networking.Client" "Status")
+ "access")
+
+@result{} "read"
+@end lisp
+@end defun
+
+@defun dbus-get-property bus service path interface property
+该函数返回@var{interface}的@var{property}值。它将在 @var{bus}、@var{service}、@var{path} 进行检查。  结果可以是任何有效的 D-Bus 值。  如果没有@var{property}，或者无法读取@var{property}，则会引发错误。  例子：
+
+@lisp
+(dbus-get-property
+ :session "org.kde.kded" "/modules/networkstatus"
+ "org.kde.Solid.Networking.Client" "Status")
+
+@result{} 4
+@end lisp
+@end defun
+
+@defun dbus-set-property bus service path interface property [type] value
+该函数将@var{interface}的@var{property}值设置为@var{value}。  它将在 @var{bus}、@var{service}、@var{path} 进行检查。  @var{value} 前面可以有 @var{type} 关键字。当值设置成功后，该函数返回@var{value}。例子：
+
+@lisp
+(dbus-set-property
+ :session "org.kde.kaccess" "/MainApplication"
+ "com.trolltech.Qt.QApplication" "doubleClickInterval" :uint16 500)
+
+@result{} 500
+@end lisp
+@end defun
+
+@defun dbus-get-all-properties bus service path interface
+该函数返回@var{interface}的所有可读属性。  它将在 @var{bus}、@var{service}、@var{path} 进行检查。  结果是 cons 单元的列表。  每个 cons 单元格都包含属性的名称及其值。  如果没有属性，则返回 @code{nil}。  例子：
+
+@lisp
+(dbus-get-all-properties
+ :session "org.kde.kaccess" "/MainApplication"
+ "com.trolltech.Qt.QApplication")
+
+@result{} (("cursorFlashTime" . 1000) ("doubleClickInterval" . 500)
+    ("keyboardInputInterval" . 400) ("wheelScrollLines" . 3)
+    ("globalStrut" 0 0) ("startDragTime" . 500)
+    ("startDragDistance" . 4) ("quitOnLastWindowClosed" . t)
+    ("styleSheet" . ""))
+@end lisp
+@end defun
+
+@defun dbus-get-all-managed-objects bus service path
+此函数返回 @var{bus}、@var{service}、@var{path} 处的所有对象以及 @var{path} 的子对象。  结果是一个对象列表。  每个对象都是现有路径名和可用接口对象列表的 cons 单元。  接口对象是另一个缺点，其 car 是接口名称，cdr 是 @code{dbus-get-all-properties} 返回的该路径和接口的属性列表。  例子：
+
+@lisp
+(dbus-get-all-managed-objects
+ :session "org.gnome.SettingsDaemon" "/")
+
+@result{} (("/org/gnome/SettingsDaemon/Power"
+     ("org.gnome.SettingsDaemon.Power.Keyboard")
+     ("org.gnome.SettingsDaemon.Power.Screen")
+     ("org.gnome.SettingsDaemon.Power"
+      ("Icon" . ". GThemedIcon battery-full-charged-symbolic ")
+      ("Tooltip" . "Laptop battery is charged"))
+     ("org.freedesktop.DBus.Peer")
+     ("org.freedesktop.DBus.Introspectable")
+     ("org.freedesktop.DBus.Properties")
+     ("org.freedesktop.DBus.ObjectManager"))
+    @dots{})
+@end lisp
+
+如果可能，使用 @samp{org.freedesktop.DBus.ObjectManager.GetManagedObjects} 来检索信息。  否则，通过@samp{org.freedesktop.DBus.Introspectable.Introspect}和@samp{org.freedesktop.DBus.Properties.GetAll}收集信息，速度很慢。
+
+可以通过以下代码检索所有现有对象路径、其接口和属性的概述：
+
+@lisp
+(let ((result (mapcar (lambda (service)
+                        (cons service
+                              (dbus-get-all-managed-objects
+                               :session service "/")))
+                      (dbus-list-known-names :session))))
+  (pop-to-buffer "*objectmanager*")
+  (erase-buffer)
+  (pp result (current-buffer)))
+@end lisp
+@end defun
+
+@defun dbus-introspect-get-annotation-names bus service path interface &optional name
+此函数以字符串列表形式返回所有注释名称的列表。  如果 @var{name} 是 @code{nil}，则注释是 @var{interface} 的子级，否则 @var{name} 必须是注释所属的 @code{method}、@code{signal} 或 @code{property} XML 元素。  例子：
+
+@lisp
+(dbus-introspect-get-annotation-names
+ :session "de.berlios.Pinot" "/de/berlios/Pinot"
+ "de.berlios.Pinot" "GetStatistics")
+
+@result{} ("de.berlios.Pinot.GetStatistics")
+@end lisp
+
+默认注释名称@footnote{See @uref{https://dbus.freedesktop.org/doc/dbus-specification.html#introspection-format}}是
+
+@table @samp
+@item org.freedesktop.DBus.Deprecated
+该实体是否已弃用；默认为@code{nil}
+
+@item org.freedesktop.DBus.GLib.CSymbol
+C符号；可用于 @code{methods} 和 @code{interfaces}
+
+@item org.freedesktop.DBus.Method.NoReply
+如果设置，则不要期望对 @code{method} 调用做出答复；默认为@code{nil}
+@end table
+@end defun
+
+@defun dbus-introspect-get-annotation bus service path interface name annotation
+该函数返回 @var{annotation} 作为 XML 对象。  如果 @var{name} 是 @code{nil}，则 @var{annotation} 是 @var{interface} 的子级，否则 @var{name} 必须是 @var{annotation} 所属的 @code{method}、@code{signal} 或 @code{property} XML 元素的名称。
+
+可以通过@code{dbus-introspect-get-attribute}检索属性值。  例子：
+
+@lisp
+(dbus-introspect-get-annotation
+ :session "de.berlios.Pinot" "/de/berlios/Pinot"
+ "de.berlios.Pinot" "GetStatistics"
+ "de.berlios.Pinot.GetStatistics")
+
+@result{} (annotation ((name . "de.berlios.Pinot.GetStatistics")
+                (value . "pinotDBus")))
+
+(dbus-introspect-get-attribute
+ (dbus-introspect-get-annotation
+  :session "de.berlios.Pinot" "/de/berlios/Pinot"
+  "de.berlios.Pinot" "GetStatistics"
+  "de.berlios.Pinot.GetStatistics")
+ "value")
+
+@result{} "pinotDBus"
+@end lisp
+@end defun
+
+
+@node Arguments and Signatures
+@section 最终细节
+
+方法和信号有参数。  它们在 @code{arg} XML 元素中进行描述。
+
+@defun dbus-introspect-get-argument-names bus service path interface name
+此函数以字符串形式返回所有参数名称的列表。 @var{name} 必须是 @code{method} 或 @code{signal} XML 元素。例子：
+
+@lisp
+(dbus-introspect-get-argument-names
+ :session "org.freedesktop.xesam.searcher"
+ "/org/freedesktop/xesam/searcher/main"
+ "org.freedesktop.xesam.Search" "GetHitData")
+
+@result{} ("search" "hit_ids" "fields" "hit_data")
+@end lisp
+
+参数名称是可选的；因此，即使方法或信号有参数，函数也可以返回@code{nil}。
+@end defun
+
+@defun dbus-introspect-get-argument bus service path interface name arg
+该函数将参数 @var{arg} 作为 XML 对象返回。 @var{name} 必须是 @code{method} 或 @code{signal} XML 元素。例子：
+
+@lisp
+(dbus-introspect-get-argument
+ :session "org.freedesktop.xesam.searcher"
+ "/org/freedesktop/xesam/searcher/main"
+ "org.freedesktop.xesam.Search" "GetHitData" "search")
+
+@result{} (arg ((name . "search") (type . "s") (direction . "in")))
+@end lisp
+@end defun
+
+@defun dbus-introspect-get-signature bus service path interface name &optional direction
+此函数返回 @code{method} 或 @code{signal} 的签名（由 @var{name} 表示）作为字符串。
+
+如果@var{name}是@code{method}，则@var{direction}可以是@samp{in}或@samp{out}。  如果@var{direction}是@code{nil}，则假设@samp{in}。
+
+如果@var{name}是@code{signal}，并且@var{direction}不是@code{nil}，则@var{direction}一定是@samp{out}。  例子：
+
+@lisp
+(dbus-introspect-get-signature
+ :session "org.freedesktop.xesam.searcher"
+ "/org/freedesktop/xesam/searcher/main"
+ "org.freedesktop.xesam.Search" "GetHitData" "in")
+
+@result{} "sauas"
+
+(dbus-introspect-get-signature
+ :session "org.freedesktop.xesam.searcher"
+ "/org/freedesktop/xesam/searcher/main"
+ "org.freedesktop.xesam.Search" "HitsAdded")
+
+@result{} "su"
+@end lisp
+@end defun
+
+
+@node Type Conversion
+@chapter 映射 Lisp 类型和 D-Bus 类型
+@cindex type conversion
+
+D-Bus 方法调用和信号通常接受多个参数作为参数，或者作为输入参数，或者作为输出参数。  每个参数都属于 D-Bus 类型。
+
+这些参数必须在编码为 D-Bus 类型的值和相应的 Lisp 对象类型之间进行映射。  该映射应用于输入参数的 Lisp 对象 @expansion{} D-Bus 类型，以及输出参数的 D-Bus 类型 @expansion{} Lisp 对象。
+
+
+@section 输入参数
+
+D-Bus 方法和信号的输入参数作为 Lisp 函数调用的参数出现。  当创建相应的 D-Bus 消息时，将应用以下到 D-Bus 类型的映射：
+
+@example
+@multitable {negative integer} {@expansion{}} {DBUS_TYPE_BOOLEAN}
+@item Lisp type               @tab              @tab D-Bus type
+@item
+@item @code{t} and @code{nil} @tab @expansion{} @tab DBUS_TYPE_BOOLEAN
+@item natural number          @tab @expansion{} @tab DBUS_TYPE_UINT32
+@item negative integer        @tab @expansion{} @tab DBUS_TYPE_INT32
+@item float                   @tab @expansion{} @tab DBUS_TYPE_DOUBLE
+@item string                  @tab @expansion{} @tab DBUS_TYPE_STRING
+@item list                    @tab @expansion{} @tab DBUS_TYPE_ARRAY
+@end multitable
+@end example
+
+其他 Lisp 对象（如符号或哈希表）不被接受作为输入参数。
+
+如果需要使用其他 D-Bus 类型，可以在相应的 Lisp 对象前面添加相应的类型关键字。  基本 D-Bus 类型由类型关键字 @code{:byte}、@code{:boolean}、@code{:int16}、@code{:uint16}、@code{:int32}、@code{:uint32}、@code{:int64}、@code{:uint64}、@code{:double}、@code{:string}、@code{:object-path}、 @code{:signature}和@code{:unix-fd}。
+
+@noindent
+例子：
+
+@lisp
+(dbus-call-method @dots{} @var{nat-number} @var{string})
+@end lisp
+
+相当于
+
+@lisp
+(dbus-call-method @dots{} :uint32 @var{nat-number} :string @var{string})
+@end lisp
+
+但不同于
+
+@lisp
+(dbus-call-method @dots{} :int32 @var{nat-number} :signature @var{string})
+@end lisp
+
+D-Bus 字节类型的值可以是任何自然数。  如果数字大于 255，则会被截断为最低有效字节。  例如，@code{:byte 1025}等于@code{:byte 1}。  如果使用字符作为参数，则表示在此范围之外的修饰符将被删除。  例如，@code{:byte ?x}等于@code{:byte ?\M-x}，但不等于@code{:byte ?\C-x}或@code{:byte ?\M-\C-x}。
+
+有符号和无符号 D-Bus 整数类型需要相应的整数值。  unix 文件描述符的值仅限于 0@dots{}9。
+
+如果显式输入，则像@code{:boolean 'symbol}这样的非@code{nil}布尔值将像@code{t}或@code{:boolean t}一样处理。
+
+D-Bus 复合类型始终表示为列表。  该列表的@sc{car}可以是类型关键字@code{:array}、@code{:variant}、@code{:struct}或@code{:dict-entry}，这将产生相应的D-Bus容器。  @code{:array} 是可选的，因为这是列表的默认复合 D-Bus 类型。
+
+作为列表元素的对象根据 D-Bus 复合类型规则进行检查。
+
+@itemize
+@item An array must contain only elements of the same D-Bus type.  It
+可以为空。
+
+@item A variant must contain only a single element.
+
+@item A dictionary entry must be an element of an array, and it must
+仅包含两个元素的键值对，具有基本的 D-Bus 类型键。
+
+@item There are no restrictions for structs.
+@end itemize
+
+如果空数组需要字符串以外的 D-Bus 类型元素，则它可以恰好包含一个 D-Bus 类型@code{:signature} 的元素。  该元素的值（字符串）用作该数组元素的签名。  例子：
+
+@lisp
+(dbus-call-method
+ :session "org.freedesktop.Notifications"
+ "/org/freedesktop/Notifications"
+ "org.freedesktop.Notifications" "Notify"
+ "GNU Emacs"                   ; Application name.
+ 0                             ; No replacement of other notifications.
+ ""                            ; No icon.
+ "Notification summary"        ; Summary.
+ (format                       ; Body.
+  "This is a test notification, raised from\n%S" (emacs-version))
+ '(:array)                     ; No actions (empty array of strings).
+ '(:array :signature "@{sv@}")   ; No hints
+                               ; (empty array of dictionary entries).
+ :int32 -1)                    ; Default timeout.
+
+@result{} 3
+@end lisp
+
+@defun dbus-string-to-byte-array string
+有时，D-Bus 方法需要字节数组而不是字符串作为输入参数。  该函数将@var{string}转换为@var{string}的UTF-8编码的字节数组。  例子：
+
+@lisp
+(dbus-string-to-byte-array "/etc/hosts")
+
+@result{} (:array :byte 47 :byte 101 :byte 116 :byte 99 :byte 47
+           :byte 104 :byte 111 :byte 115 :byte 116 :byte 115)
+@end lisp
+@end defun
+
+@defun dbus-escape-as-identifier string
+该函数对任意 @var{string} 进行转义，因此它遵循 C 标识符的规则。  转义字符串可以用作D-Bus中的对象路径组件、接口元素组件、总线名称组件或成员名称。
+
+转义包括用下划线和两个小写十六进制数字替换所有非字母数字和第一个字符（如果是数字）。  作为一种特殊情况，“”被转义为“_”。  例子：
+
+@lisp
+(dbus-escape-as-identifier "0123abc_xyz\x01\xff")
+
+@result{} "_30123abc_5fxyz_01_ff"
+@end lisp
+@end defun
+
+
+@section 输出参数
+
+D-Bus 方法和信号的输出参数映射到 Lisp 对象。
+
+@example
+@multitable {DBUS_TYPE_OBJECT_PATH} {@expansion{}} {natural number}
+@item D-Bus type            @tab              @tab Lisp type
+@item
+@item DBUS_TYPE_BOOLEAN     @tab @expansion{} @tab @code{t} or @code{nil}
+@item DBUS_TYPE_BYTE        @tab @expansion{} @tab natural number
+@item DBUS_TYPE_UINT16      @tab @expansion{} @tab natural number
+@item DBUS_TYPE_INT16       @tab @expansion{} @tab integer
+@item DBUS_TYPE_UINT32      @tab @expansion{} @tab natural number
+@item DBUS_TYPE_UNIX_FD     @tab @expansion{} @tab natural number
+@item DBUS_TYPE_INT32       @tab @expansion{} @tab integer
+@item DBUS_TYPE_UINT64      @tab @expansion{} @tab natural number
+@item DBUS_TYPE_INT64       @tab @expansion{} @tab integer
+@item DBUS_TYPE_DOUBLE      @tab @expansion{} @tab float
+@item DBUS_TYPE_STRING      @tab @expansion{} @tab string
+@item DBUS_TYPE_OBJECT_PATH @tab @expansion{} @tab string
+@item DBUS_TYPE_SIGNATURE   @tab @expansion{} @tab string
+@item DBUS_TYPE_ARRAY       @tab @expansion{} @tab list
+@item DBUS_TYPE_VARIANT     @tab @expansion{} @tab list
+@item DBUS_TYPE_STRUCT      @tab @expansion{} @tab list
+@item DBUS_TYPE_DICT_ENTRY  @tab @expansion{} @tab list
+@end multitable
+@end example
+
+最后 4 个 D-Bus 复合类型的结果列表包含 D-Bus 容器的元素作为元素，根据相同的规则进行映射。
+
+信号@code{PropertyModified}（在@ref{Inspection}中作为示例进行讨论）将提供以下对象作为Lisp数据（@var{bool}在这里代表@code{nil}或@code{t}）：
+
+@lisp
+(@var{integer} ((@var{string} @var{bool} @var{bool}) (@var{string} @var{bool} @var{bool}) @dots{}))
+@end lisp
+
+@defun dbus-byte-array-to-string byte-array
+如果 D-Bus 方法或信号返回一个字节数组，已知该数组表示 UTF-8 字符串，则该函数将 @var{byte-array} 转换为相应的 Lisp 字符串。  @var{byte-array} 的内容应该是 UTF-8 编码字符串的字节序列。  例子：
+
+@lisp
+(dbus-byte-array-to-string '(47 101 116 99 47 104 111 115 116 115))
+
+@result{} "/etc/hosts"
+@end lisp
+@end defun
+
+@defun dbus-unescape-from-identifier string
+该函数从编码的 @var{string} 中检索原始字符串作为单字节字符串。  @var{string} 的值必须已使用 @code{dbus-escape-as-identifier} 进行编码。  例子：
+
+@lisp
+(dbus-unescape-from-identifier "_30123abc_5fxyz_01_ff")
+
+@result{} "0123abc_xyz\x01\xff"
+@end lisp
+
+如果 @code{dbus-escape-as-identifier} 中使用的原始字符串是多字节字符串，则不能期望此函数返回该字符串：
+
+@lisp
+(string-equal
+ (dbus-unescape-from-identifier
+  (dbus-escape-as-identifier "Grüß Göttin"))
+ "Grüß Göttin")
+
+@result{} nil
+@end lisp
+
+
+@end defun
+
+
+@node Synchronous Methods
+@chapter 以阻塞方式调用方法
+@cindex method calls, synchronous
+@cindex synchronous method calls
+
+方法可以同步调用 (@dfn{blocking}) 或异步调用 (@dfn{non-blocking})。
+
+在 D-Bus 级别，方法调用由两条消息组成：一条消息将输入参数携带到拥有要调用的方法的对象，一条回复消息从对象返回结果输出参数。
+
+@defun dbus-call-method bus service path interface method &optional :timeout timeout :authorizable auth :keep-fd &rest args
+@anchor{dbus-call-method}
+该函数调用 D-Bus @var{bus} 上的 @var{method}。  @var{bus} 是关键字@code{:system} 或关键字@code{:session}。
+
+@var{service} 是要使用的 D-Bus 服务名称。  @var{path} 是 D-Bus 对象路径，@var{service} 已注册。  @var{interface}是@var{service}提供的接口。  它必须提供@var{method}。
+
+如果给出参数@code{:timeout}，则后面的整数@var{timeout}指定方法调用必须返回之前的最大毫秒数。  默认值为 25,000。  如果方法调用没有及时返回，则会引发 D-Bus 错误 (@pxref{Errors and Events})。
+
+如果给定参数@code{:authorizable}并且后面的@var{auth}非@code{nil}，则调用的方法可能会交互提示用户授权。  默认值为@code{nil}。  例如，以下命令将重新启动 Bluez systemd 服务，提示用户通过 polkit 进行授权（假设 polkit 代理正在运行）：
+
+@lisp
+(dbus-call-method
+ :system
+ "org.freedesktop.systemd1" "/org/freedesktop/systemd1"
+ "org.freedesktop.systemd1.Manager" "RestartUnit"
+ :authorizable t
+ "bluetooth.service" "replace")
+
+@result{} "/org/freedesktop/systemd1/job/17508"
+@end lisp
+
+如果给出参数 @code{:keep-fd}，并且返回消息的第一个参数为 D-Bus 类型 @code{:unix-fd}，则返回的文件描述符将保留在内部，并且可以在以后调用 @code{dbus--close-fd} (@pxref{File Descriptors}) 时使用。
+
+其余参数 @var{args} 作为参数传递给 @var{method}。  它们被转换为 D-Bus 类型，如@ref{Type Conversion}中所述。
+
+该函数根据 @ref{Type Conversion} 中描述的类型转换规则，以 Lisp 对象列表的形式返回 @var{method} 的结果值。  例子：
+
+@lisp
+(dbus-call-method
+ :session "org.gnome.seahorse" "/org/gnome/seahorse/keys/openpgp"
+ "org.gnome.seahorse.Keys" "GetKeyField"
+ "openpgp:657984B8C7A966DD" "simple-name")
+
+@result{} (t ("Philip R. Zimmermann"))
+@end lisp
+
+如果方法调用的结果只是一个值，则返回转换后的 Lisp 对象，而不是包含该单个 Lisp 对象的列表。  例子：
+
+@lisp
+(dbus-call-method
+ :system "org.freedesktop.Hal"
+ "/org/freedesktop/Hal/devices/computer"
+ "org.freedesktop.Hal.Device" "GetPropertyString"
+ "system.kernel.machine")
+
+@result{} "i686"
+@end lisp
+
+使用 @code{dbus-introspect} 函数可以探索 @samp{org.freedesktop.Hal} 服务的接口。  它为路径 @samp{/org/freedesktop/Hal/Manager} 处的对象提供接口 @samp{org.freedesktop.Hal.Manager}，并为所有以路径 @samp{/org/freedesktop/Hal/devices} 为前缀的对象提供接口 @samp{org.freedesktop.Hal.Device}。  使用方法@samp{GetAllDevices}和@samp{GetAllProperties}，可以很简单地在GNU/Linux系统上模拟@code{lshal}命令：
+
+@lisp
+(dolist (device
+         (dbus-call-method
+          :system "org.freedesktop.Hal"
+          "/org/freedesktop/Hal/Manager"
+          "org.freedesktop.Hal.Manager" "GetAllDevices"))
+  (message "\nudi = %s" device)
+  (dolist (properties
+           (dbus-call-method
+            :system "org.freedesktop.Hal" device
+            "org.freedesktop.Hal.Device" "GetAllProperties"))
+    (message "  %s = %S"
+             (car properties) (or (caadr properties) ""))))
+
+@print{} "udi = /org/freedesktop/Hal/devices/computer
+      info.addons = (\"hald-addon-acpi\")
+      info.bus = \"unknown\"
+      info.product = \"Computer\"
+      info.subsystem = \"unknown\"
+      info.udi = \"/org/freedesktop/Hal/devices/computer\"
+      linux.sysfs_path_device = \"(none)\"
+      power_management.acpi.linux.version = \"20051216\"
+      power_management.can_suspend_to_disk = t
+      power_management.can_suspend_to_ram = \"\"
+      power_management.type = \"acpi\"
+      smbios.bios.release_date = \"11/07/2001\"
+      system.chassis.manufacturer = \"COMPAL\"
+      system.chassis.type = \"Notebook\"
+      system.firmware.release_date = \"03/19/2005\"
+      @dots{}"
+@end lisp
+@end defun
+
+
+@node Asynchronous Methods
+@chapter 非阻塞调用方法
+@cindex method calls, asynchronous
+@cindex asynchronous method calls
+
+@defun dbus-call-method-asynchronously bus service path interface method handler &optional :timeout timeout :authorizable auth :keep-fd &rest args
+该函数异步调用 D-Bus @var{bus} 上的 @var{method}。  @var{bus} 是关键字@code{:system} 或关键字@code{:session}。
+
+@var{service} 是要使用的 D-Bus 服务名称。  @var{path} 是 D-Bus 对象路径，@var{service} 已注册。  @var{interface}是@var{service}提供的接口。  它必须提供@var{method}。
+
+@var{handler}是一个Lisp函数，当相应的返回消息到达时调用它。  如果@var{handler}是@code{nil}，则不会有返回消息。
+
+如果给出参数@code{:timeout}，则后面的整数@var{timeout}指定回复消息必须到达之前的最大毫秒数。  默认值为 25,000。  如果没有及时回复消息，则会引发 D-Bus 错误 (@pxref{Errors and Events})。
+
+如果给定参数@code{:authorizable}并且后面的@var{auth}非@code{nil}，则调用的方法可能会交互提示用户授权。  默认值为@code{nil}。
+
+如果给出参数 @code{:keep-fd}，并且返回消息的第一个参数为 D-Bus 类型 @code{:unix-fd}，则返回的文件描述符将保留在内部，并且可以在以后调用 @code{dbus--close-fd} (@pxref{File Descriptors}) 时使用。
+
+其余参数 @var{args} 作为参数传递给 @var{method}。  它们被转换为 D-Bus 类型，如@ref{Type Conversion}中所述。
+
+如果@var{handler}是一个Lisp函数，该函数会将一个键返回到哈希表@code{dbus-registered-objects-table}中。  当返回消息到达时，哈希表中相应的条目将被删除，并调用@var{handler}。  例子：
+
+@lisp
+(dbus-call-method-asynchronously
+ :system "org.freedesktop.Hal"
+ "/org/freedesktop/Hal/devices/computer"
+ "org.freedesktop.Hal.Device" "GetPropertyString"
+ (lambda (msg) (message "%s" msg))
+ "system.kernel.machine")
+
+@print{} i686
+
+@result{} (:serial :system 2)
+@end lisp
+@end defun
+
+
+@node Register Objects
+@chapter 提供自己的服务
+@cindex method calls, returning
+@cindex returning method calls
+
+@c https://wiki.ubuntu.com/DebuggingDBus
+
+您可以在 D-Bus 中提供自己的服务，其他 D-Bus 客户端将可以看到该服务。  有关设计的讨论，请参阅@uref{https://dbus.freedesktop.org/doc/dbus-api-design.html}。
+
+为了在 D-Bus 上注册方法，Emacs 必须在 D-Bus 上请求一个众所周知的名称，其他客户端可以使用该名称。  可以使用以下函数注册和取消注册 D-Bus 上的名称：
+
+@defun dbus-register-service bus service &rest flags
+该函数在 D-Bus @var{bus} 上注册已知名称 @var{service}。
+
+@var{bus} 是关键字@code{:system} 或关键字@code{:session}。
+
+@var{service} 是要在 D-Bus 上注册的服务名称。  这一定是一个众所周知的名字。
+
+@var{flags} 是以下关键字的子集：
+
+@table @code
+@item :allow-replacement
+如果需要，允许其他服务成为主要所有者。
+@item :replace-existing
+请求更换当前主要所有者。
+@item :do-not-queue
+如果我们不能成为主要所有者，请不要将我们放入队列中。
+@end table
+
+返回以下关键字之一：
+
+@table @code
+@item :primary-owner
+我们已成为@var{service}这个名字的主要所有者。
+@item :in-queue
+我们无法成为主要所有者并已被放入队列中。
+@item :exists
+我们已经在排队了。
+@item :already-owner
+我们已经是主要所有者了。
+@end table
+@end defun
+
+@defun dbus-unregister-service bus service
+此函数从 D-Bus @var{bus} 注销所有由 Emacs 为 @var{service} 注册的对象。
+
+@var{bus} 是关键字@code{:system} 或关键字@code{:session}。
+
+@var{service} 是 D-Bus 的 D-Bus 服务名称。  这一定是一个众所周知的名字。  Emacs 从 D-Bus 释放与 @var{service} 的关联。
+
+返回以下关键字之一：
+
+@table @code
+@item :released
+我们成功发布了@var{service}这个名字。
+@item :non-existent
+总线上不存在名称 @var{service}。
+@item :not-owner
+我们不是 @var{service} 这个名字的所有者。
+@end table
+
+当@var{service}不是已知名称而是唯一名称时，该函数返回@code{nil}。
+@end defun
+
+选择名称后，Emacs 可以提供自己的方法，可供其他应用程序调用。  这些方法可以是众所周知的服务接口的实现，例如@samp{org.freedesktop.TextEditor}。
+
+它们也可以是其自己的接口的实现。  在这种情况下，服务名称必须是@samp{org.gnu.Emacs}。  对象路径应以@samp{/org/gnu/Emacs/@var{application}}开头，接口名称应为@code{org.gnu.Emacs.@var{application}}，其中@var{application}是提供接口的应用程序的名称。
+
+@deffn Constant dbus-service-emacs
+Emacs 众所周知的服务名称@samp{org.gnu.Emacs}。
+@end deffn
+
+@deffn Constant dbus-path-emacs
+Emacs 使用的对象路径命名空间@samp{/org/gnu/Emacs}。
+@end deffn
+
+@deffn Constant dbus-interface-emacs
+Emacs 使用的接口命名空间@code{org.gnu.Emacs}。
+@end deffn
+
+@defun dbus-register-method bus service path interface method handler dont-register-service
+通过此函数，应用程序可以在 D-Bus @var{bus} 上注册 @var{method}。
+
+@var{bus} 是关键字@code{:system} 或关键字@code{:session}。
+
+@var{service} 是注册 D-Bus 对象@var{method} 的 D-Bus 服务名称。  它必须是一个已知的名称（参见下面@var{dont-register-service}的讨论）。
+
+@var{path} 是 D-Bus 对象路径 @var{service} 已注册（请参阅下面对 @var{dont-register-service} 的讨论）。
+
+@var{interface}是@var{service}提供的接口。  它必须提供@var{method}。
+
+@var{handler} 是一个 Lisp 函数，当收到 @var{method} 调用时将被调用。  它必须接受 @var{method} 的输入参数作为参数。  @var{handler}应该返回一个列表，其元素将用作@var{method}的回复消息的参数。  这个列表可以像@ref{Type Conversion}中的输入参数一样组成。
+
+如果@var{handler}只想返回一个Lisp对象并且它不是cons单元，@var{handler}可以直接返回该对象，而不是返回包含该对象的列表。
+
+如果 @var{handler} 返回带有空参数列表的回复消息，@var{handler} 必须返回关键字 @code{:ignore} 以便将其与 @code{nil}（布尔值 false）区分开来。
+
+如果@var{handler}检测到错误，它将返回列表@code{(:error @var{error-name} @var{error-message})}。 @var{error-name} 是一个命名空间字符串，用于表征错误类型，@var{error-message} 是一个自由文本字符串。  或者，@var{handler} 中的任何 Emacs 信号@code{dbus-error} 都会引发错误名称为 @samp{org.freedesktop.DBus.Error.Failed} 的 D-Bus 错误消息。
+
+当@var{dont-register-service}为非@code{nil}时，不登记已知名称@var{service}。  这意味着其他 D-Bus 客户端无法注意到新注册的方法。  当通过一次添加单个方法或属性来增量构造接口时，可以使用 @var{dont-register-service} 来防止其他客户端发现仍然不完整的接口。
+
+等待消息回复时 D-Bus 的默认超时时间为 25 秒。  该值可能更小，具体取决于调用客户端。  因此，@var{handler} 的持续时间不应超过绝对必要的时间。
+
+@code{dbus-register-method} 返回一个 Lisp 对象，它可以用作 @code{dbus-unregister-object} 中的参数来删除 @var{method} 的注册。  例子：
+
+@lisp
+(defun my-dbus-method-handler (filename)
+  (if (find-file filename)
+      '(:boolean t)
+    '(:boolean nil)))
+
+(dbus-register-method
+ :session "org.freedesktop.TextEditor" "/org/freedesktop/TextEditor"
+ "org.freedesktop.TextEditor" "OpenFile"
+ #'my-dbus-method-handler)
+
+@result{} ((:method :session "org.freedesktop.TextEditor" "OpenFile")
+    ("org.freedesktop.TextEditor" "/org/freedesktop/TextEditor"
+     my-dbus-method-handler))
+@end lisp
+
+如果您使用文件名作为参数从另一个 D-Bus 应用程序调用方法 @samp{org.freedesktop.TextEditor.OpenFile}，则该文件将在 Emacs 中打开，并且该方法返回 @var{true} 或 @var{false}，表明该方法成功。  作为测试工具，可以在 shell 中使用命令行工具 @code{dbus-send}：
+
+@example
+# dbus-send --session --print-reply \
+    --dest="org.freedesktop.TextEditor" \
+    "/org/freedesktop/TextEditor" \
+    "org.freedesktop.TextEditor.OpenFile" string:"/etc/hosts"
+
+@print{} method return sender=:1.22 -> dest=:1.23 reply_serial=2
+      boolean true
+@end example
+
+您可以通过返回 @code{:error} 列表回复或引发 Emacs 信号 @code{dbus-error} 来指示错误。  上面的处理程序可以这样更改：
+
+@lisp
+(defun my-dbus-method-handler (&rest args)
+  (if (not (and (= (length args) 1) (stringp (car args))))
+      (list :error
+            "org.freedesktop.TextEditor.Error.InvalidArgs"
+            (format "Wrong argument list: %S" args))
+    (condition-case err
+        (find-file (car args))
+      (error (signal 'dbus-error (cdr err))))
+    t))
+@end lisp
+
+然后测试运行
+
+@example
+# dbus-send --session --print-reply \
+    --dest="org.freedesktop.TextEditor" \
+    "/org/freedesktop/TextEditor" \
+    "org.freedesktop.TextEditor.OpenFile" \
+    string:"/etc/hosts" string:"/etc/passwd"
+
+@print{} Error org.freedesktop.TextEditor.Error.InvalidArgs:
+   Wrong argument list: ("/etc/hosts" "/etc/passwd")
+@end example
+
+@example
+# dbus-send --session --print-reply \
+    --dest="org.freedesktop.TextEditor" \
+    "/org/freedesktop/TextEditor" \
+    "org.freedesktop.TextEditor.OpenFile" \
+    string:"/etc/crypttab"
+
+@print{} Error org.freedesktop.DBus.Error.Failed:
+   D-Bus error: "File is not readable", "/etc/crypttab"
+@end example
+@end defun
+
+@defun dbus-register-property bus service path interface property access [type] value &optional emits-signal dont-register-service
+通过此函数，应用程序可以在 D-Bus @var{bus} 上声明@var{property}。
+
+@var{bus} 是关键字@code{:system} 或关键字@code{:session}。
+
+@var{service} 是 D-Bus 的 D-Bus 服务名称。  这一定是一个众所周知的名字。
+
+@var{path} 是 D-Bus 对象路径 @var{service} 已注册（请参阅下面对 @var{dont-register-service} 的讨论）。
+
+@var{interface} 是@var{path} 使用的接口名称，@var{property} 是@var{interface} 的属性名称。
+
+@var{access} 表示该属性是否可以通过 D-Bus 被其他服务更改。  它必须是关键字 @code{:read}、@code{:write} 或 @code{:readwrite}。
+
+@var{value} 是属性的初始值，它可以是任何有效类型（@xref{dbus-call-method}，了解详情）。  @var{value} 前面可以有 @var{type} 关键字。
+
+如果@var{property}已经存在于@var{path}上，它将被覆盖。  对于访问类型为 @code{:read} 的属性，这是更改其值的唯一方法。  访问类型为 @code{:write} 或 @code{:readwrite} 的属性可以通过 @code{dbus-set-property} 进行更改。
+
+接口 @samp{org.freedesktop.DBus.Properties} 添加到 @var{path}，包括该接口的 @samp{Get}、@samp{GetAll} 和 @samp{Set} 方法的默认处理程序。  当@var{emits-signal}非@code{nil}时，当属性被@code{dbus-set-property}改变时，发送信号@samp{PropertiesChanged}。
+
+当@var{dont-register-service}为非@code{nil}时，不登记已知名称@var{service}。  这意味着其他 D-Bus 客户端无法注意到新注册的方法。  当通过一次添加单个方法或属性来增量构造接口时，可以使用 @var{dont-register-service} 来防止其他客户端发现仍然不完整的接口。
+
+@code{dbus-register-property} 返回一个 Lisp 对象，它可以用作 @code{dbus-unregister-object} 中的参数来删除 @var{property} 的注册。  例子：
+
+@lisp
+(dbus-register-property
+ :session "org.freedesktop.TextEditor" "/org/freedesktop/TextEditor"
+ "org.freedesktop.TextEditor" "name" :read "GNU Emacs")
+
+@result{} ((:property :session "org.freedesktop.TextEditor" "name")
+    ("org.freedesktop.TextEditor" "/org/freedesktop/TextEditor"))
+
+(dbus-register-property
+ :session "org.freedesktop.TextEditor" "/org/freedesktop/TextEditor"
+ "org.freedesktop.TextEditor" "version" :readwrite emacs-version t)
+
+@result{} ((:property :session "org.freedesktop.TextEditor" "version")
+    ("org.freedesktop.TextEditor" "/org/freedesktop/TextEditor"))
+@end lisp
+
+其他 D-Bus 应用程序可以通过默认方法 @samp{org.freedesktop.DBus.Properties.Get} 和 @samp{org.freedesktop.DBus.Properties.GetAll} 读取属性。  也可以通过 shell 中的命令行工具 @code{dbus-send} 进行测试：
+
+@example
+# dbus-send --session --print-reply \
+    --dest="org.freedesktop.TextEditor" \
+    "/org/freedesktop/TextEditor" \
+    "org.freedesktop.DBus.Properties.GetAll" \
+    string:"org.freedesktop.TextEditor"
+
+@print{} method return sender=:1.22 -> dest=:1.23 reply_serial=3
+      array [
+         dict entry(
+            string "name"
+            variant             string "GNU Emacs"
+         )
+         dict entry(
+            string "version"
+            variant             string "23.1.50.5"
+         )
+      ]
+@end example
+
+还可以应用 @code{dbus-get-property}、@code{dbus-get-all-properties} 和 @code{dbus-set-property} 函数 (@pxref{Properties and Annotations})。
+
+@lisp
+(dbus-set-property
+ :session "org.freedesktop.TextEditor" "/org/freedesktop/TextEditor"
+ "org.freedesktop.TextEditor" "version" "23.1.50")
+
+@result{} "23.1.50"
+
+(dbus-get-property
+ :session "org.freedesktop.TextEditor" "/org/freedesktop/TextEditor"
+ "org.freedesktop.TextEditor" "version")
+
+@result{} "23.1.50"
+@end lisp
+@end defun
+
+@defun dbus-unregister-object object
+该函数从 D-Bus 取消注册 @var{object}。  @var{object} 必须是前面的 @code{dbus-register-method}、@code{dbus-register-property}、@code{dbus-register-signal} (@pxref{Signals}) 或 @code{dbus-register-monitor} 调用的结果。  如果 @var{object} 未注册，则返回 @code{t}，否则返回 @code{nil}。
+
+当 @var{object} 识别出为相应服务注册的最后一个方法或属性时，Emacs 会从 D-Bus 释放其与该服务的关联。
+@end defun
+
+
+@node Signals
+@chapter 发送和接收信号
+@cindex signals
+
+信号是一种单向消息。  它们携带输入参数，这些参数由所有已注册此类信号的对象接收。
+
+@defun dbus-send-signal bus service path interface signal &rest args
+该函数与@code{dbus-call-method}类似。  不同之处在于，没有返回输出参数。
+
+该函数在 D-Bus @var{bus} 上发出 @var{signal}。  @var{bus} 是关键字@code{:system} 或关键字@code{:session}。  另一个对象是否已注册@var{signal}并不重要。
+
+信号可以是单播或广播消息。  对于广播消息，@var{service} 必须是@code{nil}。  否则，@var{service} 是信号作为单播消息发送到的 D-Bus 服务名称。@footnote{For backward compatibility, a broadcast message is also emitted if @var{service} is the known or unique name Emacs is registered at D-Bus @var{bus}.} @var{path} 是发送@var{signal} 的 D-Bus 对象路径。  @var{interface} 是@var{path} 上可用的接口。  它必须提供@var{signal}。
+
+其余参数 @var{args} 作为参数传递给 @var{signal}。  它们被转换为 D-Bus 类型，如@ref{Type Conversion}中所述。  例子：
+
+@lisp
+(dbus-send-signal
+ :session nil dbus-path-emacs
+ (concat dbus-interface-emacs ".FileManager") "FileModified"
+ "/home/albinus/.emacs")
+
+@result{} nil
+@end lisp
+@end defun
+
+@defun dbus-register-signal bus service path interface signal handler &rest args
+通过此函数，应用程序可以在 D-Bus @var{bus} 上注册信号。
+
+@var{bus} 是关键字@code{:system} 或关键字@code{:session}。
+
+@var{service} 是发送 D-Bus 对象使用的 D-Bus 服务名称。  它可以是发送信号的 D-Bus 对象的已知名称或唯一名称。  已知名称将映射到对象的唯一名称，在注册时拥有@var{service}。当对应的D-Bus对象消失时，将不再接收到信号。
+
+@var{path} 是@var{service} 注册的相应 D-Bus 对象路径。  @var{interface}是@var{service}提供的接口。  它必须提供@var{signal}。
+
+@var{service}、@var{path}、@var{interface}和@var{signal}可以是@code{nil}。  这被解释为相应参数的通配符。
+
+@var{handler} 是一个 Lisp 函数，当接收到 @var{signal} 时将被调用。  它必须接受 @var{signal} 正在发送的输出参数作为参数。@footnote{It is possible to register different handlers for the same signal.  All registered handlers will be called when the signal arrives.  This is useful for example if different Lisp packages are interested in the same signal.}
+
+其余参数@var{args}可以是关键字或关键字字符串对。@footnote{For backward compatibility, the arguments @var{args} can also be just strings.  They stand for the respective arguments of @var{signal} in their order, and are used for filtering as well.  A @code{nil} argument might be used to preserve the order.}其含义如下：
+
+@table @code
+@item :arg@var{n} @var{string}
+@item :path@var{n} @var{string}
+这代表信号的第 0 个参数。 @code{:path@var{n}} 参数可用于 D-Bus 指定的对象路径通配符匹配，而 @code{:argN} 参数需要精确匹配。
+
+@item :arg-namespace @var{string}
+注册这些信号，其第一个参数命名命名空间@var{string}内的服务或接口。
+
+@item :path-namespace @var{string}
+注册对象路径命名空间@var{string}。  从对象路径发送的所有信号（其前面的字符串为 @var{string}）都会被匹配。  这要求 @var{path} 为 @code{nil}。
+
+@item :eavesdrop
+如果 BUS 的安全策略允许，则注册不定向到 D-Bus 对象的单播信号 Emacs 会在 D-Bus BUS 上注册。  否则，该参数将被忽略。
+@end table
+
+@code{dbus-register-signal} 返回一个 Lisp 对象，它可以用作 @code{dbus-unregister-object} 中的参数来删除 @var{signal} 的注册。  例子：
+
+@lisp
+(defun my-dbus-signal-handler (device)
+  (message "Device %s added" device))
+
+(dbus-register-signal
+ :system "org.freedesktop.Hal" "/org/freedesktop/Hal/Manager"
+ "org.freedesktop.Hal.Manager" "DeviceAdded"
+ #'my-dbus-signal-handler)
+
+@result{} ((:signal :system "org.freedesktop.Hal.Manager" "DeviceAdded")
+    ("org.freedesktop.Hal" "/org/freedesktop/Hal/Manager"
+     my-signal-handler))
+@end lisp
+
+从接口@samp{org.freedesktop.Hal.Manager}的内省数据中我们知道，信号@samp{DeviceAdded}提供了一个参数，该参数被映射到一个Lisp字符串中。因此，回调函数@code{my-dbus-signal-handler}必须定义单个字符串参数。  将 USB 设备插入您的计算机，在注册信号 @samp{DeviceAdded} 时，将显示 GNU/Linux @code{hal} 守护程序添加了哪些对象。
+
+一些匹配规则已添加到 D-Bus 的更高版本中。为了测试这些功能的可用性，您可以注册一个虚拟信号，并检查结果：
+
+@lisp
+(dbus-ignore-errors
+  (dbus-register-signal
+   :system nil nil nil nil #'ignore :path-namespace "/invalid/path"))
+
+@result{} nil
+@end lisp
+@end defun
+
+
+@node Alternative Buses
+@chapter 替代巴士和环境
+@cindex bus names
+@cindex UNIX domain socket
+@cindex TCP/IP socket
+
+到目前为止，我们已经讨论了系统和会话总线，它们是要连接的默认总线。  但是，可以连接到任何具有已知地址的总线。  这是一个 UNIX 域或 TCP/IP 套接字。  在任何地方，当提到 @var{bus} 作为函数的参数（关键字 @code{:system} 或关键字 @code{:session}）时，都可以使用此地址。  必须首先初始化与该总线的连接。
+
+@defun dbus-init-bus bus &optional private
+该函数建立与 D-Bus @var{bus} 的连接。
+
+@var{bus}可以是关键字@code{:system}或关键字@code{:session}，也可以是表示相应总线地址的字符串。  对于系统和会话总线，该函数在加载@file{dbus.el}时调用，无需再次调用。
+
+如果在还没有可用的 D-Bus 会话总线时调用 Emacs，则可以在会话总线守护程序运行并提供地址后设置环境变量@env{DBUS_SESSION_BUS_ADDRESS}。  调用@code{dbus-init-bus}初始化与会话总线的连接。
+
+@lisp
+(setenv "DBUS_SESSION_BUS_ADDRESS" "unix:path=/run/user/1000/bus")
+
+@result{} "unix:path=/run/user/1000/bus"
+
+(dbus-init-bus :session)
+
+@result{} 2
+@end lisp
+
+@code{dbus-init-bus} 返回此 Emacs 会话在相同唯一名称 (@pxref{dbus-get-unique-name}) 下与 @var{bus} 建立的连接数。  它取决于 Emacs 链接的库以及 Emacs 运行的环境。  例如，如果 Emacs 与 GTK+ 工具包链接，并且它在支持 GTK+ 的环境（如 GNOME）中运行，则可能已经建立了另一个连接。
+
+当 0⁣ 为非 1⁣ 时，将建立一个新连接，而不是重用现有连接。  它会在 @var{bus} 处产生一个新的唯一名称。  如果需要与同一 Emacs 进程中使用的另一个连接（例如 GTK+ 建立的连接）区分开来，则可以使用此方法。  如果@var{bus}是关键字@code{:system}或关键字@code{:session}，则新的私有连接分别由关键字@code{:system-private}或@code{:session-private}标识。
+
+示例：您初始化与主机上 AT-SPI 总线的连接：
+
+@lisp
+(setq my-bus
+      (dbus-call-method
+       :session "org.a11y.Bus" "/org/a11y/bus"
+       "org.a11y.Bus" "GetAddress"))
+
+@result{} "unix:abstract=/tmp/dbus-2yzWHOCdSD,guid=a490dd26625870ca1298b6e10000fd7f"
+
+;; If Emacs is built with GTK+ support, and you run in a GTK+-enabled
+;; environment (like a GNOME session), the initialization reuses the
+;; connection established by GTK+'s atk bindings.
+(dbus-init-bus my-bus)
+
+@result{} 2
+
+(dbus-get-unique-name my-bus)
+
+@result{} ":1.19"
+
+;; Open a new connection to the same bus.  This supersedes the
+;; previous one.
+(dbus-init-bus my-bus 'private)
+
+@result{} 1
+
+(dbus-get-unique-name my-bus)
+
+@result{} ":1.20"
+@end lisp
+
+D-Bus 地址可以指定不同的传输。  可能的地址可以基于 TCP/IP 套接字，请参见下一个示例。  但是，支持哪种传输取决于总线守护程序配置。
+@end defun
+
+@defun dbus-setenv bus variable value
+该函数将 @var{bus} 环境 @var{variable} 的值设置为 @var{value}。
+
+@var{bus} 可以是 Lisp 关键字、@code{:system} 或 @code{:session}，也可以是表示总线地址的字符串。  @var{variable} 和 @var{value} 都应该是字符串。
+
+通常，服务继承总线守护程序的环境。  此功能在激活服务时添加或修改该环境。
+
+某些总线实例（例如 @code{:system}）可能会禁用设置环境。  在这种情况下，或者如果此功能在较旧的 D-Bus 版本中不可用，则此功能会发出 @code{dbus-error} 信号。
+
+例如，可能需要在本地 Emacs 运行的同一 X11 服务器上的远程主机总线上启动支持 X11 的服务。  这可以通过以下方式实现
+
+@lisp
+(setq my-bus "unix:host=example.gnu.org,port=4711")
+
+@result{} "unix:host=example.gnu.org,port=4711"
+
+(dbus-init-bus my-bus)
+
+@result{} 1
+
+(dbus-setenv my-bus "DISPLAY" (getenv "DISPLAY"))
+
+@result{} nil
+@end lisp
+@end defun
+
+
+@node Errors and Events
+@chapter 错误和事件
+@cindex debugging
+@cindex errors
+@cindex events
+
+可以通过在调试模式下运行来跟踪内部操作。
+
+@defvar dbus-debug
+如果此变量为非@code{nil}，则会引发 D-Bus 特定调试消息。
+@end defvar
+
+检查@code{dbus-call-method}、@code{dbus-call-method-asynchronously}、@code{dbus-send-signal}、@code{dbus-register-method}、@code{dbus-register-property} 和@code{dbus-register-signal} 的输入参数是否正确 D-Bus 类型。  如果存在类型不匹配，则会引发 Lisp 错误 @code{wrong-type-argument} @code{D-Bus @var{arg}}。
+
+D-Bus 引发的所有错误均以错误符号 @code{dbus-error} 表示。  如果可能，来自 D-Bus 的错误消息将附加到@code{dbus-error}。
+
+@defspec dbus-ignore-errors forms@dots{}
+这与 @code{progn} 完全相同地执行 @var{forms}，除了在 @var{forms} 期间忽略 @code{dbus-error} 错误（然后宏返回 @code{nil}）。  当@code{dbus-debug}设置为非@code{nil}时，这些错误会变得可见。
+@end defspec
+
+传入的 D-Bus 消息作为 Emacs 事件 @pxref{Misc Events, , , elisp} 进行处理。  仅当 Emacs 以交互模式运行时才会检索它们。  生成的事件具有以下形式：
+
+@lisp
+(dbus-event @var{bus} @var{type} @var{serial} @var{service} @var{destination} @var{path} @var{interface} @var{member}
+            @var{handler} &rest @var{args})
+@end lisp
+
+@var{bus} 标识消息来自的 D-Bus。  它可以是 Lisp 关键字、@code{:system}、@code{:session}、@code{:system-private} 或 @code{:session-private}，也可以是表示总线地址的字符串。
+
+@var{type} 是导致事件的 D-Bus 消息类型。  它可以是 @code{dbus-message-type-invalid}、@code{dbus-message-type-method-call}、@code{dbus-message-type-method-return}、@code{dbus-message-type-error} 或 @code{dbus-message-type-signal}。 @var{serial} 是接收到的 D-Bus 消息的序列号，除非 @var{type} 等于 @code{dbus-message-type-error}。
+
+@var{service} 和 @var{path} 是发出消息的 D-Bus 对象的唯一名称和对象路径。  @var{destination} 是消息专用的 D-Bus 名称，或者 @code{nil} 如果消息是广播信号。
+
+@var{interface}和@var{member}表示已发送的消息。  当@var{type}为@code{dbus-message-type-error}时，@var{member}为错误名称。
+
+@var{handler} 是为此消息注册的回调函数 (@pxref{Signals})。  @var{args} 是从消息返回的类型参数。  当在@code{dbus-handle-event}中的事件处理期间调用@var{handler}时，它们会在没有类型信息的情况下传递给@var{handler}。
+
+为了检查 @code{dbus-event} 数据，您可以扩展 @ref{Signals} 中回调函数的定义：
+
+@lisp
+(defun my-dbus-signal-handler (&rest args)
+  (message "my-dbus-signal-handler: %S" last-input-event))
+@end lisp
+
+存在可以在回调函数内调用的便利函数，以便从事件中检索信息。
+
+@defun dbus-event-bus-name event
+该函数返回@var{event}来自的总线名称。  结果是关键字 @code{:system} 或关键字 @code{:session}。
+@end defun
+
+@defun dbus-event-message-type event
+该函数返回相应D-Bus消息的消息类型。  结果是一个自然数。
+@end defun
+
+@defun dbus-event-serial-number event
+该函数返回相应D-Bus消息的序列号。  结果是一个自然数。
+@end defun
+
+@defun dbus-event-service-name event
+该函数返回 @var{event} 所来自的 D-Bus 对象的唯一名称。
+@end defun
+
+@defun dbus-event-destination-name event
+该函数返回 @var{event} 专用的 D-Bus 对象的唯一名称。
+@end defun
+
+@defun dbus-event-path-name event
+该函数返回 @var{event} 所来自的 D-Bus 对象的对象路径。
+@end defun
+
+@defun dbus-event-interface-name event
+该函数返回 @var{event} 所来自的 D-Bus 对象的接口名称。
+@end defun
+
+@defun dbus-event-member-name event
+该函数返回 @var{event} 来自的 D-Bus 对象的成员名称。  它可以是信号名称或方法名称。
+@end defun
+
+@defun dbus-event-handler event
+该函数返回应用 D-Bus 对象 @var{event} 的处理程序。
+@end defun
+
+@defun dbus-event-arguments event
+该函数返回 D-Bus 对象 @var{event} 所携带的参数。
+@end defun
+
+D-Bus 错误在事件处理期间不会传播，因为通常不需要这样做。  通过将变量 @code{dbus-debug} 设置为非 @code{nil} 可以使事件中的 D-Bus 错误可见。  它们也可以通过钩子函数来处理。
+
+@defvar dbus-event-error-functions
+该钩子变量保存一个函数列表，当事件处理程序中发生 D-Bus 错误时将调用这些函数。  每个函数必须接受两个参数，事件和被@code{dbus-error}捕获在@code{condition-case}中的错误变量。
+
+此类功能可用于调整要引发的误差信号。例子：
+
+@lisp
+(defun my-dbus-event-error-handler (event error)
+  (when (string-equal (concat dbus-interface-emacs ".FileManager")
+                      (dbus-event-interface-name event))
+    (message "my-dbus-event-error-handler: %S %S" event error)
+    (signal 'file-error (cdr error))))
+
+(add-hook 'dbus-event-error-functions #'my-dbus-event-error-handler)
+@end lisp
+@end defvar
+
+挂钩函数应考虑到可能还有其他 D-Bus 应用程序正在运行。  因此，他们应该仔细检查给定的 D-Bus 错误是否与他们相关。
+
+
+@node Monitoring Messages
+@chapter 监控消息
+@cindex monitoring
+
+@defun dbus-register-monitor bus &optional handler &key type sender destination path interface member
+该函数注册 @var{handler} 以监控 D-Bus @var{bus} 上的消息。
+
+@var{bus} 可以是 Lisp 关键字、@code{:system} 或 @code{:session}，也可以是表示总线地址的字符串。
+
+@findex dbus-monitor-handler
+@var{handler} 是当要监视的 D-Bus 事件到达时要调用的函数。  它是通过 D-Bus 事件 (@pxref{Errors and Events}) 的 @var{args} 槽调用的，该槽被剥离了类型关键字。  如果 @var{handler} 是 @code{nil}，则应用默认处理程序 @code{dbus-monitor-handler}。  此默认处理程序的行为类似于 @command{dbus-monitor} 程序。
+
+其他参数是关键字值对。  @code{:type @var{type}} 定义要监控的消息类型。  如果给定，它必须等于字符串 @samp{method_call}、@samp{method_return}、@samp{error} 或 @samp{signal} 之一。
+
+@code{:sender @var{sender}} 和 @code{:destination @var{destination}} 是 D-Bus 名称。  它们可以是唯一的名称，也可以是众所周知的服务名称。
+
+@code{:path @var{path}} 是要监控的 D-Bus 对象。 @code{:interface @var{interface}} 是接口的名称，@code{:member @var{member}} 是方法名称、信号名称或错误名称。
+
+@code{dbus-register-monitor} 返回一个 Lisp 对象，它可以用作 @code{dbus-unregister-object} 中的参数来删除监视器。
+
+下面的表格显示了缓冲区@samp{*D-Bus Monitor*}中会话总线上的所有 D-Bus 事件：
+
+@lisp
+(dbus-register-monitor :session)
+
+@result{} ((:monitor :session-private) (nil nil dbus-monitor-handler))
+@end lisp
+
+这种形式限制了对D-Bus错误的监控：
+
+@lisp
+(dbus-register-monitor :session nil :type "error")
+
+@result{} ((:monitor :session-private) (nil nil dbus-monitor-handler))
+@end lisp
+@end defun
+
+@deffn Command dbus-monitor &optional bus
+该命令交互调用@code{dbus-register-monitor}，并切换到监视器缓冲区。
+@end deffn
+
+
+@node File Descriptors
+@chapter 处理文件描述符
+
+D-Bus API 提供的方法可能会返回文件描述符，必须对其进行进一步处理。  调用方法 (@pxref{dbus-call-method}) 时，这由 @code{:keep-fd} 参数指示。
+
+例如，@uref{https://systemd.io/INHIBITOR_LOCKS/, Systemd}包括禁止系统关闭和睡眠状态的逻辑。  它可以通过接口@samp{org.freedesktop.login1.Manager}@footnote{@uref{https://www.freedesktop.org/software/systemd/man/latest/org.freedesktop.login1.html}}的方法@samp{Inhibit}进行控制。该函数返回一个文件描述符，必须使用该描述符来解锁锁定的资源，其中一些锁定了系统。  为了在内部保留此文件描述符，相应的 D-Bus 方法调用如下所示（@var{what}、@var{who}、@var{why} 和 @var{mode} 是特定于方法的字符串参数）
+
+@lisp
+(dbus-call-method
+ :system
+ "org.freedesktop.login1" "/org/freedesktop/login1"
+ "org.freedesktop.login1.Manager" "Inhibit"
+ :keep-fd WHAT WHO WHY MODE)
+
+@result{} 25
+@end lisp
+
+当从文件系统中删除返回的文件描述符时，禁止锁被解锁。  这在 Lisp 层面上是无法实现的。因此，有函数 @code{dbus--fd-close} 来执行此任务（见下文）。
+
+@strong{Note}：当 Emacs 进程本身终止时，所有此类锁都会被释放。
+
+@strong{Note}：以下函数是 Emacs 的 D-Bus 实现的内部函数。  小心使用它们。
+
+@defun dbus--fd-open filename
+打开@var{filename}并返回相应的只读文件描述符。这是另一个在内部保存文件描述符的函数。  返回的文件描述符可以通过@code{dbus--fd-close}关闭。例子：
+
+@lisp
+(dbus--fd-open "~/.emacs")
+
+@result{} 20
+@end lisp
+@end defun
+
+@defun dbus--fd-close fd
+关闭文件描述符@var{fd}。 @var{fd} 必须是@code{dbus-call-method} 或@code{dbus--fd-open} 调用的结果，请参阅@code{dbus--registered-fds}。  如果成功，则返回 @code{t}；如果无法关闭文件描述符，或者文件描述符已关闭，则返回 @code{nil}。例子：
+
+@lisp
+(dbus--fd-close 25)
+
+@result{} t
+@end lisp
+@end defun
+
+@defun dbus--registered-fds
+返回已注册的文件描述符，一个列表。密钥是一个打开的文件描述符，通过 @code{dbus-call-method} 或 @code{dbus--open-fd} 检索。  该值是字符串 @var{object-path} 或 @var{filename}，表示调用函数时使用的参数。  进一步的操作不需要这些值；它们只是为了提供信息而显示的。
+
+该列表允许检查正在运行的 Emacs 实例的其他包是否也获取了文件描述符。  例子：
+
+@lisp
+(dbus--registered-fds)
+
+@result{} ((20 . "/home/user/.emacs")
+   (25 . "/org/freedesktop/login1"))
+@end lisp
+@end defun
+
+
+@node Flatpak integration
+@chapter 与 Flatpak 集成
+
+@c https://docs.flatpak.org/en/latest/sandbox-permissions.html
+@c TODO: This needs more input.
+
+如果运行 Emacs flatpak 程序，则存在限制。  默认情况下，对会话 D-Bus 的访问受到限制，并且对系统 D-Bus 没有访问权。  您必须允许访问沙箱之外的服务，例如
+
+@example
+# flatpak override --talk-name=org.freedesktop.secrets org.gnu.emacs
+@end example
+
+例如，@samp{org.gnu.emacs} 是 Emacs flatpak 应用程序，@samp{org.freedesktop.secrets} 是您想要与之对话的服务。
+
+使用 @samp{--socket=system-bus} 或 @samp{--socket=session-bus} 访问整个总线会停止过滤，使用它们会带来安全风险。所以必须避免它们。
+
+@c Bug#80977.
+服务名称可能会在到达 Emacs 时进行映射。  例如，即使您已经为另一个命名空间注册了信号，您也会看到服务 @samp{org.freedesktop.portal.Flatpak} 的 @samp{org.freedesktop.DBus.NameOwnerChanged} 信号。
+
+@c TODO: What about portals?
+
+
+@node Index
+@unnumbered 指数
+
+@printindex cp
+
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@bye

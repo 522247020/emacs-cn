@@ -1,0 +1,1503 @@
+\输入 texinfo @c -*- 模式：texinfo；编码：utf-8 -*-
+@c documentation for Ediff
+@c Written by Michael Kifer
+
+@comment %**start of header (This is for running Texinfo on a region.)
+
+@comment Using ediff.info instead of ediff in setfilename breaks DOS.
+@comment @setfilename ediff
+@comment @setfilename ediff.info
+@setfilename ../../info/ediff.info
+
+@settitle 艾迪夫用户手册
+@documentlanguage en
+@include docstyle.texi
+@synindex vr cp
+@synindex fn cp
+@synindex pg cp
+@synindex ky cp
+
+@iftex
+@finalout
+@end iftex
+@c      @smallbook
+@comment %**end of header (This is for running Texinfo on a region.)
+
+@copying
+该文件记录了 Ediff，它是 Unix diff 和补丁实用程序的综合可视化界面。
+
+版权所有 @copyright{} 1995--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* Ediff: (ediff).                用于比较和合并程序的可视化界面。
+@end direntry
+
+@titlepage
+@title 艾迪夫用户手册
+@sp 4
+@subtitle Ediff版本2.81.6
+@sp 1
+@subtitle 2008年11月
+@sp 5
+@author Michael Kifer
+@page
+
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@node Top
+@top 埃迪夫
+
+@insertcopying
+
+@menu
+* Introduction::                 关于艾迪夫。
+* Major Entry Points::           如何使用艾迪夫.
+* Session Commands::             会话中使用的 Ediff 命令。
+* Registry of Ediff Sessions::   跟踪多个 Ediff 会话。
+* Session Groups::               比较和合并目录。
+* Remote and Compressed Files::   您可能想了解这一点。
+* Customization::                如何让 Ediff 按照您想要的方式工作。
+* Credits::                      感谢那些提供帮助的人。
+* GNU Free Documentation License::  本文档的许可证。
+* Index::
+@end menu
+
+@node Introduction
+@chapter 介绍
+
+@cindex Comparing files and buffers
+@cindex Merging files and buffers
+@cindex Patching files and buffers
+@cindex Finding differences
+
+Ediff 提供了一种方便的方法来同时浏览一对（或三个）文件或缓冲区（出于我们的目的，称为 @samp{variants}）之间的差异。  正在比较的文件、文件 A、文件 B 和文件 C（如果适用）显示在单独的窗口中（并排、一个在另一个之上，或在单独的框架中），并且当您逐步浏览它们时，差异会突出显示。  您还可以将差异区域从一个缓冲区复制到另一个缓冲区（如果您改变主意，则可以恢复旧的差异）。
+
+另一个强大的功能是将一对文件合并到第三个缓冲区的能力。  还支持与祖先文件合并（也称为 3way 合并）。此外，Ediff 配备了目录级功能，允许用户方便地启动对两个（或三个）不同目录中的文件组的浏览或合并会话。
+
+此外，Ediff 可以对文件应用补丁，然后让您同时逐个差异地逐步浏览两个文件（已补丁的文件和原始文件）。  您甚至可以直接从邮件缓冲区应用补丁，即，甚至不需要保存通过邮件收到的补丁。  由于 Ediff 允许您复制变体之间的差异，因此您实际上可以有选择地应用补丁（即，您可以将差异区域从 @file{file.orig} 复制到 @file{file}，从而撤消您不喜欢的任何特定补丁）。
+
+Ediff 甚至可以理解多文件补丁并可以交互应用它们！ （Ediff 只能识别上下文格式或 GNU 统一格式的多文件补丁。所有其他补丁都被视为 1 文件补丁。Ediff [希望]使用与 @code{patch} 相同的算法来确定哪些文件需要修补。）
+
+Ediff 支持版本控制，可让您将文件与其旧版本进行比较。  Ediff 还可以处理远程文件和压缩文件，自动通过 ftp 传输它们并解压缩它们。 @xref{Remote and Compressed Files}，了解详情。
+
+这个包建立在从 Emerge 借用的想法之上，Ediff 的一些功能是从 Emerge 改编而来的。  尽管 Ediff 包含并极大地扩展了 Emerge，但 Ediff 中的许多功能都受到 Emerge 的影响。当然，架构和界面是截然不同的。
+
+@node Major Entry Points
+@chapter 主要切入点
+
+当 Ediff 启动时，它会显示一个小的控制窗口，它接受 Ediff 命令，以及两个或三个显示要比较或合并的文件的窗口。  控制窗口可以位于其自己的小框架中，也可以是显示其他缓冲区的较大框架的一部分。  无论如何，当您使用 Ediff 时，控制窗口处于活动状态（即接收击键的窗口）非常重要。  您可以随意切换到其他 Emacs 缓冲区，甚至可以编辑当前正在与 Ediff 进行比较的文件，然后通过激活相应的 Emacs 窗口随时切换回 Ediff。
+
+Ediff 可以使用以下函数以交互方式调用，这些函数可以从迷你缓冲区或菜单栏运行。  在菜单栏中，所有Ediff的入口点都属于“工具”菜单的三个子菜单：“比较”、“合并”和“应用补丁”。
+
+@table @code
+@item ediff-files
+@itemx ediff
+@findex ediff-files
+@findex ediff
+比较两个文件。
+
+@item ediff-backup
+@findex ediff-backup
+将文件与其备份进行比较。  如果有多个数字备份，请使用最新的。  如果文件本身是备份，则将其与原始文件进行比较。
+
+@item ediff-current-file
+@findex ediff-current-file
+将缓冲区与其磁盘上的文件进行比较。  该函数可以用作@code{revert-buffer}的安全版本。
+
+@item ediff-buffers
+@findex ediff-buffers
+比较两个缓冲区。
+
+@item ediff-files3
+@itemx ediff3
+@findex ediff-files3
+@findex ediff3
+比较三个文件。
+
+@item ediff-buffers3
+@findex ediff-buffers3
+比较三个缓冲区。
+
+@item edirs
+@itemx ediff-directories
+@findex edirs
+@findex ediff-directories
+比较两个目录共有的文件。
+@item edirs3
+@itemx ediff-directories3
+@findex edirs3
+@findex ediff-directories3
+比较三个目录共有的文件。
+@item edir-revisions
+@itemx ediff-directory-revisions
+@findex ediff-directory-revisions
+@findex edir-revisions
+比较给定目录中文件的版本。  Ediff 仅选择受版本控制的文件。
+@item edir-merge-revisions
+@itemx ediff-merge-directory-revisions
+@findex edir-merge-revisions
+@findex ediff-merge-directory-revisions
+合并给定目录中的文件版本。  Ediff 仅选择受版本控制的文件。
+@item edir-merge-revisions-with-ancestor
+@itemx ediff-merge-directory-revisions-with-ancestor
+@findex edir-merge-revisions-with-ancestor
+@findex ediff-merge-directory-revisions-with-ancestor
+使用其他版本作为祖先来合并给定目录中的文件版本。  Ediff 仅选择受版本控制的文件。
+
+@item ediff-windows-wordwise
+@findex ediff-windows-wordwise
+逐字比较两个窗口中可见的文本。
+
+@item ediff-windows-linewise
+@findex ediff-windows-linewise
+逐行比较 2 个窗口中可见的文本。
+
+@item ediff-regions-wordwise
+@findex ediff-regions-wordwise
+逐字比较区域。  这些区域可以来自同一缓冲区，甚至可以重叠。  系统将要求您指定包含要比较的区域的缓冲区。  对于每个缓冲区，您还将被要求标记要比较的区域。  注意迷你缓冲区中出现的消息。
+
+@item ediff-regions-linewise
+@findex ediff-regions-linewise
+与@code{ediff-windows-linewise}类似，但逐行比较区域。  更多详情请参见@code{ediff-windows-linewise}。
+
+@item ediff-revision
+@findex ediff-revision
+如果缓冲区正在访问受版本控制的文件，则比较当前缓冲区的版本。
+
+@item ediff-patch-file
+@itemx epatch
+@findex ediff-patch-file
+@findex epatch
+
+修补一个或多个文件，然后进行比较。  如果补丁仅适用于一个文件，Ediff 将调用常规比较会话。  如果是多文件补丁，则将使用会话组界面，用户将能够有选择地修补文件。  @xref{Session Groups}，了解更多详情。
+
+由于补丁可能位于缓冲区或文件中，因此系统会询问您是哪种情况。  为了避免出现此额外提示，您可以使用前缀参数调用此命令。  使用奇数前缀参数，Ediff 假定补丁位于文件中；如果参数为偶数，则假定有一个缓冲区。
+
+请注意，@code{ediff-patch-file} 实际上将使用 @code{patch} 实用程序来更改磁盘上的原始文件。  这并没有那么危险，因为您始终会将文件的原始内容保存在另一个扩展名为 @file{.orig} 的文件中。此外，如果文件受版本控制，那么您始终可以返回到以前的版本之一（请参阅 Emacs 手册中有关版本控制的部分）。
+
+@code{ediff-patch-file} 对于版本控制非常谨慎：如果要修补的文件已签入，那么 Ediff 会提出将其签出，因为如果不这样做，可能会导致下次签出文件时丢失更改。
+
+如果您不打算通过补丁修改文件，而只是想了解补丁的全部内容（并稍后决定），那么 @code{ediff-patch-buffer} 可能是更好的选择。
+
+@item ediff-patch-buffer
+@itemx epatch-buffer
+@findex ediff-patch-buffer
+@findex epatch-buffer
+修补缓冲区，然后进行比较。  正在修补的缓冲区和该缓冲区访问的文件（如果有）被 @emph{not} 修改。  补丁的结果出现在名称以 @emph{_patched} 结尾的其他缓冲区中。
+
+此函数将拒绝将多文件补丁应用于缓冲区。  为此，请使用 @code{ediff-patch-file}（当您希望通过 @code{patch} 实用程序修改原始文件时）。
+
+由于补丁可能位于缓冲区或文件中，因此系统会询问您是哪种情况。  为了避免出现此额外提示，您可以使用前缀参数调用此命令。  使用奇数前缀参数，Ediff 假定补丁位于文件中；如果参数为偶数，则假定有一个缓冲区。
+
+@item ediff-merge-files
+@itemx ediff-merge
+@findex ediff-merge-files
+@findex ediff-merge
+合并两个文件。
+
+@item ediff-merge-files-with-ancestor
+@itemx ediff-merge-with-ancestor
+@findex ediff-merge-files-with-ancestor
+@findex ediff-merge-with-ancestor
+与 @code{ediff-merge} 类似，但具有第三个祖先文件。
+
+@item ediff-merge-buffers
+@findex ediff-merge-buffers
+合并两个缓冲区。
+
+@item ediff-merge-buffers-with-ancestor
+@findex ediff-merge-buffers-with-ancestor
+相同，但与祖先相同。
+
+
+@item edirs-merge
+@itemx ediff-merge-directories
+@findex edirs-merge
+@findex ediff-merge-directories
+合并两个目录共有的文件。
+@item edirs-merge-with-ancestor
+@itemx ediff-merge-directories-with-ancestor
+@findex edirs-merge-with-ancestor
+@findex ediff-merge-directories-with-ancestor
+相同，但使用第三个目录中的文件作为祖先。如果一对文件在祖先目录中没有祖先，您仍然可以在没有祖先的情况下合并它们。
+
+@item ediff-merge-revisions
+@findex ediff-merge-revisions
+合并当前缓冲区访问的文件的两个版本。
+
+@item ediff-merge-revisions-with-ancestor
+@findex ediff-merge-revisions-with-ancestor
+相同，但与祖先相同。
+
+@item ediff-documentation
+@findex ediff-documentation
+调出本手册。
+
+@item ediff-show-registry
+@itemx eregistry
+调出 Ediff 会话注册表。  此功能使您能够快速查找并重新启动活动的 Ediff 会话。
+@end table
+
+当调用上述函数时，系统会提示用户输入所有必要的信息——通常是要比较、合并或修补的文件或缓冲区。  Ediff 试图巧妙地对待这些提示。  例如，在比较/合并文件时，它将提供可见缓冲区作为默认值。  在提示输入文件时，如果用户输入目录，则先前输入的文件名将附加到该目录。  此外，如果变量 @code{ediff-use-last-dir} 不是 @code{nil}，Ediff 将提供先前输入的目录作为默认值（将为每种类型的文件 A、B 或 C 单独维护）。
+@vindex ediff-use-last-dir
+
+所有上述函数都使用 POSIX @code{diff} 或 @code{diff3} 程序来查找两个文件之间的差异。  它们处理 @code{diff} 输出并以方便的形式显示它。  目前，Ediff 只能理解 diff 的纯输出。  不支持诸如@samp{-c}之类的选项，也不支持由不兼容的文件比较程序生成的格式。
+
+函数@code{ediff-files}、@code{ediff-buffers}、@code{ediff-files3}、@code{ediff-buffers3} 首先显示粗略的、基于行的差异区域，如@code{diff} 程序所报告。  差异区域总数和当前差异数量始终显示在控制窗口的模式行中。
+
+由于 @code{diff} 可能会将相当大的文本块报告为不同，即使差异可能仅限于几个单词，甚至是空格或换行符，Ediff 还会进一步 @emph{refines} 区域来指示哪些确切单词不同。  如果唯一的区别在于空白和换行符，Ediff 是这么说的。
+
+在彩色显示屏上，细微的差异会用颜色突出显示；在单色显示器上，它们带有下划线。  @xref{Highlighting Difference Regions}，了解如何自定义此内容的信息。
+
+命令 @code{ediff-windows-wordwise}、@code{ediff-windows-linewise}、@code{ediff-regions-wordwise} 和 @code{ediff-regions-linewise} 对现有 Emacs 缓冲区的部分进行比较。  命令@code{ediff-windows-wordwise}和@code{ediff-regions-wordwise}在非常大的缓冲区上可能会很慢，因为它们基于字而不是行进行比较。 （对大块文本进行逐字比较的成本相对较高。）
+
+要比较非常大的区域，请使用 @code{ediff-regions-linewise}。此命令显示的差异与 @code{ediff-files} 和 @code{ediff-buffers} 非常相似。
+
+函数@code{ediff-patch-file}和@code{ediff-patch-buffer}将补丁应用于文件或缓冲区，然后在适当的文件/缓冲区上运行Ediff，显示差异区域。
+
+入口点@code{ediff-directories}、@code{ediff-merge-directories}等提供了一个方便的接口来比较和合并不同目录中的文件。  用户会看到类似 Dired 的界面，从中可以运行一组相关的 Ediff 会话。
+
+对于版本控制下的文件，@code{ediff-revision} 允许您将当前缓冲区访问的文件与其签入版本之一进行比较。您还可以比较所访问文件的两个签入版本。此外，函数 @code{ediff-directory-revisions}、@code{ediff-merge-directory-revisions} 等允许您通过获取目录并比较（或合并）该目录中文件的版本来运行一组相关的 Ediff 会话。
+
+@node Session Commands
+@chapter 会话命令
+
+所有 Ediff 命令都显示在“快速帮助”窗口中，除非您键入 @kbd{?} 将窗口缩小到仅一行。  您可以通过再次键入 @kbd{?} 重新显示帮助窗口。  下面详细介绍了快速帮助命令。
+
+许多 Ediff 命令采用数字前缀参数。  例如，如果您输入一个数字，例如 3，然后输入 @kbd{j} (@code{ediff-jump-to-difference})，Ediff 将移动到第三个差异区域。  输入 3，然后输入 @kbd{a} (@code{ediff-diff-to-diff}) 将第三个差异区域从变体 A 复制到变体 B@. 同样，输入 4 后跟 @kbd{ra} 将恢复缓冲区 A 中的第四个差异区域（如果之前已通过命令 @kbd{a} 覆盖）。
+
+有些命令也采用负前缀参数。  例如，输入 @kbd{-} 然后输入 @kbd{j} 将使最后一个差异区域成为当前区域。  输入 @kbd{-2} 然后输入 @kbd{j} 使倒数第二个差异区域成为当前区域，依此类推。
+
+如果没有前缀参数，所有命令都对当前选定的差异区域进行操作。  您可以使用下面解释的各种命令将任何不同区域设置为当前区域。
+
+对于某些命令，前缀参数的实际值并不重要。  但是，如果提供的话，前缀参数可以修改命令（参见 @kbd{ga}、@kbd{gb} 和 @kbd{gc}）。
+
+@menu
+* Quick Help Commands::              常用命令。
+* Other Session Commands::           不绑定按键的命令。
+@end menu
+
+@node Quick Help Commands
+@section 快速帮助命令
+@cindex command help
+@cindex important commands
+
+@table @kbd
+@item ?
+@kindex ?
+打开和关闭 Ediff 快速帮助窗口。
+@item G
+@kindex G
+准备一个邮件缓冲区，用于向 Ediff 维护者发送赞扬或诅咒。
+
+@item E
+@kindex E
+打开本手册的顶部节点，您可以在其中找到有关各种 Ediff 功能和高级问题的更多信息，例如自定义、会话组等。
+
+@item v
+@kindex v
+以协调的方式向上滚动缓冲区 A 和 B（以及缓冲区 C，如果适用）。
+@item V
+@kindex V
+向下滚动缓冲区。
+
+@item <
+@kindex <
+同时向左滚动缓冲区。
+@item >
+@kindex >
+将缓冲区向右滚动。
+
+@item wd
+@kindex wd
+保存 diff 实用程序的输出，以供进一步参考。
+
+使用前缀参数，保存 @code{diff} 的纯输出（参见 @code{ediff-diff-program} 和 @code{ediff-diff-options}）。  如果没有参数，它会保存自定义的 @code{diff} 输出（请参阅 @code{ediff-custom-diff-program} 和 @code{ediff-custom-diff-options}）（如果可用）。
+
+@item wa
+@kindex wa
+保存缓冲区 A（如果已修改）。
+@item wb
+@kindex wb
+保存缓冲区 B（如果已修改）。
+@item wc
+@kindex wc
+保存缓冲区 C（如果已修改）（如果您处于同时比较三个文件的会话中）。
+
+@item a
+@kindex a
+@emph{In comparison sessions:} 将当前差异区域（或指定为此命令的数字前缀的区域，或带有 @kbd{C-u} 前缀的 @emph{all} 区域）从缓冲区 A 复制到缓冲区 B@. Ediff 保存缓冲区 B 区域的旧内容；它可以通过命令@kbd{rb}恢复，参见。
+
+@emph{In merge sessions:} 将当前差异区域（或指定为此命令的数字前缀的区域，或带有 @kbd{C-u} 前缀的 @emph{all} 区域）从缓冲区 A 复制到合并缓冲区。  可以通过命令@kbd{r}恢复缓冲区C中该区域的旧内容。
+
+@item b
+@kindex b
+工作原理类似，但将当前差异区域从缓冲区 B 复制到缓冲区 A（在 @emph{comparison sessions} 中）或合并缓冲区（在 @emph{merge sessions} 中）。
+
+Ediff保存了复制过来的差异区域的旧内容；它可以通过比较会话中的命令 @kbd{ra} 和合并会话中的命令 @kbd{r} 恢复。
+
+@item ab
+@kindex ab
+将当前差异区域（或指定为此命令的数字前缀的区域，或带有 @kbd{C-u} 前缀的 @emph{all} 区域）从缓冲区 A 复制到缓冲区 B@. 此（以及接下来的五个）命令仅在同时比较三个文件的会话中启用。  缓冲区 B 中的旧区域被保存并可以通过命令 @kbd{rb} 恢复。
+@item ac
+@kindex ac
+将差异区域从缓冲区 A 复制到缓冲区 C@. 缓冲区 C 中的旧区域被保存，并可以通过命令 @kbd{rc} 恢复。
+@item ba
+@kindex ba
+将差异区域从缓冲区 B 复制到缓冲区 A@. 缓冲区 A 中的旧区域被保存并可以通过命令 @kbd{ra} 恢复。
+@item bc
+@kindex bc
+将差异区域从缓冲区 B 复制到缓冲区 C@. 命令 @kbd{rc} 撤消此操作。
+@item ca
+@kindex ca
+将差异区域从缓冲区 C 复制到缓冲区 A@. 命令 @kbd{ra} 撤消此操作。
+@item cb
+@kindex cb
+将差异区域从缓冲区 C 复制到缓冲区 B@. 命令 @kbd{rb} 撤消此操作。
+
+@item p
+@itemx @key{DEL}
+@kindex p
+@kindex DEL
+使前一个差异区域成为当前差异区域。
+@item n
+@itemx @key{SPC}
+@kindex n
+@kindex SPC
+使下一个差异区域成为当前区域。
+
+@item j
+@itemx -j
+@itemx Nj
+@kindex j
+使第一个差异区域成为当前区域。
+
+@kbd{-j} 使最后一个区域成为当前区域。  输入数字 N，然后 @kbd{j} 使差异区域 N 成为当前区域。  输入 @minus{}N（负数），然后 @kbd{j} 使当前区域为 Last @minus{} N。
+
+@item ga
+@kindex ga
+使当前差异区域最接近缓冲区 A 中的点的位置。
+
+然而，使用前缀参数，Ediff 会将所有变体定位在缓冲区 A 中当前点指示的区域周围：如果该点位于差异区域内，则变体将定位在该差异区域中。  如果该点不在任何差异区域中，则它位于所有变体彼此一致的区域中。  在这种情况下，将定位变体，以便每个变体都显示该区域（一致）。
+@item gb
+@kindex gb
+使当前差异区域最接近缓冲区 B 中的点的位置。
+
+使用前缀参数时，其行为类似于 @kbd{ga}，但相对于缓冲区 B。
+@item gc
+@kindex gc
+@emph{In merge sessions:} 使当前差异区域最接近合并缓冲区中的点。
+
+@emph{In 3-file comparison sessions:} 使当前区域最接近缓冲区 C 中的点。
+
+使用前缀参数时，其行为类似于 @kbd{ga}，但相对于缓冲区 C。
+
+@item !
+@kindex !
+重新计算差异区域，使它们保持最新。  这通常是需要的，因为在 Ediff 会话期间进行各种编辑是很常见的，因此一段时间后，突出显示的差异区域可能不再反映缓冲区之间的实际差异。
+
+@item *
+@kindex *
+强制细化当前差异区域，突出显示缓冲区之间不一致的确切文字。  使用负前缀参数时，取消突出显示当前区域。
+
+如果 Ediff 遇到大于 0 的差异区域，则可能需要进行强制细化。  在这种情况下，Ediff 不会进行自动优化以缩短响应时间。 （Ediff 也不会在哑终端上自动优化，但 @kbd{*} 仍然可以在那里工作。但是，它可以告诉您的唯一有用的信息是差异区域是否仅在空白量方面存在分歧。）
+
+当突出显示的细微差异由于用户编辑而不再是当前的时，此命令也很有用。
+
+@item m
+@kindex m
+在与物理显示器一样宽的框架中显示当前的 Ediff 会话。  这在并排比较文件时很有用。再次键入 @kbd{m} 可恢复框架的原始大小。
+
+@item |
+@kindex |
+切换 Ediff 显示的水平/垂直分割。  当可以并排比较文件时，水平分割很方便。  如果显示文件的框架太窄并且线条被切断，输入 @kbd{m} 可能会有所帮助。
+
+@item @@
+@kindex @@
+切换差异区域的自动细化（即自动突出显示变体之间不同的确切单词）。  在 Emacs 不支持突出显示的设备上，自动优化功能会被关闭。
+
+在慢速机器上，关闭自动优化可能会更有利。  用户始终可以通过键入 @kbd{*} 来强制细化特定差异区域。
+
+@item h
+@kindex h
+在完全突出显示、不突出显示（但计算）精细差异的模式以及使用 @acronym{ASCII} 字符串完成突出显示的模式之间循环。  不真正推荐后者，除非是在哑巴 TTY 上。
+
+@item r
+@kindex r
+恢复合并缓冲区中区域的旧内容。 （如果您使用命令 @kbd{a} 或 @kbd{b} 将缓冲区 A 或 B 中的差异区域复制到合并缓冲区中，Ediff 会保存该区域的旧内容，以防您改变主意。）
+
+此命令仅在合并会话中启用。
+
+@item ra
+@kindex ra
+恢复缓冲区 A 中当前差异区域的旧内容，该内容先前在用户调用以下命令之一时保存：@kbd{b}、@kbd{ba}、@kbd{ca}，参见。  该命令仅在比较会话中启用。
+@item rb
+@kindex rb
+恢复缓冲区 B 中当前差异区域的旧内容，该内容先前在用户调用以下命令之一时保存：@kbd{a}、@kbd{ab}、@kbd{cb}，参见。  该命令仅在比较会话中启用。
+@item rc
+@kindex rc
+恢复缓冲区 C 中当前差异区域的旧内容，该内容先前在用户调用以下命令之一时保存：@kbd{ac}、@kbd{bc}，参见。  此命令仅在 3 文件比较会话中启用。
+
+@item ##
+@kindex ##
+告诉 Edi​​ff 跳过仅在空白和换行数量方面存在分歧的区域。
+
+即使这些区域将被跳过，您仍然可以通过键入区域编号然后按 @kbd{j} 跳转到其中任何一个区域。  再次输入 @kbd{##} 将使 Ediff 恢复到原始状态。
+
+@item #c
+@kindex #c
+@vindex ediff-ignore-case-option
+@vindex ediff-ignore-case-option3
+@vindex ediff-ignore-case
+在 diff 程序中切换区分大小写。  所有差异都会重新计算。区分大小写由变量 @code{ediff-ignore-case-option}、@code{ediff-ignore-case-option3} 和 @code{ediff-ignore-case} 控制，这在其他地方进行了解释。
+
+@item #h
+@itemx #f
+@kindex #f
+@kindex #h
+Ediff 努力改善工作场所无聊的影响...
+
+很多时候，差异是由于相同的替换造成的（例如，单词“foo”到处都被单词“bar”替换）。  如果具有这种无聊差异的区域数量超过了您的容忍阈值，您可能会想告诉 Edi​​ff 完全跳过这些区域（您仍然可以通过命令 @kbd{j} 跳转到它们）。  上述命令 @kbd{#h} 和 @kbd{#f} 很可能会拯救你！
+
+@kbd{#h} 提示您为每个变体指定正则表达式。  从那时起，每个变体的区域与相应的正则表达式匹配的差异区域将被跳过。  （您还可以告诉 Edi​​ff 跳过至少有一个变体与其正则表达式匹配的区域。）
+
+@kbd{#f} 具有双重作用：它专注于与相应正则表达式匹配的区域。  所有其他区域将被跳过。  @xref{Selective Browsing}，了解更多。
+
+@item A
+@kindex A
+切换缓冲区 A@. 中的只读属性 如果文件 A 处于版本控制之下并且已签入，则它会被签出（经过您的许可）。
+@item B
+@kindex B
+切换缓冲区 B@. 中的只读属性 如果文件 B 处于版本控制之下并且已签入，则它会被签出。
+@item C
+@kindex C
+切换缓冲区 C 中的只读属性（在 3 文件比较会话中）。如果文件 C 处于版本控制之下并且已签入，则它会被签出。
+
+@item ~
+@kindex ~
+交换显示缓冲区 A 和 B 的窗口。  如果您同时比较三个缓冲区，则此命令将在缓冲区 A、B 和 C 之间旋转窗口。
+
+@item i
+@kindex i
+显示有关当前 Ediff 会话的各种有用数据。
+@item D
+@kindex D
+在变体上运行 @code{ediff-custom-diff-program} 并显示包含输出的缓冲区。  当您必须将输出发送给妈妈时，这非常有用。
+
+使用前缀参数，显示简单的 @code{diff} 输出。 @xref{Patch and Diff Programs}，了解详情。
+
+@item R
+@kindex R
+显示当前活动的 Ediff 会话列表——Ediff 注册表。然后，您可以通过单击会话记录或将光标放在其上然后键入返回键来重新启动任何会话。
+
+（一些可怜的人留下了太多活跃的 Ediff 会话，以至于他们完全忘记了它们...... @kbd{R} 命令旨在将这些人从最近发现的 Ediff 熟练综合症中拯救出来。）
+
+仅当在 Ediff 控制面板中输入时，键入 @kbd{R} 才会显示 Ediff 注册表。  如果您没有方便的控制面板，请在迷你缓冲区中输入：@kbd{M-x eregistry}。  @xref{Registry of Ediff Sessions}。
+
+@item M
+@kindex M
+显示调用当前 Ediff 会话的会话组缓冲区。 @xref{Session Groups}，有关会话组的更多信息。
+
+@item z
+@kindex z
+暂停当前​​的 Ediff 会话。  （如果您患上了重复性 Ediff 损伤——一种严重但可以治愈的疾病——您必须改变当前的活动。此命令会尽力隐藏所有与 Ediff 相关的缓冲区。）
+
+恢复挂起的 Ediff 会话的最简单方法是通过活动会话的注册表。  @xref{Registry of Ediff Sessions}，了解详情。
+@item q
+@kindex q
+终止此 Ediff 会话。  使用前缀参数（例如@kbd{1q}），询问您是否也想删除变体的缓冲区。修改的文件和合并结果永远不会被删除。
+
+@item %
+@kindex %
+切换 Ediff 缓冲区的缩小范围。  如果您通过命令 @code{ediff-windows-*} 和 @code{ediff-regions-*} 仅比较这些缓冲区的一部分，Ediff 缓冲区可能会缩小，参见。
+
+@item C-l
+@kindex C-l
+恢复通常的 Ediff 窗口设置。  这是恢复 Ediff 会话的最快方法，但仅当该会话的控制面板可见时才有效。
+
+@item $$
+@kindex $$
+在与祖先文件合并时，Ediff 决心通过节省用户大量无效的重复打字来减少用户的磨损。  如果它注意到文件 A 的差异区域与祖先文件中的相同差异区域相同，则合并缓冲区将自动获取从缓冲区 B@. 获取的差异区域。理由是缓冲区 A 中的差异区域与祖先缓冲区中的差异区域一样旧，因此缓冲区 B 中该区域的内容代表真正的更改。
+
+您可能想忽略这种“明显”的合并，并专注于两个文件与祖先“冲突”的不同区域，因为这意味着两个不同的人一直在独立地更改该区域，并且他们对如何做到这一点有不同的想法。
+
+上面的命令通过跳过只有一个变体与祖先冲突但另一个变体与其一致的区域来为您完成此操作。  再次输入 @kbd{$$} 将撤消此设置。
+
+@item $*
+@kindex $*
+当合并具有大量差异的文件时，有时可以方便地跳过您已经决定哪个变体最合适的差异区域。  输入 @kbd{$*} 即可完成此操作。
+
+更准确地说，这会切换检查当前合并是否与其默认设置相同，正如 Ediff 最初决定的那样。  例如，如果 Ediff 根据“combined”策略进行合并，则如果合并区域与缓冲区 A 和 B@. 中的区域组合不同，则将跳过该合并区域（警告：交换缓冲区 A 和 B 会在这方面造成混淆。）如果合并区域被标记为“prefer-A”，则如果该区域与缓冲区 A 中的当前差异区域不同，则该区域将被跳过，等等。
+
+@item /
+@kindex /
+@vindex ediff-show-ancestor
+切换以在 3way 合并中显示祖先文件。您可以通过自定义变量@code{ediff-show-ancestor}永久启用此设置。
+@item &
+@kindex &
+在某些情况下，例如当一个文件在差异区域上与祖先文件一致而另一个文件不同意时，Ediff 知道该怎么做：它将当前差异区域从第二个缓冲区复制到合并缓冲区中。
+
+在其他情况下，正确的行动方针并不是那么明确，Ediff 会使用默认行动。  上面的命令更改了默认操作。默认操作可以是 @samp{default-A}（从缓冲区 A 选择区域）、@samp{default-B}（从缓冲区 B 选择区域）或 @samp{combined}（组合两个缓冲区中的区域）。 @xref{Merging and diff3}，了解更多详情。
+
+命令 @kbd{&} 还会影响合并缓冲区中具有 @samp{default-A}、@samp{default-B} 或 @samp{combined} 状态的区域，前提是它们相对于原始状态没有更改。  例如，如果这样的区域的状态为@samp{default-A}，则将默认操作更改为@samp{default-B}也会将此合并缓冲区的区域替换为缓冲区 B 中的相应区域。
+
+@item s
+@kindex s
+导致合并窗口缩小到最小大小，从而暴露尽可能多的变体缓冲区。  再次输入 @kbd{s} 可恢复该窗口的原始大小。
+
+使用正前缀参数，此命令会扩大合并窗口。例如，如果可能的话，@kbd{4s} 将窗口的大小增加大约 4 行。  如果可能的话，使用负数值参数时，合并窗口的大小会缩小那么多行。  因此，@kbd{-s} 将窗口缩小约 1 行，@kbd{-3s} 缩小约 3 行。
+
+该命令仅用于临时查看；因此，只要在窗口配置中进行任何其他更改，Ediff 都会将窗口 C 恢复为其原始大小。  然而，重新显示 (@kbd{C-l}) 或跳转到另一个差异不会影响窗口 C 的大小。
+
+合并窗口和变体窗口之间的分割由变量 @code{ediff-merge-window-share} 控制，参见。
+
+@item +
+@kindex +
+合并缓冲区 A 和 B 中的差异区域，并将结果复制到合并缓冲区中。  @xref{Merging and diff3}，以及变量@code{ediff-combine-diffs}和@code{ediff-combination-pattern}。
+
+
+@item =
+@kindex =
+您可能会遇到这样的情况：一个文件中的一大块文本已被编辑，然后移动到另一个文件中的不同位置。  在这种情况下，这两块文本不太可能属于同一个差异区域，因此 Ediff 的细化功能将无法告诉您这些文本块内部到底有什么不同。  由于用眼睛盯着大段文字有悖于人性，艾迪夫有一个特殊的命令来帮助降低患白内障的风险。
+
+在其他情况下，当前突出显示的区域可能很大，您可能希望以交互方式协调它们。
+
+所有这些都可以通过上面的命令 @kbd{=} 来完成，该命令比较 Ediff 缓冲区内的区域。  键入 @kbd{=} 创建一个子 Ediff 会话，用于比较缓冲区 A、B 或 C 中的区域，如下所示。
+
+首先，系统会询问您是否要逐字比较当前突出显示的缓冲区之间的细微差异。  如果您接受，子 Ediff 会话将开始使用当前突出显示的区域。  Ediff 会让您跨越单词方面的差异。
+
+如果您拒绝该优惠，系统会要求您选择您选择的区域。
+
+@emph{If you are comparing 2 files or buffers:} Ediff 会要求您选择缓冲区 A 和 B 中的区域。
+
+@emph{If you are comparing 3 files or buffers simultaneously:} Ediff 会要求您选择缓冲区，然后选择这些缓冲区内的区域。
+
+@emph{If you are merging files or buffers (with or without ancestor):} Ediff 会要求您选择哪个缓冲区（A 或 B）与合并缓冲区进行比较，然后选择这些缓冲区中的区域。
+
+@end table
+
+@node Other Session Commands
+@section 其他会话命令
+
+可以从任何 Ediff 会话中调用以下命令，尽管其中一些命令未绑定到密钥。
+
+@table @code
+@item eregistry
+@itemx ediff-show-registry
+@findex eregistry
+@findex ediff-show-registry
+此命令将显示活动 Ediff 会话的注册表。  Ediff 注册表是一个可用于恢复任何活动 Ediff 会话的设备（该会话可能由于用户切换到某些其他活动而被推迟）。  此命令对于在同时运行的多个活动 Ediff 会话之间进行切换也很有用。  函数 @code{eregistry} 是 @code{ediff-show-registry} 的别名。 @xref{Registry of Ediff Sessions}，了解有关此注册表的更多信息。
+
+@item ediff-toggle-multiframe
+@findex ediff-toggle-multiframe
+将显示从多帧模式（其中快速帮助窗口位于单独的帧中）更改为单帧模式（其中所有 Ediff 缓冲区共享同一帧），反之亦然。  有关如何将这两种模式设为默认模式的详细信息，请参阅@code{ediff-window-setup-function}。
+
+也可以从菜单栏调用此功能。  但是，在某些情况下，只有在执行其中一个 Ediff 命令后才会发生更改，例如转到下一个差异或重新显示。
+
+@c --> The below can be revisited once the toolbar has been ported to Emacs:
+@ignore
+@item ediff-toggle-use-toolbar
+@findex ediff-toggle-use-toolbar
+The Ediff toolbar provides quick access to some of the common Ediff
+functions.  This function toggles the display of the toolbar.  If
+invoked from the menubar, the function may take sometimes effect only
+after you execute an Ediff command, such as going to the next
+difference.
+
+@item ediff-use-toolbar-p
+@vindex ediff-use-toolbar-p
+The use of the toolbar can also be specified via the variable
+@code{ediff-use-toolbar-p} (default is @code{t}).  This variable can be set
+only in @file{.emacs}: do @strong{not} change it interactively.  Use the
+function @code{ediff-toggle-use-toolbar} instead.
+@end ignore
+
+@item ediff-revert-buffers-then-recompute-diffs
+@findex ediff-revert-buffers-then-recompute-diffs
+此命令恢复您正在比较的缓冲区并重新计算它们的差异。  当您在进行更改后决定重新开始，或者在某个时刻更改了正在比较的文件但希望放弃此后对比较缓冲区所做的任何更改时，此功能非常有用。
+
+此命令通常在恢复文件之前要求确认。使用前缀参数，它无需询问即可恢复文件。
+
+
+@item ediff-profile
+@findex ediff-profile
+Ediff 有一个公认的原始（但有用）工具来分析 Ediff 的命令。  它是为了 Ediff 维护而设计的——具体来说，是为了让它运行得更快。  函数 @code{ediff-profile} 切换 ediff 命令的分析。
+@end table
+
+@node Registry of Ediff Sessions
+@chapter Ediff 会议登记处
+
+Ediff 维护着所有仍为 @emph{active} 的调用的注册表。  此功能对于在活动的 Ediff 会话之间切换或快速重新启动暂停的 Ediff 会话非常方便。
+
+此活动的焦点是一个名为 @emph{*Ediff Registry*} 的缓冲区。  您可以通过在任何 Ediff 控制缓冲区或会话组缓冲区 (@pxref{Session Groups}) 中键入 @kbd{R} 或在迷你缓冲区中键入 @kbd{M-x eregistry} 来显示此缓冲区。如果任何可见的 Emacs 窗口中都没有显示控件或组缓冲区，则后者将是调出注册表缓冲区的最快方法。如果您习惯于运行多个长时间的 Ediff 会话，并且经常需要暂停、恢复或在它们之间切换，那么将注册表缓冲区永久显示在单独的专用窗口中可能是个好主意。
+
+注册表缓冲区有几个方便的键绑定。例如，单击鼠标按钮 2 或在任何会话记录上键入 @kbd{RET} 或 @kbd{v} 可恢复该会话。注册表缓冲区中的会话记录提供了每个会话的相当完整的描述，因此通常很容易识别要恢复的正确会话。
+
+其他有用的命令绑定到@kbd{SPC}（下一个注册表记录）和@kbd{DEL}（上一个注册表记录）。  还有其他命令，但您不需要记住它们，因为它们列在注册表缓冲区的顶部。
+
+@node Session Groups
+@chapter 会话组
+
+Ediff的几个主要条目对目录进行比较和合并。  输入 @code{ediff-directories}、@code{ediff-directories3}、@code{ediff-merge-directories}、@code{ediff-merge-directories-with-ancestor}、@code{ediff-directory-revisions}、@code{ediff-merge-directory-revisions} 或 @code{ediff-merge-directory-revisions-with-ancestor} 时，用户会看到一个类似 Dired 的缓冲区，其中列出了所涉及目录的公共文件及其大小。  （公共文件列表可以通过正则表达式进一步过滤，系统会提示用户输入该正则表达式。）我们将此缓冲区称为@emph{Session Group Panel}，因为与列出的文件关联的所有 Ediff 会话都将将此缓冲区作为公共焦点。
+
+单击按钮 2 或在描述文件的记录上键入 @kbd{RET} 或 @kbd{v} 会在这些文件上以适当的模式调用 Ediff。  您可以通过在该调用的 Ediff 控制缓冲区中键入 @kbd{M} 来返回与特定 Ediff 调用关联的会话组缓冲区。
+
+会话组缓冲区中有许多命令可用；有些仅适用于某些类型的工作。  相关命令始终列在每个会话组缓冲区的顶部，因此无需记住它们。
+
+在目录比较或合并中，会话组面板仅显示所有涉及的目录共有的文件。  差异保存在单独的 @emph{directory difference buffer} 中，并通过在相应的会话组面板中键入 @kbd{D} 方便地显示。  因此，作为一个额外的好处，Ediff 可以用来比较最多三个目录的内容。
+
+@cindex Directory difference buffer
+有时需要将一些文件从一个目录复制到另一个目录而不退出 Ediff。  如上所述，通过键入 @kbd{D} 显示的 @emph{directory difference buffer} 可以用于此目的。  例如，如果文件位于 Ediff 的目录 A 中，但在 Ediff 的目录 B 中缺失（Ediff 将拒绝覆盖现有文件），则在该文件上键入 @kbd{C} 或单击鼠标按钮 2（必须显示在目录差异缓冲区中）会将该文件从目录 A 复制到目录 B。
+
+会话组面板中的会话记录还标有 @kbd{+}（表示活动会话）和 @kbd{-}（表示已完成会话）。
+
+有时，从组中排除某些会话会很方便。通常，当用户不打算对组中的某些文件运行 Ediff，并且相应的会话记录只会向会话组缓冲区添加混乱时，就会发生这种情况。  为了帮助缓解此问题，用户可以键入 @kbd{h} 将会话标记为排除候选会话，并键入 @kbd{x} 实际隐藏标记的会话。  这些操作是可逆的：使用前缀参数，@kbd{h}取消标记光标下的会话，@kbd{x}将隐藏的会话带入视图（但是@kbd{x}不会取消标记它们，因此用户必须显式取消标记感兴趣的会话）。
+
+组会话还理解命令 @kbd{m}，该命令标记会话以供将来对一组会话进行操作（而不是隐藏）。  目前，唯一的此类组级操作是创建多文件补丁。
+
+@vindex ediff-autostore-merges
+对于为合并文件而创建的组会话，Ediff 可以将所有合并自动存储在一个目录中。  如果@code{ediff-autostore-merges}的值为非@code{nil}，则要求用户指定此类目录。  如果该值为@code{nil}，则不会对合并缓冲区执行任何操作——用户有责任保存它们。  如果该值为@code{t}，系统将询问用户在所有合并作业中保存合并缓冲区的位置，即使是那些不是源自会话组的作业。  如果该值既不是 4⁣ 也不是 5⁣，则如果从会话组调用此合并会话，则保存合并缓冲区 @emph{only}。  此行为在函数 @code{ediff-maybe-save-and-delete-merge} 中实现，该函数是 @code{ediff-quit-merge-hook} 中的钩子。  如有必要，用户可以提供不同的挂钩。
+
+变量 @code{ediff-autostore-merges} 是缓冲区本地的，因此可以基于每个缓冲区进行设置。  因此，使用@code{setq-default}全局更改此变量。
+
+@cindex Multi-file patches
+多文件补丁是多次运行 Unix @code{diff} 命令的串联输出（某些版本的 @code{diff} 让您只需运行一次即可创建多文件补丁）。  Ediff 有助于创建多文件补丁，如下所示。  如果您位于响应 @code{ediff-directories} 或 @code{ediff-directory-revisions} 创建的会话组缓冲区中，则可以标记（通过键入 @kbd{m}）所需的 Ediff 会话，然后键入 @kbd{P} 创建这些标记会话的多文件补丁。然后 Ediff 将显示包含补丁的缓冲区。该补丁是通过在所有标记的单个会话（由文件表示）和会话组（由目录表示）上调用 @code{diff} 生成的。  Ediff 还将递归地下降到任何 @emph{unmarked} 会话组，并在那里搜索标记的会话。  通过这种方式，您可以创建跨越从任何给定目录中生长的文件子树的多文件补丁。
+
+在 @code{ediff-directories} 会话中，只需标记必要的会话就足够了。  在 @code{ediff-directory-revisions} 修订版中，标记的会话也必须处于活动状态，否则 Ediff 将拒绝生成多文件补丁。  这是因为，在后一种样式的会话中，有多种方法可以创建 diff 输出，并且通过在非活动会话上运行 Ediff 更容易处理。
+
+最后但并非最不重要的一点是，通过输入 @kbd{==}，您可以快速找出哪些会话具有相同的条目，因此您不必在这些会话上运行 Ediff。  但是，这只适用于本地未压缩的文件。对于压缩文件或远程文件，此命令不会报告任何内容。同样，您可以使用 @kbd{=h} 标记具有相同条目的会话以进行隐藏，或者使用 @kbd{=m} 标记会话以进行进一步操作。
+
+比较操作@kbd{==}、@kbd{=h}和@kbd{=m}可以递归到子目录以查看它们是否具有相同的内容（因此用户不需要手动进入这些子目录）。  这些命令询问用户是否进行递归下降。
+
+
+
+@node Remote and Compressed Files
+@chapter 远程和压缩文件
+
+Ediff 适用于远程、压缩和加密文件。  Ediff 支持 @file{ange-ftp.el}、@file{jka-compr.el}、@file{uncompress.el} 和 @file{crypt++.el}，但它也可以与其他类似的软件包一起使用。  这意味着您可以比较另一台计算机上的文件，或者可以将补丁应用于另一台计算机上的文件。  甚至补丁本身也可以是远程文件！
+
+当修补压缩或远程文件时，Ediff 不会重命名源文件（与 @code{patch} 实用程序通常所做的不同）。  相反，源文件保留其名称，并将应用补丁的结果放置在附加后缀 @file{_patched} 的临时文件中。一般来说，这适用于使用黑魔法处理的文件，例如特殊的文件名处理程序（ange-ftp和一些压缩和加密包也使用这种方法）。
+
+常规文件由 @code{patch} 实用程序以通常的方式处理，即将原始文件重命名为 ⁣​​1⁣ 并将补丁的结果放入文件源名称中（@file{_orig} 用于 DOS 等系统）。
+
+@node Customization
+@chapter 定制化
+
+Ediff 有一个相当不言自明的界面，在大多数情况下您不需要更改任何内容。  然而，如果需要的话，有大量的工具可以改变默认行为。
+
+大多数定制可以通过在 @file{.emacs} 文件中设置各种变量来完成。  一些自定义（主要是与窗口相关的自定义和外观）可以通过在 @file{.Xdefaults}、@file{.xrdb} 或任何正在使用的 X 资源文件中放置适当的行来完成。
+
+对于后者，请注意 Ediff 定制的 X 资源是“Ediff”、@emph{not}“emacs”。 @xref{Window and Frame Configuration}、@xref{Highlighting Difference Regions}，了解更多详情。  有关如何设置 Emacs X 资源的信息，另请参阅 Emacs 手册。
+
+@menu
+* Hooks::                        通过钩子进行定制。
+* Quick Help Customization::     如何自定义 Ediff 的快速帮助功能。
+* Window and Frame Configuration::   控制 Ediff 显示事物的方式。
+* Selective Browsing::           不同区域的高级浏览。
+* Highlighting Difference Regions::   控制突出显示。
+* Narrowing::                    比较区域、窗口等
+* Refinement of Difference Regions::   如何控制细化过程。
+* Patch and Diff Programs::      更改计算差异和应用补丁的实用程序。
+* Merging and diff3::            如何在合并模式下自定义 Ediff。
+* Support for Version Control::   更改版本控制包。你不太可能这样做。
+* Customizing the Mode Line::    更改 Ediff 中模式线的外观。
+* Miscellaneous::                其他定制。
+* Notes on Heavy-duty Customization::   为大师定制。
+@end menu
+
+@node Hooks
+@section 挂钩
+
+大部分定制可以通过以下钩子完成：
+
+@table @code
+@item ediff-before-setup-hook
+@vindex ediff-before-setup-hook
+在 Ediff 根据自己的喜好重新排列窗口之前运行的挂钩。可用于保存 Windows 配置。
+
+@item ediff-keymap-setup-hook
+@vindex ediff-keymap-setup-hook
+@vindex ediff-mode-map
+该钩子可用于更改 Ediff 键盘映射@code{ediff-mode-map} 中的绑定。  这些挂钩在设置默认绑定后立即运行。普通用户不需要关心这个钩子——它是为构建在 Ediff 之上的其他 Emacs 包的实现者提供的。
+
+@item ediff-before-setup-windows-hook
+@itemx ediff-after-setup-windows-hook
+@vindex ediff-before-setup-windows-hook
+@vindex ediff-after-setup-windows-hook
+这两个钩子在 Ediff 设置其窗口配置之前和之后调用。  每次 Ediff 根据自己的喜好重新排列窗口时，都会运行这些挂钩。  每当检测到用户更改了 Windows 设置时就会发生这种情况。
+
+@item ediff-suspend-hook
+@itemx ediff-quit-hook
+@vindex ediff-suspend-hook
+@vindex ediff-quit-hook
+当您暂停或退出 Ediff 时，这两个钩子就会运行。  它们可用于设置所需的窗口配置、删除 Ediff 退出后不想清理的文件等。
+
+默认情况下， @code{ediff-quit-hook} 持有一个钩子函数 @code{ediff-cleanup-mess} ，它在 Ediff 之后进行清理（在大多数情况下适用）。  您可能不想更改它，但您可能想添加其他挂钩函数。
+
+请记住，在 @code{ediff-cleanup-mess} 开始于 @code{ediff-control-buffer;} 之前执行的钩子在完成时也应将 @code{ediff-control-buffer} 保留为当前缓冲区。在 @code{ediff-cleanup-mess} 之后执行的钩子应该期望当前缓冲区是缓冲区 A 或缓冲区 B@. @code{ediff-cleanup-mess} 不会杀死正在比较或合并的缓冲区（参见下面的 @code{ediff-cleanup-hook}）。
+
+@item ediff-cleanup-hook
+@vindex ediff-cleanup-hook
+该钩子在@code{ediff-quit-hook}之前运行。  这是进行各种清理的好地方，例如删除变体缓冲区。 Ediff 提供了一个辅助函数 @code{ediff-janitor}，您可以从私有钩子函数中调用它。  例如：
+
+@example
+(defun my-ediff-janitor ()
+  (ediff-janitor nil nil))
+(add-hook 'ediff-cleanup-hook #'my-ediff-janitor)
+@end example
+
+@findex ediff-janitor
+如果缓冲区 A、B 和 C（可能）未被修改，则该函数将杀死这些缓冲区。  在合并作业中，缓冲区 C 永远不会被删除。  但是，使用此功能的副作用是您可能无法在两个单独的 Ediff 会话中比较相同的缓冲区：退出其中一个会话也会删除另一个会话中的此缓冲区。
+
+@item ediff-quit-merge-hook
+@vindex ediff-quit-merge-hook
+@vindex ediff-autostore-merges
+@findex ediff-maybe-save-and-delete-merge
+当 Ediff 退出合并作业时，会调用此挂钩。  默认情况下，该值为@code{ediff-maybe-save-and-delete-merge}，这是一个尝试根据@code{ediff-autostore-merges}的值保存合并缓冲区的函数，如下所述。
+
+@item ediff-before-setup-control-frame-hook
+@itemx ediff-after-setup-control-frame-hook
+@vindex ediff-before-setup-control-frame-hook
+@vindex ediff-after-setup-control-frame-hook
+这两个钩子在 Ediff 设置控制框架之前和之后运行。当 Ediff 在多帧模式下运行时（即，当控制缓冲区位于其自己的专用帧中时），它们可用于重新定位 Ediff 控制帧。  请注意，驱动 Ediff 的许多变量都是 Ediff 控制面板 (@code{ediff-control-buffer}) 的本地变量，因此在编写这些钩子时需要特别小心。  查看 @code{ediff-default-suspend-hook} 和 @code{ediff-default-quit-hook} 以了解其中涉及的内容。
+
+@item ediff-startup-hook
+@vindex ediff-startup-hook
+该钩子在 Ediff 启动结束时运行。
+
+@item ediff-select-hook
+@vindex ediff-select-hook
+该钩子在 Ediff 选择下一个差异区域后运行。
+
+@item ediff-unselect-hook
+@vindex ediff-unselect-hook
+此挂钩在 Ediff 取消选择当前差异区域后运行。
+
+@item ediff-prepare-buffer-hook
+@vindex ediff-prepare-buffer-hook
+在安排缓冲区后，立即为每个 Ediff 缓冲区（A、B、C）运行此挂钩。
+
+@item ediff-display-help-hook
+@vindex ediff-display-help-hook
+Ediff 每次在设置帮助消息后都会运行此挂钩。  它可用于更改在 Ediff 之上运行的自定义包的帮助消息。
+
+@item ediff-mode-hook
+@vindex ediff-mode-hook
+该钩子在控制缓冲区中设置 Ediff 模式后立即运行。  这是在创建任何 Ediff 窗口之前完成的。  您可以使用它来设置改变显示外观的局部变量。
+
+@item ediff-registry-setup-hook
+@vindex ediff-registry-setup-hook
+挂钩在为所有活动 Ediff 会话设置注册表后运行。 @xref{Session Groups}，了解详情。
+@item ediff-before-session-group-setup-hook
+@vindex ediff-before-session-group-setup-hook
+挂钩在为一组相关 Ediff 会话设置控制面板之前运行。  例如，可用于保存窗口配置以便稍后恢复。
+@item ediff-after-session-group-setup-hook
+@vindex ediff-after-session-group-setup-hook
+为一组相关的 Ediff 会话设置控制面板后，挂钩将运行。  @xref{Session Groups}，了解详情。
+@item ediff-quit-session-group-hook
+@vindex ediff-quit-session-group-hook
+挂钩在退出会话组之前运行。
+@item ediff-meta-buffer-keymap-setup-hook
+@vindex ediff-meta-buffer-keymap-setup-hook
+@vindex ediff-meta-buffer-map
+挂钩在设置 @code{ediff-meta-buffer-map}（控制元缓冲区中的键绑定的映射）后运行。  由于 1⁣ 是局部变量，因此您可以为不同类型的元缓冲区设置不同的绑定。
+@end table
+
+@node Quick Help Customization
+@section 快速帮助定制
+@vindex ediff-use-long-help-message
+@vindex ediff-control-buffer
+@vindex ediff-startup-hook
+@vindex ediff-help-message
+
+Ediff 使用其控制面板窗口提供快速帮助。  由于此窗口占用了相当大的屏幕空间，因此您可以通过键入 @kbd{?} 将其关闭。  然后控制窗口将缩小到只有一行和模式行，并显示一条简短的帮助消息。
+
+变量 @code{ediff-use-long-help-message} 告诉 Edi​​ff 您使用的是短消息还是长消息。  默认设置为@code{nil}，表示使用短消息。如果您希望 Ediff 默认使用长消息，请将其设置为 @code{t}。  通过在 Ediff Control Buffer 中输入 @kbd{?} ，此属性始终可以交互更改。
+
+如果要更改每个缓冲区的帮助消息的外观，则必须使用 @code{ediff-startup-hook} 来更改变量 @code{ediff-help-message} 的值，该变量是 @code{ediff-control-buffer} 的本地变量。
+
+@node Window and Frame Configuration
+@section 窗框配置
+
+在非图形显示上，Ediff 将内容设置在一帧中，将其分割为一个小控制窗口和缓冲区 A、B 和 C@. 的窗口。这些窗口之间的分割可以是水平或垂直的，可以通过在光标位于控制窗口中时键入 @kbd{|} 来交互更改。
+
+在图形显示上，Ediff 为 Ediff 控制面板设置一个专用框架，然后按如下方式选择窗口： 如果其中一个缓冲区不可见，则它会显示在当前选定的框架中。  如果缓冲区可见，它将显示在可见的帧中。如果根据上述标准，两个缓冲区属于同一帧，那么就这样吧——该帧将由两者共享。  当您输入 @kbd{C-l} (@code{ediff-recenter})、@kbd{p} (@code{ediff-previous-difference})、@kbd{n} (@code{ediff-next-difference}) 等时，相同的算法将起作用。
+
+上述行为还取决于当前框架是否可分割、专用等。不幸的是，本书的页边距太窄，无法呈现这一非凡算法的细节。
+
+所有这一切的结果是您可以比较一帧或不同帧中的缓冲区。  前者是默认完成的，而后者可以通过将缓冲区 A、B（和 C，如果适用）安排在不同的帧中来实现。  Ediff 尊重这些安排，自动适应多帧模式。
+
+Ediff 使用以下变量来设置其控制面板（又名@:“控制缓冲区”，又名@:“快速帮助窗口”）：
+
+@table @code
+@item ediff-control-frame-parameters
+@vindex ediff-control-frame-parameters
+您可以更改或增加此变量，包括字体、颜色等。Ediff 控制面板框架的 X 资源名称是@samp{Ediff}。  在 X-windows 下，您可以使用此名称在 @file{~/.Xdefaults}、@file{~/.xrdb} 或任何正在使用的 X 资源文件中设置首选项。  通常这比直接改变 @code{ediff-control-frame-parameters} 更好。  例如，您可以使用资源 @samp{Ediff*background} 在 @file{~/.Xdefaults} 中指定控制框的颜色。
+
+一般来说，任何与控制帧相关的 X 资源都可以通过前缀 @code{Ediff*} 到达。
+
+@item ediff-control-frame-position-function
+@vindex ediff-control-frame-position-function
+指定控制框位置的首选方法是将变量 0⁣ 设置为适当的函数。该变量的默认值为@code{ediff-make-frame-position}。  该函数将控制帧放置在显示缓冲区 A 的帧的东北角附近。
+
+@findex ediff-make-frame-position
+@end table
+
+以下变量可用于调整 @code{ediff-make-frame-position} 产生的位置并进行相关定制。
+
+@table @code
+@item ediff-narrow-control-frame-leftward-shift
+@vindex ediff-narrow-control-frame-leftward-shift
+指定当控制框显示为小窗口时，控制框从 A 框最右边缘移动的字符数。
+
+@item ediff-wide-control-frame-rightward-shift
+@vindex ediff-wide-control-frame-rightward-shift
+指定当控制框显示完整选项菜单时，控制框从 A 框的左边缘向右移动。
+
+@item ediff-control-frame-upward-shift
+@vindex ediff-control-frame-upward-shift
+指定控制框向上移动的像素数。
+
+@item ediff-prefer-iconified-control-frame
+@vindex ediff-prefer-iconified-control-frame
+如果此变量为 @code{t}，则当您关闭快速帮助消息时，控制框会自动图标化。  这节省了屏幕上宝贵的空间。  切换回帮助将取消控制框架的图标。
+
+要使用图标化控制面板启动 Ediff，您应该将此变量设置为 @code{t} 并将 @code{ediff-prefer-long-help-message} 设置为 @code{nil} (@pxref{Quick Help Customization})。  仅当允许图标接受键盘输入（这取决于窗口管理器和其他因素）时，此行为才有用。
+@end table
+
+@findex ediff-setup-windows
+要对 Ediff 设置窗口的方式进行更多创造性的更改，您可以重写函数 @code{ediff-setup-windows}。  然而，我们相信将 Ediff 控制面板与其余部分分离并将其放入一个单独的框架中可以提供一个重要的机会，允许您图标化该框架。  该图标通常会接受所有 Ediff 命令，但会释放屏幕上宝贵的空间（但这可能取决于您的窗口管理器）。
+
+以下变量控制窗口的设置方式：
+
+@table @code
+@item ediff-window-setup-function
+@vindex ediff-window-setup-function
+多帧设置是通过 @code{ediff-setup-windows-multiframe} 函数完成的，这是窗口显示的默认设置。  简单的设置，即所有窗口始终位于一帧中，是通过 @code{ediff-setup-windows-plain} 完成的，这是非图形显示（或 xterm 窗口）上的默认设置。  事实上，在 Emacs 下，您可以通过使用菜单栏的 Minibuffer 执行命令 @code{ediff-toggle-multiframe} 在这两种设置之间自由切换。
+@findex ediff-setup-windows-multiframe
+@findex ediff-setup-windows-plain
+@findex ediff-toggle-multiframe
+
+如果您不喜欢这些设置，请编写您自己的函数。  有关基本准则，请参阅 @code{ediff-window-setup-function} 的文档。  然而，编写窗口设置并不容易，因此您应该首先仔细查看@code{ediff-setup-windows-plain}和@code{ediff-setup-windows-multiframe}。
+@end table
+
+您可以通过多次调用 Ediff 来一次运行多个 Ediff 会话，而无需退出以前的 Ediff 会话。  不同的会话甚至可以对同一对文件进行操作。
+
+每个会话都有自己的 Ediff 控制面板，并且所有与特定会话相关的内容都位于关联控制面板缓冲区的本地。  您可以通过暂停一个会话然后切换到另一个控制面板来在会话之间进行切换。  （不同的控制面板缓冲区通过数字后缀来区分，例如@samp{Ediff Control Panel<3>}。）
+
+@node Selective Browsing
+@section 选择性浏览
+
+有时，能够仅单步执行某些差异区域（即与某些正则表达式匹配的区域）并忽略所有其他区域会很方便。  在其他情况下，您可能希望忽略与某些正则表达式匹配的差异区域，而只查看其余区域。
+
+命令 @kbd{#f} 和 @kbd{#h} 可以让您准确地执行此操作。
+
+键入 @kbd{#f} 可以指定与您想要关注的不同区域相匹配的正则表达式。我们将这些正则表达式称为@var{regexp-A}、@var{regexp-B} 和@var{regexp-C}。然后，Ediff 将开始仅逐步遍历缓冲区 A 中的区域匹配 @var{regexp-A} 和/或缓冲区 B 中的区域匹配 @var{regexp-B} 等的差异区域。是否使用“and”或“or”取决于您如何回答问题。
+
+当扫描上述正则表达式的差异区域时，Ediff 将缓冲区缩小到这些区域。  这意味着您可以使用表达式 @kbd{\`} 和 @kbd{\'} 将搜索与差异区域的开头或结尾联系起来。
+
+另一方面，输入 @kbd{#h} 可以让您指定（隐藏）不感兴趣的区域。  也就是说，如果缓冲区 A 中的差异区域匹配 @var{regexp-A}，缓冲区 B 中的相应区域匹配 @var{regexp-B} 并且（如果适用）缓冲区 C 的区域匹配 @var{regexp-C}，则该区域将被命令 @kbd{n}/@key{SPC} (@code{ediff-next-difference}) 和 @kbd{p}/@key{DEL} (@code{ediff-previous-difference}) 命令忽略。
+
+键入 @kbd{#f} 和 @kbd{#h} 可打开和关闭选择性浏览。
+
+请注意，选择性浏览仅影响@code{ediff-next-difference}和@code{ediff-previous-difference}，即命令@kbd{n}/@key{SPC}和@kbd{p}/@key{DEL}。  @kbd{#f} 和 @kbd{#h} 不会更改缓冲区中点的位置。  您仍然可以直接跳转（使用@kbd{j}）到任何编号的差异。
+
+用户可以提供自己的函数来指定 Ediff 如何进行选择性浏览。  要更改默认的 Ediff 函数，请使用如下所示的内容：
+
+@example
+(with-eval-after-load 'ediff
+  (setq ediff-hide-regexp-matches-function 'your-hide-function)
+  (setq ediff-focus-on-regexp-matches-function 'your-focus-function))
+@end example
+
+@strong{Useful hint}：要指定匹配所有内容的正则表达式，不要简单地键入 @key{RET} 来响应提示。  输入 @key{RET} 告诉 Edi​​ff 接受默认值，这可能不是您想要的。  相反，您应该输入类似 @kbd{^} 或 @kbd{$} 的内容。  这些匹配每一行。
+
+您可以使用状态命令 @kbd{i} 来查明选择性浏览当前是否有效。
+
+您指定的正则表达式保存在局部变量 @code{ediff-regexp-focus-A}、@code{ediff-regexp-focus-B}、@code{ediff-regexp-focus-C}、@code{ediff-regexp-hide-A}、@code{ediff-regexp-hide-B}、@code{ediff-regexp-hide-C} 中。  它们的默认值是空字符串（即没有隐藏或关注任何内容）。  要更改默认值，请使用 @code{setq-default} 在 @file{.emacs} 中设置这些变量。
+
+除了能够忽略与正则表达式匹配的区域之外，还可以命令 Ediff 开始跳过某些“无趣”的差异区域。  这是由以下变量控制的：
+
+@table @code
+@item ediff-ignore-similar-regions
+@vindex ediff-ignore-similar-regions
+如果@code{t}，则导致 Ediff 跳过“无趣”差异区域，这些区域中的变体仅在空白和换行符数量上有所不同。  可以通过命令@kbd{##}交互式地打开/关闭此功能。
+@end table
+
+@strong{Please note:} 为了使此功能发挥作用，必须启用差异区域的自动细化，否则 Ediff 将不知道区域之间是否存在细微差异。  在 Emacs 可以显示面孔的设备上，自动优化是默认设置，但在纯文本终端上默认情况下不会打开它。  在这种情况下，您必须显式打开自动优化（例如，通过键入 @kbd{@@}）。
+
+@strong{Reassurance:} 如果连续出现许多这样的无趣区域，Ediff 可能需要很长时间才能跳过它们，因为它必须计算所有中间区域的精细差异。  这种延迟并不表示有任何问题。
+
+@vindex ediff-ignore-case-option
+@vindex ediff-ignore-case-option3
+@vindex ediff-ignore-case
+最后，可以告诉 Edi​​ff 忽略字母的大小写。  此行为可以使用 @kbd{#c} 进行切换，并由三个变量控制：@code{ediff-ignore-case-option}、@code{ediff-ignore-case-option3} 和 @code{ediff-ignore-case}。
+
+变量 @code{ediff-ignore-case-option} 指定传递给 diff 程序以比较两个文件或缓冲区的选项。  对于 GNU @code{diff}，此选项是 @code{"-i"}。  变量 @code{ediff-ignore-case-option3} 指定传递给 @code{diff3} 程序的选项，以使其不区分大小写。  GNU@code{diff3}没有这样的选项，因此当使用此程序合并或比较三个文件时，不支持忽略字母大小写。
+
+变量 @code{ediff-ignore-case} 控制 Ediff 是否从忽略字母大小写开始。  可以使用 @code{setq-default} 在 @file{.emacs} 中设置。
+
+当切换区分大小写时，所有差异区域都会重新计算。
+
+@node Highlighting Difference Regions
+@section 突出显示差异区域
+
+以下变量控制 Ediff 突出显示不同区域的方式：
+
+@table @code
+@item ediff-before-flag-bol
+@itemx ediff-after-flag-eol
+@itemx ediff-before-flag-mol
+@itemx ediff-after-flag-mol
+@vindex ediff-before-flag-bol
+@vindex ediff-after-flag-eol
+@vindex ediff-before-flag-mol
+@vindex ediff-after-flag-mol
+这些变量保存 Ediff 用来标记在 Emacs 无法显示面孔的设备上的文件 A、B 和 C 中发现的差异的开始和结束的字符串。  Ediff 使用不同的标志来突出显示在行的开头/结尾或行的中间开始/结束的区域。
+
+@item ediff-current-diff-face-A
+@itemx ediff-current-diff-face-B
+@itemx ediff-current-diff-face-C
+@vindex ediff-current-diff-face-A
+@vindex ediff-current-diff-face-B
+@vindex ediff-current-diff-face-C
+Ediff 使用这些面孔来突出显示 Emacs 可以显示面孔的设备上当前的差异。  这些面和随后描述的面可以设置在 0⁣ 或 @file{.Xdefaults} 中。  Ediff 的 X 资源是 @samp{Ediff}、@emph{not} @samp{emacs}。  有关如何设置 X 资源的信息，请参阅 Emacs 手册。
+@item ediff-fine-diff-face-A
+@itemx ediff-fine-diff-face-B
+@itemx ediff-fine-diff-face-C
+@vindex ediff-fine-diff-face-A
+@vindex ediff-fine-diff-face-B
+@vindex ediff-fine-diff-face-C
+Ediff 使用这些面分别显示缓冲区 A、B 和 C 中当前差异区域之间的细微差异。
+
+@item ediff-even-diff-face-A
+@itemx ediff-even-diff-face-B
+@itemx ediff-even-diff-face-C
+@itemx ediff-odd-diff-face-A
+@itemx ediff-odd-diff-face-B
+@itemx ediff-odd-diff-face-C
+@vindex ediff-even-diff-face-A
+@vindex ediff-even-diff-face-B
+@vindex ediff-even-diff-face-C
+@vindex ediff-odd-diff-face-A
+@vindex ediff-odd-diff-face-B
+@vindex ediff-odd-diff-face-C
+使用这些交替面来显示非当前差异区域。  在单色显示器上，奇数面和偶数面实际上是相同的，因为没有颜色，选项是有限的。因此，Ediff 使用斜体来突出显示非当前差异。
+
+@item ediff-force-faces
+@vindex ediff-force-faces
+Ediff 通常可以检测到 Emacs 何时在可以使用面部突出显示的设备上运行。  但是，如果无法确定可以使用面部，用户可以将此变量设置为@code{t}，以确保 Ediff 使用面部来突出显示差异。
+
+@item ediff-highlight-all-diffs
+@vindex ediff-highlight-all-diffs
+指示在窗口显示上，Ediff 是否应使用插入的字符串（如在纯文本终端上）或使用颜色和突出显示来突出显示差异。  通常，Ediff 会突出显示所有差异，但所选差异会更明显地突出显示。  您可以通过输入 @kbd{h} 来循环切换各种突出显示模式。  默认情况下，Ediff 以突出显示所有差异区域的模式启动。  如果您希望以未突出显示未选定差异的模式开始，则应将 @code{ediff-highlight-all-diffs} 设置为 @code{nil}。  输入 @kbd{h} 恢复所有差异的突出显示。
+
+Ediff 允许您在两种突出显示模式之间切换。  也就是说，您可以交互地从使用面孔突出显示到使用字符串标志突出显示，然后再切换回来。  当然，切换只有在窗口系统下才有效。  在纯文本终端或 xterm 窗口中，唯一可用的选项是使用字符串突出显示。
+@end table
+
+@noindent
+如果您想更改 @code{ediff-force-faces} 和 @code{ediff-highlight-all-diffs} 的默认设置，则必须在 @strong{before} Ediff 加载后执行此操作。
+
+您还可以更改用于突出显示差异区域的面的默认值。  有两种方法可以做到这一点。  最简单且首选的方法是使用可从菜单栏访问的自定义小部件。  Ediff 的自定义组位于“工具”下，而“工具”又位于“编程”下。  用于突出显示差异区域的面位于 Ediff 自定义组的“突出显示”子组中。
+
+第二种更神秘的改变默认面孔的方法是在 @file{~/.emacs} 中包含一些 Lisp 代码。  例如，
+
+@example
+(setq ediff-current-diff-face-A
+      (copy-face 'bold-italic 'ediff-current-diff-face-A))
+@end example
+
+@noindent
+将使用预定义的面 @code{bold-italic} 来突出显示缓冲区 A 中的当前差异区域（顺便说一句，该面不是一个好的选择）。
+
+如果您对默认面的 @emph{some} 方面不满意，可以在加载 Ediff 时使用 @code{with-eval-after-load} 修改它们。  例如：
+
+@smallexample
+(with-eval-after-load 'ediff
+  (set-face-foreground
+    ediff-current-diff-face-B "blue")
+  (set-face-background
+    ediff-current-diff-face-B "red")
+  (make-face-italic ediff-current-diff-face-B))
+@end smallexample
+
+@node Narrowing
+@section 缩小范围
+
+如果正在比较的缓冲区在调用 Ediff 时缩小，@code{ediff-buffers} 将保留缩小范围。  但是，如果对这些缓冲区访问的文件调用 @code{ediff-files} ，则会扩大缓冲区，因为该命令被定义为比较整个文件。
+
+调用 @code{ediff-regions-linewise} 或 @code{ediff-windows-linewise} 或相应的 @samp{-wordwise} 命令，将变体缩小到正在比较的特定区域。  当您退出 Ediff 时，将恢复原来的可访问范围。  在命令期间，您可以使用 @kbd{%} 命令打开和关闭此缩小范围。
+
+这两个变量控制这种缩小行为：
+
+@table @code
+@item ediff-start-narrowed
+@vindex ediff-start-narrowed
+如果@code{t}，当使用@samp{ediff-regions@dots{}}或@samp{ediff-windows@dots{}}命令调用时，Ediff会将显示缩小到适当的范围。  如果是@code{nil}，这些命令不会自动缩小范围，但您仍然可以通过键入@kbd{%}来打开和关闭缩小范围。
+
+@item ediff-quit-widened
+@vindex ediff-quit-widened
+控制退出 Ediff 时是否应恢复当前调用之前存在的可访问范围。
+@end table
+
+@node Refinement of Difference Regions
+@section 差异区域细化
+
+Ediff 有变量来控制细微差异的突出显示方式。  此功能使您可以控制优化过程。请注意，细化会忽略空格、制表符和换行符。
+
+@table @code
+@item ediff-auto-refine
+@vindex ediff-auto-refine
+该变量控制是否自动突出显示区域内的细微差异（“自动细化”）。  默认值为“是”(@samp{on})。
+
+在一台慢速机器上，自动优化可能会很痛苦。  在这种情况下，您可以通过键入 @kbd{@@} 以交互方式打开或关闭自动优化。  您还可以关闭已完成精炼的显示。
+
+当自动细化关闭时，仅显示之前已计算并保存这些差异的区域的精细差异。  如果自动精炼和精炼显示都关闭，则根本不会显示精细差异。
+
+键入 @kbd{*} 会计算并显示当前差异区域的精细差异，无论是否打开自动细化。
+
+@item ediff-auto-refine-limit
+@vindex ediff-auto-refine-limit
+如果打开自动细化，此变量会限制要自动细化的区域的大小。  这可以防止由于异常大的差异区域可能导致的可能的减速。
+
+您始终可以通过输入 @kbd{*} 来细化当前区域。
+
+@item ediff-forward-word-function
+@vindex ediff-forward-word-function
+该变量控制如何计算精细差异。  该值必须是一个 Lisp 函数，用于确定当前差异区域应如何分割为单词。
+
+@vindex ediff-diff-program
+@vindex ediff-forward-word-function
+@findex ediff-forward-word
+精细差异的计算方法是首先将当前差异区域分割为单词，然后将结果传递给@code{ediff-diff-program}。  对于默认的前向单词函数（@code{ediff-forward-word}），单词是由字母、@samp{-}或@samp{_}组成的字符串；一串标点符号；一串数字，或由既不是空格也不是字母的符号组成的字符串。
+
+此默认行为由四个变量控制：@code{ediff-word-1}、...、@code{ediff-word-4}。  有关如何修改这些变量的说明，请参阅这些变量和函数 @code{ediff-forward-word} 的在线文档。
+@vindex ediff-word-1
+@vindex ediff-word-2
+@vindex ediff-word-3
+@vindex ediff-word-4
+@end table
+
+有时，当一个区域的变体之间存在太多差异时，突出显示细微差异会很不方便，尤其是在彩色显示器上。  如果是这种情况，请键入带有负前缀参数的 @kbd{*}。  这凸显了当前地区的细微差异。
+
+要取消突出显示所有差异区域中的细微差异，请使用命令 @kbd{@@}。  重复键入该键会在三种不同状态之间循环：自动细化、不自动细化和不突出显示细微差异。
+
+@node Patch and Diff Programs
+@section 补丁和差异程序
+
+本节描述指定用于应用补丁和计算主要差异区域（而不是精细差异区域）的程序的变量：
+
+@table @code
+@item ediff-diff-program
+@itemx ediff-diff3-program
+@vindex ediff-patch-program
+@vindex ediff-diff-program
+@vindex ediff-diff3-program
+这些变量指定用于产生差异和进行修补的程序。
+
+@item ediff-diff-options
+@itemx ediff-diff3-options
+@vindex ediff-patch-options
+@vindex ediff-diff-options
+@vindex ediff-diff3-options
+这些变量指定传递给上述实用程序的选项。
+
+在@code{ediff-diff-options}中，指定诸如@samp{-w}之类的忽略某些类型更改的选项可能很有用。  然而，Ediff 不允许您使用选项 @samp{-c}，因为它还不能识别这种格式。  （如果更改此变量，应通过自定义界面完成，而不是直接使用@code{setq}。）
+
+@item ediff-coding-system-for-read
+@vindex ediff-coding-system-for-read
+该变量指定读取程序 @code{diff3} 和 @code{diff} 发送到 Emacs 的输出时要使用的编码系统。  默认值为@code{raw-text}，这在 Unix 中应该可以正常工作，并且在大多数情况下在 Windows NT/98/2000 下应该可以正常工作。  有 @code{diff} 程序的默认选项在 Windows 下不起作用。  在这种情况下，@code{raw-text-dos} 可能会起作用。  如果没有，您将不得不尝试其他编码系统或使用 GNU diff。
+
+@item ediff-patch-program
+用于应用补丁的程序。  由于不同版本的补丁程序之间存在一定的不兼容性，因此避免麻烦的最佳方法是使用 GNU 兼容版本。否则，您可能需要调整变量 @code{ediff-patch-options}、@code{ediff-backup-specs} 和 @code{ediff-backup-extension} 的值，如下所述。
+@item ediff-patch-options
+传递给@code{ediff-patch-program}的选项。
+
+注意：@option{-b}和@option{-z}选项应在@code{ediff-backup-specs}中指定，而不是在@code{ediff-patch-options}中指定。
+
+建议将 @option{-f} 选项传递给补丁程序，这样它就不会提出问题。  但是，某些实现不接受此选项，在这种情况下，应更改此变量的默认值。
+
+@item ediff-backup-extension
+补丁程序使用的备份扩展。  必须指定，即使给出了@code{ediff-backup-specs}。
+@item ediff-backup-specs
+传递给补丁程序的备份指令。 Ediff 要求将文件的旧版本（在应用补丁之前）保存在名为 @file{the-patch-file.@var{extension}} 的文件中。通常@var{extension}是@file{.orig}，但这可以由用户更改，并且也可能取决于系统。  因此，Ediff需要知道补丁程序使用的备份扩展名。
+
+某些版本的补丁程序允许用户指定 @option{-b @var{extension}} 来指定备份文件扩展名。  其他版本仅允许@option{-b}，它（通常）采用扩展名@file{.orig}。  还有一些人强迫你使用@option{-z@var{extension}}。
+
+@code{ediff-backup-extension} 和 @code{ediff-backup-specs} 都必须正确设置。  如果您的补丁程序采用选项 @option{-b}，但不采用 @option{-b @var{extension}}，则仍必须设置变量 @code{ediff-backup-extension}，以便 Ediff 知道要使用哪个扩展。
+
+@item ediff-custom-diff-program
+@itemx ediff-custom-diff-options
+@vindex ediff-custom-diff-program
+@vindex ediff-custom-diff-options
+@findex ediff-save-buffer
+由于 Ediff 限制了您可能想要传递给 @code{diff} 程序的选项，因此它允许您以首选格式保存 @code{diff} 的输出（通过上述两个变量指定），从而部分弥补了这一缺陷。
+
+Ediff 不使用 @code{ediff-custom-diff-program} 生成的输出（甚至不必是标准样式 @code{diff}！）@:。  它是专门提供的，以便您稍后参考、通过电子邮件发送等。例如，在查看差异后，您可能希望将上下文差异发送给同事。由于 Ediff 忽略 @code{ediff-diff-program} 中的 @samp{-c} 选项，因此您必须单独运行 @code{diff -c} 才能生成差异列表。  幸运的是，@code{ediff-custom-diff-program}和@code{ediff-custom-diff-options}通过在缓冲区中以所需格式保存差异列表的副本来消除这种麻烦，该缓冲区可以通过命令@kbd{D}显示。
+
+@item ediff-patch-default-directory
+@vindex ediff-patch-default-directory
+指定查找补丁的默认目录。
+
+@end table
+
+@node Merging and diff3
+@section 合并和差异3
+
+Ediff 通过函数 @code{ediff-files3} 和 @code{ediff-buffers3} 支持三向比较。  接口与双向比较的接口相同。在三向比较和合并中，Ediff 报告是否有任何两个差异区域相同。  例如，如果缓冲区 A 中的当前区域与缓冲区 C 中的区域相同，则缓冲区 A 的模式行将显示 @samp{[=diff(C)]}，缓冲区 C 的模式行将显示 @samp{[=diff(A)]}。
+
+合并是根据以下算法完成的。
+
+如果其中一个缓冲区（例如 B）中的差异区域与祖先文件不同，而另一个缓冲区 A 中的区域则不然，则合并缓冲区 C 将获取 B 的区域。  同样，当缓冲区 A 的区域与祖先区域不同而 B 的区域不同时，将使用 A 的区域。
+
+@vindex ediff-default-variant
+如果缓冲区 A 和 B 中的两个区域都与祖先文件不同，Ediff 将根据变量 @code{ediff-default-variant} 的值选择区域。  如果其值为@code{default-A}，则选择 A 的区域。  如果是 2⁣ 则选择 B 的区域。如果是 @code{combined} 那么缓冲区 C 中的区域将如下所示：
+
+@comment Use @set to avoid triggering merge conflict detectors like CVS.
+@set seven-left <<<<<<<
+@set seven-right >>>>>>>
+@example
+@value{seven-left} variant A
+the difference region from buffer A
+@value{seven-right} variant B
+the difference region from buffer B
+####### Ancestor
+the difference region from the ancestor buffer, if available
+======= end
+@end example
+
+以上是合并区域的默认模板。  用户可以使用变量@code{ediff-combination-pattern}自定义此模板。
+
+@vindex ediff-combination-pattern
+变量 @code{ediff-combination-pattern} 指定确定组合合并区域的外观的模板。  该模板表示为 @code{(STRING1 Symbol1 STRING2 Symbol2 STRING3 Symbol3 STRING4)} 形式的列表。  这里的符号必须是@code{A}、@code{B}或@code{Ancestor}形式的原子。  它们确定相应差异区域（来自缓冲区 A、B 和祖先缓冲区）在缓冲区 C@. 的合并区域中显示的顺序。模板中的字符串确定分隔上述区域的文本。  默认模板是
+
+@smallexample
+("@value{seven-left} variant A" A "@value{seven-right} variant B" B
+   "####### Ancestor" Ancestor "======= end")
+@end smallexample
+
+@noindent
+（这是一根长线），相应的组合区域如上所示。  可以通过更改上述模板来更改区域的显示顺序（以及分隔符字符串）。  甚至可以在此模板中添加或删除区域说明符（尽管唯一可能有用的此类修改似乎是删除祖先）。
+
+除了差异的状态之外，Ediff 还显示每个区域的合并状态。  如果默认情况下差异来自缓冲区 A（因为区域 A 和 B 都与祖先不同，并且 @code{ediff-default-variant} 设置为 @code{default-A}），则 @samp{[=diff(A) default-A]} 将显示在模式行中。  如果缓冲区 C 中的差异来自缓冲区 B，因为该缓冲区中的差异区域与祖先不同，但缓冲区 A 中的区域则不然（如果与祖先合并），则显示 @samp{[=diff(B) prefer-B]}。  default-A/B和prefer-A/B指标受到Emerge的启发，具有相同的含义。
+
+合并状态的另一个指标是@samp{combined}。  它与缓冲区 C 中的任何差异区域一起出现，该差异区域是通过如上所述组合缓冲区 A 和 B 中的差异区域而获得的。
+
+除了合并状态和差异状态指示器之外，在与祖先文件或缓冲区合并时，Ediff 会通过 @emph{AncestorEmpty} 指示器通知用户（通常不可见）祖先缓冲区中的当前差异区域为空。  这有助于确定变体 A 和 B 中对原始文本所做的更改是否代表纯粹的文本插入或删除：如果模式行显示 @emph{AncestorEmpty} 并且缓冲区 A 或 B 中的相应区域不为空，则意味着插入了新文本。  如果该指示符不存在并且缓冲区 A 或 B 中的差异区域非空，则意味着文本已被修改。  否则，原文被删除。
+
+虽然祖先缓冲区通常是不可见的，但 Ediff 在那里维护差异区域并相应地推进当前差异区域。  除细微差异外，所有差异区域的突出显示均在祖先缓冲区中提供。  因此，如果需要，用户可以将祖先缓冲区放在单独的帧中并在那里观看。  然而，在 TTY 上，在任何给定时间只能看到一帧，并且 Ediff 不支持任何单帧窗口配置，其中所有缓冲区（包括祖先缓冲区）都可见。  但是，可以通过在控制窗口中键入 @kbd{/} 来显示祖先缓冲区。  （输入 @kbd{C-l} 再次隐藏它。）
+
+请注意，即使存在合并状态指示符，上面的差异状态指示符@samp{=diff(A)}和@samp{=diff(B)}也不是多余的。  事实上，两者有不同的目的。
+
+例如，如果模式行显示 @samp{=diff(B) prefer(B)} 并且您将差异区域从缓冲区 A 复制到缓冲区 C，则 @samp{=diff(B)} 将更改为 @samp{diff-A} 并且模式行将显示 @samp{=diff(A) prefer-B}。  这表明缓冲区 C 中的差异区域与缓冲区 A 中的差异区域相同，但最初缓冲区 C 的区域来自缓冲区 B@. 知道这一点很有用，因为您可以通过键入 @kbd{r} 恢复缓冲区 C 中的原始差异区域。
+
+
+Ediff 永远不会更改合并状态指示器，除非响应 @kbd{!} 命令（见下文），在这种情况下指示器会丢失。另一方面，状态差异指示符通过复制/恢复命令 @kbd{a}、@kbd{b}、@kbd{r}、@kbd{+} 自动更改。
+
+@kbd{!} 命令丢失有关合并缓冲区中区域起源的信息（默认 A、首选 B 或组合）。  这是因为在这种情况下重新计算差异意味着在缓冲区 A、B 和合并缓冲区上运行 @code{diff3}，而不是在祖先缓冲区上运行。  （使用祖先文件重新计算差异是没有意义的，因为在合并模式下，Ediff 假设您没有编辑缓冲区 A 和 B，但您可能编辑了缓冲区 C，并且这些更改将被保留。）由于编辑缓冲区 C 时一些差异区域可能会消失，而其他差异区域可能会出现，因此通常没有简单的方法来判断合并缓冲区中的各个区域来自何处。
+
+在三向比较中，Ediff 尝试忽略完全由空白组成的区域。  例如，如果缓冲区 A 中的当前区域仅由空白组成（或者如果它为空），Ediff 将不会出于计算精细差异的目的而将其考虑在内。  结果是，Ediff 可以提供有关缓冲区 B 和 C@. 中的非白色区域的实际细微差异的更好的视觉信息。此外，如果缓冲区 B 和 C 中的区域仅在白色空间上有所不同，则将显示有关此效果的消息。
+
+@vindex ediff-merge-window-share
+在合并模式下，窗口 C（显示合并缓冲区的窗口）与显示缓冲区 A 和 B 的窗口之间的分割份额由变量 @code{ediff-merge-window-share} 控制。  其默认值为 0.5。  要使合并缓冲区窗口更小，请减少此数量。
+
+我们不建议将合并窗口的大小增加到超过帧的一半（即，将 @code{ediff-merge-window-share} 的值增加到 0.5 以上），因为很难看到缓冲区 A 和 B 的内容。
+
+您可以通过键入 @kbd{s} 将合并窗口暂时缩小为一行。  此更改是暂时的，直到 Ediff 找到重绘屏幕的理由为止。  再次输入 @kbd{s} 可恢复原始窗口大小。
+
+使用正前缀参数，@kbd{s}命令将使合并窗口稍微更高。  这种变化是持久的。  使用“@kbd{-}”或负前缀参数，命令@kbd{s}使合并窗口稍微短一些。  这种变化还持续存在。
+
+@vindex ediff-show-clashes-only
+Ediff 让您自动忽略只有缓冲区 A 和 B 之一与祖先不一致的区域。  为此，请将变量 @code{ediff-show-clashes-only} 设置为非 @code{nil}。
+
+您可以通过键入 @kbd{$$} 以交互方式切换此功能。
+
+请注意，此变量仅影响显示下一个/上一个差异命令。  您仍然可以使用命令 @kbd{j}（使用指定差异编号的前缀参数）直接跳转到任何差异区域。
+
+@vindex ediff-autostore-merges
+@vindex ediff-quit-merge-hook
+@findex ediff-maybe-save-and-delete-merge
+变量 @code{ediff-autostore-merges} 控制 Ediff 退出时合并缓冲区发生的情况。  如果该值为@code{nil}，则不会对合并缓冲区执行任何操作——用户有责任保存它。如果值为@code{t}，将询问用户将缓冲区保存在哪里以及之后是否删除它。  如果该值既不是 @code{nil} 也不是 @code{t}，则如果此合并会话是从一组相关的 Ediff 会话调用的，例如由 @code{ediff-merge-directories}、@code{ediff-merge-directory-revisions} 等 @xref{Session Groups} 生成的会话，则将保存合并缓冲区 @emph{only}。  此行为在函数 @code{ediff-maybe-save-and-delete-merge} 中实现，该函数是 @code{ediff-quit-merge-hook} 中的钩子。  如有必要，用户可以提供不同的挂钩。
+
+变量 @code{ediff-autostore-merges} 是缓冲区本地的，因此可以以每个缓冲区的方式设置它。  因此，使用@code{setq-default}全局更改此变量。
+
+@vindex ediff-merge-filename-prefix
+当合并缓冲区按照@code{ediff-autostore-merges}的指示自动保存时，Ediff 会为每个文件附加一个前缀，如变量@code{ediff-merge-filename-prefix}指定的。  默认值为@code{merge_}，但用户可以更改此值。
+
+@node Support for Version Control
+@section 支持版本控制
+
+
+Ediff 支持版本控制，并允许您通过函数 @code{ediff-revision} 比较 Emacs 缓冲区访问的文件版本。  此功能由以下变量控制：
+
+@table @code
+@item ediff-version-control-package
+@vindex ediff-version-control-package
+一个符号。  默认值为@samp{vc}。
+
+如果你像大多数 Emacs 用户一样，Ediff 将使用 VC 作为版本控制包。  这是 RCS、CVS 和 SCCS 的标准 Emacs 接口。
+
+但是，如果其他接口可以更好地满足您的需求，您将必须告诉 Edi​​ff 您正在使用哪个版本控制包，例如，
+@example
+(setq ediff-version-control-package 'rcs)
+@end example
+
+除了标准 @file{vc.el} 之外，Ediff 还支持其他三种版本控制接口：@file{rcs.el}、@file{pcl-cvs.el}（最近重命名为 pcvs.el）和 @file{generic-sc.el}。  包 @file{rcs.el} 由 Sebastian Kremer <sk@@thp.Uni-Koeln.DE> 编写，可作为
+@example
+@file{ftp.cs.buffalo.edu:pub/Emacs/rcs.tar.Z}
+@file{ftp.uni-koeln.de:/pub/gnu/emacs/rcs.tar.Z}
+@end example
+@pindex @file{vc.el}
+@pindex @file{rcs.el}
+@pindex @file{pcl-cvs.el}
+@pindex @file{generic-sc.el}
+@end table
+
+Ediff 与上述包的接口允许用户比较当前缓冲区的版本或合并它们（有或没有祖先版本）。  这些操作也可以在包含受版本控制的文件的目录上执行。
+
+如果是@file{pcl-cvs.el}，也可以通过函数@code{run-ediff-from-cvs-buffer}调用Ediff——请参阅此函数的文档字符串。
+
+@node Customizing the Mode Line
+@section 自定义模式线
+
+Ediff运行时，@samp{Ediff Control Panel}缓冲区的模式行显示当前差异数以及两个文件中差异区域的总数。
+
+正在比较的缓冲区的模式行显示缓冲区的类型（@samp{A:}、@samp{B:} 或 @samp{C:}）和（通常）文件名。 Ediff 尝试智能地选择模式行缓冲区识别。  特别是，它与 @file{uniquify.el} 和 @file{mode-line.el} 包配合得很好（它们改进了 Emacs 显示缓冲区标识的默认方式）。  如果您不喜欢 Ediff 更改模式线的方式，可以使用@code{ediff-prepare-buffer-hook} 修改模式线。
+@vindex ediff-prepare-buffer-hook
+@pindex @file{uniquify.el}
+@pindex @file{mode-line.el}
+
+@node Miscellaneous
+@section 各种各样的
+
+以下是用于自定义 Ediff 的其他一些变量：
+
+@table @code
+@item ediff-split-window-function
+@vindex ediff-split-window-function
+控制您希望窗口在文件 A 和文件 B（以及文件 C，如果适用）之间分割的方式。  它默认为垂直分割 (@code{split-window-vertically}，但如果您愿意，您可以将其设置为 @code{split-window-horizontally}。Ediff 还允许您以交互方式在垂直分割和水平分割之间切换。
+
+请注意，如果 Ediff 检测到它比较的所有缓冲区都显示在单独的帧中，则它会假定用户希望它们如此显示并停止分割窗口。  相反，它安排每个缓冲区显示在单独的帧中。  您可以通过隐藏缓冲区 A/B/C 之一来切换到一帧模式。
+
+您还可以通过键入 @kbd{~} 来交换显示缓冲区的窗口。
+
+@item ediff-merge-split-window-function
+@vindex ediff-merge-split-window-function
+控制合并模式下窗口如何在缓冲区 A 和 B 之间分割。该变量类似于 @code{ediff-split-window-function}，但它默认为 @code{split-window-horizontally} 而不是 @code{split-window-vertically}。
+
+@item ediff-make-wide-display-function
+@vindex ediff-make-wide-display-function
+该值是一个函数，被调用以加宽显示 Ediff 缓冲区的框架。  有关详细信息，请参阅 @code{ediff-make-wide-display-function} 的在线文档。  还建议查看默认函数@code{ediff-make-wide-display}的源代码。
+
+您可以通过键入 @kbd{m} 来切换宽屏/常规显示。  在宽显示模式下，缓冲区 A、B（和 C，如果适用）显示在与整个工作站屏幕一样宽的单个帧中。  当并排比较文件时，这非常有用。  默认情况下，显示会加宽而不改变其高度。
+
+@item ediff-use-last-dir
+@vindex ediff-use-last-dir
+控制 Ediff 在提示用户要比较的文件时显示默认目录的方式。  如果@code{nil}，Ediff 在提示用户输入文件名时使用当前缓冲区的默认目录。  否则，它将使用之前分别用于文件 A、B 或 C 的目录。
+
+@item ediff-no-emacs-help-in-control-buffer
+@vindex ediff-no-emacs-help-in-control-buffer
+如果 @code{t} 使 @kbd{C-h} 的行为类似于 @key{DEL} 键，即，它将让您返回到之前的差异，而不是调用帮助。  当在 xterm 窗口或纯文本终端中，Backspace 键绑定到 @kbd{C-h} 并且其位置比 @key{DEL} 键更方便时，这非常有用。
+
+@item ediff-toggle-read-only-function
+@vindex ediff-toggle-read-only-function
+该变量的值是 Ediff 用于切换其缓冲区中的只读属性的函数。
+
+Ediff 使用的默认函数只是切换只读属性，除非文件处于版本控制之下。  对于版本控制下签入的文件，Ediff 首先尝试签出该文件。
+
+@item ediff-make-buffers-readonly-at-startup nil
+@vindex ediff-make-buffers-readonly-at-startup
+如果@code{t}，则所有变体缓冲区在 Ediff 启动时都设为只读。
+
+@item ediff-keep-variants
+@vindex ediff-keep-variants
+默认值为@code{t}，这意味着当 Ediff 退出时，正在比较或合并的缓冲区将被保留。  将其设置为 @code{nil} 会使 Ediff 为用户提供删除这些缓冲区的机会（如果它们未被修改）。向退出命令 (@code{q}) 提供前缀参数会暂时反转该变量的含义。  当用户大多数时候喜欢其中一种行为，但偶尔需要另一种行为时，这很方便。
+
+但是，如果通过“缓冲区”作业之一（例如 @code{ediff-buffers}）调用该变量，Ediff 会暂时将该变量重置为 @code{t}。这是因为否则很容易失去一天的工作。此外，在“缓冲区”作业中，变量缓冲区在启动 Ediff 之前就已加载，因此 Ediff 仅保留此处的现状。
+
+使用 @code{ediff-cleanup-hook}，可以使 Ediff 无条件删除变体（例如，通过将 @code{ediff-janitor} 放入这些钩子之一）。
+
+@item ediff-keep-tmp-versions
+@vindex ediff-keep-tmp-versions
+默认值为@code{nil}。  如果为@code{t}，则使用@code{ediff-revision}或@code{ediff-merge-revisions}等操作进行比较或合并的文件版本在退出时不会被删除。  正常的操作是清理并删除这些版本文件。
+
+@item ediff-grab-mouse
+@vindex ediff-grab-mouse
+默认值为@code{t}。  通常，Ediff 会抓取鼠标并将其放入控制框中。  这很有用，因为用户可以确定当他需要键入 Ediff 命令时焦点将位于适当的 Ediff 框架中。  然而，一些用户更喜欢自己移动鼠标。  上述变量，如果设置为@code{maybe}，将阻止 Ediff 在许多情况下抓住鼠标，通常是在可能比平时花费更多时间的命令之后。  在其他情况下，Ediff 将继续抓住鼠标并将其放在它认为合适的地方。  如果值为@code{nil}，则鼠标完全由用户负责。尝试不同的设置，看看哪一种适合您。
+@end table
+
+
+@node Notes on Heavy-duty Customization
+@section 重载定制注意事项
+
+一些用户需要以相当复杂的方式自定义 Ediff，这需要针对不同类型的文件（例如 SGML 等）使用不同的默认值。  Ediff 通过多种方式支持这种定制。  首先，大多数自定义变量都是缓冲区本地的。  那些不是的通常可以从 Ediff 控制面板中访问，因此可以通过从 @code{ediff-startup-hook} 中调用 make-local-variable 使它们成为面板本地的。
+
+其次，函数@code{ediff-setup}接受可选的第六个参数，其形式为@code{((@var{var-name-1} .@: @var{val-1}) (@var{var-name-2} .@: @var{val-2}) @dots{})}。  函数@code{ediff-setup}将列表中的变量设置为本地 Ediff 控制缓冲区中的相应值。  这是一种添加自定义变量（通常应该是本地缓冲区）的简单方法，然后可以在各种挂钩中对其进行测试。
+
+在这种情况下，请确保变量 @code{ediff-job-name} 和 @code{ediff-word-mode} 设置正确，因为 Ediff 中的某些内容取决于此。
+
+最后，如果您想要定制帮助消息，可以将变量 @code{ediff-brief-help-message-function} 和 @code{ediff-long-help-message-function} 设置为返回帮助字符串的函数。
+@vindex ediff-startup-hook
+@findex ediff-setup
+@vindex ediff-job-name
+@vindex ediff-word-mode
+@vindex ediff-brief-help-message-function
+@vindex ediff-long-help-message-function
+
+自定义 Ediff 时，其他一些变量很有用，尽管它们不是用户可定义的。  它们位于 Ediff 控制缓冲区的本地，因此当您访问这些变量时，该缓冲区必须是最新的。  控制缓冲区可通过变量 @code{ediff-control-buffer} 访问，该变量也是该缓冲区的本地变量。  它通常用于检查当前缓冲区是否也是控制缓冲区。
+
+其他感兴趣的变量是：
+@table @code
+@item ediff-buffer-A
+正在比较的第一个数据缓冲区。
+
+@item ediff-buffer-B
+正在比较的第二个数据缓冲区。
+
+@item ediff-buffer-C
+在三向比较中，这是要比较的第三个缓冲区。在合并中，这是合并缓冲区。在双向比较中，该变量为@code{nil}。
+
+@item ediff-window-A
+显示缓冲区 A@. 的窗口如果缓冲区 A 不可见，则该变量为 @code{nil} 或者它可能是死窗口。
+
+@item ediff-window-B
+显示缓冲区 B 的窗口。如果缓冲区 B 不可见，则该变量为 @code{nil} 或者它可能是死窗口。
+
+@item ediff-window-C
+显示缓冲区 C 的窗口（如果有）。  如果缓冲区 C 不可见，则该变量为 @code{nil} 或者它可能是死窗口。
+
+@item ediff-control-frame
+显示控制缓冲区（如果存在）的专用帧。  仅当 Ediff 使用多帧显示时，即当控制缓冲区位于其自己的帧中时，它才是非@code{nil}。
+@end table
+
+@node Credits
+@chapter 制作人员
+
+Ediff 由 Michael Kifer <kifer@@cs.stonybrook.edu> 编写。  它的灵感来自 Dale R. Worley <drw@@math.mit.edu> 编写的emerge.el。  Boris Goldowsky <boris@@cs.rochester.edu> 提出的一个想法使得突出 Ediff 缓冲区中的细微差异成为可能。  Alastair Burt <burt@@dfki.uni-kl.de> 将 Ediff 移植到 XEmacs，Eric Freudenthal <freudent@@jan.ultra.nyu.edu> 使其与 VC 兼容，Marc Paquette <marcpa@@cam.org> 为 Ediff 编写了工具栏支持包，Hrvoje Nikšić <hniksic@@xemacs.org> 将其改编为 Emacs 定制包。
+
+许多人提供了错误报告、功能建议和建议方面的帮助。没有他们，埃迪夫就不会像今天这样有用。以下是贡献者的完整列表：
+
+@example
+Adrian Aichner (aichner at ecf.teradyne.com),
+Drew Adams (drew.adams at oracle.com),
+Steve Baur (steve at xemacs.org),
+Neal Becker (neal at ctd.comsat.com),
+E. Jay Berkenbilt (ejb at ql.org),
+Lennart Borgman (ennart.borgman at gmail.com)
+Alastair Burt (burt at dfki.uni-kl.de),
+Paul Bibilo (peb at delcam.co.uk),
+Kevin Broadey (KevinB at bartley.demon.co.uk),
+Harald Boegeholz (hwb at machnix.mathematik.uni-stuttgart.de),
+Bradley A. Bosch (brad at lachman.com),
+Michael D. Carney (carney at ltx-tr.com),
+Jin S. Choi (jin at atype.com),
+Scott Cummings (cummings at adc.com),
+Albert Dvornik (bert at mit.edu),
+Eric Eide (eeide at asylum.cs.utah.edu),
+Paul Eggert (eggert at twinsun.com),
+Urban Engberg (ue at cci.dk),
+Kevin Esler (esler at ch.hp.com),
+Robert Estes (estes at ece.ucdavis.edu),
+Jay Finger (jayf at microsoft.com),
+Xavier Fornari (xavier at europe.cma.fr),
+Eric Freudenthal (freudent at jan.ultra.nyu.edu),
+Job Ganzevoort (Job.Ganzevoort at cwi.nl),
+Felix Heinrich Gatzemeier (felix.g at tzemeier.info),
+Boris Goldowsky (boris at cs.rochester.edu),
+Allan Gottlieb (gottlieb at allan.ultra.nyu.edu),
+Aaron Gross (aaron at bfr.co.il),
+Thorbjoern Hansen (thorbjoern.hansen at mchp.siemens.de),
+Marcus Harnisch (marcus_harnisch at mint-tech.com),
+Steven E. Harris (seh at panix.com),
+Aaron S. Hawley (Aaron.Hawley at uvm.edu),
+Xiaoli Huang (hxl at epic.com),
+Andreas Jaeger (aj at suse.de),
+Lars Magne Ingebrigtsen (larsi at ifi.uio.no),
+Larry Gouge (larry at itginc.com),
+Karl Heuer (kwzh at gnu.org),
+(irvine at lks.csi.com),
+(jaffe at chipmunk.cita.utoronto.ca),
+David Karr (dkarr at nmo.gtegsc.com),
+Norbert Kiesel (norbert at i3.informatik.rwth-aachen.de),
+Steffen Kilb (skilb at gmx.net),
+Leigh L Klotz (klotz at adoc.xerox.com),
+Fritz Knabe (Fritz.Knabe at ecrc.de),
+Heinz Knutzen (hk at informatik.uni-kiel.d400.de),
+Andrew Koenig (ark at research.att.com),
+Hannu Koivisto (azure at iki.fi),
+Ken Laprade (laprade at dw3f.ess.harris.com),
+Will C Lauer (wcl at cadre.com),
+Richard Levitte (levitte at e.kth.se),
+Mike Long (mike.long at analog.com),
+Dave Love (d.love at dl.ac.uk),
+Martin Maechler (maechler at stat.math.ethz.ch),
+Simon Marshall (simon at gnu.org),
+Paul C. Meuse (pmeuse at delcomsys.com),
+Richard Mlynarik (mly at adoc.xerox.com),
+Stefan Monnier (monnier at cs.yale.edu),
+Chris Murphy (murphycm at sun.aston.ac.uk),
+Erik Naggum (erik at naggum.no),
+Eyvind Ness (Eyvind.Ness at hrp.no),
+Ray Nickson (nickson at cs.uq.oz.au),
+Dan Nicolaescu (dann at ics.uci.edu),
+David Petchey (petchey_david at jpmorgan.com),
+Benjamin Pierce (benjamin.pierce at cl.cam.ac.uk),
+François Pinard (pinard at iro.umontreal.ca),
+Tibor Polgar (tlp00 at spg.amdahl.com),
+David Prince (dave0d at fegs.co.uk),
+Paul Raines (raines at slac.stanford.edu),
+Stefan Reicher (xsteve at riic.at),
+Charles Rich (rich at merl.com),
+Bill Richter (richter at math.nwu.edu),
+C.S. Roberson (roberson at aur.alcatel.com),
+Kevin Rodgers (kevin.rodgers at ihs.com),
+Sandy Rutherford (sandy at ibm550.sissa.it),
+Heribert Schuetz (schuetz at ecrc.de),
+Andy Scott (ascott at pcocd2.intel.com),
+Axel Seibert (axel at tumbolia.ppp.informatik.uni-muenchen.de),
+Vin Shelton (acs at xemacs.org),
+Scott O. Sherman (Scott.Sherman at mci.com),
+Nikolaj Schumacher (n_schumacher at web.de),
+Richard Stallman (rms at gnu.org),
+Richard Stanton (stanton at haas.berkeley.edu),
+Sam Steingold (sds at goems.com),
+Ake Stenhoff (etxaksf at aom.ericsson.se),
+Stig (stig at hackvan.com),
+Peter Stout (Peter_Stout at cs.cmu.edu),
+Chuck Thompson (cthomp at cs.uiuc.edu),
+Ray Tomlinson (tomlinso at bbn.com),
+Raymond Toy (toy at rtp.ericsson.se),
+Stephen J. Turnbull  (stephen at xemacs.org),
+Jan Vroonhof (vroonhof at math.ethz.ch),
+Colin Walters (walters at cis.ohio-state.edu),
+Philippe Waroquiers (philippe.waroquiers at eurocontrol.be),
+Klaus Weber (gizmo at zork.north.de),
+Ben Wing (ben at xemacs.org),
+Tom Wurgler (twurgler at goodyear.com),
+Steve Youngs (youngs at xemacs.org),
+Ilya Zakharevich (ilya at math.ohio-state.edu),
+Eli Zaretskii (eliz at is.elta.co.il)
+@end example
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+
+@node Index
+@unnumbered 指数
+@printindex cp
+
+@bye

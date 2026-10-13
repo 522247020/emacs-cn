@@ -1,0 +1,322 @@
+\输入 texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename ../../info/eww.info
+@settitle Emacs Web Wowser
+@documentlanguage en
+@include docstyle.texi
+@c %**end of header
+
+@copying
+此文件记录了 GNU Emacs Web Wowser (EWW) 包。
+
+版权所有 @copyright{} 2014--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* EWW: (eww).       Emacs Web Wowser
+@end direntry
+
+@finalout
+
+@titlepage
+@title Emacs Web Wowser (EWW)
+@subtitle GNU Emacs 的网络浏览器。
+
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top EWW
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Overview::
+* Basics::
+* Advanced::
+* Command Line::
+
+附录
+* History and Acknowledgments::
+* GNU Free Documentation License::   本文档的许可证。
+
+指数
+* Key Index::
+* Variable Index::
+* Lisp Function Index::
+* Concept Index::
+@end menu
+
+@node Overview
+@chapter 概述
+
+@dfn{EWW}，Emacs Web Wowser，是 GNU Emacs 的 Web 浏览器，提供简单、简洁的体验，注重可读性。它使用@dfn{shr.el}加载、解析和显示网页。  如果 Emacs 构建时支持图像，则它可以内联显示图像，但不支持 CSS 或 JavaScript。
+
+要使用 EWW，您需要使用支持 @code{libxml2} 的 Emacs。
+
+@node Basics
+@chapter 基本用法
+
+@findex eww
+@findex eww-open-file
+@vindex eww-search-prefix
+@cindex eww
+@cindex Web Browsing
+您可以使用命令 @kbd{M-x eww} 打开 URL 或搜索网络。如果输入看起来不像 URL 或域名，将通过 @code{eww-search-prefix} 搜索网络。  默认搜索引擎是@url{https://duckduckgo.com, DuckDuckGo}。  如果要打开文件，请在文件名中添加前缀 @code{file://} 或使用命令 @kbd{M-x eww-open-file}。
+
+如果您使用前缀参数调用 @code{eww} 或 @code{eww-open-file}（如 @w{@kbd{C-u M-x eww}} 中所示），它们将创建一个新的 EWW 缓冲区，而不是重用默认缓冲区（通常称为 @file{*eww*}）。
+
+@findex eww-quit
+@findex eww-reload
+@findex eww-copy-page-url
+@findex shr-maybe-probe-and-copy-url
+@kindex q
+@kindex w
+@kindex g
+如果加载 URL 成功，则会打开缓冲区 @file{*eww*} 并在其中呈现网页。  您可以通过按 @kbd{q} 离开 EWW，或通过调用 @kbd{eww-quit} 退出浏览器。  要重新加载网页，请点击@kbd{g} (@code{eww-reload})。
+
+当点位于链接上时按 @kbd{w} 将调用 @code{shr-maybe-probe-and-copy-url}，它将将此链接的 @acronym{URL} 复制到终止环。  如果点不在链接上，按 @kbd{w} 会调用 @code{eww-copy-page-url}，这会将当前页面的 URL 复制到 Kill Ring。
+
+@findex eww-copy-alternate-url
+@kindex A
+@kbd{A} 命令 (@code{eww-copy-alternate-url}) 将当前页面上的备用链接的 URL 复制到 Kill Ring 中。  如果页面指定了多个备用链接，则此命令会提示在迷你缓冲区中输入其中一个链接并完成。  备用链接是 @acronym{HTML} 页面可能包含的引用，以指向充当其备用表示的其他文档。  值得注意的是，@acronym{HTML}页面可以使用备用链接指向其翻译版本和@acronym{RSS}提要。  备用链接作为 @samp{<link>} 元素出现在 @acronym{HTML} 页面的 @samp{<head>} 部分，且 @samp{rel} 属性等于 @samp{``alternate''}；它们是页面元数据的一部分，在其呈现的内容中不可见。
+
+@findex eww-open-in-new-buffer
+@kindex M-RET
+@kbd{M-@key{RET}} 命令 (@code{eww-open-in-new-buffer}) 在新的 EWW 缓冲区中打开 URL，类似于在其他浏览器中的新“选项卡”中打开链接。  如果使用前缀参数调用，该命令不会使新缓冲区成为当前缓冲区。  当@code{global-tab-line-mode}启用时，该缓冲区显示在窗口选项卡行的选项卡中。  启用 @code{tab-bar-mode} 后，会在框架选项卡栏上创建一个新选项卡。
+
+@findex eww-readable
+@kindex R
+@kbd{R} 命令 (@code{eww-readable}) 尝试确定当前页面的哪一部分包含“可读”文本，并且仅显示该部分。  这消除了导航菜单等混乱，帮助您专注于重要文本。
+
+当以交互方式调用时，此命令会切换可读部分的显示。  使用正前缀参数时，此命令始终显示可读部分，使用零或负前缀时，它始终显示整页。
+
+@vindex eww-readable-urls
+如果您希望 EWW 默认使用“可读”视图呈现某些页面，您可以添加一个与其 URL 匹配的正则表达式 @code{eww-readable-urls}。  每个条目可以是字符串形式的正则表达式，也可以是 @w{@code{(@var{regexp} . @var{readability})}} 形式的 cons 单元格。  如果@var{readability}非@code{nil}，则其行为与字符串形式相同；如果@code{nil}，EWW 将始终默认渲染完整页面以匹配 URL。  例如，您可以使用它使所有页面默认为可读模式，除了一些异常值：
+
+@example
+(setq eww-readable-urls '(("https://example\\.com/" . nil)
+                          ".*"))
+@end example
+
+@findex eww-toggle-fonts
+@vindex shr-use-fonts
+@kindex F
+@kbd{F} 命令 (@code{eww-toggle-fonts}) 切换是否使用可变间距字体。  这会设置 @code{shr-use-fonts} 变量。
+
+@findex eww-toggle-colors
+@vindex shr-use-colors
+@kindex M-C
+@kbd{M-C} 命令 (@code{eww-toggle-colors}) 切换是否使用 HTML 指定的颜色。  这会设置 @code{shr-use-colors} 变量。
+
+@findex eww-toggle-images
+@vindex shr-inhibit-images
+@kindex M-I
+@cindex Image Display
+@kbd{M-I} 命令（@code{eww-toggle-images}，大写字母 i）切换是否显示图像。  这也会设置 @code{shr-inhibit-images} 变量。
+
+@findex eww-download
+@vindex eww-download-directory
+@kindex d
+@cindex Download
+可以使用 @kbd{d} (@code{eww-download}) 下载 URL。  如果有的话，这将下载 point 下的链接，否则下载当前页面的 URL。  该文件将写入 @code{eww-download-directory} 指定的目录（默认：@file{~/Downloads/}，如果存在；否则由 @samp{DOWNLOAD} @acronym{XDG} 目录指定））。
+
+@findex eww-back-url
+@findex eww-forward-url
+@findex eww-list-histories
+@kindex r
+@kindex l
+@kindex H
+@cindex History
+EWW 会记住您访问过的 URL，以便您可以在它们之间来回切换。  按 @kbd{l} (@code{eww-back-url}) 即可转到上一个 URL@. 您可以使用 @kbd{r} (@code{eww-forward-url}) 再次前进。  如果您想概览浏览历史记录，请按@kbd{H} (@code{eww-list-histories}) 打开历史记录缓冲区@file{*eww history*}。  当 EWW 退出时，历史记录就会丢失。如果您想记住网站，可以使用书签。
+
+@vindex eww-before-browse-history-function
+默认情况下，当从“历史”页面（即@:通过导航返回@code{eww-back-url}加载的页面）浏览到新页面时，EWW将首先删除比当前页面更新的所有历史记录条目。  这与大多数其他网络浏览器的行为相同。  您可以通过将 @code{eww-before-browse-history-function} 自定义为另一个值来更改此设置。例如，将其设置为@code{ignore}将保留现有的历史记录条目，并简单地将新页面添加到历史列表中。
+
+@vindex eww-history-limit
+除了访问的 URL 之外，EWW 还记住呈现的页面（如缓冲区中显示的那样）及其源。  这可能会占用大量内存，因此 EWW 会丢弃历史记录条目，以将其数量保持在设定的限制内，如 @code{eww-history-limit} 指定的；默认值为 50。该变量也可以设置为 @code{nil} 以允许历史列表无限增长。
+
+@cindex PDF
+默认情况下，使用 @code{doc-view-mode} 内联查看 PDF，但这可以通过使用 mailcap (@pxref{mailcap,,, emacs-mime, Emacs MIME Manual}) 机制（特别是 @code{mailcap-mime-data}）进行自定义。
+
+@findex eww-add-bookmark
+@findex eww-list-bookmarks
+@kindex b
+@kindex B
+@cindex Bookmarks
+EWW 允许您 @dfn{bookmark} URL。  只需点击 @kbd{b} (@code{eww-add-bookmark}) 即可存储当前网站的书签。您可以使用 @kbd{B} (@code{eww-list-bookmarks}) 查看存储的书签。  这将打开书签缓冲区@file{*eww bookmarks*}。
+
+@findex eww-switch-to-buffer
+@findex eww-list-buffers
+@kindex s
+@kindex S
+@cindex Multiple Buffers
+要获取当前打开的 EWW 缓冲区的摘要，请按 @kbd{S} (@code{eww-list-buffers})。  @file{*eww buffers*} 缓冲区允许您快速杀死、翻转并切换到特定的 EWW 缓冲区。  要通过迷你缓冲区提示符切换 EWW 缓冲区，请按 @kbd{s} (@code{eww-switch-to-buffer})。
+
+当没有 EWW 缓冲区时，@code{eww-switch-to-buffer} 命令将回退到 @code{eww}。
+
+@findex eww-browse-with-external-browser
+@vindex browse-url-secondary-browser-function
+@vindex eww-use-external-browser-for-content-type
+@kindex &
+@cindex External Browser
+尽管 EWW 和 shr.el 尽最大努力在 GNU Emacs 中呈现网页，但某些网站使用了无法正确表示或未实现的功能（例如 JavaScript）。  如果您在使用 EWW 查看网站时遇到问题，请在 EWW 缓冲区内点击 @kbd{&} (@code{eww-browse-with-external-browser})，以在 @code{browse-url-secondary-browser-function} 指定的外部浏览器中打开该网站。  某些内容类型（例如视频或音频内容）在 GNU Emacs 中显示根本没有意义。  您可以通过自定义 @code{eww-use-external-browser-for-content-type} 来告诉 EWW 在外部浏览器中自动打开特定内容。
+
+@node Advanced
+@chapter 先进的
+
+@findex eww-retrieve-command
+EWW 通常在渲染之前使用 @code{url-retrieve} 来获取 @acronym{HTML}，并在 @code{eww-retrieve-command} 的值为 @code{sync} 时使用 @code{url-retrieve-synchronously}。  有时使用外部程序来执行此操作会很方便，并且 @code{eww-retrieve-command} 应该是指定命令和参数的列表。  例如，要使用 Chromium 浏览器，您可以这样说：
+
+@lisp
+(setq eww-retrieve-command
+      '("chromium" "--headless" "--dump-dom"))
+@end lisp
+
+该命令应在标准输出上返回 @acronym{HTML}，数据应使用 @acronym{UTF-8} 作为字符集。
+
+@findex eww-view-source
+@kindex v
+@cindex Viewing Source
+您可以使用 @kbd{v} (@code{eww-view-source}) 查看网站的源代码。  这将打开一个新的缓冲区@file{*eww-source*}并插入源。  如果可用，缓冲区将设置为@code{html-mode}。
+
+@findex url-cookie-list
+@kindex C
+@cindex Cookies
+EWW 通过 @ref{Top, url package, ,url} 包处理 cookie。  您可以使用 @kbd{C} (@code{url-cookie-list}) 列出现有 cookie。  有关 Cookie 处理的详细信息@xref{Cookies,,,url}。
+
+@vindex shr-cookie-policy
+许多 @acronym{HTML} 页面都嵌入了图像，EWW 将默认下载其中的大部分图像。  获取图像时，可以发送和接收cookie，这些cookie可用于跟踪用户。  要控制在检索这些图像时何时发送 cookie，可以使用 @code{shr-cookie-policy} 变量。  默认值 @code{same-origin} 表示 EWW 仅在获取与 @acronym{HTML} 页面来源相同的图像时发送 cookie。  @code{nil} 表示“检索这些图像时从不发送 cookie”，@code{t} 表示“检索这些图像时始终发送 cookie”。
+
+@vindex eww-use-browse-url
+当跟踪 EWW 中的链接时，与 @code{eww-use-browse-url} 正则表达式匹配的 @acronym{URL} 将被传递到 @code{browse-url}，而不是 EWW 自行处理它们。  可以通过更改 @code{browse-url-handlers} 进一步自定义该操作。
+
+@vindex eww-header-line-format
+@cindex Header
+EWW缓冲区的标题行可以通过自定义@code{eww-header-line-format}来更改。  该格式将 @code{%t} 替换为网站标题，将 @code{%u} 替换为 URL。
+
+@findex eww-toggle-paragraph-direction
+@cindex paragraph direction
+@kbd{D} 命令 (@code{eww-toggle-paragraph-direction}) 在从左到右和从右到左文本之间切换段落方向。  这对于显示从右到左测试（如阿拉伯语和希伯来语）但网页未明确说明方向性的网页非常有用。
+
+@c @vindex shr-bullet
+@c @vindex shr-hr-line
+@c @vindex eww-form-checkbox-selected-symbol
+@c @vindex eww-form-checkbox-symbol
+@c   EWW and the rendering engine shr.el use ASCII characters to
+@c represent some graphical elements, such as bullet points
+@c (@code{shr-bullet}), check boxes
+@c (@code{eww-form-checkbox-selected-symbol} and
+@c @code{eww-form-checkbox-symbol}), and horizontal rules
+@c @code{shr-hr-line}).  Depending on your fonts these characters can be
+@c replaced by Unicode glyphs to achieve better looking results.
+
+@vindex shr-max-image-proportion
+@vindex shr-blocked-images
+@vindex shr-allowed-images
+@cindex Image Display
+由于图像的大小或内容，从网络加载随机图像可能会出现问题。  通过自定义 @code{shr-max-image-proportion}，您可以设置相对于显示图像的窗口的最大图像比例。例如，0.7 表示允许图像占据宽度和高度的 70%。  如果 Emacs 支持图像缩放，则较大的图像会按比例缩小。  您可以通过自定义@code{shr-blocked-images}来完全阻止特定图像。
+
+@vindex shr-inhibit-images
+您可以通过自定义@code{shr-inhibit-images}来控制图像显示。  如果此变量为@code{nil}，则显示图像的“ALT”文本。
+
+@vindex shr-sliced-image-height
+为了使向上/向下滚动过去的图像更加直观，EWW 将大图像分成几行。  这样，您可以单独滚动经过每个切片，而不是跳过整个图像。  EWW 对占据其显示窗口高度超过 @code{shr-sliced-image-height} 的图像进行切片。例如，值 0.7 表示允许图像在切片之前占据窗口高度的 70%。
+
+@vindex shr-color-visible-distance-min
+@vindex shr-color-visible-luminance-min
+@cindex Contrast
+EWW（或者更确切地说，它的 HTML 渲染器@code{shr}）使用 HTML 页面中声明的颜色，但如果需要的话会调整它们以保持一定的最小对比度。  如果这对您来说仍然太低，您可以自定义变量 @code{shr-color-visible-distance-min} 和 @code{shr-color-visible-luminance-min} 以获得更好的对比度。
+
+@vindex shr-max-width
+@vindex shr-width
+默认情况下，渲染时使用的最大宽度为 120 个字符，但这可以通过更改 @code{shr-max-width} 变量来调整。如果无论窗口的宽度是多少，都首选指定的宽度，则可以设置@code{shr-width}。  如果两个变量都是@code{nil}，则将始终使用窗口宽度。
+
+@vindex shr-discard-aria-hidden
+@cindex @code{aria-hidden}, HTML attribute
+HTML 属性 @code{aria-hidden} 旨在告诉屏幕阅读器忽略标签的内容。  您可以自定义变量 @code{shr-discard-aria-hidden} 来告诉 @code{shr} 忽略此类标签。当在 @code{shr} 的输出上使用屏幕阅读器时（例如，在 EWW 缓冲区文本上），这非常有用。  即使不使用屏幕阅读器，它也很有用，因为网络作者经常将此属性放在非必要的装饰元素上。
+
+@cindex Desktop Support
+@cindex Saving Sessions
+除了在运行时维护历史记录之外，EWW 还将在桌面文件中保存其缓冲区的部分状态（URI 和访问的页面标题）（如果使用）。  @xref{Saving Emacs Sessions,,, emacs, The GNU Emacs Manual}。
+
+@vindex eww-desktop-remove-duplicates
+EWW 历史记录可能包含同一页面 URI@. 的多个条目。在运行时，这些条目可能仍然具有不同的关联点位置或实际网页内容。然而，后者往往太大而无法保存在桌面文件中，因此它们被省略，从而使各个条目完全等效。  默认情况下，不会保存此类重复条目。  将 @code{eww-desktop-remove-duplicates} 设置为 @code{nil} 将强制 EWW 无论如何保存它们。
+
+@vindex eww-restore-desktop
+恢复 EWW 缓冲区的内容可能需要很长时间才能完成。  当 @code{eww-restore-desktop} 变量设置为 @code{nil}（默认值）时，当缓冲区从桌面文件恢复时，EWW 将不会尝试重新加载上次访问的网页，从而允许更快的 Emacs 启动时间。  当设置为@code{t}时，恢复缓冲区还将启动此类页面的重新加载。
+
+@vindex eww-restore-reload-prompt
+从桌面文件恢复但尚未重新加载的 EWW 缓冲区将包含一个提示，由 @code{eww-restore-reload-prompt} 变量指定。  每次使用时，该变量的值都会通过 @code{substitute-command-keys} 传递，从而允许使用通常的替换，例如 @code{\[eww-reload]} 代表 @code{eww-reload} 命令的当前键绑定。
+
+@vindex eww-auto-rename-buffer
+如果@code{eww-auto-rename-buffer}用户选项为非@code{nil}，EWW缓冲区将在渲染文档后被重命名。  如果是@code{title}，则根据文档标题重命名。  如果是@code{url}，则根据文档的@acronym{URL}重命名。  这也可以是用户定义的函数，在 EWW 缓冲区中调用时不带任何参数，并且应该返回一个字符串。
+
+@cindex utm
+@vindex eww-url-transformers
+EWW 在使用 URL 之前通过 @code{eww-url-transformers} 运行它们。  这个用户选项是一个函数列表，其中每个函数都以 URL 作为参数来调用，并且应该返回（可能）转换后的 URL。  默认情况下，此变量包含 @code{eww-remove-tracking}，这会从链接中删除常见的 @samp{utm_} 跟踪器。
+
+@cindex video
+@vindex shr-use-xwidgets-for-media
+如果 Emacs 已构建为支持 xwidget，则 EWW 可以使用它来显示 @samp{<video>} 元素。  但是，此支持仍处于实验阶段，在某些系统上不起作用（甚至更糟）可能会使您的 Emacs 崩溃，因此默认情况下此功能处于关闭状态。  如果您想打开它，请将 @code{shr-use-xwidgets-for-media} 设置为非 @code{nil} 值。
+
+@node Command Line
+@chapter 命令行使用
+
+直接从命令行启动 eww 可以很方便。  @code{eww-browse} 函数可用于：
+
+@example
+emacs -f eww-browse https://gnu.org
+@end example
+
+这还允许将 Emacs 注册为 @samp{"text/x-uri"} 媒体类型的 @acronym{MIME} 处理程序。  如何做到这一点因系统而异，但通常您会注册处理程序来调用@samp{"emacs -f eww-browse %u"}。
+
+@node History and Acknowledgments
+@appendix 历史和致谢
+
+EWW 最初由 Lars Ingebrigtsen 编写，他因 Gnus 方面的工作而闻名。  他开始编写 Emacs HTML 渲染库@code{shr.el}，以阅读 Gnus 中的博客。  他最终添加了 Web 浏览器前端和 HTML 表单支持。  这导致了 EWW，即 Emacs Web Wowser。  EWW 于 2013 年 6 月 16 日宣布：@url{https://lars.ingebrigtsen.no/2013/06/16/eww/}。
+
+随后 EWW 从 Gnus 存储库转移到 GNU Emacs，一些开发人员也开始为其做出贡献。
+
+@node GNU Free Documentation License
+@chapter GNU 自由文档许可证
+@include doclicense.texi
+
+@node Key Index
+@unnumbered 关键指标
+
+@printindex ky
+
+@node Variable Index
+@unnumbered 变量索引
+
+@vindex eww-after-render-hook
+在 eww 渲染缓冲区中的数据后，调用 @code{eww-after-render-hook}。  例如，它可用于更改内容。
+
+@printindex vr
+
+@node Lisp Function Index
+@unnumbered 功能索引
+
+@printindex fn
+
+@node Concept Index
+@unnumbered 概念索引
+
+@printindex cp
+
+
+@bye

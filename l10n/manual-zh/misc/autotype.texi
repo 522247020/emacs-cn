@@ -1,0 +1,380 @@
+\输入texinfo
+@c This is an annex of the Emacs manual.
+@c Author: Daniel Pfeiffer <Daniel.Pfeiffer@Informatik.START.dbp.de>
+@setfilename ../../info/autotype.info
+@c @node Autotypist, Picture, Abbrevs, Top
+@c @chapter Features for Automatic Typing
+@settitle 自动打字功能
+@documentlanguage en
+@include docstyle.texi
+@c  @cindex text
+@c  @cindex selfinserting text
+@c  @cindex autotypist
+
+@copying
+版权所有 @copyright{} 1994--1995, 1999, 2001--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* Autotype: (autotype).          针对您在 Emacs 中经常输入的文本的便捷功能。
+@end direntry
+
+@titlepage
+@sp 10
+
+@center @titlefont{Autotyping}
+@sp 2
+@center Convenient features for text that you enter frequently in Emacs
+@sp 2
+@center Daniel Pfeiffer
+@center additions by Dave Love
+
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@node Top
+@top 自动打字
+
+在某些情况下，您会发现自己一遍又一遍地输入类似的内容。  对于套用信函和编程语言结构尤其如此。  特定于项目的标头注释、流程控制结构或幻数每次基本上都是相同的。  除了 Abbrev 功能 (@pxref{Abbrevs,,, emacs, The GNU Emacs Manual}) 之外，Emacs 还具有各种功能可以帮助您完成繁琐且重复的打字工作。
+
+一种解决方案是使用框架、灵活的规则来说明要插入的内容以及如何插入。  各种编程语言模式提供了一些现成的框架，您可以调整它们以满足您的需求或品味，或者定义新的框架。
+
+另一个功能是根据文件名或适当的模式自动将您想要的内容插入到空文件中。  您可以插入文件或骨架，也可以调用函数。  然后就有可能让 Un*x 解释器脚本自动采用幻数并在保存后立即可执行。  或者，如有必要，您可以在每次保存文件时更新版权声明的年份。  文件中的时间戳也是如此。
+
+可以根据某个单词插入 URL。  可以定义灵活的模板，以便更普遍地在文本之间插入和导航。  一种元扩展工具可用于尝试一组替代的文本补全和扩展。
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* Using Skeletons::         如何在文本中插入骨架。
+* Wrapping Skeletons::      将现有文本放入骨架中。
+* Skeletons as Abbrevs::    发出骨架命令的替代方法。
+* Inserting Pairs::         键入一个字符并在点后获取另一个字符。
+* Autoinserting::           访问空文件后立即填充它们。
+* Copyrights::              插入和更新版权。
+* Executables::             将解释器脚本转换为可执行文件。
+* Timestamps::              更新修改文件中的日期和时间。
+* Tempo::                   灵活的模板插入。
+* Hippie Expand::           尝试各种方法扩展文本。
+* Skeleton Language::       使骨架命令插入你想要的内容。
+
+* GNU Free Documentation License::  本文档的许可证。
+* Concept Index::
+* Command Index::
+* Variable Index::
+@end menu
+
+
+@node Using Skeletons
+@chapter 使用骨骼
+@cindex skeletons
+@cindex using skeletons
+
+当您希望 Emacs 插入套用信函或您正在使用的编程语言的典型结构时，骨架是实现此目的的一种方法。  通常，每个骨架都有自己的命令，当调用该命令时，将插入骨架。  这些命令可以通过通常的方式发出（@pxref{Commands,,, emacs, The GNU Emacs Manual}）。  提供各种骨架的模式通常会将它们绑定到 @kbd{C-c} 前缀上的按键序列，并且具有 @cite{Insert} 菜单，甚至可能为它们预定义缩写 (@pxref{Skeletons as Abbrevs})。
+
+最简单的骨架将简单地插入一些根据主要模式缩进的文本，并将光标保留在中间可能的位置。  交互式骨架可能会提示您输入一个字符串，该字符串将成为插入文本的一部分。
+
+骷髅可能会多次要求输入。  他们甚至有一个循环机制，只要你愿意提供，就会要求你提供输入。  一个例子是多个“else if”条件。  您可以通过以 @key{RET}、@kbd{C-g} 或 @kbd{C-h} 结尾的提示来识别这种情况。  这意味着输入空字符串将简单地假设您已完成。另一方面，输入 quit 会终止循环，但也会终止骨架的其余部分，例如，跳过“else”子句。  仅仍然插入语法上必要的终止符。
+
+
+
+@node Wrapping Skeletons
+@chapter 将骨架包裹在现有文本周围
+@cindex wrapping skeletons
+
+通常，您会发现自己的一些代码由于某种原因突然变成了有条件的。  或者您已经写了一些文字并希望将其放在套用信函的中间。  骨架提供了一种实现此目的的方法，对于编程语言来说，甚至可以为您重新缩进包装的代码。
+
+骨架命令采用可选的数字前缀参数 (@pxref{Arguments,,, emacs, The GNU Emacs Manual})。  这可以用两种不同的方式解释，具体取决于前缀是正的，即向前导向，还是负的，即向后导向。
+
+正前缀意味着将骨架包裹在后面的许多单词周围。  这是通过将单词放在插入骨架后通常留下的点 (@pxref{Using Skeletons}) 来完成的。  点 (@pxref{Point,,, emacs, The GNU Emacs Manual}) 则留在骨架中下一个有趣的位置。
+
+负前缀意味着对许多先前标记的区域间执行类似的操作 (@pxref{Mark,,, emacs, The GNU Emacs Manual})。  在最简单的情况下，如果您在发出骨架命令之前输入 @kbd{M--} ，那么骨架将围绕当前区域，就像正参数将其围绕多个单词一样。
+
+较小的否定参数会将许多中间区域包装到骨架内连续的有趣点中，再次将点留在下一个点。我们在这里谈论区域间而不是区域，因为我们按照它们在缓冲区中出现的顺序对待它们，只有当它们按顺序标记时，它才与连续区域一致。
+
+也就是说，如果您按字母顺序标记点 A B C []（其中 [] 代表点）并使用 @kbd{M-- 3} 调用骨架命令，您将从 A 到 B 的文本换行到骨架的第一个有趣点，从 B 到 C 的文本换到下一个，从 C 到该点的文本换到第三个，并将点保留在第四个。  如果缓冲区中的标记较少，或者骨架定义的有趣点较少，则多余的部分将被忽略。
+
+另一方面，如果您按字母顺序标记点 [] A C B，并使用 @kbd{M-- 3} 调用骨架命令，您将把文本从点换行到 A，然后将文本从 A 换行到 C，最后将文本从 C 换行到 B@. 这样做是因为区域重叠，如果 Emacs 试图遵循您标记这些点的顺序，它将会无助地丢失。
+
+
+
+@node Skeletons as Abbrevs
+@chapter 骨架作为缩写扩展
+@cindex skeletons as abbrevs
+
+您还可以定义一个缩写 (@pxref{Defining Abbrevs,,, emacs, The GNU Emacs Manual})，将其扩展 (@pxref{Expanding Abbrevs,,, emacs, The GNU Emacs Manual}) 到骨架中，而不是为每个骨架命令使用键绑定。
+
+假设您希望 @samp{ifst} 成为 C 语言 if 语句的缩写。  您将告诉 Emacs @samp{ifst} 扩展为空字符串，然后调用骨架命令。  在 Emacs Lisp 中，你可以说类似 @code{(define-abbrev c-mode-abbrev-table "ifst" "" 'c-if)} 的内容。  或者您可以编辑 @kbd{M-x list-abbrevs} 的输出，使其看起来像这样：
+
+@example
+(c-mode-abbrev-table)
+"ifst"           0    ""         c-if
+@end example
+
+@noindent
+（一些没有语义意义的空行和其他缩写表已被省略。）
+
+
+
+@node Inserting Pairs
+@chapter 插入匹配的字符对
+@cindex inserting pairs
+@cindex pairs
+
+各种角色通常成对出现。  例如，当你插入一个左括号时，无论你是在编程还是在写散文，你肯定会在后面输入一个右括号。  通过同时输入两者并将光标留在中间，Emacs 可以保证这些括号始终是平衡的。  如果你有一个非标准键盘，输入一些陌生的编程语言符号会让你的手指向后弯曲，这也可以让你松一口气。
+
+@findex skeleton-pair-insert-maybe
+@vindex skeleton-pair
+这是通过将键对中的第一个键 (@pxref{Rebinding,,, emacs, The GNU Emacs Manual}) 绑定到 @code{skeleton-pair-insert-maybe} 而不是 @code{self-insert-command} 来完成的。  “也许”来自这样一个事实：这种起初令人惊讶的行为最初被关闭了。  要启用它，您必须将 @code{skeleton-pair} 设置为某个非 @code{nil} 值。即使如此，正参数 (@pxref{Arguments,,, emacs, The GNU Emacs Manual}) 也会使该键的行为类似于自插入键 (@pxref{Inserting Text,,, emacs, The GNU Emacs Manual})。
+
+@vindex skeleton-pair-on-word
+虽然这违背了始终平衡配对的既定意图，但事实证明，当后面的字符是单词的一部分时，人们通常不希望发生配对。  如果您希望即使在此时也能进行配对，请将 @code{skeleton-pair-on-word} 设置为某个非 @code{nil} 值。
+
+@vindex skeleton-pair-alist
+所有可见字符都可以配对。  默认情况下圆括号@samp{(}、方括号@samp{[}、大括号@samp{@{} and the pointed bracket @samp{<} all pair with the symmetrical character, and the grave accent @samp{`} pairs with the apostrophe @samp{'}.  All other characters pair themselves.  This behavior can be modified by the variable @code{skeleton-pair-alist}.  This is in fact an alist of skeletons (@pxref{Skeleton Language}), with the first part of each sublist matching the typed character.  This is the position of the interactor, but since pairs don't need the @code{str} element, this is ignored.
+
+某些模式已将命令 @code{skeleton-pair-insert-maybe} 绑定到相关按键。  这些模式还根据需要配置对。  例如，当键入 @TeX{} 输入时，您会期望重音符号 (@samp{`}) 与撇号 (@samp{'}) 配对，而在 Shell 脚本模式下，它必须与其自身配对。  它们还可以在某些情况下抑制配对。  例如，转义字符代表其自身。
+
+
+
+@node Autoinserting
+@chapter 在空文件中自动插入文本
+@cindex autoinserting
+
+@findex auto-insert
+@kbd{M-x auto-insert} 将在缓冲区的开头放置一些预定义的文本。  顾名思义，该函数的主要用途是每次访问空文件时自动调用该函数，并且仅访问空文件。  这是通过将 @code{(auto-insert-mode t)} 放入初始化文件 (@pxref{Init File,,, emacs, The GNU Emacs Manual}) 来完成的。
+
+@vindex auto-insert-alist
+插入的内容（如果有的话）由变量 @code{auto-insert-alist} 决定。  该列表中每个元素的 @sc{car} 要么是一个模式名称，使该元素在缓冲区处于该模式时适用，要么是一个字符串，它是与缓冲区的文件名匹配的正则表达式（后者使您能够区分 Emacs 中具有相同模式的不同类型的文件）。  它也可以是通过 @code{(predicate @var{function})} 形式的 plist 声明的谓词。 @var{function} 应该是一个没有参数的谓词函数。  元素的 @sc{car} 也可以是 cons 单元，由模式名称或正则表达式（如上所述）和附加描述性字符串组成。
+
+当找到匹配的元素时，@sc{cdr} 会指示要做什么。  它可能是一个字符串，即文件名，如果在目录 @code{auto-insert-directory} 中或在绝对文件名下找到该文件，则将插入其内容。  或者它可以是要插入的骨架（@pxref{Skeleton Language}）。
+
+它也可以是一个函数，允许执行各种操作。  该函数可以简单地插入一些文本，实际上，它可以是骨架命令（@pxref{Using Skeletons}）。  它可以是 lambda 函数，例如有条件地调用另一个函数。  或者它甚至可以重置缓冲区的模式。  如果您想按顺序执行多个此类操作，则可以使用向量，即方括号 (@samp{[@r{@dots{}}]}) 之间的上述几个元素。
+
+默认情况下，C 和 C++ 标头会插入从文件名派生的符号的定义，以防止多重包含。  C 和 C++ 源代码插入了标头的包含内容。  Makefile 插入文件 makefile.inc（如果存在）。
+
+TeX 和 bibTeX 模式文件插入文件 tex-insert.tex（如果存在），而 LaTeX 模式文件插入典型的 @code{\documentclass} 帧。  HTML 文件插入带有常用框架的骨架。
+
+Ada 模式文件调用 Ada 标头骨架命令。  Emacs Lisp 源文件插入常用的标头，其中包含环境变量 @env{$ORGANIZATION} 的版权或当前用户的名称，并提示输入描述内容的有效关键字。 @file{bin} 目录中 Emacs 无法确定其没有专用模式 (@pxref{Choosing Modes,,, emacs, The GNU Emacs Manual}) 的文件被设置为 Shell 脚本模式。
+
+@findex define-auto-insert
+在 Lisp (@pxref{Init File,,, emacs, The GNU Emacs Manual}) 中，您可以使用函数 @code{define-auto-insert} 添加或修改 @code{auto-insert-alist}。  请使用 @kbd{C-h f define-auto-insert} 查看其文档。
+
+@vindex auto-insert
+变量 @code{auto-insert} 表示当 @code{auto-insert} 被非交互调用时要做什么，例如，当新找到的文件为空时（见上文）：
+@table @asis
+@item @code{nil}
+什么也不做。
+@item @code{t}
+如果可能的话，插入一些内容，即@code{auto-insert-alist}中有匹配的条目。
+@item 其他
+如果可能的话插入一些内容，但标记为未修改。
+@end table
+
+@vindex auto-insert-query
+变量 @code{auto-insert-query} 控制是否询问插入内容。  当这是@code{nil}时，插入只能用@kbd{M-x auto-insert}完成。  当这是 @code{function} 时，每当 @code{auto-insert} 作为函数调用时，例如当 Emacs 访问空文件并且您设置了上述钩子时，都会查询您。  不然总是会被问到。
+
+@vindex auto-insert-prompt
+查询时，变量@code{auto-insert-prompt}的值用作 y 或 n 类型问题的提示。  如果其中包含 @samp{%s} 构造，则该构造会被导致选择插入规则的内容替换。  它可以是描述性文本、缓冲区的模式名称或与文件名匹配的正则表达式。
+
+
+
+@node Copyrights
+@chapter 插入和更新版权
+@cindex copyrights
+
+@findex copyright
+@kbd{M-x copyright}是骨架插入命令，在该点添加版权声明。  “by”部分取自您的环境变量@env{$ORGANIZATION}，或者如果未设置，系统会提示您设置。  如果缓冲区具有注释语法 (@pxref{Comments,,, emacs, The GNU Emacs Manual})，则会将其作为注释插入。
+
+@findex copyright-update
+@vindex copyright-limit
+@vindex copyright-current-year
+@kbd{M-x copyright-update} 在缓冲区的前 @code{copyright-limit} 字符中查找版权声明，并在必要时更新它。将当前年份（变量@code{copyright-current-year}）添加到现有年份中，格式与前一年相同，即 1994、'94 或 94。如果找到截至去年的破折号分隔的年份列表，则将其扩展到当前年份，否则添加年份，并用逗号分隔。  或者当使用前缀参数调用时它会替换它们。  如果发现引用错误版本的 GNU 通用公共许可证 (@pxref{Copying,,, emacs, The GNU Emacs Manual}) 的标头，该标头也会更新。
+
+此函数的一个有趣的应用是每次保存文件时自动调用它。  这是通过将 @code{(add-hook 'before-save-hook 'copyright-update)} 放入 @file{~/.emacs} 文件 (@pxref{Init File,,, emacs, The GNU Emacs Manual}) 来完成的。  或者，您可以执行@kbd{M-x customize-variable @key{RET} before-save-hook @key{RET}}。  @code{copyright-update} 可以方便地作为自定义缓冲区中的选项列出。
+
+@vindex copyright-query
+变量@code{copyright-query}控制是否更新版权或是否询问版权。  当这是@code{nil}时，更新仅通过@kbd{M-x copyright-update}完成。  当这是 @code{function} 时，只要 @code{copyright-update} 作为函数被调用，就会被查询，例如在上面提到的 @code{before-save-hook} 功能中。  不然总是会被问到。
+
+
+
+@node Executables
+@chapter 使解释器脚本可执行
+@cindex executables
+
+@vindex executable-prefix
+@vindex executable-chmod
+各种解释器模式（例如 Shell 脚本模式或 AWK 模式）将自动插入或更新缓冲区的幻数，这是第一行的特殊注释，使 @code{exec} 系统调用知道如何执行脚本。  为此，脚本在保存时自动可执行，并使用 @code{executable-chmod} 作为系统 @code{chmod} 命令的参数。  幻数以 @code{executable-prefix} 的值作为前缀。
+
+@vindex executable-magicless-file-regexp
+任何名称与 @code{executable-magicless-file-regexp} 匹配的文件都不会带有幻数，也不会被设为可执行文件。  这主要用于资源文件，这些文件仅用于读入。
+
+@vindex executable-insert
+变量 @code{executable-insert} 表示当 @code{executable-set-magic} 被非交互式调用时要做什么，例如，当文件没有幻数或幻数错误时：
+@table @asis
+@item @code{nil}
+什么也不做。
+@item @code{t}
+插入或更新幻数。
+@item 其他
+插入或更新幻数，但标记为未修改。
+@end table
+
+@findex executable-set-magic
+@vindex executable-query
+变量 @code{executable-query} 控制是否询问插入或更新幻数。  当这是@code{nil}时，更新仅通过@kbd{M-x executable-set-magic}完成。  当这是 @code{function} 时，每当 @code{executable-set-magic} 作为函数调用时，例如当 Emacs 将缓冲区置于 Shell 脚本模式时，您都会被查询。  不然总是会被问到。
+
+@node Timestamps
+@chapter 维护修改文件中的时间戳
+@cindex timestamps
+
+@findex time-stamp
+@vindex before-save-hook
+@code{time-stamp} 命令可用于在每次保存文件时使用新时间戳自动更新文件中的模板。自定义挂钩 @code{before-save-hook} 添加函数 @code{time-stamp} 来安排此操作。  如果您使用自定义来执行此操作，则 @code{time-stamp} 会方便地在自定义缓冲区中列为选项。
+
+@vindex time-stamp-active
+@findex time-stamp-toggle-active
+@vindex time-stamp-format
+@vindex time-stamp-time-zone
+仅当可自定义变量 @code{time-stamp-active} 打开时（默认情况下），时间戳才会更新；命令 @code{time-stamp-toggle-active} 可用于切换它。  时间戳的格式由可自定义变量@code{time-stamp-format}和@code{time-stamp-time-zone}设置。
+
+@vindex time-stamp-line-limit
+@vindex time-stamp-start
+@vindex time-stamp-end
+@vindex time-stamp-count
+@vindex time-stamp-inserts-lines
+变量 @code{time-stamp-line-limit}、@code{time-stamp-start}、@code{time-stamp-end}、@code{time-stamp-count} 和 @code{time-stamp-inserts-lines} 控制查找模板。  不要在您的初始化文件中更改这些内容，否则您将与其他人的文件不兼容。  如果必须更改它们，请仅在文件本身的局部变量部分中进行更改。
+
+通常，模板必须出现在文件的前 8 行，并且如下所示：
+
+@example
+Time-stamp: <>
+Time-stamp: " "
+@end example
+
+时间戳写在括号或引号之间：
+
+@example
+Time-stamp: <1998-02-18 10:20:51 gildea>
+@end example
+
+@node Tempo
+@chapter Tempo：灵活的模板插入
+
+@cindex templates
+Tempo 包提供了一种简单的方法来定义强大的模板或宏（如果您愿意）。  它主要供但不限于程序员用于创建编辑某些类型文档的快捷方式。
+
+@findex tempo-backward-mark
+@findex tempo-forward-mark
+模板被定义为要在当前缓冲区中的某个时间点插入的项目列表。  有些可以是简单的字符串，而其他可以控制格式或定义插入文本中的特殊兴趣点。 @kbd{M-x tempo-backward-mark} 和 @kbd{M-x tempo-forward-mark} 可用于在这些点之间跳转。
+
+可以通过包含 Lisp 符号（将被计算为变量）或列表（将被计算为 Lisp 表达式）来创建更灵活的模板。  可以提供指定标签到扩展模板的自动完成。
+
+@findex tempo-define-template
+请参阅 @code{tempo-define-template} 的文档，了解可用于定义速度模板以及插入命令的不同项目。
+
+有关使用 Tempo 包的更多信息，请参阅 @file{tempo.el} 中的注释。
+
+@node Hippie Expand
+@chapter “嬉皮士”扩张
+
+@findex hippie-expand
+@kindex M-/
+@vindex hippie-expand-try-functions-list
+@kbd{M-x hippie-expand} 是一个提供各种补全和扩展的单个命令。  反复调用，它会连续尝试所有可能的完成。
+
+尝试哪些以及按什么顺序由可定制选项@code{hippie-expand-try-functions-list}的内容决定。  可以通过更改此列表中函数的顺序、删除或插入新函数来进行扩展行为的许多自定义。  给定一个正数值参数，@kbd{M-x hippie-expand} 直接向前跳转到该列表中的该数量的函数。  给定一些其他参数（负参数或只是@kbd{C-u}），它会撤消尝试的完成。
+
+有关可能性的更多信息，请参阅 @file{hippie-exp.el} 中的评论。
+
+通常，您可以使用 @code{dabbrev-expand}（@kbd{M-/} 的标准绑定）将 @code{hippie-expand} 绑定到 @kbd{M-/}，从而提供一种扩展可能性。
+
+@node Skeleton Language
+@chapter 骨架语言
+@cindex skeleton language
+
+@findex skeleton-insert
+骨架是 Lisp 语言的简写扩展，其中各种原子直接对当前缓冲区执行操作或基本的流量控制机制。  骨架由函数 @code{skeleton-insert} 解释。
+
+骨架是一个以交互器开头的列表，通常是提示字符串，或者在不需要时为 @code{nil}，但也可以是用于复杂读取函数或返回某些计算值的 Lisp 表达式。列表的其余部分是任意数量的元素，如下表所述：
+
+@table @asis
+@item @code{"@var{string}"}, @code{?@var{c}}, @code{?\@var{c}}
+@vindex skeleton-transformation
+插入字符串或字符。  当 @code{skeleton-transformation} 为非 @code{nil} 时，文字字符串和字符将通过 @code{skeleton-transformation} 传递。
+@item @code{\n}
+@c ??? something seems very wrong here.
+插入换行符并在当前行下对齐，但如果这是骨架的最后一个元素并且换行符将插入到行尾，或者这是第一个元素并且换行符将插入到行首，则不会。  使用换行符 @code{?\n} 来防止对齐。  使用 @code{"\n"} 作为骨架的第一个或最后一个字符串元素可无条件插入换行符。
+@item @code{_}
+有趣的一点。  当将骨骼缠绕在连续的区域上时，它们会被放置在这些地方。  首先留下点 @code{_} ，没有任何东西被包裹。
+@item @code{-}
+没有区域间互动的有趣点；覆盖由 @code{_} 设置的有趣点。
+@item @code{>}
+根据主模式缩进。  当后面的元素是@code{_}，并且有一个中间区域将被包裹在这里时，缩进该中间区域。
+@item @code{&}
+逻辑和。  如果前面的元素移动了点，即通常插入了一些东西，则执行后面的元素。
+@item @code{|}
+逻辑异或。  如果前面的元素没有移动点，即通常没有插入任何内容，则执行后面的元素。
+@item @code{@@}
+将位置添加到@code{skeleton-positions}。
+@item @code{-@var{number}}
+删除前面的数字字符。  取决于 @code{skeleton-untabify} 的值。
+@item @code{()} 或 @code{nil}
+被忽略了。
+@item @var{lisp-expression}
+求值，返回值再次被解释为骨架元素。
+@item @code{str}
+一个特殊变量，当第一次评估时，通常会根据骨架的交互器提示输入。  然后将其设置为交互器产生的返回值。  每个子骨架都有该变量的本地副本。
+@item @code{v1}, @code{v2}
+骨架本地用户变量。
+@item @code{'@var{expression}}
+评估以下 Lisp 表达式的副作用，但防止它被解释为骨架元素。
+@item @var{skeleton}
+子骨架会递归插入，不是一次，而是随着用户在子骨架交互器上输入内容而经常插入。  因此子骨架中一定有一个@code{str}。  当提示是返回连续列表元素的 lisp 表达式时，它们也可以非交互方式使用。
+@item @code{resume:}
+被忽略了。  如果用户在骨架解释期间退出，则执行将在此处恢复。
+@item @code{help}
+在与用户交互期间帮助形成或@code{nil}。
+@item @code{input}
+读取输入时的初始输入（字符串或带索引的 cons）。
+@item @code{quit}
+由于用户退出而进入 @code{resume:} 部分时，该常量为非 @code{nil}。
+@end table
+
+@findex skeleton-further-elements
+有些模式还使用它们自己定义的其他骨架元素。  例如，在 shell 脚本模式的骨架中，您会发现@code{<}，它会向后进行刚性缩进，或者在 CC 模式的骨架中，您会发现自插入元素@code{@{} and @code{@}}。  它们由缓冲区局部变量 @code{skeleton-further-elements} 定义，它是解释骨架时绑定的变量列表。
+
+@findex define-skeleton
+宏@code{define-skeleton}定义了用于解释骨架的命令。  第一个参数是命令名称，第二个参数是文档字符串，其余的是交互器和任意数量的骨架元素，它们一起形成骨架。  该骨架被分配给与命令同名的变量，因此可以从您的 @file{~/.emacs} 文件 (@pxref{Init File,,, emacs, The GNU Emacs Manual}) 中覆盖。
+
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Concept Index
+@unnumbered 概念索引
+@printindex cp
+
+@node Command Index
+@unnumbered 命令索引
+@printindex fn
+
+@node Variable Index
+@unnumbered 变量索引
+@printindex vr
+
+@bye

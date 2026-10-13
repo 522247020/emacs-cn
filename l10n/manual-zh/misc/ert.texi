@@ -1,0 +1,1282 @@
+\输入texinfo
+@c %**start of header
+@setfilename ../../info/ert.info
+@settitle Emacs Lisp 回归测试
+@documentlanguage en
+@include docstyle.texi
+@syncodeindex fn cp
+@syncodeindex vr cp
+@syncodeindex pg cp
+@syncodeindex ky cp
+@c %**end of header
+
+@dircategory Emacs misc features
+@direntry
+* ERT: (ert).                    Emacs Lisp 回归测试工具。
+@end direntry
+
+@copying
+版权所有 @copyright{} 2008, 2010--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@titlepage
+@title Emacs Lisp 回归测试
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top ERT: Emacs Lisp Regression Testing
+
+@insertcopying
+
+ERT is a tool for automated testing in Emacs Lisp.  Its main features
+are facilities for defining and running tests, reporting results, and
+debugging test failures interactively.  Tests are written in Emacs Lisp,
+just like the code under test, making it easy to write expressive and
+concise test cases.
+
+ERT has unique features that take advantage of the dynamic and
+interactive nature of Emacs.  It has no opinion about when or how
+tests are written: you can use it to verify newly written code,
+reproduce known bugs, prevent regressions, or explore the behavior of
+complex systems.  It can be used for both unit tests and larger
+integration tests.
+
+@menu
+* Introduction::                A simple example of an ERT test.
+* How to Run Tests::            Run tests in Emacs or from the command line.
+* How to Write Tests::          How to add tests to your Emacs Lisp code.
+* How to Debug Tests::          What to do if a test fails.
+* Extending ERT::               ERT is extensible in several ways.
+* Other Testing Concepts::      Features not in ERT.
+* Index::                       Concept, Function and Variable Index
+* GNU Free Documentation License::  The license for this documentation.
+
+@detailmenu
+ --- The Detailed Node Listing ---
+
+How to Run Tests
+
+* Running Tests Interactively::  Run tests in your current Emacs.
+* Running Tests in Batch Mode::  Run tests in emacs -Q.
+* Test Selectors::               Choose which tests to run.
+
+How to Write Tests
+
+* The @code{should} Macro::          A powerful way to express assertions.
+* Expected Failures::           Tests for known bugs.
+* Tests and Their Environment:: Don't depend on customizations; no side effects.
+* Useful Techniques::           Some examples.
+
+How to Debug Tests
+
+* Understanding Explanations::  How ERT gives details on why an assertion failed.
+* Interactive Debugging::       Tools available in the ERT results buffer.
+
+Extending ERT
+
+* Defining Explanation Functions::  Teach ERT about more predicates.
+* Low-Level Functions for Working with Tests::  Use ERT's data for your purposes.
+
+Other Testing Concepts
+
+* Mocks and Stubs::           Stubbing out code that is irrelevant to the test.
+* Fixtures and Test Suites::  How ERT differs from tools for other languages.
+
+Index
+
+* Index::                       Concept, Function and Variable Index
+
+Appendix
+
+* GNU Free Documentation License:: The license for this documentation.
+
+@end detailmenu
+@end menu
+@end ifnottex
+
+
+@node Introduction
+@chapter 介绍
+@cindex introduction to ERT
+
+除了函数、宏、变量和其他常见的 Lisp 结构之外，ERT 还允许您定义 @emph{tests}。  测试只是 Lisp 代码：调用其他代码并检查其行为是否按预期运行的代码。
+
+ERT 跟踪已定义的测试，并提供方便的命令来运行这些测试，以验证当前加载到 Emacs 中的定义是否通过测试。
+
+一些 Lisp 文件具有如下注释（改编自包@file{pp.el}）：
+
+@lisp
+;; (pp-to-string '(quote quote))          ; expected: "'quote"
+;; (pp-to-string '((quote a) (quote b)))  ; expected: "('a 'b)\n"
+;; (pp-to-string '('a 'b))                ; same as above
+@end lisp
+
+这些注释中包含的 Lisp 形式可以不时地进行评估，例如使用@kbd{C-x C-e}，将输出与预期输出进行比较。  ERT 将其形式化并引入了一个通用约定，这简化了 Emacs 开发，因为程序员不再需要手动查找和评估此类注释。
+
+与上述注释等效的 ERT 测试定义如下：
+
+@lisp
+(ert-deftest pp-test-quote ()
+  "Tests the rendering of `quote' symbols in `pp-to-string'."
+  (should (equal (pp-to-string '(quote quote)) "'quote"))
+  (should (equal (pp-to-string '((quote a) (quote b))) "('a 'b)\n"))
+  (should (equal (pp-to-string '('a 'b)) "('a 'b)\n")))
+@end lisp
+
+如果您知道 @code{defun}，@code{ert-deftest} 的语法应该看起来很熟悉：此示例定义了一个名为 @code{pp-test-quote} 的测试，如果对 @code{equal} 的三个调用都返回非 @code{nil}，则该测试将通过。
+
+@code{should} 是一个与 @code{cl-assert} 含义相同但更好的错误报告功能的宏。  @xref{The @code{should} Macro}。
+
+每个测试都应该有一个名称来描述它测试的功能。测试名称可以任意选择——它们位于与函数和变量分开的命名空间中——但应该遵循通常的 Emacs Lisp 约定，即具有指示它们属于哪个包的前缀。  测试名称由 ERT 在报告失败时显示，并且可以在选择要运行的测试时使用。
+
+第一行中的空括号@code{()}目前没有任何意义，保留用于将来的扩展。  它们还使 @code{ert-deftest} 的语法与 @code{defun} 的语法更加相似。
+
+文档字符串描述了此测试测试的功能。  以交互方式运行测试时，会显示失败测试的文档字符串的第一行，因此如果第一行本身有意义，那就太好了。
+
+测试的主体可以是任意 Lisp 代码。  它应该具有尽可能少的副作用；每个测试都应该编写为在完成后进行清理，使 Emacs 处于与测试之前相同的状态。  即使测试失败，也应该进行清理。  @xref{Tests and Their Environment}。
+
+
+@node  How to Run Tests
+@chapter 如何运行测试
+@cindex how to run ert tests
+
+您可以在正在使用的 Emacs 中运行测试，也可以在单独的 Emacs 进程中以批处理模式（即没有用户界面）的命令行上运行测试。  前一种模式在交互式开发过程中很方便，后者有助于确保测试独立于您的自定义而通过；它允许您从 makefile 调用测试，并编写在多个不同 Emacs 版本中运行测试的脚本。
+
+@menu
+* Running Tests Interactively::   在当前的 Emacs 中运行测试。
+* Running Tests in Batch Mode::   在 emacs -Q 中运行测试。
+* Test Selectors::                选择要运行的测试。
+@end menu
+
+
+@node Running Tests Interactively
+@section 交互式运行测试
+@cindex running tests interactively
+@cindex interactive testing
+
+@findex ert
+@findex ert-run-tests-interactively
+您可以使用命令 @kbd{M-x ert @key{RET} t @key{RET}}（这是 @code{ert-run-tests-interactively} 的别名）运行当前在 Emacs 中定义的测试。  @code{t}参数意味着运行所有定义的测试，请参阅@ref{Test Selectors}，它还解释了如何仅运行测试的某些特定部分。  ERT 将弹出一个新的缓冲区，即 ERT 结果缓冲区，显示测试运行的结果。它看起来像这样：
+
+@example
+Selector: t
+Passed:  31
+Skipped: 0
+Failed:  2 (2 unexpected)
+Total:   33/33
+
+Started at:   2008-09-11 08:39:25-0700
+Finished.
+Finished at:  2008-09-11 08:39:27-0700
+
+FF...............................
+
+F addition-test
+    (ert-test-failed
+     ((should
+       (=
+        (+ 1 2)
+        4))
+      :form
+      (= 3 4)
+      :value nil))
+
+F list-test
+    (ert-test-failed
+     ((should
+       (equal
+        (list 'a 'b 'c)
+        '(a b d)))
+      :form
+      (equal
+       (a b c)
+       (a b d))
+      :value nil :explanation
+      (list-elt 2
+                (different-atoms c d))))
+@end example
+
+@cindex test results buffer
+顶部是结果摘要：我们运行了当前 Emacs 中定义的所有测试 (@code{Selector: t})，其中 31 个通过，2 个意外失败。  @xref{Expected Failures}，解释本文中术语@emph{unexpected}。
+
+由点和@code{F}s组成的线是一个进度条，其中每个字符代表一个测试；当测试运行时它会被填满。  点表示测试通过，@code{F} 表示测试失败。  在进度条下方，ERT 显示有关具有意外结果的每个测试的详细信息。  在上面的示例中，有两次失败，都是由于失败的 @code{should} 表单造成的。  @xref{Understanding Explanations}，了解更多详情。
+
+ERT 结果缓冲区中提供以下键绑定：
+
+@table @kbd
+
+@item @key{RET}
+@kindex RET@r{, in ert results buffer}
+该缓冲区中的每个函数或宏的名称都是一个按钮；将点移动到它并输入 @kbd{@key{RET}} 跳转到它的定义。
+
+@item @key{TAB}
+@itemx S-@key{TAB}
+@kindex TAB@r{, in ert results buffer}
+@kindex S-TAB@r{, in ert results buffer}
+在向前 (@code{forward-button}) 和向后 (@code{backward-button}) 按钮之间循环。
+
+@item r
+@kindex r@r{, in ert results buffer}
+@findex ert-results-rerun-test-at-point
+自行重新运行近点测试 (@code{ert-results-rerun-test-at-point})。
+
+@item d
+@kindex d@r{, in ert results buffer}
+@findex ert-results-rerun-test-at-point-debugging-errors
+在启用调试器的情况下重新运行近点测试 (@code{ert-results-rerun-test-at-point-debugging-errors})。
+
+@item R
+@kindex R@r{, in ert results buffer}
+@findex ert-results-rerun-all-tests
+重新运行所有测试 (@code{ert-results-rerun-all-tests})。
+
+@item .
+@kindex .@r{, in ert results buffer}
+@findex ert-results-find-test-at-point-other-window
+跳转到测试附近点 (@code{ert-results-find-test-at-point-other-window}) 的定义。  这与 @kbd{@key{RET}} 具有相同的效果，但不要求点位于测试名称上。
+
+@item b
+@kindex b@r{, in ert results buffer}
+@findex ert-results-pop-to-backtrace-for-test-at-point
+@cindex backtrace of a failed test
+显示失败测试的回溯 (@code{ert-results-pop-to-backtrace-for-test-at-point})。 @xref{Debugging,, Backtraces, elisp, GNU Emacs Lisp Reference Manual}，有关回溯的更多信息。
+
+@item l
+@kindex l@r{, in ert results buffer}
+@findex ert-results-pop-to-should-forms-for-test-at-point
+显示测试中执行的 @code{should} 表单列表 (@code{ert-results-pop-to-should-forms-for-test-at-point})。
+
+@kindex e@r{, in ert results buffer}
+@findex ert-results-pop-to-erts-file-tests-for-test-at-point
+@item e
+显示一个缓冲区，其中包含由点 (@code{ert-results-pop-to-erts-file-tests-for-test-at-point}) 处的测试执行的 erts 文件中的测试列表。  对于调用 @code{ert-test-erts-file} 的测试，该列表包含已执行的引用的 erts 文件中定义的测试。  跳过的测试将被省略。  如果测试失败，列表将以失败的测试结束。
+
+每个条目都包含测试名称，后跟执行正在测试的转换的代码。  缓冲区还包含允许跳转到测试定义的按钮。
+
+@xref{erts files} 了解更多信息。
+
+@item m
+@kindex m@r{, in ert results buffer}
+@findex ert-results-pop-to-messages-for-test-at-point
+显示测试中生成的任何消息（使用 Lisp 函数@code{message}）或它调用的任何代码 (@code{ert-results-pop-to-messages-for-test-at-point})。
+
+@item L
+@kindex L@r{, in ert results buffer}
+@findex ert-results-toggle-printer-limits-for-test-at-point
+默认情况下，故障详细信息中的长表达式使用 @code{print-length} 和 @code{print-level} 缩写。  通过使用此命令 (@code{ert-results-toggle-printer-limits-for-test-at-point}) 将点移动到测试失败，增加限制以显示更多表达式。
+
+@item D
+@kindex D@r{, in ert results buffer}
+@findex ert-delete-test
+@cindex delete test
+从正在运行的 Emacs 会话中删除测试 (@code{ert-delete-test})。
+
+@item h
+@kindex h@r{, in ert results buffer}
+@findex ert-describe-test
+显示测试文档 (@code{ert-describe-test})。
+
+@item T
+@kindex T@r{, in ert results buffer}
+@findex ert-results-pop-to-timings
+显示上次运行的测试时间 (@code{ert-results-pop-to-timings})。
+
+@item M-x ert-delete-all-tests
+@findex ert-delete-all-tests
+@cindex delete all tests
+从正在运行的会话中删除所有测试。
+
+@item M-x ert-describe-test
+@findex ert-results-describe-test-at-point
+提示进行测试，然后显示其文档。
+
+@end table
+
+
+@node Running Tests in Batch Mode
+@section 以批处理模式运行测试
+@cindex running tests in batch mode
+@cindex batch-mode testing
+
+@findex ert-run-tests-batch
+@findex ert-run-tests-batch-and-exit
+ERT 支持从命令行、脚本或 makefile 进行自动调用。  为此目的有两个函数：@code{ert-run-tests-batch}和@code{ert-run-tests-batch-and-exit}。它们可以这样使用：
+
+@example
+emacs -batch -l ert -l my-tests.el -f ert-run-tests-batch-and-exit
+@end example
+
+该命令将以批处理模式启动 Emacs，加载 ERT，加载@file{my-tests.el}，并运行其中定义的所有测试。  如果所有测试都通过，它将以零退出状态退出；如果任何测试失败或出现其他问题，它将以非零退出状态退出。  它还会将进度消息和错误诊断打印到标准输出。
+
+@findex ert-summarize-tests-batch-and-exit
+您还可以将上述输出重定向到日志文件，例如 @file{output.log}，并使用 @code{ert-summarize-tests-batch-and-exit} 函数生成简洁的摘要，如下所示：
+
+@example
+emacs -batch -l ert -f ert-summarize-tests-batch-and-exit output.log
+@end example
+
+@vindex ert-batch-print-level
+@vindex ert-batch-print-length
+ERT 尝试通过在打印 Lisp 值时为 @code{print-level} 和 @code{print-length} 选择保守值来限制失败测试的输出大小。  在某些情况下，这可能会导致很难看出这些值的哪些部分不正确。  使用 @code{ert-batch-print-level} 和 @code{ert-batch-print-length} 进行自定义：
+
+@example
+emacs -batch -l ert -l my-tests.el \
+      --eval "(let ((ert-batch-print-level 10) \
+                    (ert-batch-print-length 120)) \
+                (ert-run-tests-batch-and-exit))"
+@end example
+
+@vindex ert-batch-backtrace-line-length
+然而，即使 @code{print-level} 和 @code{print-length} 的适度设置也可能在回溯中产生极长的行，并伴随执行过程中的暂停。  将 @code{ert-batch-backtrace-line-length} 设置为 @code{t} 以使用 @code{backtrace-line-length}、@code{nil} 的值来停止对回溯行长度的任何限制（即，获取完整回溯），或设置正整数以将回溯行长度限制为该数字。
+
+@vindex ert-quiet
+默认情况下，批处理模式下的 ERT 非常冗长，每次测试后都会打印一行结果。  这为您提供进度信息：已执行了多少测试以及有多少测试。  然而，在某些情况下，这么多的输出可能是不合需要的。  在这种情况下，将 @code{ert-quiet} 变量设置为非 @code{nil} 值：
+
+@example
+emacs -batch -l ert -l my-tests.el \
+      --eval "(let ((ert-quiet t)) (ert-run-tests-batch-and-exit))"
+@end example
+
+在安静模式下，ERT 仅打印意外结果和摘要。
+
+您可以指定选择器仅运行测试的子集 (@pxref{Test Selectors})。  例如，以下命令将运行测试名称与正则表达式“to-match”匹配的所有测试。
+
+@example
+emacs -batch -l ert -l my-tests.el \
+      -eval '(ert-run-tests-batch-and-exit "to-match")'
+@end example
+
+@vindex EMACS_TEST_VERBOSE@r{, environment variable}
+默认情况下，批处理模式下的 ERT 测试失败摘要非常简短 — 仅列出失败测试的名称。  如果 @env{EMACS_TEST_VERBOSE} 环境变量已设置且非空，则失败摘要还将包含失败测试的数据。
+
+@vindex EMACS_TEST_JUNIT_REPORT@r{, environment variable}
+ERT 可以以批处理模式生成 JUnit 测试报告。  如果设置了环境变量 @env{EMACS_TEST_JUNIT_REPORT}，ERT 将为每个测试包 @file{my-tests.el} 生成相应的 JUnit 测试报告 @file{my-tests.xml}。  函数 @code{ert-summarize-tests-batch-and-exit} 将所有这些包测试报告收集到一个新的 JUnit 测试报告中，并带有该环境变量的相应名称。
+
+
+@node Test Selectors
+@section 测试选择器
+@cindex test selector
+@cindex selecting tests
+
+像@code{ert}这样的函数接受@emph{test selector}，一个指定一组测试的 Lisp 表达式。  测试选择器语法类似于 Common Lisp 的类型说明符语法：
+
+@itemize
+@item @code{nil} selects no tests.
+@item @code{t} selects all tests.
+@item @code{:new} selects all tests that have not been run yet.
+@item @code{:failed} and @code{:passed} select tests according to their most recent result.
+@item @code{:expected}, @code{:unexpected} select tests according to their most recent result.
+@item A string is a regular expression that selects all tests with matching names.
+@item A test (i.e., an object of @code{ert-test} data type, see its doc string for details) selects that test.
+@item A symbol selects the test that the symbol names.
+@item @code{(member @var{tests}...)} selects the elements of
+@var{tests}，测试列表或命名测试的符号。
+@item @code{(eql @var{test})} selects @var{test}, a test or a symbol
+命名一个测试。
+@item @code{(and @var{selectors}@dots{})} selects the tests that match
+全部@var{selectors}。
+@item @code{(or @var{selectors}@dots{})} selects the tests that match
+@var{selectors} 中的任何一个。
+@item @code{(not @var{selector})} selects all tests that do not match
+@var{selector}.
+@item @code{(tag @var{tag})} selects all tests that have @var{tag} on
+他们的标签列表。 （标签是可选标签，您可以在定义测试时将其应用于测试。）
+@item @code{(satisfies @var{predicate})} selects all tests that
+满足 @var{predicate}，一个以测试作为参数的函数，如果选择它，则返回非 @code{nil}。
+@end itemize
+
+选择要运行的测试时经常有用的选择器包括 @code{t} 来运行当前在 Emacs 中定义的所有测试，@code{"^foo-"} 来运行包 @code{foo} 中的所有测试（这假设包 @code{foo} 使用前缀 @code{foo-} 作为其测试名称），基于结果的选择器（例如 @code{(or :new :unexpected)} 来运行所有尚未运行或具有意外结果的测试）在最后一次运行中，以及基于标签的选择器（例如 @code{(not (tag :causes-redisplay))}）来运行所有未标记为 @code{:causes-redisplay} 的测试。
+
+
+@node How to Write Tests
+@chapter 如何编写测试
+@cindex how to write tests
+
+@findex ert-deftest
+ERT 允许您以定义函数的方式定义测试。  您可以在缓冲区中键入 @code{ert-deftest} 形式，并使用 @code{eval-defun} 或 @code{compile-defun} 对其进行评估，或者您可以保存文件并加载它，也可以选择先对其进行字节编译。
+
+就像 @code{find-function} 只能在从文件加载函数时才能找到函数的定义位置一样，只有从文件加载测试时，ERT 才能找到定义测试的位置。
+
+如果测试定义是由宏生成的，则宏可能希望通过将属性 @code{find-function-type-alist} 放在测试名称上来帮助 ERT 找到对宏的定义调用。 @xref{Finding Definitions,,,elisp, GNU Emacs Lisp Reference Manual}。
+
+
+@menu
+* The @code{should} Macro::           表达主张的有力方式。
+* Expected Failures::            测试已知错误。
+* Tests and Their Environment::  不要依赖定制；无副作用。
+* Useful Techniques::            一些例子。
+* erts files::                   包含许多缓冲区测试的文件。
+* Syntax Highlighting Tests::    面部分配测试。
+* Helpers for Buffers::          在测试期间处理缓冲区。
+* Helper Functions::             各种辅助功能。
+@end menu
+
+
+@node The @code{should} Macro
+@section @code{should} 宏
+
+@findex should@r{, ert macro}
+测试主体可以包含任意代码；但为了有用，他们需要检查正在测试的代码（或@emph{code under test}）是否做了它应该做的事情。  宏 @code{should} 与 cl 包 (@pxref{Assertions,,, cl, Common Lisp Extensions}) 中的@code{cl-assert}类似，但分析其参数形式并记录 ERT 可以显示的信息以帮助调试。
+
+本次测试定义
+
+@lisp
+(ert-deftest addition-test ()
+  (should (= (+ 1 2) 4)))
+@end lisp
+
+通过 @kbd{M-x ert} 运行时将产生以下输出：
+
+@example
+F addition-test
+    (ert-test-failed
+     ((should
+       (=
+        (+ 1 2)
+        4))
+      :form
+      (= 3 4)
+      :value nil))
+@end example
+
+在这个例子中，@code{should}记录了这样的事实：(= (+ 1 2) 4)在减少到@code{nil}之前减少到(= 3 4)。  在调试测试失败的原因时，了解函数 @code{+} 在此处返回 3 会有所帮助。  ERT 记录在 @code{should} 内直接调用的任何谓词的返回值。
+
+@findex should-not@r{, ert macro}
+@findex should-error@r{, ert macro}
+除了@code{should}之外，ERT 还提供@code{should-not}（用于检查谓词是否返回@code{nil}）和@code{should-error}（用于检查其中调用的形式是否发出错误信号）。  @code{should-error} 的使用示例：
+
+@lisp
+(ert-deftest test-divide-by-zero ()
+  (should-error (/ 1 0)
+                :type 'arith-error))
+@end lisp
+
+这会检查一除以零是否表示 @code{arith-error} 类型的错误。  @code{should-error} 的 @code{:type} 参数是可选的；如果不存在，则接受任何类型的错误。 @code{should-error} 返回已发出信号的错误的错误描述，以允许进行额外的检查。  错误描述的格式为@code{(ERROR-SYMBOL . DATA)}。
+
+没有 @code{should-not-error} 宏，因为发出错误信号的测试无论如何都会失败，因此 @code{should-not-error} 实际上是默认值。
+
+@xref{Understanding Explanations}，了解有关 @code{should} 报告内容的更多详细信息。
+
+
+@node Expected Failures
+@section 预期失败
+@cindex expected failures
+@cindex known bugs
+
+@vindex :expected-result
+有些错误修复起来很复杂，或者不是很重要，因此保留为@emph{known bugs}。  如果存在触发错误并失败的测试用例，ERT 会在您每次运行所有测试时提醒您此失败。  对于已知的错误，此警报会分散注意力。  抑制它的方法是将 @code{:expected-result :failed} 添加到测试定义中：
+
+@lisp
+(ert-deftest future-bug ()
+  "Test `time-forward' with negative arguments.
+Since this functionality isn't implemented, the test is known to fail."
+  :expected-result :failed
+  (time-forward -1))
+@end lisp
+
+ERT 仍会在进度栏中显示一个小@code{f}，以提醒存在已知错误，并将测试视为失败，但否则会保持安静。
+
+以这种方式将测试标记为已知失败的另一种方法是删除该测试。  如果无意修复它，即，如果以前被视为错误的行为已成为可接受的功能，那么这是一个好主意。
+
+然而，一般来说，保留已知会失败的测试可能会很有用。  如果有人想要修复错误，他们将有一个非常好的起点：重现错误的自动化测试用例。  这使得修复错误、证明错误已修复并防止未来出现回归变得更加容易。
+
+ERT 对意外通过的测试显示的警报与对意外失败的测试显示的警报类型相同。  这样，如果您所做的代码更改碰巧修复了您不知道的错误，您将知道删除该测试的 @code{:expected-result} 子句并关闭相应的错误报告（如果有）。
+
+由于 @code{:expected-result} 在加载测试时评估其参数，因此只能在某些 Emacs 版本、特定架构等上将测试标记为已知失败：
+
+@lisp
+(ert-deftest foo ()
+  "A test that is expected to fail on Emacs 23 but succeed elsewhere."
+  :expected-result (if (string-match "GNU Emacs 23[.]" (emacs-version))
+                       :failed
+                     :passed)
+  ...)
+@end lisp
+
+
+@node Tests and Their Environment
+@section 测试及其环境
+
+@cindex skipping tests
+@cindex test preconditions
+@cindex preconditions of a test
+@findex skip-when
+@findex skip-unless
+有时，由于缺少先决条件，运行测试没有意义。  所需的 Emacs 功能可能不会被编译，要测试的函数可能会调用外部二进制文件，而该二进制文件可能在测试机器上不可用，等等。  在这种情况下，可以使用宏@code{skip-when}或@code{skip-unless}来跳过测试。@footnote{The @code{skip-when} macro was added in Emacs 30.1.  If you need your tests to be compatible with older versions of Emacs, use @code{skip-unless} instead.}
+
+@noindent
+例如，在 MS-Windows 和 macOS 上会跳过此测试：
+
+@lisp
+(ert-deftest test-gnu-linux ()
+  "A test that is not relevant on MS-Windows and macOS."
+  (skip-when (memq system-type '(windows-nt ns))
+  ...))
+@end lisp
+
+@noindent
+如果正在运行的 Emacs 中不存在功能 @samp{dbusbind}，则跳过此测试：
+
+@lisp
+(ert-deftest test-dbus ()
+  "A test that checks D-BUS functionality."
+  (skip-unless (featurep 'dbusbind))
+  ...)
+@end lisp
+
+@cindex tests and their environment
+运行测试的结果不应依赖于环境的当前状态，并且每个测试都应使其环境保持在其发现时的相同状态。特别是，测试不应依赖于任何 Emacs 自定义变量或挂钩，并且如果必须对 Emacs 的状态或 Emacs 外部的状态（例如文件系统）进行任何更改，则应在返回之前撤消这些更改，无论它是通过还是失败。
+
+测试不应依赖于环境，因为任何此类依赖关系都会使测试变得脆弱或导致仅在某些情况下发生且难以重现的失败。  当然，被测试的代码可能具有影响其行为的设置。  在这种情况下，最好使测试@code{let}绑定所有此类设置变量，以在测试期间设置特定配置。  测试还可以设置许多不同的配置，并使用每个配置运行被测代码。
+
+对环境有副作用的测试应该将其恢复到原始状态，因为测试后持续存在的任何副作用都会扰乱运行测试的程序员的工作流程。  如果测试中的代码对 Emacs 的当前状态有副作用，例如对当前缓冲区或窗口配置，则测试应分别创建一个临时缓冲区供代码操作（使用@code{with-temp-buffer}），或保存和恢复窗口配置（使用@code{save-window-excursion}）。  对于无法用此类宏保留的状态方面，应使用 @code{unwind-protect} 执行清理，以确保即使测试失败也能进行清理。
+
+一个例外是被测试的代码使用 @code{message} 和类似的日志记录打印的消息；测试不应该费心将 @file{*Message*} 缓冲区恢复到原始状态。
+
+上述准则意味着测试应避免调用高度可定制的命令，例如 @code{find-file}，当然，除非这些命令是他们想要测试的命令。  @code{find-file} 的确切行为取决于许多设置，例如 @code{find-file-wildcards}、@code{enable-local-variables} 和 @code{auto-mode-alist}。  如果测试的行为会受到如此多的外部因素的影响，那么很难编写有意义的测试。  此外，@code{find-file} 具有难以预测且难以撤消的副作用：如果已经在访问所请求的文件，它可能会创建一个新的缓冲区或重用现有的缓冲区；它运行 @code{find-file-hook}，这可能会产生任意副作用。
+
+相反，最好使用具有简单且可预测语义的低级机制，如@code{with-temp-buffer}、@code{insert}或@code{insert-file-contents-literally}，并在将钩子变量绑定到@code{nil}之后，通过直接调用相应的函数来激活任何所需的模式。  这样就避免了上述问题。
+
+
+@node Useful Techniques
+@section 编写测试时的有用技巧
+@cindex useful techniques
+@cindex tips and tricks
+
+测试没有副作用且不依赖于环境的简单函数很容易。  此类测试通常如下所示：
+
+@lisp
+(ert-deftest ert-test-mismatch ()
+  (should (eql (cl-mismatch "" "") nil))
+  (should (eql (cl-mismatch "" "a") 0))
+  (should (eql (cl-mismatch "a" "a") nil))
+  (should (eql (cl-mismatch "ab" "a") 1))
+  (should (eql (cl-mismatch "Aa" "aA") 0))
+  (should (eql (cl-mismatch '(a b c) '(a b d)) 2)))
+@end lisp
+
+此测试使用各种参数组合多次调用函数@code{cl-mismatch}，并将返回值与预期返回值进行比较。  （有些程序员更喜欢 @code{(should (eql EXPECTED ACTUAL))} 而不是此处所示的 @code{(should (eql ACTUAL EXPECTED))}。ERT 无论哪种方式都可以。）
+
+这是一个更复杂的测试：
+
+@lisp
+(ert-deftest ert-test-record-backtrace ()
+  (let ((test (make-ert-test :body (lambda () (ert-fail "foo")))))
+    (let ((result (ert-run-test test)))
+      (should (ert-test-failed-p result))
+      (with-temp-buffer
+        (ert--print-backtrace (ert-test-failed-backtrace result))
+        (goto-char (point-min))
+        (end-of-line)
+        (let ((first-line (buffer-substring-no-properties
+                           (point-min) (point))))
+          (should (equal first-line
+                         "  signal(ert-test-failed (\"foo\"))")))))))
+@end lisp
+
+@findex make-ert-test
+此测试使用 @code{make-ert-test} 创建一个测试对象，其主体将立即发出失败信号。  然后它运行该测试并断言它失败。  然后，它创建一个临时缓冲区并调用 @code{ert--print-backtrace} 将失败测试的回溯打印到当前缓冲区。  最后，它从缓冲区中提取第一行并断言它符合我们的预期。  它使用 @code{buffer-substring-no-properties} 和 @code{equal} 来忽略文本属性；对于考虑属性的测试，可以使用 @code{buffer-substring} 和 @code{equal-including-properties} 代替。
+
+此测试仅检查回溯的第一行的原因是，回溯的其余部分取决于 ERT 的内部结构以及代码是在解释运行还是编译运行。  通过仅查看第一行，测试检查了一个有用的属性——回溯正确地捕获了对 1⁣ 的调用所产生的对 @code{signal} 的调用——而不是脆弱的。
+
+这个例子还表明，如果被测代码的结构考虑到了测试，那么编写测试会容易得多。
+
+例如，如果 @code{ert-run-test} 只接受命名测试的符号而不是测试对象，则测试将需要失败测试的名称，该名称必须是使用 @code{make-symbol} 生成的临时符号，以避免对 Emacs 状态产生副作用。  为@code{ert-run-tests}选择正确的接口可以让测试变得更简单。
+
+类似地，如果 @code{ert--print-backtrace} 将回溯打印到具有固定名称的缓冲区而不是当前缓冲区，则测试将更难消除副作用。  当然，某些地方的代码需要选择缓冲区名称。  但该逻辑独立于打印回溯的逻辑，并将它们保存在单独的函数中使我们能够独立测试它们。
+
+您在 Emacs 中遇到的许多代码都没有考虑到测试。  有时，为此类代码编写测试的最简单方法是稍微重构代码以提供更好的测试接口。  通常，这也使得界面更易于使用。
+
+
+@node erts files
+@section erts 文件
+
+@findex ert-test-erts-file
+许多相关的 Emacs 测试依赖于在执行特定函数之前和之后比较缓冲区的内容。  这些测试可以用正常的方式编写——创建一个临时缓冲区，插入“之前”文本，运行函数，然后与预期的“之后”文本进行比较。  然而，这通常会导致测试代码非常难以阅读和编写，特别是当相关文本是多行时。
+
+因此 ert 提供了一个名为 @code{ert-test-erts-file} 的函数，它接受两个参数：特殊格式的 @dfn{erts} 文件的名称，以及（可选）执行转换的函数。
+
+@findex erts-mode
+这些 erts 文件可以使用 @code{erts-mode} 主模式进行编辑。
+
+erts 文件由 (@samp{=-=}) 分隔符分为多个部分。
+
+这是包含两个测试的示例文件：
+
+@example
+Name: flet
+
+=-=
+(cl-flet ((bla (x)
+(* x x)))
+(bla 42))
+=-=
+(cl-flet ((bla (x)
+            (* x x)))
+  (bla 42))
+=-=-=
+
+Name: defun
+
+=-=
+(defun x ()
+  (print (quote ( thingy great
+                  stuff))))
+=-=-=
+@end example
+
+测试从仅包含 @samp{=-=} 的行开始，以仅包含 @samp{=-=-=} 的行结束。  测试之前可能会出现自由格式的文本（例如注释）以及名称/值对（请参阅下面的列表）。
+
+如果测试中有一行带有 @samp{=-=} ，则表示“after”文本的开始。  否则，“之前”和“之后”文本被假定为相同，这在编写缩进测试时通常会看到。
+
+@code{ert-test-erts-file} 将“before”部分放入临时缓冲区，调用转换函数，然后与“after”部分进行比较。
+
+这是一个用法示例：
+
+@lisp
+(ert-test-erts-file "elisp.erts"
+                    (lambda ()
+                      (emacs-lisp-mode)
+                      (indent-region (point-min) (point-max))))
+@end lisp
+
+测试前可能出现的名称/值规范列表如下。  一般语法是 @samp{Name: Value}，但可以使用续行（与邮件中的行相同——以空格开头的后续行是值的一部分）。
+
+@example
+Name: foo
+Code: (lambda ()
+        (indent-region (point-min) (point-max)))
+@end example
+
+@table @samp
+@item Name
+所有测试都应该有一个名称。  如果测试失败，此名称将出现在 ERT 输出中，并有助于识别失败的测试。
+
+@item Code
+这是将运行以进行转换的代码。  这也可以通过 @code{ert-test-erts-file} 调用传入，但 @samp{Code} 会覆盖它。  它不仅用于以下测试，而且用于文件中的所有后续测试（直到被另一个 @samp{Code} 规范覆盖）。
+
+@item No-Before-Newline
+@itemx No-After-Newline
+这些规范规定“之前”或“之后”部分末尾是否有换行符。  （否则将无法指定。）
+
+@item Point-Char
+有时，在执行变换函数之前能够将点放置在特定位置是很有用的。  @samp{Point-Char: |} 将使 @code{ert-test-erts-file} 放置在 @samp{|} 位于“before”形式中的位置（并删除该字符），并检查它是否位于 @samp{|} 字符位于“after”形式中的位置（如果不是这种情况，则发出测试失败）。  （这将用于所有后续测试，除非被新的 @samp{Point-Char} 规范覆盖。）
+
+@cindex skipping tests, in erts file
+@item Skip
+如果存在并且 value 是计算结果为非 0⁣ 值的形式，则将跳过测试。
+@end table
+
+如果您需要在测试部分中使用文字行单行 @samp{=-=}，您可以用 @samp{\} 字符引用它。
+
+
+@node Syntax Highlighting Tests
+@section 语法突出显示测试
+
+语法突出显示通常由字体锁定次要模式提供，该模式将外观属性分配给缓冲区的某些部分。  @code{ert-font-lock} 包使得引入检查面分配的单元测试成为可能。  测试断言直接包含在代码级注释中，可以从内联字符串或文件中读取。解析器期望输入字符串至少包含一个断言。
+
+测试断言解析器从仅注释行中提取测试。  每个注释断言行都以插入符号 (@samp{^}) 或箭头 (@samp{<-}) 开头。  单个插入符号/箭头或多个插入符号后应紧跟要根据点处的 @code{:face} 属性进行检查的面名称或面列表。
+
+然后，测试检查插入符号上方的第一个非断言列是否包含断言所期望的面：
+
+@example
+var variable = 11;
+//   ^ font-lock-variable-name-face
+//             ^ font-lock-literal-face
+//               ^ font-lock-punctuation-face
+// this is not an assertion, it's just a comment
+//   ^ font-lock-comment-face
+
+// multiple carets per line
+// ^^^^     ^    ^ font-lock-comment-face
+@end example
+
+仅符号 @code{:face} 属性值和断言面值都标准化为单个元素列表，因此下面的断言是等效的：
+
+@example
+// single
+// ^ font-lock-comment-face
+// single
+// ^ (font-lock-comment-face)
+@end example
+
+断言可以被否定：
+
+@example
+var variable = 11;
+//  ^ !font-lock-comment-face
+@end example
+
+可以在断言中指定面列表：
+
+@example
+// TODO
+// ^^^^ (font-lock-comment-face hl-todo)
+     var test = 1;
+// ^    ()
+// ^    nil
+//   negation works as expected
+//   ^  !nil
+@end example
+
+箭头 (@samp{<-}) 表示断言行的第一个非空列将用于检查：
+
+@example
+var variable = 1;
+// <- font-lock-keyword-face
+  11;
+   // <- font-lock-literal-face
+@end example
+
+@findex ert-font-lock-test-string
+
+@code{ert-font-lock-test-string} 函数从内联字符串中提取 ERT 断言。  下面的@code{javascript-mode}符号指定用于注释和字体锁定的主要模式：
+
+@lisp
+(ert-deftest test-font-lock-test-string--correct ()
+  (ert-font-lock-test-string
+   "
+var abc = function(d) @{
+// <- font-lock-keyword-face
+//   ^ font-lock-variable-name-face
+    //        ^ font-lock-keyword-face
+    //             ^ font-lock-variable-name-face
+@};
+"
+   'javascript-mode))
+@end lisp
+
+@findex ert-font-lock-test-file
+
+还可以从文件中提取测试断言：
+
+@lisp
+(ert-deftest test-font-lock-test-file--correct ()
+  (ert-font-lock-test-file
+   (ert-resource-file "correct.js")
+   'javascript-mode))
+@end lisp
+
+@findex ert-font-lock-deftest
+
+@code{ert-font-lock-deftest} 宏简化了内联测试定义：
+
+@lisp
+(ert-font-lock-deftest test-macro-test--inline
+  emacs-lisp-mode
+  "
+(defun fun ())
+;; ^ font-lock-keyword-face
+;;      ^ font-lock-function-name-face")
+@end lisp
+
+@findex ert-font-lock-deftest-file
+
+@code{ert-font-lock-deftest-file} 宏从文件中读取断言：
+
+@lisp
+(ert-font-lock-deftest-file test-macro-test--file
+  "Test reading correct assertions from a file."
+  javascript-mode
+  "correct.js")
+@end lisp
+
+@code{ert-font-lock-deftest} 和 @code{ert-font-lock-deftest-file} 宏接受与 @code{ert-deftest} 相同的关键字参数，即 @code{:tag} 和 @code{:expected-result}。
+
+
+@node Helpers for Buffers
+@section 在测试期间处理缓冲区
+
+ERT 附带了一些宏，用于处理测试时使用的缓冲区。
+
+@subsection 创建临时缓冲区
+
+@findex ert-kill-all-test-buffers
+@code{ert-with-test-buffer} 宏可用于在测试期间创建临时缓冲区，如果测试成功，该缓冲区会自动清除。  但如果测试失败，缓冲区会保留下来，以便您可以更轻松地调查测试失败。  完成后，您可以使用命令 @code{ert-kill-all-test-buffers} 杀死由该宏创建的所有测试缓冲区。
+
+@defmac ert-with-test-buffer ((&key ((:name name-form :selected select-form))) &body body)
+该宏创建一个测试缓冲区并在该缓冲区中运行@var{body}。  如果@var{body}成功完成，则测试缓冲区被终止；如果出现错误，则保留测试缓冲区以供进一步检查。  返回值是@var{body}中的最后一个形式。
+
+测试缓冲区名称源自 ERT 测试的名称和@var{NAME-FORM}的结果。  例子：
+
+@lisp
+(ert-deftest backtrace-tests--variables ()
+  (ert-with-test-buffer (:name "variables")
+    @dots{}))
+@end lisp
+
+这使用测试缓冲区@file{*Test buffer (backtrace-tests--variables): variables*}。
+
+如果@var{select-form}非@code{nil}，则在创建缓冲区后选择它。这与将 @code{ert-with-test-buffer} 与 @code{ert-with-buffer-selected} 组合具有相同的效果。  例子：
+
+@lisp
+(ert-deftest whitespace-tests--global ()
+  (ert-with-test-buffer (:name "global" :selected t)
+    @dots{}))
+@end lisp
+
+@findex ert-play-keys
+当@var{body}包含对@code{ert-play-keys}的某些调用以以编程方式生成将文本插入测试缓冲区或启动作用于测试缓冲区的命令的用户输入事件时，@var{select-form}应设置为非@code{nil}。
+@end defmac
+
+@defmac ert-with-buffer-selected (buffer &body body)
+该宏在临时选定的窗口中显示缓冲区并运行@var{body}。如果@var{buffer}是@code{nil}，则使用当前缓冲区。
+
+在评估 1⁣ 之前，该缓冲区将成为当前缓冲区，并且临时窗口将变为 00。  在评估@var{body}期间，修改钩子@code{before-change-functions}和@code{after-change-functions}不会受到抑制，这使得更容易使用@code{execute-kbd-macro}来模拟用户交互。  即使@var{body}非本地退出，窗口配置也会在返回之前恢复。  返回值是@var{body}中的最后一个形式。  例子：
+
+@lisp
+(with-temp-buffer
+  (ert-with-buffer-selected nil
+    @dots{}))
+@end lisp
+
+这会显示一个临时缓冲区，如@file{ *temp*-739785*}。
+
+@c @findex ert-play-keys
+@code{ert-with-buffer-selected} 的用途之一是设置缓冲区，通过对 @code{ert-play-keys} 的一次或多次调用以编程方式生成的用户输入事件的目标为该缓冲区，当这些事件要将文本插入到该缓冲区中或启动作用于该缓冲区的命令时需要使用该缓冲区。
+@end defmac
+
+@subsection 保护缓冲区
+
+@defmac ert-with-buffer-renamed ((buffer-name-form) &body body)
+该宏保护缓冲区@var{buffer-name}免受副作用影响并运行@var{body}。  它将缓冲区@var{buffer-name}重命名为新的临时名称，创建一个名为@var{buffer-name}的新缓冲区，执行@var{body}，终止新缓冲区，并将原始缓冲区重命名回@var{buffer-name}。
+
+如果 @var{body} 对具有固定名称（例如 @file{*Messages*}）的 Emacs 缓冲区产生不良副作用，则这很有用。  例子：
+
+@lisp
+(ert-with-buffer-renamed ("*Messages*") @dots{})
+@end lisp
+@end defmac
+
+
+@node Helper Functions
+@section 各种辅助功能
+
+包 @file{ert-x.el} 包含一些对于编写测试有用的宏和函数。
+
+@defmac ert-with-message-capture (var &rest body)
+该宏在收集@var{var}中的消息时执行@var{body}。它捕获 Lisp 代码发出的消息，并将它们以换行符分隔连接成一个字符串。  这包括 @code{message} 写入的消息以及 @code{print}、@code{prin1} 和 @code{princ} 打印到回显区域的对象。  使用上述函数从 C 代码发出的消息将不会被捕获。
+
+这对于将被测试代码发出的消息与 @file{*Messages*} 缓冲区的行为分开非常有用。  例子：
+
+@lisp
+(ert-with-message-capture captured-messages @dots{})
+@end lisp
+@end defmac
+
+@subsection 测试目录和文件
+
+@defmac ert-resource-directory ()
+它返回资源（测试数据）目录的绝对文件名。资源目录的路径是 @file{resources} 目录，与调用的测试文件位于同一目录中。
+
+如果该目录不存在，则根据测试文件名查找目录。  如果测试文件名为 @file{foo-tests.el}，则返回 @file{foo-resources} 的绝对文件名。  例子：
+
+@lisp
+(let ((dir (ert-resource-directory)))
+  @dots{})
+@end lisp
+
+@vindex ert-resource-directory-format
+@vindex ert-resource-directory-trim-left-regexp
+@vindex ert-resource-directory-trim-right-regexp
+为了使用不同的资源目录命名方案，可以更改变量@code{ert-resource-directory-format}。  在格式化之前，将使用 @code{string-trim} 以及参数 @code{ert-resource-directory-trim-left-regexp} 和 @code{ert-resource-directory-trim-right-regexp} 来修剪文件名。  例子：
+
+@lisp
+(let* ((ert-resource-directory-format "test-resources-%s/")
+       (ert-resource-directory-trim-left-regexp ".*/")
+       (dir (ert-resource-directory)))
+  @dots{})
+@end lisp
+
+使用 @file{test-resources-foo} 的绝对文件名。
+@end defmac
+
+@defmac ert-resource-file (file)
+它返回名为 @var{file} 的资源（测试数据）文件的绝对文件名，它应该是相对文件名。  资源文件定义为放置在@code{ert-resource-directory}返回的资源目录中的任何文件。  例子：
+
+@lisp
+(let ((file (ert-resource-file "bar/baz")))
+  @dots{})
+@end lisp
+
+当在测试文件@file{foo-tests.el}中调用时，它返回@file{foo-resources/bar/baz}的绝对文件名。
+@end defmac
+
+@defmac ert-with-temp-file (name &rest body)
+该宏将 @var{name} 绑定到新临时文件的名称并计算 @var{body}。  @var{body}正常退出或非本地退出后，它会删除临时文件。  @var{name} 将绑定到临时文件的文件名。
+
+支持以下关键字参数：
+
+@table @code
+@vindex ert-temp-file-prefix
+@item :prefix @var{string}
+如果非 @code{nil}，则将 @var{string} 传递给 @code{make-temp-file} 作为 @var{prefix} 参数。  否则，使用 @code{ert-temp-file-prefix} 的值。
+
+@vindex ert-temp-file-suffix
+@item :suffix @var{string}
+如果非 @code{nil}，则将 @var{string} 传递给 @code{make-temp-file} 作为 @var{suffix} 参数。  否则，使用@code{ert-temp-file-suffix}的值；如果该变量的值为 nil，则根据调用 @code{ert-with-temp-file} 的文件名生成后缀。
+
+@item :text @var{string}
+如果非 @code{nil}，则将 @var{string} 传递给 @code{make-temp-file} 作为 @var{text} 参数。
+
+@item :buffer @var{symbol}
+使用 @code{find-file-noselect} 打开临时文件并将 @var{symbol} 绑定到缓冲区。  @var{body}正常或非本地退出后杀死缓冲区。
+
+@item :coding @var{coding}
+如果非@code{nil}，则在执行@var{body}时将@code{coding-system-for-write}绑定到@var{coding}。  当 @var{string} 包含非 ASCII 字符或临时文件必须具有特定编码或行尾格式时，这很方便。
+@end table
+
+例子：
+
+@lisp
+(ert-with-temp-file temp-file
+  :prefix "foo"
+  :suffix "bar"
+  :text "foobar3"
+  @dots{})
+@end lisp
+@end defmac
+
+@defmac ert-with-temp-directory (name &rest body)
+该宏将 @var{name} 绑定到新临时目录的名称并计算 @var{body}。  @var{body}正常退出或非本地退出后，它会删除临时目录。
+
+@var{name} 绑定到目录名，而不是目录文件名。 （换句话说，它将以目录分隔符结尾；在类 Unix 系统上，它将以 @t{"/"} 结尾。）
+
+支持与 @code{ert-with-temp-file} 中相同的关键字参数，但 @code{:text} 除外。  例子：
+
+@lisp
+(ert-with-temp-directory temp-dir
+  :prefix "foo"
+  :suffix "bar"
+  @dots{})
+@end lisp
+@end defmac
+
+@defvar ert-remote-temporary-file-directory
+该变量提供远程文件测试的临时目录的名称。  默认情况下，使用模拟连接方法（在 MS Windows 上运行时可能无法实现）。  默认值为@t{"/mock::/tmp/"}。
+
+如果要使用真实的远程连接进行测试，可以通过环境变量@env{REMOTE_TEMPORARY_FILE_DIRECTORY}覆盖。  例子：
+
+@example
+# env REMOTE_TEMPORARY_FILE_DIRECTORY=/ssh:host:/tmp make @dots{}
+@end example
+@end defvar
+
+@subsection 杂项公用事业
+
+@defun ert-simulate-command (command)
+以 Emacs 命令循环调用它的方式模拟调用 @var{command}。  它运行像@code{pre-command-hook}和@code{post-command-hook}这样的钩子，并设置像@code{this-command}和@code{last-command}这样的变量。
+
+@var{command} 应该是一个列表，其中 @code{car} 是命令符号，其余的是命令的参数。  例子：
+
+@lisp
+(ert-simulate-command '(find-file "project/foo.c"))
+@end lisp
+
+@strong{Note}：由于该命令不是由 @code{call-interactively} 调用的，因此对于 @var{kind} 的任何情况，命令中对 @code{(called-interactively-p @var{kind})} 的测试都将失败。如果您需要在命令主体中测试谓词 @code{(called-interactively-p @var{kind})} 来为 @var{kind} 返回 @code{t}，则可以使用函数 @code{ert-play-keys} 来启动命令。 @code{any}，但请注意，对于 @var{kind} @code{interactive} 来说，它仍然是 @code{nil}，因为 @code{ert-play-keys} 在幕后使用键盘宏，并且 @code{ert-play-keys} 需要选择感兴趣的缓冲区。
+@end defun
+
+@defmac ert-simulate-keys (keys &rest body)
+这将执行 @var{body} 和 @var{keys} 作为伪交互式输入。 @var{keys} 是字符串、字符列表或字符向量。  示例：
+
+@lisp
+(ert-simulate-keys '(?n ?\C-m) @dots{})
+(ert-simulate-keys "\r\r\r\ry\r" @dots{})
+(ert-simulate-keys (kbd "#fake C-m C-a C-k C-m") @dots{})
+(ert-simulate-keys [?b ?2 return] @dots{})
+@end lisp
+
+@c @findex ert-play-keys
+要生成用于将一些文本插入缓冲区或调用一些交互式命令的输入事件，请参阅函数@code{ert-play-keys}。
+@end defmac
+
+@defun ert-play-keys (keys)
+以编程方式生成用户输入事件。
+
+@c @findex ert-simulate-keys
+与@code{ert-simulate-keys}相反，这些事件并不打算由读取输入的函数（如@code{read-from-minibuffer}）消耗，而是由命令循环消耗，命令循环通常会处理它们以启动交互式命令或将文本插入到选定的缓冲区中。
+
+因此，在调用 @code{ert-play-keys} 之前，您通常需要选择输入事件要插入文本或调用命令的缓冲区。如果缓冲区是以这种方式创建的，则可以通过将非 @code{nil} @code{:selected} 标志传递给 @code{ert-with-test-buffer} 来实现此目的，或者使用 @code{ert-with-buffer-selected} 宏。
+
+@c @findex ert-simulate-command
+与@code{ert-simulate-command}相反，当@code{ert-play-keys}生成启动命令的事件时，您无法获取命令返回值。另一方面，在命令体中测试的@code{(called-interactively-p 'any)}将是@code{t}，但不是@code{(called-interactively-p 'interactive)}，因为@code{ert-play-keys}不是真正的交互式调用，而是在幕后使用键盘宏。另一个区别是，与@code{ert-simulate-command}相反，@code{ert-play-keys}需要选择命令作用的缓冲区，以便输入事件到达它。
+
+在这个例子中，创建并选择了一个测试缓冲区，然后 @code{ert-play-keys} 设置标记，插入文本 @samp{n'importe quoi} 并杀死它，然后测试检查被杀死的文本是否在杀死环中并且测试缓冲区为空，然后第二个 @code{ert-play-keys} 调用再次拉出被杀死的文本，最后测试检查测试缓冲区包含 @samp{n'importe quoi}：
+
+@lisp
+(ert-deftest ert-example-kill&yank ()
+  "Test kill and yank."
+  (ert-with-test-buffer (:selected t)
+    (ert-play-keys "C-SPC n'importe SPC quoi C-w")
+    (should (string= "n'importe quoi" (car kill-ring)))
+    (should (string= "" (buffer-substring (point-min) (point-max))))
+    (ert-play-keys "C-y")
+    (should (string= "n'importe quoi"
+                     (buffer-substring (point-min) (point-max))))))
+@end lisp
+
+@noindent
+如上所述，使用 @code{key-parse} 使用的输入格式的字符串编写输入事件，或者直接在内部 Emacs 表示中编写，如下所示，否则与上面的测试相同：
+
+@lisp
+(ert-deftest ert-example-kill&yank ()
+  "Test kill and yank."
+  (ert-with-test-buffer (:selected t)
+    (ert-play-keys (vconcat [ ?\C- ] "n'importe quoi" [ ?\C-w]))
+    (should (string= "n'importe quoi" (car kill-ring)))
+    (should (string= "" (buffer-substring (point-min) (point-max))))
+    (ert-play-keys [ ?\C-y ])
+    (should (string= "n'importe quoi"
+                     (buffer-substring (point-min) (point-max))))))
+@end lisp
+@end defun
+
+@defun ert-filter-string (s &rest regexps)
+此函数返回字符串 @var{s} 的副本，其中删除了 @var{regexps} 的所有匹配项。  @var{regexps} 的元素也可以是二元素列表@code{(@var{regexp} @var{subexp})}，其中@var{subexp} 是@var{regexp} 中子表达式的编号。  在这种情况下，只会删除该子表达式，而不是整个匹配项。例子：
+
+@lisp
+(with-current-buffer @dots{}
+ (ert-filter-string (buffer-string)
+  '("Started at:\\(.*\\)$" 1)
+  '("Finished at:\\(.*\\)$" 1))
+ @dots{})
+@end lisp
+@end defun
+
+@defun ert-propertized-string (&rest args)
+该函数返回一个字符串，其属性由@var{args}指定。
+
+@var{args} 是字符串和 plist 的列表。  @var{args} 中的字符串连接起来生成输出字符串。  在输出字符串中，@var{args} 中的每个字符串都将前面的 plist 作为其属性列表，如果前面没有 plist，则没有属性。例子：
+
+@lisp
+(ert-propertized-string "foo " '(face italic) "bar" " baz" nil " quux")
+@end lisp
+
+这将返回字符串 @t{"foo @i{bar baz} quux"}，其中子字符串 @t{"@i{bar baz}"} 具有值为 @code{italic} 的 @code{face} 属性。
+@end defun
+
+
+@node How to Debug Tests
+@chapter 如何调试测试
+
+本节介绍如何使用 ERT 的功能来了解测试失败的原因。
+
+
+@menu
+* Understanding Explanations::   ERT 如何提供有关断言失败原因的详细信息。
+* Interactive Debugging::        ERT 结果缓冲区中提供了工具。
+@end menu
+
+
+@node Understanding Explanations
+@section 理解解释
+@cindex understanding explanations
+@cindex explanations, understanding
+
+失败的 @code{should} 表格的报告如下：
+
+@example
+F addition-test
+    (ert-test-failed
+     ((should
+       (=
+        (+ 1 2)
+        4))
+      :form
+      (= 3 4)
+      :value nil))
+@end example
+
+ERT 显示 @code{should} 表达式的外观及其子表达式的值：断言的源代码是 @code{(should (= (+ 1 2) 4))}，它将函数 @code{=} 应用于参数 @code{3} 和 @code{4}，产生值 @code{nil}。  在这种情况下，测试是错误的；它应该期望 3 而不是 4。
+
+如果像 @code{equal} 这样的谓词与 @code{should} 一起使用，ERT 会提供所谓的 @emph{explanation}：
+
+@example
+F list-test
+    (ert-test-failed
+     ((should
+       (equal
+        (list 'a 'b 'c)
+        '(a b d)))
+      :form
+      (equal
+       (a b c)
+       (a b d))
+      :value nil :explanation
+      (list-elt 2
+                (different-atoms c d))))
+@end example
+
+在本例中，函数 @code{equal} 应用于参数 @code{(a b c)} 和 @code{(a b d)}。  ERT 的解释表明，两个列表中索引 2 处的项目不同；在一个列表中，它是原子 c，在另一个列表中，它是原子 d。
+
+在像上面这样的简单例子中，解释是不必要的。但在差异不是立即明显的情况下，它可以节省时间：
+
+@example
+F test1
+    (ert-test-failed
+     ((should
+       (equal x y))
+      :form
+      (equal a a)
+      :value nil :explanation
+      (different-symbols-with-the-same-name a a)))
+@end example
+
+ERT 仅为已注册解释函数的谓词提供解释。  @xref{Defining Explanation Functions}。
+
+
+@node Interactive Debugging
+@section 交互式调试
+@cindex interactive debugging
+@cindex debugging failed tests
+
+调试失败的测试本质上与调试 Lisp 代码的任何其他问题的方式相同。  以下是一些针对测试的技巧：
+
+@itemize
+@cindex re-running a failed test
+@item
+重新运行失败的测试几次，看看每次是否都以同样的方式失败。  在花时间寻找原因之前，最好先查明该行为是否是确定性的。  在 ERT 结果缓冲区中，@kbd{r} 重新运行所选测试。
+
+@cindex jump to the test source code
+@item
+使用 @kbd{.} 跳转到测试的源代码以了解其具体作用。  也许是测试被破坏了，而不是被测试的代码被破坏了。
+
+@item
+如果测试包含一系列 @code{should} 形式，并且您无法判断哪一个失败，请使用 @kbd{l}，它会显示测试期间在失败之前执行的所有 @code{should} 形式的列表。
+
+@cindex show backtrace of failed test
+@item
+使用 @kbd{b} 查看回溯。  您还可以使用@kbd{d}在启用调试的情况下重新运行测试，这将进入调试器并显示回溯；但是上面显示的几帧与您无关，因为它们是 ERT 自己的调试器挂钩。  @kbd{b}将它们剥离出来，这样更方便。
+
+@item
+如果测试或正在测试的代码使用 @code{message} 打印消息，请使用 @kbd{m} 查看失败之前打印的消息。  这对于弄清楚它走了多远很有用。
+
+@cindex instrumenting test for Edebug
+@item
+您可以像使用 @code{defun} 进行调试一样使用测试进行调试：转到测试的源代码并输入 @kbd{C-u C-M-x}。  然后，返回 ERT 缓冲区并使用 @kbd{r} 或 @kbd{d} 重新运行测试。
+
+@cindex discard obsolete test results
+@item
+如果您一直在编辑和重新排列测试，那么 ERT 可能会记住您已重命名或删除的旧测试：重命名或删除源代码中的定义会在运行过程中的旧名称下留下杂散定义（这是 Lisp 中的常见问题）。  在这种情况下，请点击@kbd{D}让 ERT 忘记过时的测试。
+@end itemize
+
+
+@node Extending ERT
+@chapter 延长 ERT
+@cindex extending ert
+
+有多种方法可以向 ERT 添加功能。
+
+@menu
+* Defining Explanation Functions::   向 ERT 教授更多谓词。
+* Low-Level Functions for Working with Tests::   将 ERT 的数据用于您的目的。
+@end menu
+
+
+@node Defining Explanation Functions
+@section 定义解释函数
+@cindex defining explanation functions
+
+谓词的解释函数是一个采用与谓词相同的参数并返回 @emph{explanation} 的函数。解释应该解释为什么当使用给定解释函数的参数调用谓词时，会返回它返回的值。  解释可以是任何对象，但应该有易于理解的印刷形式。  如果谓词的返回值不需要对给定参数列表进行解释，则解释函数应返回@code{nil}。
+
+@vindex ert-explainer@r{, property}
+要将解释函数与谓词关联起来，请将属性 @code{ert-explainer} 添加到命名谓词的符号中。属性的值应该是命名解释函数的符号。
+
+
+@node Low-Level Functions for Working with Tests
+@section 用于测试的低级函数
+@cindex low-level functions
+
+@code{ert-run-tests-interactively} 和 @code{ert-run-tests-batch} 都是在 @file{ert.el} 标记为“运行单个测试的设施”、“测试选择器”和“运行整套测试的设施”的部分中的较低级别测试处理代码之上实现的。
+
+如果您想编写适用于 ERT 测试的代码，您应该看看这个较低级别的代码。  以 @code{ert--} 开头的符号是 ERT 内部的，而以 @code{ert-} 开头的符号则可供其他代码使用。  但目前还没有成熟的API。
+
+欢迎为 ERT 做出贡献。
+
+
+@node Other Testing Concepts
+@chapter 其他测试概念
+
+有关模拟、存根、固定装置或测试套件的信息，请参阅下文。
+
+
+@menu
+* Mocks and Stubs::            删除与测试无关的代码。
+* Fixtures and Test Suites::   ERT 与其他语言的工具有何不同。
+@end menu
+
+
+@node Mocks and Stubs
+@section Emacs Lisp 的其他工具
+@cindex mocks and stubs
+
+删除函数或使用所谓的 @emph{mocks} 可以使编写测试变得更容易。  有关面向对象语言中相应概念的解释，请参见@url{https://en.wikipedia.org/wiki/Mock_object}。
+
+ERT 没有对模拟或存根的内置支持。  包@code{el-mock}（请参阅@url{https://www.emacswiki.org/emacs/el-mock.el}）提供 Emacs Lisp 的模拟，并且可以与 ERT 结合使用。
+
+
+@node Fixtures and Test Suites
+@section 夹具和测试套件
+@cindex fixtures
+
+在许多方面，ERT 与 SUnit 或 JUnit 等其他语言的框架相似。  然而，此类框架中常见的两个功能在 ERT 中明显缺失：固定装置和测试套件。
+
+夹具主要用于（例如，在 SUnit 或 JUnit 中）为一组测试提供环境，并由设置和拆卸功能组成。
+
+虽然固定装置在其他语言中是一种有用的语法简化，但这不适用于 Lisp，因为 Lisp 中可以使用高阶函数和 @code{unwind-protect}。  在 ERT 中实现和使用夹具的一种方法是
+
+@lisp
+(defun my-fixture (body)
+  (unwind-protect
+      (progn [set up]
+             (funcall body))
+    [tear down]))
+
+(ert-deftest my-test ()
+  (my-fixture
+   (lambda ()
+     [test code])))
+@end lisp
+
+（另一种方法是使用 @code{with-my-fixture} 宏。）这解决了设置和拆卸部分，并且还允许任何测试使用任何夹具组合，因此它比其他工具通常允许的更灵活。
+
+如果测试需要访问固定装置设置的环境，则可以修改固定装置以将参数传递给主体。
+
+这些都是众所周知的 Lisp 技术。  可以添加它们的特殊语法，但只能提供较小的简化。
+
+（如果你对这样的语法感兴趣，请注意，将设置和拆卸分成单独的函数，就像 *Unit 工具通常所做的那样，使得不可能建立动态 @code{let} 绑定作为装置的一部分。因此，盲目模仿其他语言中实现装置的方式在 Lisp 中会适得其反。）
+
+测试套件的目的是将相关测试组合在一起。
+
+最常见的用途是仅运行一个特定模块的测试。  由于符号前缀是 Emacs Lisp 中分隔模块命名空间的常用方法，测试选择器已经通过允许测试名称的正则表达式匹配来解决这个问题；例如，选择器 @code{"^ert-"} 选择 ERT 的自检。
+
+其他用途包括按预期执行时间对测试进行分组，例如，在交互式开发期间运行快速测试，并减少慢速测试。  这可以通过 @code{ert-deftest} 和 @code{tag} 测试选择器的 @code{:tag} 参数来实现。
+
+
+@node Index
+@unnumbered 指数
+
+@printindex cp
+
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@bye
+
+@c  LocalWords:  ERT JUnit namespace docstring ERT's
+@c  LocalWords:  backtrace makefiles workflow backtraces API SUnit
+@c  LocalWords:  subexpressions

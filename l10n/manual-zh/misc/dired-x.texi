@@ -1,0 +1,646 @@
+\输入 texinfo @comment -*-texinfo-*-
+
+@c dired-x.texi --- Sebastian Kremer's Extra DIRED hacked up for GNU Emacs
+@c
+@c Author: Sebastian Kremer <sk@thp.uni-koeln.de>
+@c      Lawrence R. Dodd <dodd@roebling.poly.edu>
+@c [Dodd's address no longer valid.]
+
+@comment %**start of header (This is for running Texinfo on a region.)
+@setfilename ../../info/dired-x.info
+@settitle Dired Extra 用户手册
+@documentlanguage en
+@include docstyle.texi
+
+@include emacsver.texi
+
+@iftex
+@finalout
+@end iftex
+@c @setchapternewpage odd               % For book style double sided manual.
+@comment %**end of header (This is for running Texinfo on a region.)
+
+@copying
+版权所有 @copyright{} 1994--1995, 1999, 2001--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* Dired-X: (dired-x).            可怕的额外功能。
+@end direntry
+
+@c      @smallbook
+@tex
+\overfullrule=0pt
+%\global\baselineskip 30pt      % For printing in double spaces
+@end tex
+
+@titlepage
+@sp 6
+@center @titlefont{Dired Extra}
+@sp 2
+@center @titlefont{For The GNU Emacs}
+@sp 1
+@center @titlefont{Directory Editor}
+@sp 4
+@center Lawrence R@. Dodd
+@c @center @t{dodd@@roebling.poly.edu}
+@sp 5
+@center (Based on @file{dired.texi} by Sebastian Kremer <sk@@thp.uni-koeln.de>)
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+
+@ifnottex
+
+@node Top
+@top Dired Extra
+
+@noindent
+This documents the ``extra'' features for GNU Emacs's Dired Mode that are
+provided by the file @file{dired-x.el}.
+
+@itemize @bullet
+
+@item
+Based on @file{dired.texi} by Sebastian Kremer <sk@@thp.uni-koeln.de>
+
+@item
+For @file{dired-x.el} as distributed with GNU Emacs @value{EMACSVER}.
+
+@end itemize
+
+@insertcopying
+
+@menu
+* Introduction::
+* Installation::
+* Omitting Files in Dired::
+* Virtual Dired::
+* Advanced Mark Commands::
+* Multiple Dired Directories::
+* Find File At Point::
+* Miscellaneous Commands::
+* Bugs::
+
+* GNU Free Documentation License::
+* Concept Index::
+* Command Index::
+* Key Index::
+* Variable Index::
+
+@end menu
+
+@end ifnottex
+
+@node Introduction
+@chapter 介绍
+
+本文档记录了由 @file{dired-x.el} 提供的 GNU Emacs Dired 模式的一些 @emph{extra} 功能（源自 Sebastian Kremer 的原始 @file{dired-x.el}）。
+
+@ifnottex
+@menu
+* Features::
+* Technical Details::
+@end menu
+@end ifnottex
+
+@node Features
+@section 特征
+@cindex Dired-x features
+
+Dired Extra 提供的一些功能：
+
+@enumerate
+@item 
+从 Dired 列表中删除无趣的文件 (@pxref{Omitting Files in Dired})。
+@item 
+在非 Dired 缓冲区中运行 Dired 命令 (@pxref{Virtual Dired})。
+@item 
+查找缓冲区中提到的文件 (@pxref{Find File At Point})。
+@item 
+使用文件标记的命令 (@pxref{Advanced Mark Commands})。
+@end enumerate
+
+@noindent
+@file{dired-x.el} 将一些功能绑定到 Dired 模式 (@pxref{Key Index}) 中的按键。  可选地，它还分别将@kbd{C-x C-f}和@kbd{C-x 4 C-f}绑定到@code{dired-x-find-file}和@code{dired-x-find-file-other-window}（@pxref{Find File At Point}）。
+
+@node Technical Details
+@section 技术细节
+@cindex modified functions
+@cindex @file{dired-aux.el}
+
+加载 @file{dired-x.el} 时，@file{dired.el} 和 @file{dired-aux.el} 中的一些标准 Dired 函数会提供附加功能。 @code{dired-add-entry} 遵循 Dired Omit 模式 (@pxref{Omitting Files in Dired})（如果处于活动状态）。  @code{dired-find-buffer-nocreate} 和 @code{dired-initial-position} 遵循 @code{dired-find-subdir} (@pxref{Miscellaneous Commands}) 的值。
+
+@node Installation
+@chapter 安装
+
+@noindent
+本手册描述了文件@file{dired-x.el}提供的 Dired 功能。  要利用这些功能，您必须加载文件并（可选）设置一些变量。
+
+@noindent
+在 @file{~/.emacs} 文件中，或在 @file{site-lisp} 目录下的系统范围初始化文件 @file{default.el} 中，将
+
+@example
+(with-eval-after-load 'dired
+  (require 'dired-x)
+  ;; Set dired-x global variables here.  For example:
+  ;; (setq dired-x-hands-off-my-keys nil)
+  )
+(add-hook 'dired-mode-hook
+          (lambda ()
+            ;; Set dired-x buffer-local variables here.  For example:
+            ;; (dired-omit-mode 1)
+            ))
+@end example
+
+@noindent
+当第一次调用 Dired 时（例如，当您第一次输入 @kbd{C-x d} 时），这将加载 @file{dired-x.el}。
+
+@ifnottex
+@menu
+* Optional Installation File At Point::
+@end menu
+@end ifnottex
+
+@node Optional Installation File At Point
+@section 可选安装文件
+
+@cindex binding @code{dired-x-find-file}
+如果您选择将 @file{dired-x.el} 绑定 @code{dired-x-find-file} 到 @code{find-file} (@pxref{Find File At Point})，那么您将需要设置 @code{dired-x-hands-off-my-keys}。  为此，可以将其设置为加载@emph{before}@file{dired-x.el}，或者使用@kbd{M-x customize-variable}，或者在更改值后调用@code{dired-x-bind-find-file}。
+
+@example
+(with-eval-after-load 'dired
+  ;; Bind dired-x-find-file.
+  (setq dired-x-hands-off-my-keys nil)
+  (require 'dired-x))
+@end example
+
+@node Omitting Files in Dired
+@chapter 在 Dired 中省略文件
+
+@cindex omitting Files in Dired
+@cindex uninteresting files
+@dfn{Omitting} 文件意味着将其从目录列表中删除。  省略对于保持 Dired 缓冲区中没有“不感兴趣”的文件（例如，自动保存、辅助、备份和修订控制文件）很有用，以便用户可以专注于感兴趣的文件。  与隐藏文件一样，Dired 永远不会看到省略的文件。  省略与隐藏在几个方面有所不同：
+
+@itemize @bullet
+
+@item 
+省略对单个文件的操作，而不是对目录的操作；整个目录不能被省略（尽管它的每个文件都可以）。
+
+@item 
+省略的是批发；如果 Dired 缓冲区启用了省略，则该缓冲区中列出的所有不感兴趣的文件都将被省略。  用户不会一次省略（或取消省略）一个文件。
+
+@item 
+省略可以是自动的；缓冲区中不感兴趣的文件行可以在用户看到它们之前被删除。
+
+@item 
+标记的文件永远不会被省略。
+@end itemize
+
+@table @kbd
+@item C-x M-o
+@kindex C-x M-o
+@findex dired-omit-mode
+(@code{dired-omit-mode}) 在显示和忽略“无趣”文件之间切换。
+@item * O
+@kindex * O
+@findex dired-mark-omitted
+(@code{dired-mark-omitted}) 标记“无趣”文件。
+@end table
+
+@noindent
+为了使 Dired Omit 工作，您需要在加载 @file{dired} (@pxref{Installation}) 后加载 @file{dired-x}，然后以某种方式评估 @code{(dired-omit-mode 1)} (@pxref{Omitting Variables})。
+
+@ifnottex
+@menu
+* Omitting Variables::
+* Omitting Examples::
+* Omitting Technical::
+@end menu
+@end ifnottex
+
+@node Omitting Variables
+@section 省略变量
+
+@cindex customizing file omitting
+以下变量可用于自定义省略。
+
+@cindex how to make omitting the default in Dired
+@defvar dired-omit-mode
+如果非@code{nil}，则不会列出“无趣”文件。默认值为@code{nil}。无趣的文件是名称与正则表达式@code{dired-omit-files}匹配的文件，以及名称以扩展名@code{dired-omit-extensions}结尾的文件。  @kbd{C-x M-o} (@code{dired-omit-mode}) 切换其值，该值是缓冲区本地的。  放
+
+@example
+(dired-omit-mode 1)
+@end example
+
+@noindent
+在您的 @code{dired-mode-hook} 中，首先在 @emph{every} Dired 缓冲区 (@pxref{Installation}) 中启用省略。  然后您可以使用 @kbd{C-x M-o} 取消该缓冲区中的省略。
+
+要仅在某些目录中启用自动省略，您可以为 Dired 模式添加目录本地设置 (@pxref{Directory Variables,,,emacs,The GNU Emacs manual})
+
+@example
+((dired-mode . ((dired-omit-mode . t))))
+@end example
+
+@noindent
+到该目录中的 @file{.dir-locals.el} 文件。  您可以使用命令 @code{add-dir-local-variable} 来执行此操作。
+@end defvar
+
+@defvar dired-omit-files
+该缓冲区局部变量的值是一个正则表达式，一个字符串。  名称与此正则表达式匹配的文件将不会显示。  仅当@code{dired-omit-mode}的值为@code{t}时才有效。
+
+默认值忽略特殊目录 @file{.} 和 @file{..} 以及自动保存文件（以及以 @file{.} 结尾的其他文件）(@pxref{Omitting Examples})。
+@end defvar
+
+@defvar dired-omit-extensions
+如果非@code{nil}，则此变量的值是要从 Dired 列表中省略的扩展名（字符串）列表。  其格式与@code{completion-ignored-extensions}相同。  默认值为 @code{completion-ignored-extensions}、@code{dired-latex-unclean-extensions}、@code{dired-bibtex-unclean-extensions} 和 @code{dired-texinfo-unclean-extensions} 的元素。
+@end defvar
+
+@defvar dired-omit-case-fold
+默认值：@code{filesystem} 此变量控制文件名匹配是否不区分大小写。默认情况下，当@code{dired-omit-case-fold}设置为@code{filesystem}时，@code{dired-omit-mode}将在访问区分大小写的文件系统的 Dired 缓冲区上区分大小写地匹配文件名和扩展名，在不区分大小写的文件系统上不区分大小写。  将其设置为 @code{nil} 则始终区分大小写，设置为 @code{t} 则始终不区分大小写。
+@end defvar
+
+@defvar dired-omit-localp
+该变量确定 @var{localp} 参数 @code{dired-omit-expunge} 传递给 @code{dired-get-filename}。  如果是@code{no-dir}，默认情况下，省略会快得多，但只能匹配文件名的非目录部分。  如果您需要匹配整个文件名，请将其设置为 @code{nil} ，或者设置为 @code{t} 以匹配相对于缓冲区顶级目录的文件名。
+@end defvar
+
+@defvar dired-omit-size-limit
+如果非 @code{nil}，@code{dired-omit-mode} 将在其列表大小（以字节为单位）大于此选项值的目录中被有效禁用。  由于对于非常大的目录来说，省略可能会很慢，因此这可以避免在查看目录之前必须等待。  当以交互方式调用 @code{dired-omit-mode} 时（例如通过 @kbd{C-x M-o}），此变量将被忽略，因此您仍然可以在初始显示后在目录中启用省略。
+@end defvar
+
+@cindex omitting additional files
+@defvar dired-omit-marker-char
+Dired用来实现省略的临时标记。  用户或其他包永远不应该将其用作标记。  此规则有一个例外：通过添加
+
+@example
+(setq dired-mark-keys "\C-o")
+;; i.e., the value of dired-omit-marker-char
+;; (which is not defined yet)
+@end example
+
+@noindent
+对于您的@file{~/.emacs}，您可以绑定@kbd{C-o}键来插入@kbd{C-o}标记，从而导致除了通常省略的文件之外，这些文件也被省略。  不幸的是，与其他文件不同，您以这种方式手动忽略的文件在恢复缓冲区后将再次显示。默认值为@kbd{C-o}。
+@end defvar
+
+@node Omitting Examples
+@section 省略各种文件类型的示例
+
+@itemize @bullet
+
+@item
+@cindex RCS files, how to omit them in Dired
+@cindex omitting RCS files in Dired
+如果您希望避免看到 RCS 文件和 @file{RCS} 目录，请使用
+
+@example
+(setq dired-omit-files
+      (concat dired-omit-files "\\|^RCS$\\|,v$"))
+@end example
+
+@noindent
+加载@file{dired-x} (@pxref{Installation}) 后。  这假设 @code{dired-omit-localp} 具有默认值 @code{no-dir} 以使 @code{^} 锚定的匹配起作用。  作为较慢的替代方案，将 @code{dired-omit-localp} 设置为 @code{nil}，您可以在正则表达式中使用 @code{/} 代替 @code{^}。
+
+@item
+@cindex tib files, how to omit them in Dired
+@cindex omitting tib files in Dired
+如果您使用 @code{tib}，则与 @TeX{} 一起使用的参考书目程序和
+@LaTeX{}, and you
+想要省略 @file{INDEX} 和 @file{*-t.tex} 文件，然后使用
+
+@example
+(setq dired-omit-files
+      (concat dired-omit-files "\\|^INDEX$\\|-t\\.tex$"))
+@end example
+
+@noindent
+加载@file{dired-x} (@pxref{Installation}) 后。
+
+@item
+@cindex dot files, how to omit them in Dired
+@cindex omitting dot files in Dired
+如果您不希望看到 @samp{dot} 文件（以 @file{.} 开头的文件），则使用
+
+@example
+(setq dired-omit-files
+      (concat dired-omit-files "\\|^\\..+$"))
+@end example
+
+@noindent
+加载@file{dired-x} (@pxref{Installation}) 后。  （当然，实现这一特定目标的更好方法就是从 @code{dired-listing-switches} 中省略 @samp{-a}。）
+
+@end itemize
+
+@node Omitting Technical
+@section 省略一些技术细节
+
+加载@file{dired-x.el}将通过将@code{dired-omit-expunge}放在您的@code{dired-after-readin-hook}上来安装Dired Omit，并调用@code{dired-extra-startup}，这又会在您的@code{dired-mode-hook}中调用@code{dired-omit-startup}。
+
+@node Virtual Dired
+@chapter 虚拟定向
+
+@cindex virtual Dired
+@cindex perusing @code{ls} listings
+@cindex @command{ls} listings, how to peruse them in Dired
+使用 @dfn{Virtual Dired} 意味着在 Dired 模式下放置一个包含类似 Dired 内容的缓冲区。  缓冲区内容描述的文件不必实际存在。  如果您想仔细阅读 @samp{ls -lR} 输出文件（例如从 FTP 服务器获得的文件），这非常有用。  您可以使用 Dired 中通常可用的所有动作命令。  您还可以使用它将 Dired 缓冲区保存在文件中，并在以后的会话中恢复它。
+
+@findex dired-virtual
+@kindex g
+@findex dired-virtual-revert
+输入@kbd{M-x dired-virtual} 将当前缓冲区置于虚拟 Dired 模式。  系统将提示您输入该缓冲区的顶级目录，并使用从缓冲区内容猜测的默认值。  要再次将虚拟 Dired 缓冲区转换为真实 Dired 缓冲区，请在虚拟 Dired 缓冲区中键入 @kbd{g}（调用 @code{dired-virtual-revert}）并回答 @samp{y}。  不过，您不必这样做：您可以在子目录标题行上使用 @kbd{l} (@code{dired-do-redisplay}) 重新列出单个子目录，使缓冲区始终处于虚拟 Dired 模式。
+
+@findex dired-virtual-mode
+@vindex auto-mode-alist
+函数 @samp{dired-virtual-mode} 专门设计用于从 @code{auto-mode-alist} 打开虚拟 Dired 模式。  要在虚拟 Dired 模式下自动编辑所有 @file{*.dired} 文件，请将其放入您的 @file{~/.emacs} 中：
+
+@example
+(setq auto-mode-alist (cons '("[^/]\\.dired$" . dired-virtual-mode)
+                              auto-mode-alist))
+@end example
+
+@noindent
+正则表达式比通常排除 @file{.dired} 本地变量文件要复杂一些。
+
+@node Advanced Mark Commands
+@chapter 高级标记命令
+
+@table @kbd
+@item F
+@kindex F
+@cindex visiting several files at once
+@cindex simultaneous visiting of several files
+@findex dired-do-find-marked-files
+(@code{dired-do-find-marked-files}) 立即查找所有标记的文件并同时显示它们。  如果可选的⁣​​1⁣不是@code{nil}，则只查找文件但不选择。  如果您想保持显示 Dired 缓冲区，请先输入 @kbd{C-x 2}。  如果您只想显示标记的文件而不显示其他内容，请先输入 @kbd{C-x 1}。
+
+当前窗口尽可能均匀地分布在所有标记的文件中。其余行转到最底部的窗口。  通过这种方式可以显示的文件数量受到当前窗口的高度和变量@code{window-min-height}的限制。
+@end table
+
+@table @code
+@item dired-mark-extension
+@findex dired-mark-extension
+标记具有特定扩展名的所有文件，以便在以后的命令中使用。  当输入的字符串不存在时，会自动在其前面添加 @samp{.}。如果使用前缀参数 @kbd{C-u} 调用，此命令将取消文件标记。如果使用 @kbd{C-u C-u} 前缀调用，则请求一个字符用作标记，并用它来标记文件。
+
+当从 Lisp 调用时，@var{extension} 也可以是扩展列表，并且可选参数 @var{marker-char} 指定使用的标记。
+
+@item dired-mark-suffix
+@findex dired-mark-suffix
+将所有文件标记为具有特定后缀，以便在后续命令中使用。  @samp{.} 不会自动添加到输入的字符串前面，您必须明确键入它。  这与 @code{dired-mark-extension} 不同，@code{dired-mark-extension} 如果不存在则在前面添加 @samp{.}。如果使用前缀参数 @kbd{C-u} 调用，此命令将取消文件标记。如果使用 @kbd{C-u C-u} 前缀调用，则请求一个字符用作标记，并用它标记文件。
+
+当从 Lisp 调用时，@var{suffix} 也可以是后缀列表，并且可选参数 @var{marker-char} 指定使用的标记。
+
+@item dired-flag-extension
+@findex dired-flag-extension
+将所有具有特定扩展名的文件标记为删除。  @samp{.} 和 @emph{not} 自动添加到输入的字符串前面。
+@end table
+
+@ifnottex
+@menu
+* Advanced Cleaning Functions::
+* Advanced Cleaning Variables::
+* Special Marking Function::
+@end menu
+@end ifnottex
+
+@node Advanced Cleaning Functions
+@section 先进的清洁功能
+
+@table @code
+@item dired-clean-patch
+@findex dired-clean-patch
+将 @samp{patch} 程序创建的可有可无的文件标记为删除。  参见变量@code{dired-patch-unclean-extensions}。
+
+@item dired-clean-tex
+@findex dired-clean-tex
+将 @TeX{}、@LaTeX{} 和 @samp{texinfo} 创建的可有可无的文件标记为删除。  请参阅以下变量 (@pxref{Advanced Cleaning Variables})：
+
+@itemize @bullet
+@item
+@code{dired-tex-unclean-extensions}
+@item
+@code{dired-texinfo-unclean-extensions}
+@item
+@code{dired-latex-unclean-extensions}
+@item
+@code{dired-bibtex-unclean-extensions}
+@end itemize
+
+@item dired-very-clean-tex
+@findex dired-very-clean-tex
+将 @TeX{}、@LaTeX{}、@samp{texinfo} 和 @file{*.dvi} 文件创建的可有可无的文件标记为删除。
+@end table
+
+@node Advanced Cleaning Variables
+@section 高级清洁变量
+
+上述清理命令使用的变量（以及变量@code{dired-omit-extensions}、@pxref{Omitting Variables}的默认值）：
+
+@defvar dired-patch-unclean-extensions
+该变量指定由@samp{patch}程序创建的可有可无的文件的扩展名列表。  默认值为@w{@code{(".rej" ".orig")}}。
+@end defvar
+
+@defvar dired-tex-unclean-extensions
+该变量指定由@TeX{}创建的可有可无的文件的扩展名列表。  默认值为@w{@code{(".toc" ".log" ".aux")}}。
+@end defvar
+
+@defvar dired-texinfo-unclean-extensions
+该变量保存由@samp{texinfo}创建的可有可无的文件的扩展名列表。  默认为@w{@code{(".cp" ".cps" ".fn" ".fns" ".ky" ".kys"} @code{".pg" ".pgs" ".tp" ".tps" ".vr" ".vrs")}}
+@end defvar
+
+@defvar dired-latex-unclean-extensions
+该变量指定由@LaTeX{}创建的可有可无的文件的扩展名列表。  默认值为@w{@code{(".idx" ".lof" ".lot" ".glo")}}。
+@end defvar
+
+@defvar dired-bibtex-unclean-extensions
+该变量指定由 Bib@TeX{} 创建的可有可无的文件的扩展名列表。  默认值为@w{@code{(".blg" ".bbl")}}。
+@end defvar
+
+@node Special Marking Function
+@section 特殊标记功能
+
+@table @kbd
+@item M-(
+@kindex M-(
+@findex dired-mark-sexp
+@cindex lisp expression, marking files with in Dired
+@cindex mark file by Lisp expression
+标记 @var{predicate} 返回非 @code{nil} (@code{dired-mark-sexp}) 的文件。  使用前缀参数，取消标记这些文件。
+
+@var{predicate} 是一个 Lisp 表达式，可以引用以下符号：
+@table @code
+@item inode
+[@i{integer}] 文件的索引节点（仅适用于@samp{ls -i}输出）
+@item s
+[@i{integer}] @samp{ls -s} 输出的文件大小（通常以块为单位，或者对于@samp{-k}，以千字节为单位）
+@item mode
+[@i{string}] 文件权限位，例如@samp{-rw-r--r--}
+@item nlink
+[@i{integer}] 文件链接数
+@item uid
+[@i{string}] 主人
+@item gid
+[@i{string}]组（如果@samp{ls}未显示gid，则仍会设置它（与uid相同））
+@item size
+[@i{integer}] 文件大小（以字节为单位）
+@item time
+[@i{string}] @samp{ls} 显示的时间，例如 @samp{Feb 12 14:17}
+@item name
+[@i{string}] 文件名
+@item sym
+[@i{string}] 如果文件是符号链接，则为链接到的名称，否则@code{""}
+@end table
+
+@noindent
+例如，使用
+@example
+(equal 0 size)
+@end example
+标记所有零长度文件。
+
+要找出目录中所有尚未编译的 Emacs Lisp 文件，请使用通配符 @samp{*.el} 定向 lisp 目录中的所有 @file{.el} 文件。  然后使用 @kbd{M-(} 与
+@example
+(not (file-exists-p (concat name "c")))
+@end example
+标记所有没有对应 @file{.elc} 文件的 @file{.el} 文件。
+
+@end table
+
+@node Multiple Dired Directories
+@chapter 多个定向目录和非定向命令
+
+@cindex multiple Dired directories
+@cindex working directory
+一个 Emacs 缓冲区只能有一个工作目录，存储在缓冲区局部变量 @code{default-directory} 中。  Dired 缓冲区可能插入了多个子目录，但它仍然只有一个工作目录：该缓冲区中顶级 Dired 目录的工作目录。  对于某些命令，使用当前 Dired 目录而不是 @code{default-directory} 是合适的，例如 @code{find-file} 和 @code{compile}。
+
+@findex dired-smart-shell-command
+@findex shell-command
+@kindex M-!
+命令 @code{dired-smart-shell-command} 绑定到 Dired 缓冲区中的 @kbd{M-!}，类似于 @code{shell-command}，但它与绑定到当前 Dired 目录的 @code{default-directory} 一起运行。
+
+@node Find File At Point
+@chapter 在点查找文件
+@cindex visiting a file mentioned in a buffer
+@cindex finding a file at point
+
+@file{dired-x} 提供了一种访问或编辑您正在查看的缓冲区中提到的文件的方法（例如，邮件缓冲区、新闻文章、@file{README} 文件等）@: 或测试该文件是否存在。  获取文件名后，您可以在迷你缓冲区中修改它。
+
+安装后，@file{dired-x} 将用 @code{dired-x-find-file} 替代 @code{find-file}（通常绑定到 @kbd{C-x C-f}），用 @code{dired-x-find-file-other-window} 替代 @code{find-file-other-window}（通常绑定到 @kbd{C-x 4 C-f}）。
+
+为了使用此功能，您需要在加载 @file{dired-x} (@pxref{Optional Installation File At Point}) 之前将 @code{dired-x-hands-off-my-keys} 设置为 @code{nil}。
+
+@table @code
+@item dired-x-find-file
+@findex dired-x-find-file
+@kindex C-x C-f
+
+@code{dired-x-find-file} 的行为与 @code{find-file} 完全相同（通常绑定到 @kbd{C-x C-f}），除非将前缀参数传递给函数，在这种情况下，它将使用此时的文件名作为要访问的文件的猜测。
+
+例如，如果您正在读取的缓冲区包含单词
+
+@example
+Available via anonymous ftp in
+
+   /roebling.poly.edu:/pub/lisp/crypt++.el.gz
+@end example
+
+@noindent
+然后您可以将光标移动到包含 ftp 地址的行并输入 @kbd{C-u C-x C-f} （@kbd{C-u} 是通用参数）。  迷你缓冲区会读取
+
+@example
+Find file: /roebling.poly.edu:/pub/lisp/crypt++.el.gz
+@end example
+
+@noindent
+与最后一个@code{/}之后的点。  如果您点击 @key{RET}，emacs 将访问该地址的文件。  这也适用于您自己计算机上的文件。
+
+@item dired-x-find-file-other-window
+@findex dired-x-find-file-other-window
+@kindex C-x 4 C-f
+
+@code{dired-x-find-file-other-window} 的行为与 @code{find-file-other-window} 完全相同（通常绑定到 @kbd{C-x 4 C-f}），除非使用前缀参数。  请参阅@code{dired-x-find-file}了解更多信息。
+
+@item dired-x-hands-off-my-keys
+@vindex dired-x-hands-off-my-keys
+如果设置为@code{t}，则意味着@file{dired-x}应该在键盘上将@emph{not}绑定到@code{dired-x-find-file}而不是@code{find-file}。  同样，它不应该将 @code{dired-x-find-file-other-window} 绑定到 @code{find-file-other-window} 上。  如果在加载 @file{dired-x.el} 后更改此变量，则执行 @kbd{M-x dired-x-bind-find-file}。  该变量的默认值为@code{t}；默认情况下，不进行绑定。  @xref{Optional Installation File At Point}。
+
+@item dired-x-bind-find-file
+@findex dired-x-bind-find-file
+一个可以交互调用或在 @file{~/.emacs} 文件中调用的函数，它使用 @code{dired-x-hands-off-my-keys} 的值来确定 @code{dired-x-find-file} 是否应绑定到 @code{find-file} 和 @code{dired-x-find-file-other-window} 绑定到 @code{find-file-other-window}。  @xref{Optional Installation File At Point}。
+@end table
+
+@node Miscellaneous Commands
+@chapter 杂项命令
+
+其他地方不适合的其他功能：
+
+@table @code
+@item dired-find-subdir
+@vindex dired-find-subdir
+默认值：@code{nil}
+
+如果非@code{nil}，如果可以在某些现有 Dired 缓冲区中找到该目录（可能是子目录），则 Dired 不会为该目录创建新缓冲区。
+
+如果一个目录有多个 Dired 缓冲区，则选择最近使用的一个。
+
+Dired 避免切换到当前缓冲区，因此，如果同一目录有一个普通缓冲区和一个通配符缓冲区，@kbd{C-x d @key{RET}} 将在这两个缓冲区之间切换。
+@end table
+
+@table @code
+
+@item dired-vm
+@cindex reading mail.
+@kindex V
+@findex dired-vm
+如果@code{dired-bind-vm} 是@code{t}，则绑定到@kbd{V}。  在此文件上运行 VM（假设是 UNIX 邮件文件夹）。
+
+@vindex dired-vm-read-only-folders
+如果您为此命令提供前缀参数，它将以只读方式访问该文件夹。
+
+如果变量@code{dired-vm-read-only-folders}是@code{t}，@code{dired-vm}将以只读方式访问所有文件夹。  如果它既不是@code{nil}也不是@code{t}，例如符号@code{if-file-read-only}，则仅以只读方式访问您不可写的文件。
+
+@vindex dired-bind-vm
+如果变量@code{dired-bind-vm}是@code{t}，则@code{dired-vm}将绑定到@kbd{V}。  否则，@code{dired-bind-rmail}将被绑定。
+
+@item dired-rmail
+@cindex reading mail.
+@findex dired-rmail
+如果@code{dired-bind-vm} 是@code{nil}，则绑定到@kbd{V}。  在此文件上运行 Rmail（假设是 Rmail 格式的邮件文件夹）。
+@end table
+
+@node Bugs
+@chapter 虫子
+@cindex bugs
+
+@noindent
+如果您在此软件包中遇到错误，或者希望提出增强建议，请使用 @kbd{M-x report-emacs-bug} 报告它。
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node     Concept Index
+@unnumbered 概念索引
+@printindex cp
+
+@node     Command Index
+@unnumbered 功能索引
+@printindex fn
+
+@node     Key Index
+@unnumbered 关键指标
+@printindex ky
+
+@node     Variable Index
+@unnumbered 变量索引
+@printindex vr
+
+@bye

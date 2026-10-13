@@ -1,0 +1,1020 @@
+\输入 texinfo.tex @c -*-texinfo-*-
+@c %**start of header
+@setfilename ../../info/todo-mode.info
+@settitle 待办事项模式用户手册
+@documentlanguage en
+@include docstyle.texi
+@syncodeindex fn cp
+@syncodeindex vr cp
+@syncodeindex ky cp
+@c %**end of header
+
+@copying
+版权所有 @copyright{} 2013--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* Todo Mode: (todo-mode).        制定并维护待办事项列表。
+@end direntry
+
+@titlepage
+@title 待办事项模式用户手册
+@subtitle 用于制作和维护待办事项列表的工具。
+
+@author Stephen Berman
+@page
+
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+
+@node Top
+@top Todo Mode User Manual
+
+This manual describes the version of Todo mode first appearing in
+Emacs 24.4.
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Overview::
+* Todo Mode Entry Points::
+* Key Binding Conventions::
+* Navigation::                   在类别内和类别之间移动。
+* Editing::                      添加、删除和更改待办事项文件、类别和项目。
+* Todo Archives::                已完成待办事项的文件。
+* Marked Items::                 同时作用于多个项目。
+* Todo Categories Mode::         类别和项目计数表。
+* Searching for Items::
+* Todo Filtered Items Mode::     制作来自不同类别和文件的项目的虚拟类别。
+* Todo Display Features::
+* Printing Todo Buffers::
+* Legacy Todo Mode Files::       转换旧式待办事项文件。
+
+* GNU Free Documentation License::
+
+@detailmenu
+--- 详细节点列表 ---
+
+概述
+
+* Levels of Organization::
+* Todo Items as Diary Entries::
+
+编辑
+
+* File Editing::
+* Category Editing::
+* Item Editing::
+
+项目编辑
+
+* Inserting New Items::
+* Editing Item Headers and Text::
+* Relocating and Removing Items::
+
+搬迁和移除物品
+
+* Reprioritizing Items::
+* Moving and Deleting Items::
+* Done Items::
+
+都都档案馆
+
+* Creating and Visiting Archives::
+* Todo Archive Mode::
+
+待办类别模式
+
+* Table of Item Counts::
+* Reordering Categories::
+
+Todo 过滤项目模式
+
+* Filtering Items::
+* Todo Filtered Items Mode Commands::
+* Files of Filtered Items::
+
+待办事项显示功能
+
+* Faces::
+* Item Prefix::
+* Other Display Commands and Options::
+@end detailmenu
+@end menu
+
+@node Overview
+@chapter 概述
+
+Todo 模式包提供了用于创建和维护待办事项列表的工具。  待办事项列表是待办事项列表——要做的事情（在最广泛的意义上）——按优先级顺序排列，最高优先级项目位于列表顶部，最低优先级项目位于底部。
+
+本手册介绍了 Todo 模式用户界面。  待办事项模式包含大量用于创建、显示、导航和编辑待办事项列表的命令和用户选项，分布在五种主要模式中。主要模式是Todo模式；其他四种模式（Todo 编辑模式、Todo 存档模式、Todo 类别模式和 Todo 过滤项目模式）是 Todo 模式的附属模式，可从 Todo 模式访问。
+
+此版本的 Todo 模式极大地扩展了原始版本，并且在很多方面与原始版本有所不同；有关最重要差异的详细信息和后果，@ref{Legacy Todo Mode Files}。
+
+@menu
+* Levels of Organization::
+* Todo Items as Diary Entries::
+@end menu
+
+@node Levels of Organization
+@section 组织层次
+
+在“待办事项”模式下，每个待办事项列表都用一个命名类别进行标识，因此您可以将主题相关的待办事项分组在一起。  每个类别都存储在一个文件中，从而提供了更高层次的组织。您可以根据需要在每个类别中创建任意数量的待办事项文件。
+
+所有待办事项文件都驻留在一个目录中，该目录的位置由用户选项@code{todo-directory}指定。  该目录还可能包含其他类型的 Todo 文件，稍后讨论（@pxref{Todo Archive Mode} 和 @ref{Todo Filtered Items Mode}）。
+@c Emacs recognizes Todo files by their extension, so when you visit
+@c the files the buffer is in the appropriate mode and the current
+@c category is correctly displayed.
+当您使用 Todo 模式命令创建 todo 文件时，扩展名 @samp{.todo} 会自动添加到您选择的基本名称中（通常，此名称也用于其他类型的 Todo 文件，它们有自己的扩展名）。  作为用户，您只需处理 Todo 文件的基本名称。
+
+当您创建新的待办事项文件时，还必须向其中添加至少一个类别，并且每个待办事项都属于一个类别。  不可能有一个未分类的待办事项列表，但您始终可以使用“Todo”之类的通用名称创建一个包罗万象的类别，如果您不提供不同的名称，这实际上是您创建新的待办事项文件时分配给第一个类别的默认名称；您可以通过自定义 @code{todo-initial-category} 来更改默认值。
+
+最基本的组织级别是待办事项本身，因为它包含有关您想要执行的操作的信息。  正如本手册后续章节所详述的，大多数 Todo 模式命令和用户选项涉及通过将各种元数据与其相关联来分类和部署此信息的方法，例如，它所属的类别、它的优先级、是否包含在 Emacs 日记中、日期和时间戳、是否已完成或尚未完成。
+
+@node Todo Items as Diary Entries
+@section 作为日记条目的待办事项
+
+通过将待办事项文件包含在日记文件中 (@pxref{Fancy Diary Display,,, emacs})，您可以让待办事项显示在 Emacs Fancy Diary 显示中。  这有效地通过分类日记条目增强了 Emacs 日记。  包含的待办事项文件中的所有项目都将显示在 Fancy Diary 显示屏中，标记为 @code{todo-nondiary-marker} 的项目除外。  您可以在创建新的待办事项时添加或省略此标记，也可以通过编辑现有项目来添加或省略此标记，有关详细信息，请参阅@ref{Inserting New Items}和@ref{Editing Item Headers and Text}。
+
+为了确保待办事项在 Fancy Diary 显示中正确显示，它们必须具有日记条目的格式，即它们必须以 Emacs 日记识别的日期字符串@footnote{Two types of dates recognized by the Emacs diary are not supported in the current Todo mode implementation: sexp diary entries and date strings in which the year is omitted (however, the latter type is equivalent to using @samp{*} for an arbitrary year, which Todo mode does support).} 开头，并且如果它们长于一行，则除第一行之外的所有行都必须以空格开头。  Todo 模式可确保满足这些要求 (@pxref{Other Display Commands and Options})。
+
+Fancy Diary 显示也支持 Todo 模式：如果它包含 Todo 模式文件中的项目，则在该项目上单击或键入 @key{RET} 将切换到访问该文件的缓冲区，并正确显示该项目的类别，并在该项目上显示点。
+
+@node Todo Mode Entry Points
+@chapter Todo 模式入口点
+
+要初始化您的第一个待办事项文件，请调用命令@code{todo-show}。这将提示您输入文件名（默认为值@code{todo-initial-file}），提示您输入第一个类别的名称（默认为值@code{todo-initial-category}），创建并访问文件并以待办事项模式显示类别，然后提示您输入第一项。  如果您选择现在不输入项目，只需输入 @kbd{C-g}，这将使类别为空，但格式良好。  如果您不希望在添加新类别时提示您输入项目，请禁用选项 @code{todo-add-item-if-new-category}。
+
+一旦至少存在一个待办事项文件，调用 @code{todo-show} 即可进入待办事项模式。  使用前缀参数调用时，该命令会提示要访问哪个待办事项文件。  否则，加载 Todo 模式包后第一次调用此命令将访问默认的 todo 文件（选项@code{todo-default-todo-file}）并显示其第一个类别。 （通过自定义选项 @code{todo-show-first}、@pxref{Todo Categories Mode} 和 @ref{Files of Filtered Items}，您可以在首次调用 @code{todo-show} 时获得不同的显示。）
+
+如果您离开 Todo 模式并稍后调用 @code{todo-show} 重新输入，默认情况下，这将返回到当前 todo 文件的当前（即最后显示的）类别，该类别是最近选择的且仍处于访问 todo 文件的活动缓冲区中的类别。  如果禁用选项 @code{todo-show-current-file}，则@code{todo-show} 的非初始调用始终返回到默认待办事项文件的第一个或当前类别。
+
+如果您想进入 Todo 模式并直接进入特定类别，而不是当前或默认 todo 文件中的第一个或当前类别，请使用命令 @code{todo-jump-to-category}; @ref{Navigation}，了解详情。  您还可以通过调用命令 @code{todo-insert-item} 进入 Todo 模式； @ref{Inserting New Items}，了解详情。
+
+使用这些命令进入 Todo 模式的最便捷方法是在 init 文件中为它们定义全局键绑定。  不错的选择是 @kbd{C-c t} 对应 @code{todo-show}、@kbd{C-c j} 对应 @code{todo-jump-to-category} 和 @kbd{C-c i} 对应 @code{todo-insert-item}，因为这些命令在 Todo 模式下分别绑定到 @kbd{t}、@kbd{j} 和 @kbd{i}。
+
+@c You can also visit a Todo file via @code{find-file} or Dired, like any
+@c other file, and since Emacs recognizes it, the buffer will automatically
+@c be in the appropriate Todo mode.  Moreover, as long as the command you
+@c use to visit the file is listed in the option
+@c @code{todo-visit-files-commands} (which by default contains
+@c @code{find-file} and @code{dired-find-file}), it will also correctly
+@c display the file's first category on first visiting the file (otherwise
+@c you have to use one of the commands for navigating between categories in
+@c order to get a proper display).
+
+您可以通过键入 @kbd{q} (@code{todo-quit}) 退出 Todo 模式，这会隐藏当前的 todo 文件缓冲区。  执行此操作还会保存您对文件所做的任何更改，并将退出时显示的文件和类别保留为后续 Todo 模式命令的当前状态（除非通过退出而变为当前状态的缓冲区正在访问 Todo 模式下的另一个文件和类别，在这种情况下，后者将成为 Todo 模式命令的当前状态）。
+
+@node Key Binding Conventions
+@chapter 键绑定约定
+
+为了使 Todo 模式命令正常运行，必须在所有三个组织级别（项目、类别和文件）上保持正确的格式。  Todo 模式尝试通过向用户隐藏格式的某些部分、使缓冲区只读并抑制自插入键来最大程度地降低格式损坏的风险。  因此，如果不显式调用 Todo 模式命令，通常不可能对 todo 文件进行更改。
+
+这种限制性的一个有益的副作用是，您可以通过键入普通打印字符（单个或按指定序列）来调用几乎所有 Todo 命令，而无需使用修饰键，除了用于大写的 Shift 键和原始前缀参数@kbd{C-u}；只需键入数字键即可输入数字前缀参数。
+
+Todo 中预定义的键绑定或多或少是助记符。  通常，以 @kbd{C} 开头的按键序列（大写 @samp{C}，不是控制键）绑定到应用于类别的命令，以 @kbd{F} 开头的序列应用于（非存档）文件级命令，而以 @kbd{A} 开头的序列应用于存档（一种特殊类型的 Todo 文件；@ref{Todo Archive Mode}）。  适用于构成大多数项目的 Todo 命令被绑定到小写按键序列。
+
+@node Navigation
+@chapter 导航
+
+导航命令用于通过将指针移动到另一个待办事项文件、类别或项目来将其设为当前的待办事项文件、类别或项目。@footnote{Many editing commands can also do this by side effect, but since that is not their main function, they are not included in this section.}由于这些命令可能会频繁且重复地使用，因此将它们的键绑定设置为单个小写键很方便，即使对于应用于类别和文件的导航命令也是如此。
+
+@ref{Todo Mode Entry Points} 中已经提到了两个导航命令：
+
+@table @kbd
+
+@item t
+在所选窗口中显示另一个待办事项文件 (@code{todo-show})。当您在 Todo 模式下调用此命令时，它会提示输入文件名，您可以通过迷你缓冲区补全来选择该文件名（例如在 Todo 模式之外使用前缀参数调用 @code{todo-show}）。  如果缓冲区已经在访问该文件，则会显示其当前类别；如果调用 @kbd{t} 打开文件，它将显示其第一个类别（默认情况下；请参阅选项 @code{todo-show-first} 了解其他可能性）。
+
+@item j
+在所选窗口中显示另一个待办事项类别 (@code{todo-jump-to-category})。  当您调用此命令时，它会提示您输入类别名称，您可以通过迷你缓冲区完成来选择该名称。  待完成的候选对象包括当前待办事项文件中的类别以及选项@code{todo-category-completions-files}中列出的文件中的类别。  如果您键入 @key{RET} 而不选择类别，则会自动选择当前待办事项文件的当前类别（当您在 Todo 模式之外调用 @code{todo-jump-to-category} 时，这可能是一个有用的快捷方式）。  如果您键入不存在的类别的名称，则可以将其作为新类别添加到文件中并跳转到该类别。  如果您使用前缀参数调用此命令，它首先提示您跳转到哪个待办事项文件（您也可以使用迷你缓冲区完成来选择），然后提示该文件中的哪个类别；在这种情况下，仅针对所选文件中的类别完成。
+@end table
+
+在单个待办事项文件的类别之间按顺序来回导航也很方便。  待办事项文件的类别以@samp{1}开始连续编号。@footnote{A category's number is automatically assigned when the category is created: the category is appended to the end of the file, so its number is simply the highest until another category is added.  There is no command in Todo mode to reorder the numbering of the categories in a todo file, but this is possible from the file's table of categories; @ref{Todo Categories Mode}.} 当前类别的编号和名称出现在模式行中。
+
+@table @kbd
+
+@item f
+将点移动到紧随当前类别之后的类别的第一项数字 (@code{todo-forward-category})。
+
+@item b
+将点移动到当前类别之前的类别的第一项（@code{todo-backward-category}）。
+@end table
+
+使用 @kbd{f} 和 @kbd{b} 您可以循环浏览类别，因此，例如，如果最后一个类别是当前类别并且您输入 @kbd{f}，则第一个类别将成为当前类别。
+
+您还可以在当前类别中的项目之间导航：
+
+@table @kbd
+
+@item n
+将点向下移动到当前项目下方的下一个项目（即，移动到具有下一个较低优先级的项目）(@code{todo-next-item})。
+
+@item p
+将点向上移动到当前项目正上方的项目（即，移动到下一个更高优先级的项目）(@code{todo-previous-item})。
+@end table
+
+这些命令还接受正数字前缀参数；例如，输入 @kbd{5 n} 或 @kbd{5 p} 可一步导航到比当前项低或高 5 项的项目。
+
+下面的相关部分讨论了导航到其他类型的 Todo 文件。
+
+@node Editing
+@chapter 编辑
+
+在待办事项模式下编辑意味着在组织级别之一（文件、类别或项目）进行结构或文本更改。  结构编辑包括添加、重新定位和删除某个级别的信息单元；文本编辑包括重命名文件或类别以及更改项目的内容或日期/时间戳，或向项目添加某些类型的标记或标签。  待办事项模式提供的命令（在以下部分中详细介绍）使您能够快速、安全地更改待办事项列表，而不必担心保留文件格式。
+
+要保存对当前待办事项文件所做的更改，请输入 @kbd{s} (@code{todo-save})。  使用 @kbd{q} 退出 Todo 模式时也会保存更改。
+
+@menu
+* File Editing::
+* Category Editing::
+* Item Editing::
+@end menu
+
+@node File Editing
+@section 文件编辑和待办事项编辑模式
+
+有四个文件级编辑命令：
+
+@table @kbd
+
+@item F a
+添加一个新的待办事项文件 (@code{todo-add-file})。  此命令提示输入名称并在 @code{todo-directory} 中创建文件，并添加 @samp{.todo} 扩展名（因此您不应在输入的名称中包含扩展名）。  该命令还会提示输入文件的第一个类别，如果启用了选项 @code{todo-add-item-if-new-category}（默认），则提示输入该类别的第一个项目。
+
+@item F r
+重命名当前待办事项文件 (@code{todo-rename-file})。  如果使用前缀参数调用，则提示输入待办事项文件并重命名它。  如果待办事项文件有存档 (@pxref{Todo Archive Mode}) 或有相应的过滤项目文件 (@pxref{Todo Filtered Items Mode})，则此命令会相应地重命名这些文件。  如果有实时缓冲区访问这些文件中的任何一个，该命令也会相应地重命名它们。
+
+@item F k
+删除当前待办事项文件 (@code{todo-delete-file})。@footnote{The key binding of this command is mnemonic for ``kill'' to parallel the binding @kbd{k} for item deletion, since @kbd{d} is bound to another item editing command (@pxref{Done Items}).} 如果待办事项文件有存档 (@pxref{Todo Archive Mode})，则提示是否也将其删除。此命令还会终止访问已删除文件的缓冲区。
+
+@item F e
+此命令 (@code{todo-edit-file}) 将缓冲区的主要模式更改为 Todo 编辑模式。  在此模式下，整个文件可见，缓冲区可写，您可以使用自插入键和标准 Emacs 编辑命令进行更改。  要返回 Todo 模式，请输入 @kbd{C-x C-q} (@code{todo-edit-quit})。
+
+命令 @kbd{F e} 不适用于项目和类别的正常编辑，因为它规避了 Todo 为防止文件格式损坏而施加的限制（即所有类别，而不仅仅是当前类别，以及所有内部格式都公开且可编辑）。提供它主要是为了方便可能不经常出现的两类用例。  一是能够使用标准 Emacs 命令（如 @code{query-replace}）来替换整个文件中不同类别中出现的一段文本。  另一个用例是从错误中恢复，例如意外删除项目，因为这在 Todo 模式下无法撤消。
+
+使用 @kbd{C-x C-q} 退出 Todo 编辑模式提供了一种安全措施，因为它会运行文件格式检查，如果格式无效，则会发出错误信号。  但是，此检查无法判断项目或类别的数量是否已更改，这可能会导致文件包含不一致的信息（有关更多详细信息，请参阅@ref{Reordering Categories}中的注意事项）。  调用 @kbd{F e} 会显示此效果的警告。
+@end table
+
+@node Category Editing
+@section 类别编辑
+
+以下命令可用于专门在类别级别进行编辑（对于另外两个类别编辑命令，它们是项目命令的扩展@pxref{Editing Item Headers and Text}）：
+
+@table @kbd
+
+@item C a
+向当前待办事项文件添加一个新类别，并使该类别成为当前类别 (@code{todo-add-category})。  如果使用前缀参数调用，则提示输入文件名并将新类别添加到该文件。  此命令与使用@kbd{j}类似，但它只接受不是文件中现有类别名称的类别名称。
+
+@item C r
+重命名当前类别 (@code{todo-rename-category})。  如果该类别的文件有一个包含相应类别的存档 (@pxref{Todo Archive Mode})，也请重命名该类别。
+
+@item C m
+将当前类别（及其所有项目）移动到另一个待办事项文件 (@code{todo-move-category})。  If this category's file has an archive (@pxref{Todo Archive Mode}) with a corresponding category, this command also moves that category to the archive file corresponding to the moved to todo file;如果没有这样的存档文件，该命令将创建它并添加类别。
+
+@item C k
+删除当前类别 (@code{todo-delete-category})。@footnote{This binding is mnemonic for ``kill'' to parallel the binding @kbd{k} for item deletion, since @kbd{d} is bound to another item editing command (@pxref{Done Items}).} 要删除包含项目的类别，您必须确认您的意图；如果类别为空，则立即删除。
+
+@item C g
+将一个类别的项目合并到另一个类别中，删除第一个类别并将第二个类别设为当前类别 (@code{todo-merge-category})。  如果第一类和第二类都有已归档项目 (@pxref{Todo Archive Mode})，则将前者合并到后者。  如果只有第一个类别有归档项目，请将归档类别重命名为合并到类别。  Minibuffer completion of the name of the category merged to works as with the navigation command @kbd{j}, and as with that command, passing a prefix argument, i.e., typing @kbd{C-u C g}, prompts for a file and confines merging to a category in that file.
+@end table
+
+@node Item Editing
+@section 项目编辑
+
+Todo 模式提供用于添加新项目以及文本更改、删除和重新定位现有项目的命令。  The commands and associated options for adding and editing items, in particular, offer you a lot of flexibility to fine-tune these operations to your needs.
+
+@menu
+* Inserting New Items::
+* Editing Item Headers and Text::
+* Relocating and Removing Items::
+@end menu
+
+@node  Inserting New Items
+@subsection 插入新项目
+
+要将新的待办事项添加到类别，请输入 @kbd{i}，它绑定到命令 @code{todo-insert-item}。
+
+@table @kbd
+
+@item i
+此命令是将新项目插入类别 (@code{todo-insert-item}) 的入口点。  它会提示输入其他键，直到达到完整的键序列，该序列指定您希望应用的插入参数（见下文）。  It then prompts for the text of the item, which you enter in the minibuffer.@footnote{There are two insertion parameters that override prompting for and manually entering the new item's text, see below.}  Called with one prefix argument, it also prompts for a category, and called with two prefix arguments, it prompts for both a file and a category from that file, and inserts the item accordingly;类别名称补全的工作方式与导航命令@kbd{j} 相同。  Finally, it inserts the item into the current or selected category of the current or selected todo file at the position in the list corresponding to the priority you choose, which also depends on the insertion parameters.
+@end table
+
+@noindent
+
+
+In addition to its file and category, each newly inserted todo item has a priority in the category and begins with a header string, which includes at least the current date in the same format used by @code{diary-insert-entry} (@pxref{Date Formats,,, emacs}).  您可以通过两种方式指定优先级和标头字符串的内容。首先，您可以设置以下项目插入选项，这些选项适用于每次调用 @code{todo-insert-item}。
+
+@itemize @bullet
+
+@item
+@code{todo-default-priority} 用于自动为新项目分配类别中的最高或最低优先级（如果您在调用 @code{todo-insert-item} 时未显式为其分配优先级）。默认情况下，此类新项目被赋予最高优先级，即插入到列表顶部。  此外，在设置项目的优先级时，您可以使用迷你缓冲区历史记录通过键入 @kbd{M-p} 或 @kbd{M-n} 快速调用迷你缓冲区中的最低或最高优先级编号，并且可以使用这些键滚动浏览当前类别的所有优先级编号。  例如，使用默认设置 @code{todo-default-priority}，您可以通过在设置优先级的提示下键入 @kbd{M-p M-p} 来插入新项目作为类别中倒数第二个项目。
+
+@item
+@code{todo-always-add-time-string} 用于在新项目的标题中包含或省略当前时间。  默认情况下，该时间字符串被省略。
+
+@item
+@code{todo-include-in-diary} 用于通过添加或省略 @code{todo-nondiary-marker} 来指定该项目是否出现在 Fancy Diary 显示中（当待办事项文件包含在 Emacs 日记文件中时）。  默认情况下，新的待办事项会被如此标记，从而从日记中排除。
+
+@item
+@code{todo-diary-nonmarking} 用于添加或省略 @code{diary-nonmarking-symbol} 到日记中显示的项目，以控制它们是否在日历中标记（@pxref{Format of Diary File,,, emacs}）。  默认情况下，作为日记条目的待办事项缺少此符号，因此会在日历中进行标记。
+@end itemize
+
+除了设置这些选项之外，为了获得更大的灵活性，您还可以在每次调用 @code{todo-insert-item} 时传递某些参数。这些参数不仅涉及新项目的优先级和标题，还涉及其文本内容。  您可以通过在初始 @kbd{i} 之后键入一系列一个或多个键来传递这些参数。
+
+以下是项目插入参数的列表及其助记相关的键@footnote{The non-mnemonic choice of @kbd{i} for the parameter @samp{default} is motivated by the convenience of repeating the @kbd{i} used to invoke @code{todo-insert-item}.}以及其在@code{todo-insert-item}中的效果描述：
+
+@enumerate
+
+@item
+@samp{default} (@kbd{i})：提示输入新项目的优先级（一个介于 1 和比类别中已有项目数多 1 之间的数字）并添加符合上述选项值的标题字符串。
+
+@samp{copy} (@kbd{p})：制作当前项目的精确副本，包括其标题字符串，并提示其优先级。  （这对于快速创建新的待办事项非常有用，您希望其文本或标题与现有项目的文本或标题仅部分不同：插入副本后，您可以使用下一节中描述的操作根据需要快速编辑它。）
+
+@item
+@samp{diary} (@kbd{y})：覆盖选项@code{todo-include-in-diary}；也就是说，如果选项不是@code{nil}，则添加@code{todo-nondiary-marker}，如果选项是@code{nil}，则省略此标记。
+
+@samp{nonmarking} (@kbd{k})：覆盖选项@code{todo-diary-nonmarking}；也就是说，如果选项不是@code{nil}，则添加@code{diary-nonmarking-symbol}，如果选项是@code{nil}，则省略此符号。  由于此符号仅适用于日记项目，因此新项目会自动标记为这样，即缺少 @code{todo-nondiary-marker}。
+
+@item
+@samp{calendar} (@kbd{c})：弹出 Emacs 日历并单击其中的日期以在新待办事项的标题中使用该日期。
+
+@samp{date} (@kbd{d})：提示在迷你缓冲区中输入标题的年、月（完成）和日数部分。
+
+@samp{dayname} (@kbd{n})：提示在迷你缓冲区中输入工作日名称作为日期标题，而不是年月日字符串。
+
+@item
+@samp{time} (@kbd{t})：提示在迷你缓冲区中输入时间字符串，而不是自动插入当前时间；但是，如果 3⁣ 不是 4⁣，则在提示符下键入 2⁣ 会输入当前时间，否则会输入空字符串（即没有时间字符串）。
+
+@item
+@samp{here} (@kbd{h})：将新项目插入到该项目的位置，将该项目以及类别中所有较低的项目向下推，即将其优先级降低 1。
+
+@samp{region} (@kbd{r})：使用所选区域的文本作为新项目的文本，并根据项目插入选项和传递的其他参数插入此文本。  如果选项@code{todo-use-only-highlighted-region}非@code{nil}，则仅在突出显示时使用该区域；否则，无论突出显示如何，都使用该区域。
+@end enumerate
+
+请注意，参数分为五个编号组；在一个组内，参数是互斥的。  因此，要构建完整的插入操作，您可以通过键入相应的键从至少一组参数中选择最多一个参数。  如果要应用多个参数，则必须按照编号组的顺序键入相应的键，并遵守以下限制。
+
+第 2-4 组的键是连续键，即每个键后面都可以跟有来自下一组的键。  如果您想使用继续键来结束序列，则必须将最终键加倍。  例如，@kbd{i y}不是一个完整的按键序列；相反，您必须输入@kbd{i y y}。
+
+相比之下，第1组和第5组的键是最终键；例如，@kbd{i i}和@kbd{i h}是完整序列。  制作两组单独的最终键的原因是参数 @samp{default} 和 @samp{copy} 不能与任何其他参数组合，而 @samp{here} 和 @samp{region} 可以与组 2-4 中的任何参数组合。
+
+为了帮助您构建项目插入键序列，当您键入插入键时，会在回显区域中显示一条提示，显示剩余的可能键对及其关联参数，并根据上面的列表进行分组和排序。  输入 @kbd{i} 调用 @code{todo-insert-item} 后，初始提示如下所示：
+
+@example
+Press a key (so far @kbd{i}):  @{ i=>default p=>copy @} @{ y=>diary k=>nonmarking @} @{ c=>calendar d=>date n=>dayname @} t=>time @{ h=>here r=>region @}
+@end example
+
+@noindent If you now type @kbd{y}, the prompt changes to this:
+
+@example
+Press a key (so far @kbd{i y}):  y=>diary:GO! @{ c=>calendar d=>date n=>dayname @} t=>time @{ h=>here r=>region @}
+@end example
+
+@noindent Notice that the pair @samp{k=>nonmarking} is now absent, since it
+与所选对 @samp{y=>diary} 属于同一组，因此不再适用于此序列。  由于 @kbd{y} 是继续键，因此它仍然可用，但现在字符串 @samp{:GO!} 附加到该键对中，以提醒您再次按此键将完成序列。
+
+
+
+@c Here are some examples of item insertion command key sequences:
+
+@c @itemize @bullet
+
+@c @item
+@c @kbd{i h} inserts a new item at the position of the item at point (pushing
+@c the latter down) with a header containing the current date and,
+@c depending on the values of the mentioned options, possibly the current
+@c time and diary-related markings.
+@c @item
+@c @kbd{i y h} does the same as the preceding command, except that
+@c @code{todo-nondiary-marker} is added if @code{todo-include-in-diary} is
+@c non-@code{nil} and omitted if that option is @code{nil}; that is,
+@c the diary key @kbd{y} @c overrides the setting of this option.
+@c @item
+@c @kbd{i y t h} does the same as the preceding command, except that it
+@c prompts for a time string instead of automatically inserting the
+@c current time; however, typing @key{RET} at the prompt returns the
+@c current time if @code{todo-always-add-time-string} is non-@code{nil},
+@c otherwise the empty string (i.e., no time string).
+@c @item
+@c @kbd{i y t t} does the same as the preceding command, except that it
+@c prompts for the item's priority and inserts it accordingly.
+@c @end itemize
+
+
+还可以使用按键序列 @kbd{i c c} 的替代方法从日历中选择项目的日期：当点已位于日历中的某个日期时，键入 @kbd{i t} (@code{todo-insert-item-from-calendar}) 会提示输入新项目及其优先级，并将其插入当前类别中。  该命令与 @code{todo-insert-item} 一样，也接受一两个前缀参数，用于通过迷你缓冲区补全选择类别。  但请注意，键序列 @kbd{i t} 不是在 Todo 模式中定义的，而是在日历模式键映射中定义的。  如果您在决定创建新的待办事项时碰巧使用日历，那么这是一个方便的快捷方式。  （将此与传递 @samp{calendar} 参数进行对比，该参数会在您输入项目文本后弹出打开日历，然后您可以从日历中选择日期。）
+
+
+@node  Editing Item Headers and Text
+@subsection 编辑项目标题和文本
+
+要更改现有项目的内容或标题，请输入 @kbd{e}，它绑定到命令 @code{todo-edit-item}。
+
+@table @kbd
+
+@item e
+此命令是对类别中现有项目进行文本编辑的入口点 (@code{todo-edit-item})。  它会提示输入其他键，直到达到完整的键序列，该序列指定您要应用的编辑参数（见下文），然后相应地执行编辑操作。
+@end table
+
+以下是项目编辑参数的列表及其助记相关的键以及@code{todo-edit-item}中的效果描述。  该列表分为三组，原因如下。
+
+@enumerate 1
+
+@item
+@samp{edit} (@kbd{e})：编辑迷你缓冲区中当前项目的文本；项目的标题被省略。
+
+@samp{header} (@kbd{h})：编辑迷你缓冲区中当前项目的文本和标题。
+
+@samp{multiline} (@kbd{m})：在 Todo 编辑模式下编辑特殊缓冲区中当前项目的文本。  编辑后，输入@kbd{C-x C-q}返回待办事项模式。@footnote{This runs a format check to ensure the item is well-formed.  However, unlike the command @kbd{F e} (@pxref{File Editing}), @kbd{e m} does not expose you to the risk of putting the file in an inconsistent state, since it puts only the current item in Todo Edit mode.}
+
+@samp{diary} (@kbd{y})：更改当前项目的日记包含状态，如果项目缺少，则添加 @code{todo-nondiary-marker}，或者如果存在，则将其删除。
+
+@samp{nonmarking} (@kbd{k})：通过添加@code{diary-nonmarking-symbol}（如果项目缺少）或删除（如果存在）来更改当前项目的日历标记状态。  由于此符号仅适用于日记项目，因此该项目会自动标记为这样，即，如果 @code{todo-nondiary-marker} 存在，则会将其删除。
+
+@samp{date} (@kbd{d})：提示输入第二组项目编辑参数中的最后一个键，以编辑当前项目的日期字符串。
+
+@samp{time} (@kbd{t})：编辑当前项目的时间字符串（如果存在）；否则，添加一个。  如果 3⁣ 不是 4⁣，则在提示符下键入 2⁣ 将输入当前时间，否则将输入空字符串（即没有时间字符串）。
+@end enumerate
+
+@noindent
+编辑迷你缓冲区中较长项目的文本可能会很不方便；因此，如果您在文本包含多个逻辑行的项目上键入 @kbd{e e} 或 @kbd{e h}，其效果与键入 @kbd{e m} 相同，即在 Todo 编辑模式下切换特殊缓冲区。
+
+当您传递前一组参数（@samp{date} 参数除外）时，这将完成通过键入 @kbd{e} 开始的项目编辑调用。  但是，按 @kbd{d} 传递 @samp{date} 参数，会提示您输入以下参数及其关联键，按其中任意一个即可完成调用。
+
+@enumerate 2
+
+@item
+@samp{full} (@kbd{f}): 依次提示编辑当前项目日期字符串的年、月（已完成）和日数部分，如果选项@code{todo-always-add-time-string}非@code{nil}，还提示编辑其时间字符串。
+
+@samp{calendar} (@kbd{c})：这会弹出 Emacs 日历，在日历中的某个日期上键入 @key{RET} 后，该日期就会成为项目的日期。
+
+@samp{today} (@kbd{a})：将项目的日期设置为今天的日期。
+
+@samp{dayname} (@kbd{n})：提示输入工作日名称（需完成）并将其设为项目的日期标题。  请注意，这会替换现有的日期字符串，但不会将日期名称添加到日期字符串中。
+
+@samp{year} (@kbd{y})：仅编辑当前项目日期字符串的年份部分。
+
+@samp{month} (@kbd{m})：仅编辑当前项目日期字符串的月份部分（带补全）。
+
+@samp{daynum} (@kbd{d})：仅编辑当前项目日期字符串的日期部分。
+@end enumerate
+
+@noindent
+使用后三个参数，您可以在调用中添加正或负数字前缀参数：这将按给定数字递增或递减选定的日期部分，并在必要时自动调整其他日期部分。  例如，如果项目的日期字符串是“2013 年 1 月 1 日”，则输入 @kbd{- 3 e d d} 将得到“2012 年 12 月 29 日”。
+
+前两组参数仅适用于未标记为完成的待办事项 (@pxref{Done Items})；相比之下，第三组的两个参数仅适用于已完成的待办事项。  您无法编辑此类项目的文本，但可以编辑或删除在将项目标记为完成时添加的注释 (@pxref{Done Items, @code{todo-item-done}},)，或者通过传递这些参数之一来追溯添加注释。
+
+@enumerate 3
+
+@item
+@samp{add/edit comment} (@kbd{c})：编辑当前已完成项目的注释（如果有）；否则，提示并添加评论。
+
+@samp{delete comment} (@kbd{d})：删除当前已完成项目的注释（如果有）。
+@end enumerate
+
+命令@code{todo-edit-item}对未完成和已完成的待办事项之间的区别很敏感。  如果当点位于已完成项目上时键入 @kbd{e}，则会在回显区域中显示以下提示：
+
+@example
+Press a key (so far @kbd{e}): c=>add/edit comment d=>delete comment
+@end example
+
+@noindent
+只有根据此提示输入@kbd{c}或@kbd{d}才能完成调用。  相反，如果当点位于未完成的待办事项上时键入 @kbd{e}，则会在回显区域中显示以下提示，并且您只需键入列出的键之一即可继续或完成调用：
+
+@example
+Press a key (so far @kbd{e}): e=>edit h=>header m=>multiline y=>diary k=>nonmarking d=>date t=>time
+@end example
+
+如上所述，传递@samp{date}参数并不能完成@code{todo-edit-item}的调用；相反，它会显示以下提示，并且键入任何这些键即可完成调用：
+
+@example
+Press a key (so far @kbd{e d}): f=>full c=>calendar a=>today n=>dayname y=>year m=>month d=>daynum
+@end example
+
+除了项目级调用 @kbd{e y}（更改当前项目的日记包含状态）和 @kbd{e k}（更改当前项目的日历标记状态）之外，Todo 模式还有两个相关的类别级命令：
+
+@table @kbd
+
+@item C e y
+@itemx C e k
+分别为当前类别中的所有待办事项添加@code{todo-nondiary-marker}和@code{diary-nonmarking-symbol}；如果使用前缀参数调用，这些标记将从类别中的所有项目中删除。
+@end table
+
+@noindent
+与@kbd{e k}一样，@kbd{C e k}会自动从所有存在它的项目中删除@code{todo-nondiary-marker}，因为只有日记项目才能承载@code{diary-nonmarking-symbol}。
+
+由于类别通常包含标记为日记包含和排除的项目的混合，并且前者是日历中要标记的项目和不标记的项目的混合，因此这些类别级命令更有用，与项目级命令不同，不是切换，而是对类别中的所有项目具有相同的效果，并采用前缀参数来反转效果。  （如果您确实想切换类别中所有项目的日记包含和日历标记状态，可以通过标记所有项目然后调用 @kbd{e y} 或 @kbd{e k}、@pxref{Marked Items} 来实现）。
+
+@node  Relocating and Removing Items
+@subsection 搬迁和移除物品
+
+除了插入新的待办事项和更改现有项目的文本或标题之外，您还可以将项目移动到另一个类别（即重新分类）、更改其在类别中的优先级、从类别和文件中删除它，或将其标记为“完成”项目，这会将其从待办事项列表中删除但不会删除它。
+
+@menu
+* Reprioritizing Items::
+* Moving and Deleting Items::
+* Done Items::
+@end menu
+
+@node Reprioritizing Items
+@subsubsection 重新排列项目的优先顺序
+
+可以通过三种方式更改待办事项的优先级：
+
+@table @kbd
+
+@item r
+将当前项目的优先级提高 1，将其在列表中的位置与其正上方的项目的位置交换 (@code{todo-raise-item-priority})。
+
+@item l
+将当前项目的优先级降低 1，将其在列表中的位置与其正下方的项目的位置交换 (@code{todo-lower-item-priority})。
+
+@item #
+提示输入数字并将项目重新定位到列表中的相应位置 (@code{todo-set-item-priority})。  例如，在提示处输入 @kbd{3} 会使该项目成为该类别中的第三个项目，即赋予其第三高优先级；所有较低优先级的项目都被向下推一位。  您还可以将所需的优先级作为数字前缀参数传递，例如，@kbd{3 #} 为项目提供第三高优先级而不提示。  （前缀参数对 @kbd{r} 或 @kbd{l} 无效。）您可以在迷你缓冲区中键入 @kbd{M-p} 和 @kbd{M-n} 滚动浏览当前类别的所有优先级编号。  如果您错误地选择了该项目的当前优先级，系统将提示您选择其他优先级。
+@end table
+
+@node Moving and Deleting Items
+@subsubsection 移动和删除项目
+
+您可以将项目移动到另一个类别，从而对其进行重新分类：
+
+@table @kbd
+
+@item m
+将当前点的项目移动到另一个类别 (@code{todo-move-item})。这会提示输入要将项目移动到的类别，显示该类别，提示移动项目在移动到的类别中的优先级，并相应地插入项目。  移动到的类别名称的迷你缓冲区补全与导航命令 @kbd{j} 一样，并且与该命令一样，传递前缀参数提示输入文件并将项目移动到该文件中的类别；如果您输入的类别名称是新的，则会询问您是否将该类别添加到文件中，如果您确认，则该项目将移至新类别。
+@end table
+
+您可以删除一个项目，从而永久（并且就 Todo 模式而言，不可撤销地）将其从 todo 文件中删除：
+
+@table @kbd
+
+@item k
+删除点处的待办事项（@code{todo-delete-item}；绑定是“kill”的助记符，因为@kbd{d}用于将项目标记为已完成（@pxref{Done Items}）；但请注意，@kbd{k}不会将项目放入kill环中）。  此命令需要确认您要删除该项目，因为您无法在待办事项模式下撤消删除操作。  （您可以使用@kbd{F e}来恢复该项目，但请注意，这会使文件处于不一致的状态，您可以从中恢复，但并非没有风险；参见@:中的注意事项@ref{Reordering Categories}。）
+@end table
+
+@quotation Note
+需要用户确认的 Todo 命令（例如 @kbd{k}）使用 @code{y-or-n-p} 的修改形式，默认情况下仅接受 @kbd{y} 或 @kbd{Y}，但不接受 @key{SPC} 作为肯定答案。  这是为了降低无意执行命令的风险，这对于执行删除的命令尤其重要，因为没有 Todo 命令可以撤消删除。  如果您希望能够使用@key{SPC}进行确认，请启用选项@code{todo-y-with-space}。
+@end quotation
+
+@node Done Items
+@subsubsection 已完成的项目
+
+当待办事项相关的活动或事情已经完成时，很自然地从待办事项列表中删除该项目。  但您可能更愿意通过将项目标记为已完成来保留您的成就记录，而不是永久删除它。  在待办事项模式下，这将从待办事项列表中删除已完成的项目，以免使其混乱，并将其存储在其他地方。  这些存储的项目形成了所做事情的记录或日记。 Todo 包提供了两个这样的存储：这里描述的 Todo 类别的“已完成项目”部分，以及已完成项目档案 (@pxref{Todo Archive Mode})。
+
+@table @kbd
+
+@anchor{todo-item-done}
+@item d
+此命令 (@code{todo-item-done}) 从待办事项列表中删除该点的待办事项，将由 @code{todo-done-string}（默认为 @samp{DONE }）和当前日期组成的标题附加到原始标题，如果启用 @code{todo-always-add-time-string}，还包括当前时间，并将生成的已完成项目添加到类别的已完成项目部分的顶部。  使用前缀参数调用时，它还会提示您输入注释，该注释附加到已完成项目的末尾，前缀为 @code{todo-comment-string}（默认为 @samp{COMMENT: }）。
+@end table
+
+类别的已完成项目部分位于类别中最后一个待办事项（即未完成）项目的下方。  默认情况下，此部分在视图中隐藏。  有两个命令用于查看和隐藏已完成的项目；由于这些是切换命令，为了方便起见，它们也有一个键绑定：
+
+@table @kbd
+
+@item C v
+@itemx v
+如果当前类别的已完成项目部分被隐藏，则使其可见，或者如果它可见则将其隐藏 (@code{todo-toggle-view-done-items})。  如果您总是想在进入类别时查看已完成的项目部分，请启用选项@code{todo-show-with-done}；您仍然可以使用 @kbd{C v} 或 @kbd{v} 来隐藏（和取消隐藏）它。
+
+@item F V
+@itemx V
+切换当前待办事项文件中的标准类别显示，即仅显示文件中每个类别的已完成项目部分，或者如果可见，则再次隐藏它并仅显示待办事项部分 (@code{todo-toggle-view-done-only})。
+@end table
+
+由于已完成的项目是已完成的待办事项的记录，因此您无法对它们应用与未完成的待办事项相同类型的编辑操作。  但是，正如 @ref{Editing Item Headers and Text} 中所述以及为了方便起见在下面重复的那样，您可以编辑或删除已完成项目的评论，或者追溯添加评论。  您还可以重新定位已完成的项目，并且可以恢复其已完成的状态，使其再次成为未完成的项目。
+
+@table @kbd
+
+@item e c
+编辑当前已完成项目的评论（如果有）；否则，提示并添加评论。
+
+@item e d
+删除当前已完成项目的注释（如果有）。
+
+@item m
+将点处的已完成项目移动到另一个类别的已完成项目部分的顶部 (@code{todo-move-item})。  如果在完成待办事项并将其重新定位到其类别的已完成项目部分后，您创建的类别比其当前类别更适合已完成项目的内容，则这非常有用；换句话说，您可以追溯性地对已完成的项目重新分类。
+
+@item u
+如果您决定此时已完成的项目根本没有完成，则此命令会“撤消”它，即将其恢复到其类别的待办事项列表，并具有您为其选择的优先级（@code{todo-item-undone}）。  如果完成的项目有注释，系统会询问您是否将其从恢复的项目中删除。
+@end table
+
+@node Todo Archives
+@chapter 都都档案馆
+
+当类别本身的已完成项目部分开始变得混乱时，或者如果您只想将一些已完成的待办事项存储在单独的文件中，您可以将它们移动到待办事项存档。  这是一个与待办事项文件结构完全相同的文件，即分为多个类别，但不同之处在于类别仅包含已完成的项目。 Todo 档案与 todo 文件一样，位于 @code{todo-directory} 中，但扩展名为 @samp{.toda} 而不是 @samp{.todo}。
+
+@menu
+* Creating and Visiting Archives::
+* Todo Archive Mode::
+@end menu
+
+@node Creating and Visiting Archives
+@section 创建和访问档案
+
+Todo 模式提供以下用于归档项目的命令：
+
+@table @kbd
+
+@item A d
+此命令 (@code{todo-archive-done-item}) 归档当前已完成的项目。使用前缀参数调用时，它会存档当前待办事项类别中的所有已完成项目。  如果当前待办事项文件的存档已存在并且包含与当前待办事项类别同名的类别，则此命令将已完成的项目移动到相应存档类别的顶部。  如果存档存在但没有相应的类别，则此命令会在存档中创建类别并将已完成的项目移至其中。  如果 todo 文件不存在存档，该命令将使用与 todo 文件相同的基本名称创建存档文件以及类别，并将已完成的项目移至其中。
+@end table
+
+键入 @kbd{A d} 也是在 Todo 模式包中创建存档文件及其类别的唯一方法。  因此，作为一项规则，每个存档文件恰好对应于一个待办事项文件，并且具有与该文件相同的基本名称，并且存档文件中的每个类别对应于相应待办文件中的类别并具有相同的名称。仅当您删除待办事项文件但未删除相应的存档，或者删除待办事项文件中的类别且存档中具有相应的类别时，才会出现异常。
+
+如果您已归档给定待办事项类别中的所有项目并且不打算向其中添加新项目，您可能倾向于执行后者。  特别是，如果待办事项文件中有大量此类空类别，这可能会使文件中的顺序导航变得烦人。  您可以通过删除这些类别来避免这种烦恼，但代价是使待办事项文件与存档文件不同步。
+
+您可能会发现最好不要删除空的待办事项类别，而是启用选项@code{todo-skip-archived-categories}。  当这是非@code{nil}时，此类空的待办事项类别将被顺序类别导航命令@kbd{f}和@kbd{b}跳过，因此它们在导航时不会分散您的注意力，并且您可以保持待办事项和存档文件之间的结构对应关系（您仍然可以使用@kbd{j}跳转到空的待办事项类别）。
+
+如果您重命名存档中具有相应类别的待办事项类别，则存档类别也会自动进行相同的重命名。同样，如果您将这样的待办事项类别移动到另一个文件；在这种情况下，如果没有与类别移动到的todo文件对应的存档文件，则自动创建存档并将存档类别移动到其中。
+
+Todo 模式下有两个命令用于访问存档文件：
+
+@table @kbd
+
+@item A f
+切换到显示与当前待办事项类别 (@code{todo-find-archive}) 对应的存档类别的缓冲区。  如果待办事项类别没有存档项目，该命令会询问您是否仍要访问存档。  如果此待办事项文件没有存档，它会询问您是否要访问另一个存档，您可以通过迷你缓冲区完成来选择。
+
+@item A c
+选择要访问的存档，无论当前待办事项文件是否有存档 (@code{todo-choose-archive})。
+@end table
+
+与待办事项文件一样，您还可以通过调用标准 Emacs 文件访问命令来访问待办事项存档；这将显示存档的第一个（在初始调用时）或当前类别。
+
+@node Todo Archive Mode
+@section 待办存档模式
+
+当您访问 Todo 存档时，缓冲区处于 Todo 存档模式。  它显示类别就像在待办事项模式中一样，只不过它们只包含已完成的项目。  它提供与 Todo 模式相同的顺序导航命令：@kbd{f} 和 @kbd{b} 在当前存档的类别之间导航，@kbd{n} 和 @kbd{p} 在当前存档类别的已完成项目之间导航。
+
+命令@kbd{t}和@kbd{j}在Todo存档模式下也可用，它们的工作方式与Todo模式相同，这意味着它们只能用于返回Todo模式：@kbd{t}提示并切换到todo文件，使用@kbd{j}只能跳转到todo类别。  这些命令排除存档，因为存档文件与相应的待办事项文件具有相同的基本名称，并且类别名称完成仅使用基本名称，因此命令无法知道您要访问哪种类型的文件。  因此，在 Todo Archive 模式下有一个特殊的命令用于跳转到另一个存档类别或访问另一个存档文件：
+
+@table @kbd
+
+@item a
+此命令 (@code{todo-jump-to-archive-category}) 提示输入当前存档中的类别并跳转到该类别。  使用前缀参数调用时，它会提示输入另一个存档，然后提示其中的类别并跳转到该类别。
+@end table
+
+Todo 模式编辑命令在 Todo 存档模式下不可用，因为存档是已完成的待办事项的静态记录。  但是，如果您错误地归档了某个项目，或者只是改变了对某个项目的归档状态的看法，您可以“取消归档”它：
+
+@table @kbd
+
+@item u
+将已完成的项目恢复到相应待办事项文件中相应类别的已完成项目部分的顶部，即未归档的项目仍然是已完成的项目 (@code{todo-unarchive-items})。  当归档类别中的最后一个项目被取消归档时，该类别会自动从归档中删除。  如果这是存档中的唯一类别，则存档文件也会自动删除。
+@end table
+
+由于从相应的待办文件中访问存档是很自然的，因此当您浏览完存档后，可以很方便地轻松返回到待办事项文件。  如果您输入 @kbd{q} 退出待办事项存档模式，则会切换到相应的待办事项文件，并显示与您刚刚访问的存档类别相对应的待办事项类别。
+
+命令 @kbd{F k} (@pxref{File Editing}) 在 Todo 存档模式下也可用。  它会删除当前存档文件并提示您是否删除相应的待办事项文件。
+
+@node Marked Items
+@chapter 标记的项目
+
+对于许多项目编辑命令来说，将它们同时应用于当前类别中的多个项目是有意义且方便的。 Todo 通过标记项目来促进这一点。
+
+@table @kbd
+
+@item *
+如果该项目未标记，则标记该项目，并删除已标记的项目 (@code{todo-toggle-mark-item})。  标记是由选项 @code{todo-item-mark}（默认为 @samp{*}）指定的字符串，附加在项目标题前面（更准确地说，在项目的优先级编号或前缀之前；有关后者的详细信息，请参阅@ref{Todo Display Features}）。  标记当前项目后，命令前进指向下一个项目。  它还接受数字前缀参数，它允许切换多个连续项目的标记。
+
+@item C *
+标记当前类别中的所有待办事项。
+
+@item C u
+取消标记当前类别中的所有待办事项。
+@end table
+
+您还可以使用最后两个命令来标记或取消标记类别中的所有已完成项目，但前提是仅显示已完成项目部分，即在调用 @kbd{C V} 或 @kbd{V} 之后。
+
+以下命令对标记的项目进行操作：
+
+@itemize @bullet
+
+@item
+@kbd{k}（删除）
+@item
+@kbd{m}（移至另一个类别）
+@item
+@kbd{d}（移至已完成项目部分；请注意，@kbd{C-u d} 向所有标记的项目添加相同的注释）
+@item
+@kbd{A d}（存档）
+@item
+@kbd{u}（在 Todo 模式下用于撤消已完成的项目，在 Todo 存档模式下用于取消存档项目）
+@item
+用于编辑项目标题的命令（以前缀 @kbd{e d} 以及 @kbd{e t}、@kbd{e y} 和 @kbd{e k} 开头的命令）
+@end itemize
+
+@noindent
+项目插入、文本编辑和优先级更改命令不适用于标记的项目。
+
+如果您在多个不连续的标记项目上使用 @kbd{m}、@kbd{d}、@kbd{A d} 或 @kbd{u}，则重新定位的项目将保留其相对顺序，但现在会连续连续列出。
+
+您可以标记待办事项和已完成事项，但请注意，只有 @kbd{m} 和 @kbd{k} 可以同时应用于两者；其他命令仅影响标记的待办事项或标记的已完成项目，因此如果两种类型的项目都被标记，则调用这些命令无效并通知您错误的尝试。
+
+@node Todo Categories Mode
+@chapter 待办类别模式
+
+对待办事项文件中的类别及其包含的项目类型有一个紧凑的概述会很有帮助； Todo 包提供了此信息的表格视图。
+
+@table @kbd
+
+@item F c
+在 Todo 模式或 Todo 存档模式下键入此命令 (@code{todo-show-categories-table}) 会切换到显示表格的缓冲区，该表格概述了当前 todo 或存档文件中的类别。  该缓冲区处于 Todo 类别模式。
+@end table
+
+该表由包含文件中类别名称的列和包含每个类别中某些类型项目计数的列组成。  待办事项文件有四种计数类型：所有待办事项（即未完成）项目、日记项目（即那些缺少 @code{todo-nondiary-marker} 的待办事项项目，因此可以出现在 Fancy Diary 显示中）、已完成（但未存档）项目和已存档项目。  对于存档文件，所有项目都已完成，因此该表只有一列用于此计数。  表的最后一行给出了文件中所有类别的项目总数。
+
+除了显式调用 @kbd{F c} 来显示类别表之外，您还可以安排在给定文件的第一次调用 @code{todo-show} 时显示它（即，使用 @code{todo-show} 启动 Todo 会话，或在 Todo 模式下调用它来访问另一个 todo 文件）。  为此，请自定义选项@code{todo-show-first}。
+
+@menu
+* Table of Item Counts::
+* Reordering Categories::
+@end menu
+
+@node Table of Item Counts
+@section 项目计数表
+
+表的每一列上方都有一个带有标签的按钮，您可以通过单击鼠标或在其上键入 @key{RET} 来按下。  按项目计数按钮可根据计数类型交替按升序或降序对表格进行排序。  按类别按钮可在类别的初始数字顺序和字母顺序之间交替。  按数字顺序，类别名称列前面是包含相应类别编号的列；此列不显示在按字母顺序排列的列表中。  您还可以通过键入以下键对表格进行排序，而不是按按钮：
+
+@itemize
+
+@item @kbd{c}
+按类别按数字或字母顺序排序；
+@item @kbd{t}
+按待办事项数量排序；
+@item @kbd{y}
+按日记项目计数排序；
+@item @kbd{d}
+按已完成项目数量排序；
+@item @kbd{a}
+按存档项目计数排序。
+@end itemize
+
+桌子的每一行也都有按钮；按其中一个退出缓冲区（杀死它），返回到您调用@kbd{F c}的文件的缓冲区，并显示您按下的行按钮中指定的类别（即，按此按钮跳转到该类别）。  但是，如果该行中指定的类别位于待办事项文件中，并且其所有项目都已存档，并且您已启用选项 @code{todo-skip-archived-categories}，则按下按钮会跳转到存档类别，而不是空的待办事项类别。  您可以通过表中的项目计数来识别此类类别（除存档列之外的所有列的计数均为零），此外，表中的行也通过不同的面 (@pxref{Faces}) 与其他行区分开来。
+
+您可以在表格中导航：
+
+@table @kbd
+
+@item n
+@itemx @key{TAB}
+前进指向下一个按钮。
+
+@item p
+@itemx S-@key{TAB}
+将点放在上一个按钮上。
+@end table
+
+这些命令是循环的，例如，当点位于最后一个按钮上时，按 @kbd{n} 将其移动到第一个按钮。
+
+键入 @kbd{q} 退出 Todo 类别模式，终止缓冲区并返回到您调用 @kbd{F c} 的 Todo 模式或 Todo 存档模式缓冲区中的当前类别。
+
+@node Reordering Categories
+@section 重新排序类别
+
+Todo 类别模式提供的命令可用于更改当前文件中类别的编号。  此重新编号具有在 Todo 模式和 Todo 存档模式下通过 @kbd{f} 和 @kbd{b} 重新排序类别以进行顺序导航的效果。  仅当表格按数字顺序显示类别时，这些命令才有效。  它们的工作方式就像在待办事项模式中重新排列项目的优先级一样，因此具有相同的键绑定：
+
+@table @kbd
+
+@item r
+升高表格的当前行（光标所在的行），将类别编号减一 (@code{todo-raise-category})。该命令在调用该命令之前交换该点及其上方类别的行和数字。
+
+@item l
+降低表格的当前行，将类别编号加一 (@code{todo-lower-category})。  在调用该命令之前，该命令会交换该点及其下一级类别的行，从而交换其编号。
+
+@item #
+提示输入 1 到文件中类别数之间的数字，并相应地对表格重新排序 (@code{todo-set-category-number})。  如果使用允许范围内的数字前缀参数调用，则在不提示的情况下对表重新排序。
+@end table
+
+当您返回到待办事项模式或待办事项存档模式时，并且只要您在重新排序后保存待办事项或存档文件，在后续会话中，由这些命令完成的重新排序仍然有效。
+
+@quotation @strong{Caution}
+请务必注意，对类别重新编号不会更改文件中类别的文本顺序。  如果您应该调用 @kbd{F e} 手动编辑整个文件，并在此过程中更改类别数或类别中的项目数，这一点就很重要：这将使该文件的类别表中显示的信息与其实际状态不一致。您可以通过调用命令 @code{todo-repair-categories-sexp} 来修复这种不一致（该命令缺少键绑定，因为它是一个很少需要的救援操作）。  但这将恢复您对类别进行的任何重新编号，因此您必须再次对它们进行重新编号。  这就是使用 @kbd{F e} 时应小心谨慎的原因之一。
+@end quotation
+
+@node Searching for Items
+@chapter 搜索物品
+
+能够找到并检查所有符合特定条件的待办事项（无论它们属于哪个类别）会很有用。  在 Todo 模式下执行此操作的一种方法是在文件中顺序搜索：
+
+@table @kbd
+
+@item S
+此命令（@code{todo-search}；键为大写@kbd{S}）提示输入正则表达式，从当前待办事项文件的开头进行搜索，并显示包含它找到的第一个匹配项的类别，并突出显示该匹配项。  如果还有更多比赛，则会显示一条消息，说明还剩多少场比赛，并询问您是否要进入下一场比赛。  当您到达最后一场比赛时，或者如果您决定不再继续比赛，系统会询问您是否应删除比赛突出显示。
+
+@item X
+此命令 (@code{todo-clear-matches}) 删除由 @kbd{S} 添加的任何突出显示。这样您就可以在搜索结束时突出显示匹配项，并在稍后删除突出显示。
+@end table
+
+这些命令在 Todo 存档模式下也可用。
+
+@node Todo Filtered Items Mode
+@chapter Todo 过滤项目模式
+
+顺序搜索的一个更强大的替代方案是项目过滤，通过该过滤，来自不同类别的符合指定条件的项目被收集并显示在新的缓冲区中，作为一种不同模式（Todo Filtered Items 模式）的虚拟类别。
+
+@menu
+* Filtering Items::
+* Todo Filtered Items Mode Commands::
+* Files of Filtered Items::
+@end menu
+
+@node Filtering Items
+@section 过滤项目
+
+Todo 模式提供了三种过滤项目的方法： 与用户输入的正则表达式匹配的项目的常规过滤器，如搜索命令；以及两个特定的过滤器，一个用于可显示日记的项目（即缺少 @code{todo-nondiary-marker} 的项目），一个用于最优先的项目（下面将详细介绍后者）。  每个过滤器的命令都是成对出现的，一个用于仅过滤当前待办事项文件，另一个用于过滤用户指定的待办事项文件列表。  因此，有六个项目过滤命令：@footnote{The use of @kbd{F} in the key sequences of these commands naturally recalls ``filter'', but is also consistent with the Todo mode mnemonic key binding convention, since the commands involve one or more whole files.}
+
+@itemize @bullet
+
+@item
+@kbd{F x x} (@code{todo-filter-regexp-items})
+@item
+@kbd{F x m} (@code{todo-filter-regexp-items-multifile})
+@item
+@kbd{F y y} (@code{todo-filter-diary-items})
+@item
+@kbd{F y m} (@code{todo-filter-diary-items-multifile})
+@item
+@kbd{F t t} (@code{todo-filter-top-priorities})
+@item
+@kbd{F t m} (@code{todo-filter-top-priorities-multifile})
+@end itemize
+
+有两种方法可以指定多文件过滤命令适用于哪些文件。  如果您每次使用这些命令时都想要过滤某些文件，请自定义选项@code{todo-filter-files}。  如果将此选项留空（默认），调用多文件过滤命令会弹出一个类似于 @code{todo-filter-files} 的自定义缓冲区的缓冲区，您可以在其中选择要为此调用进行过滤的文件。
+
+根据定义，日记和最高优先级项目是未完成的待办事项，但是当通过正则表达式过滤时，您可以通过启用选项 @code{todo-filter-done-items} 将命令的范围扩展到已完成的项目。然后@kbd{F x x}和@kbd{F x m}会将匹配的待办事项和匹配的已完成项目（包括来自与所选待办事项文件对应的任何存档文件中的已完成项目）收集到已过滤项目的虚拟类别中。
+
+有多种方法可以指定每个类别中有多少项目被视为最高优先级，从而通过 @kbd{F t t} 和 @kbd{F t m} 进行过滤：
+
+@itemize @bullet
+
+@item
+选项 @code{todo-top-priorities} 为所有类别和所有待办事项文件指定一个默认编号；它的默认值为 1，这意味着除非另有指定，否则仅过滤每个类别中优先级最高的项目。
+@item
+选项 @code{todo-top-priorities-overrides} 列出了 @code{todo-top-priorities} 的文件范围覆盖以及特定于类别的覆盖。  默认为空。  但是，使用自定义工具来设置此选项会很乏味且容易出错，因此您应该使用命令 @kbd{F t s} 和 @kbd{C t s}。  前者设置（即覆盖）当前待办文件中所有类别的默认最高优先级数量，后者设置当前类别的最高优先级数量。  要从 @kbd{F t t} 和 @kbd{F t m} 的过滤中排除类别或文件，请将数字设置为 @samp{0}。
+@item
+您可以使用数字前缀参数调用@kbd{F t t}和@kbd{F t m}，该参数指定每个类别中仅针对此调用的最高优先级数量，覆盖@code{todo-top-priorities-overrides}和@code{todo-top-priorities}。
+@end itemize
+
+@node Todo Filtered Items Mode Commands
+@section Todo 过滤项目模式命令
+
+项目过滤命令的输出看起来与常规 Todo 类别类似，但它不包含在任何 todo 文件中，并且在创建时没有名称，因此它不是“真实”类别，而是“虚拟”类别。  另一个区别是缺少已完成的项目部分；列表中没有已完成的项目（当过滤的项目是日记或最高优先级项目时），或者这些项目与待办事项显示在同一列表中（如果您按正则表达式过滤并允许完成的项目）。  另一个区别是，这些项目在其日期/时间标题与其文本之间有一个附加标题，指定该项目来自哪个类别（如果您调用了多文件命令，还指定哪个文件），以及如果您通过正则表达式进行过滤，还指定该项目是否来自 Todo 存档。
+
+顺序项目导航命令 @kbd{n} 和 @kbd{p} 在 Todo 过滤项目模式中的工作方式与在 Todo 模式中相同，文件和类别跳转命令 @kbd{t} 和 @kbd{j} 也是如此；然而，顺序类别导航命令不可用，因为过滤项目的虚拟类别没有相对于“真实”类别排序。  此外，Todo Filtered Items 模式提供了一个特殊的导航命令：
+
+@table @kbd
+
+@item g
+@itemx @key{RET}
+如果您在过滤的项目上键入此命令 (@code{todo-go-to-source-item})，缓冲区会切换到该项目的源文件（在 Todo 模式或 Todo 存档模式下，视情况而定）并显示其类别，并在项目上使用点。
+@end table
+
+过滤后的项目无法像真实待办事项类别中的项目一样进行文本编辑、移动到另一个类别、标记为已完成或存档，因为这些项目将彼此不同步。  但是，有一种类型的编辑命令可以在“待办事项过滤项目”模式下使用：更改项目的优先级：
+
+@table @kbd
+
+@item r
+@itemx l
+@itemx #
+这些命令分别提高、降低或设置虚拟类别中当前项目的优先级。
+@end table
+
+@noindent
+使用这些命令，您可以创建跨类别（甚至跨文件）的已筛选项目的优先级列表。  但是，在待办事项筛选项目模式下，这些命令有一个限制：您无法更改同一真实类别中项目的相对优先级，因为这会使筛选列表与源待办事项列表不一致。
+
+@node Files of Filtered Items
+@section 过滤项目的文件
+
+在 Todo 筛选项目模式下键入 @kbd{s} 会将筛选项目的缓冲区保存到 @code{todo-directory} 中的文件中。  通过正则表达式过滤的项目的文件具有扩展名@samp{.todr}，具有过滤的日记项目的文件具有扩展名@samp{.tody}，具有过滤的最高优先级的文件具有扩展名@samp{.todt}。  第一次将缓冲区保存到文件时，会自动添加扩展名。
+
+对于已过滤的最高优先级或日记项目，文件在首次保存时会自动命名，使用与生成该文件的单个待办事项文件相同的基本名称作为基本名称，或者组合多文件过滤命令中使用的待办事项文件的基本名称。对于按正则表达式过滤的项目，使用不同的正则表达式保存从同一文件生成的单独列表可能很有用，因此在保存此类列表时，系统会提示您输入一个简短的标识字符串以添加到文件名中。
+
+当您调用不带前缀参数的项目过滤命令之一且对应的文件已存在时，该命令将访问该文件（如果当前文件或所选文件存在多个正则表达式过滤项目的文件，则系统会提示您选择一个）。  要强制生成新的过滤列表，请使用前缀参数调用命令（在最高优先级项目的情况下，可以是如上所述的数字，也可以是原始前缀参数@kbd{C-u}以使用@code{todo-top-priorities-overrides}或@code{todo-top-priorities}的值）。
+
+除了显式调用项目过滤命令来显示通过给定待办事项文件中的给定方法过滤的已保存项目列表之外，还有两种其他方法可以访问已保存的已过滤项目文件。  您可以调用类似于 @code{find-file} 的命令：
+
+@table @kbd
+@item F f
+访问已保存的已过滤项目的文件，您可以通过迷你缓冲区补全 (@code{todo-find-filtered-items-file}) 选择该文件。
+@end table
+
+@noindent
+或者，与类别表一样，通过自定义 @code{todo-show-first}，您可以对给定的待办事项文件第一次调用 @code{todo-show} 显示过滤项的相应保存文件。  如果文件没有保存的过滤项目列表，@code{todo-show} 只是默认访问该文件并显示其第一个类别，像往常一样。
+
+命令 @kbd{F k} (@pxref{File Editing}) 也可在 Todo 过滤项目模式下使用。  它删除当前过滤的项目文件。
+
+@node Todo Display Features
+@chapter 待办事项显示功能
+
+您可以通过多种方式更改 Todo 模式缓冲区的外观。
+
+@menu
+* Faces::
+* Item Prefix::
+* Other Display Commands and Options::
+@end menu
+
+@node Faces
+@section 面孔
+
+每种 Todo 模式都使用面孔来区分显示的各个方面，包括结构和信息。  例如，待办事项标题的日期和时间字符串的面（分别为@code{todo-date}和@code{todo-time}）默认继承 Emacs 日记使用的相应面的属性；但是，当 Todo 日记项目（即缺少 @code{todo-nondiary-marker} 的项目）的日期和时间早于当前日期和时间时，它们会以不同的面显示 (@code{todo-diary-expired})。  通过这种方式，您可以轻松识别已“过期”的日记项目并采取相应措施（例如，将其标记为已完成或更新截止日期）。
+
+信息面孔的另一个示例是用于区分最高优先级项目的面孔 (@code{todo-top-priority})。  第三种情况是在 Todo 类别模式中使用的面，用于标记包含仅包含已归档项目的类别的表行 (@code{todo-archived-only})。
+
+@code{todo-faces} 自定义组包含 Todo 模式面孔的完整列表及其使用的简要说明。
+
+
+@node Item Prefix
+@section 项目前缀
+
+在 Todo 模式、Todo 存档模式和 Todo 筛选项目模式下（真实或虚拟）类别的默认显示中，项目按升序直观编号，从顶部项目的 @samp{1} 开始，显示在其标题（日期/时间字符串）的左侧。  对于待办事项，数字表示列表中每个项目的优先级，因此当您使用 @kbd{#} 重新确定项目的优先级或使用 @kbd{m} 移动项目时，这些数字可以更轻松地选择项目的新优先级。  编号还可以让您一目了然地看到列表中有多少项目。  当插入、删除或移动项目时，编号会自动更新。  在待办事项模式中，每个类别中的待办事项和已完成项目部分均单独编号。
+
+如果您不想显示项目编号，请禁用选项@code{todo-number-prefix}；那么默认情况下，每个项目的显示都从其标题开始。  但您也可以通过自定义选项 @code{todo-prefix}（默认为空字符串），将编号替换为您选择的视觉上独特的字符串。  另一种选择是暂时隐藏项目编号：
+
+@table @kbd
+
+@item F N
+@itemx N
+在显示项目编号和显示当前 Todo 文件（待办事项、存档或已保存的筛选项目的虚拟类别）中的 @code{todo-prefix} 字符串之间切换。  （此命令也适用于尚未写入文件的已过滤项目的缓冲区。）
+@end table
+
+在每个待办事项模式类别的待办事项部分中，最高优先级项目（根据@pxref{Filtering Items}中指定确定）的项目前缀（无论是优先级数字还是固定字符串）显示在与非最高优先级项目的前缀不同的面（@code{todo-top-priority}）中，因此您可以一目了然地看到该类别中有多少项目是最优先的。
+
+@node Other Display Commands and Options
+@section 其他显示命令和选项
+
+还有两个额外的切换命令会影响当前文件中的显示：
+
+@table @kbd
+
+@item F h
+@itemx h
+如果项目标题可见，则隐藏项目标题；如果项目标题隐藏，则显示它们。对于已完成的项目，仅隐藏已完成的标头（即，将项目标记为已完成时插入的已完成标记和日期时间字符串），而不隐藏原始日期时间字符串。  对于过滤的项目，类别（或类别文件）标签不会隐藏。
+
+@item F H
+@itemx H
+如果未突出显示，则突出显示当前项目（使用面 @code{hl-line}），或者删除其突出显示。  启用项目突出显示后，它会按 @kbd{n} 或 @kbd{p} 进行导航。  如果您希望默认突出显示当前项目，请启用选项@code{todo-highlight-item}。  @kbd{F H} 或 @kbd{H} 仍会切换它。
+@end table
+
+有两个选项会影响内容长于屏幕行的项目的显示：
+
+@itemize @bullet{}
+
+@item
+@code{todo-indent-to-here} 设置多行待办事项中第一行之后的所有行的缩进量，这是使待办事项日记项目在 Fancy Diary 显示中完全可见所必需的。默认缩进为 3 个空格。  为了获得统一的外观，此选项适用于所有项目，即日记和非日记待办事项以及已完成的项目。
+
+@item
+@code{todo-wrap-lines} 允许您出于插入和编辑的目的进行选择，将多行待办事项视为包含带有硬换行符的多个逻辑行，还是使用可视线模式视为多个可视线；后者是默认值。  由于多段落项目在视觉行模式下还包含硬换行符，因此为了获得统一的外观，此显示通过使用 @code{todo-indent-to-here} 空格的换行前缀在换行上显示缩进。
+@end itemize
+
+在硬换行符后面插入的缩进实际上是制表符，显示项目的 Todo 模式将 @code{tab-width} 绑定到 @code{todo-indent-to-here}，因此，如果您更改后者的默认值，下次访问 Todo 文件时，缩进将反映您的更改。
+
+默认情况下，待办事项类别的待办事项和已完成项目部分在视觉上由与显示缓冲区的窗口一样宽的线分隔。您可以通过自定义 @code{todo-done-separator-string} 来更改分隔符的外观和宽度；您还可以更改分隔符字符串的外观 (@code{todo-done-sep})。
+
+除了上面有关这些模式的部分中提到的选项之外，还有多个选项可用于更改“待办事项类别”模式和“待办事项过滤项目”模式中的外观；有关详细信息，请参阅自定义组 @code{todo-categories} 和 @code{todo-filtered}。
+
+@node Printing Todo Buffers
+@chapter 打印 Todo 缓冲区
+
+如果您使用标准 Emacs 打印命令之一打印 Todo 缓冲区，它看起来与您在缓冲区中看到的并不完全相同。这是因为某些显示功能是不可打印的（特别是那些使用覆盖、自动换行和换行前缀的显示功能）。  Todo 模式提供了两个生成输出的打印命令，其中包括此类显示功能的可打印对应项：
+
+@table @kbd
+
+@item P B
+将可打印缓冲区输出直接发送到打印机。
+
+@item P F
+提示输入文件名并将可打印输出写入该文件。
+@end table
+
+默认情况下，Todo 使用 @code{ps-print-buffer-with-faces} 来制作可打印版本；您可以通过设置选项 @code{todo-print-function} 来更改此设置。
+
+@node Legacy Todo Mode Files
+@chapter 旧版 Todo 模式文件
+
+原版 Todo 模式的用户将从本用户手册的描述中认识到，尽管新版本与原版本共享相同的基本用户界面和待办事项处理，但它们之间存在一些不兼容的差异，例如已完成的项目部分（幕后还存在其他用户通常不可见的文件格式不兼容）。
+
+最重要的不兼容性涉及项目前缀。  在早期版本的 Todo 模式中，前缀是项目字符串本身的初始部分，因此为了使项目可以在 Emacs 日记中显示，前缀必须是日记可识别的日期/时间模式（尽管待办事项也有自己的日期/时间标题）。此外，由于所有项目在原始版本中都具有相同的前缀字符串，这意味着在任何给定日期，只有所有项目或没有项目可以出现在 Fancy Diary 显示中。  这极大地限制了在日记中包含待办事项的实用性。  相比之下，当前版本的待办事项模式使用覆盖项目优先级编号或前缀、项目特定的日记兼容日期/时间标题以及要从日记中排除的待办事项的特殊标记，因此您可以确定每个项目是否以及何时出现在 Fancy Diary 显示中。
+
+由于这些不兼容性，使用原始版本的 Todo 模式创建的文件无法在当前版本中显示或编辑。不过，这个版本提供了一个功能，可以将原版本使用的两种主要类型的文件分别转换为新式的有效待办事项和存档文件，并保存在@code{todo-directory}.@footnote{The original version of Todo mode also allowed saving a file of top priority items, but since you can readily create such a file with the new version, which is also more flexible, no conversion is provided for this file.}
+
+当您第一次调用 @code{todo-show} 时（即，在使用新版本创建待办事项文件之前），此转换函数会自动调用，如果它找到旧式文件，它会提供转换它们，使它们成为第一个新式待办事项和存档文件。如果您选择此时不转换旧式文件，则可以稍后通过调用命令 @code{todo-convert-legacy-files} 来执行此操作（它没有键绑定，因为不需要经常使用它）。  （转换的一个微妙部分涉及旧式项目日期/时间标题的可自定义格式；有关详细信息，请参阅 @code{todo-legacy-date-time-regexp} 的文档字符串。）
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@bye
+
+@c End:

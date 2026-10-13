@@ -1,0 +1,1945 @@
+\输入 texinfo @c -*-texinfo-*-
+
+@setfilename ../../info/message.info
+@settitle 留言手册
+@documentlanguage en
+@include docstyle.texi
+@synindex fn cp
+@synindex vr cp
+@synindex pg cp
+@copying
+该文件记录了 Message，即 Emacs 消息撰写模式。
+
+版权所有 @copyright{} 1996--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs network features
+@direntry
+* Message: (message).            与 Gnus 配套的邮件和新闻撰写模式。
+@end direntry
+@iftex
+@finalout
+@end iftex
+
+@titlepage
+@ifset WEBHACKDEVEL
+@title 留言手册（开发版）
+@end ifset
+@ifclear WEBHACKDEVEL
+@title 留言手册
+@end ifclear
+
+@author by Lars Magne Ingebrigtsen
+@page
+
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@summarycontents
+@contents
+
+@node Top
+@top 信息
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+Gnus 的所有消息（邮件和新闻）都发生在消息模式缓冲区中。
+
+@menu
+* Interface::          设置消息缓冲区。
+* Commands::           您可以在消息模式缓冲区中执行的命令。
+* Variables::          自定义消息缓冲区。
+* Appendices::         更多技术性的东西。
+* GNU Free Documentation License::  本文档的许可证。
+* Index::              变量、函数和概念索引。
+* Key Index::          消息模式键列表。
+@end menu
+
+@c Adjust ../Makefile.in if you change the following lines:
+消息通过 Gnus 分发。  Gnus 发行版
+@c
+本手册对应的是Gnus v5.13
+
+
+@node Interface
+@chapter 界面
+
+当程序（或人）想要响应消息（回复、跟进、转发、取消）时，程序（或人）应该将指针放入消息所在的缓冲区中，并调用所需的命令。然后，@code{Message} 将弹出一个新的 @code{message} 模式缓冲区，其中填写了适当的标头，用户可以在发送之前编辑消息。
+
+@menu
+* New Mail Message::      编辑全新的邮件消息。
+* New News Message::      编辑全新的新闻消息。
+* Reply::                 通过邮件回复。
+* Wide Reply::            通过邮件回复所有人。
+* Followup::              通过新闻进行追踪。
+* Canceling News::        取消新闻文章。
+* Superseding::           取代消息。
+* Forwarding::            通过新闻或邮件转发消息。
+* Resending::             重新发送邮件消息。
+* Bouncing::              退回邮件消息。
+* Mailing Lists::         将邮件发送到邮件列表。
+* System Mailer Setup::   使用 Message 作为系统邮件程序。
+@end menu
+
+您可以自定义消息模式工具栏，请参见@kbd{M-x customize-apropos @key{RET} message-tool-bar}。  此功能仅在 Emacs 中可用。
+
+@node New Mail Message
+@section 新邮件消息
+
+@findex message-mail
+@code{message-mail} 命令弹出一个新的消息缓冲区。
+
+接受两个可选参数：第一个将用作 @code{To} 标头，第二个用作 @code{Subject} 标头。  如果它们是@code{nil}，则这两个标头将为空。
+
+
+@node New News Message
+@section 新消息
+
+@findex message-news
+@code{message-news} 命令弹出一个新的消息缓冲区。
+
+该函数接受两个可选参数。  第一个将用作 @code{Newsgroups} 标头，第二个将用作 @code{Subject} 标头。  如果它们是@code{nil}，则这两个标头将为空。
+
+
+@node Reply
+@section 回复
+
+@findex message-reply
+@code{message-reply}函数弹出一个消息缓冲区，它是对当前缓冲区中消息的回复。
+
+@vindex message-reply-to-function
+Message 使用正常方法来确定回复的去向 (@pxref{Responses})，但您可以通过调整 @code{message-reply-to-function} 变量来更改行为以满足您的需要。
+
+如果您希望回复发送至 @code{Sender} 而不是 @code{From}，您可以执行以下操作：
+
+@lisp
+(setq message-reply-to-function
+      (lambda ()
+       (cond ((equal (mail-fetch-field "from") "somebody")
+               (list (cons 'To (mail-fetch-field "sender"))))
+             (t
+              nil))))
+@end lisp
+
+该函数将被称为缩小到正在回复的文章的头部。
+
+正如您所看到的，这个函数应该返回一个列表。  在这种情况下，如果它对 To 标头应该是什么有意见，则返回 @code{((To . "Whom"))}。  如果没有，它应该只返回@code{nil}，并且将使用确定 To 标头的正常方法。
+
+每个列表元素都应该是一个 cons，其中 @sc{car} 应该是标头的名称（例如 @code{CC}），而 @sc{cdr} 应该是标头值（例如 @samp{larsi@@ifi.uio.no}）。  所有这些标头都将插入到外发邮件的标头中。
+
+
+@node Wide Reply
+@section 广泛回复
+
+@findex message-wide-reply
+@code{message-wide-reply} 弹出一个消息缓冲区，它是对当前缓冲区中消息的广泛回复。  @dfn{wide reply} 是对@code{To}、@code{From}（或@code{Reply-To}）和@code{CC} 标题中列出的所有人员的回复。
+
+@vindex message-wide-reply-to-function
+Message 使用正常方法来确定广泛回复的去向，但您可以通过调整 @code{message-wide-reply-to-function} 来更改行为以满足您的需要。  它的使用方式与 @code{message-reply-to-function} (@pxref{Reply}) 相同。
+
+@vindex message-dont-reply-to-names
+与 @code{message-dont-reply-to-names} 正则表达式（或正则表达式列表或谓词函数）匹配的地址将从 @code{CC} 标头中删除。  值 @code{nil} 表示仅排除您的电子邮件地址。
+
+@vindex message-prune-recipient-rules
+@code{message-prune-recipient-rules} 用于修剪进行广泛回复时使用的地址。  它旨在用于删除重复的地址等。  它是一个列表列表，其中第一个元素是一个正则表达式，用于匹配触发规则的地址，第二个元素是一个正则表达式，它将基于第一个元素进行扩展，以匹配要修剪的地址。
+
+解释起来很复杂，但使用起来很容易。
+
+例如，如果您收到来自 @samp{foo@@example.org} 的电子邮件，但 @samp{foo@@zot.example.org} 也在 @code{CC} 列表中，那么您的广泛回复将发送到这两个地址，因为它们是唯一的。
+
+为了避免这种情况，请执行以下操作：
+
+@lisp
+(setq message-prune-recipient-rules
+      '(("^\\([^@@]+\\)@@\\(.*\\)" "\\1@@.*[.]\\2")))
+@end lisp
+
+例如，如果您希望涉及来自 @samp{cvs@@example.org} 的消息的所有广泛回复都发送到该地址，而不是其他地址（即，如果 @samp{cvs@@example.org} 位于收件人列表中，则删除所有其他收件人：
+
+@lisp
+(setq message-prune-recipient-rules
+      '(("cvs@@example.org" ".")))
+@end lisp
+
+@vindex message-wide-reply-confirm-recipients
+如果@code{message-wide-reply-confirm-recipients}非@code{nil}，系统会要求您确认是否要回复多个收件人。  默认值为@code{nil}。
+
+@node Followup
+@section 跟进
+
+@findex message-followup
+@code{message-followup} 命令弹出一个消息缓冲区，该缓冲区是当前缓冲区中消息的后续消息。
+
+@vindex message-followup-to-function
+Message 使用常规方法来确定后续操作的去向，但您可以通过调整 @code{message-followup-to-function} 来更改行为以满足您的需求。  它的使用方式与 @code{message-reply-to-function} (@pxref{Reply}) 相同。
+
+@vindex message-use-followup-to
+@code{message-use-followup-to} 变量表示如何处理 @code{Followup-To} 标头。  如果是@code{use}，则始终使用该值。如果是@code{ask}（默认），询问是否使用该值。  如果是@code{t}，则使用该值，除非它是@samp{poster}。  如果是@code{nil}，则不要使用该值。
+
+
+@node Canceling News
+@section 取消新闻
+
+@findex message-cancel-news
+@code{message-cancel-news} 命令取消当前缓冲区中的文章。
+
+@vindex message-cancel-message
+@code{message-cancel-message} 的值被插入到取消消息的正文中。  默认值为@samp{I am canceling my own article.}。
+
+@cindex Cancel Locks
+@vindex message-insert-canlock
+@cindex canlock
+当 Message 发布新闻消息时，它默认插入 @code{Cancel-Lock} 标题。  这是一个加密标头，可确保只有您可以取消自己的消息，这很好。  缺点是，如果您丢失了 @file{.emacs} 文件（Gnus 存储秘密取消锁定密码的位置（在您第一次使用此功能时自动生成）），您将无法取消消息。  如果您想自己管理密码，可以在 @file{~/.gnus.el} 文件中添加如下内容：
+
+@lisp
+(setq canlock-password "geheimnis"
+      canlock-password-for-verify canlock-password)
+@end lisp
+
+是否插入标题由 @code{message-insert-canlock} 变量控制。
+
+目前还没有多少新闻服务器尊重 @code{Cancel-Lock} 标头，但这预计将来会改变。
+
+
+@node Superseding
+@section 取代
+
+@findex message-supersede
+@code{message-supersede} 命令弹出一个消息缓冲区，该缓冲区将取代当前缓冲区中的消息。
+
+@vindex message-ignored-supersedes-headers
+在弹出新的消息缓冲区之前，匹配 @code{message-ignored-supersedes-headers} 的标头将被删除。
+
+
+
+@node Forwarding
+@section 转发
+
+@findex message-forward
+@code{message-forward}命令弹出一个消息缓冲区，转发当前缓冲区中的消息。  如果给定前缀，则使用新闻转发。
+
+@table @code
+@item message-forward-ignored-headers
+@vindex message-forward-ignored-headers
+在非@code{nil}中，转发消息时将删除与此正则表达式匹配的所有标头。
+
+@item message-forward-included-headers
+@vindex message-forward-included-headers
+在非@code{nil}中，转发消息时仅保留与此正则表达式匹配的标头。  这也可以是正则表达式列表。
+
+@item message-forward-included-mime-headers
+@vindex message-forward-included-mime-headers
+在非@code{nil}中，当将消息转发为@acronym{MIME}时，将保留与此正则表达式匹配的标头，但不使用@acronym{MML}。这也可以是正则表达式列表。
+
+@item message-make-forward-subject-function
+@vindex message-make-forward-subject-function
+调用以生成转发消息的主题标头的函数列表。  前一个函数生成的主题被传递到每个后续函数中。
+
+提供的功能有：
+
+@table @code
+@item message-forward-subject-author-subject
+@findex message-forward-subject-author-subject
+文章来源（作者或新闻组），放在括号中，后跟主题。
+
+@item message-forward-subject-fwd
+文章主题前面带有 @samp{Fwd:}。
+@end table
+
+@item message-wash-forwarded-subjects
+@vindex message-wash-forwarded-subjects
+如果该变量为@code{t}，则转发消息的主题在构造新主题之前会删除先前转发的证据（例如@samp{Fwd:}、@samp{Re:}、@samp{(fwd)}）。  默认值为@code{nil}。
+
+@item message-forward-as-mime
+@vindex message-forward-as-mime
+如果此变量为 @code{t}，则转发的消息将作为内联 @acronym{MIME} RFC822 部分包含在内。  如果它是 @code{nil} （默认值），转发的消息将被内联复制到新消息中，就像以前的、不支持 @acronym{MIME} 的 Gnus 版本所做的那样。
+
+@item message-forward-before-signature
+@vindex message-forward-before-signature
+如果非@code{nil}，则将转发的消息放在签名之前，否则放在签名之后。
+
+@end table
+
+
+@node Resending
+@section 重新发送
+
+@findex message-resend
+@code{message-resend} 命令将提示用户输入地址并将当前缓冲区中的消息重新发送到该地址。
+
+@vindex message-ignored-resent-headers
+与 @code{message-ignored-resent-headers} 正则表达式匹配的标头将在发送消息之前被删除。
+
+
+@node Bouncing
+@section 弹跳
+
+@findex message-bounce
+如果当前缓冲区包含退回邮件消息，@code{message-bounce} 命令将弹出一个删除了退回信息的消息缓冲区。  @dfn{bounced message} 通常是您发出的邮件，但由于无法送达而被某些 @code{mailer-daemon} 退回。
+
+@vindex message-ignored-bounced-headers
+与 @code{message-ignored-bounced-headers} 正则表达式匹配的标头将在弹出缓冲区之前被删除。  默认值为@samp{^\\(Received\\|Return-Path\\|Delivered-To\\):}。
+
+
+@node Mailing Lists
+@section 邮件列表
+
+@cindex Mail-Followup-To
+有时，在发布到邮件列表时，发布者需要将帖子的后续内容定向到特定位置。  Mail-Followup-To (MFT) 的创建就是为了实现这一点。  三个有用的示例场景：
+
+@itemize @bullet
+@item
+邮件列表发帖者可以使用 MFT 来表示响应应仅发送至列表，而不是发帖者。  如果发帖者已经订阅了列表，就会发生这种情况。
+
+@item
+邮件列表发帖者可以使用 MFT 来表示响应应该发送到列表和发帖者。  如果发帖者未订阅该列表，则会发生这种情况。
+
+@item
+如果将一条消息发布到多个邮件列表，MFT 还可以用于将以下讨论仅定向到一个列表，因为分布在多个列表中的讨论往往是分散的并且很难跟踪。
+
+@end itemize
+
+Gnus 尊重其他消息中的 MFT 标头（即，在跟踪其他人的帖子时），并且还支持为传出消息生成合理的 MFT 标头。
+
+@c @menu
+@c * Honoring an MFT post::        What to do when one already exists
+@c * Composing with a MFT header:: Creating one from scratch.
+@c @end menu
+
+@c @node Composing with a MFT header
+@subsection 自动编写正确的 MFT 标头
+
+让 Gnus 在您发布的帖子中自动生成 MFT 标头的第一步是向 Gnus 提供您订阅的邮件列表地址列表。  您可以通过多种方式做到这一点。  以下变量会派上用场。
+
+@table @code
+
+@vindex message-subscribed-addresses
+@item message-subscribed-addresses
+这应该是用户订阅的地址列表。  它的默认值为@code{nil}。  例子：
+@lisp
+(setq message-subscribed-addresses
+      '("ding@@gnus.org" "bing@@noose.org"))
+@end lisp
+
+@vindex message-subscribed-regexps
+@item message-subscribed-regexps
+这应该是一个正则表达式列表，表示订阅的邮件列表的地址。  默认值为@code{nil}。  示例：如果你想达到与上面相同的结果：
+@lisp
+(setq message-subscribed-regexps
+      '("\\(ding@@gnus\\)\\|\\(bing@@noose\\)\\.org")
+@end lisp
+
+@vindex message-subscribed-address-functions
+@item message-subscribed-address-functions
+这可以是要调用的函数列表（一次一个！）以确定 MFT 标头的值。  建议这些函数不带任何参数。  默认值为@code{nil}。
+
+Gnus 中有一个预定义函数是该变量的良好候选者。  @code{gnus-find-subscribed-addresses} 是一个函数，它返回与将 @code{subscribed} (@pxref{Group Parameters, ,Group Parameters, gnus, The Gnus Manual}) 组参数设置为非 @code{nil} 值的组相对应的地址列表。这就是你要做的。
+
+@lisp
+(setq message-subscribed-address-functions
+      '(gnus-find-subscribed-addresses))
+@end lisp
+
+@vindex message-subscribed-address-file
+@item message-subscribed-address-file
+您可能是一个有组织的人类怪胎，并且在一个单独的文件中拥有所有订阅的邮件列表的地址列表！  然后你只需将此变量设置为文件名即可，一切都会很好。
+
+@end table
+
+您可以使用一个或多个上述变量。  它们的所有值都以某种有效的方式“添加”:-)
+
+现在一切都准备好了。  只需像平常一样开始撰写消息即可。只需发送即可；一如既往。  就在消息发出之前，Gnus 的 MFT 生成功能会启动并检查消息是否已经具有 MFT 字段。  如果有的话，就不管它了。  （除非它为空；在这种情况下，该字段将被删除，并且不会被自动生成的字段替换。这使您可以在每条消息的基础上禁用 MFT 生成。）如果没有，则检查收件人地址列表（在“收件人：”和“抄送：”标头中）以查看其中之一是否是您订阅的列表地址。  如果都不是列表地址，则不生成MFT；否则，MFT 将添加到其他标头并设置为 To: 和 CC: 中所有地址的值：
+
+@kindex C-c C-f C-a
+@findex message-generate-unsubscribed-mail-followup-to
+@kindex C-c C-f C-m
+@findex message-goto-mail-followup-to
+嗯。  “那么，”您会问，“如果我向我未订阅的列表发送电子邮件怎么办？  我希望我的 MFT 说我想要一个额外的副本。”（这应该被其他人以与没有 MFT 相同的方式解释，但您可以使用显式 MFT 来覆盖其他人的目标地址组参数。）函数 @code{message-generate-unsubscribed-mail-followup-to} 可能会派上用场。  默认情况下它绑定到 @kbd{C-c C-f C-a}。  无论如何，您都可以插入您自己选择的MFT； @kbd{C-c C-f C-m} (@code{message-goto-mail-followup-to}) 将帮助您开始。
+
+@c @node Honoring an MFT post
+@subsection 授予 MFT 职位荣誉
+
+@vindex message-use-mail-followup-to
+当您跟踪邮件列表上的帖子并且该帖子具有 MFT 标头时，Gnus 的操作将取决于变量 @code{message-use-mail-followup-to} 的值。  该变量可以是以下之一：
+
+@table @code
+@item use
+始终尊重 MFT。  后续文章中的“收件人：”和“抄送：”标题将源自原始帖子的 MFT 标题。  这是默认设置。
+
+@item nil
+总是羞辱 MFT（忽略那该死的事情）
+
+@item ask
+Gnus 将提示您执行操作。
+
+@end table
+
+尊重 MFT 被认为是良好的网络礼仪，因为发布消息的人被认为比你更知道后续需要去哪里。
+
+
+@node System Mailer Setup
+@section 系统邮件程序设置
+@cindex mailto:
+@cindex System Mailer
+
+Emacs 可以设置为系统邮件程序，这样当您单击其他程序中的 @samp{mailto:} 链接时，Emacs 就会打开。
+
+完成此操作的方式因系统而异，但通常有一种方法可以为 @acronym{MIME} 类型设置默认应用程序，这里的相关类型是 @samp{x-scheme-handler/mailto;}。
+
+要启动的应用程序应该是@w{@samp{emacs -f message-mailto %u}}。这将启动 Emacs，然后运行 ​​@code{message-mailto} 命令。  它将解析给定的@acronym{URL}，并使用给定的参数设置一个消息缓冲区。  如果您更喜欢使用 emacsclient，请使用 @w{@samp{emacsclient -e '(message-mailto "%u")'}} 作为应用程序。
+
+例如，@samp{mailto:larsi@@gnus.org?subject=This+is+a+test}将打开一个消息缓冲区，其中@samp{To:}标头填充为@samp{"larsi@@gnus.org"}，@samp{Subject:}标头填充为@samp{"This is a test"}。
+
+
+@node Commands
+@chapter 命令
+
+@menu
+* Buffer Entry::         进入消息缓冲区后的命令。
+* Header Commands::      用于移动标题或更改标题的命令。
+* Movement::             在消息缓冲区中移动。
+* Insertion::            将内容插入消息缓冲区。
+* MIME::                 @acronym{MIME} 考虑因素。
+* IDNA::                 非@acronym{ASCII}域名注意事项。
+* Security::             签名和加密消息。
+* Various Commands::     各种各样的事情。
+* Sending::              实际上发送消息。
+* Mail Aliases::         如何使用邮件别名。
+* Spelling::             让 Emacs 检查您的拼写。
+@end menu
+
+
+@node Buffer Entry
+@section 缓冲区条目
+@cindex undo
+@kindex C-_
+
+当响应某种其他消息时，您通常会进入消息缓冲区。  Message 对引用的文本进行了大量处理，并且可能会删除签名、重新格式化文本等，具体取决于您所使用的设置。  消息通常会让事情顺利进行，但有时也会出错。  为了帮助用户消除这些障碍，Message 在执行每个主要自动操作之前设置了撤消边界。  如果按几次撤消键（通常位于@kbd{C-_}），您将返回正在回复的未编辑的消息。
+
+
+@node Header Commands
+@section 标头命令
+
+@subsection 移动到标题的命令
+
+以下命令移动到有问题的标题。  如果不存在，则会将其插入。
+
+@table @kbd
+
+@item C-c ?
+@kindex C-c ?
+@findex describe-mode
+描述消息模式。
+
+@item C-c C-f C-t
+@kindex C-c C-f C-t
+@findex message-goto-to
+转到 @code{To} 标题 (@code{message-goto-to})。
+
+@item C-c C-f C-o
+@kindex C-c C-f C-o
+@findex message-goto-from
+转到 @code{From} 标题 (@code{message-goto-from})。  （键绑定中的“o”代表发起者。）
+
+@item C-c C-f C-b
+@kindex C-c C-f C-b
+@findex message-goto-bcc
+转到 @code{BCC} 标题 (@code{message-goto-bcc})。
+
+@item C-c C-f C-w
+@kindex C-c C-f C-w
+@findex message-goto-fcc
+转到 @code{FCC} 标题 (@code{message-goto-fcc})。
+
+@item C-c C-f C-c
+@kindex C-c C-f C-c
+@findex message-goto-cc
+转到 @code{CC} 标题 (@code{message-goto-cc})。
+
+@item C-c C-f C-s
+@kindex C-c C-f C-s
+@findex message-goto-subject
+转到 @code{Subject} 标题 (@code{message-goto-subject})。
+
+@item C-c C-f C-r
+@kindex C-c C-f C-r
+@findex message-goto-reply-to
+转到 @code{Reply-To} 标题 (@code{message-goto-reply-to})。
+
+@item C-c C-f C-n
+@kindex C-c C-f C-n
+@findex message-goto-newsgroups
+转到 @code{Newsgroups} 标题 (@code{message-goto-newsgroups})。
+
+@item C-c C-f C-d
+@kindex C-c C-f C-d
+@findex message-goto-distribution
+转到 @code{Distribution} 标题 (@code{message-goto-distribution})。
+
+@item C-c C-f C-f
+@kindex C-c C-f C-f
+@findex message-goto-followup-to
+转到 @code{Followup-To} 标题 (@code{message-goto-followup-to})。
+
+@item C-c C-f C-k
+@kindex C-c C-f C-k
+@findex message-goto-keywords
+转到 @code{Keywords} 标题 (@code{message-goto-keywords})。
+
+@item C-c C-f C-u
+@kindex C-c C-f C-u
+@findex message-goto-summary
+转到 @code{Summary} 标题 (@code{message-goto-summary})。
+
+@item C-c C-f C-i
+@kindex C-c C-f C-i
+@findex message-insert-or-toggle-importance
+这将插入值为 @samp{high} 的 @samp{Importance:} 标头。  该标头用于向接收者表明消息的​​重要性。  如果标头已存在于缓冲区中，则会根据 RFC 1376 在三个有效值之间循环：@samp{low}、@samp{normal} 和 @samp{high}。
+
+@item C-c C-f C-a
+@kindex C-c C-f C-a
+@findex message-generate-unsubscribed-mail-followup-to
+在取消订阅列表的帖子中插入合理的 @samp{Mail-Followup-To:} 标头 (@pxref{Mailing Lists})。  当向您未订阅的邮件列表发送原始帖子时，您必须手动输入 @samp{Mail-Followup-To:} 标题。  内容通常是列表的地址和您自己的地址。  该函数会自动插入这样的标头。  它获取当前邮件缓冲区中 @samp{To:} 标头的内容，并附加当前的 @code{user-mail-address}。
+
+如果可选参数 @code{include-cc} 为非 @code{nil}，则 @samp{CC:} 标头中的地址也会放入 @samp{Mail-Followup-To:} 标头中。
+
+@end table
+
+@subsection 更改标题的命令
+
+@table @kbd
+
+@item C-c C-o
+@kindex C-c C-o
+@findex message-sort-headers
+@vindex message-header-format-alist
+根据 @code{message-header-format-alist} (@code{message-sort-headers}) 对标题进行排序。
+
+@item C-c C-t
+@kindex C-c C-t
+@findex message-insert-to
+插入 @code{To} 标头，其中包含您要跟进的消息的 @code{Reply-To} 或 @code{From} 标头 (@code{message-insert-to})。
+
+@item C-c C-n
+@kindex C-c C-n
+@findex message-insert-newsgroups
+插入反映您要回复的文章的 @code{Followup-To} 或 @code{Newsgroups} 标题的 @code{Newsgroups} 标题 (@code{message-insert-newsgroups})。
+
+@item C-c C-l
+@kindex C-c C-l
+@findex message-to-list-only
+仅向列表发送消息。  从 @code{To:} 和 @code{CC:} 标头中删除除列表地址之外的所有地址。
+
+@item C-c M-n
+@kindex C-c M-n
+@findex message-insert-disposition-notification-to
+插入处置通知请求。  (@code{message-insert-disposition-notification-to})。这意味着，如果收件人支持 RFC 2298，她可能会向您发送一条通知，表明她收到了该消息。
+
+@item M-x message-insert-importance-high
+@findex message-insert-importance-high
+@cindex Importance
+插入值为 @samp{high} 的 @samp{Importance} 标头，必要时删除标头。
+
+@item M-x message-insert-importance-low
+@findex message-insert-importance-low
+@cindex Importance
+插入值为 @samp{low} 的 @samp{Importance} 标头，必要时删除标头。
+
+@item C-c C-f s
+@kindex C-c C-f s
+@findex message-change-subject
+@cindex Subject
+更改当前的 @samp{Subject} 标题。  请求新的 @samp{Subject} 标题并附加 @samp{(was: <Old Subject>)}。  回复时可以删除旧主题，请参阅@code{message-subject-trailing-was-query} (@pxref{Message Headers})。
+
+@item C-c C-f x
+@kindex C-c C-f x
+@findex message-cross-post-followup-to
+@vindex message-cross-post-default
+@vindex message-cross-post-note-function
+@cindex X-Post
+@cindex cross-post
+设置带有目标新闻组的 @samp{FollowUp-To} 标头以进行交叉发布，如果目标新闻组不是 @samp{Newsgroups} 的成员，则将该目标新闻组添加到 @samp{Newsgroups} 标头，并在正文中插入注释。如果 @code{message-cross-post-default} 是 @code{nil} 或者使用前缀参数调用此命令，则仅设置 @samp{FollowUp-To} 标头，但目标新闻组不会添加到 @samp{Newsgroups} 标头。  插入注释的功能由 @code{message-cross-post-note-function} 变量控制。
+
+@item C-c C-f t
+@kindex C-c C-f t
+@findex message-reduce-to-to-cc
+将 @samp{To} 标头的内容替换为 @samp{CC} 标头的内容（或 @samp{BCC} 标头，如果没有 @samp{CC} 标头）。
+
+@item C-c C-f w
+@kindex C-c C-f w
+@findex message-insert-wide-reply
+插入 @samp{To} 和 @samp{CC} 标头，就像您正在执行宽回复一样，即使消息不是首先为宽回复创建的。
+
+@item C-c C-f a
+@kindex C-c C-f a
+@findex message-add-archive-header
+@vindex message-archive-header
+@vindex message-archive-note
+@cindex X-No-Archive
+在标题中插入 @samp{X-No-Archive: Yes}，在正文中插入注释。可以使用 @code{message-archive-header} 和 @code{message-archive-note} 自定义标题和注释。  当使用前缀参数调用时，要求插入文本。  如果您不想在正文中添加注释，请将 @code{message-archive-note} 设置为 @code{nil}。
+
+@end table
+
+
+@node Movement
+@section 移动
+
+@table @kbd
+@item C-c C-b
+@kindex C-c C-b
+@findex message-goto-body
+移至消息正文的开头 (@code{message-goto-body})。
+
+@item C-c C-i
+@kindex C-c C-i
+@findex message-goto-signature
+移至消息签名 (@code{message-goto-signature})。
+
+@item C-a
+@kindex C-a
+@findex message-beginning-of-line
+@vindex message-beginning-of-line
+如果位于标头值的开头，则转到行的开头，否则转到标头值的开头。  （标头值位于标头名称和冒号之后。）可以通过切换变量 @code{message-beginning-of-line} 来禁用此行为。
+
+@end table
+
+
+@node Insertion
+@section 插入
+
+@table @kbd
+
+@item C-c C-y
+@kindex C-c C-y
+@findex message-yank-original
+将正在回复的消息拉入消息缓冲区 (@code{message-yank-original})。
+
+@item C-c C-M-y
+@kindex C-c C-M-y
+@findex message-yank-buffer
+提示输入缓冲区名称并将该缓冲区的内容拖入消息缓冲区 (@code{message-yank-buffer})。
+
+@item C-c C-q
+@kindex C-c C-q
+@findex message-fill-yanked-message
+填写拉出的消息 (@code{message-fill-yanked-message})。  警告：如果引用约定很奇怪，可能会严重弄乱被拉出的文本。  不过，您很快就会感觉到什么时候是安全的。  不管怎样，只要记住 @kbd{C-x u} (@code{undo}) 可用就可以了。
+
+@item C-c C-w
+@kindex C-c C-w
+@findex message-insert-signature
+在缓冲区末尾插入签名 (@code{message-insert-signature})。
+
+@item C-c M-h
+@kindex C-c M-h
+@findex message-insert-headers
+插入消息标头 (@code{message-insert-headers})。
+
+@item C-c M-m
+@kindex C-c M-m
+@findex message-mark-inserted-region
+使用封闭标签标记当前文章中的某些区域。  参见@code{message-mark-insert-begin}和@code{message-mark-insert-end}。当使用前缀参数调用时，请使用 slrn 样式逐字标记（@samp{#v+} 和 @samp{#v-}）。
+
+@item C-c M-f
+@kindex C-c M-f
+@findex message-mark-insert-file
+在当前文章中插入带有封闭标签的文件。参见@code{message-mark-insert-begin}和@code{message-mark-insert-end}。当使用前缀参数调用时，请使用 slrn 样式逐字标记（@samp{#v+} 和 @samp{#v-}）。
+
+@end table
+
+
+@node MIME
+@section 哑剧
+@cindex MML
+@cindex MIME
+@cindex multipart
+@cindex attachment
+
+消息是一个符合 @acronym{MIME} 标准的发布代理。  用户通常无需执行任何操作即可使 @acronym{MIME} 发生——消息将自动添加 @code{Content-Type} 和 @code{Content-Transfer-Encoding} 标头。
+
+@findex mml-attach-file
+@kindex C-c C-a
+用户想要使用 @acronym{MIME} 中的多部分内容的最典型的事情就是向他们发出的邮件添加“附件”。这可以使用 @kbd{C-c C-a} 命令 (@kbd{M-x mml-attach-file}) 来完成，该命令将提示输入文件名和 @acronym{MIME} 类型。
+
+@vindex mml-dnd-protocol-alist
+@vindex mml-dnd-attach-options
+如果您的 Emacs 支持拖放，您还可以将文件拖放到消息缓冲区中。  变量 @code{mml-dnd-protocol-alist} 指定当您将文件放入消息缓冲区时执行何种操作。  变量 @code{mml-dnd-attach-options} 控制您在删除文件时要指定的 @acronym{MIME} 选项。  如果是列表，则有效成员为 @code{type}、@code{description} 和 @code{disposition}。  @code{disposition} 意味着 @code{type}。  如果是@code{nil}，则不要询问选项。  如果是@code{t}，询问用户是否指定选项。
+
+@vindex message-screenshot-command
+@findex message-insert-screenshot
+@cindex screenshots
+@kindex C-c C-p
+如果您的系统支持，您还可以将屏幕截图直接插入消息缓冲区。  @kbd{C-c C-p} (@code{message-insert-screenshot}) 命令将图像作为 @acronym{MML} 部分插入缓冲区，并将图像文本属性放在顶部。  @code{message-screenshot-command} 变量表示使用什么外部命令来截取屏幕截图。  默认为 @code{"import png:-"}，这是一个 ImageMagick 命令。
+
+您还可以使用 @acronym{MML} 语言 (@pxref{Composing, , Composing, emacs-mime, The Emacs MIME Manual}) 创建任意复杂的多部分。
+
+@node IDNA
+@section 国际DNA
+@cindex IDNA
+@cindex internationalized domain names
+@cindex non-ASCII domain names
+
+@acronym{IDNA} 是将非 @acronym{ASCII} 域名编码为可读的 @acronym{ASCII} 字符串的标准方法。  详细信息可以在 RFC 3490 中找到。
+
+消息是一个符合 @acronym{IDNA} 标准的发布代理。  用户通常无需执行任何操作即可使 @acronym{IDNA} 发生——消息将自动对 @code{From}、@code{To} 和 @code{CC} 标头中的非 @acronym{ASCII} 域名进行编码。
+
+在 @acronym{IDNA} 变得更加广为人知之前，消息会询问您是否确实应该对域名进行 @acronym{IDNA} 编码。  一些用户可能不知道域名现在可以包含非 @acronym{ASCII} 域名，因此，如果他们不小心输入了非 @acronym{ASCII} 域名，这将为他们提供安全网。
+
+@vindex message-use-idna
+@code{message-use-idna}变量控制是否使用@acronym{IDNA}。  如果变量为@code{nil}，则不会发生@acronym{IDNA}编码，如果将其设置为符号@code{ask}，将查询用户，如果设置为@code{t}（如果@acronym{IDNA}完全可用，这是默认值），@acronym{IDNA}编码会自动发生。
+
+@findex message-idna-to-ascii-rhs
+如果您想尝试使用 @acronym{IDNA} 编码，您可以在消息缓冲区中调用 @kbd{M-x message-idna-to-ascii-rhs @key{RET}}，以便在编辑消息时对非 @acronym{ASCII} 域名进行编码。
+
+请注意，您必须安装@uref{https://www.gnu.org/software/libidn/, GNU Libidn}才能使用此功能。
+
+@node Security
+@section 安全
+@cindex Security
+@cindex S/MIME
+@cindex PGP
+@cindex PGP/MIME
+@cindex sign
+@cindex encrypt
+@cindex secure
+
+默认情况下，电子邮件在互联网上传输时没有任何保护，这意味着它们可以被许多不同的各方阅读和更改。  特别是，它们是在批量监视下进行分析的，这侵犯了基本人权。  为了捍卫这些权利，数字自卫是必要的（除了法律变更之外），而加密和数字签名是强大的自卫技术。  从本质上讲，加密确保只有预期的收件人才能读取消息，而数字签名则确保收件人可以检测到对消息的修改。
+
+如今，有两个主要的不兼容的电子邮件加密标准，即@acronym{OpenPGP}和@acronym{S/MIME}。  这两个标准都是由 @uref{https://www.gnupg.org/, GNU Privacy Guard (GnuPG)} 实现的，除了 GNU Emacs 之外，还需要作为外部软件安装。  在开始加密、解密和签名消息之前，您需要创建一个所谓的密钥对，它由私钥和公钥组成。  您的 @emph{public} 密钥（也称为 @emph{certificate}，特别是 @acronym{S/MIME}）被其他人用来 (a) 加密发给您的消息以及 (b) 验证您创建的数字签名。  相反，您可以使用 @emph{private} 密钥 (a) 解密消息并 (b) 签署消息。  （您可能希望将您的公钥视为一个打开的保险箱，您可以将其提供给其他人，以便他们可以存放消息并锁上门，而您的私钥则对应于保险箱的打开组合。）
+
+因此，您需要执行以下步骤来进行电子邮件加密，通常是在 Emacs 之外。  例如，请参阅 @uref{https://www.gnupg.org/gph/en/manual.html, The GNU Privacy Handbook} 了解涵盖标准 @acronym{OpenPGP} 和 @acronym{GnuPG} 的详细信息。
+@enumerate
+@item
+安装 GnuPG。
+@item
+为您自己的电子邮件地址创建密钥对。
+@item
+分发您的公钥，例如通过上传到密钥服务器。
+@item
+导入您要向其发送加密电子邮件的收件人的公钥。
+@end enumerate
+
+使用标准 @acronym{OpenPGP} 还是 @acronym{S/MIME} 超出了本文档的范围。  实际上，您可以对一组收件人使用一种标准，对不同的收件人使用另一种标准（取决于他们的偏好或能力）。
+
+如果您不熟悉所有这些缩写词：标准 @acronym{OpenPGP} 也称为 @acronym{PGP}（相当好的隐私）。 @acronym{GnuPG} 为 @acronym{OpenPGP} 提供的命令行工具称为 @command{gpg} 和 @command{gpg2}，而为 @acronym{S/MIME} 提供的命令行工具称为 @command{gpgsm}。  @acronym{S/MIME} 的另一种替代工具是 @command{openssl}，但不鼓励使用。  更糟糕的是，可以用 @acronym{OpenPGP} 以两种不同的方式形成电子邮件消息，即 @acronym{PGP} (RFC 1991/4880) 和 @acronym{PGP/MIME} (RFC 2015/3156)。
+
+不过，好消息是：在 GNU Emacs 中，Message 支持所有这些变体，具有可根据您的需要进行自定义的合理默认值，并在幕后调用适当的命令行工具来加密、解密以及数字签名的创建和验证。
+
+消息使用 @acronym{MML} 语言来创建签名和/或加密消息，如下所述。
+
+
+@menu
+* Signing and encryption::       签名和加密命令。
+* Using S/MIME::                 使用 S/MIME
+* Using OpenPGP::                使用 OpenPGP
+* OpenPGP Header::               将 OpenPGP 标头添加到消息中。
+* Passphrase caching::           如何缓存密码
+* PGP Compatibility::            与旧实现的兼容性
+* Encrypt-to-self::              读取您自己的加密消息
+* BCC Warning::                  不要对 BCC 标头使用加密
+@end menu
+
+@node Signing and encryption
+@subsection 签名和加密命令
+
+使用用于签名的 @kbd{C-c C-m s} 密钥映射和用于加密的 @kbd{C-c C-m c} 密钥映射来指示 @acronym{MML} 对 @acronym{MIME} 部分执行安全操作，如下所示。
+@table @kbd
+
+@item C-c C-m s s
+@kindex C-c C-m s s
+@findex mml-secure-message-sign-smime
+
+使用 @acronym{S/MIME} 对当前消息进行数字签名。
+
+@item C-c C-m s o
+@kindex C-c C-m s o
+@findex mml-secure-message-sign-pgp
+
+使用 @acronym{PGP} 对当前消息进行数字签名。
+
+@item C-c C-m s p
+@kindex C-c C-m s p
+@findex mml-secure-message-sign-pgpmime
+
+使用 @acronym{PGP/MIME} 对当前消息进行数字签名。
+
+@item C-c C-m c s
+@kindex C-c C-m c s
+@findex mml-secure-message-encrypt-smime
+
+使用@acronym{S/MIME}对当前消息进行数字加密。
+
+@item C-c C-m c o
+@kindex C-c C-m c o
+@findex mml-secure-message-encrypt-pgp
+
+使用@acronym{PGP}对当前消息进行数字加密。
+
+@item C-c C-m c p
+@kindex C-c C-m c p
+@findex mml-secure-message-encrypt-pgpmime
+
+使用@acronym{PGP/MIME}对当前消息进行数字加密。
+
+@item C-c C-m C-n
+@kindex C-c C-m C-n
+@findex mml-unsecure-message
+从消息中删除与安全相关的 @acronym{MML} 标签。
+
+@end table
+
+这些命令不会立即对消息进行签名或加密，它们只是插入正确的 @acronym{MML} 安全标签，以指示 @acronym{MML} 引擎在消息实际发送时执行该操作。  他们还可以执行其他操作，例如查找和检索您希望向其发送加密邮件的人的 @acronym{S/MIME} 证书。  当 mml 解析引擎将您的 @acronym{MML} 转换为正确编码的 @acronym{MIME} 消息时，安全标签将被替换为部分或多部分标签。  如果您的消息包含其他 mml 部分，则会使用多部分标记；如果您的消息中没有其他部分，则将使用单个部分标签。这样，消息模式将使用签名/加密的多部分消息做正确的事情 (TM)。
+
+由于发送敏感信息时经常使用签名，尤其是加密，因此您可能需要某种方法来确保您的邮件确实经过签名或加密。  调用上述签名/加密命令后，可以使用 @kbd{C-u C-c @key{RET} P} (@code{mml-preview}) 预览原始文章。  然后你可以验证你的长篇大论，关于你的前重要的人或任何人在那天晚上那个奇怪的聚会上与那个长相有趣的人实际上做了什么，实际上会被加密发送。
+
+@emph{Note!} @acronym{PGP/MIME} 和 @acronym{S/MIME} 都不加密/签名 RFC822 标头。  它们仅对 @acronym{MIME} 对象进行操作。  在发送带有敏感主题行的邮件之前请记住这一点。
+
+默认情况下，当加密消息时，Gnus 将使用“signencrypt”模式，这意味着消息既经过签名又经过加密。  如果您想对特定消息禁用此功能，请为 @code{mml-secure-message-encrypt-*} 命令提供前缀参数，例如 @kbd{C-u C-c C-m c p}。
+
+实际上使用上面的安全命令并不是很困难。  至少与确保所有涉及的程序能够正确地相互通信相比。  因此，我们现在描述需要哪些外部库或程序才能正常工作，以及一些小的一般提示。
+
+@node Using S/MIME
+@subsection 使用 S/MIME
+
+@acronym{S/MIME} 需要外部实现，例如 @uref{https://www.gnupg.org/, GNU Privacy Guard} 或 @uref{https://www.openssl.org/, OpenSSL}。  S/MIME 实现的默认 Emacs 接口是 EasyPG (@pxref{Top,,EasyPG Assistant User's Manual, epa, EasyPG Assistant User's Manual})，它包含在 Emacs 中并依赖于 @acronym{GnuPG} 提供的命令行工具 @command{gpgsm}。  该工具实现证书管理，包括证书吊销和到期，而如果使用 OpenSSL，则需要手动执行此类任务。
+
+EasyPG 和 OpenSSL 之间的选择由变量 @code{mml-smime-use} 控制，对于 EasyPG@. 需要将其设置为值 @code{epg}，具体取决于您的 Emacs 版本，该值可能是默认值；如果没有，您可以自定义该变量或将以下行放入您的 @file{.emacs} 文件中（该行需要放置在与消息/gnus/加密相关的其他代码之上）：
+
+@lisp
+(require 'epg)
+@end lisp
+
+此外，您可能希望将变量 @code{mml-default-encrypt-method} 和 @code{mml-default-sign-method} 自定义为字符串 @code{"smime"}。
+
+如果您想将 S/MIME 与 EasyPG 结合使用，这就是全部内容，并且这是将 S/MIME 与 Message 结合使用的推荐方法。
+
+如果您考虑使用 OpenSSL 而不是 EasyPG，请先阅读 OpenSSL 附带的 @command{smime} 命令手册中的 BUGS 部分。  如果您仍想使用 OpenSSL，则以下内容适用。
+
+@emph{Note!} 本节的其余部分假设您对现代密码学、@acronym{S/MIME}、各种 PKCS 标准、OpenSSL 等有基本的了解。
+
+Message 中的 @acronym{S/MIME} 支持（和 @acronym{MML}）可以使用 OpenSSL@. OpenSSL 执行实际的 @acronym{S/MIME} 签名/加密操作。  OpenSSL 可以在@uref{https://www.openssl.org/} 找到。 OpenSSL 0.9.6 及更高版本应该可以工作。  版本 0.9.5a 无法从证书中提取邮件地址，并且它会在 @acronym{MIME} 分隔符中插入一个虚假的 CR 字符，因此如果您想避免被视为发送奇怪邮件的人，您可能希望避免使用它。  （尽管通过发送 @acronym{S/MIME} 消息，您可能已经输掉了这场比赛。）
+
+为了能够发送加密邮件，不需要个人证书。  不过，消息 (@acronym{MML}) 需要您希望与之通信的人的证书。  当您输入 @kbd{C-c C-m c s} 时，系统会询问您此信息。  目前有两种方法可以检索此证书，从本地文件或从 DNS@. 如果您选择本地文件，则它需要包含 @acronym{PEM} 格式的 X.509 证书。如果您选择 DNS，系统会询问您存储证书的域名，默认值是一个不错的猜测。  据我所知，Message (@acronym{MML}) 是世界上第一个支持从 DNS 检索 @acronym{S/MIME} 证书的邮件代理，因此您不太可能在那里找到很多证书。  至少应该有一个，存储在域 @code{simon.josefsson.org} 中。  LDAP 是一种更流行的证书分发方法，计划支持它。  （同时，您可以从命令行使用 @code{ldapsearch} 将证书检索到文件中并使用它。）
+
+对于签名消息，如果没有某种配置，OpenSSL 无法执行签名操作。  特别是，您需要告诉它您的私钥和证书的存储位置。  @acronym{MML} 使用 OpenSSL 的 Emacs 接口，恰当地命名为 ⁣​​1⁣，并且它包含用于此配置的 @code{custom} 组。  所以，尝试@kbd{M-x customize-group @key{RET} smime @key{RET}}并环顾四周。
+
+目前不支持与 CA（或 RA）对话来创建您自己的证书。  也没有计划。  您需要使用 OpenSSL 或使用其他程序手动执行此操作。  我使用 Netscape 并从网络上的大型 CA 之一获得了免费的 @acronym{S/MIME} 证书。  Netscape 能够以 PKCS #12 格式导出您的私钥和证书。  使用 OpenSSL 将其转换为 PEM 格式的纯 X.509 证书，如下所示。
+
+@example
+$ openssl pkcs12 -in ns.p12 -clcerts -nodes > key+cert.pem
+@end example
+
+@code{smime-keys} 变量应该指向 @file{key+cert.pem} 文件。  您现在应该能够发送签名的邮件。
+
+@emph{Note!} 您的私钥现在未加密地存储在文件中，因此请小心处理。  支持在磁盘上存储加密密钥，并且 Gnus 会在调用 OpenSSL@. 之前要求您输入密码，请阅读 OpenSSL 文档以了解如何实现此目的。  如果您使用未加密的密钥（例如，如果它们位于安全存储中，或者您位于安全的单用户计算机上），只需在出现密码短语提示时按 @code{RET} 即可。
+
+@node Using OpenPGP
+@subsection 使用 OpenPGP
+
+使用 OpenPGP 需要外部软件，例如@uref{https://www.gnupg.org/, GNU Privacy Guard}。  还支持 Pre-OpenPGP 实现，例如 PGP 2.x 和 PGP 5.x。  PGP 实现的默认 Emacs 接口是 EasyPG (@pxref{Top,,EasyPG Assistant User's Manual, epa, EasyPG Assistant User's Manual})，但也支持 Mailcrypt。  @xref{PGP Compatibility}。
+
+如前所述，使用 OpenPGP 加密的消息可以根据两种不同的标准进行格式化，即 @acronym{PGP} 或 @acronym{PGP/MIME}。  变量 @code{mml-default-encrypt-method} 和 @code{mml-default-sign-method} 确定首选哪个变体，默认为 @acronym{PGP/MIME}。
+
+@node OpenPGP Header
+@subsection OpenPGP 标头
+
+@samp{OpenPGP} 标头可用于提供有关发送方 OpenPGP 密钥的信息。  这是长期使用的非标准 @samp{X-PGP-Key} （等）标头的形式化和现代化。  欲了解更多详情，请参阅@uref{https://tools.ietf.org/html/draft-josefsson-openpgp-mailnews-header}。
+
+@vindex message-openpgp-header
+要在消息中使用它，请说：
+
+@lisp
+(add-hook 'message-header-setup-hook 'message-add-openpgp-header)
+@end lisp
+
+@noindent
+然后根据您的 PGP 设置自定义 @code{message-openpgp-header} 变量。  该变量是密钥 ID、密钥 URL 或 ASCII 装甲密钥以及保护首选项（@samp{"unprotected"}、@samp{"sign"}、@samp{"encrypt"} 或 @samp{"signencrypt"} 之一的列表。
+
+@node Passphrase caching
+@subsection 密码缓存
+
+@cindex @command{gpg-agent}
+EasyPG 的消息内部调用 GnuPG（@command{gpg} 或 @command{gpgsm} 命令）来执行数据加密，并且在某些情况下（例如解密或签名），@command{gpg}/@command{gpgsm} 需要用户的密码。目前推荐的提供密码的方法是使用 @command{gpg-agent} 程序。
+
+特别是，@command{gpg-agent}程序支持密码缓存，因此您无需为每个解密/签名操作输入密码。  @xref{Agent Options, , , gnupg, Using the GNU Privacy Guard}。
+
+如何在 Emacs 中使用 @command{gpg-agent} 取决于您的 GnuPG@. 版本。对于 GnuPG 版本 2.1，@command{gpg-agent} 会在必要时自动启动。  对于旧版本，您可能需要在启动 Emacs 之前从 shell 运行以下命令。
+
+@example
+eval `gpg-agent --daemon`
+@end example
+
+这将调用@command{gpg-agent}并设置环境变量@code{GPG_AGENT_INFO}以允许@command{gpg}与其通信。将此命令放入 @file{.xsession} 或 @file{.bash_profile} 中可能是个好主意。  @xref{Invoking GPG-AGENT, , , gnupg, Using the GNU Privacy Guard}。
+
+设置@command{gpg-agent}后，它会要求您输入@command{gpg}所需的密码。  在 X Window 系统下，您将看到出现一个新的密码输入对话框。  该对话框由 PIN 输入（@command{pinentry} 命令）提供，其最新版本还可以与文本控制台上的 Emacs 配合。  如果这不起作用，您可能需要事先将密码放入 gpg-agent 的缓存中。  下面的命令就可以解决这个问题。
+
+@example
+gpg --use-agent --sign < /dev/null > /dev/null
+@end example
+
+@node PGP Compatibility
+@subsection 与旧实现的兼容性
+
+@vindex gpg-temp-directory
+请注意，如果您使用@code{gpg.el}，则必须确保@code{gpg-temp-directory}指定的目录具有权限0700。
+
+PGP 实现的文档中详细描述了创建您自己的密钥，因此我们参考它。
+
+如果您已将旧的 PGP 2.x 密钥导入到 GnuPG 中，并且想要向其他 PGP 2.x 用户发送签名和加密的消息，您会发现接收者无法理解您发送的内容。  一种解决方案是使用 PGP 2.x。  您还可以说服其他 PGP 2.x 用户转换为 GnuPG@.
+@vindex mml-signencrypt-style-alist
+作为最后的解决方法，您可以分两步进行签名和加密；单独签名，然后加密消息。  如果您想更改此行为，可以自定义 @code{mml-signencrypt-style-alist} 变量。  例如：
+
+@lisp
+(setq mml-signencrypt-style-alist '(("smime" separate)
+                                    ("pgp" separate)
+                                    ("pgpauto" separate)
+                                    ("pgpmime" separate)))
+@end lisp
+
+这会导致在两次传递中进行签名和加密，从而生成 PGP 版本 2 可以理解的消息。
+
+（有关该问题的更多信息，请参阅@uref{https://www.gnupg.org/gph/en/pgp2x.html}。）
+
+@node Encrypt-to-self
+@subsection 自我加密
+
+默认情况下，消息会加密发送给所有收件人（@code{To}、@code{CC}、@code{BCC} 标头）。  因此，您将无法解密您自己的消息。  为了确保消息也使用您自己的密钥加密，存在多种替代解决方案：
+@enumerate
+@item
+使用文件中的@code{encrypt-to}选项@file{gpg.conf}（对于OpenPGP）或@file{gpgsm.conf}（对于EasyPG的@acronym{S/MIME}）。 @xref{Invoking GPG, , , gnupg, Using the GNU Privacy Guard}，或@xref{Invoking GPGSM, , , gnupg, Using the GNU Privacy Guard}。
+@item
+在收件人中包含您自己的电子邮件地址（您为其创建了密钥对）。
+@item
+自定义变量 @code{mml-secure-openpgp-encrypt-to-self}（对于 OpenPGP）或 @code{mml-secure-smime-encrypt-to-self}（对于 EasyPG 的 @acronym{S/MIME}）。
+@end enumerate
+
+@node BCC Warning
+@subsection 密件抄送警告
+
+@code{BCC} 标头旨在隐藏消息的收件人。然而，当使用加密消息时，所有 @code{BCC} 标头的电子邮件地址都会在没有警告的情况下泄露给所有收件人，这是一个错误。
+@vindex mml-secure-safe-bcc-list
+但现在，当您正要发送加密消息时，如果在加密消息中找到 @code{BCC} 收件人，Message 必须发出警告。  如果您确定这些 @code{BCC} 地址可以安全公开，请设置 @code{mml-secure-safe-bcc-list} 变量，即电子邮件地址列表。  参见@uref{https://debbugs.gnu.org/cgi/bugreport.cgi?bug=18718}。
+
+
+@node Various Commands
+@section 各种命令
+
+@table @kbd
+
+@item C-c C-r
+@kindex C-c C-r
+@findex message-caesar-buffer-body
+凯撒旋转（又名 rot13）当前消息 (@code{message-caesar-buffer-body})。  如果缩小生效，只需旋转缓冲区的可见部分即可。  数字前缀表示文本旋转的位置。  默认值为 13。
+
+@item C-c C-e
+@kindex C-c C-e
+@findex message-elide-region
+@vindex message-elide-ellipsis
+删除点和标记之间的文本 (@code{message-elide-region})。文本被删除并替换为变量 @code{message-elide-ellipsis} 的内容。  默认值是使用省略号 (@samp{[...]})。
+
+这是一个格式规范字符串，您可以使用 @samp{%l} 表示删除了多少行，使用 @samp{%c} 表示删除了多少个字符。
+
+@item C-c M-k
+@kindex C-c M-k
+@findex message-kill-address
+杀掉点下的地址。
+
+@item C-c C-z
+@kindex C-c C-z
+@findex message-kill-to-signature
+删除签名之前的所有文本，或者如果缺少签名，则删除直到消息末尾 (@code{message-kill-to-signature}) 的所有文本。
+
+@item C-c C-v
+@kindex C-c C-v
+@findex message-delete-not-region
+删除消息正文中区域 (@code{message-delete-not-region}) 之外的所有文本。
+
+@item M-@key{RET}
+@kindex M-RET
+@findex message-newline-and-reformat
+插入四个换行符，然后如果在引用的文本内则重新格式化。
+
+这是一个例子：
+
+@example
+> This is some quoted text.  And here's more quoted text.
+@end example
+
+如果点在 @samp{And} 之前并且您按 @kbd{M-@key{RET}}，您将得到：
+
+@example
+> This is some quoted text.
+
+*
+
+> And here's more quoted text.
+@end example
+
+@samp{*} 表示点的放置位置。
+
+@item C-c M-r
+@kindex C-c M-r
+@findex message-rename-buffer
+重命名缓冲区 (@code{message-rename-buffer})。  如果给定前缀，则提示输入新的缓冲区名称。
+
+@item @key{TAB}
+@kindex TAB
+@findex message-tab
+@vindex message-tab-body-function
+如果@code{message-tab-body-function}非@code{nil}，则执行它指定的函数。  否则使用 @code{text-mode-map} 或 @code{global-map} 中绑定到 @key{TAB} 的函数。
+
+@end table
+
+
+@node Sending
+@section 发送
+
+@table @kbd
+@item C-c C-c
+@kindex C-c C-c
+@findex message-send-and-exit
+发送消息并隐藏当前缓冲区 (@code{message-send-and-exit})。
+
+@item C-c C-s
+@kindex C-c C-s
+@findex message-send
+发送消息 (@code{message-send})。
+
+@item C-c C-d
+@kindex C-c C-d
+@findex message-dont-send
+隐藏消息缓冲区并退出 (@code{message-dont-send})。
+
+@item C-c C-k
+@kindex C-c C-k
+@findex message-kill-buffer
+终止消息缓冲区并退出 (@code{message-kill-buffer})。
+
+@end table
+
+
+
+@node Mail Aliases
+@section 邮件别名
+@cindex mail aliases
+@cindex aliases
+@cindex completion
+@cindex ecomplete
+
+@vindex message-mail-alias-type
+@code{message-mail-alias-type} 变量控制要使用的邮件别名扩展类型。  目前支持两种形式：@code{mailabbrev}和@code{ecomplete}。  如果该变量为@code{nil}，则不会执行邮件别名扩展。
+
+@code{mailabbrev} 通过解析 @file{/etc/mailrc} 和 @file{~/.mailrc} 文件来工作。  这些文件看起来像：
+
+@example
+alias lmi "Lars Magne Ingebrigtsen <larsi@@ifi.uio.no>"
+alias ding "ding@@ifi.uio.no (ding mailing list)"
+@end example
+
+将这样的行添加到 @file{~/.mailrc} 文件后，您应该能够在 @code{To} 或 @code{CC}（等等）标题中写入 @samp{lmi}，然后按 @kbd{SPC} 展开别名。
+
+发送消息时不会执行任何扩展——所有扩展都必须显式完成。
+
+如果您使用 @code{ecomplete}，则 @code{To} 和 @code{CC} 标头中的所有地址将自动放入 @file{~/.ecompleterc} 文件中。  当您在 @code{To} 和 @code{CC} 标题中输入文本时，@code{ecomplete} 将检查存储在那里的值，并“以电子方式”说明可以完成哪些操作。  要选择这些补全之一，请使用 @kbd{M-n} 命令向下移动到列表。  使用@kbd{@key{DOWN}}或@kbd{M-n}和@kbd{@key{UP}}或@kbd{M-p}在列表中上下移动，并使用@kbd{@key{RET}}选择完成。
+
+@code{ecomplete-sort-predicate} 变量控制@code{ecomplete} 匹配项的排序方式。
+
+@node Spelling
+@section 拼写
+@cindex spelling
+@findex ispell-message
+
+有两种流行的方法可以让 Emacs 对消息进行拼写检查：@code{ispell} 和 @code{flyspell}。  @code{ispell} 是较旧且可能更受欢迎的软件包。  您通常首先编写消息，然后通过 @code{ispell} 运行整个过程并修复所有拼写错误。  要在发送消息时自动执行此操作，请在 @file{.emacs} 文件中添加类似以下内容：
+
+@lisp
+(add-hook 'message-send-hook 'ispell-message)
+@end lisp
+
+@vindex ispell-message-dictionary-alist
+如果你习惯用不同的语言编写，这可以通过 @code{ispell-message-dictionary-alist} 变量来控制：
+
+@lisp
+(setq ispell-message-dictionary-alist
+      '(("^Newsgroups:.*\\bde\\." . "deutsch8")
+        (".*" . "default")))
+@end lisp
+
+@code{ispell} 取决于是否安装了外部 @samp{ispell} 命令。
+
+另一种流行的方法是使用@code{flyspell}。  该软件包会在您写作时检查您的拼写，并以各种方式标记任何拼写错误的单词。
+
+要使用 @code{flyspell}，请将类似以下内容放入 @file{.emacs} 文件中：
+
+@lisp
+(defun my-message-setup-routine ()
+  (flyspell-mode 1))
+(add-hook 'message-setup-hook 'my-message-setup-routine)
+@end lisp
+
+@code{flyspell} 取决于是否安装了外部 @samp{ispell} 命令。
+
+
+@node Variables
+@chapter 变量
+
+@menu
+* Message Headers::              一般消息头内容。
+* Mail Headers::                 自定义邮件标题。
+* Mail Variables::               其他邮件变量。
+* News Headers::                 自定义新闻标题。
+* News Variables::               其他新闻变量。
+* Insertion Variables::          自定义插入内容的方式。
+* Various Message Variables::    其他消息变量。
+* Sending Variables::            用于发送的变量。
+* Message Buffers::              Message 如何命名其缓冲区。
+* Message Actions::              退出时要执行的操作。
+@end menu
+
+
+@node Message Headers
+@section 消息头
+
+Message 在消息生成方面非常激进。  它必须是——它是新闻和邮件代理的结合体。  为了能够发送组合消息，它必须自己生成所有标头（而不是让邮件/新闻系统来完成），以确保消息的邮件和新闻副本看起来足够相似。
+
+@table @code
+
+@item message-generate-headers-first
+@vindex message-generate-headers-first
+如果@code{t}，则在开始撰写消息之前生成所有必需的标头。  这也可以是要生成的标头列表：
+
+@lisp
+(setq message-generate-headers-first
+      '(References))
+@end lisp
+
+@vindex message-required-headers
+变量@code{message-required-headers}、@code{message-required-mail-headers} 和@code{message-required-news-headers} 指定需要哪些标头。
+
+请注意，由于变量 @code{message-deletable-headers} （见下文），一些标题将在发布之前被删除并重新生成。
+
+@item message-draft-headers
+@vindex message-draft-headers
+当从 Gnus 运行消息时，消息缓冲区与草稿组关联。  @code{message-draft-headers} 表示将草稿写入草稿组时应生成哪些标头。
+
+@item message-from-style
+@vindex message-from-style
+指定 @code{From} 标题的外观。  有四个有效值：
+
+@table @code
+@item nil
+只是地址---@samp{king@@grassland.com}。
+
+@item parens
+@samp{king@@grassland.com (Elvis Parsley)}.
+
+@item angles
+@samp{Elvis Parsley <king@@grassland.com>}.
+
+@item default
+如果不需要引用，则类似于 @code{angles}；如果需要，则类似于 @code{parens}。  如果连 @code{parens} 都需要引用，则无论如何都使用 @code{angles}。
+
+@end table
+
+@item message-deletable-headers
+@vindex message-deletable-headers
+此列表中先前由 Message 生成的标头将在发布前删除。  假设您发布了一篇文章。  然后你决定再次将其发布到其他组，你这个顽皮的男孩，所以你跳回 @file{*post-buf*} 缓冲区，编辑 @code{Newsgroups} 行，然后再次发送。  默认情况下，此变量确保删除旧生成的 @code{Message-ID} 并生成新的。  如果不这样做，整个帝国可能会崩溃，无政府状态将会盛行，猫将开始用两条腿走路并统治世界。据称。
+
+@item message-default-headers
+@vindex message-default-headers
+在编辑邮件之前，将在外发邮件中插入标题行，以便您可以编辑或删除其行。  如果设置为字符串，则直接插入。  如果设置为函数，则会调用该函数并插入其结果。
+
+@item message-subject-re-regexp
+@vindex message-subject-re-regexp
+@vindex mail-re-regexps
+@cindex Aw
+@cindex Sv
+@cindex Re
+对消息的响应的主题以 @samp{Re: } 开头。  这是 @emph{not} 英语单词“response”的缩写，但它来自拉丁语“res”，意思是“就……而言”。  一些看似对标准过敏的公司未能抓住这一事实，并将其软件“国际化”，以使用诸如@samp{Aw: }（“antwort”）或@samp{Sv: }（“svar”）之类的可憎之物来代替，这是毫无意义和邪恶的。  但是，您可能必须处理使用这些邪恶工具的用户，在这种情况下，您可以将此变量设置为与这些前缀匹配的正则表达式。  我自己，我只是扔掉不合规的邮件。
+
+以下是响应消息时处理这些标头的值的示例：
+
+@lisp
+(setq message-subject-re-regexp
+      (concat
+       "^[ \t]*"
+         "\\("
+           "\\("
+             "[Aa][Nn][Tt][Ww]\\.?\\|"     ; antw
+             "[Aa][Ww]\\|"                 ; aw
+             "[Ff][Ww][Dd]?\\|"            ; fwd
+             "[Oo][Dd][Pp]\\|"             ; odp
+             "[Rr][Ee]\\|"                 ; re
+             "[Rr][\311\351][Ff]\\.?\\|"   ; ref
+             "[Ss][Vv]"                    ; sv
+           "\\)"
+           "\\(\\[[0-9]*\\]\\)"
+           "*:[ \t]*"
+         "\\)"
+       "*[ \t]*"
+       ))
+@end lisp
+
+您不需要这样做，因为 @code{message-subject-re-regexp} 的默认值是基于 @code{mail-re-regexps} 初始化的，它涵盖了此类国际化的大多数已知情况，并且更容易自定义。  自定义 @code{mail-re-regexps} 会更新 @code{message-subject-re-regexp} 以匹配。
+
+请注意，正则表达式与 @samp{Subject} 标头内容进行匹配，不区分大小写。
+
+@item message-subject-trailing-was-query
+@vindex message-subject-trailing-was-query
+@vindex message-subject-trailing-was-ask-regexp
+@vindex message-subject-trailing-was-regexp
+控制如何处理主题行中尾随的 @samp{(was: <old subject>)}。  如果@code{nil}，则保持主题不变。  如果是符号@code{ask}，询问用户要做什么。  在这种情况下，主语与 @code{message-subject-trailing-was-ask-regexp} 相匹配。  如果 @code{message-subject-trailing-was-query} 是 @code{t}，则始终删除尾随的旧主题。  在这种情况下，使用@code{message-subject-trailing-was-regexp}。
+
+@item message-alternative-emails
+@vindex message-alternative-emails
+匹配备用电子邮件地址的正则表达式或谓词函数。与此变量匹配的原始文章的“收件人”、“抄送”或“发件人”标头中的第一个地址将用作传出邮件的“发件人”字段，替换默认的“发件人”值。
+
+例如，如果您有两个辅助电子邮件地址 john@@home.net 和 john.doe@@work.com，并且希望在撰写对发送给其中一个的邮件的回复时在“发件人”字段中使用它们，则可以像这样设置此变量：
+
+@lisp
+(setq message-alternative-emails
+      (regexp-opt '("john@@home.net" "john.doe@@work.com")))
+@end lisp
+
+该变量优先于发布样式和任何超出 @code{message-setup-hook} 的内容。
+
+@item message-allow-no-recipients
+@vindex message-allow-no-recipients
+指定当除了 @code{Gcc} 或 @code{FCC} 之外没有收件人时要执行的操作。  如果是@code{always}，则允许发帖。  如果是@code{never}，则不允许发帖。  如果是 @code{ask}（默认值），系统会提示您。
+
+@item message-hidden-headers
+@vindex message-hidden-headers
+正则表达式、正则表达式列表或第一个元素为 @code{not} 且其余元素为正则表达式的列表。  它说明撰写邮件时要隐藏哪些标头。
+
+@lisp
+(setq message-hidden-headers
+      '(not "From" "Subject" "To" "CC" "Newsgroups"))
+@end lisp
+
+使用缩小来隐藏标题，您可以使用 @kbd{M-x widen} 在缓冲区中公开它们。
+
+@item message-header-synonyms
+@vindex message-header-synonyms
+标题同义词列表的列表。  例如，如果此列表包含具有元素 @code{CC} 和 @code{To} 的成员列表，则当消息已 @code{CC} 发送给收件人时，@code{message-carefully-insert-headers} 将不会插入 @code{To} 标头。
+
+@item message-header-use-obsolete-in-reply-to
+@vindex message-header-use-obsolete-in-reply-to
+当非 @code{nil} 时，使用 @code{In-Reply-To} 标头的过时形式，其中包含一个括号短语，其中包含消息 ID 后面的原始电子邮件的详细信息。  默认值为@code{nil}。
+
+@item message-syntax-checks
+@vindex message-syntax-checks
+控制不应在传出帖子上执行哪些语法检查。例如，要禁用长签名检查，请添加
+
+@lisp
+(signature . disabled)
+@end lisp
+
+到这个列表。
+
+有效的检查是：
+
+@table @code
+@item approved
+@cindex approved
+检查文章是否有 @code{Approved} 标题，这是只有版主才应该包含的内容。
+@item continuation-headers
+检查是否存在不以空格开头的连续标题行。
+@item control-chars
+检查是否有无效字符。
+@item empty
+检查文章是否为空。
+@item existing-newsgroups
+检查@code{Newsgroups}和@code{Followup-To}标题中提到的新闻组是否存在。
+@item from
+检查 @code{From} 标头是否看起来不错。
+@item illegible-text
+检查正文中是否有不可打印的字符。
+@item invisible-text
+检查缓冲区中是否有不可见的文本。
+@item long-header-lines
+检查标题行是否太长。
+@item long-lines
+@cindex long lines
+检查体内的线条是否太长。
+@item message-id
+检查 @code{Message-ID} 看起来语法是否正确。
+@item multiple-headers
+检查是否存在多个相等的标头。
+@item new-text
+检查消息中是否有新文本。
+@item newsgroups
+检查@code{Newsgroups}头是否存在且不为空。
+@item quoting-style
+检查文本是否跟在最后引用的部分之后。
+@item repeated-newsgroups
+检查@code{Newsgroups}和@code{Followup-To}标头是否包含重复的组名。
+@item reply-to
+检查 @code{Reply-To} 标头是否正常。
+@item sender
+@cindex Sender
+如果 @code{From} 标头看起来很奇怪，请插入新的 @code{Sender} 标头。
+@item sendsys
+@cindex sendsys
+检查 version 和 sendsys 命令是否存在。
+@item shoot
+检查 @code{Message-ID} 标头的域部分看起来是否正常。
+@item shorten-followup-to
+检查是否添加 @code{Followup-To} 标头以缩短发布到的组数。
+@item signature
+检查签名的长度。
+@item size
+检查是否尺寸过大。
+@item subject
+检查@code{Subject}头是否存在且不为空。
+@item subject-cmsg
+检查命令主题。
+@item valid-newsgroups
+检查 @code{Newsgroups} 和 @code{Followup-To} 标头在语法上是否有效。
+@end table
+
+默认情况下会检查所有这些条件，但 @code{sender} 除外，如果 @code{message-insert-canlock} 为非 @code{nil} (@pxref{Canceling News})，则默认禁用检查。
+
+@end table
+
+@node Mail Headers
+@section 邮件标头
+
+@table @code
+@item message-required-mail-headers
+@vindex message-required-mail-headers
+@xref{News Headers}，该变量的语法。  默认为@code{(From Subject Date (optional . In-Reply-To) Message-ID (optional . User-Agent))}。
+
+@item message-ignored-mail-headers
+@vindex message-ignored-mail-headers
+邮寄前要删除的标头的正则表达式。  默认值为@* @samp{^[GF]cc:\\|^Resent-FCC:\\|^Xref:\\|^X-Draft-From:\\|@* ^X-Gnus-Agent-Meta-Information:}。
+
+@item message-default-mail-headers
+@vindex message-default-mail-headers
+该字符串插入到所有初始化为邮件的消息缓冲区的标头末尾。
+
+@end table
+
+
+@node Mail Variables
+@section 邮件变量
+
+@table @code
+@item message-send-mail-function
+@vindex message-send-mail-function
+@findex message-send-mail-function
+@findex message-send-mail-with-sendmail
+@findex message-send-mail-with-mh
+@findex message-send-mail-with-qmail
+@findex message-smtpmail-send-it
+@findex smtpmail-send-it
+@findex feedmail-send-it
+@findex message-send-mail-with-mailclient
+用于将当前缓冲区作为邮件发送的函数。  根据系统默认为@code{message-send-mail-with-sendmail}，或@code{smtpmail-send-it}。  其他有效值包括 @code{message-send-mail-with-mailclient}、@code{message-send-mail-with-mh}、@code{message-send-mail-with-qmail}、@code{message-smtpmail-send-it} 和 @code{feedmail-send-it}。
+
+函数 @code{message-send-mail-with-sendmail} 将您的文章通过管道传输到 @code{sendmail} 二进制文件以进一步排队和发送。  当您的本地系统未配置为使用 @code{sendmail} 发送邮件，并且您可以访问远程 @acronym{SMTP} 服务器时，您可以将 @code{message-send-mail-function} 设置为 @code{smtpmail-send-it} 并确保正确设置 @code{smtpmail} 软件包。  一个例子：
+
+@lisp
+(setq message-send-mail-function 'smtpmail-send-it
+      smtpmail-default-smtp-server "YOUR SMTP HOST")
+@end lisp
+
+对于与此类似的东西，有@code{message-smtpmail-send-it}。  如果您的 @acronym{ISP} 需要 @acronym{POP}-before-@acronym{SMTP} 身份验证，这会很有用。 @xref{POP before SMTP, , POP before SMTP, gnus, The Gnus Manual}。
+
+@cindex X-Message-SMTP-Method
+如果您有复杂的 @acronym{SMTP} 设置，并且希望某些邮件通过一个邮件服务器传递，而其他邮件通过另一个邮件服务器，则可以使用 @samp{X-Message-SMTP-Method} 标头通过使用关键字 @samp{smtp} 后跟服务器信息来覆盖默认值：
+
+@example
+X-Message-SMTP-Method: smtp smtp.fsf.org 587
+@end example
+
+这将使用端口 587 通过 @samp{smtp.fsf.org} 发送消息。
+
+@example
+X-Message-SMTP-Method: smtp smtp.fsf.org 587 other-user
+@end example
+
+这与上面相同，但是在验证时使用@samp{other-user}作为用户名。  如果您在同一服务器上有多个 @acronym{SMTP} 帐户，这会很方便。
+
+通常，与 SMTP 服务器的连接遵循 @code{smtpmail-stream-type} 的值，除非端口为 465，在这种情况下需要 TLS 连接。  要强制执行特定的流类型，请提及该变量的可能值之一，如下所示：
+
+@example
+X-Message-SMTP-Method: smtp smtp.fsf.org 587 other-user starttls
+@end example
+
+该标头还可用于通过使用 @samp{mailer} 关键字来指定替代 MTA，其中 @samp{mailer} 是具有相应 @code{message-send-mail-with-'mailer'} 函数的 MTA 的名称。  例如：
+
+@example
+X-Message-SMTP-Method: sendmail
+@end example
+
+将通过本地安装的 sendmail 程序发送消息。  @samp{mailer} 的识别值为 sendmail、qmail、mh 和 mailclient。
+
+
+@item message-mh-deletable-headers
+@vindex message-mh-deletable-headers
+大多数版本的 MH 不喜欢接收包含此变量中的标头的消息。  如果此变量为非@code{nil}（这是默认值），则通过 MH@. 发送消息时，这些标头将在邮寄之前被删除，如果您的 MH 可以处理这些标头，请将其设置为 @code{nil}。
+
+@item message-qmail-inject-program
+@vindex message-qmail-inject-program
+@cindex qmail
+qmail-inject 程序的位置。
+
+@item message-qmail-inject-args
+@vindex message-qmail-inject-args
+传递给 qmail-inject 程序的参数。这应该是一个字符串列表，每个参数一个字符串。  它也可能是一个函数。
+
+例如，如果您希望设置信封发件人地址，以便退回到正确的位置或处理列表服务对该地址的使用，您可以将此变量设置为@code{'("-f" "you@@some.where")}。
+
+@item message-sendmail-f-is-evil
+@vindex message-sendmail-f-is-evil
+@cindex sendmail
+非 @code{nil} 表示不将 @samp{-f username} 添加到 sendmail 命令行。  这样做比不这样做更加邪恶。
+
+@item message-sendmail-envelope-from
+@vindex message-sendmail-envelope-from
+当@code{message-sendmail-f-is-evil}为@code{nil}时，指定在@acronym{SMTP}信封中使用的地址。  如果是@code{nil}，则使用@code{user-mail-address}。  如果是符号@code{header}，则使用消息的@samp{From}标头。
+
+@item message-mailer-swallows-blank-line
+@vindex message-mailer-swallows-blank-line
+如果系统的邮件程序同时运行标头和正文，请将其设置为非@code{nil}。  （当 sendmail 在远程模式下运行时，SunOS 4 上存在此问题。）该值应该是一个表达式，用于测试问题是否真的会发生。
+
+@item message-send-mail-partially-limit
+@vindex message-send-mail-partially-limit
+@cindex split large message
+作为消息/部分发送的消息的限制。  消息大小的下限（以字符为单位），超出该下限，消息应分多个部分发送。  如果是@code{nil}（默认），则大小不受限制。
+
+@end table
+
+
+@node News Headers
+@section 新闻标题
+
+@vindex message-required-news-headers
+@code{message-required-news-headers} 标题符号列表。  这些标头将自动生成，或者，如果不可能，则会提示输入。  以下符号有效：
+
+@table @code
+
+@item From
+@cindex From
+@findex user-full-name
+@findex user-mail-address
+此必需的标头将使用 @code{message-make-from} 函数的结果填充，该结果取决于 @code{message-from-style}、@code{user-full-name}、@code{user-mail-address} 变量。
+
+@item Subject
+@cindex Subject
+如果此必需的标头尚不存在，则会提示输入。
+
+@item Newsgroups
+@cindex Newsgroups
+此必需标题说明文章将发布到哪个新闻组。  如果尚不存在，则会提示输入。
+
+@item Organization
+@cindex organization
+@vindex message-user-organization
+@vindex message-user-organization-file
+该可选标题将根据 @code{message-user-organization} 变量填写。如果此变量为@code{t}，则将使用@code{message-user-organization-file}。  该变量也可以是一个字符串（在这种情况下将使用该字符串），也可以是一个函数（将不带参数调用并且应返回要使用的字符串）。
+
+@item Lines
+@cindex Lines
+该可选标头将由 Message 计算。
+
+@item Message-ID
+@cindex Message-ID
+@vindex message-user-fqdn
+@vindex mail-host-address
+@vindex user-mail-address
+@findex system-name
+@cindex Sun
+@cindex mail-host-address-is-not-set
+这个必需的标头将由 Message 生成。  将根据日期、时间、用户名（对于本地部分）和域部分创建唯一 ID。  对于域部分，消息将（按此顺序）查找@code{message-user-fqdn}、@code{system-name}、@code{mail-host-address} 和@code{message-user-mail-address}（即@code{user-mail-address}），直到找到可能有效的完全限定域名 (FQDN)。
+
+@item User-Agent
+@cindex User-Agent
+该可选标头将根据 @code{message-newsreader} 局部变量填写。
+
+@item In-Reply-To
+此可选标题使用正在回复的文章的 @code{Date} 和 @code{From} 标题填写。
+
+@item Expires
+@cindex Expires
+@vindex message-expires
+这个极其可选的标头将根据 @code{message-expires} 变量插入。  它已被高度弃用，除非您知道自己在做什么，否则不应使用它。
+
+@item Distribution
+@cindex Distribution
+@vindex message-distribution-function
+该可选标头根据 @code{message-distribution-function} 变量填写。  这是一个已被弃用且经常被误解的标头。
+
+@item Path
+@cindex path
+@vindex message-user-path
+这个极其可选的标头可能永远不应该被使用。然而，一些@emph{very}旧服务器要求存在此标头。  @code{message-user-path} 进一步控制此 @code{Path} 标头的外观。  如果是@code{nil}，则使用服务器名称作为叶子节点。  如果是字符串，则使用该字符串。  如果它既不是字符串也不是 4⁣，则仅使用用户名。  然而，您根本不需要摆弄这个变量。
+@end table
+
+@cindex Mime-Version
+此外，您还可以在此列表中输入 conses。  这个cons的@sc{car}应该是一个符号。  该符号的名称是标头的名称，@sc{cdr}可以是要逐字输入作为该标头的值的字符串，也可以是要调用的函数。  该函数不应接受任何参数，并返回要插入的字符串。  例如，如果要插入@code{Mime-Version: 1.0}，则应在列表中输入@code{(Mime-Version . "1.0")}。
+
+如果列表包含一个 cons，其中 cons 的 @sc{car} 为 @code{optional}，则仅当该 cons 的 @sc{cdr} 为非 @code{nil} 时才会插入。
+
+如果您想从此列表中删除一个条目，下面的 Lisp 片段可能会有用。  如果您想删除另一个元素，请进行相应调整。
+
+@lisp
+(setq message-required-news-headers
+      (delq 'Message-ID message-required-news-headers))
+@end lisp
+
+用于自定义传出新闻文章的其他变量：
+
+@table @code
+
+@item message-ignored-news-headers
+@vindex message-ignored-news-headers
+在发布之前删除标题的正则表达式。  默认值为@* @samp{^NNTP-Posting-Host:\\|^Xref:\\|^[BGF]cc:\\|^Resent-FCC:\\|@* ^X-Draft-From:\\|^X-Gnus-Agent-Meta-Information:}。
+
+@item message-default-news-headers
+@vindex message-default-news-headers
+该字符串被插入到所有初始化为新闻的消息缓冲区中的标头末尾。
+
+@end table
+
+
+@node News Variables
+@section 新闻变量
+
+@table @code
+@item message-send-news-function
+@vindex message-send-news-function
+用于将当前缓冲区作为消息发送的函数。  默认值为@code{message-send-news}。
+
+@item message-post-method
+@vindex message-post-method
+Gnusish @dfn{select method}（有关详细信息，请参阅 Gnus 手册）用于发布准备好的新闻消息。
+
+@end table
+
+
+@node Insertion Variables
+@section 插入变量
+
+@table @code
+@item message-cite-style
+@vindex message-cite-style
+回复消息时使用的整体风格。  这控制诸如回复相对于原始内容的放置位置、引文的格式如何、签名的位置等之类的事情。
+
+值是 @code{nil} （无变量覆盖）或 let 样式的对 @code{(VARIABLE VALUE)} 列表来覆盖默认值。
+
+请参阅@code{gnus-posting-styles} 为特定组设置此变量。  @code{message-cite-style-*} 变量中提供了模拟流行邮件代理的预设。
+
+@item message-cite-reply-position
+@vindex message-cite-reply-position
+回复应该放在哪里。  可用样式为 @code{traditional} 用于内联回复、@code{above} 用于顶部发帖、@code{below} 用于底部发帖
+
+@item message-ignored-cited-headers
+@vindex message-ignored-cited-headers
+所有与此正则表达式匹配的标头都将从拉出的邮件中删除。  默认值为@samp{.}，这意味着所有标头都将被删除。
+
+@item message-cite-prefix-regexp
+@vindex message-cite-prefix-regexp
+正则表达式匹配一行中最长的可能引用前缀。
+
+@item message-citation-line-function
+@vindex message-citation-line-function
+@cindex attribution line
+调用函数插入引文行。  默认值为 @code{message-insert-citation-line}，这将导致引文行如下所示：
+
+@example
+Hallvard B Furuseth <h.b.furuseth@@usit.uio.no> writes:
+@end example
+
+@c FIXME: Add 'message-insert-formatted-citation-line' and
+@c 'message-citation-line-format'.
+
+调用此函数时，点将位于消息正文的开头。
+
+请注意，Gnus 提供了一项功能，单击 @samp{writes:} 即可隐藏引用的文本。  如果您对引文行更改太多，您的消息的读者也将不得不调整他们的 Gnus。  请参阅变量@code{gnus-cite-attribution-suffix}。  @xref{Article Highlighting, , Article Highlighting, gnus, The Gnus Manual}，了解详情。
+
+@item message-yank-prefix
+@vindex message-yank-prefix
+@cindex yanking
+@cindex quoting
+当您回复或跟进一篇文章时，您通常想要引用您正在回复的人。  插入带引号的文本是通过 @dfn{yanking} 完成的，并且您拉出的每一行都会在其前面添加 @code{message-yank-prefix}（使用 @code{message-yank-cited-prefix} 的带引号行和使用 @code{message-yank-empty-prefix} 的空行除外）。  默认值为@samp{> }。
+
+@item message-yank-cited-prefix
+@vindex message-yank-cited-prefix
+@cindex yanking
+@cindex cited
+@cindex quoting
+当从包含已引用文本的文章中提取文本时，每一行都将以此变量的内容作为前缀。  默认值为@samp{>}。  另请参见@code{message-yank-prefix}。
+
+@item message-yank-empty-prefix
+@vindex message-yank-empty-prefix
+@cindex yanking
+@cindex quoting
+从文章中提取文本时，每个空行都将以此变量的内容作为前缀。  默认值为@samp{>}。  您可以将此变量设置为空字符串，以自动将引用的文本拆分为段落。  另请参见@code{message-yank-prefix}。
+
+@item message-indentation-spaces
+@vindex message-indentation-spaces
+缩进拉出的消息的空格数。
+
+@item message-cite-function
+@vindex message-cite-function
+@findex message-cite-original
+@findex message-cite-original-without-signature
+引用原始消息的功能。  默认值为 @code{message-cite-original}，它只是插入原始消息并在每行前面添加 @samp{> }。 @code{message-cite-original-without-signature} 执行相同操作，但省略签名。
+
+@item message-indent-citation-function
+@vindex message-indent-citation-function
+用于修改刚刚插入邮件缓冲区中的引文的功能。这也可以是函数列表。  每个函数都可以在@code{(point)}和@code{(mark t)}之间找到引用。  每个函数都应该在引用文本周围留下点和标记作为修改。
+
+@item message-mark-insert-begin
+@vindex message-mark-insert-begin
+用于标记某些插入文本开头的字符串。
+
+@item message-mark-insert-end
+@vindex message-mark-insert-end
+用于标记某些插入文本结尾的字符串。
+
+@item message-signature
+@vindex message-signature
+要插入到消息缓冲区末尾的字符串。  如果 @code{t} （这是默认值），则将插入 @code{message-signature-file} 文件。  如果是函数，则将使用函数的结果。  如果是表单，则将使用表单的结果。  如果此变量是 @code{nil}，则根本不会插入签名，但您仍然可以在需要时使用 @kbd{C-c C-w} (@code{message-insert-signature}) 命令手动插入 @code{message-signature-file}。
+
+@item message-signature-file
+@vindex message-signature-file
+包含要插入到缓冲区末尾的签名的文件。如果指定了路径，则即使已设置，@code{message-signature-directory} 的值也会被忽略。默认值为@file{~/.signature}。
+
+@item message-signature-directory
+@vindex message-signature-directory
+包含签名文件的目录名称。  如果您有许多此类文件（例如通过 Gnus 发布样式处理），那么就会派上用场。如果 @code{nil} （默认值），@code{message-signature-file} 预计在需要时指定目录。
+
+
+@item message-signature-insert-empty-line
+@vindex message-signature-insert-empty-line
+如果@code{t}（默认值），则在签名分隔符之前插入一个空行。
+
+@end table
+
+请注意，RFC1036bis 规定签名前面应有三个字符 @samp{-- } 单独一行。  这是为了让接收者更容易自动识别和处理签名。  因此，不要删除这些字符，即使您可能觉得它们完全破坏了您美丽的设计。
+
+另请注意，签名的长度不得超过四行。包含 @acronym{ASCII} 图形是让每个人都相信你很愚蠢并且没有什么重要可说的有效方法。
+
+
+@node Various Message Variables
+@section 各种消息变量
+
+@table @code
+@item message-default-charset
+@vindex message-default-charset
+@cindex charset
+命名 @acronym{MIME} 字符集的符号。  假定消息中的非 1⁣ 字符使用此字符集进行编码。  非 @sc{mule} Emacsen 上的默认值为 @code{iso-8859-1}；否则@code{nil}，表示询问用户。  （此变量仅在非 @sc{mule} Emacsen 上使用。） @xref{Charset Translation, , Charset Translation, emacs-mime, Emacs MIME Manual}，有关 @sc{mule} 到 @acronym{MIME} 转换过程的详细信息。
+
+@item message-fill-column
+@vindex message-fill-column
+@cindex auto-fill
+列的本地值，超出该值后消息缓冲区将发生自动换行。  如果非@code{nil}（默认值），还打开消息缓冲区的自动填充。
+
+@item message-signature-separator
+@vindex message-signature-separator
+匹配签名分隔符的正则表达式。  默认为@samp{^-- *$}。
+
+@item mail-header-separator
+@vindex mail-header-separator
+用于分隔标题和正文的字符串。  默认为@samp{--text follows this line--}。
+
+@item message-directory
+@vindex message-directory
+许多邮件事物使用的目录。  默认值为@file{~/Mail/}。所有其他邮件文件变量均源自@code{message-directory}。
+
+@item message-auto-save-directory
+@vindex message-auto-save-directory
+如果 Gnus 未运行，消息自动保存缓冲区的目录。  如果@code{nil}，消息将不会自动保存。  默认值为@file{~/Mail/drafts/}。
+
+@item message-signature-setup-hook
+@vindex message-signature-setup-hook
+初始化消息缓冲区时运行挂钩。  它在插入标头之后但在插入签名之前运行。
+
+@item message-setup-hook
+@vindex message-setup-hook
+钩子在消息缓冲区初始化后、插入拉出的文本之前作为最后一件事运行。
+
+@item message-header-setup-hook
+@vindex message-header-setup-hook
+初始化标头后，调用的钩子缩小到标头。
+
+例如，如果您正在运行 Gnus 并希望在所有新闻文章和发送到邮件列表的所有消息中插入 @samp{Mail-Copies-To} 标头，您可以执行如下操作：
+
+@lisp
+(defun my-message-header-setup-hook ()
+  (let ((group (or gnus-newsgroup-name "")))
+    (when (or (message-fetch-field "newsgroups")
+              (gnus-group-find-parameter group 'to-address)
+              (gnus-group-find-parameter group 'to-list))
+      (insert "Mail-Copies-To: never\n"))))
+
+(add-hook 'message-header-setup-hook
+          'my-message-header-setup-hook)
+@end lisp
+
+@item message-send-hook
+@vindex message-send-hook
+在发送消息之前运行挂钩。
+
+如果您想在发送之前添加某些标头，可以使用此挂钩中的 @code{message-add-header} 函数。  例如：
+@findex message-add-header
+
+@lisp
+(add-hook 'message-send-hook 'my-message-add-content)
+(defun my-message-add-content ()
+  (message-add-header "X-In-No-Sense: Nonsense")
+  (message-add-header "X-Whatever: no"))
+@end lisp
+
+如果标头已经存在，则此函数不会添加标头。
+
+@item message-send-mail-hook
+@vindex message-send-mail-hook
+在发送邮件消息之前运行挂钩。  这个钩子运行得很晚：就在消息实际作为邮件发送之前。
+
+@item message-send-news-hook
+@vindex message-send-news-hook
+在发送新闻消息之前运行挂钩。  这个钩子运行得很晚：就在消息实际作为新闻发送之前。
+
+@item message-sent-hook
+@vindex message-sent-hook
+发送消息后运行挂钩。
+
+@item message-cancel-hook
+@vindex message-cancel-hook
+取消新闻文章时运行挂钩。
+
+@item message-mode-syntax-table
+@vindex message-mode-syntax-table
+消息模式缓冲区中使用的语法表。
+
+@item message-cite-articles-with-x-no-archive
+@vindex message-cite-articles-with-x-no-archive
+如果非 @code{nil}，请勿从设置了 @samp{X-No-Archive} 的文章中删除引用的文本。  即使未设置此变量，您也可以通过按 @code{undo} 按键来撤消剥离。
+
+@item message-strip-special-text-properties
+@vindex message-strip-special-text-properties
+Emacs 有许多特殊的文本属性，它们可能会以各种方式破坏消息的撰写。  如果设置此选项，消息将从消息组合缓冲区中删除这些属性。  但是，某些软件包需要这些属性才能工作。  如果您使用这些软件包之一，请关闭此选项，并希望消息撰写不会太糟糕。
+
+@item message-send-method-alist
+@vindex message-send-method-alist
+@findex message-mail-p
+@findex message-news-p
+@findex message-send-via-mail
+@findex message-send-via-news
+发送传出消息的方式列表。  每个元素的形式如下：
+
+@lisp
+(@var{type} @var{predicate} @var{function})
+@end lisp
+
+@table @var
+@item type
+命名方法的符号。
+
+@item predicate
+不带任何参数调用的函数，用于确定消息是否为@var{type}类型的消息。  该函数将在消息所在的缓冲区中被调用。
+
+@item function
+如果 @var{predicate} 返回非 @code{nil} 则调用的函数。 @var{function} 是用一个参数——前缀来调用的。
+@end table
+
+默认为：
+
+@lisp
+((news message-news-p message-send-via-news)
+ (mail message-mail-p message-send-via-mail))
+@end lisp
+
+如果消息看起来像新闻，则 @code{message-news-p} 函数返回非 @code{nil}，并且 @code{message-send-via-news} 函数根据 @code{message-send-news-function} 变量 (@pxref{News Variables}) 发送消息。  如果消息看起来像邮件，则 @code{message-mail-p} 函数返回非 @code{nil}，并且 @code{message-send-via-mail} 函数根据 @code{message-send-mail-function} 变量 (@pxref{Mail Variables}) 发送消息。
+
+该列表中的所有元素都将按顺序进行尝试，因此，例如，包含有效 @samp{Newsgroups} 标头和有效 @samp{To} 标头的消息将作为新闻发送，然后作为邮件发送。
+@end table
+
+
+
+@node Sending Variables
+@section 发送变量
+
+@table @code
+
+@item message-fcc-handler-function
+@vindex message-fcc-handler-function
+调用一个函数来保存传出的文章。  该函数将使用存储文章的文件名来调用。默认函数是@code{message-output}，它以 Unix 邮箱格式保存。
+
+@item message-courtesy-message
+@vindex message-courtesy-message
+发送组合邮件时，该字符串将插入到邮件副本的开头。  如果字符串包含格式规范@samp{%s}，则文章已发布到的新闻组将插入其中。  如果此变量为@code{nil}，则不会添加此类礼貌消息。默认值为@samp{"The following message is a courtesy copy of an article\\nthat has been posted to %s as well.\\n\\n"}。
+
+@item message-fcc-externalize-attachments
+@vindex message-fcc-externalize-attachments
+如果@code{nil}，则将文件作为 FCC 副本中的正常部分附加；如果不是@code{nil}，则将本地文件作为外部部分附加。
+
+@item message-interactive
+@vindex message-interactive
+如果非@code{nil}发送消息时等待并显示错误； if @code{nil} 让邮件程序回邮一条消息来报告错误。
+
+@item message-confirm-send
+@vindex message-confirm-send
+当非@code{nil}时，Gnus在发送消息时会要求确认。
+
+@item message-server-alist
+@vindex message-server-alist
+一个列表，描述在发送新消息之前生成要插入的 @code{X-Message-SMTP-Method} 标头的规则（如果消息尚无此类标头）。  alist 的每个元素都应采用 @w{@code{(@var{cond} . @var{method})}} 的形式。  如果@var{cond}是字符串，它将与@code{From}标头进行比较，如果它们比较相等，则相应的@var{method}将作为字符串插入到邮件标头中作为SMTP方法。  如果@var{cond}是一个函数，它将在消息缓冲区中不带任何参数地被调用，并且如果该函数返回非@code{nil}值，则相应的@var{method}将作为SMTP方法插入到消息头中；如果@var{method}是@code{nil}，则使用函数@code{cond}返回的值。
+
+@end table
+
+
+@node Message Buffers
+@section 消息缓冲区
+
+当您请求消息缓冲区时，消息将生成具有唯一缓冲区名称的新缓冲区。  当您发送消息时，缓冲区通常不会被终止。  它的名称已更改，并且一定数量的旧消息缓冲区保持活动状态。
+
+@table @code
+@item message-generate-new-buffers
+@vindex message-generate-new-buffers
+控制是否创建新的消息缓冲区来撰写消息。有效值包括：
+
+@table @code
+@item nil
+以消息方式生成缓冲区名称（例如，*邮件*、*新闻*、*发邮件给谁*、*组新闻*等）@: 并继续在该名称的现有缓冲区中进行编辑。  如果没有这样的缓冲区，则会重新创建。
+
+@item unique
+@item t
+使用 Message 方式生成的名称创建新的缓冲区。
+
+@item unsent
+与@code{unique}类似，但缓冲区名称以“*unsent”开头。
+
+@item standard
+与 @code{nil} 类似，但缓冲区名称更简单，如 *mail message*。
+@end table
+@table @var
+@item function
+如果这是一个函数，请使用三个参数调用该函数：类型、目标地址和组名称（其中任何一个都可以是@code{nil}）。  该函数应返回新的缓冲区名称。
+@end table
+
+默认值为@code{unsent}。
+
+@item message-max-buffers
+@vindex message-max-buffers
+该变量表示要保留多少旧消息缓冲区。  如果消息缓冲区多于此，则最旧的缓冲区将被杀死。  默认值为 10。如果此变量为 @code{nil}，则不会杀死任何旧消息缓冲区。
+
+@item message-send-rename-function
+@vindex message-send-rename-function
+发送消息后，缓冲区会从 @samp{*reply to Lars*} 重命名为 ⁣​​1⁣。  如果您不喜欢这样，请将此变量设置为以您喜欢的方式重命名缓冲区的函数。  如果您根本不想重命名缓冲区，您可以说：
+
+@lisp
+(setq message-send-rename-function 'ignore)
+@end lisp
+
+@item message-kill-buffer-on-exit
+@findex message-kill-buffer-on-exit
+如果非@code{nil}，则在退出时立即终止缓冲区。
+
+@end table
+
+
+@node Message Actions
+@section 消息操作
+
+当新闻/邮件阅读器使用消息时，阅读器可能希望在消息发送后执行某些任务。  也许返回到以前的窗口配置或将文章标记为已回复。
+
+@vindex message-kill-actions
+@vindex message-postpone-actions
+@vindex message-exit-actions
+@vindex message-send-actions
+用户可以通过多种方式退出消息缓冲区。  最常见的是@kbd{C-c C-c}，它发送消息并退出。  其他可能性是@kbd{C-c C-s}，它只发送消息，@kbd{C-c C-d}，它推迟消息编辑并隐藏消息缓冲区，以及@kbd{C-c C-k}，它杀死消息缓冲区。  每个操作都有与之关联的列表，其中包含要执行的操作：@code{message-send-actions}、@code{message-exit-actions}、@code{message-postpone-actions} 和 @code{message-kill-actions}。
+
+Message 提供了与这些列表交互的函数：@code{message-add-action}。  第一个参数是要添加的操作，其余参数是要将此操作添加到的列表。  这是 Gnus 的一个例子：
+
+@lisp
+  (message-add-action
+   `(set-window-configuration ,(current-window-configuration))
+   'exit 'postpone 'kill)
+@end lisp
+
+当消息缓冲区被终止、推迟或退出时，这会恢复 Gnus 窗口配置。
+
+@dfn{action} 可以是：普通函数，或者列表，其中 @sc{car} 是函数，@sc{cdr} 是参数列表，或者要进行 @code{eval}ed 的形式。
+
+
+@node Appendices
+@chapter 附录
+
+@menu
+* Responses::           用于确定响应去向的标准规则。
+@end menu
+
+
+@node Responses
+@section 回应
+
+为了确定消息的去向，默认使用以下算法。
+
+@table @dfn
+@item 回复
+A @dfn{reply} 是指您想要回复 @emph{just} 通过邮件发送消息的人。  只有一名收件人。  为了确定收件人是谁，将依次查阅以下标头：
+
+@table @code
+@item Reply-To
+
+@item From
+@end table
+
+
+@item wide reply
+@dfn{wide reply} 是邮件响应，其中包含您正在响应的消息中提到的 @emph{all} 实体。  以下标头中的所有邮箱将连接起来形成传出 @code{To}/@code{CC} 标头：
+
+@table @code
+@item From
+（除非有 @code{Reply-To}，在这种情况下则使用 @code{Reply-To}）。
+
+@item CC
+
+@item To
+@end table
+
+如果存在 @code{Mail-Copies-To} 标头，它也将包含在邮箱列表中。  如果此标头为@samp{never}，则意味着@code{From}（或@code{Reply-To}）邮箱将被抑制。
+
+
+@item followup
+A @dfn{followup} 是通过消息发送的响应。  以下标头（按优先顺序列出）确定响应的发送位置：
+
+@table @code
+
+@item Followup-To
+
+@item Newsgroups
+
+@end table
+
+如果存在 @code{Mail-Copies-To} 标头，它将用作新 @code{CC} 标头的基础，除非该标头是 @samp{never}。
+
+@end table
+
+
+@node GNU Free Documentation License
+@chapter GNU 自由文档许可证
+@include doclicense.texi
+
+@node Index
+@chapter 指数
+@printindex cp
+
+@node Key Index
+@chapter 关键指标
+@printindex ky
+
+@bye
+
+@c End:

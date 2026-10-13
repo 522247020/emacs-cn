@@ -1,0 +1,231 @@
+\输入 texinfo.tex
+
+@setfilename ../../info/mairix-el.info
+@settitle Mairix 的 Emacs 界面
+@documentlanguage en
+@include docstyle.texi
+
+@copying
+版权所有 @copyright{} 2008--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs network features
+@direntry
+* Mairix: (mairix-el).           Mairix 邮件索引器的 Emacs 界面。
+@end direntry
+
+@titlepage
+@title mairix.el---Emacs 的 Mairix 接口
+
+@author David Engster
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@node Top
+@top mairix.el---Emacs 的 Mairix 接口
+
+Mairix 是一种用于在本地存储的邮件中索引和搜索单词的工具。  它由 Richard Curnow 编写，并根据 GPL 获得许可。
+
+@code{mairix.el} 是 mairix 搜索引擎的接口。  它允许您使用搜索词调用 mairix，根据当前显示的邮件轻松创建搜索，将经常使用的搜索保存在您的 @file{.emacs} 中以供将来使用，并允许您调用 mairix 来更新数据库。
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* About::                        关于 mairix 搜索引擎和 mairix.el。
+* Configuring mairix::           如何配置 mailix。
+* Setting up the mairix interface::  设置 mailix.el。
+* Using::                        交互功能列表
+* Extending::                    支持您最喜欢的邮件阅读器！
+* GNU Free Documentation License::   本文档的许可证。
+* Function Index:               Function Index.
+* Variable Index:               Variable Index.
+@end menu
+
+@node About
+@chapter 关于 mairix 和 mairix.el
+
+Mairix 是一种用于在本地存储的邮件中索引和搜索单词的工具。  它由 Richard Curnow 编写，并获得 GPL@. 许可。Mairix 附带最流行的 GNU/Linux 发行版，但它也可以在 Windows（使用 Cygwin）、macOS 和 Solaris 下运行。  该网站可以在@uref{http://www.rpcurnow.force9.co.uk/mairix/index.html}找到
+
+尽管 mairix 可能不像 swish++ 或 namazu 等其他搜索工具那么灵活，但它的主要优势是速度令人难以置信。在当前系统上，它可以在一秒钟之内轻松搜索成千上万封邮件的标题和消息正文。构建搜索所需的数据库可能需要一两分钟，但只需完整完成一次。  之后，更新会逐步完成，因此速度也非常快。  此外，mairix 的设置非常简单。
+
+Mairix 通过使用指向“真实”消息文件的符号链接填充 @emph{virtual} maildir/MH 文件夹来显示搜索结果，或者如果使用 mbox，它会创建一个新的 mbox 文件，其中包含找到的消息的副本。
+
+@code{mairix.el} 是 mairix 搜索引擎的接口。  它允许您使用搜索词调用 mairix，根据当前显示的邮件轻松创建搜索，将经常使用的搜索保存在您的 @file{.emacs} 中以供将来使用，并允许您调用 mairix 来更新数据库。  它还允许您使用图形小部件轻松创建搜索查询，类似于自定义缓冲区。
+
+目前，@code{mairix.el} 仅使用 mbox 输出与 RMail、Gnus 或 VM 作为 Emacs 邮件程序进行测试。  然而，它也应该与 Maildir 或 MH 一起使用，并且应该很容易将其他 Emacs 邮件程序集成到 @code{mairix.el} (@pxref{Extending}) 中。
+
+如果您将 Gnus 与 maildir 或 MH 一起使用，您实际上应该使用本机 Gnus 后端 @code{nnmairix}，因为它更紧密地集成到 Gnus 中并且具有更多功能。
+
+@node Configuring mairix
+@chapter 配置邮箱
+
+设置 mairix 很简单：只需创建一个包含（至少）以下条目的 @file{.mairixrc} 文件：
+
+@example
+# Your mail base folder
+base=~/Mail
+@end example
+
+这是您邮件的基本文件夹。  除数据库目录外，以下所有目录都与此基本文件夹相关。
+
+@example
+mbox = ... your mbox files which should be indexed ...
+maildir= ... your maildir folders which should be indexed ...
+mh= ... your nnml/mh folders which should be indexed ...
+@end example
+
+指定您想要使用 mairix 建立索引的所有 maildir/nnml 文件夹和 mbox 文件（相对于基本目录！）。  使用冒号分隔不同的文件。  有关详细信息，请参阅 @code{mairixrc} 的手册页。
+
+@example
+mformat = mbox
+database = ... location of database file ...
+@end example
+
+这将选择 @code{mbox} 作为 mairix 搜索结果的输出格式。  目前，这是 mairix.el 支持的格式，但从技术上讲，也应该可以使用 maildir 或 mh；只是还没有经过测试。
+
+您应该确保不会意外地将 mairix 生成的搜索结果编入索引。  这可以通过将 @code{mairix-file-path} 指向一个肯定不会被 mairix 索引的目录来完成。另一种可能性是使用类似的东西
+
+@example
+omit = mairix*
+@end example
+
+在 @file{.mairixrc} 文件中，并为您使用的每个搜索文件添加前缀“mairix”。
+
+@example
+database = /home/user/.mairixdatabase
+@end example
+
+这指定数据库文件的名称。  请注意，这与 @code{base} 文件夹无关。
+
+有关详细信息和更多选项，请参阅 @code{mairixrc} 的手册页，特别是有关通配符的使用，这可能与您习惯的稍有不同。
+
+现在只需调用 @code{mairix} 即可首次创建索引。请注意，这可能需要几分钟，但每个后续索引都会增量更新，因此速度非常快。
+
+@node Setting up the mairix interface
+@chapter 设置 mailix 接口
+
+首先，将 @code{mairix.el} 放入 Emacs 搜索路径中，并将 @code{(require 'mairix)} 放入 @file{.emacs} 文件中。  然后，使用 @kbd{M-x customize-group @key{RET} mairix @key{RET}} 设置您对 mairix.el 的首选项。  最重要的项目是@emph{Mairix File Path}、@emph{Mairix Search File} 和@emph{Mairix Mail Program}。后者指定应使用哪个邮件程序来显示 mairix 搜索结果。  目前，支持 RMail、带有 mbox 文件的 Gnus 和 VM。  如果您将 Gnus 与 maildir 或 mh 一起使用，请改用本机 Gnus 后端 nnmairix。
+
+如果您使用其他尚未被 mairix.el 支持的 Emacs 邮件程序，那么集成它是非常容易的。  @xref{Extending}，关于如何将其集成到 mairix.el 中。
+
+现在您应该准备好出发了。 @xref{Using}，用于可用命令。
+
+@node Using
+@chapter 使用 mailix.el
+
+目前 mairix.el 没有默认的键绑定，因为这些应该取决于所使用的邮件程序，而且我个人不使用 RMail，所以我不知道哪些键绑定是合理的。  我希望有一天这种情况会改变，并且 @code{mairix.el} 将为不同的邮件程序提供一些好的按键绑定。  请随时向我发送您的建议。  在那之前，您自己定义一些绑定。  这是一个快速而肮脏的解决方案，其中包含我当前使用的全局键定义，它可能会也可能不会与其他一些模式发生冲突。  只需将它们包含在您的 @file{.emacs} 中并适应您的需求：
+
+@lisp
+(keymap-global-set "C-c C-o m" 'mairix-search)
+(keymap-global-set "C-c C-o w" 'mairix-widget-search)
+(keymap-global-set "C-c C-o u" 'mairix-update-database)
+(keymap-global-set "C-c C-o f" 'mairix-search-from-this-article)
+(keymap-global-set "C-c C-o t" 'mairix-search-thread-this-article)
+(keymap-global-set "C-c C-o b" 'mairix-widget-search-based-on-article)
+(keymap-global-set "C-c C-o s" 'mairix-save-search)
+(keymap-global-set "C-c C-o i" 'mairix-use-saved-search)
+(keymap-global-set "C-c C-o e" 'mairix-edit-saved-searches)
+@end lisp
+
+以下是可用交互功能的说明：
+
+@table @code
+
+@item mairix-search
+@findex mairix-search
+@vindex mairix-search-file
+@vindex mairix-file-path
+@vindex mairix-command
+@vindex mairix-search-options
+使用搜索查询调用 mairix。  系统还会询问您是否要包含整个线程。  结果由 mairix 保存在默认邮件文件中，该文件通过变量 @code{mairix-search-file} 设置，该变量再次以 @code{mairix-file-path} 为前缀。  结果将与所选邮件程序一起显示。  用于调用 mairix 的命令由变量 @code{mairix-command} 以及选项 @code{mairix-search-options} 指定。  后者具有默认的 @option{-F} 以使搜索速度更快。
+
+@item mairix-widget-search
+@findex mairix-widget-search
+@vindex mairix-widget-fields-list
+使用图形小部件创建 mairix 查询。  如果您（尚）不熟悉 mairix 搜索语法，那么这将非常方便。  只需调用它即可查看它是如何工作的。  然后，您可以使用搜索词直接调用 mairix 或保存它以供将来使用。  由于 mairix 允许几乎任意的搜索命令组合（例如“tc”代表“to 或 cc”），因此您可能需要包含一些其他字段。  这可以通过修改 @code{mairix-widget-fields-list} 轻松完成。
+
+@item mairix-widget-search-based-on-article
+@findex mairix-widget-search-based-on-article
+使用图形小部件创建 mairix 查询，但基于当前显示的文章，即可用字段将填充当前标题值。
+
+@item mairix-search-from-this-article
+@findex mairix-search-from-this-article
+搜索来自当前文章发件人的邮件。  这实际上是用 @code{f:current_from} 调用 @code{mairix-search} 的快捷方式。如果与前缀一起使用，请包含找到的消息的整个线程。
+
+@item mairix-search-thread-this-article
+@findex mairix-search-thread-this-article
+搜索当前文章的线索。  这实际上是使用当前文章的 @code{m:msgid} 调用 @code{mairix-search} 并启用线程的快捷方式。
+
+@item mairix-save-search
+@findex mairix-save-search
+保存上次搜索以供将来使用。  您必须指定搜索名称，然后系统会询问您是否要将已保存的搜索保存在@file{.emacs}中。  如果您回答“是”，则变量 @code{mairix-saved-searches} 将保存在 @file{.emacs} 的自定义部分中。  您也可以稍后使用 @code{mairix-edit-saved-searches} 执行此操作。
+
+@item mairix-use-saved-search
+@findex mairix-use-saved-search
+使用之前保存的搜索呼叫 mairix。  系统将要求您输入已保存搜索的名称（使用 @kbd{TAB} 完成）。
+
+@item mairix-edit-saved-searches
+@findex mairix-edit-saved-searches
+编辑您当前的邮箱搜索。  这是一个简单的主要模式，用于编辑变量@code{mairix-saved-searches}的内容。  您可以编辑和删除搜索并将其保存在您的 @file{.emacs}.  您还可以使用此模式通过保存的搜索之一呼叫 mairix。此外，您还可以为 mairix 指定用于特定搜索的文件名，而不是默认的文件名。  如果您想同时打开不同的搜索，或者您想定期访问某些搜索而不需要调用 mairix，这非常有用。
+
+@item mairix-edit-saved-searches-customize
+@findex mairix-edit-saved-searches-customize
+在普通自定义缓冲区中编辑变量 @code{mairix-saved-searches}。  这个功能的存在或多或少有历史原因，但也许你喜欢它。
+
+@item mairix-update-database
+@findex mairix-update-database
+@vindex mairix-update-options
+@vindex mairix-synchronous-update
+调用 mailix 更新数据库。  将使用选项 @code{mairix-update-options} 调用 Mailix；默认值为 @option{-F} 和 @option{-Q} 以尽可能快地进行更新。  请注意，通过使用这些选项，绝对不会进行完整性检查。  如果您的数据库因某种原因损坏，只需将其删除并更新即可。  如果 @code{mairix-synchronous-update} 是 @code{nil}（默认值），mairix 将在子进程中调用，因此在更新完成时 Emacs 仍然可用。
+
+@end table
+
+
+@node Extending
+@chapter 扩展 mailix.el
+
+您最喜欢的 Emacs 邮件程序不受支持？  我真丢脸。  但将其他邮件程序集成到 mairix.el 中确实很容易。  只需执行以下操作：
+
+@table @strong
+@item 写一个显示函数
+编写一个显示 mairix 搜索结果的函数。  该函数将从 @code{mairix.el} 调用，并将邮件文件/文件夹作为单个参数。  例如，函数@code{mairix-rmail-display}当前用于RMail，@code{mairix-gnus-ephemeral-nndoc}用于Gnus。
+
+@item 编写一个获取头函数
+编写一个函数，从当前活动的邮件中检索标题。该函数的单个参数是带有标头名称的字符串。例如，请分别参阅 RMail 和 Gnus 的 @code{mairix-rmail-fetch-field} 和 @code{mairix-gnus-fetch-field}。
+
+@item 将功能集成到mairix.el中
+将您的邮件程序添加到@code{mairix-mail-program}的默认设置中。然后将函数添加到@code{mairix-display-functions}和@code{mairix-get-mail-header-functions}。
+
+@item 让我知道...
+...以便我最终可以将其集成到 mairix.el 的未来版本中。
+@end table
+
+就是这样！
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Function Index
+@unnumbered 功能索引
+
+@printindex fn
+
+@node Variable Index
+@unnumbered 变量索引
+
+@printindex vr
+
+@bye

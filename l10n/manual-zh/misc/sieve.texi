@@ -1,0 +1,322 @@
+\输入 texinfo @c -*-texinfo-*-
+
+@setfilename ../../info/sieve.info
+@settitle Emacs 筛选手册
+@documentlanguage en
+@include docstyle.texi
+@synindex fn cp
+@synindex vr cp
+@synindex pg cp
+
+@copying
+此文件记录了用于服务器端邮件过滤的 Emacs Sieve 包。
+
+版权所有 @copyright{} 2001--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs network features
+@direntry
+* Sieve: (sieve).                在 Emacs 中管理 Sieve 脚本。
+@end direntry
+@iftex
+@finalout
+@end iftex
+@setchapternewpage odd
+
+@titlepage
+@ifset WEBHACKDEVEL
+@title Emacs Sieve 手册（开发版）
+@end ifset
+@ifclear WEBHACKDEVEL
+@title Emacs 筛选手册
+@end ifclear
+
+@author by Simon Josefsson
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@summarycontents
+@contents
+
+@node Top
+@top Emacs 的 Sieve 支持
+
+本书旨在作为 Sieve 模式和管理 Sieve 的用户手册，以及 @samp{sieve-manage} 协议 Emacs Lisp API 的参考手册。
+
+Sieve 是一种用于服务器端邮件过滤的语言。  该语言记录在 RFC 3028 中。本手册并不尝试记录该语言，因此请保留 RFC 3028。
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* Installation::           准备使用该包。
+* Sieve Mode::             编辑 Sieve 脚本。
+* Managing Sieve::         在远程服务器上管理 Sieve 脚本。
+* Examples ::              一些 Sieve 代码片段。
+* Manage Sieve API ::      连接到管理筛协议 API。
+* Standards::              使用的 RFC 和工作文档的摘要。
+* GNU Free Documentation License::  本文档的许可证。
+* Index::                  函数和变量索引。
+@end menu
+
+
+@node Installation
+@chapter 安装
+@cindex Install
+@cindex Setup
+
+Sieve 包应该随您的 Emacs 版本一起提供，并且应该可以直接使用。
+
+但是，要手动设置包，您可以将以下命令放入 @code{~/.emacs} 中：
+
+@lisp
+(autoload 'sieve-mode "sieve-mode")
+@end lisp
+@lisp
+(setq auto-mode-alist (cons '("\\.s\\(v\\|iv\\|ieve\\)\\'" . sieve-mode)
+                            auto-mode-alist))
+@end lisp
+
+
+@node Sieve Mode
+@chapter 筛分模式
+
+Sieve 模式提供基于语法的缩进、字体锁定支持和其他方便的功能，使编辑 Sieve 脚本变得更加容易。
+
+使用 @samp{M-x sieve-mode} 切换到该主要模式。  该命令运行钩子@code{sieve-mode-hook}。
+
+@vindex sieve-mode-map
+@vindex sieve-mode-syntax-table
+Sieve 模式源自@code{c-mode}，除了注释语法之外，其他都非常相似。  键映射 (@code{sieve-mode-map}) 继承自@code{c-mode}，用于自定义缩进的变量也是如此。  Sieve 模式有自己的缩写表 (@code{sieve-mode-abbrev-table}) 和语法表 (@code{sieve-mode-syntax-table})。
+
+除了编辑实用程序功能之外，Sieve 模式还包含远程管理 Sieve 脚本的绑定。 @xref{Managing Sieve}。
+
+@table @kbd
+
+@item C-c @key{RET}
+@kindex C-c RET
+@findex sieve-manage
+@cindex manage remote sieve script
+使用 Manage Sieve 协议打开与远程服务器的连接。
+
+@item C-c C-l
+@kindex C-c C-l
+@findex sieve-upload
+@cindex upload sieve script
+将 Sieve 脚本上传到当前打开的服务器。
+
+@end table
+
+
+@node Managing Sieve
+@chapter 管理筛子
+
+管理 Sieve 是一种特殊模式，用于显示远程服务器上可用的 Sieve 脚本。  可以使用 @kbd{M-x sieve-manage RET} 调用它，它会向用户查询服务器，并在必要时查询要使用的用户凭据。
+
+成功联系服务器后，管理 Sieve 缓冲区如下所示：
+
+@example
+Server  : mailserver:sieve
+
+2 scripts on server, press RET on a script name edits it, or
+press RET on <new script> to create a new script.
+        <new script>
+ ACTIVE .sieve
+        template.siv
+@end example
+
+其中一个脚本会突出显示，并且可以使用标准点导航命令（@kbd{@key{UP}}、@kbd{@key{DOWN}} 等）@: 来导航列表。
+
+管理筛缓冲区中提供以下命令：
+
+@table @kbd
+
+@item m
+@kindex m
+@findex sieve-activate
+激活当前突出显示的脚本。
+
+@item u
+@kindex u
+@findex sieve-deactivate
+停用当前突出显示的脚本。
+
+@item C-M-?
+@kindex C-M-?
+@findex sieve-deactivate-all
+停用所有脚本。
+
+@item r
+@kindex r
+@findex sieve-remove
+删除当前突出显示的脚本。
+
+@item @key{RET}
+@item mouse-2
+@item f
+@kindex RET
+@kindex mouse-2
+@kindex f
+@findex sieve-edit-script
+隐藏服务器缓冲区并将当前突出显示的脚本下载到新缓冲区中，以便在 Sieve 模式 (@pxref{Sieve Mode}) 下进行编辑。
+
+@item o
+@kindex o
+@findex sieve-edit-script-other-window
+在另一个窗口中创建一个新缓冲区，其中包含当前突出显示的脚本，以便在 Sieve 模式 (@pxref{Sieve Mode}) 下进行编辑。
+
+@item q
+@kindex q
+@findex sieve-bury-buffer
+隐藏管理筛缓冲区而不关闭连接。
+
+@item ?
+@item h
+@kindex ?
+@kindex h
+@findex sieve-help
+显示迷你缓冲区中的帮助。
+
+@item g
+@kindex g
+@findex sieve-refresh-scriptlist
+刷新当前打开的服务器上找到的脚本列表。更新当前筛选缓冲区的内容。
+
+@item Q
+@kindex Q
+@findex sieve-manage-quit
+退出 Manage Sieve 并关闭连接。
+
+@end table
+
+@node Examples
+@chapter 示例
+
+如果您不熟悉 Sieve，本章包含一些简单的代码片段，您可以随意剪切粘贴和修改，直到您更习惯使用 Sieve 语言从头开始编写规则。
+
+以下完整的 Sieve 脚本将所有具有匹配 @samp{Sender:} 标头的邮件放入给定邮箱中。  许多邮件列表都使用这种格式。  第一行确保您的 Sieve 服务器理解 @code{fileinto} 命令。
+
+@example
+require "fileinto";
+
+if address "sender" "emacs-devel@@gnu.org" @{
+        fileinto "INBOX.emacs-devel";
+@}
+@end example
+
+一些邮件列表不使用 @samp{Sender:} 标头，但在其他标头中具有唯一标识符。  以下不是完整的脚本，它假设已经需要 @code{fileinto} 。
+
+@example
+if header :contains "Delivered-To" "auc-tex@@sunsite.dk" @{
+        fileinto "INBOX.auc-tex";
+@}
+@end example
+
+最后，我们的邮件列表毫无希望，没有任何唯一标识符，您被迫匹配 @samp{To:} 和 @samp{Cc} 标头。  和之前一样，此代码片段假设需要 @code{fileinto}。
+
+@example
+if address ["to", "cc"] "kerberos@@mit.edu" @{
+        fileinto "INBOX.kerberos";
+@}
+@end example
+
+@node Manage Sieve API
+@chapter 管理筛选 API
+
+@file{sieve-manage.el} 库包含使用 @sc{managesieve} 协议与服务器通信的低级功能。
+
+存在许多用户可见的变量，所有这些变量都可以在 @code{sieve} 组 (@kbd{M-x customize-group @key{RET} sieve @key{RET}}) 中自定义：
+
+@table @code
+
+@item sieve-manage-default-port
+@vindex sieve-manage-default-port
+设置要使用的默认端口，建议端口号为@code{2000}。
+
+@item sieve-manage-log
+@vindex sieve-manage-log
+如果非@code{nil}，则应该是一个字符串，命名转储协议跟踪的缓冲区（用于调试目的）。
+
+@end table
+
+API 函数包括：
+
+@table @code
+
+@item sieve-manage-open
+@findex sieve-manage-open
+打开与managesieve服务器的连接，返回一个供所有其他API函数使用的缓冲区。
+
+@item sieve-manage-opened
+@findex sieve-manage-opened
+检查服务器是否打开。
+
+@item sieve-manage-close
+@findex sieve-manage-close
+关闭服务器连接。
+
+@item sieve-manage-authenticate
+@findex sieve-manage-authenticate
+向服务器进行身份验证。
+
+@item sieve-manage-capability
+@findex sieve-manage-capability
+返回服务器支持的功能列表。
+
+@item sieve-manage-listscripts
+@findex sieve-manage-listscripts
+列出服务器上的脚本。
+
+@item sieve-manage-havespace
+@findex sieve-manage-havespace
+如果服务器有空间容纳给定大小的脚本，则返回非@code{nil}。
+
+@item sieve-manage-getscript
+@findex sieve-manage-getscript
+从服务器下载脚本。
+
+@item sieve-manage-putscript
+@findex sieve-manage-putscript
+将脚本上传到服务器。
+
+@item sieve-manage-setactive
+@findex sieve-manage-setactive
+指示服务器上的哪个脚本应处于活动状态。
+
+@end table
+
+@node Standards
+@chapter 标准
+
+Emacs Sieve 包实现了少量但有望不断增长的 RFC 和草案文档的全部或部分。  本章列出了相关内容。  它们都可以从@uref{https://quimby.gnus.org/notes/}获取。
+
+@table @dfn
+
+@item RFC3028
+Sieve：一种邮件过滤语言。
+
+@item RFC5804
+远程管理 Sieve 脚本的协议
+
+@end table
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Index
+@unnumbered 指数
+@printindex cp
+
+@bye
+
+@c End:

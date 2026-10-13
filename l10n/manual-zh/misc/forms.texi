@@ -1,0 +1,732 @@
+\输入 texinfo @c -*-texinfo-*-
+@c documentation for forms-mode
+@c Written by Johan Vromans, and edited by Richard Stallman
+
+@comment %**start of header (This is for running Texinfo on a region.)
+@setfilename ../../info/forms.info
+@settitle 表单模式用户手册
+@documentlanguage en
+@include docstyle.texi
+@include emacsver.texi
+@syncodeindex vr cp
+@syncodeindex fn cp
+@syncodeindex ky cp
+@iftex
+@finalout
+@setchapternewpage odd
+@end iftex
+@c      @smallbook
+@comment %**end of header (This is for running Texinfo on a region.)
+
+@copying
+该文件记录了表单模式，这是 GNU Emacs 的表单编辑主要模式。
+
+版权所有 @copyright{} 1989, 1997, 2001--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* Forms: (forms).                用于通过填写表单来编辑数据库的 Emacs 包。
+@end direntry
+
+@titlepage
+@sp 6
+@center @titlefont{Forms Mode User's Manual}
+@sp 4
+@center Forms-Mode version 2
+@sp 1
+@center for GNU Emacs @value{EMACSVER}
+@sp 1
+@center April 2007
+@sp 5
+@center Johan Vromans
+@center @i{jvromans@@squirrel.nl}
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top Forms Mode
+
+Forms mode is an Emacs major mode for working with simple textual data
+bases in a forms-oriented manner.  In Forms mode, the information in
+these files is presented in an Emacs window in a user-defined format,
+one record at a time.  The user can view records or modify their
+contents.
+
+Forms mode is not a simple major mode, but requires two files to do its
+job: a control file and a data file.  The data file holds the
+actual data to be presented.  The control file describes
+how to present it.
+
+@insertcopying
+
+@menu
+* Forms Example::               An example: editing the password data base.
+* Entering and Exiting Forms Mode::
+                                How to visit a file in Forms mode.
+* Forms Commands::              Special commands to use while in Forms mode.
+* Data File Format::            How to format the data file.
+* Control File Format::         How to control forms mode.
+* Format Description::          How to define the forms layout.
+* Modifying Forms Contents::    How to modify.
+* Miscellaneous::               Forms mode messages and other remarks.
+* Error Messages::              List of error messages forms mode can produce.
+* Long Example::                A more complex control file example.
+* Credits::                     Thanks everyone.
+* GNU Free Documentation License:: The license for this documentation.
+* Index::                       Index to this manual.
+@end menu
+@end ifnottex
+
+@node Forms Example
+@chapter 表格示例
+
+让我们用一个例子来说明表单模式。  假设您正在查看 @file{/etc/passwd} 文件，屏幕如下所示：
+
+@example
+====== /etc/passwd ======
+
+User : root   Uid: 0   Gid: 1
+
+Name : Super User
+
+Home : /
+
+Shell: /bin/sh
+@end example
+
+正如您所看到的，超级用户条目中熟悉的字段都在那里，但它们不是用冒号分隔在一行上，而是组成了一个表单。
+
+表单的内容由记录字段的内容（例如，@samp{root}、@samp{0}、@samp{1}、@samp{Super User}）和散布的普通文本（例如，@samp{User : }、@samp{Uid: }）组成。
+
+如果您修改字段的内容，表单模式将分析您的更改并相应地更新文件。  您无法修改散布的解释性文本（除非您为此遇到麻烦），因为它被标记为只读（@pxref{Text Properties,,, elisp, The Emacs Lisp Reference Manual}）。
+
+表单模式控制文件指定 @file{/etc/passwd} 的格式与表单模式下屏幕上显示的内容之间的关系。  @xref{Control File Format}。
+
+@node Entering and Exiting Forms Mode
+@chapter 进入和退出表单模式
+
+@table @kbd
+@findex forms-find-file
+@item M-x forms-find-file @key{RET} @var{control-file} @key{RET}
+使用表单模式访问数据库。  指定 @strong{control file} 的名称，而不是数据文件！
+
+@findex forms-find-file-other-window
+@item M-x forms-find-file-other-window @key{RET} @var{control-file} @key{RET}
+类似，但在另一个窗口中显示文件。
+@end table
+
+命令 @code{forms-find-file} 评估文件 @var{control-file}，并在表单模式下访问它。  您在其缓冲区中看到的不是该文件的内容，而是在其自己的缓冲区中访问的相应数据文件的单个记录。  因此，表单模式涉及两个缓冲区：最初用于访问控制文件并显示正在浏览的记录的@dfn{forms buffer}，以及保存正在访问的数据文件的@dfn{data buffer}。  后一个缓冲区通常不可见。
+
+最初，第一条记录显示在表单缓冲区中。模式行显示主模式名称@samp{Forms}，如果数据库是只读的，则显示次要模式@samp{View}。  当前记录的数量 (@var{n}) 和文件中的记录总数 (@var{t}) 在模式行中显示为 @samp{@var{n}/@var{t}}。  例如：
+
+@example
+--%%-Emacs: passwd-demo          (Forms View 1/54)----All-------
+@end example
+
+如果缓冲区不是只读的，您可以更改缓冲区以修改记录中的字段。  当您移动到不同的记录时，将使用@code{forms-format-list}中的规范解析缓冲区的内容，并更新数据文件。  如果记录中包含未包含在显示中的字段，则它们不会更改。
+
+@vindex forms-mode-hook
+进入表单模式运行普通钩子@code{forms-mode-hook}来执行用户定义的定制。
+
+要保存任何修改的数据，您可以使用@kbd{C-x C-s} (@code{forms-save-buffer})。  这不会保存表单缓冲区（这将毫无用处），而是保存访问数据文件的缓冲区。
+
+要终止表单模式，您可以使用@kbd{C-x C-s} (@code{forms-save-buffer})，然后终止表单缓冲区。  但是，数据缓冲区仍将保留。  如果这不是你想要的，你也必须杀死这个缓冲区。
+
+@node Forms Commands
+@chapter 表单命令
+
+表单模式的命令属于 @kbd{C-c} 前缀，但有一个例外：@key{TAB}，它移动到下一个字段。  表单模式对正常模式和只读模式使用不同的键映射。  在只读表单模式下，您可以访问大多数不带 @kbd{C-c} 前缀的命令，但您必须键入普通字母而不是控制字符；例如，输入 @kbd{n} 而不是 @kbd{C-c C-n}。
+
+如果您的 Emacs 是使用 X-toolkit 支持构建的，则表单模式将提供其自己的菜单，其中包含许多表单模式命令。
+
+@table @kbd
+@findex forms-next-record
+@kindex C-c C-n
+@item C-c C-n
+显示下一条记录 (@code{forms-next-record})。  使用数字参数 @var{n}，显示下一条@var{n}记录。
+
+@findex forms-prev-record
+@kindex C-c C-p
+@item C-c C-p
+显示上一条记录 (@code{forms-prev-record})。  使用数字参数 @var{n}，显示第 @var{n} 条先前记录。
+
+@findex forms-jump-record
+@kindex C-c C-l
+@item C-c C-l
+按编号跳转到记录 (@code{forms-jump-record})。   使用数字参数指定记录编号。
+
+@findex forms-first-record
+@kindex C-c <
+@item C-c <
+跳转到第一条记录 (@code{forms-first-record})。
+
+@findex forms-last-record
+@kindex C-c >
+@item C-c >
+跳转到最后一条记录 (@code{forms-last-record})。  此命令还会重新计算数据文件中的记录数。
+
+@findex forms-next-field
+@kindex TAB
+@item @key{TAB}
+@kindex C-c TAB
+@itemx C-c @key{TAB}
+跳转到当前记录中的下一个字段 (@code{forms-next-field})。使用数字参数 @var{n}，向前跳转 @var{n} 字段。  如果此命令移过最后一个字段，它将返回到第一个字段。
+
+@findex forms-toggle-read-only
+@kindex C-c C-q
+@item C-c C-q
+切换只读模式 (@code{forms-toggle-read-only})。  在只读表单模式下，您无法编辑字段；如果您使用普通字母（例如，键入 @kbd{n} 而不是 @kbd{C-c C-n}），则无需前缀 @kbd{C-c} 即可访问大多数表单模式命令。  在编辑模式下，您可以编辑字段，从而更改数据库的内容；您必须以 @code{C-c} 开始表单模式命令。  仅当您对数据文件具有写访问权限时才允许切换到编辑模式。
+
+@findex forms-insert-record
+@kindex C-c C-o
+@item C-c C-o
+创建一条新记录并将其插入到当前记录之前 (@code{forms-insert-record})。  它的字段内容一开始为空（或默认）；然后您可以编辑字段。  使用数字参数，将创建新记录 @emph{after} 当前记录。另请参见@ref{Modifying Forms Contents}中的@code{forms-modified-record-filter}。
+
+@findex forms-delete-record
+@kindex C-c C-k
+@item C-c C-k
+删除当前记录 (@code{forms-delete-record})。  除非提供了数字参数，否则在删除记录之前系统会提示您进行确认。
+
+@findex forms-search-forward
+@kindex C-c C-s @var{regexp} RET
+@item C-c C-s @var{regexp} @key{RET}
+在该记录之后的所有记录中向前搜索 @var{regexp} (@code{forms-search-forward})。  如果找到，则会显示该记录。如果给出空参数，则再次使用之前的正则表达式。
+
+@findex forms-search-backward
+@kindex C-c C-r @var{regexp} RET
+@item C-c C-r @var{regexp} @key{RET}
+在该记录之后的所有记录中向后搜索 @var{regexp} (@code{forms-search-backward})。  如果找到，则会显示该记录。如果给出空参数，则再次使用之前的正则表达式。
+
+@ignore
+@findex forms-exit
+@kindex C-c C-x
+@item C-c C-x
+Terminate Forms mode processing (@code{forms-exit}).  The data file is
+saved if it has been modified.
+
+@findex forms-exit-no-save
+@item M-x forms-exit-no-save
+Terminates forms mode processing without saving modified data first.
+@end ignore
+
+@findex forms-prev-field
+@item M-x forms-prev-field
+与@code{forms-next-field}类似，但向后移动。
+
+@findex forms-save-buffer
+@item M-x forms-save-buffer
+@kindex C-x C-s
+@itemx C-x C-s
+表单模式替换 @code{save-buffer}。  当在表单缓冲区中执行时，它将保存（修改后的）数据缓冲区的内容。  在表单模式下，该函数将绑定到@kbd{C-x C-s}。
+
+@findex forms-print
+@item M-x forms-print
+该命令可用于对数据文件的内容进行格式化打印。
+
+@end table
+
+此外，命令 @kbd{M-x revert-buffer} 在表单模式下非常有用，就像在其他模式下一样。
+
+@ignore
+@vindex forms-forms-scroll
+@findex scroll-up
+@findex scroll-down
+If the variable @code{forms-forms-scrolls} is set to a value other
+than @code{nil} (which it is, by default), the Emacs functions
+@code{scroll-up} and @code{scroll-down} will perform a
+@code{forms-next-record} and @code{forms-prev-record} when in forms
+mode.  So you can use your favorite page commands to page through the
+data file.
+
+@vindex forms-forms-jump
+@findex beginning-of-buffer
+@findex end-of-buffer
+Likewise, if the variable @code{forms-forms-jump} is not @code{nil}
+(which it is, by default), Emacs functions @code{beginning-of-buffer}
+and @code{end-of-buffer} will perform @code{forms-first-record} and
+@code{forms-last-record} when in forms mode.
+@end ignore
+
+以下功能键定义是在表单模式下设置的（无论是否只读）：
+
+@table @kbd
+@kindex NEXT
+@item @key{NEXT}
+形成下一条记录
+
+@kindex PRIOR
+@item @key{PRIOR}
+表格上一条记录
+
+@kindex BEGIN
+@item @key{BEGIN}
+表格第一记录
+
+@kindex END
+@item @key{END}
+表格最后记录
+
+@kindex S-TAB
+@findex forms-prev-field
+@item S-@key{TAB}
+表单上一个字段
+@end table
+
+@node Data File Format
+@chapter 数据文件格式
+
+@cindex record
+@cindex field
+@vindex forms-field-sep
+用于表单模式的文件非常简单——每个@dfn{record}（通常是一行）构成一个表单的内容。  每条记录由多个@dfn{fields}组成，每个@dfn{fields}之间由字符串@code{forms-field-sep}的值分隔，默认情况下为@code{"\t"}（制表符）。
+
+@vindex forms-read-file-filter
+@vindex forms-write-file-filter
+如果数据文件的格式不够合适，您可以定义过滤器函数@code{forms-read-file-filter}和@code{forms-write-file-filter}。当数据文件从磁盘读入数据缓冲区时，@code{forms-read-file-filter}被调用。  它对数据缓冲区进行操作，忽略只读保护。  当数据文件保存到磁盘时，调用@code{forms-write-file-filter}来取消@code{forms-read-file-filter}的效果。  保存后，再次调用@code{forms-read-file-filter}以准备数据缓冲区以供进一步处理。
+
+@cindex pseudo-newline
+@vindex forms-multi-line
+字段可能包含以多行形式显示在表单中的文本。这些行在字段中使用“伪换行符”分隔，该字符由字符串 @code{forms-multi-line} 的值定义。  它的默认值为@code{"\^k"}（Control-K 字符）。  如果设置为@code{nil}，则禁止多行字段。
+
+如果数据文件不存在，则会自动创建。
+
+@node Control File Format
+@chapter 控制文件格式
+
+@cindex control file
+表单模式@dfn{control file}有两个用途。  首先，它命名要使用的数据文件，并定义其格式和属性。  其次，它占用的 Emacs 缓冲区被表单模式用来显示表单。
+
+控制文件的内容被评估为 Lisp 程序。  它应该将以下 Lisp 变量设置为合适的值：
+
+@table @code
+@vindex forms-file
+@item forms-file
+该变量指定数据文件的名称。  例子：
+
+@example
+(setq forms-file "my/data-file")
+@end example
+
+如果控制文件未设置@code{forms-file}，表单模式会报告错误。
+
+@vindex forms-format-list
+@item forms-format-list
+该变量描述记录字段在屏幕上的格式化方式。  详情请参见@ref{Format Description}。
+
+@vindex forms-number-of-fields
+@item forms-number-of-fields
+该变量保存数据文件每条记录中的字段数。  例子：
+
+@example
+(setq forms-number-of-fields 10)
+@end example
+@end table
+
+如果控制文件未设置@code{forms-format-list}，则使用默认格式。  在这种情况下，表单模式将从数据文件中推断字段数，前提是该文件存在并且控制文件中未设置@code{forms-number-of-fields}。
+
+控制文件可以选择设置以下附加表单模式变量。  它们中的大多数都有适合大多数应用程序的默认值。
+
+@table @code
+@vindex forms-field-sep
+@item forms-field-sep
+该变量可用于指定分隔数据文件记录中的字段的字符串。  如果未设置，则默认为字符串 @code{"\t"} （制表符）。  例子：
+
+@example
+(setq forms-field-sep "\t")
+@end example
+
+@vindex forms-read-only
+@item forms-read-only
+如果该值非@code{nil}，则数据文件被视为只读。  （如果您无权写入数据文件，表单模式也会将其视为只读。）示例：
+
+@example
+(set forms-read-only t)
+@end example
+
+@vindex forms-multi-line
+@item forms-multi-line
+该变量指定允许多行字段的 @dfn{pseudo newline} 分隔符。  该分隔符位于字段内的“行”之间，因此，该字段实际上并不包含多行，但在表单模式下显示时会出现这种情况。  如果值为@code{nil}，则禁止多行文本字段。  伪换行符不能是@code{forms-field-sep}中包含的字符。
+
+默认值为 @code{"\^k"}，字符 Control-K@. 示例：
+
+@example
+(setq forms-multi-line "\^k")
+@end example
+
+@ignore
+@vindex forms-forms-scroll
+@item forms-forms-scroll
+@xref{Forms Mode Commands}, for details.
+
+@vindex forms-forms-jump
+@item forms-forms-jump
+@xref{Forms Mode Commands}, for details.
+@end ignore
+
+@findex forms-read-file-filter
+@item forms-read-file-filter
+该变量保存读入数据文件后要调用的函数的名称。这可用于将数据文件的内容转换为更适合表单处理的格式。如果是@code{nil}，则不调用任何函数。  例如，要维护 gzip 压缩的数据库：
+
+@example
+(defun gzip-read-file-filter ()
+  (shell-command-on-region (point-min) (point-max)
+                           "gzip -d" t t))
+(setq forms-read-file-filter 'gzip-read-file-filter)
+@end example
+
+@findex forms-write-file-filter
+@item forms-write-file-filter
+该变量保存在写出数据文件内容之前要调用的函数的名称。这可以用来消除 @code{forms-read-file-filter} 的影响。如果是@code{nil}，则不调用任何函数。  例子：
+
+@example
+(defun gzip-write-file-filter ()
+  (make-variable-buffer-local 'require-final-newline)
+  (setq require-final-newline nil)
+  (shell-command-on-region (point-min) (point-max)
+                           "gzip" t t))
+(setq forms-write-file-filter 'gzip-write-file-filter)
+@end example
+
+@findex forms-new-record-filter
+@item forms-new-record-filter
+该变量包含一个在创建新记录时调用的函数，以提供字段的默认值。  如果是@code{nil}，则不调用任何函数。 @xref{Modifying Forms Contents}，了解详情。
+
+@findex forms-modified-record-filter
+@item  forms-modified-record-filter
+该变量保存一个函数，每当修改记录时（即更新 Forms 数据文件之前）就会调用该函数。  如果是@code{nil}，则不调用任何函数。 @xref{Modifying Forms Contents}，了解详情。
+
+@findex forms-insert-after
+@item forms-insert-after
+如果此变量不是 @code{nil}，则会在当前记录 @emph{after} 上创建新记录。  此外，在访问文件时，初始位置将位于最后一条记录而不是第一个记录。
+
+@findex forms-check-number-of-fields
+@item forms-check-number-of-fields
+通常会检查每条记录是否包含正确数量的字段。在某些情况下，这可能是不可取的。如果该变量设置为@code{nil}，这些检查将被绕过。
+@end table
+
+@node Format Description
+@chapter 格式说明
+
+@vindex forms-format-list
+变量@code{forms-format-list}指定数据文件中数据的格式，以及如何转换数据以在表单模式下显示。它的值必须是 Forms 模式@dfn{formatting elements} 的列表，每个模式都可以是字符串、数字、Lisp 列表或计算结果为其中之一的 Lisp 符号。  格式化元素按照它们在列表中出现的顺序进行处理。
+
+@table @var
+@item string
+字符串格式化元素“按原样”插入到表单中，作为用户无法更改的文本。
+
+@item number
+数字元素选择记录的字段。  此时该字段的内容将插入到显示屏中。  字段编号从 1（一）开始计数。
+
+@item list
+作为列表的格式化元素指定函数调用。  每次显示记录时都会调用此函数，并将其结果（必须是字符串）插入到显示文本中。  该函数除了返回一个字符串之外什么也不做。
+
+@vindex forms-fields
+您调用的函数可以以变量@code{forms-fields}中的列表形式访问记录的字段。
+
+@item symbol
+用作格式化元素的符号应计算为字符串、数字或列表；该值被解释为格式化元素，如上所述。
+@end table
+
+如果记录不包含@code{forms-number-of-fields}中指定的字段数，则会打印警告消息。  多余的字段将被忽略，缺失的字段将设置为空。
+
+如本手册开头所示，显示 @file{/etc/passwd} 文件的控制文件可能如下所示：
+
+@example
+;; @r{This demo visits @file{/etc/passwd}.}
+
+(setq forms-file "/etc/passwd")
+(setq forms-number-of-fields 7)
+(setq forms-read-only t)                 ; @r{to make sure}
+(setq forms-field-sep ":")
+;; @r{Don't allow multi-line fields.}
+(setq forms-multi-line nil)
+
+(setq forms-format-list
+      (list
+       "====== /etc/passwd ======\n\n"
+       "User : "    1
+       "   Uid: "   3
+       "   Gid: "   4
+       "\n\n"
+       "Name : "    5
+       "\n\n"
+       "Home : "    6
+       "\n\n"
+       "Shell: "    7
+       "\n"))
+@end example
+
+当您构造 @code{forms-format-list} 的值时，通常应该引用整个值，如下所示，
+
+@example
+(setq forms-format-list
+     '(
+       "====== " forms-file " ======\n\n"
+       "User : "    1
+       (make-string 20 ?-)
+       @dots{}
+      ))
+@end example
+
+@noindent
+或者引用列表元素，如下所示：
+
+@example
+(setq forms-format-list
+      (list
+       "====== " forms-file " ======\n\n"
+       "User : "    1
+       '(make-string 20 ?-)
+       @dots{}
+      ))
+@end example
+
+当您访问数据库时，表单模式会验证 @code{forms-format-list} 的内容。  如果出现错误，处理将中止，并显示一条包含描述性文本的错误消息。  @xref{Error Messages}，查看错误消息的详细列表。
+
+如果未指定 @code{forms-format-list}，表单模式将提供默认格式列表。  该列表包含正在访问的文件的名称，以及每个字段的简单标签，指示字段编号。
+
+@node Modifying Forms Contents
+@chapter 修改表单内容
+
+如果@code{forms-read-only}为@code{nil}，则用户可以修改数据库的字段和记录。
+
+所有普通编辑命令都可用于编辑显示记录的内容。  您无法删除或修改来自字符串格式化元素的固定解释性文本，但可以修改实际字段内容。
+
+如果变量@code{forms-modified-record-filter}非@code{nil}，则在新数据写入数据文件之前将其作为函数调用。  该函数接收一个参数，即一个包含记录字段内容的向量。
+
+该函数可以使用@code{aref}引用字段并使用@code{aset}修改它们。  第一个字段的编号为 1（一）；因此，不使用向量的元素 0。  该函数应该返回与传递的向量相同的向量；矢量的（可能被修改的）内容决定了文件中实际写入的内容。  这是一个例子：
+
+@example
+(defun my-modified-record-filter (record)
+  ;; @r{Modify second field.}
+  (aset record 2 (current-time-string))
+  ;; @r{Return the field vector.}
+  record)
+
+(setq forms-modified-record-filter 'my-modified-record-filter)
+@end example
+
+如果变量 @code{forms-new-record-filter} 不是 @code{nil}，则其值是一个要调用的函数，用于填充新记录字段的默认值。  该函数传递一个空字符串向量，每个字段一个；它应该返回相同的向量，其中存储了所需的字段值。  字段从 1（一）开始编号。  例子：
+
+@example
+(defun my-new-record-filter (fields)
+  (aset fields 5 (login-name))
+  (aset fields 1 (current-time-string))
+  fields)
+
+(setq forms-new-record-filter 'my-new-record-filter)
+@end example
+
+@node Miscellaneous
+@chapter 各种各样的
+
+@vindex forms-version
+全局变量@code{forms-version}保存Forms模式软件的版本信息。
+
+@findex forms-enumerate
+对记录中的字段使用符号名称非常方便。函数 @code{forms-enumerate} 提供了一种优雅的方法来定义一系列值为连续整数的变量。  该函数返回使用的最大数字，因此它也可以用于设置@code{forms-number-of-fields}。  例如：
+
+@example
+(setq forms-number-of-fields
+      (forms-enumerate
+       '(field1 field2 field3 @dots{})))
+@end example
+
+这会将 @code{field1} 设置为 1，将 @code{field2} 设置为 2，依此类推。
+
+我们已注意将表单模式变量保留在缓冲区本地，因此可以在表单模式下同时访问多个文件，即使它们具有不同的属性。
+
+@findex forms-mode
+如果您已经使用 @code{find-file} 或类似命令以正常方式访问了控制文件，则可以使用命令 @code{M-x forms-mode} 切换到表单模式。  如果将 @samp{-*- forms -*-} 放在控制文件的第一行，则访问它会自动启用表单模式。  但这使得编辑控制文件本身变得困难，所以在使用它之前你最好三思而后行。
+
+数据文件的默认格式使用 @code{"\t"} 分隔字段，使用 @code{"\^k"} 分隔字段内的行，与一些流行数据库程序（例如 FileMaker）的文件格式相匹配。  因此 @code{forms-mode} 可以减少使用专有软件的需要。
+
+@node Error Messages
+@chapter 错误信息
+
+本节描述了表单模式可能生成的所有错误消息。  解析控制文件产生的错误消息均以文本@samp{Forms control file error}开头。  分析 @code{forms-format-list} 的定义时生成的消息以 @samp{Forms format error} 开头。
+
+@table @code
+@item Forms control file error: `forms-file' has not been set
+控制文件未设置变量@code{forms-file}。
+
+@item Forms control file error: `forms-number-of-fields' has not been set
+控制文件未设置变量@code{forms-number-of-fields}。
+
+@item Forms control file error: `forms-number-of-fields' must be a number > 0
+变量@code{forms-number-of-fields}不包含正数。
+
+@item Forms control file error: `forms-field-sep' is not a string
+@itemx Forms control file error: `forms-multi-line' must be nil or a one-character string
+变量 @code{forms-multi-line} 被设置为 @code{nil} 或单字符字符串以外的值。
+
+@item Forms control file error: `forms-multi-line' is equal to 'forms-field-sep'
+变量@code{forms-multi-line}可能不等于@code{forms-field-sep}，因为这将导致无法区分字段和字段中的行。
+
+@item Forms control file error: `forms-new-record-filter' is not a function
+@itemx Forms control file error: `forms-modified-record-filter' is not a function
+该变量已被设置为函数以外的其他内容。
+
+@item Forms control file error: `forms-format-list' is not a list
+控制文件未将变量 @code{forms-format-list} 设置为 Lisp 列表。
+
+@item Forms format error: field number @var{xx} out of range 1..@var{nn}
+在@code{forms-format-list}中提供的字段编号值为@var{xx}，该值不大于零且小于或等于表单中的字段数量@var{nn}。
+
+@item Forms format error: @var{fun} is not a function
+列表的第一个元素（@code{forms-format-list} 的元素）不是有效的 Lisp 函数。
+
+@item Forms format error: invalid element @var{xx}
+@code{forms-format-list} 中提供了一个列表元素，它不是字符串、数字或列表。
+
+@item Warning: this record has @var{xx} fields instead of @var{yy}
+数据文件中该记录的字段数与 @code{forms-number-of-fields} 不匹配。  缺少的字段将被清空。
+
+@item Multi-line fields in this record - update refused!
+当前记录包含换行符，因此无法写回数据文件，因为它会损坏它。  可能您在字段中插入了换行符，而 @code{forms-multi-line} 是 @code{nil}。
+
+@item Field separator occurs in record - update refused!
+当前记录包含字段之一内的字段分隔符字符串。  它无法写回数据文件，因为这会损坏数据文件。  可能您在字段中插入了字段分隔符字符串。
+
+@item Record number @var{xx} out of range 1..@var{yy}
+跳转到不存在的记录@var{xx}。  @var{yy} 表示文件中的记录数。
+
+@item Stuck at record @var{xx}
+内部错误导致无法检索特定记录。
+
+@item No write access to @code{"}@var{file}@code{"}
+尝试对已写保护的文件启用编辑模式。
+
+@item Search failed: @var{regexp}
+在数据文件中找不到@var{regexp}。  向前搜索从当前位置直到文件末尾，然后从文件开头重试直到当前位置。向后搜索是从当前位置直到文件开头，然后从文件末尾重试直到当前位置。
+
+@item Wrapped
+绕回后，搜索成功完成。
+
+@item Warning: number of records changed to @var{nn}
+表单模式的记录数概念已根据数据文件中实际存在的记录数进行了调整。
+
+@item Problem saving buffers?
+保存数据文件缓冲区时出错。  最有可能的是，Emacs 确实要求确认删除缓冲区，因为它已被修改，而您说“不”。
+@end table
+
+@node Long Example
+@chapter 长示例
+
+以下示例利用了表单模式的大部分功能。该示例作为文件 @file{etc/forms/forms-d2.el} 包含在发行版中。
+
+@example
+;; demo2 -- demo forms-mode     -*- emacs-lisp -*-
+
+;; @r{This sample forms exploit most of the features of forms mode.}
+
+;; @r{Set the name of the data file.}
+(setq forms-file
+       (expand-file-name "forms/forms-d2.dat" data-directory))
+
+;; @r{Use @code{forms-enumerate} to set field names and number thereof.}
+(setq forms-number-of-fields
+      (forms-enumerate
+       '(arch-newsgroup                 ; 1
+         arch-volume                    ; 2
+         arch-issue                     ; and ...
+         arch-article                   ; ... so
+         arch-shortname                 ; ... ... on
+         arch-parts
+         arch-from
+         arch-longname
+         arch-keywords
+         arch-date
+         arch-remarks)))
+
+;; @r{The following functions are used by this form for layout purposes.}
+;;
+(defun arch-tocol (target &optional fill)
+  "Produces a string to skip to column TARGET.
+Prepends newline if needed.
+The optional FILL should be a character, used to fill to the column."
+  (if (null fill)
+      (setq fill ? ))
+  (if (< target (current-column))
+      (concat "\n" (make-string target fill))
+    (make-string (- target (current-column)) fill)))
+;;
+(defun arch-rj (target field &optional fill)
+  "Produces a string to skip to column TARGET\
+ minus the width of field FIELD.
+Prepends newline if needed.
+The optional FILL should be a character,
+used to fill to the column."
+  (arch-tocol (- target (length (nth field forms-fields))) fill))
+
+;; @r{Record filters.}
+;;
+(defun new-record-filter (the-record)
+  "Form a new record with some defaults."
+  (aset the-record arch-from (user-full-name))
+  (aset the-record arch-date (current-time-string))
+  the-record)                           ; return it
+(setq forms-new-record-filter 'new-record-filter)
+
+;; @r{The format list.}
+(setq forms-format-list
+     (list
+       "====== Public Domain Software Archive ======\n\n"
+       arch-shortname
+       " - "                    arch-longname
+       "\n\n"
+       "Article: "              arch-newsgroup
+       "/"                      arch-article
+       " "
+       '(arch-tocol 40)
+       "Issue: "                arch-issue
+       " "
+       '(arch-rj 73 10)
+       "Date: "                 arch-date
+       "\n\n"
+       "Submitted by: "         arch-from
+       "\n"
+       '(arch-tocol 79 ?-)
+       "\n"
+       "Keywords: "             arch-keywords
+       "\n\n"
+       "Parts: "                arch-parts
+       "\n\n====== Remarks ======\n\n"
+       arch-remarks
+     ))
+
+;; @r{That's all, folks!}
+@end example
+
+@node Credits
+@chapter 制作人员
+
+Forms 模式是由 Johan Vromans 在荷兰 Multihouse Research 工作时开发的。
+
+错误修复和其他有用的建议由 Harald Hanche-Olsen (@code{hanche@@imf.unit.no})、@code{cwitty@@portia.stanford.edu}、Jonathan I. Kamens、Per Cederqvist (@code{ceder@@signum.se})、Michael Lipka (@code{lipka@@lip.hanse.de})、Andy Piper (@code{ajp@@eng.cam.ac.uk})、Frederic Pierresteguy (@code{F.Pierresteguy@@frcl.bull.fr})、Ignatios Souvatzis 和 Richard 提供斯托曼（@code{rms@@gnu.org}）。
+
+本文档的灵感来自于 Schlumberger Cambridge Research (@code{davis%scrsu1%sdr.slb.com@@relay.cs.net}) 的 Paul Davis 的“rolo 模式”文档。
+
+如果没有自由软件基金会的 GNU Emacs，这一切都是不可能的。  谢谢，理查德！
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Index
+@unnumbered 指数
+@printindex cp
+
+@bye

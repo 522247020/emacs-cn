@@ -1,0 +1,4379 @@
+\输入 texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename ../../info/reftex.info
+@settitle RefTeX 用户手册
+@documentlanguage en
+@include docstyle.texi
+@synindex ky cp
+@syncodeindex vr cp
+@syncodeindex fn cp
+
+@ifnottex
+@macro RefTeX {}
+Ref@TeX{}
+@end macro
+@macro AUCTeX {}
+AUC@TeX{}
+@end macro
+@macro BibTeX {}
+Bib@TeX{}
+@end macro
+@macro ConTeXt {}
+Con@TeX{}t
+@end macro
+@end ifnottex
+@tex
+\gdef\RefTeX{Ref\TeX}
+\gdef\AUCTeX{AUC\TeX}
+\gdef\BibTeX{Bib\TeX}
+\gdef\ConTeXt{Con\TeX t}
+@end tex
+
+@include emacsver.texi
+
+@set VERSION @value{EMACSVER}
+@set AUCTEXSITE @uref{https://www.gnu.org/software/auctex/,@AUCTeX{} web site}
+@set MAINTAINERSITE @uref{https://www.gnu.org/software/auctex/reftex.html,@RefTeX{} web page}
+@set MAINTAINERCONTACT @uref{mailto:auctex-devel@@gnu.org,contact the maintainers}
+@set MAINTAINER the @AUCTeX{} project
+@set SUPPORTADDRESS @AUCTeX{} user mailing list (@email{auctex@@gnu.org})
+@set DEVELADDRESS @AUCTeX{} developer mailing list (@email{auctex-devel@@gnu.org})
+@set BUGADDRESS @AUCTeX{} bug mailing list (@email{bug-auctex@@gnu.org})
+@c %**end of header
+
+@copying
+本手册记录了@RefTeX{}（版本@value{VERSION}），这是一个使用 Emacs 为 LaTeX 文档制作标签、参考、引文和索引的包。
+
+版权所有 @copyright{} 1997--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* RefTeX: (reftex).              Emacs 支持 LaTeX 交叉引用和引用。
+@end direntry
+
+@finalout
+
+@c Macro definitions
+
+@c Subheadings inside a table.  Need a difference between info and the rest.
+@macro tablesubheading{text}
+@ifinfo
+@subsubheading \text\
+@end ifinfo
+@ifnotinfo
+@item @b{\text\}
+@end ifnotinfo
+@end macro
+
+@titlepage
+@title @RefTeX{} 用户手册
+@subtitle GNU Emacs 支持 @LaTeX{} 标签、参考文献、引文和索引条目
+@subtitle 版本@value{VERSION}
+
+@author by Carsten Dominik
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@summarycontents
+@contents
+
+@ifnottex
+@node Top
+@top @RefTeX{}
+
+@insertcopying
+
+@RefTeX{} is a package for managing Labels, References, Citations and
+index entries with GNU Emacs.
+
+This manual documents @RefTeX{} version @value{VERSION}.
+
+Don't be discouraged by the size of this manual, which covers @RefTeX{}
+in great depth.  All you need to know to use @RefTeX{} can be summarized
+on two pages (@pxref{RefTeX in a Nutshell}).  You can go back later to
+other parts of this document when needed.
+
+@menu
+* Introduction::                     Quick-Start information.
+
+* Table of Contents::                A Tool to move around quickly.
+* Labels and References::            Creating and referencing labels.
+* Citations::                        Creating Citations.
+* Index Support::                    Creating and Checking Index Entries.
+* Viewing Cross-References::         Who references or cites what?
+
+* RefTeXs Menu::                     The Ref menu in the menubar.
+* Key Bindings::                      The default key bindings.
+* Faces::                            Fontification of RefTeX's buffers.
+* Multifile Documents::              Document spread over many files.
+* Language Support::                 How to support other languages.
+* Finding Files::                    Included @TeX{} files and @BibTeX{} .bib files.
+* Optimizations::                    When RefTeX is too slow.
+* AUCTeX::                           Cooperation with @AUCTeX{}.
+* Problems and Work-Arounds::        First Aid.
+* Imprint::                          Author, Web-site, Thanks
+
+* Commands::                         Which are the available commands.
+* Options::                          How to extend and configure RefTeX.
+* Changes::                          A List of recent changes to RefTeX.
+* GNU Free Documentation License::   The license for this documentation.
+
+The Index
+
+* Index::                            The full index.
+
+@detailmenu
+ --- The Detailed Node Listing ---
+
+Introduction
+
+* Installation::                     How to install and activate RefTeX.
+* RefTeX in a Nutshell::             A brief summary and quick guide.
+
+Labels and References
+
+* Creating Labels::
+* Referencing Labels::
+* Builtin Label Environments::       The environments RefTeX knows about.
+* Defining Label Environments::        ... and environments it doesn't.
+* Reference Info::                   View the label corresponding to a \ref.
+* Reference Styles::                 Macros to be used instead of \ref.
+* LaTeX xr Package::                 References to external documents.
+
+Defining Label Environments
+
+* Theorem and Axiom::                Defined with @code{\newenvironment}.
+* Quick Equation::                   When a macro sets the label type.
+* Figure Wrapper::                   When a macro argument is a label.
+* Adding Magic Words::               Other words for other languages.
+* Using \eqref::                     How to switch to this AMS-LaTeX macro.
+* Non-Standard Environments::        Environments without \begin and \end
+* Putting it Together::              How to combine many entries.
+
+Citations
+
+* Creating Citations::               How to create them.
+* Citation Styles::                  Natbib, Harvard, Chicago and Co.
+* Citation Info::                    View the corresponding database entry.
+* Chapterbib and Bibunits::          Multiple bibliographies in a Document.
+* Citations Outside LaTeX::          How to make citations in Emails etc.
+* BibTeX Database Subsets::          Extract parts of a big database.
+
+Index Support
+
+* Creating Index Entries::           Macros and completion of entries.
+* The Index Phrases File::           A special file for global indexing.
+* Displaying and Editing the Index:: The index editor.
+* Builtin Index Macros::             The index macros RefTeX knows about.
+* Defining Index Macros::                ... and macros it  doesn't.
+
+The Index Phrases File
+
+* Collecting Phrases::               Collecting from document or external.
+* Consistency Checks::               Check for duplicates etc.
+* Global Indexing::                  The interactive indexing process.
+
+AUCTeX
+
+* AUCTeX-RefTeX Interface::          How both packages work together
+* Style Files::                      @AUCTeX{}'s style files can support RefTeX
+* Bib-Cite::                         Hypertext reading of a document
+
+Options, Keymaps, Hooks
+
+* Options - Table of Contents::
+* Options - Defining Label Environments::
+* Options - Creating Labels::
+* Options - Referencing Labels::
+* Options - Creating Citations::
+* Options - Index Support::
+* Options - Viewing Cross-References::
+* Options - Finding Files::
+* Options - Optimizations::
+* Options - Fontification::
+* Options - Misc::
+
+@end detailmenu
+@end menu
+
+@end ifnottex
+
+@node Introduction
+@chapter 介绍
+@cindex Introduction
+
+@RefTeX{} is a specialized package for support of labels, references,
+
+@LaTeX{} macros: @code{\label}, @code{\ref}, @code{\cite}, and
+@code{\index}。  使用这些宏通常需要查找文档的不同部分并搜索 @BibTeX{} 数据库文件。
+@RefTeX{} automates these time-consuming tasks almost entirely.  It also
+提供显示文档结构并在该结构中快速移动的功能。
+
+@iftex
+Don't be discouraged by the size of this manual, which covers @RefTeX{}
+in great depth.  All you need to know to use @RefTeX{} can be
+summarized on two pages (@pxref{RefTeX in a Nutshell}).  You can go
+back later to other parts of this document when needed.
+@end iftex
+
+@xref{Imprint}，了解联系谁寻求帮助、错误报告或建议的信息。
+
+@menu
+* Installation::                      
+* RefTeX in a Nutshell::              
+@end menu
+
+@node Installation
+@section 安装
+@cindex Installation
+
+@RefTeX{} has been bundled and pre-installed with Emacs since
+版本 20.2。
+
+@findex turn-on-reftex
+@findex reftex-mode
+@findex use-package
+@vindex LaTeX-mode-hook
+@vindex latex-mode-hook
+要在特定缓冲区中打开和关闭@RefTeX{}模式，请使用@kbd{M-x reftex-mode @key{RET}}。  要为所有 LaTeX 文件打开 @RefTeX{} 模式，请将以下行添加到您的 @file{.emacs} 文件中：
+
+@lisp
+(add-hook 'LaTeX-mode-hook #'turn-on-reftex)  ; with AUCTeX LaTeX mode
+(add-hook 'latex-mode-hook #'turn-on-reftex)  ; with Emacs latex mode
+@end lisp
+
+@noindent
+use-package 库的用户可以通过以下方式获得相同的结果：
+
+@lisp
+(use-package reftex  ; with AUCTeX LaTeX mode
+  :hook (LaTeX-mode . turn-on-reftex))
+(use-package reftex  ; with Emacs latex mode
+  :hook (latex-mode . turn-on-reftex))
+@end lisp
+
+就这样！
+
+首先，请阅读文档，特别是摘要。 (@pxref{RefTeX in a Nutshell})
+
+为了生成文档的打印版本，请使用 @code{make pdf} 生成 reftex.pdf 文件。  类似地，您可以使用 @code{dvi}、@code{ps} 或 @code{html} 目标来创建 DVI、PostScript 或 HTML 文件。
+
+@subsection 环境
+@cindex Finding files
+@cindex BibTeX database files, not found
+@cindex TeX files, not found
+@cindex @code{TEXINPUTS}, environment variable
+@cindex @code{BIBINPUTS}, environment variable
+
+@RefTeX{} needs to access all files which are part of a multifile
+文档，以及 @code{\bibliography} 命令请求的 BibTeX 数据库文件。  要查找这些文件，@RefTeX{} 将需要一个搜索路径，即要检查的目录列表。  通常这个列表存储在环境变量 @code{TEXINPUTS} 和 @code{BIBINPUTS} 中，它们也被 @RefTeX{} 使用。  但是，在某些系统上，这些变量不包含完整的搜索路径。  如果
+@RefTeX{} does not work for you because it cannot find some files,
+@xref{Finding Files}.
+
+@page
+@node RefTeX in a Nutshell
+@section @RefTeX{} 简而言之
+@cindex Quick-Start
+@cindex Getting Started
+@cindex RefTeX in a Nutshell
+@cindex Nutshell, RefTeX in a
+
+@enumerate
+@item 
+@b{Table of Contents}@* 键入@kbd{C-c =} (@code{reftex-toc}) 将显示文档的目录。  该缓冲区可以显示文档中定义的部分、标签和索引条目。  从缓冲区中，您可以快速跳转到文档的每个部分。  按 @kbd{?} 获取帮助。
+
+@item 
+@b{Labels and References}@* @RefTeX{} 有助于创建独特的标签并快速找到正确的参考键。  它区分不同环境的标签，了解所有标准环境（以及许多其他环境），并且可以配置为识别您自己定义的任何其他标记环境（变量@code{reftex-label-alist}）。
+
+@itemize @bullet
+@item 
+@b{Creating Labels}@* 键入 @kbd{C-c (} (@code{reftex-label}) 在点处插入标签。
+@RefTeX{} will either
+@itemize @minus
+@item 
+从上下文中派生标签（部分标签的默认值）
+@item 
+提示输入标签字符串（图形和表格的默认值）或
+@item 
+插入由前缀和数字组成的简单标签（所有其他环境）
+@end itemize
+@noindent
+如何使用变量 @code{reftex-insert-label-flags} 配置创建哪些标签。
+
+@item 
+@b{Referencing Labels}@* 要进行引用，请输入 @kbd{C-c )} (@code{reftex-reference})。  这显示了文档的大纲，其中包含某种类型的所有标签（图形、方程……）和一些标签上下文。  选择一个标签会将 @code{\ref@{@var{label}@}} 宏插入到原始缓冲区中。
+@end itemize
+
+@item 
+@b{Citations}@* 键入 @kbd{C-c [} (@code{reftex-citation}) 将让您指定一个正则表达式，以在当前 @BibTeX{} 数据库文件中搜索（如 @code{\bibliography} 命令中指定），并拉出匹配列表供您选择。  该列表为 @emph{formatted} 并已排序。  所选文章被引用为 @samp{\cite@{@var{key}@}}（如果要插入不同的宏，请参阅变量 @code{reftex-cite-format}）。
+
+@item 
+@b{Index Support}@*
+@RefTeX{} helps to enter index entries.  It also compiles all entries
+到按字母顺序排序的 @file{*Index*} 缓冲区中，您可以使用它来检查和编辑条目。  @RefTeX{} 了解标准索引宏，并且可以配置为识别您定义的任何其他宏 (@code{reftex-index-macros})。  支持多个索引。
+
+@itemize @bullet
+@item 
+@b{Creating Index Entries}@* 要索引当前选择或当前点处的单词，请输入 @kbd{C-c /} (@code{reftex-index-selection-or-word})。  将使用默认宏 @code{reftex-index-default-macro}。  对于更复杂的条目类型@kbd{C-c <} (@code{reftex-index})，选择任何索引宏并输入完整的参数。
+
+@item 
+@b{The Index Phrases File (Delayed Indexing)}@* 键入@kbd{C-c \} (@code{reftex-index-phrase-selection-or-word}) 将当前单词或选择添加到特殊@emph{index phrase file}。
+@RefTeX{} can later search the document for occurrences of these
+短语并让您以交互方式索引匹配项。
+
+@item 
+@b{Displaying and Editing the Index}@* 要在特殊缓冲区中显示编译后的索引，请键入 @kbd{C-c >} (@code{reftex-display-index})。  您可以从该缓冲区检查和编辑所有条目。
+@end itemize
+
+@page
+@item 
+@b{Viewing Cross-References}@* 当点位于交叉引用宏（@code{\label}、@code{\ref}、@code{\cite}、@code{\bibitem}、@code{\index} 和变体）的 @var{key} 参数上或@BibTeX{} 数据库条目内时，您可以按 @kbd{C-c &} (@code{reftex-view-crossref}) 显示文档中的相应位置以及关联的 @BibTeX{} 数据库文件。 @* 当包含的宏为@code{\cite} 或@code{\ref} 并且没有其他消息占据回显区域时，有关引文或标签的信息将自动显示在回显区域中。
+
+@item 
+@b{Multifile Documents}@* 完全支持多文件文档。  包含的文件必须有一个文件变量 @code{TeX-master} 或 @code{tex-main-file} 指向主文件。  @RefTeX{} 提供文档所有部分以及跨文档边界的交叉引用信息 (@file{xr.sty})。
+
+@item 
+@b{Document Parsing}@*
+@RefTeX{} needs to parse the document in order to find labels and other
+信息。  当使用 @code{reftex-label} 和 @code{reftex-index} 时，它会自动执行一次并在内部更新其列表。要强制重新解析，请使用原始 @kbd{C-u} 前缀调用上述任何命令，或者在标签选择缓冲区、目录缓冲区或索引缓冲区中按 @kbd{r} 键。
+
+@item 
+@b{@AUCTeX{}}@* 如果您的主要@LaTeX{}模式是@AUCTeX{}，则@RefTeX{}可以与其配合（参见变量@code{reftex-plug-into-AUCTeX}）。  @AUCTeX{} 包含触发 @RefTeX{} 中适当设置的样式文件，因此对于许多流行的 @LaTeX{} 软件包，不需要额外的自定义。
+
+@item 
+@b{Useful Settings}@* 要将 RefTeX 与 @AUCTeX{} 集成，请使用
+@lisp
+(setq reftex-plug-into-AUCTeX t)
+@end lisp
+
+要使您自己的 @LaTeX{} 宏定义为 @RefTeX{} 所知，请自定义变量
+@example
+@code{reftex-label-alist}          @r{(for label macros/environments)}
+@code{reftex-section-levels}       @r{(for sectioning commands)}
+@code{reftex-cite-format}          @r{(for @code{\cite}-like macros)}
+@code{reftex-index-macros}         @r{(for @code{\index}-like macros)}
+@code{reftex-index-default-macro}  @r{(to set the default macro)}
+@end example
+如果定义了大量宏，您可能需要编写一个 @AUCTeX{} 样式文件来支持它们，同时使用 @AUCTeX{} 和
+@RefTeX{}.
+
+@item 
+@b{Where Next?}@* 继续使用@RefTeX{}。  使用它的菜单，直到您选择了按键绑定。  要概述您可以在每个不同的特殊缓冲区中执行的操作，请按 @kbd{?}。  如果您遇到困难，或者您好奇还有哪些可用的内容，请阅读本手册。  手册第一部分以教程的方式解释了如何使用和定制
+@RefTeX{}.  The second part is a command and variable reference.
+@end enumerate
+
+@node Table of Contents
+@chapter 目录
+@cindex @file{*toc*} buffer
+@cindex Structure editing
+@cindex Table of contents buffer
+@findex reftex-toc
+@kindex C-c =
+
+按 @kbd{C-c =} 键会弹出一个缓冲区，显示文档的目录。  默认情况下，此 @file{*toc*} 缓冲区仅显示文档的部分。  使用 @kbd{l} 和 @kbd{i} 键，您还可以显示文档中定义的所有标签和索引条目。
+
+当光标位于表示文档中某个位置的任何行时，简单的按键操作将在另一个窗口中显示相应的部分、跳转到该位置或执行其他操作。
+
+@kindex ?
+这是 @file{*toc*} 缓冲区中的特殊命令列表。  按 @kbd{?} 始终可以获得此信息的摘要。
+
+@table @kbd
+
+@tablesubheading{General}
+@item ?
+显示命令摘要。
+
+@item 0-9, -
+前缀参数。
+
+@tablesubheading{Moving around}
+@item n
+转到目录中的下一个条目。
+
+@item p
+转到目录中的上一个条目。
+
+@item C-c C-n
+转到下一节标题。  当许多标签和索引条目分隔章节标题时很有用。
+
+@item C-c C-p
+转到上一节标题。
+
+@item N z
+使用前缀 arg 跳转到 N 部分。  例如，@kbd{3 z} 跳转到第 3 部分。
+
+@tablesubheading{Access to document locations}
+@item @key{SPC}
+在另一个窗口中显示相应的位置。  此命令@emph{not} 选择另一个窗口。
+
+@item @key{TAB}
+转到另一个窗口中的位置。
+
+@item @key{RET}
+转到该位置并隐藏 @file{*toc*} 缓冲区。  这将恢复调用 @code{reftex-toc} (@kbd{C-c =}) 之前的窗口配置。
+
+@item mouse-2
+@vindex reftex-highlight-selection
+用鼠标按钮 2 单击一行具有与 @key{RET} 相同的效果。另请参见变量@code{reftex-highlight-selection}、@ref{Options - Fontification}。
+
+@item f
+@vindex reftex-toc-follow-mode
+@vindex reftex-revisit-to-follow
+切换跟随模式。  当跟随模式处于活动状态时，另一个窗口将始终显示与 @file{*toc*} 缓冲区中的点对应的线的位置。  这类似于每次光标移动后按 @key{SPC}。  该标志的默认值可以使用变量 @code{reftex-toc-follow-mode} 设置。  请注意，仅显示已访问的文件中的上下文。  @RefTeX{} 不会仅仅为了跟随模式而访问文件。  然而，请参见变量@code{reftex-revisit-to-follow}。
+
+@item .
+在另一个窗口中显示调用点。  这是最后一次调用 @code{reftex-toc} 的点。
+
+@page
+@tablesubheading{Promotion and Demotion}
+
+@item <
+宣传当前部分。  这会将@code{\section}转换为@code{\chapter}，@code{\subsection}转换为@code{\section}等。如果存在活动区域​​，则该区域中的所有部分都将被提升，包括当前的部分。  为了避免错误，@RefTeX{} 需要在执行此命令之前重新扫描文档；如有必要，它会自动执行此扫描并要求用户重复升级命令。
+
+@item >
+降级当前部分。  这与促销相反。  它将把 @code{\chapter} 转换为 @code{\section} 等。如果存在活动区域​​，则该区域中的所有部分都将被降级，包括当前的部分。
+
+@item M-%
+在该点重命名标签。  虽然通常不推荐，但当使用像 0⁣ 这样的包（其中标签前缀决定引用的措辞）时，这可能很有用。  升级/降级后，可能需要将一些标签从 @samp{sec:xyz} 更改为 @samp{cha:xyz}，反之亦然。  该命令可用于执行此操作；它启动查询替换来重命名标签的定义和所有引用。
+
+@tablesubheading{Exiting}
+@item q
+隐藏@file{*toc*}缓冲区，返回到最后调用@code{reftex-toc}的位置。
+
+@item k
+杀死@file{*toc*}缓冲区，返回到最后调用@code{reftex-toc}的位置。
+
+@item C-c >
+切换到本文档的@file{*Index*}缓冲区。  使用前缀 @samp{2}，将索引限制为 @file{*toc*} 缓冲区中的点处的部分。
+
+@tablesubheading{Controlling what gets displayed}
+
+@item t
+@vindex reftex-toc-max-level
+更改 @file{*toc*} 缓冲区中显示的目录条目的最大级别。  如果没有前缀 arg，将包含所有级别。  使用前缀 arg（例如 @kbd{3 t}），忽略级别大于 @var{arg}（本例中为 3）的所有目录条目。  章节为 1 级，章节为 2 级。模式行 @samp{T<>} 指示器显示当前值。  可以使用变量 @code{reftex-toc-max-level} 配置默认深度。
+
+@item F
+@vindex reftex-toc-include-file-boundaries
+切换 @file{*toc*} 缓冲区中多文件文档的文件边框的显示。  该标志的默认值可以使用变量 @code{reftex-toc-include-file-boundaries} 设置。
+
+@item l
+@vindex reftex-toc-include-labels
+切换 @file{*toc*} 缓冲区中标签的显示。  该标志的默认值可以使用变量 @code{reftex-toc-include-labels} 设置。  当使用前缀参数调用时，
+@RefTeX{} will prompt for a label type and include only labels of
+@file{*toc*} 缓冲区中选定的类型。  模式行 @samp{L<>} 指示器显示包含哪些标签。
+
+@item i
+@vindex reftex-toc-include-index-entries
+切换 @file{*toc*} 缓冲区中索引条目的显示。  该标志的默认值可以使用变量 @code{reftex-toc-include-index-entries} 设置。  当使用前缀参数调用时，@RefTeX{}将提示输入特定索引，并仅包含@file{*toc*}缓冲区中所选索引中的条目。  模式行@samp{I<>}指示器显示使用哪个索引。
+
+@item c
+@vindex reftex-toc-include-context
+切换 @file{*toc*} 缓冲区中标签和索引上下文的显示。  该标志的默认值可以使用变量 @code{reftex-toc-include-context} 设置。
+
+@tablesubheading{Updating the buffer}
+
+@item g
+重建 @file{*toc*} 缓冲区。  这会 @emph{not} 重新扫描文档。
+
+@item r
+@vindex reftex-enable-partial-scans
+重新解析 @LaTeX{} 文档并重建 @file{*toc*} 缓冲区。  当 2⁣ 为非 3⁣ 时，仅重新扫描定义此位置的文件，而不是整个文档。
+
+@item C-u r
+重新解析 @emph{entire} @LaTeX{} 文档并重建 @file{*toc*} 缓冲区。
+
+@item x
+切换到外部文档的 @file{*toc*} 缓冲区。  当当前文档使用@code{xr}包（@pxref{LaTeX xr Package}）时，
+@RefTeX{} will switch to one of the external documents.
+
+
+@tablesubheading{Automatic recentering}
+
+@item d
+切换仅显示 @file{*toc*} 缓冲区的专用帧的显示。  跟随模式和访问位置不适用于该框架，但自动居中将使该框架始终显示文档中当前的编辑位置（见下文）。
+
+@item a
+切换 @file{*toc*} 缓冲区的自动居中。  启用此选项后，在文档中移动将导致 @file{*toc*} 始终突出显示当前部分。  默认情况下，当专用 @file{*TOC*} 框架存在时，此选项处于活动状态。  另请参见变量@code{reftex-auto-recenter-toc}。
+
+@end table
+
+@vindex reftex-toc-mode-map
+为了定义 @file{*toc*} 缓冲区的附加命令，可以使用键映射 @code{reftex-toc-mode-map}。
+
+@findex reftex-toc-recenter
+@vindex reftex-auto-recenter-toc
+@vindex reftex-idle-time
+@cindex @file{*toc*} buffer, recentering
+@cindex Table of contents buffer, recentering
+@kindex C-c -
+如果在 @file{*toc*} 缓冲区已存在时调用 @code{reftex-toc}，光标将立即跳转到正确的位置，即，调用 @code{reftex-toc} 的部分将突出显示。命令 @kbd{C-c -} (@code{reftex-toc-recenter}) 只会重新显示 @file{*toc*} 缓冲区并突出显示正确的行，而不会实际选择 @file{*toc*} 窗口。  这对于快速找出您当前在文档中的位置非常有用。  您还可以通过要求 RefTeX 跟踪您当前在 TOC@. 中的编辑位置来自动执行此操作。只要您停止输入超过 @code{reftex-idle-time} 秒，TOC 窗口就会更新。  默认情况下，这仅适用于专用的 @file{*TOC*} 框架。  但您也可以使用以下命令强制当前帧上的 TOC 窗口自动重新居中
+@lisp
+(setq reftex-auto-recenter-toc t)
+@end lisp
+
+
+@cindex Sectioning commands
+@cindex KOMA-Script, LaTeX classes
+@cindex LaTeX classes, KOMA-Script
+@cindex TOC entries for environments
+@vindex reftex-section-levels
+@RefTeX{} 识别的节宏都是 @LaTeX{} 节宏（从 @code{\part} 到 @code{\subsubparagraph}）以及来自 KOMA-Script 类的命令 @code{\addchap} 和 @code{\addsec}。可以使用变量 @code{reftex-section-levels} 配置其他宏。  还可以将某些 @LaTeX{} 环境添加到目录中。  这可能只对类似定理的环境有用。以@xref{Defining Label Environments}为例。
+
+@node Labels and References
+@chapter 标签和参考
+@cindex Labels in LaTeX
+@cindex References in LaTeX
+@cindex Label category
+@cindex Label environment
+@cindex @code{\label}
+
+@LaTeX{} provides a powerful mechanism to deal with cross-references in a
+文档。  编写文档时，可以用标签来标记文档的任何部分，例如@samp{\label@{mark@}}。  @LaTeX{} 记录定义标签时某个计数器的当前值。  稍后对该标签的引用（如@samp{\ref@{mark@}}）将产生计数器的记录值。
+
+标签可用于标记章节、图形、表格、方程、脚注、枚举列表中的项目等。 @LaTeX{} 在此过程中是上下文相关的：在图形环境中定义的标签会自动记录图形计数器，而不是章节计数器。
+
+几种不同的环境可以共享一个公共计数器，因此也可以共享一个公共标签类别。  例如，@code{equation}和@code{eqnarray}环境中的标签记录相同计数器的值：方程计数器。
+
+@menu
+* Creating Labels::
+* Referencing Labels::
+* Builtin Label Environments::        RefTeX 了解的环境。
+* Defining Label Environments::         ...而环境则不然。
+* Reference Info::                    查看与 \ref 对应的标签。
+* Reference Styles::                  使用宏来代替 \ref。
+* LaTeX xr Package::                  对外部文档的引用。
+@end menu
+
+@node Creating Labels
+@section 创建标签
+@cindex Creating labels
+@cindex Labels, creating
+@cindex Labels, deriving from context
+@kindex C-c (
+@findex reftex-label
+
+要在 @LaTeX{} 文档中创建标签，请按 @kbd{C-c (} (@code{reftex-label})。  就像@LaTeX{}一样，@RefTeX{}是上下文敏感的，会找出它当前所处的环境并使标签适应该环境。  标签通常由指示标签类型的短前缀和唯一标记组成。  @RefTeX{} 有三种不同的模式来创建此标记。
+
+@enumerate
+@item
+@vindex reftex-translate-to-ascii-function
+@vindex reftex-derive-label-parameters
+@vindex reftex-label-illegal-re
+@vindex reftex-abbrev-parameters
+标签可以从上下文中派生出来。  这意味着，@RefTeX{}采用标签定义的上下文并从中构造标签@footnote{Note that the context may contain constructs which are invalid in labels.  @RefTeX{} will therefore strip the accent from accented Latin-1 characters and remove everything else which is not valid in labels.  This mechanism is safe, but may not be satisfactory for non-western languages.  Check the following variables if you need to change things: @code{reftex-translate-to-ascii-function}, @code{reftex-derive-label-parameters}, @code{reftex-label-illegal-re}, @code{reftex-abbrev-parameters}.}。  这最适合部分标签，其中部分标题用于构造标签。  实际上，
+@RefTeX{}'s default settings use this method only for section
+标签。  系统将要求您确认派生标签或对其进行编辑。
+
+@item
+我们还可以使用简单的唯一编号来识别标签。  这对于很难想出一个很好的描述性名称的标签来说非常有用。  @RefTeX{} 的默认设置使用此方法进行方程、枚举项和脚注。  @RefTeX{} 的作者倾向于编写包含许多方程式的文档，并且发现不可能为每个方程式想出一个好的名称。  这些简单的标签无需查询即可插入，因此速度非常快。  好的描述性名称并不是真正必要的，因为 @RefTeX{} 将提供引用标签的上下文 (@pxref{Referencing Labels})。
+
+@item
+第三种方法是向用户询问标签。  这对于易于简单描述且不会在文档中频繁出现的内容最有用。  @RefTeX{} 将其用于图形和表格。  当然，可以通过输入完整的@samp{\label@{mark@}}来直接输入标签。  无论如何，使用 @code{reftex-label} 的优点是 @RefTeX{} 会知道已经定义了一个新标签。这样就无需重新扫描文档即可稍后访问该标签。
+@end enumerate
+
+@vindex reftex-insert-label-flags
+如果您想更改某些标签的创建方式，请查看变量 @code{reftex-insert-label-flags} (@pxref{Options - Creating Labels})。
+
+如果您使用 @AUCTeX{} 编写 @LaTeX{} 文档，您可以将其设置为将标签的创建委托给
+@RefTeX{}. @xref{AUCTeX}, for more information.
+
+@node Referencing Labels
+@section 引用标签
+@cindex Referencing labels
+@cindex Labels, referencing
+@cindex Selection buffer, labels
+@cindex Selection process
+@cindex @code{\ref}
+@kindex C-c )
+@findex reftex-reference
+
+@vindex reftex-trust-label-prefix
+@RefTeX{} scans the document in order to find all labels.  To make
+为了更容易地引用标签，它为每个标签分配一个类别，@emph{label type}（例如部分、表格、图形、方程等）。为了确定标签类型，@RefTeX{} 解析每个标签以查看它所在的环境类型。  您可以通过使用标签的特定于类型的前缀并配置变量@code{reftex-trust-label-prefix}来加快解析速度。
+
+引用标签确实是 @RefTeX{} 的核心。  按 @kbd{C-c )} 以引用标签 (@code{reftex-reference})。  这将启动一个选择过程，并最终将完整的@samp{\ref@{label@}}插入缓冲区。
+
+@vindex reftex-ref-macro-prompt
+首先，您可以选择要使用的参考宏，例如 @samp{\ref} 或 @samp{\pageref}。  在此过程的稍后部分，您还有另一次机会进行此选择，因此，如果您发现它过于干扰，您可以通过自定义 @code{reftex-ref-macro-prompt} 来禁用此步骤。  @xref{Reference Styles}。
+
+然后，@RefTeX{}将确定所需的标签类别。通常可以从上下文中找出这一点。  例如，如果您输入 @samp{As shown in eq.} 然后按 @kbd{C-c )}，则 @RefTeX{} 知道将引用方程标签。  如果它无法确定需要什么标签类别，它将查询一个标签类别。
+
+然后您将看到一个标签选择菜单。  这是一个特殊的缓冲区，其中包含文档的轮廓以及给定标签类别的所有标签。  另外，标签旁边会有一行标签定义的上下文，它是缓冲区中标签定义附近的一些文本。  通常这足以识别标签。  如果您不确定某个标签，按 @key{SPC} 将在另一个窗口中显示标签定义点。
+
+要引用标签，请将光标移动到正确的标签并按 @key{RET}。  您还可以通过使用 @kbd{m} 键标记条目，通过一次调用 @code{reftex-reference} 来引用多个标签（见下文）。
+
+@kindex ?
+这是选择缓冲区中的特殊命令的列表。  通过按 @kbd{?}，始终可以从选择过程中获得此信息的摘要。
+
+
+
+@table @kbd
+@tablesubheading{General}
+@item ?
+显示可用命令的摘要。
+
+@item 0-9,-
+前缀参数。
+
+@tablesubheading{Moving around}
+@item n
+转到下一个标签。
+
+@item p
+转到上一个标签。
+
+@item b
+跳回您上次离开选择缓冲区的位置。通常，这应该让您返回到最后引用的标签。
+
+@item C-c C-n
+转到下一节标题。
+
+@item C-c C-p
+转到上一节标题。
+
+@item N z
+使用前缀 arg 跳转到 N 部分。  例如 @kbd{3 z} 跳转到第 3 部分。
+
+@tablesubheading{Displaying Context}
+@item @key{SPC}
+在另一个窗口中显示当前标签定义的周围。  另请参见 @kbd{f} 键。
+
+@item f
+@vindex reftex-revisit-to-follow
+切换跟随模式。  当跟随模式处于活动状态时，另一个窗口将始终显示当前标签的完整上下文。  这类似于每次光标移动后按 @key{SPC}。  请注意，仅显示已访问的文件中的上下文。  @RefTeX{} 不会仅仅为了跟随模式而访问文件。  然而，请参见变量@code{reftex-revisit-to-follow}。
+
+@item .
+在另一个窗口中显示插入点。  这是您调用 @code{reftex-reference} 的点。
+
+@tablesubheading{Selecting a label and creating the reference}
+@item @key{RET}
+将对该点的标签的引用插入到开始选择过程的缓冲区中。  当条目被标记后，@key{RET}引用所有标记的标签。
+
+@item mouse-2
+@vindex reftex-highlight-selection
+用鼠标按钮 2 单击标签将接受它，就像 @key{RET} 一样。  另请参见变量@code{reftex-highlight-selection}、@ref{Options - Misc}。
+
+@vindex reftex-multiref-punctuation
+@item m - + ,
+标记当前条目。  当标记了多个条目后，按 @kbd{RET} 将接受所有条目并将它们放入多个 @code{\ref} 宏中。  特殊标记 @samp{,-+} 还存储要插入到相应引用之前的分隔符。  因此，用键 @samp{m , , - , +} 标记六个条目将给出这样的参考列表（参见变量 @code{reftex-multiref-punctuation}）
+@example
+In eqs. (1), (2), (3)--(4), (5) and (6)
+@end example
+
+@item u
+取消标记已标记的条目。
+
+@c FIXME: Do we need 'A' as well for consistency?
+@cindex LaTeX packages, @code{saferef}
+@cindex @code{saferef}, LaTeX package
+@item a
+接受标记的条目并将所有标签作为逗号分隔列表放入一个 @emph{single} @code{\ref} 宏中。  一些包如 @file{saferef.sty} 支持以这种方式进行多个引用。
+
+@item l
+再次使用最后引用的标签。  这相当于移至该标签并按 @key{RET}。
+
+@item @key{TAB}
+输入完成后的标签。  这也可能是文档中尚不存在的标签。
+
+@item v
+向前循环浏览活动的参考宏。  所选宏由选择缓冲区模式行中的 @samp{S<...>} 指示器显示。  如果您正在使用，此机制会派上用场
+@LaTeX{} packages like @code{varioref} or @code{fancyref} and want to
+使用它们提供的特殊引用宏（例如 @code{\vref} 或 @code{\fref}）而不是 @code{\ref}。
+
+@item V
+通过活动参考宏向后循环。
+
+@tablesubheading{Exiting}
+
+@item q
+退出选择过程而不将任何引用插入缓冲区。
+
+@tablesubheading{Controlling what gets displayed}
+@vindex reftex-label-menu-flags
+以下标志的默认值可以使用变量 @code{reftex-label-menu-flags} (@pxref{Options - Referencing Labels}) 进行配置。
+
+@item c
+切换选择缓冲区中单行标签定义上下文的显示。
+
+@item F
+切换选择缓冲区中多文件文档的文件边框的显示。
+
+@item t
+切换选择缓冲区中目录的显示。使用前缀@var{arg}，将显示的目录条目的最大级别更改为@var{arg}。  章节为 1 级，节为 2 级。
+
+@item #
+切换选择缓冲区中标签计数器的显示。
+
+@item %
+切换隐藏在选择缓冲区注释中的标签的显示。  有时，您可能注释掉了文档的部分内容。如果这些部分包含标签定义，@RefTeX{}仍然可以显示和引用这些标签。
+
+@tablesubheading{Updating the buffer}
+@item g
+更新菜单。  这将从内部标签列表重建菜单，但不会重新解析文档（参见@kbd{r}）。
+
+@item r
+@vindex reftex-enable-partial-scans
+重新解析文档以更新所有标签上的信息并重建菜单。  如果变量 @code{reftex-enable-partial-scans} 为非 @code{nil} 并且您的文档是多文件文档，则这将仅重新解析文档的一部分（定义了当前标签的文件）。
+
+@item C-u r
+重新解析 @emph{entire} 文档。
+
+@item s
+切换标签类别。  提示输入另一个标签类别后，将显示该类别的菜单。
+
+@item x
+引用外部文档中的标签。  使用 @LaTeX{} 包 @code{xr} 可以引用另一个文档中定义的标签。  该键将切换到外部文档的标签菜单，并让您从那里选择标签 (@pxref{LaTeX xr Package,,xr})。
+
+@end table
+
+@vindex reftex-select-label-mode-map
+为了定义用于选择过程的附加命令，可以使用键映射@code{reftex-select-label-mode-map}。
+
+@node Builtin Label Environments
+@section 内置标签环境
+@cindex Builtin label environments
+@cindex Label environments, builtin
+@cindex Environments, builtin
+@vindex reftex-label-alist
+@vindex reftex-label-alist-builtin
+
+@RefTeX{} needs to be aware of the environments which can be referenced
+带有标签（即带有自己的计数器）。  默认情况下，@RefTeX{}识别@cite{The中讨论的所有带标签的环境和宏
+@LaTeX{} Companion by Goossens, Mittelbach & Samarin, Addison-Wesley
+1994 年。}。  这些都是：
+
+@itemize @minus
+@item
+@cindex @code{figure}, LaTeX environment
+@cindex @code{figure*}, LaTeX environment
+@cindex @code{table}, LaTeX environment
+@cindex @code{table*}, LaTeX environment
+@cindex @code{equation}, LaTeX environment
+@cindex @code{eqnarray}, LaTeX environment
+@cindex @code{enumerate}, LaTeX environment
+@cindex @code{\footnote}, LaTeX macro
+@cindex LaTeX macro @code{footnote}
+@cindex LaTeX core
+@code{figure}、@code{figure*}、@code{table}、@code{table*}、@code{equation}、@code{eqnarray}、@code{enumerate}、@code{\footnote}宏（这是@LaTeX{}核心内容）
+@item
+@cindex AMS-LaTeX
+@cindex @code{amsmath}, LaTeX package
+@cindex LaTeX packages, @code{amsmath}
+@cindex @code{align}, AMS-LaTeX environment
+@cindex @code{gather}, AMS-LaTeX environment
+@cindex @code{multline}, AMS-LaTeX environment
+@cindex @code{flalign}, AMS-LaTeX environment
+@cindex @code{alignat}, AMS-LaTeX environment
+@cindex @code{xalignat}, AMS-LaTeX environment
+@cindex @code{xxalignat}, AMS-LaTeX environment
+@cindex @code{subequations}, AMS-LaTeX environment
+@code{align}、@code{gather}、@code{multline}、@code{flalign}、@code{alignat}、@code{xalignat}、@code{xxalignat}、@code{subequations}（来自 AMS-@LaTeX{} 的 @file{amsmath.sty} 包）
+@item
+@cindex @code{fancybox}, LaTeX package
+@cindex LaTeX packages, @code{fancybox}
+@cindex @code{Beqnarray}, LaTeX environment
+@code{Beqnarray} (@file{fancybox.sty})
+@item
+@cindex @code{ctable}, LaTeX package
+@cindex LaTeX packages, @code{ctable}
+@cindex @code{\ctable}, LaTeX macro
+@code{\ctable} 宏（来自 @file{ctable.sty}）
+@item
+@cindex @code{endnote}, LaTeX package
+@cindex LaTeX packages, @code{endnote}
+@cindex @code{\endnote}, LaTeX macro
+@code{\endnote} 宏（来自 @file{endnotes.sty}）
+@item
+@cindex @code{floatflt}, LaTeX package
+@cindex LaTeX packages, @code{floatflt}
+@cindex @code{floatingfigure}, LaTeX environment
+@cindex @code{floatingtable}, LaTeX environment
+@code{floatingfigure}, @code{floatingtable} (@file{floatflt.sty})
+@item
+@cindex @code{minted}, LaTeX package
+@cindex LaTeX packages, @code{minted}
+@cindex @code{listing}, LaTeX environment
+@code{listing} (@file{minted.sty})
+@item
+@cindex @code{listings}, LaTeX package
+@cindex LaTeX packages, @code{listings}
+@cindex @code{lstlisting}, LaTeX environment
+@code{lstlisting} (@file{listings.sty})
+@item
+@cindex @code{longtable}, LaTeX package
+@cindex LaTeX packages, @code{longtable}
+@cindex @code{longtable}, LaTeX environment
+@code{longtable} (@file{longtable.sty})
+@item
+@cindex @code{picinpar}, LaTeX package
+@cindex LaTeX packages, @code{picinpar}
+@cindex @code{figwindow}, LaTeX environment
+@cindex @code{tabwindow}, LaTeX environment
+@code{figwindow}, @code{tabwindow} (@file{picinpar.sty})
+@item
+@cindex @code{sidecap}, LaTeX package
+@cindex LaTeX packages, @code{sidecap}
+@cindex @code{SCfigure}, LaTeX environment
+@cindex @code{SCtable}, LaTeX environment
+@code{SCfigure}, @code{SCtable} (@file{sidecap.sty})
+@item
+@cindex @code{rotating}, LaTeX package
+@cindex LaTeX packages, @code{rotating}
+@cindex @code{sidewaysfigure}, LaTeX environment
+@cindex @code{sidewaystable}, LaTeX environment
+@code{sidewaysfigure}, @code{sidewaystable} (@file{rotating.sty})
+@item
+@cindex @code{subfig}, LaTeX package
+@cindex LaTeX packages, @code{subfig}
+@cindex @code{\subfigure}, LaTeX macro
+@cindex @code{\subtable}, LaTeX macro
+@code{\subfigure} 和 @code{\subtable} 宏（来自 @file{subfig.sty}）
+@item
+@cindex @code{wrapfig}, LaTeX package
+@cindex LaTeX packages, @code{wrapfig}
+@cindex @code{wrapfigure}, LaTeX environment
+@code{wrapfigure} (@file{wrapfig.sty})
+@end itemize
+
+如果您想使用使用 @code{\newtheorem} 定义的其他标记环境，则需要配置 @RefTeX{} 来识别它们 (@pxref{Defining Label Environments})。
+
+@node Defining Label Environments
+@section 定义标签环境
+@cindex Label environments, defining
+
+@vindex reftex-label-alist
+@RefTeX{} can be configured to recognize additional labeled
+环境和宏。  这是通过变量 @code{reftex-label-alist} (@pxref{Options - Defining Label Environments}) 完成的。  如果您不熟悉 Lisp，可以使用 @code{custom} 库来配置这个相当复杂的变量。  为此，请使用
+
+@example
+@kbd{M-x customize-variable @key{RET} reftex-label-alist @key{RET}}
+@end example
+
+@vindex reftex-label-alist-builtin
+这里我们将讨论几个例子，以便使事情更清楚。查看常量 @code{reftex-label-alist-builtin} 也很有启发性，它包含所有内置环境和宏 (@pxref{Builtin Label Environments}) 的条目。
+
+@menu
+* Theorem and Axiom::                 用@code{\newenvironment}定义。
+* Quick Equation::                    当宏设置标签类型时。
+* Figure Wrapper::                    当宏参数是标签时。
+* Adding Magic Words::                其他语言的换句话说。
+* Using \eqref::                      如何切换到此 AMS-@LaTeX{} 宏。
+* Non-Standard Environments::         没有 \begin 和 \end 的环境
+* Putting it Together::               如何组合多个条目。
+@end menu
+
+@node Theorem and Axiom
+@subsection 定理和公理环境
+@cindex @code{theorem}, newtheorem
+@cindex @code{axiom}, newtheorem
+@cindex @code{\newtheorem}
+
+假设您在 @LaTeX{} 中使用 @code{\newtheorem} 来定义两个新环境，@code{theorem} 和 @code{axiom}
+
+@example
+\newtheorem@{axiom@}@{Axiom@}
+\newtheorem@{theorem@}@{Theorem@}
+@end example
+
+@noindent
+像这样使用：
+
+@example
+\begin@{axiom@}
+\label@{ax:first@}
+  ....
+\end@{axiom@}
+@end example
+
+因此，我们需要告诉 @RefTeX{} @code{theorem} 和 @code{axiom} 是新的标记环境，它们定义了自己的标签类别。  我们可以使用 Lisp 来执行此操作（例如，在 @file{.emacs} 中）或使用自定义库。  对于 Lisp 来说，它看起来像这样
+
+@lisp
+(setq reftex-label-alist
+   '(("axiom"   ?a "ax:"  "~\\ref@{%s@}" nil ("axiom"   "ax.") -2)
+     ("theorem" ?h "thr:" "~\\ref@{%s@}" t   ("theorem" "th.") -3)))
+@end lisp
+
+类型指示符字符 @code{?a} 和 @code{?h} 用于在 @RefTeX{} 查询标签类型时进行提示。  为@code{theorem}选择@code{?h}，因为@code{?t}已被@code{table}占据。  请注意，@code{?s}、@code{?f}、@code{?e}、@code{?i}、@code{?n} 也已用于标准环境。
+
+@noindent
+公理和定理的标签将分别具有前缀 @samp{ax:} 和 @samp{thr:}。  @xref{AUCTeX}，了解如何操作的信息
+@AUCTeX{} can use @RefTeX{} to automatically create labels when a new
+环境被插入到缓冲区中。  此外，在 @AUCTeX{} 自动为新环境创建标签之前，需要将以下内容添加到 .emacs 文件中。
+
+@lisp
+(add-hook 'LaTeX-mode-hook
+          (lambda ()
+            (LaTeX-add-environments
+             '("axiom" LaTeX-env-label)
+             '("theorem" LaTeX-env-label))))
+@end lisp
+
+
+@noindent
+@samp{~\ref@{%s@}} 是一个格式字符串，指示如何插入对这些标签的引用。
+
+@noindent
+下一项指示如何获取标签定义的上下文。
+@itemize @minus
+@item
+@code{t} 表示从默认位置获取它（从 @code{\macro} 的开头或 @code{\begin} 语句之后）。  对于 eqnarray 和类似环境，@code{t} 是 @emph{not} 的不错选择。
+@item
+@code{nil} 表示使用标签定义之后的文本。
+@item
+有关获取上下文的更复杂方法，请参阅变量 @code{reftex-label-alist} (@ref{Options - Defining Label Environments})。
+@end itemize
+
+以下字符串列表用于在创建引用时根据点之前的单词猜测正确的标签类型。  例如，如果您写：@samp{As we have shown in Theorem}，然后按@kbd{C-c )}，
+@RefTeX{} will know that you are looking for a theorem label and
+无需询问即可将菜单限制为仅包含这些标签。
+
+每个条目中的最后一项是环境应在上下文缓冲区表中生成条目的级别。  如果数字为正数，则环境将生成编号条目（如@code{\section}），如果为负数，则条目将不编号（如@code{\section*}）。  仅在文档结构类似于切片命令的环境中使用此选项。  对于其他所有内容，请省略该项目。
+
+要使用 @code{customize} 进行相同的配置，您需要单击 @code{[INS]} 按钮两次以创建两个模板并如下填写：
+
+@example
+Reftex Label Alist: [Hide]
+[INS] [DEL] Package or Detailed   : [Value Menu] Detailed:
+            Environment or \macro : [Value Menu] String: axiom
+            Type specification    : [Value Menu] Char  : a
+            Label prefix string   : [Value Menu] String: ax:
+            Label reference format: [Value Menu] String: ~\ref@{%s@}
+            Context method        : [Value Menu] After label
+            Magic words:
+              [INS] [DEL] String: axiom
+              [INS] [DEL] String: ax.
+              [INS]
+            [X] Make TOC entry    : [Value Menu] Level: -2
+[INS] [DEL] Package or Detailed   : [Value Menu] Detailed:
+            Environment or \macro : [Value Menu] String: theorem
+            Type specification    : [Value Menu] Char  : h
+            Label prefix string   : [Value Menu] String: thr:
+            Label reference format: [Value Menu] String: ~\ref@{%s@}
+            Context method        : [Value Menu] Default position
+            Magic words:
+              [INS] [DEL] String: theorem
+              [INS] [DEL] String: theor.
+              [INS] [DEL] String: th.
+              [INS]
+            [X] Make TOC entry    : [Value Menu] Level: -3
+@end example
+
+@vindex reftex-insert-label-flags
+@vindex reftex-label-menu-flags
+根据您希望新环境的标签插入和选择的工作方式，您可能需要将字母 @samp{a} 和 @samp{h} 添加到变量 @code{reftex-insert-label-flags} (@pxref{Options - Creating Labels}) 和 @code{reftex-label-menu-flags} (@pxref{Options - Referencing Labels}) 中的某些标志。
+
+
+@node Quick Equation
+@subsection 快速方程宏
+@cindex Quick equation macro
+@cindex Macros as environment wrappers
+
+假设您想要一个用于快速方程式的宏。  它可以这样定义：
+
+@example
+\newcommand@{\quickeq@}[1]@{\begin@{equation@} #1 \end@{equation@}@}
+@end example
+
+@noindent
+并像这样使用：
+
+@example
+Einstein's equation is \quickeq@{E=mc^2 \label@{eq:einstein@}@}.
+@end example
+
+我们需要告诉 @RefTeX{} @code{\quickeq} 的参数中定义的任何标签都是方程标签。  下面是如何用 lisp 来做到这一点：
+
+@lisp
+(setq reftex-label-alist '(("\\quickeq@{@}" ?e nil nil 1 nil)))
+@end lisp
+
+此列表中的第一个元素现在是带有空大括号作为宏参数的 @emph{image} 的宏。  @code{?e} 表示这是一个方程标签，不同的 @code{nil} 元素表示使用方程的默认值。  @samp{1} 作为第五个元素表示标签定义的上下文应该是宏的第一个参数。
+
+这又是在自定义缓冲区中的样子：
+
+@example
+Reftex Label Alist: [Hide]
+[INS] [DEL] Package or Detailed   : [Value Menu] Detailed:
+            Environment or \macro : [Value Menu] String: \quickeq@{@}
+            Type specification    : [Value Menu] Char  : e
+            Label prefix string   : [Value Menu] Default
+            Label reference format: [Value Menu] Default
+            Context method        : [Value Menu] Macro arg nr: 1
+            Magic words:
+              [INS]
+            [ ] Make TOC entry    : [Value Menu] No entry
+@end example
+
+@node Figure Wrapper
+@subsection 图形环绕宏
+@cindex Macros as environment wrappers
+@cindex Figure wrapping macro
+
+假设您不想直接使用图形环境来制作图形，而是使用像这样的宏
+
+@example
+\newcommand@{\myfig@}[5][tbp]@{%
+  \begin@{figure@}[#1]
+    \epsimp[#5]@{#2@}
+    \caption@{#3@}
+    \label@{#4@}
+  \end@{figure@}@}
+@end example
+
+@noindent
+这会被称为像
+
+@example
+\myfig[htp]@{filename@}@{caption text@}@{label@}@{1@}
+@end example
+
+现在我们需要告诉 @RefTeX{} @code{\myfig} 宏 @emph{is itself} 的第四个参数是一个图形标签，以及在哪里可以找到上下文。
+
+@lisp
+(setq reftex-label-alist
+      '(("\\myfig[]@{@}@{@}@{*@}@{@}" ?f nil nil 3)))
+@end lisp
+
+空括号对表示 @code{\myfig} 宏的不同参数。  @samp{*} 标记标签参数。  @code{?f} 表示这是一个图形标签，它将与正常图形环境中的标签一起列出。  前缀和参考格式的 @code{nil} 条目意味着使用图形标签的默认值。 context 方法的 @samp{3} 意味着获取第三个宏参数：标题。
+
+作为此配置的副作用，当 point 直接位于 @code{\myfig} 宏参数的左括号之后时，@code{reftex-label} 现在将插入所需的裸标签（没有 @code{\label} 宏）。
+
+同样，这里是自定义缓冲区中的配置：
+
+@example
+[INS] [DEL] Package or Detailed   : [Value Menu] Detailed:
+            Environment or \macro : [Value Menu] String: \myfig[]@{@}@{@}@{*@}@{@}
+            Type specification    : [Value Menu] Char  : f
+            Label prefix string   : [Value Menu] Default
+            Label reference format: [Value Menu] Default
+            Context method        : [Value Menu] Macro arg nr: 3
+            Magic words:
+              [INS]
+            [ ] Make TOC entry    : [Value Menu] No entry
+@end example
+
+@node Adding Magic Words
+@subsection 添加魔法词
+@cindex Magic words
+@cindex German magic words
+@cindex Label category
+
+有时您不想定义新的标签环境或宏，而只是更改与标签类别关联的信息。  也许您想为另一种语言添加一些神奇的单词。  通过为环境名称指定 @code{nil} 来仅更改与标签类别关联的信息，然后指定要定义的项目。  下面是一个示例，它将德语魔术词添加到所有预定义的标签类别中。
+
+@lisp
+(setq reftex-label-alist
+  '((nil ?s nil nil nil ("Kapitel" "Kap." "Abschnitt" "Teil"))
+    (nil ?e nil nil nil ("Gleichung" "Gl."))
+    (nil ?t nil nil nil ("Tabelle"))
+    (nil ?f nil nil nil ("Figur" "Abbildung" "Abb."))
+    (nil ?n nil nil nil ("Anmerkung" "Anm."))
+    (nil ?i nil nil nil ("Punkt"))))
+@end lisp
+
+@node Using \eqref
+@subsection 使用@code{\eqref}
+@cindex @code{\eqref}, AMS-LaTeX macro
+@cindex AMS-LaTeX
+@cindex Label category
+
+只想更改与标签类别相关的信息的另一种情况是更改用于引用标签的宏。  使用 AMS-@LaTeX{} 时，您可能更喜欢使用 @code{\eqref} 进行方程引用。  以下是如何执行此操作：
+
+@lisp
+(setq reftex-label-alist '((nil ?e nil "~\\eqref@{%s@}" nil nil)))
+@end lisp
+
+@RefTeX{} has also a predefined symbol for this special purpose.  The
+下面的行与上面的行等效。
+
+@lisp
+(setq reftex-label-alist '(AMSTeX))
+@end lisp
+
+请注意，这是由 @AUCTeX{} (@pxref{Style Files}) 的 @file{amsmath.el} 样式文件自动完成的；所以如果您使用@AUCTeX{}，则不需要此配置。
+
+@node Non-Standard Environments
+@subsection 非标准环境
+@cindex Non-standard environments
+@cindex Environments without @code{\begin}
+@cindex Special parser functions
+@cindex Parser functions, for special environments
+
+一些 @LaTeX{} 包定义了类似环境的结构，而不使用标准 @samp{\begin..\end} 结构。  @RefTeX{} 无法直接解析这些，但您可以编写自己的专用解析器并使用它代替 @code{reftex-label-alist} 条目中的环境名称。  该函数应检查点当前是否处于其编写的要检测的特殊环境中。  如果是这样，它必须返回一个缓冲区位置，指示该环境的开始。  检测环境失败时，返回值必须为@code{nil}。  该函数使用一个参数 @var{bound} 进行调用。如果非@code{nil}，则@var{bound}是应该观察的向后搜索的边界。  我们将讨论两个例子。
+
+@cindex LaTeX commands, abbreviated
+
+有些人定义环境的缩写，例如 @code{\be} 代表 @code{\begin@{equation@}}，@code{\ee} 代表 @code{\end@{equation@}}。  解析器函数必须向后搜索这些宏。  当第一个匹配是@code{\ee}时，点不在这个环境中。  当第一个匹配项是 @code{\be} 时，点位于此环境中，并且该函数必须返回匹配项的开头。  为了避免扫描得太远，我们还可以寻找方程环境中不能出现的空行。这是设置：
+
+@lisp
+;; Setup entry in reftex-label-alist, using all defaults for equations
+(setq reftex-label-alist '((detect-be-ee ?e nil nil nil nil)))
+
+(defun detect-be-ee (bound)
+  ;; Search backward for the macros or an empty line
+  (if (re-search-backward
+       "\\(^[ \t]*\n\\|\\\\ee\\>\\)\\|\\(\\\\be\\>\\)" bound t)
+      (if (match-beginning 2)
+          (match-beginning 2)  ; Return start of environment
+        nil)                   ; Return nil because env is closed
+    nil))                      ; Return nil for not found
+@end lisp
+
+@cindex @code{linguex}, LaTeX package
+@cindex LaTeX packages, @code{linguex}
+一个更复杂的例子是 @file{linguex.sty} 包，它为以 @samp{\z.} 或空行终止的列表定义了列表宏 @samp{\ex.}、@samp{\a.}、@samp{\b.} 等@:。
+
+@example
+\ex.  \label@{ex:12@} Some text in an exotic language ...
+      \a. \label@{ex:13@} more stuff
+      \b. \label@{ex:14@} still more stuff
+          \a. List on a deeper level
+          \b. Another item
+          \b. and the third one
+      \z.
+      \b. Third item on this level.
+
+... text after the empty line terminating all lists
+@end example
+
+困难在于 @samp{\a.} 列表可以嵌套，并且空行一次性终止所有列表级别。  所以我们必须计算@samp{\a.}和@samp{\z.}之间的嵌套层数。  这是 @RefTeX{} 的实现。
+
+@lisp
+(setq reftex-label-alist
+      '((detect-linguex ?x "ex:" "~\\ref@{%s@}" nil ("Example" "Ex."))))
+
+(defun detect-linguex (bound)
+  (let ((cnt 0))
+    (catch 'exit
+      (while
+          ;; Search backward for all possible delimiters
+          (re-search-backward
+           (concat "\\(^[ \t]*\n\\)\\|\\(\\\\z\\.\\)\\|"
+                   "\\(\\ex[ig]?\\.\\)\\|\\(\\\\a\\.\\)")
+           nil t)
+        ;; Check which delimiter was matched.
+        (cond
+         ((match-beginning 1)
+          ;; empty line terminates all - return nil
+          (throw 'exit nil))
+         ((match-beginning 2)
+          ;; \z. terminates one list level - decrease nesting count
+          (decf cnt))
+         ((match-beginning 3)
+          ;; \ex. : return match unless there was a \z. on this level
+          (throw 'exit (if (>= cnt 0) (match-beginning 3) nil)))
+         ((match-beginning 4)
+          ;; \a. : return match when on level 0, otherwise
+          ;;       increment nesting count
+          (if (>= cnt 0)
+              (throw 'exit (match-beginning 4))
+            (incf cnt))))))))
+@end lisp
+
+@node Putting it Together
+@subsection 把它们放在一起
+
+当您必须将多个条目放入 @code{reftex-label-alist} 时，只需将它们依次放在列表中，或者在自定义缓冲区中创建那么多模板即可。  下面是一个 Lisp 示例，它使用了上述几个条目：
+
+@lisp
+(setq reftex-label-alist
+  '(("axiom"   ?a "ax:"  "~\\ref@{%s@}" nil ("axiom"   "ax.") -2)
+    ("theorem" ?h "thr:" "~\\ref@{%s@}" t   ("theorem" "theor." "th.") -3)
+    ("\\quickeq@{@}" ?e nil nil 1 nil)
+    AMSTeX
+    ("\\myfig[]@{@}@{@}@{*@}@{@}" ?f nil nil 3)
+    (detect-linguex ?x "ex:" "~\\ref@{%s@}" nil ("Example" "Ex."))))
+@end lisp
+
+@node Reference Info
+@section 参考信息
+@findex reftex-view-crossref
+@findex reftex-mouse-view-crossref
+@cindex Cross-references, displaying
+@cindex Reference info
+@cindex Displaying cross-references
+@cindex Viewing cross-references
+@kindex C-c &
+@kindex S-mouse-2
+
+当 @code{\ref} 宏的参数上的点空闲时间超过 @code{reftex-idle-time} 秒时，回显区域将显示有关此处引用的标签的一些信息。  请注意，仅当回显区域未被其他消息占用时才会显示该信息。
+
+@RefTeX{} can also display the label definition corresponding to a
+@code{\ref} 宏，或与 @code{\label} 宏对应的所有参考位置。  @xref{Viewing Cross-References}，了解更多信息。
+
+@node Reference Styles
+@section 参考样式
+
+如果您定义了自己的宏以供参考或者您正在使用
+@LaTeX{} packages providing specialized macros to be used instead of
+@code{\ref}、@RefTeX{}提供了方便选择和插入它们的方法。
+
+@RefTeX{} comes equipped with a set of so-called reference styles where
+每一个都与一个或多个参考宏相关。  标准宏 @samp{\ref}、@samp{\Ref}、@samp{\footref} 和 @samp{\pageref} 由“默认”样式提供。  “Varioref”样式为 @samp{varioref} @LaTeX{} 软件包（@samp{\vref}、@samp{\Vref} 和 @samp{\vpageref}）提供宏，为 @samp{fancyref} 软件包（@samp{\fref}、@samp{\Fref}）提供“Fancyref”，为@samp{hyperref} 软件包（@samp{\autoref}、@samp{\autopageref}）、“Cleveref”用于 @samp{cleveref} 软件包（@samp{\cref}、@samp{\Cref}、@samp{\cpageref} 和 @samp{\Cpageref}）以及“AMSmath”用于@samp{amsmath} 软件包（@samp{\eqref}）。
+
+@vindex reftex-ref-style-default-list
+可以通过选择 @samp{Reference Style} 菜单中的相应条目来切换样式。  通过菜单所做的更改仅在 Emacs 会话中有效。  为了永久配置首选项，应自定义变量 @code{reftex-ref-style-default-list}。  该变量指定要激活的样式列表。如果应为特定文件设置首选项，也可以将其设置为文件变量。
+
+@vindex reftex-ref-style-alist
+如果内置样式不够，您可以向变量 @code{reftex-ref-style-alist} 添加其他宏和样式。  这些不一定必须与某个 @LaTeX{} 包相关，但可以遵循任意分组规则。  例如，您可以为您的个人引用宏定义一个名为“个人”的样式。  （更改变量时，您应该注意其他 Emacs 包，例如 @AUCTeX{}，可能依赖于默认值中的条目。）
+
+一旦样式处于活动状态，当您要插入引用时，就可以选择与其相关的宏。  一般来说，这个过程涉及三个步骤：参考宏的选择、标签类型和标签。  可以在第一步和最后一步中选择参考宏。
+
+@vindex reftex-ref-macro-prompt
+在第一步中，您将看到一个宏列表，您可以通过键入一个键从中选择一个宏。  如果您不喜欢使用额外的步骤来选择参考宏，则可以通过自定义 @code{reftex-ref-macro-prompt} 并仅依赖最后一步中提供的选择功能来禁用它。
+
+在最后一步，即标签选择中，提供了两个键绑定来设置参考宏。  输入 @kbd{v} 向前循环可用宏列表，或输入 @kbd{V} 向后循环。  选择缓冲区的模式行显示当前选择的宏。
+
+如果您在循环使用宏时对宏的顺序不满意，您应该调整变量 @code{reftex-ref-style-alist} 中的条目顺序以满足您的喜好。
+
+对于 @code{reftex-ref-style-alist} 中的每个条目，@RefTeX{} 将自动创建一个名为 @code{reftex-<package>-<macro>} 的函数（例如 @code{reftex-varioref-vref}）。  这些函数可以用来代替 @kbd{C-c )}，并提供另一种方法来预先选择您最喜欢的引用宏，并且如果循环遍历宏对您来说不方便的话。@footnote{You could, e.g., bind @code{reftex-varioref-vref} to @kbd{C-c v} and @code{reftex-fancyref-fref} to @kbd{C-c f}.}
+
+@cindex @code{varioref}, LaTeX package
+@cindex LaTeX packages, @code{varioref}
+@cindex @code{fancyref}, LaTeX package
+@cindex LaTeX packages, @code{fancyref}
+@vindex reftex-vref-is-default @r{(deprecated)}
+@vindex reftex-fref-is-default @r{(deprecated)}
+在 @RefTeX{} 的早期版本中，仅支持 @code{varioref} 和 @code{fancyref}。  @code{varioref} 是 @LaTeX{} 包，用于创建与页面信息的交叉引用。  @code{fancyref} 是一个包，其中像 @code{\fref@{@var{fig:map-of-germany}@}} 这样的宏调用不仅创建引用的计数器的编号，而且还创建它周围的完整文本，例如 @samp{Figure 3 on the preceding page}。  为了使其工作，您需要一致地使用像 @samp{fig:} 这样的标签前缀——@RefTeX{} 会自动执行。  对于每个包，可以配置一个变量以使其宏优先于@code{\ref}。  分别是@code{reftex-vref-is-default}和@code{reftex-fref-is-default}。  虽然这些变量仍然有效，但现在已被弃用。  现在应该调整变量@code{reftex-ref-style-default-list}，而不是设置它们。
+
+@node LaTeX xr Package
+@section @code{xr}：跨文档引用
+@cindex @code{xr}, LaTeX package
+@cindex LaTeX packages, @code{xr}
+@cindex @code{\externaldocument}
+@cindex External documents
+@cindex References to external documents
+@cindex Cross-document references
+
+@LaTeX{} 包 @code{xr} 可以创建对外部文档中定义的标签的引用。  使用 @code{xr} 的文档的序言将包含如下内容：
+
+@example
+\usepackage@{xr@}
+\externaldocument[V1-]@{volume1@}
+\externaldocument[V3-]@{volume3@}
+@end example
+
+@noindent
+我们可以分别使用前缀 @samp{V1-} 和 @samp{V3-} 来引用这些外部文档中定义的任何标签。
+
+@RefTeX{} can be used to create such references as well.  Start the
+按 @kbd{C-c )} 即可正常参考过程。  如有必要，选择标签类型。  当您看到标签选择缓冲区时，按 @kbd{x} 将切换到外部文档之一的标签选择缓冲区。  然后，您可以像以前一样选择一个标签，@RefTeX{} 会将其与所需的前缀一起插入。
+
+对于这种文档间交叉引用，保存解析信息和使用多个选择缓冲区可能意味着很大的加速（@pxref{Optimizations}）。
+
+@node Citations
+@chapter 引文
+@cindex Citations
+@cindex @code{\cite}
+
+@LaTeX{} 中的引用是通过 @code{\cite} 宏或其变体完成的。  宏的参数是一个引用键，它标识 @BibTeX{} 数据库文件或文档中显式 @code{thebibliography} 环境中的文章或书籍。  @RefTeX{} 对引用的支持有助于快速选择正确的键。
+
+@menu
+* Creating Citations::                如何创建它们。
+* Citation Styles::                   纳特比卜 (Natbib)、哈佛大学、芝加哥大学
+* Citation Info::                     查看对应的数据库条目。
+* Chapterbib and Bibunits::           文档中的多个参考书目。
+* Citations Outside LaTeX::           如何在电子邮件等中进行引用
+* BibTeX Database Subsets::           提取大数据库的一部分。
+@end menu
+
+@node Creating Citations
+@section 创建引文
+@cindex Creating citations
+@cindex Citations, creating
+@findex reftex-citation
+@kindex C-c [
+@cindex Selection buffer, citations
+@cindex Selection process
+
+要创建引文，请按@kbd{C-c [}。  然后，@RefTeX{} 提示输入正则表达式，该正则表达式将用于搜索数据库并在类似于选择标签 (@pxref{Referencing Labels}) 的选择过程中显示可供选择的匹配列表。
+
+正则表达式使用扩展语法：@samp{&&} 为正则表达式定义逻辑@code{and}。  例如，@samp{Einstein&&Bose} 将匹配所有提到玻色-爱因斯坦凝聚或玻色和爱因斯坦合着的文章。  输入正则表达式时，您可以根据已知的引文键完成。  @RefTeX{} 还在提示输入正则表达式时提供默认值。  该默认值是光标之前的单词或当前 @samp{\cite} 命令之前的单词。  有时这可能是一个很好的搜索关键字。
+
+@cindex @code{\bibliography}
+@cindex @code{thebibliography}, LaTeX environment
+@cindex @code{BIBINPUTS}, environment variable
+@cindex @code{TEXBIB}, environment variable
+@RefTeX{} prefers to use @BibTeX{} database files specified with a
+@code{\bibliography}宏来收集其信息。  一样
+@BibTeX{}, it will search for the specified files in the current directory
+并沿着环境变量@code{BIBINPUTS}中给定的路径。如果您不使用 @BibTeX{}，但文档包含显式 @code{thebibliography} 环境，@RefTeX{} 将从那里收集其信息。  请注意，在这种情况下，选择缓冲区中呈现的信息将只是相关@code{\bibitem}条目的副本，而不是可用的结构化列表
+@BibTeX{} database files.
+
+@kindex ?
+在选择缓冲区中，以下键提供特殊命令。  通过按 @kbd{?}，始终可以从选择过程中获得此信息的摘要。
+
+@table @kbd
+@tablesubheading{General}
+@item ?
+显示可用命令的摘要。
+
+@item 0-9,-
+前缀参数。
+
+@tablesubheading{Moving around}
+@item n
+转到下一篇文章。
+
+@item p
+转到上一篇文章。
+
+@tablesubheading{Access to full database entries}
+@item @key{SPC}
+在另一个窗口中显示与该文章对应的数据库条目。  另请参见 @kbd{f} 键。
+
+@item f
+切换跟随模式。  当关注模式处于活动状态时，另一个窗口将始终显示当前文章的完整数据库条目。  这相当于每次光标移动后按 @key{SPC}。  对于 @BibTeX{} 条目，跟随模式可能会相当慢。
+
+@tablesubheading{Selecting entries and creating the citation}
+@item @key{RET}
+将引用该文章的引文插入到开始选择过程的缓冲区中。
+
+@item mouse-2
+@vindex reftex-highlight-selection
+用鼠标按钮 2 单击引文将接受它，就像 @key{RET} 一样。  另请参见变量@code{reftex-highlight-selection}、@ref{Options - Misc}。
+
+@item m
+标记当前条目。  当标记一个或多个条目时，按 @kbd{a} 或 @kbd{A} 接受所有标记的条目。  此外，@key{RET} 的作用类似于 @kbd{a} 键。
+
+@item u
+取消标记已标记的条目。
+
+@item a
+接受选择缓冲区中的所有（标记的）条目并创建引用它们的单个 @code{\cite} 宏。
+
+@item A
+接受选择缓冲区中的所有（标记的）条目，并为每个条目创建一个单独的 @code{\cite} 宏。
+
+@item e
+创建一个新的 @BibTeX{} 数据库文件，其中包含选择缓冲区中的所有 @i{marked} 条目。  如果没有标记任何条目，则选择所有条目。
+
+@item E
+创建一个新的 @BibTeX{} 数据库文件，其中包含选择缓冲区中的所有 @i{unmarked} 条目。  如果没有标记任何条目，则选择所有条目。
+
+@item @key{TAB}
+输入完整的引文关键字。  这也可能是尚不存在的密钥。
+
+@item .
+在另一个窗口中显示插入点。  这是您调用 @code{reftex-citation} 的点。
+
+@tablesubheading{Exiting}
+@item q
+退出选择过程而不将引文插入缓冲区。
+
+@tablesubheading{Updating the buffer}
+
+@item g
+使用新的正则表达式重新开始。  将使用新表达式重新扫描完整数据库（另请参见@kbd{r}）。
+
+@c FIXME: Should we use something else here? r is usually rescan!
+@item r
+使用另一个正则表达式优化当前选择。  这将 @emph{not} 重新扫描整个数据库，但仅扫描已选择的条目。
+
+@end table
+
+@vindex reftex-select-bib-mode-map
+为了定义此选择过程的附加命令，可以使用键映射@code{reftex-select-bib-mode-map}。
+
+请注意，如果您不使用 Emacs 编辑 @BibTeX{} 数据库文件，
+@RefTeX{} will ask if the related buffers should be updated once it
+检测到文件已被外部更改。  如果您不想被此类查询打扰，可以通过将以下表达式添加到初始化文件来激活这些缓冲区的自动恢复模式：
+
+@lisp
+(add-hook 'bibtex-mode-hook 'turn-on-auto-revert-mode)
+@end lisp
+
+
+@node Citation Styles
+@section 引文样式
+@cindex Citation styles
+@cindex Citation styles, @code{biblatex}
+@cindex Citation styles, @code{natbib}
+@cindex Citation styles, @code{harvard}
+@cindex Citation styles, @code{chicago}
+@cindex Citation styles, @code{jurabib}
+@cindex Citation styles, @ConTeXt{}
+@cindex @code{biblatex}, citation style
+@cindex @code{natbib}, citation style
+@cindex @code{harvard}, citation style
+@cindex @code{chicago}, citation style
+@cindex @code{jurabib}, citation style
+@cindex @ConTeXt{}, citation style
+
+@vindex reftex-cite-format
+标准 @LaTeX{} 宏 @code{\cite} 适用于数字或简单的关键引用。  为了处理许多自然科学中使用的作者年份引用的更复杂的任务，已经开发了各种包来定义 @code{\cite} 宏的派生形式。
+@RefTeX{} can be configured to produce these citation macros as well by
+设置变量@code{reftex-cite-format}。  对于最常用的 @LaTeX{} 软件包（@code{biblatex}、@code{natbib}、@code{harvard}、@code{chicago}、@code{jurabib}）和@ConTeXt{}，可以从@code{Ref->Citation Styles} 下的菜单完成。  由于通常有多个宏来创建引文，因此执行 @code{reftex-citation} (@kbd{C-c [}) 首先会提示输入正确的宏。  对于 Natbib 风格，如下所示：
+
+@example
+SELECT A CITATION FORMAT
+
+[^M]   \cite@{%l@}
+[t]    \citet@{%l@}
+[T]    \citet*@{%l@}
+[p]    \citep@{%l@}
+[P]    \citep*@{%l@}
+[e]    \citep[e.g.][]@{%l@}
+[s]    \citep[see][]@{%l@}
+[a]    \citeauthor@{%l@}
+[A]    \citeauthor*@{%l@}
+[y]    \citeyear@{%l@}
+@end example
+
+@noindent
+对于 Biblatex 风格，它看起来像这样：
+
+@example
+SELECT A CITATION FORMAT
+
+[^M]   \cite[][]@{%l@}
+[C]    \cite*[][]@{%l@}
+[t]    \textcite[][]@{%l@}
+[T]    \textcite*[][]@{%l@}
+[p]    \parencite[][]@{%l@}
+[P]    \parencite*[][]@{%l@}
+[f]    \footcite[][]@{%l@}
+[s]    \smartcite[][]@{%l@}
+[u]    \autocite[][]@{%l@}
+[U]    \autocite*[][]@{%l@}
+[a]    \citeauthor@{%l@}
+[A]    \citeauthor*@{%l@}
+[i]    \citetitle@{%l@}
+[I]    \citetitle*@{%l@}
+[y]    \citeyear@{%l@}
+[Y]    \citeyear*@{%l@}
+[n]    \nocite@{%l@}
+@end example
+
+@vindex reftex-cite-prompt-optional-args
+如果引文格式包含空方括号对，并且使用 @kbd{C-u} 前缀调用 @code{reftex-citation} 命令，@RefTeX{} 将提示输入这些可选参数的值。在这些包中最通用的@code{natbib}之后，内置引文包始终接受@emph{textual}引文的@kbd{t}键（例如：@code{Jones et al. (1997) have shown...}）以及括号引文的@kbd{p}键（例如：@code{As shown earlier (Jones et al, 1997)}）。
+
+要将这些样式之一设置为默认样式，请自定义变量 @code{reftex-cite-format} 或放入 @file{.emacs}：
+
+@lisp
+(setq reftex-cite-format 'natbib)
+@end lisp
+
+@noindent
+或者如果您更喜欢 biblatex 包：
+
+@lisp
+(setq reftex-cite-format 'biblatex)
+@end lisp
+
+您还可以使用 @AUCTeX{} 样式文件根据给定文档中的 @code{usepackage} 命令自动设置引文样式。  @xref{Style Files}，有关如何正确设置样式文件的信息。
+
+@node Citation Info
+@section 引文信息
+@cindex Displaying citations
+@cindex Citations, displaying
+@cindex Citation info
+@cindex Viewing citations
+@kindex C-c &
+@kindex S-mouse-2
+@findex reftex-view-crossref
+@findex reftex-mouse-view-crossref
+
+当 @code{\cite} 宏的参数上的点空闲超过 @code{reftex-idle-time} 秒时，回显区域将显示有关此处引用的文章的一些信息。  请注意，仅当回显区域未被其他消息占用时才会显示该信息。
+
+@RefTeX{} can also display the @code{\bibitem} or @BibTeX{} database
+对应于 @code{\cite} 宏的条目，或对应于 @code{\bibitem} 或 @BibTeX{} 数据库条目的所有引用位置。 @xref{Viewing Cross-References}。
+
+@node Chapterbib and Bibunits
+@section Chapterbib 和 Bibunits
+@cindex @code{chapterbib}, LaTeX package
+@cindex @code{bibunits}, LaTeX package
+@cindex Bibliographies, multiple
+
+@code{chapterbib} 和 @code{bibunits} 是两个 @LaTeX{} 包，它们在文档中生成多个参考书目。  这对于
+@RefTeX{} as long as all bibliographies use the same @BibTeX{} database
+文件。  如果不这样做，最好将每个文档部分放在单独的文件中（因为无论如何 @code{chapterbib} 都需要它）。  然后
+@RefTeX{} will still scan the locally relevant databases correctly.  If
+您在 @emph{single file} 内有多个参考书目，情况可能是也可能不是。
+
+@node Citations Outside LaTeX
+@section 外部引用 @LaTeX{}
+@cindex Citations outside LaTeX
+@vindex reftex-default-bibliography
+
+命令 @code{reftex-citation} 也可以在 @LaTeX{} 缓冲区之外执行。  这对于参考邮件缓冲区中的文章和其他文档很有用。  您应该为此输入@emph{not}输入@code{reftex-mode}，只需执行该命令即可。  在这种情况下，@BibTeX{} 文件的列表将从变量 @code{reftex-default-bibliography} 中获取。将变量 @code{reftex-cite-format} 设置为符号 @code{locally} 可以很好地将有关引文的所有相关信息直接放入缓冲区。  这是将 @kbd{C-c [} 绑定添加到邮件缓冲区的 lisp 代码。  它还为 @code{reftex-cite-format} 提供本地绑定。
+
+@lisp
+(add-hook 'mail-setup-hook
+          (lambda () (keymap-set mail-mode-map "C-c ["
+                       (lambda ()
+                         (interactive)
+                         (let ((reftex-cite-format 'locally))
+                           (reftex-citation))))))
+@end lisp
+
+@node BibTeX Database Subsets
+@section 数据库子集
+@cindex BibTeX database subsets
+@findex reftex-create-bibtex-file
+
+@RefTeX{} offers two ways to create a new @BibTeX{} database file.
+
+第一个选项生成一个文件，其中仅包含当前文档中实际引用的条目。  如果数据库仅用于单个文档并且您想要清除其中旧的和未使用的镇流器，则这可能很有用。  在与协作者一起编写文档时，它也很有用，以避免发送整个（可能非常大）数据库。  要创建文件，请使用@kbd{M-x reftex-create-bibtex-file}，也可以从@code{Ref->Global Actions->Create Bibtex File}下的菜单中使用。  该命令将提示输入 @BibTeX{} 文件名并将提取的条目写入该文件。
+
+第二个选项利用由命令 @kbd{C-c [} (@pxref{Creating Citations}) 启动的选择过程。  此命令使用正则表达式来选择条目，并将它们列在格式化的选择缓冲区中。  按 @kbd{e} 键（助记符：导出）后，该命令将提示输入新 @BibTeX{} 文件的名称，并将所选条目写入该文件。  您还可以首先使用 @kbd{m} 键标记选择缓冲区中的一些条目，然后导出 @i{marked} 条目（使用 @kbd{e} 键）或 @i{unmarked} 条目（使用 @kbd{E} 键）。
+
+@node Index Support
+@chapter 指数支持
+@cindex Index Support
+@cindex @code{\index}
+
+@LaTeX{} has builtin support for creating an Index.  The @LaTeX{} core
+支持两种不同的索引：标准索引和术语表。  在特殊的@LaTeX{}包（@file{multind.sty}或@file{index.sty}）的帮助下，可以支持任意数量的索引。
+
+索引条目是使用 @code{\index@{@var{entry}@}} 宏创建的。文档中定义的所有条目都会写入 @file{.aux} 文件。  必须使用单独的工具将此信息转换为格式良好的索引。  与@LaTeX{}一起使用的工具包括@code{MakeIndex}和@code{xindy}。
+
+索引是一项非常困难的任务。  它必须遵循严格的约定，以使索引一致和完整。  基本上有两种方法可以遵循，并且两者都有其优点。
+
+@enumerate
+@item
+部分索引应该已经通过标记完成。  文档结构应反映在索引中，因此在开始新部分时，应对该部分的基本主题建立索引。  如果文档包含定义、定理等，这些都应该对应于适当的索引条目。  索引的这一部分可以很好地与文档一起开发。  通常，值得定义特殊用途的宏，这些宏定义项目并同时创建索引条目，可能具有特殊格式以使索引中的参考页面加粗或加下划线。  为了使 @RefTeX{} 支持索引成为可能，必须将这些特殊宏添加到
+@RefTeX{}'s configuration (@pxref{Defining Index Macros}).
+
+@item
+索引的其余部分通常只是文档中某些单词或短语的使用位置的集合。  这部分很难与文档一起开发，因为每次出现都需要一致的条目，并且最好在文档准备好时选择。  @RefTeX{} 通过 @emph{index phrases file} 支持这一点，它收集短语并帮助全局索引短语。
+@end enumerate
+
+在开始之前，您需要确保 @RefTeX{} 了解当前文档中使用的索引样式。  @RefTeX{} 内置支持默认的 @code{\index} 和 @code{\glossary} 宏。  其他 @LaTeX{} 包（例如 @file{multind} 或 @file{index} 包）重新定义 @code{\index} 宏以具有附加参数，并且需要为其配置 @RefTeX{}。  足够新的 9⁣ 版本（9.10c 或更高版本）将自动执行此操作。  如果您确实不使用 @AUCTeX{} （您应该！），则需要使用菜单 (@code{Ref->Index Style}) 手动完成此配置，或者使用以下命令对所有文档进行全局配置
+
+@lisp
+(setq reftex-index-macros '(multind))     @r{or}
+(setq reftex-index-macros '(index))
+@end lisp
+
+@menu
+* Creating Index Entries::            宏和条目完成。
+* The Index Phrases File::            用于全局索引的特殊文件。
+* Displaying and Editing the Index::  索引编辑器。
+* Builtin Index Macros::              RefTeX 了解的索引宏。
+* Defining Index Macros::                 ...而宏却没有。
+@end menu
+
+@node Creating Index Entries
+@section 创建索引条目
+@cindex Creating index entries
+@cindex Index entries, creating
+@kindex C-c <
+@findex reftex-index
+@kindex C-c /
+@findex reftex-index-selection-or-word
+
+要索引当前选择或光标处的单词，请按 @kbd{C-c /} (@code{reftex-index-selection-or-word})。  这会导致选择或单词 @samp{@var{word}} 被替换为 @samp{\index@{@var{word}@}@var{word}}。  使用的宏（默认为@code{\index}）可以使用变量@code{reftex-index-default-macro}进行配置。  当使用前缀参数 (@kbd{C-u C-c /}) 调用该命令时，您有机会编辑生成的索引条目。  使用它可以更改单词的大小写或使条目成为子条目，例如输入@samp{main!sub!@var{word}}。  当使用两个原始 @kbd{C-u} 前缀 (@kbd{C-u C-u C-c /}) 调用时，系统还会要求您提供索引宏。当没有选择任何内容并且当前位置没有单词时，此命令将仅调用@code{reftex-index}，如下所述。
+
+要创建通用索引条目，请按@kbd{C-c <} (@code{reftex-index})。  @RefTeX{} 将提示输入可用索引宏之一及其参数。  索引条目和索引标记（如果适用）将可以完成。  索引标签是标识多个索引之一的字符串。  对于 @file{multind} 和 @file{index} 包，此标记是重新定义的 @code{\index} 宏的第一个参数。
+
+@node The Index Phrases File
+@section 索引短语文件
+@cindex Index phrase file
+@cindex Phrase file
+@kindex C-c |
+@findex reftex-index-visit-phrases-buffer
+@cindex Macro definition lines, in phrase buffer
+
+@RefTeX{} maintains a file in which phrases can be collected for
+稍后索引。  该文件与文档的主文件位于同一目录中，扩展名为 @file{.rip} (@b{R}eftex @b{I}ndex @b{P}hrases)。  您可以使用 @kbd{C-c |} (@code{reftex-index-visit-phrases-buffer}) 创建或访问该文件。  如果文件为空，则通过插入包含可用索引宏定义的文件头来初始化它。  该列表从 @code{reftex-index-macros} (@pxref{Defining Index Macros}) 初始化。  您可以根据需要编辑标题，但如果您定义新的 @LaTeX{} 索引宏，请不要忘记将它们添加到 @code{reftex-index-macros} 中。  这是一个短语文件头示例：
+
+@example
+% -*- mode: reftex-index-phrases -*-
+%                           Key   Macro Format       Repeat
+%----------------------------------------------------------
+>>>INDEX_MACRO_DEFINITION:   i    \index@{%s@}          t
+>>>INDEX_MACRO_DEFINITION:   I    \index*@{%s@}         nil
+>>>INDEX_MACRO_DEFINITION:   g    \glossary@{%s@}       t
+>>>INDEX_MACRO_DEFINITION:   n    \index*[name]@{%s@}   nil
+%----------------------------------------------------------
+@end example
+
+宏定义行由标识宏的唯一字母、格式字符串和 @var{repeat} 标志组成，全部由 @key{TAB} 分隔。  格式字符串显示如何应用宏，@samp{%s} 将替换为索引条目。  重复标志指示宏是否将 @var{word} 索引为 @samp{\index@{@var{word}@}} (@var{repeat} = @code{nil}) 或@samp{\index@{@var{word}@}@var{word}} (@var{repeat} = @code{t})。  在上面的例子中，假设宏@code{\index*@{@var{word}@}}已经在文本中排版了它的参数，因此不需要在宏之外重复@var{word}。
+
+@menu
+* Collecting Phrases::                从文档或外部收集。
+* Consistency Checks::                检查是否有重复项等。
+* Global Indexing::                   交互式索引过程。
+@end menu
+
+@node Collecting Phrases
+@subsection 收集短语
+@cindex Collecting index phrases
+@cindex Index phrases, collection
+@cindex Phrases, collecting
+
+可以在编写文档时收集用于索引的短语。  命令 @kbd{C-c \} (@code{reftex-index-phrase-selection-or-word}) 将当前选择（如果处于活动状态）或单词附近点复制到短语缓冲区中。  然后它选择该缓冲区，以便可以编辑短语行。  要返回到 @LaTeX{} 文档，请按 @kbd{C-c C-c} (@code{reftex-index-phrases-save-and-return})。
+
+您还可以以不同的方式准备索引短语列表并将其复制到短语文件中。  例如，您可能希望从文档的单词列表开始，并删除所有不应索引的单词。
+
+短语缓冲区中的短语行必须具有特定的格式。
+@RefTeX{} will use font-lock to indicate if a line has the proper
+格式。  短语行如下所示：
+
+@example
+[@var{key}] <TABs> @var{phrase} [<TABs> @var{arg}[&&@var{arg}]... [ || @var{arg}]...]
+@end example
+
+@code{<TABs>} 代表至少包含一个 @key{TAB} 的空白。 @var{key} 必须位于行的开头，并且是标识文件头中定义的宏之一的字符。  它是可选的；省略时，文件中的第一个宏定义行将用于该短语。  @var{phrase} 是索引时要搜索的短语。  它可能包含多个由空格分隔的单词。  默认情况下，搜索短语也是作为索引宏参数输入的文本。  如果您希望索引条目与搜索短语不同，请输入另一个 @key{TAB} 和索引参数 @var{arg}。  如果您想让每个匹配产生多个索引条目，请使用 @samp{ && }@footnote{@samp{&&} with optional spaces, see @code{reftex-index-phrases-logical-and-regexp}.} 分隔不同的索引参数。  如果您希望能够在每次匹配时在多个不同的索引参数之间进行选择，请使用 @samp{ || }@footnote{@samp{||} with optional spaces, see @code{reftex-index-phrases-logical-or-regexp}.} 将它们分开。  这是一个例子：
+
+@example
+%--------------------------------------------------------------------
+I     Sun
+i     Planet         Planets
+i     Vega           Stars!Vega
+      Jupiter        Planets!Jupiter
+i     Mars           Planets!Mars || Gods!Mars || Chocolate Bars!Mars
+i     Pluto          Planets!Pluto && Kuiper Belt Objects!Pluto
+@end example
+
+
+因此，@samp{Sun}将直接索引为@samp{\index*@{Sun@}}，而@samp{Planet}将索引为@samp{\index@{Planets@}Planet}。 @samp{Vega} 将被索引为 @samp{Stars} 的子项。  @samp{Jupiter} 行也将使用 @samp{i} 宏，因为它是文件头中的第一个宏定义（参见上面的示例）。  每次出现 @samp{Mars} 时，您都可以选择将其索引为 @samp{Planets}、@samp{Gods} 或 @samp{Chocolate Bars} 的子项。最后，每次出现 @samp{Pluto} 都将被索引为 @samp{\index@{Planets!Pluto@}\index@{Kuiper Belt Objects!Pluto@}Pluto}，因此将创建两个不同的索引条目。
+
+@node Consistency Checks
+@subsection 一致性检查
+@cindex Index phrases, consistency checks
+@cindex Phrases, consistency checks
+@cindex Consistency check for index phrases
+
+@kindex C-c C-s
+在对短语缓冲区中的短语进行索引之前，应仔细检查它们的一致性。  第一步是按字母顺序对短语进行排序；这是通过命令 @kbd{C-c C-s} (@code{reftex-index-sort-phrases}) 完成的。  它将按搜索短语的字母顺序对缓冲区中的所有短语进行排序。  如果您想要对某些短语进行分组并且仅在组内进行排序，请在组之间插入空行。  排序只会改变每组内的短语顺序（参见变量@code{reftex-index-phrases-sort-in-blocks}）。
+
+@kindex C-c C-i
+一个有用的命令是 @kbd{C-c C-i} (@code{reftex-index-phrases-info})，它列出了有关该点的短语的信息，包括索引条目的外观以及文档中预期匹配的数量的示例。
+
+@kindex C-c C-t
+另一个重要的检查是查明缓冲区中是否存在重复或重叠的条目。  例如，如果您首先搜索并索引 @samp{Mars}，然后搜索 @samp{Planet Mars}，则第二个短语将不匹配，因为之前在 @samp{Mars} 之前插入了索引宏。  命令 @kbd{C-c C-t} (@code{reftex-index-find-next-conflict-phrase}) 在缓冲区中查找下一个短语，该短语要么是重复的，要么是另一个短语的子短语。为了像这样检查整个缓冲区，请从头开始并重复执行此命令。
+
+@node Global Indexing
+@subsection 全球索引
+@cindex Global indexing
+@cindex Indexing, global
+@cindex Indexing, from @file{phrases} buffer
+
+一旦收集并组织了索引短语，您就可以进行全局索引了。  我建议仅在已完成的文档上执行此操作。  全局索引从短语缓冲区开始。有几个开始索引的命令：@kbd{C-c C-x}作用于当前短语行，@kbd{C-c C-r}作用于当前区域中的所有行，@kbd{C-c C-a}作用于缓冲区中的所有短语行。  分小块进行索引可能是件好事，因为您的注意力可能无法持续足够长的时间来一次性完成所有事情。
+
+@RefTeX{} will start at the first phrase line and search the phrase
+在整个文档中全局。  在每次匹配时，它都会停止，计算替换字符串并为您提供以下选择@footnote{Windows users: Restrict yourself to the described keys during indexing.  Pressing @key{Help} at the indexing prompt can apparently hang Emacs.}：
+
+@table @kbd
+@item y
+将此匹配项替换为建议的字符串。
+@item n
+跳过这场比赛。
+@item !
+替换该文件以及该文件中的所有其他匹配项。
+@item q
+跳过本次匹配，从下一个文件开始。
+@item Q
+跳过此匹配，从下一个短语开始。
+@item o
+为此匹配选择不同的索引宏。
+@item 1-9
+选择多个索引键之一（用 @samp{||} 分隔）。
+@item e
+编辑替换文本。
+@item C-r
+递归编辑。  使用 @kbd{C-M-c} 返回索引过程。
+@item s
+保存此缓冲区并再次询问当前匹配。
+@item S
+保存所有文档缓冲区并再次询问当前匹配项。
+@item C-g
+中止索引进程。
+@end table
+
+短语缓冲区中的@samp{Find and Index in Document}菜单还列出了一些用于索引过程的选项。  这些选项具有关联的自定义变量来设置默认值 (@pxref{Options - Index Support})。  以下是对这些选项的作用的简短说明：
+
+@table @i
+@item 匹配整个单词
+搜索索引短语时，请确保整个单词匹配。这可能应该始终处于开启状态。
+@item 区分大小写的搜索
+搜索短语时区分大小写。  我建议关闭此设置，以便匹配句子开头的大写单词，甚至拼写错误。  在您不喜欢的比赛中，您可以随时说@emph{no}。
+@item 换行长线
+插入索引宏会增加行长度。  打开此选项以允许 @RefTeX{} 换行长行。
+@item 跳过索引匹配
+当启用此功能时，@RefTeX{} 将在每场比赛中尝试确定该比赛是否已被索引。  如果匹配是索引宏的参数，或者索引宏直接位于匹配之前或之后（没有空格分隔），则认为该匹配已建立索引。  索引宏是在@code{reftex-index-macros}中配置的宏。  用于在更改后重新索引文档。
+@end table
+
+尽管索引应该是您对文档所做的最后一件事，但您之后必然会进行更改。  然后必须将索引应用于更改的区域。  命令@code{reftex-index-phrases-apply-to-region}就是为此目的而设计的。  当从具有活动区域的 @LaTeX{} 文档调用时，它将把 @code{reftex-index-all-phrases} 应用于当前区域。
+
+@node Displaying and Editing the Index
+@section 显示和编辑索引
+@cindex Displaying the Index
+@cindex Editing the Index
+@cindex Index entries, creating
+@cindex Index, displaying
+@cindex Index, editing
+@kindex C-c >
+@findex reftex-display-index
+
+要编译并显示索引，请按@kbd{C-c >}。  如果文档使用多个索引，@RefTeX{} 会要求您选择一个。  然后，所有索引条目将按字母顺序排序并显示在一个特殊的缓冲区中，即@file{*Index*}缓冲区。  您可以从该缓冲区检查和编辑每个条目。
+
+索引可以限制为当前部分或区域。  然后，只有文档该部分中的条目才会进入编译索引。  要限制为当前部分，请使用数字前缀 @samp{2}，然后按 @kbd{C-u 2 C-c >}。  要限制当前区域，请激活该区域并使用数字前缀 @samp{3}（按 @kbd{C-u 3 C-c >}）。  在 4⁣ 缓冲区内，可以通过按 @kbd{<} 和 @kbd{>} 键将限制从一个部分移至下一个部分。
+
+需要注意的是：@RefTeX{} 通过在扫描期间找到宏的缓冲区位置附近进行搜索来找到索引条目的定义点。  如果同一个缓冲区中有多个相同的索引条目，并且显着的更改已经移动了条目，则必须重新扫描缓冲区以确保 @file{*Index*} 缓冲区和定义位置之间的对应关系。  因此，建议在编辑 @file{*Index*} 缓冲区中的索引时经常重新扫描文档（使用 @kbd{r} 或 @kbd{C-u r}）。
+
+@kindex ?
+以下是 @file{*Index*} 缓冲区中可用的特殊命令的列表。  按 @kbd{?} 始终可以获得此信息的摘要。
+
+@table @kbd
+@tablesubheading{General}
+@item ?
+显示命令摘要。
+
+@item 0-9, -
+前缀参数。
+
+@tablesubheading{Moving around}
+@item ! A..Z
+按任意大写字母将跳转到 @file{*Index*} 缓冲区中的相应部分。  感叹号很特殊，它会跳转到@samp{A} 下面按字母顺序排序的第一个条目。  这些通常是非字母数字字符。
+@item n
+转到下一个条目。
+@item p
+转到上一个条目。
+
+@tablesubheading{Access to document locations}
+@item @key{SPC}
+显示文档中定义此索引条目的位置。
+
+@item @key{TAB}
+转到另一个窗口中当前索引条目的定义。
+
+@item @key{RET}
+转到当前索引条目的定义并隐藏 @file{*Index*} 缓冲区窗口。
+
+@item f
+@vindex reftex-index-follow-mode
+@vindex reftex-revisit-to-follow
+切换跟随模式。  当跟随模式处于活动状态时，另一个窗口将始终显示与 @file{*Index*} 缓冲区中的行相对应的位置。  这类似于每次光标移动后按 @key{SPC}。  该标志的默认值可以使用变量 @code{reftex-index-follow-mode} 设置。  请注意，仅显示已访问的文件中的上下文。  @RefTeX{} 不会仅仅为了跟随模式而访问文件。  然而，请参见变量@code{reftex-revisit-to-follow}。
+
+@tablesubheading{Entry editing}
+@item e
+编辑当前索引条目。  在迷你缓冲区中，您可以编辑定义此条目的索引宏。
+
+@item C-k
+杀死索引条目。  目前尚未实现，因为我不知道如何为此实现 @code{undo} 函数。
+
+@item *
+编辑条目的 @var{key} 部分。  这是条目的初始部分，决定条目在索引中的位置。
+
+@item |
+编辑条目的 @var{attribute} 部分。  这是竖线之后的部分。  对于@code{MakeIndex}来说，这部分是一个封装宏。  对于@code{xindy}，它被称为@emph{attribute}，并且是索引条目的一个属性，可以导致特殊格式。  当使用 @kbd{C-u} 前缀调用时，杀死整个 @var{attribute} 部分。
+
+@item @@
+编辑条目的 @var{visual} 部分。  这是 @samp{@@} 之后的部分，@code{MakeIndex} 使用它来更改索引中条目的视觉外观。  当使用 @kbd{C-u} 前缀调用时，杀死整个 @var{visual} 部分。
+
+@item (
+切换条目的页面范围属性 @samp{|(} 的开头。
+
+@item )
+切换条目的页面范围属性 @samp{|)} 的结尾。
+
+@item _
+将当前条目设为子条目。  该命令将提示输入上级条目并将其插入。
+
+@item ^
+删除最高上级条目。  如果当前条目是子项 (@samp{aaa!bbb!ccc})，则此函数会将其向上移动到层次结构 (@samp{bbb!ccc})。
+
+@tablesubheading{Exiting}
+@item q
+隐藏 @file{*Index*} 缓冲区。
+
+@item k
+杀死@file{*Index*}缓冲区。
+
+@item C-c =
+切换到本文档的目录缓冲区。
+
+@tablesubheading{Controlling what gets displayed}
+@item c
+@vindex reftex-index-include-context
+切换 @file{*Index*} 缓冲区中短上下文的显示。  该标志的默认值可以使用变量 @code{reftex-index-include-context} 设置。
+
+@item @}
+将索引限制为单个文档部分。  相应的节号将显示在模式行的@code{R<>}指示器和@file{*Index*}缓冲区的标题中。
+
+@item @{
+扩大索引以包含文档的所有条目。
+
+@item <
+当索引当前受到限制时，将限制移至上一部分。
+
+@item >
+当索引当前受到限制时，请将限制移至下一部分。
+
+@tablesubheading{Updating the buffer}
+@item g
+重建 @file{*Index*} 缓冲区。  这会 @emph{not} 重新扫描文档。  但是，它会再次对条目进行排序，以便编辑的条目将移动到正确的位置。
+
+@item r
+@vindex reftex-enable-partial-scans
+重新解析 @LaTeX{} 文档并重建 @file{*Index*} 缓冲区。  当 2⁣ 为非 3⁣ 时，仅重新扫描定义此位置的文件，而不是整个文档。
+
+@item C-u r
+重新解析 @emph{entire} @LaTeX{} 文档并重建 @file{*Index*} 缓冲区。
+
+@item s
+切换到不同的索引（对于具有多个索引的文档）。
+@end table
+
+
+@node Builtin Index Macros
+@section 内置索引宏
+@cindex Builtin index macros
+@cindex Index macros, builtin
+@vindex reftex-index-macros
+@cindex @code{multind}, LaTeX package
+@cindex @code{index}, LaTeX package
+@cindex LaTeX packages, @code{multind}
+@cindex LaTeX packages, @code{index}
+
+@RefTeX{} by default recognizes the @code{\index} and
+@code{\glossary} 宏在 @LaTeX{} 核心中定义。  它还内置支持在 @file{multind} 和 @file{index} 包中重新实现 @code{\index}。  但是，由于 @code{\index} 宏的不同定义是不兼容的，因此您必须显式指定所使用的索引样式。 @xref{Creating Index Entries}，了解如何执行此操作的信息。
+
+@node Defining Index Macros
+@section 定义索引宏
+@cindex  Defining Index Macros
+@cindex Index macros, defining
+@vindex reftex-index-macros
+
+当编写带有索引的文档时，您可能会定义额外的宏来将条目添加到索引中。让我们看一个例子。
+
+@example
+\newcommand@{\ix@}[1]@{#1\index@{#1@}@}
+\newcommand@{\nindex@}[1]@{\textit@{#1@}\index[name]@{#1@}@}
+\newcommand@{\astobj@}[1]@{\index@{Astronomical Objects!#1@}@}
+@end example
+
+第一个宏 @code{\ix} 在文本中排版其参数并将其放入索引中。  第二个宏@code{\nindex}在文本中排版其参数，并将其放入带有标签@samp{name}@footnote{We are using the syntax of the @file{index} package here.}的单独索引中。  最后一个宏也将其参数放入索引中，但作为主索引条目@samp{Astronomical Objects}下的子项。  以下是如何让 @RefTeX{} 识别并正确解释这些宏，首先使用 Emacs Lisp。
+
+@lisp
+(setq reftex-index-macros
+      '(("\\ix@{*@}" "idx" ?x "" nil nil)
+        ("\\nindex@{*@}" "name" ?n "" nil nil)
+        ("\\astobj@{*@}" "idx" ?o "Astronomical Objects!" nil t)))
+@end lisp
+
+请注意，主索引的索引标签为@samp{idx}，名称索引的索引标签为@samp{name}。  @samp{idx} 和 @samp{glo} 保留用于默认索引和术语表。
+
+字符参数@code{?x}、@code{?n}和@code{?o}用于在@RefTeX{}使用@code{reftex-index}插入新索引条目时快速识别这些宏。  这些代码必须是唯一的。 @code{?i}、@code{?I} 和@code{?g} 分别为@code{\index}、@code{\index*} 和@code{\glossary} 宏保留。
+
+除非您的宏向索引键添加上级条目，否则以下字符串为空； @code{\astobj} 宏就是这种情况。
+
+下一个条目可以是一个钩子函数来排除某些匹配，它几乎总是可以是@code{nil}。
+
+列表中的最后一个元素指示是否需要在宏外部重复正在索引的文本。  对于普通索引宏，这应该是@code{t}。  仅当宏排版文本中的条目时（如示例中的 @code{\ix} 和 @code{\nindex} 所做的那样），这才应该是 @code{nil}。
+
+要使用自定义执行相同的操作，您需要填写如下模板：
+
+@example
+Repeat:
+[INS] [DEL] List:
+            Macro with args: \ix@{*@}
+            Index Tag      : [Value Menu] String: idx
+            Access Key     : x
+            Key Prefix     :
+            Exclusion hook : nil
+            Repeat Outside : [Toggle]  off (nil)
+[INS] [DEL] List:
+            Macro with args: \nindex@{*@}
+            Index Tag      : [Value Menu] String: name
+            Access Key     : n
+            Key Prefix     :
+            Exclusion hook : nil
+            Repeat Outside : [Toggle]  off (nil)
+[INS] [DEL] List:
+            Macro with args: \astobj@{*@}
+            Index Tag      : [Value Menu] String: idx
+            Access Key     : o
+            Key Prefix     : Astronomical Objects!
+            Exclusion hook : nil
+            Repeat Outside : [Toggle]  on (non-nil)
+[INS]
+@end example
+
+定义宏 @code{\ix} 后，您可能需要更改用于索引文本短语 (@pxref{Creating Index Entries}) 的默认宏。这会像这样完成
+
+@lisp
+(setq reftex-index-default-macro '(?x "idx"))
+@end lisp
+
+它指定用字符 @code{?x} 标识的宏（@code{\ix} 宏）应用于使用 @kbd{C-c /} (@code{reftex-index-selection-or-word}) 索引缓冲区中已有的短语和单词。索引标签是“idx”。
+
+@node Viewing Cross-References
+@chapter 查看交叉引用
+@findex reftex-view-crossref
+@findex reftex-mouse-view-crossref
+@kindex C-c &
+@kindex S-mouse-2
+
+@RefTeX{} can display cross-referencing information.  This means,
+如果链接了两个文档位置，@RefTeX{} 可以在另一个窗口中显示匹配的位置。  @code{\label} 和 @code{\ref} 宏是建立此类链接的一种方法。  此外，@code{\cite} 宏链接到相应的 @code{\bibitem} 宏或@BibTeX{} 数据库条目。
+
+当点位于涉及交叉引用的宏的 @var{key} 参数上时，通过按 @kbd{C-c &} (@code{reftex-view-crossref}) 来调用该功能。  您还可以使用 @kbd{S-mouse-2} 单击宏参数。  以下是各个宏类将发生的情况：
+
+@table @asis
+
+@item @code{\ref}
+@cindex @code{\ref}
+显示对应的标签定义。  @code{\ref} 宏的所有常用变体@footnote{all macros that start with @samp{ref} or end with @samp{ref} or @samp{refrange}} 都处于活动状态，可用于交叉引用显示。  当当前文档通过 @code{xr} 接口 (@pxref{LaTeX xr Package}) 引用外部文档中定义的标签时，这也适用。
+
+@item @code{\label}
+@cindex @code{\label}
+@vindex reftex-label-alist
+显示引用此标签的文档位置。  按 @kbd{C-c &} 多次可浏览整个文档并查找所有位置。  不仅@code{\label}宏，还有其他带有标签参数的宏（如使用@code{reftex-label-alist}配置的）对于交叉引用显示都是活动的。
+
+@item @code{\cite}
+@cindex @code{\cite}
+显示相应的@BibTeX{}数据库条目或@code{\bibitem}。 @code{\cite} 宏的所有常用变体@footnote{all macros that either start or end with @samp{cite}} 都处于活动状态，可用于交叉引用显示。
+
+@item @code{\bibitem}
+@cindex @code{\bibitem}
+显示引用本文的文档位置。  按 @kbd{C-c &} 多次可浏览整个文档并查找所有位置。
+
+@item @BibTeX{}
+@cindex BibTeX buffer, viewing cite locations from
+@cindex Viewing cite locations from BibTeX buffer
+@kbd{C-c &} 在 @BibTeX{} 缓冲区中也处于活动状态。  将显示文档中引用该点数据库条目的所有位置。首次使用时，@RefTeX{} 将提示输入属于您要搜索的文档的缓冲区。  后续调用将使用相同的文档，直到您使用 @kbd{C-c &} 的前缀参数中断此链接。
+
+@item @code{\index}
+@cindex @code{\index}
+显示文档中由具有相同键参数的索引宏标记的其他位置。  除了标准 @code{\index} 和 @code{\glossary} 宏之外，@code{reftex-index-macros} 中配置的所有宏都将被识别。
+@end table
+
+@vindex reftex-view-crossref-extra
+虽然上述宏的交叉引用信息的显示是硬编码的，但您可以在变量 @code{reftex-view-crossref-extra} 中配置其他关系。
+
+@iftex
+@chapter All the Rest
+@end iftex
+@ifnottex
+@raisesections
+@end ifnottex
+
+@node RefTeXs Menu
+@section @RefTeX{}的菜单
+@cindex RefTeXs Menu
+@cindex Menu, in the menu bar
+
+@RefTeX{} installs a @code{Ref} menu in the menu bar on systems
+这支持这一点。  从此菜单中您可以访问所有
+@RefTeX{}'s commands and a few of its options.  There is also a
+@code{Customize} 子菜单可用于访问 @RefTeX{} 的整套选项。
+
+@node Key Bindings
+@section 默认按键绑定
+@cindex Key Bindings, summary
+
+以下是可用键绑定的摘要。
+
+@kindex C-c =
+@kindex C-c -
+@kindex C-c (
+@kindex C-c )
+@kindex C-c [
+@kindex C-c &
+@kindex S-mouse-2
+@kindex C-c /
+@kindex C-c \
+@kindex C-c |
+@kindex C-c <
+@kindex C-c >
+@example
+@kbd{C-c =}      @code{reftex-toc}
+@kbd{C-c -}      @code{reftex-toc-recenter}
+@kbd{C-c (}      @code{reftex-label}
+@kbd{C-c )}      @code{reftex-reference}
+@kbd{C-c [}      @code{reftex-citation}
+@kbd{C-c &}      @code{reftex-view-crossref}
+@kbd{S-mouse-2}  @code{reftex-mouse-view-crossref}
+@kbd{C-c /}      @code{reftex-index-selection-or-word}
+@kbd{C-c \}      @code{reftex-index-phrase-selection-or-word}
+@kbd{C-c |}      @code{reftex-index-visit-phrases-buffer}
+@kbd{C-c <}      @code{reftex-index}
+@kbd{C-c >}      @code{reftex-display-index}
+@end example
+
+请注意，仅当此密钥尚未被其他包使用时才提供 @kbd{S-mouse-2} 绑定。  @RefTeX{} 不会覆盖现有的@kbd{S-mouse-2} 绑定。
+
+就我个人而言，我还在 users @kbd{C-c} 映射中绑定了一些函数，以便于访问。
+
+@c FIXME: Do we need bindings for the Index macros here as well?
+@c C-c i   C-c I or so????
+@c How about key bindings for reftex-reset-mode and reftex-parse-document?
+@kindex C-c t
+@kindex C-c l
+@kindex C-c r
+@kindex C-c c
+@kindex C-c v
+@kindex C-c s
+@kindex C-c g
+@example
+@kbd{C-c t}    @code{reftex-toc}
+@kbd{C-c l}    @code{reftex-label}
+@kbd{C-c r}    @code{reftex-reference}
+@kbd{C-c c}    @code{reftex-citation}
+@kbd{C-c v}    @code{reftex-view-crossref}
+@kbd{C-c s}    @code{reftex-search-document}
+@kbd{C-c g}    @code{reftex-grep-document}
+@end example
+
+@noindent These keys are reserved for the user, so I cannot bind them by
+默认。  如果您希望这些键绑定可用，请在 @file{.emacs} 文件中设置：
+
+@vindex reftex-extra-bindings
+@lisp
+(setq reftex-extra-bindings t)
+@end lisp
+
+请注意，必须在加载 @RefTeX{} 之前设置此变量才能生效。
+
+更改和添加 @RefTeX{} 的键绑定最好使用 @code{with-eval-after-load} 来完成。  有关用于添加键的键映射的信息，请参阅@ref{Keymaps and Hooks}。
+
+@node Faces
+@section 面孔
+@cindex Faces
+
+@RefTeX{} uses faces when available to structure the selection and
+目录缓冲区。  它不会创建自己的面，而是使用@file{font-lock.el}中定义的面。  因此，仅当加载 2⁣ 时，@RefTeX{} 才会使用面。  这似乎是合理的，因为喜欢面孔的人很可能会加载它。  如果您想关闭字体或更改涉及的面孔，请参阅@ref{Options - Fontification}。
+
+@node Multifile Documents
+@section 多文件文档
+@cindex Multifile documents
+@cindex Documents, spread over files
+
+当处理分布在多个文件中的文档时，以下内容是相关的：
+
+@itemize @bullet
+@item 
+@RefTeX{} has full support for multifile documents.  You can edit parts of
+同时处理多个（多文件）文档而不会发生冲突。
+@RefTeX{} provides functions to run @code{grep}, @code{search} and
+@code{query-replace} 对于属于多文件文档一部分的所有文件。
+
+@item 
+@vindex tex-main-file
+@vindex TeX-master
+属于多文件文档的所有文件都应定义一个包含主文件名称的文件变量（@AUCTeX{} 为 @code{TeX-master} 或标准 Emacs @LaTeX{} 模式为 @code{tex-main-file}）。  例如，要设置文件变量 @code{TeX-master}，请在每个 @TeX{} 文件的末尾包含类似以下内容：
+
+@example
+%%% Local Variables: ***
+%%% mode:latex ***
+%%% TeX-master: "thesis.tex"  ***
+%%% End: ***
+@end example
+
+@AUCTeX{} with the setting
+
+@lisp
+(setq-default TeX-master nil)
+@end lisp
+
+实际上会询问您有关主文件的每个新文件并自动插入此注释。  有关更多详细信息，请参阅 @AUCTeX{} (@pxref{Multifile,,,auctex, The AUCTeX User Manual}) 的文档、有关 Emacs (La)TeX 模式 (@pxref{TeX Print,,,emacs, The GNU Emacs Manual}) 的文档以及有关文件变量的 Emacs 文档 (@pxref{File Variables,,,emacs, The GNU Emacs Manual})。
+
+@item 
+标签定义的上下文必须在与标签本身相同的文件中找到，才能被 @RefTeX{} 正确处理。  唯一的例外是，引用当前文件外部的节语句的节标签仍然可以使用该节标题作为上下文。
+
+@item 
+@vindex reftex-include-file-commands
+@RefTeX{} knows about the @code{\include} and @code{\input} macros.
+如果您使用不同的命令将文件包含在多文件文档中，请自定义变量@code{reftex-include-file-commands}。
+@end itemize
+
+@node Language Support
+@section 语言支持
+@cindex Language support
+
+@RefTeX{} 的某些部分与语言相关。  默认设置适用于英语。  如果您使用其他语言编写，以下提示可能有用：
+
+@itemize @bullet
+@vindex reftex-derive-label-parameters
+@vindex reftex-abbrev-parameters
+@item 
+从上下文中导出标签的机制包括单词的缩写和不重要单词的省略。  对于其他语言，这些机制可能需要更改。  请参阅变量 @code{reftex-derive-label-parameters} 和 @code{reftex-abbrev-parameters}。
+
+@vindex reftex-translate-to-ascii-function
+@vindex reftex-label-illegal-re
+@item 
+此外，当从上下文派生标签时，@RefTeX{} 会清除上下文字符串中的非 ASCII 字符以创建标签。  从 @LaTeX{} 版本 2019-10-01 开始，允许使用非 ASCII 字符
+@LaTeX{}'s @code{\label}/@code{\ref} mechanism.  If you want to change
+@RefTeX{}'s behavior and allow extended characters in labels, then take
+看一下变量 @code{reftex-translate-to-ascii-function} 和 @code{reftex-label-illegal-re}。  以下示例允许标签定义中包含任何字母和数字（以及其他字符）：
+@lisp
+(setq reftex-label-illegal-re "[^-[:alnum:]_+=:;,.]")
+@end lisp
+
+@item 
+当引用标签时，@RefTeX{} 查看 point 之前的单词来猜测需要哪种标签类型。  这些@emph{magic words}在每种语言中都是不同的。  有关如何添加魔术词的示例，请参阅@ref{Adding Magic Words}。
+
+@vindex reftex-multiref-punctuation
+@vindex reftex-cite-punctuation
+@item 
+@RefTeX{} inserts ``punctuation'' for multiple references and
+用于引用中的作者列表。  其中一些可能取决于语言。  请参阅变量 @code{reftex-multiref-punctuation} 和 @code{reftex-cite-punctuation}。
+@end itemize
+
+@node Finding Files
+@section 查找文件
+@cindex Finding files
+
+为了通过 @code{\input} 或 @code{\include} 查找文档中包含的文件，@RefTeX{} 搜索环境变量 @code{TEXINPUTS} 中指定的所有目录。  同样，它将搜索变量 @code{BIBINPUTS} 和 @code{TEXBIB} 中指定的路径
+@BibTeX{} database files.
+
+搜索时，@RefTeX{} 还将扩展递归路径定义（以 @samp{//} 或 @samp{!!} 结尾的目录）。  但它只会搜索并展开这些变量中给出的目录@emph{explicitly}。  在以下情况下这可能会导致问题：
+
+@itemize @bullet
+@item 
+大多数 @TeX{} 系统都有 @TeX{} 文件和 @BibTeX{} 文件的默认搜索路径，该路径在某些安装文件中定义。  通常这个默认路径是 @RefTeX{} 不需要看到的系统文件。  但是，如果您的文档仅在默认搜索路径中指定的目录中需要 @TeX{} 文件或 @BibTeX{} 数据库文件，则 @RefTeX{} 将无法找到它们。
+@item 
+有些 @TeX{} 系统根本不使用环境变量来指定搜索路径。  然后在安装文件中定义默认搜索路径和用户搜索路径。
+@end itemize
+
+@noindent
+有以下三种方法可以解决这个问题：
+
+@itemize @bullet
+@item 
+在环境变量中明确指定所有相关目录。  如果由于某种原因您不想弄乱默认变量 @code{TEXINPUTS} 和 @code{BIBINPUTS}，请定义您自己的变量并配置 @RefTeX{} 以使用它们：
+
+@lisp
+(setq reftex-texpath-environment-variables '("MYTEXINPUTS"))
+(setq reftex-bibpath-environment-variables '("MYBIBINPUTS"))
+@end lisp
+
+@item 
+直接在 @RefTeX{} 的变量中指定完整搜索路径。
+
+@lisp
+(setq reftex-texpath-environment-variables
+      '("./inp:/home/cd/tex//:/usr/local/tex//"))
+(setq reftex-bibpath-environment-variables
+      '("/home/cd/tex/lit/"))
+@end lisp
+
+@item 
+一些@TeX{}系统提供独立程序来进行文件搜索，就像@TeX{}和@BibTeX{}一样。  例如，Thomas Esser 的 @code{teTeX} 使用 @code{kpathsearch} 库，该库提供命令 @code{kpsewhich} 来搜索文件。  @RefTeX{} 可以配置为使用该程序。  请注意，@code{kpsewhich} 命令的确切语法取决于该程序的版本。
+
+@lisp
+(setq reftex-use-external-file-finders t)
+(setq reftex-external-file-finders
+      '(("tex" . "kpsewhich -format=.tex %f")
+        ("bib" . "kpsewhich -format=.bib %f")))
+@end lisp
+@end itemize
+
+@cindex Noweb files
+@vindex reftex-file-extensions
+@vindex TeX-file-extensions
+有些人喜欢将 RefTeX 与 noweb 文件一起使用，这些文件通常具有扩展名 @file{.nw}。  为了处理此类文件，必须将新扩展名添加到变量@code{reftex-file-extensions}中的有效扩展名列表中。  当使用@AUCTeX{}作为主要模式时，@AUCTeX{}也必须通过变量@code{TeX-file-extension}知道新的扩展。  例如：
+
+@lisp
+(setq reftex-file-extensions
+      '(("nw" "tex" ".tex" ".ltx") ("bib" ".bib")))
+(setq TeX-file-extensions
+      '("nw" "tex" "sty" "cls" "ltx" "texi" "texinfo"))
+@end lisp
+
+@node Optimizations
+@section 优化
+@cindex Optimizations
+
+@b{Note added 2002.  Computers have gotten a lot faster, so most of the optimizations discussed below will not be necessary on new machines.  I am leaving this stuff in the manual for people who want to write thick books, where some of it still might be useful.}
+
+实施最少意外原则，默认设置
+@RefTeX{} ensure a safe ride for beginners and casual users.  However,
+当在大型项目和/或小型计算机上使用 @RefTeX{} 时，有多种方法可以提高速度或内存使用率。
+
+@itemize @bullet
+@item 
+@b{Removing Lookup Buffers}@*
+@cindex Removing lookup buffers
+@RefTeX{} will load other parts of a multifile document as well as @BibTeX{}
+用于查找目的的数据库文件。  保留这些缓冲区，以便后续使用相同文件的速度更快。  如果您无法承担保留这些缓冲区的费用，并且您可以忍受速度损失，请尝试
+
+@vindex reftex-keep-temporary-buffers
+@lisp
+(setq reftex-keep-temporary-buffers nil)
+@end lisp
+
+@item 
+@b{Partial Document Scans}@*
+@cindex Partial documents scans
+@cindex Document scanning, partial
+主要 @RefTeX{} 命令上的 @kbd{C-u} 前缀@code{reftex-label} (@kbd{C-u C-c (})、@code{reftex-reference} (@kbd{C-u C-c )})、@code{reftex-citation} (@kbd{C-u C-c [})、@code{reftex-toc} (@kbd{C-u C-c =}) 和@code{reftex-view-crossref} (@kbd{C-u C-c &}) 启动重新解析整个文档以更新解析信息。  对于大型文档，这可能是不必要的，特别是如果只有一个文件发生了更改。  @RefTeX{} 可以配置为进行部分扫描而不是完整扫描。  @kbd{C-u} 重新解析仅适用于当前缓冲区和其中包含的文件。同样，标签选择缓冲区和目录缓冲区中的@kbd{r}键只会提示扫描定义了光标附近的标签或节宏的文件。  通过使用 @kbd{C-u C-u} 作为前缀或菜单中的大写 @kbd{R} 键仍然可以重新解析整个文档。  要使用此功能，请尝试
+
+@vindex reftex-enable-partial-scans
+@lisp
+(setq reftex-enable-partial-scans t)
+@end lisp
+
+@item 
+@b{Saving Parser Information}@*
+@cindex Saving parser information
+@cindex Parse information, saving to a file
+@vindex reftex-parse-file-extension
+即使启用了部分扫描，当您开始处理文档时，@RefTeX{} 仍然需要进行一次完整扫描。  为了避免这种情况，可以将解析信息存储在文件中。  文件 @file{MASTER.rel} 用于存储有关带有主文件 @file{MASTER.tex} 的文档的信息。  当您在 @code{reftex-mode} 中终止缓冲区或退出 Emacs 时，它会自动写入。  当您在新的编辑会话中开始处理文档时，该信息将被恢复。  要使用此功能，请放入@file{.emacs}：
+
+@vindex reftex-save-parse-info
+@lisp
+(setq reftex-save-parse-info t)
+@end lisp
+
+@item 
+@b{Identifying label types by prefix}@*
+@cindex Parse information, saving to a file
+@vindex reftex-trust-label-prefix
+@RefTeX{} normally parses around each label to check in which
+该标签所在的环境，以便为该标签分配标签类型。  如果您的文档包含数千个标签，则文档解析将花费相当长的时间。  如果您一直使用 tab: 和 fn: 等标签前缀，则可以告诉 @RefTeX{} 直接从前缀获取标签类型，无需额外解析。  这会更快，并且如果由于某种原因无法从上下文中导出正确的类型，标签也可以最终进入正确的类别。  例如，要为脚注和方程标签启用此功能，请使用
+
+@lisp
+(setq reftex-trust-label-prefix '("fn:" "eq:"))
+@end lisp
+
+@item 
+@b{Automatic Document Scans}@*
+@cindex Automatic document scans
+@cindex Document scanning, automatic
+在极少数情况下，@RefTeX{} 会自动重新扫描文档的一部分。  如果这妨碍了您，可以将其关闭
+
+@vindex reftex-allow-automatic-rescan
+@lisp
+(setq reftex-allow-automatic-rescan nil)
+@end lisp
+
+@RefTeX{} will then occasionally annotate new labels in the selection
+buffer，表示它们在标签列表中的位置不确定。  手动文档扫描可以解决此问题。
+
+@item 
+@b{Multiple Selection Buffers}@*
+@cindex Multiple selection buffers
+@cindex Selection buffers, multiple
+通常，为每个选择过程重新创建选择缓冲区@file{*RefTeX Select*}。  在具有很多标签的文档中，这可能需要几秒钟的时间。  @RefTeX{} 提供了一个选项，可以为每种标签类型创建单独的选择缓冲区，并将该缓冲区从一个选择保留到下一个选择。  仅当使用 @code{reftex-label} 在缓冲区类别中添加新标签时，这些缓冲区才会自动更新。  更新缓冲区所需的时间与重新创建缓冲区所需的时间一样长 - 因此节省的时间仅限于未添加该类别的新标签的情况。  要打开此功能，请使用
+
+@vindex reftex-use-multiple-selection-buffers
+@lisp
+(setq reftex-use-multiple-selection-buffers t)
+@end lisp
+
+@noindent
+@cindex Selection buffers, updating
+您还可以完全禁止自动更新。  然后选择缓冲区总是会非常快地弹出，但可能不包含最近定义的标签。  您始终可以使用 @kbd{g} 键手动更新缓冲区。  要获得此行为，请改用
+
+@vindex reftex-auto-update-selection-buffers
+@lisp
+(setq reftex-use-multiple-selection-buffers t
+      reftex-auto-update-selection-buffers nil)
+@end lisp
+@end itemize
+
+@need 2000
+@noindent
+@b{As a summary}，这是我建议大量使用的设置
+@RefTeX{} with large documents:
+
+@lisp
+@group
+(setq reftex-enable-partial-scans t
+      reftex-save-parse-info t
+      reftex-use-multiple-selection-buffers t)
+@end group
+@end lisp
+
+@node AUCTeX
+@section @AUCTeX{}
+@cindex @code{AUCTeX}, Emacs package
+@cindex Emacs packages, @code{AUCTeX}
+
+@AUCTeX{} is without doubt the best major mode for editing @TeX{} and @LaTeX{}
+使用 Emacs 文件 (@pxref{Top,AUCTeX,,auctex, The AUCTeX User Manual})。您可以从其网站 @value{AUCTEXSITE} 获取它，但由于它可以从 GNU ELPA 获得，因此您可以简单地从 @kbd{M-x list-packages} 安装它。
+
+@menu
+* AUCTeX-RefTeX Interface::           两个包如何协同工作
+* Style Files::                       @AUCTeX{}的样式文件可以支持RefTeX
+* Bib-Cite::                          文档的超文本阅读
+@end menu
+
+@node AUCTeX-RefTeX Interface
+@subsection @AUCTeX{}-@RefTeX{} 接口
+
+@RefTeX{} contains code to interface with @AUCTeX{}.  When this
+接口打开后，两个包将紧密交互。  您也可以将它们作为 @AUCTeX{} 环境@footnote{@RefTeX{} 4.0 and @AUCTeX{} 9.10c will be needed for all of this to work.  Parts of it work also with earlier versions.} 的一部分间接使用，而不是直接使用 @RefTeX{} 的命令。  该接口已打开
+
+@lisp
+(setq reftex-plug-into-AUCTeX t)
+@end lisp
+
+如果您需要更好地控制使用界面的哪些部分和不使用哪些部分，请阅读变量 @code{reftex-plug-into-AUCTeX} 的文档字符串或使用 @kbd{M-x customize-variable @key{RET} reftex-plug-into-AUCTeX @key{RET}} 自定义它。
+
+以下列表描述了该界面的各个部分。
+
+@itemize @bullet
+@item 
+@findex reftex-label
+@vindex LaTeX-label-function@r{, AUCTeX}
+@kindex C-c C-e
+@kindex C-c C-s
+@findex LaTeX-section@r{, AUCTeX}
+@findex TeX-insert-macro@r{, AUCTeX}
+@b{@AUCTeX{} calls @code{reftex-label} to insert labels}@* 当使用 @kbd{C-c C-s} 创建新部分或使用 @kbd{C-c C-e} 插入新环境时，@AUCTeX{} 通常会提示输入标签。  对于该接口，将调用 @code{reftex-label} 。例如，如果您输入 @kbd{C-c C-e equation @key{RET}}、@AUCTeX{} 和
+@RefTeX{} will insert
+
+@example
+\begin@{equation@}
+\label@{eq:1@}
+
+\end@{equation@}
+@end example
+
+@noindent
+没有进一步的提示。
+
+同样，当您输入 @kbd{C-c C-s section @key{RET}} 时，@RefTeX{} 将提供源自章节标题的默认标签。
+
+@item 
+@b{@AUCTeX{} tells @RefTeX{} about new sections}@* 当使用 @kbd{C-c C-s} 创建新部分时，@RefTeX{} 无需重新扫描缓冲区即可查看它。
+
+@item 
+@findex reftex-arg-label
+@findex TeX-arg-label@r{, AUCTeX function}
+@findex reftex-arg-ref
+@findex TeX-arg-ref@r{, AUCTeX function}
+@findex reftex-arg-cite
+@findex TeX-arg-cite@r{, AUCTeX function}
+@findex reftex-arg-index
+@findex TeX-arg-index@r{, AUCTeX function}
+@findex TeX-insert-macro@r{, AUCTeX function}
+@kindex C-c RET
+@b{@RefTeX{} supplies macro arguments}@* 当您与 @kbd{C-c @key{RET}} 交互插入宏时，@AUCTeX{} 通常会提示输入宏参数。  在内部，它使用函数 @code{TeX-arg-label}、@code{TeX-arg-cite} 和 @code{TeX-arg-index} 提示输入参数，即标签、引文键和索引条目。该接口接管这些函数@footnote{@code{fset} is used to do this, which is not reversible.  However, @RefTeX{} implements the old functionality when you later decide to turn off the interface.}并为宏参数提供@b{@RefTeX{}'s}机制。  例如，当您输入 @kbd{C-c @key{RET} ref @key{RET}} 时，@RefTeX{} 将提供其标签选择过程 (@pxref{Referencing Labels})。
+
+@item 
+@b{@RefTeX{} tells @AUCTeX{} about new labels, citation and index keys}@*
+@RefTeX{} will add all newly created labels to @AUCTeX{}'s completion list.
+@end itemize
+
+@node Style Files
+@subsection 样式文件
+@cindex Style files, AUCTeX
+@findex TeX-add-style-hook@r{, AUCTeX}
+样式文件是 Emacs Lisp 文件，由与文档 (@pxref{Style Files,,,auctex}) 的 @code{\documentclass} 和 @code{\usepackage} 命令相关联的 @AUCTeX{} 进行评估。  支持
+@RefTeX{} in such a style file is useful when the @LaTeX{} style defines
+与标签、引文或索引相关的宏或环境。许多与 @AUCTeX{} 一起分发的样式文件（例如 @file{amsmath.el}、@file{natbib.el} 或 @file{biblatex.el}）已经以这种方式支持 @RefTeX{}。
+
+在调用 @RefTeX{} 函数之前，样式挂钩应始终测试该函数的可用性，以便样式文件也适用于不使用 @RefTeX{} 的人。
+
+按照下面描述的方式使用样式文件进行的添加保留在当前文档的本地。  例如，如果一个包使用 AMSTeX，样式文件将使@RefTeX{}切换到@code{\eqref}，但这不会影响其他文档。
+
+@findex reftex-add-label-environments
+@findex reftex-add-to-label-alist
+样式钩子可能包含对 @code{reftex-add-label-environments}@footnote{This used to be the function @code{reftex-add-to-label-alist} which is still available as an alias for compatibility.} 的调用，它定义了对 @code{reftex-label-alist} 的添加。  该函数采用的参数必须具有与 @code{reftex-label-alist} 相同的格式。  例如，@AUCTeX{}的@file{amsmath.el}样式文件包含以下内容：
+
+@lisp
+@group
+(TeX-add-style-hook "amsmath"
+   (lambda ()
+     (if (fboundp 'reftex-add-label-environments)
+         (reftex-add-label-environments '(AMSTeX)))))
+@end group
+@end lisp
+
+@noindent
+@findex LaTeX-add-environments@r{, AUCTeX}
+而使用 @code{\newtheorem} 定义 @code{proposition} 环境的包 @code{myprop} 可能会使用
+
+@lisp
+@group
+(TeX-add-style-hook "myprop"
+   (lambda ()
+     (LaTeX-add-environments '("proposition" LaTeX-env-label))
+     (if (fboundp 'reftex-add-label-environments)
+         (reftex-add-label-environments
+          '(("proposition" ?p "prop:" "~\\ref@{%s@}" t
+                           ("Proposition" "Prop.") -3))))))
+@end group
+@end lisp
+
+@findex reftex-set-cite-format
+类似地，样式挂钩可能包含对 @code{reftex-set-cite-format} 的调用来设置引文格式。  Natbib 引文样式的样式文件 @file{natbib.el} 确实会切换
+@RefTeX{}'s citation format like this:
+
+@lisp
+(TeX-add-style-hook "natbib"
+   (lambda ()
+     (if (fboundp 'reftex-set-cite-format)
+         (reftex-set-cite-format 'natbib))))
+@end lisp
+
+@findex reftex-add-index-macros
+该钩子可能包含对 @code{reftex-add-index-macros} 的调用来定义附加的 @code{\index} 类宏。  该参数必须具有与 @code{reftex-index-macros} 相同的格式。  它可能是一个符号，用于触发对内置索引包之一的支持。  例如，样式 @file{multind.el} 包含
+
+@lisp
+(TeX-add-style-hook "multind"
+  (lambda ()
+    (and (fboundp 'reftex-add-index-macros)
+         (reftex-add-index-macros '(multind)))))
+@end lisp
+
+如果您有自己的包 @file{myindex} ，它定义了与 @LaTeX{} @file{index.sty} 文件一起使用的以下宏
+@example
+\newcommand@{\molec@}[1]@{#1\index@{Molecules!#1@}@}
+\newcommand@{\aindex@}[1]@{#1\index[author]@{#1@}
+@end example
+
+你可以在样式文件@file{myindex.el}中写入：
+
+@lisp
+(TeX-add-style-hook "myindex"
+   (lambda ()
+     (TeX-add-symbols
+      '("molec" TeX-arg-index)
+      '("aindex" TeX-arg-index))
+     (if (fboundp 'reftex-add-index-macros)
+         (reftex-add-index-macros
+          '(("molec@{*@}" "idx" ?m "Molecules!" nil nil)
+            ("aindex@{*@}" "author" ?a "" nil nil))))))
+@end lisp
+
+@findex reftex-add-section-levels
+最后，钩子可能包含对 @code{reftex-add-section-levels} 的调用来定义附加的节语句。  例如，FoilTeX 类只有两个标头：@code{\foilhead} 和 @code{\rotatefoilhead}。  这是一个样式文件 @file{foils.el} ，它将通知 @RefTeX{} 有关这些的信息：
+
+@lisp
+(TeX-add-style-hook "foils"
+   (lambda ()
+     (if (fboundp 'reftex-add-section-levels)
+         (reftex-add-section-levels '(("foilhead" . 3)
+                                      ("rotatefoilhead" . 3))))))
+@end lisp
+
+@node Bib-Cite
+@subsection 围脖引用
+@cindex @code{bib-cite}, Emacs package
+@cindex Emacs packages, @code{bib-cite}
+
+一旦您编写了带有标签、参考文献和引文的文档，就可以像阅读超文本文档一样阅读它。  @RefTeX{} 支持：@code{reftex-view-crossref}（绑定到@kbd{C-c &}）、@code{reftex-mouse-view-crossref}（绑定到@kbd{S-mouse-2}）和@code{reftex-search-document}。  Peter S. Galbraith 的 @file{bib-cite.el} 提供了一个带有鼠标突出显示的更精美的界面（除其他外）。  Bib-cite 和@RefTeX{} 的功能有一些重叠。  Bib-cite.el 捆绑有
+@AUCTeX{}.
+
+Bib-cite 3.06 及更高版本可以配置为 bib-cite 的鼠标功能使用 @RefTeX{} 显示参考文献和引文。这在使用 @LaTeX{} @code{xr} 包或显式 @code{thebibliography} 环境（而不是 @BibTeX{}）时尤其有用。  Bib-cite 无法处理这些，但 @RefTeX{} 可以。  要使用此功能，请尝试
+
+@vindex bib-cite-use-reftex-view-crossref
+@lisp
+(setq bib-cite-use-reftex-view-crossref t)
+@end lisp
+
+@page
+@node Problems and Work-Arounds
+@section 问题和解决方法
+@cindex Problems and work-arounds
+
+@itemize @bullet
+@item 
+@b{@LaTeX{} commands}@*
+@cindex LaTeX commands, not found
+@code{\input}、@code{\include} 和 @code{\section}（等）@: 语句必须位于一行的开头（空格除外）。
+
+@item 
+@b{Commented regions}@*
+@cindex Labels, commented out
+@RefTeX{} sees also labels in regions commented out and will refuse to
+复制此类标签。  这被认为是一个特征。
+
+@item 
+@b{Wrong section numbers}@*
+@cindex Section numbers, wrong
+@vindex reftex-enable-partial-scans
+当使用部分扫描（@code{reftex-enable-partial-scans}）时，目录中的节号最终可能会出错。  完整扫描将解决此问题。
+
+@item 
+@b{Local settings}@*
+@cindex Settings, local
+@findex reftex-add-label-environments
+@findex reftex-set-cite-format
+@findex reftex-add-section-levels
+@code{reftex-label-alist} 中的标签环境定义是全局的，适用于所有文档。  如果您需要在文档中进行本地定义，因为它们会干扰其他文档中的设置，则应使用 @AUCTeX{} 并通过调用 @code{reftex-add-label-environments}、@code{reftex-set-cite-format}、@code{reftex-add-index-macros} 和 @code{reftex-add-section-levels} 设置样式文件。使用这些功能进行的设置保留在当前文档的本地。 @xref{AUCTeX}。
+
+@item 
+@b{Funny display in selection buffer}@*
+@cindex @code{x-symbol}, Emacs package
+@cindex Emacs packages, @code{x-symbol}
+@cindex @code{isotex}, Emacs package
+@cindex Emacs packages, @code{isotex}
+@cindex @code{iso-cvt}, Emacs package
+@cindex Emacs packages, @code{iso-cvt}
+当使用使文件的缓冲区表示与其磁盘表示不同的包（例如，x-symbol、isotex、iso-cvt）时，您可能会发现@RefTeX{}的解析信息有时反映文件的磁盘状态。  这种情况仅发生在多文件文档的 @emph{unvisited} 部分，因为 @RefTeX{} 出于速度原因逐字访问这些文件。  那么简短的上下文和章节标题可能看起来与您通常在屏幕上看到的不同。在极少数情况下，@code{reftex-toc} 可能无法跳转到受影响的章节标题。  有三种可能的方法来处理这个问题：
+@itemize @minus
+@item 
+@vindex reftex-keep-temporary-buffers
+@code{(setq reftex-keep-temporary-buffers t)}@* 这意味着 @RefTeX{} 会将多文件文档的所有部分加载到 Emacs 中（即，不会有任何临时缓冲区）。
+@item 
+@vindex reftex-initialize-temporary-buffers
+@code{(setq reftex-initialize-temporary-buffers t)}@* 这意味着临时缓冲区的完全初始化。  当经常使用同一未访问的文件进行查找时，会产生惩罚。
+@item 
+将 @code{reftex-initialize-temporary-buffers} 设置为执行最小初始化的钩子函数列表。
+@end itemize
+@vindex reftex-refontify-context
+另请参见变量@code{reftex-refontify-context}。
+
+@item 
+@b{Labels as arguments to \begin}@*
+@cindex @code{pf}, LaTeX package
+@cindex LaTeX packages, @code{pf}
+某些包使用 @code{\begin} 宏的附加参数来指定标签。  例如，Lamport 的 @file{pf.sty} 同时使用
+@example
+\step@{@var{label}@}@{@var{claim}@}   and      \begin@{step+@}@{@var{label}@}
+                                  @var{claim}
+                               \end@{step+@}
+@end example
+
+@noindent
+我们需要欺骗 @RefTeX{} 吞下这个：
+
+@lisp
+@group
+;; Configuration for Lamport's pf.sty
+(setq reftex-label-alist
+  '(("\\step@{*@}@{@}"       ?p "st:" "~\\stepref@{%s@}" 2 ("Step" "St."))
+    ("\\begin@{step+@}@{*@}" ?p "st:" "~\\stepref@{%s@}" 1000)))
+@end group
+@end lisp
+
+@noindent
+第一行只是宏的正常配置。  对于 @code{step+} 环境，我们实际上告诉 @RefTeX{} 查找 @emph{macro} @samp{\begin@{step+@}} 并将 @emph{first} 参数（实际上是宏 @code{\begin} 的第二个参数）解释为 @code{?p} 类型的标签。  该宏的参数计数仅在 @samp{@{step+@}} 之后开始，也在指定如何获取上下文时开始。
+
+@end itemize
+
+@page
+@node Imprint
+@section 印记
+@cindex Imprint
+@cindex Maintainer
+@cindex Acknowledgments
+@cindex Thanks
+@cindex Bug reports
+@cindex @code{http}, @RefTeX{} website
+@cindex @code{ftp}, @RefTeX{} site
+
+@c dominik@@science.uva.nl
+@RefTeX{} was written by @i{Carsten Dominik}, with contributions by @i{Stephen
+埃格伦}。  @RefTeX{} 目前由 @value{MAINTAINER} 维护，详细信息请参阅 @value{MAINTAINERSITE}。
+
+如果您对@RefTeX{}有疑问，可以发送电子邮件至@value{SUPPORTADDRESS}。  如果您想贡献代码或想法，请写信给@value{DEVELADDRESS}。  在极少数情况下发现错误，请使用@kbd{M-x reftex-report-bug @key{RET}}，它将准备一份错误报告，其中包含有关您的设置的有用信息。  请记住添加基本信息，例如重现错误的方法、您期望发生的情况以及实际发生的情况。  将错误报告发送至@value{BUGADDRESS}。
+
+还有几个 Usenet 小组拥有可能提供帮助的有能力的读者：@code{comp.emacs}、@code{gnu.emacs.help} 和 @code{comp.text.tex}。
+
+感谢网上使用 @RefTeX{} 并通过报告帮助开发它的人们。  特别感谢@i{Ralf Angeli, Fran Burstall, Alastair Burt, Lars Clausen, Soren Dayton, Stephen Eglen, Karl Eichwalder, Erik Frisk, Peter Galbraith, Kai Grossjohann, Frank Harrell, Till A. Heilmann, Peter Heslin, Stephan Heuel, Alan Ho, Lute Kamstra, Dieter Kraft, David Kastrup, Adrian Lanz, Juri Linkov, Wolfgang Mayer, Rory Molinari, Stefan Monnier, Laurent Mugnier, Dan Nicolaescu, Sudeep Kumar Palat, Daniel Polani, Alan Shutko, Robin Socha, Richard Stanton, Allan Strand, Jan Vroonhof, Christoph Wedler, Alan Williams, Roland Winkler, Hans-Christoph Wirth, Eli Zaretskii}。
+
+@code{view-crossref} 功能的灵感来自于 @i{Peter Galbraith's} @file{bib-cite.el}。
+
+最后感谢 @i{Uwe Bolick} ，他首先让我对使用编辑器（当时是 MicroEmacs）支持 @LaTeX{} 标签和参考产生兴趣。
+
+@c Turn off the raising that we turned on in ``All the rest''.
+@ifnottex
+@lowersections
+@end ifnottex
+
+@node Commands
+@chapter 命令
+@cindex Commands, list of
+
+以下是 @RefTeX{} 的命令摘要，可以从以下位置执行
+@LaTeX{} files.  Command which are executed from the special buffers are
+此处不予描述。  所有命令均可从 @code{Ref} 菜单获得。  @xref{Key Bindings}。
+
+@deffn Command reftex-toc
+显示当前文档的目录。  当使用一个或两个 @kbd{C-u} 前缀调用时，请先重新扫描文档。
+@end deffn
+
+@deffn Command reftex-label
+插入独特的标签。  使用一个或两个 @kbd{C-u} 前缀，首先强制文档重新扫描。
+@end deffn
+
+@deffn Command reftex-reference
+启动选择过程以选择标签，并插入对其的引用。  使用一个或两个 @kbd{C-u} 前缀，首先强制文档重新扫描。
+@end deffn
+
+@deffn Command reftex-citation
+使用 @BibTeX{} 数据库文件进行引用。  提示输入正则表达式后，使用 @BibTeX{} 条目（取自 @code{\bibliography} 命令或 @code{thebibliography} 环境）扫描缓冲区，并提供匹配的条目以供选择。  所选条目根据@code{reftex-cite-format}进行格式化并插入到缓冲区中。 @* 当使用 @kbd{C-u} 前缀调用时，提示在引用宏中输入可选参数。  当使用数字前缀调用时，请进行多次引用。当用 @code{\cite} 命令的大括号内的 point 调用时，它将添加另一个键，忽略 @code{reftex-cite-format} 的值。 @* 正则表达式使用扩展语法：@samp{&&} 被解释为@code{and}。  因此，@samp{aaaa&&bbb} 匹配同时包含@samp{aaaa} 和@samp{bbb} 的条目。  输入正则表达式时，可以完成已知引文键。  @samp{=} 是一个很好的正则表达式，可以匹配所有文件中的所有条目。
+@end deffn
+
+@deffn Command reftex-index
+查询索引宏并将其及其参数插入。  可用的索引宏是在 @code{reftex-index-macro} 中定义的宏或通过调用 @code{reftex-add-index-macros} 定义的宏，通常来自 @AUCTeX{} 样式文件。  @RefTeX{} 提供索引标记和索引键的补全，并提示输入其他参数。
+@end deffn
+
+@deffn Command reftex-index-selection-or-word
+将当前选择或单词附近点放入默认索引宏中。  这使用@code{reftex-index-default-macro}中的信息来创建索引条目。  索引的短语是当前选择或附近的单词。  当使用一个 @kbd{C-u} 前缀调用时，让用户有机会编辑索引条目。  当以 2 @kbd{C-u} 作为前缀调用时，还要求提供索引宏和其他内容。  当在@TeX{}数学模式（由@AUCTeX{}一部分的@file{texmathp.el}库确定）内调用时，首先使用@code{reftex-index-math-format}处理字符串，参见。
+@end deffn
+
+@deffn Command reftex-index-phrase-selection-or-word
+将当前选择或当前点处的单词添加到短语缓冲区。当您处于瞬态标记模式并且该区域处于活动状态时，将使用选择；否则就是该词。您有机会编辑短语缓冲区中的条目；要保存缓冲区并返回到@LaTeX{}文档，请按@kbd{C-c C-c}结束。
+@end deffn
+
+@deffn Command reftex-index-visit-phrases-buffer
+切换到短语缓冲区，如果为空则初始化。
+@end deffn
+
+@deffn Command reftex-index-phrases-apply-to-region
+索引当前区域中的所有索引短语。这与索引短语缓冲区的全局索引完全相同，但操作仅限于当前区域。
+@end deffn
+
+@deffn Command reftex-display-index
+显示带有从当前文档编译的索引的缓冲区。当文档有多个索引时，首先提示输入正确的索引。当索引支持关闭时，建议将其打开。如果有一个或两个 @kbd{C-u} 前缀，请先重新扫描文档。使用前缀 2，将索引限制为当前文档部分。使用前缀 3，将索引限制到活动区域。
+@end deffn
+
+@deffn Command reftex-view-crossref
+查看该点宏的交叉引用。  点必须位于 @var{key} 参数上。  适用于宏 @code{\label}、@code{\ref}、@code{\cite}、@code{\bibitem}、@code{\index} 及其许多派生宏。  在有意义的情况下，后续调用会显示其他位置。  另请参见变量 @code{reftex-view-crossref-extra} 和命令 @code{reftex-view-crossref-from-bibtex}。  使用一两个 @kbd{C-u} 前缀，强制重新扫描文档。  使用参数 2，选择显示交叉引用的窗口。
+@end deffn
+
+@deffn Command reftex-view-crossref-from-bibtex
+查看 @LaTeX{} 文档中引用 @BibTeX{} 条目的位置。由于 @BibTeX{} 文件可以被许多 @LaTeX{} 文档使用，因此该功能会在 @RefTeX{} 模式下首次使用缓冲区时提示。  要重置此链接到文档，请使用前缀 arg 调用该函数。  多次调用此函数可找到连续的引用位置。
+@end deffn
+
+@deffn Command reftex-create-tags-file
+通过在当前文档上运行 @code{etags} 创建 TAGS 文件。  TAGS 文件也会立即通过 @code{visit-tags-table} 访问。
+@end deffn
+
+@deffn Command reftex-grep-document
+对与此文档相关的所有文件运行 grep 查询。使用前缀 arg，强制重新扫描文档。不需要活动的 TAGS 表。
+@end deffn
+
+@deffn Command reftex-search-document
+正则表达式搜索当前文档的所有文件。始终在主文件中启动。  找到匹配项时停止。不需要活动的 TAGS 表。
+@end deffn
+
+@deffn Command reftex-query-replace-document
+在整个文档上运行 @var{from} 和 @var{to} 的查询替换正则表达式。  使用前缀 arg，仅替换单词分隔的匹配项。  不需要活动的 TAGS 表。
+@end deffn
+
+@deffn Command reftex-isearch-minor-mode
+切换次要模式，使增量搜索能够在整个多文件文档上全局工作。  将按照文件在文档中出现的顺序搜索文件。
+@end deffn
+
+@deffn Command reftex-goto-label
+提示输入标签（有补全）并跳转到该标签的位置。  可选前缀参数 @var{other-window} 转到另一个窗口中的标签。
+@end deffn
+
+
+@deffn Command reftex-change-label
+查询将所有 @code{\label} 和 @code{\ref} 命令中的 @var{from} 替换为 @var{to}。  适用于整个多文件文档。  不需要活动的 TAGS 表。
+@end deffn
+
+@deffn Command reftex-renumber-simple-labels
+对文档中的所有简单标签重新编号，使其按顺序排列。简单标签是由 RefTeX 创建的标签，仅包含前缀和数字。  命令完成后，所有这些标签将在整个文档中具有连续的编号。  对标签的任何引用也将更改。  为此，@RefTeX{} 查看以字符串 @samp{ref} 开头或结尾的任何宏的参数。  应谨慎使用此命令，特别是在多文件文档中。  如果另一个文档通过 @code{xr} 包引用此文档，则不应使用它。
+@end deffn
+
+@deffn Command reftex-find-duplicate-labels
+生成文档中所有重复标签的列表。
+@end deffn
+
+@deffn Command reftex-create-bibtex-file
+@vindex reftex-create-bibtex-header
+@vindex reftex-create-bibtex-footer
+创建一个新的 @BibTeX{} 数据库文件，其中包含文档中引用的所有条目。  该命令提示输入文件名并将收集的条目写入该文件。  仅使用当前文档中使用任何类似 @code{\cite} 的宏引用的条目。  新文件中的序列与旧数据库中的序列相同。
+
+从其他条目引用的条目必须出现在所有引用条目之后。
+
+您可以分别在变量 @code{reftex-create-bibtex-header} 或 @code{reftex-create-bibtex-footer} 中定义用作所创建文件的页眉或页脚的字符串。
+@end deffn
+
+@deffn Command reftex-customize
+在 @RefTeX{} 组上运行自定义浏览器。
+@end deffn
+@deffn Command reftex-show-commentary
+显示@file{reftex.el}的评论部分。
+@end deffn
+@deffn Command reftex-info
+在顶部 @RefTeX{} 节点上运行 info。
+@end deffn
+@deffn Command reftex-parse-document
+解析整个文档以更新解析信息。
+@end deffn
+@deffn Command reftex-reset-mode
+强制重建多个内部列表和变量。  还删除与当前文档关联的解析文件。
+@end deffn
+
+@node Options
+@chapter 选项、键盘映射、挂钩
+@cindex Options, list of
+
+这是 @RefTeX{} 配置变量的完整列表。  所有变量都有自定义支持，因此如果您不熟悉 Emacs Lisp（即使您熟悉），您可能会发现使用 @code{customize} 来查看和更改这些变量会更舒服。 @kbd{M-x reftex-customize} 会带你到达那里。
+
+如果您不使用 @code{customize} 接口，请注意：更改（主要与解析相关）选项可能需要调用 @code{reftex-compile-variables} 才能生效。
+
+@menu
+* Options - Table of Contents::
+* Options - Defining Label Environments::
+* Options - Creating Labels::
+* Options - Referencing Labels::
+* Options - Creating Citations::
+* Options - Index Support::
+* Options - Viewing Cross-References::
+* Options - Finding Files::
+* Options - Optimizations::
+* Options - Fontification::
+* Options - Misc::
+* Keymaps and Hooks::
+@end menu
+
+@node Options - Table of Contents
+@section 目录
+@cindex Options, table of contents
+@cindex Table of contents, options
+
+@defopt reftex-include-file-commands
+输入另一个文件的 @LaTeX{} 命令列表。命令后面需要文件名，可以用大括号括起来，也可以用空格分隔。
+@end defopt
+
+@defopt reftex-max-section-depth
+文档结构中节级别的最大深度。标准 @LaTeX{} 需要 7，默认为 12。
+@end defopt
+
+@defopt reftex-section-levels
+用于定义文档中的部分的命令和级别。  每个 cons 单元格的 @code{car} 是节宏的名称。  @code{cdr} 是表示其级别的数字。  负值与正值的含义相同，但该部分永远不会得到数字。 @code{cdr} 也可以是一个必须返回级别的函数。  此列表还用于分段命令的升级和降级。  如果您使用的文档类具有多组分段命令，则仅当此列表首先按组排序，然后在每个组中按级别排序时，升级才能正常工作。  升级命令始终选择具有正确新级别的最近条目。
+
+@end defopt
+
+@defopt reftex-toc-max-level
+将忽略 TOC@. 章节标题中包含的目录条目的最大级别，级别较高的目录条目将被忽略。  在 RefTeX 中，章节为级别 1，节为级别 2，等等。可以使用 @kbd{t} 键在 @file{*toc*} 缓冲区内更改此变量。
+@end defopt
+
+@defopt reftex-part-resets-chapter
+非 @code{nil} 意味着 @code{\part} 与任何其他切片命令一样。这意味着，零件编号将包含在章节编号中，并且每个零件的章节计数器都将重置。当@code{nil}（默认）时，部分是特殊的，不重置章节计数器，也不显示在章节编号中。
+@end defopt
+
+@defopt reftex-auto-recenter-toc
+非@code{nil}表示打开@file{*TOC*}窗口的自动居中。当处于活动状态时，@file{*TOC*} 窗口将始终显示您当前正在工作的部分。只要 Emacs 空闲时间超过 @code{reftex-idle-time} 秒，就会发生重新定位。
+
+值@code{t}表示RefTeX启动后立即开启。  然后，重新定位将适用于会话期间创建的任何目录窗口。
+
+值 @code{frame} （默认值）表示仅当专用 TOC 框架确实存在时才打开自动重心调整，并且仅在该框架中进行重心调整。  因此，当创建该框架时（在普通目录窗口中使用 @kbd{d} 键），自动重新居中功能将打开。  当框架被破坏时，自动重新定位将再次关闭。
+
+可以从菜单（参考->选项）打开和关闭此功能。
+@end defopt
+
+@defopt reftex-toc-split-windows-horizontally
+非@code{nil}表示通过水平分割窗口来创建TOC窗口。  默认是垂直分割。
+@end defopt
+
+@defopt reftex-toc-split-windows-fraction
+用于 TOC 窗口的框架宽度或高度的分数。
+@end defopt
+
+@defopt reftex-toc-keep-other-windows
+非@code{nil}表示，分割所选窗口以显示@file{*toc*}缓冲区。  这有助于保持窗口配置，但使 @file{*toc*} 变小。  当@code{nil}时，除所选窗口外的所有其他窗口都将被删除，从而使@file{*toc*}窗口占满半帧。
+@end defopt
+
+@defopt reftex-toc-include-file-boundaries
+非 @code{nil} 表示，在 @file{*toc*} 缓冲区中包含文件边界。可以使用 @kbd{i} 键在 @file{*toc*} 缓冲区内切换该标志。
+@end defopt
+
+@defopt reftex-toc-include-labels
+非@code{nil}表示，在@file{*toc*}缓冲区中包含标签。  可以使用 @kbd{l} 键在 @file{*toc*} 缓冲区内切换该标志。
+@end defopt
+
+@defopt reftex-toc-include-index-entries
+非@code{nil}表示，在@file{*toc*}缓冲区中包含索引条目。可以使用 @kbd{i} 键在 @file{*toc*} 缓冲区内切换该标志。
+@end defopt
+
+@defopt reftex-toc-include-context
+非 @code{nil} 表示，在 @file{*toc*} 缓冲区中包含带有标签的上下文。  仅当标签也可见时才会显示上下文。可以使用 @kbd{c} 键在 @file{*toc*} 缓冲区内切换该标志。
+@end defopt
+
+@defopt reftex-toc-follow-mode
+非@code{nil}意味着，指向@file{*toc*}缓冲区（目录缓冲区）中的点将导致其他窗口跟随。  另一个窗口将显示文档的相应部分。  可以使用 @kbd{f} 键在 @file{*toc*} 缓冲区内切换该标志。
+@end defopt
+
+@deffn {Normal Hook} reftex-toc-mode-hook
+创建 @file{*toc*} 缓冲区时运行的普通钩子。
+@end deffn
+
+@deffn Keymap reftex-toc-mode-map
+@file{*toc*} 缓冲区中处于活动状态的键盘映射。 （@pxref{Table of Contents}）。
+@end deffn
+
+@node Options - Defining Label Environments
+@section 定义标签环境
+@cindex Options, defining label environments
+@cindex Defining label environments, options
+
+@defopt reftex-default-label-alist-entries
+默认标签列表规范。  它是与常数 @code{reftex-label-alist-builtin} 关联的符号列表。 @code{LaTeX} 应始终是最后一个条目。
+@end defopt
+
+@defopt reftex-label-alist
+设置此变量以定义@code{reftex-default-label-alist-entries}中默认值的添加和更改。  您 @emph{must not} 唯一更改的是 @code{?s} 是部分标签的类型指示符，@key{SPC} 是 @code{any} 标签类型。  这些是硬编码在代码中的其他位置的。
+
+变量的值必须是项目列表。  每个项目本身都是一个列表，并具有以下结构：
+
+@example
+ (@var{env-or-macro}  @var{type-key}  @var{label-prefix}  @var{reference-format}
+    @var{context-method}  (@var{magic-word} ... )  @var{toc-level})
+@end example
+
+每个列表条目都描述一个带有与 @code{\label} 和 @code{\ref} 一起使用的计数器的环境，或者一个 @LaTeX{} 宏，将标签定义为其参数之一（或在其内部）。  每个列表条目的元素是：
+
+@table @asis
+@item @var{env-or-macro}
+环境名称（如@samp{table}）或宏（如@samp{\myfig}）。  对于宏，请指示参数，如 @samp{\myfig[]@{@}@{@}@{*@}@{@}} 中所示。  使用方括号作为可选参数，使用星号来标记标签参数（如果有）。  宏不必有标签参数；您还可以在其参数之一中使用 @samp{\label@{...@}} 。
+
+特殊名称：@code{section} 表示部分标签，@code{any} 定义包含所有标签的组。
+
+这也可能是进行本地解析并识别非标准标签环境中的点的功能。  该函数必须采用参数 @var{bound} 并将向后搜索限制为此值。  它应该返回 @code{nil} 或 cons cell @code{(@var{function} . @var{position})} 以及函数符号和特殊环境开始的位置。  有关示例，请参阅信息文档。
+
+最后，如果该条目仅用于更改与类型指示符字符相关的某些设置（见下文），则这也可能是@code{nil}。
+
+@item @var{type-key}
+类型指示符（如 @code{?t}）必须是可打印的 ASCII 字符。  类型指示符是定义标签类型的单个字符。  环境或宏内的任何标签都被假定属于此类型。  相同的字符可能会在此列表中出现多次，以涵盖不同环境携带相同标签类型的情况（例如 @code{equation} 和 @code{eqnarray}）。  如果类型指示符为 @code{nil} 并且宏具有标签参数 @samp{@{*@}}，则宏定义中性标签，就像 @code{\label} 一样。  在这种情况下，该条目的其余部分将被忽略。
+
+@item @var{label-prefix}
+标签前缀字符串，如@samp{tab:}。  前缀是用作标签开头的短字符串。  它可能是空字符串。  前缀可能包含以下 @samp{%} 转义：
+
+@example
+%f Current file name, directory and extension stripped.
+%F Current file name relative to master file directory.
+%m Master file name, directory and extension stripped.
+%M Directory name (without path) where master file is located.
+%u User login name, on systems which support this.
+%S A section prefix derived with variable @code{reftex-section-prefixes}.
+@end example
+
+@noindent
+示例：在文件 @file{intro.tex} 中，@samp{eq:%f:} 将变为 @samp{eq:intro:}。
+
+@item @var{reference-format}
+用于在缓冲区中插入引用的格式化字符串。  @samp{%s} 将被标签替换。  当格式以 @samp{~} 开头时，仅当 point 之前的字符为 @emph{not} 空格时才会插入此 @samp{~}。
+
+@item @var{context-method}
+有关如何查找简短上下文的指示。
+@itemize @minus
+@item 
+如果@code{nil}，则使用@samp{\label@{...@}}宏后面的文本。
+@item 
+如果@code{t}，则使用
+@itemize @minus
+@item 
+章节标签的章节标题。
+@item 
+@samp{\begin@{...@}} 环境语句后面的文本（对于 eqnarray 或 enumerate 等环境来说不是一个好的选择，因为在这些环境中，单个环境中有多个标签）。
+@item 
+宏名称后面的文本（从第一个参数开始）。
+@end itemize
+@item 
+如果是整数，则使用宏的第 n 个参数。  作为一种特殊情况，1000 表示获取最后一个宏参数之后的文本。
+@item 
+如果是字符串，则使用正则表达式从标签中搜索@emph{backward}。上下文就是比赛结束后的文本。  例如，将其设置为 @samp{\\caption[[@{]} will use the caption in a figure or table environment.  @samp{\\begin@{eqnarray@}\|\\\\} works for eqnarrays.
+@item 
+如果 @code{caption}、@code{item}、@code{eqnarray-like}、@code{alignat-like} 中的任何一个，该符号将在内部转换为适当的正则表达式（另请参见变量 @code{reftex-default-context-regexps}）。
+@item 
+如果是函数，则使用环境/宏的名称作为参数来调用该函数。  调用时，点将位于 @code{\label} 宏之后。该函数预计会返回合适的上下文字符串。  当未能找到上下文时，它应该抛出异常（错误）。  作为示例，以下函数返回标签宏后面的 10 个字符作为上下文：
+
+@example
+(defun my-context-function (env-or-mac)
+   (if (> (point-max) (+ 10 (point)))
+       (buffer-substring (point) (+ 10 (point)))
+     (error "Buffer too small")))
+@end example
+@end itemize
+
+@RefTeX{} 以两种方式使用标签上下文：用于在标签菜单中显示，以及派生标签字符串。  如果您想对其中每个方法使用不同的方法，请将它们指定为点对。例如，@code{(nil . t)} 使用标签 (@code{nil}) 之后的文本进行显示，并使用默认位置 (@code{t}) 中的文本来派生标签字符串。  这实际上用于部分标签。
+
+@item @var{magic-word-list}
+标识此类引用的魔术词列表。  如果调用 @code{reftex-reference} 时，point 之前的单词等于这些单词之一，则提供的标签列表将自动限制为正确类型的标签。  如果此单词列表的第一个元素是符号 @code{regexp}，则字符串将被解释为正则表达式。
+
+@item @var{toc-level}
+应将此环境添加到目录的整数级别。  另请参见@code{reftex-section-levels}。  正值将对与同一级别的分段命令混合的条目进行编号。  负值将产生未编号的条目。  仅适用于构建文档的类似定理的环境。  对于宏将被忽略。  当省略或 @code{nil} 时，不会生成任何 TOC 条目。
+@end table
+
+如果两个或多个条目的类型指示符相同，
+@RefTeX{} will use
+@itemize @minus
+@item 
+第一个非@code{nil}格式和前缀
+@item 
+所有相关条目的魔咒。
+@end itemize
+
+任何列表条目也可以是一个符号。  如果它在 @code{reftex-label-alist-builtin} 中有关联，则该关联的 @code{cddr} 会被拼接到列表中。  但是，内置默认值通常应使用变量 @code{reftex-default-label-alist-entries} 设置。
+@end defopt
+
+@defopt reftex-label-regexps
+匹配 @samp{\label} 定义的正则表达式列表。  默认值与通常的 @samp{\label@{@dots{}@}} 定义和键值样式 @samp{[@dots{}, label = @{@dots{}@}, @dots{}]} 标签定义匹配。  键值样式的正则表达式显式查找包 @code{listings} (@code{lstlisting})、@code{beamer} (@code{frame})、@code{breqn} (@code{dmath}、@code{dseries}、@code{dgroup}、@code{darray}) 包提供的环境以及由相同包提供的宏 @code{\ctable}名字。
+
+假设正则表达式组 1 与标签文本匹配，因此在添加新正则表达式时必须使用 @samp{\(?1:...\)} 定义它。
+
+当从 Lisp 进行更改时，请确保随后调用 @code{reftex-compile-variables} 以使更改生效。
+@end defopt
+
+@defopt reftex-section-prefixes
+部分标签的前缀。  当@code{reftex-label-alist}中的条目中给出的标签前缀包含@samp{%S}时，此列表用于根据当前部分级别确定正确的前缀字符串。  该列表是一个 alist，每个条目的形式为 @w{@code{(@var{key} . @var{prefix})}}。  可能的键是分段宏名称，如 @samp{chapter}、整数分段级别（如 @code{reftex-section-levels} 中给出）和默认值 @code{t}。
+@end defopt
+
+@defopt reftex-default-context-regexps
+使用默认正则表达式查找上下文的 Alist。  emacs lisp 形式 @w{@code{(format regexp (regexp-quote environment))}} 用于计算最终的正则表达式，因此 @samp{%s} 将被替换为环境或宏。
+@end defopt
+
+@defopt reftex-trust-label-prefix
+非@code{nil}表示在确定标签类型时信任标签前缀。习惯上使用特殊的标签前缀来区分不同的标签类型。  标签前缀在 @LaTeX{} 中没有语法意义（除非使用像 fancyref 这样的特殊包）。  默认情况下，RefTeX 可以解析每个标签以检测正确的标签类型，但当文档包含数千个标签时，此过程可能会很慢。  如果您一致地使用标签前缀，则可以通过将此变量设置为非 @code{nil} 值来加快文档解析速度。  然后，RefTeX 会将标签前缀与@code{reftex-label-alist} 中找到的前缀进行比较，并以这种方式导出正确的标签类型。该选项的可能值为：
+
+@example
+t       @r{This means to trust any label prefixes found.}
+regexp  @r{If a regexp, only prefixes matched by the regexp are trusted.}
+list    @r{List of accepted prefixes, as strings.  The colon is part of}
+        @r{the prefix, e.g., ("fn:" "eqn:" "item:").}
+nil     @r{Never trust a label prefix.}
+@end example
+使用此功能的唯一缺点是，与每个标签一起显示在标签选择缓冲区中的标签上下文只是标签定义之后的一些文本。  如果您在放置标签时牢记这一点（例如，@i{before} 方程、@i{at the beginning} 图/选项卡标题...），那么这不是问题。  无论如何，最好使用正则表达式或列表值类型来微调此功能。例如，如果您的文档包含数千个带有标签 fn:xxx 的脚注，您可能需要将此变量设置为值“^fn:$”或 (“fn:”)。  然后 RefTeX 仍然会对任何非脚注标签进行广泛的解析。
+@end defopt
+
+@node Options - Creating Labels
+@section 创建标签
+@cindex Options, creating labels
+@cindex Creating labels, options
+
+@defopt reftex-insert-label-flags
+管理标签插入的标志。  该值具有以下形式
+
+@example
+(@var{derive} @var{prompt})
+@end example
+
+如果@var{derive}是@code{t}，@RefTeX{}将尝试从上下文中导出一个合理的标签。  例如，部分标签将从部分标题中派生出来。  上下文到有效标签的转换由@code{reftex-derive-label-parameters}中给出的规范控制。  如果 @var{derive} 是 @code{nil}，则默认标签将由前缀和唯一编号组成，如 @samp{eq:23}。
+
+如果 @var{prompt} 是 @code{t}，系统将提示用户输入标签字符串。  当@var{prompt}为@code{nil}时，将插入默认标签，无需查询。
+
+因此@var{derive}和@var{prompt}的组合控制标签插入。  这是一个描述所有四种可能性的表格：
+
+@example
+@group
+@var{derive} @var{prompt} @var{action}
+-----------------------------------------------------------
+nil    nil    @r{Insert simple label, like @samp{eq:22} or @samp{sec:13}. No query.}
+nil    t      @r{Prompt for label.}
+t      nil    @r{Derive a label from context and insert. No query.}
+t      t      @r{Derive a label from context, prompt for confirmation.}
+@end group
+@end example
+
+每个标志可以设置为 @code{t}、@code{nil} 或一串标签类型字母，指示其应该为真的标签类型。  因此，可以针对每个标签类型不同地设置组合。  默认设置 @samp{"s"} 和 @samp{"sft"} 的意思是：从标题派生章节标签（需要确认）。  提示输入图形和表格标签。  使用简单的标签，无需确认其他所有内容。
+
+可用的标签类型有：@code{s}（部分）、@code{f}（图）、@code{t}（表格）、@code{i}（项目）、@code{e}（方程）、@code{n}（脚注）、@code{N}（尾注）以及@code{reftex-label-alist}中的任何定义。
+@end defopt
+
+@deffn Hook reftex-format-label-function
+如果非@code{nil}，则应该是一个生成要作为标签定义插入的字符串的函数。  该函数将使用两个参数来调用：@var{label} 和 @var{default-format}（通常是@samp{\label@{%s@}}）。  它应该返回要插入缓冲区的字符串。
+@end deffn
+
+@deffn Hook reftex-string-to-label-function
+将任意字符串转换为有效标签的函数。
+@RefTeX{}'s default function uses the variable
+@code{reftex-derive-label-parameters}.
+@end deffn
+
+@deffn Hook reftex-translate-to-ascii-function
+过滤器函数将在使用上下文字符串从中派生标签之前对其进行处理。  预期的应用是将 ISO 或 Mule 字符转换为标签中有效的字符。  默认函数 @code{reftex-latin1-to-ascii} 删除 Latin-1 字符中的重音符号。  X-Symbol (>=2.6) 将此变量设置为更通用的 @code{x-symbol-translate-to-ascii}。
+@end deffn
+
+@defopt reftex-derive-label-parameters
+用于将字符串转换为标签的参数。  该变量是以下项目的列表：
+@table @asis
+@item @var{nwords}
+要使用的字数。
+@item @var{maxchar}
+标签字符串中的最大字符数。
+@item @var{invalid}
+@code{nil}：丢弃标签中包含无效字符的任何单词。@* @code{t}：仅丢弃无效字符，而不是整个单词。
+@item @var{abbrev}
+@code{nil}：从不缩写单词。@* @code{t}：始终缩写单词（请参阅@code{reftex-abbrev-parameters}）。@* @code{1}：如果需要缩短标签字符串，则缩写单词。
+@item @var{separator}
+分隔标签中不同单词的字符串。
+@item @var{ignorewords}
+不应成为标签一部分的单词列表。
+@item @var{downcase}
+@code{t}：在将单词放入标签之前先将其小写。@*
+@end table
+@end defopt
+
+@defopt reftex-label-illegal-re
+正则表达式匹配字符在标签中无效。
+@end defopt
+
+@defopt reftex-abbrev-parameters
+单词缩写参数。  四个参数的列表。
+@table @asis
+@item @var{min-chars}
+缩写后剩余的最少字符数。
+@item @var{min-kill}
+缩写单词时要删除的最少字符数。
+@item @var{before}
+Word 中缩写点之前的字符类。
+@item @var{after}
+Word 中缩写点之后的字符类。
+@end table
+@end defopt
+
+@node Options - Referencing Labels
+@section 引用标签
+@cindex Options, referencing labels
+@cindex Referencing labels, options
+
+@defopt reftex-label-menu-flags
+管理标签菜单构成的标志列表。  这些标志是：
+@table @asis
+@item @var{table-of-contents}
+显示嵌入上下文表中的标签。
+@item @var{section-numbers}
+在目录中包含章节编号（如 4.1.3）。
+@item @var{counters}
+显示计数器。  这只是对菜单中的标签进行编号。
+@item @var{no-context}
+非 @code{nil} 表示 @emph{not} 显示短上下文。
+@item @var{follow}
+遵循其他窗口中的完整上下文。
+@item @var{show-commented}
+显示被注释掉的区域的标签。
+@item @var{match-everywhere}
+过时的标志。
+@item @var{show-files}
+显示包含文件的开头和结尾。
+@end table
+
+这些标志中的每一个都可以设置为@code{t}或@code{nil}，或者设置为指示其应该为真的标签类型的类型字母字符串。这些字符串的工作方式类似于正则表达式中的字符类。  因此，将其中一个标志设置为 @samp{"sf"} 使该标志对于部分和图形标签为 true，对于其他所有内容为 @code{nil}。  将其设置为@samp{"^sf"} 则相反。
+
+可用的标签类型有：@code{s}（部分）、@code{f}（图）、@code{t}（表格）、@code{i}（项目）、@code{e}（方程）、@code{n}（脚注）以及 @code{reftex-label-alist} 中的任何定义。
+
+大多数选项也可以从标签菜单本身进行切换，因此，如果您决定在标签菜单中不包含目录，您仍然可以在从标签菜单中进行选择时以交互方式获取目录。
+@end defopt
+
+@defopt reftex-multiref-punctuation
+多个引用的标点符号字符串。  当在选择缓冲区中使用标记来选择多个引用时，该变量将 3 个标记字符 @samp{,-+} 与要插入缓冲区中相应 @code{\ref} 宏之前的前缀字符串相关联。这用于将整个参考集串在一起，就像在一次调用 @code{reftex-reference} 中使用 @samp{eqs. 1,2,3-5,6 and 7} 一样。
+@end defopt
+
+@defopt reftex-ref-style-alist
+参考样式列表。  每个元素都是样式名称的列表、与样式关联的 @LaTeX{} 包的名称或任何包的 @code{t} 以及宏列表，其中每个项目的第一个条目是参考宏，第二个条目是在提示宏类型时用于选择宏的键。  （另请参见@code{reftex-ref-macro-prompt}。）表示为字符的键必须是唯一的。
+@end defopt
+
+@defopt reftex-ref-style-default-list
+默认情况下激活的参考样式列表。  该顺序很重要，它控制宏在缓冲区中循环以选择标签的顺序。  列表中的条目必须与变量 @code{reftex-ref-style-alist} 中使用的相应引用样式名称相匹配。
+@end defopt
+
+@defopt reftex-ref-macro-prompt
+控制 @code{reftex-reference} 是否提示输入参考宏。
+@end defopt
+
+@deffn Hook reftex-format-ref-function
+如果非@code{nil}，则应该是一个生成要插入作为引用的字符串的函数。  请注意，插入格式也可以使用 @code{reftex-label-alist} 更改。  这个钩子也被特殊命令用来插入，例如 @code{\vref} 和 @code{\fref} 引用，所以即使你设置了这个，你的设置也会被特殊命令忽略。  该函数将使用三个参数进行调用：@var{label}、@var{default format}（通常为@samp{~\ref@{%s@}}）和@var{reference style}。  该函数应返回要插入缓冲区的字符串。
+@end deffn
+
+@defopt reftex-level-indent
+每个节级别用于缩进的空格数。
+@end defopt
+
+@defopt reftex-guess-label-type
+非 @code{nil} 意味着 @code{reftex-reference} 将尝试猜测标签类型。  为此，@RefTeX{} 将查看光标之前的单词，并将其与 @code{reftex-label-alist} 中给出的魔术词进行比较。  当找到匹配项时，@RefTeX{}将立即提供正确的标签菜单；否则它会提示您输入标签类型。  如果将此变量设置为 @code{nil}，@RefTeX{} 将始终提示输入标签类型。
+@end defopt
+
+@deffn {Normal Hook} reftex-display-copied-context-hook
+正常钩子在上下文显示在任何地方之前运行。  专为 @w{@code{X-Symbol}} 设计，但也可能有其他用途。
+@end deffn
+
+@deffn Hook reftex-pre-refontification-functions
+@code{X-Symbol}特定钩子。  对于其他目的可能没有用。这些函数有两个参数，一个是命令开始处的缓冲区，另一个是指示在什么上下文中调用钩子的符号。
+@end deffn
+
+@deffn {Normal Hook} reftex-select-label-mode-hook
+当选择缓冲区进入@code{reftex-select-label-mode}时运行的普通钩子。
+@end deffn
+
+@deffn Keymap reftex-select-label-mode-map
+在标签选择过程中处于活动状态的键盘映射 (@pxref{Referencing Labels})。
+@end deffn
+
+@node Options - Creating Citations
+@section 创建引文
+@cindex Options, creating citations
+@cindex Creating citations, options
+
+@defopt reftex-bibliography-commands
+@LaTeX{} commands which specify the @BibTeX{} databases to use with the document.
+@end defopt
+
+@defopt reftex-bibfile-ignore-regexps
+用于排除 @code{\bibliography@{..@}} 中的文件的正则表达式列表。  与任何这些正则表达式匹配的文件名都不会被解析。  适用于仅包含 @code{@@string} 宏定义等的文件，这些定义将被忽略
+@RefTeX{} anyway.
+@end defopt
+
+@defopt reftex-default-bibliography
+如果未指定，则应使用的 @BibTeX{} 数据库文件列表。当从既没有 @samp{\bibliography@{...@}} 语句也没有 @code{thebibliography} 环境的文档调用 @code{reftex-citation} 时，@RefTeX{} 将扫描这些文件。  用于在非 @LaTeX{} 文件中使用 @code{reftex-citation}。  将沿着 BIBINPUTS 或 TEXBIB 路径搜索文件。
+@end defopt
+
+@defopt reftex-sort-bibtex-matches
+通过引用文本对 @BibTeX{} 数据库中找到的条目进行排序。可能的值：
+@example
+nil          @r{Do not sort entries.}
+author       @r{Sort entries by author name.}
+year         @r{Sort entries by increasing year.}
+reverse-year @r{Sort entries by decreasing year.}
+@end example
+@end defopt
+
+@defopt reftex-cite-format
+要插入缓冲区的引文格式。  它可以是字符串、列表或符号。  在最简单的情况下，这只是字符串 @samp{\cite@{%l@}}，这也是默认值。  有关更复杂的示例，请参阅 @code{reftex-cite-format-builtin} 的定义。
+
+如果@code{reftex-cite-format}是一个字符串，它将被用作格式。在格式中，以下百分比转义将被扩展。
+
+@table @code
+@item %l
+引文的 @BibTeX{} 标签。
+@item %a
+作者姓名列表，另见@code{reftex-cite-punctuation}。
+@item %2a
+与 %a 类似，但缩写为 2 位以上作者，例如 Jones 等人。
+@item %A
+仅第一作者姓名。
+@item %e
+与 @samp{%a} 类似，但位于编辑器名称列表中。 （@samp{%2e} 和 @samp{%E} 效果很好）。
+@end table
+
+还可以访问所有其他 @BibTeX{} 数据库字段：
+
+@example
+%b booktitle     %c chapter        %d edition    %h howpublished
+%i institution   %j journal        %k key        %m month
+%n number        %o organization   %p pages      %P first page
+%r address       %s school         %u publisher  %t title
+%v volume        %y year
+%B booktitle, abbreviated          %T title, abbreviated
+@end example
+
+@noindent
+通常，只需要@samp{%l}。  其他的东西主要是回声区域显示，以及@code{(setq reftex-comment-citations t)}。
+
+@samp{%<} 作为特殊运算符，在字符串格式化后会删除标点符号和周围的空格。
+
+一对方括号表示可选参数，RefTeX 将提示输入这些参数的值。
+
+请注意，这一切仅适用于 @BibTeX{} 数据库文件。  当在显式 @code{thebibliography} 环境中从 @code{\bibitems} 进行引用时，只有 @samp{%l} 可用。
+
+如果 @code{reftex-cite-format} 是字符和字符串列表，系统将提示用户输入一个字符以选择可能的格式字符串之一。
+
+为了配置此变量，您可以直接自己设置 @code{reftex-cite-format} 或将其设置为预定义样式之一的 @emph{symbol}。  预定义符号是那些与常数 @code{reftex-cite-format-builtin} 相关的符号，例如：@code{(setq reftex-cite-format 'natbib)}。
+@end defopt
+
+@deffn Hook reftex-format-cite-function
+如果非@code{nil}，则应该是一个生成要作为引用插入的字符串的函数。  请注意，引文格式也可以使用变量 @code{reftex-cite-format} 进行更改。  该函数将使用两个参数来调用，即 @var{citation-key} 和 @var{default-format}（取自 @code{reftex-cite-format}）。  它应该返回要插入缓冲区的字符串。
+@end deffn
+
+@defopt reftex-cite-prompt-optional-args
+非 @code{nil} 表示在引用宏中提示空可选参数。当 @code{reftex-cite-format} 中的条目带有方括号以指示可选参数（例如 @samp{\cite[][]@{%l@}}）时，RefTeX 可以提示输入值。  可能的值为：
+@example
+nil     @r{Never prompt for optional arguments}
+t       @r{Always prompt}
+maybe   @r{Prompt only if @code{reftex-citation} was called with C-u prefix arg}
+@end example
+在插入缓冲区之前，不必要的空可选参数将被删除。  参见@code{reftex-cite-cleanup-optional-args}。
+@end defopt
+
+@defopt reftex-cite-cleanup-optional-args
+非@code{nil}表示，如果可能的话，从引用宏中删除空的可选参数。
+@end defopt
+
+@defopt reftex-comment-citations
+非@code{nil}表示为描述完整条目的每个引文添加注释。  注释的格式根据@code{reftex-cite-comment-format}。
+@end defopt
+
+@defopt reftex-cite-comment-format
+用于注释引文的引文格式。  必须@emph{not}包含@samp{%l}。  请参阅变量 @code{reftex-cite-format} 了解可能的逃逸百分比。
+@end defopt
+
+@defopt reftex-cite-punctuation
+引文中姓名列表格式的标点符号。  这是 3 个字符串的列表。
+@enumerate
+@item
+普通名称分隔符，如 Jones、Brown 和 Miller 中的 @samp{, }
+@item
+最终名称分隔符，如 Jones、Brown 和 Miller 中的 @samp{ and }
+@item
+@samp{et al.} 字符串，如 Jones @{\it et al.@} 中的 @samp{ @{\it et al.@}}
+@end enumerate
+@end defopt
+
+@deffn {Normal Hook} reftex-select-bib-mode-hook
+当选择缓冲区进入@code{reftex-select-bib-mode}时运行的普通钩子。
+@end deffn
+
+@deffn Keymap reftex-select-bib-mode-map
+在引文键选择过程中处于活动状态的键映射 (@pxref{Creating Citations})。
+@end deffn
+
+@defopt reftex-cite-key-separator
+用于分隔单个 @samp{\cite} 宏中的多个键的字符串。默认情况下，这是@samp{","}，但如果您经常需要处理大量条目并且需要将宏分成几行，您可能需要将其更改为@samp{", "}。
+@end defopt
+
+@defopt reftex-create-bibtex-header
+要插入由 @code{reftex-create-bibtex-file} 生成的 BibTeX 文件的标头。
+@end defopt
+
+@defopt reftex-create-bibtex-footer
+页脚插入到由 @code{reftex-create-bibtex-file} 生成的 BibTeX 文件中。
+@end defopt
+
+
+@node Options - Index Support
+@section 指数支持
+@cindex Options, Index support
+@cindex Index support, options
+
+@defopt reftex-support-index
+非@code{nil} 意味着索引条目也会被解析。  索引支持是资源密集型的，并且保存解析信息的内部结构可能会变得相当大。  因此可以将其关闭。  当这是@code{nil}并且您执行需要索引支持的命令时，系统会要求您确认以打开它并重新扫描文档。
+@end defopt
+
+@defopt reftex-index-special-chars
+索引条目中的特殊字符列表，以字符串形式给出。  它们对应于 @code{MakeIndex} 关键字 @code{(@var{level} @var{encap} @var{actual} @var{quote} @var{escape})}。
+@end defopt
+
+@defopt reftex-index-macros
+定义索引条目的宏列表。  每个条目的结构是
+@lisp
+(@var{macro} @var{index-tag} @var{key} @var{prefix} @var{exclude} @var{repeat})
+@end lisp
+
+@var{macro} 是宏。  参数应该用空大括号表示，例如@samp{\index[]@{*@}}中。  使用方括号表示可选参数。  星号标记索引键所在的位置。
+
+@var{index-tag} 是索引的简称。  @samp{idx} 和 @samp{glo} 保留用于默认索引和术语表。  也可以定义其他索引。  如果这是一个整数，则宏的第 N 个参数保存索引标记。
+
+@var{key} 是一个字符，用于标识与 @code{reftex-index} 输入的宏。  @samp{?i}、@samp{?I} 和 @samp{?g} 保留用于默认索引和术语表。
+
+@var{prefix} 可以是添加到索引条目的 @var{key} 部分的前缀。  如果你有一个宏@code{\newcommand@{\molec@}[1]@{#1\index@{Molecules!#1@}}, this prefix should be @samp{Molecules!}.
+
+@var{exclude} 可以是一个函数。  如果此函数存在并返回非 1⁣ 值，则忽略该点的索引条目。  实现此功能是为了支持 @LaTeX{}2e @code{index} 包中的（已弃用的）@samp{^} 和 @samp{_} 快捷方式。
+
+@var{repeat}，如果非@code{nil}，则表示索引宏不会排版文本中的条目，因此必须在索引宏之外重复文本。  @code{reftex-index-selection-or-word} 和从短语缓冲区进行索引所需。
+
+最后的条目也可能是一个符号。  它必须在变量 @code{reftex-index-macros-builtin} 中具有关联，以指定您正在使用的主索引包。  当前有效值为
+@example
+default         @r{The @LaTeX{} default; unnecessary to specify this one}
+multind         @r{The multind.sty package}
+index           @r{The index.sty package}
+index-shortcut  @r{The index.sty packages with the ^ and _ shortcuts.}
+                @r{Should not be used; only for old documents}
+@end example
+请注意，@AUCTeX{} 也在内部为 @RefTeX{} 设置这些内容，因此对于足够新的 @AUCTeX{} 版本，您不应该在此处设置包。
+@end defopt
+
+@defopt reftex-index-default-macro
+@code{reftex-index-selection-or-word} 的默认索引宏。这是一个带有@code{(@var{macro-key} @var{default-tag})}的列表。
+
+@var{macro-key} 是标识索引宏的字符；参见@code{reftex-index-macros}。
+
+如果宏需要 @var{tag} 参数，@var{default-tag} 是要使用的标签。  当这是@code{nil}并且需要@var{tag}时，
+@RefTeX{} will ask for it.  When this is the empty string and the
+索引宏的 TAG 参数是可选的，TAG 参数将被省略。
+@end defopt
+
+@defopt reftex-index-default-tag
+默认索引标签。  使用多个索引时，RefTeX 在创建索引条目或显示特定索引时查询索引标记。  此变量控制为这些查询提供的默认值。在选择或完成过程中可以使用 @key{RET} 选择默认值。  该变量的有效值为：
+@example
+nil        @r{Do not provide a default index}
+"tag"      @r{The default index tag given as a string, e.g., "idx"}
+last       @r{The last used index tag will be offered as default}
+@end example
+@end defopt
+
+@defopt reftex-index-math-format
+从数学模式内部复制时索引条目的格式。  当在@TeX{}数学模式中执行@code{reftex-index-selection-or-word}时，从缓冲区复制的索引键将通过@code{format}函数使用此格式字符串进行处理。  这可用于将数学分隔符（例如，@samp{$}）添加到字符串中。  需要 @file{texmathp.el} 库，它是 @AUCTeX{} 的一部分。
+@end defopt
+
+@defopt reftex-index-phrase-file-extension
+索引短语文件的文件扩展名。  该扩展名将添加到主文件的基本名称中。
+@end defopt
+
+@defopt reftex-index-phrases-logical-and-regexp
+与短语文件中索引参数的 @samp{and} 运算符匹配的正则表达式。  当短语行中的多个索引参数用此运算符分隔时，每个部分都会生成一个索引宏。  因此，搜索短语的每次匹配都会产生@emph{several}不同的索引条目。确保这不匹配不是分隔符的东西。  该逻辑@samp{and}比@code{reftex-index-phrases-logical-or-regexp}中指定的逻辑@samp{or}具有更高的优先级。
+@end defopt
+
+@defopt reftex-index-phrases-logical-or-regexp
+与短语文件中索引参数的 @samp{or} 运算符匹配的正则表达式。  当短语行中的多个索引参数被此运算符分隔时，系统将要求用户在搜索短语的每次匹配时选择其中一个。  第一个索引 arg 将是默认值。  必须按下数字键@kbd{1}--@kbd{9}才能切换到另一个。  确保这不匹配不是分隔符的东西。  @code{reftex-index-phrases-logical-or-regexp} 中指定的逻辑@samp{and} 比该逻辑@samp{or} 具有更高的优先级。
+@end defopt
+
+@defopt reftex-index-phrases-search-whole-words
+非@code{nil}表示短语搜索将查找整个单词，而不是子词。这是通过在搜索字符串的开头和结尾要求单词边界来实现的。  当搜索短语在这些点之一已经具有非单词字符时，那里不需要单词边界。
+@end defopt
+
+@defopt reftex-index-phrases-case-fold-search
+非@code{nil}表示搜索索引短语将忽略大小写。
+@end defopt
+
+@defopt reftex-index-verify-function
+在全局索引期间每次匹配时调用的函数。如果函数返回@code{nil}，则跳过当前匹配。
+@end defopt
+
+@defopt reftex-index-phrases-skip-indexed-matches
+非 @code{nil} 意味着跳过看起来已经被索引的匹配。当从短语缓冲区进行全局索引时，对某些短语的搜索可能会在该短语已建立索引的位置匹配。  特别是当再次索引已经处理过的文档时，这甚至会成为常态。  当该变量为非@code{nil}时，
+@RefTeX{} checks if the match is an index macro argument, or if an
+索引宏位于短语之前或之后。  如果是这种情况，该匹配将被忽略。
+@end defopt
+
+@defopt reftex-index-phrases-wrap-long-lines
+非@code{nil}表示，当从短语缓冲区索引时，换行。在一行中插入索引命令会使行变长，通常会长到无法在屏幕上显示。  当此变量为非 1 时，将根据需要在索引命令之前和/或之后添加换行符以保持行短。  但是，匹配的文本短语及其索引命令将始终以一行结束。
+@end defopt
+
+@defopt reftex-index-phrases-sort-prefers-entry
+非@code{nil}表示在对短语行进行排序时，使用显式索引条目。  短语缓冲区中的短语行包含搜索短语，排序通常基于这些短语。  某些短语行还指定了显式索引参数。  当该变量为非@code{nil}时，索引参数将用于排序。
+@end defopt
+
+@defopt reftex-index-phrases-sort-in-blocks
+非@code{nil}表示空行和注释行将短语缓冲区分隔成块。  然后排序将保留块，以便仅在块内重新排列行。
+@end defopt
+
+@defopt reftex-index-phrases-mode-map
+索引短语缓冲区的键盘映射。
+@end defopt
+
+@defopt reftex-index-phrases-mode-hook
+当缓冲区放入 @code{reftex-index-phrases-mode} 时运行的普通钩子。
+@end defopt
+
+@defopt reftex-index-section-letters
+表示索引中的部分的字母。  通常这些都是大写字母。  不要使用任何小写字母。  顺序并不重要，索引将按照排序函数认为正确的方式进行排序。  除了这些字母之外，@RefTeX{}还将创建一个组@samp{!}，其中包含排序在最低指定字母下方的所有条目。  在@file{*Index*}缓冲区中，按任何大写字母或@kbd{!}将跳转到该部分。
+@end defopt
+
+@defopt reftex-index-include-context
+非@code{nil}表示，在@file{*Index*}缓冲区中显示索引定义上下文。  该标志也可以使用 @kbd{c} 键从 @file{*Index*} 缓冲区切换。
+@end defopt
+
+@defopt reftex-index-follow-mode
+非@code{nil}意味着，@file{*Index*}缓冲区中的点将导致其他窗口跟随。  另一个窗口将显示文档的相应部分。  可以使用 @kbd{f} 键在 @file{*Index*} 缓冲区内切换该标志。
+@end defopt
+
+@deffn Keymap reftex-index-mode-map
+@file{*Index*} 缓冲区 (@pxref{Index Support}) 中处于活动状态的键盘映射。
+@end deffn
+
+@node Options - Viewing Cross-References
+@section 查看交叉引用
+@cindex Options, viewing cross-references
+@cindex Viewing cross-references, options
+
+@defopt reftex-view-crossref-extra
+可用于显示交叉引用的宏。当使用宏参数中的 point 调用 @code{reftex-view-crossref} 时，会使用此方法。  请注意，引用、参考文献（双向）和索引条目的交叉引用查看是硬编码的。  该变量仅用于配置交叉引用查看有用的附加结构。  每个条目都有结构
+@example
+(@var{macro-re} @var{search-re} @var{highlight}).
+@end example
+@var{macro-re} 与宏匹配。  @var{search-re} 是用于搜索交叉引用的正则表达式。  此正则表达式中的 @samp{%s} 被替换为此时的宏参数。  @var{highlight} 是一个整数，指示应突出显示匹配的哪个子组。
+@end defopt
+
+@defopt reftex-auto-view-crossref
+非@code{nil}表示，首先打开交叉引用信息的自动查看。  自动查看交叉引用信息通常使用回显区域。每当点在 @code{\ref} 或 @code{\cite} 宏的参数上空闲超过 @code{reftex-idle-time} 秒，并且没有显示其他消息时，回显区域将显示有关该交叉引用的信息。  您还可以将该变量设置为符号 @code{window}。  在这种情况下，使用一个小的临时窗口进行显示。  可以从菜单（参考->选项）打开和关闭此功能。
+@end defopt
+
+@defopt reftex-idle-time
+时间（秒） 在自动交叉引用显示或目录重新调整完成之前，Emacs 必须处于空闲状态。
+@end defopt
+
+@defopt reftex-cite-view-format
+引文格式用于在消息区域中显示引文信息。  请参阅变量 @code{reftex-cite-format} 了解可能的逃逸百分比。
+@end defopt
+
+@defopt reftex-revisit-to-echo
+非@code{nil}表示，自动引文显示将在必要时重新访问文件。  当@code{nil}时，回显区域中的引文显示仅对缓存的回显字符串有效（参见@code{reftex-cache-cite-echo}），或者对于
+@BibTeX{} database files which are already visited by a live associated
+缓冲区。
+@end defopt
+
+@defopt reftex-cache-cite-echo
+非@code{nil}表示，引用宏的回显区域中显示的信息（参见变量@code{reftex-auto-view-crossref}）与解析信息一起缓存并保存。  缓存在文档扫描后仍然存在。  为了清除它，请使用@kbd{M-x reftex-reset-mode}。
+@end defopt
+
+@node Options - Finding Files
+@section 查找文件
+@cindex Options, Finding Files
+@cindex Finding files, options
+
+@defopt reftex-texpath-environment-variables
+如何检索 @TeX{} 文件的搜索路径的规范列表。可以有多个条目。
+@itemize @minus
+@item
+如果元素是环境变量的名称，则使用其内容。
+@item
+如果元素以感叹号开头，则将其用作检索路径的命令。  kpathsearch 库的典型命令是 @w{@code{"!kpsewhich -show-path=.tex"}}。
+@item
+否则元素本身将被解释为路径。
+@end itemize
+多个目录可以通过系统相关@code{path-separator}分隔。  以 @samp{//} 或 @samp{!!} 结尾的目录将递归扩展。  另请参阅@code{reftex-use-external-file-finders}。
+@end defopt
+
+@defopt reftex-bibpath-environment-variables
+如何检索 @BibTeX{} 文件的搜索路径的规范列表。  可以有多个条目。
+@itemize @minus
+@item
+如果元素是环境变量的名称，则使用其内容。
+@item
+如果元素以感叹号开头，则将其用作检索路径的命令。  kpathsearch 库的典型命令是 @w{@code{"!kpsewhich -show-path=.bib"}}。
+@item
+否则元素本身将被解释为路径。
+@end itemize
+多个目录可以通过系统相关@code{path-separator}分隔。  以 @samp{//} 或 @samp{!!} 结尾的目录将递归扩展。  另请参阅@code{reftex-use-external-file-finders}。
+@end defopt
+
+@defopt reftex-file-extensions
+具有不同文件类型的文件扩展名的关联列表。这是一个项目列表，每个项目类似于：@code{(@var{type} . (@var{def-ext} @var{other-ext} ...))}
+@example
+@var{type}:       @r{File type like @code{"bib"} or @code{"tex"}.}
+@var{def-ext}:    @r{The default extension for that file type, like @code{".tex"} or @code{".bib"}.}
+@var{other-ext}:  @r{Any number of other valid extensions for this file type.}
+@end example
+当搜索文件并且它没有任何有效扩展名时，我们首先尝试默认扩展名，然后尝试裸文件名。
+@end defopt
+
+@defopt reftex-search-unrecursed-path-first
+非@code{nil}表示在尝试递归之前搜索所有指定的目录。  因此，在路径 1⁣ 中，首先搜索 2⁣，然后搜索 3⁣，最后搜索 4⁣ 的所有子目录。  如果此选项为@code{nil}，则在@samp{/tex/}之前搜索@samp{./}的子目录。  这主要是为了速度；大多数时候，递归路径是针对系统文件的，而不是针对用户文件的。  如果默认设置为 @RefTeX{} 以错误的顺序查找具有相同名称的文件，请将其设置为 @code{nil}。
+@end defopt
+
+@defopt reftex-use-external-file-finders
+非@code{nil}表示使用外部程序查找文件。  通常情况下，
+@RefTeX{} searches the paths given in the environment variables
+@code{TEXINPUTS} 和 @code{BIBINPUTS} 查找 @TeX{} 文件和 @BibTeX{} 数据库文件。  打开此选项后，它将调用选项@code{reftex-external-file-finders}中指定的外部程序。  作为副作用，变量 @code{reftex-texpath-environment-variables} 和 @code{reftex-bibpath-environment-variables} 将被忽略。
+@end defopt
+
+@defopt reftex-external-file-finders
+与外部程序的关联列表以调用查找文件。  每个条目都是一个 cons 单元格 @w{@code{(@var{type} . @var{program})}}。 @var{type} 是@code{"tex"} 或@code{"bib"}。  @var{program} 是一个字符串，包含与任何参数一起使用的外部程序。 @code{%f} 将替换为要查找的文件的名称。  请注意，这些命令将直接执行，而不是通过 shell。  仅当 @code{reftex-use-external-file-finders} 为非 @code{nil} 时相关。
+@end defopt
+
+@page
+@node Options - Optimizations
+@section 优化
+@cindex Options, optimizations
+@cindex Optimizations, options
+
+@defopt reftex-keep-temporary-buffers
+非@code{nil}表示保留为解析和查找创建的缓冲区。
+@RefTeX{} sometimes needs to visit files related to the current
+文档。  我们区分访问的文件
+@table @asis
+@item 解析
+（重新）解析文档时加载多文件文档的部分内容。
+@item 抬头
+@BibTeX{} database files and @TeX{} files loaded to find a reference, to
+显示标签上下文等
+@end table
+创建的缓冲区可以保留以供以后使用，也可以在使用后立即丢弃，具体取决于此变量的值：
+
+@table @code
+@item nil
+尽可能扔掉。
+@item t
+保留一切。
+@item 1
+丢弃为解析创建的缓冲区，但保留为查找创建的缓冲区。
+@end table
+
+如果要保留缓冲区，则可以正常访问文件（这可能会很慢，但只会发生一次）。  如果要丢弃缓冲区，则缓冲区的初始化取决于变量@code{reftex-initialize-temporary-buffers}。
+@end defopt
+
+@defopt reftex-initialize-temporary-buffers
+非@code{nil}表示即使临时访问文件也会进行初始化。  当@code{nil}时，@RefTeX{}可能会关闭查找文件挂钩和其他东西以短暂访问文件。  当@code{t}时，完成完整的默认初始化（@code{find-file-hook}等）。  除了@code{t}或@code{nil}之外，这个变量也可以是一个钩子函数列表来进行最小的初始化。
+@end defopt
+
+@defopt reftex-no-include-regexps
+用于从解析中排除某些输入文件的正则表达式列表。如果通过 @code{\include} 或 @code{\input} 包含的文件名与此列表中的任何正则表达式匹配，则@RefTeX{} 不会解析该文件。
+@end defopt
+
+@defopt reftex-enable-partial-scans
+非@code{nil}表示，当要求重新解析时仅重新解析 1 个文件。通常使用许多 @RefTeX{} 命令的 @kbd{C-u} 前缀或菜单中的 @kbd{r} 键来请求重新解析。  当此选项在多文件文档中为 @code{t} 时，我们将仅解析当前缓冲区，或与菜单中靠近点的标签或节标题关联的文件。  请求重新解析整个多文件文档需要在菜单中使用 @kbd{C-u C-u} 前缀或大写 @kbd{R} 键。
+@end defopt
+
+@defopt reftex-save-parse-info
+非@code{nil}表示将解析收集到的信息保存在文件中。与@file{MASTER.tex}同一目录下的文件@file{MASTER.rel}用于保存信息。  当这个变量为@code{t}时，
+@itemize @minus
+@item
+在编辑会话中首次访问解析信息将读取该文件（如果可用）而不是解析文档。
+@item
+退出 Emacs 或在 reftex 模式下终止缓冲区将导致写入文件的新版本。
+@end itemize
+@end defopt
+
+@defopt reftex-parse-file-extension
+存储解析器信息的文件的文件扩展名。该扩展名被添加到主文件的基本名称中。
+@end defopt
+
+@defopt reftex-allow-automatic-rescan
+非@code{nil} 表示，@RefTeX{} 可能会在必要时重新扫描文档。  （目前）仅适用于极少数情况，即无法确定地将新标签放入内部标签列表中时。
+@end defopt
+
+@defopt reftex-use-multiple-selection-buffers
+非@code{nil}表示为每个标签类型使用单独的选择缓冲区。  这些缓冲区从一个选择保留到下一个选择，不需要为每次使用创建，因此菜单通常会更快地出现。添加类别中的新标签时，选择缓冲区将自动删除（并因此更新）。  请参阅变量@code{reftex-auto-update-selection-buffers}。
+@end defopt
+
+@defopt reftex-auto-update-selection-buffers
+非@code{nil}表示，选择缓冲区将自动更新。当使用@code{reftex-label}定义新标签时，与该标签类别关联的所有选择缓冲区都将被清空，以便在下次使用时强制更新。  当@code{nil}时，缓冲区将被单独保留，并且必须使用标签选择过程中的@kbd{g}键手动更新。  仅当@code{reftex-use-multiple-selection-buffers}非@code{nil}时，该变量的值才会产生任何影响。
+@end defopt
+
+@node Options - Fontification
+@section 字体化
+@cindex Options, fontification
+@cindex Fontification, options
+
+@defopt reftex-use-fonts
+非 @code{nil} 表示在标签菜单和即时帮助中使用字体。还必须加载字体锁定才能真正获得字体显示。  更改此选项后，可能需要重新扫描才能激活它。
+@end defopt
+
+@defopt reftex-refontify-context
+非@code{nil}表示，使用字体锁定重新设置标签菜单中的上下文。  这会稍微减慢标签菜单的创建速度。  仅当您确实希望上下文字体化时才需要这样做。
+
+该选项可能有 3 个不同的值：
+@table @code
+@item nil
+切勿重新配置。
+@item t
+始终重新配置。
+@item 1
+必要时重新字体化，例如使用旧版本的 x-symbol 包。
+@end table
+当@code{reftex-use-fonts}为@code{nil}时，该选项被忽略。
+@end defopt
+
+@defopt reftex-highlight-selection
+非 @code{nil} 表示突出显示选择和 @file{*toc*} 缓冲区中的选定文本。  通常，光标附近的文本是@emph{selected}文本，并且它是突出显示的。  这是选择中大多数键和 @file{*toc*} 缓冲区起作用的条目。  但是，如果您主要使用鼠标来选择项目，您可能会发现鼠标触发突出显示@emph{instead}或@emph{as well}很好。  该变量可能具有以下值之一：
+
+@example
+nil      @r{No highlighting.}
+cursor   @r{Highlighting is cursor driven.}
+mouse    @r{Highlighting is mouse driven.}
+both     @r{Both cursor and mouse trigger highlighting.}
+@end example
+
+更改此变量需要重建选择和 *toc* 缓冲区才能生效（键 @kbd{g} 或 @kbd{r}）。
+@end defopt
+
+@defopt reftex-cursor-selected-face
+用于突出显示光标在目录和选择缓冲区中选择的项目的名称。另请参见变量@code{reftex-highlight-selection}。
+@end defopt
+@defopt reftex-mouse-selected-face
+用于突出显示鼠标在目录和选择缓冲区中选择的项目的名称。另请参见变量@code{reftex-highlight-selection}。
+@end defopt
+@defopt reftex-file-boundary-face
+选择缓冲区中文件边界的面名称。
+@end defopt
+@defopt reftex-label-face
+选择缓冲区中标签的面名称。
+@end defopt
+@defopt reftex-section-heading-face
+目录和选择缓冲区中章节标题的名称。
+@end defopt
+@defopt reftex-toc-header-face
+目录缓冲区标头的名称。
+@end defopt
+@defopt reftex-bib-author-face
+书目选择缓冲区中作者姓名的面孔名称。
+@end defopt
+@defopt reftex-bib-year-face
+号码布选择缓冲区中年份的面孔名称。
+@end defopt
+@defopt reftex-bib-title-face
+参考文献选择缓冲区中文章标题的面孔名称。
+@end defopt
+@defopt reftex-bib-extra-face
+书目选择缓冲区中书目信息的名称。
+@end defopt
+@defopt reftex-select-mark-face
+选择缓冲区中标记条目的面孔名称。
+@end defopt
+@defopt reftex-index-header-face
+索引缓冲区标头的面名称。
+@end defopt
+@defopt reftex-index-section-face
+索引中新字母部分开头的面孔名称。
+@end defopt
+@defopt reftex-index-tag-face
+索引名称的面名称（对于多个索引）。
+@end defopt
+@defopt reftex-index-face
+索引条目的名称。
+@end defopt
+
+@node Options - Misc
+@section 各种各样的
+@cindex Options, misc
+
+@defopt reftex-extra-bindings
+非@code{nil}表示在启动时进行额外的键绑定。  这些额外的绑定位于 users @samp{C-c letter} 映射中。  @xref{Key Bindings}。
+@end defopt
+
+@defopt reftex-plug-into-AUCTeX
+@AUCTeX{} 接口的插件标志。  该变量是 5 个布尔标志的列表。  当标志为非@code{nil}时，@RefTeX{}将
+
+@example
+- supply labels in new sections and environments  (flag 1)
+- supply arguments for macros like @code{\label}         (flag 2)
+- supply arguments for macros like @code{\ref}           (flag 3)
+- supply arguments for macros like @code{\cite}          (flag 4)
+- supply arguments for macros like @code{\index}         (flag 5)
+@end example
+
+您还可以将变量本身设置为 @code{t} 或 @code{nil}，以便分别打开或关闭所有选项。@* 在使用 @kbd{C-c C-s} 创建节和使用 @kbd{C-c C-e} 创建环境时，适用于在新节和环境中提供标签。@* 在与 @kbd{C-c @key{RET}} 交互地插入此类宏时，适用于提供宏参数。@* 请参阅@AUCTeX{} 文档以获取更多信息。
+@end defopt
+
+@defopt reftex-revisit-to-follow
+非@code{nil}表示，如果需要，跟随模式将重新访问文件。当@code{nil}时，跟随模式将暂停以处理未访问文件中的内容。
+@end defopt
+
+@defopt reftex-allow-detached-macro-args
+非@code{nil}表示允许宏的参数通过空格分隔。  当这是@code{t}时，@w{@samp{\bbb [xxx] @{aaa@}}}中的@samp{aaa}将被视为@code{\bb}的参数。  请注意，即使 @code{\bb} 定义有零个或一个参数，情况也会如此。
+@end defopt
+
+@node Keymaps and Hooks
+@section 键盘映射和挂钩
+@cindex Keymaps
+
+@RefTeX{} has the usual general keymap, load hook and mode hook.
+
+@deffn Keymap reftex-mode-map
+@RefTeX{} 模式的键盘映射。
+@end deffn
+
+@deffn {Normal Hook} reftex-mode-hook
+开启 @RefTeX{} 模式时正在运行的普通钩子。
+@end deffn
+
+此外，用于引用标签、创建引文、目录缓冲区和短语缓冲区的四种模式都有自己的键盘映射和模式挂钩。  请参阅相应部分。  关于 @RefTeX{} 特定部分的选项的相关部分中描述了更多的钩子。
+
+@node Changes
+@chapter 变化
+@cindex Changes
+
+以下是 @RefTeX{} 的最新更改列表。
+
+@noindent @b{Version 4.33}
+
+@itemize @bullet
+@item
+更新至 GPLv3。
+@item
+解析文件的创建方式不会干扰最近模式。
+@end itemize
+
+@noindent @b{Version 4.32}
+
+@itemize @bullet
+@item
+由 @AUCTeX{} 项目首次发布。
+@item
+源包结构改变后重写安装例程。
+@item
+@RefTeX{} 的激活已更改，因此请务必阅读安装说明并从初始化文件中删除与 @RefTeX{} 相关的过时的内容。
+@item
+修复了在多个 @LaTeX{} 和短语缓冲区之间跳转时点最终会出现在错误缓冲区中的错误。
+@item
+修复了带有连字符的 @BibTeX{} 键被错误解析的错误。
+@item
+一些性能改进。
+@item
+现在可以通过自定义变量 @code{reftex-cite-key-separator} 来更改 \cite 宏中多个引用之间使用的分隔符。
+@end itemize
+
+@noindent @b{Version 4.28}
+@itemize @bullet
+@item Support for the Jurabib package.
+@item Improvements when selecting several items in a selection buffer.
+@end itemize
+
+@noindent @b{Version 4.26}
+@itemize @bullet
+@item
+支持全局增量搜索。
+@item
+XEmacs 兼容性的一些改进。
+@end itemize
+
+@noindent @b{Version 4.25}
+@itemize @bullet
+@item
+修复了标签前缀中带有 @samp{%F} 的错误。  为主文件名和主目录添加了新的转义符 @samp{%m} 和 @samp{%M}。
+@end itemize
+
+@noindent @b{Version 4.24}
+@itemize @bullet
+@item
+现在，当使用前缀参数调用时，插入引用命令会提示输入可选参数。  相关的新选项是@code{reftex-cite-prompt-optional-args}和@code{reftex-cite-cleanup-optional-args}。
+@item
+新选项@code{reftex-trust-label-prefix}。  如果您希望 RefTeX 根据前缀对标签进行分类，请配置此变量。这可以加快文档解析速度，但在某些情况下可能会降低 RefTeX 用于描述标签的上下文的质量。
+@item
+修复了当 1⁣ 为非 2⁣ 时 @code{reftex-create-bibtex-file} 中的错误。
+@item
+修复了索引中的错误：区分大小写的搜索、单词之前和/或之后的引号。  禁用注释行中的索引。
+@end itemize
+
+@noindent @b{Version 4.22}
+@itemize @bullet
+@item
+新命令 @code{reftex-create-bibtex-file} 用于创建一个新数据库，其中包含当前文档中引用的所有条目。
+@item
+新键 @kbd{e} 和 @kbd{E} 允许您从引文选择缓冲区中标记的条目生成 BibTeX 数据库文件。
+@end itemize
+
+@noindent @b{Version 4.21}
+@itemize @bullet
+@item
+使用键 @kbd{M-%} 重命名目录缓冲区中的标签。
+@end itemize
+
+@noindent @b{Version 4.20}
+@itemize @bullet
+@item
+结构编辑功能。  TOC 缓冲区中的命令键 @kbd{<} 和 @kbd{>} 可以提升/降低当前区域中某个点的部分或所有部分。
+@item
+新选项 @code{reftex-toc-split-windows-fraction} 用于设置 TOC@. 使用的窗口大小，这使得旧变量 @code{reftex-toc-split-windows-horizontally-fraction} 过时。
+@item
+专用框架可以显示目录，并且当前部分始终自动突出显示。  使用 @kbd{d} 键创建帧并从目录缓冲区中删除该帧。
+@end itemize
+
+@noindent @b{Version 4.19}
+@itemize @bullet
+@item
+新命令 @code{reftex-toc-recenter} (@kbd{C-c -}) 显示 TOC 缓冲区中的当前部分，而无需选择 TOC 窗口。
+@item
+当选项 @code{reftex-auto-recenter-toc} 打开时，会在空闲时间自动进行重新定位。
+@item
+修复了与 TOC 缓冲区中自动光标定位相关的多个错误。
+@item
+当焦点移动到不同的窗口时，TOC 缓冲区中的突出显示会保留。
+@item
+新命令@code{reftex-goto-label}。
+@item
+零件编号不再包含在章节编号中，并且新零件不会重置章节计数器。  请参阅新选项@code{reftex-part-resets-chapter}。
+@end itemize
+
+@noindent @b{Version 4.18}
+@itemize @bullet
+@item
+@code{reftex-citation} 使用光标之前的单词作为默认搜索字符串。
+@item
+简化了几个正则表达式以提高速度。
+@item
+更好地支持chapterbib。
+@end itemize
+
+@noindent @b{Version 4.17}
+@itemize @bullet
+@item
+目录窗口可以水平分割。  查看新选项@code{reftex-toc-split-windows-horizontally}、@code{reftex-toc-split-windows-horizontally-fraction}。
+@item
+可以指定一个在全局索引期间验证索引匹配的函数。  请参阅新选项@code{reftex-index-verify-function}。
+@item
+可以配置在 LaTeX 中输入文件的宏（如 \input、\include）。  请参阅新选项@code{reftex-include-file-commands}。
+@item
+可以配置指定参考书目文件（如 \bibliography）的宏。  请参阅新选项@code{reftex-bibliography-commands}。
+@item
+用于搜索 \bibliography 宏的正则表达式已放宽，以允许 Chapterbib 所需的 @samp{@{\bibliography@{...@}@}}。
+@item
+小错误修复。
+@end itemize
+
+@noindent @b{Version 4.15}
+@itemize @bullet
+@item
+修复了当字段包含引号或不匹配的括号时 BibTeX 文件解析的错误。
+@item
+小错误修复。
+@item
+改进了与 Emacs LaTeX 模式的交互。
+@end itemize
+
+@noindent @b{Version 4.12}
+@itemize @bullet
+@item
+支持@file{bibentry}引用样式。
+@end itemize
+
+@noindent @b{Version 4.11}
+@itemize @bullet
+@item
+修复了像 1⁣ 一样解析 @samp{\Section} 的错误。
+@end itemize
+
+@noindent @b{Version 4.10}
+@itemize @bullet
+@item
+由于与 DOS 机器上的 @file{reftex-vars.el} 冲突，将 @file{reftex-vcr.el} 重命名为 ⁣​​1⁣。
+@item
+新选项@code{reftex-parse-file-extension}和@code{reftex-index-phrase-file-extension}。
+@end itemize
+
+@noindent [.....]
+@ignore
+@noindent @b{Version 4.09}
+@itemize @bullet
+@item
+New option @code{reftex-toc-max-level} to limit the depth of the toc.
+New key binding @kbd{t} in the @file{*toc*} buffer to change this
+setting.
+@item
+RefTeX maintains an @file{Index Phrases} file in which phrases can be
+collected.  When the document is ready, RefTeX can search all
+these phrases and assist indexing all matches.
+@item
+The variables @code{reftex-index-macros} and
+@code{reftex-index-default-macro} have changed their syntax slightly.
+The @var{repeat} parameter has move from the latter to the former.
+Also calls to @code{reftex-add-index-macros} from AUCTeX style files
+need to be adapted.
+@item
+The variable @code{reftex-section-levels} no longer contains the
+default stuff which has been moved to a constant.
+@item
+Environments like theorems can be placed into the TOC by putting
+entries for @samp{"begin@{theorem@}"} in
+@code{reftex-section-levels}.
+@end itemize
+
+@noindent @b{Version 4.06}
+@itemize @bullet
+@item
+@code{reftex-section-levels} can contain a function to compute the level
+of a sectioning command.
+@item
+Multiple @code{thebibliography} environments recognized.
+@end itemize
+
+@noindent @b{Version 4.04}
+@itemize @bullet
+@item
+New option @code{reftex-index-default-tag} implements a default for queries.
+@end itemize
+
+@noindent @b{Version 4.02}
+@itemize @bullet
+@item
+macros ending in @samp{refrange} are considered to contain references.
+@item
+Index entries made with @code{reftex-index-selection-or-word} in TeX
+math mode automatically get enclosing @samp{$} to preserve math mode.  See
+new option @code{reftex-index-math-format}.  Requires AUCTeX.
+@end itemize
+
+@noindent @b{Version 4.01}
+@itemize @bullet
+@item
+New command @code{reftex-index-globally} to index a word in many
+places in the document.  Also available from the index buffer with
+@kbd{&}.
+@item
+The first item in a @code{reftex-label-alist} entry may now also be a parser
+function to do non-standard parsing.
+@item
+@code{reftex-auto-view-crossref} no longer interferes with
+@code{pop-up-frames} (patch from Stefan Monnier).
+@end itemize
+
+@noindent @b{Version 4.00}
+@itemize @bullet
+@item
+RefTeX has been split into several smaller files which are autoloaded on
+demand.
+@item
+Index support, along with many new options.
+@item
+The selection of keys for @code{\ref} and @code{\cite} now allows you
+to select multiple items by marking entries with the @kbd{m} key.
+@item
+Fancyref support.
+@end itemize
+
+@noindent @b{Version 3.43}
+@itemize @bullet
+@item
+Viewing cross-references generalized.  Now works on @code{\label},
+@code{\ref}, @code{\cite}, @code{\bibitem}, @code{\index}, variations of
+these, and from BibTeX buffers.
+@item
+New option @code{reftex-view-crossref-extra}.
+@item
+Support for the additional sectioning commands @code{\addchap} and
+@code{\addsec} which are defined in the LaTeX KOMA-Script classes.
+@item
+Files in @code{reftex-default-bibliography} will be searched along
+@code{BIBINPUTS} path.
+@item
+Reading a parse file now checks consistency.
+@end itemize
+
+@noindent @b{Version 3.42}
+@itemize @bullet
+@item
+File search further refined.  New option @code{reftex-file-extensions}.
+@item
+@file{*toc*} buffer can show the file boundaries of a multifile
+document, all labels and associated context.  New keys @kbd{i}, @kbd{l},
+and @kbd{c}.  New options @code{reftex-toc-include-labels},
+@code{reftex-toc-include-context},
+@code{reftex-toc-include-file-boundaries}.
+@end itemize
+
+@noindent @b{Version 3.41}
+@itemize @bullet
+@item
+New options @code{reftex-texpath-environment-variables},
+@code{reftex-use-external-file-finders},
+@code{reftex-external-file-finders},
+@code{reftex-search-unrecursed-path-first}.
+@item
+@emph{kpathsearch} support.  See new options and
+@code{reftex-bibpath-environment-variables}.
+@end itemize
+
+@noindent @b{Version 3.38}
+@itemize @bullet
+@item
+@code{reftex-view-crossref} no longer moves to find a macro.  Point has
+to be on the macro argument.
+@end itemize
+
+@noindent @b{Version 3.36}
+@itemize @bullet
+@item
+New value @code{window} for option @code{reftex-auto-view-crossref}.
+@end itemize
+
+@noindent @b{Version 3.35}
+@itemize @bullet
+@item
+ISO 8859 Latin-1 chars are converted to ASCII to derive better labels.
+This takes back the related changes in 3.34 for safety reasons.
+@end itemize
+
+@noindent @b{Version 3.34}
+@itemize @bullet
+@item
+Additional flag in @code{reftex-derive-label-parameters} do make only
+lowercase labels (default @code{t}).
+@item
+All @file{.rel} files have a final newline to avoid queries.
+@item
+Single byte representations of accented European letters (ISO-8859-1)
+are now valid in labels.
+@end itemize
+
+@noindent @b{Version 3.33}
+@itemize @bullet
+@item
+Multiple selection buffers are now hidden buffers (they start with a
+SPACE).
+@item
+Fixed bug with file search when TEXINPUTS environment variable is empty.
+@end itemize
+
+@noindent @b{Version 3.30}
+@itemize @bullet
+@item
+In @code{reftex-citation}, the regular expression used to scan BibTeX
+files can be specified using completion on known citation keys.
+@item
+New keys @kbd{a} and @kbd{A} in BibTeX selection process to cite @emph{all}
+entries.
+@item
+New command @code{reftex-renumber-simple-labels} to renumber simple
+labels like @samp{eq:13} sequentially through a document.
+@end itemize
+
+@noindent @b{Version 3.28}
+@itemize @bullet
+@item
+Auto view crossref for XEmacs uses @code{post-command-hook} to restart the
+timer, since itimer restart is not reliable.
+@item
+Option @code{reftex-bibfile-ignore-list} renamed to @code{-regexps}.
+@item
+Expansion of recursive tex and bib path rewritten.
+@item
+Fixed problem where @RefTeX{} did not scan unsaved buffers.
+@item
+Fixed bug with section numbering after *-red sections.
+@end itemize
+
+@noindent @b{Version 3.27}
+@itemize @bullet
+@item
+Macros can define @emph{neutral} labels, just like @code{\label}
+itself.
+@item
+New option @code{reftex-allow-detached-macro-args}, default @code{nil}!
+@end itemize
+
+@noindent @b{Version 3.26}
+@itemize @bullet
+@item
+[X]Emacs 19 no longer supported.  Use 3.22 for Emacs 19.
+@item
+New hooks @code{reftex-translate-to-ascii-function},
+@code{reftex-string-to-label-function}.
+@item
+Made sure automatic crossref display will not visit/scan files.
+@end itemize
+
+@noindent @b{Version 3.25}
+@itemize @bullet
+@item
+Echoing of citation info caches the info for displayed entries.
+New option @code{reftex-cache-cite-echo}.
+@item
+@kbd{M-x reftex-reset-mode} now also removes the file with parsing
+info.
+@item
+Default of @code{reftex-revisit-to-follow} changed to @code{nil}.
+@end itemize
+
+@noindent @b{Version 3.24}
+@itemize @bullet
+@item
+New option @code{reftex-revisit-to-echo}.
+@item
+Interface with X-Symbol (>=2.6) is now complete and stable.
+@item
+Adapted to new outline, which uses overlays.
+@item
+File names in @code{\bibliography} may now have the @code{.bib}
+extension.
+@item
+Fixed Bug with parsing "single file" from master file buffer.
+@end itemize
+
+@noindent @b{Version 3.23}
+@itemize @bullet
+@item
+Parse files @file{MASTER.rel} made compatible between Emacs and XEmacs.
+@item
+@code{kill-emacs-hook} and @code{kill-buffer-hook} now write the parse
+file.
+@item
+The cursor inside a @code{\ref} or @code{\cite} macro can now trigger
+automatic display of crossref information in the echo area.  See
+variable @code{reftex-auto-view-crossref}.
+@item
+AUCTeX interface updates:
+@itemize @minus
+@item
+AUCTeX 9.9c and later notifies @RefTeX{} about new sections.
+@item
+@RefTeX{} notifies AUCTeX about new labels.
+@item
+@code{TeX-arg-ref} no longer used (introduction was unnecessary).
+@item
+@code{reftex-arg-label} and @code{reftex-arg-cite} fixed up.
+@item
+Settings added to @RefTeX{} via style files remain local.
+@end itemize
+@item
+Fixed bug with @code{reftex-citation} in non-latex buffers.
+@item
+Fixed bug with syntax table and context refontification.
+@item
+Safety-net for name change of @code{font-lock-reference-face}.
+@end itemize
+
+@noindent @b{Version 3.22}
+@itemize @bullet
+@item
+Fixed bug with empty context strings.
+@item
+@code{reftex-mouse-view-crossref} is now bound by default at
+@kbd{S-mouse-2}.
+@end itemize
+
+@noindent @b{Version 3.21}
+@itemize @bullet
+@item
+New options for all faces used by @RefTeX{}.  They're in the
+customization group @code{reftex-fontification-configurations}.
+@end itemize
+
+@noindent @b{Version 3.19}
+@itemize @bullet
+@item
+Fixed bug with AUCTeX @code{TeX-master}.
+@end itemize
+
+@noindent @b{Version 3.18}
+@itemize @bullet
+@item
+The selection now uses a recursive edit, much like minibuffer input.
+This removes all restrictions during selection.  E.g., you can now
+switch buffers at will, use the mouse etc.
+@item
+New option @code{reftex-highlight-selection}.
+@item
+@kbd{mouse-2} can be used to select in selection and @file{*toc*}
+buffers.
+@item
+Fixed some problems regarding the interaction with VIPER mode.
+@item
+Follow-mode is now only used after point motion.
+@item
+@RefTeX{} now finally does not fontify temporary files anymore.
+@end itemize
+
+@noindent @b{Version 3.17}
+@itemize @bullet
+@item
+Additional bindings in selection and @file{*toc*} buffers.  @kbd{g}
+redefined.
+@item
+New command @code{reftex-save-all-document-buffers}.
+@item
+Magic word matching made more intelligent.
+@item
+Selection process can switch to completion (with @key{TAB}).
+@item
+@code{\appendix} is now recognized and influences section numbering.
+@item
+File commentary shortened considerably (use Info documentation).
+@item
+New option @code{reftex-no-include-regexps} to skip some include files.
+@item
+New option @code{reftex-revisit-to-follow}.
+@end itemize
+
+@noindent @b{Version 3.16}
+@itemize @bullet
+@item
+New hooks @code{reftex-format-label-function},
+@code{reftex-format-ref-function}, @code{reftex-format-cite-function}.
+@item
+TeXInfo documentation completed.
+@item
+Some restrictions in Label inserting and referencing removed.
+@item
+New variable @code{reftex-default-bibliography}.
+@end itemize
+
+@noindent @b{Version 3.14}
+@itemize @bullet
+@item
+Selection buffers can be kept between selections: this is faster.
+See new variable @code{reftex-use-multiple-selection-buffers}.
+@item
+Prefix interpretation of reftex-view-crossref changed.
+@item
+Support for the @code{varioref} package (@kbd{v} key in selection
+buffer).
+@end itemize
+
+@noindent @b{Version 3.12}
+@itemize @bullet
+@item
+There are 3 new keymaps for customization: @code{reftex-toc-mode-map},
+@code{reftex-select-label-mode-map}, @code{reftex-select-bib-mode-map}.
+@item
+Refontification uses more standard font-lock stuff.
+@item
+When no BibTeX database files are specified, citations can also use
+@code{\bibitem} entries from a @code{thebibliography} environment.
+@end itemize
+
+@noindent @b{Version 3.11}
+@itemize @bullet
+@item
+Fixed bug which led to naked label in (e.g.)@: footnotes.
+@item
+Added scroll-other-window functions to RefTeX-Select.
+@end itemize
+
+@noindent @b{Version 3.10}
+@itemize @bullet
+@item
+Fixed a bug which made reftex 3.07 fail on [X]Emacs version 19.
+@item
+Removed unimportant code which caused OS/2 Emacs to crash.
+@item
+All customization variables now accessible from menu.
+@end itemize
+
+@noindent @b{Version 3.07}
+@itemize @bullet
+@item
+@code{Ref} menu improved.
+@end itemize
+
+@noindent @b{Version 3.05}
+@itemize @bullet
+@item
+Compatibility code now first checks for XEmacs feature.
+@end itemize
+
+@noindent @b{Version 3.04}
+@itemize @bullet
+@item
+Fixed BUG in the @emph{xr} support.
+@end itemize
+
+@noindent @b{Version 3.03}
+@itemize @bullet
+@item
+Support for the LaTeX package @code{xr}, for inter-document
+references.
+@item
+A few (minor) Mule-related changes.
+@item
+Fixed bug which could cause @emph{huge} @file{.rel} files.
+@item
+Search for input and @file{.bib} files with recursive path definitions.
+@end itemize
+
+@noindent @b{Version 3.00}
+@itemize @bullet
+@item
+@RefTeX{} should work better for very large projects:
+@item
+The new parser works without creating a master buffer.
+@item
+Rescanning can be limited to a part of a multifile document.
+@item
+Information from the parser can be stored in a file.
+@item
+@RefTeX{} can deal with macros having a naked label as an argument.
+@item
+Macros may have white space and newlines between arguments.
+@item
+Multiple identical section headings no longer confuse
+@code{reftex-toc}.
+@item
+@RefTeX{} should work correctly in combination with buffer-altering
+packages like outline, folding, x-symbol, iso-cvt, isotex, etc.
+@item
+All labeled environments discussed in @emph{The LaTeX Companion} by
+Goossens, Mittelbach & Samarin, Addison-Wesley 1994) are part of
+@RefTeX{}'s defaults.
+@end itemize
+
+@noindent @b{Version 2.17}
+@itemize @bullet
+@item
+Label prefix expands % escapes with current file name and other stuff.
+@item
+Citation format now with % escapes.  This is not backward
+compatible!
+@item
+TEXINPUTS variable recognized when looking for input files.
+@item
+Context can be the nth argument of a macro.
+@item
+Searching in the select buffer is now possible (@kbd{C-s} and
+@kbd{C-r}).
+@item
+Display and derive-label can use two different context methods.
+@item
+AMSmath @code{xalignat} and @code{xxalignat} added.
+@end itemize
+
+@noindent @b{Version 2.14}
+@itemize @bullet
+@item
+Variable @code{reftex-plug-into-AUCTeX} simplifies cooperation with
+AUCTeX.
+@end itemize
+
+@noindent @b{Version 2.11}
+@itemize @bullet
+@item
+Submitted for inclusion to Emacs and XEmacs.
+@end itemize
+
+@noindent @b{Version 2.07}
+@itemize @bullet
+@item
+New functions @code{reftex-search-document},
+@code{reftex-query-replace-document}.
+@end itemize
+
+@noindent @b{Version 2.05}
+@itemize @bullet
+@item
+Support for @file{custom.el}.
+@item
+New function @code{reftex-grep-document} (thanks to Stephen Eglen).
+@end itemize
+
+@noindent @b{Version 2.03}
+@itemize @bullet
+@item
+@code{figure*}, @code{table*}, @code{sidewaysfigure/table} added to
+default environments.
+@item
+@code{reftex-bibfile-ignore-list} introduced (thanks to Rory Molinari).
+@item
+New functions @code{reftex-arg-label}, @code{reftex-arg-ref},
+@code{reftex-arg-cite}.
+@item
+Emacs/XEmacs compatibility reworked.  XEmacs 19.15 now is
+required.
+@item
+@code{reftex-add-to-label-alist} (to be called from AUCTeX style
+files).
+@item
+Finding context with a hook function.
+@item
+Sorting BibTeX entries (new variable:
+@code{reftex-sort-bibtex-matches}).
+@end itemize
+
+@noindent @b{Version 2.00}
+@itemize @bullet
+@item
+Labels can be derived from context (default for sections).
+@item
+Configuration of label insertion and label referencing revised.
+@item
+Crossref fields in BibTeX database entries.
+@item
+@code{reftex-toc} introduced (thanks to Stephen Eglen).
+@end itemize
+
+@noindent @b{Version 1.09}
+@itemize @bullet
+@item
+Support for @code{tex-main-file}, an analogue for
+@code{TeX-master}.
+@item
+MS-DOS support.
+@end itemize
+
+@noindent @b{Version 1.07}
+@itemize @bullet
+@item
+@RefTeX{} gets its own menu.
+@end itemize
+
+@noindent @b{Version 1.05}
+@itemize @bullet
+@item
+XEmacs port.
+@end itemize
+
+@noindent @b{Version 1.04}
+@itemize @bullet
+@item
+Macros as wrappers, AMSTeX support, delayed context parsing for
+new labels.
+@end itemize
+@end ignore
+
+@noindent @b{Version 1.00}
+@itemize @bullet
+@item
+1997年1月7日发行。
+@end itemize
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Index
+@unnumbered 指数
+@printindex cp
+
+@bye

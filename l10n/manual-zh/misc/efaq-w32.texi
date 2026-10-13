@@ -1,0 +1,1711 @@
+\输入 texinfo @c -*-编码:utf-8 -*-
+@setfilename ../../info/efaq-w32.info
+@settitle MS Windows 的 GNU Emacs 常见问题解答
+@documentlanguage en
+@include docstyle.texi
+@setchapternewpage odd
+@syncodeindex pg cp
+@syncodeindex ky cp
+@syncodeindex tp cp
+@syncodeindex vr fn
+
+@documentdescription
+有关在 Microsoft Windows 上使用 Emacs 的常见问题解答。
+@end documentdescription
+
+@include emacsver.texi
+
+@copying
+版权所有 @copyright{} 2008, 2010--2026 自由软件基金会, Inc.
+
+@quotation
+此有关 MS Windows 上的 GNU Emacs 的常见问题及其答案（“FAQ”）的列表可以翻译成其他语言，转换成其他格式（例如，Texinfo、Info、WWW），并用新信息进行更新。
+
+适用于常见问题解答本身的相同条件适用于常见问题解答的任何衍生产品。  常见问题解答的每份副本都必须包含此通知或经批准的翻译、有关当前维护常见问题解答的人员以及如何联系他们的信息（包括他们的电子邮件地址），以及有关最新版本常见问题解答的存档位置的信息（包括 FTP 信息）。
+
+在这些条件下，可以复制和重新分发常见问题解答，但常见问题解答不得嵌入较大的文学作品中，除非该作品本身允许免费复制和重新分发。
+@end quotation
+@end copying
+
+@dircategory Emacs
+@direntry
+* Emacs W32 FAQ: (efaq-w32).	 有关 MS Windows 上的 Emacs 的常见问题解答。
+@end direntry
+
+@c The @titlepage stuff only appears in the printed version
+@titlepage
+@sp 10
+@center @titlefont{GNU Emacs FAQ for MS Windows}
+
+@c The following two commands start the copyright page.
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@footnotestyle end
+
+@node Top
+@top 适用于 MS Windows 的 GNU Emacs 常见问题解答
+
+这是在 MS Windows 上使用 GNU Emacs 的常见问题解答，与 Emacs @value{EMACSVER} 一起分发。
+
+此常见问题解答由 MS Windows 上的 Emacs 开发人员和用户维护。如果您发现任何错误，或有任何建议，请将其发送到 @url{https://lists.gnu.org/mailman/listinfo/help-emacs-windows, help-emacs-windows} 邮件列表。
+
+在撰写本文时，GNU Emacs 的最新版本是版本@value{EMACSVER}。
+
+@c Links to ftp.gnu.org are given as http links, since Windows ftp clients
+@c are notoriously bad at handling firewalls etc.
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@contents
+
+@menu
+* Introduction::
+* Getting Emacs::
+* Installing Emacs::
+* Display Settings::
+* Fonts and text translation::
+* Printing::
+* Sub-processes::
+* Network access::
+* Text and Utility modes::
+* Developing with Emacs::
+* Other useful ports::
+* Further information::
+* Indexes::
+@end menu
+
+@c ------------------------------------------------------------
+@node Introduction
+@chapter 介绍
+@cindex scope of FAQ
+
+此常见问题解答涵盖了特定于在 Windows 上运行 GNU Emacs 的问题。有关更多一般信息，请参阅其他 Emacs 手册。 @xref{Further information}。
+
+@menu
+* Why Emacs on Windows::
+* Which versions of Windows::
+* Other versions of Emacs::
+@end menu
+
+@node Why Emacs on Windows
+@section 为什么在 Windows 上支持 GNU Emacs？
+@cindex Why Windows
+
+我们的目标并不是通过使 Windows 上的文本编辑更加方便来“帮助 Windows 用户”。  我们的目标是取代专有软件，而不是增强它。  那么为什么在 Windows 上支持 GNU Emacs 呢？
+
+我们希望在 Windows 上使用 GNU Emacs 的体验能让程序员尝到自由的滋味，并在以后激励他们转向 GNU/Linux 等自由操作系统。  这是在非自由操作系统上支持自由应用程序的主要原因。
+
+@node Which versions of Windows
+@section 支持哪些版本的 Windows？
+@cindex Windows, versions
+@cindex supported versions of Windows
+
+已知 Emacs @value{EMACSVER} 可以运行在从 Windows 98 开始的所有 Windows 9X 版本，以及从 NT 4.0 开始的所有 NT 系列版本；这包括 Windows XP 及更高版本的所有现代版本。  Windows 端口是使用 Win32 API 构建的，支持 X 版本的大多数功能，包括可变宽度字体、图像和工具提示。  Windows 上的 Emacs 可以编译为 64 位或 32 位可执行文件。
+
+@node Other versions of Emacs
+@section 还有哪些其他版本的 Emacs 可在 Windows 上运行？
+@cindex other ports of Emacs
+
+@xref{Cygwin}.
+
+@cindex DOS port
+@cindex Windows 3.11 port
+Emacs 还可以针对 MSDOS@. 进行编译，当在最新的 MS Windows 上运行时，它支持长文件名，并使用 Windows 剪贴板。请参阅 Emacs 源代码中的 @file{msdos} 目录以获取构建说明（需要 DJGPP）。
+
+@c ------------------------------------------------------------
+@node Getting Emacs
+@chapter 获取 Emacs
+
+@menu
+* Downloading::
+* Compiling::
+* Debugging::
+@end menu
+
+@node Downloading
+@section 哪里可以下载 Emacs？
+
+@cindex getting Emacs
+@cindex where to get sources
+@cindex Emacs source code
+@cindex source for Emacs
+您可以从 @uref{https://ftpmirror.gnu.org/emacs/, ftp.gnu.org mirrors} 下载 Emacs 版本。  它们以压缩 tar 文件的形式分发，并由发布版本的维护者进行数字签名。
+
+@cindex precompiled binaries
+@cindex where to get Emacs binaries
+MS Windows 的预编译二进制文件可能会尽最大努力在上述 ftp 站点的 @file{windows} 子目录中提供（作为由构建者数字签名的 zip 文件）。有关更多信息，请参阅该目录中的 @file{README} 文件。按照 @file{nt} 目录中的说明自行从源代码构建 Emacs 应该很简单，因此我们鼓励您尝试一下。  @xref{Compiling}。
+
+@cindex latest development version of Emacs
+@cindex Emacs Development
+Emacs 的开发版本可从 GNU 开发站点 @uref{https://savannah.gnu.org/projects/emacs, Savannah} 获取。
+
+@node Compiling
+@section 如何自己编译 Emacs？
+@cindex compiling Emacs
+
+要在 64 位版本的 Windows 7 或更高版本上编译 Emacs，我们建议使用 GCC 的 MinGW-w64 端口和 Binutils 以及 MSYS2 工具套件。  有关详细信息，请参阅 Emacs 源代码分发中的文件@file{nt/INSTALL.W64}。
+
+如果您需要在 Windows 7 之前的 MS Windows 上构建或运行 Emacs，则必须使用 GCC 的 MinGW 端口和 MSYS 工具套件。  Emacs 源代码分发中的文件 @file{nt/INSTALL} 包含详细信息。  @xref{MinGW}。
+
+支持显示图像、XML/HTML 渲染和 TLS 网络需要外部库、标头和导入库，需要将其安装在编译器可以找到的位置。  同样，详细信息（包括可以下载这些库的站点的 URL）位于 @file{nt/INSTALL.W64} 或 @file{nt/INSTALL} 中。  @xref{Other useful ports}，对于辅助工具，您可能希望与 Emacs 一起安装和使用。
+
+解压源代码或检出存储库后，请务必阅读 @file{nt/README} 中的说明以及相应的安装文件。
+
+@node Debugging
+@section 如何在 Emacs 上使用调试器？
+@cindex debugging Emacs
+@cindex bugs in Emacs, how to debug
+@cindex Emacs debugging
+
+默认情况下，Emacs 是在启用调试和优化的情况下编译的。优化可能会干扰某些类型的调试；调试器可能无法清楚地显示它所在的位置，或者可能无法检查某些变量。  如果是这种情况，请使用 @kbd{CFLAGS='-O0 -g3'} 重新配置
+
+文件 @file{etc/DEBUG} 包含一般调试提示，以及有关调试 Emacs 的具体说明。
+
+@cindex debugging Emacs with GDB
+GDB 是 GNU 调试器，当使用 GCC@. 编译 Emacs 时，可以使用它来调试 Emacs。如果从 @file{src} 目录作为 @kbd{gdb ./emacs.exe} 启动 gdb，将获得最佳结果。这将加载该目录中的初始化文件@file{.gdbinit}@footnote{ Latest versions of GDB might refuse to load the init file for security reasons, unless you customize GDB; alternatively, use an explicit @kbd{source ./gdbinit} command after entering GDB. }，以定义一些在调试时使用 lisp 的额外命令，并设置断点以捕获异常中止。
+
+GDB 的 Windows 端口与 MinGW64-w64 和 MSYS2（@samp{mingw-w64-<arch>-toolchain} 组）一起安装，或者可以在 MinGW 下载网站和其他一些网站上找到。
+
+@c ------------------------------------------------------------
+@node Installing Emacs
+@chapter 安装Emacs
+
+@menu
+* Unpacking::
+* Installing binaries::
+* Image support::
+* Init file::
+* Location of init file::
+* Troubleshooting init file::
+* Associate files with Emacs::
+* Find-file and the Desktop::
+* Make Windows more like X::
+* Make Emacs like a Windows app::
+* Window operations::
+* Uninstall::
+* Does not run::
+* Virus::
+* Anti-virus::
+@end menu
+
+@node Unpacking
+@section 如何解压发行版？
+@cindex unpacking Emacs distribution
+@cindex extracting Emacs distribution
+@cindex unzipping Emacs distribution
+@cindex untarring Emacs distribution
+@cindex zip files, how to unpack Emacs binaries
+@cindex tar.gz files, how to unpack Emacs sources
+
+二进制发行版以 zip 文件形式分发，由 Windows XP 及更高版本本机处理。  对于早期版本，有许多工具可以处理 zip 格式，从 InfoZip 的命令行解压缩工具，到 7zip 的多格式图形存档浏览器。  （虽然 WinZip 很流行，但过去曾引起过行尾问题，而且它不是免费软件，因此我们不推荐它。）
+
+源发行版以 @file{.tar.gz} 或 @file{.tar.xz} 文件形式分发。  7zip 和类似的多格式图形工具可以处理这些问题，或者您可以从多个来源获取命令行 gzip 和 tar 工具的 Windows 端口，或使用 @command{bsdtar}。 @xref{Other useful ports}。
+
+从命令行解压源发行版的命令是：
+
+@example
+tar xzf emacs-@value{EMACSVER}.tar.gz
+@end example
+
+如果这不适用于您拥有的 tar 和 gzip 版本，您可能需要尝试两步过程：
+
+@example
+gzip -dc emacs-@value{EMACSVER}.tar.gz | tar xf -
+@end example
+
+您可能会看到许多来自 tar 的消息抱怨无法更改目录的修改时间，以及来自 gzip 的许多消息抱怨管道损坏。  这些消息通常是无害的，是由未完全了解 Windows 限制的不完整端口引起的。
+
+这是使用 @command{bsdtar} （来自 @samp{libarchive} 包）解压 @file{.tar.xz} 存档的示例：
+
+@example
+bsdtar -xf emacs-@value{EMACSVER}.tar.xz
+@end example
+
+希望@command{bsdtar}能够毫无怨言地解压整个发行版。
+
+解压源发行版后，请在 @file{nt} 目录中查找构建说明。
+
+@node Installing binaries
+@section 解压二进制 zip 后如何安装 Emacs？
+@cindex installing Emacs
+@pindex addpm
+@cindex Start Menu, creating icons for Emacs
+
+您可以运行 Emacs，无需任何额外的步骤，但如果您希望在开始菜单中出现图标，或者让 Emacs 检测已作为 GTK+ 一部分安装在系统上的图像库，那么您应该运行程序 @file{addpm.exe}，该程序通常与 @file{emacs.exe} 安装在同一 @file{bin} 目录中。
+
+@node Image support
+@section 如何获得图像支持？
+@cindex images, installing libraries for
+@cindex jpeg, installing image support in Emacs
+@cindex png, installing image support in Emacs
+@cindex gif, installing image support in Emacs
+@cindex tiff, installing image support in Emacs
+@cindex xpm, installing image support in Emacs
+@cindex rsvg, installing image support in Emacs
+@cindex toolbar, installing color icons in
+@cindex color images, installing support for images in Emacs
+@cindex monochrome images, getting color images in Emacs
+@cindex black and white images, getting color images in Emacs
+
+Emacs 内置了对 XBM 和 PBM/PGM/PPM 图像的支持。  这足以看到单色启动屏幕和工具栏图标。从 v22.2 开始，Windows 的官方预编译二进制文件捆绑了 libXpm，这是显示这些图像的彩色版本所必需的。
+
+Emacs 也被编译为识别 JPEG、PNG、GIF、TIFF 和 RSVG 图像，但显示这些图像类型需要未与 Emacs 捆绑的外部 DLL。  @xref{Other useful ports}。
+
+@node Init file
+@section 我的初始化文件是什么？
+@cindex .emacs
+@cindex init file
+@cindex early init file
+
+当 Emacs 启动时，它会尝试加载并执行通常称为 @file{.emacs}（尽管它可能有其他名称，@pxref{Location of init file,,Where do I put my init file?}）的文件的内容，其中包含您所做的任何自定义设置。  您可以手动将 Lisp 代码添加到 .emacs，也可以使用 @emph{Options} 菜单访问的自定义界面。  如果该文件不存在，Emacs 将以默认设置启动。
+
+此外，Emacs 27 及更高版本会尝试加载并执行 @file{early-init.el} 文件的内容。  顾名思义，该文件（如果存在）会在 Emacs 启动序列期间（在 @code{.emacs} 之前）加载并执行，并且旨在包含在查找和加载 @file{.emacs} 之前必须执行的一些初始化。
+
+@node Location of init file
+@section 我的初始化文件应该放在哪里？
+@cindex HOME directory
+@cindex .emacs.d
+@cindex _emacs
+@cindex init.el
+@cindex early-init.el
+@cindex registry, setting the HOME directory in
+
+在 Windows 上，@file{.emacs} init 文件可能被称为 @file{_emacs}，以向后兼容 DOS 和 FAT 文件系统，其中文件名不能以点开头。  由于过去各种 Windows 工具在文件名以点开头的情况下存在历史问题，一些用户更愿意继续使用这样的名称。  初始化文件也可以称为@file{.emacs.d/init.el}。  @file{early-init.el} 文件和许多由 Lisp 包创建的其他文件也存储在 @file{.emacs.d} 目录中，这将所有与 Emacs 相关的文件保存在一个位置。
+
+上面提到的所有文件都应该放在您的 @env{HOME} 目录中。 @env{HOME}目录通过以下步骤确定：
+
+@enumerate
+@item 
+如果设置了环境变量@env{HOME}，则使用它指示的目录。
+@item 
+如果设置了注册表项@code{HKCU\SOFTWARE\GNU\Emacs\HOME}，请使用它指示的目录。
+@item 
+如果设置了注册表项@code{HKLM\SOFTWARE\GNU\Emacs\HOME}，请使用它指示的目录。  不推荐，因为这会导致用户共享相同的主目录。
+@item 
+如果@file{C:\.emacs}存在，则使用@file{C:/}。  这是为了向后兼容，因为如果未设置 @env{HOME}，以前的版本默认为 @file{C:/}。
+@item 
+使用用户的 AppData 目录，通常是用户配置文件目录下名为 @file{AppData} 的目录，该目录的位置根据 Windows 版本以及计算机是否属于域的一部分而有所不同。
+@end enumerate
+
+在 Emacs 中，文件名开头的 @kbd{~} 会扩展到您的 @env{HOME} 目录，因此您始终可以通过键入命令 @kbd{C-x C-f ~/.emacs} 找到您的 @file{.emacs} 文件。
+
+@node Troubleshooting init file
+@section 解决初始化文件问题
+@cindex troubleshooting init problems
+@cindex debugging init problems
+@cindex checking that HOME is set correctly
+
+如果您使用上述方法之一将 @env{HOME} 设置为目录，并且 Emacs 仍然不加载您的初始化文件，那么您应该做的第一件事是检查 Emacs 认为 @env{HOME} 设置为什么。  您可以通过使用 @kbd{C-x C-e} 计算 @file{*scratch*} 缓冲区中的以下表达式来完成此操作：
+
+@example
+(getenv "HOME")
+@end example
+
+仔细查看回显区域中打印的内容，并确保该值有效。  例如，如果该值有尾随空格，Emacs 将无法找到该目录。  另外，请确保该值不是相对驱动器号（例如，@file{d:} 不带反斜杠或冒号后不带正斜杠）；如果是，那么 @env{HOME} 将是该驱动器上的当前目录，这可能不是您想要发生的情况。
+
+@node Associate files with Emacs
+@section 如何将文件与 Emacs 关联？
+@cindex Explorer, associating Emacs with files in
+@cindex emacsclient, associating files with
+@cindex file associations
+@cindex associating files with Emacs
+@cindex ALTERNATE_EDITOR
+@findex server-start
+
+关联文件的推荐方法是将它们与 @command{emacsclientw.exe} 关联。  为了在 Emacs 尚未启动时使其工作，您还需要将环境变量 @env{ALTERNATE_EDITOR} 设置为 @command{runemacs.exe}。  要在正在运行的 Emacs 实例中打开文件，您需要将以下内容添加到 init 文件中：
+@example
+(server-start)
+@end example
+
+@menu
+* Using with Explorer::
+@end menu
+
+@node Using with Explorer
+@subsection 与 Internet Explorer 一起使用
+@cindex Internet Explorer, view source in Emacs
+@cindex mailto URLs, associating with Emacs
+@cindex news URLs, associating with Emacs
+@cindex URLs, associating mail and news URLs with Emacs
+
+您可以使用 Emacs 作为编辑器来撰写 @indicateurl{mailto:} 链接的邮件、阅读 @indicateurl{news:} 链接的 Usenet 以及查看源代码。  以下注册表项对此进行控制：
+
+@itemize @w{}
+@item 
+邮件
+@itemize
+@item @strong{Key:} HKCR\mailto\shell\open\command\(默认)
+@item @strong{Value:} emacsclientw -e "(消息邮件 (子字符串 \"%1\" 7))"
+@end itemize
+
+@item 
+消息
+@itemize
+@item @strong{Key:} HKCR\news\shell\open\command\(默认)
+@item @strong{Value:} emacsclientw -e "(gnus-fetch-group (子字符串 \"%1\" 5)"
+@end itemize
+
+@item 
+查看源代码
+@itemize
+@item @strong{Key:} HKCR\htmlfile\shell\edit\command\(默认)
+@item @strong{Value:} emacsclientw "%1"
+@end itemize
+
+@end itemize
+
+感谢 Jason Rumney 和 Sigbjorn Finne 提供的这些建议。
+
+@node Find-file and the Desktop
+@section 如何使用 find-file 打开桌面上的文件？
+@cindex Desktop, finding where it is
+@cindex finding the Desktop
+@cindex locating files on the Desktop
+
+桌面的位置因 Windows 的不同版本而异，并且在企业环境中可以由网络管理员移动。  在最新的 Windows 版本上，您可以使用 @env{USERPROFILE} 环境变量的值来查找桌面可能所在的位置：
+
+@example
+@kbd{C-x C-f $USERPROFILE/Desktop}
+@end example
+
+如果这不起作用，那么您可能必须放弃键盘这一次，然后将文件从桌面拖到 Emacs 框架上，或者使用文件对话框（默认情况下使用工具栏或菜单时显示）。  一旦您从 Emacs 内的桌面获得了文件，@kbd{C-x C-f} 将快速显示您的桌面的保存位置。
+
+@node Make Windows more like X
+@section 如何修改 Windows 使其更像 X？
+@cindex X, making Windows behave like
+
+@menu
+* Focus follows mouse::
+* Swap CapsLock and Control::
+@end menu
+
+@node Focus follows mouse
+@subsection 如何使活动窗口跟随鼠标移动？
+@vindex focus-follows-mouse
+@cindex point to focus
+@cindex mouse over to focus
+
+自定义变量@code{focus-follows-mouse}和@code{mouse-autoselect-window}。  前者可以用来误导 Emacs，使其在鼠标悬停在其他框架上时将焦点转移到其他框架上，即使 Windows 默认情况下具有单击焦点策略（但有软件可以更改该策略）。  后者可用于使 Emacs 在其自己的框架内使用焦点跟随鼠标策略。
+
+您还可以通过更改注册表中的设置来更改 Windows 单击焦点策略。  详细信息根据您的 Windows 版本而有所不同；在 Internet 上查找有关为您的 Windows 版本启用“活动窗口跟踪”的说明。
+
+@node Swap CapsLock and Control
+@subsection 如何交换 CapsLock 和 Control？
+@cindex scan codes, modifying
+@cindex key layout, customizing
+@cindex caps-lock, swapping with control key
+@cindex control key, swapping with caps-lock
+@cindex windows key, use as alt
+@cindex alt key, using windows keys as additional
+
+这无法在 Emacs 中完成，但您可以修改注册表中的扫描代码映射或定义新的键盘布局以在系统范围内交换键。
+
+@menu
+* Swap Caps NT::
+* Swap Caps 98::
+@end menu
+
+@node Swap Caps NT
+@subsubsection Windows NT/2000/XP/Vista？
+
+@itemize
+@item 
+来自克里斯·麦克马洪。  要将 CapsLock 设为控制键（保留原始控制键不变），请使用以下注册表文件：
+@example
+REGEDIT4
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Keyboard Layout]
+"Scancode Map"=hex:00,00,00,00,00,00,00,00,02,00,00,00,1d,00,3a,00,00,00,00,00
+@end example
+要交换 CapsLock 和左侧 Control 键，请使用：
+@example
+REGEDIT4
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Keyboard Layout]
+"Scancode Map"=hex:00,00,00,00,00,00,00,00,03,00,00,00,1d,00,3a,00,3a,00,1d,00,00,00,00,00
+@end example
+将它们保存为带有 @file{.reg} 扩展名的文件，然后在资源管理器中双击它们，或者从命令提示符“运行”它们以让它们更新您的注册表（您可能需要重新启动）。
+@item 
+Shane Holder 给出了系统如何使用“Scancode Map”的一些背景知识：
+@ignore
+https://ftp.gnu.org/old-gnu/emacs/windows/docs/ntemacs/contrib/caps-ctrl-registry.txt
+From: Shane Holder <holder@@mordor.rsn.hp.com>
+To: ntemacs-users@@cs.washington.edu
+Date: 04 Dec 1996 14:36:21 -0600
+Message-ID: <fawg21mm4hm.fsf@@mordor.rsn.hp.com>
+Subject: Re: Re[2]: problem with caps/ctrl swap on NT 4.0
+@end ignore
+@smallexample
+It's a binary value that lets you map keystrokes in the low-level keyboard
+drivers in NT@.  As a result you don't have to worry about applications
+bypassing mappings that you've done at a higher level (i.e., it just works).
+
+Here's the format of the value:
+
+	DWORD:	0x00000000	header
+	DWORD:	0x00000000	header
+	DWORD:	length (in DWORDs) of remaining data, including terminating DWORD
+	DWORD:	mapping 1
+	...
+	DWORD:	mapping n
+	DWORD:	0x00000000	terminating null DWORD
+
+Each mapping DWORD  has two parts: the input scancode, and an output
+scancode.  To map scancode 0x1d (left control) to scancode 0x3a (caps
+lock), you want a value of 0x003a001d.  Note that this does not swap the
+keys.  Using just this mapping value, both the left control and the caps
+lock key will behave as caps-lock.  To swap, you also need to map 0x3a to
+0x1d, using 0x001d003a.
+
+This registry value is system wide, and can't be made user-specific.  It
+also only takes affect on reboot.
+@end smallexample
+@item 
+Ulfar Erlingsson 提供了一个注册表文件，将 CapsLock 键设置为 Control 键，将 Windows 键设置为 Alt 键：
+@example
+REGEDIT4
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Keyboard Layout]
+"Scancode Map"=hex:00,00,00,00,00,00,00,00,03,00,00,00,1d,00,3a,00,38,00,5b,e0,00,00,00,00
+@end example
+@end itemize
+
+@node Swap Caps 98
+@subsubsection Windows 98/ME
+
+Microsoft 有一个名为 keyremap 的工具，它是 Windows 95 的 Kernel Toys 附加组件的一部分。该工具也已被证实可以在 Windows 98 上运行。
+
+@node Make Emacs like a Windows app
+@section 如何修改 Emacs 使其更像 Windows 应用程序？
+@cindex Windows, making Emacs act more like
+@cindex UI, making Emacs more like other Windows apps
+
+许多初学者发现 Emacs 很难使用，因为它的用户界面在很多方面都不同。  Emacs 早于大多数 UI 标准，并且经验丰富的 Emacs 用户已经习惯了事物的样子，因此更改默认值很困难。  经过一些配置后，大多数“标准”行为都可以在 Emacs 中近似实现。
+
+@menu
+* Highlight selection::
+* CUA::
+@end menu
+
+@node Highlight selection
+@subsection 突出显示选择
+@cindex transient-mark-mode
+@cindex selection, highlighting
+@cindex region, highlighting
+@cindex highlighting the selected region
+@cindex marked region, highlighting
+@cindex point and mark, highlighting the region between
+@cindex delete-selection-mode
+@cindex overwriting the selected region
+
+Emacs 有一个标记和点的概念，类似于其他程序中的选择。  但 Emacs 中的标记不仅仅用于定义所选区域，当您继续编辑和在缓冲区中移动时，它仍然存在，因此它也可以是一种书签。  标记的历史记录将被保存，因此您可以将以前的标记弹出到堆栈顶部，以返回到您之前所在的位置。由于此双重目的，默认情况下，标记和点之间的区域不会突出显示，除非您通过单击并拖动鼠标来选择区域。
+
+次要模式@code{transient-mark-mode}以两种方式改变标记的行为。  首先，它区分刚刚定义或重新激活的活动标记和非活动标记。  当标记处于活动状态时，一些通常作用于行、字、缓冲区等的命令将改为作用于区域。  除非设置了@code{mark-even-if-inactive}，否则需要重新激活非活动标记才能对其进行操作。  其次，@code{transient-mark-mode} 还会在该区域处于活动状态时突出显示该区域，提供与其他程序中获得的相同的视觉线索。  在最新版本的 Emacs 中，此模式默认打开。
+
+除了看到突出显示之外，Emacs 新用户通常还希望编辑命令能够在该区域处于活动状态时替换该区域。  此行为可以通过 @code{delete-selection-mode} 获得，但另请参阅以下问题。
+
+@node CUA
+@subsection 标准 Windows 键绑定
+@findex cua-mode
+@cindex CUA key bindings
+@cindex shift key, selecting with
+@cindex standard Windows key bindings
+@cindex paste with C-v
+@cindex cut with C-x
+@cindex copy with C-c
+@cindex C-c to copy
+@cindex C-x to cut
+@cindex C-v to paste
+
+Emacs 的按键绑定早于现代 GUI，并且后来的 GUI 选择用于剪切和复制的按键在 Emacs 中被赋予了作为扩展键盘映射的重要功能。  CUA 模式尝试通过在区域处于活动状态时将 C-x 和 C-c 定义为 @code{kill-region} 和 @code{copy-region-as-kill} 来让两种绑定共存，并在区域不活动时让它们具有正常的 Emacs 绑定。许多人认为这是一个可以接受的妥协方案。  CUA 模式还定义了许多其他键（C-v、Shift 选择），并且可以从 @emph{Options} 菜单打开。
+
+@node Window operations
+@section 窗口操作
+@cindex maximize frames from lisp
+@cindex minimize frames from lisp
+@cindex WM_SYSCOMMAND, sending system commands from lisp
+@cindex system menu, simulating from lisp
+
+函数 @code{w32-send-sys-command} 可用于模拟从系统菜单（位于窗口左上角）和其他一些系统范围的函数中选择命令。  它采用一个整数参数，其值应该是 Microsoft API 文档中记录的有效 @code{WM_SYSCOMMAND} 消息。
+
+@node Uninstall
+@section 如何卸载 Emacs？
+@cindex uninstall Emacs
+@cindex remove Emacs
+@cindex clean Emacs registry settings
+@cindex registry, cleaning the Emacs settings
+@cindex Start Menu, removing Emacs from
+@cindex upgrading Emacs
+@cindex delete Emacs directory
+
+Emacs 不附带卸载程序。  在二进制 zip 存档中找到的目录之外不会安装任何文件，因此删除这些目录足以清除文件。  如果您运行@command{addpm}，您还需要删除“开始”菜单组。  如果将 @command{addpm} 插入的注册表项留在那里，不会造成任何问题，但为了完整起见，您可以使用 @command{regedit} 删除 @code{HKEY_LOCAL_MACHINE} 或 @code{HKEY_CURRENT_USER} 下的键：@code{SOFTWARE\GNU\Emacs} 以及键 @code{HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\emacs.exe}（如果存在）。
+
+@node Does not run
+@section 当我运行 Emacs 时没有任何反应
+@cindex troubleshooting installation problems
+@cindex window not appearing, Emacs
+@cindex failure to run, Emacs
+@cindex 8.3 filenames, problems caused
+
+Emacs 可能由于多种原因而无法运行。  最常见的症状是，当 Emacs 启动时，光标改变一秒钟但没有任何反应。  如果您遇到这种情况，很可能是发行版解包不正确。
+
+检查以下内容，看看解包过程中是否存在问题：
+@enumerate
+@item 
+请务必禁用 CR/LF 转换，否则可执行文件将无法使用。  旧版本的 WinZipNT 默认启用此转换。  如果您使用的是 WinZipNT，请将其禁用。
+@item 
+检查文件名是否被截断为 8.3。  例如，顶级目录中应该有一个文件CONTRIBUTE；如果它被截断为 CONTRIBU 或 CONTRI~1，则您的发行版在解包时已损坏，并且 Emacs 将无法启动。
+@end enumerate
+
+如果仍然无法正常工作，请将邮件发送到 @email{help-gnu-emacs@@gnu.org} 邮件列表，描述您所做的事情以及您所看到的情况。  （您发送的信息越多，您收到有用回复的可能性就越大。）
+
+@node Virus
+@section Emacs 是否含有病毒？
+@cindex virus reported in Emacs
+@cindex anti-virus software reporting a virus in Emacs
+
+过去有报道称，一些病毒扫描程序声称 Emacs 发行版存在病毒。  如果您从 GNU FTP 站点或其镜像之一下载了 Emacs，并且它的 GPG 签名有效并列在 GNU 密钥环中，则这种情况极不可能发生，除非它是最近几天发布的新版本，在这种情况下您应该更加小心并报告问题。  过去的问题似乎是由于病毒检查程序在解压大型 tar.gz 文件进行扫描时遇到缓冲区大小限制并将失败报告为“未知病毒”而引起的。
+
+@node Anti-virus
+@section 防病毒软件有哪些已知问题？
+@cindex anti-virus software, bad interaction with
+@cindex virus software, bad interaction with
+@cindex firewall, bad interaction with
+@cindex scan all files, anti-virus option causing problems
+@cindex auto protect, anti-virus option causing problems
+@cindex shell, interacting badly with anti-virus
+@cindex subprocesses, interacting badly with anti-virus
+
+防病毒和防火墙软件可以阻止 Emacs 启动子进程和打开网络连接。  大多数此类产品都有高级模式，它们会提示您而不是默默阻止。  在某些情况下，防病毒程序的“扫描所有文件”或“自动保护”选项会导致在 Emacs 中运行与 shell 相关的命令失败。 @xref{Sub-processes,,Why is nothing happening when I enter shell commands?}。
+
+@c ------------------------------------------------------------
+@node Display Settings
+@chapter 显示设置
+
+@menu
+* Console window size::
+* Mouse trouble::
+* Cut and paste NUL::
+* Garbled clipboard::
+* Beep sound::
+@end menu
+
+@node Console window size
+@section 控制台模式下的 Emacs 超出了窗口大小
+@cindex console, window size
+@cindex telnet, display size problems running emacs over
+@cindex -nw, window size
+@vindex w32-use-full-screen-buffer
+
+变量 @code{w32-use-full-screen-buffer} 控制 Emacs 是使用窗口大小还是缓冲区大小来确定屏幕上的行数。通常窗口大小是正确的，但是当在某些 telnet 服务器上运行 Emacs 时，需要使用缓冲区大小。  Emacs 在启动时尝试猜测正确的值，但如果猜测错误，您可以自己自定义该变量。
+
+@node Mouse trouble
+@section 如果我的鼠标按钮出现问题该怎么办？
+@cindex mouse buttons, problems with
+@cindex 2 button mouse
+@cindex two button mouse
+@cindex third mouse button, simulating
+@cindex middle mouse button, simulating
+@cindex simulating three button mouse with two buttons
+@cindex swap right and middle mouse buttons
+@cindex exchange mouse-2 and mouse-3 buttons
+@vindex w32-mouse-button-tolerance
+@vindex w32-num-mouse-buttons
+@vindex w32-swap-mouse-buttons
+
+Emacs 假设有一个三键鼠标来分配绑定。  在 Windows 上，如果检测到双键鼠标，则会启用黑客攻击，让您可以通过同时按下两个鼠标按钮来模拟第三个按钮。  @code{w32-mouse-button-tolerance} 定义了“同时”的超时时间。  您可以使用 @kbd{C-h v} @code{w32-num-mouse-buttons} 检查 Emacs 认为您的鼠标有多少个按钮。
+
+如果您发现自己比 mouse-2 更频繁地需要 mouse-3 绑定，则可以在 init 文件中使用以下代码交换按钮：
+@example
+(setq w32-swap-mouse-buttons t)
+@end example
+
+@node Cut and paste NUL
+@section 如何剪切和粘贴带有 NUL 字符的文本？
+@cindex clipboard, NUL characters
+
+如果您尝试剪切并粘贴嵌入了 NUL 字符的文本，则文本将在第一个 NUL 字符处被截断。  这是 Windows 剪贴板的限制，并且不影响 Emacs 中从 Kill-ring 进行终止和拉取。
+
+@node Garbled clipboard
+@section 如何修复从剪贴板中拉出的乱码文本？
+@cindex clipboard, corruption of
+@cindex garbage on the clipboard
+@cindex clipboard encoding
+@cindex encoding, clipboard
+@findex set-selection-coding-system
+
+您可以尝试 @code{set-selection-coding-system}，但通常这种损坏已成为过去，因为 Emacs 现在默认使用 Unicode 作为剪贴板。
+
+@node Beep sound
+@section 如何更改 Emacs 蜂鸣声？
+@cindex beep, changing the sound
+@cindex sound, changing the beep
+@findex set-message-beep
+
+您可以使用函数 @code{set-message-beep} 更改 Emacs 用于发出蜂鸣声的声音。  这会影响控制台和 GUI 框架。文档字符串包含您可以使用的系统声音的列表。
+
+@c ------------------------------------------------------------
+@node Fonts and text translation
+@chapter 字体和文本翻译
+
+@menu
+* Font names::
+* Bold and italic::
+* Multilingual fonts::
+* Font menu::
+* Line ends::
+* UTF-8 encoding::
+@end menu
+
+@node Font names
+@section 字体名称
+@cindex XLFD font names
+@cindex font XLFD name format
+@cindex fontconfig font names in Emacs 23
+@cindex font dialog, using to find font names
+@findex x-select-font
+@findex x-list-fonts
+
+Emacs 22 及更早版本中的字体使用 X 逻辑字体描述 (XLFD) 格式命名。  Windows 上的 Emacs 会忽略许多字段，并在列出字体时用 * 填充它们。  前维护者 Andrew Innes 在 19.34 中写了 @uref{https://www.gnu.org/software/emacs/windows/ntemacs/discuss/x-font-details, this explanation} 来说明字体字符串中每个字段的含义以及 Emacs 如何处理它们。  从那时起，多语言支持和重新显示大修以支持可变宽度字体使事情发生了一些细微的变化；可以识别更多字符集（并且不推荐使用旧的伪字符集），并且分辨率字段用于计算点大小和像素大小之间的差异，但通常您应该将它们保留为系统默认值。  列出字体时，铸造厂字段还会填充字体是基于轮廓（.TTF、.ATM）还是基于光栅（.FON）的指示，这可以让您区分具有相同名称和不同技术的两种字体。
+
+从 Emacs 23 开始，首选的字体名称格式是更简单、更灵活的 fontconfig 格式。  为了向后兼容，XLFD 名称将继续受到支持。
+
+@example
+XLFD: -*-Courier New-normal-r-*-*-13-*-*-*-c-*-iso8859-1
+Fontconfig: Courier New-13
+@end example
+
+要查找字体的 XFLD 名称，您可以通过在行末尾按 C-j 在 @file{*scratch*} 缓冲区中执行以下命令：
+@example
+(x-select-font nil t)
+@end example
+
+要查看完整的字体列表，请执行以下 Lisp 代码片段，将其输入到 @file{*scratch*} 缓冲区并在第二行末尾按 @w{@kbd{C-x C-e}}：
+
+@example
+(dolist (font (x-list-fonts "*"))
+  (insert (format "%s\n" font)))
+@end example
+
+手册中记录了用于更改 Emacs 中默认字体的命令行选项和框架参数。  定义面孔时也可以使用字体，尽管系列和尺寸通常是单独指定的。此外，Windows 上的 Emacs 会读取注册表来查找 X 资源。  这也记录在手册中。
+
+@node Bold and italic
+@section 如何使粗体和斜体字体正常工作？
+@cindex italic fonts
+@cindex synthesized italic and bold fonts
+@cindex bold fonts, synthesized
+@findex set-face-font
+@vindex w32-enable-synthesized-fonts
+
+如果字体的宽度与普通版本相同，Emacs 只会自动使用斜体（和粗体）版本。  许多字体都有稍宽的斜体和粗体版本。  默认情况下，它也只会使用真正的粗体和斜体字体，而其他应用程序可能会使用从普通字体派生的合成变体。  要显示更多斜体和粗体字体，您可以启用合成字体并手动设置斜体、粗体和粗斜体字体，如下所示：
+
+@example
+(setq w32-enable-synthesized-fonts t)
+(set-face-font 'italic "-*-Courier New-normal-i-*-*-11-*-*-*-c-*-iso8859-1")
+(set-face-font 'bold-italic "-*-Courier New-bold-i-*-*-11-*-*-*-c-*-iso8859-1")
+@end example
+
+从 Emacs 24.4 开始， @code{w32-enable-synthesized-fonts} 变量已过时，因为 Emacs 不再有此限制。
+
+@node Multilingual fonts
+@section 多语言字体支持
+@cindex multilingual display, fonts
+@cindex MULE, fonts
+
+@menu
+* Language display::
+* Non-latin display::
+* International fonts::
+* Third-party multibyte::
+* Localized fonts::
+@end menu
+
+@node Language display
+@subsection 是否可以显示所有支持的语言？
+@cindex HELLO file, displaying all
+@cindex language support, fonts
+@cindex GNU intlfonts, for displaying all languages
+@cindex intlfonts, for displaying all languages
+
+要显示 Emacs 能够显示的所有语言，您将需要 GNU intlfonts 包中的 BDF 字体。 @xref{Fonts and text translation,,How do I use bdf fonts with Emacs?}。
+
+对于许多语言来说，原生 truetype 字体就足够了，在 Emacs 23 中，几乎所有语言都不再需要 BDF 字体。  在撰写本文时，所有受支持的字符都可以使用适当的 truetype 或 opentype 字体显示。
+
+@node Non-latin display
+@subsection 如何让 Emacs 显示非拉丁字符？
+@cindex fontsets, defining
+@cindex language support, forcing Emacs to use specific fonts
+@cindex MULE, fontsets
+@cindex multilingual display, fontsets
+@findex create-fontset-from-ascii-font
+@findex create-fontset-from-fontset-spec
+
+最新版本的 Emacs 可以立即显示大量字符，但是如果您在使用某个特定字符集（您知道自己有字体）时遇到问题，可以尝试使用 @code{create-fontset-from-ascii-font} 或 @code{create-fontset-from-fontset-spec} 定义新的字体集。
+
+@example
+(create-fontset-from-fontset-spec
+ "-*-Courier New-normal-r-*-*-12-*-*-*-c-*-fontset-most,
+ latin-iso8859-2:-*-Courier New-normal-r-*-*-12-*-*-*-c-*-iso8859-2,
+ latin-iso8859-3:-*-Courier New-normal-r-*-*-12-*-*-*-c-*-iso8859-3,
+ latin-iso8859-4:-*-Courier New-normal-r-*-*-12-*-*-*-c-*-iso8859-4,
+ cyrillic-iso8859-5:-*-Courier New-normal-r-*-*-12-*-*-*-c-*-iso8859-5,
+ greek-iso8859-7:-*-Courier New-normal-r-*-*-12-*-*-*-c-*-iso8859-7,
+ latin-iso8859-9:-*-Courier New-normal-r-*-*-12-*-*-*-c-*-iso8859-9,
+ japanese-jisx0208:-*-MS Gothic-normal-r-*-*-12-*-*-*-c-*-jisx0208-sjis,
+ katakana-jisx0201:-*-MS Gothic-normal-r-*-*-12-*-*-*-c-*-jisx0208-sjis,
+ latin-jisx0201:-*-MS Gothic-normal-r-*-*-12-*-*-*-c-*-jisx0208-sjis,
+ japanese-jisx0208-1978:-*-MS Gothic-normal-r-*-*-12-*-*-*-c-*-jisx0208-sjis,
+ korean-ksc5601:-*-Gulim-normal-r-*-*-12-*-*-*-c-*-ksc5601-*,
+ chinese-gb2312:-*-MS Song-normal-r-*-*-12-*-*-*-c-*-gb2312-*,
+ chinese-big5-1:-*-MingLiU-normal-r-*-*-12-*-*-*-c-*-big5-*,
+ chinese-big5-2:-*-MingLiU-normal-r-*-*-12-*-*-*-c-*-big5-*" t)
+@end example
+
+或者，您可以使用用于某些字符范围或特定脚本/字符集的字体信息来扩充默认字体集。  @xref{Modifying Fontsets,, Modifying Fontsets, emacs, The GNU Emacs Manual}，了解详细信息和一些有用的示例。
+
+@node International fonts
+@subsection 在哪里可以找到其他语言的字体？
+@cindex language support, finding fonts
+@cindex fonts, where to find
+@cindex MULE, finding fonts
+@cindex multilingual display, finding fonts
+@cindex GNU intlfonts, where to get
+@cindex intlfonts, where to get
+
+除了 Windows 本身各个组件的语言支持包附带的各种字体之外，现在的 GNU/Linux 发行版还附带了许多覆盖多种语言的免费 truetype 字体。  GNU Unifont 项目包含大多数 Unicode 代码空间的字形，可以从 @uref{https://ftpmirror.gnu.org/unifont, ftp.gnu.org mirrors} 下载。
+
+@node Third-party multibyte
+@subsection 如何使用第三方程序显示多字节字符？
+@cindex multilingual display, third party programs on Windows 9x/ME
+@cindex language support, third party programs on Windows 9x/ME
+@vindex w32-enable-unicode-output
+
+您可能只需要在非 Unicode 版本的 Windows（98 和 ME）上执行此操作，即使如此，各种 Windows 和 Internet Explorer 更新在大多数情况下也使得第三方软件变得不必要。如果您在显示文本时遇到问题，请尝试定义一个字体集，将第三方软件处理的语言的字体设置为该软件期望的字体（这可能不是适合该语言的字体，但第三方软件正在拦截它并在幕后使用不同的字体）。 @xref{Non-latin display}。
+
+@node Localized fonts
+@subsection 我可以使用带有我的语言名称的字体吗？
+@cindex fonts, localized font names
+@vindex locale-coding-system
+
+通常，Emacs 应该根据您的语言环境适当地初始化 @code{locale-coding-system}，这将使 Emacs 成功地使用您本地语言的字体名称。
+
+@c This feature disappeared in Emacs 23, and was resurrected in 25.1.
+@node Font menu
+@section 如何让 Emacs 使用像 X 上那样的字体菜单？
+@cindex fonts, displaying a menu
+@cindex fontsets, displaying a menu
+@cindex font dialog, using a menu instead
+@vindex w32-use-w32-font-dialog
+
+将以下内容放入您的初始化文件中：
+
+@example
+(setq w32-use-w32-font-dialog nil)
+@end example
+
+@menu
+* Add fonts to menu::
+@end menu
+
+@c This variable had no effect between v23 and v25.1, where
+@c w32-use-w32-font-dialog support was resurrected, see above.
+@node Add fonts to menu
+@subsection 如何将我的字体添加到字体菜单？
+@cindex font menu, adding fonts
+@vindex w32-fixed-font-alist
+
+如果您已将 w32-use-w32-font-dialog 设置为 @code{nil}，则可以通过更改 @code{w32-fixed-font-alist} 将字体添加到字体菜单。  例如：
+
+@example
+(setq w32-fixed-font-alist
+   (append w32-fixed-font-alist
+      '(("Monotype.com"
+         ("8" "-*-Monotype.com-normal-r-*-*-11-*-*-*-c-iso8859-1")
+         ("9" "-*-Monotype.com-normal-r-*-*-12-*-*-*-c-iso8859-1")
+         ("10" "-*-Monotype.com-normal-r-*-*-13-*-*-*-c-iso8859-1")
+         ("11" "-*-Monotype.com-normal-r-*-*-15-*-*-*-c-iso8859-1")))))
+@end example
+
+@node Line ends
+@section 如何控制 CR/LF 翻译？
+@cindex DOS line ends
+@cindex Unix line ends
+@cindex Mac line ends
+
+您可以通过多种方法来控制 Emacs 中的自动 CR/LF 转换，这种情况反映了过去默认支持不是很强大的事实。  有关此问题的讨论，请查看该主题的 @uref{https://www.gnu.org/software/emacs/windows/ntemacs/todo/translate, this collection of email messages}。
+
+@menu
+* Automatic line ends::
+* Line ends by file system::
+@end menu
+
+@node Automatic line ends
+@subsection 自动回车/换行翻译
+@cindex line ends, automatic detection
+
+对于现有文件，Emacs 会扫描文件以确定行结束约定，作为确定文件编码的同一扫描的一部分。  嵌入的 Ctrl-M (ASCII 13) 字符和不一致的行尾可能会混淆自动扫描，Emacs 将以 Unix (LF) 模式显示文件，并将 Ctrl-M 字符显示为@samp{^M}。这样做是为了安全起见，因为如果文件确实是二进制文件并且 Ctrl-M 字符很重要，则不会发生数据丢失。
+
+@node Line ends by file system
+@subsection 按文件系统进行 CR/LF 转换
+@cindex line ends, determining by filesystem
+@cindex binary files, determining by filesystem
+@vindex w32-untranslated-filesystem-list
+@findex w32-add-untranslated-filesystem
+@findex w32-remove-untranslated-filesystem
+
+变量 @code{w32-untranslated-filesystem-list} 定义不应对其执行 CR/LF 自动检测的整个目录树。  可以使用函数 @code{w32-add-untranslated-filesystem} 和 @code{w32-remove-untranslated-filesystem} 操作该列表。  通过最新版本的 Emacs 中的自动检测，这对于现有文件很少有用，但仍然可以用于影响新创建文件的行结束选择。
+
+@node UTF-8 encoding
+@section 我可以在 MS-Windows 上使用 UTF-8 作为默认编码吗？
+@cindex UTF-8 as default encoding on Windows
+@cindex codepage 65001 support in Emacs
+
+最新版本的 MS-Windows（自 build 1803 起的 Windows 10 以及 Windows 11 或更高版本）允许使用 UTF-8（又名@:“代码页 65001”）作为默认系统代码页。  截至撰写本文时，即使在 Windows 11 中，这仍然是一个实验性功能，并且默认情况下处于禁用状态。在 Windows 11 上，您可以按如下方式启用它：
+
+@enumerate
+@item 
+打开设置。
+
+@item 
+选择“时间和语言”，然后选择“语言和地区”。
+
+@item 
+单击“管理语言设置”。
+
+@item 
+在弹出的对话框中单击“更改系统区域设置...”
+
+@item 
+在弹出的“区域设置”对话框中，选中标有“Beta：使用 Unicode UTF-8 获得全球语言支持”的复选框，然后在两个对话框中单击“确定”进行确认。
+@end enumerate
+
+@cindex UCRT runtime library
+@cindex MSVCRT runtime library
+Emacs 从版本 30.2 开始支持此功能，但仅当在提供此功能的 Windows 版本上运行时，并且仅当 Emacs 可执行文件作为 Windows C 运行时链接到 @samp{UCRT} 库（而不是旧版 @samp{MSVCRT}）时。  这是因为处理非 ASCII 字符的 C 函数（如 @samp{MSVCRT} 实现的）不支持 UTF-8 作为非 ASCII 字符的多字节编码。  （链接到哪个运行时由构建 Emacs 二进制文件的人决定。请注意，使用链接到 @samp{UCRT} 的 Emacs 需要 Emacs 动态加载的所有库，例如 GnuTLS、@samp{rsvg}、Tree-sitter 等图像库以及所有其他库，也链接到 @samp{UCRT}，否则在处理非 ASCII 字符和字符串时可能会出现微妙的问题。）
+
+如果您有一个与 @samp{UCRT} 链接的 Emacs，并且如上所述在 Windows 中打开了 UTF-8 支持，则可以自定义 Emacs 以使用 UTF-8 作为默认编码，例如，通过添加
+
+@lisp
+ (prefer-coding-system 'utf-8)
+@end lisp
+
+@noindent
+到您的 init 文件，或者在您的 Emacs 会话中使用 @samp{UTF-8} 语言环境 (@pxref{Language Environments,,, emacs, The GNU Emacs Manual})。
+
+请注意，由于 Windows 的此功能仍处于测试阶段，因此可能会出现一些微妙的问题。  因此，我们还不建议打开此功能，除非您喜欢冒险。
+
+@c ------------------------------------------------------------
+@node Printing
+@chapter 印刷
+@cindex printing
+
+为了让在 MS Windows 上的 Emacs 打印变得更加容易，我们付出了很多努力，但这仍然不足以跟上打印技术的变化，从通过可直接访问的端口连接的基于文本和 Postscript 的打印机，到只能通过 USB@. 访问的图形打印机。有关详细信息，请参阅@uref{https://www.emacswiki.org/emacs/PrintingFromEmacs, Emacs Wiki}、@uref{https://www.emacswiki.org/emacs/PrintWithWebBrowser} 和 @uref{https://www.emacswiki.org/emacs/PrintFromWindowsExplorer}。
+
+@c ------------------------------------------------------------
+@node Sub-processes
+@chapter 子流程
+@cindex subprocesses
+
+@menu
+* Quoting issues::
+* Subprocess hang::
+* Subprocess buffering::
+* Subprocesses and floppy drive::
+* Killing subprocesses::
+* Subprocess EOF::
+* Using shell::
+* Cygwin paths::
+* Dired ls::
+* Shell echo::
+* Shell completion forward slash::
+* Incorrect DOS version::
+* Shell commands do nothing::
+@end menu
+
+@node Quoting issues
+@section 引用问题
+@cindex quoting arguments to subprocesses
+@cindex sub-processes, quoting arguments to
+@cindex cygwin, quoting arguments
+
+本机 Windows shell 和 Cygwin shell 的引用规则有一些细微的差别。  当 Emacs 生成子进程时，它会尝试确定该进程是否是 Cygwin 程序并适当地更改其引用机制。
+
+@node Subprocess hang
+@section 程序读取输入挂起
+@cindex subprocesses, hanging when reading input
+@cindex full-screen console programs, as subprocesses
+@cindex ftp, client hanging
+@findex ftp
+
+显式使用控制台句柄（@file{CON} 或 @file{CON:}）而不是 stdin 和 stdout 的程序不能用作 Emacs 的子进程，并且它们也无法在 shell 模式下工作。  Windows 上的默认 ftp 客户端就是此类程序的一个示例 - 该 ftp 程序大多适合与 @code{ange-ftp} 或 @code{tramp} 一起使用，但不适用于 @kbd{M-x ftp} (@pxref{Network access,,How do I use FTP within Emacs})。  Emacs 或 @code{shell-mode} 中使用的任何 shell 都没有方便的方法将此类进程的输入和输出从控制台重定向到输入和输出管道。唯一的解决方法是使用不直接使用控制台的程序的不同实现。  Microsoft 的新 PowerShell 似乎是另一个此类程序，因此不能用作 Emacs 的替代 shell。
+
+@node Subprocess buffering
+@section shell 和子进程中的缓冲
+@cindex subprocesses, buffering output
+@cindex output not displaying, subprocesses
+@cindex SQL subprocess hanging
+@cindex cvs hanging when login needed
+@cindex ssh, password prompt not appearing when using with cvs
+@findex sql-mode
+@findex shell-mode
+@cindex setbuf, using in subprocesses to prevent buffering
+@cindex setvbuf, using in subprocesses to prevent buffering
+
+您可能会注意到，某些程序在 @code{shell-mode} 中的 shell 中运行时，其输出会被缓冲（例如，人们发现使用 @code{sql-mode} 时会发生这种情况）。  当程序有大量输出时，它会溢出缓冲并打印到 shell 缓冲区；但是，如果程序仅输出少量文本，它将保持缓冲状态并且不会出现在 shell 缓冲区中。  同样的情况也可能发生在本身作为子进程运行其他程序的其他子进程中，例如，当使用 Emacs 中的 @command{cvs} 时，它本身被配置为使用 @command{ssh}，密码提示无法按预期出现，并且 @command{cvs} 似乎挂起。
+
+尽管乍一看似乎是 shell 正在缓冲程序的输出，但实际上是程序在缓冲输出。  C 运行时通常根据 stdout 是否绑定到控制台窗口的句柄来决定如何缓冲输出。  如果绑定到控制台窗口，则输出将逐行缓冲；如果绑定到块设备（例如文件），则输出将逐块缓冲。
+
+在 shell 缓冲区中，stdout 是管道句柄，因此以块的形式进行缓冲。  如果您希望程序的缓冲行为有所不同，则必须更改程序本身；您可以使用 @code{setbuf} 和 @code{setvbuf} 来操作缓冲语义。
+
+一些程序通过使用显式标志来控制其缓冲行为来处理此问题，通常为 @option{-i} 进行交互，或者通过特殊的环境变量。  其他程序通过内部使用 @samp{getenv("emacs")} 设法检测到它们正在 Emacs 下运行。  查看程序的文档以了解解决此问题的方法。
+
+@menu
+* Perl script buffering::
+@end menu
+
+@node Perl script buffering
+@subsection Perl 脚本缓冲
+@cindex perl, avoiding buffering when used as a subprocess of Emacs
+
+Perl 脚本解决上述问题的一个方便的解决方案是使用：
+
+@example
+# Turn all buffering off.
+select((select(STDOUT), $| = 1)[0]);
+select((select(STDERR), $| = 1)[0]);
+select((select(STDIN), $| = 1)[0]);
+@end example
+
+@node Subprocesses and floppy drive
+@section 访问软盘驱动器的 16 位子进程
+@cindex floppy drive, access when subprocesses started
+@cindex subprocess starting causes floppy drive access
+
+如果您发现 16 位 DOS 子进程导致您的 A: 驱动器被访问，并且驱动器中没有软盘，则挂起 Emacs 直到读取超时，请检查是否是您的病毒软件导致了该问题。
+
+@node Killing subprocesses
+@section 终止 Windows 98/Me 上的子进程
+@cindex subprocess, killing on Windows 98/ME
+@cindex killing subprocesses, Windows 98/ME
+@cindex shutdown, complaints about cmdproxy.exe running
+
+Emacs 无法保证子进程在 Windows 95 及其后代上被终止，这是一个很难解决的限制。  为了避免这些系统出现问题，您应该让子进程运行完成，包括在终止相关缓冲区之前显式退出 shell。
+
+如果您发现在关闭时，Windows 抱怨有一个正在运行的 @command{cmdproxy.exe}，即使您小心地退出了所有 shell，并且在关闭之前任务管理器中没有显示任何 shell，这可能是由于与病毒扫描程序的交互存在错误。
+
+@node Subprocess EOF
+@section 向子进程发送 EOF
+@cindex EOF, sending to subprocesses
+@cindex shell terminates when EOF sent to subprocess
+@findex process-send-eof
+
+当使用 @code{process-send-eof} 将 EOF 发送到在交互式 shell 中运行的子进程时，shell 会意外终止，就好像其输入已关闭一样。  这会影响 @kbd{C-c C-d} 在 shell 缓冲区中的使用。  更多详情请参见@uref{https://www.gnu.org/software/emacs/windows/ntemacs/todo/shell-ctrl-d, this discussion}。
+
+@node Using shell
+@section 如何在 Emacs 中使用 shell？
+@cindex interactive shell, using
+@cindex shell within emacs, using
+@findex shell
+@findex  shell-command
+@vindex shell-file-name
+@vindex explicit-shell-file-name
+
+您可以通过键入 @kbd{M-x shell} 在 Emacs 中启动交互式 shell。默认情况下，这将启动标准 Windows shell @file{cmd.exe}。 Emacs 使用 @env{SHELL} 环境变量来确定使用哪个程序作为 shell。  要指示 Emacs 使用非默认 shell，您可以设置此环境变量，或自定义 @code{explicit-shell-file-name}。  您还可以自定义 @code{shell-file-name} 来更改由 @code{shell-command} 启动的子进程和相关非交互式 shell 命令所使用的 shell。
+
+@menu
+* Bash::
+@end menu
+
+@node Bash
+@subsection 巴什
+@cindex cygwin bash as shell within Emacs
+@cindex shell, using cygwin bash within Emacs
+@cindex bash, using cygwin shell within Emacs
+@vindex comint-scroll-show-maximum-output
+@vindex comint-completion-addsuffix
+@vindex comint-eol-on-send
+@vindex w32-quote-process-args
+@vindex shell-mode-hook
+
+Cygwin bash 是与 Emacs 一起使用的流行 shell。  要使用 bash 作为 Emacs 中的默认 shell，您可以将以下内容放入 init 文件中：
+
+@example
+(defun my-shell-setup ()
+  "For Cygwin bash under Emacs 20"
+  (setq comint-scroll-show-maximum-output 'this)
+  (make-variable-buffer-local 'comint-completion-addsuffix))
+  (setq comint-completion-addsuffix t)
+  ;; (setq comint-process-echoes t) ;; reported that this is no longer needed
+  (setq comint-eol-on-send t)
+  (setq w32-quote-process-args ?\")
+
+(add-hook 'shell-mode-hook 'my-shell-setup)
+@end example
+
+警告：某些版本的 bash 设置并使用环境变量 PID@. 由于某些尚不清楚的原因，如果设置了 @env{PID} 并且 Emacs 将其传递给 bash 子 shell，则 bash 会终止（如果从 bash shell 启动，Emacs 可以继承 @env{PID} 变量）。  如果清除 init 文件中的 @env{PID} 变量，您应该能够继续使用 bash 作为子 shell：
+@example
+    (setenv "PID" nil)
+@end example
+
+@node Cygwin paths
+@section 如何在 Emacs 中使用 Cygwin 样式路径？
+@cindex cygwin paths, using within Emacs
+@cindex mount points, cygwin
+@cindex cygwin mount points, using within Emacs
+
+包 @uref{https://www.emacswiki.org/emacs/cygwin-mount.el, cygwin-mount.el} 向 Emacs 介绍 Cygwin 挂载点。
+
+@node Dired ls
+@section 如何让 dired 使用我的 ls 程序？
+@cindex dired, using an external ls program
+@cindex dired, interpreting symlinks the same way as cygwin
+@cindex symlinks in dired, interpreting the same way as cygwin
+@cindex cygwin symlinks in dired
+@vindex ls-lisp-use-insert-directory-program
+@vindex insert-directory-program
+
+Dired 在 Windows 上默认使用 @command{ls} 的内部 lisp 实现。  为了与其他程序（例如 Cygwin）一致地显示符号链接和其他信息以及性能原因，您可能需要改用 Windows 端口 @command{ls}。
+
+@example
+(setq ls-lisp-use-insert-directory-program t)      ;; use external ls
+(setq insert-directory-program "c:/cygwin/bin/ls") ;; ls program name
+@end example
+
+@node Shell echo
+@section 如何防止 shell 命令被回显？
+@cindex echo, suppressing for shell input
+@cindex shell commands, suppressing echo
+@vindex comint-process-echoes
+@vindex comint-mode-hook
+@vindex explicit-cmd.exe-args
+@vindex explicit-cmdproxy.exe-args
+@vindex explicit-bash.exe-args
+@vindex explicit-bash-args
+@cindex shell specific arguments
+
+某些 shell 会回显您发送给它们的命令，并且回显的命令会出现在输出缓冲区中。  特别是，默认 shell @command{command.com} 和 @command{cmd.exe} 具有此行为。
+
+为了防止打印回显命令，您可以将以下内容放入 init 文件中：
+
+@example
+    (defun my-comint-init ()
+      (setq comint-process-echoes t))
+    (add-hook 'comint-mode-hook 'my-comint-init)
+@end example
+
+如果 0⁣ 仍然没有剥离回显命令，那么您必须明确告诉 shell 不要回显命令。  您可以通过适当设置 @code{explicit-@var{SHELL}-args} 变量来做到这一点；其中 @var{SHELL} 是 @env{SHELL} 环境变量的值（执行 @kbd{M-: (getenv "SHELL")} 查看它当前设置的值）。  假设您使用的是 NT 并且您的 @env{SHELL} 环境变量设置为 @command{cmd.exe}，那么将以下内容放入您的 init 文件中将告诉 @command{cmd.exe} 不要回显命令：
+
+@example
+    (setq explicit-cmd.exe-args '("/q"))
+@end example
+
+每次启动新 shell 时，comint 包都会使用该变量的值作为 @command{cmd.exe} 的参数； @option{/q} 是 @command{cmd.exe} 的参数，用于停止回显（在 shell 中调用 @samp{cmd /?} 将显示 @command{cmd.exe} 的所有命令行参数）。
+
+请注意，该变量区分大小写；如果 @env{SHELL} 环境变量的值为 @command{CMD.EXE}，则该变量需要命名为 ⁣​​2⁣。
+
+@node Shell completion forward slash
+@section 如何使用正斜杠使 shell 完成？
+@cindex completion, using forward slashes in shell buffers
+@cindex forward slashes for completion in shell buffers
+@vindex comint-completion-addsuffix
+
+在 shell 缓冲区中完成时附加到目录名称的字符由变量 @code{comint-completion-addsuffix} 控制。有关详细信息，请参阅其文档（带有 @kbd{C-h v}）。
+
+@node Incorrect DOS version
+@section 为什么我收到错误的 DOS 版本消息？
+@cindex nmake, Incorrect DOS version messages
+@cindex shell, Incorrect DOS version messages
+@cindex COMSPEC, effect on subprocesses of subprocesses
+
+例如，如果您在 shell 中调用 @command{nmake} 并且它尝试创建子 shell，则可能会发生这种情况。  出现此问题的原因是，在最初创建 shell 时，shell 的第一个参数不是 shell 程序所在的目录。  发生这种情况时，@command{command.com} 会为其 @env{COMSPEC} 环境变量创建一个不正确的值。  然后，当其他程序使用 @env{COMSPEC} 来查找 shell 时，它们会被赋予错误的值。
+
+解决此问题的方法是，在 shell 启动时阻止任何参数发送到 shell（在这种情况下，@command{command.com} 将使用 @env{COMSPEC} 的默认且正确的值），或者让第一个参数为 shell 可执行文件所在的目录。
+
+@node Shell commands do nothing
+@section 为什么我输入 shell 命令时没有任何反应？
+@cindex shell commands not working
+@cindex anti-virus software, bad interaction with
+@cindex virus software, bad interaction with
+@cindex firewall, bad interaction with
+@cindex scan all files, anti-virus option causing problems
+@cindex auto protect, anti-virus option causing problems
+@cindex shell, interacting badly with anti-virus
+
+据报道，一些防病毒软件过去曾导致 shell 出现问题。  尝试关闭“扫描所有文件”等选项。  @xref{Installing Emacs,,What known problems are there with anti-virus software?}。
+
+@c ------------------------------------------------------------
+@node Network access
+@chapter 网络接入
+
+@menu
+* Mail::
+* Attachments with Gnus::
+* Using FTP::
+* Tramp ssh::
+* telnet::
+@end menu
+
+@node Mail
+@section 如何在 Emacs 中使用邮件？
+
+Emacs 提供了多种阅读和编写邮件的选项。  这些都记录在手册中，选择使用哪种方法取决于个人喜好。  然而，存在一些特定于 Windows 的问题，与 Windows 计算机不具备其他平台上通常安装的邮件基础设施这一事实相关，因此如果没有某些配置，邮件将无法工作。
+
+@menu
+* Outgoing mail::
+* Incoming mail with Rmail::
+* Incoming mail with Gnus::
+* Incoming mail other::
+@end menu
+
+@node Outgoing mail
+@subsection 外发邮件
+@cindex mail, outgoing
+@cindex smtp server
+@vindex user-full-name
+@vindex user-mail-address
+@vindex smtpmail-default-smtp-server
+@vindex smtpmail-smtp-server
+@vindex send-mail-command
+@vindex message-send-mail-function
+@findex smtpmail-send-it
+@vindex smtpmail-debug-info
+
+对于外发邮件，您需要使用 @file{smtpmail.el}，它允许 Emacs 直接与 SMTP 邮件服务器对话。  它包含在 Emacs 中，可以按如下方式设置：
+
+@example
+(setq user-full-name "@var{Your full name}")
+(setq user-mail-address "@var{Your@@email.address}")
+(setq smtpmail-default-smtp-server "@var{domain.name.of.your.smtp.server}")
+
+(setq send-mail-command 'smtpmail-send-it) ; For mail-mode (Rmail)
+(setq message-send-mail-function 'smtpmail-send-it) ; For message-mode (Gnus)
+@end example
+
+请注意，如果您想在加载 smtpmail 后更改 SMTP 服务器的名称，则需要更改 @code{smtpmail-smtp-server}。
+
+如果您在发送大消息时遇到问题，请检查变量 @code{smtpmail-debug-info} 的值。  如果不是@code{nil}，则应将其设置为@code{nil}：
+
+@node Incoming mail with Rmail
+@subsection 使用 Rmail 和 POP3 接收邮件
+@cindex mail, incoming with rmail
+@cindex pop3, using rmail
+@cindex rmail, mail client
+@cindex movemail, using pop3
+@cindex MAILHOST
+@vindex rmail-primary-inbox-list
+@vindex rmail-remote-password-required
+
+对于使用 Rmail 包和 POP3 服务器接收邮件，您将需要以下配置：
+
+@example
+(setenv "MAILHOST" "@var{domain.name.of.your.pop3.server}")
+(setq rmail-primary-inbox-list '("po:@var{your logon id}"))
+(setq rmail-remote-password-required t)
+@end example
+
+@node Incoming mail with Gnus
+@subsection 使用 Gnus 接收邮件
+@cindex mail, incoming with Gnus
+@cindex pop3, using Gnus
+@cindex imap, using Gnus
+@cindex gnus, mail and news client
+
+虽然 Gnus 最初是作为 Usenet 新闻阅读器出现的，但它也是一个很好的邮件阅读器，特别是如果您订阅了很多邮件列表，或者您想使用 IMAP 而不是 POP3（Rmail 不支持 POP3）。  @xref{Top,The Gnus manual,,gnus, The Gnus manual}。
+
+@node Incoming mail other
+@subsection 其他传入邮件选项
+@cindex mail, other options
+@cindex wanderlust, mail and news client
+@cindex vm, mail client
+@cindex mh-e, mail client
+
+在 Emacs 中阅读邮件的其他选项包括 VM、MH-E 和 Wanderlust。 MH-E 包含在 Emacs 中。  其他的需要 Lisp 或 Emacs 不附带的可执行代码，因此如果您想使用它们，您应该从获取这些包的地方寻求帮助。
+
+@node Attachments with Gnus
+@section 如何在 Gnus 中打开附件？
+@cindex gnus, attachments
+@cindex attachments, in gnus
+@cindex mail, attachments in gnus
+@cindex .mailcap
+@cindex MIME, configuration for Gnus
+
+在 @env{HOME} 目录中创建一个名为 @file{.mailcap} 的文件，其内容如下：
+@example
+application/zip; "C:/Program Files/7-Zip/7zFM.exe"
+video/*; "C:/Program Files/VideoLAN/VLC/vlc.exe"
+@end example
+
+@strong{Warning:} 将 MIME 类型与 @command{start} 或其他通用 Windows 命令关联起来以打开任意文件似乎是个好主意，但它会让您的系统容易受到攻击，就像 Outlook Express 最糟糕的情况一样。  以这种方式关联 application/* 或 */* 尤其危险。
+
+@node Using FTP
+@section 如何在 Emacs 中使用 FTP？
+@cindex ftp, using within Emacs
+@cindex ange-ftp
+@cindex tramp, ftp
+@cindex remote hosts via ftp
+@vindex ange-ftp-ftp-program-name
+
+Windows内置的FTP客户端可以与ange-ftp一起使用。  Ange-ftp 是 Emacs 软件包，它提供到 trapmp 的 FTP 连接，tramp 是默认启用的 Emacs 多协议远程文件访问软件包。
+
+由于缺乏被动模式支持，Windows FTP 客户端在某些防火墙上确实存在问题，因此您可能需要尝试替代的 ftp 客户端。  确保您尝试的客户端在 @env{PATH} 中位于默认 Windows 客户端之前，或者重命名默认 Windows 客户端以避免它妨碍。  或者，您可以将 @code{ange-ftp-ftp-program-name} 自定义为您正在尝试的版本的完整路径。  @xref{Other useful ports}。
+
+@node Tramp ssh
+@section 如何通过 SSH 使用 Tramp 在 Emacs 中工作？
+@cindex tramp, ssh
+@cindex ssh, accessing remote hosts within Emacs
+@cindex remote hosts via ssh
+@cindex openssh
+@cindex PuTTY
+@cindex plink
+@vindex tramp-default-method
+@vindex tramp-default-method-alist
+
+TRAMP 可以使用多种协议连接到远程计算机来读取文件，甚至远程对这些文件运行命令。  一种流行的方法是 ssh。  除了 openssh 的 Cygwin 版本之外，您还可以使用 PuTTY 的命令行 plink 程序作为 ssh 客户端。  这些选项在 @code{tramp-default-method} 或 @code{tramp-default-method-alist} 中使用的相关方法是：
+@itemize @w{}
+@item 
+打开ssh
+@itemize
+@item @code{scp} 使用 scp 进行复制，使用 ssh 进行 shell 操作。
+@item @code{ssh} 使用 ssh 和 stdin/stdout 上的编码进行文件传输。
+@end itemize
+
+@item 
+油灰
+@itemize
+@item @code{pscp} 使用 pscp 进行复制，使用 plink 进行 shell 操作。
+@item @code{plink} 使用 plink 和 stdin/stdout 上的编码进行文件传输。
+@end itemize
+@end itemize
+
+@node telnet
+@section 如何在 Emacs 中使用 telnet？
+@cindex telnet, in Emacs
+@findex telnet
+@cindex telnet client, that works with Emacs
+
+要在 Windows 上使用 telnet 模式，您需要一个使用 stdin 和 stdout 进行输入和输出的 telnet 客户端。  默认的 Windows 客户端是 Windows 应用程序，并且不会作为子进程工作。  存在多个选项，但此常见问题解答中以前的信息现已过时，因此没有可用的具体指示。
+
+@c ------------------------------------------------------------
+@node Text and Utility modes
+@chapter 文本和实用模式
+
+@menu
+* TeX::
+* Spell check::
+* Encryption::
+* Mouse wheel::
+* Grep::
+@end menu
+
+@node TeX
+@section 如何将 TeX 与 Emacs 一起使用？
+@cindex tex
+@cindex typesetting
+
+您将需要 Windows 版 TeX 的实现。 @uref{https://www.tug.org/interest.html#free, TeX Users Group} 网站上列出了许多实现。
+
+@node Spell check
+@section 如何执行拼写检查？
+@cindex spell checking
+@cindex ispell
+@cindex aspell
+@cindex flyspell
+@vindex ispell-program-name
+@findex flyspell-mode
+
+Emacs 支持按需 (@code{ispell}) 和您的类型 (@code{flyspell}) 进行拼写检查。  这两个软件包都依赖于 @command{ispell} 3.2 的副本或兼容的拼写检查程序。 GNU Aspell 是当今流行的选择，过时的 Windows 安装程序可从 @uref{http://aspell.net/win32/, official site} 获得。另一种可能性是 Hunspell，可以从 @uref{https://sourceforge.net/projects/ezwinports/files/?source=navbar, the ezwinports site} 获得。  如果您使用的是 MSYS2 发行版，则可以通过包管理器 Pacman 安装最新版本的 GNU Aspell 或 Hunspell。  @xref{Other useful ports}。
+
+安装后，您需要配置 @code{ispell-program-name} 来告诉 ispell 和 Flyspell 使用 @command{aspell} 或 @command{hunspell} 作为 ispell 的替代品。  您可以包含@file{aspell}/@file{hunspell}二进制文件的完整路径，这意味着您不需要将其安装目录添加到@env{PATH}。
+
+@node Encryption
+@section Emacs 和加密
+@cindex encryption
+@cindex gpg, Windows binaries
+@cindex pgp encryption, with GNU Privacy Guard
+@cindex signatures on Emacs distribution, checking
+@cindex Emacs distribution, checking digital signatures
+
+GNU Privacy Guard 是 PGP 的免费替代品，可提供 Windows 二进制文件。  参见@uref{https://www.gnupg.org/}。
+
+@node Mouse wheel
+@section 为什么我的滚轮鼠标在 Emacs 中不起作用？
+@cindex mouse wheel
+@cindex wheel mouse
+@cindex middle button, on wheel mouse
+@cindex scrolling, with mouse wheel
+
+某些滚轮鼠标附带的默认设置不会将标准滚轮事件发送到程序，而是尝试模拟滚动条事件。  通常，这可以从鼠标控制面板上的硬件特定页面进行配置。  中键通常映射到相同的设置中，以具有除发送鼠标中键事件之外的某些功能。  在某些情况下，卸载制造商的驱动程序并告诉 Windows 使用通用 USB 或 PS/2 驱动程序是使鼠标正常工作的唯一方法。
+
+@node Grep
+@section 如何在 Emacs 中使用 grep？
+@cindex searching through files with grep
+@cindex grep
+@cindex findstr
+@findex grep
+
+在 Emacs 中使用 @kbd{M-x grep} 的最佳方法是下载 GNU @command{grep} 的端口。 @xref{Other useful ports}。
+
+如果您想在不安装额外工具的情况下获得快速解决方案，则适用于简单文本搜索的一个糟糕的替代方案是将内置 Windows 命令 @command{findstr} 指定为在 @kbd{M-x grep} 提示符下运行的命令。  通常，您需要使用 @command{findstr} 的 @option{/n} 参数，让它打印每次命中的行号。
+
+@menu
+* Recursive grep::
+@end menu
+
+@node Recursive grep
+@subsection 如何进行递归 grep？
+@cindex recursive searching with grep
+@cindex grep, recursive through subdirectories
+@cindex findstr, recursive
+@cindex find, using with grep
+@cindex find, the POSIX command
+@findex rgrep
+@findex grep-find
+@findex find-grep-dired
+@vindex find-program
+@vindex grep-find-command
+
+Emacs 命令 @code{rgrep}、@code{grep-find} 和 @code{find-grep-dired} 都是用于递归地 grep 到子目录的不同接口。  默认情况下，他们使用命令 @command{find} 来确定要处理哪些文件，并直接从 find 运行 @command{grep} ，或使用 @command{xargs} 来批量处理文件并减少 @command{grep} 的调用次数。
+
+Windows 还附带了 @command{find} 命令，但它与 Emacs 尝试使用的 POSIX @command{find} 不兼容。 Emacs 期望 @command{find} 与 GNU findutils 兼容。 @xref{Other useful ports}。  安装后，您需要确保 Emacs 找到此版本，而不是标准的 Windows @command{find} 命令。  您可以通过重命名 Windows 命令、更改 @env{PATH} 以确保包含 findutils @file{bin} 目录的目录位于 Windows 系统目录之前，或者将变量 @code{find-program} 设置为 findutils @command{find} 命令的完整路径来完成此操作。
+
+如果您有最新版本的 grep，另一种方法是自定义 @code{grep-find-command} 以使用 @samp{grep -r} 而不是同时使用 find 和 grep。  如果您不需要 grep 的全部功能，另一种选择是使用 @samp{findstr /n /r};如果您想要递归搜索，请添加 @samp{/s} 选项。
+
+@c ------------------------------------------------------------
+@node Developing with Emacs
+@chapter 使用 Emacs 进行开发
+
+我们建议使用 GNU 编译器集合从 Emacs 开发 C/C++ 代码。  MinGW开发工具链提供GCC和其他编译器的Windows端口。
+
+本章的其余部分描述了您可能需要使用的其他替代方案。
+
+@menu
+* MSVC::
+* Borland C++ Builder::
+* Version control::
+* Perldb::
+@end menu
+
+@node MSVC
+@section 如何将 Emacs 与 Microsoft Visual C++ 结合使用
+
+有两种方法可以将 Emacs 与 MSVC 结合使用@. 您可以使用 Emacs 作为编辑器，并在 DevStudio IDE 中执行其他操作@. 或者您可以使用 Emacs 作为 IDE，调用 MSVC 命令行工具来构建项目。
+
+@menu
+* DevStudio::
+* MSVC command line::
+@end menu
+
+@node DevStudio
+@subsection Emacs 作为 DevStudio 的文本编辑器
+@cindex DevStudio, using Emacs as editor in
+@cindex MSVC++, using Emacs as editor with
+@cindex Visual Studio, using Emacs as editor in
+@cindex VisEmacs, add in for MS Developer Studio
+
+Christopher Payne 编写了一个 Visual Studio 插件，使 Emacs 成为默认的文本编辑器，现在已由 Jeff Paquette 接管。详细信息请参见以下两个网址：
+@itemize
+@item @uref{https://sourceforge.net/projects/visemacs/} 为最新版本。
+@item @uref{http://www.smathers.net/VisEmacs.htm} 有关使用说明。
+@end itemize
+
+@node MSVC command line
+@subsection 使用 Emacs 中的 MSVC 命令行工具
+@cindex MSVC++, compiling within Emacs
+@findex compile
+
+这是关于如何将 Microsoft Visual C++ 与 Emacs 结合使用的应用说明。  下面进行的实验是在 Windows 95 上的 Emacs 19.34.1 上使用 Visual C++ 4.0 标准版完成的。  您的里程可能会有所不同。
+
+这篇文章假设读者对 Emacs 黑客知识了解甚少。
+
+@menu
+* VC++ environment::
+* Default compile command::
+* Reverting buffers::
+* Edit MSVC::
+@end menu
+
+@node VC++ environment
+@subsubsection VC++环境变量
+@cindex vcvars32.bat
+@cindex MSVC++, environment variables
+
+在 VC++ 安装的 bin 目录中有一个名为 @file{vcvars32.bat} 的批处理文件，它设置运行 VC++ 命令行工具所需的环境变量。  安排在 Emacs 会话中设置相同的环境变量。  您可以在 Windows 9x 上通过从 @file{autoexec.bat} 调用 @file{vcvars32.bat} 脚本来执行此操作。在其他版本的 Windows 上，您可以使用系统控制面板全局设置环境变量。
+
+对于所有版本的 Windows，您也可以通过在 init 文件中使用 @code{setenv} 调用来在 Emacs 内设置变量。 @xref{Installing Emacs,,Where do I put my init file?}。
+
+您现在应该能够从 Emacs 进行编译。  从 VC++ 项目加载源文件。  输入@kbd{M-x compile}。  将建议的命令行替换为：
+@example
+nmake -f @var{ProjectName}.mak
+@end example
+
+您会发现这默认为调试版本。  您可以使用以下命令将其更改为发布版本：
+@example
+nmake -f @var{ProjectName}.mak CFG="@var{ProjectName} - Win32 Release"
+@end example
+
+@node Default compile command
+@subsubsection 设置默认编译命令
+@cindex compile, setting default command
+@cindex nmake, as default compile command
+@vindex compile-command
+
+现在设置编译命令行的默认值。  将以下内容添加到您的初始化文件中：
+
+@example
+;; Set up for Visual C++ compiling
+(setq compile-command "nmake -f ")
+@end example
+
+如果您长期从事同一个项目，则可以将项目 makefile 添加到字符串中。
+
+David Biesack 建议，也许在项目目录中写一个 @file{Makefile} 很容易，它可以
+
+@example
+PROJECT=MyProject
+all: debug
+debug: FORCE
+        nmake /f $(PROJECT).mak CFG="$(PROJECT) - Win32 Debug"
+release: FORCE
+        nmake /f $(PROJECT).mak CFG="$(PROJECT) - Win32 Release"
+FORCE:
+@end example
+
+然后你可以简单地将编译命令更改为@command{nmake}。
+
+Caleb T. Deupree 报告说，在 VC++ 5.0 及更高版本上，“您还可以在 Options/Build 中设置一个选项，以便在每次保存项目时导出 makefile，然后您可以使用该文件通过 @samp{nmake -f project.mak} 进行编译。”  VC++ 4.0每次都会构建make文件，没有选项。
+
+@node Reverting buffers
+@subsubsection 恢复缓冲区
+@cindex DevStudio, keeping source in sync
+@cindex Visual Studio, keeping source in sync
+@cindex MSVC++, keeping source in sync
+@findex auto-revert-mode
+@findex global-auto-revert-mode
+
+建议您在 Emacs 和 MSVC++ 中同时打开的缓冲区中使用@code{auto-revert-mode}。  然后，如果您在 MSVC++ 中错误地编辑了该文件，Emacs 将立即接受您的更改，而不是在您编写更多代码并尝试保存之后。
+
+@node Edit MSVC
+@subsubsection 使用 MSVC 的 Emacs 功能进行编辑
+@cindex DevStudio, load in Emacs command
+@cindex Visual Studio, load in Emacs command
+@cindex MSVC++, load in Emacs command
+@cindex emacsclient, calling from Visual Studio
+
+您还可以设置 VC++ 将文件导入到 Emacs 中，一切都准备好进行编辑。  在 VC++ 中，转到 @code{Tools} 下拉菜单，然后单击 @code{Customize...}。  在 @code{Tools} 选项卡中，单击 @code{Add}。  使用 @code{Browse} 在 Emacs bin 目录中找到 @file{emacsclientw.exe} 文件，然后选择它。  对于参数，请使用 @option{+$(CurLine)} @option{"$(FilePath)"}，对于目录，请使用 @code{$(WkspDir)}（FilePath 周围的引号处理其中包含空格的路径）。  将菜单文本设置为“Em&acs”。  @option{+$(CurLine)} 会将 Emacs 中的点设置为与 VC++ 中的光标位置同一行。  单词 @code{Em&acs} 中的 & 允许您从键盘选择 emacs。 （E 已用于 OLE 控件测试容器。）
+
+您现在应该能够访问项目中的任何源文件。  然后，使用下拉菜单@code{Tools->Emacs}。  VC++ IDE 中的活动文件现在应该位于 Emacs 的前面和中间，一切都准备好按照您的意愿进行编辑。  如果您使用击键来操作菜单，请尝试 @kbd{Alt-T A} 将文件移动到 Emacs 中。  将此工具与击键绑定将作为学生的练习。
+
+如果您可以选择在运行工具之前保存文件，请确保设置此选项。  （我在 VC++ 4.0 上没有看到它。）
+
+@node Borland C++ Builder
+@section Emacs 和 Borland C++ Builder
+@cindex Borland C++, integration with Emacs
+
+Jonathan Arnold 编写了一个用于连接 C++ Builder 和 Emacs 的 @uref{https://www.buddydog.org/C++Builder/c++builder.html, EmacsEdit ``expert''}。
+
+@node Version control
+@section 是否有可以与 Emacs 一起使用的 VC 软件版本？
+@cindex version control, integration with Emacs
+@cindex revision control, integration with Emacs
+@cindex source control,  integration with Emacs
+@cindex cvs, version control integration with Emacs
+@cindex rcs, version control integration with Emacs
+@cindex svn, version control integration with Emacs
+@cindex git, version control integration with Emacs
+@cindex bzr, version control integration with Emacs
+@cindex arch, version control integration with Emacs
+@cindex mercurial, version control integration with Emacs
+@cindex hg, version control integration with Emacs
+@cindex monotone, version control integration with Emacs
+
+如果您已经在使用图形版本控制工具，请检查它是否附带命令行工具。  许多这样的 GUI 工具只是 Emacs 进行 VC 集成所需的相同命令行工具的包装。  大多数受支持的 VC 系统都很好地支持免费的本机 Windows 二进制文件。  对于那些不这样做的人来说，Cygwin 可能是一个选择。 @xref{Other useful ports}。
+
+@node Perldb
+@section 如何将 Perl 调试器与 Emacs 一起使用？
+@cindex perl, debugging within Emacs
+@cindex perldb, using with Emacs
+
+来自杰·罗杰斯：
+
+Perl 调试器本身的某些版本需要修补才能与 emacs 一起使用。  它们是 Perl 版本 5.001 及更低版本，以及版本 5.004_01。  要修复，请在 lib/perl5db.pl 中找到并更改类似于以下代码的代码
+@example
+        if (-e "/dev/tty") @{
+            $console = "/dev/tty";
+            $rcfile=".perldb";
+        @}
+        elsif (-e "con") @{
+            $console = "";                 <---- change "con" to ""
+            $rcfile="perldb.ini";
+        @}
+        else @{
+            $console = "sys\$command";
+            $rcfile="perldb.ini";
+        @}
+@end example
+
+Doug Campbell 也有一些 @uref{https://www.gnu.org/software/emacs/windows/ntemacs/discuss/perldb, suggestions} 来改进 perldb 和 Emacs 的交互。
+
+@c ------------------------------------------------------------
+@node Other useful ports
+@chapter 其他有用的端口
+@cindex useful tools
+@cindex subprocesses, useful tools
+
+@menu
+* Cygwin::
+* MinGW-w64::
+* EZWinPorts::
+* MinGW::
+* GnuWin32::
+* GTK::
+* Read man pages::
+@end menu
+
+@node Cygwin
+@section 西格文
+@cindex cygwin environment
+@cindex cygwin, library conflicts
+@cindex library conflicts with cygwin
+@cindex interoperability with cygwin
+@cindex subprocesses, cygwin tools
+@vindex exec-path
+
+@uref{https://www.cygwin.com/}.
+
+Cygwin 是一种流行的 Windows 完整 POSIX 仿真环境。它的大部分工具都可以与 Emacs 一起使用，并且涵盖了广泛的移植软件。  Cygwin 使用的主要 shell 是 GNU @command{bash}，但也可以使用其他 shell。  由于 Cygwin 的整体沉浸性（包括其非本机文件系统映射），某些 Cygwin 工具可能无法与 Emacs 或其他本机 Windows 工具良好地互操作。
+
+如果您选择使用 Cygwin，那么它的工具可能就是您所需要的，但您需要从其他地方获取图像库，因为 Cygwin 工具与非 Cygwin 软件不兼容。  事实上，如果运行 Emacs 时 Cygwin 位于您的 PATH 中，并且 Emacs 没有首先找到其他版本的映像库，那么 Cygwin 可能会导致问题。  由于这个原因，Cygwin 开发人员建议您不要将 Cygwin 安装在您的系统上@env{PATH}。  相反，您可以通过在 init 文件中设置 @code{exec-path} 来使 Cygwin 工具在 Emacs 中可用。
+
+@node MinGW-w64
+@section MinGW-w64 和 MSYS2
+@cindex mingw-w64 tools
+@cindex msys2 environment
+@cindex subprocesses, mingw-w64 and msys2
+
+@uref{https://www.msys2.org/}
+
+MinGW-w64 是一组生成本机 Windows 可执行文件的开发工具，不依赖于 Cygwin 的 POSIX 模拟 DLL。 MinGW-w64 在 2007 年对原始 MinGW 进行了分叉，以提供对 64 位和新 API 的支持。
+
+MSYS2 是 Windows 的软件分发和构建平台。 MSYS2 是 MSYS 的独立重写，基于现代 Cygwin 和 MinGW-w64，旨在与本机 Windows 软件更好的互操作性。  它扮演的角色与 MSYS 在 MinGW 中扮演的角色相同。  作为一个发行版，MSYS2 提供了构建软件的工具以及超过 2600 个可供使用的预编译包。
+
+@node EZWinPorts
+@section EZWinPorts
+@cindex ezwinports
+
+@uref{https://sourceforge.net/projects/ezwinports/, EZWinPorts project} 提供了最新版本的 GNU 和 Unix 软件的许多有用的移植。  这包括 Emacs 使用的所有可选库（图像库、libxml2、GnuTLS）、RCS、Texinfo、@command{man} 命令的克隆、G​​rep、xz、bzip2、bsdtar、ID Utils、Findutils、Hunspell、Gawk、GNU Make、Groff、GDB。
+
+@node MinGW
+@section mingw.org 的 MinGW 和 MSYS
+@cindex mingw tools
+@cindex msys environment
+@cindex subprocesses, mingw and msys
+
+@uref{https://osdn.net/projects/mingw/}
+
+@code{mingw.org} 中的 MinGW 是另一组生成本机 Windows 可执行文件的开发工具，不依赖于 Cygwin 的 POSIX 模拟 DLL。  这是最初的 MinGW 项目，现在不再积极开发。  目前只能通过称为 @dfn{Wayback Machine} 的 WWW 存档站点找到其文件。  最新的 MinGW 发布文件可以在这里找到：@uref{https://web.archive.org/web/20210410172202/https://osdn.net/projects/mingw/releases/}。
+
+MSYS 是 0⁣s MinGW 的一部分，是一个 POSIX shell 和配置脚本中常用的最小工具集。  与 Cygwin 一样，此环境使用非本机文件系统映射，使其运行的脚本看起来更像 POSIX。  这是为了补充 MinGW 工具，以便更轻松地将软件移植到 Windows。
+
+@node GnuWin32
+@section GnuWin32
+@cindex gnuwin32 tools
+@cindex subprocesses, gnuwin32
+@cindex image libraries, gnuwin32
+@cindex image libraries, development
+
+@uref{https://gnuwin32.sourceforge.net/}
+
+GnuWin32 提供了多种免费软件和库的预编译本机 Windows 移植。  不幸的是，这些端口已经过时了。  此处提供的对 Emacs 有用的工具包括：
+
+@itemize
+@item Arc - 由 @code{archive-mode} 用于编辑 .arc 文件。
+@item Bzip2 - Emacs 使用它来自动解压缩 .bz2 文件。
+@item CompFace - 由 @code{gnus} 使用来显示消息中的 XFace 标题。
+@item CoreUtils - GNU 文件、shell 和文本实用程序（也在 MSYS 中）
+@item DiffUtils - 用于 @code{ediff} 并生成补丁
+@item FindUtils - 用于 @code{grep-find} 和其他文件搜索。
+@item GifLib - 支持 GIF 图像的库。
+@item Grep - 用于使用 @code{grep} 搜索文件。
+@item Gzip - Emacs 使用它来自动解压缩 .gz 文件。
+@item Jpeg - 支持 JPEG 图像的库（也在 GTK+ 中）。
+@item Lha - 由 @code{archive-mode} 用于编辑 .lzh 文件。
+@item LibPng - 支持 PNG 图像的库（也在 GTK+ 中）。
+@item LibTiff - 支持 TIFF 图像的库（也在 GTK+ 中）。
+@item Make - 由 @code{compile} 用于构建项目（也在 MinGW 中）
+@item OpenSSL - @code{gnus} 使用它通过 SSL 与服务器通信。
+@item 补丁 - @code{ediff-patch-file} 和其他人使用它来应用补丁。
+@item Tar - @code{tar-mode} 使用它来编辑 tar 文件。
+@item TexInfo - 用于构建 Emacs 的手册。
+@item Unzip - 由 @code{archive-mode} 用于解压 zip 文件。
+@item Xpm - 支持 XPM 映像的库（与 Emacs 二进制文件捆绑在一起）
+@item Zip - 由 @code{archive-mode} 用于编辑 zip 文件。
+@item Zlib - LibPng 需要（也在 GTK+ 中）。
+@end itemize
+
+@node GTK
+@section GTK+
+@cindex GTK+ image libraries
+@cindex image libraries, GTK+
+@cindex addpm, using GTK+ image libraries
+
+GTK+ 是 Emacs 所需的一些图像库的潜在来源。  GTK+ 与 GUI 软件的其他端口一起安装，例如 GIMP 图像编辑器和 Pidgin 即时通讯客户端。如果在运行 @command{addpm} 时安装了 GTK+，Emacs 将使用它提供的图像库，即使它们不在 @env{PATH} 上。  GTK+ 附带 JPEG、PNG 和 TIFF 支持。
+
+@node Read man pages
+@section 如何阅读手册页？
+@cindex man pages
+@findex woman
+@findex man
+
+可以使用 Emacs 的内置手册阅读器 @code{woman} 来阅读 Emacs 和其他移植程序的手册页。  这不需要外部程序，但如果您确实有 @command{man} 端口，还有一个 Emacs 包装器 @code{man} 可能会稍微快一些。  EZWinPorts 站点 (@pxref{EZWinPorts}) 提供了 @command{man} 的 Windows 版本。
+
+@c ------------------------------------------------------------
+@node Further information
+@chapter 更多信息
+
+@menu
+* More information::
+* Mailing lists::
+@end menu
+
+@node More information
+@section 在哪里可以获得有关 Emacs 的更多信息？
+@cindex other sources of information
+@cindex faqs, general
+@cindex faqs, old
+@cindex help, manuals and other sources
+@cindex manuals
+@cindex wiki
+
+如果您有关于 Emacs 的一般性问题，最好从 @ref{Top,,, emacs, The GNU Emacs Manual} 和 @ref{Top,,, efaq, the standard Emacs FAQ} 开始查找。在 Emacs 中，您可以通过输入 @kbd{C-h r} 来浏览使用 Info 的手册，并且可以通过输入 @kbd{C-h C-f} 查看常见问题解答。  其他资源包括：
+
+@itemize
+@item @uref{https://www.gnu.org/software/emacs/, The Emacs website}
+@item @uref{https://www.gnu.org/software/emacs/manual/, Other Emacs manuals}
+@item @uref{https://www.emacswiki.org/, Emacs Wiki}
+@end itemize
+
+@node Mailing lists
+@section 有哪些邮件列表可用于讨论 Windows 上的 Emacs？
+@cindex mailing lists
+@cindex help, mailing lists
+
+Windows 特定帮助和讨论的官方邮件列表是@url{https://lists.gnu.org/mailman/listinfo/help-emacs-windows, help-emacs-windows}。  有关如何订阅或取消订阅的信息，请参阅该链接。  @uref{https://lists.gnu.org/r/help-emacs-windows/, list archives} 可在线获取。
+
+@c ------------------------------------------------------------
+@node Indexes
+@unnumbered 索引
+
+@unnumberedsec 函数和变量索引
+
+@printindex fn
+
+@unnumberedsec 概念索引
+
+@printindex cp
+
+@bye

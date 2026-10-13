@@ -1,0 +1,851 @@
+\输入 texinfo @c -*-texinfo-*-
+@setfilename ../../info/speedbar.info
+@settitle Speedbar：文件/标签汇总实用程序
+@documentlanguage en
+@include docstyle.texi
+@syncodeindex fn cp
+
+@copying
+版权所有 @copyright{} 1999--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* Speedbar: (speedbar).          文件/标签汇总实用程序。
+@end direntry
+
+@titlepage
+@sp 10
+@center @titlefont{Speedbar}
+@sp 2
+@center Eric Ludlam
+@vskip 0pt plus 1 fill
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@node Top
+@top 速度条
+
+Speedbar 是 Emacs 的一个程序，可用于汇总与当前缓冲区相关的信息。  它最初的灵感来自现代开发环境、办公套件和网络浏览器中经常使用的“资源管理器”。
+
+Speedbar 显示一个窄框架或一个窄窗口，其中显示树视图。  该树视图默认包含文件和目录的列表。  文件可以“扩展”以列出其中的标签。目录可以展开以列出其中的文件。  每个文件或标签都可以立即跳转到。
+
+Speedbar 通过维护用户的上下文来扩展“资源管理器”窗口。  例如，当使用文件视图时，当前缓冲区的文件会突出显示。  Speedbar 还通过提供多种显示模式来模仿资源管理器窗口。  这些模式有两种风格。  主要显示模式在缓冲区之间保持一致，次要显示模式仅在显示适用类型的缓冲区时出现。  这允许其他软件包的作者提供根据该模式的需求定制的速度栏摘要。
+
+在本手册中，活动被定义为“单击”或“展开”项目。  单击意味着在按钮上使用 @kbd{mouse-2}。  展开是指单击展开按钮以显示展开按钮所在条目的展开摘要。  @xref{Basic Navigation}。
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* Introduction::      速度栏的基础知识。
+* Basic Navigation::  所有模式之间通用的速度栏基础知识。
+* File Mode::         总结文件。
+* Buffer Mode::       总结缓冲区。
+* Minor Modes::       其他次要模式，例如 Info 和 RMAIL。
+* Customizing::       更改速度栏行为。
+* Extending::         为您自己的项目扩展速度栏。
+* GNU Free Documentation License::  本文档的许可证。
+* Index::
+@end menu
+
+@node Introduction
+@chapter 介绍
+@cindex introduction
+
+要开始使用速度栏，请使用命令 @kbd{M-x speedbar @key{RET}} 或从 @samp{Options->Show/Hide} 子菜单中选择它。  该命令将打开一个新框架来汇总本地文件。  在 X Window 系统或 MS-Windows 上，speedbar 的框架为 20 个字符宽，并将模仿其启动时框架的高度。  它会将自己定位在您启动它的框架的左侧或右侧。
+
+为了有效地使用速度栏，了解它与您启动它的框架的关系非常重要。  该帧是速度条将用作参考点的@dfn{attached frame}。  一旦启动，speedbar 就会监视该帧的内容，并尝试使其内容与加载到附加帧中的缓冲区相关。  此外，在 speedbar 中发出的所有需要​​显示另一个缓冲区的请求都将显示在附加的框架中。
+
+在终端模式下使用时，新框架的大小与终端相同。  由于在附加帧中工作时它不可见，因此速度栏将通过使用 @dfn{slowbar mode} 来节省时间，其中在请求速度栏显示自身之前不会进行跟踪（即，速度栏的帧成为所选帧）。
+
+@cindex @code{speedbar-get-focus}
+使用键盘在帧之间切换时使用的函数是@code{speedbar-get-focus}。  此函数将在帧之间切换，并且将其绑定到终端模式下的键很有用。  @xref{Customizing}。
+
+@cindex @code{speedbar-window}
+或者，速度栏可以显示为窗口，在终端和图形模式下分割所选帧的窗口。一次只能打开一个速度栏窗口。
+
+只需使用 @kbd{M-x speedbar-window @key{RET}} 或 @kbd{M-x speedbar-frame@key{RET}} 命令即可将速度栏从在单独的框架中显示切换到在窗口中显示，反之亦然。
+
+@cindex @code{speedbar-prefer-window}
+用户选项@code{speedbar-prefer-window}更改@code{speedbar}命令的行为：如果设置为@code{t}，@code{speedbar}命令将在窗口中而不是在框架中显示速度栏。
+
+@node Basic Navigation
+@chapter 基本导航
+
+Speedbar可以显示不同类型的数据，并且有多种显示和行为模式。  这些模式都有共同的行为、菜单系统和外观。  如果学会了一种模式，那么其他模式就很容易使用。
+
+@menu
+* Basic Key Bindings::
+* Basic Visuals::
+* Mouse Bindings::
+* Displays Submenu::
+@end menu
+
+@node Basic Key Bindings
+@section 基本按键绑定
+@cindex key bindings
+
+这些键绑定在所有模式中都是通用的：
+
+@table @kbd
+@item Q
+@cindex quitting speedbar
+退出速度栏，并杀死框架。  这仅适用于@code{speed-frame}。
+@item q
+退出速度栏，并隐藏框架或关闭窗口。  这使得恢复速度栏框架比按 @kbd{Q} 更快。
+@item g
+@cindex refresh speedbar display
+刷新速度栏中的所有内容。
+@item t
+@cindex slowbar mode
+将速度栏切换到慢速栏模式或从慢速栏模式切换。  在 Slowbar 模式下，不进行帧跟踪。
+@item n
+@itemx p
+@cindex navigation
+分别移动到下一个或上一个项目。  该项目的摘要将显示在附加框架的迷你缓冲区中。
+@item M-n
+@itemx M-p
+以受限方式移至下一个或上一个项目。  如果列表已打开，光标将跳过它。  如果光标位于打开的列表中，则不会离开它。
+@item C-M-n
+@itemx C-M-p
+在扩展的群体中前后移动。  这使您可以快速跳过相同当前深度的所有文件、目录或其他常见子项。
+@item C-x b
+在附加帧中切换缓冲区。
+@end table
+
+Speedbar 可以处理多种模式。  默认提供两个。这些模式是文件模式和缓冲区模式。  有加速器可以切换到这些不同的模式。
+
+@cindex mode switching hotkeys
+@table @kbd
+@item b
+切换到快速缓冲区模式 (@pxref{Buffer Mode})。  使用一次后，恢复之前的显示模式。
+@item f
+切换到文件模式。
+@item r
+切换回之前的模式。
+@end table
+
+某些模式提供组、列表和标签。  @xref{Basic Visuals}。  当这些可用时，一些附加的常见绑定也可用。
+
+@cindex common keys
+@table @kbd
+@item @key{RET}
+@itemx e
+编辑/打开当前组或标签。  此行为取决于模式。  一般来说，文件或缓冲区在附加框架中打开，目录或组节点在本地展开。
+@item +
+@itemx =
+展开当前组，显示子项。当与前缀参数一起使用时，任何可能已缓存的数据都会被刷新。  这类似于电源点击。  @xref{Mouse Bindings}。
+@item -
+收缩当前组，隐藏子项目。
+@end table
+
+@node Basic Visuals
+@section 基本视觉效果
+@cindex visuals
+
+Speedbar 具有指示不同类型数据的视觉提示。  这些提示在不同的速度栏模式中一致使用，使它们更容易解释。
+
+在较高级别上，在文件模式下，有目录按钮、子目录按钮、文件按钮、标签按钮和扩展按钮。这使得您可以轻松地使用鼠标导航目录树，并快速查看文件或这些文件的摘要。
+
+用于区分这些按钮类型的最基本的视觉效果是颜色和鼠标突出显示。  鼠标突出显示的任何内容都可以单击，称为按钮 (@pxref{Mouse Bindings})。任何未通过鼠标突出显示的内容都将不可单击。
+
+速度栏中的文本由四种不同类型的数据组成。  了解如何阅读这些文本元素将有助于通过识别可用数据类型来更轻松地进行导航。
+
+@subsection 团体
+@cindex groups
+
+组在一行中总结信息，并提供更复杂系统的高级视图，例如目录树或手册章节。
+
+组出现在不同的缩进级别，并在某种“盒子”中以 @samp{+} 为前缀。  组名称将总结其中的信息，扩展框将内联显示该信息。  在文件模式下，目录和文件是“组”，其中 @samp{+} 被括号包围，如下所示：
+
+@example
+<+> include
+<-> src
+ [+] foo.c
+@end example
+
+在此示例中，除了文件之外，我们还看到打开和关闭的目录。  目录有一个由尖括号组成的框，文件使用方括号。
+
+在所有模式下，可以通过按@kbd{RET}“编辑”组，这意味着将打开一个文件，或在速度栏中显式打开一个目录。  可以使用 @kbd{+} 或 @kbd{-} 扩展或收缩组。  @xref{Basic Key Bindings}。
+
+有时，组的指示框中可能有一个@samp{?}。  这意味着它是一个组类型，但没有内容，或者没有已知的方法来提取该组的内容。
+
+展开组后，指示器按钮从 @samp{+} 变为 @samp{-}。  这表明正在显示内容。单击@samp{-}按钮可缩小组，或隐藏当前显示的内容。
+
+@subsubsection 标签
+@cindex tags
+
+标签是树系统的叶节点。  标签通常以简单字符作为前缀，例如@samp{>}。  标签只能使用@kbd{RET}或@kbd{e}跳转。
+
+@subsubsection 布尔标志
+
+有时，组或标签会被赋予布尔标志。  这些标志在行尾显示为额外的文本字符。  文件模式使用布尔标志，例如 @samp{*} 来指示文件已从版本控制系统中检出。
+
+有关其他标志，请参阅
+@c Note to self, update these to sub-nodes which are more relevant.
+@ref{File Mode}和@ref{Version Control}。
+
+@subsubsection 朴素的文字
+
+未经修饰的文本通常从第 0 列开始，没有任何特殊符号作为前缀。  在缓冲区模式下，不同的缓冲区组以以下缓冲区的描述为前缀（文件、暂存缓冲区和不可见缓冲区。）
+
+未经修饰的文本通常是无色的，并且不可点击。
+
+@subsubsection 颜色提示
+
+每种类型的组、项目指示器和标签都有不同的颜色。  选择的颜色取决于背景颜色是浅色还是深色。重要的是，“当前项目”（可能是缓冲区或文件名）以红色突出显示并带有下划线。
+
+颜色可以从组 @code{speedbar-faces} 中定制。  某些模式（例如信息模式）将使用信息颜色而不是默认的速度栏颜色来指示当前显示的内容。
+
+面命名约定反映了文件显示模式。  不使用文件的模式将尝试在类似条目上使用相同的颜色。
+
+@node Mouse Bindings
+@section 鼠标绑定
+@cindex mouse bindings
+
+鼠标已成为常用的信息导航工具。  Speedbar 将使用鼠标来导航文件系统、缓冲区列表和其他数据。  不同的文本提示提供了可以单击的按钮 (@pxref{Basic Visuals})。  任何突出显示的内容都可以用鼠标单击，或受菜单影响。
+
+鼠标绑定是：
+
+@table @kbd
+@item mouse-1
+将光标移动到该位置。
+@item mouse-2
+@itemx Double-mouse-1
+激活当前按钮。  @kbd{Double-mouse-1} 在其他平台上称为 @dfn{double click}，对于使用两个按钮鼠标的 Windows 用户很有用。
+@c Isn't it true that with two-button mice, the right button is mouse-2?
+@c On GNU/Linux, the right button is mouse-3.
+@item S-mouse-2
+@itemx S-Double-mouse-1
+@cindex power click
+这与 @kbd{mouse-2} 具有相同的效果，只不过它称为强力点击。  这意味着，如果单击带有扩展按钮 @samp{+} 的组，所有缓存都会被刷新，并且子项目会重新读取。  如果是名称，则会在新框架中打开。
+@item mouse-3
+激活速度栏菜单。  所选项目影响单击的行，而不影响光标所在的行。
+@item mouse-1 @r{(mode line)}
+激活菜单。  这会影响单击之前光标所在的项目，因为鼠标没有单击任何内容。
+@item C-mouse-1
+缓冲区子菜单。  附加帧中的缓冲区被切换。
+@end table
+
+当鼠标移动到速度栏中的按钮上时，该项目的详细信息应显示在附加框架的迷你缓冲区中。  有时，这可能包含额外的信息，例如文件权限或标记位置。
+
+@node Displays Submenu
+@section 显示子菜单
+@cindex displays submenu
+
+您可以通过使用不同的显示模式来显示不同的数据。  这些专门的模式可以更轻松地导航相关信息，例如文件和目录或缓冲区。
+
+在主菜单中，通过单击@kbd{mouse-3}找到，有一个标记为@samp{Displays}的子菜单。  该子菜单可让您轻松选择不同的显示模式。
+
+内容是当前加载到 emacs 中的模式。  默认情况下，这将包括文件、快速缓冲区和缓冲区。  Info 等其他主要显示模式是单独加载的。
+
+@node File Mode
+@chapter 文件模式
+@cindex file mode
+
+文件模式显示当前目录的摘要。  您可以在附加框架中显示文件，或总结文件中找到的标签。  您甚至可以查看文件是否已从版本控制系统中检出，或者是否具有某些关联的目标文件。
+
+还提供了高级行为，例如复制和重命名文件。
+
+@menu
+* Directory Display::    显示的意思是什么。
+* Hidden Files::         如何显示隐藏文件。
+* File Key Bindings::    执行文件操作。
+@end menu
+
+@node Directory Display
+@section 目录显示
+@cindex directory display
+
+显示屏分为三个主要部分。  第一行或第二行是 speedbar 当前正在查看的根目录。  您可以通过单击要跳转到的目录名称来跳转到父目录之一。
+
+接下来，列出目录。  目录以组指示符按钮 @samp{<+>} 开始。  单击目录名称会使 speedbar 加载该目录作为其显示的根目录。  单击@samp{<+>}按钮将列出下面的所有目录和文件。
+
+接下来，列出文件。  文件以组指示符 @samp{[+]} 或 @samp{[?]} 开头。  您可以通过单击文件名跳转到附加框架中的文件。  您可以通过单击文件名附近的 @samp{[+]} 符号来展开文件并查看其标签。
+
+典型的会话可能如下所示：
+
+@example
+~/lisp/
+<+> checkdoc
+<+> eieio
+<-> speedbar
+ [+] Makefile
+ [+] rpm.el #
+ [+] sb-gud.el #
+ [+] sb-info.el #
+ [+] sb-rmail.el #
+ [+] sb-w3.el
+ [-] speedbar.el *!
+  @{+@} Types
+  @{+@} Variables
+  @{+@} def (group)
+  @{+@} speedbar-
+ [+] speedbar.texi *
+<+> testme
+[+] align.el
+[+] autoconf.el
+@end example
+
+在此示例中，您可以看到多个目录。  目录@file{speedbar}已内联打开。  在目录 @file{speedbar} 内，文件 @file{speedbar.el} 的标签已公开。这些标签非常广泛，并且被归纳为标签组。
+
+文件获得与其关联的附加布尔标志。  有效标志是：
+
+@cindex file flags
+@table @code
+@item *
+该文件已从版本控制系统中检出。  @xref{Version Control}。
+@cindex @code{speedbar-obj-alist}
+@item #
+该文件有一个与其关联的最新目标文件。  变量 @code{speedbar-obj-alist} 定义 speedbar 如何确定该值。
+@item !
+该文件有一个与其关联的过时目标文件。
+@end table
+
+标签组以符号 @samp{@{+@}} 为前缀。  单击此符号将显示已组织到该组中的所有符号。不同类型的文件具有由其主要模式定义的独特标记方法。  标签是使用 @code{imenu} 包或通过 @code{etags} 接口生成的。
+
+标签组以多种方式定义，可以更轻松地找到您要查找的标签。  Imenu 关键字显式创建组，如果标签列表太长，speedbar 会自动创建组。
+
+在我们的示例中，Imenu 创建了组@samp{Types} 和@samp{Variables}。  然后根据变量 @code{speedbar-tag-hierarchy-method} 重新分组所有剩余的顶级符号。  子组 @samp{def} 和 @samp{speedbar-} 是在组名称中指定给定符号的前几个字符的分组。某些组名称可能会显示类似 @samp{speedbar-t to speedbar-v} 的内容，表示按字母顺序属于这些类别之间的所有符号都包含在该子组中。  @xref{Tag Hierarchy Methods}。
+
+@node Hidden Files
+@section 隐藏文件
+@cindex hidden files
+
+在 GNU 和 Unix 系统上，隐藏文件是名称以句点开头的文件。  它们在常规目录列表中是隐藏的，因为用户通常对它们不感兴趣。
+
+在 speedbar 中，隐藏文件是不是很有趣并且可能会分散用户注意力的文件。  所有不感兴趣的文件都会从文件显示中删除。  对速度栏不感兴趣有两个级别。  第一级不感兴趣是没有扩展方法或提取标签的方法的文件。  第二级是与 @code{find-file} 中用于完成的相同模式匹配的任何文件。  这是从变量@code{completion-ignored-extensions}导出的。
+
+您可以通过切换菜单项 @samp{Show All Files} 切换不感兴趣文件的显示。  这将显示所有一级隐藏文件。这些文件将显示有 @samp{?} 指示符。  2 级隐藏文件仍然不会显示。
+
+目标文件属于 2 级隐藏文件类别。  您可以通过 @samp{#} 和 @samp{!} 文件指示器确定它们的存在。 @xref{Directory Display}。
+
+@node File Key Bindings
+@section 文件键绑定
+@cindex file key bindings
+
+文件模式具有允许不同文件系统操作（例如复制或重命名）的键绑定。  这些命令都在@dfn{current file}上运行。  在这种情况下，当前文件是当前位置的文件，或者是拉出菜单时单击的文件。
+
+@table @kbd
+@item U
+将整个速度栏显示向上移动一个目录。
+@item I
+显示迷你缓冲区中有关该行的信息。  这与使用 @kbd{n} 和 @kbd{p} 导航或将鼠标移动到项目上时显示的信息相同。
+@item B
+在这一行字节编译 Emacs Lisp 文件。
+@item L
+在此行加载 Emacs Lisp 文件。  如果 @file{.elc} 文件存在，可选择加载该文件。
+@item C
+将当前文件复制到其他位置。
+@item R
+重命名当前文件，可能会将其移动到其他位置。
+@item D
+删除当前文件。
+@item O
+删除当前文件的目标文件。  使用符号 @samp{#} 和 @samp{!} 确定是否有可用的目标文件。
+@end table
+
+一个菜单项可切换所有可用文件的显示。  默认情况下，仅显示 Emacs 理解并知道如何转换为标签列表的文件。  通过显示所有文件，还会显示其他文件（例如文本文件），但它们带有 @samp{[?]} 符号前缀。  这意味着它是一个文件，但 Emacs 不知道如何扩展它。
+
+@node Buffer Mode
+@chapter 缓冲模式
+@cindex buffer mode
+
+缓冲区模式与文件模式非常相似，不同之处在于，缓冲区模式不跟踪当前目录和其中的所有可用文件，而是显示 Emacs 缓冲区的当前列表。
+
+这些缓冲区可以以与文件相同的方式扩展其标签，并使用相同的未知文件指示符 (@pxref{File Mode})。
+
+缓冲区模式没有文件操作绑定，但可以使用以下缓冲区特定的键绑定：
+
+@table @kbd
+@item k
+杀死这个缓冲区。  不要碰它的文件。
+@item r
+恢复此缓冲区，从磁盘重新加载。
+@end table
+
+除了Buffer模式外，还有Quick Buffer模式。  事实上，快速缓冲区绑定到@kbd{b}键。  缓冲区和快速缓冲区之间的唯一区别是，在执行影响附加帧的操作后，显示会立即恢复到最后的显示模式。
+
+因此，如果您处于文件模式，并且需要快速访问缓冲区，请按@kbd{b}，单击所需的缓冲区，速度栏将恢复到文件模式。
+
+@node Minor Modes
+@chapter 次要显示模式
+@cindex minor display modes
+
+对于某些缓冲区，文件和标签列表没有意义。  这可能是因为当前未引用文件（例如网页），或者您可能感兴趣的文件具有特殊属性（例如电子邮件文件夹）。
+
+在这些情况下，需要次要显示模式。  在专用缓冲​​区的使用期间，次要显示模式将覆盖当前显示的任何主要显示模式。  次要显示模式在按键绑定和视觉效果方面将遵循其主要对应项的一般规则，但会有专门的行为。
+
+@menu
+* RMAIL::   管理文件夹。
+* Info::    浏览主题。
+* GDB::     观察表达式或管理当前堆栈跟踪。
+@end menu
+
+@node RMAIL
+@section 远程邮件
+@cindex RMAIL
+
+使用 RMAIL 时，速度栏将显示两部分。  第一个是一层回复按钮。  单击此处将初始化回复缓冲区，仅在 @samp{To:} 字段中显示此电子邮件地址。
+
+第二部分列出了与主 RMAIL 文件夹位于同一目录中的所有 RMAIL 文件夹。  一般规则是 RMAIL 文件夹始终以全部大写或数字显示。  可以将邮件保存在小写字母的文件夹中，但没有一种干净的方法可以在不将其全部打开的情况下检测此类 RMAIL 文件夹。
+
+单击名称即可访问每个文件夹。  您可以通过单击 @samp{<M>} 按钮将邮件从当前 RMAIL 文件夹移动到其他文件夹。  @samp{M} 代表移动。
+
+通过这种方式，您可以使用鼠标相当轻松地管理现有的 RMAIL 文件夹。
+
+@node Info
+@section 信息
+@cindex Info
+
+浏览信息文件时，所有本地相关信息都显示在信息缓冲区中，并且在速度栏中提供主题高级视图。所有顶级信息节点都显示在速度栏框架中，并且可以通过单击名称跳转到。
+
+您可以使用 @samp{[+]} 按钮打开这些节点以查看哪些子主题可用。  由于只有单击@samp{[+]}按钮才会检查这些子主题，因此有时单击@samp{[+]}时会出现@samp{[?]}，表示没有子主题。
+
+@node GDB
+@section 广东发展银行
+@cindex gdb
+@cindex gud
+
+您可以使用图形模式或文本命令模式 (@pxref{GDB Graphical Interface,,, emacs, The extensible self-documenting text editor}) 在 Emacs 中使用 GDB 调试应用程序。
+
+如果您使用图形模式，您可以看到每次程序停止时所选变量如何变化（@pxref{Watch Expressions,,, emacs, The extensible self-documenting text editor}）。
+
+如果您使用文本命令模式，当当前缓冲区是 @file{*gdb*} 缓冲区时，speedbar 可以显示当前堆栈。  通常，它只会报告没有堆栈，但是当应用程序停止时，将显示当前堆栈。
+
+您可以单击任何堆栈元素，gdb 将移动到该堆栈级别。  然后，您可以在 GDB 提示符下检查该级别的本地变量。
+
+@node Customizing
+@chapter 定制
+@cindex customizing
+
+Speedbar 是高度可定制的，具有大量的控制元素。由于速度栏非常直观并减少了很多信息，因此这是其行为的一个重要方面。
+
+一般来说，您可以使用三个自定义组来快速修改速度栏的行为。
+
+@table @code
+@item speedbar
+基本的速度栏行为。
+@item speedbar-vc
+有关版本控制处理的自定义。
+@item speedbar-faces
+自定义速度栏的多种颜色和字体。
+@end table
+
+@menu
+* Frames Windows and Faces::    看得见的行为。
+* Tag Hierarchy Methods::        自定义标签的显示方式。
+* Version Control::              添加新的 VC 检测模式。
+* Hooks::                        您可以使用许多挂钩。
+@end menu
+
+@node Frames Windows and Faces
+@section 框架、窗户和面孔
+@cindex faces
+@cindex frame parameters
+
+speedbar 会生成多个面，以在不同的显示类型之间提供一致的配色方案。  您可以使用您喜欢的方法自定义这些面孔。  他们是：
+
+@table @asis
+@cindex @code{speedbar-button-face}
+@item 速度栏按钮面
+用于展开/收缩按钮的面。
+@cindex @code{speedbar-file-face}
+@item 速度栏文件面
+文件上使用的面孔。  也应该用于非目录类节点。
+@cindex @code{speedbar-directory-face}
+@item 速度栏目录面
+用于目录或由其他节点组组成的节点的面。
+@cindex @code{speedbar-tag-face}
+@item 速度栏标签面
+用于文件中标签或叶项的面。
+@cindex @code{speedbar-selected-face}
+@item speedbar-选定的面
+用于突出显示所选项目的面。  这将是当前正在编辑的文件。
+@cindex @code{speedbar-highlight-face}
+@item 速度栏-突出显示-脸部
+当鼠标经过按钮时使用的面。
+@end table
+
+@cindex @code{speedbar-frame-parameters}
+您还可以通过更改列表@code{speedbar-frame-parameters}来自定义速度栏的初始帧参数。  该变量用于设置初始详细信息。  创建速度栏时也会自动添加高度，但您可以覆盖它。
+
+@cindex @code{speedbar-window-side}
+如果速度条显示在窗口中，您还可以通过更改 @code{speedbar-window-side} 选项来自定义 @code{speedbar-window} 显示的一侧。
+
+@cindex @code{speedbar-window-default-width}
+@cindex @code{speedbar-window-max-width}
+当在左侧或右侧打开时，@code{speedbar-window} 的大小可以通过更改 @code{speedbar-window-default-width} 选项来定义，该选项定义默认窗口大小。  速度栏窗口的宽度可以大于@code{speedbar-window-max-width}，但如果关闭并稍后重新打开，宽度将等于@code{speedbar-window-max-width}。
+
+@cindex @code{speedbar-window-dedicated-window}
+默认情况下，@code{speedbar-window}显示在专用窗口中，因此@code{display-buffer}永远不会使用该窗口。  将 @code{speedbar-window-dedicated-window} 设置为 @code{nil} 会更改此行为。
+
+@node Tag Hierarchy Methods
+@section 标签层次结构方法
+@cindex tag hierarchy
+@cindex tag groups
+@cindex tag sorting
+
+当列出文件中的标签时，可能会得到令人烦恼的长条目列表。  Imenu（在 Emacs 中生成标签列表）将自动对某些类别的项目进行分组。   然而，即使在这里，一些标签组也可能非常大。
+
+@cindex @code{speedbar-tag-hierarchy-method}
+为了解决这个问题，可以通过层次处理器将标签分组为逻辑单元。  要使用的具体变量是@code{speedbar-tag-hierarchy-method}。  有多种方法可以按任意顺序应用。  他们是：
+
+@table @code
+@cindex @code{speedbar-trim-words-tag-hierarchy}
+@item speedbar-trim-words-tag-hierarchy
+为组中的所有元素找到一个公共前缀，并将其修剪掉。
+@cindex @code{speedbar-prefix-group-tag-hierarchy}
+@item speedbar-prefix-group-tag-hierarchy
+如果组太大，请根据公共前缀将标签组放入容器中。
+@cindex @code{speedbar-simple-group-tag-hierarchy}
+@item speedbar-simple-group-tag-hierarchy
+取出顶级列表中不属于组的所有项目，并将它们粘贴到 @samp{Tags} 组中。
+@cindex @code{speedbar-sort-tag-hierarchy}
+@item speedbar-sort-tag-hierarchy
+对所有项目进行排序，将组留在顶部。
+@end table
+
+您还可以添加自己的函数来根据需要重新组织标签。
+
+其他一些控制变量是：
+
+@table @code
+@cindex @code{speedbar-tag-group-name-minimum-length}
+@item speedbar-tag-group-name-minimum-length
+默认值：4。
+
+扩展前前缀组名称的最小长度。  因此，如果@code{speedbar-tag-hierarchy-method}包含@code{speedbar-prefix-group-tag-hierarchy}并且其中一个组的公共字符少于此字符数，则组名称将更改为以下形式：
+
+@example
+worda to wordb
+@end example
+
+而不是仅仅
+
+@example
+word
+@end example
+
+这样我们就不会得到看起来很傻的列表。
+
+@cindex @code{speedbar-tag-split-minimum-length}
+@item speedbar-tag-split-minimum-length
+默认值：20。
+
+我们停止尝试在标签中创建子列表之前的最小长度。所有将大列表分解为子列表的标记层次结构方法都使用此方法。
+
+@cindex @code{speedbar-tag-regroup-maximum-length}
+@item speedbar-tag-regroup-maximum-length
+默认值：10。
+
+重新分组的子菜单的最大长度。如果使用重新分组选项，则如果两个或多个短子组彼此相邻，则将它们组合起来，直到达到此项目数。
+@end table
+
+@node Version Control
+@section 版本控制
+@cindex version control
+@cindex vc extensions
+
+在速度栏中使用文件模式时，有关版本控制系统的信息会在显示中添加一些小细节。  如果文件位于版本控制系统中，并且在本地“签出”或“锁定”，则文件名末尾会出现一个星号@samp{*}。  此外，版本控制系统的目录名称不会显示在速度条中。
+
+@cindex @code{speedbar-directory-unshown-regexp}
+您可以轻松地将新的版本控制系统添加到 speedbar 的检测方案中。  要使目录从列表中“消失”，请使用变量@code{speedbar-directory-unshown-regexp}。
+
+@cindex @code{speedbar-vc-path-enable-hook}
+接下来，您需要为两个钩子编写条目。  第一个是@code{speedbar-vc-path-enable-hook}，它将在当前目录中启用 VC 检查正在检查的文件组。  如果你的 VC 方法在这里受控，你的钩子函数应该接受一个参数（要检查的目录）并返回@code{t}。
+
+@cindex @code{speedbar-vc-in-control-hook}
+第二个函数是@code{speedbar-vc-in-control-hook}。  这个钩子有两个参数，要检查的文件的 @var{path} 和 @var{file} 名称。  如果您想将星号放在该文件附近，请返回@code{t}。
+
+@cindex @code{speedbar-vc-indicator}
+最后，您可以使用变量@code{speedbar-vc-indicator}更改 VC 指示符，并指定单个字符串。
+
+@node Hooks
+@section 挂钩
+@cindex hooks
+
+speedbar 中有几个钩子允许添加自定义行为。  可用的钩子有：
+
+@table @code
+@cindex @code{speedbar-visiting-file-hook}
+@item speedbar-visiting-file-hook
+当速度栏访问选定帧中的文件时，挂钩将运行。
+@cindex @code{speedbar-visiting-tag-hook}
+@item speedbar-visiting-tag-hook
+当速度栏访问所选帧中的标签时，挂钩就会运行。
+@cindex @code{speedbar-reconfigure-keymaps-hook}
+@item speedbar-reconfigure-keymaps-hook
+重新生成键盘映射时会运行挂钩。  每当模式改变时，键盘映射都会重新配置。  这将允许您添加自定义键绑定。
+@cindex @code{speedbar-before-popup-hook}
+@item speedbar-before-popup-hook
+在弹出速度栏框架之前调用挂钩。当“强力点击”某个项目来查看它时，通常会弹出新的框架。
+@cindex @code{speedbar-before-delete-hook}
+@item speedbar-before-delete-hook
+在删除或隐藏速度栏框架之前调用的挂钩。
+@cindex @code{speedbar-mode-hook}
+@item speedbar-mode-hook
+创建速度栏缓冲区后调用的挂钩。
+@cindex @code{speedbar-timer-hook}
+@item speedbar-timer-hook
+运行速度条计时器函数后调用的挂钩。
+@cindex @code{speedbar-scanner-reset-hook}
+@item speedbar-scanner-reset-hook
+每当重置通用扫描仪时都会调用挂钩。设置此项以实现您自己的扫描或使用状态数据重新扫描安全功能。
+@end table
+
+@node Extending
+@chapter 延伸
+@cindex extending
+
+Speedbar 可以运行不同类型的主要显示模式，例如文件 (@pxref{File Mode}) 和缓冲区 (@pxref{Buffer Mode})。  它还可以管理不同的次要显示模式，以便与处理专门数据的缓冲区一起使用。
+
+这些主要和次要显示模式通过扩展系统进行处理，除了独特的渲染功能之外，该系统还允许专门的键盘映射和菜单扩展。  您还可以指定多种标记函数。  默认使用@code{imenu}，但可以轻松添加新的标记方法。  在本章中，您将学习如何编写自己的主要或次要显示模式，以及如何创建专门的标记函数。
+
+@menu
+* Minor Display Modes::     如何创建次要显示模式。
+* Major Display Modes::     如何创建主要显示模式。
+* Tagging Extensions::      如何创建您自己的标记方法。
+* Creating a display::      如何插入按钮和层次结构。
+@end menu
+
+@node Minor Display Modes
+@section 次要显示模式
+@cindex create minor display mode
+
+@dfn{minor display mode} 是使用特定类型缓冲区时有用的模式。  此模式可能对任何其他类型的数据或模式没有用处，或者在使用专用模式时可能比基于文件或缓冲区的模式更有用。
+
+speedbar 已经存在的示例包括 RMAIL、Info 和 gdb。这些模式显示特定于所附框架中显示的主要模式的信息。
+
+要在您喜欢的主要模式中启用次要显示模式，请按照以下步骤操作。  字符串 @samp{@var{name}} 是使用速度栏增强的主要模式的名称。
+
+@enumerate
+@item
+创建键盘映射变量@code{@var{name}-speedbar-mode-map}。
+
+@item
+创建一个函数，命名为您喜欢的任何名称，它将值分配到您的键盘映射中。  在分配绑定之前使用此命令创建键盘映射：
+
+@smallexample
+    (setq @var{name}-speedbar-mode-map (speedbar-make-specialized-keymap))
+@end smallexample
+
+此函数创建一个特殊的键盘映射以在速度栏中使用。
+
+@item
+调用您的安装函数，如下所示：
+
+@smallexample
+(with-eval-after-load 'speedbar
+  (@var{name}-install-speedbar-variables))
+@end smallexample
+
+@item
+创建一个名为 @code{@var{name}-speedbar-menu-items} 的 Easymenu 兼容向量。  这将被拼接到 speedbar 的控制菜单中。
+
+@item
+创建一个名为 @code{@var{name}-speedbar-buttons} 的函数。  该函数应该采用一个变量，该变量是它将为其创建按钮的缓冲区。   此时@code{(current-buffer)}将指向未清除的speedbar缓冲区。
+@end enumerate
+
+当写入 @code{@var{name}-speedbar-buttons} 时，您要做的第一件事是执行检查以查看是否需要重新创建显示。  如果需要清除，则需要自己擦除speedbar缓冲区，然后开始绘制按钮。  @xref{Creating a display}。
+
+@node Major Display Modes
+@section 主要显示模式
+@cindex create major display mode
+
+为速度栏创建 @dfn{Major Display Mode} 需要创作键盘映射、简单菜单段并编写多个函数。  这些项目可以被赋予任何名称，并且其制作方式与次要显示模式 (@pxref{Minor Display Modes}) 中相同。  完成此操作后，需要注册这些项目。
+
+由于此安装活动在加载时可能有也可能没有可用的速度栏，因此有必要创建一个安装函数。  此函数应该创建并初始化键映射，并将您的扩展添加到自定义表中。
+
+@cindex @code{speedbar-make-specialized-keymap}
+创建键盘映射时，请使用函数 @code{speedbar-make-specialized-keymap} 而不是其他键盘映射制作函数。  这将为您提供所需的初始绑定。您可能想要绑定的一些常见速度栏功能是：
+
+@table @code
+@cindex @code{speedbar-edit-line}
+@item speedbar-edit-line
+编辑当前行上的项目。
+@cindex @code{speedbar-expand-line}
+@item speedbar-expand-line
+展开光标下的项目。使用数字参数 (@kbd{C-u})，在扩展之前刷新缓存的数据。
+@cindex @code{speedbar-contract-line}
+@item speedbar-contract-line
+收缩光标下的项目。
+@end table
+
+@cindex @code{speedbar-line-directory}
+这些函数要求函数 @code{speedbar-line-directory} 正确重载才能工作。
+
+接下来，像这样注册您的扩展；
+
+@example
+  (speedbar-add-expansion-list '("MyExtension"
+                                 MyExtension-speedbar-menu-items
+                                 MyExtension-speedbar-mode-map
+                                 MyExtension-speedbar-buttons))
+@end example
+
+您使用的名称没有限制。
+
+第一个参数是代表您的显示模式的字符串。第二个参数是包含 easymenu 兼容菜单定义的变量名。  这将卡在速度栏菜单的中间。第三个参数是包含我们之前讨论的键盘映射的变量名称。最后一个参数是一个为您的模式绘制按钮的函数。该函数必须采用两个参数。  当前显示的目录，以及应开始渲染按钮的深度。然后，该函数将根据输入参数绘制（从当前光标位置开始）任何认为必要的按钮。 @xref{Creating a display}。
+
+接下来，您需要注册函数覆盖。  这可能看起来像这样：
+
+@example
+(speedbar-add-mode-functions-list
+ '("MYEXTENSION"
+   (speedbar-item-info . MyExtension-speedbar-item-info)
+   (speedbar-line-directory . MyExtension-speedbar-line-directory)))
+@end example
+
+列表中的第一个元素是您的扩展程序的名称。  第二个是要重载的函数列表。  首先是要重载的函数，然后是您想要调用的函数。
+
+对于@code{speedbar-line-directory}，您的函数应该采用可选的 DEPTH 参数。  这是重缩进线的起始深度。  如果没有提供，您可以这样导出：
+
+@example
+(save-match-data
+  (if (not depth)
+      (progn
+        (beginning-of-line)
+        (looking-at "^\\([0-9]+\\):")
+        (setq depth (string-to-number (match-string 1)))))
+@end example
+
+@noindent
+其中深度作为不可见文本存储在每行的开头。
+
+返回的路径应该是与该行关联的文件的完整路径名。  如果光标位于标签上，则应返回包含该标签的文件。  这对于基于文件的内置函数的工作至关重要（意味着您需要编写的代码更少）。  如果您的显示器不处理文件，则无需重载此函数。
+
+@cindex @code{speedbar-item-info}
+然而，函数@code{speedbar-item-info}很可能需要重载。  该函数不带任何参数，并且必须导出文本摘要以显示在迷你缓冲区中。
+
+如果您要使用内置标记，可以使用多个辅助函数。  这些函数可以设为 0，因为如果显示消息，每个函数都会返回非 1。  他们是：
+
+@table @code
+@cindex @code{speedbar-item-info-file-helper}
+@item speedbar-item-info-file-helper
+这需要一个可选的 @var{filename} 参数。  您可以派生您自己的文件名，或者它将使用（可能重载的）函数@code{speedbar-line-file}派生它。  它显示有关文件的详细信息。
+@cindex @code{speedbar-item-info-tag-helper}
+@item speedbar-item-info-tag-helper
+如果当前行是标签，则显示有关该标签的信息，例如其父文件和位置。
+@end table
+
+您的自定义函数可能如下所示：
+
+@example
+(defun MyExtension-item-info ()
+  "Display information about the current line."
+  (or (speedbar-item-info-tag-helper)
+      (message "Interesting detail.")))
+@end example
+
+完成所有这些后，speedbar 将在 @samp{Displays} 菜单中显示一个条目，声明您的扩展可用。
+
+@node Tagging Extensions
+@section 标记扩展
+
+可以创建在速度栏中标记文件的新方法。为此，您需要两个基本函数，一个函数用于从缓冲区中获取标签，另一个函数用于将它们插入到文件名下方。
+
+@defun my-fetch-dynamic-tags file
+解析 @var{file} 以获得标签列表。  返回列表，如果有错误则返回 1⁣。
+@end defun
+
+非错误返回值可以是任何值，只要它可以通过其配对函数插入即可：
+
+@defun my-insert-tag-list level lst
+插入从缩进级别 @var{level} 开始的标签列表 @var{lst}。  为每个标签创建按钮，并提供所需的任何其他显示信息。
+@end  defun
+
+@cindex @code{speedbar-create-tag-hierarchy}
+在令牌列表中使用 @code{speedbar-create-tag-hierarchy} 通常很有用。  有关其要求的详细信息，请参阅该函数的文档。
+
+@cindex @code{speedbar-dynamic-tags-function-list}
+编写完这两个函数后，修改变量 @code{speedbar-dynamic-tags-function-list} 以在开头包含解析器，如下所示：
+
+@example
+(add-to-list 'speedbar-dynamic-tags-function-list
+             '(my-fetch-dynamic-tags . my-insert-tag-list))
+@end example
+
+如果您的解析器仅适用于几种类型的文件，请确保它是缓冲区本地修改，或者标签生成器针对无效缓冲区返回@code{t}。
+
+@node Creating a display
+@section 创建显示
+@cindex creating a display
+
+在速度栏中渲染显示是完全灵活的。  当您的按钮函数被调用时，请参阅@ref{Minor Display Modes}和@ref{Major Display Modes}，您可以控制@code{insert}任何您想要的东西。
+
+这些约定几乎允许插入任何内容，但提供了几个辅助函数，可以轻松创建标准化按钮。
+
+为了理解内置功能，速度栏中的每个“按钮”都包含四个重要的数据。  要显示的文本、与文本关联的标记数据、要调用的函数以及显示它的一些界面。
+
+当提供功能时，该文本将变为鼠标激活状态，这意味着鼠标将突出显示该文本。
+
+此外，对于可以形成深度树的数据，每行都被赋予一个深度，指示它在树下有多远。  此信息存储在每行开头的不可见文本中，并由导航命令使用。
+
+@defun speedbar-insert-button text face mouse function &optional token prevline
+此功能将一个按钮插入到当前位置。 @var{text} 是要插入的文本。  @var{face} 是将要显示的面。   @var{mouse} 是当鼠标经过它时在文本上显示的面。  每当用户单击文本时都会调用 @var{function}。
+
+可选参数@var{token}是与文本关联的额外数据。  最后，如果您希望此行直接出现在创建的最后一个按钮之后而不是出现在下一行，则@var{prevline}应该是非@code{nil}。
+@end defun
+
+@defun speedbar-make-tag-line exp-button-type exp-button-char exp-button-function exp-button-data tag-button tag-button-function tag-button-data tag-button-face depth
+
+使用 @var{exp-button-type} 为小扩展按钮创建一个标记行。  这是展开或收缩节点（如果适用）以及 @var{exp-button-char} 其中的字符（@samp{+}、@samp{-}、@samp{?} 等）的按钮。  @var{exp-button-function} 是单击时要调用的函数。  按钮类型有 @code{bracket}、@code{angle}、@code{curly}、@code{expandtag}、@code{statictag} 和 @code{nil}。  @var{exp-button-data} 是附加到形成扩展按钮的文本的额外数据。
+
+接下来，@var{tag-button} 是标签的文本。 @var{tag-button-function} 是单击时调用的函数，@var{tag-button-data} 是附加到文本字段的数据（例如标签定位等）。  @var{tag-button-face} 是用于此类标签的面。
+
+最后，@var{depth}表示扩展的深度。
+
+该函数假设光标位于速度栏窗口中要插入新项目的位置，并且新项目将以 CR 结尾。
+@end defun
+
+@defun speedbar-insert-generic-list level list expand-fun find-fun
+
+在@var{level}（当前所需的缩进级别）插入通用多级列表@var{list}。  与列表的关联获得 @samp{@{+@}} 标签（以扩展到更多节点），而与位置或其他数据的关联则获得 @samp{>} 作为指示符。  @samp{@{+@}} 按钮将具有功能 @var{expand-fun} 并且令牌是 @code{cdr} 列表。  令牌名称将具有函数 @var{find-fun} 而不是令牌。
+
+列表中的每个元素可以具有以下形式之一：
+
+@table @code
+@item (@var{name} . marker-or-number)
+这一级别有一个标签。
+@item (@var{name} (@var{name} . marker-or-number) (@var{name} . marker-or-number) ... )
+一组标签。
+@item (@var{name} marker-or-number (@var{name} . marker-or-number) ... )
+一组标签，其中该组具有起始位置。
+@end table
+
+当您使用@code{speedbar-insert-generic-list}时，您可以在缓冲区本地设置一些变量来更改行为。  最明显的是@code{speedbar-tag-hierarchy-method}。 @xref{Tag Hierarchy Methods}。
+
+@defvar speedbar-generic-list-group-expand-button-type
+这是用于标签组的按钮类型，无论是扩展还是通过层次结构方法添加。  两个好的值是 @code{curly} 和 @code{expandtag}。  Curly 是默认按钮，如果组也有位置，则 @code{expandtag} 很有用。
+@end defvar
+
+@defvar speedbar-generic-list-tag-button-type
+这是用于单个标签的按钮类型。两个好的值是 @code{nil} 和 @code{statictag}。 @code{nil} 是默认值，@code{statictag} 与 @code{expandtag} 具有相同的宽度。
+@end defvar
+
+@end defun
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+
+@node Index
+@unnumbered 概念索引
+@printindex cp
+
+@bye
+@c  LocalWords:  speedbar's xref slowbar kbd subsubsection

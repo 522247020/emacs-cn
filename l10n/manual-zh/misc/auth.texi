@@ -1,0 +1,506 @@
+\输入 texinfo @c -*-texinfo-*-
+
+@set VERSION 0.3
+
+@setfilename ../../info/auth.info
+@settitle Emacs auth-source 库@value{VERSION}
+@documentlanguage en
+@include docstyle.texi
+
+@copying
+该文件描述了 Emacs auth-source 库。
+
+版权所有 @copyright{} 2008--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs lisp libraries
+@direntry
+* Auth-source: (auth).           Emacs auth-source 库。
+@end direntry
+
+@titlepage
+@ifset WEBHACKDEVEL
+@title Emacs auth-source 库（开发版本）
+@end ifset
+@ifclear WEBHACKDEVEL
+@title Emacs auth-source 库
+@end ifclear
+@author by Ted Zlatanov
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top Emacs auth-source
+This manual describes the Emacs auth-source library.
+
+It is a way for multiple applications to share a single configuration
+(in Emacs and in files) for user convenience.
+
+@insertcopying
+
+@menu
+* Overview::                    Overview of the auth-source library.
+* Help for users::
+* Multiple GMail accounts with Gnus::
+* Secret Service API::
+* The Unix password store::
+* Help for developers::
+* GnuPG and EasyPG Assistant Configuration::
+* GNU Free Documentation License::  The license for this documentation.
+* Index::
+* Function Index::
+* Variable Index::
+@end menu
+@end ifnottex
+
+@node Overview
+@chapter 概述
+
+auth-source 库只是 Emacs 和 Gnus 等解决老问题“我的用户名和密码是什么？”的一种方式。
+
+（这与关于燃烧的老问题“请问灭火器在哪里？”不同。）
+
+auth-source 库不仅仅支持用户名或密码（称为密钥）。
+
+同样，auth-source 库支持多个存储后端，当前是经典的“netrc”后端（您可以在本文档后面看到示例）、JSON 文件、Secret Service API 和@samp{pass}（标准 unix 密码管理器）。  这是通过基于 EIEIO 的后端完成的，如果您愿意，您可以编写自己的后端。
+
+@node Help for users
+@chapter 对用户的帮助
+
+“Netrc”文件是事实上的标准。  它们看起来像这样：
+
+@example
+machine @var{mymachine} login @var{myloginname} password @var{mypassword} port @var{myport}
+@end example
+
+@code{machine} 是服务器（DNS 名称或 IP 地址）。它在 @code{auth-source-search} 查询中称为 @var{:host}。
+
+@code{port} 是连接端口或协议。  它在 @code{auth-source-search} 查询中称为 @var{:port}。
+
+@code{user} 是用户名。  它在 @code{auth-source-search} 查询中称为 @var{:user}。  您还可以使用 @code{login} 和 @code{account}。
+
+匹配条目通常按照它们出现的顺序使用，因此将最具体的条目放在文件的前面是一个好主意。  例如：
+
+@example
+machine example.com login foobar password geheimnis port smtp
+machine example.com login foobar password hemmelig
+@end example
+
+在这里，我们为 @code{smtp} 服务使用一个密码，为所有其他服务使用不同的密码。
+
+您还可以使用此文件指定设置 TLS 连接时要使用的客户端证书。  格式为：
+
+@example
+machine @var{mymachine} port @var{myport} key @var{key} cert @var{cert}
+@end example
+
+@var{key} 和 @var{cert} 是分别包含要使用的密钥和证书的文件名。  为了使网络连接自动使用它们，请将 @code{:client-certificate t} 传递给 @code{open-network-stream}，或将 @code{network-stream-use-client-certificates} 自定义为 @code{t}。
+
+您可以在密码或其他令牌内使用空格或数字符号 (@t{"#"})，方法是将令牌用单引号或双引号引起来。
+
+您可以在密码或其他令牌中使用撇号，方法是将其用双引号引起来，例如 @t{"he'llo"}。  同样，您可以在密码或其他令牌中使用双引号，方法是将其用撇号括起来，例如 @t{'he"llo'}。  不能混合使用两者（因此密码或其他令牌不能同时包含撇号和双引号）。
+
+所有这些都是可选的。  你可以只是说（但我们不推荐它，我们只是表明这是可能的）
+
+@example
+password @var{mypassword}
+@end example
+
+到处使用相同的密码。  再次强调，@emph{DO NOT DO THIS}，否则你就会像孩子们说的那样被打败。
+
+“Netrc”文件通常称为 @file{.authinfo} 或 @file{.netrc}；如今 @file{.authinfo} 似乎更流行，并且 auth-source 库通过接受两者来鼓励这种混乱，正如您稍后将看到的。
+
+如果您在搜索时遇到问题，请将 @code{auth-source-debug} 设置为 @code{trivia} 并查看库在 @file{*Messages*} 缓冲区中检查的主机、端口和用户。  对于任何其他问题也是如此，您的第一步始终是查看正在检查的内容。  第二步当然是写一篇关于它的博客文章并等待评论中的答案。
+
+您可以自定义用户选项@code{auth-sources}。  如果您使用旧版本的 Emacs 或者由于某些其他原因未加载 auth-source 库，则可能需要以下内容。
+
+@lisp
+(require 'auth-source)             ;; probably not necessary
+(customize-variable 'auth-sources) ;; optional, do it once
+@end lisp
+
+@defopt auth-sources
+
+@code{auth-sources} 用户选项告诉 auth-source 库您的 netrc 文件、Secret Service API 集合项或特定主机和协议的密码存储的位置。  虽然您可能会喜欢，但默认且最简单的配置是：
+
+@lisp
+;;; old default: required :host and :port, not needed anymore
+(setopt auth-sources '((:source "~/.authinfo.gpg" :host t :port t)))
+;;; mostly equivalent (see below about fallbacks) but shorter:
+(setopt auth-sources '((:source "~/.authinfo.gpg")))
+;;; even shorter:
+(setopt auth-sources '("~/.authinfo.gpg"))
+;;; use the Secrets API @var{Login} collection
+;;; (@pxref{Secret Service API})
+(setopt auth-sources '("secrets:Login"))
+;;; use pass (@file{~/.password-store})
+;;; (@pxref{The Unix password store})
+(auth-source-pass-enable)
+;;; JSON data in format [@{ "machine": "SERVER",
+;;; "login": "USER", "password": "PASSWORD" @}...]
+(setopt auth-sources '("~/.authinfo.json.gpg"))
+@end lisp
+
+通过向 @code{auth-sources} 添加特定主机或协议的多个条目，您可以拥有该主机或协议的特定 netrc 文件。  通常这是不必要的，但如果您共享 netrc 文件或其他一些不寻常的设置，这可能是有意义的（90% 的 Emacs 用户有不寻常的设置，其余 10% 是 @emph{really} 不寻常的）。
+
+这是使用两个来源的混合示例：
+
+@lisp
+(setopt auth-sources '((:source (:secrets default)
+                        :host "myserver" :user "joe")
+                       "~/.authinfo.gpg"))
+@end lisp
+
+@end defopt
+
+如果您不自定义 @code{auth-sources}，则必须使用默认设置：未加密的 netrc 文件 @file{~/.authinfo} 将用于任何主机和任何端口（如果存在）。  不建议这样做，因为它会以明文形式暴露您的所有秘密。
+
+如果失败，则会在 netrc 文件 @file{~/.authinfo.gpg} 中查找任何主机和任何端口，该文件是一个 GnuPG 加密文件 (@pxref{GnuPG and EasyPG Assistant Configuration})。
+
+最后，未加密的 netrc 文件 @file{~/.netrc} 将用于任何主机和任何端口。
+
+典型的 netrc 线路示例没有端口。
+
+@example
+machine YOURMACHINE login YOU password YOURPASSWORD
+@end example
+
+这将匹配任何身份验证端口。  很简单，对吧？  但是，如果该计算机的端口 433 上有一个 SMTP 服务器需要与 IMAP 服务器不同的密码，该怎么办？
+
+@example
+machine YOURMACHINE login YOU password SMTPPASSWORD port 433
+machine YOURMACHINE login YOU password GENERALPASSWORD
+@end example
+
+如果您希望指定与计算机一起使用的特定 SMTP 身份验证方法，可以使用 @code{smtp-auth} 关键字。 @xref{Authentication,, Authentication, smtpmail, Emacs SMTP Library}，了解可用的方法。
+
+对于 url-auth 身份验证 (HTTP/HTTPS)，您需要将其放入 netrc 文件中：
+
+@example
+machine yourmachine.com:80 port http login testuser password testpass
+@end example
+
+这将匹配 HTTP@. HTTPS 上的任何领域和身份验证方法（基本或摘要），HTTPS 的设置类似。  如果您想要更精细的控制，请探索 url-auth 源代码和变量。
+
+对于 TRAMP 身份验证，请使用：
+
+@example
+machine yourmachine.com port scp login testuser password testpass
+@end example
+
+请注意，端口表示 Tramp 连接方法。  当您不使用端口条目时，您将匹配任何 TRAMP 方法，如前所述。  由于 TRAMP 有大约 88 种连接方法，如果您有不寻常的设置（请参阅之前的评论），这可能是必要的。 @xref{Password handling, Password handling,, tramp, Tramp}。
+
+如果您喜欢这种事情，netrc 格式会直接转换为 JSON。  只需指向一个扩展名为 @file{.json} 的文件，其中包含如下条目：
+
+@example
+[
+ @{ "machine": "yourmachine.com", "port": "http",
+   "login": "testuser", "password": "testpass" @}
+]
+@end example
+
+也可以将其转换为属性列表，在扩展名为 @file{.plist} 的文件中使用。  其格式在 @file{plstore.el} 库中描述：
+
+@example
+(("foo" :host "yourmachine.com" :port "http"
+        :user "testuser" :password "testpass"))
+@end example
+
+@vindex auth-source-ignore-non-existing-file
+如果底层数据文件不存在，则 @code{auth-sources} 中指向基于文件的数据存储的条目将被忽略。  如果需要将新的秘密存储在文件中，这一点很重要；选择 @code{auth-sources} 的第一个可用条目作为目标。  如果您希望选择指向不存在文件的条目，请将用户选项 @code{auth-source-ignore-non-existing-file} 设置为 @code{nil}。  请注意，使用默认值@code{auth-sources}，这将导致新的秘密以明文形式存储在@file{~/.authinfo}中。
+
+@node Multiple GMail accounts with Gnus
+@chapter 使用 Gnus 的多个 GMail 帐户
+
+对于使用 Gnus 的多个 GMail 帐户，您必须在 @code{gnus-secondary-select-methods} 中使用不同的名称创建两个 nnimap 条目：
+
+@example
+(setq gnus-secondary-select-methods '((nnimap "gmail"
+                                       (nnimap-address "imap.gmail.com"))
+                                      (nnimap "gmail2"
+                                       (nnimap-address "imap.gmail.com"))))
+@end example
+
+您的 netrc 条目将是：
+
+@example
+machine gmail login account@@gmail.com password "account password" port imap
+machine gmail2 login account2@@gmail.com password "account2 password" port imap
+@end example
+
+@node Secret Service API
+@chapter 特勤局API
+
+@dfn{Secret Service API} 是@uref{https://www.freedesktop.org/wiki/Specifications/secret-storage-spec/,,freedesktop.org} 的标准，用于安全存储密码和其他机密信息。  该 API 由 GNOME Keyring 和 KDE Wallet 等系统守护程序实现（它们分别是 GNOME 和 KDE 软件包，应该在大多数现代 GNU/Linux 系统上可用）。  它还通过 KeePassXC 进行了测试。
+
+auth-source 库使用 @file{secrets.el} 库通过 Secret Service API@. 连接。您还可以在其他包中使用该库，它不是 auth-source 独有的。
+
+@defvar secrets-enabled
+加载 @file{secrets.el} 后，该变量的非 @code{nil} 值表示存在提供 Secret Service API 的守护进程。
+@end defvar
+
+@deffn Command secrets-show-secrets
+此命令显示所有集合、项目及其属性。
+@end deffn
+
+Secret Service API 管理的原子对象是@dfn{secret items}，其中包含应用程序希望安全存储的内容，例如密码。  秘密项目有一个标签（名称）、@dfn{secret}（这是我们想要的字符串，如密码）和一组查找属性。  这些属性可用于稍后搜索和检索秘密项目。
+
+秘密物品被分组在 @dfn{collections} 中。  在 GNOME 密钥环和 KDE 钱包中，集合有时被称为 @samp{keyring} 或 @samp{wallet}，但它是同一件事，是一组秘密。收藏品是个人的并受到保护，因此只有所有者才能打开它们。
+
+最常见的集合称为 @t{"login"}。
+
+集合可以有别名。  别名 @t{"default"} 很常用，因此客户端不必知道他们打开的集合的具体名称。  尚不支持其他别名。由于别名是全局可访问的，因此仅在确定合适时才设置 @t{"default"} 别名。
+
+@defun secrets-list-collections
+此函数以列表形式返回所有集合名称。
+@end defun
+
+@defun secrets-set-alias collection alias
+将 @var{alias} 设置为标记为 @var{collection} 的集合的别名。目前仅支持别名 @t{"default"}。
+@end defun
+
+@defun secrets-get-alias alias
+返回@var{alias}引用的集合名称。目前仅支持别名 @t{"default"}。
+@end defun
+
+可以通过函数@code{secrets-create-collection}和@code{secrets-delete-collection}创建和删除集合。通常，这不是在 Emacs 内完成的。  不要删除标准集合，例如 @t{"login"}。
+
+对于 GNOME Keyring，存在一个名为 @t{"session"} 的特殊集合，它具有登录用户的生命周期。它的数据不存储在磁盘上，并在用户注销时消失。因此，它可以用来临时存储和检索秘密物品。  当秘密项目不应该永久存在时，@t{"session"}集合比持久集合更好。  每当需要集合参数时，@t{"session"}集合可以通过字符串@t{"session"}或@code{nil}寻址。
+
+但是，其他特勤局提供商不会创建此临时 @t{"session"} 集合。  在使用该集合之前，您必须首先检查该集合是否存在。
+
+@defun secrets-list-items collection
+以列表形式返回 @var{collection} 的所有项目标签。
+@end defun
+
+@defun secrets-create-item collection item password &rest attributes
+此函数在 @var{collection} 中创建一个带有标签 @var{item} 和密码 @var{password} 的新项目。  标签 @var{item} 在 @var{collection} 中不必是唯一的。  @var{attributes} 是为创建的项目设置的键值对。  键是关键字符号，以冒号开头；值是字符串。  例子：
+
+@example
+;;; The collection is "session", the label is "my item"
+;;; and the secret (password) is "geheim".
+(secrets-create-item "session" "my item" "geheim"
+ :method "sudo" :user "joe" :host "remote-host")
+@end example
+
+键 @code{:xdg:schema} 确定要生成的项目的范围，即 @: 该项目适用于哪些应用程序。这只是一个像“org.freedesktop.NetworkManager.Mobile”或“org.gnome.OnlineAccounts”这样的字符串，其他必需的键由此确定。  如果没有给出 @code{:xdg:schema}，则默认使用“org.freedesktop.Secret.Generic”。
+@end defun
+
+@defun secrets-get-secret collection item
+返回@var{collection}中标记为@var{item}的项目的秘密。  如果有多个标记为@var{item}的项目，则未定义返回哪一项。  如果没有这样的项目，则返回@code{nil}。
+@end defun
+
+@defun secrets-delete-item collection item
+该函数删除@var{collection}中的项目@var{item}。  如果有多个标记为@var{item}的项目，则不确定删除哪一项。
+@end defun
+
+查找属性是在创建秘密项时指定的，必须是键值对。  键是关键字符号，以冒号开头；值是字符串。  它们可以从给定的秘密物品中检索，并且可以用于搜索物品。
+
+@defun secrets-get-attribute collection item attribute
+返回 @var{collection} 中标记为 @var{item} 的项的键 @var{attribute} 的值。  如果有多个标记为@var{item}的项目，则未定义返回哪一项。  如果不存在这样的项目，或者该项目不拥有该键，则该函数返回@code{nil}。
+@end defun
+
+@defun secrets-get-attributes collection item
+返回 @var{collection} 中标记为 @var{item} 的项的查找属性。  如果有多个标记为@var{item}的项目，则未定义返回哪一项。  如果不存在这样的项目，或者该项目没有属性，则返回@code{nil}。  例子：
+
+@example
+(secrets-get-attributes "session" "my item")
+     @result{} ((:user . "joe") (:host . "remote-host"))
+@end example
+@end defun
+
+@defun secrets-search-items collection &rest attributes
+搜索 @var{collection} 中与 @var{attributes} 匹配的项目。  @var{attributes} 是键值对，如 @code{secrets-create-item} 中所使用。  例子：
+
+@example
+(secrets-search-items "session" :user "joe")
+     @result{} ("my item" "another item")
+@end example
+@end defun
+
+当您指定与 @t{"secrets:@var{collection}"} 匹配的源时，auth-source 库使用 @file{secrets.el} 库，因此使用 Secret Service API。  例如，您可以使用 @t{"secrets:session"} 来使用 @t{"session"} 集合，仅在 Emacs 的生命周期内打开。  或者您可以使用 @t{"secrets:Login"} 打开 @t{"Login"} 集合。  作为特殊情况，您可以在@code{auth-sources}中使用符号@code{default}（不是字符串，而是符号）来指定@t{"default"}别名。  这是一个人为的示例，设置 @code{auth-sources} 来搜索三个集合，然后回退到 @file{~/.authinfo.gpg}。
+
+@example
+(setopt auth-sources '(default
+                       "secrets:session"
+                       "secrets:Login"
+                       "~/.authinfo.gpg"))
+@end example
+
+auth-source 规范中的属性值不是字符串（如端口号），而是在调用 @file{secrets.el} 函数之前进行字符串化。
+
+@node The Unix password store
+@chapter Unix 密码存储
+
+@uref{https://www.passwordstore.org,,The standard unix password manager}（或只是@samp{pass}）遵循 Unix 哲学，将您的密码存储在受 @code{gpg} 保护的文件中。  存储位置（任何目录）必须在 @code{auth-source-pass-filename} 用户选项中指定，默认为 @file{~/.password-store}。
+
+@samp{pass} 的 Emacs 集成遵循 pass 项目本身建议的数据组织方式来查找数据。  特别是，要在主机 @code{gnu.org} 和端口 @code{22} 上存储用户 @code{rms} 的密码，您应该使用以下文件名之一。
+
+@table @file
+@item gnu.org.gpg
+文件名中没有用户名或端口意味着任何用户名和端口都将匹配。
+
+@item gnu.org/rms.gpg
+要匹配的用户名可以表示为名称与主机匹配的目录中的文件名。  如果商店在同一主机上有多个用户的密码，这非常有用。
+
+@item rms@@gnu.org.gpg
+用户名也可以表示为前缀，用 at 符号 (@code{@@}) 与主机分隔。
+
+@item gnu.org:22.gpg
+要匹配的端口（又名服务）只能在主机后面表示，并用冒号（@code{:}）分隔。  分隔符可以通过 @code{auth-source-pass-port-separator} 用户选项更改。
+
+@item gnu.org:22/rms.gpg
+
+@item rms@@gnu.org:22.gpg
+
+@item a/b/gnu.org.gpg
+条目可以存储在任意目录中。
+
+@item a/b/gnu.org/rms.gpg
+
+@item a/b/rms@@gnu.org.gpg
+
+@item a/b/gnu.org:22.gpg
+
+@item a/b/gnu.org:22/rms.gpg
+
+@item a/b/rms@@gnu.org:22.gpg
+@end table
+
+如果多个条目匹配，则首选匹配最多项目的条目（其中“项目”是用户名、端口或主机之一）。  例如，在主机 @code{gnu.org} 和端口 @code{22} 上搜索与 @code{rms} 用户匹配的条目时，条目 @file{gnu.org:22/rms.gpg} 优先于 @file{gnu.org.gpg}。然而，当选项@code{auth-source-pass-extra-query-keywords}设置为@code{t}时，不应用此类处理。
+
+@samp{pass} 的用户可能还对其他 Emacs 软件包提供的功能感兴趣：
+
+@itemize
+@item
+@uref{https://git.zx2c4.com/password-store/tree/contrib/emacs/password-store.el,,password-store}：库包装@samp{pass}；
+@item
+@uref{https://github.com/NicolasPetton/pass,,pass}：操作存储和编辑条目的主要模式；
+@item
+@uref{https://github.com/jabranham/helm-pass,,helm-pass}：pass 的 helm 接口。
+@end itemize
+
+@defopt auth-source-pass-filename
+将此用户选项设置为在磁盘上定位密码存储的字符串。默认为@file{~/.password-store}。
+@end defopt
+
+@defopt auth-source-pass-port-separator
+将此用户选项设置为一个字符串，该字符串应将条目中的主机名与端口分开。  默认为@samp{:}。
+@end defopt
+
+@defopt auth-source-pass-extra-query-keywords
+这扩大了可用关键字的选择范围，包括 @code{:max} 和 @code{:require} 并告诉更多关键字接受查询参数列表作为参数。  搜索时，无论是否提供 @code{:user} 参数，它也更喜欢 @samp{rms@@gnu.org.gpg} 形式的用户名而不是 @samp{gnu.org/rms.gpg} 形式。
+
+一般来说，如果您更喜欢此后端传统上表现出的特性，例如优先考虑文件名中的字段计数或与子域标签匹配，请将此选项设置为@code{nil}（默认值）。  但是，如果您在预测相对于其他身份验证源后端的搜索结果时遇到问题，或者遇到期望统一查询多个后端的代码，请尝试将其翻转为@code{t}。
+@end defopt
+
+@node Help for developers
+@chapter 对开发者的帮助
+
+auth-source 库可让您轻松控制日志输出。
+
+@defopt auth-source-debug
+将此用户选项设置为 @code{trivia} 以查看 @file{*Messages*} 中的大量输出，或者将其设置为行为类似于 @code{message} 的函数来执行您自己的日志记录。
+@end defopt
+
+auth-source 库只有几个供外部使用的函数。
+
+@defun auth-source-search &rest spec &key type max host user port secret require create delete &allow-other-keys
+该函数根据@var{spec}搜索（或修改）身份验证后端。  有关详细信息，请参阅函数的文档字符串。
+@c TODO more details.
+@end defun
+
+让我们看一下使用 Gnus 的 @code{nnimap.el} 中的 @code{auth-source-search} 的示例。
+
+@example
+(defun nnimap-credentials (address ports)
+  (let* ((auth-source-creation-prompts
+          '((user  . "IMAP user at %h: ")
+            (secret . "IMAP password for %u@@%h: ")))
+         (found (nth 0 (auth-source-search :max 1
+                                           :host address
+                                           :port ports
+                                           :require '(:user :secret)
+                                           :create t))))
+    (if found
+        (list (plist-get found :user)
+              (auth-info-password found)
+              (plist-get found :save-function))
+      nil)))
+@end example
+
+@vindex auth-source-creation-defaults
+此调用要求结果中包含用户和密码（秘密）。  如果条目尚不存在，它还请求创建该条目。  在组装创建的条目时，将使用显示的提示与用户进行交互。  调用者还可以在 @code{auth-source-creation-defaults} 中传递数据来为任何提示提供默认值。
+
+请注意，如果密码是函数，则需要对其进行评估。  它被包装在一个函数中以提供一些安全性。
+
+随后，成功登录后，@code{nnimap.el} 会调用 @code{:save-function}，如下所示：
+
+@example
+(when (functionp (nth 2 credentials))
+  (funcall (nth 2 credentials)))
+@end example
+
+无论是否提供了@code{:save-function}，这都将起作用。仅当创建新条目时才会提供@code{:save-function}，因此这实际上表示“成功登录后，保存我们刚刚使用的身份验证信息（如果是新创建的）。”
+
+第一次调用后，@code{:save-function}将不会再次运行（但如果您将@code{auth-source-debug}设置为@code{trivia}，它会记录一些内容）。  这样它就不会再问同样的问题，这很烦人。
+
+因此，指定 @code{:create t} 的 API 用户的责任是调用 @code{:save-function}（如果已提供）。
+
+@defun auth-source-delete &rest spec &key delete &allow-other-keys
+此函数从身份验证后端删除与 @var{spec} 匹配的条目。  它返回已删除的条目。后端可能不会真正删除条目。
+@end defun
+
+@defun auth-source-forget spec
+该函数会忘记任何与 @var{spec} 完全匹配的缓存数据。如果忘记某些数据，则返回 @code{t}；如果未找到匹配数据，则返回 @code{nil}。
+@end defun
+
+@defun auth-source-forget+ &rest spec &allow-other-keys
+该函数会忘记任何匹配 @var{spec} 的缓存数据。它返回遗忘的项目数。
+@end defun
+
+@defun auth-source-pick-first-password &rest spec
+此函数返回通过将 @code{auth-source-search} 应用于 @var{spec} 找到的第一条记录的密码。
+@end defun
+
+@defun auth-info-password auth-info
+该函数从 @var{auth-info} 记录中提取密码字符串。
+@end defun
+
+@node GnuPG and EasyPG Assistant Configuration
+@appendix GnuPG 和 EasyPG 助手配置
+
+如果 @code{auth-sources} 用户选项在 @file{~/.authinfo} 之前包含 @file{~/.authinfo.gpg}，则 auth-source 库将尝试先读取 GnuPG 加密的 @file{.gpg} 文件，然后再读取未加密的文件。
+
+与 Emacs 捆绑在一起的 EasyPG Assistant 自动处理加密文件的解密，请参阅@ref{Top, , Top, epa, EasyPG Assistant User's Manual}。  它是 @acronym{GnuPG, GNU Privacy Guard} 的 Emacs 用户界面，请参阅@ref{Top, , Top, gnupg, Using the GNU Privacy Guard}。  要快速开始使用这些内容，请参阅@ref{Quick start, , Quick Start, epa, EasyPG Assistant User's Manual}。
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Index
+@unnumbered 指数
+@printindex cp
+
+@node Function Index
+@unnumbered 功能索引
+@printindex fn
+
+@node Variable Index
+@unnumbered 变量索引
+@printindex vr
+
+@bye
+
+@c End:

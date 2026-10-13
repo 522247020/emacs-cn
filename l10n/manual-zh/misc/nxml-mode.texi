@@ -1,0 +1,556 @@
+\输入 texinfo @c -*- texinfo -*-
+@c %**start of header
+@setfilename ../../info/nxml-mode.info
+@settitle nXML模式
+@documentlanguage en
+@include docstyle.texi
+@c %**end of header
+
+@copying
+本手册介绍了 nXML 模式，这是一种 Emacs 主要模式，用于通过 RELAX NG 支持编辑 XML。
+
+版权所有 @copyright{} 2007--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs editing modes
+@direntry
+* nXML Mode: (nxml-mode).        支持 RELAX NG 的 XML 编辑模式。
+@end direntry
+
+
+@titlepage
+@title nXML模式
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+
+@node Top
+@top nXML模式
+
+@insertcopying
+
+本手册尚未完成。
+
+@menu
+* Introduction::
+* Completion::
+* Inserting end-tags::
+* Paragraphs::
+* Outlining::
+* Locating a schema::
+* DTDs::
+* Limitations::
+* GNU Free Documentation License::   本文档的许可证。
+@end menu
+
+@node Introduction
+@chapter 介绍
+
+nXML 模式是用于编辑 XML 文档的 Emacs 主要模式。  它支持编辑格式正确的 XML 文档，并使用 RELAX NG Compact Syntax 提供模式敏感的编辑。  首先，访问包含 XML 文档的文件，并在必要时使用 @kbd{M-x nxml-mode} 切换到 nXML 模式。  默认情况下，如果 @code{auto-mode-alist} 和 @code{magic-fallback-alist} 具有可识别的 XML 内容或文件扩展名，则将缓冲区置于 nXML 模式。  您可能希望自定义设置，例如识别不同的文件扩展名。
+
+进入 nXML 模式后，您可以键入 @kbd{C-h m} 以获取有关该模式的基本信息。
+
+Emacs 发行版中的 @file{etc/nxml} 目录包含 nXML 模式使用的一些数据文件，并包括两个文件（@file{test-valid.xml} 和 @file{test-invalid.xml}），它们提供了有效和无效 XML 文档的示例。
+
+要进行验证和架构敏感的编辑，您的文档需要一个 RELAX NG 紧凑语法 (RNC) 架构 (@pxref{Locating a schema})。  @file{etc/schema} 目录包含一些流行文档类型的模式。  有关 RELAX NG@. 的更多信息，请参阅@url{https://relaxng.org/} 您可以使用 @url{http://www.thaiopensource.com/relaxng/trang.html} 中的 @samp{Trang} 程序自动创建 RNC 模式。  该程序可以：
+
+@itemize @bullet
+@item 
+从实例文档推断 RNC 模式；
+@item 
+将 DTD 转换为 RNC 模式；
+@item 
+将 RELAX NG XML 语法模式转换为 RNC 模式。
+@end itemize
+
+@noindent To convert a RELAX NG XML syntax (@samp{.rng}) schema to a RNC
+一，您还可以使用 @url{https://github.com/oleg-pavliv/emacs/tree/master/xsl} 中的 XSLT 样式表。
+@ignore
+@c Original location, now defunct.
+@url{http://www.pantor.com/download.html}.
+@end ignore
+
+要将 W3C XML 模式转换为 RNC 模式，您首先需要使用 RELAX NG 转换器工具 @code{rngconv}（构建在 MSV 之上）将其转换为 RELAX NG XML 语法。  参见@url{https://github.com/kohsuke/msv}和@url{https://msv.dev.java.net/}。
+
+仅对于历史讨论，请参阅 @url{http://groups.yahoo.com/group/emacs-nxml-mode/} 的邮件列表档案。  请在 @samp{help-gnu-emacs} 和 @samp{emacs-devel} 邮件列表上进行所有新的讨论。  使用 @kbd{M-x report-emacs-bug} 报告任何错误。
+
+
+@node Completion
+@chapter 完成
+
+除了实时验证之外，nXML模式为协助文档创建提供的最重要的功能是“补全”。完成功能可帮助用户根据模式知识和点之前的缓冲区内容在点处插入字符。
+
+nXML 模式采用标准 GNU Emacs 命令以在缓冲区中完成：@code{completion-at-point}，它绑定到 @kbd{C-M-i} 和 @kbd{M-@key{TAB}}。  请注意，许多窗口系统和窗口管理器本身使用@kbd{M-@key{TAB}}（通常用于在窗口之间切换），并且不将其传递给应用程序。  在这种情况下，您应该输入 @kbd{C-M-i} 或 @kbd{@key{ESC} @key{TAB}} 来完成，或者将 @code{completion-at-point} 绑定到您方便的键。  在下文中，我假设您输入 @kbd{C-M-i}。
+
+nXML 模式补全通过检查点前面的符号来工作。这是要完成的符号。  要完成的符号可以是空的。  给定模式和点之前缓冲区的内容，完成考虑以要完成的符号开头的哪些符号将是要完成的符号的有效替换。  这些符号是可能的完成。  一个例子可能会让这一点更清楚。  假设缓冲区如下所示（其中 @point{} 表示点）：
+
+@example
+<html xmlns="http://www.w3.org/1999/xhtml">
+<h@point{}
+@end example
+
+@noindent
+模式是 XHTML@. 在这种情况下，要完成的符号是 @samp{h}。  可能的补全仅由 @samp{head} 组成。  另一个例子是
+
+@example
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<@point{}
+@end example
+
+@noindent
+在这种情况下，要补全的符号为空，可能的补全为@samp{base}、@samp{isindex}、@samp{link}、@samp{meta}、@samp{script}、@samp{style}、@samp{title}。  另一个例子是：
+
+@example
+<html xmlns="@point{}
+@end example
+
+@noindent
+在这种情况下，要完成的符号为空，可能的完成只有@samp{http://www.w3.org/1999/xhtml}。
+
+当您输入 @kbd{C-M-i} 时，会发生什么取决于可能的补全集是什么。
+
+@itemize @bullet
+@item 
+如果完成集为空，则不会发生任何事情。
+@item 
+如果存在一种可能的补全，则插入该补全以及所需的任何后续字符。  例如，在这种情况下：
+
+@example
+<html xmlns="http://www.w3.org/1999/xhtml">
+<@point{}
+@end example
+
+@noindent
+@kbd{C-M-i} 将产生
+
+@example
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head@point{}
+@end example
+@item 
+如果存在多个可能的完成，但所有可能的完成共享一个公共非空前缀，则插入该前缀。  例如，假设缓冲区是：
+
+@example
+<html x@point{}
+@end example
+
+@noindent
+需要补全的符号是@samp{x}。  可能的完成是@samp{xmlns}和@samp{xml:lang}。  它们共享一个共同的前缀 @samp{xml}。  因此，@kbd{C-M-i}将产生：
+
+@example
+<html xml@point{}
+@end example
+
+@noindent
+通常，您会再次执行@kbd{C-M-i}，这将得到下一项中描述的结果。
+@item 
+如果有多个可能的补全，但可能的补全不共享非空前缀，则 Emacs 会提示您在迷你缓冲区中输入符号，用要补全的符号初始化迷你缓冲区，并弹出一个缓冲区显示可能的补全。  您现在可以输入要插入的符号。  您输入的符号将代替要完成的符号插入到缓冲区中。  然后，Emacs 将在该符号后插入任何所需的字符。  例如，如果它包含：
+
+@example
+<html xml@point{}
+@end example
+
+@noindent
+Emacs 将在迷你缓冲区中提示您
+
+@example
+Attribute: xml@point{}
+@end example
+
+@noindent
+显示可能完成的缓冲区将包含
+
+@example
+Possible completions are:
+xml:lang                           xmlns
+@end example
+
+@noindent
+如果输入@kbd{xmlns}，结果将是：
+
+@example
+<html xmlns="@point{}"
+@end example
+
+@noindent
+（如果再次执行@kbd{C-M-i}，命名空间 URI 将被插入。这应该自动发生吗？）
+@end itemize
+
+@node Inserting end-tags
+@chapter 插入结束标签
+
+XML 语法中的主要冗余是结束标记。  nXML 模式提供了多种方法来更轻松地输入结束标记。  您无需架构即可使用所有这些。
+
+您可以在 @samp{</} 之后使用 @kbd{C-M-i} 来完成结束标记的其余部分。
+
+@kbd{C-c C-f} 为包含点的元素插入结束标记。  当您想输入开始标签，然后输入内容，最后输入结束标签时，此命令很有用。  @samp{f} 是完成的助记符。
+
+如果你想保持标签平衡，并在输入内容之前同时输入结束标签和开始标签，那么你可以使用@kbd{C-c C-i}。  这将插入一个 @samp{>}，然后插入结束标记并在结束标记之前留下点。  @kbd{C-c C-b} 类似，但对于块级元素更方便：它将开始标记、点和结束标记放在连续的行上，并适当缩进。  @samp{i} 是内联助记符，@samp{b} 是块助记符。
+
+最后，您可以自定义 nXML 模式，以便 @kbd{/} 在 @samp{<} 之后出现时自动插入结束标记的其余部分，方法是
+
+@display
+@kbd{M-x customize-variable @key{RET} nxml-slash-auto-complete-flag @key{RET}}
+@end display
+
+@noindent
+然后按照显示的缓冲区中的说明进行操作。
+
+@node Paragraphs
+@chapter 段落
+
+Emacs 有几个对段落进行操作的命令，最著名的是 @kbd{M-q}。 nXML 模式重新定义了它们以对 XML@. 有用的方式工作。用于查找段落开头和结尾的确切规则很复杂；它们的设计主要是为了确保 2⁣ 做正确的事情。
+
+段落由一行或多行完整的连续行组成。一组行不被视为段落，除非它在标签之间或内部注释中包含一些非空白字符。  段落之间用空行分隔。  一行上的单个标签本身也可以分隔段落。  更准确地说，如果一个标签与任何前导和尾随空格一起完全占据一行或多行，则这些行将不会包含在任何段落中。
+
+行开头的开始标签（可能是缩进的）可以被视为段落的开始。  类似地，行末尾的结束标记可以被视为结束段落。  以下规则用于确定此类标签实际上是否被视为段落边界：
+
+@itemize @bullet
+@item 
+如果架构不允许在该点出现文本，则它是段落边界。
+@item 
+如果开始标签对应的结束标签不在行尾，或者结束标签对应的开始标签不在行首，则不是段落边界。  例如，在
+
+@example
+<p>This is a paragraph with an
+<emph>emphasized</emph> phrase.
+@end example
+
+@noindent
+@samp{<emph>} 开始标签不会被视为开始段落，因为它相应的结束标签不在行的末尾。
+@item 
+如果元素树中存在同级文本，则它不是段落边界。  例如，在
+
+@example
+<p>This is a paragraph with an
+<emph>emphasized phrase that takes one source line</emph>
+@end example
+
+@noindent
+@samp{<emph>} 开始标签不会被视为开始一个段落，即使它的结束标签位于行尾，因为文本 @samp{This is a paragraph with an} 是 @samp{emph} 元素的同级元素。
+@item 
+否则，它是段落边界。
+@end itemize
+
+@node Outlining
+@chapter 提纲
+
+nXML 模式允许您将缓冲区的全部或部分显示为大纲，类似于 Emacs 的大纲模式。  nXML 模式中的大纲基于识别两种元素：章节和标题。  每个部分有一个标题，每个标题有一个部分。  节包含其标题作为其第一个子元素或在其第一个子元素内。  节还包含其从属节（其子节）。  节的文本内容由节中既不是小节也不是标题的任何内容组成。
+
+请注意，这是与 XHTML@. 使用的模型不同的模型，nXML 模式的大纲支持对于 XHTML 没有用处，除非您采用添加 @code{div} 来包围每个部分的约定，而不是让各部分由不同的 @code{h@var{n}} 元素隐式分隔。  此限制可能会在未来版本中删除。
+
+变量 @code{nxml-section-element-name-regexp} 给出节元素的本地名称（即任何前缀后面的名称部分）的正则表达式。  变量 @code{nxml-heading-element-name-regexp} 给出标题元素的本地名称的正则表达式。  将元素识别为节
+
+@itemize @bullet
+@item 
+它的开始标签必须出现在行的开头（可能是缩进的）；
+@item 
+它的本地名称必须匹配@code{nxml-section-element-name-regexp}；
+@item 
+它的第一个子元素或该第一个子元素的后代必须具有与 @code{nxml-heading-element-name-regexp} 匹配的本地名称；第一个这样的元素被视为该节的标题。
+@end itemize
+
+@noindent
+您可以使用@kbd{M-x customize-variable}自定义这些变量。
+
+节有三种可能的大纲状态：
+
+@itemize @bullet
+@item 
+正常，显示所有内容，包括标题、文本内容和小节；每个小节根据该小节的状态显示；
+@item 
+仅显示其标题，隐藏其文本内容和小节；所有小节均被隐藏，无论其状态如何；
+@item 
+显示标题及其小节，隐藏文本内容；每个小节根据该小节的状态显示。
+@end itemize
+
+在最后两种状态下，文本内容被隐藏，标题以缩写形式专门显示。  像这样的元素：
+
+@example
+<section>
+<title>Food</title>
+<para>There are many kinds of food.</para>
+</section>
+@end example
+
+@noindent
+将显示在单行上，如下所示：
+
+@example
+<-section>Food...</>
+@end example
+
+@noindent
+如果存在隐藏的子部分，则将使用 @code{+} 而不是 @code{-}，如下所示：
+
+@example
+<+section>Food...</>
+@end example
+
+@noindent
+如果存在非隐藏的子部分，则该部分将显示如下：
+
+@example
+<-section>Food...
+  <-section>Delicious Food...</>
+  <-section>Distasteful Food...</>
+</-section>
+@end example
+
+@noindent
+标题始终显示为带有与其在轮廓中的深度相对应的缩进，即使它实际上并未在缓冲区中缩进。变量 @code{nxml-outline-child-indent} 控制当标题被特殊显示时，子标题相对于其父标题缩进的程度。
+
+更改部分大纲状态的命令绑定到以 @kbd{C-c C-o} 开头的按键序列（@kbd{o} 是大纲的助记符）。  第三个也是最后一个键已被选择为与大纲模式一致。  在下面的描述中，当前节是指包含点的节，或者更准确地说，是包含紧接着点的字符的最内节。
+
+@itemize @bullet
+@item 
+@kbd{C-c C-o C-a} 正常显示缓冲区中的所有部分。
+@item 
+@kbd{C-c C-o C-t} 隐藏缓冲区中所有部分的文本内容。
+@item 
+@kbd{C-c C-o C-c} 隐藏当前节的文本内容。
+@item 
+@kbd{C-c C-o C-e} 显示当前节的文本内容。
+@item 
+@kbd{C-c C-o C-d} 隐藏当前部分的文本内容和小节。
+@item 
+@kbd{C-c C-o C-s} 通常显示当前部分及其所有直接和间接子部分。
+@item 
+@kbd{C-c C-o C-k} 显示当前节的直接和间接小节的标题。
+@item 
+@kbd{C-c C-o C-l} 隐藏当前节及其直接和间接子节的文本内容。
+@item 
+@kbd{C-c C-o C-i} 显示当前节的直接子节的标题。
+@item 
+@kbd{C-c C-o C-o} 尽可能隐藏，不隐藏当前节的文本内容；当前节及其子节的祖先节的标题不会被隐藏。
+@end itemize
+
+当某个标题被特殊显示时，您可以在该标题中使用@key{RET}来显示该部分的文本内容，其方式与@kbd{C-c C-o C-e}相同。
+
+您还可以使用鼠标来更改大纲状态：@kbd{S-mouse-2}隐藏某节的文本内容，方式与@kbd{C-c C-o C-c}相同；特殊显示标题上的@kbd{mouse-2}以与@kbd{C-c C-o C-e}相同的方式显示该部分的文本内容；特殊显示的开始标签上的 @kbd{mouse-1} 可打开和关闭副标题的显示。
+
+每个部分的大纲状态与该部分的第一个字符一起存储（作为文本属性）。  每个更改任何部分的轮廓状态的命令都会更新缓冲区的显示，以便每个部分根据其轮廓状态正确显示。  如果随后更改部分结构，则显示可能不再正确反映存储的轮廓状态。 @kbd{C-c C-o C-r} 可用于刷新显示，使其再次正确。
+
+@node Locating a schema
+@chapter 定位架构
+
+nXML 模式具有一组可配置的规则来定位正在编辑的文件的架构。  这些规则包含在一个或多个模式定位文件中，这些文件是 XML 文档。
+
+变量 @samp{rng-schema-locating-files} 指定 nXML 模式应使用的模式定位文件的文件名列表。  列表的顺序很重要：当文件@var{x}出现在列表中的文件@var{y}之前时，文件@var{x}中的规则优先于文件@var{y}中的规则。  @samp{rng-schema-locating-files} 中指定的文件名可能是相对的。  如果是这样，它将相对于模式所在的文档进行解析。  如果 @samp{rng-schema-locating-files} 中的相对文件名不存在，也不是错误。  您可以使用@kbd{M-x customize-variable @key{RET} rng-schema-locating-files @key{RET}}自定义模式定位文件列表。
+
+默认情况下，@samp{rng-schema-locating-files}列表有两个成员：@samp{schemas.xml}和@samp{@var{dist-dir}/schema/schemas.xml}，其中@samp{@var{dist-dir}}是包含nXML发行版的目录。  第一个成员将导致 nXML 模式使用与正在编辑的文档位于同一目录中的文件 @samp{schemas.xml}（如果存在这样的文件）。  第二个成员包含 nXML 发行版中包含的模式的规则。
+
+@menu
+* Commands for locating a schema::
+* Schema locating files::
+@end menu
+
+@node Commands for locating a schema
+@section 用于定位模式的命令
+
+命令@kbd{C-c C-s C-w}将告诉您当前正在使用什么模式。
+
+当您以 nXML 模式访问文件时，会自动应用查找架构的规则。  但是，如果您刚刚创建了一个新文件并且无法从文件名推断出架构，那么这将无法找到正确的架构。  在这种情况下，您应该插入根元素的开始标记，然后使用命令@kbd{C-c C-s C-a}，该命令会根据文档的当前内容重新应用规则。  通常不需要插入完整的开始标签；通常只需 @samp{<@var{name}} 就足够了。
+
+如果要使用尚未添加到模式定位文件中的模式，可以使用命令@kbd{C-c C-s C-f}手动选择包含当前缓冲区中文档的模式的文件。  Emacs 将从迷你缓冲区中读取模式的文件名。  读取文件名后，Emacs 会询问您是否希望向模式定位文件添加一条规则，以将文档与所选模式持久关联。  该规则将添加到指定列表中的第一个文件@samp{rng-schema-locating-files}；如有必要，它将创建文件，但不会创建目录。  如果变量 @samp{rng-schema-locating-files} 尚未自定义，则意味着该规则将添加到与正在编辑的文档位于同一目录中的文件 @samp{schemas.xml} 中。
+
+命令 @kbd{C-c C-s C-t} 允许您通过指定文档类型的标识符来选择模式。  模式定位文件确定可用的类型标识符以及每个类型标识符使用什么模式。  当无法从文件名或文档内容推断出正确的架构时（即使该架构已经位于架构定位文件中），这非常有用。  可能发生这种情况的情况是当模式有多个变体时，其中所有有效文档都具有相同的文档元素。  例如，XHTML 有严格变体和过渡变体。  在这样的情况下，模式定位文件可以为每个变体定义类型标识符。  与 1⁣ 一样，Emacs 会询问您是否希望向模式定位文件添加一条规则，该规则将文档与指定的类型标识符持久关联。
+
+命令@kbd{C-c C-s C-l}向模式定位文件添加一条规则，该规则将文档与当前正在使用的模式持久关联。
+
+@node Schema locating files
+@section 架构定位文件
+
+每个模式定位文件指定一个规则列表。  每个文件中的规则按顺序附加。  为了定位模式，将依次应用每个规则，直到规则匹配为止。  然后使用第一匹配规则来确定模式。
+
+架构定位文件旨在对需要定位文档架构的其他应用程序有用。  事实上，在设计中定位模式并没有什么特别的；它同样可以用于定位样式表。
+
+@menu
+* Schema locating file syntax basics::
+* Using the document's URI to locate a schema::
+* Using the document element to locate a schema::
+* Using type identifiers in schema locating files::
+* Using multiple schema locating files::
+@end menu
+
+@node Schema locating file syntax basics
+@subsection 架构定位文件语法基础知识
+
+schema目录下的文件@samp{locate.rnc}中有一个schema定位文件的schema。  模式定位文件对于该模式必须有效。
+
+模式定位文件的文档元素必须是@samp{locatingRules}，命名空间 URI 必须是@samp{http://thaiopensource.com/ns/locating-rules/1.0}。  文档元素的子元素指定规则。  子项的顺序与规则的顺序相同。  这是模式定位文件的完整示例：
+
+@example
+<?xml version="1.0"?>
+<locatingRules xmlns="http://thaiopensource.com/ns/locating-rules/1.0">
+  <namespace ns="http://www.w3.org/1999/xhtml" uri="xhtml.rnc"/>
+  <documentElement localName="book" uri="docbook.rnc"/>
+</locatingRules>
+@end example
+
+@noindent
+这表示对具有命名空间 @samp{http://www.w3.org/1999/xhtml} 的文档使用模式 @samp{xhtml.rnc}，对本地名称为 @samp{book} 的文档使用模式 @samp{docbook.rnc}。  如果文档元素同时具有命名空间 URI @samp{http://www.w3.org/1999/xhtml} 和本地名称 @samp{book}，则将使用最先出现的匹配规则，因此将使用模式@samp{xhtml.rnc}。  不同类型的规则之间没有优先顺序；使用任何类型的第一个匹配规则。
+
+与 XML 相关技术一样，资源由 URI 标识。  @samp{uri} 属性通过指定 URI@. 来标识模式。URI 可以是相对的。  如果是，则相对于包含属性的模式定位文件的 URI 进行解析。  这意味着如果@samp{uri}属性的值不包含@samp{/}，那么它将引用与模式定位文件位于同一目录中的文件名。
+
+@node Using the document's URI to locate a schema
+@subsection 使用文档的 URI 来定位架构
+
+@samp{uri} 规则根据文档的 URI 定位架构。  @samp{uri} 属性指定模式的 URI。  @samp{resource} 属性可用于指定特定文档的模式。  例如，
+
+@example
+<uri resource="spec.xml" uri="docbook.rnc"/>
+@end example
+
+@noindent
+指定 @samp{spec.xml} 的模式为 @samp{docbook.rnc}。
+
+可以使用 @samp{pattern} 属性代替 @samp{resource} 属性来指定 URI 与模式匹配的任何文档的架构。  该模式与绝对或相对 URI 具有相同的语法，只是 URI 的路径组件可以使用 @samp{*} 字符来代表路径段中的零个或多个字符（即除 @samp{/} 之外的任何字符）。通常，URI 模式看起来像相对 URI，但是，虽然 @samp{resource} 属性中的相对 URI 使用模式定位文件的基本 URI 解析为特定的绝对 URI，但如果相对 URI 模式匹配以文档 URI@. 的最后一个路径段结尾的文档 URI 的一定数量的完整路径段，则相对 URI 模式匹配。
+
+@example
+<uri pattern="*.xsl" uri="xslt.rnc"/>
+@end example
+
+@noindent
+指定路径以 @samp{.xsl} 结尾的 URI 的文档的架构为 @samp{xslt.rnc}。
+
+@samp{transformURI} 规则通过转换文档的 URI 来定位模式。  @samp{fromPattern} 属性指定 URI 模式，其含义与 @samp{uri} 元素的 @samp{pattern} 属性相同。  @samp{toPattern} 属性是一个 URI 模式，用于生成模式的 URI。  @samp{toPattern} 中的每个 @samp{*} 都被替换为与 @samp{fromPattern} 中对应的 @samp{*} 匹配的字符串。  生成的字符串将附加到未与 @samp{fromPattern} 显式匹配的文档 URI 的初始部分。  仅当转换后的 URI 标识现有资源时，该规则才匹配。  例如，规则
+
+@example
+<transformURI fromPattern="*.xml" toPattern="*.rnc"/>
+@end example
+
+@noindent
+会将 URI @samp{file:///home/jjc/docs/spec.xml} 转换为 URI @samp{file:///home/jjc/docs/spec.rnc}。  因此，此规则指定要查找文档 @samp{@var{foo}.xml} 的模式，Emacs 应测试文件 @samp{@var{foo}.rnc} 是否存在于与 @samp{@var{foo}.xml} 相同的目录中，如果存在，则应将其用作模式。
+
+@node Using the document element to locate a schema
+@subsection 使用文档元素来定位架构
+
+@samp{documentElement} 规则根据文档元素的本地名称和前缀来定位模式。  例如，一条规则
+
+@example
+<documentElement prefix="xsl" localName="stylesheet" uri="xslt.rnc"/>
+@end example
+
+@noindent
+指定当文档元素的名称为@samp{xsl:stylesheet}时，则应使用@samp{xslt.rnc}作为模式。  可以省略 @samp{prefix} 或 @samp{localName} 属性以允许任何前缀或本地名称。
+
+@samp{namespace} 规则根据文档元素的命名空间 URI 定位模式。  例如，一条规则
+
+@example
+<namespace ns="http://www.w3.org/1999/XSL/Transform" uri="xslt.rnc"/>
+@end example
+
+@noindent
+指定当文档的命名空间 URI 为 @samp{http://www.w3.org/1999/XSL/Transform} 时，则应使用 @samp{xslt.rnc} 作为模式。
+
+@node Using type identifiers in schema locating files
+@subsection 在模式定位文件中使用类型标识符
+
+类型标识符允许在定位文档模式时进行一定程度的间接。  文档不是直接与架构 URI 关联，而是与类型标识符关联，类型标识符又与架构 URI@. nXML 模式不限制类型标识符的格式。  它们可以是没有任何正式结构的简单字符串，也可以是公共标识符或 URI。  请注意，这些类型标识符与 DOCTYPE 声明无关。  比较类型标识符时，空格以与 @samp{xsd:token} 数据类型相同的方式标准化：前导和尾随空格被去除；其他空白序列被标准化为单个空格字符。
+
+前面部分中描述的每个使用 @samp{uri} 属性来指定模式的规则都可以使用 @samp{typeId} 属性来指定类型标识符。  类型标识符可以使用 @samp{typeId} 元素与 URI 相关联。  例如，
+
+@example
+<locatingRules xmlns="http://thaiopensource.com/ns/locating-rules/1.0">
+  <namespace ns="http://www.w3.org/1999/xhtml" typeId="XHTML"/>
+  <typeId id="XHTML" typeId="XHTML Strict"/>
+  <typeId id="XHTML Strict" uri="xhtml-strict.rnc"/>
+  <typeId id="XHTML Transitional" uri="xhtml-transitional.rnc"/>
+</locatingRules>
+@end example
+
+@noindent
+声明三个类型标识符@samp{XHTML}（代表要使用的 XHTML 的默认变体）、@samp{XHTML Strict} 和 @samp{XHTML Transitional}。  这样的模式定位文件将使用 @samp{xhtml-strict.rnc} 来表示命名空间为 @samp{http://www.w3.org/1999/xhtml} 的文档。  但它比简单指定的模式定位文件要灵活得多
+
+@example
+<namespace ns="http://www.w3.org/1999/xhtml" uri="xhtml-strict.rnc"/>
+@end example
+
+@noindent
+用户可以轻松地使用 @kbd{C-c C-s C-t} 在 XHTML Strict 和 XHTML Transitional 之间进行选择。  此外，用户可以轻松添加目录
+
+@example
+<locatingRules xmlns="http://thaiopensource.com/ns/locating-rules/1.0">
+  <typeId id="XHTML" typeId="XHTML Transitional"/>
+</locatingRules>
+@end example
+
+@noindent
+这使得 XHTML 的默认变体是 XHTML Transitional。
+
+@node Using multiple schema locating files
+@subsection 使用多个模式定位文件
+
+@samp{include} 元素包含来自另一个模式定位文件的规则。  其行为就像包含该文件中的规则来代替 @samp{include} 元素一样。在执行包含之前，相对 URI 将解析为绝对 URI。  例如，
+
+@example
+<include rules="../rules.xml"/>
+@end example
+
+@noindent
+包括来自@samp{rules.xml}的规则。
+
+定位模式的过程将模式定位文件的列表作为输入。  所有这些文件及其包含的文件中的规则都被解析为单个规则列表，并严格按顺序应用。  有时这个顺序并不是所需要的。例如，假设您有两个模式定位文件，一个私有文件
+
+@example
+<locatingRules xmlns="http://thaiopensource.com/ns/locating-rules/1.0">
+  <namespace ns="http://www.w3.org/1999/xhtml" uri="xhtml.rnc"/>
+</locatingRules>
+@end example
+
+@noindent
+随后是公共文件
+
+@example
+<locatingRules xmlns="http://thaiopensource.com/ns/locating-rules/1.0">
+  <transformURI pathSuffix=".xml" replacePathSuffix=".rnc"/>
+  <namespace ns="http://www.w3.org/1999/XSL/Transform" typeId="XSLT"/>
+</locatingRules>
+@end example
+
+@noindent
+这两个文件的效果是 XHTML @samp{namespace} 规则优先于 @samp{transformURI} 规则，这几乎肯定不是所需要的。  这可以通过在私有文件中添加 @samp{applyFollowingRules} 来解决。
+
+@example
+<locatingRules xmlns="http://thaiopensource.com/ns/locating-rules/1.0">
+  <applyFollowingRules ruleType="transformURI"/>
+  <namespace ns="http://www.w3.org/1999/xhtml" uri="xhtml.rnc"/>
+</locatingRules>
+@end example
+
+@node DTDs
+@chapter DTD
+
+nXML 模式旨在支持创建不依赖于 DTD@. 的独立 XML 文档，尽管插入引用外部 DTD 的 DOCTYPE 声明是常见做法，但这会产生不良副作用。  这意味着该文档不再是独立的。  这还意味着不同的 XML 解析器可能以不同的方式解释文档，因为 XML 建议书不要求 XML 解析器读取 DTD@. 对于 DTD，如果不使用外部 DTD 或对参数实体的引用来获得验证是不切实际的。  借助 RELAX NG 和其他模式语言，您可以同时获得验证和独立 XML 文档的优势。  因此，我建议您不要在 XML 文档中引用外部 DOCTYPE。
+
+其中一个问题是角色的实体。  通常，除了提供验证之外，DTD 还提供一组字符实体供文档使用。  模式无法提供此功能，因为模式验证发生在 XML 解析之后。  建议的解决方案是直接使用 Unicode 字符，或者，如果不切实际，则使用字符引用。  nXML 模式通过提供使用 Unicode 名称输入字符和字符引用的命令来支持这一点，并且可以显示与字符引用相对应的字形。
+
+@node Limitations
+@chapter 局限性
+
+nXML 模式有一些限制：
+
+@itemize @bullet
+@item 
+DTD 支持是有限的。  支持在内部子集中声明的内部解析通用实体，前提是它们不包含元素。  DTD 的其他用法将被忽略。
+@item 
+RELAX NG 规范第 7 节中对 RELAX NG 模式的限制并未强制执行。
+@end itemize
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@bye

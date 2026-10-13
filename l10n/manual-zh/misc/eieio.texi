@@ -1,0 +1,1257 @@
+\输入texinfo
+@setfilename ../../info/eieio.info
+@set TITLE Enhanced Implementation of Emacs Interpreted Objects
+@set AUTHOR Eric M. Ludlam
+@documentlanguage en
+@settitle @value{TITLE}
+@include docstyle.texi
+
+@c *************************************************************************
+@c @ Header
+@c *************************************************************************
+
+@copying
+本手册记录了 EIEIO，它是 Emacs Lisp 的一个对象框架。
+
+版权所有 @copyright{} 2007--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* EIEIO: (eieio).                Emacs Lisp 的对象系统。
+@end direntry
+
+@titlepage
+@center @titlefont{@value{TITLE}}
+@sp 4
+@center by @value{AUTHOR}
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@macro eieio{}
+@i{EIEIO}
+@end macro
+
+@node Top
+@top 埃伊奥
+
+@eieio{} (``Enhanced Implementation of Emacs Interpreted Objects'')
+遵循 Common Lisp 对象系统 (CLOS) 的基本概念，为 Emacs Lisp 提供面向对象层。  它提供了在 Emacs 中编写面向对象应用程序的框架。
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* Quick Start::            EIEIO 快速入门。
+* Introduction::           为什么使用@eieio{}？  基本概述、样本列表。
+* Building Classes::       如何编写新的类结构。
+* Making New Objects::     如何构造新对象。
+* Accessing Slots::        如何访问插槽。
+* Writing Methods::        如何写一个方法。
+* Method Invocation::      如何调用方法。
+* Predicates::             类-p，对象-p，等等-p。
+* Association Lists::      作为关联列表的对象列表。
+* Customizing::            定制对象。
+* Introspection::          观察班级内部。
+* Base Classes::           您可以继承的其他类。
+* Browsing::               浏览您的班级列表。
+* Class Values::           显示有关类或对象的信息。
+* Default Superclass::     根超类。
+* Signals::                当你犯错误时。
+* Naming Conventions::     以 Emacs 友好的方式命名您的对象。
+* CLOS compatibility::     有什么区别？
+* Wish List::              关于 EIEIO 可以改进的地方。
+* GNU Free Documentation License::   本文档的许可证。
+* Function Index::
+@end menu
+
+@node Quick Start
+@chapter 快速入门
+
+@eieio{} provides an Object Oriented layer for Emacs Lisp.  You can
+使用 @eieio{} 创建类、这些类的方法以及类的实例。
+
+下面是一个名为 @code{person} 的类的简单示例，其中包含三个名为 @code{name}、@code{birthday} 和 @code{phone} 的槽：
+
+@example
+(defclass person () ; No superclasses
+  ((name :initarg :name
+         :initform ""
+         :type string
+         :custom string
+         :documentation "The name of a person.")
+   (birthday :initarg :birthday
+             :initform "Jan 1, 1970"
+             :custom string
+             :type string
+             :documentation "The person's birthday.")
+   (phone :initarg :phone
+          :initform ""
+          :documentation "Phone number."))
+  "A class for tracking people I know.")
+@end example
+
+每个类都可以有方法，其定义如下：
+
+@example
+(cl-defmethod call-person ((pers person) &optional scriptname)
+  "Dial the phone for the person PERS.
+Execute the program SCRIPTNAME to dial the phone."
+  (message "Dialing the phone for %s"  (slot-value pers 'name))
+  (shell-command (concat (or scriptname "dialphone.sh")
+                         " "
+                         (slot-value pers 'phone))))
+@end example
+
+@noindent
+在此示例中，@code{call-person} 的第一个参数是一个列表，其形式为 (@var{varname} @var{classname})。  @var{varname} 是用于第一个参数的变量名称； @var{classname} 是预期作为此方法的第一个参数的类的名称。
+
+@eieio{} dispatches methods based on the type of the first argument.
+对于不同类的对象，可以有多个同名的方法。  当调用 @code{call-person} 方法时，将检查第一个参数以确定该参数的类，然后执行与输入类型匹配的方法。
+
+一旦定义了类的行为，您就可以创建类型为 @code{person} 的新对象。  对象是通过调用构造函数来创建的。  构造函数是一个与类同名的函数，它返回该类的新实例。  这是一个例子：
+
+@example
+(setq pers (person :name "Eric" :birthday "June" :phone "555-5555"))
+@end example
+
+@noindent
+出于向后兼容性的原因，第一个参数可以是字符串（为此实例指定的名称）。  过去每个实例都有一个名称，这样在调试时可以很容易地区分不同的实例。
+
+如果还有一个 :name 槽，可能会有点重复。  为了避免这种情况，有时使用基类 @code{eieio-named} 会很方便。 @xref{eieio-named}。
+
+调用对象的方法很像调用任何函数。  第一个参数应该是为其定义了此方法的类的对象。  在这个例子中，它看起来像这样：
+
+@example
+(call-person pers)
+@end example
+
+@noindent
+或者
+
+@example
+(call-person pers "my-call-script")
+@end example
+
+在这些示例中，@eieio{}自动检查@code{pers}的类，并确保调用上面定义的方法。  如果 2⁣ 是缺少 3⁣ 方法或其他数据类型的其他类，则 Emacs 会发出 4⁣ 错误信号。  @ref{Signals}。
+
+@node Introduction
+@chapter 介绍
+
+首先，请注意，本手册不能作为 LISP@. 中面向对象编程和泛型函数的完整介绍。尽管 EIEIO 不是 Common Lisp 对象系统 (CLOS) 的完整实现，并且在多个方面与它有所不同，但它遵循相同的基本概念。  因此，强烈建议首先从教科书或教程中学习这些内容，特别是如果您只了解 C++ 或 Java 等语言的 OOP。  另一方面，如果您已经熟悉 CLOS，则应该意识到 @eieio{} 并未实现完整的 CLOS 规范，并且在下面提到的其他一些方面也有所不同（也是 @pxref{CLOS compatibility}）。
+
+@eieio{} supports the following features:
+
+@enumerate
+@item 
+一个结构化框架，用于使用类似于 CLOS 的继承来创建具有属性和方法的基本类。
+@item 
+类型检查和插槽解除绑定。
+@item 
+方法定义与 CLOS 类似。
+@item 
+简单和复杂的类浏览器。
+@item 
+Edebug 对方法的支持。
+@item 
+菜单更新。
+@item 
+方法的字节编译支持。
+@item 
+类和方法的帮助系统扩展。
+@item 
+用于有趣任务的几个基类。
+@item 
+简单的测试套件。
+@item 
+老虎机的公共和私人分类（CLOS 的扩展）
+@item 
+类中的自定义支持（CLOS 的扩展）
+@end enumerate
+
+由于Emacs Lisp语言的限制，无法完全支持CLOS，并且添加了一些函数来代替setf。  以下是 @eieio{} 目前缺乏的一些重要的 CLOS 功能：
+
+@table @asis
+
+@item 对元类的支持
+只有一个默认元类 @code{eieio-default-superclass}，并且您无法定义自己的元类。  @code{defclass} 中的 @code{:metaclass} 标记将被忽略。  此外，像 @code{find-class} 这样的函数，应该返回元类的实例，在以下情况下的行为有所不同：
+@eieio{} in that they return symbols or plain structures instead.
+
+@item :@code{defclass} 中的默认 initargs
+每个槽都可以有一个 @code{:initform} 标签，所以这并不是必需的。
+
+@item 模拟对象初始值设定项
+每个类都包含一个模拟对象，用于快速初始化实例化对象。  使用对对象槽值有副作用的函数可能会导致模拟对象发生修改。  @eieio{} 应该使用深层复制，但目前没有。
+
+@end table
+
+@node Building Classes
+@chapter 构建类
+
+A @dfn{class} 是将数据和方法组织在一起的定义。  @eieio{} 类的结构与其他面向对象 (OO) 语言中的类类似。
+
+要创建新类，请使用 @code{defclass} 宏：
+
+@defmac defclass class-name superclass-list slot-list &rest options-and-doc
+
+创建一个名为@var{class-name}的新类。  该类由名称为 @var{class-name} 的符号表示。  @eieio{} 将类的结构存储为 @var{class-name} (@pxref{Symbol Components,,,elisp,GNU Emacs Lisp Reference Manual}) 的符号属性。
+
+定义类时，@eieio{} 会覆盖符号 @var{class-name} 的任何预先存在的变量或函数绑定，这可能会导致不良后果。  在命名新类之前，应该检查名称是否冲突。  为了帮助避免跨包冲突，您应该选择一个与您为包的其余函数和变量选择的前缀相同的名称 (@pxref{Coding Conventions,,,elisp,GNU Emacs Lisp Reference Manual})。
+
+@var{class-name} 符号的变量文档字符串是 @var{options-and-doc} 中文档字符串的修改版本。每次定义方法时，符号的文档字符串都会更新以包含该方法的文档。
+
+@var{class-name} 的父类是@var{superclass-list}。 @var{superclass-list} 的每个元素都必须是一个类。  这些类是正在创建的类的父类。  每个父类中出现的每个槽都会在新类中复制。
+
+如果两个父级共享相同的插槽名称，则出现在 @var{superclass-list} 中的父级首先设置该插槽的标签。  如果新类具有与父类同名的槽，则新槽将覆盖父类的槽。
+
+覆盖槽时，某些槽属性无法覆盖，因为它们违反了基本的 OO 规则。  您不能覆盖 @code{:type} 或 @code{:protection}。
+@end defmac
+
+@noindent
+每当使用 defclass 创建一个新类时，都会为其创建一个谓词，名为 @code{@var{CLASS-NAME}-p}：
+
+@defun CLASS-NAME-p object
+当且仅当 1⁣ 属于 @var{CLASS-NAME} 类时，返回非 @code{nil}。
+@end defun
+
+@defvar eieio-error-unsupported-class-tags
+如果非 @code{nil}，则当插槽说明符中的标签不受支持时，@code{defclass} 会发出错误信号。
+
+此选项用于支持使用旧版本编写的程序
+@eieio{}, which did not produce such errors.
+@end defvar
+
+@menu
+* Inheritance::          如何指定家长班级。
+* Slot Options::         如何指定插槽的功能。
+* Class Options::        如何指定此类的功能。
+@end menu
+
+@node Inheritance
+@section 遗产
+
+@dfn{Inheritance}是面向对象语言的基本特征。在@eieio{}中，定义的类通过使用@code{defclass}的第二个参数来指定它继承的超类。  这是一个例子：
+
+@example
+(defclass my-baseclass ()
+   ((slot-A :initarg :slot-A)
+    (slot-B :initarg :slot-B))
+  "My Baseclass.")
+@end example
+
+@noindent
+要从 @code{my-baseclass} 进行子类化，我们在超类列表中指定它：
+
+@example
+(defclass my-subclass (my-baseclass)
+   ((specific-slot-A :initarg specific-slot-A)
+    )
+   "My subclass of my-baseclass")
+@end example
+
+@indent
+除了从 @code{my-subclass} 声明中获得 @code{specific-slot-A} 之外，@code{my-subclass} 的实例还将继承 @code{slot-A} 和 @code{slot-B}。
+
+@eieio{} also supports multiple inheritance.  Suppose we define a
+第二个基类，可能是一个“接口”类，如下所示：
+
+@example
+(defclass my-interface ()
+   ((interface-slot :initarg :interface-slot))
+   "An interface to special behavior."
+   :abstract t)
+@end example
+
+@noindent
+接口类定义了一个特殊的@code{interface-slot}，并且也将自己指定为抽象。  抽象类不能被实例化。  不需要使接口抽象，但这是一个很好的编程实践。
+
+我们现在可以修改 @code{my-subclass} 的定义以使用此接口类以及原始基类：
+
+@example
+(defclass my-subclass (my-baseclass my-interface)
+   ((specific-slot-A :initarg specific-slot-A)
+    )
+   "My subclass of my-baseclass")
+@end example
+
+@noindent
+这样，@code{my-subclass}也有@code{interface-slot}。
+
+如果 @code{my-baseclass} 和 @code{my-interface} 具有同名的插槽，则列表中显示的超类首先定义插槽属性。
+
+@eieio{} 中的继承不仅仅是组合不同的槽。它在方法调用中也很重要。  @ref{Writing Methods}。
+
+如果在 @code{my-subclass} 的实例上调用一个方法，并且该方法仅在 @code{my-baseclass} 或 @code{my-interface} 上有实现，则调用基类的实现。
+
+如果@code{my-subclass}有一个方法实现，而@code{my-baseclass}中有另一个方法实现，则@code{my-subclass}的实现也可以调用超类。
+
+@node Slot Options
+@section 插槽选项
+
+@code{defclass} 的 @var{slot-list} 参数是一个元素列表，其中每个元素定义一个槽。  每个槽都是一个表单的列表
+
+@example
+  (SLOT-NAME :TAG1 ATTRIB-VALUE1
+             :TAG2 ATTRIB-VALUE2
+             :TAGN ATTRIB-VALUEN)
+@end example
+
+@noindent
+其中 @var{SLOT-NAME} 是用于指代插槽的符号。  @var{:TAG} 是描述要在插槽上设置的功能的符号。  @var{ATTRIB-VALUE} 是一个 Lisp 表达式，将用于 @var{:TAG}。
+
+有效标签是：
+
+@table @code
+@item :initarg
+可在构造函数的参数列表中使用的符号，用于为正在创建的新实例的该槽指定值。
+
+用于 initarg 的一个好符号是以冒号 @code{:} 开头的符号。
+
+插槽指定如下：
+@example
+  (myslot :initarg :myslot)
+@end example
+然后可以像这样初始化为数字 1：
+@example
+  (myobject :myslot 1)
+@end example
+
+@xref{Making New Objects}.
+
+@item :initform
+用作此槽的默认值的表达式。
+
+如果 @code{:initform} 被省略，则该插槽默认为未绑定。引用未绑定的槽是错误的，因此如果您需要槽始终处于绑定状态，则应始终使用 @code{:initform} 说明符。
+
+使用 @code{slot-boundp} 测试插槽是否未绑定 (@pxref{Predicates})。  给插槽赋值后，使用 @code{slot-makeunbound} 将其设置为未绑定 (@pxref{Accessing Slots})。
+
+传递给 initform 的值过去常常被自动引用。  因此，
+@example
+:initform (1 2 3)
+@end example
+将使用列表作为值。  这与 CLOS 不兼容（这会发出错误信号，因为 1 不是有效函数）并且将来可能会发生变化，因此如果它们只是值，最好引用您的 initforms。
+
+@item :type
+不带引号的类型说明符，用于验证此槽中的数据集。 @xref{Type Predicates,,,cl,Common Lisp Extensions}。以下是一些示例：
+ @table @code
+ @item symbol
+一个符号。
+ @item number
+数字类型
+ @item my-class-name
+您的类类型的对象。
+ @item (or null symbol)
+一个符号，或@code{nil}。
+ @end table
+
+@item :allocation
+:class 或 :instance （默认为 :instance）用于指定数据的存储方式。  每个实例存储的槽对于每个对象都有唯一的值。  每个类存储的槽具有每个对象的共享值。  如果一个对象更改了 :class 分配的槽，则该类的所有对象都会获得新值。
+
+@item :documentation
+详细说明此插槽的使用的文档。  当用户描述类以及自定义对象期间，会公开此文档。
+
+@item :accessor
+可用于获取此槽值的通用函数的名称。您可以稍后在对象上调用此函数并检索槽的值。
+
+此选项位于 CLOS 规范中，但在 @eieio{} 中并不完全兼容。
+
+@item :writer
+将写入此槽的通用函数的名称。
+
+此选项位于 CLOS 规范中，但在 @eieio{} 中并不完全兼容。
+
+@item :reader
+将读取此槽的通用函数的名称。
+
+此选项位于 CLOS 规范中，但在 @eieio{} 中并不完全兼容。
+
+@item :custom
+编辑此类型的对象时使用的自定义 :type 说明符。有关详细信息，请参阅 @code{defcustom} 的文档。  此说明符等效于 @code{defcustom} 调用的 :type 说明。
+
+此选项特定于 Emacs，不在 CLOS 规范中。
+
+@item :label
+自定义对象时，将使用 :label 的值而不是插槽名称。  这使得能够比通常提供的更好地描述数据。
+
+此选项特定于 Emacs，不在 CLOS 规范中。
+
+@item :group
+与 @code{defcustom} 的 :group 命令类似，它将对象中的不同槽组织成组。  自定义对象时，仅需要使用属于特定组的插槽，从而简化了显示的大小。
+
+此选项特定于 Emacs，不在 CLOS 规范中。
+
+@item :printer
+该例程采用一个符号，该符号是函数名称。  该函数应该接受一个参数。  参数是要打印的槽中的值。  @code{object-write} 中的函数会将槽值写入@code{standard-output} 上的可打印形式。
+
+输出格式必须是可以用 @code{read} 解释的格式，以便可以从输出流中带回对象。  因此，如果你想输出一个符号，你需要引用该符号。  如果您想在加载时运行函数，您可以输出代码来构造值。
+
+@item :protection
+这是一个旧选项，不再受支持。
+
+当使用诸如@code{slot-value}之类的槽引用函数时，并且@var{slot}后面的值是私有的或受保护的，则当前操作范围必须在调用对象的方法内。
+
+这种保护不再由代码强制执行，因此它仅作为文档有用。
+
+有效值为：
+
+@table @code
+@item :public
+从任何范围访问此插槽。
+@item :protected
+仅从同一类或子类的方法访问此槽。
+@item :private
+只能从同一类的方法访问此槽。
+@end table
+
+此选项特定于 Emacs，不在 CLOS 规范中。
+
+@end table
+
+@node Class Options
+@section 课程选项
+
+在 @code{defclass} 的 @var{options-and-doc} 参数中，可以指定以下类选项：
+
+@table @code
+@item :documentation
+此类的文档字符串。
+
+如果还提供了 Emacs 样式的文档字符串，则忽略此选项。  Emacs 样式的文档字符串不以 @code{:documentation} 标记为前缀，并且出现在槽列表之后、选项之前。
+
+@item :allow-nil-initform
+如果此选项为非@code{nil}，且@code{:initform}为@code{nil}，但@code{:type}指定了诸如@code{string}之类的内容，则允许其通过。  默认情况下此选项处于关闭状态。  这是作为未绑定槽的替代方案来实现的。
+
+此选项特定于 Emacs，不在 CLOS 规范中。
+
+@item :abstract
+@code{:abstract} 的类无法实例化，而是用于定义子类应实现的接口。
+
+此选项特定于 Emacs，不在 CLOS 规范中。
+
+@item :custom-groups
+这是可以在此类中自定义的组列表。  该槽是在创建类时自动生成的，无需指定。  但是，可以使用 @code{class-option} 命令检索它，以查看哪些组可用。
+
+此选项特定于 Emacs，不在 CLOS 规范中。
+
+@item :method-invocation-order
+这控制在多重继承的情况下方法解析发生的顺序。  该顺序会影响树中首先调用哪个方法，如果使用 @code{cl-call-next-method}，则它控制方法堆栈的运行顺序。
+
+有效值为：
+
+@table @code
+@item :breadth-first
+按广度优先顺序在类层次结构中搜索方法。这是默认设置。
+@item :depth-first
+以深度优先的顺序在类层次结构中搜索方法。
+@item :c3
+以线性化方式搜索与定义单调类结构时 CLOS 的操作最匹配的方法。
+@end table
+
+@xref{Method Invocation}，了解有关方法调用顺序的更多信息。
+
+@item :metaclass
+不支持的 CLOS 选项。  允许使用 @code{standard-class} 以外的不同基类。
+
+@item :default-initargs
+不支持的 CLOS 选项。  指定创建新对象时要使用的 initargs 列表。  据我所知，这重复了@code{:initform}的功能。
+@end table
+
+@xref{CLOS compatibility}，有关 CLOS 标签与
+@eieio{}-specific tags.
+
+@node Making New Objects
+@chapter 制作新物体
+
+假设我们定义了一个简单的类，例如：
+
+@example
+(defclass my-class ()
+   ( ) "Doc String")
+@end example
+
+@noindent
+现在可以创建该类类型的对象。
+
+调用@code{defclass}定义了两个新函数。  一个是构造函数 @var{my-class}，另一个是谓词 @var{my-class}-p。
+
+@defun my-class object-name &rest slots
+
+这将创建并返回一个新对象。  该对象没有分配给任何东西，如果不保存，将会被垃圾回收。  该对象将被赋予字符串名称@var{object-name}。  可以有多个同名的对象，但名称槽提供了一种跟踪对象的便捷方法。  @var{slots} 就是您想要预设的所有插槽。  任何这样设置的插槽 @emph{will not} 都会获得其默认值，并且插槽的 @code{:initform} 可能是函数的任何副作用都不会发生。
+
+示例对将简单地显示为 @code{:value 1}。  当然，你可以用它做任何你想要的有效的 Lispy 事情，例如 @code{:value (if (boundp 'special-symbol) special-symbol nil)}
+
+从类创建对象的示例：
+
+@example
+(my-class :value 3 :reference nil)
+@end example
+
+@end defun
+
+要从类符号创建对象，请使用@code{make-instance}。
+
+@defun make-instance class &rest initargs
+@anchor{make-instance}
+基于@var{initargs}创建@var{class}的新实例。 @var{class} 是一个类符号。  例如：
+
+@example
+  (make-instance 'foo)
+@end example
+
+@var{initargs} 是一个属性列表，其中包含基于每个插槽的 @code{:initarg} 的关键字。  例如：
+
+@example
+  (make-instance @code{'foo} @code{:slot1} value1 @code{:slotN} valueN)
+@end example
+
+@end defun
+
+@node Accessing Slots
+@chapter 访问插槽
+
+有多种方法可以访问对象中的槽值。以下访问器由 CLOS 定义，用于引用或修改槽值，并使用前面提到的 set/ref 例程。
+
+@defun slot-value object slot
+@anchor{slot-value}
+该函数从 @var{object} 检索 @var{slot} 的值。它也可以用于由@code{cl-defstruct}定义的对象。
+
+这是一个广义变量，可以与 @code{setf} 一起使用来修改存储在 @var{slot} 中的值。 @xref{Generalized Variables,,,elisp,GNU Emacs Lisp Reference Manual}。
+@end defun
+
+@defun set-slot-value object slot value
+@anchor{set-slot-value}
+该函数从 @var{object} 设置 @var{slot} 的值。
+
+这不是 CLOS 功能。  因此建议使用 @w{@code{(setf (slot-value @var{object} @var{slot}) @var{value})}} 代替。
+@end defun
+
+@defun slot-makeunbound object slot
+该函数解除@var{object}中@var{slot}的绑定。  引用未绑定的槽可能会发出错误信号。
+@end defun
+
+以下访问器遵循的命名和参数顺序约定类似于用于引用向量 (@pxref{Vectors,,,elisp,GNU Emacs Lisp Reference Manual}) 的约定。
+
+@defmac oref obj slot
+@anchor{oref}
+该宏检索存储在命名的@var{slot}中的@var{obj}中的值。  与 2⁣ 不同，@var{slot} 的符号不得加引号。
+
+这是一个广义变量，可以与 @code{setf} 一起使用来修改存储在 @var{slot} 中的值。  @xref{Generalized Variables,,,elisp,GNU Emacs Lisp Reference Manual}。
+@end defmac
+
+@defmac oref-default class slot
+@anchor{oref-default}
+该宏从 @var{class} 返回类分配的 @var{slot} 的值。
+
+这是一个广义变量，可以与 @code{setf} 一起使用来修改存储在 @var{slot} 中的值。  @xref{Generalized Variables,,,elisp,GNU Emacs Lisp Reference Manual}。
+@end defmac
+
+@defmac oset object slot value
+该宏将@var{object}中@var{slot}后面的值设置为@var{value}。  它返回@var{value}。
+@end defmac
+
+@defmac oset-default class slot value
+该宏将 @var{class} 中类分配的 @var{slot} 的值设置为 @var{value}。
+
+例如，如果用户希望所有@code{data-objects}（@pxref{Building Classes}）在更改时通知他自己设计的特殊对象，则可以通过简单地执行以下代码来安排：
+
+@example
+(oset-default data-object reference (list my-special-object))
+@end example
+@end defmac
+
+@defun object-add-to-list object slot item &optional append
+@anchor{object-add-to-list}
+在 OBJECT 的 @var{slot} 中，将 @var{item} 添加到元素列表中。可选参数 @var{append} 指示我们需要追加到列表中。如果 @var{item} 已存在于 @var{slot} 的列表中，则不会添加它。通过 @dfn{member} 函数调用与 @dfn{equal} 进行比较。如果@var{slot}未绑定，则将其绑定到包含@var{item}的列表。
+@end defun
+
+@defun object-remove-from-list object slot item
+@anchor{object-remove-from-list}
+在 OBJECT 的 @var{slot} 中，删除出现的 @var{item}。删除是用@dfn{delete}完成的，它通过副作用删除，比较是用@dfn{equal}完成的。如果@var{slot}未绑定，则不执行任何操作。
+@end defun
+
+@defun with-slots spec-list object &rest body
+@anchor{with-slots}
+将@var{spec-list}词法绑定到@var{object}中的槽值，并执行@var{body}。这建立了一个词法环境，用于引用由给定槽名称命名的实例中的槽，就像它们是变量一样。  在这样的上下文中，可以通过使用槽名称来指定槽的值，就好像它是词法绑定变量一样。  @code{setf}和@code{setq}都可以用来设置槽的值。
+
+@var{spec-list} 的形式与@dfn{let} 类似。  例如：
+
+@example
+  ((VAR1 SLOT1)
+    SLOT2
+    SLOTN
+   (VARN+1 SLOTN+1))
+@end example
+
+其中每个@var{var}是赋予关联的@var{slot}的局部变量。  未指定变量名的槽会被赋予与该槽同名的变量名。
+
+@example
+(defclass myclass () ((x :initform 1)))
+(setq mc (make-instance 'myclass))
+(with-slots (x) mc x)                      => 1
+(with-slots ((something x)) mc something)  => 1
+@end example
+@end defun
+
+@node Writing Methods
+@chapter 写作方法
+
+在 @eieio{} 中编写方法与编写函数类似。不同之处在于多了一些额外的选项，并且同一个功能符号下可以有多个定义。
+
+您可以通过 @code{cl-defgeneric} 和 @code{cl-defmethod} 宏 (@pxref{Generic Functions,,,elisp,GNU Emacs Lisp Reference Manual}) 使用 Emacs Lisp 对 CLOS 风格泛型函数的内置支持来完成此操作。
+
+EIEIO 为 @code{cl-defmethod} 提供了一种扩展，以允许方法在类参数上分派：所谓的“静态”方法不依赖于对象实例，而是对类进行操作。  您可以使用 @code{subclass} 专用化器和 @code{cl-defmethod} 创建静态方法：
+
+@example
+(cl-defmethod make-instance ((class (subclass mychild)) &rest args)
+  (let ((new (cl-call-next-method)))
+    (push new all-my-children)
+    new))
+@end example
+
+静态方法的参数将是一个类而不是一个对象。使用适用于类的函数 @code{oref-default} 或 @code{oset-default}。
+
+类的 @code{make-instance} 方法被定义为静态方法。
+
+@b{Note:} @code{subclass} 特化器是 @eieio{} 所独有的。
+
+@c TODO - Write some more about static methods here
+
+@node Method Invocation
+@chapter 方法调用
+
+定义类时，您可以指定@code{:method-invocation-order}。  这是 EIEIO 特有的功能。
+
+这控制在多重继承的情况下方法解析发生的顺序。  该顺序会影响树中首先调用哪个方法，如果使用 @code{cl-call-next-method}，则它控制方法堆栈的运行顺序。
+
+原来的 EIEIO 顺序因多重继承而被破坏，但有些程序依赖于它。  因此，当默认调用顺序固定为在这种情况下更有意义的内容时，会添加此选项。
+
+有效值为：
+
+@table @code
+@item :breadth-first
+按广度优先顺序在类层次结构中搜索方法。这是默认设置。
+@item :depth-first
+以深度优先的顺序在类层次结构中搜索方法。
+@item :c3
+以线性化方式搜索与定义单调类结构时 CLOS 的操作最匹配的方法。
+
+这源自 Kim Barrett 等人的 Dylan 语言文档：A Monotonic Superclass Linearization for Dylan 检索自：https://doi.org/10.1145/236338.236343
+@end table
+
+@node Predicates
+@chapter 谓词和实用程序
+
+现在我们知道如何创建类、访问槽和定义方法，验证一切是否正常可能会很有用。  为了帮助解决这个问题，创建了过多的谓词。
+
+@defun find-class symbol &optional errorp
+@anchor{find-class}
+返回@var{symbol}代表的类。如果没有类，且@var{errorp}为@code{nil}，则返回@code{nil}。如果@var{errorp}非@code{nil}，则发出信号@code{wrong-type-argument}。
+@end defun
+
+@defun class-p class
+@anchor{class-p}
+如果 1⁣ 是有效的类对象，则返回 0⁣。 @var{class} 是一个符号。
+@end defun
+
+@defun slot-exists-p object-or-class slot
+@anchor{slot-exists-p}
+如果@var{object-or-class}有@var{slot}，则非@code{nil}。
+@end defun
+
+@defun slot-boundp object slot
+@anchor{slot-boundp}
+如果 OBJECT 的 1⁣ 已绑定，则为非 0⁣。设置槽的值使其绑定。  调用 @dfn{slot-makeunbound} 将使插槽解除绑定。 @var{object} 可以是实例或类。
+@end defun
+
+@defun eieio-class-name class
+以符号形式返回类名。
+@end defun
+
+@defun class-option class option
+返回给定 @var{OPTION} 的 @var{CLASS} 中的值。例如：
+
+@example
+(class-option eieio-default-superclass :documentation)
+@end example
+
+将获取 @code{eieio-default-superclass} 的文档字符串。
+@end defun
+
+@defun eieio-object-name obj
+对于@var{obj}，返回@samp{#<object-class myobjname>}形式的字符串。这应该看起来像来自 Emacs 其他部分（例如缓冲区和进程）的 Lisp 符号，并且比打印对象的记录更短、更清晰。  使用 @code{object-print} 获取对象的打印形式更有用，因为这允许对象将额外的显示信息添加到符号中。
+@end defun
+
+@defun eieio-object-class obj
+从 @var{obj} 返回类符号。
+@end defun
+
+@defun eieio-object-class-name obj
+返回 @var{obj} 类的符号。
+@end defun
+
+@defun eieio-class-parents class
+返回 @var{class} 的直接父类。  如果它是超类，则返回 @code{nil}。
+@end defun
+
+@defun eieio-class-parents-fast class
+就像 0⁣ 一样，只不过它是一个宏并且不执行类型检查。
+@end defun
+
+@defun eieio-class-parent class
+已弃用的函数，它返回 @var{class} 的第一个父级。
+@end defun
+
+@defun eieio-class-children class
+返回继承自@var{class}的类的列表。
+@end defun
+
+@defun eieio-class-children-fast class
+就像@code{eieio-class-children}一样，但没有检查。
+@end defun
+
+@defun same-class-p obj class
+如果@var{obj}的类别与@var{class}相同，则返回@code{t}。
+@end defun
+
+@defun object-of-class-p obj class
+如果@var{obj}继承了@var{class}的任何内容，则返回@code{t}。  这与 @code{same-class-p} 不同，因为它检查继承。
+@end defun
+
+@defun child-of-class-p child class
+如果@var{child}是@var{class}的子类，则返回@code{t}。
+@end defun
+
+@defun generic-p method-symbol
+如果 @code{method-symbol} 是泛型函数（与常规 Emacs Lisp 函数相反），则返回 @code{t}。
+@end defun
+
+@node Association Lists
+@chapter 协会名单
+
+Lisp 提供了关联列表的概念，并使用 @code{assoc} 等原语来访问它们。  以下函数可用于管理 @eieio{} 对象的关联列表：
+
+@defun object-assoc key slot list
+@anchor{object-assoc}
+如果 @var{key} 是 @dfn{equal} 到 @var{list} 中对象的 SLOT 值，则返回一个对象。 @var{list} 是搜索其槽的对象的列表。 @var{list} 中的对象不需要有名为 @var{slot} 的槽，也不需要绑定 @var{slot}。  如果发生这些错误，这些对象将被忽略。
+@end defun
+
+
+@defun object-assoc-list slot list
+返回通过从@var{list}中的所有对象中提取@var{slot}生成的关联列表。  对于 2⁣ 的每个元素，@code{car} 是 @var{slot} 的值，@code{cdr} 是从中提取的对象。  这对于生成完成表很有用。
+@end defun
+
+@defun eieio-build-class-alist &optional base-class
+返回所有当前定义的类的列表。  该列表适用于交互式功能用来选择类的完成列表。  可选参数 @var{base-class} 允许程序员仅选择类的子集，其中包括 @var{base-class} 及其所有子类。
+@end defun
+
+@node Customizing
+@chapter 自定义对象
+
+@eieio{} supports the Custom facility through two new widget types.
+如果变量被声明为类型@code{object}，则可以通过小部件对插槽进行完全编辑。  但是，应该谨慎使用，因为修改的对象是克隆的，因此如果有其他对这些对象的引用，它们将不再链接在一起。
+
+如果要就地编辑对象，请使用以下方法：
+
+@defun eieio-customize-object object
+创建自定义缓冲区并插入用于编辑的小部件@var{object}。  最后，可以使用 @code{Apply} 和 @code{Reset} 按钮。  这将“就地”编辑对象，因此对其的引用也会更改。无法阻止对单个对象进行多次编辑，因此使用此功能的用户必须小心。
+@end defun
+
+@defun eieio-custom-widget-insert object flags
+此方法将编辑对象插入到当前缓冲区中。它被实现为@code{(widget-create 'object-edit :value object)}。此方法作为区域设置提供，用于添加跟踪或专门为任何对象添加小部件插入过程。
+@end defun
+
+要定义其中包含对象的槽，请使用 @code{object} 标签。  如果您对对象进行就地编辑，此小部件类型将自动转换为 @code{object-edit}。
+
+如果您希望在用户单击 @code{Apply} 按钮时执行其他操作，请重载方法 @code{eieio-done-customizing}。默认情况下，此方法不执行任何操作，但将来可能会发生变化。这将是使用就地编辑时使对象持久化的最佳方法。
+
+@section 小部件扩展
+
+创建小部件时，会添加一个新的小部件扩展，称为@code{:slotofchoices}。  当这种情况发生在小部件定义中时，它后面的所有元素都会被删除，指定的槽会被查询并转换为一系列常量。
+
+@example
+(choice (const :tag "None" nil)
+        :slotofchoices morestuff)
+@end example
+
+如果槽@code{morestuff}包含@code{(sym1 sym2 sym3)}，则上面的示例将转换为：
+
+@example
+(choice (const :tag "None" nil)
+        (const sym1)
+        (const sym2)
+        (const sym3))
+@end example
+
+当需要从第二个槽中定义的项目列表中选择给定项目时，这非常有用。
+
+@node Introspection
+@chapter 内省
+
+内省允许程序员在事先不了解某个类的情况下查看该类的内容。  虽然 @eieio{} 在记录之上实现对象，因此一切在技术上都是可见的，但已经提供了一些功能。  这些功能都不属于 CLOS 的一部分。
+
+@defun eieio-class-slots obj
+返回 @var{obj} 的公共槽列表。
+@end defun
+
+@node Base Classes
+@chapter 基类
+
+所有定义的类，如果在创建时没有指定父类，则将从名为 @code{eieio-default-superclass} 的特殊类继承。 @xref{Default Superclass}。
+
+通常，从 @eieio{} 提供的其他基类之一继承更为方便，这些基类具有有用的预定义属性。  （由于 @eieio{} 支持多重继承，您甚至可以同时从多个类继承。）
+
+@menu
+* eieio-instance-inheritor::     启用实例之间的值继承。
+* eieio-instance-tracker::       启用自我跟踪实例。
+* eieio-singleton::              给定类只有一个实例。
+* eieio-persistent::             启用类的持久性。
+* eieio-named::                  使用对象名称作为 :name 槽。
+* eieio-speedbar::               在您的对象中启用速度栏支持。
+@end menu
+
+@node eieio-instance-inheritor
+@section @code{eieio-instance-inheritor}
+
+该类在包@file{eieio-base}中定义。
+
+实例继承是一种机制，对象实例中的槽的值可以引用父实例。  如果父实例的槽值发生更改，则子实例也会发生更改。  如果设置了子级的插槽，则不会修改父级的插槽。
+
+@deftp {Class} eieio-instance-inheritor parent-instance
+其实例启用实例继承的类。 @var{parent-instance} 槽表示被视为当前实例的父实例的实例。  默认值为@code{nil}。
+@end deftp
+
+@cindex @code{clone}
+要使用此类，请使用您自己的类继承它。要创建一个继承自类的现有实例的新实例，请使用 @code{clone} 方法和附加参数来指定本地值。
+
+@cindex @code{slot-unbound}
+@code{eieio-instance-inheritor} 类的工作原理是使克隆对象的所有槽都解除绑定。  此类的 @code{slot-unbound} 方法将导致对未绑定插槽的引用重定向到父实例。  如果父槽也未绑定，则 @code{slot-unbound} 将发出名为 @code{slot-unbound} 的错误。
+
+@node eieio-instance-tracker
+@section @code{eieio-instance-tracker}
+
+该类在包@file{eieio-base}中定义。
+
+有时，保留给定类的所有实例的主列表很有用。  类 @code{eieio-instance-tracker} 执行此任务。
+
+@deftp {Class} eieio-instance-tracker tracking-symbol
+启用此类的实例跟踪。槽 @var{tracking-symbol} 应在此类的继承者中初始化为使用 @code{defvar} 创建的符号。  该符号将用作变量，用作给定类的所有对象的主列表。
+@end deftp
+
+@defmethod eieio-instance-tracker initialize-instance obj slot
+该方法被定义为 @code{:after} 方法。它将新实例添加到主列表中。
+@end defmethod
+
+@defmethod eieio-instance-tracker delete-instance obj
+从此类的实例主列表中删除@var{obj}。这可能会让垃圾收集器捕获该实例。
+@end defmethod
+
+@deffn eieio-instance-tracker-find key slot list-symbol
+这个便利的功能可以让您找到实例。  @var{key} 是要搜索的值。  @var{slot} 是与 @var{KEY} 进行比较的槽。  函数@code{equal}用于比较。参数@var{list-symbol}是变量符号，包含要搜索的对象列表。
+@end deffn
+
+@node eieio-singleton
+@section @code{eieio-singleton}
+
+该类在包@file{eieio-base}中定义。
+
+@deftp {Class} eieio-singleton
+从单例类继承将保证该类只有一个实例。  多次调用 @code{make-instance} 将始终返回相同的对象。
+@end deftp
+
+@node eieio-persistent
+@section @code{eieio-persistent}
+
+该类在包@file{eieio-base}中定义。
+
+如果您希望一个对象或一组对象是持久的，这意味着槽值在会话之间保存很重要，那么您将希望您的顶级对象继承自@code{eieio-persistent}。
+
+为了确保可以移动持久对象，请确保存储到磁盘的所有文件名都与 @code{eieio-persistent-path-relative} 相关。
+
+@deftp {Class} eieio-persistent file file-header-line
+启用此类实例的持久性。 Slot @var{file} 和 initarg @code{:file} 是保存该对象的文件名。类分配槽 @var{file-header-line} 与方法 @code{object-write} 一起用作标头注释。
+@end deftp
+
+所有对象都可以将自己写入文件，但持久对象有几个附加方法可以帮助维护它们。
+
+@defmethod eieio-persistent eieio-persistent-save obj &optional file
+将对象 @var{obj} 写入其文件。如果指定了可选参数@var{file}，则使用该文件名。
+@end defmethod
+
+@defmethod eieio-persistent eieio-persistent-path-relative obj file
+返回从 @var{file} 派生的文件名，该文件名相对于 @var{OBJ} 的存储位置。  此方法应用于转换文件名，以便它们与保存文件相关，从而使任何文件系统可以从一个位置移动到另一个位置。
+@end defmethod
+
+@defmethod eieio-persistent object-write obj &optional comment
+类似于 @code{standard-object} 的 @code{object-write}，但如果未提供，将从类分配的槽中派生标题行注释。
+@end defmethod
+
+@defun eieio-persistent-read filename &optional class allow-subclass
+从 @var{filename} 读取一个持久对象，并将其返回。如果 @var{FILENAME} 中的对象不是 @var{CLASS} 的构造函数，则发出错误信号。  可选的@var{allow-subclass}表示@code{eieio-persistent-read}加载类的子类是可以的，而不是迂腐的。
+@end defun
+
+@node eieio-named
+@section @code{eieio-named}
+
+该类在包@file{eieio-base}中定义。
+
+@deftp {Class} eieio-named
+有名称的对象。名称存储已存在于对象中。  该对象提供对其的获取/设置访问。
+@end deftp
+
+@node eieio-speedbar
+@section @code{eieio-speedbar}
+
+该类位于包@file{eieio-speedbar}中。
+
+如果一系列类实例映射到树结构，则可能会导致您的类可在 Speedbar 中显示。  @xref{Top,,,speedbar}。从这些类继承将能够以最小的努力启用快速栏主要显示模式。
+
+@deftp {Class} eieio-speedbar buttontype buttonface
+启用类别的基本速度栏显示。
+@cindex @code{speedbar-make-tag-line}
+槽 @var{buttontype} 是函数 @code{speedbar-make-tag-line} 对于 @var{exp-button-type} 参数 @xref{Extending,,,speedbar} 允许的任何符号。插槽 @var{buttonface} 是用于速度栏中显示的字符串文本的面。插槽 @var{buttontype} 和 @var{buttonface} 是类分配的插槽，不会占用实例中的空间。
+@end deftp
+
+@deftp {Class} eieio-speedbar-directory-button buttontype buttonface
+该类继承自 @code{eieio-speedbar} 并初始化 @var{buttontype} 和 @var{buttonface} 以显示为目录级别行。
+@end deftp
+
+@deftp {Class} eieio-speedbar-file-button buttontype buttonface
+该类继承自 @code{eieio-speedbar} 并初始化 @var{buttontype} 和 @var{buttonface} 以显示为文件级行。
+@end deftp
+
+要使用这些类，请从类中的其中一个继承。  您可以安全地使用它们的多重继承。  要自定义速度栏显示的类，请覆盖 @var{buttontype} 和 @var{buttonface} 的默认值以获得所需的效果。
+
+为新类定义的有用方法包括：
+
+@defmethod eieio-speedbar eieio-speedbar-derive-line-path obj depth
+返回一个字符串，表示与 @var{obj} 实例关联的目录。  @var{depth} 可用于索引用户已打开多少级缩进，其中显示@var{obj}。
+@end defmethod
+
+
+@defmethod eieio-speedbar eieio-speedbar-description obj
+返回 @var{OBJ} 的字符串描述。当鼠标悬停在速度栏中的该实例上时，这会显示在迷你缓冲区或工具提示中。
+@end defmethod
+
+@defmethod eieio-speedbar eieio-speedbar-child-description obj
+当 @var{obj} 的子节点不是对象时，返回表示该子节点描述的字符串。  仅使用项目信息辅助函数（例如 @code{speedbar-item-info-file-helper}）通常很有用。
+@end defmethod
+
+@defmethod eieio-speedbar eieio-speedbar-object-buttonname obj
+返回一个字符串，它是 @var{obj} 速度栏中显示的文本。
+@end defmethod
+
+@defmethod eieio-speedbar eieio-speedbar-object-children obj
+返回 @var{obj} 的子级列表。
+@end defmethod
+
+@defmethod eieio-speedbar eieio-speedbar-child-make-tag-lines obj depth
+此方法为 @var{obj} 插入速度条标记线列表来表示其子项。  如果您的孩子本身不是对象，请为您的班级实现此方法。  您仍然需要实现@code{eieio-speedbar-object-children}。
+
+在此方法中，请使用 Speedbar 手册中指定的技术。 @xref{Extending,,,speedbar}。
+@end defmethod
+
+您需要学习使用的其他一些功能是：
+
+@deffn eieio-speedbar-create make-map key-map menu name toplevelfn
+使用 speedbar 注册您的对象显示模式。 @var{make-map} 是一个初始化键盘映射的函数。 @var{key-map} 是您安装键盘映射的符号。 @var{menu} 是一个简单的菜单向量，表示特定于对象显示的菜单项。 @var{name} 是一个短字符串，用作识别您的模式的名称。 @var{toplevelfn} 是一个被调用的函数，它必须返回一个对象列表，这些对象代表您希望在速度栏中浏览的实例系统中的对象。
+
+请阅读速度栏手册中的扩展章节，了解有关速度栏模式如何工作的更多信息@xref{Extending,,,speedbar}。
+@end deffn
+
+@node Browsing
+@chapter 浏览类树
+
+命令 @kbd{M-x eieio-browse} 显示一个缓冲区，列出 Emacs 中当前加载的所有类。  这些类以缩进树结构列出，从 @code{eieio-default-superclass} (@pxref{Default Superclass}) 开始。
+
+使用前缀参数，此命令会提示输入类名；然后它只列出该类及其子类。
+
+这是我们当前示例中的示例树：
+
+@example
+eieio-default-superclass
+  +--data-object
+       +--data-object-symbol
+@end example
+
+注意：新类被保存到继承列表中，因此树是颠倒的。
+
+@node Class Values
+@chapter 类别值
+
+您可以使用普通的 @code{describe-function} 命令来检索有关类的信息。  在构造函数上运行它将显示生成的类的完整描述。  如果您在通用函数上调用它，则会列出该通用函数的所有实现，以及可以直接跳转到源代码的链接。
+
+@node Default Superclass
+@chapter 默认超类
+
+所有定义的类，如果在创建时没有指定父类，则将从@code{eieio-default-superclass}中存储的特殊类继承。  这个超类非常简单，但是有了它，可以将某些默认方法或属性添加到所有对象。  在 CLOS 中，这将被命名为 ⁣​​1⁣，并且该符号是 @code{eieio-default-superclass} 的别名。
+
+目前，默认超类定义如下：
+
+@example
+(defclass eieio-default-superclass nil
+  nil
+  "Default parent class for classes with no specified parent class.
+Its slots are automatically adopted by classes with no specified
+parents.  This class is not stored in the `parent' slot of a class object."
+  :abstract t)
+@end example
+
+默认超类实现了几种方法，为 @eieio{} 创建的所有对象提供默认行为。
+
+@menu
+* Initialization::       对象是如何初始化的
+* Basic Methods::        克隆、打印和写入
+* Signal Handling::      管理信号的方法。
+@end menu
+
+@node Initialization
+@section 初始化
+
+创建任何类型的对象时，都可以使用其构造函数或@code{make-instance}。  这依次调用方法@code{initialize-instance}，然后该方法调用方法@code{shared-initialize}。
+
+这些方法都是在默认超类上实现的，因此您不需要自己编写它们，除非您需要重写它们的行为之一。
+
+用户不需要调用@code{initialize-instance}或@code{shared-initialize}，因为@code{make-instance}使用它们来初始化对象。  相反，提供它们是为了让用户可以增强这些行为。
+
+@defun initialize-instance obj &rest slots
+初始化@var{obj}。  设置 @var{obj} 和 @var{slots} 的槽位，@var{slots} 是名称/值对的列表。  这些实际上只是传递给@code{shared-initialize}。
+@end defun
+
+@defun shared-initialize obj &rest slots
+设置 @var{obj} 和 @var{slots} 的槽位，@var{slots} 是名称/值对的列表。
+
+这是从默认构造函数调用的。
+@end defun
+
+@node Basic Methods
+@section 基本方法
+
+在基子类上定义的其他有用方法是：
+
+@defun clone obj &rest params
+@anchor{clone}
+复制 @var{obj}，然后应用 @var{params}。 @var{params} 是与@var{initialize-instance} 形式相同的参数列表，用于更改对象。  重载@dfn{clone}时，请务必先调用@dfn{cl-call-next-method}并修改返回的对象。
+@end defun
+
+@defun object-print this &rest strings
+@anchor{object-print}
+对象@var{this}的漂亮打印机。  使用 @var{strings} 调用函数 @dfn{eieio-object-name}。打印对象@var{this}的默认方法是使用函数@dfn{eieio-object-name}。
+
+使用 eieio 浏览工具时，将对象摘要放入默认的 #<notation> 字符串有时很有用。
+
+实现此函数并在调用 @dfn{cl-call-next-method} 时指定 @var{strings} 以提供额外的摘要信息。当从子类传递额外的字符串时，请始终记住在前面添加一个空格。
+
+@example
+(defclass data-object ()
+   (value)
+   "Object containing one data slot.")
+
+(cl-defmethod object-print ((this data-object) &optional strings)
+  "Return a string with a summary of the data object as part of the name."
+  (apply #'cl-call-next-method this
+         (format " value: %s" (render this))
+         strings))
+@end example
+
+一些输出可能如下所示：
+@example
+(object-print test-object)
+   => #<data-object test-object value: 3>
+@end example
+@end defun
+
+@defun object-write obj &optional comment
+以可读的方式将 @var{obj} 写入流中。  生成的输出将是 Lisp 代码，可与 @code{read} 和 @code{eval} 一起使用来恢复对象。  只有具有 @code{:initarg} 的槽才会写入流中。
+@end defun
+
+@node Signal Handling
+@section 信号处理
+
+默认超类定义了管理错误条件的方法。这些方法都会针对特定的错误情况发出信号。
+
+通过为类实现这些方法之一，您可以更改在这些错误情况之一期间发生的行为，甚至可以通过提供某些行为来忽略错误。
+
+@defun slot-missing object slot-name operation &optional new-value
+@anchor{slot-missing}
+当尝试访问 @var{object} 中的槽失败时调用的方法。 @var{slot-name} 是失败插槽的名称，@var{operation} 是请求的访问类型，可选的 @var{new-value} 是需要设置的值。
+
+该方法是从 @code{slot-value}、@code{set-slot-value} 和其他直接引用 EIEIO 对象中的槽的函数调用的。
+
+默认方法会发出 @code{invalid-slot-name} 类型的错误信号。 @xref{Signals}。
+
+您可以覆盖此行为，但预计不会在当前实现中返回。
+
+该函数接受参数的顺序与 CLOS 中的顺序不同。
+@end defun
+
+@defun slot-unbound object class slot-name fn
+@anchor{slot-unbound}
+在尝试引用未绑定槽时会调用未绑定槽。 @var{object} 是被引用对象的实例。  @var{class} 是 @var{object} 的类，@var{slot-name} 是有问题的槽。  该函数抛出信号@code{unbound-slot}。  您可以重载此函数并返回要用来代替未绑定值的值。参数@var{fn}是发出此错误信号的函数。使用 @dfn{slot-boundp} 确定插槽是否已绑定。
+
+在 @var{clos} 中，参数列表为 (@var{class} @var{object} @var{slot-name})，但 @var{eieio} 只能分派第一个参数，因此前两个被交换。
+@end defun
+
+@defun cl-no-applicable-method generic &rest args
+@anchor{cl-no-applicable-method}
+如果通用函数 @var{generic} 中没有适用于 @var{args} 的方法，则调用。 @var{args} 是传递给@var{generic} 的参数。
+
+为类实现此功能以阻止此信号。  返回值成为原始方法调用的返回值。
+@end defun
+
+@defun cl-no-primary-method generic &rest args
+@anchor{cl-no-primary-method}
+如果通用函数 @var{generic} 中有适用于 @var{args} 的方法，但它们都是合格的，则调用。 @var{args} 是传递给@var{generic} 的参数。
+
+为类实现此功能以阻止此信号。  返回值成为原始方法调用的返回值。
+@end defun
+
+@defun cl-no-next-method generic method &rest args
+@anchor{cl-no-next-method}
+当没有其他方法可用时从 @dfn{cl-call-next-method} 调用。 @var{generic} 是@dfn{cl-call-next-method} 上调用的泛型函数，@var{method} 是调用@dfn{cl-call-next-method} 的方法，@var{args} 是调用它的参数。该方法默认发出 @dfn{cl-no-next-method} 信号。  重写该方法不会抛出错误，并且其返回值成为@dfn{cl-call-next-method}的返回值。
+@end defun
+
+@node Signals
+@chapter 信号
+
+使用时可以捕获新的条件名称（信号）
+@eieio{}.
+
+@deffn Signal invalid-slot-name obj-or-class slot
+当尝试引用 @var{obj-or-class} 中的槽且未为其定义 @var{slot} 时，会调用此信号。
+@end deffn
+
+@deffn Signal cl-no-applicable-method generic arguments
+当 @var{generic} 被调用时，这个信号被调用，而 @var{arguments} 并没有解决任何问题。  当 @var{generic} 已定义，但参数使 @eieio{} 无法确定要运行哪个方法体时，就会发生这种情况。
+
+为了防止您的类中出现此信号，请为您的类实现方法 @code{cl-no-applicable-method}。  当抛出此信号时会调用此方法，因此为您的类实现此方法允许您阻止信号并执行一些工作。
+@end deffn
+
+@deffn Signal cl-no-primary-method generic arguments
+与@code{cl-no-applicable-method}类似，但适用于有一些适用的方法，但它们都不是主要的。  您可以通过实现 @code{cl-no-primary-method} 方法来类似地阻止它。
+@end deffn
+
+@deffn Signal cl-no-next-method class arguments
+如果调用函数 @code{cl-call-next-method} 并且没有下一个方法要调用，则调用此信号。
+
+重载方法 @code{cl-no-next-method} 以防止出现此信号。
+@end deffn
+
+@deffn Signal invalid-slot-type slot spec value
+当尝试设置 @var{slot} 并且 @var{value} 与指定类型 @var{spec} 不匹配时，将调用此信号。
+
+在 0⁣ 中，如果槽说明符在 @code{defclass} 期间具有无效值，也会使用此选项。
+@end deffn
+
+@deffn Signal unbound-slot object class slot
+当尝试引用 @var{object} 中的 @var{slot} 且该实例当前未绑定时，会调用此信号。
+@end deffn
+
+@node Naming Conventions
+@chapter 命名约定
+
+@xref{Tips,,Tips and Conventions,elisp,GNU Emacs Lisp Reference Manual}，有关 Emacs Lisp 编程约定的描述。这些约定有助于确保 Emacs 包彼此良好地工作，因此基于 @eieio{} 的程序应该遵循它们。  以下是一些专门适用于基于 @eieio{} 的程序的约定：
+
+@itemize
+
+@item Come up with a package prefix that is relatively short.  Prefix
+带有您的前缀的所有类和方法。  这是 Emacs 中函数和变量的标准约定。
+
+@item Do not prefix method names with the class name.  All methods in
+@eieio{} are ``virtual'', and are dynamically dispatched.  Anyone can
+随时覆盖您的方法。  您的方法应该以您的包名称作为前缀。
+
+@item Do not prefix slots in your class.  The slots are always locally
+范围仅限于您的班级，并且不需要前缀。
+
+@item If your library inherits from other libraries of classes, you
+必须使用 @code{require} 命令“要求”该库。
+
+@end itemize
+
+@node CLOS compatibility
+@chapter CLOS 兼容性
+
+目前，以下功能的行为应该几乎与 CLOS 的预期一致。
+
+@table @code
+
+@item defclass
+所有插槽关键字均可用，但并非全部都能正常工作。插槽关键字的区别是：
+
+@table @asis
+
+@item :reader 和 :writer 标签
+创建发出错误信号的方法，而不是创建不合格的方法。  您仍然可以创建新的来开展业务。
+
+@item : 访问器
+这应该创建一个非限定方法来访问槽，而是预先构建一个获取槽值的方法。
+
+@item ：类型
+说明符使用 @file{cl-lib} 包中的 @code{cl-typep} 函数。  @xref{Type Predicates,,,cl,Common Lisp Extensions}。因此，它与该软件包具有相同的问题。  扩展包括提供对象名称的能力。
+@end table
+
+defclass 还支持类选项，但当前不使用 @code{:metaclass} 和 @code{:default-initargs} 的值。
+
+@item 制作实例
+使实例按预期工作，但是它只使用创建新类时自动生成的 @eieio{} 实例创建器。 @xref{Making New Objects}。
+
+@item cl-defgeneric
+创建所需的符号，并接受 CLOS 的 @code{defgeneric} 的大部分预期参数。
+
+@item CL-定义方法
+接受 CLOS @code{defmethod} 的大部分预期参数。  要针对类进行类型转换，该类必须在调用 @code{cl-defmethod} 之前存在。
+
+@item cl 调用下一个方法
+工作原理与 CLOS 的@code{call-next-method} 类似。
+@end table
+
+CLOS 支持 @code{describe} 命令，但 @eieio{} 支持在构造函数或泛型函数上使用标准 @code{describe-function} 命令。
+
+创建新类 (@pxref{Building Classes}) 时，@eieio{} 支持几个新关键字。
+
+在 @eieio{} 中，标签是小写的，而不是混合大小写的。
+
+@node Wish List
+@chapter 愿望清单
+
+@eieio{} is an incomplete implementation of CLOS@.  Finding ways to
+提高兼容性将有助于CLOS风格的程序在Emacs中更好地运行。
+
+最好添加一些重要的兼容性功能：
+
+@enumerate
+@item 
+支持元类。
+@item 
+改进与 @file{cl-lib} 包的集成。
+@end enumerate
+
+为了让 @eieio{} 在 Emacs 环境中更好地运行，还需要进行一些改进。
+
+@enumerate
+@item 
+允许 Emacs 内置类型的子类化，例如面、标记和缓冲区。
+@item 
+允许 Emacs 中类似方法的函数的方法重载。
+@end enumerate
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Function Index
+@unnumbered 功能索引
+
+@printindex fn
+
+@contents
+@bye

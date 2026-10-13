@@ -1,0 +1,284 @@
+\输入 texinfo @c -*-texinfo-*-
+@setfilename ../../info/smtpmail.info
+@settitle Emacs SMTP 库
+@documentlanguage en
+@include docstyle.texi
+@syncodeindex vr fn
+@copying
+版权所有 @copyright{} 2003--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs lisp libraries
+@direntry
+* SMTP: (smtpmail).              用于通过 SMTP 发送邮件的 Emacs 库。
+@end direntry
+
+@titlepage
+@title Emacs SMTP 库
+@subtitle 用于通过 SMTP 发送邮件的 Emacs 包
+@author Simon Josefsson, Alex Schroeder
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top Emacs SMTP Library
+
+@insertcopying
+@end ifnottex
+
+@menu
+* How Mail Works::       邮件概念简介。
+* Emacs Speaks SMTP::    如何在 Emacs 中使用 SMTP 库。
+* Authentication::       向服务器验证您自己的身份。
+* Encryption::           保护您与服务器的连接。
+* Queued delivery::      在没有互联网连接的情况下发送邮件。
+* Server workarounds::   有特殊要求的邮件服务器。
+* Debugging::            追踪问题。
+* GNU Free Documentation License::  本文档的许可证。
+
+指数
+
+* Index::                变量和函数的索引。
+@end menu
+
+@node How Mail Works
+@chapter 邮件如何运作
+
+@cindex SMTP
+@cindex MTA
+在 Internet 上，邮件使用简单邮件传输协议 (SMTP) 从邮件主机发送到邮件主机。  要发送和接收邮件，您必须从邮件主机获取邮件并将其发送到邮件主机。  每个邮件主机都运行一个邮件传输代理 (MTA)，例如 Exim，它接受邮件并传递它们。  然而，邮件主机和其他客户端之间的通信不一定涉及 SMTP。  以下是所涉及内容的简短概述。
+
+@cindex MUA
+邮件程序（也称为邮件用户代理 (MUA)）通常将外发邮件发送到邮件主机。  当您的计算机永久连接到互联网时，它甚至可能本身就是一个邮件主机。  在这种情况下，MUA 将通过管道将邮件发送至 @file{/usr/lib/sendmail} 应用程序。  它将处理您的邮件并将其传递给下一个邮件主机。
+
+@cindex ISP
+当您只是偶尔连接到互联网时，您的互联网服务提供商 (ISP) 可能已经告诉您要使用哪个邮件主机。  您必须配置 MUA 才能使用该邮件主机。  由于您正在阅读本手册，您可能希望将 Emacs 配置为使用 SMTP 将邮件发送到该邮件主机。  下一节将详细介绍这一点。
+
+@cindex MDA
+阅读邮件时情况有所不同。  负责您邮件的邮件主机将其保存在某个文件中。  消息通过邮件传递代理 (MDA)（例如 procmail）进入文件。  这些投递代理通常允许您在看到邮件之前对其进行过滤和处理。  当您的计算机是该邮件主机时，该文件称为假脱机，有时位于目录@file{/var/spool/mail/}中。  那么，您的 MUA 所要做的就是从假脱机中读取邮件。
+
+@cindex POP3
+@cindex IMAP
+当您的计算机并不总是连接到 Internet 时，您必须使用 POP3 或 IMAP@. 等协议从远程邮件主机获取邮件。POP3 本质上是将所有邮件从邮件主机下载到您的计算机。  邮件存储在您计算机上的某个文件中，同样，您的 MUA 所要做的就是从假脱机中读取邮件。
+
+当您从不同的机器上阅读邮件时，将邮件从邮件主机下载到您当前的机器上并不方便。  在这种情况下，您可能需要使用 IMAP 协议。  您的邮件保存在邮件主机上，当您通过 IMAP 连接到邮件主机时可以阅读它。
+
+@cindex Webmail
+那么您可能会问，通过网络阅读邮件是如何进行的呢？  在这种情况下，Web 界面仅允许您远程控制 Web 主机上的 MUA。  Web 主机是否也是邮件主机，以及所有部分如何交互完全无关。  您通常无法使用 Emacs 通过 Web 阅读邮件，除非您使用能够解析 Web 界面不断变化的 HTML 的软件。
+
+@node Emacs Speaks SMTP
+@chapter Emacs 讲 SMTP
+
+Emacs 包含一个包，用于将邮件发送到 SMTP 服务器并让它负责将其传送到最终目的地，而不是让本地系统上的 MTA 来处理它。  如果您的主机上没有设置 MTA，或者您的计算机经常与 Internet 断开连接，这会很有用。
+
+通过 SMTP 发送邮件需要配置您的邮件用户代理 (@pxref{Mail Methods,,,emacs}) 才能使用 SMTP 库。  如果您没有配置任何内容，那么在 Emacs 24.1 及更高版本中，当您第一次尝试发送邮件时，Emacs 会询问您希望如何发送邮件。  要使用此库，请在出现提示时回答@samp{smtp}。  然后，Emacs 会询问 SMTP 服务器的名称。
+
+如果您愿意，或者如果您使用非标准邮件用户代理，您可以自行配置。  执行此操作的正常方法是将变量 @code{send-mail-function} (@pxref{Mail Sending,,,emacs}) 设置为您要使用的值。  要使用该库：
+
+@smallexample
+(setq send-mail-function 'smtpmail-send-it)
+@end smallexample
+
+@noindent
+该变量的默认值为@code{sendmail-query-once}，它以交互方式询问您要如何发送邮件。
+
+您的邮件用户代理可能会使用不同的变量来实现此目的。它应该继承自 @code{send-mail-function}，但如果没有继承，或者如果您愿意，您可以直接设置该变量。  有关更多详细信息，请参阅邮件用户代理的文档。  例如，(@pxref{Mail Variables,,,message})。
+
+在使用 SMTP 之前，您必须找出要使用的 SMTP 服务器的主机名。  您的系统管理员或邮件服务提供商应提供此信息。  通常它是您接收邮件的服务器的某种变体。  如果您的电子邮件地址是@samp{yourname@@example.com}，则 SMTP 服务器的名称可能类似于@samp{smtp.example.com}。
+
+@table @code
+@item smtpmail-smtp-server
+@vindex smtpmail-smtp-server
+@vindex SMTPSERVER
+变量 @code{smtpmail-smtp-server} 控制要使用的服务器的主机名。  它是一个带有 IP 地址或主机名的字符串。  它默认为 @env{SMTPSERVER} 环境变量的内容，或者，如果为空，则为 @code{smtpmail-default-smtp-server} 的内容。
+
+@item smtpmail-default-smtp-server
+@vindex smtpmail-default-smtp-server
+变量 @code{smtpmail-default-smtp-server} 控制要使用的服务器的默认主机名。  它是一个带有 IP 地址或主机名的字符串。  必须在加载 SMTP 库之前设置它。  如果在加载 SMTP 库之后设置，或者定义了@code{smtpmail-smtp-server}，则它无效。  它通常由系统管理员在站点范围的初始化文件中设置。
+@end table
+
+以下示例说明了您可以在 @file{~/.emacs} 中输入的内容来设置 SMTP 服务器名称。
+
+@example
+;; Send mail using SMTP via mail.example.org.
+(setq smtpmail-smtp-server "mail.example.org")
+@end example
+
+@cindex Mail Submission
+SMTP 通常在注册的“smtp”TCP 服务端口 25 上使用。某些环境在“邮件提交”模式下使用 SMTP，该模式使用端口 587。使用其他端口并不罕见，无论是出于模糊目的、端口转发还是其他目的。
+
+@table @code
+@item smtpmail-smtp-service
+@vindex smtpmail-smtp-service
+变量@code{smtpmail-smtp-service}控制要联系的服务器上的端口。  它可以是一个字符串（在这种情况下，它将使用系统调用转换为整数），也可以是一个整数。
+@end table
+
+以下示例说明了您可以在 @file{~/.emacs} 中输入什么内容来设置 SMTP 服务端口。
+
+@example
+;; Send mail using SMTP on the mail submission port 587.
+(setq smtpmail-smtp-service 587)
+@end example
+
+@node Authentication
+@chapter 验证
+
+@cindex password
+@cindex user name
+大多数 SMTP 服务器要求客户端在允许发送邮件之前验证自己的身份。  身份验证通常涉及提供用户名和密码。
+
+如果您没有配置任何内容，那么当您第一次尝试通过服务器发送邮件并且 SMTP 服务器报告需要身份验证时，Emacs（版本 24.1 及更高版本）会提示您输入要使用的用户名和密码，然后提出保存信息。  默认情况下，Emacs 将身份验证信息存储在文件 @file{~/.authinfo} 中，但可以通过自定义 @code{auth-sources} (@pxref{Authentication, Persisting Authinfo,,emacs}) 来更改。
+
+@vindex smtpmail-servers-requiring-authorization
+某些 SMTP 服务器可能会限制带宽（或拒绝）来自尝试未经授权发送邮件的客户端的请求，即使它们后来确实提供了该信息。  要使该库在第一次尝试时提供该信息，请将 @code{smtpmail-servers-requiring-authorization} 设置为与服务器名称匹配的正则表达式。
+
+@cindex authinfo
+@file{~/.authinfo} 文件的基本格式是每组凭据一行。  每行由变量和值对组成。  一个简单的例子是：
+
+@smallexample
+machine mail.example.org port 25 login myuser password mypassword
+@end smallexample
+
+@noindent
+这指定当在端口 25 上使用名为 @samp{mail.example.org} 的 SMTP 服务器时，Emacs 应发送用户名 @samp{myuser} 和密码 @samp{mypassword}。  登录名和密码字段中的一个或两个字段可能不存在，在这种情况下，当您尝试发送邮件时，Emacs 会提示您输入信息。  （这取代了 Emacs 24.1 之前使用的旧 @code{smtpmail-auth-credentials} 变量。）
+
+@vindex smtpmail-smtp-user
+当 SMTP 库连接到某个端口上的主机时，它会在 @file{~/.authinfo} 文件中搜索匹配的条目。  如果找到条目，则会调用身份验证过程并使用凭据。  如果变量 @code{smtpmail-smtp-user} 设置为非 @code{nil} 值，则仅考虑该用户的条目。  有关 @file{~/.authinfo} 文件的更多信息，@pxref{Top,,auth-source, auth, Emacs auth-source Library}。
+
+@cindex SASL
+@cindex CRAM-MD5
+@cindex PLAIN
+@cindex LOGIN
+@cindex OAuth2
+@cindex OAuth 2.0
+@acronym{SMTP} 库向服务器验证您的身份的过程称为“简单身份验证和安全层”(@acronym{SASL})。  有多种 @acronym{SASL} 机制，该库支持其中四种：@code{cram-md5}、@code{plain}、@code{login} 和 @code{xoauth2}，其中第一个使用加密形式来隐藏您的密码，而其他则不使用。  它按顺序尝试每一个，直到其中一个成功。 （@code{xoauth2} 需要使用 @file{oauth2.el} 库。您可以通过在相应的 @file{~/.authinfo} 条目中包含密钥 @code{smtp-auth} 以及您的首选机制的值，为服务器分配特定的身份验证机制来覆盖此设置。
+
+@node Encryption
+@chapter 加密
+
+@cindex STARTTLS
+@cindex TLS
+@cindex SSL
+为了提高安全性，您可以加密与 SMTP 服务器的连接。  如果要这样做，Emacs 和服务器都必须支持它。
+
+SMTP 库支持“传输层安全”(TLS) 和较旧的“安全套接字层”(SSL) 加密机制。它还支持 STARTTLS，这是 TLS 的一种变体，其中与服务器的初始连接以纯文本形式建立，请求切换到加密通道以完成其余过程。
+
+@vindex smtpmail-stream-type
+变量 @code{smtpmail-stream-type} 控制 SMTP 库使用的连接形式。  默认值为@code{nil}，这意味着使用普通连接，但如果服务器支持，请尝试切换到 STARTTLS 加密连接。  其他可能的值是： @code{starttls} 坚持 STARTTLS； @code{ssl} 使用 TLS/SSL； @code{plain} 表示不加密。
+
+使用任何形式的 TLS/SSL 都需要 Emacs 的支持。  您可以使用对 GnuTLS 的内置支持
+@footnote{@url{https://www.gnu.org/software/gnutls/}} library.  If your
+Emacs 内置了 GnuTLS 支持，定义了函数 @code{gnutls-available-p} 并返回非 @code{nil}。
+
+@cindex certificates
+@cindex keys
+SMTP 服务器还可能要求您通过向服务器发送证书和关联的加密密钥来验证您的身份。如果您需要执行此操作，可以使用 @file{~/.authinfo} 条目，如下所示：
+
+@smallexample
+machine mail.example.org port 25 key "~/.my_smtp_tls.key" cert "~/.my_smtp_tls.cert"
+@end smallexample
+
+@noindent
+（这取代了 Emacs 24.1 之前使用的旧 @code{smtpmail-starttls-credentials} 变量。）
+
+
+@node Queued delivery
+@chapter 排队交付
+
+@cindex Dialup connection
+如果您通过拨号连接连接到互联网，或者由于某些其他原因没有永久的互联网连接，则在未连接时发送邮件将会失败。  SMTP 库实现排队传送，以下变量控制其行为。
+
+@table @code
+@item smtpmail-queue-mail
+@vindex smtpmail-queue-mail
+变量@code{smtpmail-queue-mail}控制简单的离线邮件发送器是否处于活动状态。  该变量是一个布尔值，默认为@code{nil}（禁用）。  如果不是 @code{nil}，则邮件不会立即发送，而是在目录 @code{smtpmail-queue-dir} 中排队，稍后可以通过调用 @code{smtpmail-send-queued-mail} 手动发送（通常在连接到互联网时）。
+
+@item smtpmail-store-queue-variables
+@vindex smtpmail-store-queue-variables
+通常，队列将使用执行 @kbd{M-x smtpmail-send-queued-mail} 时有效的 @acronym{SMTP} 变量值进行分派，但如果 @code{smtpmail-store-queue-variables} 为非 @code{nil}，@code{smtpmail-smtp-server}（等@:）的值将在邮件排队时存储，然后在实际发送邮件时使用。  如果您有复杂的外发邮件设置，这会很有用。
+
+@item smtpmail-queue-dir
+@vindex smtpmail-queue-dir
+变量@code{smtpmail-queue-dir}指定保存排队消息的目录名称。  默认为@file{~/Mail/queued-mail/}。
+@end table
+
+@findex smtpmail-send-queued-mail
+当启用 @code{smtpmail-queue-mail} 时，功能 @code{smtpmail-send-queued-mail} 可用于发送任何排队的邮件。  当您连接到互联网时，它通常与 @kbd{M-x smtpmail-send-queued-mail @key{RET}} 交互调用。
+
+@node Server workarounds
+@chapter 服务器解决方法
+
+某些 SMTP 服务器有特殊要求。  以下变量实现对常见需求的支持。
+
+@table @code
+
+@item smtpmail-retries
+@vindex smtpmail-retries
+SMTP 服务器可能会返回一个错误代码，表示存在暂时性错误（@samp{4xx} 代码）。  在这种情况下，smtpmail会自动尝试重新发送邮件，放弃之前尝试的次数由该变量决定，默认为10次。
+
+@item smtpmail-local-domain
+@vindex smtpmail-local-domain
+变量 @code{smtpmail-local-domain} 控制在发送到服务器的第一个 @code{EHLO} 或 @code{HELO} 命令中发送的主机名。仅当 @code{system-name} 函数返回服务器不接受的名称时才应设置它。  除非您的服务器抱怨，否则不要设置此变量。
+
+@item smtpmail-sendto-domain
+@vindex smtpmail-sendto-domain
+当使用 @code{RCPT TO} 命令发送消息时，变量 @code{smtpmail-sendto-domain} 使 SMTP 库将 @samp{@@} 和指定值添加到消息中指定的收件人。  sendmail 的某些配置需要此行为。  除非您遇到如下错误，否则不必费心设置此项：
+
+@example
+        Sending failed; SMTP protocol error
+@end example
+
+发送邮件时，调试缓冲区 (@pxref{Debugging})) 包含错误，例如：
+
+@example
+        RCPT TO: @var{someone}
+        501 @var{someone}: recipient address must contain a domain
+@end example
+
+@end table
+
+
+@node Debugging
+@chapter 调试
+
+有时传送会失败，通常会显示通用错误消息@samp{Sending failed; SMTP protocol error}。  启用以下一个或两个变量并检查跟踪缓冲区通常会提供有关错误原因的线索。
+
+@table @code
+
+@item smtpmail-debug-info
+@vindex smtpmail-debug-info
+变量 @code{smtpmail-debug-info} 控制是否打印迷你缓冲区中的 SMTP 协议交换，并将整个交换保留在缓冲区 @file{*trace of SMTP session to @var{server}*} 中，其中 @var{server} 是您向其发送邮件的邮件服务器的名称。
+
+@item smtpmail-debug-verb
+@vindex smtpmail-debug-verb
+变量 @code{smtpmail-debug-verb} 控制是否将 @code{VERB} 令牌发送到服务器。  @code{VERB} 服务器指示服务器更加详细，并且通常还会在 SMTP 会话仍在运行时尝试最终传送。  它通常仅与 @code{smtpmail-debug-info} 一起使用。  请注意，如果最终目的地无法接受邮件，这可能会导致邮件递送需要相当长的时间。
+
+@end table
+
+@node GNU Free Documentation License
+@chapter GNU 自由文档许可证
+@include doclicense.texi
+
+@node Index
+@chapter 指数
+
+@section 概念索引
+
+@printindex cp
+
+@section 函数和变量索引
+
+@printindex fn
+
+@bye

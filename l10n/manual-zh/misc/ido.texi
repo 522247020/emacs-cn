@@ -1,0 +1,628 @@
+\输入 texinfo @c -*-texinfo-*-
+@setfilename ../../info/ido.info
+@settitle 互动做
+@documentlanguage en
+@include docstyle.texi
+@include emacsver.texi
+
+@copying
+该文件记录了 GNU Emacs 的 Ido 包。
+
+版权所有 @copyright{} 2013--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* Ido: (ido).                    使用缓冲区和文件交互地执行操作。
+@end direntry
+
+@finalout
+
+@titlepage
+@sp 6
+@center @titlefont{Interactive Do}
+@sp 4
+@center For GNU Emacs
+@sp 1
+@center as distributed with Emacs @value{EMACSVER}
+@sp 5
+@center Kim F. Storm
+@center storm@@cua.dk
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top Interactive Do
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Overview::                     基础知识，激活。
+* Matching::                     交互、匹配、滚动。
+* Highlighting::                 突出显示匹配的项目。
+* Hidden Buffers and Files::     隐藏缓冲区、文件和目录。
+* Customization::                更改 Ido 功能。
+* Misc::                         各种其他功能。
+
+附录
+* GNU Free Documentation License::   本文档的许可证。
+
+索引
+* Function Index::               每个记录功能的条目。
+* Variable Index::               每个记录变量的条目。
+
+@detailmenu
+--- 详细节点列表 ---
+
+概述
+
+* Activation::                   如何使用这个包。
+* Working Directories::          最近打开文件的位置。
+
+匹配
+
+* Interactive Substring Matching::   交互、匹配、滚动。
+* Prefix Matching::              标准完成。
+* Flexible Matching::            搭配更灵活。
+* Regexp Matching::              使用正则表达式进行匹配。
+
+定制化
+
+* Changing List Order::          更改文件列表。
+* Find File At Point::           让 Ido 猜测上下文。
+* Ignoring::                     无知是福。
+* Misc Customization::           Ido 的各种定制。
+
+各种各样的
+
+* All Matching::                 查看所有匹配的缓冲区或文件。
+* Replacement::                  替换 @code{read-buffer} 和 @code{read-file-name}。
+* Other Packages::               不想依赖@code{ido-everywhere}？
+
+@end detailmenu
+@end menu
+
+@node Overview
+@chapter 概述
+@cindex overview
+
+@noindent
+本文档描述了一组可以交互地处理缓冲区和文件的功能。  所有功能均在此处详细描述。
+
+@dfn{Ido} 包允许您在缓冲区之间切换并以最少的击键访问文件和目录。  它是 Iswitchb 的超集，Iswitchb 是 Stephen Eglen 开发的交互式缓冲区切换包。
+
+@cindex author of Ido
+@cindex Iswitchb
+该软件包最初由 Kim F. Storm 编写，基于 Stephen Eglen 的 @file{iswitchb.el} 软件包。
+
+@menu
+* Activation::                   如何使用这个包。
+* Working Directories::          最近打开文件的位置。
+@end menu
+
+@node Activation
+@section 激活
+@cindex activation
+@cindex installation
+
+@noindent
+该软件包随 Emacs 一起分发，因此无需安装任何其他文件即可开始使用它。  要激活，请使用@kbd{M-x ido-mode}。
+
+@noindent
+如果您经常使用此包中的功能，您可能希望将以下表达式添加到初始化文件中 (@pxref{Init File,,The Emacs Initialization File, emacs, GNU Emacs Manual})。
+
+@example
+(require 'ido)
+(ido-mode t)
+@end example
+
+@node Working Directories
+@section 工作目录
+@cindex working directories
+
+@vindex ido-work-directory-list
+@noindent
+@dfn{Working directories} 是最近打开文件的目录。  每当使用 @code{ido-find-file} 和其他与文件相关的函数打开文件时，当前目录都会插入到此 @code{ido-work-directory-list} 的前面。
+
+@c @cindex merge
+@c or maybe a new node for ``merge''
+
+@c @deffn Command ido-merge-work-directories
+
+@c @deffn Command ido-prev-work-directory
+
+@c @deffn Command ido-next-work-directory
+
+@c @deffn Command ido-forget-work-directory
+
+@c @defvar ido-use-merged-list
+@c @defvar ido-try-merged-list
+@c @defvar ido-pre-merge-state
+
+@defopt ido-max-work-directory-list
+该用户选项指定要记录的最大工作目录数。
+@end defopt
+
+@c see (info "(elisp) File Name Completion")
+@findex ido-reread-directory
+@defopt ido-max-dir-file-cache
+该用户选项指定要缓存的工作目录的最大数量。  这是 @code{file-name-all-completions} 结果的缓存大小。  每个缓存条目都带有目录的修改时间的时间戳。  某些系统（例如 MS-Windows）的目录修改时间不可靠，因此您可以选择在此类系统上禁用缓存，或者使用迷你缓冲区中的命令 @code{ido-reread-directory}（通常为 @kbd{C-l}）显式刷新缓存内容。
+@end defopt
+
+@node Matching
+@chapter 匹配
+@cindex matching
+
+@noindent
+本节描述了该包与各种 @emph{matching} 有关的功能：缓冲区、文件和目录。
+
+@menu
+* Interactive Substring Matching::   交互、匹配、滚动。
+* Prefix Matching::              标准完成。
+* Flexible Matching::            搭配更灵活。
+* Regexp Matching::              使用正则表达式进行匹配。
+@end menu
+
+@node Interactive Substring Matching
+@section 交互式子串匹配
+@cindex interactive substring matching
+@cindex substring, interactive matching
+@cindex matching, using substring
+
+@noindent
+当您键入子字符串时，当前与该子字符串匹配的缓冲区或文件的列表将在您键入时显示。  该列表是有序的，以便最近访问的缓冲区或文件位于列表的开头。
+
+当您按 @key{RET} 时，将访问列表开头的缓冲区或文件。  通过输入更多的子字符串，列表会缩小，这样您想要的缓冲区或文件就会逐渐位于列表的顶部。  或者，您可以使用 @kbd{C-s} 和 @kbd{C-r}（或左右箭头键）旋转列表中的缓冲区或文件名，直到您想要的名称位于列表顶部。
+
+还可以使用补全功能，以便您在键入时可以看到所有匹配缓冲区或文件的共同点。
+
+例如，如果有两个名为 @file{123456} 和 @file{123} 的缓冲区，其中 @file{123456} 是最新的，则在使用 @code{ido-switch-buffer} 时，您首先会看到所有缓冲区的列表
+
+@example
+Buffer: @{123456 | 123@}
+@end example
+
+如果您随后按 @kbd{2}：
+
+@example
+Buffer: 2[3]@{123456 | 123@}
+@end example
+
+@{...@} 中列出的项目是匹配的缓冲区，最新的第一个（当前帧中可见的缓冲区默认放置在列表的末尾）。  您可以随时按 @key{RET} 选择列表开头的项目。  您还可以通过按 @kbd{C-s} 或 @key{RIGHT} 将第一个元素放在列表的末尾，或者通过按 @kbd{C-r} 或 @key{LEFT} 将最后一个元素置于列表的头部。
+
+@findex ido-complete
+[...] 中的项目表示可以通过按 @key{TAB} (@code{ido-complete}) 添加到您的输入中。  在这种情况下，您的输入中将添加“3”。
+
+所以，按@key{TAB}：
+
+@example
+Buffer: 23@{123456 | 123@}
+@end example
+
+此时，您仍然有两个匹配的缓冲区。  如果您想要列表中的第一个缓冲区，只需按@key{RET}即可。  如果您想要列表中的第二个，可以按 @kbd{C-s} 将其移至列表顶部，然后按 @key{RET} 将其选中。
+
+但是，如果您输入 @kbd{4}，则只剩下一个匹配项：
+
+@example
+Buffer: 234[123456]
+@end example
+
+由于只剩下一个匹配缓冲区，因此它在 [] 中给出，并显示在 @code{ido-only-match} 面（ForestGreen）中。  您现在可以按 @key{TAB} 或 @key{RET} 转到该缓冲区。
+
+@findex ido-select-text
+如果要创建名为 @file{234} 的新缓冲区，可以按 @kbd{C-j} (@code{ido-select-text}) 而不是 @key{TAB} 或 @key{RET}。
+
+如果相反，您输入 @kbd{a}：
+
+@example
+Buffer: 234a [No match]
+@end example
+
+没有匹配的缓冲区。  如果您按 @key{RET} 或 @key{TAB}，系统会提示您创建一个名为 @file{234a} 的新缓冲区。
+
+当然，这个函数真正派上用场的是当您只需使用几次按键即可指定缓冲区时。  在上面的示例中，访问 @file{123456} 文件的最快方法就是键入 @kbd{4}，然后键入 @key{RET}（假设没有任何名称中包含 @kbd{4} 的较新缓冲区）。
+
+@findex ido-find-file
+同样，如果您使用 @kbd{C-x C-f} (@code{ido-find-file})，当前目录中的文件和目录列表将以与上面的缓冲区相同的方式提供。  文件和目录通常按字母顺序排序，但最近访问的目录会放在最前面，以加快导航到最近访问过的目录的速度。
+
+除了使用 @kbd{<right>} 和 @kbd{<left>} 滚动列表之外，您还可以使用 @kbd{<up>} 和 @kbd{<down>} 将列表快速滚动到下一个或上一个子目录。
+
+要进入子目录并继续对该目录中的文件进行文件选择，只需将该目录移动到列表的头部并点击@key{RET}。
+
+要转到父目录，请删除已指定的任何部分文件名（例如，使用@key{DEL}）并点击@key{DEL}。
+
+@c @deffn Command ido-delete-backward-updir
+
+@cindex root directory
+@cindex home directory
+要转到根目录（当前驱动器上），请输入两个斜杠。在 MS-DOS 或 Windows 上，要选择另一个驱动器的根目录，请输入 @samp{X:/}，其中 @samp{X} 是驱动器号。  要转到主目录，请输入@samp{~/}。  要为此目录输入 Dired，请使用 @kbd{C-d}。
+
+@c TODO: a new node for ftp hosts
+@cindex ftp hosts
+您还可以使用 ange-ftp 符号 @samp{/host:} 和 @samp{/user@@host:} 访问其他主机上的文件。
+@c @defopt ido-record-ftp-work-directories
+@c @defopt ido-merge-ftp-work-directories
+@c @defopt ido-cache-ftp-work-directory-time
+@c @defopt ido-slow-ftp-hosts
+@c @defopt ido-slow-ftp-host-regexps
+
+您可以键入 @kbd{M-p} 和 @kbd{M-n} 从历史记录中更改到上一个/下一个目录，@kbd{M-s} 搜索与您的输入匹配的文件，以及 @kbd{M-k} 从历史记录中删除当前目录。
+
+如果由于某种原因您无法使用 @code{ido-find-file} 指定正确的文件，您可以按 @kbd{C-f} 输入正常的 @code{find-file}。  您也可以按@kbd{C-b} 进入@code{ido-switch-buffer}。
+
+@c @kindex C-x b
+@c @deffn Command ido-switch-buffer
+@c This command switch to another buffer interactively.
+@c @end deffn
+
+@c @kindex C-x C-f
+@c @deffn Command ido-find-file
+@c Edit file with name obtained via minibuffer.
+@c @end deffn
+
+@c @kindex C-x d
+@c @findex ido-dired
+@c @deffn Command ido-dired
+@c Call Dired the Ido way.
+@c @end deffn
+
+@node Prefix Matching
+@section 前缀匹配
+@cindex prefix matching
+@cindex matching, using prefix
+@cindex standard way of completion
+
+@noindent
+*nix shell 和 Emacs 的标准补全方法是插入 @dfn{prefix}，然后按 @key{TAB}（或其他补全键）。因为这种行为已经成为许多 Emacs 用户的第二天性，所以除了默认的子字符串匹配方法（见上文）之外，Ido 还提供了前缀匹配方法。  匹配的种类是与上面描述的子串匹配的唯一区别。
+
+@findex ido-toggle-prefix
+@cindex toggle prefix matching
+您可以使用 @kbd{C-p} (@code{ido-toggle-prefix}) 切换前缀匹配。
+
+例如，如果您有两个缓冲区 @file{123456} 和 @file{123}，则点击 @kbd{2} 不匹配，因为 @kbd{2} 不是任何缓冲区名称中的前缀。
+
+@node Flexible Matching
+@section 灵活搭配
+@cindex flexible matching
+
+@defopt ido-enable-flex-matching
+如果非@code{nil}，Ido 将进行灵活的字符串匹配。  灵活匹配意味着如果输入的字符串与任何项目都不匹配，则任何包含给定序列中输入的字符的项目都将匹配。
+@end defopt
+
+@noindent
+如果@code{ido-enable-flex-matching}不是@code{nil}，如果使用普通前缀或子字符串匹配没有找到匹配项，Ido 将进行更灵活的匹配（除非正则表达式匹配处于活动状态），以在可用缓冲区或文件名中查找可能的匹配项。
+
+灵活匹配意味着任何仅包含指定序列中所有输入字符的项目都将匹配。
+
+例如，如果您有四个文件 @file{alpha}、@file{beta}、@file{gamma} 和 @file{delta}，则输入 @samp{aa} 将匹配 @file{alpha} 和 @file{gamma}，而 @samp{ea} 则匹配 @file{beta} 和 @file{delta}。  如果前缀匹配也处于活动状态，则@samp{aa}仅匹配@file{alpha}，而@samp{ea}不匹配任何文件。
+
+@node Regexp Matching
+@section 正则表达式匹配
+@cindex regexp matching
+@cindex matching, using regular expression
+
+@noindent
+Ido 中的正则表达式匹配功能有限，通过 @code{ido-enable-regexp} 启用（用 @kbd{C-t} 切换）。  例如，您可以输入 @samp{[ch]$} 并查看以 @samp{c} 或 @samp{h} 结尾的所有文件名。
+
+@defopt ido-enable-regexp
+@findex ido-toggle-regexp
+如果此用户选项的值非@code{nil}，Ido 将进行正则表达式匹配。  可以使用 @code{ido-toggle-regexp} 在 ido 模式下切换此用户选项的值。
+@end defopt
+
+@strong{Please note:} 当您启用正则表达式匹配时，Ido 风格的补全将被禁止。
+
+@node Highlighting
+@chapter 突出显示
+@cindex highlighting
+
+@noindent
+@vindex ido-use-faces
+匹配项的突出显示通过@code{ido-use-faces} 控制。  使用的面是 @code{ido-first-match}、@code{ido-only-match} 和 @code{ido-subdir}。
+
+匹配物品的颜色是由卡斯滕·多米尼克（Carsten Dominik）建议的。
+
+@node Hidden Buffers and Files
+@chapter 隐藏缓冲区和文件
+@cindex hidden buffers and files
+
+通常，Ido 不会在可能的补全列表中包含隐藏缓冲区（其名称以空格开头）和隐藏文件和目录（其名称以 @file{.} 开头）。  但是，如果您输入的子字符串与任何可见缓冲区或文件都不匹配，Ido 将自动在隐藏缓冲区或文件中查找补全。
+
+@findex ido-toggle-ignore
+您可以使用 @kbd{C-a} (@code{ido-toggle-ignore}) 切换隐藏缓冲区和文件的显示。
+
+@c @deffn Command ido-toggle-ignore
+
+@node Customization
+@chapter 定制化
+@cindex customization
+
+@noindent
+您可以自定义 @code{ido} 组来更改 Ido 功能：
+
+@example
+M-x customize-group @key{RET} ido @key{RET}
+@end example
+
+@noindent
+或者自定义某个变量：
+
+@example
+M-x customize-variable @key{RET} ido-xxxxx @key{RET}
+@end example
+
+@vindex ido-setup-hook
+要修改键绑定，请使用@code{ido-setup-hook}。  例如：
+
+@example
+(add-hook 'ido-setup-hook 'ido-my-keys)
+
+(defun ido-my-keys ()
+ "Add my key bindings for Ido."
+ (keymap-set ido-completion-map "SPC" 'ido-next-match))
+@end example
+
+@c @defopt ido-setup-hook
+@c a new node for Ido hooks?
+
+@menu
+* Changing List Order::          更改文件列表。
+* Find File At Point::           让 Ido 猜测上下文。
+* Ignoring::                     无知是福。
+* Misc Customization::           Ido 的各种定制。
+@end menu
+
+@node Changing List Order
+@section 更改列表顺序
+@cindex changing order of the list
+
+@noindent
+默认情况下，当前文件的列表是最新的在前，最旧的在最后，但当前帧中可见的文件被放置在列表的末尾。  存在一个钩子以允许其他函数对列表进行排序。  例如，如果您添加：
+
+@example
+(add-hook 'ido-make-buffer-list-hook 'ido-summary-buffers-to-end)
+@end example
+
+@noindent
+那么所有匹配“Summary”的文件都会被移动到列表的末尾。 （我发现这可以方便地保留收件箱摘要等内容。）它还将匹配 @samp{output\*$} 的文件移动到列表末尾（这些文件是在编译时由 AUCTeX 创建的。）可以使用其他函数来更改匹配文件列表（删除或重新排列元素。）
+
+@node Find File At Point
+@section 在点查找文件
+@cindex find file at point
+@cindex ffap
+
+@noindent
+Find File At Point，通常也称为“ffap”，是一个用于打开文件和 URL 的智能系统。
+
+以下表达式将使 Ido 猜测上下文：
+
+@example
+(setq ido-use-filename-at-point 'guess)
+@end example
+
+@c @defopt ido-use-filename-at-point
+@c If the value of this user option is non-@code{nil}, ...
+@c @end defopt
+
+您可以通过切换 @code{ido-use-url-at-point} 禁用 URL ffap 支持。
+
+@defopt ido-use-url-at-point
+如果此用户选项的值非@code{nil}，Ido 将在该点查找 URL。  如果找到，请调用@code{find-file-at-point}进行访问。
+@end defopt
+
+@node Ignoring
+@section 忽略缓冲区和文件
+@cindex ignoring
+@cindex regexp, ignore buffers and files
+
+@noindent
+Ido 能够使用正则表达式忽略缓冲区、目录、文件和扩展。
+
+@defopt ido-ignore-buffers
+该变量采用缓冲区的正则表达式列表来忽略@code{ido-switch-buffer}。
+@end defopt
+
+@defopt ido-ignore-directories
+此变量采用要在 @code{ido-dired} 和 @code{ido-find-file} 中忽略的（子）目录名称的正则表达式列表。
+@end defopt
+
+@defopt ido-ignore-files
+该变量采用要在 @code{ido-find-file} 中忽略的文件的正则表达式列表。
+@end defopt
+
+@defopt ido-ignore-unc-host-regexps
+此变量采用与要忽略的 UNC 主机匹配的正则表达式列表。  如果@code{ido-downcase-unc-hosts}非@code{nil}，则字母大小写将被忽略。
+@end defopt
+
+@c FIXME: Where to add this variable?  This node or ``working directory''?
+@c @defopt ido-work-directory-list-ignore-regexps
+
+要让 Ido 使用 @code{completion-ignored-extensions}，您需要启用它：
+
+@example
+(setq ido-ignore-extensions t)
+@end example
+
+@vindex completion-ignored-extensions
+现在您也可以自定义 @code{completion-ignored-extensions}。继续添加所有无用的对象文件、备份文件、共享库文件和其他您不希望 Ido 显示的计算废物。
+
+@strong{Please note:} 如果 Ido 不会显示任何其他匹配项，它仍然会完成被忽略的元素。  因此，如果您输入被忽略的文件的名称，Ido 仍然会让您正常打开它。
+
+@node Misc Customization
+@section 杂项定制
+@cindex miscellaneous customization for Ido
+
+@c Variables described in this sections may be moved to new nodes in
+@c the future.
+
+@defopt ido-mode
+此用户选项确定应为哪个功能组（缓冲区和文件）启用 Ido 行为。
+@end defopt
+
+@defopt ido-case-fold
+如果此用户选项的值非@code{nil}，则缓冲区和文件名的搜索应忽略大小写。
+@end defopt
+
+@defopt ido-show-dot-for-dired
+如果此用户选项的值不是@code{nil}，则始终将@samp{.} 作为文件名列表中的第一项。  这允许使用 Dired 立即打开当前目录
+@end defopt
+
+@defopt ido-enable-dot-prefix
+如果此用户选项的值为非@code{nil}，Ido 将匹配前导点作为前缀。  即，仅当您键入点作为第一个字符时，隐藏文件和缓冲区才会匹配（即使 @code{ido-enable-prefix} 是 @code{nil}）。
+@end defopt
+
+@defopt ido-confirm-unique-completion
+如果该用户选项的值为非@code{nil}，则即使是唯一的完成也必须得到确认。  这意味着即使只有一个唯一的补全，@code{ido-complete} (@key{TAB}) 后面也必须始终跟着 @code{ido-exit-minibuffer} (@key{RET})。
+@end defopt
+
+@defopt ido-cannot-complete-command
+当@code{ido-complete}无法完成时，它将运行该用户选项指定的命令。  最有用的值是@code{ido-completion-help}，它会弹出一个带有完成选项的窗口，或者@code{ido-next-match}或@code{ido-prev-match}，它会循环缓冲区列表。
+@end defopt
+
+@defopt ido-max-file-prompt-width
+该用户选项指定提示字符串的上限。  如果它的值为整数，则指定字符串的字符数。  如果它的值是浮点数，则它指定帧宽度的一部分。
+@end defopt
+
+@defopt ido-max-window-height
+如果此用户选项的值不是@code{nil}，则其值将覆盖变量@code{max-mini-window-height}，它是调整迷你窗口（迷你缓冲区和回显区域）大小的最大高度。  如果它是浮点数，则它指定迷你窗口框架高度的一部分。  如果它是整数，则指定行数。
+@end defopt
+
+@defopt ido-record-commands
+如果此用户选项的值非@code{nil}，Ido 会将命令记录在变量@code{command-history}中。  请注意，记录了非 Ido 等效项。
+@end defopt
+
+@defopt ido-all-frames
+当 Ido 查找缓冲区时，此用户选项将作为其 @var{all-frames} 参数传递给 @code{walk-windows}。  @xref{Cyclic Window Ordering, , Cyclic Ordering of Windows, elisp, GNU Emacs Lisp Reference Manual}。
+@end defopt
+
+@defopt ido-minibuffer-setup-hook
+该钩子变量包含 Ido 特定的迷你缓冲区设置自定义。  如果 Ido 处于活动状态，它会在迷你缓冲区设置期间运行，并且旨在用于自定义 ido 以与其他包进行互操作。
+@end defopt
+
+@c @defopt ido-enable-tramp-completion
+@c cross-reference to tramp.texi
+
+@c @cindex UNC host names, completion
+@c @defopt ido-unc-hosts
+@c @defopt ido-downcase-unc-hosts
+@c @defopt ido-cache-unc-host-shares-time
+
+@c @defopt ido-enable-last-directory-history
+@c @defopt ido-max-work-file-list
+@c @defopt ido-work-directory-match-only
+@c @defopt ido-auto-merge-work-directories-length
+@c @defopt ido-auto-merge-delay-time
+@c @defopt ido-auto-merge-inhibit-characters-regexp
+@c @defopt ido-merged-indicator
+@c @defopt ido-max-directory-size
+@c @defopt ido-rotate-file-list-default
+@c @defopt ido-enter-matching-directory
+@c @defopt ido-create-new-buffer
+@c @defopt ido-separator
+@c @defopt ido-decorations
+@c @defopt ido-use-virtual-buffers
+@c @defopt ido-use-faces
+@c @defopt ido-make-file-list-hook
+@c @defopt ido-make-dir-list-hook
+@c @defopt ido-make-buffer-list-hook
+@c @defopt ido-rewrite-file-prompt-functions
+@c @defopt ido-completion-buffer
+@c @defopt ido-completion-buffer-all-completions
+@c @defopt ido-save-directory-list-file
+@c @defopt ido-read-file-name-as-directory-commands
+@c @defopt ido-read-file-name-non-ido
+@c @defopt ido-before-fallback-functions
+@c @defopt ido-buffer-disable-smart-matches
+
+@node Misc
+@chapter 各种各样的
+@cindex miscellaneous
+
+@noindent
+在@kbd{C-x b}（@code{ido-switch-buffer}）之后，可以通过按@kbd{C-k}杀死列表头部的缓冲区。  如果缓冲区需要保存，则会在缓冲区被杀死之前询问您。  @kbd{C-S-b} 将缓冲区埋藏在列表的末尾。
+
+同样，在@kbd{C-x C-f}之后，您可以使用@kbd{C-k}删除（即物理删除）列表头部的文件。  在删除文件之前，系统始终会要求您进行确认。
+
+如果输入@kbd{C-x b}切换到访问给定文件的缓冲区，并且发现您要查找的文件不在任何缓冲区中，则可以按@kbd{C-f}立即落入@code{ido-find-file}。  您可以使用 @kbd{C-b} 切换回缓冲区选择。
+
+@c @deffn Command ido-magic-forward-char
+@c @deffn Command ido-magic-backward-char
+
+您还可以在 Emacs Lisp 程序中使用 Ido：
+
+@example
+(setq my-pkgs (list "CEDET" "Gnus" "Rcirc" "Tramp" "Org" "all-of-them"))
+(ido-completing-read "What's your favorite package? " my-pkgs)
+@end example
+
+@menu
+* All Matching::                 查看所有匹配的缓冲区或文件。
+* Replacement::                  替换 @code{read-buffer} 和 @code{read-file-name}。
+* Other Packages::               不想依赖@code{ido-everywhere}？
+@end menu
+
+@node All Matching
+@section 所有匹配
+@cindex all matching
+@cindex seeing all the matching buffers or files
+
+@noindent
+如果您有许多匹配的文件，它们可能无法全部放入迷你缓冲区的一行中。  通常，迷你缓冲区窗口会增大以显示更多匹配文件（取决于变量 @code{resize-mini-windows} 和 @code{max-mini-window-height} 的值）。  如果您希望 Ido 的行为与默认的迷你缓冲区调整大小行为不同，请设置变量 @code{ido-max-window-height}。
+
+此外，为了提高 Ido 的响应能力，匹配项的最大数量限制为 12，但您可以通过 @code{ido-max-prospects} 用户选项增加或删除此限制。
+
+@c @defopt ido-max-prospects
+
+要查看单独缓冲区中所有匹配缓冲区的完整列表，请按 @kbd{?} 或在子字符串没有进一步补全时按 @key{TAB}。  重复按下 @key{TAB} 将会滚动浏览这个单独的缓冲区。
+
+@node Replacement
+@section 替代品
+
+@noindent
+@code{ido-read-buffer} 和 @code{ido-read-file-name} 已被编写为普通缓冲区和文件名读取函数 @code{read-buffer} 和 @code{read-file-name} 的直接替换。
+
+要在 Emacs 中对所有缓冲区和文件选择使用 ido，请自定义变量 @code{ido-everywhere}。
+
+@c @deffn Command ido-everywhere
+@c @defopt ido-everywhere
+
+@node Other Packages
+@section 其他套餐
+@cindex other packages
+@cindex used by other packages
+
+@noindent
+如果您不想依赖 @code{ido-everywhere} 功能，其他包可以使用 @code{ido-read-buffer}、@code{ido-read-file-name} 和 @code{ido-read-directory-name} 以 @emph{Ido} 的方式读取缓冲区名称、文件名或目录名称。
+
+@c @node Cheatsheet
+
+@c * History and Acknowledgments::     How Ido came into being
+@c @node History and Acknowledgments
+@c @appendix History and Acknowledgments
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Function Index
+@unnumbered 功能索引
+
+@printindex fn
+
+@node Variable Index
+@unnumbered 变量索引
+
+@printindex vr
+
+@bye

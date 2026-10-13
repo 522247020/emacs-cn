@@ -1,0 +1,1570 @@
+\输入texinfo
+
+@setfilename ../../info/emacs-mime.info
+@settitle Emacs MIME 手册
+@documentlanguage en
+@include docstyle.texi
+@synindex fn cp
+@synindex vr cp
+@synindex pg cp
+
+@copying
+该文件记录了 Emacs MIME 接口功能。
+
+版权所有 @copyright{} 1998--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@c Node ``Interface Functions'' uses non-ASCII characters
+
+@dircategory Emacs lisp libraries
+@direntry
+* Emacs MIME: (emacs-mime).      Emacs MIME 分解/合成库。
+@end direntry
+@iftex
+@finalout
+@end iftex
+@setchapternewpage odd
+
+@titlepage
+@ifset WEBHACKDEVEL
+@title Emacs MIME 手册（开发版）
+@end ifset
+@ifclear WEBHACKDEVEL
+@title Emacs MIME 手册
+@end ifclear
+
+@author by Lars Magne Ingebrigtsen
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@node Top
+@top Emacs MIME
+
+本手册记录了用于编写和显示 @acronym{MIME} 消息的库。
+
+本手册面向想要修改 @acronym{MIME} 编码/解码过程的行为或想要更详细地了解 Emacs @acronym{MIME} 库如何工作的用户，以及想要编写操作 @acronym{MIME} 元素的函数和命令的用户。
+
+@acronym{MIME} 是@dfn{Multipurpose Internet Mail Extensions} 的缩写。该标准记录在许多 RFC 中；主要是RFC2045（互联网消息体格式）、RFC2046（媒体类型）、RFC2047（非@acronym{ASCII}文本的消息头扩展）、RFC2048（注册程序）、RFC2049（一致性标准和示例）。  强烈建议任何想要编写符合 @acronym{MIME} 标准的软件的人至少阅读 RFC2045 和 RFC2047。
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* Decoding and Viewing::   解码和查看的框架。
+* Composing::              @acronym{MML}；用于描述 @acronym{MIME} 部分的语言。
+* Interface Functions::    对基本功能的抽象。
+* Basic Functions::        实用程序和基本解析函数。
+* Standards::              使用的 RFC 和工作文档的摘要。
+* GNU Free Documentation License::  本文档的许可证。
+* Index::                  函数和变量索引。
+@end menu
+
+
+@node Decoding and Viewing
+@chapter 解码与观看
+
+本章涉及在更高级别上解码和查看 @acronym{MIME} 消息。
+
+主要思想是首先分析 @acronym{MIME} 文章，然后允许其他程序根据分析结果返回的 @dfn{handles} 列表执行操作。
+
+@menu
+* Dissection::              分析 @acronym{MIME} 消息。
+* Non-MIME::                分析非@acronym{MIME}消息。
+* Handles::                 处理操纵。
+* Display::                 显示手柄。
+* Display Customization::   影响显示的变量。
+* Files and Directories::   保存并命名附件。
+* New Viewers::             如何编写自己的观众。
+@end menu
+
+
+@node Dissection
+@section 解剖
+
+@code{mm-dissect-buffer} 是负责剖析 @acronym{MIME} 文章的函数。  如果给定多部分消息，它将按照结构递归地下降消息，并返回描述消息结构的 @acronym{MIME} 句柄树。
+
+@node Non-MIME
+@section 非MIME
+@vindex mm-uu-configure-list
+
+Gnus 还可以理解一些非 @acronym{MIME} 附件，例如 postscript、uuencode、binhex、yenc、shar、forward、gnatsweb、pgp、diff。  这些功能中的每一个都可以通过向@code{mm-uu-configure-list}添加一个项目来禁用。  例如，
+
+@lisp
+(require 'mm-uu)
+(add-to-list 'mm-uu-configure-list '(pgp-signed . disabled))
+@end lisp
+
+@table @code
+@item postscript
+@findex postscript
+PostScript 文件。
+
+@item uu
+@findex uu
+Uu 编码的文件。
+
+@item binhex
+@findex binhex
+Binhex 编码的文件。
+
+@item yenc
+@findex yenc
+Yenc 编码文件。
+
+@item shar
+@findex shar
+共享存档文件。
+
+@item forward
+@findex forward
+非@acronym{MIME}转发的消息。
+
+@item gnatsweb
+@findex gnatsweb
+蚊虫网附件。
+
+@item pgp-signed
+@findex pgp-signed
+@acronym{PGP} 签名明文。
+
+@item pgp-encrypted
+@findex pgp-encrypted
+@acronym{PGP} 加密的明文。
+
+@item pgp-key
+@findex pgp-key
+@acronym{PGP} 公钥。
+
+@item emacs-sources
+@findex emacs-sources
+@vindex mm-uu-emacs-sources-regexp
+Emacs 源代码。  该项目仅在匹配@code{mm-uu-emacs-sources-regexp}的组中有效。
+
+@item diff
+@findex diff
+@vindex mm-uu-diff-groups-regexp
+补丁。  这适用于自动发送已提交文件差异的组。  它仅适用于匹配 @code{mm-uu-diff-groups-regexp} 的组。
+
+@item verbatim-marks
+@findex verbatim-marks
+Slrn 风格的逐字标记。
+
+@item LaTeX
+@findex LaTeX
+乳胶文档。  它仅适用于匹配 @code{mm-uu-tex-groups-regexp} 的组。
+
+@end table
+
+@cindex text/x-verbatim
+@c Is @vindex suitable for a face?
+@vindex mm-uu-extract
+一些内联的非@acronym{MIME}附件使用面@code{mm-uu-extract}显示。  默认情况下，这些部件不显示 @acronym{MIME} 按钮。  您可以使用 @kbd{K b} (@code{gnus-summary-display-buttonized}) 强制显示按钮，或将 @code{text/x-verbatim} 添加到 @code{gnus-buttonized-mime-types}、@xref{MIME Commands, ,MIME Commands, gnus, Gnus Manual}。
+
+@node Handles
+@section 手柄
+
+@acronym{MIME}句柄是一个完整描述@acronym{MIME}组件的列表。
+
+以下宏可用于访问句柄中的元素：
+
+@table @code
+@item mm-handle-buffer
+@findex mm-handle-buffer
+返回保存未解码的 @acronym{MIME} 部分内容的缓冲区。
+
+@item mm-handle-type
+@findex mm-handle-type
+返回该部分解析后的@code{Content-Type}。
+
+@item mm-handle-encoding
+@findex mm-handle-encoding
+返回零件的 @code{Content-Transfer-Encoding}。
+
+@item mm-handle-undisplayer
+@findex mm-handle-undisplayer
+返回可用于移除显示部分的对象（如果已显示）。
+
+@item mm-handle-set-undisplayer
+@findex mm-handle-set-undisplayer
+设置取消显示对象。
+
+@item mm-handle-disposition
+@findex mm-handle-disposition
+返回该部分解析后的@code{Content-Disposition}。
+
+@item mm-get-content-id
+返回@code{Content-ID}引用的句柄。
+
+@end table
+
+
+@node Display
+@section 展示
+
+具有显示、删除、保存等功能。
+
+@table @code
+@item mm-display-part
+@findex mm-display-part
+显示零件。
+
+@item mm-remove-part
+@findex mm-remove-part
+删除该部件（如果已显示）。
+
+@item mm-inlinable-p
+@findex mm-inlinable-p
+说明 @acronym{MIME} 类型是否可以内联显示。
+
+@item mm-automatic-display-p
+@findex mm-automatic-display-p
+说明是否应自动显示 @acronym{MIME} 类型。
+
+@item mm-destroy-part
+@findex mm-destroy-part
+释放部分占用的所有资源。
+
+@item mm-save-part
+@findex mm-save-part
+提议将零件保存在文件中。
+
+@item mm-pipe-part
+@findex mm-pipe-part
+提出将零件通过管道输送到某些流程。
+
+@item mm-interactively-view-part
+@findex mm-interactively-view-part
+提示输入用于查看该部件的 mailcap 方法。
+
+@end table
+
+
+@node Display Customization
+@section 显示定制
+
+@table @code
+
+@item mm-inline-media-tests
+@vindex mm-inline-media-tests
+这是一个列表，其中键是 @acronym{MIME} 类型，第二个元素是显示部分 @dfn{inline} 的函数（即在 Emacs 内部），第三个元素是要进行 @code{eval} 编辑的表单，表示该部分是否可以内联显示。
+
+该变量指定部件 @emph{can} 是否内联显示，如果是，则如何执行。  它没有说明部件是否 @emph{actually} 内联显示。
+
+@item mm-inlined-types
+@vindex mm-inlined-types
+另一方面，这表示如果满足上面变量设置的条件，则哪些类型将内联显示。  它是 @acronym{MIME} 媒体类型的列表。
+
+@item mm-automatic-display
+@vindex mm-automatic-display
+这是要“自动”显示的类型列表，但前提是上述变量允许。  也就是说，只有可内联的部分才能自动显示。
+
+@item mm-automatic-external-display
+@vindex mm-automatic-external-display
+这是将自动显示在外部查看器中的类型列表。
+
+@item mm-keep-viewer-alive-types
+@vindex mm-keep-viewer-alive-types
+这是一个媒体类型列表，外部查看者在选择不同的文章时不会被杀死。
+
+@item mm-attachment-override-types
+@vindex mm-attachment-override-types
+一些 @acronym{MIME} 代理创建的部件的内容处置为 @samp{attachment}。  此变量允许覆盖该配置并内联显示零件。  （请注意，只有当我们能够并且想要内联显示该部分时，该配置才会被覆盖。）
+
+@item mm-discouraged-alternatives
+@vindex mm-discouraged-alternatives
+查看 @samp{multipart/alternative} 时不鼓励使用的 @acronym{MIME} 类型列表。  查看代理应该查看消息的最后可能部分，因为这应该是最丰富的部分。但是，用户可能更喜欢其他类型，此列表列出了最不需要的类型。  例如，如果 @samp{text/html} 部分是非常不需要的，而 @samp{text/richtext} 部分是有些不需要的，你可以这样说：
+
+@lisp
+(setq mm-discouraged-alternatives
+      '("text/html" "text/richtext")
+      mm-automatic-display
+      (remove "text/html" mm-automatic-display))
+@end lisp
+
+添加 @code{"image/.*"} 也可能有用。  垃圾邮件发送者使用图像作为 @samp{multipart/alternative} 消息的首选部分，因此您可能不会注意到还有其他部分。  另请参见@code{gnus-buttonized-mime-types}、@ref{MIME Commands, ,MIME Commands, gnus, Gnus Manual}。  将 @code{"multipart/alternative"} 添加到 @code{gnus-buttonized-mime-types} 后，您可以手动选择要查看的替代方案。  例如，您可以设置这些变量，例如：
+
+@lisp
+(setq gnus-buttonized-mime-types
+      '("multipart/alternative" "multipart/signed")
+      mm-discouraged-alternatives
+      '("text/html" "image/.*"))
+@end lisp
+
+在这种情况下，Gnus 将显示此类垃圾邮件消息的单选按钮，如下所示：
+
+@example
+1.  (*) multipart/alternative  ( ) image/gif
+
+2.  (*) text/plain          ( ) text/html
+@end example
+
+@item mm-inline-large-images
+@vindex mm-inline-large-images
+该变量默认为 @code{resize}，这意味着大于 Emacs 窗口的图像将被调整大小以适合它们。如果将其设置为 @code{nil}，则大图像不会在 Emacs 中显示，但可以在外部显示（例如，使用 @samp{ImageMagick} 或 @samp{xv}）。  将此变量设置为 @code{t} 会禁用此检查，并使库将所有内联图像显示为内联图像，无论其大小如何。
+
+@item mm-inline-large-images-proportion
+@vindex mm-inline-images-max-proportion
+调整大图像大小时使用的比例。
+
+@item mm-inline-override-types
+@vindex mm-inline-override-types
+@code{mm-inlined-types} 可以包含正则表达式，例如指定所有 @samp{text/.*} 部分内联显示。  如果用户希望将与此类正则表达式匹配的类型视为附件，则可以通过将此变量设置为包含该类型的列表来完成。  例如，假设 @code{mm-inlined-types} 包含 @samp{text/.*}，则在此变量中包含 @samp{text/html} 将导致 @samp{text/html} 部分被视为附件。
+
+@item mm-text-html-renderer
+@vindex mm-text-html-renderer
+这将选择用于渲染 @acronym{HTML} 的函数。  预定义渲染器通过符号 @code{shr}、@code{gnus-w3m}、@code{w3m}@footnote{See @uref{http://emacs-w3m.namazu.org/} for more information about emacs-w3m}、@code{links}、@code{lynx} 或 @code{w3m-standalone} 选择。  您还可以指定一个函数，该函数将使用 @acronym{MIME} 句柄作为参数来调用。
+
+@item mm-html-inhibit-images
+@vindex mm-html-inhibit-images
+@vindex mm-inline-text-html-with-images
+如果不是 0，则禁止在文章正文中内嵌显示图像。  对@code{mm-text-html-renderer}（@pxref{Display Customization}）为@code{shr}或@code{w3m}时渲染的@acronym{HTML}文章中的图像有效。  在 Gnus 中，它被 @code{gnus-inhibit-images} (@pxref{Misc Article, ,Misc Article, gnus, Gnus manual}) 的值覆盖。  默认值为@code{nil}。
+
+@item mm-html-blocked-images
+@vindex mm-html-blocked-images
+具有与此正则表达式匹配的 @acronym{URL} 的外部图像将不会被获取和显示。  例如，要阻止所有包含字符串“ads”的@acronym{URL}，请执行以下操作：
+
+@lisp
+(setq mm-html-blocked-images "ads")
+@end lisp
+
+当@code{mm-text-html-renderer}(@pxref{Display Customization})为@code{shr}时有效。  在 Gnus 中，它被 @code{gnus-blocked-images} 的值或 @code{gnus-blocked-images} 设置为 (@pxref{HTML, ,HTML, gnus, Gnus manual}) 的函数的返回值覆盖。
+
+某些 @acronym{HTML} 邮件可能存在垃圾邮件发送者使用 @samp{<img>} 标签的伎俩。  它可能是为了验证您是否已阅读该邮件。  您可以通过将此选项设置为@code{""}（这是默认值）来防止泄露您的个人信息。
+
+@item mm-w3m-safe-url-regexp
+@vindex mm-w3m-safe-url-regexp
+匹配安全 URL 名称的正则表达式，即在呈现 @acronym{HTML} 电子邮件时不太可能泄漏个人信息的 URL（默认值为 @samp{\\`cid:}）。  如果 @code{nil} 则认为所有 URL 都是安全的。  在 Gnus 中，这将根据变量 @code{gnus-safe-html-newsgroups}、@xref{Various Various, ,Various Various, gnus, Gnus Manual} 的值被覆盖。
+
+@item mm-inline-text-html-with-w3m-keymap
+@vindex mm-inline-text-html-with-w3m-keymap
+通过将此选项设置为非@code{nil}，您可以在内联文本/html 部分中使用 emacs-w3m 命令键。  默认值为@code{t}。
+
+@item mm-external-terminal-program
+@vindex mm-external-terminal-program
+这应该是一个字符串列表；通常类似于 @samp{("xterm" "-e")} 或 @samp{("gnome-terminal" "--")}。
+
+@item mm-enable-external
+@vindex mm-enable-external
+指示是否应使用外部 @acronym{MIME} 处理程序。
+
+如果 @code{t}，则使用所有定义的外部 @acronym{MIME} 处理程序。  如果为@code{nil}，文件将保存到磁盘 (@code{mailcap-save-binary-file})。如果它是符号 @code{ask}，则会在调用外部 @acronym{MIME} 处理程序之前提示您。
+
+当您通过 mailcap (@pxref{mailcap}) 启动附件时，系统会尝试使用具有最安全选项的安全查看器 — 如果您将其保存到磁盘并以不同方式（命令行或双击）启动它，则情况并非如此。  无论如何，如果您想确保不启动任何外部程序，请将此变量设置为@code{nil}或@code{ask}。
+
+@item mm-inline-font-lock
+@vindex mm-inline-font-lock
+如果非@code{nil}，则支持字体锁定的内联部分（例如补丁或代码片段）将被字体锁定。  这可能会被有自己的启用/禁止字体锁定方式的调用者覆盖。
+
+@end table
+
+@node Files and Directories
+@section 文件和目录
+
+@table @code
+
+@item mm-default-directory
+@vindex mm-default-directory
+保存附件的默认目录。  如果@code{nil}使用@code{default-directory}。
+
+@item mm-tmp-directory
+@vindex mm-tmp-directory
+存放临时文件的目录。
+
+@item mm-file-name-rewrite-functions
+@vindex mm-file-name-rewrite-functions
+用于重写 @acronym{MIME} 部分的文件名的函数列表。  每个函数都会连续应用于文件名。现成的功能包括
+
+@table @code
+@item mm-file-name-delete-control
+@findex mm-file-name-delete-control
+删除所有控制字符。
+
+@item mm-file-name-delete-gotchas
+@findex mm-file-name-delete-gotchas
+删除与有缺陷的 shell 脚本一起使用时可能产生意外后果的字符，即 @samp{|}、@samp{>} 和 @samp{<}； @samp{-}、@samp{.} 作为第一个字符。
+
+@item mm-file-name-delete-whitespace
+@findex mm-file-name-delete-whitespace
+删除所有空格。
+
+@item mm-file-name-trim-whitespace
+@findex mm-file-name-trim-whitespace
+删除前导和尾随空格。
+
+@item mm-file-name-collapse-whitespace
+@findex mm-file-name-collapse-whitespace
+折叠多个空白字符。
+
+@item mm-file-name-replace-whitespace
+@findex mm-file-name-replace-whitespace
+@vindex mm-file-name-replace-whitespace
+用下划线替换空格。  如果您不喜欢下划线，请将变量 @code{mm-file-name-replace-whitespace} 设置为任何其他字符串。
+@end table
+
+标准 Emacs 函数 @code{capitalize}、@code{downcase}、@code{upcase} 和 @code{upcase-initials} 也可能很有用。
+
+@item mm-path-name-rewrite-functions
+@vindex mm-path-name-rewrite-functions
+用于重写 @acronym{MIME} 部分的完整文件名的函数列表。  这在外部查看部件时使用，旨在转换绝对名称，以便不兼容的程序可以找到保存该文件的位置。
+
+@end table
+
+@node New Viewers
+@section 新观众
+
+这是一个用于内联显示 @code{text/enriched} 的示例查看器：
+
+@lisp
+(defun mm-display-enriched-inline (handle)
+  (let (text)
+    (with-temp-buffer
+      (mm-insert-part handle)
+      (save-window-excursion
+        (enriched-decode (point-min) (point-max))
+        (setq text (buffer-string))))
+    (mm-insert-inline handle text)))
+@end lisp
+
+我们看到该函数采用 @acronym{MIME} 句柄作为参数。  然后，它转到临时缓冲区，插入该部分的文本，对文本进行一些处理，存储结果，返回到调用它的缓冲区并插入结果。
+
+这里两个重要的辅助函数是@code{mm-insert-part}和@code{mm-insert-inline}。  第一个函数将句柄的文本插入当前缓冲区中。  它处理字符集和/或内容传输解码。  第二个函数只是插入您告诉它插入的任何文本，但它也进行一些设置，以便文本可以以方便的方式“不显示”。
+
+
+@node Composing
+@chapter 构成
+@cindex Composing
+@cindex MIME Composing
+@cindex MML
+@cindex MIME Meta Language
+
+创建 @acronym{MIME} 消息既无聊又不简单。  因此，定义了一个名为 @code{mml} 的库，它解析名为 @acronym{MML}（@acronym{MIME} 元语言）的语言并生成 @acronym{MIME} 消息。
+
+@findex mml-generate-mime
+主接口函数为@code{mml-generate-mime}。  它将检查当前（缩小范围）缓冲区的内容并返回包含 @acronym{MIME} 消息的字符串。
+
+@menu
+* Simple MML Example::              示例 @acronym{MML} 文档。
+* MML Definition::                  所有有效的 @acronym{MML} 元素。
+* Advanced MML Example::            另一个示例 @acronym{MML} 文档。
+* Encoding Customization::          影响编码的变量。
+* Charset Translation::             字符集如何从 @sc{mule} 映射到 @acronym{MIME}。
+* Conversion::                      从 @acronym{MIME} 到 @acronym{MML}，反之亦然。
+* Flowed text::                     软换行符和硬换行符。
+@end menu
+
+
+@node Simple MML Example
+@section 简单的 MML 示例
+
+这是一个简单的@samp{multipart/alternative}：
+
+@example
+<#multipart type=alternative>
+This is a plain text part.
+<#part type=text/enriched>
+<center>This is a centered enriched part</center>
+<#/multipart>
+@end example
+
+通过 @code{mml-generate-mime} 运行后，我们得到：
+
+@example
+Content-Type: multipart/alternative; boundary="=-=-="
+
+
+--=-=-=
+
+
+This is a plain text part.
+
+--=-=-=
+Content-Type: text/enriched
+
+
+<center>This is a centered enriched part</center>
+
+--=-=-=--
+@end example
+
+
+@node MML Definition
+@section MML定义
+
+@acronym{MML} 语言非常简单。  它看起来有点像 SGML 应用程序，但事实并非如此。
+
+@acronym{MML}的主要概念是@dfn{part}。  每个部分可以是不同的类型或使用不同的字符集。  描绘零件的方法是使用 @samp{<#part ...>} 标签。  可以使用 @samp{<#multipart ...>} 标签引入多部分。  各部分以 @samp{<#/part>} 或 @samp{<#/multipart>} 标签结束。  以 @samp{<#part ...>} 标签开始的部分也由下一个开放标签关闭。
+
+还有 @samp{<#external ...>} 标签。  这些介绍@samp{external/message-body}部分。
+
+每个标签可以包含零个或多个形如 @samp{parameter=value} 的参数。  这些值可以用引号括起来，但这不是必需的，除非该值包含空格。  所以@samp{filename=/home/user/#hello$^yes}是完全有效的。
+
+如果您想在消息中谈论 MML，您需要一种“引用”这些标签的方法。  方法是在开头的两个字符后添加一个感叹号；我。 e. @samp{<#!part ...>}。
+
+以下参数在@acronym{MML}中有意义；没有意义的参数将被忽略。  @acronym{MML}参数名称与@acronym{MIME}参数名称相同；括号中的内容表示它将在哪个标头中使用。
+
+@table @samp
+@item type
+部件 (@code{Content-Type}) 的 @acronym{MIME} 类型。
+
+@item filename
+在部分主体中使用文件内容 (@code{Content-Disposition})。
+
+@item recipient-filename
+将此用作为收件人生成的 @acronym{MIME} 消息中的文件名。  也就是说，即使文件在本地被称为 @file{foo.txt}，也可以在发送的消息中的 @code{Content-Disposition} 中使用该名称。
+
+@item charset
+该部分主体的内容将使用指定的字符集 (@code{Content-Type}) 进行编码。 @xref{Charset Translation}。
+
+@item name
+如果要将零件保存到文件中，则可能用于建议文件名 (@code{Content-Type})。
+
+@item disposition
+有效值为 @samp{inline} 和 @samp{attachment} (@code{Content-Disposition})。
+
+@item encoding
+有效值为 @samp{7bit}、@samp{8bit}、@samp{quoted-printable} 和 @samp{base64}。  @xref{Charset Translation}。  该参数表示发送部件时使用什么@code{Content-Transfer-Encoding}，通常是自动计算的。
+
+@item data-encoding
+该参数表示数据使用了什么编码，并且数据在使用之前将被解码。  有效值为 @samp{quoted-printable} 和 @samp{base64}。  当您将包含二进制数据（例如图像）的部件直接插入到 @samp{"<#part>...<#/part>"} 标签内的消息缓冲区中时，这非常有用。
+
+@item description
+部件的描述 (@code{Content-Description})。
+
+@item creation-date
+创建零件的日期 (@code{Content-Disposition})。它使用 RFC 822 或其后继者的格式。
+
+@item modification-date
+RFC 822（或更高版本）部分修改日期 (@code{Content-Disposition})。
+
+@item read-date
+RFC 822（或更高版本）读取该部分的日期 (@code{Content-Disposition})。
+
+@item recipients
+向谁加密/签名该部分。  该字段用于覆盖基于“收件人/抄送”标头的任何自动检测。
+
+@item sender
+用于签署该部分的身份。  该字段用于覆盖所使用的默认密钥。
+
+@item size
+部分 (@code{Content-Disposition}) 的大小（以八位字节为单位）。
+
+@item sign
+使用什么技术来签署此 @acronym{MML} 部分（@code{smime}、@code{pgp} 或 @code{pgpmime}）
+
+@item encrypt
+使用什么技术来加密这个@acronym{MML}部分（@code{smime}、@code{pgp}或@code{pgpmime}）
+
+@end table
+
+@samp{text/plain} 的参数：
+
+@table @samp
+@item format
+文本的格式化参数，有效值包括@samp{fixed}（默认）和@samp{flowed}。  通常您不会手动指定此项，因为它需要以 RFC 2646 中描述的特殊方式格式化文本正文。@xref{Flowed text}。
+@end table
+
+@samp{application/octet-stream} 的参数：
+
+@table @samp
+@item type
+零件类型；非正式——面向人类读者 (@code{Content-Type})。
+@end table
+
+@samp{message/external-body} 的参数：
+
+@table @samp
+@item access-type
+指示可用于获取文件的受支持访问机制的单词。  值包括 @samp{ftp}、@samp{anon-ftp}、@samp{tftp}、@samp{localfile} 和 @samp{mailserver}。  （@code{Content-Type}。）
+
+@item expiration
+RFC 822（或更高版本）日期，在此之后将无法再获取文件。 （@code{Content-Type}。）
+
+@item size
+文件的大小（以八位字节为单位）。  （@code{Content-Type}。）
+
+@item permission
+有效值为 @samp{read} 和 @samp{read-write} (@code{Content-Type})。
+
+@end table
+
+@samp{sign=smime} 的参数：
+
+@table @samp
+
+@item keyfile
+包含签名者密钥和证书的文件。
+
+@item chainfile
+包含要包含在消息中的附加证书的文件。
+
+@end table
+
+@samp{encrypt=smime} 的参数：
+
+@table @samp
+
+@item certfile
+包含收件人证书的文件。
+
+@end table
+
+
+@node Advanced MML Example
+@section 高级 MML 示例
+
+这是一条复杂的多部分消息。  它是一个包含许多部分的@samp{multipart/mixed}，其中一个是@samp{multipart/alternative}。
+
+@example
+<#multipart type=mixed>
+<#part type=image/jpeg filename=~/rms.jpg disposition=inline>
+<#multipart type=alternative>
+This is a plain text part.
+<#part type=text/enriched name=enriched.txt>
+<center>This is a centered enriched part</center>
+<#/multipart>
+This is a new plain text part.
+<#part disposition=attachment>
+This plain text part is an attachment.
+<#/multipart>
+@end example
+
+这是生成的 @acronym{MIME} 消息：
+
+@example
+Content-Type: multipart/mixed; boundary="=-=-="
+
+
+--=-=-=
+
+
+
+--=-=-=
+Content-Type: image/jpeg;
+ filename="~/rms.jpg"
+Content-Disposition: inline;
+ filename="~/rms.jpg"
+Content-Transfer-Encoding: base64
+
+/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRof
+Hh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAAwADABAREA/8QAHwAA
+AQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQR
+BRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RF
+RkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ip
+qrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/9oACAEB
+AAA/AO/rifFHjldNuGsrDa0qcSSHkA+gHrXKw+LtWLrMb+RgTyhbr+HSug07xNqV9fQtZrNI
+AyiaE/NuBPOOOP0rvRNE880KOC8TbXXGCv1FPqjrF4LDR7u5L7SkTFT/ALWOP1xXgTuXfc7E
+sx6nua6rwp4IvvEM8chCxWxOdzn7wz6V9AaB4S07w9p5itow0rDLSY5Pt9K43xO66P4xs71m
+2QXiGCbA4yOVJ9+1aYORkdK434lyNH4ahCnG66VT9Nj15JFbPdX0MS43M4VQf5/yr2vSpLnw
+5ZW8dlCZ8KFXjOPX0/mK6rSPEGt3Angu44fNEReHYNvIH3TzXDeKNO8RX+kSX2ouZkicTIOc
+L+g7E810ulFjpVtv3bwgB3HJyK5L4quY/C9sVxk3ij/xx6850u7t1mtp/wDlpEw3An3Jr3Dw
+34gsbWza4nBlhC5LDsaW6+IFgupQyCF3iHH7gA7c9R9ay7zx6t7aX9jHC4smhfBkGCvHGfrm
+tLQ7hbnRrV1GPkAP1x1/Hr+Ncr8Vzjwrbf8AX6v/AKA9eQRyYlQk8Yx9K6XTNbkgia2ciSIn
+7p5Ga9Atte0LTLKO6it4i7dVRFJDcZ4PvXN+JvEMF9bILVGXJLSZ4zkjivRPDaeX4b08HOTC
+pOffmua+KkbS+GLVUGT9tT/0B68eeIpIFYjB70+OOVXyoOM9+M1eaWeCLzHPyHGO/NVWvJJm
+jQ8KGH1NfQWhXSXmh2c8eArRLwO3HSv/2Q==
+
+--=-=-=
+Content-Type: multipart/alternative; boundary="==-=-="
+
+
+--==-=-=
+
+
+This is a plain text part.
+
+--==-=-=
+Content-Type: text/enriched;
+ name="enriched.txt"
+
+
+<center>This is a centered enriched part</center>
+
+--==-=-=--
+
+--=-=-=
+
+This is a new plain text part.
+
+--=-=-=
+Content-Disposition: attachment
+
+
+This plain text part is an attachment.
+
+--=-=-=--
+@end example
+
+@node Encoding Customization
+@section 编码定制
+
+@table @code
+
+@item mm-body-charset-encoding-alist
+@vindex mm-body-charset-encoding-alist
+从 @acronym{MIME} 字符集映射到要使用的编码。  通常使用此变量，除非其他要求强制使用特定编码（数字签名消息需要 7 位编码）。  默认为
+
+@lisp
+((iso-2022-jp . 7bit)
+ (iso-2022-jp-2 . 7bit)
+ (utf-16 . base64)
+ (utf-16be . base64)
+ (utf-16le . base64))
+@end lisp
+
+例如，如果您不想对 ISO-8859-1 字符进行引用打印编码，则可以向此变量添加 @code{(iso-8859-1 . 8bit)}。  您可以使用 @code{encoding} @acronym{MML} 标签 (@pxref{MML Definition}) 在每条消息的基础上覆盖此设置。
+
+@item mm-coding-system-priorities
+@vindex mm-coding-system-priorities
+优先考虑用于传出消息的编码系统。  默认值为 @code{nil}，表示使用 Emacs 中的默认值，但在日语环境中运行 Emacs 时为 @code{(iso-8859-1 iso-2022-jp utf-8)}。  它是编码系统符号的列表（也允许使用编码系统的别名，使用 @kbd{M-x describe-coding-system} 确保指定正确的编码系统名称）。  例如，如果您已将 Emacs 配置为首选 UTF-8，但希望在可能的情况下以 ISO-8859-1 发送传出消息，则可以将此变量设置为 @code{(iso-8859-1)}。  您可以使用 @code{charset} @acronym{MML} 标签 (@pxref{MML Definition}) 在每条消息的基础上覆盖此设置。
+
+由于不同的层次结构喜欢不同的字符集，您可能需要根据 Gnus 中的层次结构设置@code{mm-coding-system-priorities}。这是一个例子：
+
+@c Corrections about preferred charsets are welcome.  de, fr and fj
+@c should be correct, I don't know about the rest (so these are only
+@c examples):
+@lisp
+(add-to-list 'gnus-newsgroup-variables 'mm-coding-system-priorities)
+(setq gnus-parameters
+      (append
+       ;; Some charsets are just examples!
+       '(("^cn\\." ;; Chinese
+          (mm-coding-system-priorities
+           '(iso-8859-1 cn-big5 chinese-iso-7bit utf-8)))
+         ("^cz\\.\\|^pl\\." ;; Central and Eastern European
+          (mm-coding-system-priorities '(iso-8859-2 utf-8)))
+         ("^de\\." ;; German language
+          (mm-coding-system-priorities '(iso-8859-1 iso-8859-15 utf-8)))
+         ("^fr\\." ;; French
+          (mm-coding-system-priorities '(iso-8859-15 iso-8859-1 utf-8)))
+         ("^fj\\." ;; Japanese
+          (mm-coding-system-priorities
+           '(iso-8859-1 iso-2022-jp utf-8)))
+         ("^ru\\." ;; Cyrillic
+          (mm-coding-system-priorities
+           '(koi8-r iso-8859-5 iso-8859-1 utf-8))))
+       gnus-parameters))
+@end lisp
+
+@item mm-content-transfer-encoding-defaults
+@vindex mm-content-transfer-encoding-defaults
+从 @acronym{MIME} 类型映射到要使用的编码。  通常使用此变量，除非其他要求强制使用更安全的编码（数字签名消息需要 7 位编码）。  除了正常的 @acronym{MIME} 编码之外，@code{qp-or-base64} 还可以用于指示对于每种情况，应该使用最有效的引用打印和 base64。
+
+@code{qp-or-base64} 还有另一个作用。  它会折叠长行，以便 MIME 部分不会被 MTA@. 破坏，@code{quoted-printable} 和 @code{base64} 也是如此。
+
+请注意，仅当部分是原始转发消息（例如，由带有 arg 2 的 @code{gnus-summary-mail-forward} 生成）或者既不是 @samp{text/*} 类型也不是 @samp{message/*} 类型时，它才会影响正文编码。  即使在这些情况下，您也可以使用 @code{encoding} @acronym{MML} 标签 (@pxref{MML Definition}) 在每条消息的基础上覆盖此设置。
+
+@item mm-use-ultra-safe-encoding
+@vindex mm-use-ultra-safe-encoding
+当它为非@code{nil}时，意味着文本部分如果包含长度超过 76 个字符的行或正文中以“From”开头，则被编码为可引用打印。  通常不允许使用非 7 位编码（8 位、二进制）。  这降低了非 8 位干净 MTA 或 MDA 更改消息的可能性。  这不应该直接设置，而是在必要时由其他函数绑定（例如，在对要进行数字签名的消息进行编码时）。
+
+@end table
+
+@node Charset Translation
+@section 字符集翻译
+@cindex charsets
+
+在从 @acronym{MML} 到 @acronym{MIME} 的转换过程中，对于在 Emacs 内编写的每个 @acronym{MIME} 部分，必须选择适当的字符集。
+
+@vindex mail-parse-charset
+如果您运行的是非 @sc{mule} Emacs，则此过程很简单：如果该部分包含任何非 @acronym{ASCII}（8 位）字符，则使用 @code{mail-parse-charset}（符号）给出的 @acronym{MIME} 字符集。  （但是，切勿直接设置此变量。如果要更改默认字符集，请查阅用于处理 @acronym{MIME} 消息的包的文档。例如 @xref{Various Message Variables, , Various Message Variables, message, Message Manual}。）如果只有 @acronym{ASCII} 字符，则当然使用 @acronym{MIME} 字符集 US-ASCII。
+
+@cindex MULE
+@cindex UTF-8
+@cindex Unicode
+@vindex mm-mime-mule-charset-alist
+当运行支持 @sc{mule} 的 Emacs 时，事情会稍微复杂一些。  在这种情况下，会获取该部分中使用的 @sc{mule} 字符集列表，并通过查阅 Emacs 本身提供的表格将 @sc{mule} 字符集转换为 @acronym{MIME} 字符集。如果这导致单个 @acronym{MIME} 字符集，则用于对该部分进行编码。  但是，如果 @acronym{MIME} 字符集的结果列表包含多个元素，则可能会发生两种情况： 如果可以通过 UTF-8 对该部分进行编码，则使用此字符集。  （为此，Emacs 必须支持 @code{utf-8} 编码系统，并且该部分必须完全由具有 Unicode 对应项的字符组成。）如果 UTF-8 由于某种原因不可用，则该部分会被分成几个部分，以便每个部分都可以使用单个 @acronym{MIME} 字符集进行编码。  不过，该部分只能在行边界处分割——如果需要多个 @acronym{MIME} 字符集来编码单行，则无法对该部分进行编码。
+
+当运行支持 @sc{mule} 的 Emacs 时，要使用的编码系统的首选项继承自 Emacs 本身。  这意味着如果 Emacs 设置为首选 UTF-8，则在对消息进行编码时将使用它。  您可以通过更改 @code{mm-coding-system-priorities} 变量 (@pxref{Encoding Customization}) 来修改它。
+
+在编写消息时，可以通过设置 @code{charset} @acronym{MML} 标签 (@pxref{MML Definition}) 来覆盖要使用的字符集。
+
+字符编码（quoted-printable、8bit 等）@: 与此处的讨论正交，并由变量 @code{mm-body-charset-encoding-alist} 和 @code{mm-content-transfer-encoding-defaults} (@pxref{Encoding Customization}) 控制。
+
+@node Conversion
+@section 转换
+
+@findex mime-to-mml
+（多部分）@acronym{MIME}消息可以使用@code{mime-to-mml}函数转换为@acronym{MML}。  它作用于当前缓冲区中的消息，并用 @acronym{MML} 标记替换 @acronym{MIME} 边界。  非文本部分的内容不在缓冲区中，而是在单独的缓冲区中具有从 @acronym{MML} 标签引用的内容。
+
+@findex mml-to-mime
+@acronym{MML}消息可以通过@code{mml-to-mime}函数转换回@acronym{MIME}。
+
+这些函数在某种意义上是“有损的”——如果你运行@code{mime-to-mml}然后运行@code{mml-to-mime}，你将不会得到相同的消息。  不仅诸如标头顺序之类的琐碎事情会有所不同，而且标头的内容也可能不同。例如，原始消息可能对文本使用 base64 编码，而 2⁣ 可能决定使用引用打印编码，等等。
+
+然而，本质上，这两个函数应该是互逆的。  消息的结果内容即使不相同，也应保持等效。
+
+
+@node Flowed text
+@section 流畅的文字
+@cindex format=flowed
+
+Emacs @acronym{MIME} 库在编码消息时将遵循 @code{use-hard-newlines} 变量 (@pxref{Hard and Soft Newlines, ,Hard and Soft Newlines, emacs, Emacs Manual})，并在解码消息时遵循“format=flowed”Content-Type 参数。
+
+在编码文本时，无论@code{use-hard-newlines}如何，以软换行符结尾的行都会填充在一起，并在由@code{fill-flowed-encode-column}决定的列之后换行。引用引号（匹配 @samp{^>* ?}）。  该变量控制文本在不支持流动文本的客户端中的外观，默认值是在 66 个字符后换行。  如果缓冲区中不存在硬换行符，则不会发生流编码。
+
+您可以自定义 @code{mml-enable-flowed} 变量的值，以在缓冲区中存在换行符时启用或禁用流编码使用。
+
+在解码流动文本时，带有软换行符的行被填充在一起并在由 @code{fill-flowed-display-column} 决定的列之后换行。  默认是在@code{fill-column}之后换行。
+
+@table @code
+@item mm-fill-flowed
+@vindex mm-fill-flowed
+如果非@code{nil}格式=流式文章将显示为流式。
+@end table
+
+
+@node Interface Functions
+@chapter 接口功能
+@cindex interface functions
+@cindex @code{mail-parse}
+
+@code{mail-parse} 库是对下一章中描述的实际低级库的抽象。
+
+标准发生变化，因此程序也必须改变以适应新模式。  例如，RFC2045 描述了 @code{Content-Type} 标头的语法，该语法仅允许参数列表中包含 @acronym{ASCII} 字符。  RFC2231 扩展了 RFC2045 语法，提供了连续标头和非 @acronym{ASCII} 字符的方案。
+
+处理这个问题的传统方法只是更新库函数来解析新语法。  然而，有时这样做是错误的。  在某些情况下，能够理解旧语法和新语法可能是至关重要的，并且如果只有一个库，则必须在旧版本库和新版本库之间进行选择。
+
+Emacs @acronym{MIME} 库采取了不同的策略。  它定义了一系列严格按照相应标准解析的低级库（@file{rfc2047.el}、@file{rfc2231.el}等）。  但是，普通程序不会直接使用这些库提供的函数，而是使用@code{mail-parse}库提供的函数。  该库中的函数只是最新低级库中相应函数的别名。  使用这种方案，程序可以获得可以使用的一致接口，并且库开发人员可以自由创建处理新标准的编写代码。
+
+该库定义了以下函数：
+
+@table @code
+@item mail-header-parse-content-type
+@findex mail-header-parse-content-type
+解析 @code{Content-Type} 标头并返回以下格式的列表：
+
+@lisp
+("type/subtype"
+ (attribute1 . value1)
+ (attribute2 . value2)
+ ...)
+@end lisp
+
+这是一个例子：
+
+@example
+(mail-header-parse-content-type
+ "image/gif; name=\"b980912.gif\"")
+@result{} ("image/gif" (name . "b980912.gif"))
+@end example
+
+@item mail-header-parse-content-disposition
+@findex mail-header-parse-content-disposition
+解析 @code{Content-Disposition} 标头并返回与上述函数格式相同的列表。
+
+@item mail-content-type-get
+@findex mail-content-type-get
+采用两个参数——上面格式的列表和一个属性。返回属性的值。
+
+@example
+(mail-content-type-get
+ '("image/gif" (name . "b980912.gif")) 'name)
+@result{} "b980912.gif"
+@end example
+
+@item mail-header-encode-parameter
+@findex mail-header-encode-parameter
+接受参数字符串并返回该字符串的编码版本。这用于标头中的参数，如 @code{Content-Type} 和 @code{Content-Disposition}。
+
+@item mail-header-remove-comments
+@findex mail-header-remove-comments
+返回标头的无注释版本。
+
+@example
+(mail-header-remove-comments
+ "Gnus/5.070027 (Pterodactyl Gnus v0.27) (Finnish Landrace)")
+@result{} "Gnus/5.070027  "
+@end example
+
+@item mail-header-remove-whitespace
+@findex mail-header-remove-whitespace
+从标题中删除线性空白。  引用的字符串和注释内的空格被保留。
+
+@example
+(mail-header-remove-whitespace
+ "image/gif; name=\"Name with spaces\"")
+@result{} "image/gif;name=\"Name with spaces\""
+@end example
+
+@item mail-header-get-comment
+@findex mail-header-get-comment
+返回标题中的最后一条评论。
+
+@example
+(mail-header-get-comment
+ "Gnus/5.070027 (Pterodactyl Gnus v0.27) (Finnish Landrace)")
+@result{} "Finnish Landrace"
+@end example
+
+@item mail-header-parse-address
+@findex mail-header-parse-address
+解析地址并返回包含邮箱和明文名称的列表。
+
+@example
+(mail-header-parse-address
+ "Hrvoje Nikšić <hniksic@@srce.hr>")
+@result{} ("hniksic@@srce.hr" . "Hrvoje Nikšić")
+@end example
+
+@item mail-header-parse-addresses
+@findex mail-header-parse-addresses
+解析带有地址列表的字符串并返回一个类似于上述的元素列表。
+
+@example
+(mail-header-parse-addresses
+ "Hrvoje Nikšić <hniksic@@srce.hr>, Steinar Bang <sb@@metis.no>")
+@result{} (("hniksic@@srce.hr" . "Hrvoje Nikšić")
+     ("sb@@metis.no" . "Steinar Bang"))
+@end example
+
+@item mail-header-parse-date
+@findex mail-header-parse-date
+解析日期字符串并返回 Emacs 时间结构。
+
+@item mail-narrow-to-head
+@findex mail-narrow-to-head
+将缓冲区缩小到缓冲区的标头部分。  点放置在缩小缓冲区的开头。
+
+@item mail-header-narrow-to-field
+@findex mail-header-narrow-to-field
+将缓冲区缩小到点下的标题。  理解连续标题。
+
+@item mail-header-fold-field
+@findex mail-header-fold-field
+将标题折叠到点下方。
+
+@item mail-header-unfold-field
+@findex mail-header-unfold-field
+展开点下的标题。
+
+@item mail-header-field-value
+@findex mail-header-field-value
+返回点下字段的值。
+
+@item mail-encode-encoded-word-region
+@findex mail-encode-encoded-word-region
+对区域中的非@acronym{ASCII}字进行编码。  例如，@samp{Naïve} 被编码为@samp{=?iso-8859-1?q?Na=EFve?=}。
+
+@item mail-encode-encoded-word-buffer
+@findex mail-encode-encoded-word-buffer
+对当前缓冲区中的非@acronym{ASCII}字进行编码。  该函数的调用范围仅限于消息的标头。
+
+@item mail-encode-encoded-word-string
+@findex mail-encode-encoded-word-string
+将需要编码的单词编码成字符串，并返回结果。
+
+@example
+(mail-encode-encoded-word-string
+ "This is naïve, baby")
+@result{} "This is =?iso-8859-1?q?na=EFve,?= baby"
+@end example
+
+@item mail-decode-encoded-word-region
+@findex mail-decode-encoded-word-region
+解码该区域中的编码字。
+
+@item mail-decode-encoded-word-string
+@findex mail-decode-encoded-word-string
+解码字符串中的编码单词并返回结果。
+
+@example
+(mail-decode-encoded-word-string
+ "This is =?iso-8859-1?q?na=EFve,?= baby")
+@result{} "This is naïve, baby"
+@end example
+
+@end table
+
+目前，@code{mail-parse}是@code{ietf-drums}、@code{rfc2047}、@code{rfc2045}和@code{rfc2231}的抽象。  这些内容将记录在后续部分中。
+
+
+
+@node Basic Functions
+@chapter 基本功能
+
+本章描述了用于解析和处理的基本底层函数。  这里涵盖的是解析 @code{From} 行、从标题行中删除注释、解码编码的单词、解析日期标题等等。  第一章 (@pxref{Decoding and Viewing}) 讨论高级功能。
+
+@menu
+* rfc2045::       编码 @code{Content-Type} 标头。
+* rfc2231::       解析 @code{Content-Type} 标头。
+* ietf-drums::    处理 RFC 2822 定义的邮件标头。
+* rfc2047::       编码/解码标头中的编码字。
+* time-date::     用于解析日期和操作时间的函数。
+* qp::            引用-可打印编码/解码。
+* base64::        Base64 编码/解码。
+* binhex::        Binhex 解码。
+* uudecode::      Uuencode解码。
+* yenc::          日元解码。
+* rfc1843::       解码 HZ 编码文本。
+* mailcap::       部件的显示方式由 @file{.mailcap} 文件指定
+@end menu
+
+
+@node rfc2045
+@section RFC2045
+
+RFC2045 是“主要”@acronym{MIME} 文档，因此，人们会想象会有很多东西需要实现。  但事实并非如此，因为大部分实现细节都委托给了后续的 RFC。
+
+所以 @file{rfc2045.el} 只有一个函数：
+
+@table @code
+@item rfc2045-encode-string
+@findex rfc2045-encode-string
+接受一个参数和一个值并返回一个 @samp{PARAM=VALUE} 字符串。 @var{value} 如果其中有非安全字符，将会被引用。
+@end table
+
+
+@node rfc2231
+@section RFC2231
+
+RFC2231 定义了 @code{Content-Type} 和 @code{Content-Disposition} 标头的语法。  它活泼的名字是@dfn{MIME Parameter Value and Encoded Word Extensions: Character Sets, Languages, and Continuations}。
+
+简而言之，这些标头看起来像这样：
+
+@example
+Content-Type: application/x-stuff;
+ title*0*=us-ascii'en'This%20is%20even%20more%20;
+ title*1*=%2A%2A%2Afun%2A%2A%2A%20;
+ title*2="isn't it!"
+@end example
+
+不过，他们通常没那么糟糕。
+
+该库定义了以下函数：
+
+@table @code
+@item rfc2231-parse-string
+@findex rfc2231-parse-string
+解析 @code{Content-Type} 标头并返回描述其元素的列表。
+
+@example
+(rfc2231-parse-string
+ "application/x-stuff;
+ title*0*=us-ascii'en'This%20is%20even%20more%20;
+ title*1*=%2A%2A%2Afun%2A%2A%2A%20;
+ title*2=\"isn't it!\"")
+@result{} ("application/x-stuff"
+    (title . "This is even more ***fun*** isn't it!"))
+@end example
+
+@item rfc2231-get-value
+@findex rfc2231-get-value
+获取上述格式的列表之一并返回指定属性的值。
+
+@item rfc2231-encode-string
+@findex rfc2231-encode-string
+在标头中对参数进行编码，例如 @code{Content-Type} 和 @code{Content-Disposition}。
+
+@end table
+
+
+@node ietf-drums
+@section ietf 鼓
+
+@dfn{drums} 是一个 IETF 工作组，致力于 Internet RFC 2822，这是 RFC 822 的第一个后续版本，也是当前电子邮件标准的前身。
+
+该库提供的功能包括：
+
+@table @code
+@item ietf-drums-remove-comments
+@findex ietf-drums-remove-comments
+从参数中删除注释并返回结果。
+
+@item ietf-drums-remove-whitespace
+@findex ietf-drums-remove-whitespace
+从字符串中删除线性空白并返回结果。引用的字符串和注释内的空格保持不变。
+
+@item ietf-drums-get-comment
+@findex ietf-drums-get-comment
+返回字符串中最后一条注释。
+
+@item ietf-drums-parse-address
+@findex ietf-drums-parse-address
+解析地址字符串并返回包含邮箱和纯文本名称的列表。
+
+@item ietf-drums-parse-addresses
+@findex ietf-drums-parse-addresses
+解析包含任意数量的逗号分隔地址的字符串，并返回包含邮箱/纯文本对的列表。
+
+@item ietf-drums-parse-date
+@findex ietf-drums-parse-date
+解析日期字符串并返回 Emacs 时间结构。
+
+@item ietf-drums-narrow-to-header
+@findex ietf-drums-narrow-to-header
+将缓冲区缩小到当前缓冲区的标头部分。
+
+@end table
+
+
+@node rfc2047
+@section RFC2047
+
+RFC2047（非@acronym{ASCII}文本的消息头扩展）指定如何对标头中的非@acronym{ASCII}文本进行编码。  这实际上相当复杂，因此需要许多变量来调整这个库的功能。
+
+以下变量是可调整的：
+
+@table @code
+@item rfc2047-header-encoding-alist
+@vindex rfc2047-header-encoding-alist
+这是标头/编码类型对的列表。  其主要目的是防止对某些标头进行编码。
+
+键可以是标头正则表达式，也可以是@code{t}。
+
+这些值可以是@code{nil}，在这种情况下，相关标头不会被编码，@code{mime}，这意味着它们将被编码，或者@code{address-mime}，这意味着假设它们包含地址，标头将被仔细编码。
+
+@item rfc2047-charset-encoding-alist
+@vindex rfc2047-charset-encoding-alist
+RFC2047 指定了两种编码形式——@code{Q}（类似 Quoted-Printable 的编码）和 @code{B} (base64)。  该列表指定哪个字符集应该使用哪种编码。
+
+@item rfc2047-encode-function-alist
+@vindex rfc2047-encode-function-alist
+这是编码/函数对的列表。  编码为@code{Q}、@code{B} 和@code{nil}。
+
+@item rfc2047-encoded-word-regexp
+@vindex rfc2047-encoded-word-regexp
+解码单词时，该库会查找与该正则表达式的匹配项。
+
+@item rfc2047-encoded-word-regexp-loose
+@vindex rfc2047-encoded-word-regexp-loose
+这是一个版本，其中 @code{rfc2047-encoded-word-regexp} 的 Q 编码模式的正则表达式变得宽松。
+
+@item rfc2047-encode-encoded-words
+@vindex rfc2047-encode-encoded-words
+布尔变量指定是否应再次对编码字（例如，@samp{=?us-ascii?q?hello?=}）进行编码。 @code{rfc2047-encoded-word-regexp} 用于查找此类单词。
+
+@item rfc2047-allow-irregular-q-encoded-words
+@vindex rfc2047-allow-irregular-q-encoded-words
+布尔变量指定是否应解码不规则 Q 编码字（例如，@samp{=?us-ascii?q?hello??=}）。  如果它是非@code{nil}，则使用@code{rfc2047-encoded-word-regexp-loose}代替@code{rfc2047-encoded-word-regexp}来查找编码字。
+
+@end table
+
+这些是变量，这些是这个函数：
+
+@table @code
+@item rfc2047-narrow-to-field
+@findex rfc2047-narrow-to-field
+将缓冲区缩小到当前行的标题。
+
+@item rfc2047-encode-message-header
+@findex rfc2047-encode-message-header
+应该将其称为缩小到消息的标题。  根据@code{rfc2047-header-encoding-alist}编码。
+
+@item rfc2047-encode-region
+@findex rfc2047-encode-region
+对指定区域中的所有可编码字进行编码。
+
+@item rfc2047-encode-string
+@findex rfc2047-encode-string
+对字符串进行编码并返回结果。
+
+@item rfc2047-decode-region
+@findex rfc2047-decode-region
+解码该区域中的编码字。
+
+@item rfc2047-decode-string
+@findex rfc2047-decode-string
+解码字符串并返回结果。
+
+@item rfc2047-encode-parameter
+@findex rfc2047-encode-parameter
+以类似 RFC2047 的风格对参数进行编码。  这是 @code{rfc2231-encode-string} 函数的替代，这是标准函数，但许多邮件程序不支持它。  @xref{rfc2231}。
+
+@end table
+
+
+@node time-date
+@section 时间-日期
+
+虽然实际上不是 @acronym{MIME} 库的一部分，但记录解析 @code{Date} 标头和操作时间时经常使用的时间转换函数很方便。  （不过，我很遗憾地说，不是通过使用超立方体。）
+
+这些函数在五种格式之间进行转换：日期字符串、Lisp 时间戳、解码的时间列表、秒数和天数。
+
+这是一堆时间/日期/秒/日的示例：
+
+@example
+(parse-time-string "Sat Sep 12 12:21:54 1998 +0200")
+@result{} (54 21 12 12 9 1998 6 -1 7200)
+
+(time-convert
+  (date-to-time "Sat Sep 12 12:21:54 1998 +0200")
+  'integer)
+@result{} 905595714
+
+(float-time '(905595714000000 . 1000000))
+@result{} 905595714.0
+
+(time-convert 905595714.0 1000000)
+@result{} (905595714000000 . 1000000)
+
+(time-to-days '(905595714000000 . 1000000))
+@result{} 729644
+
+(time-convert (days-to-time 729644) 'integer)
+@result{} 63041241600
+
+(time-convert (time-since '(905595714000000 . 1000000))
+              1000000)
+@result{} (631963244775642171 . 1000000000)
+
+(time-less-p '(905595714000000 . 1000000)
+             '(905595593000000000 . 1000000000))
+@result{} nil
+
+(time-equal-p '(905595593000000000 . 1000000000)
+              '(905595593000000    . 1000000   ))
+@result{} t
+
+(time-subtract '(905595714000000 . 1000000)
+               '(905595593000000000 . 1000000000))
+@result{} (121000000 . 1000000)
+
+(days-between "Sat Sep 12 12:21:54 1998 +0200"
+              "Sat Sep 07 12:21:54 1998 +0200")
+@result{} 5
+
+(date-leap-year-p 2000)
+@result{} t
+
+(time-to-day-in-year '(905595714000000 . 1000000))
+@result{} 255
+
+(time-to-number-of-days
+ (time-since
+  (date-to-time "Mon, 01 Jan 2001 02:22:26 GMT")))
+@result{} 6472.722661506652
+@end example
+
+最后，我们有 @code{safe-date-to-time}，它的作用与 @code{date-to-time} 相同，但如果日期语法错误，则返回零时间。
+
+使用的五种数据表示如下：
+
+@table @var
+@item date
+RFC 822（或类似）日期字符串。  例如：@code{"Sat Sep 12 12:21:54 1998 +0200"}。
+
+@item time
+Lisp 时间戳。例如：@code{(905595714000000 . 1000000)}。
+
+@item seconds
+整数或浮点数秒数。  例如：@code{905595714.0}、@code{905595714}。
+
+@item days
+一个整数，表示自公元前 1 年 12 月 31 日星期日（公历）以来的天数。  例如：@code{729644}。
+
+@item decoded time
+解码时间列表。  例如：@code{(54 21 12 12 9 1998 6 nil 7200)}。
+@end table
+
+上面所有的例子都代表同一时刻，除了@var{days}代表包含该时刻的那一天。
+
+这些是可用的功能：
+
+@table @code
+@item date-to-time
+获取日期并返回时间。
+
+@item time-convert
+获取时间并以指定的形式返回时间戳。
+
+@item float-time
+获取时间并返回秒数。
+
+@item encode-time
+获取解码时间并返回时间戳。
+
+@item time-to-days
+花时间，回天数。
+
+@item days-to-time
+花几天时间，回来一次。
+
+@item date-to-day
+取一个日期并返回天数。
+
+@item time-to-number-of-days
+取一个时间并返回所代表的天数。
+
+@item safe-date-to-time
+获取日期并返回时间。  如果日期在语法上无效，则返回“零”时间。
+
+@item time-less-p
+进行两次，并说出第一次是否比第二次少（即早）。  （这是一个内置函数。）
+
+@item time-equal-p
+检查两个时间值是否相等。  时间值不必采用相同的格式。  （这是一个内置函数。）
+
+@item time-since
+取一个时间并返回一个时间，说明自该时间以来已经过去了多长时间。
+
+@item time-subtract
+进行两次并从第一次中减去第二次。  即返回两个时间之间的时间。  （这是一个内置函数。）
+
+@item days-between
+取两天并返回这两天之间的天数。
+
+@item date-leap-year-p
+取一个年份数字并说出它是否是闰年。
+
+@item time-to-day-in-year
+取一个时间并返回该时间所在年份中的天数。
+
+@end table
+
+
+@node qp
+@section qp
+
+该库处理解码和编码引用可打印文本。
+
+非常简单地解释一下，qp 编码意味着将所有 8 位字符（以及大量控制字符）转换为看起来像 0 的东西；也就是说，等号后跟编码为十六进制字符串的字节。
+
+该库定义了以下函数：
+
+@table @code
+@item quoted-printable-decode-region
+@findex quoted-printable-decode-region
+QP 解码指定区域中的所有编码文本。
+
+@item quoted-printable-decode-string
+@findex quoted-printable-decode-string
+解码字符串中的 QP 编码文本并返回结果。
+
+@item quoted-printable-encode-region
+@findex quoted-printable-encode-region
+对指定区域中的所有可编码字符进行 QP 编码。  第三个可选参数@var{fold}指定是否折叠长线。 （长在这里意味着 72。）
+
+@item quoted-printable-encode-string
+@findex quoted-printable-encode-string
+对字符串中的所有可编码字符进行 QP 编码并返回结果。
+
+@end table
+
+
+@node base64
+@section 64位基数
+@cindex base64
+
+Base64 是一种将三个字节编码为四个字符的编码，从而使大小增加了约 33%。  用于编码的字母表在传输过程中非常耐损坏。
+
+该库定义了以下函数：
+
+@table @code
+@item base64-encode-region
+@findex base64-encode-region
+对所选区域进行 Base64 编码。  返回编码文本的长度。  可选的第三个参数@var{no-line-break}表示不要将长行分成较短的行。
+
+@item base64-encode-string
+@findex base64-encode-string
+Base64 对字符串进行编码并返回结果。
+
+@item base64-decode-region
+@findex base64-decode-region
+Base64 解码所选区域。  返回解码文本的长度。  如果该区域无法解码，则返回@code{nil}并且不修改缓冲区。
+
+@item base64-decode-string
+@findex base64-decode-string
+Base64 解码字符串并返回结果。  如果无法解码字符串，则返回 @code{nil}。
+
+@end table
+
+
+@node binhex
+@section 二进制十六进制
+@cindex binhex
+@cindex Apple
+@cindex Macintosh
+
+@code{binhex} 是一种起源于 Macintosh 环境的编码。提供以下函数来处理这些：
+
+@table @code
+@item binhex-decode-region
+@findex binhex-decode-region
+解码该区域中的编码文本。  如果给定第三个参数，则仅解码 @code{binhex} 标头并返回文件名。
+
+@end table
+
+@node uudecode
+@section 乌德码
+@cindex uuencode
+@cindex uudecode
+
+尽管 @code{base64} 统治着邮件世界，@code{uuencode} 可能仍然是 Usenet 上最流行的二进制编码。
+
+该软件包提供以下功能：
+
+@table @code
+@item uudecode-decode-region
+@findex uudecode-decode-region
+解码该区域中的文本。
+@end table
+
+
+@node yenc
+@section 日元
+@cindex yenc
+
+@code{yenc} 用于在 Usenet 上编码二进制文件。  该软件包提供以下功能：
+
+@table @code
+@item yenc-decode-region
+@findex yenc-decode-region
+解码该区域中的编码文本。
+
+@end table
+
+
+@node rfc1843
+@section RFC1843
+@cindex rfc1843
+@cindex HZ
+@cindex Chinese
+
+RFC1843 处理消息中混合中文和 @acronym{ASCII} 字符的问题。  本质上，RFC1843 通过这样做在 @acronym{ASCII} 和中文之间切换：
+
+@example
+This sentence is in @acronym{ASCII}.
+The next sentence is in GB.~@{<:Ky2;S@{#,NpJ)l6HK!#~@}Bye.
+@end example
+
+足够简单，并且在中国广泛使用。
+
+以下函数可用于处理此编码：
+
+@table @code
+@item rfc1843-decode-region
+解码该区域中的 HZ 编码文本。
+
+@item rfc1843-decode-string
+解码 HZ 编码的字符串并返回结果。
+
+@end table
+
+
+@node mailcap
+@section 邮件帽
+
+@file{~/.mailcap} 文件由大多数支持 @acronym{MIME} 的消息处理程序进行解析，并描述了元素应该如何显示。这是一个示例文件：
+
+@example
+image/*; gimp -8 %s
+audio/wav; wavplayer %s
+application/msword; catdoc %s ; copiousoutput ; nametemplate=%s.doc
+@end example
+
+这表示所有图像文件应使用 @code{gimp} 显示，WAVE 音频文件应使用 @code{wavplayer} 播放，MS-WORD 文件应使用 @code{catdoc} 内联。
+
+@code{mailcap} 库解析该文件，并提供匹配类型的函数。
+
+@table @code
+@item mailcap-mime-data
+@vindex mailcap-mime-data
+该变量是包含备份查看规则的列表的列表。
+
+@item mailcap-user-mime-data
+@vindex mailcap-user-mime-data
+优先于 @code{mailcap-mime-data} 的可自定义查看者列表。
+
+@end table
+
+接口功能：
+
+@table @code
+@item mailcap-view-file
+@findex mailcap-view-file
+提示输入文件名，然后启动适用于相关文件类型的查看器。
+
+@item mailcap-parse-mailcaps
+@findex mailcap-parse-mailcaps
+@vindex mailcap-prefer-mailcap-viewers
+解析 @file{~/.mailcap} 文件。
+
+@item mailcap-mime-info
+采用 @acronym{MIME} 类型作为参数并返回匹配的查看器。
+
+@code{mailcap-prefer-mailcap-viewers} 变量控制选择哪个查看器。  默认的非 1⁣ 值意味着 2⁣ 中的设置优先于系统范围或 Emacs 提供的查看器设置。
+
+如果 @code{nil}，则 Emacs 提供的查看器设置优先。  接下来，最具体的查看器优先于不太具体的设置，无论它们是系统提供的还是私有的，因此@file{/etc/mailcap}中的@samp{image/gif}将“赢得”@file{~/.mailcap}中的@samp{image/*}设置。
+
+@end table
+
+
+
+
+@node Standards
+@chapter 标准
+
+Emacs @acronym{MIME} 库根据（某种程度上）大量的 RFC、草案和标准文档来实现对各种元素的处理。  本章列出了相关内容。  它们都可以从@uref{https://www.rfc-editor.org}获取。
+
+@table @dfn
+@item RFC 5322
+互联网消息格式
+
+@item RFC 5536
+网络新闻文章格式
+
+@item RFC 2045
+互联网消息体的格式
+
+@item RFC 2046
+媒体类型
+
+@item RFC 2047
+非@acronym{ASCII}文本的消息头扩展
+
+@item RFC 6838
+媒体类型规格和注册程序
+
+@item RFC 4289
+注册程序（废弃 RFC 2048）
+
+@item RFC 2049
+一致性标准和示例
+
+@item RFC 2231
+@acronym{MIME} 参数值和编码字扩展：字符集、语言和延续
+
+@item RFC 1843
+HZ---一种任意混合中文和@acronym{ASCII}字符文件交换的数据格式
+
+@item RFC 2387
+@acronym{MIME} 多部分/相关内容类型
+
+@item RFC 6522
+@itemx 性病 73
+用于报告邮件系统管理消息的多部分/报告媒体类型
+
+@item RFC 2183
+在 Internet 消息中传达表示信息：Content-Disposition 标头字段
+
+@item RFC 3676
+Text/Plain 格式和 DelSp 参数
+
+@end table
+
+@node GNU Free Documentation License
+@chapter GNU 自由文档许可证
+@include doclicense.texi
+
+@node Index
+@chapter 指数
+@printindex cp
+
+@bye
+
+
+@c Local Variables:
+@c mode: texinfo
+@c coding: utf-8
+@c End:

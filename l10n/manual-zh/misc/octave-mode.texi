@@ -1,0 +1,342 @@
+\输入 texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename ../../info/octave-mode.info
+@settitle 八度模式
+@documentlanguage en
+@include docstyle.texi
+@c %**end of header
+
+@copying
+版权所有 @copyright{} 1996--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs editing modes
+@direntry
+* Octave mode: (octave-mode).    用于编辑 GNU Octave 文件的 Emacs 模式。
+@end direntry
+
+@finalout
+
+@titlepage
+@title 八度模式
+@subtitle 用于 GNU Octave 编程的 Emacs 模式
+
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top Octave Mode
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Overview::
+* Using Octave Mode::
+* Running Octave from Within Emacs::
+* GNU Free Documentation License::
+* Key Index::
+* Variable Index::
+* Lisp Function Index::
+* Concept Index::
+@end menu
+
+@node Overview
+@chapter 概述
+
+使用带有 Octave 模式的 Emacs 可以极大地促进 Octave 代码的开发，Octave 模式是编辑 Octave 文件的主要模式，可以自动缩进代码，进行一些输入（使用 Abbrev 模式）并以不同的方式显示关键字、注释、字符串等。@:（在支持它的设备上使用字体锁定模式）。
+
+还可以在 Emacs 中运行 Octave，方法是在 Inferior Octave 模式下在缓冲区中的提示符处直接输入命令，或者通过使用 Octave 代码从文件中与 Octave 交互。  这对于调试 Octave 代码特别有用。
+
+@node Using Octave Mode
+@chapter 使用八度模式
+@cindex Using Octave Mode
+
+在 Octave 模式下，除了标准 Emacs 命令之外，还可以使用以下特殊 Emacs 命令。
+
+@table @kbd
+@item C-M-j
+@kindex C-M-j
+@findex octave-indent-new-comment-line
+@vindex octave-continuation-string
+@vindex octave-string-continuation-marker
+在点处断开八度线，如果在一处，则继续注释。  除非在列表中，否则在换行之前插入 @code{octave-continuation-string}。  如果在双引号字符串中，则插入 @code{octave-string-continuation-marker}。  如果在单引号字符串内，则发出错误信号。
+
+@item C-c ;
+@kindex C-c ;
+@findex octave-update-function-file-comment
+查询替换函数文件注释中的函数名称。
+
+@item C-c C-p
+@kindex C-c C-p
+@findex octave-previous-code-line
+向后移动一行 Octave 代码，跳过空行和注释行 (@code{octave-previous-code-line})。  使用数字前缀参数 @var{n}，向后移动那么多代码行（如果 @var{n} 为负数则向前移动）。
+
+@item C-c C-n
+@kindex C-c C-n
+@findex octave-next-code-line
+向前移动一行 Octave 代码，跳过空行和注释行 (@code{octave-next-code-line})。  使用数字前缀参数 @var{n}，向前移动许多代码行（如果 @var{n} 为负数，则向后移动）。
+
+@item C-c C-a
+@kindex C-c C-a
+@findex octave-beginning-of-line
+移动到物理行的开头 (@code{octave-beginning-of-line})。  如果点位于空行或注释行中，则只需转到其开头即可；否则，向后移动到不在延续语句内的第一个代码行的开头，即不跟随以 @samp{...} 或 @samp{\} 结尾的代码行，或者位于左括号列表内。
+
+@item C-c C-e
+@kindex C-c C-e
+@findex octave-end-of-line
+移动到物理线的末尾 (@code{octave-end-of-line})。  如果点位于代码行中，则向前移动到第一个不以 @samp{...} 或 @samp{\} 结尾或位于左括号列表内的第一个 Octave 代码行的末尾。  否则，只需转到当前行的末尾。
+
+@item C-c M-C-h
+@kindex C-c M-C-h
+@findex octave-mark-block
+将点放在该块的开头，在结尾处进行标记 (@code{octave-mark-block})。  标记的块是包含点或跟随点的块。
+
+@item C-c ]
+@kindex C-c ]
+在单独的行上关闭当前块 (@code{smie-close-block})。如果没有找到要关闭的块，则会发出错误信号。
+
+@item C-c C-f
+@kindex C-c C-f
+@findex octave-insert-defun
+插入一个函数骨架，提示输入函数的名称、参数和返回值，这些值必须在 Emacs 启动文件之一中输入，不带括号 (@code{octave-insert-defun})。
+@end table
+
+以下变量可用于自定义八度模式。
+
+@vtable @code
+@item octave-blink-matching-block
+非 @code{nil} 表示在 else 或 end 关键字后插入空格、换行符或 @samp{;} 时显示匹配的块开头。  默认值为@code{t}。这是一个非常有用的功能，可以自动验证关键字是否匹配——如果不匹配，则会显示错误消息。
+
+@item octave-block-offset
+额外缩进应用于块结构中的语句。默认值为 2。
+
+@item octave-continuation-offset
+额外缩进应用于八度连续线。默认值为 4。
+
+@item octave-font-lock-texinfo-comment
+突出显示 texinfo 注释块。  默认值为@code{t}。
+@end vtable
+
+如果启用字体锁定模式，将显示八度模式
+
+@itemize @bullet
+@item
+@code{font-lock-string-face} 中的字符串
+
+@item
+@code{font-lock-comment-face} 中的评论
+
+@item
+Octave 保留字（例如所有块关键字）和文本函数（例如 @samp{cd} 或 @samp{who}）也使用 @code{font-lock-keyword-face} 保留
+
+@item
+使用 @code{font-lock-reference-face} 的内置运算符 (@samp{&&}、@samp{==}、@dots{})
+
+@item
+以及@code{font-lock-function-name-face}中函数声明中的函数名称。
+
+@item
+@code{octave-function-comment-block} 中的函数注释块
+@end itemize
+
+@cindex Imenu Support
+还有对 Imenu (@pxref{Imenu,,, emacs, The GNU Emacs Manual}) 的基本支持。  目前，函数名称可以被索引。
+
+@cindex ElDoc Mode Support
+@vindex octave-eldoc-message-style
+支持 ElDoc 模式 (@pxref{Programming Language Doc,,, emacs, The GNU Emacs Manual})。  通过自定义@code{octave-eldoc-message-style}，可以将其从显示一行或多行提示更改为显示。
+
+@c @cindex TAGS
+@c @cindex Emacs TAGS files
+@c @cindex @file{octave-tags}
+@c You can generate TAGS files for Emacs from Octave @file{.m} files using
+@c the shell script @file{octave-tags} that is installed alongside your copy of
+@c Octave.
+@c
+@vindex octave-mode-hook
+可以通过修改变量@code{octave-mode-hook}来自定义八度模式。
+
+@node Running Octave from Within Emacs
+@chapter 从 Emacs 中运行 Octave
+@cindex Inferior Octave Mode
+
+Octave 模式提供了在特殊的 Emacs 缓冲区中运行下级 Octave 进程的命令。  使用
+@lisp
+M-x run-octave
+@end lisp
+@noindent
+直接启动一个劣质的Octave进程。
+
+@vindex inferior-octave-buffer
+这将在一个特殊的缓冲区中启动 Octave，其名称由变量 @code{inferior-octave-buffer} 指定，默认为 @file{*Inferior Octave*}。  在此缓冲区内，您可以“照常”与下级 Octave 进程交互，即通过在提示符下输入 Octave 命令。  缓冲区处于 Inferior Octave 模式，该模式源自标准 Comint 模式，这是与下级解释器交互的主要模式。  有关更多详细信息，请参阅 @code{comint-mode} 的文档，并使用 @kbd{C-h b} 查找可用的特殊键绑定。
+
+您还可以使用以下命令从具有 Octave 代码的文件（即 Octave 模式下的缓冲区）与下级 Octave 进程进行通信。
+
+@table @kbd
+@item C-c C-i l
+@kindex C-c C-i l
+@findex octave-send-line
+@vindex octave-send-line-auto-forward
+将当前行发送到下级 Octave 进程 (@code{octave-send-line})。  使用正前缀参数@var{n}，发送那么多行。  如果@code{octave-send-line-auto-forward}非@code{nil}，则转到下一个未发送的代码行。
+
+@item C-c C-i b
+@kindex C-c C-i b
+@findex octave-send-block
+将当前块发送到下级 Octave 进程 (@code{octave-send-block})。
+
+@item C-c C-i f
+@kindex C-c C-i f
+@findex octave-send-defun
+将当前函数发送到下级 Octave 进程 (@code{octave-send-defun})。
+
+@item C-c C-i r
+@kindex C-c C-i r
+@findex octave-send-region
+将区域发送到下级 Octave 进程 (@code{octave-send-region})。
+
+@item C-c C-i a
+@kindex C-c C-i a
+@findex octave-send-buffer
+将整个缓冲区发送到下级 Octave 进程 (@code{octave-send-buffer})。  如果缓冲区与文件关联，则应首选使用 @kbd{C-c C-l} (@code{octave-source-file}) 来获取缓冲区。
+
+@item C-c C-i s
+@kindex C-c C-i s
+@findex octave-show-process-buffer
+确保显示 @code{inferior-octave-buffer} (@code{octave-show-process-buffer})。
+
+@item C-c C-i q
+@kindex C-c C-i q
+@findex octave-hide-process-buffer
+删除所有显示下级 Octave 缓冲区 (@code{octave-hide-process-buffer}) 的窗口。
+
+@item C-c C-i k
+@kindex C-c C-i k
+@findex octave-kill-process
+杀死劣质 Octave 进程及其缓冲区 (@code{octave-kill-process})。
+
+@item C-c C-l
+@kindex C-c C-l
+@findex octave-source-file
+解析并执行下级 Octave 缓冲区 (@code{octave-source-file}) 中的当前文件。  这是使用 Octave 的 @code{source} 函数完成的。
+
+@item M-.
+@kindex M-.
+@findex octave-find-definition
+@vindex octave-source-directories
+查找函数或变量的定义。  如果变量@code{octave-source-directories}设置正确（@code{octave-find-definition}），则可以找到用C++实现的函数。
+
+@item C-h d
+@kindex C-h d
+@findex octave-help
+@vindex octave-help-buffer
+显示函数 (@code{octave-help}) 的文档。  可以通过自定义@code{octave-help-buffer}来更改缓冲区名称。
+
+@item C-h a
+@kindex C-h a
+@findex octave-lookfor
+在函数帮助字符串的所有第一句中搜索给定字符串 (@code{octave-lookfor})。  使用 @code{universal-argument} 可以搜索整个帮助字符串。
+
+@end table
+
+将代码发送到 Octave 进程的命令的效果可以通过以下变量进行自定义。
+
+@vtable @code
+@item octave-send-echo-input
+非@code{nil}表示回显输入发送到下级 Octave 进程。默认值为@code{t}。
+
+@item octave-send-show-buffer
+非@code{nil}表示发送命令后（但不选择它）显示运行Octave进程的缓冲区。默认值为@code{t}。
+@end vtable
+
+如果您发送代码并且还没有劣等的 Octave 进程，它将自动启动。
+
+@vindex inferior-octave-startup-args
+次等Octave进程的启动是高度可定制的。变量 @code{inferior-octave-startup-args} 可用于指定在启动时作为字符串列表传递给 Octave 的命令行参数。  例如，要抑制启动消息并使用“传统”模式，请将其设置为@code{("-q" "--traditional")}。您还可以指定要在启动时加载的 Octave 命令的启动文件；请注意，这些命令不会在进程缓冲区中产生任何可见的输出。  使用哪个文件由变量@code{inferior-octave-startup-file}控制。  默认值为@file{~/.emacs-octave}，或者如果未找到此文件则为@file{~/.emacs.d/init_octave.m}。
+
+@vindex inferior-octave-prompt-read-only
+通过自定义@code{inferior-octave-prompt-read-only}，可以将提示更改为只读。  默认值与@code{comint-prompt-read-only}相同。
+
+@vindex inferior-octave-mode-hook
+最后，在启动进程并将其缓冲区置于 Inferior Octave 模式后运行 @code{inferior-octave-mode-hook}。  因此，如果您希望向上和向下箭头键在交互缓冲区中的行为与 shell 中一样，并且希望该缓冲区使用漂亮的颜色，请添加
+@lisp
+(add-hook 'inferior-octave-mode-hook
+          (lambda ()
+            (keymap-set inferior-octave-mode-map "<up>"
+              'comint-previous-input)
+            (keymap-set inferior-octave-mode-map "<down>"
+              'comint-next-input)))
+@end lisp
+@noindent
+到您的 @file{.emacs} 或 @file{init.el} 文件。  您还可以使用此钩子交换 @kbd{C-a} (@code{beginning-of-line}) 和 @code{C-c C-a} (@code{comint-bol}) 的角色。
+
+@vindex inferior-octave-prompt
+@quotation
+@strong{Note} 如果您将 Octave 提示设置为与默认值不同的内容，请确保 @code{inferior-octave-prompt} 与它们匹配。  否则，@emph{nothing} 将起作用，因为 Emacs 将不知道 Octave 何时等待输入，或完成发送输出。
+@end quotation
+
+@node GNU Free Documentation License
+@chapter GNU 自由文档许可证
+@include doclicense.texi
+
+@node Key Index
+@unnumbered 关键指标
+
+@printindex ky
+
+@node Variable Index
+@unnumbered 变量索引
+
+@printindex vr
+
+@node Lisp Function Index
+@unnumbered 功能索引
+
+@printindex fn
+
+@node Concept Index
+@unnumbered 概念索引
+
+@printindex cp
+
+
+@bye
+
+@c TODO Update (and change gnuserv to emacsclient)
+
+@c @node Using the Emacs Info Reader for Octave
+@c @chapter Using the Emacs Info Reader for Octave
+
+@c You may also use the Emacs Info reader with Octave's @code{doc} function.
+
+@c If @file{gnuserv} is installed, add the lines
+@c @lisp
+@c (autoload 'octave-help "octave-hlp" nil t)
+@c (require 'gnuserv)
+@c (gnuserv-start)
+@c @end lisp
+@c @noindent
+@c to your @file{.emacs} file.
+
+@c You can use either 'plain' Emacs Info or the function @code{octave-help}
+@c as your Octave info reader (for @samp{help -i}).  In the former case,
+@c use @code{info_program ("info-emacs-info")}.
+@c The latter is perhaps more attractive because it allows you to look up keys
+@c in the indices of @emph{several} info files related to Octave (provided
+@c that the Emacs variable @code{octave-help-files} is set correctly).  In
+@c this case, use @code{info_program ("info-emacs-octave-help")}.
+
+@c If you use Octave from within Emacs, it is best to add these settings to
+@c your @file{~/.emacs-octave} startup file (or the file pointed to by the
+@c Emacs variable @code{inferior-octave-startup-file}).

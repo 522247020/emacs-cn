@@ -1,0 +1,383 @@
+\输入 texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename ../../info/bovine.info
+@set TITLE  Bovine parser development
+@set AUTHOR Eric M. Ludlam, David Ponce, and Richard Y. Kim
+@settitle @value{TITLE}
+@documentlanguage en
+@include docstyle.texi
+
+@c *************************************************************************
+@c @ Header
+@c *************************************************************************
+
+@c Merge all indexes into a single index for now.
+@c We can always separate them later into two or more as needed.
+@syncodeindex vr cp
+@syncodeindex fn cp
+@syncodeindex ky cp
+@syncodeindex pg cp
+@syncodeindex tp cp
+
+@c @footnotestyle separate
+@c @paragraphindent 2
+@c @@smallbook
+@c %**end of header
+
+@copying
+版权所有 @copyright{} 1999--2004, 2012--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* Bovine: (bovine).              语义牛解析器开发。
+@end direntry
+
+@iftex
+@finalout
+@end iftex
+
+@c @setchapternewpage odd
+@c @setchapternewpage off
+
+@titlepage
+@sp 10
+@title @value{TITLE}
+@author by @value{AUTHOR}
+@page
+@vskip 0pt plus 1 fill
+@insertcopying
+@end titlepage
+@page
+
+@macro semantic{}
+@i{Semantic}
+@end macro
+
+@c *************************************************************************
+@c @ Document
+@c *************************************************************************
+@contents
+
+@node top
+@top @value{TITLE}
+
+@dfn{bovine} 解析器是原始 @semantic{} 解析器，并且是 @acronym{LL} 解析器的实现。  这对于简单的语言很有用。  它有很多便利之处，使语法写作变得容易。  这些便利性使其不如类似 Bison 的 @acronym{LALR} 解析器那么强大。  欲了解更多信息，@pxref{Top,, Wisent Parser Development, wisent}。
+
+牛 @acronym{LL} 语法存储在扩展名为 @file{.by} 的文件中。  编译时，内容将转换为 @file{NAME-by.el} 形式的文件。
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* Starting Rules::               语法的起始规则。
+* Bovine Grammar Rules::         用于解析语言的规则。
+* Optional Lambda Expression::   匹配规则时要采取的操作。
+* Bovine Examples::              简单的示例。
+* GNU Free Documentation License::   本文档的许可证。
+@c * Index::
+@end menu
+
+@node Starting Rules
+@chapter 起始规则
+
+在 Bison 中，只有一个非终结符被指定为“开始”符号。  在@semantic{}中，一个或多个非终结符可以被指定为“开始”符号。  它们是在 @code{%start} 关键字之后声明的，并用空格分隔。
+
+如果语法中没有使用 @code{%start} 关键字，则使用第一个关键字。  在内部，第一个起始非终结符是保留符号 @code{bovine-toplevel} 的目标，因此解析器工具可以找到它。
+
+为了查找本地定义的变量，本地上下文处理程序需要解析功能代码的主体。  @code{scopestart} 声明指定用作解析本地上下文的目标的非终结符的名称。  在内部，scopestart 非终结符的目标是保留符号 @code{bovine-inner-scope}，因此解析器工具可以找到它。
+
+@node Bovine Grammar Rules
+@chapter 牛语法规则
+
+这些规则允许编译器从语言文件创建标签。  一旦序言中的设置完成，就可以开始编写规则了。
+
+@example
+@var{result} : @var{components1} @var{optional-semantic-action1})
+       | @var{components2} @var{optional-semantic-action2}
+       ;
+@end example
+
+@var{result} 是一个非终结符，它是语法中合成的符号。 @var{components} 是要创建 @var{result} 时要匹配的元素列表。  @var{optional-semantic-action} 是一个可选的简化 Emacs Lisp 表达式序列，用于构建解析树。
+
+在 bison 中，每次找到 @var{components} 的元素时，都会将 @dfn{shifted} 放入解析器堆栈中。  （匹配元素的堆栈。）当所有@var{components}'个元素都已匹配时，它是@dfn{reduced}到@var{result}。  @xref{Algorithm,,, bison, The GNU Bison Manual}。
+
+写入语法中的特定 @var{result} 成为解析器的目标。  它由 @code{%start} 语句 (@pxref{Starting Rules}) 指定。  关联的 @var{optional-semantic-action} 返回的值是解析器的结果。  它应该是一棵 @semantic{} @dfn{tags} 的树。
+
+@var{components} 由符号组成。  诸如@code{FOO}之类的符号意味着必须匹配类@code{FOO}的语法标记。
+
+@menu
+* How Lexical Tokens Match::
+* Grammar-to-Lisp Details::
+* Order of components in rules::
+@end menu
+
+@node How Lexical Tokens Match
+@section 词汇标记如何匹配
+
+必须使用词法规则来定义如何匹配词法标记。
+
+例如：
+
+@example
+%keyword FOO "foo"
+@end example
+
+意味着@code{FOO}是保留语言关键字，通过查找关键字表来匹配。  这是因为在词法分析阶段@code{"foo"}会被转换为@code{FOO}。  因此，符号 @code{FOO} 将无法以任何其他方式使用。
+
+如果我们以这种方式指定我们的令牌：
+
+@example
+%token <symbol> FOO "foo"
+@end example
+
+那么@code{FOO}将显式匹配字符串@code{"foo"}，但它不会在词法级别上这样做，从而允许在其他形式的正则表达式中使用文本@code{"foo"}。
+
+在这种情况下，@code{FOO}是@code{symbol}类型的令牌。  为了匹配，必须首先遇到@code{symbol}，然后必须遇到@code{string-match "foo"}。
+
+@table @strong
+@item 警告：
+要特别小心地记住，@code{"foo"}，更一般地说，%token 的匹配值字符串，是一个正则表达式！
+@end table
+
+非符号标记也是允许的。  例如：
+
+@example
+%token <punctuation> PERIOD "[.]"
+
+filename : symbol PERIOD symbol
+         ;
+@end example
+
+@code{PERIOD} 是一种 @code{punctuation} 类型标记，在上述规则中使用时将显式匹配一个句点。
+
+@table @strong
+@item 请注意：
+@code{symbol}、@code{punctuation} 等是基于当前有效的 @dfn{syntax class} 字符关联的预定义词汇标记类型。
+@end table
+
+@node Grammar-to-Lisp Details
+@section 语法到 Lisp 的详细信息
+
+对于 bovinator，词汇标记匹配模式是 @emph{inlined}。当语法到 Lisp 转换器遇到以下形式的词法标记声明时：
+
+@example
+%token <@var{type}> @var{token-name} @var{match-value}
+@end example
+
+它通过其扩展形式替换规则中出现的所有@var{token-name}：
+
+@example
+@var{type} @var{match-value}
+@end example
+
+例如：
+
+@example
+%token <symbol> MOOSE "moose"
+
+find_a_moose: MOOSE
+            ;
+@end example
+
+将生成这个伪等效规则：
+
+@example
+find_a_moose: symbol "moose"   ;; invalid syntax!
+            ;
+@end example
+
+因此，从 bovinator 的角度来看，规则的 @var{components} 部分由符号和字符串组成。  混合中的字符串意味着前一个符号必须具有与其完全匹配的附加约束，如@ref{How Lexical Tokens Match}中所述。
+
+@table @strong
+@item 请注意：
+对于 bovinator 来说，这项任务被混合到语言定义中以简化实现，尽管 Bison 的技术更加高效。
+@end table
+
+@node Order of components in rules
+@section 规则中组件的顺序
+
+如果规则有多个组成部分，则顺序很重要，例如
+
+@example
+headerfile : symbol PERIOD symbol
+           | symbol
+           ;
+@end example
+
+将匹配 @samp{foo.h} 或 @acronym{C++} 标头 @samp{foo}。牛解析器将首先尝试匹配长形式，然后匹配短形式。  如果它们的顺序相反，那么长形式将永远不会被测试。
+
+@c @xref{Default syntactic tokens}.
+
+@node Optional Lambda Expression
+@chapter 可选的 Lambda 表达式
+
+@acronym{OLE} (@dfn{Optional Lambda Expression}) 被转换为牛 lambda。  该 lambda 有特殊的快捷方式来简化语义操作定义的阅读。  像这样的@acronym{OLE}：
+
+@example
+( $1 )
+@end example
+
+结果是一个 lambda 返回，它完全由通过匹配 match 的第一个（第零个）元素找到的字符串或对象组成。像这样的@acronym{OLE}：
+
+@example
+( ,(foo $1) )
+@end example
+
+对第一个参数执行 @code{foo}，然后将其返回值拼接到返回列表中，而：
+
+@example
+( (foo $1) )
+@end example
+
+执行@code{foo}，并将其放入返回列表中。
+
+以下是可以内联显示的其他内容：
+
+@table @code
+@item $1
+第一个对象匹配。
+
+@item ,$1
+拼接到列表中的第一个对象（假设它是来自非终端的列表）。
+
+@item '$1
+第一个匹配的对象被放置在列表中。  即@code{( $1 )}。
+
+@item foo
+符号@code{foo}（与显示的完全相同）。
+
+@item (foo)
+对 foo 的函数调用被困在返回列表中。
+
+@item ,(foo)
+对 foo 的函数调用被拼接到返回列表中。
+
+@item '(foo)
+对 foo 的函数调用被困在列表的返回列表中。
+
+@item (EXPAND @var{$1} @var{nonterminal} @var{depth})
+以 @code{EXPAND} 开头的列表对传递给它的标记（由上面的 @samp{$1} 表示）执行递归解析。 @dfn{semantic list} 是一个常见的扩展标记，因为列表中经常有有趣的东西。  @var{nonterminal} 是表中的一个符号，bovinator 在解析时将以此符号开头。 @var{nonterminal} 的定义与任何其他非终结符相同。当下降到语义列表时，@var{depth}应至少为@samp{1}。
+
+@item (EXPANDFULL @var{$1} @var{nonterminal} @var{depth})
+与 @code{EXPAND} 类似，只不过解析器将迭代 @var{nonterminal} 直到不再有匹配项。  （与解析器迭代起始规则 (@pxref{Starting Rules}) 的方式相同。这可以让您在这种特定情况下拥有更简单的规则，还可以让您在返回的标记中获得位置信息，并跳过错误。
+
+@item (ASSOC @var{symbol1} @var{value1} @var{symbol2} @var{value2} @dots{})
+这用于创建关联列表。  如果关联的 1⁣ 是非 2⁣，则每个@var{symbol} 都包含在列表中。虽然所有项目都显式列出，但创建的结构是以下形式的关联列表：
+
+@example
+((@var{symbol1} . @var{value1}) (@var{symbol2} . @var{value2}) @dots{})
+@end example
+
+@item (TAG @var{name} @var{class} [@var{attributes}])
+这会在当前缓冲区中创建一个标记。
+
+@table @var
+@item name
+是表示语言中的标签的字符串。
+
+@item class
+是正在创建的标签类型，例如 @code{function} 或 @code{variable}，但任何符号都可以使用。
+
+@item attributes
+是一组可选的标记值，例如 @code{:constant-flag t :parent "parenttype"}。
+@end table
+
+@item  (TAG-VARIABLE @var{name} @var{type} @var{default-value} [@var{attributes}])
+@itemx (TAG-FUNCTION @var{name} @var{type} @var{arg-list} [@var{attributes}])
+@itemx (TAG-TYPE @var{name} @var{type} @var{members} @var{parents} [@var{attributes}])
+@itemx (TAG-INCLUDE @var{name} @var{system-flag} [@var{attributes}])
+@itemx (TAG-PACKAGE @var{name} @var{detail} [@var{attributes}])
+@itemx (TAG-CODE @var{name} @var{detail} [@var{attributes}])
+创建一个标签，其 @var{name} 分别属于类 @code{variable}、@code{function}、@code{type}、@code{include}、@code{package} 和 @code{code}。
+@end table
+
+如果指定了符号 @code{%quotemode backquote}，则使用 @code{,@@} 拼接列表，并使用 @code{,} 计算表达式。这使您可以将 @code{$1} 作为符号发送到列表中，而不是使其内联扩展。
+
+@node Bovine Examples
+@chapter 示例
+
+规则：
+
+@example
+any-symbol: symbol
+          ;
+@end example
+
+相当于
+
+@example
+any-symbol: symbol
+            ( $1 )
+          ;
+@end example
+
+如果它与字符串 @samp{"A"} 匹配，将返回
+
+@example
+( "A" )
+@end example
+
+如果像这样使用这个规则：
+
+@example
+%token <punctuation> EQUAL "="
+@dots{}
+assign: any-symbol EQUAL any-symbol
+        ( $1 $3 )
+      ;
+@end example
+
+它将匹配 @samp{"A=B"}，并返回
+
+@example
+( ("A") ("B") )
+@end example
+
+字母 @samp{A} 和 @samp{B} 再次出现在列表中，因为 @samp{any-symbol} 是非终结符，而不是实际的词汇元素。
+
+为了获得更好的非终结符结果，请使用 @asis{,} 来拼接列表，如下所示：
+
+@example
+%token <punctuation> EQUAL "="
+@dots{}
+assign: any-symbol EQUAL any-symbol
+        ( ,$1 ,$3 )
+      ;
+@end example
+
+这会返回
+
+@example
+( "A" "B" )
+@end example
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+
+@include doclicense.texi
+
+@c There is nothing to index at the moment.
+@ignore
+@node Index
+@unnumbered Index
+@printindex cp
+@end ignore
+
+@iftex
+@contents
+@summarycontents
+@end iftex
+
+@bye
+
+@c Following comments are for the benefit of ispell.
+
+@c  LocalWords:  bovinator inlined

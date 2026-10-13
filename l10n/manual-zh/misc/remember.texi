@@ -1,0 +1,325 @@
+\输入 texinfo @c -*- 模式：texinfo；编码：utf-8 -*-
+@c %**start of header
+@setfilename ../../info/remember.info
+@settitle 记住手册
+@documentlanguage en
+@include docstyle.texi
+@include emacsver.texi
+@syncodeindex fn cp
+@c %**end of header
+
+@copying
+本手册适用于随 Emacs @value{EMACSVER} 分发的记住模式。
+
+版权所有 @copyright{} 2001、2004--2005、2007--2026 自由软件基金会
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* Remember: (remember).          Emacs 的简单信息管理器。
+@end direntry
+
+@titlepage
+@title 记住模式指南
+@subtitle 一个简单的信息管理器
+@subtitle 对于 Emacs
+
+@c The following two commands
+@c start the copyright page.
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top Remember
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Preface::                      关于文档。
+* Introduction::                 什么是记忆模式？
+* Implementation::               Remember 是如何诞生的。
+* Quick Start::                  开始使用 Remember。
+* Function Reference::           Remember.el 中的交互功能。
+* Keystrokes::                   按键绑定在记住模式下。
+* Backends::                     用于保存笔记的后端。
+* GNU Free Documentation License::   本文档的许可证。
+* Concept Index::                搜索术语。
+
+@detailmenu
+--- 详细节点列表 ---
+
+后端
+
+* Text File::                    保存到文本文件。
+* Separate Text Files::          保存到单独的文本文件。
+* Diary::                        保存到日记文件。
+* Mailbox::                      保存到邮箱。
+* Org::                          保存到组织模式文件。
+
+@end detailmenu
+@end menu
+
+@node Preface
+@chapter 前言
+
+本文档描述了 Remember.el，它由 John Wiegley 编写，曾经由 Sacha Chua 维护，现在由 Emacs 开发人员维护。
+
+本文档正在开发中，我们将非常感谢您的贡献。
+
+@node Introduction
+@chapter 介绍
+
+待办事项列表、日程安排、电话数据库……我们使用数据库所做的一切实际上只是扩展我们记忆力的一种方式，以便能够记住我们的意识当前可能无法访问的内容。
+
+有许多不同的数据库——而且是好的数据库——这种模式并不试图取代它们。  相反，问题在于数据如何到达那里。  大多数时候，我们只想说“记住某某的电话号码，或者我今晚必须给猫买晚餐。”这就是事实@. 它的存储方式实际上是计算机的问题。  但在这个时候，这绝对也是用户的问题，有时非常费力，以至于人们只是让数据溜走，而不是花费精力去记录它。
+
+“记住”是一种记忆数据的模式。  它使用任何适合的后端来记录和关联数据，但其主要目的是允许您预先表达尽可能的 @emph{little} 结构。  如果您稍后想要表达数据之间更强大的关系，或者陈述最初过于隐含而无法识别的假设，您可以稍后“研究”数据并重新排列它。  但最初的“记住这一点”的冲动应该尽可能接近简单地将数据扔给 Emacs。
+
+您是否注意到，从长远来看，拥有一台笔记本电脑来书写并不会 @emph{actually} 增加您产出的优质材料的数量？  也许是因为我们以某种方式通过电子方式节省了时间，但同时又以另一种方式失去了电子方式的时间；工具永远不应该占据人们的注意力。  正如神秘主义者 Farīd ud-Dīn ʿAṭṭār 所写：“尽可能少地关注外在世界的事物，而多关注内在世界的事物；那么正确的行动将战胜不行动。”
+
+如果 Emacs 可以成为一个更智能的数据存储，集思广益将集中于所涉及的 @emph{ideas}，而不是这些想法的结构和格式，或者必须停止当前的工作流程来记录它们，它将更接近地映射到思维（好吧，至少是我的）的工作方式，从而消除计算机从一开始就被认为能够减少的手动性。
+
+@node Implementation
+@chapter 执行
+
+Hyperbole 作为一种数据呈现工具，总是让我觉得非常强大，但在数据真正可用之前，它似乎需要大量的“前端”工作。  BBDB（或保存 Bibl 模式文件）的问题在于，您必须使用不同的函数来记录数据，并且总是需要时间来停止您正在做的事情，以特定数据接口期望的方式格式化数据，然后恢复您的工作。
+
+使用“记住”，您只需按@kbd{M-x remember}（您可能希望将其绑定到易于访问的击键，例如@kbd{C-x M-r}），随心所欲地猛击文本，然后按@kbd{C-c C-c}。它将数据归档以供以后检索，并可能建立索引。
+
+索引对于数据来说就像现实世界中的“学习”一样。  当你学习（或者对我们中的一些人来说是深入研究）时，你所做的就是认识数据中隐含的某些关系，以便你可以利用这些关系。  表达你记得的某句话是文学引言，并且你希望能够调出所有文学性质的引言，这就是学习的作用。  这是一项比最初记忆数据更加耗费人力的任务，并且在现实生活中通常会留出一段特殊的时间来完成这项工作。
+
+“记住”以同样的方式起作用。  当您输入数据时，无论是通过将其输入缓冲区，还是使用所选区域的内容，它都会将该数据（未索引、未解释）存储在数据池中。它还会尝试记住尽可能多的上下文信息（设置的任何文本属性、从何处复制、何时复制、如何复制等）。  稍后，您可以浏览积累的数据集（有组织的和无组织的），并轻松地开始移动数据，并制作注释来表达您所知道的数据的全部含义。
+
+显然，后一个阶段的用户界面更加密集，如果“记住”能够尽可能优雅地完成它，而不是需要十亿次击键来重新组织层次结构，那就太好了。  好吧，随着未来的到来，希望经验和用户反馈将有助于使其成为尽可能直观的工具。
+
+@node Quick Start
+@chapter 快速入门
+
+@itemize
+
+@item 
+输入@kbd{M-x remember}。  应显示 @file{*Remember*} 缓冲区。
+
+@item 
+输入您想要记住的内容。  第一行将被视为标题，缓冲区的其余部分将包含注释的正文。
+
+@item 
+输入 @kbd{C-c C-c} (@code{remember-finalize}) 保存注释并关闭 @file{*Remember*} 缓冲区。
+@end itemize
+
+默认情况下，@code{remember-finalize} 将注释保存在@file{~/emacs.d/notes} 中。您现在可以编辑它以查看记住的和带时间戳的注释。  您可以根据需要编辑此文件。  新条目将始终添加到末尾。
+
+要记住文本区域，请使用通用前缀。  @kbd{C-u M-x remember} 显示 @file{*Remember*} 缓冲区，该区域作为初始内容。
+
+作为一个简单的开始，您可以从使用文本文件后端开始，将 @file{~/.emacs.d/notes} 文件保持为大纲模式格式，最后一个条目称为 @samp{* Raw data}。  记住的数据将添加到文件末尾。  您经常可以将附加到其他文件的数据移动到其他文件中，或重新组织文档。
+
+您还可以将记住的数据存储在其他后端中。  @xref{Backends}。
+
+以下是使用以下模式将初始化文件 (@pxref{Init File, , The Emacs Initialization File, emacs, GNU Emacs Manual}) 中的记住函数映射到易于访问的击键设施的一种方法：
+
+@lisp
+(keymap-set global-map "<f9> r" 'remember)
+(keymap-set global-map "<f9> R" 'remember-region)
+@end lisp
+
+@cindex annotation
+默认情况下，记住使用 @code{remember-annotation-functions} 返回的第一个注释。  要包含所有注释，请将 @code{remember-run-all-annotation-functions-flag} 设置为非 @code{nil} 值。
+
+@defopt remember-run-all-annotation-functions-flag
+非@code{nil}表示使用@code{remember-annotation-functions}返回的所有注释。
+@end defopt
+
+您可以编写使用不同的记住注释函数集的自定义函数。  例如：
+
+@lisp
+(defun my/remember-with-filename ()
+ "Always use the filename."
+ (interactive)
+ (let ((remember-annotation-functions '(buffer-file-name)))
+  (call-interactively 'remember)))
+@end lisp
+
+@cindex notes
+@code{remember-notes} 命令创建一个 @dfn{notes} 缓冲区，用于访问选项 @code{remember-data-file} 指定的文件。选项@code{remember-notes-buffer-name}指定缓冲区的名称。  缓冲区使用@code{remember-notes-initial-major-mode}和@code{remember-notes-mode}次要模式。  使用 @kbd{C-c C-c} 保存并隐藏缓冲区。  命令 @code{save-some-buffers} 无需询问即可保存该缓冲区。  此功能适合 @code{initial-buffer-choice} 的设置。
+
+
+@node Function Reference
+@chapter 功能参考
+
+@file{remember.el}定义了以下交互函数：
+
+@defun remember &optional initial
+记住任意一段数据。  有了前缀，它将使用该区域作为@var{initial}。
+@end defun
+
+@defun remember-other-frame &optional initial
+与 @code{remember} 类似，但使用新框架。
+@end defun
+
+@defun remember-region &optional beg end
+如果从记住缓冲区内调用，@var{beg}和@var{end}将被忽略，并且整个缓冲区将被记住。  如果从任何其他缓冲区调用，该区域以及特定于该区域的任何上下文信息都将被记住。
+@end defun
+
+@defun remember-clipboard
+记住当前剪贴板的内容。  这对于记住 Web 浏览器或其他 X Windows 应用程序中的内容最有用。
+@end defun
+
+@defun remember-finalize
+记住当前缓冲区的内容。
+@end defun
+
+@defun remember-destroy
+销毁当前的记忆缓冲区。
+@end defun
+
+@defun remember-mode
+这将进入主模式 (@pxref{Major Modes, , Major Modes, emacs, GNU Emacs Manual})，以从 @code{remember} 输出。  该缓冲区用于收集您想要记住的数据。  输入完成后，只需按@kbd{C-c C-c}，它就会继续将数据归档以供以后检索和可能的索引。
+@end defun
+
+@defun remember-notes &optional switch-to
+这将返回音符缓冲区，如果需要的话创建它，并在交互调用时切换到它（或者如果@var{switch-to}是非@code{nil}）。音符缓冲区访问@code{remember-data-file}，并命名为@code{remember-notes-buffer-name}。  它使用 @code{remember-notes-initial-major-mode} 和 @code{remember-notes-mode} 小模式。
+@end defun
+
+@defun remember-notes-mode &optional arg
+这是音符缓冲区的次要模式。  它设置@code{buffer-save-without-query}，以便@code{save-some-buffers}将在不询问的情况下保存音符缓冲区。  使用@kbd{C-c C-c}运行命令@code{remember-notes-save-and-bury-buffer}。
+@end defun
+
+@defun remember-notes-save-and-bury-buffer
+保存（如果被修改）并埋葬当前缓冲区。
+@end defun
+
+@node Keystrokes
+@chapter 按键参考
+
+@file{remember.el} 默认定义以下键绑定：
+
+@table @kbd
+
+@item C-c C-c
+@itemx C-x C-s
+记住当前缓冲区的内容 (@code{remember-finalize})。
+
+@item C-c C-k
+销毁当前的 @file{*Remember*} 缓冲区 (@code{remember-destroy})。
+
+@end table
+
+@node Backends
+@chapter 后端
+
+您可以将记住的笔记保存到各种后端。
+
+@menu
+* Text File::                    保存到文本文件。
+* Separate Text Files::          保存到单独的文本文件。
+* Diary::                        保存到日记文件。
+* Mailbox::                      保存到邮箱。
+* Org::                          保存到组织模式文件。
+@end menu
+
+@node Text File
+@section 保存到文本文件
+@cindex text file, saving to
+
+@subheading 影射
+
+@lisp
+(setq remember-handler-functions '(remember-append-to-file))
+@end lisp
+
+@subheading 选项
+
+@defopt remember-data-file
+存储未处理数据的文件。
+@end defopt
+
+@defopt remember-leader-text
+用于开始每个记忆项目的文本。
+@end defopt
+
+
+@node Separate Text Files
+@section 保存到单独的文本文件
+@cindex text files, saving to separate
+
+@subheading 影射
+
+@lisp
+(setq remember-handler-functions '(remember-store-in-files))
+@end lisp
+
+@subheading 选项
+
+@defopt remember-data-directory
+将记忆数据存储为文件的目录。
+@end defopt
+
+@defopt remember-directory-file-name-format
+用于命名记住目录中的文件的格式字符串。文件名是通过在保存时调用 @code{format-time-string} 使用此格式字符串形成的。
+@end defopt
+
+
+@node Diary
+@section 保存到日记文件
+@cindex diary, integration
+
+@subheading 影射
+
+@lisp
+(add-to-list 'remember-handler-functions 'remember-diary-extract-entries)
+@end lisp
+
+@subheading 选项
+
+@defopt remember-diary-file
+提取日记条目的文件。如果这是 @code{nil}，则将使用 @code{diary-file} 代替。
+@end defopt
+
+@node Mailbox
+@section 保存到邮箱
+@cindex mailbox, saving to
+
+@subheading 影射
+
+@lisp
+(add-to-list 'remember-handler-functions 'remember-store-in-mailbox)
+@end lisp
+
+@subheading 选项
+
+@defopt remember-mailbox
+将记忆数据存储为邮件的文件。
+@end defopt
+
+@defopt remember-default-priority
+记住的邮件消息的默认优先级。
+@end defopt
+
+@node Org
+@section 保存到组织模式文件
+@cindex org mode, integration
+
+有关如何将 Remember 与 Org Mode 集成的说明，请参阅 @ref{Capture, , , org}。
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Concept Index
+@unnumbered 指数
+
+@printindex cp
+
+@bye

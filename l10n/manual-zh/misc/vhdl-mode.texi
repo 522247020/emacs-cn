@@ -1,0 +1,753 @@
+\输入 texinfo @c -*- texinfo -*-
+
+@setfilename ../../info/vhdl-mode.info
+@settitle VHDL 模式，一种用于编辑 VHDL 代码的 Emacs 模式
+@documentlanguage en
+@include docstyle.texi
+
+@c Adapted from the VHDL Mode texinfo manual version 2 by Rodney J. Whitby.
+@c Adapted from the CC Mode texinfo manual by Barry A. Warsaw.
+
+@copying
+此文件记录了 VHDL 模式，这是一种用于编辑 VHDL 代码的 Emacs 模式。
+
+版权所有 @copyright{} 1995--2008, 2010, 2012, 2015--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs editing modes
+@direntry
+* VHDL Mode: (vhdl-mode).        用于编辑 VHDL 代码的 Emacs 模式。
+@end direntry
+
+@finalout
+
+@titlepage
+@title VHDL模式
+@sp 2
+@subtitle 用于编辑 VHDL 代码的 GNU Emacs 模式。
+@sp 2
+@author Reto Zimmermann
+@author @email{reto@@gnu.org}
+@author Rod Whitby
+@author @email{software.vhdl-mode@@rwhitby.net}
+
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top VHDL Mode, an Emacs mode for editing VHDL code
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Introduction::
+* Getting Connected::
+* New Indentation Engine::
+* Customizing Indentation::
+* Syntactic Symbols::
+* Frequently Asked Questions::
+* Getting the latest VHDL Mode release::
+* Sample Init File::
+* Limitations and Known Bugs::
+* Mailing Lists and Submitting Bug Reports::
+* GNU Free Documentation License::  本文档的许可证。
+* Concept Index::
+* Command Index::                命令索引
+* Key Index::                    关键指标
+* Variable Index::               变量索引
+@end menu
+
+@node     Introduction
+@chapter 介绍
+@cindex   Introduction
+
+欢迎使用 VHDL 模式。  这是用于编辑包含 VHDL 代码的文件的 GNU Emacs 模式。
+
+本手册将描述以下内容：
+
+@itemize @bullet
+@item 
+如何开始使用 VHDL 模式。
+
+@item 
+压痕引擎如何工作。
+
+@item 
+如何自定义缩进引擎。
+
+@end itemize
+
+@findex vhdl-version
+主要版本号增加到 3，并在新的缩进引擎中添加了许多用于编辑 VHDL 代码的新功能，该引擎在主要版本 2 中引入。要查找此版本的次要修订号，请使用 @kbd{M-x vhdl-version @key{RET}}。
+
+特别感谢编写 VHDL 模式缩进引擎的 Rod Whitby 和编写构成其基础的 CC 模式缩进引擎的 Barry Warsaw。  他们的手册也是本手册的基础。
+
+本手册不是最新的。  它基本上包含 Rod Whitby 的压痕机文档，仅进行了少量修改。  通过键入@kbd{C-c C-h}，可以在模式本身中获得整个 VHDL 模式的简短文档。  此外，所有命令和大多数变量的自定义都可以通过菜单获得，这使得一切都非常不言自明。
+
+@node     Getting Connected
+@chapter 建立联系
+@cindex   Getting Connected
+
+首先，只需访问 Emacs 中的 @file{.vhd} 文件即可；或输入@kbd{M-x vhdl-mode @key{RET}}。
+
+@node     New Indentation Engine
+@chapter 新的压痕引擎
+@cindex   New Indentation Engine
+
+VHDL 模式具有新的缩进引擎，为自定义缩进提供了简化但灵活且通用的机制。  它将压痕计算分为两个步骤。  首先，对于缩进的代码行，VHDL 模式会分析它正在查看的语言结构类型，然后根据此分析将用户定义的偏移量应用到当前行。
+
+本节将简要介绍如何在 VHDL 模式下计算缩进。  了解所使用的缩进模型非常重要，这样您才能知道如何根据您的个人编码风格自定义 VHDL 模式。
+
+@menu
+* Syntactic Analysis::        第一步——句法分析
+* Indentation Calculation::   第 2 步——压痕计算
+@end menu
+
+@node  Syntactic Analysis
+@section 句法分析
+@cindex   Syntactic Analysis
+
+@vindex vhdl-offsets-alist
+@vindex offsets-alist @r{(vhdl-)}
+@cindex relative buffer position
+@cindex syntactic symbol
+@cindex syntactic component
+@cindex syntactic component list
+@cindex relative buffer position
+VHDL 模式在缩进一行代码时所做的第一件事是分析该行，确定该行上构造的 @dfn{syntactic component list}。  @dfn{syntactic component} 由一对信息组成（用 Lisp 的话说，a @emph{cons cell}），其中第一部分是 @dfn{syntactic symbol}，第二部分是 @dfn{relative buffer position}。  语法符号描述 VHDL 代码的元素，例如 @code{statement}、@code{comment}、@code{block-open}、@code{block-close} 等 @xref{Syntactic Symbols}，获取当前识别的语法符号及其语义的完整列表。  此外，变量 @code{vhdl-offsets-alist} 包含当前支持的语法符号的列表。
+
+从概念上讲，一行 VHDL 代码总是相对于缓冲区中较高的某些行的缩进进行缩进。  这由句法组件中的相对缓冲区位置来表示。
+
+看一个例子可能会有所帮助。  假设我们有以下代码作为 VHDL 模式缓冲区@footnote{The line numbers in this and future examples don't actually appear in the buffer.}中的唯一内容：
+@example
+@group
+
+  1: inverter : process
+  2: begin
+  3:   q <= not d;
+  4:   wait on d;
+  5: end inverter;
+
+@end group
+@end example
+
+@kindex C-c C-x
+@findex vhdl-show-syntactic-information
+@findex show-syntactic-information @r{(vhdl-)}
+我们可以使用命令 @kbd{C-c C-x} (@code{vhdl-show-syntactic-information}) 来简单地报告当前行的语法分析结果。  在示例 1 的第 4 行运行此命令，我们会在回显区域看到：
+@example
+
+((statement . 28))
+
+@end example
+
+这告诉我们该行是一条语句，并且它相对于缓冲区位置 28 缩进，这恰好是第 3 行上的 @samp{q}。如果您将点移动到第 3 行并点击 @kbd{C-c C-x}，您将看到：
+@example
+
+((statement-block-intro . 20))
+
+@end example
+
+这表明第 3 行是块中的第一个语句，并且相对于缓冲区位置 20 缩进，即第 2 行 @code{begin} 关键字中的 @samp{b}。
+
+@cindex comment only line
+语法组件列表可以包含多个组件，并且各个语法组件不需要具有相对的缓冲区位置。最常见的示例是包含 @dfn{comment only line} 的行。
+@example
+@group
+
+%%% TBD %%%
+
+@end group
+@end example
+
+@noindent
+在示例的第 3 行点击 @kbd{C-c C-x} 可以得到：
+@example
+
+((comment-intro) (block-intro . 46))
+
+@end example
+
+@noindent
+所以你可以看到句法成分列表包含两个句法成分。  另请注意，第一个组件 @samp{(comment-intro)} 没有相对缓冲区位置。
+
+@node  Indentation Calculation
+@section 压痕计算
+@cindex   Indentation Calculation
+
+@vindex vhdl-offsets-alist
+@vindex offsets-alist @r{(vhdl-)}
+当前行的缩进是使用上面步骤 1 中导出的语法组件列表计算的 (@pxref{Syntactic Analysis})。  每个组件以两种方式影响该行的最终总缩进。
+
+首先，在 @code{vhdl-offsets-alist} 变量中查找语法符号，该变量是语法符号和应用于这些符号的偏移量的关联列表。  这些偏移量将添加到运行总计中。
+
+其次，如果组件具有相对缓冲区位置，VHDL 模式会将该位置的列号添加到运行总计中。  通过将列表中每个语法组件的偏移量和列相加，计算出当前行的最终总缩进量。
+
+让我们使用上面的代码示例来看看它是如何工作的。  这又是我们的例子。
+@example
+@group
+
+  1: inverter : process
+  2: begin
+  3:   q <= not d;
+  4:   wait on d;
+  5: end inverter;
+
+@end group
+@end example
+
+@kindex TAB
+假设点位于第 3 行，我们按 @key{TAB} 键重新缩进该行。  请记住，该行的语法组件列表是：
+@example
+
+((statement-block-intro . 20))
+
+@end example
+
+@noindent
+VHDL 模式在 @code{vhdl-offsets-alist} 变量中查找 @code{statement-block-intro}。  假设它找到了值 @samp{2}；它将其添加到运行总数中（初始化为零），产生 2 个空格的运行总数缩进。
+
+接下来，VHDL 模式转到缓冲区位置 20 并询问当前列。  由于缓冲区位置 20 处的 @code{begin} 关键字位于第 0 列，因此它将 @samp{0} 添加到运行总计中。  由于该行的列表中只有一个语法组件，因此缩进计算已完成，并且该行的总缩进为 2 个空格。很简单吧？
+
+实际上，该模式通常只是做正确的事情，而无需您考虑这么多细节。  但是，在自定义缩进时，了解所使用的一般缩进模型会很有帮助。
+
+@vindex vhdl-echo-syntactic-information-p
+@vindex echo-syntactic-information-p @r{(vhdl-)}
+@cindex @key{TAB}
+为了帮助您配置 VHDL 模式，您可以将变量 @code{vhdl-echo-syntactic-information-p} 设置为非 @code{nil}，以便当您点击 @kbd{@key{TAB}} 时，语法组件列表和计算的偏移量将始终在迷你缓冲区中回显。
+
+
+@ignore
+@node  Indentation Commands
+@chapter  Indentation Commands
+@cindex   Indentation Commands
+
+@strong{<TBD>}
+@end ignore
+
+
+@node     Customizing Indentation
+@chapter 自定义缩进
+@cindex   Customizing Indentation
+
+@cindex @code{vhdl-set-offset}
+@cindex set-offset (vhdl-)
+@code{vhdl-offsets-alist} 变量是您自定义所有缩进的位置。  您只需决定要为每个语法符号添加哪些附加偏移量。  您可以使用命令 @kbd{C-c O} (@code{vhdl-set-offset}) 作为设置偏移量的方式，无论是交互方式还是从模式挂钩。  另外，您还可以设置 @emph{styles} 缩进。  最有可能的是，您会发现其中一种预定义样式能够满足您的需求，但如果没有，本节将介绍如何设置基本编辑配置。  @xref{Styles}，了解如何设置命名样式的说明。
+
+@cindex @code{vhdl-basic-offset}
+@cindex basic-offset (vhdl-)
+如前所述，变量@code{vhdl-offsets-alist}是语法符号和要应用于这些符号的偏移量之间的关联列表。  事实上，这些偏移值可以是整数、函数或变量名称，或者以下符号之一：@code{+}、@code{-}、@code{++}、@code{--}、@code{*} 或@code{/}。  符号值的含义如下：
+
+@itemize @bullet
+
+@item 
+@code{+} -- 1 x @code{vhdl-basic-offset}
+@item 
+@code{-} -- -1 x @code{vhdl-basic-offset}
+@item 
+@code{++} -- 2 x @code{vhdl-basic-offset}
+@item 
+@code{--} -- -2 x @code{vhdl-basic-offset}
+@item 
+@code{*} -- 0.5 x @code{vhdl-basic-offset}
+@item 
+@code{/} -- -0.5 x @code{vhdl-basic-offset}
+
+@end itemize
+
+@noindent
+因此，举例来说，因为大多数默认偏移量都是根据 @code{+}、@code{-} 和 @code{0} 定义的，如果您喜欢一般缩进样式，但每个级别使用 2 个空格而不是 4 个空格，那么您可能只需通过更改 @code{vhdl-basic-offset} 即可实现您的样式（在您的 @file{.emacs} 文件中）：
+@example
+
+(setq vhdl-basic-offset 2)
+
+@end example
+
+要更彻底地更改缩进样式，您需要更改与 @code{vhdl-offsets-alist} 变量中的语法符号关联的值。  首先，我将向您展示如何以交互方式执行此操作，然后我将描述如何对 @file{.emacs} 文件进行更改，以便您的更改更加永久。
+
+@menu
+* Interactive Customization::
+* Permanent Customization::
+* Styles::
+* Advanced Customizations::
+@end menu
+
+@node     Interactive Customization
+@section 互动定制
+@cindex   Interactive Customization
+
+作为如何自定义缩进的示例，让我们将上面示例的样式更改为：
+@example
+@group
+
+  1: inverter : process
+  2: begin
+  3:   q <= not d;
+  4:   wait on d;
+  5: end inverter;
+
+@end group
+@end example
+@noindent
+到：
+@example
+@group
+
+  1: inverter : process
+  2: begin
+  3:     q <= not d;
+  4:     wait on d;
+  5: end inverter;
+
+@end group
+@end example
+
+换句话说，我们想要更改逆变器进程内语句的缩进。  请注意，我们要更改的结构从第 3 行开始。要更改行的缩进，我们需要查看哪个语法组件影响该行的偏移量计算。  在第 3 行点击 @kbd{C-c C-x} 会产生：
+@example
+
+((statement-block-intro . 20))
+
+@end example
+
+@findex vhdl-set-offset
+@findex set-offset @r{(vhdl-)}
+@kindex C-c O
+@noindent
+所以我们知道，要更改第一个信号分配的偏移量，我们需要更改 @code{statement-block-intro} 语法符号的缩进。  要以交互方式执行此操作，只需点击 @kbd{C-c O} (@code{vhdl-set-offset})。  这会提示您更改语法符号，从而提供合理的默认值。  在本例中，默认值是@code{statement-block-intro}，这正是我们要更改的语法符号！
+
+按回车键后，VHDL 模式将提示您输入新的偏移值，旧值作为默认值。  本例中的默认值为 @samp{+}，因此请按退格键删除 @samp{+}，然后按 @samp{++} 和 @kbd{RET}。  这会将基本缩进两倍的偏移量与 @code{vhdl-offsets-alist} 变量中的语法符号 @code{statement-block-intro} 相关联。
+
+@findex vhdl-indent-defun
+@findex indent-defun @r{(vhdl-)}
+要快速检查更改，只需输入 @kbd{M-x vhdl-indent-defun} 重新缩进整个函数。  该示例现在应如下所示：
+@example
+@group
+
+  1: inverter : process
+  2: begin
+  3:     q <= not d;
+  4:     wait on d;
+  5: end inverter;
+
+@end group
+@end example
+
+请注意，我们只需更改第 3 行的偏移量即可。由于其他受影响的行相对于第 3 行缩进，因此它们会按照您期望的方式自动缩进。  对于更复杂的示例，这可能并不总是有效。  一般采取的方法是始终开始调整文件中较高行的偏移量，然后重新缩进并查看是否有任何后续行需要进一步调整。
+
+@node     Permanent Customization
+@section 永久压痕
+@cindex   Permanent Indentation
+
+@vindex vhdl-mode-hook
+@cindex hooks
+要使此更改永久生效，您需要将一些 Lisp 代码添加到您的 @file{.emacs} 文件中。  VHDL 模式提供了@code{vhdl-mode-hook}，您可以使用它来自定义语言编辑样式。  当您进入 VHDL 模式时，此挂钩将作为最后一件事运行。
+
+以下是一个简化示例，说明您可以添加到 @file{.emacs} 文件中以使上一节 (@ref{Interactive Customization}) 中描述的更改更加永久。  有关通过挂钩自定义 Emacs 的更多信息，请参阅 Emacs 手册。 @xref{Sample Init File}，获取更完整的示例 @file{.emacs} 文件。
+
+@example
+@group
+
+(defun my-vhdl-mode-hook ()
+  ;; my customizations for all of vhdl-mode
+  (vhdl-set-offset 'statement-block-intro '++)
+  ;; other customizations can go here
+  )
+(add-hook 'vhdl-mode-hook 'my-vhdl-mode-hook)
+
+@end group
+@end example
+
+对于复杂的自定义，您可能需要设置一个 @emph{style} 将所有自定义分组到一个名称下。  @xref{Styles}。
+
+偏移值也可以是一个函数，这就是高级用户在自定义缩进方面获得巨大灵活性的方式。  @xref{Advanced Customizations}。
+
+@node     Styles
+@section 风格
+@cindex   Styles
+
+大多数人只需要编辑一些定义明确且一致的样式格式的代码。  例如，他们的组织可能会强加一种“受祝福的”风格，所有程序员都必须遵守。  同样，从事 GNU 软件工作的人也必须在 C 代码上使用 GNU 编码风格。  有些商店更宽松，允许多种编码风格，并且随着程序员的来来去去，可能会使用多种风格。  因此，VHDL 模式使您可以方便地设置称为 @dfn{styles} 的自定义逻辑分组，为任何特定样式关联单个名称，并非常轻松地开始使用这些样式编辑新的或现有的代码。  本章介绍如何设置样式以及如何使用样式编辑 C 代码。
+
+@menu
+* Built-in Styles::
+* Adding Styles::
+* File Styles::
+@end menu
+
+
+@node     Built-in Styles
+@subsection 内置样式
+@cindex   Built-in Styles
+
+如果您幸运的话，VHDL 模式的内置样式之一可能正是您正在寻找的。  一些最常见的 VHDL 样式已经内置。  这些包括：
+
+@itemize @bullet
+@item 
+@cindex IEEE style
+@code{GNU}——IEEE语言参考手册中的编码风格。
+
+@end itemize
+
+@findex vhdl-set-style
+@findex set-style @r{(vhdl-)}
+如果您想尝试这些内置样式，只需在 VHDL 模式缓冲区中键入 @kbd{M-x vhdl-set-style @key{RET}} 即可。
+
+系统将提示您选择上述样式之一（需完成）。输入一种样式并点击@kbd{RET}。  但请注意，以这种方式设置样式会 @emph{not} 自动重新缩进您的文件。
+@ignore
+For commands that you can use to view the effect of your changes, see
+@ref{Indentation Commands}.
+@end ignore
+
+一旦找到您喜欢的内置样式，您可以通过添加对 @file{.emacs} 文件的调用来使更改永久化。  举例来说，假设您想在所有文件中使用 @code{IEEE} 样式。  你可以添加这个：
+@example
+@group
+
+(defun my-vhdl-mode-hook ()
+  ;; use IEEE style for all VHDL code
+  (vhdl-set-style "IEEE")
+  ;; other customizations can go here
+  )
+(add-hook 'vhdl-mode-hook 'my-vhdl-mode-hook)
+
+@end group
+@end example
+
+@noindent
+@xref{Permanent Customization}.
+
+@node     Adding Styles
+@subsection 添加样式
+@cindex   Adding Styles
+
+@vindex vhdl-style-alist
+@vindex style-alist @r{(vhdl-)}
+@findex vhdl-add-style
+@findex add-style @r{(vhdl-)}
+如果没有一个内置样式合适，您可能需要添加新的样式定义。  样式保存在 @code{vhdl-style-alist} 变量中，但您可能不想直接修改此变量。 VHDL 模式提供了一个名为 @code{vhdl-add-style} 的函数，您可以使用它轻松添加新样式或更新现有样式。  该函数接受两个参数，一个 @var{stylename} 字符串和一个样式自定义关联列表 @var{description}。  如果 @var{stylename} 尚未在 @code{vhdl-style-alist} 中，则添加新样式，否则已与 @var{stylename} 关联的样式将更改为新的 @var{description}。  该函数还采用可选的第三个参数，如果该参数非 @code{nil} ，则会自动在当前缓冲区中建立新样式。
+
+示例 @file{.emacs} 文件提供了如何添加和自动设置新样式的具体示例。  @xref{Sample Init File}。
+
+@node     File Styles
+@subsection 文件样式
+@cindex   File Styles
+
+@cindex local variables
+Emacs 手册描述了如何通过在文件末尾包含 @dfn{Local Variable} 块来自定义每个文件的某些变量。  到目前为止，您只看到了 VHDL 模式的功能接口，这对于在局部变量块中使用非常不方便。  VHDL 模式提供两个变量，使您可以更轻松地基于每个文件自定义样式。
+
+@vindex vhdl-file-style
+@vindex file-style @r{(vhdl-)}
+@vindex vhdl-file-offsets
+@vindex file-offsets @r{(vhdl-)}
+
+变量@code{vhdl-file-style}可以设置为样式名称字符串，如@ref{Built-in Styles}中所述。  当文件被访问时，VHDL 模式将自动使用@code{vhdl-set-style} 将文件的样式设置为此样式。
+
+@vindex vhdl-offsets-alist
+@vindex offsets-alist @r{(vhdl-)}
+@findex vhdl-set-offset
+@findex set-offset @r{(vhdl-)}
+另一个变量 @code{vhdl-file-offsets} 采用类似于 @code{vhdl-offsets-alist} 中允许的关联列表。  当访问文件时，VHDL 模式将使用 @code{vhdl-set-offset} 自动建立这些偏移量。  @xref{Customizing Indentation}。
+
+请注意，文件样式设置（即 @code{vhdl-file-style}）在文件偏移设置（即 @code{vhdl-file-offsets}）之前应用。
+
+
+@node     Advanced Customizations
+@section 高级定制
+@cindex   Advanced Customizations
+
+@vindex vhdl-style-alist
+@vindex style-alist @r{(vhdl-)}
+@vindex vhdl-basic-offset
+@vindex basic-offset @r{(vhdl-)}
+对于大多数用户来说，VHDL 模式将支持他们的编码风格，几乎不需要自定义。  通常，@code{vhdl-style-alist} 中定义的标准样式之一就可以解决问题。  有时，需要稍微调整其中一个语法符号偏移量，或者可能需要更改 @code{vhdl-basic-offset}。  然而，某些样式需要更高级的定制能力，而VHDL模式的真正优势之一是句法分析模型为定制缩进提供了非常灵活的框架。  这允许您针对模式未直接处理的情况执行特殊的缩进计算。
+
+@menu
+* Custom Indentation Functions::
+* Other Special Indentations::
+@end menu
+
+@node     Custom Indentation Functions
+@subsection 自定义缩进函数
+@cindex   Custom Indentation Functions
+
+@cindex custom indentation functions
+自定义 VHDL 模式的最常见方法之一是编写 @dfn{custom indentation functions} 并将它们与特定语法符号 (@pxref{Syntactic Symbols}) 相关联。  VHDL 模式本身使用自定义缩进功能来提供更复杂的缩进，例如在排列选定的信号分配时：
+@example
+@group
+
+%%% TBD %%%
+
+@end group
+@end example
+
+在本例中，@code{statement-cont}语法符号的偏移量为@code{+}，而@code{vhdl-basic-offset}为2，因此第4行到第6行只是在第3行右侧缩进两个空格。但也许我们希望VHDL模式更智能一些，以便它相对于第3行中的信号分配运算符偏移波形描述。为此，我们必须编写一个自定义缩进函数来查找语句第一行的信号赋值运算符列。  下面是实现此功能的 lisp 代码（来自 @file{vhdl-mode.el} 源文件）：
+@example
+@group
+
+(defun vhdl-lineup-statement-cont (langelem)
+  ;; line up statement-cont after the assignment operator
+  (save-excursion
+    (let* ((relpos (cdr langelem))
+	   (assignp (save-excursion
+		     (goto-char (vhdl-point 'boi))
+		     (and (re-search-forward "\\(<\\|:\\)="
+					     (vhdl-point 'eol) t)
+			  (- (point) (vhdl-point 'boi)))))
+	   (curcol (progn
+		     (goto-char relpos)
+		     (current-column)))
+	   foundp)
+      (while (and (not foundp)
+		  (< (point) (vhdl-point 'eol)))
+	(re-search-forward "\\(<\\|:\\)=\\|(" (vhdl-point 'eol) 'move)
+	(if (vhdl-in-literal (cdr langelem))
+	    (forward-char)
+	  (if (= (preceding-char) ?\()
+	      ;; skip over any parenthesized expressions
+	      (goto-char (min (vhdl-point 'eol)
+			      (scan-lists (point) 1 1)))
+	    ;; found an assignment operator (not at eol)
+	    (setq foundp (not (looking-at "\\s-*$"))))))
+      (if (not foundp)
+	  ;; there's no assignment operator on the line
+	  vhdl-basic-offset
+	;; calculate indentation column after assign and ws, unless
+	;; our line contains an assignment operator
+	(if (not assignp)
+	    (progn
+	      (forward-char)
+	      (skip-chars-forward " \t")
+	      (setq assignp 0)))
+	(- (current-column) assignp curcol))
+      )))
+
+@end group
+@end example
+@noindent
+自定义缩进函数采用单个参数，该参数是语法组件 cons 单元 (@pxref{Syntactic Analysis})。  该函数返回一个整数偏移值，该值将添加到该行的运行总缩进中。  请注意，实际返回的是信号赋值运算符所在的列与函数参数中传递的缓冲区相对位置的列之间的差异。  请记住，VHDL 模式会自动添加组件相对缓冲区位置的列，我们不希望将该值添加到最终总数中两次。
+
+@cindex statement-cont syntactic symbol
+@findex vhdl-lineup-statement-cont
+@findex lineup-statement-cont @r{(vhdl-)}
+现在，要将函数 @code{vhdl-lineup-statement-cont} 与 @code{statement-cont} 语法符号关联起来，我们可以向 @code{vhdl-mode-hook} 添加如下内容：
+@example
+
+(vhdl-set-offset 'statement-cont 'vhdl-lineup-statement-cont)
+
+@end example
+
+@findex vhdl-indent-defun
+现在，函数在重新缩进后看起来像这样（使用 @kbd{M-x vhdl-indent-defun}）：
+@example
+@group
+
+%%% TBD %%%
+
+@end group
+@end example
+
+@vindex vhdl-offsets-alist
+@vindex offsets-alist @r{(vhdl-)}
+自定义缩进函数可以像您喜欢的那样简单或复杂，并且出现在 @code{vhdl-offsets-alist} 中的任何语法符号都可以有一个与之关联的自定义缩进函数。  但请注意，使用许多自定义缩进函数可能会对 VHDL 模式的性能产生影响。
+
+@node     Other Special Indentations
+@subsection 其他特殊压痕
+@cindex   Other Special Indentations
+
+@vindex vhdl-special-indent-hook
+@vindex special-indent-hook @r{(vhdl-)}
+您还可以使用另一个变量来自定义 VHDL 模式：@code{vhdl-special-indent-hook}。  这是一个标准的钩子变量，在 VHDL 模式下每行缩进后调用。  您可以使用它来执行您的样式指示的任何特殊缩进或行调整，例如向组件实例化中的端口映射子句添加额外的缩进等。但请注意，您不应在 @code{vhdl-special-indent-hook} 函数内更改 @code{point} 或 @code{mark}。
+
+
+@node  Syntactic Symbols
+@chapter 句法符号
+@cindex   Syntactic Symbols
+
+@vindex vhdl-offsets-alist
+已识别语法符号的完整列表在 @code{vhdl-offsets-alist} 变量中描述。  本章将提供一些示例来帮助阐明这些符号。
+
+@cindex -open syntactic symbols
+@cindex -close syntactic symbols
+大多数语法符号名称遵循通用命名约定。  当一行以 @code{begin} 或 @code{end} 关键字开头时，语法符号将分别包含后缀 @code{-open} 或 @code{-close}。
+
+@cindex -intro syntactic symbols
+@cindex -cont syntactic symbols
+@cindex -block-intro syntactic symbols
+通常，引入构造的第一行和继续构造的行之间是有区别的，并且表示这些行的语法符号将分别包含后缀@code{-intro}或@code{-cont}。  作为该方案的子分类，作为特定块构造的第一行的行将包含后缀@code{-block-intro}。
+
+@strong{<TBD> include the name and a brief example of every syntactic symbol currently recognized}
+
+@node  Frequently Asked Questions
+@chapter 常见问题解答
+@cindex   Frequently Asked Questions
+
+@kindex C-x h
+@kindex ESC C-\
+@kindex ESC C-q
+@kindex ESC C-u
+@kindex RET
+@kindex LFD
+@findex newline-and-indent
+@quotation
+
+@strong{Q.} @emph{How do I re-indent the whole file?}
+
+@strong{A.} 访问文件并点击@kbd{C-x h} 标记整个缓冲区。  然后按@kbd{@key{ESC} C-\}重新缩进刚刚标记的整个区域。  或者直接输入@kbd{M-x vhdl-indent-buffer}。
+@sp 2
+
+@strong{Q.} @emph{How do I re-indent the entire function?}
+
+@strong{A.} 点击 @kbd{@key{ESC} C-h} 标记整个函数。  然后按@kbd{@key{ESC} C-\}重新缩进刚刚标记的整个区域。
+@sp 2
+
+@strong{Q.} @emph{How do I re-indent the current block?}
+
+@strong{A.} 首先移动到用 @kbd{@key{ESC} C-u} 打开块的大括号，然后用 @kbd{@key{ESC} C-q} 重新缩进该表达式。
+@sp 2
+
+@strong{Q.} @emph{How do I re-indent the current statement?}
+
+@strong{A.} 首先使用 @kbd{@key{ESC} a} 移动到语句的开头，然后使用 @kbd{@key{ESC} C-q} 重新缩进该表达式。
+@sp 2
+
+@strong{Q.} @emph{I put @code{(vhdl-set-offset 'statement-cont 0)} in my @file{.emacs} file but I get an error saying that @code{vhdl-set-offset}'s function definition is void.}
+
+@strong{A.} 这意味着在到达 @code{vhdl-set-offset} 调用时，VHDL 模式尚未加载到您的 Emacs 会话中，这很可能是因为 VHDL 模式正在自动加载。  不要将 @code{vhdl-set-offset} 行放入顶级 @file{.emacs} 文件中，而是将其放入 @code{vhdl-mode-hook} 中，或者只需将以下内容添加到 @file{.emacs} 文件的顶部：
+@example
+
+(require 'vhdl-mode)
+
+@end example
+
+有关详细信息，请参阅示例 @file{.emacs} 文件 @ref{Sample Init File}。
+
+@end quotation
+
+
+@node  Getting the latest VHDL Mode release
+@chapter 获取最新的 VHDL 模式版本
+@cindex   Getting the latest VHDL Mode release
+
+确保您始终拥有最新 VHDL 模式版本的最佳方法是加入 @code{vhdl-mode-announce} 邮件列表。  如果您是一个勇敢的灵魂，并且希望参与新版本 VHDL 模式的 Beta 测试，您也可以加入 @code{vhdl-mode-victims} 邮件列表。  向维护者发送电子邮件 @email{reto@@gnu.org} 以加入其中任一列表。
+
+官方 Emacs VHDL 模式主页可以在 @uref{https://www.iis.ee.ethz.ch/~zimmi/emacs/vhdl-mode.html} 找到。
+
+@node  Sample Init File
+@chapter 示例初始化文件
+@cindex   Sample init file
+
+大多数自定义可以使用 VHDL 模式菜单中的“自定义”条目完成，无需编辑 .emacs 文件。如果您想自定义缩进，请执行以下操作：
+
+@example
+;; Here's a sample .emacs file that might help you along the way.  Just
+;; copy this region and paste it into your .emacs file.  You may want to
+;; change some of the actual values.
+
+(defconst my-vhdl-style
+  '((vhdl-tab-always-indent        . t)
+    (vhdl-comment-only-line-offset . 4)
+    (vhdl-offsets-alist            . ((arglist-close    . vhdl-lineup-arglist)
+                                      (statement-cont   . 0)
+                                      (case-alternative . 4)
+                                      (block-open       . 0)))
+    (vhdl-echo-syntactic-information-p . t)
+    )
+  "My VHDL Programming Style")
+
+;; Customizations for vhdl-mode
+(defun my-vhdl-mode-hook ()
+  ;; add my personal style and set it for the current buffer
+  (vhdl-add-style "PERSONAL" my-vhdl-style t)
+  ;; offset customizations not in my-vhdl-style
+  (vhdl-set-offset 'statement-case-intro '++)
+  ;; other customizations
+  (setq tab-width 8
+        ;; this will make sure spaces are used instead of tabs
+        indent-tabs-mode nil)
+  ;; key bindings for VHDL are put in vhdl-mode-map
+  (define-key vhdl-mode-map "\C-m" 'newline-and-indent)
+  )
+
+(add-hook 'vhdl-mode-hook 'my-vhdl-mode-hook)
+@end example
+
+@node  Limitations and Known Bugs
+@chapter 限制和已知错误
+@cindex   Limitations and Known Bugs
+
+@itemize @bullet
+@item 
+重新缩进大区域或表达式可能会很慢。
+
+@ignore
+@item
+The index menu does not work on my XEmacs installation (don't know why).
+@end ignore
+
+@end itemize
+
+@node  Mailing Lists and Submitting Bug Reports
+@chapter 邮件列表和提交错误报告
+@cindex   Mailing Lists and Submitting Bug Reports
+
+@kindex C-c C-b
+@findex vhdl-submit-bug-report
+@findex submit-bug-report @r{(vhdl-)}
+@cindex beta testers mailing list
+@cindex announcement mailing list
+要报告错误，请使用 @kbd{C-c C-b} (@code{vhdl-submit-bug-report}) 命令。  这提供了我重现您的问题所需的重要信息。  确保包含简洁但完整的代码示例。请尝试将您的示例简化为重现问题所需的基本代码，并包含暴露错误所需的准确步骤。  请特别确保包含 @emph{before} 您的错误示例中出现的所有代码。
+
+如需其他帮助或建议，请发送消息至@email{reto@@gnu.org}。
+
+向 @email{reto@@gnu.org} 发送一条添加消息，即可进入 @code{vhdl-mode-victims} Beta 测试者列表，其中发布了 VHDL 模式的 Beta 版本。  请注意，您不应期望测试版本与公开版本一样稳定。
+
+还有一个仅发布的列表，其中发布了 VHDL 模式的最新公开版本。  向 @email{reto@@gnu.org} 发送添加消息以将其添加到此列表中。
+
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+
+@node    Concept Index
+@unnumbered 概念索引
+
+@printindex cp
+
+
+@node    Command Index
+@unnumbered 命令索引
+
+由于所有 VHDL 模式命令都以字符串 @samp{vhdl-} 开头，因此每个命令都出现在其 @code{vhdl-<thing>} 名称和 @code{<thing> (vhdl-)} 名称下。
+@iftex
+@sp 2
+@end iftex
+@printindex fn
+
+
+@node    Key Index
+@unnumbered 关键指标
+
+@printindex ky
+
+
+@node    Variable Index
+@unnumbered 变量索引
+
+由于所有 VHDL 模式变量都以字符串 @samp{vhdl-} 开头，因此每个变量都出现在其 @code{vhdl-<thing>} 名称和 @code{<thing> (vhdl-)} 名称下。
+@iftex
+@sp 2
+@end iftex
+@printindex vr
+
+@bye

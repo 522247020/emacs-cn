@@ -1,0 +1,719 @@
+\输入 texinfo.tex @c -*-texinfo-*-
+@c We must \input texinfo.tex instead of texinfo, otherwise make
+@c distcheck in the Texinfo distribution fails, because the texinfo Info
+@c file is made first, and texi2dvi must include . first in the path.
+@comment %**start of header
+@setfilename info.info
+@settitle 信息
+@documentlanguage en
+@include docstyle.texi
+@syncodeindex fn cp
+@syncodeindex vr cp
+@syncodeindex ky cp
+@comment %**end of header
+
+@copying
+该文件描述了如何使用 Info（菜单驱动的 GNU 文档系统）。
+
+版权所有 @copyright{} 1989, 1992, 1996--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Texinfo documentation system
+@direntry
+* Info: (info).                  如何使用文档浏览系统。
+@end direntry
+
+@titlepage
+@title 信息
+@subtitle 在线超文本 GNU 文档系统
+@author Brian Fox
+@author and the GNU Texinfo community
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top Info: An Introduction
+
+The GNU Project distributes most of its manuals in the
+@dfn{Info format}, which you read using an @dfn{Info reader}.  You are
+probably using an Info reader to read this now.
+
+There are two primary Info readers: @code{info}, a stand-alone program
+designed just to read Info files (@pxref{Top,,What is Info?,
+info-stnd, GNU Info}), and the @code{info} package in GNU Emacs, a
+general-purpose editor.  At present, only the Emacs reader supports
+using a mouse.
+
+@ifinfo
+If you are new to the Info reader and want to learn how to use it,
+type the command @kbd{h} now.  It brings you to a programmed
+instruction sequence.
+
+To read about advanced Info commands, type @kbd{n} twice.  This
+brings you to @cite{Advanced Info Commands}, skipping over the ``Getting
+Started'' chapter.
+
+If you are using Emacs, type @kbd{?} to see a summary of all available
+commands.  In the stand-alone Info reader, type @kbd{H} instead.
+@end ifinfo
+@end ifnottex
+
+@insertcopying
+
+@menu
+* Getting Started::              开始使用信息阅读器。
+* Advanced::                     高级信息命令。
+* Further Reading::              哪里可以了解有关信息文件的更多信息。
+* GNU Free Documentation License::   本文档的许可证。
+* Index::                        主题、命令和变量的索引。
+@end menu
+
+@node Getting Started
+@chapter 入门
+
+本 Info 手册的第一部分描述了如何绕过 Info 内部。  本手册的第二部分介绍了各种高级 Info 命令。  第三部分包含对其他来源的引用，解释了如何从 Texinfo 文件生成 Info 文件。
+
+@ifnotinfo
+本手册主要用于在计算机上使用 Info 阅读器程序进行浏览，以便您可以在阅读 Info 命令的同时尝试它们。  在纸上或使用 HTML 浏览器阅读它的效果较差，因为您必须相信所描述的命令确实按照手册所述进行。  既然你已经有了这本手册，请务必通读一遍。但也请尝试浏览信息版本。
+
+@cindex Info reader, how to invoke
+@cindex entering Info
+有两种方式查看本手册的在线版本：
+
+@enumerate
+@item 
+在 shell 命令行中输入 @code{info}。  此方法使用专门用于读取信息文件的独立程序。
+
+@item 
+在命令行输入@code{emacs}；然后输入@kbd{C-h i}（@kbd{Control-h}，然后输入@kbd{i}）。  此方法使用 Emacs 编辑器的 Info 模式。
+@end enumerate
+
+无论哪种情况，然后输入@kbd{mInfo}（仅字母），然后输入@key{RET}——“Return”或“Enter”键。  此时，您应该准备好按照屏幕上的本手册中的说明进行操作。
+@c FIXME! (pesch@cygnus.com, 14 dec 1992)
+@c Is it worth worrying about what-if the beginner goes to somebody
+@c else's Emacs session, which already has an Info running in the middle
+@c of something---in which case these simple instructions won't work?
+@end ifnotinfo
+
+@menu
+* Help-Small-Screen::    在小屏幕上启动信息。
+* Help::                 如何使用信息。
+* Help-P::               返回上一个节点。
+* Help-^L::              Space、DEL、B 和 ^L 命令。
+* Help-Inv::             Emacs Info 中的不可见文本。
+* Help-M::               菜单。
+* Help-Xref::            以下交叉引用。
+* Help-Int::             一些中间信息命令。
+* Help-Q::               戒烟信息。
+@end menu
+
+@node Help-Small-Screen
+@section 在小屏幕上启动信息
+
+@ifnotinfo
+（在 Info 中，只有当您的终端行数很少时，您才会看到此部分；大多数读者会忽略它而不会看到它。）
+@end ifnotinfo
+
+@cindex small screen, moving around
+由于您的终端屏幕上的行数相对较少，因此有必要在开始时给您特殊建议。
+
+如果您正在查看的整个文本适合屏幕，则文本 @samp{All} 将显示在屏幕底部附近的模式行（通常是反相视频中的行）上。  如果您看到文本 @samp{Top}，则意味着下面还有更多文本不适合。  要向前移动文本并查看另一屏，请按 @key{SPC}（空格键）。  要向后移动，请按标有 @samp{Backspace} 或 @samp{DEL} 的键（在某些键盘上，该键可能标有 @samp{Delete}）。  在图形化 Emacs 中，您还可以使用 @kbd{S-@key{SPC}}（按住 @key{Shift} 键，然后按 @key{SPC}）向后移动，但这在独立的信息阅读器中不起作用（如果您在文本模式终端中使用它，则在 Emacs 中也不起作用）。
+
+@ifinfo
+这里有 40 行垃圾，所以你可以尝试 @key{SPC} 和 @key{DEL} 看看它们的作用。  最后是您下一步应该做什么的说明。
+
+@format
+这是第20行这是第21行这是第22行这是第23行这是第24行这是第25行这是第26行这是第27行这是第28行这是第29行这是第30行这是第31行这是第32行这是第33行这是第34行这是第35行这是第36行这是第37行这是第38行这是行39 这是第40行 这是第41行 这是第42行 这是第43行 这是第44行 这是第45行 这是第46行 这是第47行 这是第48行 这是第49行 这是第50行 这是第51行 这是第52行 这是第53行 这是第54行 这是第55行 这是第56行 这是第57行 这是第58行是第59行
+@end format
+
+如果您已经成功到达这里，请使用@key{DEL}（或@key{BACKSPACE}）返回到开头，然后再次返回这里，那么您就了解了@samp{Space}和@samp{Backspace}键。  现在输入 @kbd{n}——仅一个字符；不要键入引号，也不要随后键入 Return 键——以正常开始课程。
+@end ifinfo
+
+@node Help
+@section 如何使用信息
+
+您正在与程序 Info 交谈，以阅读文档。
+
+有两种使用 Info 的方法：从 Emacs 内部或作为独立的阅读器，您可以使用命令 @command{info} 从 ​​shell 调用。
+
+@cindex node, in Info documents
+现在您正在查看一条 @dfn{Node} 信息。节点包含以特定详细程度描述特定主题的文本。  该节点的主题是“如何使用Info”。  模式行表示这是文件@file{info}中的节点@samp{Help}。
+
+@cindex header of Info node
+节点的顶线是它的@dfn{header}。  该节点的标头（现在看一下）表明该节点之后的 @samp{Next} 节点是名为 @samp{Help-P} 的节点。  高级信息命令可让您转到您知道名称的任何节点。  在独立的信息阅读器程序中，标题行还显示该节点的名称和信息文件。  在 Emacs 中，标题行以特殊字体显示，并且即使滚动节点也始终保持在窗口顶部。
+
+除了@samp{Next}之外，节点还可以有@samp{Previous}链接，或@samp{Up}链接，或两者兼而有之。  正如您所看到的，该节点具有所有这些链接。
+
+@kindex n @r{(Info mode)}
+现在是时候转到名为 1⁣ 的 @samp{Next} 节点了。
+
+@format
+>> 输入 @kbd{n} 移动到那里。  仅输入一个字符；不要输入引号，也不要在后面输入 @key{RET}。
+@end format
+
+@noindent
+页边空白中的 @samp{>>} 表示确实是时候尝试命令了。
+
+@format
+>> 如果您在 Emacs 中并且有鼠标，并且您已经练习输入 @kbd{n} 来到达下一个节点，现在用鼠标左键单击 @samp{Next} 链接来执行相同的“鼠标方式”。
+@end format
+
+@node Help-P
+@section 返回上一个节点
+
+@kindex p @r{(Info mode)}
+该节点称为@samp{Help-P}。  如您所见，@samp{Previous} 节点是 @samp{Help}，它是您刚刚使用 @kbd{n} 命令生成的节点。  现在另一个 @kbd{n} 命令将带您到下一个节点 @samp{Help-^L}。
+
+@format
+>> 但先不要输入 @kbd{n}。  首先，尝试使用 @kbd{p} 命令，或者（在 Emacs 中）单击 @samp{Prev} 链接。  这会将您带到 @samp{Previous} 节点。  然后使用@kbd{n}返回这里。
+@end format
+
+如果您在 Emacs 中阅读本文，您将在菜单栏中靠近其右边缘的位置看到一个 @samp{Info} 项。  在 @samp{Info} 菜单栏项上单击鼠标将打开一个命令菜单，其中包括 @samp{Next} 和 @samp{Previous} （以及其他一些您尚未了解的命令）。
+
+到目前为止，这一切可能看起来非常简单，但是@emph{please don't}开始略读。  事情很快就会变得复杂！另外，请不要尝试新命令，直到被告知该尝试为止。  您可以让信息跳过即将出现的重要警告。
+
+@format
+>> 现在执行 @kbd{n}，或者（在 Emacs 中）在 @samp{Next} 链接上单击鼠标中键，以到达节点 @samp{Help-^L} 并了解更多信息。
+@end format
+
+@node Help-^L
+@section Space、DEL、B 和 ^L 命令
+
+该节点的模式行告诉您现在位于节点@samp{Help-^L}，标题行告诉您@kbd{p}将使您返回到@samp{Help-P}。  节点的标题突出显示，也可能带有下划线；它说明了该节点的含义。
+
+这是一个很大的节点，它并不完全适合您的显示屏。您可以看出还有更多不可见的内容，因为您可以在屏幕底部附近看到文本 @samp{Top} 而不是 @samp{All}。
+
+@kindex SPC @r{(Info mode)}
+@kindex DEL @r{(Info mode)}
+@kindex BACKSPACE @r{(Info mode)}
+@findex Info-scroll-up
+@findex Info-scroll-down
+@key{SPC}、@key{BACKSPACE}（或 @key{DEL}）@footnote{The key which we call ``Backspace or DEL'' in this manual is labeled differently on different keyboards.  Look for a key which is a little ways above the @key{ENTER} or @key{RET} key and which you normally use outside Emacs to erase the character before the cursor, i.e., the character you typed last.  It might be labeled @samp{Backspace} or @samp{<-} or @samp{DEL}, or sometimes @samp{Delete}.} 和 @kbd{b} 命令允许您在不能同时全部显示在屏幕上的节点中“移动”。  @key{SPC} 向前移动，显示屏幕底部下方的内容。  @key{DEL} 或 @key{BACKSPACE} 向后移动，以显示屏幕顶部上方的内容（在您键入一些空格之前，顶部上方没有任何内容）。
+
+@format
+>> 现在尝试输入 @key{SPC} （然后，输入 @key{BACKSPACE} 返回此处）。
+@end format
+
+当您键入 @key{SPC} 时，屏幕底部的两行会出现在顶部，然后是更多行。  @key{DEL} 或 @key{BACKSPACE} 从顶部取出两行并将它们移动到底部，@emph{usually}，但如果它们上方没有全屏的行，它们可能无法一直到达底部。
+
+如果您在 Emacs 中阅读本文，请注意标题行始终可见，永远不会滚出显示屏。  这样，您始终可以看到 @samp{Next}、@samp{Prev} 和 @samp{Up} 链接，并且可以通过在链接上单击鼠标中键随时方便地转到这些链接之一。
+
+@cindex reading Info documents top to bottom
+@cindex Info documents as tutorials
+@key{SPC} 和 @key{DEL} 不仅通过当前节点向前和向后移动。  它们还在节点之间移动。  @key{SPC} 在一个节点末尾移动到下一个节点；节点开头的@key{DEL}（或@key{BACKSPACE}）移动到前一个节点。  实际上，这些命令作为单个逻辑序列滚动浏览 Info 文件中的所有节点。  您只需输入 @key{SPC} 即可从上到下阅读整本手册，并通过输入 @key{DEL}（或 @key{BACKSPACE}）从下到上向后移动整个手册。
+
+在此序列中，节点的子节点出现在其父节点之后。如果节点有菜单，@key{SPC} 将带您一一进入菜单中列出的子节点。  一旦到达节点的末尾并看到其所有子节点，@key{SPC} 将带您到下一个节点或父节点的下一个节点。
+
+@kindex PageUp @r{(Info mode)}
+@kindex PageDown @r{(Info mode)}
+@kindex prior @r{(Info mode)}
+@kindex next @r{(Info mode)}
+现在许多键盘都有两个滚动键，标记为@samp{PageUp}和@samp{PageDown}（或者可能是@samp{prior}和@samp{next}）。  如果您的键盘有这些键，您可以使用它们在一个节点的文本中向前和向后移动，例如 @key{SPC} 和 @key{BACKSPACE}（或 @key{DEL}）。  但是，@key{PageUp}和@key{PageDown}键永远不会滚动到当前节点的开头或结尾之外。
+
+@kindex C-l @r{(Info mode)}
+如果您的屏幕曾经出现过垃圾，您可以通过输入@kbd{C-l}（@kbd{Control-L}——即按住@key{CTRL}并输入@kbd{L}或@kbd{l}）来告诉信息再次显示它。
+
+@format
+>> 现在输入@kbd{C-l}。
+@end format
+
+@kindex b @r{(Info mode)}
+要返回到您所在节点的开头，您可以多次键入 @key{BACKSPACE} 键（或 @key{DEL}）。  您也可以只输入一次@kbd{b}。  @kbd{b} 代表“开始”。
+
+@format
+>> 现在就试试吧。  （我们已经输入了足够的文字来将其推过第一个屏幕，但现在的屏幕太大了，可能还不够。您可能需要缩小您的 Emacs 或信息窗口。）然后通过输入 @key{SPC} 一次或多次返回。
+@end format
+
+@kindex ? @r{(Info mode)}
+@kindex H @r{(stand-alone Info reader)}
+@findex Info-summary
+您刚刚学习了相当多的命令。  如果您想使用其中一个但无法记住哪个，则应输入 @kbd{?}（独立信息阅读器中的@kbd{H}），它会显示命令的简短列表。  查看完列表后，重复输入 @key{SPC} 使其消失。
+
+@format
+>> 现在输入 @kbd{?} （或在独立信息阅读器中输入 @kbd{H}）。按 @key{SPC} 查看连续屏幕的列表，直至完成。  然后输入@key{SPC}几次。  如果您使用 Emacs，帮助将自动消失。如果您使用独立的信息阅读器，请输入 @kbd{x} 返回此处。
+@end format
+
+从现在开始，您将在没有警告的情况下遇到大节点，并且需要知道如何使用@key{SPC}和@key{BACKSPACE}在它们中移动而无需被告知。  由于并非所有终端都具有相同尺寸的屏幕，因此无论如何都不可能向您发出警告。
+
+@format
+>> 现在输入 @kbd{n}，或在 @samp{Next} 链接上单击鼠标中键，以访问下一个节点。
+@end format
+
+@node Help-Inv
+@section Emacs 信息中的不可见文本
+
+在讨论菜单之前，我们需要做一些仅与使用 Emacs 阅读 Info 的用户相关的评论。  单机版用户现在可以输入@kbd{]}跳过该节点。
+
+@cindex invisible text in Emacs
+在 Emacs 中，独立版本中出现的某些文本通常是隐藏的，从技术上讲，因为它具有 @samp{invisibility} 属性。  隐形文本实际上是文本的一部分。  在删除和拉取后它变得可见（默认情况下），它出现在打印输出中，它像任何其他文本一样保存到文件中，等等。因此，知道它的存在是很有用的。
+
+@findex visible-mode
+您可以使用命令 @kbd{M-x visible-mode} 使不可见文本可见。  可见模式是次要模式，因此第二次使用该命令将使文本再次不可见。  观察该命令在下面的“菜单”和该节点的顶行上的效果。
+
+如果您希望 @emph{always} 看到不可见文本，可以将 @code{Info-hide-note-references} 设置为 @code{nil}。  永久启用可见模式并不是真正的替代方案，因为 Emacs Info 还使用（尽管不太广泛）另一个可以更改正在显示的文本的文本属性，即 3⁣ 属性。  只有不可见属性受可见模式影响。  在本教程中，当我们提到 @samp{Emacs} 行为时，我们指的是 @emph{default} Emacs 行为。
+
+现在输入 @kbd{]}，了解 @kbd{]} 和 @kbd{[} 命令。
+
+@menu
+* ]:         Help-].                节点讲述]。
+* stuff:     Help-].                相同的节点。
+* Help-]::                          再次，同一个节点。
+@end menu
+
+@node Help-], , , Help-Inv
+@c @subheading and not @section to avoid warnings from makeinfo due to
+@c the fact that all the 3 items in the above menu point to the same
+@c node.  The downside is that the section name has no number.
+@subheading @kbd{]} 和 @kbd{[} 命令
+
+如果您现在输入 @kbd{n}，您会收到一条错误消息，指出该节点没有下一个节点。  同样，如果您输入 @kbd{p}，错误消息会告诉您没有前一个节点。  （确切的消息取决于您使用的信息阅读器。）这是因为 @kbd{n} 和 @kbd{p} 将您带到下一个和上一个节点 @emph{at the same level}。  当前节点包含在您来自的节点的菜单中（见下文），因此被认为处于较低级别。它是前一个节点菜单中的唯一节点（即使它被列出了三次）。  因此，它没有 @kbd{n} 或 @kbd{p} 可以移动到的下一个或上一个节点。
+
+如果您通过输入 @kbd{n} 系统地浏览手册，您将面临跳过许多节点的风险。  如果您系统地使用@kbd{@key{SPC}}，则不会面临此风险，因为当您滚动到节点底部并键入另一个@kbd{@key{SPC}}时，这会将您带到手册中的下一个节点@emph{regardless of level}。如果您想立即转到该节点，而不必先滚动到屏幕底部，则可以输入@kbd{]}。
+
+同样，在滚动到当前节点的开头后，@kbd{@key{BACKSPACE}} 会将您带到前一个节点，无论级别如何。  如果想立即跳到前一个节点，可以输入@kbd{[}。
+
+例如，输入此序列将分三步返回此处：@kbd{[ n [}。  要向后执行相同的操作，请输入 @kbd{] p ]}。
+
+现在输入 @kbd{]} 转到下一个节点并了解菜单。
+
+@node Help-M
+@section 菜单和 @kbd{m} 命令
+
+@cindex menus in an Info document
+@cindex Info menus
+仅使用 @kbd{n}（下一个）、@kbd{p}（上一个）、@kbd{@key{SPC}}、@kbd{@key{BACKSPACE}}、@kbd{]} 和 @kbd{[} 命令在节点之间移动，节点被限制为线性序列。  菜单允许分支结构。  菜单是您可以移动到的其他节点的列表。它实际上只是节点文本的一部分，经过特殊格式化，以便 Info 可以解释它。  菜单的开头始终由以 @w{@samp{* Menu:}} 开头的行标识。  当且仅当一个节点中有一行以这种方式开始时，它才包含一个菜单。  您随时可以使用的唯一菜单是您所在节点中的菜单。要使用任何其他节点中的菜单，您必须先移动到该节点。
+
+菜单开始后，以 @samp{*} 开头的每一行标识一个子主题。  该行通常包含子主题的简短名称（后跟 @samp{:}，通常隐藏在 Emacs 中）、讨论该子主题的节点名称（同样，通常隐藏在 Emacs 中），以及可选的子主题的一些进一步描述。  菜单中不以 @samp{*} 开头的行没有特殊含义——它们只是为了人类读者的利益，并不定义额外的子主题。  这是一个例子：
+
+@example
+* Foo:  Node about FOO.      This tells about FOO.
+@end example
+
+子主题名称为 Foo，描述它的节点为@samp{Node about FOO}。  该行的其余部分仅供读者参考。  [[ 但这行并不是真正的菜单项，因为它上面没有以 @w{@samp{* Menu:}} 开头的行。  此外，在真实的菜单项中，@samp{*} 将出现在该行的最开头。  这就是为什么 Emacs 中“通常隐藏”的文本（即 @samp{: Node about FOO.}）在本例中实际上是可见的，即使可见模式关闭也是如此。]]
+
+当您使用菜单转到另一个节点时（以即将描述的方式），您指定的是子主题名称，即菜单行中的第一个内容。  Info 使用它来查找菜单行，从中提取节点名称，然后转到该节点。  同时存在子主题名称和节点名称的原因是节点名称必须对计算机有意义，因此可能必须看起来很难看。子主题名称的选择只是为了方便用户指定。  通常，节点名称方便用户指定，因此它和子主题名称相同。  有一个缩写：
+
+@example
+* Foo::   This tells about FOO.
+@end example
+
+@noindent
+这意味着子主题名称和节点名称相同；它们都是@samp{Foo}。  （@samp{::} 通常在 Emacs 中隐藏。）
+
+@format
+>> 现在使用 @key{SPC} 查找此节点中的菜单，然后使用 @kbd{b} 和一些 @key{SPC} 返回到前面。  正如您所看到的，菜单实际上在其节点中可见。  如果通过查看无法在节点中找到菜单，则该节点没有菜单，并且 @kbd{m} 命令不可用。
+@end format
+
+如果屏幕上出现菜单后继续输入@key{SPC}，它将移动到另一个节点（菜单中的第一个节点）。  如果发生这种情况，请输入 @key{BACKSPACE} 返回。
+
+@kindex m @r{(Info mode)}
+转到子节点之一的命令是@kbd{m}。  这与您使用过的命令非常不同：它是提示您输入更多输入的命令。
+
+您所知道的 Info 命令不需要额外的输入；当您键入其中一个命令时，Info 会立即处理它，然后准备好执行另一个命令。  @kbd{m} 命令不同：它需要知道@dfn{name of the subtopic}。  输入 @kbd{m} 后，Info 会尝试读取子主题名称。
+
+现在，在独立信息中，查找屏幕底部附近包含许多破折号的行。  （这是 Emacs 中模式行的独立等效项。）该行下面还有一行，但通常是空白的。  （在 Emacs 中，这是回显区域。）当它为空时，Info 已准备好执行命令，例如 @kbd{n} 或 @kbd{b} 或 @key{SPC} 或 @kbd{m}。  如果该行包含以冒号结尾的文本，则意味着 Info 正在读取最后一个命令的更多输入。  此时您无法键入 Info 命令，因为 Info 正在尝试读取输入，而不是命令。  您必须输入并完成您启动的命令，或者输入 @kbd{Control-g} 取消该命令。  当您完成其中一项操作后，输入输入行将再次变为空白。  然后您可以再次输入信息命令。
+
+@findex Info-menu
+通过菜单转到子节点的命令是@kbd{m}。  输入 @kbd{m} 后，屏幕底部的行显示 @samp{Menu item: }。然后，您必须输入所需子主题的名称，并以 @key{RET} 结尾。
+
+@cindex abbreviating Info subnodes
+您可以缩写子主题名称。  如果缩写不唯一，则选择第一个匹配的子主题。  有些菜单用大写字母为每个子主题名称提供了最短的缩写，这样您就可以看到需要输入多少内容。  键入副主题时使用大写还是小写并不重要。  不应在项目名称的末尾或内部放置任何空格，菜单中的项目中出现空格的情况除外。
+
+@cindex completion of Info node names
+您还可以使用@dfn{completion}功能来帮助输入子主题名称。  如果您在输入部分名称后按 @key{TAB} 键，它将填充该名称的更多部分 — Info 可以从您输入的部分推断出尽可能多的内容。
+
+如果将光标移动到菜单副主题行之一，则无需键入参数：只需键入 @key{RET}，它代表您所在行的副主题。  您也可以直接在副主题行上单击鼠标中键前往那里。
+
+这是一个菜单，让您有机会练习。  此菜单为您提供了前往一个地方 Help-FOO 的三种方式：
+
+@menu
+* Foo:  Help-FOO.        您可以为了好玩而访问的节点。
+* Bar:  Help-FOO.        我们有两种方法可以到达同一个地方。
+* Help-FOO::             还有另一个！
+@end menu
+
+（如果您使用 Emacs，请打开可见模式。）
+
+@format
+>> 现在只输入 @kbd{m} 并看看会发生什么：
+@end format
+
+现在您处于 @kbd{m} 命令的“内部”。  现在无法使用命令；您接下来要输入的内容必须是子主题的名称。
+
+您可以通过输入 @kbd{Control-g} 来改变执行 @kbd{m} 的想法。
+
+@format
+>> 现在就尝试一下；  注意底线清晰。
+@end format
+
+@format
+>> 然后输入另一个@kbd{m}。
+@end format
+
+@format
+>> 现在输入 @kbd{BAR}，项目名称。  暂时不要输入 @key{RET}。
+@end format
+
+在输入项目名称时，如果输入错误，可以使用@key{DEL}（或@key{BACKSPACE}）键一次取消一个字符。
+
+@format
+>> 按@key{DEL}取消@samp{R}。  您可以输入另一个 @kbd{R} 来替换它。  但您不必这样做，因为 @samp{BA} 是有效的缩写。
+@end format
+
+@format
+>> 现在您已准备就绪。  输入 @key{RET}。
+@end format
+
+访问完@samp{Help-FOO}后，您应该返回这里。
+
+移动到菜单副主题行及其之间的另一种方法是键入 @key{TAB}。  每次输入 @key{TAB} 时，您都会移动到下一个子主题行。  要移至独立阅读器中的上一个子主题行，请键入 @kbd{M-@key{TAB}}——即按住 @key{META} 键，然后按 @key{TAB}。  （在某些键盘上，@key{META} 键可能标记为 @samp{Alt}。）在 Emacs Info 中，键入 @kbd{S-@key{TAB}} 移动到上一个子主题行（按住 @key{Shift} 键，然后按 @key{TAB}）。
+
+将光标移动到子主题行后，按 @key{RET} 转到该子主题的节点。
+
+@cindex mouse support in Info mode
+@kindex mouse-2 @r{(Info mode)}
+如果您的终端支持鼠标，您还有另一种方式进入子主题。  将鼠标指针移至副主题行，位于开头 @samp{*} 和冒号 @samp{:} 之间（以副主题简短名称结尾）。  您将看到子主题的名称改变其外观（通常，其背景颜色会改变），并且如果您的平台支持，鼠标指针的形状也会改变。  过了一会儿，如果您将鼠标放在该位置，则会弹出一个小窗口，显示“mouse-2：转到该节点”，或者屏幕底部可能会出现相同的消息。
+
+@kbd{mouse-2} 是鼠标从左数的第二个按钮——三键鼠标的中间按钮。  （在双键鼠标上，您可能必须同时按下两个按钮才能“按中键”。）该消息告诉您在鼠标指针的当前位置（在菜单中的子主题上）按 @kbd{mouse-2} 将转到该子主题。
+
+@findex Info-mouse-follow-nearest-node
+更一般地，信息缓冲区中的 @kbd{mouse-2} 找到到另一个节点的最近链接并前往那里。  例如，在交叉引用附近，它的作用类似于 @kbd{f}，在菜单中，它的作用类似于 @kbd{m}，在节点的标题行上，它的作用类似于 @kbd{n}、@kbd{p} 或 @kbd{u} 等。在节点文本末尾，@kbd{mouse-2} 移动到下一个节点，如果没有下一个节点，则向上移动。
+
+@format
+>> 输入 @kbd{n} 查看更多命令。
+@end format
+
+@node Help-FOO,  ,  , Help-M
+@c @subheading and not @subsection to avoid warnings from makeinfo due to
+@c the fact that all the 3 items in the above menu point to the same
+@c node.  The downside is that the subsection name has no number.
+@subheading @kbd{u}命令
+
+恭喜！  这是节点@samp{Help-FOO}。  它有一个 @samp{Up} 指针 @samp{Help-M}，您刚刚通过 @kbd{m} 命令来自的节点。  这是通常的约定——从菜单到达的节点有 @samp{Up} 节点返回到菜单。  菜单在树中向下移动，@samp{Up} 向上移动。  另一方面，@samp{Previous}通常用于“保持在同一水平但向后走”。
+
+@kindex u @r{(Info mode)}
+@findex Info-up
+您可以通过键入“Up”命令 @kbd{u} 返回到节点 @samp{Help-M}。  这会将您带到指向 @kbd{u} 命令所带出的子节点的菜单子主题行。  （一些信息阅读器可能会将您置于节点的 @emph{front} 处——要返回到您正在阅读的位置，您必须输入一些 @key{SPC}。）
+
+另一种向上移动的方法是单击标题行中显示的 @samp{Up} 指针上的 @kbd{mouse-2}（前提是您有鼠标）。
+
+@format
+>> 现在输入 @kbd{u} 返回到 @samp{Help-M}。
+@end format
+
+@node Help-Xref
+@section 遵循交叉引用
+
+@cindex cross references in Info documents
+在Info文档中，你会看到很多@dfn{cross references}。交叉引用如下所示：@xref{Help-Cross, Cross}。  该文本是真实的、实时的交叉引用，其名称为 @samp{Cross} 并指向名为 @samp{Help-Cross} 的节点。  （节点名称在 Emacs 中是隐藏的。执行 @kbd{M-x visible-mode} 显示或隐藏它。）
+
+@kindex f @r{(Info mode)}
+@findex Info-follow-reference
+您可以通过将光标移至交叉引用并按 @key{RET} 来跟踪交叉引用，就像在菜单中一样。  在 Emacs 中，您还可以单击交叉引用上的 @kbd{mouse-1} 来跟随它；通过将鼠标指针移动到引用并观察底层文本和鼠标指针如何响应变化，您可以看到交叉引用是鼠标敏感的。
+
+遵循交叉引用的另一种方法是键入 @kbd{f}，然后指定交叉引用的名称（在本例中为 @samp{Cross}）作为参数。  对于此命令，光标在哪里并不重要。  如果光标位于交叉引用上或附近，@kbd{f} 建议将括号中的引用名称作为默认值；输入 @key{RET} 将遵循该参考。  但是，如果您键入不同的引用名称，@kbd{f} 将遵循具有该名称的其他引用。
+
+@format
+>> 输入@kbd{f}，然后输入@kbd{Cross}，然后输入@key{RET}。
+@end format
+
+输入参考名称时，您可以使用 @key{DEL}（或 @key{BACKSPACE}）键编辑输入。  如果您改变主意不再遵循任何参考，可以使用 @kbd{Control-g} 取消该命令。  可以通过@kbd{f}命令完成；您可以通过键入 @key{TAB} 来完成当前节点中的所有交叉引用名称。
+
+要获取当前节点中所有交叉引用的列表，您可以在 @kbd{f} 之后键入 @kbd{?}。  即使在显示列表后，@kbd{f} 仍会继续等待交叉引用名称，因此，如果您实际上不想跟踪引用，则应键入 @kbd{Control-g} 来取消 @kbd{f}。
+
+@format
+>> 输入 @kbd{f?} 以获取此节点中交叉引用的列表。  然后输入 a @kbd{Control-g} 并查看 @samp{f} 如何放弃。
+@end format
+
+@key{TAB}、@kbd{M-@key{TAB}} 和 @kbd{S-@key{TAB}} 键可在菜单中的菜单项之间移动，也在菜单外的交叉引用之间移动。
+
+有时，交叉引用（或节点）可以指向另一个文件（换句话说，另一个“手册”），或者有时，甚至是远程计算机上的文件（尽管随 Emacs 分发的 Info 文件或独立的 Info 避免使用远程链接）。  这样的交叉引用如下所示：@xref{Top,, Overview of Texinfo, texinfo, Texinfo: The GNU Documentation Format}。  （点击此链接后，输入 @kbd{l} 返回此节点。）这里括号中的名称 @samp{texinfo} 指的是文件名。  如果该文件名与当前文件不同，则它会出现在交叉引用和节点名称中，因此您始终可以知道您将要切换到另一本手册以及哪一本。
+
+Emacs 通常会隐藏交叉引用中的一些文本。  如果将鼠标放在交叉引用上，则出现在单独的框（工具提示）或回显区域中的信息将显示完整的交叉引用，包括文件名和交叉引用的节点名称（如果交叉引用指向另一个文件）。  如果您有鼠标，只需将其放在下一个交叉引用上：@xref{Top,, Overview of Texinfo, texinfo, Texinfo: The GNU Documentation Format}，然后观察会发生什么。  如果您始终希望无需将鼠标移到交叉引用上即可看到该信息，请使用 @kbd{M-x visible-mode}，或将 @code{Info-hide-note-references} 设置为 @code{t} (@pxref{Emacs Info Variables}) 以外的值。
+
+@format
+>> 现在输入 @kbd{n} 了解更多命令。
+@end format
+
+
+@menu
+* Help-Cross::                   交叉引用的目标。
+@end menu
+
+
+@node Help-Cross, , , Help-Xref
+@subsection Info中交叉引用到达的节点
+
+这是名为 @samp{Cross} 的交叉引用到达的节点。
+
+虽然该节点是专门为通过交叉引用而到达的，但大多数交叉引用都会指向“属于”Info 文档结构中其他较远位置的节点。  因此，您不能期望该节点有 @samp{Next}、@samp{Previous} 或 @samp{Up} 链接指向您来自的位置。  一般来说，@kbd{l} (el) 命令是返回那里的唯一方法。
+
+@format
+>> 输入 @kbd{l} 返回交叉引用所在的节点。
+@end format
+
+
+@node Help-Int
+@section 一些中间信息命令
+
+入门课程快结束了；请再继续学习一些中级命令。
+
+大多数信息文件都有一个索引，它实际上是一个大节点，只包含一个菜单。  该菜单针对索引中列出的每个主题都有一个菜单项。  （作为一项特殊功能，索引菜单还可以包括索引条目节点内的行号。这允许信息阅读器转到条目的确切行，而不仅仅是包含节点的开头。）
+
+您可以使用 @kbd{m} 命令和索引节点的名称从文件的主菜单访问索引；然后您可以在索引节点中再次使用@kbd{m}命令转到描述您想要的主题的节点。
+
+还有一个快捷信息命令@kbd{i}，它可以为您完成所有这些操作。  它在索引中搜索给定主题（字符串）并转到该主题索引中列出的节点。 @xref{Search Index}，完整的解释。
+
+@kindex l @r{(Info mode)}
+@findex Info-history-back
+@cindex going back in Info history
+如果您一直移动到不同的节点并希望回溯您的步骤，则 @kbd{l} 命令（@kbd{l} 代表 @dfn{last}）将执行此操作，一次一个节点步骤。  当您从一个节点移动到另一个节点时，信息会在特殊的历史列表中记录您曾经去过的节点。  @kbd{l}命令重新访问历史列表中的节点；每个连续的 @kbd{l} 命令都会在历史记录中后退一步。
+
+@format
+>> 尝试输入 @kbd{p p n}，然后输入三个 @kbd{l}，中间暂停一下，看看每个 @kbd{l} 的作用。  你应该马上回到这里。
+@end format
+
+请注意 @kbd{l} 和 @kbd{p} 之间的区别：@kbd{l} 移动到 @emph{you} 最后所在的位置，而 @kbd{p} 始终移动到标头所示为 @samp{Previous} 节点的节点（从该节点，@samp{Prev} 链接通向 @samp{Help-Xref}）。
+
+@kindex r @r{(Info mode)}
+@findex Info-history-forward
+@cindex going forward in Info history
+您可以使用 @kbd{r} 命令（在 Emacs 中为 @code{Info-history-forward}）向前重新访问历史列表中的节点，这样 @kbd{r} 就会通过键入 @kbd{l} 返回到您原来的节点。
+
+@cindex using tool-bar to navigate history
+在 Emacs 中按住 @key{CTRL} 键的同时单击工具栏中的左箭头图标可打开以前访问过的节点的菜单：您可以通过 @code{Info-history-back} 重新访问相同的节点。  单击右箭头图标后选择一个节点会重新访问 @code{Info-history-forward} 可用的相同节点。
+
+@kindex L @r{(Info mode)}
+@findex Info-history
+@cindex history list of visited nodes
+@kbd{L} 命令（Emacs 中的@code{Info-history}）创建一个虚拟节点，其中包含您访问过的所有节点的列表。  您可以从此菜单中选择以前访问过的节点来重新访问它。
+
+@kindex d @r{(Info mode)}
+@findex Info-directory
+@cindex go to Directory node
+@kbd{d} 命令（Emacs 中的@code{Info-directory}）可让您立即进入目录节点。  该节点是您进入 Info 时看到的第一个节点，它有一个菜单（通过其他菜单直接或间接）引导至所有存在的节点。  目录节点列出了系统上已安装或可能安装的所有手册和其他信息文档。
+
+@format
+>> 尝试执行 @kbd{d}，然后执行 @kbd{l} 返回此处（是的，@emph{do} 返回）。
+@end format
+
+@kindex t @r{(Info mode)}
+@findex Info-top-node
+@cindex go to Top node
+@kbd{t} 命令移至手册的 @samp{Top} 节点。如果您想浏览手册的主菜单或选择某些特定的顶级菜单项，这非常有用。  @kbd{t}运行的Emacs命令是@code{Info-top-node}。
+
+@format
+>> 现在输入 @kbd{n} 查看课程的最后一个节点。
+@end format
+
+@xref{Advanced}，用于更高级的信息功能。
+
+@c If a menu appears at the end of this node, remove it.
+@c It is an accident of the menu updating command.
+
+@node Help-Q
+@section 戒烟信息
+
+@kindex q @r{(Info mode)}
+@cindex quitting Info mode
+要退出信息，请返回到之前所做的操作，输入 @kbd{q} 代表 @dfn{Quit}。  这在 Emacs 中运行 @code{quit-window}。
+
+关于使用 Info 的基础课程到此结束。  您已经了解了如何在信息文档中移动，以及如何遵循菜单和交叉引用。  这使您准备好从上到下阅读手册，就像新用户在学习新软件包时应该做的那样。
+
+当您需要在手册中快速查找某些内容时（即，当您需要使用手册作为参考而不是教程时），另一组信息命令非常有用。  我们强烈建议您也学习这些搜索命令。  如果您现在想这样做，请按照此交叉引用@ref{Advanced}。
+
+还有一组命令是为有经验的用户准备的；您可以通过在目录节点中查找有关信息的文档来找到它们。找到它们将是以通常的方式使用信息的一个很好的练习。
+
+@format
+>> 输入@kbd{d}进入Info目录节点；然后输入 @kbd{mInfo} 并回车，以转到有关信息的节点并查看还有哪些其他可用帮助。
+@end format
+
+
+@node Advanced
+@chapter 高级信息命令
+
+本章介绍各种高级 Info 命令。  （如果您使用的是独立的信息阅读器，则还有特定于它的其他命令，这些命令记录在 @ref{Top,, GNU Info, info-stnd, GNU Info} 的几个章节中。）
+
+@kindex C-q @r{(Info mode)}
+与这里描述的大多数其他命令一起使用的一个高级命令是 @kbd{C-q}，它“引用”下一个字符，以便按字面输入 (@pxref{Inserting Text,,,emacs,The GNU Emacs Manual})。  例如，按 @kbd{?} 通常会显示完成可能性的列表。  例如，如果您想搜索实际的 @samp{?} 字符，最简单的方法是使用 @kbd{C-q ?} 插入它。  这在 Emacs 和独立 Info 中的工作方式相同。
+
+@menu
+* Search Text::           如何搜索信息文档。
+* Search Index::          如何搜索特定主题的索引。
+* Go to node::            如何通过名称转到节点。
+* Choose menu subtopic::  如何通过编号选择菜单子主题。
+* Create Info buffer::    如何在 Emacs 中创建新的信息缓冲区。
+* Emacs Info Variables::  修改 Emacs Info 行为的变量。
+@end menu
+
+
+@node Search Text
+@section @kbd{s} 搜索信息文档
+
+@cindex searching Info documents
+@cindex Info document as a reference
+在节点之间和内部移动的命令允许您阅读整个手册或其大部分内容。  但是，如果您需要尽快在手册中查找某些信息，并且您不知道或不记得在哪个节点中查找，该怎么办？  当您将手册用作 @dfn{reference} 时，或者在开始使用手册中描述的程序之前阅读整个手册不切实际时，就会出现这种需要。
+
+Info拥有强大的搜索功能，让您快速找到东西。  您可以搜索手册文本或其索引。
+
+@kindex s @r{(Info mode)}
+@findex Info-search
+@kbd{s} 命令允许您在整个 Info 文件中搜索字符串。如果有必要，它会切换到下一个节点。  您键入 @kbd{s}，后跟要搜索的字符串，以 @key{RET} 结尾。  要再次搜索相同的字符串，只需按 @kbd{s} 后跟 @key{RET} 即可。  文件的节点按照它们在文件中的顺序进行扫描，这与它们在菜单和@samp{next}指针的树结构中的顺序没有必然的关系。  但通常这两个顺序并没有太大区别。  在任何情况下，如果标题不可见，您始终可以查看模式行以找出已到达哪个节点（这种情况可能会发生，因为 @kbd{s} 将光标放在字符串的出现位置，而不是节点的开头）。
+
+@kindex C-s @r{(Info mode)}
+@kindex C-r @r{(Info mode)}
+@findex isearch
+您可以使用以 @kbd{C-s} 或 @kbd{C-r} 开头的增量搜索，而不是在 Emacs Info 和独立 Info 中使用 @kbd{s}。它可以搜索多个 Info 节点。  @xref{Incremental Search,,, emacs, The GNU Emacs Manual}。  在 Emacs 中，您可以通过将变量 @code{Info-isearch-search} 设置为 @code{nil} (@pxref{Emacs Info Variables}) 来禁用此行为。
+
+@node Search Index
+@section @kbd{i} 搜索特定主题的索引
+
+@cindex searching Info indices
+@kindex i @r{(Info mode)}
+@findex Info-index
+由于手册中的大多数主题都应该建立索引，因此您应该在文本搜索之前先尝试索引搜索。  @kbd{i} 命令提示您输入主题，然后在索引中查找该主题。  如果它找到包含您键入的主题的索引条目，它将转到该索引条目指向的节点。  您应该浏览该节点，看看那里是否描述了您要查找的问题。  如果不是，请输入 @kbd{,} 一次或多次以浏览与您的主题匹配的其他索引条目。
+
+@kbd{i} 命令和后续 @kbd{,} 命令查找包含您键入的字符串 @emph{as a substring} 的所有索引条目。对于每个匹配，信息会在回显区域中显示它找到的完整索引条目。  通常，完整索引条目的文本已经为您提供了足够的信息来确定它是否与您要查找的内容相关，因此我们建议您在查看其显示的节点之前先阅读回显区域中显示的信息内容。
+
+由于 @kbd{i} 查找子字符串，因此即使您不确定主题在索引中的拼写方式，也可以搜索主题。  例如，假设您想要查找与完成部分输入的命令相关的内容（例如，当您键入 @key{TAB} 时）。  如果您想捕获引用“完整”、“完成”和“正在完成”的索引条目，您可以输入@kbd{icomplet@key{RET}}。
+
+描述程序的信息文档应该索引程序提供的命令、选项和键序列。  如果您正在查找命令、选项或键的描述，只需在 @kbd{i} 提示您输入主题时键入它们的名称即可。  例如，如果您想阅读 @kbd{C-l} 键功能的说明，请按字面输入 @kbd{iC-l@key{RET}}。
+
+@findex Info-virtual-index
+@kindex I @r{(Info mode)}
+Emacs 提供命令 @code{Info-virtual-index}，绑定到 @kbd{I} 键。  这与 @kbd{i} 类似，但会构造一个显示索引搜索结果的虚拟信息节点，从而更容易选择所需的节点。
+
+@findex info-apropos
+@findex index-apropos
+如果您不确定哪个手册记录了您要查找的主题，请尝试 Emacs 中的 @kbd{M-x info-apropos} 命令，或独立阅读器中的 @kbd{M-x index-apropos} 命令。  它提示输入一个字符串，然后在系统上安装的所有信息文档的所有索引中查找该字符串。  在 Emacs 中，为命令提供前缀参数将尝试搜索正则表达式而不是字符串。
+
+@node Go to node
+@section @kbd{g} 按名称转到节点
+
+@kindex g @r{(Info mode)}
+@findex Info-goto-node
+@cindex go to a node by name
+如果您知道节点的名称，则可以通过输入 @kbd{g}、名称和 @key{RET} 转到该节点。  因此，@kbd{gTop@key{RET}} 将转到该文件中名为 @samp{Top} 的节点。  （这相当于@kbd{t}，参见@ref{Help-Int}。）@kbd{gGo to node@key{RET}}会回到这里。
+
+与 @kbd{m} 一样，@kbd{g} 允许使用缩写。  它还允许完成，因此您可以键入 @key{TAB} 来完成部分节点名称。
+
+@cindex go to another Info file
+要转到另一个文件中的节点，可以将文件名放在节点名称前面的括号中。  因此，@kbd{g(dir)Top@key{RET}}将转到信息目录节点，即信息文件@file{dir}中的节点@samp{Top}。  同样，@kbd{g(emacs)Top@key{RET}}（或只是@kbd{g(emacs)@key{RET}}）转到 Emacs 手册的顶部节点。
+
+节点名称@samp{*}指定整个文件。  因此，您可以通过键入 @kbd{g*@key{RET}} 查看当前文件的所有内容，或者使用 @kbd{g(@var{filename})*@key{RET}} 查看任何其他文件的所有内容。
+
+@node Choose menu subtopic
+@section @kbd{1}--@kbd{9} 按编号选择菜单子主题
+
+@kindex 1 @r{through} 9 @r{(Info mode)}
+@findex Info-nth-menu-item
+@cindex select @var{n}'th menu item
+@cindex menu items, select by their numbers
+如果您不喜欢系统需要输入的每个字符，您可能想使用命令 @kbd{1}、@kbd{2}、@kbd{3}、@kbd{4}、@dots{}、@kbd{9}。  它们是 @kbd{m} 命令的缩写以及菜单子主题的名称。  @kbd{1} 浏览当前节点菜单中的第一项； @kbd{2} 浏览第二个菜单项，依此类推。在独立阅读器中，@kbd{0} 浏览最后一个菜单项；这样您就无需计算有多少条目。
+
+@cindex 3rd menu item
+@cindex third menu item
+@cindex 6th menu item
+@cindex sixth menu item
+@cindex star @samp{*} before menu item
+如果您的显示器支持多种字体、颜色或下划线，并且您使用 Emacs 的 Info 模式来读取 Info 文件，则第三个、第六个和第九个菜单项都有一个 @samp{*} 突出显示，无论是颜色还是其他属性，例如下划线；这样可以很容易地一眼看出某个项目使用哪个编号。
+
+有些终端不支持多种字体、颜色或下划线。  如果您需要实际计算项目数，最好使用 @kbd{m} 代替，并指定名称，或使用 @key{TAB} 在菜单项之间快速移动。
+
+@node Create Info buffer
+@section @kbd{M-n} 在 Emacs 中创建一个新的独立 Info 缓冲区
+
+@kindex M-n @r{(Info mode)}
+@kindex C-x x n
+@findex clone-buffer
+@cindex multiple Info buffers
+如果您正在 Emacs 中阅读 Info，则可以通过键入 @kbd{M-n} 在新的 Emacs 窗口中选择新的独立 Info 缓冲区。  新缓冲区一开始是旧缓冲区的精确副本，但您将能够在两个缓冲区中的节点之间独立移动。  （在 Info 模式下，@kbd{M-n} 运行 Emacs 命令@code{clone-buffer}。）
+
+在 Emacs Info 中，您还可以通过为 @kbd{m} 和 @kbd{g} 命令提供数字前缀参数来生成新的 Info 缓冲区。  @kbd{C-u m} 和 @kbd{C-u g} 转到新节点的方式与 @kbd{m} 和 @kbd{g} 完全相同，但它们在另一个窗口中选择的新信息缓冲区中执行此操作。
+
+在 Emacs 中生成新信息缓冲区的另一种方法是对 @kbd{C-h i} 命令 (@code{info}) 使用数字前缀参数，该命令会切换到具有该数字的信息缓冲区。  因此，@kbd{C-u 2 C-h i}切换到缓冲区@file{*info*<2>}，并在必要时创建它。
+
+@findex info-display-manual
+如果您在 Emacs 中创建了许多信息缓冲区，您可能会发现很难记住哪个缓冲区显示哪本手册。  您可以使用命令 @kbd{M-x info-display-manual} 按名称显示信息手册，重用现有缓冲区（如果有）。  当给定前缀参数时，此命令将完成替代项限制为当前访问的信息文件，从而提供了在多个手册之间切换的便捷方法。
+
+@node Emacs Info Variables
+@section Emacs 信息模式变量
+
+以下变量可能会修改 Emacs 中信息模式的行为；您可能希望以交互方式或在初始化文件中设置其中一个或多个变量。  @xref{Examining, Examining and Setting Variables, Examining and Setting Variables, emacs, The GNU Emacs Manual}。  独立的信息阅读器程序有自己的一组变量，如@ref{Variables,, Manipulating Variables, info-stnd, GNU Info}中所述。
+
+@vtable @code
+@item Info-directory-list
+用于搜索信息文件的目录列表。  每个元素都是一个字符串（目录名称）或@code{nil}（尝试默认目录）。  如果未初始化，Info 使用环境变量 @env{INFOPATH} 对其进行初始化；如果环境中没有 @env{INFOPATH} 变量，则除了 @code{Info--default-directory-list} 函数返回的值之外，还使用 ​​@code{Info-default-directory-list} 进行初始化。
+
+如果您希望为 Emacs Info 和独立 Info 自定义 Info 目录搜索列表，最好设置 @env{INFOPATH} 环境变量，因为这适用于这两个程序。
+
+@item Info-additional-directory-list
+用于搜索信息文档文件的其他目录的列表。合并 @file{dir} 文件时不会搜索这些目录。
+
+@item Info-mode-hook
+当调用 @code{Info-mode} 时，钩子就会运行。  默认情况下，它包含钩子 @code{turn-on-font-lock} ，可以突出显示信息文件。  您可以通过自定义面 @code{info-node}、@code{info-xref}、@code{info-xref-visited}、@code{info-header-xref}、@code{info-header-node}、@code{info-menu-header}、@code{info-menu-star} 和 @code{info-title-@var{n}}（其中 @var{n} 是部分的级别，是 1 到 4 之间的数字）来更改突出显示的外观。  要自定义面，请输入 @kbd{M-x customize-face @key{RET} @var{face} @key{RET}}，其中 @var{face} 是此处列出的面名称之一。
+
+@item Info-fontify-maximum-menu-size
+如果 @code{font-lock-mode} 为非 @code{nil}，则字体化菜单的最大大小。
+
+@item Info-fontify-visited-nodes
+如果非@code{nil}，则指向访问节点的菜单项和交叉引用将显示在@code{info-xref-visited} 面上。
+
+@item Info-use-header-line
+如果非 @code{nil}，Emacs 会在 Info 缓冲区中放入一个标题行，显示 @samp{Next}、@samp{Prev} 和 @samp{Up} 链接。  标题行不会随缓冲区的其余部分一起滚动，从而使这些链接始终可见。
+
+@item Info-hide-note-references
+正如前面几节中所解释的，Emacs 版本的 Info 通常会隐藏菜单和交叉引用中的一些文本。  它还将每个交叉引用的 @samp{*note} 前缀替换为语法上更正确的 @samp{see}。  这是该选项默认值@code{t} 的效果。  将此选项设置为 @code{nil} 会禁用原始交叉引用文本的隐藏和替换，然后 Emacs 将按照 Info 文件中的样子显示它们。  如果将其设置为值 @code{hide}，Emacs 将执行与 @code{t} 相同的操作，但也会删除 @samp{*note} 而不用任何内容替换它。将其设置为任何其他非@code{nil}值会产生中间行为，隐藏有限数量的文本，但显示可能有用的所有文本，包括作为交叉引用目标的节点的名称及其文件（如果它与当前文件不同）。
+
+@item Info-scroll-prefer-subnodes
+如果设置为非 @code{nil} 值，则菜单中的 @key{SPC} 和 @key{BACKSPACE}（或 @key{DEL} 或 @kbd{S-@key{SPC}}）键将分别在滚动到其末尾或开头之前访问当前节点的子节点。例如，如果节点的菜单出现在屏幕上，则下一个@key{SPC}将移动到以下菜单项指示的子节点。将此选项设置为 @code{nil} 会产生类似于独立信息阅读器程序的行为，仅当您到达当前节点的末尾时，该程序才会访问菜单中的第一个子节点。  默认值为@code{nil}。
+
+@item Info-isearch-search
+如果非@code{nil}，Info 中的 isearch 会搜索多个节点。
+
+@item Info-enable-active-nodes
+当设置为非 0 值时，允许 Info 执行与节点关联的 Lisp 代码。  当选择节点时，将执行 Lisp 代码。  要执行的 Lisp 代码应遵循节点分隔符（@samp{DEL} 字符）和 @samp{execute: } 标记，如下所示：
+
+@example
+^_execute: (message "This is an active node!")
+@end example
+@end vtable
+
+
+@node Further Reading
+@chapter 进一步阅读
+@cindex Texinfo
+
+Info 文件是从 Texinfo 源文件创建的。  您可以使用相同的源文件来制作印刷手册或生成其他格式，例如 HTML 和 DocBook。
+
+@code{makeinfo}命令将Texinfo文件转换为Info文件； @code{texinfo-format-region} 和 @code{texinfo-format-buffer} 是具有相同功能的 GNU Emacs 函数。
+
+@xref{Top,, Overview of Texinfo, texinfo, Texinfo: The GNU Documentation Format}，了解如何编写 Texinfo 文件。
+
+@xref{Creating an Info File,,, texinfo, Texinfo: The GNU Documentation Format}，了解如何从 Texinfo 文件创建 Info 文件。
+
+@xref{Installing an Info File,,, texinfo, Texinfo: The GNU Documentation Format}，了解如何在创建信息文件后安装信息文件。
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Index
+@unnumbered 指数
+
+这是本文档中讨论的所有命令、变量和主题的按字母顺序排列的列表。
+
+@printindex cp
+
+@bye

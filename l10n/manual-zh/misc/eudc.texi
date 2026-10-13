@@ -1,0 +1,854 @@
+\输入 texinfo.tex
+@c %**start of header
+@setfilename ../../info/eudc.info
+@settitle Emacs 统一目录客户端 (EUDC) 手册
+@documentlanguage en
+@include docstyle.texi
+@afourpaper
+@syncodeindex fn cp
+@syncodeindex vr cp
+@c %**end of header
+
+@copying
+此文件记录了 EUDC 版本 1.40.0。
+
+EUDC 是 Emacs 统一目录客户端，是目录服务器和联系信息的通用接口。
+
+版权所有 @copyright{} 1998, 2000--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs network features
+@direntry
+* EUDC: (eudc).                  用于目录服务器（LDAP、BBDB）的 Emacs 客户端。
+@end direntry
+
+@footnotestyle end
+
+@titlepage
+@title EUDC手册
+@subtitle Emacs 统一目录客户端
+@author by Oscar Figueiredo
+@code{1.40.0}
+
+@page
+@vskip 0pt plus 1fill
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node     Top
+@top Emacs Unified Directory Client
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Overview::                     EUDC 特性总结
+* Installation::                 如何安装 EUDC
+* Usage::                        解释了各种使用可能性
+* Credits::                      谁做了什么
+* GNU Free Documentation License::  本文档的许可证。
+* Index::
+@end menu
+
+
+
+
+
+@node     Overview
+@chapter 概述
+
+EUDC（@dfn{Emacs Unified Directory Client}）提供了一个通用用户界面来访问使用不同目录协议的目录服务器。
+
+目前支持的后端有：
+
+@itemize @bullet
+@item 
+LDAP，轻量级目录访问协议
+@item 
+BBDB，老大哥的阴险数据库
+@item 
+macOS 联系人
+@item 
+@code{ecomplete}、Emacs 的电气补全
+@item 
+@code{mailabbrev}，Emacs 的邮件别名缩写扩展
+@end itemize
+
+EUDC接口的主要特点是：
+
+@itemize @bullet
+@item 
+使用可定制的表单进行查询
+@item 
+内联查询扩展（例如，您可以使用服务器作为地址簿将名称扩展为邮件消息缓冲区中的电子邮件地址）
+@item 
+可以依次尝试多个服务器，直到找到内联查询的匹配项
+@item 
+快速迷你缓冲区查询电子邮件地址和电话号码
+@item 
+BBDB 接口，让您将服务器记录插入您自己的 BBDB 数据库 (@pxref{BBDB,,BBDB,bbdb,BBDB Manual})
+@end itemize
+
+@menu
+* LDAP::                         什么是LDAP？
+* BBDB::                         BBDB是什么？
+* macOS Contacts::               什么是 macOS 通讯录？
+* ecomplete::                    @code{ecomplete}是什么？
+* mailabbrev::                   @code{mailabbrev}是什么？
+@end menu
+
+
+
+@node LDAP
+@section LDAP
+
+LDAP，@dfn{the Lightweight Directory Access Protocol}，是 RFC 1777 中定义的目录应用程序的通信协议。
+
+引自 RFC 1777：
+
+@quotation
+[LDAP] 旨在提供对 X.500 目录的访问，同时不会产生目录访问协议 (DAP) 的资源要求。  该协议专门针对简单的管理应用程序和浏览器应用程序，这些应用程序提供对 X.500 目录的简单读/写交互访问，并且旨在成为 DAP 本身的补充。
+@end quotation
+
+LDAP 服务器通常存储（但不限于）有关人员的信息，例如姓名、电话号码、电子邮件地址、办公地点等@enddots{} 有关 LDAP 的更多信息可以在@url{https://www.openldap.org/} 找到。
+
+EUDC 需要外部支持才能访问 LDAP 目录服务器 (@pxref{LDAP Configuration})
+
+
+@node BBDB
+@section BBDB
+
+BBDB 是 @dfn{Big Brother's Insidious Database}，最初由 Jamie Zawinski 编写的 Emacs 软件包，它提供类似 rolodex 的数据库功能，与 Emacs 邮件和新闻阅读器紧密集成。
+
+它通常用作增强的电子邮件地址簿。
+
+EUDC 将 BBDB 视为目录服务器后端，就像 LDAP 一样，尽管 BBDB 没有客户端/服务器协议，因此始终驻留在您的计算机本地。  这样做的目的不是提供另一种查询 BBDB 数据库的方法（BBDB 本身提供了更灵活的方法来执行此操作），而是提供与外部 LDAP 目录的接口一致的本地目录接口。  当在多个服务器上执行查询时，这一点特别有趣。
+
+EUDC 还提供了一种将目录查询结果插入到您自己的本地 BBDB 中的方法 (@pxref{Creating BBDB Records})
+
+
+@node macOS Contacts
+@section macOS 联系人
+
+该 EUDC 后端将 macOS 联系人视为与 LDAP 一样的目录服务器，尽管 macOS 联系人应用程序始终在您的计算机上本地运行。  联系人应用程序以前称为地址簿； EUDC macOS 联系人后端也适用于这些旧版本。
+
+
+@node ecomplete
+@section @code{ecomplete}
+
+@code{ecomplete} 是 Emacs 的“电子补全”，它是 Emacs 的一部分。  它将所有信息存储在 @file{ecompleterc} 文件中，该文件的位置和名称可以通过变量 @code{ecomplete-database-file} （参见）进行配置。  文件的格式为：
+
+@display
+((TYPE_1 ITEM_1 ITEM_2 ...) (TYPE_2 ITEM_N+1 ITEM_N+2 ...) ...)
+@end display
+
+也就是说，它是一个 alist 映射，其中键是匹配类型（这样你就可以有一个“mail”的列表，还有一个“mastodon”的列表）。  在每个部分中，您都会有一个列表，其中每个项目的形式如下：
+
+@display
+（关键次使用的最后一次使用的字符串）
+@end display
+
+执行查询时，结果将是搜索词与 STRING 的全部或部分匹配的所有项目。
+
+当 EUDC 使用 @code{ecomplete} 执行查询时，构成查询的每个属性的名称将用作执行查找的类型。  从 EUDC 属性名称到 @code{ecomplete} 类型名称的映射是根据变量@code{eudc-ecomplete-attributes-translation-alist}（参见）执行的。
+
+
+@node mailabbrev
+@section @code{mailabbrev}
+
+@code{mailabbrev} 是 Emacs 的“邮件别名的缩写扩展”，它是 Emacs 的一部分。  它将所有信息存储在 @file{mailrc} 文件中，其位置和名称可以通过变量 @code{mail-personal-alias-file} （参见）进行配置。  @file{mailrc} 文件与 @command{mail} 和 @command{mailx} 命令用于其启动配置文件的格式相同。  @code{mailabbrev} 处理 @file{mailrc} 文件中的 @samp{alias} 和 @samp{source} 语句。 @samp{alias} 语句可以定义简单的别名和分发列表，并且可以嵌套，因为别名扩展可以包含对其他别名定义的引用。  前向引用（即在实际定义别名之前对其进行引用）也是可能的。
+
+最初，@code{mailabbrev} 被设计为与 @code{abbrev-mode} 一起使用。  @code{mailabbrev} EUDC 后端不使用 @code{abbrev-mode}，而是仅查询 @code{mailabbrev} 的别名条目，并将其作为 EUDC 结果返回。  别名完全等于 EUDC 查询中的 @code{email}、@code{name} 或 @code{firstname} 属性值的所有条目都将作为匹配项返回。  当 @file{mailrc} 别名定义通讯组列表时，即扩展为多个电子邮件地址时，EUDC 结果将包含单个条目，该条目仅包含电子邮件属性，其值将以逗号分隔的 RFC 5322 格式的收件人规范列表。
+
+
+@node Installation
+@chapter 安装
+
+EUDC 内置于 Emacs 中，其主要功能是自动加载的。
+
+安装 EUDC 后，您将在 @samp{Tools} 菜单中发现（下次启动 Emacs 时）新的 @code{Directory Search} 子菜单，您可以通过该子菜单访问 EUDC。
+
+您可能还会发现将以下内容添加到 @file{.emacs} 初始化文件中以在电子邮件撰写缓冲区中添加电子邮件地址扩展的快捷方式很有用 (@pxref{Inline Query Expansion})
+
+@lisp
+(with-eval-after-load "message"
+  (keymap-set message-mode-map "C-c <tab>" 'eudc-expand-try-all))
+(with-eval-after-load "sendmail"
+  (keymap-set mail-mode-map "C-c <tab>" 'eudc-expand-try-all))
+@end lisp
+
+@menu
+* LDAP Configuration::            EUDC 需要 LDAP 的外部支持
+* macOS Contacts Configuration::  启用 macOS 通讯录后端
+* ecomplete Configuration::       启用 ecomplete 后端
+* mailabbrev Configuration::      启用 mailabbrev 后端
+@end menu
+
+@node LDAP Configuration
+@section LDAP 配置
+
+LDAP 支持是通过 @file{ldap.el} 添加的，它是 Emacs 的一部分。  @file{ldap.el} 需要一个名为 @command{ldapsearch} 的外部程序，该程序作为 OpenLDAP (@url{https://www.openldap.org/}) 的一部分提供。  本节中的配置已使用 OpenLDAP 2.4.23 进行测试。
+
+如今，大多数服务器都使用 LDAP-over-SSL；这里的例子反映了这一点。  其他可能性是：
+
+@vindex ldap-host-parameters-alist
+@vindex ldap-ldapsearch-args
+@itemize @bullet
+
+@item 
+不需要身份验证或不加密身份验证流量的服务器。
+
+将@code{auth simple}包含在@code{ldap-host-parameters-alist}中，这会导致@code{-x}选项传递给@command{ldapsearch}。
+
+@item 
+需要 SASL 身份验证的服务器。
+
+使用 @code{ldap-ldapsearch-args} 将任何所需的额外选项传递给 @command{ldapsearch}。
+@end itemize
+
+以下示例使用基数 @code{ou=people,dc=gnu,dc=org} 和主机名 @code{ldap.gnu.org}，该服务器支持 LDAP-over-SSL（@code{ldaps} 协议，默认端口 @code{636}），并且需要用户 @code{emacsuser} 使用密码 @code{s3cr3t} 进行身份验证。
+
+这些配置是独立的；也就是说，每个都提供了电子邮件字段的合理 TAB 补全所需的一切。  首先尝试 BBDB 查找；如果找到匹配的 BBDB 条目，则 EUDC 将不会尝试任何 LDAP 查找。
+
+使用 @code{*} 字符支持通配符 LDAP 查找。  例如，尝试按 TAB 键完成以下操作：
+
+@example
+To: * Smith
+@end example
+
+@noindent
+将返回姓氏以 @code{Smith} 开头的所有 LDAP 条目。  在它进行的每个 LDAP 查询中，EUDC 都会隐式地将通配符附加到最后一个单词的末尾，除非该单词对应于属于 @code{eudc-ldap-no-wildcard-attributes} 成员的属性。
+
+@menu
+* Emacs-only Configuration::     配置@file{.emacs}
+* External Configuration::       配置@file{/etc/openldap/ldap.conf}
+* Troubleshooting::              调试 @command{ldapsearch} 失败
+@end menu
+
+@node Emacs-only Configuration
+@subsection 仅限 Emacs 的配置
+
+Emacs 可以通过 @command{ldapsearch} 命令行传递大多数必需的配置选项。  一个例外是 LDAP-over-SSL 的证书配置，必须在@file{/etc/openldap/ldap.conf} 中指定。  在提供此类证书作为 @code{OpenLDAP} 安装一部分的系统上，这可以像一行一样简单：
+
+@example
+TLS_CACERTDIR /etc/openldap/certs
+@end example
+
+在 @file{.emacs} 中，这些表达式足以为 LDAP 配置 EUDC：
+
+@vindex message-mode-map
+@findex eudc-expand-inline
+@findex eudc-expand-try-all
+@vindex eudc-server-hotlist
+@vindex ldap-host-parameters-alist
+@lisp
+(with-eval-after-load "message"
+  (keymap-set message-mode-map "TAB" 'eudc-expand-try-all))
+(setopt eudc-server-hotlist
+        '(("" . bbdb)
+          ("ldaps://ldap.gnu.org" . ldap)))
+(setopt ldap-host-parameters-alist
+        '(("ldaps://ldap.gnu.org"
+                  base "ou=people,dc=gnu,dc=org"
+                  binddn "gnu\\emacsuser"
+                  passwd ldap-password-read)))
+@end lisp
+
+@findex ldap-password-read
+@vindex passwd
+@vindex password-cache
+@vindex password-cache-expiry
+@findex password-reset
+为 @code{passwd} 指定函数 @code{ldap-password-read} 将导致 Emacs 以交互方式提示输入密码。  然后，密码将被验证并缓存，除非 @code{password-cache} 是 @code{nil}。  您可以自定义 @code{password-cache-expiry} 来控制密码缓存的持续时间。  如果您想清除缓存，请调用@code{password-reset}。
+
+@node External Configuration
+@subsection 外部配置
+
+您的系统可能已经配置了默认 LDAP 服务器。  例如，@file{/etc/openldap/ldap.conf} 可能包含：
+
+@example
+BASE ou=people,dc=gnu,dc=org
+URI ldaps://ldap.gnu.org
+TLS_CACERTDIR /etc/openldap/certs
+@end example
+
+@cindex bind distinguished name
+@cindex binddn
+身份验证需要密码和代表用户的@dfn{bind distinguished name (binddn)}，在本例中为@code{gnu\emacsuser}。  这些可以在 @file{~/.authinfo.gpg} 中使用以下行指定：
+
+@example
+machine ldaps://ldap.gnu.org binddn gnu\emacsuser password s3cr3t
+@end example
+
+然后在 @file{.emacs} init 文件中，这些表达式足以为 LDAP 配置 EUDC：
+
+@vindex message-mode-map
+@findex eudc-expand-inline
+@findex eudc-expand-try-all
+@vindex eudc-server-hotlist
+@vindex ldap-host-parameters-alist
+@lisp
+(with-eval-after-load "message"
+  (keymap-set message-mode-map "TAB" 'eudc-expand-try-all))
+(setopt eudc-server-hotlist
+        '(("" . bbdb)
+          ("ldaps://ldap.gnu.org" . ldap)))
+(setopt ldap-host-parameters-alist
+        '(("ldaps://ldap.gnu.org"
+                  auth-source t)))
+@end lisp
+
+对于我们只关心一台服务器的示例，可以在 @file{~/.authinfo.gpg} 和 @file{.emacs} 中省略服务器名称，在这种情况下 @command{ldapsearch} 默认为 @file{/etc/openldap/ldap.conf} 中的主机名。
+
+@file{~/.authinfo.gpg} 行变为：
+
+@example
+binddn gnu\emacsuser password s3cr3t
+@end example
+
+@noindent
+@file{.emacs} 表达式变为：
+
+@vindex message-mode-map
+@findex eudc-expand-inline
+@findex eudc-expand-try-all
+@vindex eudc-server-hotlist
+@vindex ldap-host-parameters-alist
+@lisp
+(with-eval-after-load "message"
+  (keymap-set message-mode-map "TAB" 'eudc-expand-try-all))
+(setopt eudc-server-hotlist
+        '(("" . bbdb) ("" . ldap)))
+(setopt ldap-host-parameters-alist
+        '(("" auth-source t)))
+@end lisp
+
+@node Troubleshooting
+@subsection 故障排除
+
+如果 @command{ldapsearch} 因错误退出，您将在 @code{*Messages*} 缓冲区中看到类似这样的消息（全部在一行）：
+
+@example
+ldap-search-internal: Failed ldapsearch invocation:
+   ldapsearch "-Hldaps://ldap.gnu.org" "-bou=people,dc=gnu,dc=org"
+   "-Dgnu\emacsuser" "-W" "-LL" "-tt" "(&(mail=name*))"
+   "givenname" "sn" "mail"
+@end example
+
+@command{ldapsearch} 命令的格式使其可以复制并粘贴到终端中。  通过将 @code{-d 5} 附加到命令行，将 @command{ldapsearch} 调试级别设置为 5。
+
+
+@node macOS Contacts Configuration
+@section macOS 联系人配置
+
+macOS 联系人支持是通过 Emacs 的 @file{eudcb-mab.el} 或 @file{eudcb-macos-contacts.el} 添加的。
+
+要启用 macOS 联系人后端，首先 @code{require} 相应的库来加载它，然后在初始化文件中将 @code{eudc-server} 设置为 localhost：
+@lisp
+(require 'eudcb-macos-contacts)
+(eudc-macos-contacts-set-server "localhost")
+@end lisp
+
+@file{eudcb-macos-contacts.el} 使用联系人应用程序通过 macOS 开放脚本架构 (OSA) 提供的公共脚本接口。  为了实现此目的，@file{eudcb-macos-contacts.el} 使用名为 osascript 的外部命令行实用程序，自 10.0（2001 年发布）以来的所有 macOS 版本都包含该实用程序。因此，建议所有新配置都使用@file{eudcb-macos-contacts.el}。
+
+@file{eudcb-mab.el} 使用名为 contact 的外部命令行实用程序对数据库文件的格式进行逆向工程，该实用程序需要单独安装。  虽然这可能会带来一些性能优势，但它是以使用未记录的接口为代价的。因此，建议 @file{eudcb-mab.el} 用户在升级到新版本的 macOS 之前仔细检查 @file{eudcb-mab.el} 和所需的外部命令行实用程序的兼容性。保留@file{eudcb-mab.el}是为了向后兼容现有配置，并且可能会在未来版本中删除。
+
+
+@node ecomplete Configuration
+@section @code{ecomplete} 配置
+
+@code{ecomplete} 是 Emacs 的“电气补全”，是 Emacs 的一部分。  要使用它，您需要首先设置一个数据库文件（@pxref{ecomplete}）。
+
+它将根据需要自动加载。
+
+您还可以启用多服务器查询，如@pxref{Multi-server Queries}中所述。
+
+
+@node mailabbrev Configuration
+@section @code{mailabbrev} 配置
+
+@code{mailabbrev} 是 Emacs 的“邮件别名的缩写扩展”，它是 Emacs 的一部分。  要使用它，您需要首先设置一个数据库文件（@pxref{mailabbrev}）。
+
+它将根据需要自动加载。
+
+您还可以启用多服务器查询，如@pxref{Multi-server Queries}中所述。
+
+
+@node Usage
+@chapter 用法
+
+本章介绍 EUDC@. 的用法 大多数功能和自定义选项可通过 @samp{Tools} 子菜单的 @samp{Directory Search} 子菜单获得。
+
+@menu
+* Querying Servers::             如何执行和处理查询
+* Query Form::                   如何使用和自定义查询表单
+* Display of Query Results::     控制查询结果的呈现方式
+* Inline Query Expansion::       如何使用和自定义内联查询
+* The Server Hotlist::           如何使用和管理服务器热点列表
+* Multi-server Queries::         如何连续查询多个服务器
+* Creating BBDB Records::        如何将查询结果插入 BBDB
+* Server/Protocol Locals::       基于每个服务器/协议进行定制
+@end menu
+
+
+@node Querying Servers
+@section 查询服务器
+
+EUDC 的基本功能是让您查询目录服务器并将结果返回给您。  在此过程中您可能需要自定义几项内容。
+
+
+@menu
+* Selecting a Server::           首先要做的事
+* Return Attributes::            配置服务器应返回的内容
+* Duplicate Attributes::         当记录具有重复属性时该怎么办
+@end menu
+
+@node Selecting a Server
+@subsection 选择服务器
+
+在执行任何查询之前，您需要设置目录服务器。  您需要指定运行服务器软件的主机名称以及要使用的协议。  如果您没有以任何方式设置服务器，EUDC 会在您进行第一次查询时要求您提供服务器。
+
+您可以通过从 @samp{Server} 子菜单中可用的服务器常用列表 (@pxref{The Server Hotlist}) 中选择一个服务器来设置服务器，或者在同一菜单中选择 @samp{New Server}。
+
+LDAP 服务器通常需要进行一些配置，然后才能对它们执行查询。  特别是，必须配置@dfn{search base}。  如果您选择的服务器没有配置搜索库，那么 EUDC 将建议您此时配置它。  将显示自定义缓冲区，您可以在其中编辑服务器的搜索库和其他参数。
+
+@defvar eudc-server
+远程目录服务器的名称或 IP 地址。  TCP 端口号可以通过在服务器名称后附加冒号和数字来指定。  除非您的服务器在默认端口以外的端口上运行（这取决于协议），否则您不需要它。如果目录服务器驻留在您自己的计算机上（如果您使用 BBDB 后端就是这种情况），那么 @samp{localhost} 是一个合理的值，但无论如何它都会被忽略。
+@end defvar
+
+@defvar eudc-protocol
+用于查询服务器的目录协议。  此版本 EUDC 目前支持的协议为@code{ldap} 和 @code{bbdb}。
+@end defvar
+
+@deffn Command eudc-set-server
+可从 @samp{New Server} 子菜单访问此命令，您可以指定新的目录服务器和协议。
+@end deffn
+
+@node Return Attributes
+@subsection 返回属性
+
+目录服务器可以配置为如果查询未指定任何属性，则为与查询匹配的每个记录返回默认属性集。变量 @code{eudc-default-return-attributes} 控制您想要查看的返回属性（如果与服务器默认值不同）。
+
+@defvar eudc-default-return-attributes
+从目录条目中提取的默认属性列表。  如果设置为符号 @code{all} 则返回所有可用属性。  默认值@code{nil}表示返回服务器中配置的默认属性。
+@end defvar
+
+服务器可能会向查询返回多个匹配记录。  然而，某些记录可能不包含您请求的所有属性。  您可以丢弃这些记录。
+
+@defopt eudc-strict-return-matches
+如果非@code{nil}，则忽略不包含所有请求的返回属性的条目。  默认值为@code{t}。
+@end defopt
+
+@node Duplicate Attributes
+@subsection 重复属性
+
+目录标准可以授权记录中同一属性的不同实例。  例如，一个人的记录可能包含多个包含不同电子邮件地址的电子邮件字段，在这种情况下，EUDC 将认为该属性重复。
+
+EUDC 有多种方法来处理重复属性。  可用的方法有：
+
+@table @code
+@item list
+使用重复属性的不同值创建一个列表。  返回的记录仅包含该属性的一个实例，并以所有不同值的列表作为值。  这是默认方法，用于处理未指定其他方法的重复字段。
+@item first
+丢弃字段的所有重复值，仅保留第一个值。
+@item concat
+使用换行符作为分隔符连接不同的值。  该记录仅保留该字段的一个实例，该字段的值是单个多行字符串。
+@item duplicate
+将整个记录复制到与字段有不同值的多个实例中。  这是电子邮件字段的默认值。  因此，包含 3 个不同电子邮件地址的记录被复制为三个不同的记录，每个记录都有一个电子邮件地址。  这与 @code{select} 结合使用特别有用，作为处理内联扩展查询 (@pxref{Inline Query Expansion}) 中的多个匹配的方法，因为您会在选择缓冲区中看到 3 个地址
+@end table
+
+由于方法可能不适用于所有字段，因此变量 @code{eudc-duplicate-attribute-handling-method} 允许您为所有字段指定默认方法或为每个单独字段指定方法。
+
+@defvar eudc-duplicate-attribute-handling-method
+处理包含重复属性的条目的方法。  它可以是元素列表@code{(@var{attr} . @var{method})}，也可以是符号@var{method}。  变量的 alist 形式将方法与单个属性名称相关联；第二种形式指定适用于所有属性名称的方法。  可用的方法有：@code{list}、@code{first}、@code{concat} 和 @code{duplicate}（见上文）。  默认值为@code{list}。
+@end defvar
+
+
+
+@node Query Form
+@section 查询表格
+
+查询目录服务器的最简单方法是使用查询表单。  您可以使用 @samp{Query with Form} 菜单项或调用命令 @kbd{M-x eudc-query-form} 显示查询表单。  以这种形式呈现的属性名称由 @code{eudc-query-form-attributes} 变量定义（除非向 @code{eudc-query-form} 提供非 @code{nil} 参数）。
+
+由于 EUDC 接口的不同目录协议可能对等效属性使用不同的名称，因此 EUDC 通过变量 @code{eudc-protocol-attributes-translation-alist} 定义了自己的一组属性名称以及这些名称与其特定于协议的等效名称之间的映射。  EUDC 目前定义的名称为@code{name}、@code{firstname}、@code{email} 和@code{phone}。
+
+@defvar eudc-query-form-attributes
+@findex eudc-get-attribute-list
+查询表单中显示的属性列表。  此列表中的属性名称应该是 EUDC 属性名称或有效属性名称。  您可以使用 @samp{List Valid Attribute Names} 菜单项或 @kbd{M-x eudc-get-attribute-list} 命令获取当前协议的有效属性名称列表。  默认为 @code{name}、@code{email} 和 @code{phone}。
+@end defvar
+
+@deffn Command eudc-query-form get-fields-from-server
+显示一个表单来查询目录服务器。  如果给定非@code{nil}参数，该函数首先向服务器查询现有字段并显示相应的表单。  并非所有协议都可以支持此处的非 @code{nil} 参数。
+@end deffn
+
+由于字段名称可能不够明确或不适合直接显示为表单中的提示字符串，因此变量 @code{eudc-user-attribute-names-alist} 允许您为目录属性名称定义更明确的名称。  如果@code{eudc-use-raw-directory-names} 是非@code{nil}，则忽略此变量。
+
+@defvar eudc-user-attribute-names-alist
+这是查询/响应表单中使用的目录属性的用户定义名称列表。  不在此列表中的属性的提示字符串是通过在下划线处分割属性名称并将各个单词大写而派生的。
+@end defvar
+
+@defvar eudc-use-raw-directory-names
+如果非@code{nil}，则使用目录中定义的属性名称。否则，目录查询/响应表单将显示@code{eudc-user-attribute-names-alist}中定义的用户属性名称。
+@end defvar
+
+@node Display of Query Results
+@section 查询结果展示
+
+成功完成表单查询后，EUDC 将显示包含查询结果的缓冲区。
+
+为每条记录返回的字段由@code{eudc-default-return-attributes} (@pxref{Return Attributes}) 控制。
+
+每个单独字段的显示可以通过任意函数来执行，该函数允许对二进制值（例如图像或音频样本）以及具有语义的值（例如 URL）进行特定处理。
+
+@defvar eudc-attribute-display-method-alist
+指定显示属性值的方法的列表。  列表中的每个成员的形式为 @code{(@var{name} . @var{func})}，其中 @var{name} 是命名目录属性的小写字符串（如果 @code{eudc-use-raw-directory-names} 为非 @code{nil}，则根据 @code{eudc-user-attribute-names-alist} 进行翻译），@var{func} 是一个将传递相应属性值以进行显示的函数。
+@end defvar
+
+该变量具有协议本地定义 (@pxref{Server/Protocol Locals})。  例如，对于 LDAP，它的定义如下：
+
+@lisp
+(eudc-protocol-set 'eudc-attribute-display-method-alist
+                   '(("jpegphoto" . eudc-display-jpeg-inline)
+                     ("labeledurl" . eudc-display-url)
+                     ("audio" . eudc-display-sound)
+                     ("labeledurl" . eudc-display-url)
+                     ("url" . eudc-display-url))
+                   'ldap)
+@end lisp
+
+EUDC 提供了一组内置函数来显示二进制值类型：
+
+@defun eudc-display-generic-binary data
+显示未识别的二进制 @var{data} 的按钮。
+@end defun
+
+@defun eudc-display-url url
+显示 URL 并使其可点击。
+@end defun
+
+@defun eudc-display-sound data
+显示一个按钮来播放声音@var{data}。
+@end defun
+
+@defun eudc-display-jpeg-inline data
+如果可能的话，在点处内嵌显示 JPEG @var{data}。
+@end defun
+
+@defun eudc-display-jpeg-as-button data
+显示 JPEG @var{data} 的按钮。
+@end defun
+
+右键单击二进制值按钮会弹出一个上下文菜单，其中包含处理该值的选项。  其中包括将属性值保存到文件或将其发送到外部查看器命令。  外部查看者应该期望其标准输入上的值，并且应该显示它或对其执行任意处理。  发送到标准输出的消息将被丢弃。  外部查看器列在变量 @code{eudc-external-viewers} 中，您可以自定义该变量。
+
+@defvar eudc-external-viewers
+这是查看器程序规格的列表。  每个规范都是一个列表，其第一个元素是命名查看器的字符串以进行唯一标识，第二个元素是应调用的可执行程序，以下元素是应传递给程序的参数。
+@end defvar
+
+
+@node Inline Query Expansion
+@section 内联查询扩展
+@subsection 使用键绑定的内联查询扩展
+
+内联查询扩展是从目录服务器获取完成的强大方法。  最常见的用法是将名称扩展到邮件消息缓冲区中的电子邮件地址。  扩展由命令 @kbd{M-x eudc-expand-try-all} 执行，该命令可从 @samp{Expand Inline Query Trying All Servers} 菜单项获取，但也可以方便地绑定到快捷键 (@pxref{Installation})。  该操作由变量 @code{eudc-inline-expansion-format}、@code{eudc-inline-query-format}、@code{eudc-expanding-overwrites-query} 和 @code{eudc-multiple-match-handling-method} 控制。
+
+如果某个服务器的查询失败，则可以连续尝试其他服务器，直到其中一个找到匹配项（@pxref{Multi-server Queries}），或者可以尝试所有服务器并返回所有匹配项。
+
+@deffn Command eudc-expand-try-all try-all-servers-p
+查询部分或全部服务器并在点之前展开查询字符串。查询字符串由从该点到前面的逗号、冒号或行首的缓冲区子字符串组成。 @code{eudc-inline-query-format} 控制单个单词如何映射到目录属性名称。  在向一个或多个服务器查询给定字符串后，@code{eudc-inline-expansion-format} 指定的扩展将插入到缓冲区中的点中。  如果有多个匹配项，则会显示一个选择窗口。  如果@var{try-all-servers-p}非@code{nil}则查询所有服务器。
+@end deffn
+
+@deffn Command eudc-expand-inline save-query-as-kill-p
+查询服务器并在点之前展开查询字符串。  查询字符串由从该点到前面的逗号、冒号或行首的缓冲区子字符串组成。 @code{eudc-inline-query-format} 控制单个单词如何映射到目录属性名称。  在向服务器查询给定字符串后，@code{eudc-inline-expansion-format}指定的扩展将被插入到缓冲区中的点中。  如果有多个匹配项，则会显示一个选择窗口。  如果@var{save-query-as-kill-p}是@code{t}，那么查询字符串将被保存到killring中。  如果@code{eudc-expansion-save-query-as-kill}非@code{nil}，则@var{save-query-as-kill-p}的意义被否定。
+@end deffn
+
+@defvar eudc-inline-query-format
+内联扩展查询的格式。这实际上是一个 @var{format} 的列表。  @var{format} 是一个或多个 EUDC 属性名称的列表。  如果 @var{format} 包含的属性与内联查询字符串中的单个单词一样多，则适用。  如果有多个@var{format}适用，则按顺序尝试它们，直到找到匹配项。  如果@code{nil}所有单词都将映射到默认服务器/协议属性名称（通常为@code{name}）。
+
+例如，使用以下内容
+@lisp
+(setq eudc-inline-query-format '((name)
+                                 (firstname)
+                                 (firstname name)))
+@end lisp
+@noindent
+指示单个单词扩展查询将被视为姓氏，如果未找到匹配项，则应尝试将其视为名字。  由两个单词组成的内联查询被视为由名字和姓氏组成。  如果查询由两个以上单词组成，则第一个单词被视为名字，其余单词均被视为姓氏成分。
+
+@var{format} 实际上不限于 EUDC 属性名称，您可以在其中使用服务器或协议特定名称。  如果这样做，以协议或服务器本地方式设置变量 @code{eudc-inline-query-format} (@pxref{Server/Protocol Locals}) 可能会更安全。
+
+例如，您可以使用以下命令将最多三个单词与 LDAP 服务器的 @code{cn} 属性相匹配：
+@lisp
+(eudc-protocol-set 'eudc-inline-query-format
+                   '((cn)
+                     (cn cn)
+                     (cn cn cn))
+                   'ldap)
+@end lisp
+@end defvar
+
+@defvar eudc-inline-expansion-format
+该变量可让您准确控制根据内联扩展请求插入缓冲区的内容。  它可以设置为 @code{nil}、函数或列表。  默认值为@code{nil}。
+
+当值是列表时，第一个元素是传递给@code{format}的字符串。  其余元素是与目录属性名称相对应的符号。  相应的属性值作为附加参数传递给@code{format}。
+
+当值为@code{nil}时，扩展结果将按照@url{https://datatracker.ietf.org/doc/html/rfc5322, RFC 5322}进行格式化。  @var{phrase} 部分将被格式化为“firstname name”，必要时引用结果。  在这种情况下，不会添加 @var{comment} 部分。  这将产生任何默认格式
+@center @var{address}
+@center @var{first} @code{<}@var{address}@code{>}
+@center @var{last} @code{<}@var{address}@code{>}
+@center @var{first} @var{last} @code{<}@var{address}@code{>}
+取决于查询是否返回名字和/或姓氏。
+
+当值为函数时，扩展结果将按照@url{https://datatracker.ietf.org/doc/html/rfc5322, RFC 5322}进行格式化，并调用引用的函数分别格式化@var{phrase}和@var{comment}部分。  如有必要，将引用格式化的@var{phrase}部分。  因此可以生成任何一种格式：
+@center @var{address}
+@center @var{phrase} @code{<}@var{address}@code{>}
+@center @var{address} @code{(}@var{comment}@code{)}
+@center @var{phrase} @code{<}@var{address}@code{>} @code{(}@var{comment}@code{)}
+
+通过内联扩展生成的电子邮件地址规范需要符合 RFC 5322 才能在电子邮件中有用。  当电子邮件标头中存在无效地址规范时，接收 MTA 可能会拒绝该邮件。  因此，建议将使用列表值的旧配置切换为新的 @code{nil} 或函数值类型，因为它可以确保插入的地址规范与 @url{https://datatracker.ietf.org/doc/html/rfc5322, RFC 5322} 一致。  至少，为了实现与旧列表默认值相同的语义，该变量现在应设置为 @code{nil}：
+@lisp
+(customize-set-variable 'eudc-inline-expansion-format nil)
+@end lisp
+
+例如，可以使用函数值来获取 @emph{``last, first <address>''} 而不是默认的 @emph{``first last <address>''}：
+@lisp
+(defun my-phrase-last-comma-first (search-res-alist)
+  (let* (phrase
+	 (my-attrs (eudc-translate-attribute-list '(firstname name)))
+	 (first-name (cdr (assq (nth 0 my-attrs) search-res-alist)))
+	 (last-name (cdr (assq (nth 1 my-attrs) search-res-alist)))
+         (comment nil))
+    (setq phrase (concat last-name ", " first-name))
+    (cons phrase comment)))
+
+(customize-set-variable 'eudc-inline-expansion-format
+                        #'my-phrase-last-comma-first)
+@end lisp
+要设置 @var{comment} 部分，也可以提供一个字符串作为返回的 @code{cons} 的 @code{cdr}，而不是像本例中那样设置 @code{nil}。  不要在 @var{phrase} 部分中包含任何双引号，因为如果需要，它们会自动添加。  @var{comment} 部分中都不包含括号，因为它们也是自动添加的。
+@end defvar
+
+@defvar eudc-multiple-match-handling-method
+此变量控制当多个条目与内联扩展的查询匹配时要执行的操作。  可能的值为：
+@table @code
+@item first
+第一场比赛被视为唯一一场，其他比赛将被丢弃。
+@item select
+将弹出一个选择缓冲区，您可以在其中选择特定的匹配项。  这是变量的默认值。
+@item all
+扩展依次使用所有记录
+@item abort
+发出错误信号。  扩张中止。
+@end table
+
+默认为 @code{select}
+@end defvar
+
+@subsection 使用完成点进行内联查询扩展
+
+除了提供用于绑定到快捷键 (@pxref{Inline Query Expansion}) 的专用 EUDC 函数之外，EUDC 还提供了一个函数，可通过 @code{message-mode} 缓冲区 (@pxref{Top,Message,, message, Message}) 中的函数 @code{completion-at-point} (@pxref{List Identifiers,,,emacs, The GNU Emacs Manual}) 向 Emacs 缓冲区内完成系统提供搜索结果。  使用此机制时，查询是在多服务器查询操作模式下进行的（@pxref{Multi-server Queries}）。
+
+当@code{message-mode}中的缓冲区被创建时，EUDC的内联扩展函数会自动添加到变量@code{completion-at-point-functions}中。  因此，每当在 @code{message-mode} 缓冲区中调用 @code{completion-at-point} 时，都会查询 EUDC 以查找与 point 之前的单词匹配的电子邮件地址。  由于这仅在编辑需要指定一个或多个电子邮件地址的特定邮件标头字段时才有用，因此会执行一项附加检查，以确定点是否实际上位于这些标头字段之一中。  因此，任何匹配的电子邮件地址将仅在合适的消息标头字段中提供以完成，而不是在其他地方（例如消息正文）。
+
+
+@node The Server Hotlist
+@section 服务器热门列表
+
+EUDC 允许您维护常用服务器的列表，以便您可以轻松地从一台服务器切换到另一台服务器。  大多数用户应该通过Customize 配置热点列表，并将配置存储在主Emacs 初始化文件中。  动态配置它可能会令人困惑，特别是如果热列表设置自动保存到@code{eudc-options-file}。  @code{eudc-options-file} 是历史性的，仍然保留对其的支持，但新的 EUDC 用户应将 @code{eudc-ignore-options-file} 设置为 @code{t}。
+
+但是，此热门列表也出现在 @samp{Server} 子菜单中。  您可以通过单击服务器名称来选择此列表中的服务器。  您可以使用命令@kbd{M-x eudc-bookmark-current-server}将当前服务器添加到列表中。  该列表包含在变量 @code{eudc-server-hotlist} 中，该变量存储在 @code{eudc-options-file} 指定的文件中并从中检索，或者如果 @code{eudc-ignore-options-file} 为非 @code{nil} 则为正常的 Emacs 初始化。 EUDC 还提供了交互式编辑热门列表的工具 (@pxref{The Hotlist Edit Buffer})。
+
+热点列表还用于连续在多个服务器上进行查询（@pxref{Multi-server Queries}）。  尝试服务器的顺序就是它们在活动列表中出现的顺序，因此对活动列表进行适当的排序非常重要。
+
+@deffn Command eudc-bookmark-server server
+将@var{server}添加到服务器的常用列表中
+@end deffn
+
+@deffn Command eudc-bookmark-current-server
+将当前服务器添加到服务器热列表中
+@end deffn
+
+@defvar eudc-ignore-options-file
+如果非@code{nil}，EUDC 会忽略@code{eudc-options-file}，并在尝试使用它时发出警告或发出错误。  大多数用户应该设置此项，并将其 EUDC 配置保留在主 Emacs 初始化文件中。  过去，单独的 @file{eudc-options} 文件给用户带来了混乱。
+@end defvar
+
+@defvar eudc-options-file
+EUDC 存储其内部变量（热点列表和当前服务器）的文件的名称。  EUDC 将在初始化时尝试加载该文件，因此，如果您选择的文件名与默认的 @file{~/.emacs.d/eudc-options} 不同，请务必将此变量设置为适当的值 @emph{before} EUDC 会自行加载。
+@end defvar
+
+@menu
+* The Hotlist Edit Buffer::      交互式热门列表编辑工具
+@end menu
+
+@node The Hotlist Edit Buffer
+@subsection 热门列表编辑缓冲区
+
+常用服务器列表编辑缓冲区提供了一种管理常用服务器列表的方法。  命令可在通常绑定到鼠标右键的上下文弹出菜单中使用。  这些命令也具有等效的键绑定。
+
+@deffn Command eudc-hotlist-add-server
+绑定到@kbd{a}。将新服务器添加到点后一行的热点列表中
+@end deffn
+
+@deffn Command eudc-hotlist-delete-server
+绑定到@kbd{d}。删除该行点所在的服务器
+@end deffn
+
+@deffn Command eudc-hotlist-select-server
+绑定到@kbd{s}。选择该点所在的服务器作为下一个查询的当前目录服务器
+@end deffn
+
+@deffn Command eudc-hotlist-transpose-servers
+绑定到@kbd{t}。将点所在的服务器冒泡到列表顶部
+@end deffn
+
+@deffn Command eudc-hotlist-quit-edit
+绑定到@kbd{q}。保存更改并退出活动列表编辑缓冲区。  使用@kbd{x}或@kbd{M-x kill-buffer}退出而不保存。
+@end deffn
+
+
+@node Multi-server Queries
+@section 多服务器查询
+
+当使用内联查询扩展 (@pxref{Inline Query Expansion}) 时，EUDC 可以尝试连续查询一系列目录服务器，直到其中一个成功找到查询的匹配项。
+
+@defvar eudc-inline-expansion-servers
+此变量控制尝试执行内联查询时尝试哪些服务器以及尝试的顺序。  可能的值为：
+@table @code
+@item current-server
+仅尝试当前目录服务器
+@item hotlist
+按顺序尝试热列表中的服务器，直到找到查询的匹配项或达到 @code{eudc-max-servers-to-query}
+@item server-then-hotlist
+然后，按照当前服务器在热点列表中出现的顺序尝试热点列表中的服务器，直到其中一个服务器找到匹配项或达到 @code{eudc-max-servers-to-query}。  这是默认设置。
+@end table
+@end defvar
+
+@defvar eudc-max-servers-to-query
+该变量表示执行多服务器查询时要查询的最大服务器数。  默认值@code{nil}表示应尝试所有可用的服务器。
+@end defvar
+
+
+
+@node Creating BBDB Records
+@section 创建 BBDB 记录
+
+@findex eudc-insert-record-at-point-into-bbdb
+@findex eudc-try-bbdb-insert
+使用 EUDC，您可以根据从目录服务器获取的记录自动创建 BBDB 记录 (@pxref{BBDB,,BBDB,bbdb,BBDB Manual})。  您可以通过将点移动到查询结果显示缓冲区中的相应记录并使用键盘绑定 @kbd{b}@footnote{This key binding does not actually call @code{eudc-insert-record-at-point-into-bbdb} but uses @code{eudc-try-bbdb-insert} instead.} 或使用菜单调用命令 @kbd{M-x eudc-insert-record-at-point-into-bbdb} 来完成此操作。  EUDC 无法更新现有 BBDB 记录，并且如果您尝试插入与现有记录匹配的记录，则会发出错误信号。
+
+@findex eudc-batch-export-records-to-bbdb
+也可以使用命令@kbd{M-x eudc-batch-export-records-to-bbdb}将目录查询结果中包含的整批记录导出到BBDB。
+
+由于目录系统可能不会强制执行严格的记录格式，因此本地服务器安装可能会使用不同的属性名称并采用不同的方式来组织信息。  此外，BBDB 有自己的记录结构。  由于这些原因，将记录从外部目录格式转换为 BBDB 格式是一个高度可定制的过程。
+
+@defvar eudc-bbdb-conversion-alist
+该变量的值应该是命名 alist 的符号，定义 BBDB 字段名称到目录属性名称记录之间的映射。这是一个协议局部变量，在协议切换时初始化 (@pxref{Server/Protocol Locals})。  该列表由 @code{(@var{bbdb-field} . @var{spec-or-list})} 形式的单元格组成。 @var{bbdb-field} 是必须在 BBDB 环境中定义的字段名称（标准字段名称为 @code{name}、@code{company}、@code{net}、@code{phone}、@code{address} 和 @code{notes}）。 @var{spec-or-list} 是单个映射规范或映射规范列表。  映射规范列表仅对 @code{phone} 和 @code{address} BBDB 字段有效。 @var{spec}s 实际上是 s 表达式，其计算如下：
+
+@table @asis
+@item 一个字符串
+对自己进行评估
+@item 一个符号
+计算为符号值。  与记录中存在的目录属性名称相对应的符号计算为记录中字段的值
+@item 一种形式
+被评估为函数。  参数列表可以包含属性名称，其计算结果为记录中的相应值。  表单评估应该返回适​​合特定@var{bbdb-field}的内容（参见@code{bbdb-create-internal}）。提供 @code{eudc-bbdbify-phone} 和 @code{eudc-bbdbify-address} 作为解析电话和地址的便捷函数。
+@end table
+@end defvar
+
+@defun eudc-bbdbify-phone phone location
+这是一个方便的函数，供在@code{eudc-bbdb-conversion-alist} 中使用。  它将 @var{phone} 解析为与 @code{bbdb-create-internal} 兼容的向量。  @var{phone} 是一个假定包含电话号码的字符串，或者是连接的此类字符串的列表。 @var{location} 用作 BBDB 的电话位置。
+@end defun
+
+@defun eudc-bbdbify-address addr location
+这是一个方便的函数，供在@code{eudc-bbdb-conversion-alist} 中使用。  它将 @var{addr} 解析为与 @code{bbdb-create-internal} 兼容的向量。  @var{addr} 应该是不超过四行的地址字符串或行列表。  最后一行搜索邮政编码、城市和州名称。  @var{location} 用作 BBDB 的电话位置。
+@end defun
+
+请注意，只有您使用 @code{eudc-default-return-attributes} 选择且实际显示的属性的子集实际上可能会作为新创建的 BBDB 记录的一部分插入。
+
+
+@node Server/Protocol Locals
+@section 服务器/协议局部变量
+
+EUDC 可以为每个服务器或目录协议独立定制。  所有变量都可以被赋予本地绑定，当特定服务器和/或协议变为活动状态时，这些本地绑定将被激活。  这很像缓冲区本地绑定，但基于每个服务器或每个协议。
+
+@menu
+* Manipulating local bindings::   设置和查询本地绑定的函数
+@end menu
+
+@node Manipulating local bindings
+@subsection 操作本地绑定
+
+EUDC 提供的功能可让您在每个服务器或每个协议的基础上设置和查询变量。
+
+以下谓词允许您测试特定变量的服务器/协议本地绑定是否存在。
+
+@defun eudc-server-local-variable-p var
+如果 @var{var} 具有服务器本地绑定，则返回非 @code{nil}
+@end defun
+
+@defun eudc-protocol-local-variable-p var
+如果 @var{var} 具有协议本地绑定，则返回非 @code{nil}
+@end defun
+
+以下函数允许您设置具有不同局部性程度的变量的值。
+
+@defun eudc-default-set var val
+将 EUDC 默认值 @var{var} 设置为 @var{val}。 @var{var} 的当前绑定（如果对于当前服务器或协议而言是本地的）不会更改。
+@end defun
+
+@defun eudc-protocol-set var val &optional protocol
+将@var{var}本地到@var{protocol}的绑定设置为@var{val}。  如果省略，@var{protocol} 默认为 @code{eudc-protocol} 的当前值。  仅当省略 @var{protocol} 时，@var{var} 的当前绑定才会更改。
+@end defun
+
+@defun eudc-server-set var val &optional server
+将@var{var}本地到@var{server}的绑定设置为@var{val}。  如果省略，@var{server} 默认为 @code{eudc-server} 的当前值。  仅当省略 @var{server} 时，@var{var} 的当前绑定才会更改。
+@end defun
+
+@defun eudc-set var val
+将 @var{var} 的最本地（服务器、协议或默认）绑定设置为 @var{val}。  @var{var} 的当前绑定也设置为@var{val}。
+@end defun
+
+以下变量允许您查询变量的各种绑定（本地或非本地）。
+
+@defun eudc-variable-default-value var
+返回 @var{var} 的默认绑定（在特定服务器或协议本地绑定之外）。如果 2⁣ 没有 EUDC 默认值，则返回 1⁣。
+@end defun
+
+@defun eudc-variable-protocol-value var &optional protocol
+返回 @var{protocol} 局部的 @var{var} 值。  如果@var{var}没有@var{protocol}的本地值，则返回@code{unbound}。 @var{protocol} 默认为 @code{eudc-protocol}。
+@end defun
+
+@defun eudc-variable-server-value var [server]
+返回 @var{server} 局部的 @var{var} 值。如果@var{var}没有@var{server}的本地值，则返回@code{unbound}。 @var{server} 默认为 @code{eudc-server}。
+@end defun
+
+更改变量的协议本地或服务器本地值对其当前值没有影响。  以下命令用于将变量的当前值与给定当前 @code{eudc-server} 和 @code{eudc-protocol} 的本地值同步：
+
+@defun eudc-update-local-variables
+根据本地设置更新所有 EUDC 变量。
+@end defun
+
+
+
+@node Credits
+@chapter 制作人员
+
+EUDC 是由 Oscar Figueiredo 基于同一作者的@file{ph.el} 编写的。
+
+感谢 Soren Dayton 在测试和校对 @file{ph.el} 的代码和文档方面的建议、热情和帮助。
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Index
+@unnumbered 指数
+
+@printindex cp
+
+@bye

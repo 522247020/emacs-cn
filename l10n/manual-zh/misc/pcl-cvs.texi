@@ -1,0 +1,1050 @@
+\输入 texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename ../../info/pcl-cvs.info
+@settitle PCL-CVS---Emacs 前端到 CVS
+@documentlanguage en
+@include docstyle.texi
+@syncodeindex vr fn
+@c %**end of header
+
+@copying
+版权所有 @copyright{} 1991--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* PCL-CVS: (pcl-cvs).            CVS 的 Emacs 前端。
+@end direntry
+
+@c The titlepage section does not appear in the Info file.
+@titlepage
+@sp 4
+@c The title is printed in a large font.
+@center @titlefont{User's Guide}
+@sp 1
+@center @titlefont{to}
+@sp 1
+@center @titlefont{PCL-CVS---The Emacs Front-End to CVS}
+@ignore
+@sp 2
+@center release 2.9
+@c -release-
+@end ignore
+@sp 3
+@center Per Cederqvist
+@center Stefan Monnier
+@c -date-
+
+@c  The following two commands start the copyright page
+@c  for the printed manual.  This will not appear in the Info file.
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@c ================================================================
+@c                   The real text starts here
+@c ================================================================
+
+@ifnottex
+@node Top
+@top PCL-CVS
+
+This manual describes PCL-CVS, the GNU Emacs front-end to CVS@.  It is
+nowhere near complete, so you are advised to use @kbd{M-x
+customize-group @key{RET} pcl-cvs @key{RET}} and to look at the
+documentation strings of the various commands and major modes for
+further information.
+@c This manual is updated to release 2.5 of PCL-CVS.
+
+@insertcopying
+
+@end ifnottex
+
+@menu
+* About PCL-CVS::                制作人员、历史、@dots{}
+
+* Getting started::              带有演练示例的介绍。
+* Buffer contents::              缓冲区内容的解释。
+* Selected files::               命令应用于哪些文件。
+* Commands::                     所有命令，按类型分组。
+
+* Log Edit Mode::                编辑日志消息的主要模式。
+* Log View Mode::                浏览日志更改的主要模式。
+@c * CVS Status Mode::             Major mode to view CVS' status output.
+* Customization::                如何定制 PCL-CVS 以满足您的需求。
+* Bugs::                         错误（已知和未知）。
+
+* GNU Free Documentation License::  本文档的许可证。
+* Function and Variable Index::   函数和变量列表。
+* Concept Index::                概念列表。
+* Key Index::                    击键列表。
+
+@detailmenu
+--- 详细节点列表 ---
+
+关于 PCL-CVS
+
+* Contributors::                 PCL-CVS 的贡献者。
+
+命令
+
+* Entering PCL-CVS::             调用 PCL-CVS 的命令
+* Setting flags::                设置 CVS 命令的标志
+* Updating the buffer::
+* Movement commands::            如何在缓冲区中上下移动
+* Marking files::                如何标记其他命令稍后将操作的文件。
+* Committing changes::           签入对 CVS 存储库的修改。
+* Editing files::                将文件加载到 Emacs 中。
+* Getting info about files::     显示文件的日志和状态。
+* Adding and removing files::    添加和删​​除文件
+* Undoing changes::              撤消更改
+* Removing handled entries::     无趣的线条可以轻松删除。
+* Ignoring files::               告诉 CVS 忽略生成的文件。
+* Viewing differences::          @samp{diff} 不同版本的命令。
+* Invoking Ediff::               从 @file{*cvs*} 缓冲区运行 @samp{ediff}。
+* Updating files::               更新需要更新的文件。
+* Tagging files::                标记文件。
+* Miscellaneous commands::       各种命令。
+
+定制化
+
+* Customizing Faces::
+
+@end detailmenu
+@end menu
+
+@node     About PCL-CVS
+@chapter 关于 PCL-CVS
+@cindex About PCL-CVS
+
+PCL-CVS 是 CVS 1.9 及更高版本的前端。它简洁地显示了 Emacs 缓冲区中签出模块的当前状态，并提供对最常用 CVS 命令的单键访问。  请注意，@code{vc-dir} 命令 (@pxref{VC Directory Mode, , , emacs, The GNU Emacs Manual}) 提供类似的功能，但适用于多个版本控制系统，包括 CVS。
+
+PCL-CVS 最初是由 Per Cederqvist 多年前编写的，他自豪地维护它直到 1996 年 1 月，此时他发布了 beta 版本 2.0b2 并将维护权移交给了 Greg A Woods。开发工作大部分处于休眠状态，在此期间，2.0 版本似乎永远无法离开“beta”阶段，而单独的 XEmacs 版本正在慢慢分离。  1998 年末，Stefan Monnier 再次开始开发，添加了一些主要的新功能并接管了维护工作。
+
+@menu
+* Contributors::                 PCL-CVS 的贡献者。
+@end menu
+
+@node     Contributors
+@section PCL-CVS 贡献者
+@cindex Contributors
+@cindex Authors
+
+欢迎对该包做出贡献。  我处理这个项目的时间有限，但我很乐意将您为我贡献的任何代码添加到这个包中 (@pxref{Bugs})。
+
+以下人员对 PCL-CVS 做出了贡献。
+
+@itemize @bullet
+@item 
+Brian Berliner 与其他一些贡献者一起编写了 CVS。如果没有他在 CVS 上的工作，这个包将毫无用处@dots{}
+
+@item 
+Per Cederqvist 在 PCL-CVS 中编写了大部分未归属的函数以及所有文档。
+
+@item 
+@c inge@@lysator.liu.se
+Inge Wallin 编写了 @file{pcl-cvs.texi} 的框架，并对其给出了有用的评论。  他还编写了文件@file{elib-node.el}和@file{compile-all.el}。  文件 @file{cookie.el} 的灵感来自于 Inge。
+
+@item 
+@c linus@@lysator.liu.se
+Linus Tolke 对功能和文档都提供了有用的评论。
+
+@item 
+@c jwz@@jwz.com
+Jamie Zawinski 贡献了@file{pcl-cvs-lucid.el}，后来更名为@file{pcl-cvs-xemacs.el}。
+
+@item 
+Leif Lonnblad 贡献了 RCVS 支持（此后被新的远程 CVS 支持取代）。
+
+@item 
+@c jimb@@cyclic.com
+Jim Blandy 贡献了一些钩子，可以从 @file{ChangeLog} 内容中自动猜测 CVS 日志条目，并初步支持新的 Cygnus / Cyclic 远程 CVS，以及各种错误修复和清理。
+
+@item 
+@c kingdon@@cyclic.com
+Jim Kingdon 对构建和安装过程做出了许多修复。
+
+@item 
+@c woods@@weird.com
+Greg A. Woods 贡献了代码来实现每个文件差异缓冲区的使用，供应商使用 emerge 和 ediff 加入差异，以及各种错误修复和清理。
+
+@item 
+@c greg.klanderman@@alum.mit.edu
+Greg Klanderman 实现了标记文件的切换、通过前缀参数设置 CVS 命令标志、更新了 XEmacs 支持、更新了手册并修复了许多错误。
+
+@item 
+@c monnier@@gnu.org
+Stefan Monnier 添加了大量其他功能，并引入了更多新错误。  如果还有任何错误，你可以确定是他的。
+
+@item 
+@c wordy to avoid an underfull hbox
+@c masata-y@@is.aist-nara.ac.jp
+Masatake YAMATO 慷慨地贡献了他的 cvstree 代码来显示标签树，后来被新的 @code{cvs-status-mode} 取代。
+@end itemize
+
+除此之外，还有很多人向我们发送了建议、想法、请求、错误报告和鼓励。  多谢！  没有您，就不会有 PCL-CVS 的新版本。
+
+
+@node Getting started
+@chapter 入门
+@cindex Introduction
+@cindex Example run
+@cindex Sample session
+
+本文档假设您了解 CVS 是什么，并且至少了解 CVS@. 的基本概念，如果情况并非如此，您应该阅读 CVS 文档。  输入 @kbd{info -f cvs} 或 @kbd{man cvs}。
+
+PCL-CVS 仅在您签出模块后才有用。  因此，在调用它之前，您必须在文件系统中的某个位置拥有模块的副本。
+
+您可以通过键入 @kbd{M-x cvs-examine @key{RET}} 来调用 PCL-CVS。您还可以通过@samp{Tools}下的菜单栏调用它。或者，如果您愿意，您也可以通过使用前缀参数访问模块的 CVS 管理子目录来调用 PCL-CVS。例如，要在单独的框架中调用 PCL-CVS，请键入 @kbd{C-u C-x 5 f ~/my/project/CVS @key{RET}}。
+
+函数@code{cvs-examine}将请求一个目录。  命令 @samp{cvs -n update} 将在该目录中运行。  （它应该包含已从 CVS 存档中检出的文件。） @code{cvs} 的输出将被解析并呈现在名为 @file{*cvs*} 的缓冲区中的表中。  它可能看起来像这样：
+
+@example
+Repository : /usr/CVSroot
+Module     : test
+Working dir: /users/ceder/FOO/test
+
+
+In directory .:
+           Need-Update            bar
+           Need-Update            file.txt
+           Modified               namechange
+           Need-Update            newer
+In directory sub:
+           Modified               ChangeLog
+
+--------------------- End ---------------------
+-- last cmd: cvs -f -z6 -n update -d -P --
+@end example
+
+在此示例中，您的存储库位于 @file{/usr/CVSroot} 中，并且 CVS 已在目录 @file{/users/ceder/FOO/test} 中运行。  标有 @samp{Need-Update} 的三个文件（@file{bar}、@file{file.txt} 和 @file{newer}）已被 CVS 存储库中的其他人更改。  两个文件（@file{namechange}和@file{sub/ChangeLog}）已在本地修改，需要签入。
+
+您可以使用@kbd{C-n}和@kbd{C-p}或@kbd{n}和@kbd{p}在缓冲区中上下移动光标。  如果您在 @samp{Modified} 文件之一上按 @kbd{c}，该文件将被签入 CVS 存储库。 @xref{Committing changes}。  您还可以按 @kbd{O} 更新任何标记为 @samp{Need-Update} 的文件。  您还可以运行@kbd{M-x cvs-update @key{RET}}（绑定到@file{*cvs*}缓冲区中的@kbd{M-u}）来更新所有文件。
+
+然后，您可以按 @kbd{=} 轻松获得修改后的文件和开始的基本版本之间的 @samp{diff}，或者您可以按 @kbd{l} 获取 @samp{cvs log} 的输出。  只需按一个键 (@pxref{Getting info about files}) 即可使用更多此类命令。
+
+@node Buffer contents
+@chapter 缓冲区内容
+@cindex Buffer contents
+@cindex @file{*cvs*} buffer contents
+
+显示包含多个列，其中一些是可选的。这些列从左到右是：
+
+@itemize @bullet
+
+@item 
+（可选）文件的头部修订版。  这是在存储库中找到的最新版本。  它还可能包含（而不是头部修订版）子状态，该子状态通常提供有关我们如何到达当前状态的更多信息，例如 @samp{patched}、@samp{merged}、@dots{}
+
+@item 
+当文件为 @dfn{marked} (@pxref{Selected files}) 时为星号。
+
+@item 
+文件在存储库中的实际状态。  见下文。
+
+@item 
+（可选）文件的基本修订版。  这是您工作目录中的副本所基于的版本。
+
+@item 
+文件名。
+
+@end itemize
+
+@samp{file status} 字段可以具有以下值：
+
+@table @samp
+@item Modified
+该文件在您的工作目录中被修改，并且存储库中的同一文件没有被修改。  此状态可以有以下子状态：
+
+@table @samp
+@item merged
+文件在您的工作目录中被修改，存储库中也有修改，但它们在您的工作目录中成功合并，没有冲突。
+@end table
+
+@item Conflict
+尝试将对 @var{file} 的更改与存储库中的更改合并时检测到冲突。  @var{file}（工作目录中的副本）现在是两个版本上 @code{rcsmerge} 命令的输出；文件的未修改副本也位于您的工作目录中，名称为 @file{.#@var{file}.@var{version}}，其中 @var{version} 是修改后的文件开始时的 RCS 版本。  @xref{Viewing differences}，了解更多详情。
+
+冲突也可能来自于对文件是否存在而不是其内容的分歧。  这种情况由以下可能的子状态指示：
+
+@table @samp
+@item removed
+该文件已在本地删除，但其他人已将新修订版本提交到存储库。
+
+@item added
+该文件是本地添加的，也已被其他人添加到存储库中。
+
+@item modified
+该文件已在本地修改，但其他人已将其从存储库中删除。
+@end table
+
+@item Added
+该文件已由您添加，但仍需要将其签入存储库。
+
+@item Removed
+该文件已被您删除，但仍需要将其签入存储库。  您可以通过输入 @kbd{a} (@pxref{Adding and removing files}) 来复活它。
+
+@item Unknown
+在您的目录中检测到的文件，但该文件既没有出现在存储库中，也没有出现在 CVS 应忽略的文件列表中。
+
+@item Up-to-date
+该文件相对于存储库中的版本是最新的。此状态可以有以下子状态：
+
+@table @samp
+@item added
+您刚刚将该文件添加到存储库中。
+
+@item updated
+该文件已在存储库中更新。  这适用于存储库中存在但源中不存在的任何文件，以及您尚未更改但不是存储库中可用的最新版本的文件。
+
+@item patched
+通过获取源中的文件并将补丁应用到该文件，该文件已相对于远程存储库保持最新状态。  这相当于@samp{updated}，只不过 CVS 决定使用一种希望更有效的方法。
+
+@item committed
+您刚刚提交了文件。
+@end table
+
+@item Need-Update
+存储库中存在比源中的版本更新的版本，并且您尚未修改签出的版本，或者该文件存在于存储库中但不存在于源中。  使用绑定到 1⁣ 的 @samp{cvs-mode-update} 来更新文件。
+
+@item Need-Merge
+您已修改了文件的签出版本，并且存储库中提供了更新的版本。  当您运行 @samp{cvs-update} 时，将会发生合并。
+
+@item Missing
+该文件已意外地从您的工作目录中删除，尽管它尚未被@samp{cvs remove}d。
+@end table
+
+@node Selected files
+@chapter 选定的文件
+@cindex Selected files
+@cindex Marked files
+@cindex File selection
+@cindex Active files
+@cindex Applicable
+
+许多命令适用于当前的 @dfn{selected} 文件集，这些文件可以是标记文件集（如果有任何文件被标记并且标记不被忽略），也可以是光标所在的文件或目录。
+
+如果选择了一个目录但该命令无法应用于该目录，则该命令将应用于该目录下位于 @file{*cvs*} 缓冲区中的文件集。
+
+@findex cvs-mode-force-command
+@findex cvs-allow-dir-commit
+此外，每个命令仅对所选文件的子集进行操作，具体取决于该命令是否对每个文件为“0”（基于文件的状态）。  例如，@code{cvs-mode-commit}不适用于状态为@samp{Need-Update}的文件。  如果 PCL-CVS 猜测适用性错误，您可以使用通常绑定到 4⁣ 的特殊前缀 @code{cvs-mode-force-command} 覆盖它（并提交错误报告）。  可以使用@code{cvs-allow-dir-commit}和@code{cvs-force-dir-tag}稍微改变适用性规则。
+
+默认情况下，标记始终有效（但是，您可以通过设置变量 @code{cvs-default-ignore-marks} 来更改此设置），@samp{tag} 或 @samp{diff} 文件的命令除外（可以使用变量 @code{cvs-invert-ignore-marks} 进行更改）。
+
+此外，您可以使用通常绑定到 1⁣ 的特殊前缀 @code{cvs-mode-toggle-marks} 来切换以下命令的标记使用。
+
+这个方案可能看起来有点复杂，但是一旦习惯了，它的功能就相当强大了。
+
+有关标记和取消标记文件的命令，请参阅@ref{Marking files}。
+
+@node Commands
+@chapter 命令
+
+@iftex
+This chapter describes all the commands that you can use in PCL-CVS.
+@end iftex
+@ifnottex
+The nodes in this menu contains explanations about all the commands that
+you can use in PCL-CVS@.  They are grouped together by type.
+@end ifnottex
+
+@menu
+* Entering PCL-CVS::             调用 PCL-CVS 的命令
+* Setting flags::                设置 CVS 命令的标志
+* Updating the buffer::
+* Movement commands::            如何在缓冲区中上下移动
+* Marking files::                如何标记其他命令稍后将操作的文件。
+* Committing changes::           签入对 CVS 存储库的修改。
+* Editing files::                将文件加载到 Emacs 中。
+* Getting info about files::     显示文件的日志和状态。
+* Adding and removing files::    添加和删​​除文件
+* Undoing changes::              撤消更改
+* Removing handled entries::     无趣的线条可以轻松删除。
+* Ignoring files::               告诉 CVS 忽略生成的文件。
+* Viewing differences::          @samp{diff} 不同版本的命令。
+* Invoking Ediff::               从 @file{*cvs*} 缓冲区运行 @samp{ediff}。
+* Updating files::               更新需要更新的文件。
+* Tagging files::                标记文件。
+* Miscellaneous commands::       各种命令。
+@end menu
+
+
+@node Entering PCL-CVS
+@section 进入PCL-CVS
+@findex cvs-update
+@findex cvs-examine
+@findex cvs-status
+@findex cvs-checkout
+@findex cvs-quickdir
+@cindex Creating the *cvs* buffer
+
+PCL-CVS 中的大多数命令都要求您有一个 @file{*cvs*} 缓冲区。  下面列出了用于获取它的命令。对于每个进程，将运行 @samp{cvs} 进程，输出将由 PCL-CVS 解析，结果将打印在 @file{*cvs*} 缓冲区中（@pxref{Buffer contents}，用于缓冲区内容的描述）。
+
+@table @kbd
+@item M-x cvs-update
+运行 @samp{cvs update} 命令。  系统将询问您运行 @samp{cvs update} 的目录。
+
+@item M-x cvs-examine
+运行 @samp{cvs -n update} 命令。  这与前面的命令相同，只是它只会检查需要做什么，但不会更改任何内容。  系统将询问您运行 @samp{cvs -n update} 的目录。
+
+@item M-x cvs-status
+运行 @samp{cvs status} 命令。  系统将询问您运行 @samp{cvs status} 的目录。
+
+@item M-x cvs-checkout
+运行 @samp{cvs checkout} 命令。  系统会要求您提供运行 @samp{cvs update} 的目录以及要检出的模块。
+
+@item M-x cvs-quickdir
+只需查看 @file{CVS/Entries} 文件即可填充 @file{*cvs*} 缓冲区。  这与 @code{cvs-examine} 非常相似，只是它不访问 CVS 存储库，这在存储库较远时是一个主要优点。  但当然，它无法检测文件何时需要更新或合并。
+@end table
+
+@findex cvs-dired-action
+@findex cvs-dired-use-hook
+前四个命令也可以从 @samp{Tools->PCL-CVS} 下的菜单栏访问。  最后，另一种方法是使用简单的前缀参数访问工作区中的 CVS 管理子目录。  例如@kbd{C-u C-x C-f ~/my/work/CVS @key{RET}}。  默认情况下运行@code{cvs-quickdir}，但可以使用@code{cvs-dired-action}和@code{cvs-dired-use-hook}更改特定行为。
+
+默认情况下，上面的命令将递归地下降到子目录中。  您可以通过在命令的标志中包含 @samp{-l} 来避免这种行为。  可以通过为命令提供前缀参数来设置这些标志（例如，通过键入 @kbd{C-u M-x cvs-update @key{RET} -l @key{RET}}）。
+
+
+@node Setting flags
+@section 设置 CVS 命令的标志
+@cindex Optional switches to CVS
+@cindex Command-line options to CVS
+
+本节描述几乎所有 PCL-CVS 命令使用的约定，用于设置发送到 CVS@. 的可选标志。单个 @kbd{C-u} 前缀参数用于使命令提示仅用于当前命令调用的标志。  两个 @kbd{C-u} 前缀参数用于提示将在当前调用和随后的所有调用中永久设置的标志，直到标志被更改，或者除非设置了覆盖它们的临时标志。
+
+也许举一两个例子是合适的。  假设您要将一个二进制文件添加到存储库，并希望指定标志 @samp{-kb} 到 @samp{cvs add}。  您可以输入@kbd{C-u a -kb @key{RET}}，文件将被添加。  后续的@samp{cvs add}命令将使用之前的流行标志。
+
+作为第二个示例，假设您要执行 diff 并希望以统一 diff 格式查看结果，即您希望将标志 @samp{-u} 传递给 @samp{cvs diff} 和 @samp{diff}。  您还希望所有后续差异都使用此标志。  您可以输入@kbd{C-u C-u = -u @key{RET}}，然后将执行比较，默认标志将设置为@code{("-u")}。  当然，您可以使用单个 @kbd{C-u} 前缀参数来覆盖单个差异的此标志。
+
+@cindex Special prefix
+除此之外，某些命令还可以采用 @dfn{special prefix} 参数。它们的工作原理如下：当使用 @kbd{C-u} 前缀调用时，系统会提示用户输入特殊前缀的新值，并为下一个命令激活特殊前缀。  当在没有 @kbd{C-u} 前缀的情况下调用时，将为下一个命令重新激活特殊前缀（与上次的值相同）。  当前缀命令已经激活时再次调用它会停用它。  使用 @kbd{C-u C-u} 前缀调用它会为所有后续命令激活它，直到您显式停用它为止。  特殊前缀是：
+
+@table @kbd
+@item T
+切换标记是否在下一个命令中处于活动状态。
+
+@item b
+为下一个命令提供要处理的分支（可以是任何版本说明符）。
+
+@item B
+二级分支论证。  仅当同时使用 @kbd{b} 时才有意义。它可用于为 @code{cvs-mode-diff} 或 @code{cvs-mode-update} 提供第二个分支参数。
+
+@item M-f
+强制下一个命令应用于每个选定的文件，而不是仅应用于 PCL-CVS 认为相关的文件。
+@end table
+
+@node Updating the buffer
+@section 更新 @file{*cvs*} 缓冲区
+@findex cvs-update
+@findex cvs-examine
+@findex cvs-status
+@findex cvs-mode-update
+@findex cvs-mode-examine
+@findex cvs-mode-status
+
+可以在 @file{*cvs*} 缓冲区中使用以下命令来更新显示：
+
+@table @kbd
+@item M-u
+运行命令@samp{cvs-update}。
+
+@item M-e
+运行命令@samp{cvs-examine}。
+
+@item M-s
+运行命令@samp{cvs-status}。
+@end table
+
+除了上述对整个模块进行操作的命令之外，您还可以使用以下键对文件/目录的子集运行等效的 CVS 命令：
+
+@table @kbd
+@item O
+对选定的文件运行 @code{cvs-mode-update}。  当在顶级目录上运行时，这相当于@kbd{M-u}。
+
+@item e
+对选定的文件运行 @code{cvs-mode-examine}。  当在顶级目录上运行时，这相当于@kbd{M-e}。
+
+@findex cvs-status-mode
+@item s
+对选定的文件运行 @code{cvs-mode-status}。  当在顶级目录上运行时，这相当于 @kbd{M-s}，只不过 CVS 输出将显示在 @file{*cvs-info*} 缓冲区中，该缓冲区将放入 @samp{cvs-status-mode} 中。
+@end table
+
+
+@node Movement commands
+@section 移动命令
+@cindex Movement Commands
+@findex cvs-mode-next-line
+@findex cvs-mode-previous-line
+@kindex SPC@r{--Move down one file}
+@kindex n@r{--Move down one file}
+@kindex p@r{--Move up one file}
+
+您可以使用大多数普通的 Emacs 命令在缓冲区中向前和向后移动。  一些键会反弹到利用缓冲区是 PCL-CVS 缓冲区这一事实的函数：
+
+
+@table @kbd
+@item @key{SPC}
+@itemx n
+这些键将光标向前移动一个文件，朝向缓冲区的末尾 (@code{cvs-mode-next-line})。
+
+@item p
+该键向后移动一个文件，朝向缓冲区的开头 (@code{cvs-mode-previous-line})。
+@end table
+
+
+@node Marking files
+@section 标记文件
+@cindex Selecting files (commands to mark files)
+@cindex Marking files
+@kindex m@r{--marking a file}
+@kindex M@r{--marking all files}
+@kindex u@r{--unmark a file}
+@kindex ESC DEL@r{--unmark all files}
+@kindex DEL@r{--unmark previous file}
+@kindex %@r{--mark files matching regexp}
+@kindex S@r{--mark files in a particular state}
+@kindex T@r{--toggle marks}
+@findex cvs-mode-mark
+@findex cvs-mode-unmark
+@findex cvs-mode-mark-all-files
+@findex cvs-mode-unmark-all-files
+@findex cvs-mode-unmark-up
+@findex cvs-mode-mark-matching-files
+@findex cvs-mode-mark-on-state
+@findex cvs-mode-toggle-marks
+
+PCL-CVS 适用于一组 @dfn{selected files} (@pxref{Selected files})。您可以使用以下命令标记和取消标记文件：
+
+@table @kbd
+@item m
+这标记了光标所在的文件。  如果光标位于目录上，则该目录中的所有文件都会被标记 (@code{cvs-mode-mark})。
+
+@item u
+取消标记光标所在的文件。  如果光标位于目录上，则该目录中的所有文件都将被取消标记 (@code{cvs-mode-unmark})。
+
+@item M
+标记缓冲区中的 @emph{all} 文件 (@code{cvs-mode-mark-all-files})。
+
+@item M-@key{DEL}
+取消标记 @emph{all} 文件 (@code{cvs-mode-unmark-all-files})。
+
+@item @key{DEL}
+取消标记上一行上的文件，并将点移动到该行 (@code{cvs-mode-unmark-up})。
+
+@item %
+标记与正则表达式 (@code{cvs-mode-mark-matching-files}) 匹配的所有文件。
+
+@item S
+将所有文件标记为特定状态，例如“已修改”或“已删除”(@code{cvs-mode-mark-on-state})。
+
+@item T
+切换下一个命令的标记使用 (@code{cvs-mode-toggle-marks})。
+@end table
+
+
+@node Committing changes
+@section 提交变更
+@cindex Committing changes
+@findex cvs-mode-commit
+@findex cvs-mode-commit-setup
+@kindex c@r{--commit files}
+@kindex C@r{--commit files with @file{ChangeLog} message}
+@vindex cvs-auto-revert@r{ (variable)}
+@cindex Commit buffer
+@cindex Edit buffer
+@cindex Erasing commit message
+@cindex Reverting buffers after commit
+
+提交更改基本上按以下方式进行：
+
+@enumerate
+@item
+选择要提交的文件后，输入@kbd{c}或@kbd{C}，这会弹出一个特殊的缓冲区@file{*cvs-commit*}。
+
+@item
+您输入描述您要提交的更改的日志消息 (@pxref{Log Edit Mode})。
+
+@item
+当您对此感到满意时，您可以输入 @kbd{C-c C-c} 进行实际提交。
+@end enumerate
+
+没有隐藏状态，因此您可以随时中止该过程或重新开始。
+
+@vindex log-edit-confirm@r{ (variable)}
+实际提交的文件集仅在最后一步才真正确定，这是喜忧参半的。  它允许您返回并改变您对提交哪些文件的想法，但这也意味着您可能会无意中更改所选文件集。  为了降低错误风险，如果所选文件集在第一步和最后一步之间发生更改，@kbd{C-c C-c} 将要求确认。  您可以使用 @code{log-edit-confirm} 更改最后一个细节。
+
+至于@kbd{c}（即@code{cvs-mode-commit}）和@kbd{C}（即@code{cvs-mode-commit-setup}）之间的区别在于，第一个让您直接进入@file{*cvs-commit*}，而不擦除它或更改其内容，而第二个首先擦除@file{*cvs-commit*}并尝试使用合理的默认值对其进行初始化（它通过使用由CVS 管理员或通过从 @file{ChangeLog} 文件中提取相关日志消息）。
+
+如果您在 Emacs 中编辑文件，则会自动执行 @samp{revert-buffer}。  （如果文件包含 @samp{$@asis{Id}$} 关键字，@samp{cvs commit} 将写入一个新文件并替换新值。自动还原可确保您将它们放入缓冲区中。）如果您修改了缓冲区，或者 @samp{cvs-auto-revert} 设置为 @samp{nil}，则不会发生还原。
+
+
+@node Editing files
+@section 编辑文件
+@cindex Editing files
+@cindex Finding files
+@cindex Loading files
+@cindex Dired
+@cindex Invoking dired
+@findex cvs-mode-find-file
+@findex cvs-mode-find-file-other-window
+@findex cvs-mode-add-change-log-entry-other-window
+@kindex f@r{--find file or directory}
+@kindex o@r{--find file in other window}
+@kindex A@r{--add @file{ChangeLog} entry}
+
+目前有三个命令可用于查找文件（即将其加载到缓冲区并开始在那里编辑）。  这些命令在光标所在的行上起作用。  他们总是忽略任何标记的文件。
+
+@table @kbd
+@item f
+找到光标指向的文件（@code{cvs-mode-find-file}）。  如果光标指向一个目录，则在该目录上运行@code{dired}； @pxref{Dired, Emacs Manual, , emacs}。
+
+@item o
+与 @kbd{f} 类似，但使用另一个窗口 (@code{cvs-mode-find-file-other-window})。
+
+@item A
+调用 @samp{add-change-log-entry-other-window} 编辑 @file{ChangeLog} 文件。  @file{ChangeLog} 文件将在光标指向的文件的目录中找到，或者在该目录的父目录 (@code{cvs-mode-add-change-log-entry-other-window}) 中找到。
+@end table
+
+
+@node Getting info about files
+@section 获取有关文件的信息
+@cindex Status (cvs command)
+@cindex Log (RCS/cvs command)
+@cindex Getting status
+@kindex l@r{--run @samp{cvs log}}
+@kindex s@r{--run @samp{cvs status}}
+@findex cvs-mode-log
+@findex cvs-mode-status
+
+@table @kbd
+@item l
+调用命令 @code{cvs-mode-log} 对所有选定的文件运行 @samp{cvs log}，并在临时缓冲区 @file{*cvs-info*} (@pxref{Log View Mode}) 中显示结果。
+
+@item s
+调用命令 @code{cvs-mode-status} 对所有选定的文件运行 @samp{cvs status}，并将结果显示在临时缓冲区 @file{*cvs-info*} 中。
+@c Fixme: reinstate when node is written:
+@c (@pxref{CVS Status Mode}).
+@end table
+
+
+@node Adding and removing files
+@section 添加和删​​除文件
+@cindex Adding files
+@cindex Removing files
+@cindex Resurrecting files
+@cindex Deleting files
+@cindex Putting files under CVS control
+@kindex a@r{--add a file}
+@kindex r@r{--remove a file}
+@findex cvs-mode-add
+@findex cvs-mode-remove-file
+
+使用以下命令可以轻松地向 CVS 存储库添加文件或从 CVS 存储库中删除文件。
+
+@table @kbd
+@item a
+添加所有选定的文件。  此命令可用于 @samp{Unknown} 文件 (@pxref{Buffer contents})。  文件的状态将更改为 @samp{Added}，您必须使用 @kbd{c} (@samp{cvs-mode-commit} @pxref{Committing changes}) 才能真正将文件添加到存储库中。
+
+此命令也可以用在 @samp{Removed} 文件上（在提交它们之前）来恢复它们。
+
+运行的命令是@code{cvs-mode-add}。
+
+@item r
+此命令删除选定的文件（在提示确认后）。  文件将从您的目录中删除，并且（除非状态为 @samp{Unknown}；@pxref{Buffer contents}）它们也将是 @samp{cvs remove}d。  如果文件的状态为@samp{Unknown}，它们将从缓冲区中消失。  否则它们的状态将更改为 @samp{Removed}，并且您必须使用 @kbd{c} (@samp{cvs-mode-commit}, @pxref{Committing changes}) 来提交删除。
+
+运行的命令是@code{cvs-mode-remove-file}。
+@end table
+
+
+@node Undoing changes
+@section 撤消更改
+@cindex Undo changes
+@cindex Flush changes
+@kindex U@r{--undo changes}
+@findex cvs-mode-undo-local-changes
+
+@table @kbd
+@item U
+如果您修改了文件，并且由于某种原因决定不想保留更改，则可以使用此命令撤消它们。  它的工作原理是删除文件的工作副本，然后从存储库中获取最新版本 (@code{cvs-mode-undo-local-changes})。
+@end table
+
+
+@node Removing handled entries
+@section 删除已处理的条目
+@cindex Expunging uninteresting entries
+@cindex Uninteresting entries, getting rid of them
+@cindex Getting rid of uninteresting lines
+@cindex Removing uninteresting (processed) lines
+@cindex Handled lines, removing them
+@kindex x@r{--remove processed entries}
+@kindex C-k@r{--remove selected entries}
+@findex cvs-mode-remove-handled
+@findex cvs-mode-acknowledge
+@findex cvs-mode-ignore
+
+@table @kbd
+@item x
+此命令允许您删除已处理的所有条目。更具体地说，@samp{Up-to-date} 文件 (@pxref{Buffer contents}) 的行将从缓冲区中删除。  如果目录变空，该目录的标题也会被删除。  这使得您可以更轻松地了解需要做什么。
+
+@vindex cvs-mode-remove-handled@r{ (variable)}
+@kbd{x}调用@code{cvs-mode-remove-handled}。  如果@samp{cvs-auto-remove-handled}设置为非@code{nil}，则每次提交后都会自动执行此操作。
+
+@item C-k
+此命令可用于 @samp{cvs-mode-remove-handled} 不会删除但您想要删除 (@code{cvs-mode-acknowledge}) 的行。
+@end table
+
+
+@node Ignoring files
+@section 忽略文件
+@cindex Ignoring files
+@kindex i@r{--ignoring files}
+@findex cvs-mode-ignore
+
+@table @kbd
+@item i
+进行安排，以便 CVS 忽略选定的文件。  文件名将添加到相应目录中的@file{.cvsignore} 文件中。  如果 @file{.cvsignore} 文件不存在，则会创建它。
+
+@file{.cvsignore} 文件通常应添加到存储库中，但如果您更喜欢这种方式，您也可以忽略它。
+
+这运行@code{cvs-mode-ignore}。
+@end table
+
+@node Viewing differences
+@section 查看差异
+@cindex Diff
+@cindex Invoking @code{diff}
+@cindex Conflicts, how to resolve them
+@cindex Viewing differences
+@kindex d=@r{--run @samp{cvs diff}}
+@kindex =@r{--run @samp{cvs diff}}
+@kindex db@r{--diff against base version}
+@kindex dh@r{--diff against head of repository}
+@kindex dr@r{--diff between base and head of repository}
+@kindex dv@r{--diff against vendor branch}
+@kindex dy@r{--diff against yesterday's head}
+@findex cvs-mode-diff
+@findex cvs-mode-diff-backup
+@findex cvs-mode-diff-head
+@findex cvs-mode-diff-repository
+@findex cvs-mode-diff-vendor
+@findex cvs-mode-diff-yesterday
+@vindex cvs-invert-ignore-marks@r{ (variable)}
+
+@table @kbd
+@item =
+@itemx d =
+在所选文件和它们所基于的版本 (@code{cvs-mode-diff}) 之间显示@samp{cvs diff}。
+
+@item d b
+如果 CVS 在合并文件的两个版本时（在 @samp{cvs update}、@pxref{Updating the buffer} 期间）发现冲突，它会将原始文件保存在名为 @file{.#@var{file}.@var{version}} 的文件中，其中 @var{file} 是文件名，@var{version} 是 @var{file} 所基于的修订号。
+
+使用 @kbd{d b} 命令，您可以对文件 @file{.#@var{file}.@var{version}} 和 @file{@var{file}} 运行 @samp{diff}。
+
+@item d h
+在所选文件和存储库中的头部修订（当前分支上的最新版本）之间显示 @samp{cvs diff} (@code{cvs-mode-diff-head})。
+
+@item d r
+在所选文件的基本修订版和存储库中的头修订版之间显示 @samp{cvs diff}。  这显示自您上次执行签出、更新或提交操作 (@code{cvs-mode-diff-repository}) 以来任何人已提交到存储库的更改。
+
+@item d v
+在所选文件和存储库中供应商分支的头修订版 (@code{cvs-mode-diff-vendor}) 之间显示@samp{cvs diff}。
+
+@item d y
+在所选文件和存储库中昨天的头部修订版 (@code{cvs-mode-diff-yesterday}) 之间显示@samp{cvs diff}。
+@end table
+
+默认情况下，@samp{diff}命令忽略这些标记。  这可以通过 @code{cvs-invert-ignore-marks} 更改。
+
+@node Invoking Ediff
+@section 运行埃迪夫
+@cindex Ediff
+@cindex Invoking ediff
+@cindex Viewing differences
+@cindex Conflicts, how to resolve them
+@cindex Resolving conflicts
+@kindex e@r{--invoke @samp{ediff}}
+@findex cvs-mode-idiff
+@findex cvs-mode-imerge
+
+@table @kbd
+@vindex cvs-idiff-imerge-handlers@r{ (variable)}
+@item d e
+这使用@code{ediff}（或@code{emerge}，取决于@samp{cvs-idiff-imerge-handlers}）来允许您查看差异。如果给出了前缀参数，PCL-CVS 将提示应进行比较的修订版，否则默认将使用 BASE 修订版。
+
+@cindex Merging with @code{ediff} and @code{emerge}
+@item d E
+该命令使用@code{ediff}（或@code{emerge}，见上文）来允许您进行交互式三向合并。
+
+@strong{Please note:} 当文件状态为 @samp{Conflict} 时，CVS 已经执行了合并。  如果使用此命令，则不会以任何方式使用生成的文件。  如果您在 @samp{ediff} 中使用 @kbd{q} 命令（成功终止合并），CVS 创建的文件将被覆盖。
+@end table
+
+@node Updating files
+@section 更新文件
+@findex cvs-mode-update
+@cindex Updating files
+@kindex O@r{--update files}
+
+@table @kbd
+@item O
+通过运行 @samp{cvs update} (@code{cvs-mode-update}) 更新所有选定的状态为 @samp{Need-update} 的文件。
+@end table
+
+
+@node Tagging files
+@section 标记文件
+@findex cvs-mode-tag
+@findex cvs-mode-untag
+@findex cvs-rtag
+@cindex Tagging files
+@kindex M-t@r{--repository tag files}
+@kindex t@r{--tag files}
+@vindex cvs-invert-ignore-marks@r{ (variable)}
+@vindex cvs-force-dir-tag@r{ (variable)}
+
+@table @kbd
+@item t
+通过在其上运行 @samp{cvs tag} (@code{cvs-mode-tag}) 来标记所有选定的文件。  通常最好一次标记一个目录。  不要选择所有文件（通常不会选择所有文件，而只会选择显示的少数文件），而是使用 @kbd{M-@key{DEL}} (@code{cvs-mode-unmark-all-files}) 清除选择，将光标放在要标记的目录上，然后点击 @kbd{t}。
+@end table
+
+默认情况下，@samp{tag}命令忽略这些标记。  这可以通过 @code{cvs-invert-ignore-marks} 更改。  另外，默认情况下@samp{tag}只能应用于目录，如果您想更改此行为，请参阅@code{cvs-force-dir-tag}。
+
+
+@node Miscellaneous commands
+@section 杂项命令
+@findex cvs-mode-byte-compile-files
+@cindex Recompiling elisp files
+@cindex Byte compilation
+@findex cvs-mode-delete-lock
+@cindex Getting rid of lock files
+@cindex Lock files
+@kindex q@r{--bury the PCL-CVS buffer}
+@findex cvs-bury-buffer
+@findex cvs-mode-quit
+@cindex Quitting
+@kindex h@r{--help}
+@kindex ?@r{--help}
+@findex cvs-help
+@cindex Help
+
+@table @kbd
+@item M-x cvs-mode-byte-compile-files
+字节编译所有以@file{.el}结尾的选定文件。
+
+@item M-x cvs-mode-delete-lock
+此命令删除 @file{*cvs*} 缓冲区通知您的锁定文件。  通常您不必使用此命令，因为 CVS 会非常小心地尝试始终删除锁定文件本身。
+
+仅当 @file{*cvs*} 缓冲区中的消息告诉您时，您才能使用此命令。  在使用此命令之前，您应该等待一段时间，以防其他人正在运行 @code{cvs} 命令。
+
+另请注意，这仅在存储库位于本地时才有效。
+
+@item ?
+@itemx h
+在回显区域 (@code{cvs-help}) 中显示常用命令键绑定的摘要。
+
+@item q
+掩埋 PCL-CVS 缓冲区 (@code{cvs-bury-buffer})。
+
+@item M-x cvs-mode-quit
+退出 PCL-CVS，杀死 @file{*cvs*} 缓冲区。
+@end table
+
+@node Log Edit Mode
+@chapter 编辑日志消息
+
+@cindex Log Edit mode
+@cindex mode, Log Edit
+用于输入/编辑即将提交的更改的日志消息的缓冲区被置于日志编辑模式。
+
+有时，日志缓冲区在您输入时包含默认文本，通常是输入的最后一条日志消息。  如果是这样，则在缓冲区的整个内容周围设置标记和点，以便很容易用 @kbd{C-w} 删除缓冲区的内容。
+
+@findex log-edit-insert-changelog
+如果您在 @file{ChangeLog} (@pxref{Change Log,,, emacs, The GNU Emacs Manual}) 中写入条目，然后在修订控制下提交更改，则可以使用 @kbd{C-c C-a} (@kbd{log-edit-insert-changelog}) 从变更日志生成日志编辑文本。  这会查找变更日志顶部条目中相关文件的条目，并使用这些段落作为日志文本。  仅当顶部条目是在当前日期以您的用户名创建时，才会插入此文本。 @xref{Change Logs and VC,,, emacs, The GNU Emacs Manual}，相反的工作方式——从修订控制日志生成变更日志条目。
+
+在日志编辑缓冲区中，@kbd{C-c C-f} (@kbd{M-x log-edit-show-files}) 显示要提交的文件列表，以防您需要检查。
+
+编辑完日志消息后，输入 @kbd{C-c C-c} 退出缓冲区并提交更改。
+
+@c Fixme: customization variables
+
+@node Log View Mode
+@chapter 浏览更改日志
+
+@cindex Log View mode
+@cindex mode, Log View
+@cindex output, logs
+
+@findex cvs-mode-log
+@findex vc-print-log
+日志视图模式提供了一些有用的命令来导航修订控制日志输出。  它用于 @code{cvs-mode-log} 和 @code{vc-print-log} 的输出缓冲区。
+
+在此模式下，在多文件输出中，@kbd{n} 转到下一条消息，@kbd{p} 转到上一条消息，@kbd{N} 和 @kbd{P} 分别转到下一个和上一个文件。  使用数字前缀参数，这些命令会移动文件的许多消息。
+
+@c @node CVS Status Mode
+@c @chapter Viewing CVS' Status output
+
+@node Customization
+@chapter 定制化
+@vindex log-edit-changelog-full-paragraphs@r{ (variable)}
+@vindex cvs-auto-remove-handled@r{ (variable)}
+@vindex cvs-auto-remove-directories@r{ (variable)}
+@vindex cvs-update-prog-output-skip-regexp@r{ (variable)}
+@vindex cvs-cvsroot@r{ (variable)}
+@vindex cvs-auto-revert@r{ (variable)}
+@vindex log-edit-require-final-newline@r{ (variable)}
+@vindex cvs-sort-ignore-file@r{ (variable)}
+@cindex Customization
+@cindex Variables, list of all
+@cindex Erasing input buffer
+@cindex Context diff, how to get
+@cindex Unidiff, how to get
+@cindex Automatically remove handled files
+@cindex @samp{-u} option in modules file
+@cindex Modules file (@samp{-u} option)
+@cindex Update program (@samp{-u} option in modules file)
+@cindex Reverting buffers after commit
+@cindex Require final newline
+@cindex Automatically inserting newline
+@cindex Commit message, inserting newline
+@cindex Sorting @file{.cvsignore} file
+@cindex @file{.cvsignore} file, sorting
+@cindex Automatically sorting @file{.cvsignore}
+@cindex @samp{CVSROOT}, overriding
+
+如果您有任何方便的自定义想法，但未在此列表中出现，请告诉我们！有关如何联系我们的信息，请参阅@ref{Bugs}。
+
+@table @samp
+@item cvs-auto-remove-handled
+如果此变量设置为任何非 @code{nil} 值，则每次签入文件时，在签入准备就绪后，都会调用 @samp{cvs-mode-remove-handled}。  @xref{Removing handled entries}。
+
+@item cvs-auto-remove-directories
+如果此变量设置为任何非 @code{nil} 值，则不包含任何要签入的文件的目录将不会在 @file{*cvs*} 缓冲区中列出。
+
+@item cvs-auto-revert
+如果此变量设置为任何非 0 值，则访问已提交文件的任何缓冲区都将自动恢复。该变量默认为@samp{t}。 @xref{Committing changes}。
+
+@item cvs-update-prog-output-skip-regexp
+@file{modules} 文件中的 @samp{-u} 标志可用于在执行 @samp{cvs update} 时运行命令（请参阅@code{cvs(5)}）。  此正则表达式用于搜索该输出中的最后一行。  通常设置为@samp{$}。  仅当命令不输出任何内容时，该设置才是正确的。  请注意，如果命令输出 @emph{anything} 到 @code{stderr}，PCL-CVS 会变得非常混乱。
+
+@item cvs-cvsroot
+该变量可以设置为覆盖@samp{CVSROOT}。  它应该是一个字符串。  如果设置了，那么每次运行@code{cvs}命令时，都会被调用为@samp{cvs -d @var{cvs-cvsroot}@dots{}}。  如果您的站点有多个存储库，这可能很有用。
+
+@item log-edit-require-final-newline
+@c wordy to avoid underfull hbox
+当您通过在 @file{*cvs-commit-message*} 缓冲区中键入来输入日志消息时，PCL-CVS 通常会自动插入尾随换行符，除非已经有换行符。  此行为可以通过 @samp{cvs-commit-buffer-require-final-newline} 进行控制。如果是 @samp{t} （默认行为），则始终会附加换行符。  如果是@samp{nil}，则永远不会附加换行符。  任何其他值都会导致 PCL-CVS 在提交消息缓冲区中没有尾随换行符时询问用户。
+
+@findex cvs-mode-changelog-commit
+@item log-edit-changelog-full-paragraphs
+如果此变量非 @code{nil}，则在 @samp{cvs-mode-changelog-commit} 创建的 CVS 日志中包含完整的 @file{ChangeLog} 段落。这可以在 @file{ChangeLog} 文件的局部变量部分中设置，以指示该 @file{ChangeLog} 的策略。
+
+@cindex @file{ChangeLog} paragraphs
+@dfn{@file{ChangeLog} paragraph} 是一堆不包含空行的日志文本；一个段落通常描述一组具有单一目的的更改，但可能跨越多个文件中的多个功能。不同段落的变化是不相关的。
+
+您可能会争辩说，文件的 CVS 日志条目应该包含提及文件更改的完整 @file{ChangeLog} 段落，即使它可能提到其他文件，因为这为您提供了理解更改所需的完整上下文。  这是当该变量设置为默认值 @code{t} 时得到的行为。
+
+另一方面，您可能会认为更改的 CVS 日志条目应该只包含该文件中发生的更改的文本，因为 CVS 日志是针对每个文件的。  这是当该变量设置为 @code{nil} 时得到的行为。
+
+@findex cvs-mode-ignore@r{, and @file{.cvsignore} sorting}
+@item cvs-sort-ignore-file
+如果此变量设置为任何非 @samp{nil} 值，则每当您使用 @samp{cvs-mode-ignore} 添加文件时，@file{.cvsignore} 文件将始终被排序。  该选项默认处于启用状态。
+@end table
+
+
+@menu
+* Customizing Faces::
+@end menu
+
+@node Customizing Faces
+@section 自定义面孔
+@vindex cvs-header @r{(face)}
+@vindex cvs-filename @r{(face)}
+@vindex cvs-unknown @r{(face)}
+@vindex cvs-handled @r{(face)}
+@vindex cvs-need-action @r{(face)}
+@vindex cvs-marked @r{(face)}
+@vindex cvs-msg @r{(face)}
+
+PCL-CVS 添加了一些额外的功能，包括菜单、鼠标绑定和 @file{*cvs*} 缓冲区的字体化。  下面列出了为字体化定义的面孔：
+
+@table @samp
+@item cvs-header
+用于突出显示目录更改。
+
+@item cvs-filename
+用于突出显示文件名。
+
+@item cvs-unknown
+用于突出显示 @samp{Unknown} 文件的状态。
+
+@item cvs-handled
+用于突出显示已处理且不需要进一步操作的文件的状态。
+
+@item cvs-need-action
+用于突出显示仍需要操作的文件的状态。
+
+@item cvs-marked
+用于突出显示标记的文件指示器 (@samp{*})。
+
+@item cvs-msg
+用于突出显示 CVS 消息。
+@end table
+
+
+@node   Bugs
+@chapter 错误（已知和未知）
+@cindex Reporting bugs and ideas
+@cindex Bugs, how to report them
+@cindex Author, how to reach
+@cindex Email to the author
+@cindex Known bugs
+@cindex Bugs, known
+@cindex FAQ
+@cindex Problems, list of common
+
+如果您发现错误或功能异常，请随时告诉我们！使用@kbd{M-x report-emacs-bug}向我们发送报告。您可以对功能请求遵循相同的流程。我们更喜欢一次讨论一件事。  如果您发现多个不相关的错误，请分别报告。
+
+如果您在使用 PCL-CVS 时遇到问题或其他问题，请将其发送至 @url{https://lists.gnu.org/mailman/listinfo/help-gnu-emacs, help-gnu-emacs mailing list}。  这是获得帮助的好地方，@url{https://lists.nongnu.org/mailman/listinfo/info-cvs, info-cvs list} 也是如此。
+
+如果您有改进的想法，或者您为此包编写了一些扩展，我们希望收到您的来信。  我们希望您发现这个包很有用！
+
+以下是 PCL-CVS 当前已知问题的部分列表。
+
+@table @asis
+@item CVS 的意外输出
+CVS 的意外输出可能会混淆 PCL-CVS@. 它将在 @file{*cvs*} 缓冲区中创建警告消息，提醒您任何解析错误。如果您收到这些消息，请将错误报告发送到上面列出的电子邮件地址。  包括 @file{*cvs*} 缓冲区的内容、CVS 进程的输出（应在 @file{ *cvs-tmp*} 缓冲区中找到）以及您正在使用的 Emacs、PCL-CVS 和 CVS 的版本。
+@end table
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+
+
+@node Function and Variable Index
+@unnumbered 函数和变量索引
+
+这是本手册中记录的所有函数和变量的索引。
+
+@printindex fn
+
+@node     Concept Index
+@unnumbered 概念索引
+
+这是本手册中讨论的概念索引。
+
+@printindex cp
+
+@node     Key Index
+@unnumbered 关键指标
+
+该索引包括本手册中记录的每个 PCL-CVS 键序列的条目。
+
+@printindex ky
+
+@bye

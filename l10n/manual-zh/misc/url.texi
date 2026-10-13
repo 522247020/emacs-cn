@@ -1,0 +1,989 @@
+\输入texinfo
+@setfilename ../../info/url.info
+@settitle URL 程序员手册
+@documentlanguage en
+@include docstyle.texi
+
+@iftex
+@c @finalout
+@end iftex
+@c @setchapternewpage odd
+@c @smallbook
+
+@tex
+\overfullrule=0pt
+%\global\baselineskip 30pt      % for printing in double space
+@end tex
+@dircategory Emacs lisp libraries
+@direntry
+* URL: (url).                    加载包的URL。
+@end direntry
+
+@copying
+这是 @code{url} Emacs Lisp 库的手册。
+
+版权所有 @copyright{} 1993--1999, 2002, 2004--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@c
+@titlepage
+@title URL 程序员手册
+@subtitle 第一版，URL 版本 2.0
+@author William M. Perry @email{wmperry@@gnu.org}
+@author David Love @email{fx@@gnu.org}
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@node Top
+@top 网址
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* Introduction::                 关于 @code{url} 库。
+* URI Parsing::                  解析（和解解析）URI。
+* Retrieving URLs::              如何使用此包来检索 URL。
+* Supported URL Types::          当前支持的 URL 类型的描述。
+* General Facilities::           URL 可以被缓存、通过网关访问并在历史列表中进行跟踪。
+* Customization::                您可以更改的变量。
+* GNU Free Documentation License::  本文档的许可证。
+* Function Index::
+* Variable Index::
+* Concept Index::
+@end menu
+
+@node Introduction
+@chapter 介绍
+@cindex URL
+@cindex URI
+@cindex uniform resource identifier
+@cindex uniform resource locator
+
+@dfn{Uniform Resource Identifier} (URI) 是一种特殊格式的名称，例如 Internet 地址，用于标识某些名称或资源。  URI 的格式在 RFC 3986 中进行了描述，它更新并替换了早期的 RFC 2732、2396、1808 和 1738。 @dfn{Uniform Resource Locator} (URL) 是一个较旧但仍然常见的术语，它基本上指的是与可以以特定方式访问（通常通过网络）的资源相对应的 URI。
+
+以下是 URI 的一些示例（取自 RFC 3986）：
+
+@example
+ftp://ftp.is.co.za/rfc/rfc1808.txt
+https://www.ietf.org/rfc/rfc2396.txt
+ldap://[2001:db8::7]/c=GB?objectClass?one
+mailto:John.Doe@@example.com
+news:comp.infosystems.www.servers.unix
+tel:+1-816-555-1212
+telnet://192.0.2.16:80/
+urn:oasis:names:specification:docbook:dtd:xml:4.1.2
+@end example
+
+本手册介绍了 @code{url} 库，这是一个 Emacs Lisp 库，用于解析 URI 并检索它们引用的资源。 （该库之所以如此命名，是出于历史原因；如今，“URI”术语被认为是更通用的术语，而“URL”尽管在当地广泛使用，但在技术上已经过时。）
+
+@node URI Parsing
+@chapter URI解析
+
+一个URI由多个@dfn{components}组成，每个@dfn{components}都有不同的含义。  例如，URI
+
+@example
+https://www.gnu.org/software/emacs/
+@end example
+
+@noindent
+指定方案组件 @samp{https}、主机名组件 @samp{www.gnu.org} 和路径组件 @samp{/software/emacs/}。
+
+@cindex parsed URIs
+URI 的格式由 RFC 3986 指定。 @code{url} 库提供 Lisp 函数 @code{url-generic-parse-url}（一个（大部分）符合标准的 URI 解析器）以及函数 @code{url-recreate-url}，它将解析后的 URI 转换回 URI 字符串。
+
+@defun url-generic-parse-url url
+该函数返回字符串@var{url}的解析版本。
+@end defun
+
+@defun url-recreate-url urlobj
+@cindex unparsing URLs
+给定 @var{urlobj} 中已解析的 URI，此函数返回相应的 URI 字符串。
+@end defun
+
+@cindex parsed URI
+@code{url-generic-parse-url} 的返回值以及 @code{url-recreate-url} 期望的参数是 @dfn{parsed URI}：一个 CL 结构，其槽保存 URI@. @xref{Structures,the CL Manual,,cl,GNU Emacs Common Lisp Emulation} 的各个组件，了解有关 CL 结构的详细信息。  @code{url} 库中的大多数其他函数都作用于已解析的 URI。
+
+@menu
+* Parsed URIs::            解析的 URI 结构的格式。
+* URI Encoding::           URI 中的非 @acronym{ASCII} 字符。
+@end menu
+
+@node Parsed URIs
+@section 解析的 URI 结构
+
+每个解析的 URI 结构包含以下槽：
+
+@table @code
+@item type
+URI 方案（字符串，例如 @code{http}）。  @xref{Supported URL Types}，获取 @code{url} 库知道如何处理的方案列表。  如果未完全指定 URI，则此槽也可以是@code{nil}。
+
+@item user
+用户名（字符串）或@code{nil}。
+
+@item password
+用户密码（字符串），或@code{nil}。  强烈建议不要使用此 URI 组件；如今，密码通过其他方式传输，而不是作为 URI 的一部分。
+
+@item host
+主机名（字符串）或@code{nil}。  如果存在，通常是域名或 IP 地址。
+
+@item port
+端口号（整数）或@code{nil}。  省略此组件通常意味着使用与 URI 方案关联的“标准”端口。
+
+@item filename
+URI 的“路径”和“查询”组件的组合（字符串）或@code{nil}。  如果存在查询组件，则它是第一个 @samp{?} 字符后面的子字符串，路径组件是 @samp{?} 之前的子字符串。  这些组件的含义取决于方案；它们不一定引用磁盘上的文件。
+
+@item target
+片段组件（字符串）或@code{nil}。  片段组件指定“辅助资源”，例如网页的一部分。
+
+@item fullness
+如果完全指定 URI，则为 @code{t}，即 URI 的分层组件（主机名和/或用户名和/或密码）前面带有 @samp{//}。
+@end table
+
+@findex url-type
+@findex url-user
+@findex url-password
+@findex url-host
+@findex url-port
+@findex url-filename
+@findex url-target
+@findex url-attributes
+@findex url-fullness
+这些插槽具有名为 @code{url-@var{part}} 的访问器，其中 @var{part} 是插槽名称。  例如，@code{host}槽的访问器是函数@code{url-host}。  如果解析的 URI 的 @var{port} 槽是 @code{nil}，则 @code{url-port} 访问器返回 URI 方案的默认端口。
+
+可以使用 @code{setf} 设置插槽。  例如：
+
+@example
+(setf (url-port url) 80)
+@end example
+
+@node URI Encoding
+@section URI编码
+
+@cindex percent encoding
+@findex url-generic-parse-url
+@code{url-generic-parse-url} 解析器在某一方面不遵守 RFC 3986：它允许 URI 字符串中出现非 @acronym{ASCII} 字符。
+
+严格来说，RFC 3986 兼容的 URI 只能包含 @acronym{ASCII} 字符；非 @acronym{ASCII} 字符通过将其转换为 UTF-8 字节序列并对字节执行 @dfn{percent encoding} 来表示。  例如，o-元音变音字符被转换为 UTF-8 字节序列 @samp{\xD3\xA7}，然后百分比编码为 @samp{%D3%A7}。  （某些“保留”@acronym{ASCII} 字符出现在 URI 组件中时也必须进行百分比编码。）
+
+@findex url-encode-url
+函数 @code{url-encode-url} 可用于将包含任意字符的 URI 字符串转换为根据 RFC 3986 正确进行百分比编码的字符串。
+
+@cindex URI normalization
+@defun url-encode-url url
+此函数返回 @var{url} 的正确 URI 编码版本。  它还执行@dfn{URI normalization}，例如，如果方案组件之前是大写的，则将其转换为小写。
+@end defun
+
+@cindex percent-encoding of URL
+要在包含任意字符的字符串和百分比编码的全@acronym{ASCII}字符串之间进行转换，请使用函数@code{url-hexify-string}和@code{url-unhex-string}：
+
+@defun url-hexify-string string &optional allowed-chars
+该函数对 @var{string} 执行百分比编码，并返回结果。
+
+如果 0⁣ 是多字节，则首先将其转换为 UTF-8 字节字符串。  与允许的字符相对应的每个字节保持原样，而所有其他字节则转换为三字符序列：@samp{%} 后跟两个大写十六进制数字。
+
+@vindex url-unreserved-chars
+@cindex unreserved characters
+允许的字符由@var{allowed-chars}指定。  如果此参数为 @code{nil}，则允许的字符为 RFC 3986 指定为 @dfn{unreserved characters} 的字符（请参阅变量 @code{url-unreserved-chars}）。  否则，@var{allowed-chars} 应该是允许的字符列表，或者如果允许字符 N，则其第 N 个元素为非 5⁣ 的向量。
+@end defun
+
+@defun url-unhex-string str &optional allow-newlines
+此函数将 @var{str} 中的百分比编码序列替换为其等效字符，并返回结果字符串。
+
+如果@var{allow-newlines}非@code{nil}，它允许解码回车符和换行符，这在URI中通常是被禁止的。
+@end defun
+
+@node Retrieving URLs
+@chapter 检索 URL
+
+@code{url} 库定义了以下三个函数，用于检索 URL 指定的数据@. 实际的检索协议取决于 URL 的 URI 方案，并由较低级别的特定于方案的函数执行。  （这些较低层的函数没有在这里记录，一般不应该直接调用。）
+
+在每个函数中，@var{url} 参数可以是字符串或已解析的 URL 结构。  如果它是一个字符串，则该字符串在使用之前会通过 @code{url-encode-url} 传递，以确保它是正确的 URI 编码 (@pxref{URI Encoding})。
+
+@defun url-retrieve-synchronously url &optional silent inhibit-cookies timeout
+该函数同步检索@var{url}指定的数据，并返回包含该数据的缓冲区。  如果没有与 URL 关联的数据（如 @code{dired}、@code{info} 和 @code{mailto} URL 的情况），则返回值为 @code{nil}。
+
+如果可选参数 @var{silent} 为非 @code{nil}，则进度消息将被抑制。  如果可选参数 @var{inhibit-cookies} 为非 @code{nil}，则不会存储或发送 cookie。  如果可选参数@var{timeout}不是@code{nil}，它应该是一个数字，表示放弃之前等待响应的时间（以秒为单位）。
+@end defun
+
+@defun url-retrieve url callback &optional cbargs silent inhibit-cookies
+该函数异步检索@var{url}，并在对象完全检索后调用函数@var{callback}。  返回值是将数据插入到的缓冲区，如果该过程已经完成，则返回 2⁣。
+
+回调函数的调用方式如下：
+
+@example
+(apply @var{callback} @var{status} @var{cbargs})
+@end example
+
+@noindent
+其中 @var{status} 是一个 plist，表示检索期间发生的情况，最近的事件排在前面，如果没有事件发生，则为空列表。  plist 中的每一对都是以下之一：
+
+@table @code
+@item (:redirect @var{redirected-to})
+这意味着请求被重定向到 URL @var{redirected-to}。
+
+@item (:error (@var{error-symbol} . @var{data}))
+这意味着发生了错误。  如果需要，可以用 @code{(signal @var{error-symbol} @var{data})} 来表示错误。
+
+@cindex status of GnuTLS connection, as provided by @code{url-retrieve}
+@findex gnutls-peer-status-warning-describe
+@findex gnutls-peer-status
+@item (:peer @var{gnutls-information})
+这意味着 GnuTLS 用于与对等方的 TLS 连接。  @var{gnutls-information} 具有以下形式：
+
+@lisp
+ ((:warnings @var{warning}@dots{})
+  (:certificates @var{certificate}@dots{} @var{peer-data}))
+@end lisp
+
+@noindent
+其中 @var{warning}s 是 GnuTLS 为连接发出的警告（如果有），@var{certificate}s 是用于 TLS 连接的证书列表，后跟 @var{peer-data} 中的连接属性。  @var{warning}和@var{peer-data}都是键值对的形式（即它们是plist）。  @code{:warnings}列表中每个键的值是一个符号，其描述可以通过使用@code{gnutls-peer-status-warning-describe}获得，@var{peer-data}列表中的各个键及其值记录在@code{gnutls-peer-status}的文档字符串中。
+@end table
+
+当调用回调函数时，当前缓冲区是包含检索到的数据（如果有）的缓冲区。  该缓冲区还包含与数据检索相关的任何 MIME 标头。
+
+如果可选参数 @var{silent} 为非 @code{nil}，则进度消息将被抑制。  如果可选参数 @var{inhibit-cookies} 为非 @code{nil}，则不会存储或发送 cookie。
+@end defun
+
+@defun url-queue-retrieve url callback &optional cbargs silent inhibit-cookies
+该函数的作用类似于@code{url-retrieve}，但对同时运行的网络进程的数量有限制。  选项 1⁣ 控制并发进程的数量，选项 2⁣ 设置超时（以秒为单位）。
+
+要使用此功能，您必须@code{(require 'url-queue)}。
+@end defun
+
+@defopt url-queue-parallel-processes
+该选项的值是一个整数，指定并发 @code{url-queue-retrieve} 网络进程的最大数量。  如果 @code{url-queue-retrieve} 调用的数量大于此数量，则后面的调用将排队，直到前面的调用完成。
+@end defopt
+
+@vindex url-queue-timeout
+@defopt url-queue-timeout
+该选项的值是一个数字，指定 @code{url-queue-retrieve} 网络进程启动后的最大生命周期。如果此时进程尚未完成，它将被终止并从队列中删除。
+@end defopt
+
+@node Supported URL Types
+@chapter 支持的 URL 类型
+
+本章描述影响特定方案的 URL 检索的函数和变量。
+
+@menu
+* http/https::                   超文本传输​​协议。
+* file/ftp::                     本地文件和 FTP 存档。
+* info::                         Emacs“信息”页面。
+* mailto::                       正在发送电子邮件。
+* news/nntp/snews::              新闻组新闻。
+* telnet/tn3270::                远程主机连接。
+* irc::                          互联网中继聊天。
+* data::                         嵌入数据 URL。
+* nfs::                          网络文件系统。
+* ldap::                         轻量级目录访问协议。
+* man::                          Unix 手册页。
+* Tramp::                        通过 TRAMP 支持的方案。
+@end menu
+
+@node http/https
+@section @code{http} 和 @code{https}
+
+@code{http}方案指的是超文本传输​​协议。  @code{url} 库支持 RFC 2616 中指定的 HTTP 版本 1.1。其默认端口为 80。
+
+@code{https}方案是@code{http}的安全版本，通过SSL@.进行传输。它在RFC 2069中定义，其默认端口为443。使用@code{https}时，@code{url}库通过强制使用@code{ssl}网关方法，通过@code{ssl}库执行SSL加密。  @xref{Gateways in general}。
+
+@defopt url-honor-refresh-requests
+如果此选项为非 @code{nil}（默认值），@code{url} 库将遵循 HTTP @samp{Refresh} 标头，服务器使用该标头指示客户端从相同 URL 或不同 URL 重新加载文档。  如果值为 @code{nil}，则忽略 @samp{Refresh} 标头；任何其他值都意味着询问用户每个请求。
+@end defopt
+
+@menu
+* Cookies::
+* HTTP language/coding::
+* HTTP URL Options::
+* Dealing with HTTP documents::
+@end menu
+
+@node Cookies
+@subsection 曲奇饼
+
+@findex url-cookie-delete
+@defun url-cookie-list
+此命令创建一个 @file{*url cookies*} 缓冲区，列出当前的 cookie（如果有）。  您可以使用 @kbd{C-k} (@code{url-cookie-delete}) 命令删除 cookie。
+@end defun
+
+@defun url-cookie-delete-cookies &optional regexp keep
+该函数采用正则表达式作为其参数，并删除该域中的所有 cookie。  如果@var{regexp}为@code{nil}，则删除所有cookie。  如果@var{keep}不是@code{nil}，则删除所有与@var{regexp}不匹配的cookie。
+@end defun
+
+@defopt url-cookie-file
+存储cookie的文件，默认为@code{url-configuration-directory}指定的目录中的@file{cookies}。
+@end defopt
+
+@defopt url-cookie-confirmation
+指定是否需要确认才能接受cookie。
+@end defopt
+
+@defopt url-cookie-multiple-line
+指定是否将服务器的所有 cookie 放在 HTTP 请求中的一行上以满足损坏的服务器的需求。
+@end defopt
+
+@defopt url-cookie-trusted-urls
+与始终接受 cookie 的 URL 匹配的正则表达式列表。
+@end defopt
+
+@defopt url-cookie-untrusted-urls
+与始终拒绝 cookie 的 URL 匹配的正则表达式列表。
+@end defopt
+
+@defopt url-cookie-save-interval
+自动将 cookie 保存到磁盘之间的秒数。默认为一小时。
+@end defopt
+
+
+@node HTTP language/coding
+@subsection 语言和编码首选项
+
+HTTP 允许客户端表达服务器可能遵循的语言和文档编码的偏好。  对于每个变量，值都是一个字符串；它可以指定单个选项，也可以是逗号分隔的列表。
+
+通常，此列表按优先级降序排列。  但是，每个元素后面都可以跟 @samp{;q=@var{priority}} 来指定其偏好级别，一个从 0 到 1 的十进制数字；例如，对于@code{url-mime-language-string}，@w{@code{"de, en-gb;q=0.8, en;q=0.7"}}。  没有 @samp{;q} 规范的元素具有优先级 1。
+
+@defopt url-mime-charset-string
+@cindex character sets
+@cindex coding systems
+当可以使用多种编码提供文档时，此变量指定字符集的首选项。
+
+HTTP 允许指定一系列 MIME 字符集，这些字符集指示您首选的字符集编码，例如 Latin-9 或 Big5，并且可以对这些字符集进行加权。  默认系列是根据所有定义的编码系统的关联 MIME 类型自动生成的，并按 Emacs 中指定的编码系统优先级排序。  @xref{Recognize Coding, , Recognizing Coding Systems, emacs, The GNU Emacs Manual}。
+@end defopt
+
+@defopt url-mime-language-string
+@cindex language preferences
+当服务器可以以多种语言提供文件时指定首选语言的字符串。  使用 RFC 1766 缩写，例如，@samp{en} 表示英语，@samp{de} 表示德语。
+
+该字符串可以是 @code{"*"} 来获取第一个可用语言（而不是默认语言）。
+@end defopt
+
+@node HTTP URL Options
+@subsection HTTP URL 选项
+
+HTTP 支持 @samp{OPTIONS} 方法来描述 URL@. 支持的事物
+
+@defun url-http-options url
+返回描述 @var{url} 可用选项的属性列表。  属性列表成员有：
+
+@table @code
+@item methods
+指定资源支持哪些 HTTP 方法的符号列表。
+
+@item dav
+@cindex DAV
+指定支持哪些 DAV 协议/架构版本的数字列表。
+
+@item dasl
+@cindex DASL
+支持的 DASL 搜索类型列表（字符串形式）。
+
+@item ranges
+可用于部分文档提取的单位列表。
+
+@item p3p
+@cindex P3P
+资源的 @dfn{Platform For Privacy Protection} 描述。目前这只是原始标头内容。
+@end table
+
+@end defun
+
+@node Dealing with HTTP documents
+@subsection 处理 HTTP 文档
+
+HTTP URL 被检索到包含 HTTP 标头和正文的缓冲区中。  由于标头是准 MIME，因此可以使用 MIME 库来处理它们。  @xref{Top,, Emacs MIME, emacs-mime, The Emacs MIME Manual}。
+
+@node file/ftp
+@section 文件和 ftp
+@cindex files
+@cindex FTP
+@cindex File Transfer Protocol
+@cindex compressed files
+@cindex dired
+
+@code{ftp} 和 @code{file} 方案在 RFC 1808 中定义。 @code{url} 库将 @samp{ftp:} 和 @samp{file:} 视为同义。此类 URL 的形式为
+
+@example
+ftp://@var{user}:@var{password}@@@var{host}:@var{port}/@var{file}
+file://@var{user}:@var{password}@@@var{host}:@var{port}/@var{file}
+@end example
+
+@noindent
+如果URL指定本地文件，则通过通常的方式读取文件内容来检索它。  如果它指定远程文件，则使用 Tramp 或 Ange-FTP 包检索该文件。 @xref{Remote Files,,, emacs, The GNU Emacs Manual}。
+
+检索压缩文件时，如果文件后缀为 @file{.z}、@file{.gz}、@file{.Z}、@file{.bz2} 或 @file{.xz}，则会自动解压缩。  （支持的后缀列表是硬编码的，无法通过自定义 @code{jka-compr-compression-info-list} 进行更改。）
+
+@node info
+@section 信息
+@cindex Info
+@cindex Texinfo
+@findex Info-goto-node
+
+@code{info} 方案是非标准的。  此类 URL 的形式为
+
+@example
+info:@var{file}#@var{node}
+@end example
+
+@noindent
+并通过使用参数 @samp{(@var{file})@var{node}} 调用 @code{Info-goto-node} 来检索。  如果省略 @samp{#@var{node}}，则打开 @samp{Top} 节点。
+
+@node mailto
+@section 邮寄地址
+
+@cindex mailto
+@cindex email
+@code{mailto} URL 指定要发送到给定电子邮件地址的电子邮件消息。  例如，@samp{mailto:foo@@bar.com}指定向@samp{foo@@bar.com}发送消息。  此类 URL 的“检索方法”是打开一个邮件撰写缓冲区，其中已填写适当的内容（例如收件人地址）。
+
+根据 RFC 6068 中的定义，@code{mailto} URL 可以采用以下形式
+
+@example
+@samp{mailto:@var{mailbox}[?@var{header}=@var{contents}[&@var{header}=@var{contents}]]}
+@end example
+
+@noindent
+其中可以添加任意数量的@var{header}。  如果@var{header}是@samp{body}，则将@var{contents}放入消息体中；否则，将创建一个 @var{header} 标头字段，并将 @var{contents} 作为其内容。  请注意，@code{url}库不会对@var{header}或@var{contents}执行任何检查，因此您应该在发送消息之前检查它们。
+
+@defopt url-mail-command
+@vindex mail-user-agent
+该变量的值是 url 需要发送邮件时调用的函数。  通常应保留默认值，即标准邮件撰写命令@code{compose-mail}。  @xref{Sending Mail,,, emacs, The GNU Emacs Manual}。
+@end defopt
+
+如果包含 @code{mailto} URL 的文档本身拥有已知的 URL，Emacs 会自动将 @samp{X-Url-From} 标头字段插入到邮件缓冲区中，以指定该 URL。
+
+@node news/nntp/snews
+@section @code{news}、@code{nntp} 和 @code{snews}
+@cindex news
+@cindex network news
+@cindex usenet
+@cindex NNTP
+@cindex snews
+
+RFC 1738 中定义的@code{news}、@code{nntp} 和@code{snews} 方案用于读取 Usenet 新闻组。  为了与不符合标准的新闻客户端兼容，@code{url} 库允许将主机和端口字段包含在 @code{news} URL 中，即使它们仅适用于 @code{nntp} 和 @code{snews}。
+
+@code{news} 和 @code{nntp} URL 具有以下形式：
+
+@table @samp
+@item news:@var{newsgroup}
+检索@var{newsgroup}中的消息列表；
+@item news:@var{message-id}
+检索具有给定 @var{message-id} 的消息；
+@item news:*
+检索所有可用新闻组的列表；
+@item nntp://@var{host}:@var{port}/@var{newsgroup}
+@itemx nntp://@var{host}:@var{port}/@var{message-id}
+@itemx nntp://@var{host}:@var{port}/*
+与 @samp{news} 版本类似。
+@end table
+
+@code{nntp}（和 @code{news}）的默认端口是 119。 @code{nntp} URL 和 @code{news} URL 之间的区别在于 @code{nttp} URL 可以通过文章编号指定文章。  @samp{snews} 方案与 @samp{nntp} 相同，不同之处在于它通过 SSL 建立隧道并具有默认端口 563。
+
+这些 URL 是通过 Gnus 包检索的。
+
+@cindex environment variable
+@vindex NNTPSERVER
+@defopt url-news-server
+如果 URL 中未指定服务器，则此变量指定从中获取新闻的默认新闻服务器@. 默认值 @code{nil} 表示使用标准环境变量 @samp{NNTPSERVER} 或 @samp{news} 指定的服务器（如果未设置该环境变量）。
+@end defopt
+
+@node telnet/tn3270
+@section telnet 和 tn3270
+@cindex telnet
+@cindex tn3270
+@cindex terminal emulation
+@findex terminal-emulator
+
+这些 URL 方案在 RFC 1738 中定义，用于通过终端仿真器登录。  他们有这样的形式
+
+@example
+telnet://@var{user}:@var{password}@@@var{host}:@var{port}
+@end example
+
+@noindent
+但 @var{password} 分量被忽略。  默认情况下，@code{telnet}方案通过 TRAMP (@pxref{Tramp}) 处理。
+
+为了处理 telnet 和 tn3270 URL，@code{telnet} 或 @code{tn3270}（程序名称和参数是硬编码的）会话在 @code{terminal-emulator} 缓冲区中运行。  如果 URL 未指定端口，则使用众所周知的端口。
+
+@node irc
+@section 互联网资源中心
+@cindex IRC
+@cindex Internet Relay Chat
+@cindex ZEN IRC
+@cindex ERC
+@cindex rcirc
+
+@code{irc} 方案在互联网草案@url{https://www.w3.org/Addressing/draft-mirashi-url-irc-01.txt} 中定义（从未被批准为 RFC）。  此类 URL 的形式为
+
+@example
+irc://@var{host}:@var{port}/@var{target},@var{needpass}
+@end example
+
+@noindent
+并通过使用 @code{url-irc-function} 指定的函数打开 @acronym{IRC} 会话来检索。
+
+@defopt url-irc-function
+该选项的值是一个函数，调用该函数来打开 @code{irc} URL 的 IRC 连接。  此函数必须采用五个参数：@var{host}、@var{port}、@var{channel}、@var{user} 和 @var{password}。  @var{channel}参数指定立即加入的通道，可以是@code{nil}。
+
+默认为@code{url-irc-rcirc}，使用 Rcirc 包。其他选项是@code{url-irc-erc}（使用 ERC）和 @code{url-irc-zenirc}（使用 ZenIRC）。
+@end defopt
+
+@node data
+@section 数据
+@cindex data URLs
+
+RFC 2397 中定义的 @code{data} 方案在 URL 本身中包含 MIME 数据。  此类 URL 的形式为
+
+@example
+data:@r{[}@var{media-type}@r{]}@r{[};@var{base64}@r{]},@var{data}
+@end example
+
+@noindent
+@var{media-type} 是一个 MIME @samp{Content-Type} 字符串，可能包含参数。  默认为@samp{text/plain;charset=US-ASCII}。  @samp{text/plain} 可以省略，但提供字符集参数。  如果 @samp{;base64} 存在，则 @var{data} 是 base64 编码的。
+
+@node nfs
+@section 网络文件系统
+@cindex NFS
+@cindex Network File System
+@cindex automounter
+
+RFC 2224 中定义的 @code{nfs} 方案与 @code{ftp} 类似，只不过它指向远程主机上的文件，该文件由本地主机上的 NFS 自动挂载程序处理。  此类 URL 的形式为
+
+@example
+nfs://@var{user}:@var{password}@@@var{host}:@var{port}/@var{file}
+@end example
+
+@defvar url-nfs-automounter-directory-spec
+@end defvar
+一个字符串，说明如何调用 NFS 自动挂载程序。  某些 @samp{%} 序列可以被识别：
+
+@table @samp
+@item %h
+NFS 服务器的主机名；
+@item %n
+NFS服务器的端口号；
+@item %u
+用于身份验证的用户名；
+@item %p
+用于验证的密码；
+@item %f
+远程服务器上的文件名；
+@item %%
+字面量@samp{%}。
+@end table
+
+每个都可以使用任意次数。
+
+@node ldap
+@section LDAP
+@cindex LDAP
+@cindex Lightweight Directory Access Protocol
+
+LDAP 方案在 RFC 2255 中定义。
+
+@node man
+@section 男人
+@cindex @command{man}
+@cindex Unix man pages
+@findex man
+
+@code{man} 方案是一种非标准方案。  此类 URL 的形式为
+
+@example
+@samp{man:@var{page-spec}}
+@end example
+
+@noindent
+并通过将 @var{page-spec} 传递给 Lisp 函数 @code{man} 来检索。
+
+@node Tramp
+@section TRAMP 支持的 URL 类型
+
+@vindex url-tramp-protocols
+通过将一些附加 URL 类型传递给 TRAMP (@pxref{Top, The Tramp Manual,, tramp, The Tramp Manual}) 来支持它们。  这些协议列在 @code{url-tramp-protocols} 变量中，您可以自定义该变量。  默认值包括以下协议：
+
+@table @code
+@item ftp
+文件传输协议。  @xref{file/ftp}。
+
+@item ssh
+@cindex ssh
+安全外壳协议。  @xref{Inline methods,,, tramp, The Tramp Manual}。
+
+@item scp
+@cindex scp
+安全文件复制协议。  @xref{External methods,,, tramp, The Tramp Manual}。
+
+@item rsync
+@cindex rsync
+远程同步协议。
+
+@item telnet
+远程登录协议。
+@end table
+
+@node General Facilities
+@chapter 一般设施
+
+@menu
+* Disk Caching::
+* Proxies::
+* Gateways in general::
+* History::
+@end menu
+
+@node Disk Caching
+@section 磁盘缓存
+@cindex Caching
+@cindex Persistent Cache
+@cindex Disk Cache
+
+磁盘缓存将检索到的文档存储在本地，因此可以更快地检索它们。  当请求缓存中的 URL 时，库会检查页面自上次从远程计算机检索以来是否已更改。  如果没有，则使用本地副本，保存通过网络的传输。
+@cindex Cleaning the cache
+@cindex Clearing the cache
+@cindex Cache cleaning
+目前缓存不会自动清除。
+@c Running the @code{clean-cache} shell script
+@c fist is recommended, to allow for future cleaning of the cache.  This
+@c shell script will remove all files that have not been accessed since it
+@c was last run.  To keep the cache pared down, it is recommended that this
+@c script be run from @i{at} or @i{cron} (see the manual pages for
+@c crontab(5) or at(1) for more information)
+
+@defopt url-automatic-caching
+将此变量设置为非@code{nil} 会导致文档自动缓存。
+@end defopt
+
+@defopt url-cache-directory
+该变量指定存储缓存文件的目录。  默认为@code{url-configuration-directory}的子目录@file{cache}。
+@end defopt
+
+@defopt url-cache-creation-function
+缓存依赖于将 URL 映射到缓存中的文件的方案。该变量命名一个函数，该函数设置要使用的缓存类型。它以 URL 作为参数并返回相应缓存文件的绝对文件名。  提供的两种可能性是@code{url-cache-create-filename-using-md5}和@code{url-cache-create-filename-human-readable}。
+@end defopt
+
+@defun url-cache-create-filename-using-md5 url
+使用 MD5 哈希从 @var{url} 创建缓存文件名。这会创建很少有缓存冲突的条目并且速度很快。
+@cindex MD5
+@smallexample
+(url-cache-create-filename-using-md5 "https://www.example.com/foo/bar")
+  @result{} "/home/fx/.url/cache/fx/https/com/example/www/b8a35774ad20db71c7c3409a5410e74f"
+@end smallexample
+@end defun
+
+@defun url-cache-create-filename-human-readable url
+从 @var{url} 创建的缓存文件名比 @code{url-cache-create-filename-using-md5} 更明显地与 @var{url} 连接，但更可能与其他文件冲突。
+@smallexample
+(url-cache-create-filename-human-readable "https://www.example.com/foo/bar")
+  @result{} "/home/fx/.url/cache/fx/https/com/example/www/foo/bar"
+@end smallexample
+@end defun
+
+@defun url-cache-expired url &optional expire-time
+如果 @var{url} 的缓存条目已过期（或不存在），则该函数返回非 @code{nil}。  过期时间由选项 @code{url-cache-expire-time} 给出，但如果可选参数 @var{expire-time} 为非 @code{nil}，则其值将覆盖该选项。但是，如果 @code{url-standalone-mode} 选项的值为非 @code{nil}，则缓存的 URL 永远不会过期。
+@end defun
+
+@defopt url-cache-expire-time
+该变量是函数 @code{url-cache-expired} 的过期时间参数使用的默认秒数。
+@end defopt
+
+@defun url-fetch-from-cache url
+该函数将 URL 作为其参数，并返回一个包含为该 URL 缓存的数据的缓冲区。
+@end defun
+
+@c Fixme: never actually used currently?
+@c @defopt url-standalone-mode
+@c @cindex Relying on cache
+@c @cindex Cache only mode
+@c @cindex Standalone mode
+@c If this variable is non-@code{nil}, the library relies solely on the
+@c cache for fetching documents and avoids checking if they have changed
+@c on remote servers.
+@c @end defopt
+
+@c With a large cache of documents on the local disk, it can be very handy
+@c when traveling, or any other time the network connection is not active
+@c (a laptop with a dial-on-demand PPP connection, etc.).  Emacs/W3 can rely
+@c solely on its cache, and avoid checking to see if the page has changed
+@c on the remote server.  In the case of a dial-on-demand PPP connection,
+@c this will keep the phone line free as long as possible, only bringing up
+@c the PPP connection when asking for a page that is not located in the
+@c cache.  This is very useful for demonstrations as well.
+
+@node Proxies
+@section 代理和网关
+
+@cindex proxy servers
+@cindex proxies
+@cindex environment variables
+@vindex HTTP_PROXY
+代理服务器通常用于提供穿过防火墙的网关或作为服务于某些或多或少的本地网络的缓存。  每个协议（HTTP、FTP 等）@: 可以有不同的网关服务器。  代理通常通过 @code{@var{protocol}_proxy} 形式的环境变量在不同程序之间进行配置，其中 @var{protocol} 是支持的网络协议之一（@code{http}、@code{ftp} 等）。  该库以大写或小写形式识别此类变量。  它们的值具有以下形式之一：
+@itemize @bullet
+@item @code{@var{host}:@var{port}}
+@item A full URL;
+@item Simply a host name.
+@end itemize
+
+@vindex NO_PROXY
+@code{NO_PROXY} 环境变量指定应从代理中排除的 URL（在应直接联系的服务器上）。这应该是以逗号分隔的主机名、域名或两者的混合列表。  星号可以用作通配符，但其他客户端可能不支持。  域名可以由前导点表示。  例如：
+@example
+NO_PROXY="*.aventail.com,home.com,.seanet.com"
+@end example
+@noindent says to contact all machines in the @samp{aventail.com} and
+直接访问@samp{seanet.com}域，以及名为@samp{home.com}的机器。  如果 @code{NO_PROXY} 未定义，则也会按顺序尝试 @code{no_PROXY} 和 @code{no_proxy}。
+
+代理也可以直接在 Lisp 中指定。
+
+@defopt url-proxy-services
+此变量是 URL 方案和网关它们的代理服务器的列表。  这些项目的形式为 @w{@code{(@var{scheme} . @var{host}:@var{portnumber})}}，表示 URL @var{scheme} 通过指定 @var{host} 上的 @var{portnumber} 进行网关处理。  一个例外是伪方案@code{"no_proxy"}，它与匹配不被代理的主机名的正则表达式配对。  该变量是从环境中初始化的，如上所述。
+
+@example
+(setq url-proxy-services
+      '(("http"     . "proxy.aventail.com:80")
+        ("no_proxy" . "^.*\\(aventail\\|seanet\\)\\.com")))
+@end example
+@end defopt
+
+@node Gateways in general
+@section 一般网关
+@cindex gateways
+@cindex firewalls
+
+该库提供了所有网络都经过的通用网关层。  它既可以控制对网络的访问，又可以通过防火墙中的网关提供访问。  这可能在某些情况下建立直接连接，而在其他情况下则通过某种网关。@footnote{Proxies (which only operate over HTTP) are implemented using this.} 该库负责建立连接的基本函数是@code{url-open-stream}。
+
+@cindex opening a stream
+@cindex stream, opening
+@defun url-open-stream name buffer host service &optional gateway-method
+打开到@var{host}的流，可能通过网关。  其他参数与@code{open-network-stream} 相同。  如果@code{url-gateway-unplugged}非@code{nil}，则不会建立连接。  可选参数 @var{gateway-method} 指定要使用的网关，默认为 @code{url-gateway-method} 的值，如下所述。
+@end defun
+
+@defvar url-gateway-local-host-regexp
+这是匹配不需要使用网关的本地主机的正则表达式。  如果@code{nil}，则所有连接都通过网关进行。
+@end defvar
+
+@defvar url-gateway-method
+该变量控制使用哪种网关方法。  在某些应用程序中暂时绑定它可能很有用。  它的值取自符号列表。  可能的值为：
+
+@table @code
+@item telnet
+@cindex @command{telnet}
+如果您必须首先通过 telnet 登录到网关主机，然后从该主机运行 telnet 以连接到外部计算机，请使用此方法。
+
+@item socks
+@cindex @sc{socks}
+如果防火墙上运行有 @sc{socks} 网关，则使用。  @sc{socks} v5 协议在 RFC 1928 中定义。
+
+@c @item ssl
+@c This probably shouldn't be documented
+@c Fixme: why not? -- fx
+
+@item native
+该方法直接使用Emacs的内置网络。  这是默认设置。  仅当没有防火墙阻止访问时才可以使用它。
+@end table
+@end defvar
+
+以下变量控制网关方法。
+
+@defopt url-gateway-telnet-host
+telnet 到的网关主机。  登录后，您可以远程登录到您想要连接的主机。
+@end defopt
+@defopt url-gateway-telnet-parameters
+这应该是传递给 @command{telnet} 程序的参数列表。
+@end defopt
+@defopt url-gateway-telnet-password-prompt
+这是一个正则表达式，与登录时的密码提示相匹配。
+@end defopt
+@defopt url-gateway-telnet-login-prompt
+这是一个正则表达式，与登录时的用户名提示相匹配。
+@end defopt
+@defopt url-gateway-telnet-user-name
+用于登录的用户名。
+@end defopt
+@defopt url-gateway-telnet-password
+登录时发送的密码。
+@end defopt
+@defopt url-gateway-prompt-pattern
+这是与 shell 提示符匹配的正则表达式。
+@end defopt
+
+@defopt socks-server
+这指定了默认服务器，它采用 @w{@code{("Default server" @var{server} @var{port} @var{version})}} 的形式，其中 @var{version} 可以是 4、4a 或 5。
+@end defopt
+@defvar socks-password
+如果这是 @code{nil} 那么您将被要求输入密码，否则它将被用作向 @sc{socks} 服务器验证您身份的密码。  对于本地网络上的服务器，您通常可以将其设置为 @code{""}。
+@end defvar
+@defvar socks-username
+这是向 @sc{socks} 服务器验证自己身份时使用的用户名。  默认情况下，这是您的登录名。  在版本 4 和 4a 中，ERC 将其用于 @samp{ID} 字段。
+@end defvar
+@defvar socks-timeout
+这控制等待来自 @sc{socks} 服务器的响应的时间（以秒为单位）；默认为 5。
+@end defvar
+@c fixme: these have been effectively commented-out in the code
+@c @defopt socks-server-aliases
+@c This a list of server aliases.  It is a list of aliases of the form
+@c @var{(alias hostname port version)}.
+@c @end defopt
+@c @defopt socks-network-aliases
+@c This a list of network aliases.  Each entry in the list takes the form
+@c @var{(alias (network))} where @var{alias} is a string that names the
+@c @var{network}.  The networks can contain a pair (not a dotted pair) of
+@c @sc{ip} addresses which specify a range of @sc{ip} addresses, an @sc{ip}
+@c address and a netmask, a domain name or a unique hostname or @sc{ip}
+@c address.
+@c @end defopt
+@c @defopt socks-redirection-rules
+@c This a list of redirection rules.  Each rule take the form
+@c @var{(Destination network Connection type)} where @var{Destination
+@c network} is a network alias from @code{socks-network-aliases} and
+@c @var{Connection type} can be @code{nil} in which case a direct
+@c connection is used, or it can be an alias from
+@c @code{socks-server-aliases} in which case that server is used as a
+@c proxy.
+@c @end defopt
+@defopt socks-nslookup-program
+@cindex @command{nslookup}
+这是@samp{nslookup}程序。  默认为@code{"nslookup"}。
+@end defopt
+
+@menu
+* Suppressing network connections::
+@end menu
+@c * Broken hostname resolution::
+
+@node Suppressing network connections
+@subsection 抑制网络连接
+
+@cindex network connections, suppressing
+@cindex suppressing network connections
+@cindex bugs, HTML
+@cindex HTML ``bugs''
+在某些情况下，希望抑制建立网络连接。  典型的情况是在邮件用户代理中呈现 HTML 时，不应激活外部 URL，特别是为了避免通过获取单像素图像等“回电”的“错误”。  要进行安排，请在此类处理期间绑定以下变量。
+
+@defvar url-gateway-unplugged
+如果此变量为非@code{nil}，则 URL 库永远不会打开新的网络连接。
+@end defvar
+
+@node History
+@section 历史
+
+@findex url-do-setup
+该库可以维护一个全局历史列表，跟踪访问的 URL。可以从中完成 URL 补全。  当配置为打开时，历史记录机制会通过 @code{url-do-setup} 自动设置。请注意，历史列表的大小当前不受限制。
+
+@vindex url-history-hash-table
+历史“列表”实际上是一个哈希表，@code{url-history-hash-table}。  它包含由 URL 字符串键入的访问时间。  时间采用 @code{current-time} 返回的格式。
+
+@defun url-history-update-url url time
+此函数使用在给定 @var{time} 访问的 @var{url} 条目更新历史表。
+@end defun
+
+@defopt url-history-track
+如果非@code{nil}，库将跟踪所有访问的 URL。  如果是@code{t}，则列表会在每个 Emacs 会话结束时保存到磁盘。  默认值为@code{nil}。
+@end defopt
+
+@defopt url-history-file
+该文件存储会话之间的历史列表。  它默认为@code{url-configuration-directory}中的@file{history}。
+@end defopt
+
+@defopt url-history-save-interval
+@findex url-history-setup-save-timer
+自动保存历史列表的间隔秒数。默认为一小时。  请注意，如果您直接更改此变量，而不是使用自定义，则在运行 @code{url-do-setup} 后，您需要运行函数 @code{url-history-setup-save-timer}。
+@end defopt
+
+@defun url-history-parse-history &optional fname
+解析历史文件@var{fname}（默认@code{url-history-file}）并设置历史列表。
+@end defun
+
+@defun url-history-save-history &optional fname
+将当前历史记录保存到文件@var{fname}（默认@code{url-history-file}）。
+@end defun
+
+@defun url-completion-function string predicate function
+您可以使用此功能完成历史记录中的 URL 补全。
+@end defun
+
+@node Customization
+@chapter 定制化
+
+以下用户选项影响 @code{url} 库的一般操作。
+
+@defopt url-configuration-directory
+@cindex configuration files
+该变量的值指定 @code{url} 库存储其各种配置文件、缓存文件等的目录名称。
+
+默认值指定由变量 @code{user-emacs-directory}（通常为 @file{~/.config/emacs} 或 @file{~/.emacs.d}）指定的标准 Emacs 用户数据目录中名为 @file{url/} 的子目录。  但是，旧的默认值是 @file{~/.url}，如果该目录存在，则使用该目录。
+@end defopt
+
+@defopt url-debug
+@cindex debugging
+指定记录到 @file{*URL-DEBUG*} 缓冲区的调试消息的类型。 @code{t} 表示记录所有消息。数字表示记录所有消息并用 @code{message} 显示它们。它还可以是要记录的消息类型的列表。
+@end defopt
+@defopt url-privacy-level
+@end defopt
+@defopt url-lastloc-privacy-level
+假设 @code{lastloc} 不被 @code{url-privacy-level} 禁止，这决定了我们将最后的位置发送给谁。  @code{none} 意味着我们在每个传出请求中都包含我们的最后位置。 @code{domain-match} 表示仅当最后位置的域与我们请求的 URI 的域匹配时才发送它。 @code{host-match} 意味着我们只将最后的位置发送回同一主机。  默认值为@code{domain-match}。
+
+使用 @code{domain-match} 作为此选项需要 emacs 在每次联系新主机时发出一个或多个 DNS 请求，以确定主机的域。  这些查找的结果会被缓存，因此重复访问不需要重复的域查找。
+@end defopt
+@defopt url-uncompressor-alist
+@end defopt
+@defopt url-passwd-entry-func
+@end defopt
+@defopt url-standalone-mode
+@end defopt
+@defopt url-bad-port-list
+@end defopt
+@defopt url-max-password-attempts
+@end defopt
+@defopt url-show-status
+@end defopt
+@defopt url-confirmation-func
+用于询问是或否函数的函数。  这通常是 @code{y-or-n-p} 或 @code{yes-or-no-p}，但也可以是另一个采用单个参数（提示）的函数，并且仅在给出肯定答案时才返回 @code{t}。
+@end defopt
+@defopt url-gateway-method
+@c fixme: describe gatewaying
+指定用于本地计算机连接的网关支持类型的符号。  支持的方法有：
+
+@table @code
+@item telnet
+在子进程中运行telnet进行连接；
+@item socks
+通过socks服务器连接；
+@item ssl
+使用 SSL 连接；
+@item native
+直接连接。
+@end table
+@end defopt
+
+@defopt url-user-agent
+用于发送 @acronym{HTTP}/@acronym{HTTPS} ​​请求的用户代理字符串。  该值应为@code{nil}，表示不生成@samp{User-Agent}标头，@code{default}，表示根据@code{url-privacy-level}的设置生成字符串，是字符串或返回字符串的无参数函数。
+
+默认值为 @code{default}，这意味着将生成 @w{@samp{User-Agent: @var{package-name} URL/Emacs}} 字符串，其中 @var{package-name} 是 @code{url-package-name} 及其版本的值（如果它们不是 @code{nil}）。
+@end defopt
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Function Index
+@unnumbered 命令和功能索引
+@printindex fn
+
+@node Variable Index
+@unnumbered 变量索引
+@printindex vr
+
+@node Concept Index
+@unnumbered 概念索引
+@printindex cp
+
+@bye

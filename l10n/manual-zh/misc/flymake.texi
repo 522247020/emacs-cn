@@ -1,0 +1,940 @@
+\输入 texinfo @c -*- 模式：texinfo；编码：utf-8 -*-
+@comment %**start of header
+@setfilename ../../info/flymake.info
+@set VERSION 1.3.4
+@set UPDATED April 2023
+@settitle GNU Flymake @value{VERSION}
+@documentlanguage en
+@include docstyle.texi
+@syncodeindex pg cp
+@syncodeindex vr cp
+@syncodeindex fn cp
+@comment %**end of header
+
+@copying
+本手册适用于 GNU Flymake（版本@value{VERSION}、@value{UPDATED}）。
+
+版权所有 @copyright{} 2004--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* Flymake: (flymake).            通用的即时语法检查器。
+@end direntry
+
+@titlepage
+@title GNU Flymake
+@subtitle 对于版本@value{VERSION}、@value{UPDATED}
+@author João Távora and Pavel Kobiakov(@email{pk_at_work@@yahoo.com}).
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top GNU Flymake
+@end ifnottex
+
+Flymake 是 Emacs 的通用即时语法检查器。  启用后，Flymake 会联系一个或多个源 @dfn{backends} 来收集有关缓冲区中问题的信息（称为 @dfn{diagnostics}），并用特殊的面孔直观地注释它们。模式行显示总体状态，包括不同类型诊断的总计。
+
+要了解如何使用 Flymake，@pxref{Using Flymake}。
+
+当启用 Emacs LSP 支持模式 Eglot 时，Flymake 将使用它作为附加后端。  @xref{Eglot Features,,, eglot, Eglot: The Emacs LSP Client}。  Flymake 还被设计为可以通过 Elisp 接口轻松扩展以支持新的后端。  @xref{Flymake API}。
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* Using Flymake::
+* Flymake API::
+* The legacy Proc backend::
+* GNU Free Documentation License::
+* Index::
+@end menu
+
+@node Using Flymake
+@chapter 使用 Flymake
+@cindex overview of flymake
+@cindex using flymake
+
+仅当至少配置一个 @dfn{backend} 来提供缓冲区检查服务时，Flymake 才有用。  这是通过钩子 @code{flymake-diagnostic-functions} 完成的。  @xref{Hooks,Hooks,, emacs, The Emacs Editor}。
+
+某些主要模式或第三方软件包可能已经通过将 @dfn{backend functions} 添加到 @code{flymake-diagnostic-functions} 为您设置了此钩子。  如果您了解 Elisp，您还可以编写自己的 Flymake 后端函数。  @xref{Backend functions}。
+
+当启用 Emacs LSP 支持模式 Eglot 时，Flymake 将自动将其用作附加后端。  @xref{Eglot Features,,, eglot, Eglot: The Emacs LSP Client}。
+
+@menu
+* Starting Flymake::
+* Finding diagnostics::
+* Mode line status::
+* Troubleshooting::
+* Customizable variables::
+@end menu
+
+@node Starting Flymake
+@section 启动 Flymake
+@cindex starting Flymake
+
+要使用 Flymake，请激活次要模式 @code{flymake-mode}。使用命令 @kbd{flymake-mode} 打开和关闭它。  模式线应通过指示器 (@pxref{Mode line status}) 指示其存在。
+
+语法检查是“即时”进行的。  每次检查都会在以下时间开始：
+
+@itemize @bullet
+@item 
+@code{flymake-mode}启动，除非@code{flymake-start-on-flymake-mode}为@code{nil}；
+
+@item 
+除非@code{flymake-start-on-save-buffer}是@code{nil}，否则缓冲区被保存；
+
+@item 
+超过@code{0.5}秒前对缓冲区进行了一些更改（延迟可在@code{flymake-no-changes-timeout}中配置）。
+
+@item 
+当用户调用命令@code{flymake-start}时。
+@end itemize
+
+如果检查检测到错误或警告，则会突出显示相应的缓冲区。  @xref{Finding diagnostics}，了解如何了解问题所在。
+
+@node Finding diagnostics
+@section 寻找诊断
+
+@cindex read diagnostic message
+如果 Flymake 突出显示了缓冲区，您可以将鼠标悬停在突出显示的区域上以了解具体问题是什么。  或者，将点放置在突出显示的区域上并使用命令 @code{eldoc} 或 @code{display-local-help}。
+
+即时访问诊断文本的另一种简单方法是将 @code{flymake-show-diagnostics-at-end-of-line} 设置为非 @code{nil} 值。  这使得诊断消息出现在常规注释所在行的末尾 (@pxref{Customizable variables})
+
+@cindex next and previous diagnostic
+如果诊断位于缓冲区的可见区域之外，则 @code{flymake-goto-next-error} 和 @code{flymake-goto-prev-error} 可让您分别导航到下一个/上一个错误区域。  通过添加到 init 文件中，将它们映射到 @code{flymake-mode} 中的 @kbd{M-n} 和 @kbd{M-p} 可能是个好主意：
+
+@lisp
+(define-key flymake-mode-map (kbd "M-n") 'flymake-goto-next-error)
+(define-key flymake-mode-map (kbd "M-p") 'flymake-goto-prev-error)
+@end lisp
+
+@cindex listing diagnostics
+有时，对文件中的诊断进行详细概述很有用，而无需跳转到每个诊断。  命令@code{flymake-show-buffer-diagnostics}和@code{flymake-show-project-diagnostics}旨在处理这种情况。  调用时，它们会调出一个单独的缓冲区，其中分别包含当前缓冲区或当前项目中多个诊断的详细结构化列表 (@pxref{Projects,,, emacs, The Emacs Editor})。
+
+当您编辑源代码时，列表会不断更新，当您犯错误或更正错误时，会添加或删除行。  此列表的每一行都包含诊断类型、文件中的行和列以及诊断消息。  您可以按每一列对列表进行排序。
+
+当在诊断上调用时（通过键盘或鼠标单击），命令 @code{flymake-show-buffer-diagnostics} 尝试在列表中显示所述诊断。
+
+@node Mode line status
+@section 模式线状态
+@cindex flymake mode line
+@cindex syntax check status
+
+启用后，Flymake 在模式行中显示其状态，从而提供诊断收集的可视化摘要。  它还可能暗示与后端通信时遇到的某些异常情况。
+
+定义了以下状态：
+
+@multitable @columnfractions 0.25 0.75
+@item [@var{nerrors} @var{nwarnings} ...]
+@tab Normal operation. @var{nerrors} and @var{nwarnings} are, respectively,
+所有后端在上次缓冲区检查期间发现的错误和警告总数。  它们后面可能是其他类型诊断的其他总计 (@pxref{Flymake error types})。
+
+@item @code{Wait}
+@tab  Some Flymake backends haven't reported since the last time they
+哪里受到质疑。  可以合理地假设这是暂时的延迟，Flymake 很快就会恢复正常运行。
+
+@item @code{!}
+@tab All the configured Flymake backends have disabled themselves: Flymake
+无法注释缓冲区，需要用户采取行动来调查和纠正这种情况 (@pxref{Troubleshooting})。
+
+@item @code{?}
+@tab There are no applicable Flymake backends for this buffer, thus Flymake
+无法对其进行注释。  为了解决这个问题，用户可能会扩展 Flymake 并添加一个新的后端 (@pxref{Flymake API})。
+
+@end multitable
+
+如果您想自定义模式线的外观，可以使用变量 @code{flymake-mode-line-format} 和 @code{flymake-mode-line-counter-format} 来实现此目的。 @xref{Customizable variables}。
+
+@node Troubleshooting
+@section 故障排除
+@cindex troubleshooting
+@cindex backend exceptions
+
+@cindex disabled backends
+@cindex backends, disabled
+由于 Flymake 支持多个同时活动的外部后端，因此监视它们的状态变得很有用。  例如，某些后端可能需要比其他后端更长的时间来响应或完成，并且如果某些后端不适合当前缓冲区或遇到一些不可避免的问题，则某些后端可能会自行决定“0”。  此外，默认情况下，大多数后端在包含不受信任内容的缓冲区中被禁用 (@pxref{Backend functions})。  禁用的后端不会再次尝试将来检查当前缓冲区。
+
+@findex flymake-reporting-backends
+@findex flymake-running-backends
+@findex flymake-disabled-backends
+命令 @code{flymake-reporting-backends}、@code{flymake-running-backends} 和 @code{flymake-disabled-backends} 显示当前使用的后端和禁用的后端。
+
+@cindex reset disabled backends
+有时，在删除某些外部障碍后（例如在用户安装了所需的语法检查程序后），重新启动自行禁用的后端很有用。  使用前缀参数调用 @code{flymake-start} 是重置禁用后端列表的一种方法，以便在下一次检查中再次尝试它们。  手动关闭然后再次打开 @code{flymake-mode} 也可以。
+
+@cindex logging
+@cindex flymake logging
+Flymake 使用简单的日志记录工具来指示控制流中的重要点。  日志记录工具将日志消息发送到 @file{*Flymake log*} 缓冲区。  记录的信息可用于解决与 Flymake 相关的各种问题。  为了方便起见，可以在 Flymake 的菜单中找到此缓冲区的快捷方式，可以从顶部菜单栏或状态指示器的左侧访问。  命令 @code{flymake-switch-to-log-buffer} 是另一种选择。
+
+@vindex warning-minimum-log-level
+@vindex warning-minimum-level
+日志输出由 Emacs @code{warning-minimum-log-level} 和 @code{warning-minimum-level} 变量控制。
+
+@node Customizable variables
+@section 可定制变量
+@cindex customizable variables
+@cindex variables for customizing flymake
+
+本节总结了用于 Flymake 用户界面配置的自定义变量。
+
+@vtable @code
+@item flymake-mode-line-lighter
+模式的名称。  默认为@samp{Flymake}。
+
+@item flymake-mode-line-format
+用于 Flymake 模式线指示器的格式。
+
+@item flymake-mode-line-counter-format
+模式行构造，用于格式化 Flymake 模式行指示器内的 Flymake 诊断计数器。
+
+@item flymake-no-changes-timeout
+如果对缓冲区进行任何更改，语法检查将在这么多秒后自动启动，除非用户进行另一次更改，从而重置计时器。
+
+@item flymake-start-on-flymake-mode
+一个布尔标志，指示启用@code{flymake-mode}后是否立即开始语法检查。
+
+@item flymake-start-on-save-buffer
+一个布尔标志，指示保存缓冲区后是否开始语法检查。
+
+@item flymake-error
+用于突出显示已报告错误的区域的自定义外观。
+
+@item flymake-warning
+用于突出显示已报告警告的区域的自定义面孔。
+
+@item flymake-note
+用于突出显示已报告注释的区域的自定义外观。
+
+@item flymake-indicator-type
+Flymake 应该用来指示有错误或警告的行的指示器类型。根据您的喜好，可以使用 @code{fringes} 或 @code{margins} 来指示错误。  在文本终端上，仅 @code{margins} 可用。
+
+@item flymake-error-bitmap
+边缘中使用的位图，用于标记已报告错误的行。
+
+@item flymake-warning-bitmap
+在边缘中使用的位图来标记已报告警告的行。
+
+@item flymake-fringe-indicator-position
+哪个边缘（如果有）应显示警告/错误位图。
+
+@item flymake-margin-indicators-string
+为每种错误类型指定用于边距指示器的字符串和面。
+
+@item flymake-margin-indicator-position
+哪个边距（如果有）应显示警告/错误字符串。
+
+@item flymake-autoresize-margins
+如果非 @code{nil}，Flymake 将在 @code{flymake-mode} 打开或关闭时调整边距大小。仅当@code{flymake-indicator-type}设置为@code{margins}时相关。
+
+@item flymake-wrap-around
+如果非 @code{nil}，则使用 @code{flymake-goto-next-error} 和 @code{flymake-goto-prev-error} 移动到错误，从而绕过缓冲区边界。
+
+@item flymake-show-diagnostics-at-end-of-line
+如果非@code{nil}，则在行末尾显示诊断的摘要描述。  根据您的喜好，这可能会分散您的注意力并容易与实际代码混淆，或者是一个重要的早期帮助，可以让您免于四处走动或伸手拿鼠标来查阅错误消息。  该值也可以设置为@code{fancy}，这将尝试使用 unicode 图形将诊断布局到受影响的行下方以指向诊断轨迹。
+
+@item flymake-diagnostic-format-alist
+控制在各种情况下显示诊断的哪些部分。
+
+@item flymake-error-eol
+用于总结诊断错误消息的自定义界面。
+
+@item flymake-warning-eol
+用于总结诊断警告消息的自定义界面。
+
+@item flymake-note-eol
+用于总结诊断笔记的自定义面孔。
+@end vtable
+
+@node Flymake API, The legacy Proc backend, Using Flymake, Top
+@chapter Flymake API
+@cindex extending flymake
+
+Flymake 的 API 支持以下用例：
+
+@enumerate
+@item
+更改不同后端生成的注释的外观和感觉。  @xref{Flymake error types}。
+
+@item
+添加新的缓冲区检查后端。  @xref{Backend functions}。
+
+@item
+编写扩展并处理 Flymake 的输出。 @xref{Inspecting diagnostics}。
+@end enumerate
+
+以下部分详细讨论每种方法。
+
+@menu
+* Flymake error types::
+* Backend functions::
+* Inspecting diagnostics::
+@end menu
+
+@node Flymake error types
+@section 自定义 Flymake 错误类型
+@cindex customizing error types
+@cindex error types, customization
+
+要自定义错误类型的外观，用户必须设置与每个诊断类型关联的符号的属性。
+
+三个标准诊断关键字符号 - @code{:error}、@code{:warning} 和 @code{:note} - 具有预先配置的外观。然而，后端可以定义更多（@pxref{Backend functions}）。
+
+可以设置以下属性：
+
+@itemize
+
+@item
+@cindex bitmap of diagnostic
+@code{flymake-bitmap}，根据@code{flymake-fringe-indicator-position}在边缘显示的图像。  该值实际上遵循 @code{flymake-error-bitmap} (@pxref{Customizable variables}) 的语法。  它会被任何 @code{before-string} 覆盖属性覆盖。
+
+@item
+@cindex margin of diagnostic
+@code{flymake-margin-string}，根据@code{flymake-margin-indicator-position}在页边显示的字符串。该值实际上遵循 @code{flymake-margin-indicators-string} (@pxref{Customizable variables}) 的语法。  它会被任何 @code{before-string} 覆盖属性覆盖。
+
+@item
+@code{flymake-overlay-control}，用于影响 Flymake 注释外观的其他属性的列表 ((@var{OVPROP} . @var{VALUE}) @var{...})。  除了 @code{category} 和 @code{evaporate} 之外，这些属性都直接应用于创建的叠加层 (@pxref{Overlay Properties,,, elisp, The Emacs Lisp Reference Manual})。
+
+例如，以下是如何使 @code{:note} 类型的诊断更加突出：
+
+@example
+(push '(face . highlight) (get :note 'flymake-overlay-control))
+@end example
+
+如果您将另一个列表条目推到前面，它将覆盖前一个条目。  因此，这有效地从 @code{:note} 诊断中删除了脸部：
+
+@example
+(push '(face . nil) (get :note 'flymake-overlay-control))
+@end example
+
+要恢复 @code{:note} 类型的原始外观，请清空或删除其 @code{flymake-overlay-control} 属性：
+
+@example
+(put :note 'flymake-overlay-control '())
+@end example
+
+@item
+@cindex severity of diagnostic
+@code{severity} 是一个非负整数，指定诊断的严重性。  值越高，错误越严重。  如果@code{flymake-overlay-control}中未指定覆盖属性@code{priority}，则使用@code{flymake-severity}对其进行设置并帮助对重叠覆盖进行排序。
+
+@item
+@vindex flymake-type-name
+@code{flymake-type-name} 是一个字符串，用于简洁地命名错误类型，以防与其关联的符号名称很长。
+
+@item
+@vindex flymake-category
+@code{flymake-category} 是一个符号，其属性列表被视为任何其他属性缺失值的默认值。
+
+@item
+@cindex mode-line appearance of a diagnostic
+@code{mode-line-face} 是一个面说明符，控制模式行中此类诊断的指示器的外观。
+
+@item
+@cindex summarized appearance of a diagnostic
+@code{echo-face} 是一个面部说明符，控制在读取诊断消息 (@pxref{Finding diagnostics}) 时该诊断的概括描述的外观。
+@end itemize
+
+@cindex predefined diagnostic types
+@vindex flymake-error
+@vindex flymake-warning
+@vindex flymake-note
+预定义了三种默认诊断类型：@code{:error}、@code{:warning} 和 @code{:note}。  默认情况下，它们每个都有一个 @code{flymake-category} 属性，其值分别为类别符号 @code{flymake-error}、@code{flymake-warning} 和 @code{flymake-note}。
+
+这些类别符号的 plist 是可自定义变量和面（例如 @code{flymake-error-bitmap}）的值的位置。因此，如果您更改他们的 plist，Flymake 可能会停止尊重这些用户自定义。
+
+@code{flymake-category} 特殊属性对于创建具有非默认类型的诊断对象的后端特别有用，这些非默认类型与现有类型仅相差几个属性 (@pxref{Flymake utility functions})。
+
+例如，考虑配置一个新的诊断类型 @code{:low-priority-note}，其行为与 @code{:note} 非常相似，但没有覆盖面。
+
+@example
+(put :low-priority-note 'flymake-overlay-control '((face . nil)))
+(put :low-priority-note 'flymake-category 'flymake-note)
+@end example
+
+@vindex flymake-diagnostics
+@vindex flymake-diagnostic-backend
+@vindex flymake-diagnostic-buffer
+@vindex flymake-diagnostic-text
+@vindex flymake-diagnostic-beg
+@vindex flymake-diagnostic-end
+正如您可能已经猜到的，Flymake 的注释是作为叠加层实现的 (@pxref{Overlays,,, elisp, The Emacs Lisp Reference Manual})。除了您为特定类型的诊断指定的属性之外，Flymake还将属性@code{flymake-diagnostic}添加到这些覆盖层中，并将其设置为后端使用@code{flymake-make-diagnostic}创建的对象。
+
+由于叠加层还支持任意键盘映射，因此您可以将其与函数 @code{flymake-diagnostics} 和 @code{flymake-diagnostic-text} (@pxref{Flymake utility functions}) 一起使用来创建交互式注释，例如在以下示例中将 @code{mouse-3} 事件（单击鼠标中键）绑定到 Internet 搜索 @code{:warning} 或 @code{:error} 的文本。
+
+@example
+(defun my-search-for-message (event)
+  (interactive "e")
+  (let* ((diags (flymake-diagnostics (posn-point (event-start event))))
+         (topmost-diag (car diags)))
+    (eww-browse-url
+       (concat
+        "https://duckduckgo.com/?q="
+        (replace-regexp-in-string
+          " " "+" (flymake-diagnostic-text topmost-diag)))
+       t)))
+
+(dolist (type '(:warning :error))
+  (push '(mouse-face . highlight) (get type 'flymake-overlay-control))
+  (push `(keymap . ,(let ((map (make-sparse-keymap)))
+                      (define-key map [mouse-2]
+                        'my-search-for-message)
+                      map))
+        (get type 'flymake-overlay-control)))
+@end example
+
+@node Backend functions
+@section 后端功能
+@cindex backend functions
+
+@vindex flymake-diagnostic-functions
+Flymake 后端是放置在特殊钩子 @code{flymake-diagnostic-functions} 中的 Lisp 函数。
+
+后端的职责是诊断缓冲区内容中的问题，记录问题的位置、类型和摘要描述。  这些信息以函数 @code{flymake-make-diagnostic} (@pxref{Flymake utility functions}) 创建的诊断对象的形式收集，然后交给 Flymake，后者继续注释缓冲区。
+
+缓冲区检查请求以及随后的诊断传递是 Flymake 和后端之间交互的两个关键事件。  每个此类事件都对应于一个明确定义的函数调用约定：一个用于 Flymake 通过后端函数向后端进行调用，另一个通过回调进行相反方向的调用。  为了可用，后端必须遵守两者。
+
+传递给后端函数的第一个参数始终是@var{report-fn}，这是一个回调函数，详细信息如下。  除此之外，函数必须准备好接受（并可能忽略）任意数量的 @w{@code{(@var{:key} @var{value} @var{:key2} @var{value2}...)}} 形式的关键字-值对。
+
+目前，Flymake 可以将以下关键字和值传递给后端函数：
+
+@itemize
+
+@item @code{:recent-changes}
+该值是自上次为缓冲区调用后端函数以来最近的更改列表。  如果列表为空，则表示未记录任何更改。  如果这是第一次调用此后端函数来激活 @code{flymake-mode}，则根本不提供此参数（换句话说，它不仅仅是 nil）。
+
+每个元素的形式为 (@var{beg} @var{end} @var{text})，其中 @var{beg} 和 @var{end} 是缓冲区位置，@var{text} 是一个字符串，其中包含执行更改后这些位置之间包含的文本（如果有）。
+
+@item @code{:changes-start} and @code{:changes-end}
+该值分别是最近变化所触及的最小和最大缓冲区位置。  提供这些是为了方便，并且仅当还提供 @code{:recent-changes} 时。
+
+@end itemize
+
+每当 Flymake 或用户决定重新检查缓冲区时，后端函数都会按照上面详细说明的那样被调用，并且预计会启动此检查，但在退出之前不需要以任何方式完成它：如果涉及的计算成本很高（通常是大缓冲区的情况），则应使用异步子进程（@pxref{Asynchronous Processes,,, elisp, The Emacs Lisp reference manual}）或其他异步机制为将来安排较慢的任务。
+
+在任何情况下，后端函数都应该快速返回或发出错误信号，在这种情况下后端将被禁用（@pxref{Troubleshooting}）。
+
+如果函数返回，Flymake 认为后端为@dfn{running}。  如果尚未这样做，则后端预计会调用传递给它的函数@var{report-fn}，此时 Flymake 认为后端为@dfn{reporting}。  后端通过传递单个参数 @var{report-action} 后跟@w{@code{(@var{:report-key} @var{value} @var{:report-key2} @var{value2}...)}} 形式的可选关键字-值对列表来调用 @var{report-fn}。
+
+目前可接受的 @var{report-action} 值为：
+
+@itemize
+@item
+由 @code{flymake-make-diagnostic} 创建的诊断对象（可能为空）列表，导致 Flymake 使用此信息注释缓冲区。
+
+后端可以以这种方式重复调用@var{report-fn}，但只有在 Flymake 认为最近请求的缓冲区检查现在已过时时，因为缓冲区内容同时已更改。  仅通过重新调用后端函数来向后端发出通知。  因此，为了防止生成过时的报告和浪费资源，后端函数应首先取消先前调用的任何正在进行的处理。
+
+@item
+符号@code{:panic}，表示后端遇到异常情况，应禁用。
+@end itemize
+
+目前接受的 @var{report-key} 参数是：
+
+@itemize
+@item
+@code{:explanation}，其值应提供用户可读的遇到情况的详细信息（如果有）。
+
+@item
+@code{:force}，其值应该是一个布尔值，表明 Flymake 考虑该报告，即使它在某种程度上是意外的。
+
+@item
+@code{:region}，缓冲区位置的缺点（@var{beg}.@var{end}）指示该报告适用于该区域并且之前针对缓冲区其他部分的报告仍然有效。
+@end itemize
+
+@cindex flymake-always-safe
+默认情况下，Flymake 后端不会在包含不受信任内容的缓冲区中启用 (@pxref{Host Security,,, emacs, The Emacs Editor})。  但是，如果后端采取自己的措施来确保用户的安全不会受到不受信任文件的内容的损害，则可以将其标记为安全，如下所示：
+
+@example
+(put 'foo-flymake 'flymake-always-safe t)
+@end example
+
+@menu
+* Flymake utility functions::
+* Foreign and list-only diagnostics::
+* An annotated example backend::
+@end menu
+
+@node Flymake utility functions
+@subsection Flymake实用函数
+@cindex utility functions
+
+@cindex create diagnostic object
+在将它们传递给 Flymake 之前，后端通过调用函数 @code{flymake-make-diagnostic} 创建诊断对象。
+
+@deffn Function flymake-make-diagnostic locus beg end type info &optional data
+对 @var{locus} 中由 @var{beg} 和 @var{end} 分隔的文本区域进行 Flymake 诊断。  @var{type} 是诊断符号 (@pxref{Flymake error types})。  @var{text} 可以是字符串或列表 (@var{origin} @var{code} @var{message})，对诊断进行适当分类和描述。  最常见的是，@var{locus}是指定当前正在语法检查的缓冲区的缓冲区对象。但是，它可能是相对于当前工作目录命名文件的字符串。  @xref{Foreign and list-only diagnostics}，当这可能有用时。  根据 @var{locus} 的类型，@var{beg} 和 @var{end} 都是缓冲区位置或常量 (@var{line} . @var{col})，分别指定诊断的开始位置和结束位置的行和列。
+@end deffn
+
+@cindex buffer position from line and column number
+使用外部语法工具时，通常会以行号（有时有时以列号）的形式报告诊断的位置。  要将此信息转换为缓冲区位置，后端可以使用以下函数：
+
+@deffn Function flymake-diag-region buffer line &optional col
+计算 @var{line} 和 @var{col} 对应的 @var{buffer} 区域 (@var{beg} . @var{end})。  如果@var{col}是@code{nil}，则仅返回@var{line}的区域。  如果该区域无效，则返回@code{nil}。  此功能保存匹配数据 (@pxref{Saving Match Data,,, elisp, The Emacs Lisp Reference Manual})。
+@end deffn
+
+@cindex add a log message
+出于故障排除的目的，后端可以将任意异常或错误情况记录到 Flymake 日志缓冲区 (@pxref{Troubleshooting})：
+
+@deffn Macro flymake-log level msg &optional args
+在级别 @var{level} 记录消息 @var{msg}，格式为 @var{args}。  @var{level} 被传递到 @code{display-warning} (@pxref{Warning Basics,,, elisp, The Emacs Lisp reference Manual})，用于在 Flymake 的日志缓冲区中显示警告。
+@end deffn
+
+@node Foreign and list-only diagnostics
+@subsection 外国和仅列出的诊断
+@cindex create diagnostic object for other buffer
+
+给定后端的实现可以使用 @code{flymake-make-diagnostic} 为启用 Flymake 的“源”缓冲区以外的缓冲区或文件创建诊断。  例如，当给定后端可以访问有关尚未访问的相邻文件或其诊断取决于当前缓冲区状态的相邻文件的运行状况信息时，这非常有用。有两种替代方法可以实现此目的：
+
+@enumerate
+
+@item
+@cindex foreign diagnostics
+@cindex domestic diagnostics
+如果定期获取有关相邻诊断的信息，例如当 @code{.c} 文件的每次语法检查迭代也报告相邻 @code{.h} 文件中的许多相关问题时，最好创建所谓的“外部”诊断。
+
+这是通过将文件名传递给@code{flymake-make-diagnostic} (@pxref{Flymake utility functions}) 来完成的。  然后，生成的对象与源缓冲区的其他“国内”诊断一起简单地报告（@pxref{Backend functions}）。  当相邻文件作为缓冲区被访问并且 Flymake 在那里处于活动状态时，将出现许多补充注释，并在对“源”缓冲区进行语法检查时自动更新。
+
+@item
+@cindex list-only diagnostics
+@vindex flymake-list-only-diagnostics
+如果不经常获取有关相邻诊断的信息，例如对大型项目进行耗时且零星的检查时，后端更容易修改全局变量@code{flymake-list-only-diagnostics}。
+
+当要求编译项目范围的诊断列表时，Flymake 将查找此变量。  后端应添加一个或多个类似于 (@var{file-name} . @var{diags}) 的列表条目。 @var{file-name} 是假定在 Emacs 中尚未访问的相邻文件的绝对名称，因为这意味着该缓冲区包含有关其诊断的更多最新信息。 @var{diags} 是诊断对象的列表。  当相邻文件 @var{file-name} 作为缓冲区被访问并且 Flymake 在那里被激活时，“仅列表”诊断将为 @emph{not} 生成 @var{diags} 的注释，因为 Flymake 假设新缓冲区中的 Flymake 激活将处理该问题。
+@end enumerate
+
+@node An annotated example backend
+@subsection 带注释的后端示例
+@cindex example of backend
+@cindex backend, annotated example
+
+本节提供了一个完整的可运行的 Flymake 后端的带注释的示例。  该示例说明了如上所述编写后端的过程。
+
+相关后端用于检查 Ruby 源文件。  它使用异步子进程 (@pxref{Asynchronous Processes,,, elisp, The Emacs Lisp Reference Manual})，这是 Emacs 中执行并行处理的常用技术。
+
+以下代码需要词法绑定 (@pxref{Using Lexical Binding,,, elisp, The Emacs Lisp Reference Manual}) 才能激活。
+
+@example
+@group
+;;; ruby-flymake.el --- A ruby Flymake backend  -*- lexical-binding: t; -*-
+(require 'cl-lib)
+(defvar-local ruby--flymake-proc nil)
+@end group
+
+@group
+(defun ruby-flymake (report-fn &rest _args)
+  ;; Not having a ruby interpreter is a serious problem which should cause
+  ;; the backend to disable itself, so an @code{error} is signaled.
+  ;;
+  (unless (executable-find
+           "ruby") (error "Cannot find a suitable ruby"))
+  ;; If a live process launched in an earlier check was found, that
+  ;; process is killed.  When that process's sentinel eventually runs,
+  ;; it will notice its obsoletion, since it have since reset
+  ;; `ruby-flymake-proc' to a different value
+  ;;
+  (when (process-live-p ruby--flymake-proc)
+    (kill-process ruby--flymake-proc))
+@end group
+
+@group
+  ;; Save the current buffer, the narrowing restriction, remove any
+  ;; narrowing restriction.
+  ;;
+  (let ((source (current-buffer)))
+    (save-restriction
+      (widen)
+      ;; Reset the `ruby--flymake-proc' process to a new process
+      ;; calling the ruby tool.
+      ;;
+      (setq
+       ruby--flymake-proc
+       (make-process
+        :name "ruby-flymake" :noquery t :connection-type 'pipe
+        ;; Make output go to a temporary buffer.
+        ;;
+        :buffer (generate-new-buffer " *ruby-flymake*")
+        :command '("ruby" "-w" "-c")
+        :sentinel
+        (lambda (proc _event)
+          ;; Check that the process has indeed exited, as it might
+          ;; be simply suspended.
+          ;;
+          (when (memq (process-status proc) '(exit signal))
+            (unwind-protect
+                ;; Only proceed if `proc' is the same as
+                ;; `ruby--flymake-proc', which indicates that
+                ;; `proc' is not an obsolete process.
+                ;;
+                (if (with-current-buffer source (eq proc ruby--flymake-proc))
+                    (with-current-buffer (process-buffer proc)
+                      (goto-char (point-min))
+                      ;; Parse the output buffer for diagnostic's
+                      ;; messages and locations, collect them in a list
+                      ;; of objects, and call `report-fn'.
+                      ;;
+                      (cl-loop
+                       while (search-forward-regexp
+                              "^\\(?:.*\\.rb\\|-\\):\\([0-9]+\\): \\(.*\\)$"
+                              nil t)
+                       for msg = (match-string 2)
+                       for (beg . end) = (flymake-diag-region
+                                          source
+                                          (string-to-number (match-string 1)))
+                       for type = (if (string-match "^warning" msg)
+                                      :warning
+                                    :error)
+                       when (and beg end)
+                       collect (flymake-make-diagnostic source
+                                                        beg
+                                                        end
+                                                        type
+                                                        msg)
+                       into diags
+                       finally (funcall report-fn diags)))
+                  (flymake-log :warning "Canceling obsolete check %s"
+                               proc))
+              ;; Cleanup the temporary buffer used to hold the
+              ;; check's output.
+              ;;
+              (kill-buffer (process-buffer proc)))))))
+      ;; Send the buffer contents to the process's stdin, followed by
+      ;; an EOF.
+      ;;
+      (process-send-region ruby--flymake-proc (point-min) (point-max))
+      (process-send-eof ruby--flymake-proc))))
+@end group
+
+@group
+(defun ruby-setup-flymake-backend ()
+  (add-hook 'flymake-diagnostic-functions 'ruby-flymake nil t))
+
+(add-hook 'ruby-mode-hook 'ruby-setup-flymake-backend)
+@end group
+@end example
+
+@node Inspecting diagnostics
+@section 检查诊断
+
+当 Flymake 调用后端并收集其诊断信息时，它将用它来注释缓冲区。  发生这种情况后，Elisp 程序可能会调用 @code{flymake-diagnostics} 来收集指定区域中的此类对象。
+
+@cindex collect diagnostic objects
+@deffn Function flymake-diagnostics beg end
+获取由 @var{beg} 和 @var{end} 确定的区域中的 Flymake 诊断列表。  如果 @var{beg} 或 @var{end} 均未提供，则使用整个缓冲区，否则，如果 @var{beg} 为非 @code{nil} 并且 @var{end} 为 @code{nil}，则仅考虑@var{beg} 处的诊断。
+@end deffn
+
+@cindex access diagnostic object
+可以使用函数 @code{flymake-diagnostic-backend}、@code{flymake-diagnostic-buffer}、@code{flymake-diagnostic-origin}、@code{flymake-diagnostic-code} @code{flymake-diagnostic-message}、@code{flymake-diagnostic-beg}、@code{flymake-diagnostic-end}、@code{flymake-diagnostic-type} 和 @code{flymake-diagnostic-data} 访问诊断对象的属性。  @code{flymake-diagnostic-text} 将把诊断的来源、代码和消息组成一个字符串。
+
+@node The legacy Proc backend
+@chapter 遗留的“Proc”后端
+@cindex legacy proc backend
+
+@menu
+* Proc customization variables::
+* Adding support for a new syntax check tool::
+* Implementation overview::
+* Making a temporary copy::
+* Locating a master file::
+* Getting the include directories::
+* Locating the buildfile::
+* Starting the syntax check process::
+* Parsing the output::
+* Interaction with other modes::
+@end menu
+
+@findex flymake-proc-legacy-flymake
+后端@code{flymake-proc-legacy-flymake}最初设计为扩展以支持新的语法检查工具和错误消息模式。  它还由自己的一组自定义变量控制。
+
+@node Proc customization variables
+@section Proc 后端的自定义变量
+@cindex proc backend customization variables
+
+@vtable @code
+@item flymake-proc-allowed-file-name-masks
+用于配置语法检查工具的 @code{(filename-regexp, init-function, cleanup-function getfname-function)} 列表。  @xref{Adding support for a new syntax check tool}。
+
+@item flymake-proc-master-file-dirs
+用于搜索主文件的目录列表。  @xref{Locating a master file}。
+
+@item flymake-proc-get-project-include-dirs-function
+用于获取项目列表的函数，包括目录（C/C++ 特定）。  @xref{Getting the include directories}。
+
+@item flymake-proc-master-file-count-limit
+@itemx flymake-proc-check-file-limit
+查找主文件时使用。  @xref{Locating a master file}。
+
+@item flymake-proc-err-line-patterns
+格式为 @code{(regexp file-idx line-idx col-idx err-text-idx)} 的错误/警告消息模式。  @xref{Parsing the output}。
+
+@item flymake-proc-diagnostic-type-pred
+将诊断文本分类为特定类型错误的函数。  该变量的值应该是一个接受错误文本并返回诊断符号 (@pxref{Flymake error types}) 的函数。  如果它返回非 1⁣ 值，但该表中没有此类符号，则该文本将被解释为警告。  如果函数返回@code{nil}，则文本被假定为错误。
+
+该变量的值也可以是仅匹配警告的正则表达式。
+
+该变量取代了旧的 @code{flymake-warning-re} 和 @code{flymake-warning-predicate}。
+
+@item flymake-proc-compilation-prevents-syntax-check
+指示同一文件的编译和语法检查是否不能同时运行的标志。  @xref{Interaction with other modes}。
+@end vtable
+
+@node Adding support for a new syntax check tool
+@section 添加对新语法检查工具的支持
+@cindex adding support for a new syntax check tool
+
+@menu
+* Example---Configuring a tool called directly::
+* Example---Configuring a tool called via make::
+@end menu
+
+语法检查工具是使用 @code{flymake-proc-allowed-file-name-masks} 列表配置的。  该列表中的每一项都具有以下格式：
+
+@lisp
+(filename-regexp, init-function, cleanup-function, getfname-function)
+@end lisp
+
+@table @code
+@item filename-regexp
+该字段用作定位缓冲区的 init/cleanup/getfname 函数的键。  @code{flymake-proc-allowed-file-name-masks} 中的项目按顺序搜索。选择第一个具有 @code{filename-regexp} 匹配缓冲区文件名的项目。  如果未找到匹配项，@code{flymake-mode} 将关闭。
+
+@item init-function
+初始化语法检查需要@code{init-function}，通常是通过创建缓冲区内容的临时副本。  该函数必须返回@code{(list cmd-name arg-list)}。  如果 2⁣ 返回 null，则语法检查将中止，但 3⁣ 不会关闭。
+
+@item cleanup-function
+@code{cleanup-function} 在语法检查过程完成后调用，并应负责适当的去初始化，这通常是删除由 @code{init-function} 创建的临时副本。
+
+@item getfname-function
+此函数用于将语法检查工具报告的文件名转换为“真实”文件名。  该工具报告的文件名将与真实的文件名不同，因为该工具实际上使用临时副本。  大多数情况下，Flymake提供的默认实现@code{flymake-proc-get-real-file-name}可以用作@code{getfname-function}。
+@end table
+
+要添加对新语法检查工具的支持，请编写相应的 @code{init-function} 以及（可选）@code{cleanup-function} 和 @code{getfname-function}。  如果 Flymake 尚不支持新工具报告的错误消息格式，请向 @code{flymake-proc-err-line-patterns} 列表添加新条目。
+
+以下部分包含一些配置 Flymake 支持各种语法检查工具的示例。
+
+@node Example---Configuring a tool called directly
+@subsection 示例---配置直接调用的工具
+@cindex adding support for perl
+
+在此示例中，我们将添加对 @command{perl} 作为语法检查工具的支持。  @command{perl} 支持@option{-c} 选项进行语法检查。
+
+首先，我们写出@code{init-function}：
+
+@lisp
+(defun flymake-proc-perl-init ()
+  (let* ((temp-file (flymake-proc-init-create-temp-buffer-copy
+                     'flymake-proc-create-temp-inplace))
+         (local-file (file-relative-name
+                      temp-file
+                      (file-name-directory buffer-file-name))))
+    (list "perl" (list "-wc " local-file))))
+@end lisp
+
+@code{flymake-proc-perl-init} 在 @code{flymake-proc-init-create-temp-buffer-copy} 的帮助下创建缓冲区内容的临时副本，并构建适当的命令行。
+
+接下来，我们向 @code{flymake-proc-allowed-file-name-masks} 添加一个新条目：
+
+@lisp
+(setq flymake-proc-allowed-file-name-masks
+      (cons '(".+\\.pl$"
+              flymake-proc-perl-init
+              flymake-proc-simple-cleanup
+              flymake-proc-get-real-file-name)
+            flymake-proc-allowed-file-name-masks))
+@end lisp
+
+请注意，我们使用标准 @code{cleanup-function} 和 @code{getfname-function}。
+
+最后，我们向 @code{flymake-proc-err-line-patterns} 添加一个条目：
+
+@lisp
+(setq flymake-proc-err-line-patterns
+      (cons '("\\(.*\\) at \\([^ \n]+\\) line \\([0-9]+\\)[,.\n]"
+              2 3 nil 1)
+            flymake-proc-err-line-patterns))
+@end lisp
+
+@node Example---Configuring a tool called via make
+@subsection 示例---配置一个通过make调用的工具
+@cindex adding support for C (gcc+make)
+
+在此示例中，我们将添加对通过 @command{make} 调用的 @command{gcc} 检查的 C 文件语法的支持。
+
+我们不需要编写任何新函数，因为 Flymake 已经具有 @command{make} 的函数。  我们只需向 @code{flymake-proc-allowed-file-name-masks} 添加一个新条目：
+
+@lisp
+(setq flymake-proc-allowed-file-name-masks
+      (cons '(".+\\.c$"
+              flymake-proc-simple-make-init
+              flymake-proc-simple-cleanup
+              flymake-proc-get-real-file-name)
+            flymake-proc-allowed-file-name-masks))
+@end lisp
+
+@code{flymake-proc-simple-make-init} 构建以下 @command{make} 命令行：
+
+@lisp
+(list "make"
+      (list "-s" "-C"
+            base-dir
+            (concat "CHK_SOURCES=" source)
+            "SYNTAX_CHECK_MODE=1"
+            "check-syntax"))
+@end lisp
+
+@code{base-dir} 是包含@file{Makefile} 的目录，请参阅@ref{Locating the buildfile}。
+
+因此，@file{Makefile} 必须包含@code{check-syntax} 目标。  在我们的例子中，这个目标可能如下所示：
+
+@verbatim
+check-syntax:
+	gcc -o /dev/null -S ${CHK_SOURCES} || true
+@end verbatim
+
+@noindent
+Flymake 已经支持 @command{gcc} 报告的错误消息格式，因此我们不必向 @code{flymake-err-line-patterns} 添加新条目。  请注意，如果您使用 Automake，您可能需要将 @code{gcc} 替换为标准 Automake 变量 @code{COMPILE}：
+
+@verbatim
+check-syntax:
+	$(COMPILE) -o /dev/null -S ${CHK_SOURCES} || true
+@end verbatim
+
+@node Implementation overview
+@section 实施概述
+@cindex syntax check models
+@cindex master file
+
+@code{flymake-proc-legacy-flymake} 将缓冲区的副本保存在缓冲区目录中的临时文件中（对于 Java 文件，则保存在系统临时目录中），创建语法检查命令并使用此命令启动进程。  使用错误消息模式列表来解析输出，并保存错误信息（文件名、行号、类型和文本）。  该过程完成后，Flymake 使用累积的错误信息突出显示缓冲区中的错误行。
+
+如果 @code{flymake-proc-allowed-file-name-masks} 中有一个条目与缓冲区的文件名匹配，并且其 @code{init-function} 返回非 @code{nil} 值，则认为可以进行语法检查。
+
+区分两种语法检查模式：
+
+@enumerate
+
+@item
+Buffer 可以以独立的方式进行语法检查，也就是说，文件（实际上是其临时副本）可以传递给编译器进行语法检查。  例如 C/C@t{++} 源 (@file{.c}、@file{.cpp}) 和 Java (@file{.java})。
+
+@item
+可以对缓冲区进行语法检查，但需要附加文件（称为主文件）来执行此操作。  主文件是包含当前文件的文件，因此在其上运行语法检查工具也会检查当前文件中的语法。  例如 C/C@t{++} 标头（@file{.h}、@file{.hpp}）。
+
+@end enumerate
+
+这些模式在 init/cleanup/getfname 函数内部处理，请参阅@ref{Adding support for a new syntax check tool}。
+
+Proc 后端包含支持上述不同语法检查模式（制作临时副本、查找主文件等）所需的所有功能的实现，以及一些特定于工具的（Make、Ant 等例程）@: 代码。
+
+
+@node Making a temporary copy
+@section 制作临时副本
+@cindex temporary copy of the buffer
+
+确定语法检查的可能性后，将制作当前缓冲区的临时副本，以便语法检查工具可以看到最近未保存的更改。  在独立情况下（模式@code{1}），制作副本非常简单，因为它只是将缓冲区内容保存到临时文件中。
+
+然而，当涉及主文件时，事情会变得更加棘手，因为它需要
+
+@itemize @bullet
+@item
+找到一个主文件
+@item
+使用新的（临时）名称对其进行修补以包含当前文件。
+@end itemize
+
+下一节将讨论找到主文件。
+
+修补只是更改主文件的所有适当行，以便它们使用当前文件的新（临时）名称。  例如，假设当前文件名为@code{file.h}，主文件为@code{file.cpp}，并通过@code{#include "file.h"}包含当前文件。  当前文件的副本保存到文件@code{file_flymake.h}，因此包含行必须更改为@code{#include "file_flymake.h"}。  最后，将修补后的主文件保存到@code{file_flymake_master.cpp}，最后一个传递给语法检查工具。
+
+@node Locating a master file
+@section 找到主文件
+@cindex locating a master file
+@cindex master file, locating
+
+主文件分两步定位。
+
+首先，建立可能的主文件列表。  使用简单的名称匹配来查找文件。  对于 C++ 标头 @file{file.h}，Proc 后端搜索目录中的所有 @file{.cpp} 文件，其相对路径存储在可自定义变量 @code{flymake-proc-master-file-dirs} 中，该变量通常包含类似 @code{("." "./src")} 的内容。  添加到主文件列表中的条目不超过 @code{flymake-proc-master-file-count-limit}。  然后对列表进行排序，将名称为 @file{file.cpp} 的文件移动到顶部。
+
+接下来，检查列表中的每个主文件是否包含适当的包含指令。  每个文件的解析数量不超过 @code{flymake-proc-check-file-limit}。
+
+对于@file{file.h}，要查找的包含指令为@code{#include "file.h"}、@code{#include "../file.h"} 等。每个包含都会根据包含目录列表 (@pxref{Getting the include directories}) 检查，以确保它指向正确的@file{file.h}。
+
+找到第一个匹配的主文件将停止搜索。  然后对主文件进行修补并保存到磁盘。  如果没有找到主文件，语法检查将中止，并在模式行中报告相应的状态（@samp{!}）。 @xref{Mode line status}。
+
+@node Getting the include directories
+@section 获取包含目录
+@cindex include directories (C/C++ specific)
+
+区分两组包含目录：系统包含目录和项目包含目录。  前者只是 @code{INCLUDE} 环境变量的内容。  后者并不那么容易获得，而且不同项目的获得方式也有很大差异。因此，可定制变量@code{flymake-proc-get-project-include-dirs-function}用于提供实现所需行为的方法。
+
+默认实现 @code{flymake-proc-get-project-include-dirs-imp} 使用 @command{make} 调用。  这需要确定一个正确的基目录，即包含正确的@file{Makefile}的目录。
+
+由于获取项目包含目录可能​​是一项代价高昂的操作，因此其返回值缓存在哈希表中。  在每次语法检查尝试开始时都会清除缓存。
+
+@node Locating the buildfile
+@section 找到构建文件
+@cindex locating the buildfile
+@cindex buildfile, locating
+@cindex makefile, locating
+
+Proc 后端可以配置为使用不同的工具来执行语法检查。  例如，它可以使用直接编译器调用来检查 Perl 脚本的语法，或者调用 @command{make} 来处理更复杂的 C/C@t{++} 源代码。  总体思路是简单的文件，如 Perl 脚本和 @acronym{HTML} 页面，可以通过直接调用相应的工具来检查。  通常比较复杂并且通常用作较大项目的一部分的文件可能需要将重要选项传递给语法检查工具，例如 C@t{++} 的包含目录。  后面的文件使用一些构建工具（例如 Make 或 Ant）进行语法检查。
+
+所有 Make 配置数据通常存储在名为 @file{Makefile} 的文件中。  为了允许将来扩展，Flymake 使用构建文件的概念来引用 @dfn{project configuration} 文件。
+
+@findex flymake-proc-find-buildfile
+提供特殊函数@code{flymake-proc-find-buildfile}用于定位构建文件。搜索构建文件的方式与搜索可能的主文件类似。
+@ignore
+A customizable variable
+@code{flymake-proc-buildfile-dirs} holds a list of relative paths to the
+buildfile.  They are checked sequentially until a buildfile is found.
+@end ignore
+如果没有构建文件，语法检查将中止。
+
+构建文件值也会被缓存。
+
+@node Starting the syntax check process
+@section 启动语法检查过程
+@cindex syntax check process, legacy proc backend
+
+用于启动进程的命令行（命令名称和参数列表）由初始化函数返回。  然后Proc后端启动一个异步进程并配置进程过滤器和哨兵，用于处理语法检查工具的输出。  退出 Emacs 时，正在运行的进程将被终止，而不提示用户。
+
+@node Parsing the output
+@section 解析输出
+@cindex parsing the output, legacy proc backend
+
+语法检查工具生成的输出在进程过滤器/哨兵中使用存储在 @code{flymake-proc-err-line-patterns} 变量中的错误消息模式进行解析。  该变量包含@w{@code{(regexp file-idx line-idx err-text-idx)}}形式的项目列表，用于确定特定行是否是错误消息并分别提取文件名、行号和错误文本。  错误类型（错误/警告）也可以通过将错误文本与 @samp{^[wW]arning} 模式匹配来猜测。  任何未分类为警告的内容均被视为错误。  然后使用类型对错误菜单项进行排序，首先显示错误消息。
+
+Proc 后端还能够解释缺少 err-text-idx 信息的错误消息模式。  只需将匹配行的其余部分 (@code{(substring line (match-end 0))}) 作为错误文本即可完成此操作。  这个技巧允许使用来自@file{compile.el}的大量错误消息行模式。  所有这些错误模式都附加到@code{flymake-proc-err-line-patterns} 的末尾。
+
+获得的错误信息保存在缓冲区局部变量中。  进程输出所属的缓冲区是根据每次进程启动/退出后更新的 process-id@w{}->@w{}缓冲区映射确定的。
+
+@node Interaction with other modes
+@section 与其他模式的交互
+@cindex interaction with other modes, legacy proc backend
+@cindex interaction with compile mode, legacy proc backend
+
+Proc 后端当前知道的唯一模式是@code{compile}。
+
+通过测试 @code{compilation-in-progress} 变量，Proc 后端可以配置为如果认为编译正在进行，则不启动语法检查。  这可能有用的原因是节省 CPU 时间，以防语法检查和编译都非常占用 CPU 资源。  不过，添加此功能的最初原因是解决 MS Visual C++ 编译器的锁定问题。  所讨论的变量是@code{flymake-proc-compilation-prevents-syntax-check}。
+
+@findex flymake-proc-compile
+Proc 后端还提供了另一个启动编译的命令，@code{flymake-proc-compile}。  它只是在调用@code{compile}之前杀死所有活动的语法检查进程。
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Index
+@unnumbered 指数
+
+@printindex cp
+
+@bye

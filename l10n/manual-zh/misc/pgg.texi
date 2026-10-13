@@ -1,0 +1,363 @@
+\输入 texinfo @c -*-texinfo-*-
+
+@setfilename ../../info/pgg.info
+
+@set VERSION 0.1
+@settitle PGG @value{VERSION}
+@documentlanguage en
+@include docstyle.texi
+
+@copying
+该文件描述了 PGG @value{VERSION}，它是各种 PGP 实现的 Emacs 接口。
+
+版权所有 @copyright{} 2001, 2003--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs network features
+@direntry
+* PGG: (pgg).                    各种 PGP 实现的过时 Emacs 接口。
+@end direntry
+
+@titlepage
+@ifset WEBHACKDEVEL
+@title PGG（开发版）
+@end ifset
+@ifclear WEBHACKDEVEL
+@title 前列腺癌
+@end ifclear
+
+@author by Daiki Ueno
+@page
+
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@node Top
+@top 前列腺癌
+
+PGG 是 Emacs 和各种安全通信工具之间的接口库。  PGG 还提供了一个简单的用户界面来加密、解密、签名和验证 MIME 消息。该软件包已过时；对于新代码，我们推荐使用 EasyPG。 @xref{Top,, EasyPG, epa, EasyPG Assistant User's Manual}。
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* Overview::                     PGG 是什么。
+* Prerequisites::                您可能需要做一些复杂的事情。
+* How to use::                   快速入门。
+* Architecture::
+* Parsing OpenPGP packets::
+* GNU Free Documentation License::  本文档的许可证。
+* Function Index::
+* Variable Index::
+@end menu
+
+@node Overview
+@chapter 概述
+
+PGG 是 Emacs 和各种安全通信工具之间的接口库。  尽管 Mailcrypt 具有类似的功能，但它不处理通常在 PGP/MIME 基础设施中使用的分离 PGP 消息。  这是我编写新库的主要原因。
+
+请注意，PGG 库现已过时，已被 EasyPG@. @xref{Top,, EasyPG, epa, EasyPG Assistant User's Manual} 取代。
+
+PGP/MIME 是 MIME 对象安全服务 (RFC1848) 的应用程序。该标准记录在 RFC2015 中。
+
+@node Prerequisites
+@chapter 先决条件
+
+PGG需要至少实现一种隐私保护系统。本文档假设您已经获取并安装它们，并且熟悉其基本功能。
+
+默认情况下，PGG 使用 GnuPG@. 如果您是这样的系统的新手，我建议您查看 GNU 隐私手册 (GPH)，可在 @uref{https://www.gnupg.org/documentation/} 获取。
+
+使用 GnuPG 时，我们建议使用 @code{gpg-agent} 程序，该程序随 GnuPG@. 2.0 版及更高版本一起分发。这是一个独立于任何协议管理私钥的守护进程，并提供最安全的方式来输入和缓存密码短语 (@pxref{Caching passphrase})。  默认情况下，PGG 在运行时将尝试使用 @code{gpg-agent}。  @xref{Invoking GPG-AGENT,,,gnupg,Using the GNU Privacy Guard}。
+
+PGG 还支持 Pretty Good Privacy 版本 2 或版本 5。
+
+@node How to use
+@chapter 如何使用
+
+该库的顶层接口非常简单，仅用于公钥加密操作。
+
+要使用 PGG，请在应用程序的开头评估以下表达式。
+
+@lisp
+(require 'pgg)
+@end lisp
+
+如果您想在运行时检查 pgg.el 是否存在，您可以列出所需功能的自动加载设置，如下所示。
+
+@lisp
+(autoload 'pgg-encrypt-region "pgg"
+  "Encrypt the current region." t)
+(autoload 'pgg-encrypt-symmetric-region "pgg"
+  "Encrypt the current region with symmetric algorithm." t)
+(autoload 'pgg-decrypt-region "pgg"
+  "Decrypt the current region." t)
+(autoload 'pgg-sign-region "pgg"
+  "Sign the current region." t)
+(autoload 'pgg-verify-region "pgg"
+  "Verify the current region." t)
+(autoload 'pgg-insert-key "pgg"
+  "Insert the ASCII armored public key." t)
+(autoload 'pgg-snarf-keys-region "pgg"
+  "Import public keys in the current region." t)
+@end lisp
+
+@menu
+* User Commands::
+* Selecting an implementation::
+* Caching passphrase::
+* Default user identity::
+@end menu
+
+@node User Commands
+@section 用户命令
+
+这时候就可以使用一些加密命令了。  这些命令的行为依赖于调用方式，因为它们也旨在用作库函数。  例如，如果您没有签名者的公钥，则函数 @code{pgg-verify-region} 会立即失败，但如果该函数是交互式调用的，它会要求您从服务器检索签名者的公钥。
+
+@deffn Command pgg-encrypt-region start end recipients &optional sign passphrase
+对@var{recipients}加密@var{start}和@var{end}之间的当前区域。  当以交互方式调用该函数时，系统会询问您有关收件人的信息。
+
+如果加密成功，它将用结果数据替换当前区域内容（在可访问部分）。
+
+如果可选参数@var{sign}非@code{nil}，则请求函数进行组合签名和加密。  目前已确认该功能可与 GnuPG 配合使用，但可能不适用于 PGP 或 PGP5。
+
+如果可选的⁣​​0⁣为@code{nil}，则将从密码缓存或用户获取密码。
+@end deffn
+
+@deffn Command pgg-encrypt-symmetric-region &optional start end passphrase
+使用对称密码对 @var{start} 和 @var{end} 之间的当前区域进行加密。  调用后，系统会要求您输入密码。
+
+如果可选的⁣​​0⁣为@code{nil}，则将从密码缓存或用户获取密码。
+
+对称密码加密目前仅针对 GnuPG 实现。
+@end deffn
+
+@deffn Command pgg-decrypt-region start end &optional passphrase
+解密@var{start}和@var{end}之间的当前区域。  如果解密成功，它将用结果数据替换当前区域内容（在可访问部分）。
+
+如果可选的⁣​​0⁣为@code{nil}，则将从密码缓存或用户获取密码。
+@end deffn
+
+@deffn Command pgg-sign-region start end &optional cleartext passphrase
+使用 @var{start} 和 @var{end} 之间的文本制作签名。  如果可选的第三个参数 @var{cleartext} 为非 @code{nil}，或者以交互方式调用该函数，则它不会创建分离签名。  在这种情况下，它用结果数据替换当前区域内容（在可访问部分中）。
+
+如果可选的⁣​​0⁣为@code{nil}，则将从密码缓存或用户获取密码。
+@end deffn
+
+@deffn Command pgg-verify-region start end &optional signature fetch
+验证 @var{start} 和 @var{end} 之间的当前区域。  如果可选的第三个参数@var{signature}非@code{nil}，则将其视为当前区域的分离签名文件。
+
+如果可选的第四个参数@var{fetch}不​​是@code{nil}，或者以交互方式调用该函数，我们会尝试从密钥服务器获取签名者的公钥。
+@end deffn
+
+@deffn Command pgg-insert-key
+检索用户的公钥并将其作为 ASCII-armored 格式插入。
+@end deffn
+
+@deffn Command pgg-snarf-keys-region start end
+收集当前区域中@var{start}和@var{end}之间的公钥，并将其添加到用户的密钥环中。
+@end deffn
+
+@node Selecting an implementation
+@section 选择实施方案
+
+由于 PGP 有着悠久的历史，并且目前有多种 PGP 实现，因此每种实现的功能都有很大差异。  例如，如果您使用 GnuPG，您知道可以从 3DES、CAST5、BLOWFISH 等中选择密码算法，但另一方面，PGP 的版本 2 仅支持 IDEA。
+
+使用哪种实现由 @code{pgg-scheme} 变量控制。  如果是 @code{nil} （默认值），则将使用 @code{pgg-default-scheme} 变量的值。
+
+@defvar pgg-scheme
+强制指定PGP实现方案。  该值可以设置为 @code{gpg}、@code{pgp} 和 @code{pgp5}。  默认值为@code{nil}。
+@end defvar
+
+@defvar pgg-default-scheme
+PGP 实现的默认方案。  该值应该是 @code{gpg}、@code{pgp} 和 @code{pgp5} 之一。  默认值为@code{gpg}。
+@end defvar
+
+@node Caching passphrase
+@section 缓存密码
+
+当使用 GnuPG (gpg) 作为 PGP 方案时，我们建议使用名为 @code{gpg-agent} 的程序来输入和缓存密码@footnote{Actually, @code{gpg-agent} does not cache passphrases but private keys.  On the other hand, from a user's point of view, this technical difference isn't visible.}。
+
+@defvar pgg-gpg-use-agent
+如果非@code{nil}，请尽可能尝试使用@code{gpg-agent}。默认值为@code{t}。  如果 @code{gpg-agent} 未运行，或者 GnuPG 不是当前的 PGP 方案，则使用 PGG 自己的密码缓存机制（见下文）。
+@end defvar
+
+要将 @code{gpg-agent} 与 PGG 一起使用，必须首先确保 @code{gpg-agent} 正在运行。  例如，如果您在 X Window 系统中运行，则可以通过将以下行放入 @file{.xsession} 文件中来完成此操作：
+
+@smallexample
+eval "$(gpg-agent --daemon)"
+@end smallexample
+
+有关调用 @code{gpg-agent}、@xref{Invoking GPG-AGENT,,,gnupg,Using the GNU Privacy Guard} 的更多详细信息。
+
+每当您执行需要 GnuPG 密码的 PGG 操作时，GnuPG 都会联系 @code{gpg-agent}，提示您输入密码。  此外，@code{gpg-agent}“缓存”结果，以便后续使用不需要您再次输入密码。  （此缓存通常会在经过一定时间后过期；您可以在调用 @code{gpg-agent} 时使用 @code{--default-cache-ttl} 选项更改此设置。）
+
+如果您在 X Window 系统环境中运行，@code{gpg-agent} 将通过打开图形窗口提示输入密码。  但是，如果您在文本终端上运行 Emacs，则 @code{gpg-agent} 无法从终端接收输入，因为它正在发送到 Emacs。解决此问题的一种方法是在与 Emacs 不同的终端上运行 @code{gpg-agent}，并使用 @code{--keep-tty} 选项；这告诉 @code{gpg-agent} 使用自己的终端来提示输入密码。
+
+当 @code{gpg-agent} 未使用时，PGG 会通过 Emacs 提示输入密码。  它还有自己的密码缓存机制，由变量 @code{pgg-cache-passphrase} 控制（见下文）。
+
+通过 PGG 而不是 @code{gpg-agent} 处理密码存在安全风险。  当您在 Emacs 提示符中输入密码时，它会以明文字符串的形式临时存储在 Emacs 可执行文件的内存中。  如果可执行内存被交换到磁盘，理论上根用户可以从交换文件中提取密码。  此外，在系统被丢弃或被盗后，包含明文密码的交换文件可能仍保留在磁盘上。  @code{gpg-agent} 通过使用某些技巧（例如内存锁定）来避免此问题，而这些技巧在 Emacs 中尚未实现。
+
+@defvar pgg-cache-passphrase
+如果非@code{nil}，则存储密码短语。  该变量的默认值为@code{t}。  但是，如果您担心安全问题，可以通过将此变量设置为 @code{nil} 来停止密码短语的缓存。
+@end defvar
+
+@defvar pgg-passphrase-cache-expiry
+过期所用的时间（以秒为单位）。
+@end defvar
+
+如果您的密码包含非 ASCII 字符，您可能需要指定用于对密码进行编码的编码系统，因为 GnuPG 将它们视为字节序列，而不是字符序列。
+
+@defvar pgg-passphrase-coding-system
+用于对密码进行编码的编码系统。
+@end defvar
+
+@node Default user identity
+@section 默认用户身份
+
+PGP 实现通常能够选择正确的密钥来用于签名和解密，但如果您有多个密钥，则可能需要指定要使用的密钥 ID。
+
+@defvar pgg-default-user-id
+您的默认身份的用户 ID。  它默认为@samp{(user-login-name)}返回的值。  您可以自定义此变量。
+@end defvar
+
+@defvar pgg-gpg-user-id
+GnuPG 默认身份的用户 ID。  默认为@samp{nil}。这会覆盖@samp{pgg-default-user-id}。  您可以自定义此变量。
+@end defvar
+
+@defvar pgg-pgp-user-id
+PGP 2.x/6.x 默认身份的用户 ID。  默认为@samp{nil}。  这会覆盖@samp{pgg-default-user-id}。  您可以自定义此变量。
+@end defvar
+
+@defvar pgg-pgp5-user-id
+PGP 5.x 默认身份的用户 ID。  默认为@samp{nil}。这会覆盖@samp{pgg-default-user-id}。  您可以自定义此变量。
+@end defvar
+
+@node Architecture
+@chapter 建筑学
+
+PGG 引入了“PGP 实现方案”的概念（在本文档中与“方案”互换使用）。  该术语指的是用 luna 对象系统包装的单例对象。
+
+由于 PGG 是为访问和开发 PGP 功能而设计的，因此该架构的设计不仅要考虑到互操作性，还要考虑到可扩展性。  在本章中，我们将探讨架构，同时了解如何编写 PGG 后端。
+
+@menu
+* Initializing::
+* Back end methods::
+* Getting output::
+@end menu
+
+@node Initializing
+@section 正在初始化
+
+方案在使用之前必须进行初始化。它可以更好地保证只保留一个方案的一个实例。
+
+以下代码是从@file{pgg-gpg.el} 中截取的。  一旦@code{pgg-gpg}方案的实例被初始化，它就会被存储到变量@code{pgg-scheme-gpg-instance}中，并且从现在开始将被重用。
+
+@lisp
+(defvar pgg-scheme-gpg-instance nil)
+
+(defun pgg-make-scheme-gpg ()
+  (or pgg-scheme-gpg-instance
+      (setq pgg-scheme-gpg-instance
+            (luna-make-entity 'pgg-scheme-gpg))))
+@end lisp
+
+函数的名称必须遵循规定---@code{pgg-make-scheme-}跟在后端名称之后。
+
+@node Back end methods
+@section 后端方法
+
+在每个后端，这些方法都必须存在。  这些方法的输出存储在特殊的缓冲区（@ref{Getting output}）中，因此这些方法必须告知执行的状态。
+
+@deffn Method pgg-scheme-lookup-key scheme string &optional type
+返回与 @var{string} 关联的键。  如果可选的第三个参数 @var{type} 是非 @code{nil}，它将从秘密密钥环中搜索。
+@end deffn
+
+@deffn Method pgg-scheme-encrypt-region scheme start end recipients &optional sign passphrase
+对@var{recipients}加密@var{start}和@var{end}之间的当前区域。  如果@var{sign}非@code{nil}，则进行组合签名和加密。  如果加密成功，则返回@code{t}，否则返回@code{nil}。
+@end deffn
+
+@deffn Method pgg-scheme-encrypt-symmetric-region scheme start end &optional passphrase
+使用对称密码和密码对 @var{start} 和 @var{end} 之间的当前区域进行加密。  如果加密成功，则返回@code{t}，否则返回@code{nil}。  该功能目前仅针对 GnuPG 实现。
+@end deffn
+
+@deffn Method pgg-scheme-decrypt-region scheme start end &optional passphrase
+解密@var{start}和@var{end}之间的当前区域。  如果解密成功，则返回@code{t}，否则返回@code{nil}。
+@end deffn
+
+@deffn Method pgg-scheme-sign-region scheme start end &optional cleartext passphrase
+使用 @var{start} 和 @var{end} 之间的文本制作签名。  如果可选的第三个参数@var{cleartext}是非@code{nil}，则它不会创建分离签名。  如果签名成功，则返回@code{t}，否则返回@code{nil}。
+@end deffn
+
+@deffn Method pgg-scheme-verify-region scheme start end &optional signature
+验证 @var{start} 和 @var{end} 之间的当前区域。  如果可选的第三个参数@var{signature}是非@code{nil}，则将其视为当前区域的分离签名。  如果签名成功验证，则返回@code{t}，否则返回@code{nil}。
+@end deffn
+
+@deffn Method pgg-scheme-insert-key scheme
+检索用户的公钥并将其作为 ASCII-armored 格式插入。成功时，返回@code{t}，否则返回@code{nil}。
+@end deffn
+
+@deffn Method pgg-scheme-snarf-keys-region scheme start end
+收集当前区域中@var{start}和@var{end}之间的公钥，并将其添加到用户的密钥环中。成功时，返回@code{t}，否则返回@code{nil}。
+@end deffn
+
+@node Getting output
+@section 获取输出
+
+后端方法 (@ref{Back end methods}) 的输出存储在特殊缓冲区中，因此这些方法必须告知执行状态。
+
+@defvar pgg-errors-buffer
+PGP 命令执行的标准错误输出存储在这里。
+@end defvar
+
+@defvar pgg-output-buffer
+PGP命令执行的标准输出存储在这里。
+@end defvar
+
+@defvar pgg-status-buffer
+PGP命令执行的其余状态信息都存储在这里。
+@end defvar
+
+@node Parsing OpenPGP packets
+@chapter 解析 OpenPGP 数据包
+
+维护 OpenPGP 消息的格式是为了发布开发可互操作应用程序所需的所有必要信息。该标准记录在 RFC 2440 中。
+
+PGG 有自己的 OpenPGP 数据包解析器。
+
+@defun pgg-parse-armor string
+列出@var{string}中的数据包序列。
+@end defun
+
+@defun pgg-parse-armor-region start end
+列出当前区域中@var{start}和@var{end}之间的数据包序列。
+@end defun
+
+@defvar pgg-ignore-packet-checksum
+如果非@code{nil}，则不检查数据包的校验和。
+@end defvar
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Function Index
+@unnumbered 功能索引
+@printindex fn
+
+@node Variable Index
+@unnumbered 变量索引
+@printindex vr
+
+@bye
+
+@c End:

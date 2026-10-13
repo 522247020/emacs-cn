@@ -1,0 +1,1160 @@
+\输入 texinfo @comment -*-texinfo-*-
+@comment 3.48
+@comment %**start of header (This is for running Texinfo on a region.)
+@setfilename ../../info/sc.info
+@settitle 超级引用用户手册
+@documentlanguage en
+@include docstyle.texi
+@iftex
+@finalout
+@end iftex
+
+@c @setchapternewpage odd               % For book style double sided manual.
+@comment %**end of header (This is for running Texinfo on a region.)
+
+@copying
+本文档介绍了 Supercite，这是一个用于引用和归因邮件和新闻消息回复的 Emacs 包。
+
+版权所有 @copyright{} 1993, 2001--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@c      @smallbook
+
+@dircategory Emacs network features
+@direntry
+* SC: (sc).                      Supercite 允许您以灵活的方式引用您正在回复的消息的部分内容。
+@end direntry
+
+@titlepage
+@title 超级引用用户手册
+@subtitle 引用并注明邮件归属
+@subtitle 新闻，方式灵活
+
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@summarycontents
+@contents
+
+@ifnottex
+@node Top
+@top Supercite
+
+@insertcopying
+
+The manual is divided
+into the following chapters.
+
+@menu
+* Introduction::
+* Citations::
+* Information Keys and the Info Alist::
+* Reference Headers::
+* Getting Connected::
+* Replying and Yanking::
+* Selecting an Attribution::
+* Configuring the Citation Engine::
+* Post-yank Formatting Commands::
+* Hints to MUA Authors::
+* Thanks and History::
+
+* GNU Free Documentation License::
+* Concept Index::
+* Command Index::
+* Key Index::
+* Variable Index::
+@end menu
+@end ifnottex
+
+
+@node  Introduction
+@chapter 介绍
+
+@cindex MUA
+@cindex NUA
+Supercite 是一个完全用 Emacs Lisp 编写的 GNU Emacs 软件包。  它与大多数常用的 Emacs 邮件用户代理 (@dfn{MUAs}) 和新闻用户代理 (@dfn{NUAs}) 接口，并提供用于引用和归因消息回复的复杂设施。  Supercite 在 USENET 网络新闻和电子邮件的回复过程中发挥着非常具体且有限的作用。
+
+Supercite 的首选拼写方式是大写 @samp{S}，小写@samp{upercite}。
+
+@menu
+* Usage Overview::
+* What Supercite Does Not Do::
+* What Supercite Does::
+@end menu
+
+@c FIXME: move it above the menu?  --xfq
+Supercite 仅在与 MUA 和 NUA（例如 VM、Gnus、RMAIL、MH-E 等）结合使用时有用。Supercite 通常由 MUA 在设置回复缓冲区后调用。  此后，Supercite 的许多命令和格式样式在该回复缓冲区中可用，直到发送回复为止。  Supercite 在每个新的回复缓冲区中重新初始化。
+
+
+@node Usage Overview
+@section 使用概述
+@kindex r
+@kindex f
+@kindex C-c C-y
+@cindex yank
+@cindex cite, citing
+@cindex attribute, attributing
+
+典型用法如下。  您想要回复或跟进 MUA@. 中的消息，您可能会点击@kbd{r}（即“回复”）或@kbd{f}（即“转发”）开始撰写回复。  作为响应，MUA 将创建一个回复缓冲区并适当地初始化外发邮件标头。  此时回复正文通常为空。  您现在决定在回复中包含部分原始邮件。  为此，您需要将原始消息 @dfn{yank} 放入回复缓冲区，通常使用诸如@kbd{C-c C-y}之类的按键。  此序列将调用 MUA 特定的函数，该函数用原始消息填充回复的正文，然后将 @dfn{attributes} 将此文本发送给其作者。这称为 @dfn{citing} ，其效果是为原始消息中的每一行添加特殊的文本标记。  大多数 MUA 提供一些默认的引用风格；通过使用 Supercite，您可以在引文的外观和风格上获得更广泛的灵活性。  Supercite 的唯一工作就是引用原始消息。
+
+@node  What Supercite Does Not Do
+@section Supercite 不做什么
+
+由于这种明确的分工，有些有用的功能是 MUA 独自负责的，尽管看起来 Supercite 应该提供这些功能。  例如，许多人希望能够仅提取（并引用）原始消息的一部分。由于 Supercite 仅修改它在 MUA 设置的回复缓冲区中找到的文本，因此 MUA 负责进行部分拉取。 @xref{Reply Buffer Initialization}。
+
+@vindex mail-header-separator
+另一个可能有用的事情是 Supercite 使用从回复缓冲区收集的信息来设置外发邮件标头。但根据之前达成的约定，Supercite 无法修改分隔邮件标头和邮件正文的 @code{mail-header-separator} 上方的任何文本。  事实上，Supercite 对这些标头的含义一无所知，并且从不冒险超出指定区域。 @xref{Hints to MUA Authors}，了解更多详情。
+
+@node  What Supercite Does
+@section Supercite 的作用是什么
+@findex sc-cite-original
+
+Supercite 是通过 MUA 的回复或转发命令在回复缓冲区上首次调用的。  该命令实际上将通过调用已添加 Supercite 顶级函数 @code{sc-cite-original} 的钩子变量来执行引用。  当执行@code{sc-cite-original}时，必须以非常特定的方式设置原始消息，但这由MUA@.@xref{Hints to MUA Authors}自动处理。
+
+@cindex info alist
+Supercite 所做的第一件事是通过 @code{sc-cite-original} 解析原始消息的邮件标头。  它将这些数据保存在@dfn{information association list}或@dfn{info alist}中。  此列表中的信息在 Supercite 的多个地方使用。 @xref{Information Keys and the Info Alist}。
+
+@cindex nuking mail headers
+@cindex reference header
+提取邮件标头信息后，可以选择从回复中删除标头 (@dfn{nuked})。  然后 Supercite 将 @dfn{reference header} 写入缓冲区。  该引用标头是一个字符串，其中包含有关它将要执行的引用的详细信息。
+
+@cindex modeline
+接下来，Supercite 访问回复中的每一行，根据可定制的“脚本”转换该行。  原始消息中先前未引用的行将被引用，而已引用的行则保持不变，或者强制采用您喜欢的样式。最后，Supercite 将键盘映射安装到回复缓冲区中，以便您在随后编辑回复时可以访问 Supercite 的后复制格式和背诵命令。  您可以看出 Supercite 已安装到回复缓冲区中，因为该缓冲区的模型行将显示次要模式字符串 @samp{SC}。
+
+@cindex filladapt
+@cindex gin-mode
+@vindex fill-prefix
+@findex fill-paragraph
+当原始消息被 @code{sc-cite-original} 引用时，它将（可选）由 Supercite 填充。  但是，如果您手动编辑引用的文本并想要重新填充它，则必须使用附加包，例如@cite{filladapt}或@cite{gin-mode}。  这些包可以识别超级引用文本并适当地填充它们。  Emacs 的内置填充例程，例如 @code{fill-paragraph}，无法识别引用的文本，也不会正确地重新填充它们，因为它无法猜测正在使用的 @code{fill-prefix}。 @xref{Post-yank Formatting Commands}，了解详情。
+
+如上所述，Supercite 提供了在回复缓冲区中背诵或取消引用文本区域的命令，以及对引用的原始文本执行其他美化的命令，从而在整个过程中保持一致和信息丰富的引用。  Supercite 尝试尽可能地进行配置，以允许各种个性化引文样式，但一旦它正确连接到您的 MUA@. @xref{Getting Connected}，它也可以立即使用默认配置，以了解更多详细信息。
+
+@node  Citations
+@chapter 引文
+@cindex nested citations
+@cindex citation
+
+@dfn{citation} 是回复正文中邮件消息原作者的确认。  Supercite 支持两种基本引用样式。  第一个称为 @dfn{nested citations} 是匿名引用形式；换句话说，表明所引用的行是由当前消息作者（即除您之外的撰写回复的人）的某人 @emph{other} 撰写的，但没有提及原始作者的身份。这种风格应该看起来很熟悉，因为它在网络上的使用很广泛。以下是在多个回复后使用嵌套引用的消息缓冲区的示例：
+
+@example
+>> John originally wrote this
+>> and this as well
+> Jane said that John didn't know
+> what he was talking about
+And that's what I think too.
+@end example
+
+@menu
+* Citation Elements::
+* Recognizing Citations::
+@end menu
+
+请注意，多次包含原始消息会导致 @samp{>} 字符的嵌套。  当包含许多级别的引用时，这有时会非常令人困惑，因为可能很难或不可能找出谁真正参与了线程，并且 @samp{>} 字符的多重嵌套有时会使眼睛很难扫描消息。
+
+@cindex non-nested citations
+在 @dfn{non-nested citations} 中，每个引用的行都以一个信息字符串开头，将该行归属于原始作者。  仅显示第一级归因；后续引用不会嵌套引用字符串。  当使用非嵌套引用时，上面的对话框可能如下所示：
+
+@example
+John> John originally wrote this
+John> and this as well
+Jane> Jane said that John didn't know
+Jane> what he was talking about
+And that's what I think too.
+@end example
+
+请注意，我将 Jane 包含在 John 的原始消息中，并没有导致用 @samp{Jane>John>} 引用一行。
+
+@vindex sc-nested-citation-p
+@vindex nested-citation-p @r{(sc-)}
+Supercite 支持两种引用风格，并且变量 @code{sc-nested-citation-p} 控制引用以前未引用的文本时将使用哪种风格。  当此变量为 @code{nil} （默认值）时，使用非嵌套引用。  当非@code{nil}时，使用嵌套引用。
+
+
+@node  Citation Elements
+@section 引文元素
+@cindex citation string
+
+@dfn{Citation strings} 由一个或多个元素组成。非嵌套引用由四个元素组成，其中三个元素可由用户直接定义。  这些元素按以下顺序连接在一起：
+
+@cindex citation leader
+@vindex citation-leader @r{(sc-)}
+@vindex sc-citation-leader
+@enumerate
+@item 
+@dfn{citation leader}。  引文前导包含在变量 @code{sc-citation-leader} 中，默认值为包含四个空格的字符串。
+
+@cindex attribution string
+@item 
+@dfn{attribution string}。  该元素由 Supercite 根据您的偏好和原始邮件的邮件标头自动提供，但可能会要求您确认 Supercite 的选择。 @xref{Selecting an Attribution}，了解更多详情。
+
+@cindex citation delimiter
+@vindex sc-citation-delimiter
+@vindex citation-delimiter @r{(sc-)}
+@item 
+@dfn{citation delimiter}。  该字符串包含在变量 @code{sc-citation-delimiter} 中，在视觉上将引文与该行的文本分开。  该变量的默认值为 @code{">"}，为了获得最佳结果，字符串应仅包含单个字符。
+
+@cindex citation separator
+@vindex citation-separator @r{(sc-)}
+@vindex sc-citation-separator
+@item 
+@dfn{citation separator}。  引用分隔符包含在变量 @code{sc-citation-separator} 中，并且默认值为包含单个空格的字符串。
+@end enumerate
+
+例如，假设您使用上述变量的默认值，并且 Supercite 提供了属性字符串 @samp{Jane}。在这种情况下，所使用的组合的非嵌套引用字符串可能类似于 @code{@asis{"    Jane> "}}。此引文字符串将插入到原始消息中尚未引用的每一行的前面。
+
+嵌套引用比非嵌套引用更简单，由相同的元素组成，但没有属性字符串。  Supercite 足够聪明，不会在多级嵌套引用的引用分隔符之间放置额外的空格。
+
+@node  Recognizing Citations
+@section 识别引文
+
+Supercite 还可以识别原始文章中的引用，并可以通过多种方式转换这些已引用的行。  这就是 Supercite 抑制非嵌套引用的多重引用的方式。引用行的识别由类似于前面提到的构成引文字符串的变量控制。
+
+@vindex sc-citation-leader-regexp
+@vindex citation-leader-regexp @r{(sc-)}
+@vindex sc-citation-delimiter-regexp
+@vindex citation-delimiter-regexp @r{(sc-)}
+@vindex sc-citation-separator-regexp
+@vindex citation-separator-regexp @r{(sc-)}
+@vindex sc-citation-root-regexp
+@vindex citation-root-regexp @r{(sc-)}
+@vindex sc-citation-nonnested-root-regexp
+@vindex citation-nonnested-root-regexp @r{(sc-)}
+
+变量 @code{sc-citation-leader-regexp} 描述了引文前导的外观，默认情况下它匹配任意数量的空格或制表符。请注意，由于 lisp 函数 @code{looking-at} 用于进行匹配，因此如果更改此变量，它不需要以前导 @code{"^"} 开头。
+
+类似地，变量@code{sc-citation-delimiter-regexp}和@code{sc-citation-separator-regexp}分别描述了引用定界符和分隔符的外观。  它们遵循与上面@code{sc-citation-leader-regexp}相同的规则。
+
+当 Supercite 组成引文字符串时，它会自动提供归因。  处理引文字符串归因部分识别的类似变量是@code{sc-citation-root-regexp}。该变量描述嵌套和非嵌套引用的归因根。  默认情况下，它可以匹配零到多个字母数字字符（还有“.”、“-”和“_”）。  但在某些情况下，Supercite 必须确定它正在查看嵌套引用还是非嵌套引用。  因此变量@code{sc-citation-nonnested-root-regexp}仅用于描述非嵌套引用根。  重要的是要记住，如果您更改 @code{sc-citation-root-regexp}，您也应该始终更改 @code{sc-citation-nonnested-root-regexp}。
+
+@node  Information Keys and the Info Alist
+@chapter 信息键和信息列表
+@cindex information keys
+@cindex Info Alist
+@cindex information extracted from mail fields
+@findex sc-mail-field
+@findex mail-field @r{(sc-)}
+
+@dfn{Mail header information keys} 是 Supercite 从原始邮件的各个邮件标头中提取的信息块，由 MUA@. 放置在回复缓冲区中。信息以键值对形式保存在 @dfn{Info Alist} 中，并且可以在 Supercite 内的各个位置检索以供使用，例如标头重写功能和属性选择。  由 Supercite 组成和创建的其他数据位也作为键值对保存在该列表中。对于邮件字段，关键是字段的名称，省略尾随冒号。  信息键始终不区分大小写（邮件标题也是如此），并且可以使用 @code{sc-mail-field} 函数从列表中检索相应键的值。  因此，如果原始文章中存在以下字段：
+
+@example
+Date:@: 08 Apr 1991 17:32:09 -0500
+Subject:@: Better get out your asbestos suit
+@end example
+
+@vindex sc-mumble
+@vindex mumble @r{(sc-)}
+@noindent
+然后，以下 lisp 构造返回：
+
+@example
+(sc-mail-field "date")
+==> "08 Apr 1991 17:32:09 -0500"
+
+(sc-mail-field "subject")
+==> "Better get out your asbestos suit"
+@end example
+
+由于 @code{sc-mail-field} 的参数可以是任何字符串，因此邮件字段可能不会出现在信息列表中（可能是因为原始消息中不存在邮件标头）。  在这种情况下，@code{sc-mail-field}将返回变量@code{sc-mumble}的值。
+
+Supercite 始终将在拉出的原始文章中找到的所有邮件字段放入信息列表中。  如果可能的话，Supercite 还会将以下键放入信息列表中：
+
+@table @code
+@cindex sc-attribution info field
+@cindex attribution info field (sc-)
+@item "sc-attribution"
+选定的属性字符串。
+
+@cindex sc-citation info field
+@cindex citation info field (sc-)
+@item "sc-citation"
+非嵌套引用字符串。
+
+@cindex sc-from-address info field
+@cindex from-address info field (sc-)
+@item "sc-from-address"
+从 @samp{From:@:} 字段中提取的电子邮件地址。
+
+@cindex sc-reply-address info field
+@cindex reply-address info field (sc-)
+@item "sc-reply-address"
+从 @samp{Reply-To:@:} 字段中提取的电子邮件地址。
+
+@cindex sc-sender-address info field
+@cindex sender-address info field (sc-)
+@item "sc-sender-address"
+从 @samp{Sender:@:} 字段中提取的电子邮件地址。
+
+@cindex sc-emailname info field
+@cindex emailname info field (sc-)
+@item "sc-emailname"
+从 @samp{From:@:} 字段中提取的电子邮件终点站。
+
+@cindex sc-initials info field
+@cindex initials info field (sc-)
+@item "sc-initials"
+作者姓名首字母。
+
+@cindex sc-author info field
+@cindex author info field (sc-)
+@item "sc-author"
+作者的全名。
+
+@cindex sc-firstname info field
+@cindex firstname info field (sc-)
+@item "sc-firstname"
+作者的名字。
+
+@cindex sc-lastname info field
+@cindex lastname info field (sc-)
+@item "sc-lastname"
+作者的姓氏。
+
+@cindex sc-middlename-1 info field
+@cindex middlename-1 info field (sc-)
+@item "sc-middlename-1"
+作者的第一个中间名。
+@end table
+
+如果作者的名字有多个中间名，它们将显示为具有适当索引的信息键（例如，@code{"sc-middlename-2"}、@dots{}）。  @xref{Selecting an Attribution}。
+
+@node  Reference Headers
+@chapter 参考标题
+@cindex reference headers
+
+Supercite 将在引用文本正文的开头插入信息丰富的 @dfn{reference header}，它显示有关原始文章的更多详细信息，并提供非嵌套引用中归因与原始作者之间的映射。  引文字符串通常只包含原作者姓名的一部分，而参考标题可以包含作者的全名、电子邮件地址、原始文章主题等信息。事实上，信息列表中包含的任何信息都可以插入参考标题中。
+
+@menu
+* The Built-in Header Rewrite Functions::
+* Electric References::
+@end menu
+
+@cindex header rewrite functions
+@vindex sc-rewrite-header-list
+@vindex rewrite-header-list @r{(sc-)}
+Supercite 提供了许多内置的 @dfn{header rewrite functions}，但您可以编写自己的自定义标头重写函数（也许使用内置函数作为示例）。  变量@code{sc-rewrite-header-list}包含此类标头重写函数的列表。  在插入初始引用标题和显示 @dfn{electric references} 时都会查阅此列表。 @xref{Electric References}。
+
+@vindex sc-preferred-header-style
+@vindex preferred-header-style @r{(sc-)}
+当 Supercite 最初在回复缓冲区上运行时（通过 @code{sc-cite-original}），它将自动调用这些函数之一。  它使用的变量在变量@code{sc-preferred-header-style}中定义。  该变量的值是一个整数，它是 2⁣ 的索引，从零开始。
+
+@node  The Built-in Header Rewrite Functions
+@section 内置标头重写功能
+@cindex header rewrite functions, built-in
+
+以下是各种内置标头重写函数的示例。请注意以下事项：首先，下面示例中显示为 @var{infokey} 的文本表示将在此处插入 info alist 中的 info key 的相应值。 （@pxref{Information Keys and the Info Alist}）。  例如，在下面的@code{sc-header-on-said}中，@var{date}和@var{from}分别对应于@samp{Date:@:}和@samp{From:@:}邮件标头的值。
+
+@vindex sc-reference-tag-string
+@vindex reference-tag-string @r{(sc-)}
+另外，下面的字符串@code{">>>>>"}实际上是变量@code{sc-reference-tag-string}的值。  该变量用于所有内置标头重写函数，您可以自定义其值以全局更改标记字符串。
+
+最后，如果与 0⁣ 关联的信息键不存在于信息列表中，则实际写入的引用标头可能会省略标头的某些部分。  事实上，对于所有内置标头，如果邮件标头中不存在 @samp{From:@:} 字段，则整个参考标头将被省略（但这通常表明您的 MUA 或 Supercite 安装中存在严重问题）。
+
+@table @code
+@findex sc-no-header
+@findex no-header @r{(sc-)}
+@item sc-no-header
+该函数不产生标头。  应该使用它代替 @code{nil} 来生成空白标题。  该标题可能在 @code{mail-header-separator} 行之后包含一个空行。
+
+@item sc-no-blank-line-or-header
+@findex sc-no-blank-line-or-header
+@findex no-blank-line-or-header @r{(sc-)}
+此函数与 0⁣ 类似，只不过 1⁣ 行之后的任何空行都将被删除。
+
+@item sc-header-on-said
+@findex sc-header-on-said
+@findex header-on-said @r{(sc-)}
+@code{>>>>> On @var{date}, @var{from} said:}
+
+@item sc-header-inarticle-writes
+@findex sc-header-inarticle-writes
+@findex header-inarticle-writes @r{(sc-)}
+@code{>>>>> In article @var{message-id}, @var{from} writes:}
+
+@item sc-header-regarding-adds
+@findex sc-header-regarding-adds
+@findex header-regarding-adds @r{(sc-)}
+@code{>>>>> Regarding @var{subject}; @var{from} adds:}
+
+@item sc-header-attributed-writes
+@findex sc-header-attributed-writes
+@findex header-attributed-writes @r{(sc-)}
+@code{>>>>> "@var{sc-attribution}" == @var{sc-author} <@var{sc-reply-address}> writes:}
+
+@item sc-header-author-writes
+@findex sc-header-author-writes
+@findex header-author-writes @r{(sc-)}
+@code{>>>>> @var{sc-author} writes:}
+
+@item sc-header-verbose
+@findex sc-header-verbose
+@findex header-verbose @r{(sc-)}
+@code{>>>>> On @var{date},}@* @code{>>>>> @var{sc-author}}@* @code{>>>>> from the organization of @var{organization}}@* @code{>>>>> who can be reached at:@: @var{sc-reply-address}}@* @code{>>>>> (whose comments are cited below with:@: "@var{sc-cite}")}@* @code{>>>>> had this to say in article @var{message-id}}@* @code{>>>>> in newsgroups @var{newsgroups}}@* @code{>>>>> concerning the subject of @var{subject}}@* @code{>>>>> see @var{references} for more details}
+@end table
+
+@node  Electric References
+@section 电气参考
+@cindex electric references
+
+默认情况下，当 Supercite 第一次引用原始消息时，它只是继续插入由 @code{sc-preferred-header-style} 索引的引用标头。  但是，您可能希望根据您正在执行的回复或转发类型选择不同的参考标头。  在决定是否将其插入回复缓冲区之前，您可能还需要预览参考标头。  Supercite 提供了一个可选的 @dfn{electric reference} 模式，您可以进入该模式来获得此功能。
+
+@vindex sc-electric-references-p
+@vindex electric-references-p @r{(sc-)}
+如果变量 @code{sc-electric-references-p} 不是 @code{nil}，Supercite 将调出一个电参考模式缓冲区并将您置于递归编辑中。  电参考缓冲区是只读的，因此在退出电参考并将文本插入回复缓冲区之前，您无法直接修改参考​​文本。  但是您可以循环访问 @code{sc-rewrite-header-list}.c 中的所有引用标头重写函数。
+
+您还可以设置新的首选标题样式、跳转到任何标题或跳转到首选标题。  标头将显示在电子参考缓冲区中，标头索引和函数名称将出现在回显区域中。
+
+在电气参考模式下可以使用以下命令（此处显示其默认键绑定）：
+
+@table @asis
+@item @code{sc-eref-next} (@kbd{n})
+@findex sc-eref-next
+@findex eref-next @r{(sc-)}
+@kindex n
+@vindex sc-electric-circular-p
+@vindex electric-circular-p @r{(sc-)}
+显示电子参考缓冲区中的下一个参考标头。  如果变量 @code{sc-electric-circular-p} 为非 @code{nil}，则在查看列表中最后一个引用标头时调用 @code{sc-eref-next} 将回绕到第一个标头。
+
+@item @code{sc-eref-prev} (@kbd{p})
+@findex sc-eref-prev
+@findex eref-prev @r{(sc-)}
+@kindex p
+显示电子参考缓冲区中的前一个参考标头。如果变量 @code{sc-electric-circular-p} 不是 @code{nil}，则调用 @code{sc-eref-prev} 将回绕到最后一个标头。
+
+@item @code{sc-eref-goto} (@kbd{g})
+@findex sc-eref-goto
+@findex eref-goto @r{(sc-)}
+@kindex g
+转到指定的参考标头。  索引（到@code{sc-rewrite-header-list}）可以指定为命令的数字参数。  否则，Supercite 将向您查询迷你缓冲区中的索引。
+
+@item @code{sc-eref-jump} (@kbd{j})
+@findex sc-eref-jump
+@findex eref-jump @r{(sc-)}
+@kindex j
+显示首选参考标头，即由 @code{sc-preferred-header-style} 当前值索引的标头。
+
+@item @code{sc-eref-setn} (@kbd{s})
+@findex sc-eref-setn
+@findex eref-setn @r{(sc-)}
+@kindex s
+将首选参考标题（即 @code{sc-preferred-header-style}）设置为当前显示的标题。
+
+@item @code{sc-eref-exit}（@kbd{C-j}、@key{RET}和@kbd{@key{ESC} C-c}）
+@kindex RET
+@kindex C-j
+@kindex q
+@findex sc-eref-exit
+@findex eref-exit @r{(sc-)}
+退出电参考模式并将当前标头插入回复缓冲区。
+
+@item @code{sc-eref-abort} (@kbd{q}, @kbd{x})
+@findex sc-eref-abort
+@findex eref-abort @r{(sc-)}
+@kindex x
+退出电子参考模式而不插入当前标题。
+@end table
+
+@vindex sc-electric-mode-hook
+@vindex electric-mode-hook @r{(sc-)}
+@noindent
+Supercite 将在进入电参考模式之前执行钩子 @code{sc-electric-mode-hook}。
+
+@node  Getting Connected
+@chapter 建立联系
+@cindex citation interface specification
+
+@vindex mail-citation-hook
+@cindex .emacs file
+在大多数情况下，开始使用 Supercite 所需要做的就是将以下内容添加到 @file{~.emacs}：
+
+@example
+(add-hook 'mail-citation-hook 'sc-cite-original)
+@end example
+
+@noindent For more details of the process, read on@dots{}
+
+在 MUA 的回复缓冲区中点击 @kbd{C-c C-y} 会将原始消息拉入并引用到回复缓冲区中。  实际上，原始消息的引用是通过可配置的钩子变量的调用来执行的。  该变量的名称已作为 @dfn{citation interface specification} 的一部分提前商定。  默认情况下，这个钩子变量有一个 @code{nil} 值，MUA 认为这意味着“使用默认的引用函数”。当您将 Supercite 的引用函数添加到钩子时，从而为变量提供一个非 @code{nil} 值，它告诉 MUA 通过 @code{run-hooks} 运行钩子，而不是使用默认的引用。
+
+在 Supercite 开发的早期，Supercite 作者、一些 MUA 作者和一些早期 Supercite 用户聚集在一起，就 MUA 和引文包之间的标准接口达成一致（Supercite 是目前唯一已知的附加组件@t{:-)}）。Supercite 可能可以与大多数 Emacs MUA 一起使用，但需要付出或多或少的努力。
+
+要准确了解如何将 Supercite 连接到您正在使用的软件系统，请阅读以下相应部分。  有关接口规范的详细信息，或者如果您正在编写或维护 MUA，请@pxref{Hints to MUA Authors}。
+
+@cindex autoload
+@cindex .emacs file
+@findex sc-cite-original
+@findex cite-original @r{(sc-)}
+无论您使用什么 MUA，每个人都应该做的第一件事是设置 Emacs，以便它会在适当的时间加载 Supercite。  如果 Supercite 与您的 Emacs 版本一起分发，则会自动发生这种情况。  如果没有，您可以为 Supercite 设置 @dfn{autoload}。
+
+要执行后者，请将以下内容放入您的 @file{.emacs} 文件中：
+
+@example
+(autoload 'sc-cite-original "supercite" nil t)
+@end example
+
+@cindex point
+@cindex mark
+函数 @code{sc-cite-original} 是顶级 Supercite 函数，设计为从引用挂钩运行。  它期望 @samp{point} 和 @samp{mark} 设置在要引用的区域周围，并且期望原始文章的邮件标头出现在该区域内。  请注意，Supercite @emph{never} 会触及该区域之外的任何文本。  进一步注意，@code{sc-cite-original} 不需要激活该区域即可完成其工作。 @xref{Hints to MUA Authors}。
+
+连接过程的另一个步骤是确保您的 MUA 在正确的时间调用 @code{sc-cite-original}。  如上所述，一些 MUA 对此的处理方式有所不同。  请阅读以下与您正在使用的 MUA 有关的部分。
+
+@node  Replying and Yanking
+@chapter 回复和拉扯
+
+本章解释了当您回复并从 MUA 中提取原始消息时会发生什么情况。
+
+@menu
+* Reply Buffer Initialization::
+* Filling Cited Text::
+@end menu
+
+@node  Reply Buffer Initialization
+@section 回复缓冲区初始化
+@findex sc-cite-original
+@findex cite-original @r{(sc-)}
+
+执行 @code{sc-cite-original} 在初始化回复缓冲区时执行以下步骤：
+
+@enumerate
+@item 
+@vindex sc-pre-hook
+@vindex pre-hook @r{(sc-)}
+@emph{Runs @code{sc-pre-hook}.} 该钩子变量在 @code{sc-cite-original} 执行任何其他工作之前运行。  您可以想象使用此挂钩根据回复缓冲区的模式或名称设置某些 Supercite 变量（即根据您是回复还是跟进文章来执行不同的操作）。
+
+@item 
+@emph{Inserts Supercite's keymap.}
+@vindex sc-mode-map-prefix
+@vindex mode-map-prefix @r{(sc-)}
+@kindex C-c C-p
+@cindex keymap prefix
+Supercite 提供了许多用于对回复缓冲区执行复制后修改的命令。  这些命令安装在 Supercite 的顶级键盘映射上。  由于 Supercite 必须与各种 MUA 交互，因此它不会将所有命令直接安装到回复缓冲区的键盘映射中。  相反，它将命令放在键映射前缀上，然后将此前缀安装到缓冲区的键映射上。  这意味着您通常必须键入更多字符才能调用 Supercite 命令，但 Supercite 的键绑定可以在 MUA 之间变得更加一致。
+
+您可以通过更改变量 @code{sc-mode-map-prefix} 来控制 Supercite 使用哪个键作为其键盘映射前缀。  默认情况下，该变量设置为@code{C-c C-p}；也许是一个绕手指的操作，但不幸的是，由于许多 MUA 中缺乏可用的按键绑定，因此这是最好的默认设置。
+
+@item 
+@emph{Turns on Supercite minor mode.}
+@cindex modeline
+回复缓冲区的模型行应通过显示字符串 @samp{SC} 来指示 Supercite 在该缓冲区中处于活动状态。
+
+@item 
+@emph{Sets the ``Undo Boundary.''}
+@cindex undo boundary
+Supercite 在开始修改原始猛拉文本之前设置撤消边界。  这使您可以轻松撤消 Supercite 的更改以影响替代引用样式。
+
+@item 
+@emph{Processes the mail headers.}
+@vindex sc-confirm-always-p
+@vindex confirm-always-p @r{(sc-)}
+@vindex sc-mail-warn-if-non-rfc822-p
+@vindex mail-warn-if-non-rfc822-p @r{(sc-)}
+所有先前检索到的信息键值对都将从信息列表中删除，然后扫描被拉出的邮件正文中的邮件标头。  为找到的每个标头创建信息键值对。  此外，还提取了作者姓名和电子邮件地址等有用信息。  如果变量 @code{sc-mail-warn-if-non-rfc822-p} 不是 @code{nil}，那么 Supercite 会在发现不符合 RFC 822（或更高版本）的邮件标头时向您发出警告。这种情况很少见，表明您的 MUA 或原作者的 MUA 或沿途的某个 MTA（邮件传输代理）存在问题。
+
+@vindex sc-nuke-mail-headers
+@vindex sc-nuke-mail-header-list
+@vindex nuke-mail-headers @r{(sc-)}
+@vindex nuke-mail-header-list @r{(sc-)}
+一旦从邮件标头中提取了信息密钥，标头就会从回复缓冲区中删除。  您可以准确控制删除或保留哪些标头，但默认情况下，所有标头都会被删除。
+
+有两个变量控制邮件标头的破坏。  变量@code{sc-nuke-mail-headers}控制标头核攻击例程的整体行为。  通过将此变量设置为@code{'all}，您将自动删除所有邮件标头。  同样，将此变量设置为 @code{'none} 会禁止破坏任何邮件标头。  在这两个极端之间，您可以通过将此变量设置为 @code{'specified} 来告诉 Supercite 仅删除指定的邮件标头列表，或者通过将其设置为 @code{'keep} 来仅保留指定的标头列表。
+
+如果 @code{sc-nuke-mail-headers} 设置为 @code{'specified} 或 @code{'keep}，则将参考变量 @code{sc-nuke-mail-header-list} 来获取要删除或保留的标头列表。  该变量包含正则表达式列表。  如果邮件标题行与此列表中的正则表达式匹配，则标题将被删除或保留。该行使用以行开头为根的 @code{looking-at} 与正则表达式进行匹配。
+
+@vindex sc-blank-lines-after-headers
+@vindex blank-lines-after-headers @r{(sc-)}
+如果变量 @code{sc-blank-lines-after-headers} 为非 @code{nil} ，则它包含邮件头被删除后缓冲区中剩余的空白行数。  默认情况下，缓冲区中仅保留一个空行。
+
+@item 
+@emph{Selects the attribution and citation strings.} 处理完邮件标头后，Supercite 将选择一个属性字符串和一个引文字符串，用于引用原始邮件。  @xref{Selecting an Attribution}，了解详情。
+
+@item 
+@emph{Cites the message body.}
+@vindex sc-cite-region-limit
+@vindex cite-region-limit @r{(sc-)}
+选择归属和引文字符串后，Supercite 通过在每个未引用行前面插入引文字符串前缀来引用原始消息。  然而，您可能不希望 Supercite 自动引用很长的消息。  例如，某些电子邮件可能包含较小的标头部分，后跟巨大的 uuencoded 消息。  在回复原作者的简短前言时引用 uuencoded 消息部分是没有意义的。  为此，Supercite 提供了一个变量，将长消息的自动引用限制为一定的最大行数。  该变量称为 @code{sc-cite-region-limit}。  如果该变量包含整数，则将显示更多行的消息，表明该变量根本不会被引用，并且会显示警告消息。  不过，Supercite 已经执行了所有必要的操作，您可以手动引用您想要使用的原始消息的一小部分。
+
+如果 0⁣ 包含非 1⁣ 值，则始终引用原始消息，无论其大小如何。  如果变量包含值@code{nil}，则该区域永远不会被自动引用。  如果您始终希望能够手动编辑和引用消息，请使用此选项。
+
+@vindex sc-cite-blank-lines-p
+@vindex cite-blank-lines-p @r{(sc-)}
+变量@code{sc-cite-blank-lines-p}控制是否应引用原始消息中的空行。  如果此变量为非@code{nil}，则空行将像非空行一样被引用。否则，空行将被视为段落分隔符。
+
+原始消息的引用是高度可配置的。  Supercite 的默认设置在引用先前引用的消息的许多常见形式方面做得非常好。  但是，网上的引用样式有多少种，或者差不多有多少种！  Supercite 不可能预测现有的每一种风格，而且您可能也不会全部遇到它们。  但您可以配置 Supercite 来识别您经常看到的那些样式。 @xref{Configuring the Citation Engine}，了解详情。
+
+@item 
+@emph{Runs @code{sc-post-hook}.}
+@vindex sc-post-hook
+@vindex post-hook @r{(sc-)}
+该变量与@code{sc-pre-hook}非常相似，只是它在@code{sc-cite-original}完成后运行。  提供此钩子主要是为了完整性和向后兼容性。  也许它可以用来重置@code{sc-pre-hook}中设置的某些变量。
+@end enumerate
+
+@node  Filling Cited Text
+@section 填写引用文本
+@cindex filling paragraphs
+@vindex sc-auto-fill-region-p
+@vindex auto-fill-region-p @r{(sc-)}
+@cindex filladapt
+@cindex gin-mode
+@findex sc-setup-filladapt
+@findex setup-filladapt @r{(sc-)}
+
+Supercite 将自动填充原始消息中新引用的文本，除非变量 @code{sc-auto-fill-region-p} 具有 @code{nil} 值。  当您手动引用或重新引用文本时，Supercite 也会重新填充段落。
+
+然而，在正常编辑过程中，Supercite 本身不能用于填充段落。  这是版本 2 的一个变化。还有其他附加的 lisp 包，它们的填充效果比 Supercite 更好。  最著名的两个是@dfn{filladapt}和@dfn{gin-mode}。  两者都可以与 Supercite 很好地配合，并且都可以在普通的 Emacs Lisp 存档站点上找到。  @dfn{gin-mode}开箱即用，但如果您使用@dfn{filladapt}，您可能需要在加载@file{supercite}之后运行函数@code{sc-setup-filladapt}（例如，使用@code{with-eval-after-load}）。  这只是让 @dfn{filladapt} 比其默认设置更了解 Supercite。
+
+@vindex sc-fixup-whitespace-p
+@vindex fixup-whitespace-p @r{(sc-)}
+此外，当变量 @code{sc-fixup-whitespace-p} 为非 @code{nil} 时，Supercite 将折叠引文字符串和一行文本之间的前导空格。  该变量的默认值为@code{nil}。
+
+@vindex fill-prefix
+重要的是要了解 Supercite 的自动填充（在回复的初始引用期间）非常脆弱。  这是因为自动计算出特定段落的 @code{fill-prefix} 是一件非常困难的事情。  当原始消息包含代码或一些其他文本（其中前导空格必须保留）时尤其如此。  因此，许多 Supercite 用户通常将 @code{sc-auto-fill-region-p}（也可能是 @code{sc-fixup-whitespace-p}）设置为 @code{nil} 来运行。  然后，他们手动将每个引用的段落填充到回复缓冲区中。
+
+我通常使用包含默认值的这两个变量来运行。当 Supercite 的自动填充在特定消息上中断时，我将使用 Emacs 的撤消功能来撤消引用应用于原始消息之前的情况。  然后我将切换变量并手动引用那些我不想填充或折叠空格的段落。  @xref{Variable Toggling Shortcuts}。
+
+@kindex C-c C-p C-p
+如果您发现 Supercite 的自动填充功能太脆弱，不符合您的口味，您可以考虑其中一种替代方法。此外，为了让生活更轻松，按键绑定 @kbd{C-c C-p C-p} 上提供了切换这两个变量状态的快捷功能（默认值为 @code{sc-mode-map-prefix}；@pxref{Post-yank Formatting Commands}）。
+
+您会注意到次要模式字符串会将这些变量的状态显示为限定符。  当两个变量都是@code{nil}时，Supercite 小模式字符串将显示@samp{SC}。  当 just @code{sc-auto-fill-region-p} 为非 @code{nil} 时，字符串将显示 @samp{SC:f}，当 just @code{sc-fixup-whitespace-p} 为非 @code{nil} 时，字符串将显示 @samp{SC:w}。  当两个变量都非@code{nil}时，字符串将显示@samp{SC:fw}。  请注意，所选的限定符是每个相应变量的切换函数的默认绑定的助记符。 @xref{Variable Toggling Shortcuts}。
+
+为什么这些变量默认不设置为@code{nil}？  这是因为许多用户不会手动填写超级引用的段落，并且网上对包含超过 72 个字符的行的邮件和新闻消息存在广泛的抱怨。  所以默认是填充引用的文本。
+
+@node  Selecting an Attribution
+@chapter 选择归因
+@cindex attribution list
+@vindex sc-preferred-attribution-list
+@vindex preferred-attribution-list @r{(sc-)}
+
+如您所知，归属字符串是作者姓名的一部分，将用于组成非嵌套引用字符串。  Supercite 扫描原始文章中存在的各种邮件标头，并使用多种启发式方法提取字符串并将其放入 @dfn{attribution association list} 或 @dfn{attribution alist} 中。  这与前面提到的信息列表类似，但又不同。  归因列表中的每个元素都是一个键值对，包含作者的名字、中间名和姓氏、作者的姓名首字母和作者的电子邮件终点站等信息。
+
+@menu
+* Attribution Preferences::
+* Anonymous Attributions::
+* Author Names::
+@end menu
+
+@node  Attribution Preferences
+@section 归因偏好
+
+当您引用原始消息时，您可以告诉 Supercite 您希望它使用作者姓名的哪一部分作为归属。  变量 @code{sc-preferred-attribution-list} 控制它；它包含按给定顺序与归因列表匹配的键。产生非 1⁣、非空字符串匹配的键的第一个值用作属性字符串，如果没有键匹配，则使用辅助机制来生成属性。 @xref{Anonymous Attributions}。
+
+归因列表中始终提供以下首选项（排除错误）：
+
+@table @code
+@item "emailname"
+作者的电子邮件终端。
+
+@item "initials"
+作者姓名首字母。
+
+@item "firstname"
+作者的名字。
+
+@item "lastname"
+作者的姓氏。
+
+@item "middlename-1"
+作者的第一个中间名。
+
+@item "sc-lastchoice"
+您选择的最后一个属性字符串。  当您背诵答复中的段落时，这很有用。
+
+@item "sc-consult"
+@vindex sc-attrib-selection-list
+@vindex attrib-selection-list @r{(sc-)}
+查阅可自定义列表@code{sc-attrib-selection-list}，该列表可用于根据任何信息键的值选择特殊属性。  详情请参阅下文。
+
+@item "x-attribution"
+原作者对归因字符串选择的建议。  详情请参阅下文。
+@end table
+
+中间名索引可以是任何大于零的正整数，尽管许多作者不太可能拥有多个中间名（如果有的话）。
+
+说到这里，让我岔开话题来讨论一下礼仪。  我相信，虽然引文的风格反映了回复者（即您）的个人品味，但归因选择最终是原作者的个人选择。  从某种意义上说，这是他或她的“网络昵称”，因此作者在归属字符串的选择上应该有一定的发言权。  想象一下，如果有人给你起了一个你不喜欢的昵称，你会有什么感觉？
+
+因此，Supercite 会识别一个特殊的邮件标头 @samp{X-Attribution:}，如果存在该标头，则会告诉 Supercite 原作者首选的归属字符串。  该标头的值与归因列表中的 @code{"x-attribution"} 键关联。  目前，您可以通过更改 @code{sc-preferred-attribution-list} 来覆盖此键的首选项，但这并不礼貌，将来 Supercite 可能会对其进行硬编码。  目前，建议如果您更改此列表中键的顺序，则@code{"x-attribution"}始终位于第一个，或者可能仅位于@code{"sc-lastchoice"}之后。  后者是默认设置。
+
+@vindex sc-attrib-selection-list
+@vindex attrib-selection-list @r{(sc-)}
+@code{sc-preferred-attribution-list}中的值@code{"sc-consult"}在属性选择期间具有特殊含义。  当 Supercite 遇到此首选项时，它开始处理包含在变量 @code{sc-attrib-selection-list} 中的可自定义属性列表。此列表中的每个元素都包含以下形式的列表：
+
+@example
+@group
+(@var{infokey} ((@var{regexp} . @var{attribution})
+         (@var{regexp} . @var{attribution})
+         (@dots{})))
+@end group
+@end example
+
+@noindent
+@findex sc-mail-field
+@findex mail-field @r{(sc-)}
+其中 @var{infokey} 是 @code{sc-mail-field} 的键，@var{regexp} 是与 @var{infokey} 的值匹配的正则表达式。  如果 @var{regexp} 与 @var{infokey} 的值匹配，则将 @var{attribution} 用作属性字符串。  实际上，@var{attribution}可以是字符串，也可以是列表；如果它是一个列表，则它是@code{eval}uated，并且返回值（必须是字符串）用作属性。
+
+当您回复不使用 @samp{X-Attribution:@:} 邮件标题的网友时，这非常有用。  您可能知道他们更喜欢使用什么昵称，并且您可以设置此列表以匹配特定的邮件字段，例如@samp{From:@:}，允许您使用适当的属性引用朋友的消息。
+
+@node  Anonymous Attributions
+@section 匿名归因
+@vindex sc-default-author-name
+@vindex default-author-name @r{(sc-)}
+@vindex sc-default-attribution
+@vindex default-attribution @r{(sc-)}
+
+当在 @samp{From:@:} 邮件标头中找不到作者姓名时，必须提供后备作者姓名和归属字符串。后备作者姓名包含在变量 @code{sc-default-author-name} 中，后备属性字符串包含在变量 @code{sc-default-attribution} 中。  这些变量的默认值分别是 @code{"Anonymous"} 和 @code{"Anon"}。  请注意，在大多数情况下，获取默认作者姓名或归属表明某些内容设置不正确。
+
+@vindex sc-use-only-preference-p
+@vindex use-only-preference-p @r{(sc-)}
+此外，如果无法找到您在 @code{sc-preferred-attribution-list} 变量中指定的首选归因，则可以采用辅助方法来查找有效的归因字符串。  变量 @code{sc-use-only-preference-p} 控制在这种情况下发生的情况。  如果变量的值非@code{nil}，则使用@code{sc-default-author-name}和@code{sc-default-attribution}，否则，采取以下步骤查找有效的属性字符串，第一步返回非@code{nil}、非空字符串成为属性：
+
+@enumerate
+@item
+使用最后选择的属性（如果有）。
+
+@item
+使用 @code{"x-attribution"} 键的值。
+
+@item
+使用作者的名字。
+
+@item
+使用作者的姓氏。
+
+@item
+使用作者姓名首字母。
+
+@item
+在归因列表中查找第一个非@code{nil}、非空归因字符串。
+
+@item
+使用@code{sc-default-attribution}。
+@end enumerate
+
+@vindex sc-confirm-always-p
+@vindex confirm-always-p @r{(sc-)}
+自动选择归因字符串后，可能会发生许多事情。  如果变量 @code{sc-confirm-always-p} 不是 @code{nil}，系统会询问您是否确认所选的属性字符串。  完成的可能值是归因列表中的那些字符串，但是您不限于这些选择。您可以在确认提示符下键入任意字符串。  您输入的字符串将成为与归因列表中的 @code{"sc-lastchoice"} 键关联的值。
+
+@vindex sc-downcase-p
+@vindex downcase-p @r{(sc-)}
+选择属性字符串后，如果变量 @code{sc-downcase-p} 为非 @code{nil}，Supercite 将强制该字符串小写。
+
+@vindex sc-attribs-preselect-hook
+@vindex attribs-preselect-hook @r{(sc-)}
+@vindex sc-attribs-postselect-hook
+@vindex attribs-postselect-hook @r{(sc-)}
+
+两个挂钩变量可以更好地控制归因选择过程。  钩子 @code{sc-attribs-preselect-hook} 在选择任何属性之前运行。  同样，钩子 @code{sc-attribs-postselect-hook} 在选择属性（并构建相应的引文字符串）之后、但在提交这些值供 Supercite 使用之前运行。  在后选择挂钩期间，局部变量 @code{attribution} 和 @code{citation} 绑定到适当的字符串。  通过更改挂钩函数中的这些变量，您可以更改 Supercite 使用的归因和引用字符串。  一种可能的用途是覆盖任何自动派生的属性字符串（当它只有一个字符长时）；例如，您更喜欢使用 @code{"initials"} 但作者只有一个名字。
+
+@node  Author Names
+@section 作者姓名
+@cindex author names
+
+Supercite 采用多种启发式方法，根据原始消息的 @samp{From:@:} 邮件字段值来破译作者姓名。 Supercite 可以识别几乎所有常用的 @samp{From:@:} 字段格式。  如果您遇到 Supercite 无法解析的 @samp{From:@:} 字段，请使用 @kbd{M-x report-emacs-bug} 报告此错误。
+
+@vindex sc-titlecue-regexp
+@vindex titlecue-regexp @r{(sc-)}
+有许多 Supercite 变量控制如何从 @samp{From:@:} 标头中提取作者姓名。  某些标题可能包含描述性标题，如下所示：
+
+@example
+From:@: computer!speedy!doe (John Xavier-Doe -- Decent Hacker)
+@end example
+
+Supercite 知道 @samp{From:@:} 标头的哪一部分是电子邮件地址，哪一部分是作者姓名，但在本例中，字符串 @code{"Decent Hacker"} 不是作者姓名的一部分。  您可以告诉 Supercite 忽略标题，同时仍然通过在变量 @code{sc-titlecue-regexp} 中使用正则表达式来识别连字符的名称。该变量的默认值为@code{"\\\\s +-+\\\\s +"}。  遇到此正则表达式之后的任何文本都将被视为噪音而忽略。
+
+@vindex sc-name-filter-alist
+@vindex name-filter-alist @r{(sc-)}
+一些 @samp{From:@:} 标题可能在名称字段中包含额外的标题，这些标题没有被标题提示分隔，但它们仍然不是作者姓名的一部分。  例如，头衔“博士”、“先生”、“女士”、“Jr.”、“Sr.”和“III”（例如瑟斯顿·豪三世）。此外，一些公司会在作者姓名前添加部门、组织或项目的名称。  所有这些标题都是噪音，应该被忽略。  变量 @code{sc-name-filter-alist} 用于此目的。  正如其名称所暗示的，该变量是一个关联列表，其中每个元素都是以下形式的 cons 单元格：
+
+@example
+(@var{regexp} . @var{position})
+@end example
+
+@noindent
+其中 @var{regexp} 是与 @samp{From:@:} 字段作者姓名的每个元素相匹配（使用 @code{string-match}）的正则表达式。  @var{position} 是位置指示器，从零开始。因此，要从名称中删除所有“博士”、“先生”等头衔，@code{sc-name-filter-alist} 将具有如下条目：
+
+@example
+("^\\(Mr\\|Mrs\\|Ms\\|Dr\\)[.]?$" . 0)
+@end example
+
+@noindent
+仅当它们作为名称中的第一个单词出现时才会将其删除。位置指示符是一个整数，或者两个特殊符号@code{last}或@code{any}之一。  @code{last} 始终与名称字段中的最后一个单词匹配，而 @code{any} 与名称字段中的每个单词匹配。
+
+@node  Configuring the Citation Engine
+@chapter 配置引文引擎
+@cindex Regi
+@cindex frames (Regi)
+@cindex entries (Regi)
+
+Supercite 的核心是一个名为 @dfn{Regi} 的正则表达式解释引擎。  Regi 通过解释称为 Regi-frame（或简称 @dfn{frame}）的数据结构进行操作，该数据结构是 Regi 条目列表（或简称 @dfn{entry}）。  每个条目都包含一个谓词，通常是正则表达式，它与当前缓冲区中的一行文本进行匹配。  如果谓词匹配 true，则关联的表达式将被 @code{eval}uated。  通过这种方式，整个文本区域可以以类似 4⁣ 的方式进行变换。  Regi 在整个 Supercite 中都有使用，从邮件标题信息提取到标题破坏，再到引用文本。
+
+@menu
+* Using Regi::
+* Frames You Can Customize::
+@end menu
+
+虽然下面讨论了 Regi 的细节 (@pxref{Using Regi})，但只有那些希望定制 Supercite 某些方面的人才需要关心它。  但重要的是要理解，任何可以用正则表达式描述的可能的引用样式都可以被 Supercite 识别。  这导致了一些有趣的应用。  例如，如果您经常收到同事发来的电子邮件，该同事使用不常见的引文样式（例如在行首使用 @samp{|} 或 @samp{@}} 字符），Supercite 可能会识别这一点，并将 @emph{coerce} 引文改为您喜欢的样式，以保持一致性。  理论上，Supercite 可以识别 uuencoded 消息或 C 代码等内容，并引用或填充与普通文本不同的内容。  目前这些都不是 Supercite 的一部分，但欢迎贡献！
+
+@node  Using Regi
+@section 使用Regi
+@findex regi-interpret
+@findex eval
+@findex looking-at
+
+Regi 通过使用函数 @code{regi-interpret} 解释帧来工作。  框架是任意大小的列表，其中每个元素都是以下形式的条目：
+
+@example
+(@var{pred} @var{func} [@var{negate-p} [@var{case-fold-search}]])
+@end example
+
+Regi 从帧中的第一个条目开始，根据 @samp{point} 所在行的开头评估该条目的 @var{pred}。如果 @var{pred} 计算结果为 true（如果可选 @var{negate-p} 为非 @code{nil}，则为 false），则该条目的 @var{func} 为 @code{eval}uated。  处理如何继续由@var{func}的返回值决定，如下所述。  如果@var{pred}为假，则检查帧中的下一个条目，直到所有条目都与当前行匹配。  如果没有条目匹配，则@samp{point}向前移动一行，并将帧重置为第一个条目。
+
+@var{pred} 可以是字符串、变量、列表或以下符号之一：@code{t}、@code{begin}、@code{end} 或@code{every}。  如果 5⁣ 是字符串，或者 6⁣ 相当于字符串的变量或列表，则它被解释为正则表达式。  该正则表达式使用 @code{looking-at} 从头开始​​与当前行进行匹配。  如果可选的 @var{case-fold-search} 是非 @code{nil}，则此匹配会折叠大小写。  如果 @var{pred} 不是字符串，或者不 @code{eval} 相当于字符串，则它被解释为二进制值（@code{nil} 或非 @code{nil}）。
+
+@var{pred} 的四个特殊符号值已被识别：
+
+@table @code
+@item t
+总是产生真实的结果。
+@item begin
+始终在解释帧之前执行。  例如，这可以用于初始化一些全局变量。
+@item end
+总是在帧解释完成后执行。  这可用于执行任何必要的后处理。
+@item every
+每当帧重置时执行，通常是在整个帧与当前行匹配之后。
+@end table
+
+请注意，如果 @var{pred} 是这些特殊符号之一，则@var{negate-p} 和 @var{case-fold-search} 将被忽略。  仅使用帧中每个符号第一次出现的情况；任何重复项都会被忽略。  另请注意，出于性能原因，与这些符号关联的条目会在主解释循环期间从帧中删除。
+
+您的@var{func}可以返回某些控制继续Regi处理的值。  默认情况下，如果您的 @var{func} 返回 @code{nil} （应该小心明确地执行此操作），Regi 会将框架重置为第一个条目，并将 @samp{point} 前进到下一行的开头。如果函数返回列表，则它可以包含以下元素的任意组合：
+
+@table @asis
+@item 符号@code{continue}
+这告诉 Regi 在比赛结束后继续处理条目，而不是重置框架并移动 @samp{point}。  这样，一行文本可以有多个匹配项，但要小心，避免进入无限循环。
+
+@item 符号@code{abort}
+这告诉 Regi 终止帧处理。  但是，任何 @code{end} 条目仍会被处理。
+
+@item 列表@code{(frame . @var{newframe})}
+这告诉 Regi 将 @var{newframe} 替换为它正在解释的帧。  换句话说，你的@var{func}可以动态修改Regi框架。  @var{newframe} 可以是包含框架的变量，也可以是内嵌的框架。
+
+@item 列表@code{(step . @var{step})}
+告诉 Regi 在继续处理时向前移动 @var{step} 行数。  默认情况下，Regi 向前移动一行。  @var{step} 当然可以为零或负数，但要注意无限循环。
+@end table
+
+在执行@var{func}期间，以下变量将临时绑定到一些有用的信息：
+
+@table @code
+@item curline
+Regi 为 @code{looking-at} 的缓冲区中的当前行，作为字符串。
+@item curframe
+正在解释的当前帧。
+@item curentry
+正在解释的当前帧条目。
+@end table
+
+@node  Frames You Can Customize
+@section 您可以定制的框架
+@vindex sc-nuke-mail-header
+
+如前所述，Supercite 使用各种框架来执行某些工作，例如邮件标头信息提取和邮件标头破坏。  但是，这些框架不可供您自定义，除非通过 @code{sc-nuke-mail-header} 等抽象接口。
+
+@vindex sc-default-cite-frame
+然而，Supercite 使用的引文框架提供了大量的自定义功能，因此您可以进行更改以满足您的需求。  引用的主力是变量@code{sc-default-cite-frame}中包含的框架。  该框架可以识别许多情况，例如空行，它将其解释为段落分隔符。  它还可以识别原始消息中先前引用的嵌套和非嵌套引用。  默认情况下，它会将非嵌套引用强制转换为您首选的引用样式，并且会为嵌套引用添加一定程度的引用。  它还会简单地以您喜欢的风格引用未引用的台词。
+
+@cindex unciting
+@cindex reciting
+@vindex sc-default-uncite-frame
+@vindex sc-default-recite-frame
+同样，@dfn{unciting}和@dfn{reciting}有默认框架，分别包含在变量@code{sc-default-uncite-frame}和@code{sc-default-recite-frame}中。
+
+如前所述 (@pxref{Recognizing Citations})，引用是通过正则表达式 @code{sc-citation-root-regexp} 等的值来识别的。  要识别奇怪的样式，您可以修改这些变量，或者可以修改默认的施引框架。  或者，您可以设置框架关联列表来识别特定的替代形式。
+
+@vindex sc-cite-frame-alist
+@vindex sc-uncite-frame-alist
+@vindex sc-recite-frame-alist
+对于每一个动作——引用、取消引用和背诵——都会咨询一个列表来找到要使用的框架（分别是@code{sc-cite-frame-alist}、@code{sc-uncite-frame-alist}和@code{sc-recite-frame-alist}）。  这些框架可以包含以下形式的列表：
+
+@example
+((@var{infokey} (@var{regexp} . @var{frame}) (@var{regexp} . @var{frame}) @dots{})
+ (@var{infokey} (@var{regexp} . @var{frame}) (@var{regexp} . @var{frame}) @dots{})
+ (@dots{}))
+@end example
+
+@vindex sc-mail-field
+@findex string-match
+其中 @var{infokey} 是适合 @code{sc-mail-field} 的键，@var{regexp} 是一个正则表达式，它针对 @code{sc-mail-field} 键的值进行 @code{string-match}'d，@var{frame} 是发生匹配时要使用的帧。  @var{frame} 可以是包含框架或内联框架的变量。
+
+当 Supercite 即将引用、取消引用或复述某个区域时，它会咨询适当的列表并尝试找到要使用的框架。  如果没有从列表中找到，则使用适当的默认框架。
+
+@node  Post-yank Formatting Commands
+@chapter 复制后格式化命令
+@vindex sc-mode-map-prefix
+@vindex mode-map-prefix @r{(sc-)}
+@kindex C-c C-p
+
+一旦原始消息被拉入回复缓冲区，并且 @code{sc-cite-original} 有机会执行其操作，您将可以使用许多有用的 Supercite 命令。  由于 MUA 在其回复缓冲区中设置的键盘映射多种多样，因此 Supercite 几乎不可能将其命令正确地撒入现有的键盘映射中。  因此，Supercite 将其命令放置在单独的键盘映射上，并将该键盘映射放置在回复缓冲区中的前缀键上。  您可以通过更改变量@code{sc-mode-map-prefix}来自定义 Supercite 使用的前缀键。  默认情况下，@code{sc-mode-map-prefix}为@kbd{C-c C-p}；当然，这不是一个很好的选择，但不幸的是迄今为止最好的通用解决方案。  在本章的其余部分中，我们假设您已经在默认前缀上安装了 Supercite 的键盘映射。
+
+@menu
+* Citing Commands::
+* Insertion Commands::
+* Variable Toggling Shortcuts::
+* Mail Field Commands::
+* Miscellaneous Commands::
+@end menu
+
+@node   Citing Commands
+@section 手动引用、背诵和取消引用的命令
+@vindex sc-cite-region-limit
+
+您将执行的三种最常见的复制后格式化操作可能是手动引用、背诵和取消引用回复缓冲区中的文本区域。  通常，您可能需要背诵一段文字以使用昵称，或者在将 @code{sc-cite-region-limit} 设置为 @code{nil} 时手动引用一条消息。  以下命令对 @samp{point} 和 @samp{mark} 之间的文本区域执行这些功能。  他们每个人都会在修改区域之前设置@dfn{undo boundary}，以便可以以标准 Emacs 方式撤消命令。
+
+以下是 Supercite 引用命令的列表：
+
+@table @asis
+@findex sc-cite-region
+@findex cite-region @r{(sc-)}
+@kindex C-c C-p c
+@vindex sc-pre-cite-hook
+@vindex pre-cite-hook @r{(sc-)}
+@vindex sc-confirm-always-p
+@vindex confirm-always-p
+@kindex C-u
+@item @code{sc-cite-region} (@kbd{C-c C-p c})
+此命令通过解释 @code{sc-cite-frame-alist} 中的选定帧或默认引用帧 @code{sc-default-cite-frame} 来引用文本区域中的每一行。  它在解释帧之前运行钩子@code{sc-pre-cite-hook}。  使用可选的通用参数 (@kbd{C-u})，它会临时将 @code{sc-confirm-always-p} 设置为 @code{t}，以便您可以确认单个手动引用的归因字符串。 @xref{Configuring the Citation Engine}。
+
+@findex sc-uncite-region
+@findex uncite-region @r{(sc-)}
+@kindex C-c C-p u
+@item @code{sc-uncite-region} (@kbd{C-c C-p u})
+此命令通过解释 @code{sc-uncite-frame-alist} 中的选定帧或默认的非引用帧 @code{sc-default-uncite-frame} 来删除该区域中每个引用行的开头的任何引文字符串。  它在解释帧之前运行钩子@code{sc-pre-uncite-hook}。 @xref{Configuring the Citation Engine}。
+
+@findex sc-recite-region
+@findex recite-region @r{(sc-)}
+@kindex C-c C-p r
+@item @code{sc-recite-region} (@kbd{C-c C-p r})
+此命令通过解释从 @code{sc-recite-frame-alist} 中选择的帧或默认背诵帧 @code{sc-default-recite-frame} 来背诵该区域的每一行。  它在解释帧之前运行钩子@code{sc-pre-recite-hook}。 @xref{Configuring the Citation Engine}。
+
+@vindex sc-confirm-always-p
+@vindex confirm-always-p @r{(sc-)}
+Supercite 在背诵某个区域时始终会要求您确认归属，无论 @code{sc-confirm-always-p} 的值如何。
+@end table
+
+@node  Insertion Commands
+@section 插入命令
+
+这两个函数将各种字符串插入回复缓冲区。
+
+@table @asis
+@findex sc-insert-reference
+@findex insert-reference @r{(sc-)}
+@kindex C-c C-p w
+@item @code{sc-insert-reference} (@kbd{C-c C-p w})
+@vindex sc-preferred-header-style
+@vindex preferred-header-style @r{(sc-)}
+将引用标头插入到回复缓冲区的@samp{point}处。  如果没有参数，则插入由 @code{sc-preferred-header-style} 索引的标头。  可选的数字参数是 @code{sc-rewrite-header-list} 的索引，指示要写入哪个引用标头。
+
+仅使用通用参数 (@kbd{C-u})，无论 @code{sc-electric-references-p} 的值如何，都会进入电参考模式。
+
+@findex sc-insert-citation
+@findex insert-citation @r{(sc-)}
+@kindex C-c C-p i
+@item @code{sc-insert-citation} (@kbd{C-c C-p i})
+将当前引文字符串插入到 @samp{point} 所在行的开头。  如果该行已被引用，Supercite 将发出错误并且不会引用该行。
+@end table
+
+@node  Variable Toggling Shortcuts
+@section 变量切换快捷键
+@cindex toggling variables
+
+Supercite 定义了许多命令，使您在编辑回复缓冲区时可以更轻松地切换和设置各种 Supercite 变量。  例如，您可能想关闭填充或空白清理，但只是暂时的。  这些切换快捷命令使这很容易做到。
+
+@kindex C-c C-p C-t
+与一般的 Supercite 命令一样，切换命令放置在更大的 Supercite 键映射内的键映射前缀上。  对于 @code{sc-mode-map-prefix} 的默认值，这将是 @kbd{C-c C-p C-t}。
+
+以下命令切换某些仅采用二进制值的 Supercite 变量的值：
+
+@table @kbd
+@item C-c C-p C-t b
+切换变量@code{sc-mail-nuke-blank-lines-p}。
+
+@item C-c C-p C-t c
+切换变量@code{sc-confirm-always-p}。
+
+@item C-c C-p C-t d
+切换变量@code{sc-downcase-p}。
+
+@item C-c C-p C-t e
+切换变量@code{sc-electric-references-p}。
+
+@item C-c C-p C-t f
+切换变量@code{sc-auto-fill-region-p}。
+
+@item C-c C-p C-t o
+切换变量@code{sc-electric-circular-p}。
+
+@item C-c C-p C-t s
+切换变量@code{sc-nested-citation-p}。
+
+@item C-c C-p C-t u
+切换变量@code{sc-use-only-preferences-p}。
+
+@item C-c C-p C-t w
+切换变量@code{sc-fixup-whitespace-p}。
+@end table
+
+@findex set-variable
+以下命令可让您设置多值变量的值，与 Emacs 的 @code{set-variable} 的方式相同：
+
+@table @kbd
+@item C-c C-p C-t a
+设置变量 @code{sc-preferred-attribution-list} 的值。
+
+@item C-c C-p C-t l
+设置变量 @code{sc-cite-region-limit} 的值。
+
+@item C-c C-p C-t n
+设置变量 @code{sc-mail-nuke-mail-headers} 的值。
+
+@item C-c C-p C-t N
+设置变量 @code{sc-mail-header-nuke-list} 的值。
+
+@item C-c C-p C-t p
+设置变量 @code{sc-preferred-header-style} 的值。
+@end table
+
+@kindex C-c C-p C-p
+提供了一个特殊命令来同时切换 @code{sc-auto-fill-region-p} 和 @code{sc-fixup-whitespace-p}。这是因为您通常希望使用 @code{nil} 或非 @code{nil} 变量来运行 Supercite。  将这些变量切换在一起的命令绑定在 @kbd{C-c C-p C-p} 上。
+
+最后，命令 @kbd{C-c C-p C-t h} （也称为 @kbd{C-c C-p C-t ?}）会在切换键盘映射上显示一条帮助消息。
+
+
+@node  Mail Field Commands
+@section 邮件字段命令
+
+这些命令允许您查看、修改、添加和删除信息列表中的各种信息。 @xref{Information Keys and the Info Alist}。
+
+@table @asis
+@kindex C-c C-p f
+@findex sc-mail-field-query
+@findex mail-field-query @r{(sc-)}
+@kindex C-c C-p f
+@item @code{sc-mail-field-query} (@kbd{C-c C-p f})
+允许您以交互方式查看、修改、添加和删除信息列表键值对。  如果没有参数，系统会提示您（完成后）输入信息密钥。  与该键关联的值显示在迷你缓冲区中。  使用参数时，此命令将首先询问您是否要查看、修改、添加或删除信息键。  查看与运行不带参数的命令相同。
+
+如果您想修改某个键的值，Supercite 将首先提示您（需要完成）您要更改的值的键。  然后，它会将您放入带有该键的当前值的迷你缓冲区中，以便您可以根据需要编辑该值。  当您点击 @key{RET} 时，该键的值就会更改。  保留值的迷你缓冲区历史记录。
+
+如果您选择删除键值对，Supercite 将提示您（完成后）输入要删除的键。
+
+如果您选择添加新的键值对，Supercite 首先会提示您输入要添加的键。  请注意，此提示已打开完成功能，但您可以在此处键入任何键名称，甚至是尚不存在的键名称。输入密钥后，Supercite 会提示您输入密钥的值。  输入已存在的键并不是错误，但新值将覆盖任何旧值。  但它不会取代它；如果您随后删除该键值对，旧值将重新出现。
+
+@findex sc-mail-process-headers
+@findex mail-process-headers @r{(sc-)}
+@kindex C-c C-p g
+@item @code{sc-mail-process-headers} (@kbd{C-c C-p g})
+此命令允许您从 @samp{point} 和 @samp{mark} 之间区域中的任何邮件标头集重新初始化 Supercite 的信息列表。此功能对于回复摘要消息特别有用，其中 Supercite 最初会为摘要发起者设置其信息，但您希望引用真实消息作者的每个组件文章。  请注意，除非处理过程中发生错误，否则所有旧信息都会丢失。
+@end table
+
+@node  Miscellaneous Commands
+@section 杂项命令
+
+@table @asis
+@findex sc-open-line
+@findex open-line @r{(sc-)}
+@findex open-line
+@kindex C-c C-p o
+@item @code{sc-open-line} (@kbd{C-c C-p o})
+与 Emacs 的标准 @code{open-line} 命令类似，但在新行前面插入引文字符串。  与 1⁣ 一样，可选的数字参数会插入许多新行。
+@end table
+
+@node  Hints to MUA Authors
+@chapter 给 MUA 作者的提示
+
+1989 年 6 月，各个 MUA 作者、Supercite 作者和其他 Supercite 用户之间进行了一些讨论。  这些讨论集中在 MUA 和 Supercite（或任何未来类似 Supercite 的软件包）之间需要一个标准接口。  该接口由 Martin Neitzel 于 89 年 6 月 23 日星期五在发送给 Supercite 邮件列表的邮件中正式提出：
+
+@example
+        Martin> Each news/mail-reader should provide a form of
+        Martin> mail-yank-original that
+
+        Martin> 1: inserts the original message incl. header into the
+        Martin>    reply buffer; no indentation/prefixing is done, the header
+        Martin>    tends to be a "full blown" version rather than to be
+        Martin>    stripped down.
+
+        Martin> 2: 'point' is at the start of the header, 'mark' at the
+        Martin>    end of the message body.
+
+        Martin> 3: (run-hooks 'mail-yank-hooks)
+
+        Martin> [Supercite] should be run as such a hook and merely
+        Martin> rewrite the message.  This way it isn't anymore
+        Martin> [Supercite]'s job to gather the original from obscure
+        Martin> sources. [@dots{}]
+@end example
+
+@vindex mail-citation-hook
+@vindex mail-yank-hooks
+@cindex sendmail.el
+@findex mail-yank-original
+@findex defvar
+该规范已被采纳，但随着 Emacs 19 的发布进行了轻微修改。MUA 应该提供的钩子变量不是变量 @code{mail-yank-hooks}，而是@code{mail-citation-hook}。  Richard Stallman 建议 MUA 应从 @code{defvar} @code{mail-citation-hook} 到 @code{nil} 并在这种情况下执行一些默认操作。
+
+如果您正在编写新的 MUA 包，或维护现有的 MUA 包，您应该使其符合此接口，以便您的用户能够轻松、无缝地链接 Supercite。  为此，在设置回复或转发缓冲区时，您的 MUA 应遵循以下步骤：
+
+@enumerate
+@item 
+将原始消息（包括邮件标头）插入回复缓冲区。  此时，您不应以任何方式修改原始文本（任何必要的解码除外，例如引用可打印文本的解码），并且应将所有原始标头放入回复正文中。这意味着许多邮件标头将被重复，一份副本位于 @code{mail-header-separator} 行上方，一份副本位于下方，但是该行下方可能会有更多标头。
+
+@item 
+将 @samp{point} 设置为包含回复正文中第一个邮件标头的行的开头。  在消息文本末尾设置 @samp{mark}。  在 Supercite 要修改的文本周围设置区域并且邮件标头位于该区域内非常重要。  Supercite 不会以任何理由冒险到该区域之外，该区域内的任何东西都是公平的游戏，所以不要将 @strong{must} 保持不变的任何东西放入该区域内。
+
+@item 
+运行钩子@code{mail-citation-hook}。  如果用户没有安装 Supercite，您可能希望提供某种默认引用功能。  默认情况下，您的 MUA 应从 @code{defvar} @code{mail-citation-hook} 到 @code{nil}，并在您的拉动函数中检查其值。  如果它发现@code{mail-citation-hook}是@code{nil}，它应该执行一些默认的引用行为。  想要连接到 Supercite 的用户只需使用 @code{add-hook} 将 @code{sc-cite-original} 添加到此钩子列表中。
+@end enumerate
+
+如果您完成所有这些操作，您的 MUA 将加入“开箱即用”符合此接口的行列。
+
+@node Thanks and History
+@chapter 感谢和历史
+
+Supercite 软件包源自其前身 Superyank 1.11，该软件包的灵感来自 Martin Neitzel 和 Ashwin Ram 的各种代码和想法。  他们提出了非嵌套引用的想法，并实现了一些粗略的代码来提供这种风格。  Superyank 和 Supercite 版本 2 发展到大部分属性选择机制都是自动的，并且通过 Supercite 邮件列表参与者的评论和建议不断添加功能。
+
+在版本 3 中，Supercite 经历了几乎完全的重写，在很多方面都受益匪浅，包括性能速度的巨大改进、代码大小和 Emacs 资源使用的大幅减少，以及更加干净和灵活的内部架构。  大部分工作都是内部工作，对于临时用户来说并不是很重要。  在用户可见的级别上有一些变化，但在大多数情况下，版本 2 中的 Supercite 配置变量应该仍然与版本 3 相关。希望 Supercite 版本 3 比其前身更快、更小、更灵活。
+
+在版本 2 手册中，我感谢了一些特定人员在开发 Supercite 2 时提供的帮助。你们知道自己是谁，非常感谢你们持续的支持。  我要感谢 Supercite 邮件列表中的每个人，特别是勇敢的 alpha 测试人员，他们在测试 Supercite 版本 3 的概念和实现方面提供了很大帮助。特别感谢 MUA 和 Emacs 作者 Kyle Jones、Stephen Gildea、Richard Stallman 和 Jamie Zawinski 就新的 @code{mail-citation-hook} 界面快速达成一致，并在他们的代码中添加了 magic lisp 来支持这一点。
+
+所有提供帮助和贡献的人都受到极大的感谢。
+
+Supercite 是由 Barry Warsaw 编写的。
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node  Concept Index
+@unnumbered 概念索引
+@printindex cp
+
+@node  Command Index
+@unnumbered 命令索引
+
+由于所有超级引用命令都以字符串“@code{sc-}”开头，因此每个命令都出现在其 @code{sc-}@var{command} 名称和 @var{command} 名称下。
+@iftex
+@sp 2
+@end iftex
+@printindex fn
+
+@node  Key Index
+@unnumbered 关键指标
+@printindex ky
+
+@node Variable Index
+@unnumbered 变量索引
+
+由于所有超级引用变量都以字符串“@code{sc-}”开头，因此每个变量都出现在其 @code{sc-}@var{variable} 名称和 @var{variable} 名称下。
+@iftex
+@sp 2
+@end iftex
+@printindex vr
+@bye

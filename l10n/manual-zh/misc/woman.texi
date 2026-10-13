@@ -1,0 +1,917 @@
+\输入 texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename ../../info/woman.info
+@settitle WoMan：浏览 Unix 手册页 ``W.O. （没有）男人”
+@documentlanguage en
+@include docstyle.texi
+@include emacsver.texi
+@afourpaper
+@c With different size paper the printed page breaks will need attention!
+@c Look for @page and @need commands.
+@setchapternewpage off
+@paragraphindent 0
+@c %**end of header
+
+@copying
+该文件记录了 WoMan：一个浏览 Unix 手册页的程序``W.O. （没有）人”。
+
+版权所有 @copyright{} 2001--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* WoMan: (woman).                浏览 UN*X 手册页“W.O.（无）人”。
+@end direntry
+
+@finalout
+
+@titlepage
+@title 女士
+@subtitle 浏览 Unix 手册页 ``W.O. （没有）男人”
+@subtitle 随 Emacs 一起发布 @value{EMACSVER}
+@author Francis J. Wright
+@sp 2
+@author School of Mathematical Sciences
+@author Queen Mary and Westfield College
+@author (University of London)
+@author Mile End Road, London E1 4NS, UK
+@author @email{F.J.Wright@@qmul.ac.uk}
+@author @uref{http://centaur.maths.qmw.ac.uk/}
+@c He no longer maintains this manual.
+
+@comment  The following two commands start the copyright page.
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@c ===================================================================
+
+@ifnottex
+@node Top
+@top WoMan: Browse Unix Manual Pages ``W.O. (without) Man''
+
+@display
+As distributed with Emacs @value{EMACSVER}.
+
+@ifnothtml
+@email{F.J.Wright@@qmw.ac.uk, Francis J. Wright}
+@end ifnothtml
+@ifhtml
+Francis J. Wright
+@end ifhtml
+@uref{http://centaur.maths.qmw.ac.uk/, School of Mathematical Sciences}
+Queen Mary and Westfield College (University of London)
+Mile End Road, London E1 4NS, UK
+@end display
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Introduction::         介绍
+* Background::           背景
+* Finding::              查找和格式化手册页
+* Browsing::             浏览手册页
+* Customization::        定制化
+* Log::                  *WoMan-Log* 缓冲区
+* Technical::            技术细节
+* Bugs::                 报告错误
+* Acknowledgments::      致谢
+* GNU Free Documentation License::  本文档的许可证。
+* Command Index::        命令索引
+* Variable Index::       变量索引
+* Keystroke Index::      击键索引
+* Concept Index::        概念索引
+@end menu
+
+@c ===================================================================
+
+@node Introduction
+@chapter 介绍
+@cindex introduction
+
+WoMan 主要在各种版本的 Microsoft Windows 上开发，但也在 MS-DOS 以及各种版本的 UNIX 和 GNU/Linux 上进行了测试。
+
+WoMan 与 GNU Emacs 一起发布。
+
+WoMan 实现了 Emacs @code{man}（或 @code{manual-entry}）命令执行的格式化子集，以格式化 Unix 风格的 @dfn{manual page}（通常缩写为 @dfn{man page}）进行显示，但不调用任何外部程序。  它旨在模拟整个 @code{roff -man} 宏包，以及手册页中最常用的 @code{roff} 请求 (@pxref{Background, , Background})。  然而，模拟被修改为包括由 Emacs @code{man} 命令完成的重新格式化。  不执行连字符。
+
+@table @b
+@item 优点
+更直接，不需要任何外部程序。  支持手册页名称的完成。
+@item 缺点
+不是完整的模拟。  目前不支持@code{eqn}或@code{tbl}。  对于大型手册页，速度稍慢（但对于中小型页面，速度通常更快）。
+@end table
+
+这个浏览器在简单的、编写良好的 man 文件上运行得很好。  它对于“违反规则”或直接使用更晦涩的 @code{roff} 请求的特殊文件效果较差。  当前测试结果可在文件 @uref{http://centaur.maths.qmw.ac.uk/Emacs/WoMan/files/woman.status, @file{woman.status}} 中找到。
+
+WoMan 支持通过 @code{auto-compression-mode} 使用压缩的 man 文件，必要时将其打开。  但您可能需要调整用户选项@code{woman-file-compression-regexp}。 @xref{Interface Options, , Interface Options}。
+
+有关 WoMan 交互式命令和用户选项的简要帮助（所有这些命令和用户选项均以前缀 @code{woman-}（或偶尔为 @code{WoMan-}）开头），可以通过加载 WoMan，然后运行命令 @code{woman-mini-help} 或选择 WoMan 菜单选项 @samp{Mini Help} 来最轻松地获得。
+
+下面给出了报告错误的指南。  @xref{Bugs, , Reporting Bugs}。
+
+@c ===================================================================
+
+@node Background
+@chapter 背景
+@cindex background
+
+WoMan 是传统 Unix 风格手册页文档的浏览器。每个这样的文档通常被称为“0”，或简称为“1”，即使有些文档比一页长得多。  手册页是使用 Unix“man”宏编写的文档，这些宏本身是用 nroff/troff 文本处理标记语言编写的。  @code{nroff} 和 @code{troff} 是最初由美国新泽西州默里山贝尔实验室的 Joseph F. Ossanna 为 UNIX 操作系统编写的文本处理器@. 它们密切相关，除了在少数情况下它们之间的区别很重要之外，我将它们都含糊地称为 @code{roff}。
+
+@code{roff}标记由@dfn{requests}和@dfn{escape sequences}组成。  请求占据一整行，并以句点或撇号开头。  转义序列嵌入在输入文本中，并以反斜杠开头（默认情况下）。  原始的 man 宏包定义了 20 个作为宏实现的新 @code{roff} 请求，这被认为足以编写手册页。  但是，虽然原则上手册页仅使用 man 宏，但实际上有相当多的人使用许多其他 @code{roff} 请求。
+
+@code{troff} 和 @code{nroff} 之间的区别在于，@code{troff} 设计用于驱动照排机，而 @code{nroff} 设计用于为类似于电传打字机（通常缩写为“teletype”或“tty”）的基于字符的设备产生基本 @acronym{ASCII} 输出。  因此，@code{troff}支持比@code{nroff}更精细的输出定位控制，并且可以被视为@TeX{}的先驱。  传统上，手册页要么通过 @code{troff} 进行排版，要么通过 @code{nroff} 进行格式化，以便在字符打印机上打印或在屏幕上显示。  当然，在过去 25 年左右的时间里，纸张上的排版输出和屏幕上的字符之间的区别已经变得模糊，因为大多数屏幕现在都支持位图显示，因此任何可以打印的信息也可以在屏幕上呈现，唯一的区别是分辨率。
+
+尽管如此，Unix 风格的手册页文档仍然通常通过运行名为 @code{man} 的程序在屏幕上浏览。  该程序在一组预定义的目录中查找与指定主题匹配的手册页，然后通过运行 @code{nroff} 格式化源文件或恢复预先格式化的文件，并通过分页器（例如 @code{more}）显示它。  @code{nroff} 通常为打印机设置格式，因此它对输出进行分页、对页面进行编号等，当文档在屏幕上作为连续可滚动文档浏览时，其中大部分内容都是无关紧要的。  通常由 @code{man} 程序实现的屏幕浏览的唯一让步是将连续的空白行压缩到单个空白行中。
+
+一段时间以来，Emacs 以 Emacs @code{man}（或 @code{manual-entry}）命令的形式提供了改进的界面，用于浏览手册页，请参阅@ref{Documentation, man, Documentation Commands, emacs, GNU Emacs Manual}。该命令如上所述运行 @code{man}，可能在后台运行，然后对输出进行后处理以删除大部分 @code{nroff} 分页（例如页眉和页脚），并将结果放入 Emacs 缓冲区中。  它将这个缓冲区置于一种特殊的主要模式，该模式是为手册页浏览而定制的，并提供了许多有用的导航命令，支持以下引用等。它提供了对特殊显示面（字体）的一些支持，但没有特殊的菜单或鼠标支持。  Emacs man 包似乎已经开发了大约 10 年，从 20 世纪 80 年代末到 90 年代末。
+
+使用 @code{nroff} 对文档进行分页然后删除大部分分页的效率相当低！
+
+WoMan 是一个 Emacs Lisp 库，提供 Emacs @code{man} 命令功能的模拟，主要区别在于 WoMan 不使用任何外部程序。  WoMan 可能使用外部程序的唯一情况是当源文件被压缩时，WoMan 将使用标准 Emacs 自动解压缩工具，该工具会调用外部程序。
+
+我在 1997 年春天开始开发 WoMan，第一个版本于 1997 年 5 月发布。WoMan 的最初动机是许多 GNU 和 Unix 程序被移植到其他平台并附带 Unix 风格的手册页文档。  这可能很难阅读，因为 Unix 风格的 @code{man} 程序的端口设置起来可能有点尴尬。  我认为，考虑到 Emacs 的文本处理能力，直接模拟 20 个 @code{man} 宏应该不会太难，而不将它们视为宏并在很大程度上忽略底层 @code{roff} 请求。  事实证明这基本上是正确的，并且不需要做大量的工作就可以将简单的手册页格式化为可接受的格式。
+
+除了 1⁣ 宏之外，还有大量使用 @code{roff} 请求的手册页出现了一个问题，自从发布了 WoMan 的第一个版本以来，我一直在不断扩展它以支持更多 @code{roff} 请求。  WoMan 现在可以对我测试过的大部分手册页进行格式化，无论是很好还是至少可读。  然而，我通过对文档进行额外的遍历来部分地添加了功能，这种设计从根本上来说是有缺陷的。  这只能通过对 WoMan 进行重大重新设计来解决，以在单个递归传递中处理主要格式，而不是在没有任何重大递归的情况下呈现多个传递。  有一些 @code{roff} 请求在当前设计中无法得到令人满意的处理。  其中一些目前是通过“通常或多或少有效”的拼凑方法来处理的。
+
+WoMan 的主要优点是它不需要@code{man}，事实上，WoMan 这个名字是“without man”的缩写。但它还有其他优点。  它不对文档进行分页，因此不需要再次取消分页，从而节省了时间。  它可以充分利用可用的显示功能，我希望开发 WoMan 来利用 Emacs 本身的发展。  目前，WoMan 使用多种显示面来支持粗体和斜体文本，指示其他字体等。默认面也是彩色的，但面的选择是可定制的。  除了 @code{man} 模式提供的导航功能外，WoMan 还为导航提供菜单支持，并为以下参考文献提供鼠标支持。 WoMan 有（这个）texinfo 文档！
+
+WoMan @emph{does not} 取代了 @code{man}，尽管它确实使用了 Emacs @code{man} 库中实现的许多功能。  女人和男人可以愉快地共存，这对于比较和调试目的非常有用。
+
+@ignore
+@code{nroff} simulates non-@acronym{ASCII} characters by using one or more
+@acronym{ASCII} characters.  WoMan should be able to do much better than
+this.  I have recently begun to add support for WoMan to use more of the
+characters in its default font and to use a symbol font, and it is an
+aspect that I intend to develop further in the near future.  It should
+be possible to move WoMan from an emulation of @code{nroff} to an
+emulation of @code{troff} as GNU Emacs moves to providing bit-mapped
+display facilities.
+@end ignore
+
+@node Finding
+@chapter 查找和格式化手册页
+@cindex using, finding man pages
+@cindex using, formatting man pages
+@cindex finding man pages
+@cindex formatting man pages
+@cindex man pages, finding
+@cindex man pages, formatting
+
+WoMan 提供了三个用于查找和格式化手册页的用户界面：
+
+@itemize @bullet
+@item 
+类似于标准 Emacs @code{man} 命令提供的主题接口；
+
+@item 
+类似于标准 Emacs @code{view-file} 命令的一系列文件名接口；
+
+@item 
+从文件内容中检测文件类型的自动界面。 （目前这既没有经过充分测试，也没有得到很好的支持，也不推荐！）
+@end itemize
+
+主题和文件名接口支持以通常的方式完成。
+
+主题界面通常对于常规使用来说是最方便的，尽管它可能需要一些特殊的设置，特别是如果您的计算机尚未安装传统的 @code{man} 安装（WoMan 尝试检测）。
+
+最简单的文件名接口命令 @code{woman-find-file} 始终可以在无需任何设置的情况下使用（前提是安装并加载了 WoMan 或设置为自动加载）。
+
+自动界面始终需要特殊设置。
+
+
+@heading 文件名的大小写相关性
+
+@cindex case-sensitivity
+@vindex w32-downcase-file-names
+默认情况下，WoMan 仅在合适时才忽略文件路径名中的大小写。  想要完全独立于大小写的 Microsoft Windows 用户应将特殊的 NTEmacs 变量@code{w32-downcase-file-names}设置为@code{t}，并在设置 WoMan 文件路径时使用全部小写。
+
+
+@menu
+* Topic::                主题接口
+* Filename::             文件名接口
+* Automatic::            自动接口
+@end menu
+
+@node Topic
+@section 主题接口
+@cindex topic interface
+
+主题界面主要通过命令@code{woman}访问。  加载 WoMan 后，可以通过菜单项 @samp{Help->Manuals->Read Man Page (WoMan)...} 访问相同的命令。  该命令读取迷你缓冲区中的手册主题，该主题可以是 man 文件结构中任意位置的 man 文件的 @dfn{basename} 。  在这种情况下，“基本名称”是指不带任何目录组件且不带任何与文件类型相关的扩展名或后缀组件的文件名。  因此，例如，如果 UNIX 程序员手册第 5 章中有一个完整路径名@file{/usr/local/man/man5/man.conf.5.gz} 的压缩源文件，则主题为@code{man.conf}。  如果 WoMan 配置正确，该主题将出现在 @code{woman} 提供的补全内容中。如果多个文件具有相同的主题名称，WoMan 将提示要格式化哪个文件。  主题的完成不区分大小写。
+
+显然，@code{woman} 必须知道在哪里查找 man 文件，并且有两个可自定义的用户选项来存储此信息：@code{woman-manpath} 和 @code{woman-path}。  @xref{Interface Options, , Interface Options}。  如果未显式设置 @code{woman-manpath}，则 WoMan 会尝试获取 @code{man} 命令将使用的信息，如下所示。  如果设置了环境变量@code{MANPATH}（这似乎是UNIX下的标准机制），那么WoMan就会解析它。  否则，如果 WoMan 可以找到一个名为（默认）@file{man.conf}（或非常相似的名称）的配置文件（这似乎是 GNU/Linux 下的标准机制），那么它就会解析它。  准确地说，“非常相似的东西”意味着以 @samp{man} 开头并以 @samp{.conf} 结尾，可能还有更多小写字母，例如 @file{manual.configuration}。该文件的搜索路径和/或精确的完整路径名由可自定义用户选项@code{woman-man.conf-path}的值设置。如果一切都失败了，WoMan 会使用看似合理的默认男人搜索路径。
+
+如果上述默认配置因任何原因无法正常工作，则只需自定义 @code{woman-manpath} 的值即可。  要访问不在传统 man 文件层次结构中的 man 文件，请自定义 @code{woman-path} 的值以包括包含这些文件的目录。  这样@code{woman}就可以访问整个文件系统中的手册文件@emph{anywhere}。
+
+@code{woman-manpath} 和 @code{woman-path} 之间有两个区别。  首先，@code{woman-manpath} 的元素必须是包含 @emph{directories of} man 文件的目录，而 @code{woman-path} 的元素必须是包含 man 文件 @emph{directly} 的目录。  其次，@code{woman-path}的每个元素的最后一个目录组件被视为常规（Emacs）匹配表达式而不是固定名称，这允许简洁地指定相关目录的集合。  此外，@code{woman-manpath}的元素可以是conses，表示从@samp{PATH}环境变量组件到man目录层次结构的映射。
+
+为了使主题完成工作正常，WoMan 必须构建一个它可以访问的所有手动文件的列表，这可能会非常慢，尤其是在涉及网络的情况下。  因此，它会缓存各种数量的信息，然后从缓存中检索信息的速度非常快。  如果缓存与现实不同步，运行带有前缀参数（例如 1⁣）的 @code{woman} 命令将强制它重建缓存。  仅当任何 man 文件的名称或位置发生更改时才需要这样做；如果只是其内容发生变化，则没有必要。  如果在 Emacs 运行时以及加载 WoMan 之后发生这样的更改，则总是有必要的。  如果在 Emacs 会话之间发生此类更改并且使用持久缓存，则可能有必要，尽管 WoMan 可以检测到一些使其缓存无效的更改并自动重建它。
+
+自定义变量 @code{woman-cache-filename} 以保存 Emacs 会话之间的缓存。  仅当 @code{woman} 命令第一次在 Emacs 会话中运行时太慢时才建议这样做，而它在主内存中构建其缓存，而 @emph{may} 会 @emph{very} 慢。  @xref{Cache, , The WoMan Topic Cache}，了解更多详情。
+
+
+@menu
+* Cache::                女人主题缓存
+* Word at point::        使用“点词”作为主题建议
+@end menu
+
+@node Cache
+@subsection 女人主题缓存
+@cindex topic cache
+@cindex cache, topic
+
+WoMan 缓存的信息量（在主内存中，也可以选择保存到光盘中）由用户选项@code{woman-cache-level} 控制。  WoMan 查找文件的速度和缓存大小之间存在权衡，默认设置给出了合理的折衷。
+
+@code{woman} 命令始终在主内存中执行一定量的缓存，但它也可以在用户选项 @code{woman-cache-filename} 的控制下将其缓存作为持久缓存写入文件存储。  如果启用持久缓存，则 WoMan 几乎会立即从缓存文件重新加载其内部缓存，因此当 WoMan 重建其缓存时，永远不会有任何可察觉的启动延迟@emph{except}。  当前默认情况下，持久缓存处于关闭状态。  这是因为打开持久缓存的用户可能会忽略在安装新的 man 文件后第一次运行 WoMan 时强制重建其缓存的需要；关闭持久缓存后，WoMan 每次在新的 Emacs 会话中运行时都会自动重建其缓存。
+
+前缀参数始终会导致 @code{woman} 命令（仅）重建其主题缓存，并在该变量具有非 @code{nil} 值时将其重新保存到 @code{woman-cache-filename}。  如果 @code{woman-manpath} 或 @code{woman-path} 指定的路径中的任何目录或文件的 @emph{names} 发生更改，则这是必要的。如果影响缓存的 WoMan 用户选项发生更改，那么下次在新的 Emacs 会话中运行时，WoMan 将自动更新光盘上的缓存文件（如果正在使用）。
+
+
+@node Word at point
+@subsection 使用“点词”作为主题建议
+@cindex word at point
+@cindex point, word at
+
+默认情况下，@code{woman} 命令使用当前缓冲区中最接近的单词作为要查找的主题的建议（如果该主题作为有效主题存在）。  可以在迷你缓冲区中确认或编辑主题。
+
+您还可以将变量 @code{woman-use-topic-at-point} 本地绑定到非 @code{nil} 值（使用 @code{let}），在这种情况下，@code{woman} 将可以使用建议的主题，而无需确认（如果可能）。  这对于提供特殊的私钥绑定可能很有用，例如，@kbd{C-c w}的此键绑定在该主题上运行 WoMan，无需寻求确认：
+
+@lisp
+(keymap-global-set "C-c w"
+                   (lambda ()
+                     (interactive)
+                     (let ((woman-use-topic-at-point t))
+                       (woman))))
+@end lisp
+
+
+@node Filename
+@section 文件名接口
+@cindex filename interface
+
+该族中的命令完全独立于主题接口、缓存机制等。
+
+@findex woman-find-file
+文件名接口主要通过扩展命令@code{woman-find-file}访问，无需任何配置即可使用该命令（前提是安装并加载了 WoMan 或设置为自动加载）。此命令可用于浏览任何可访问的 man 文件，无论其文件名或位置如何。  如果文件被压缩，则必须已经打开自动文件解压缩（例如，参见 @samp{Help->Options} 子菜单）——它仅由 @code{woman} 主题界面自动打开。
+
+@findex woman-dired-find-file
+一旦 WoMan 被加载（或者如果专门设置），该系列中的各种附加命令都可用。  在 Dired 缓冲区中，命令 @code{woman-dired-find-file} 允许 WoMan 格式化和浏览与 point 同一行的文件。  它绑定到 dired 模式映射中的键 @kbd{W} 并添加到 dired 主要模式菜单中。  它也可以绑定到@kbd{w}，除非该密钥由另一个库（例如，@code{dired-x}）绑定。  因为其他库很可能会扩展 dired 这种常用模式的功能，所以 WoMan 添加到 dired 模式映射的精确键绑定由用户选项@code{woman-dired-keys} 控制。
+
+@findex woman-tar-extract-file
+当在 Emacs 中访问 tar（磁带归档）文件时，它会以 tar 模式打开，该模式会解析 tar 文件并显示其内容的类似 dired 的视图。  WoMan 命令@code{woman-tar-extract-file} 允许 WoMan 格式化和浏览与点同一行的文件。  它绑定到 tar 模式映射中的键 @kbd{w} 并添加到 tar 主要模式菜单中。
+
+命令 @code{woman-reformat-last-file} 在 WoMan 模式下与键 @kbd{R} 绑定并在主模式菜单上可用，可重新格式化由 WoMan 格式化的最后一个文件。  如果格式化参数（例如填充列）发生更改，或者缓冲区因某种原因损坏，这有时可能会很有用。
+
+@findex woman-decode-buffer
+如果命令 @code{woman-decode-buffer} 正在访问 man 文件，则可用于解码和浏览当前缓冲区，尽管它主要由 WoMan 内部使用。
+
+
+@node Automatic
+@section 自动接口
+@cindex automatic interface
+
+Emacs 提供了一个接口来自动检测文件的格式并在访问文件时对其进行解码。  它主要由用于编辑富（即格式化）文本的工具使用，作为将格式信息透明地存储为 @acronym{ASCII} 标记的方式。  WoMan 原则上可以使用该接口，但必须显式配置。
+
+WoMan的这种使用似乎并没有什么特别的优势，所以并不真正支持。  它起源于关于如何最好地实现 WoMan 的早期实验，在我实现当前主题界面之前，后来我停止使用它。  我可能会恢复它作为存储预先格式化的 WoMan 文件的机制，有点类似于标准的 Unix @code{catman} 设施。  同时，任何想要尝试它的人都可以使用它。  设置完成后，只需访问文件即可，并且没有特定于 WoMan 的用户界面！
+
+要使用它，请将类似的内容放入您的 @file{.emacs} 文件中。  [调用@code{set-visited-file-name}是为了避免自动主要模式选择触发字体锁定。]
+
+@lisp
+(autoload 'woman-decode-region "woman")
+
+(add-to-list 'format-alist
+             '(man "Unix man-page source format" "\\.\\(TH\\|ig\\) "
+                   woman-decode-region nil nil
+                   (lambda (arg)
+                     set-visited-file-name
+                     (file-name-sans-extension buffer-file-name))))
+@end lisp
+
+@c ===================================================================
+
+@node Browsing
+@chapter 浏览手册页
+@cindex using, browsing man pages
+@cindex browsing man pages
+@cindex man pages, browsing
+
+一旦找到手册页并对其进行格式化，WoMan 就会提供一个浏览界面，该界面与标准 Emacs @code{man} 命令提供的浏览界面基本相同（并且大部分代码继承自 @code{man} 库，这是 WoMan 目前需要的）。  许多 WoMan 设施可以从 WoMan 主模式菜单以及按键绑定等访问。
+
+WoMan 不会产生任何分页符或页码，实际上根本不会对手册页进行分页，因为这不适合连续在线浏览。  它生成一个由标准手册页页眉和页脚构造而成的文档页眉行。  除此之外，格式化手册页的外观应该与 @code{man} 生成的内容几乎相同，连续的空白行被压缩为单个空白行。
+
+@menu
+* Fonts::                字体和外观
+* Navigation::           导航
+* References::           以下参考文献
+* Changing::             更改当前手册页
+* Convenience::          方便的按键绑定
+* Imenu::                菜单支持；内容菜单
+@end menu
+
+@node Fonts
+@section 字体和外观
+@cindex fonts
+@cindex faces
+
+@code{roff} 使用的字体由 WoMan 处理为面孔，其细节是可定制的。  @xref{Faces, , Faces}。  WoMan 支持通常在手册页中使用的斜体和粗体字体，以及表示所有未知字体的单个字体（偶尔在“非标准”手册页中使用，通常表示“打字机”字体）和一个表示 WoMan 引入的附加符号的字体。  目前，这意味着用于指示上标和下标的字符 ^ 和 _，WoMan 无法很好地显示这些字符。
+
+
+@node Navigation
+@section 导航
+@cindex navigation
+
+男人（以及女人）模式可以被认为是视图模式的超集。缓冲区无法编辑，因此通常会自动插入的键用于导航。  WoMan 键绑定是对 @code{man} 键绑定的细微修改。
+
+@table @kbd
+@item @key{SPC}
+@kindex SPC
+@findex scroll-up
+在窗口中向上滚动手册页 (@code{scroll-up})。
+
+@item @key{DEL}
+@itemx @kbd{S-@key{SPC}}
+@kindex DEL
+@kindex S-SPC
+@findex scroll-down
+在窗口中向下滚动手册页 (@code{scroll-down})。
+
+@item n
+@kindex n
+@findex Man-next-section
+将点移动到下第 N 个部分——默认 1 (@code{Man-next-section})。
+
+@item p
+@kindex p
+@findex Man-previous-section
+将点移动到前 N 个部分——默认 1 (@code{Man-previous-section})。
+
+@item g
+@kindex g
+@findex Man-goto-section
+将点移动到指定部分 (@code{Man-goto-section})。
+
+@item s
+@kindex s
+@findex Man-goto-see-also-section
+将点移至“另请参阅”部分 (@code{Man-goto-see-also-section})。  实际上移动到的部分由@code{Man-see-also-regexp} 描述。
+@end table
+
+
+@node References
+@section 以下参考文献
+@cindex following references
+@cindex references
+
+手册页通常包含“另请参阅”部分，其中包含对其他手册页的引用。  如果安装了这些手册页，则可以轻松引导 WoMan 遵循参考，即查找并格式化手册页。  当鼠标经过格式正确的引用时，它会突出显示，在这种情况下，单击中间按钮 @kbd{mouse-2} 将导致 WoMan 跟随该引用。  或者，当点位于此类参考上方时，键@key{RET} 将跟随该参考。
+
+如果还使用了 Meta 键，则可以通过单击 @kbd{mouse-2} 来将缓冲区中的任何单词用作参考（尽管通常这样的“参考”不会导致手册页）。或者，键@kbd{r}允许使用补全来选择要遵循的参考，基于默认的单词。
+
+@table @kbd
+@item @kbd{mouse-2}
+@kindex mouse-2
+@findex woman-mouse-2
+以鼠标下的单词作为主题运行 WoMan (@code{woman-mouse-2})。  该单词必须用鼠标突出显示，除非 @code{woman-mouse-2} 与 Meta 键一起使用。
+
+@item @key{RET}
+@kindex RET
+@findex man-follow
+获取点 (@code{man-follow}) 下（或最接近）的主题的手册页。
+
+@item r
+@kindex r
+@findex Man-follow-manual-reference
+获取“另请参阅”部分 (@code{Man-follow-manual-reference}) 中提到的手册页之一。  指定使用哪个参考；默认基于点上的单词。
+@end table
+
+
+@node Changing
+@section 更改当前手册页
+@cindex changing current man page
+@cindex current man page, changing
+
+WoMan 当前正在浏览的手册页可以通过多种方式进行更改。  可以调用命令 @code{woman} 来格式化另一个手册页，或者可以隐藏或杀死当前的 WoMan 缓冲区。  WoMan 维护一个格式化的手册页环，并且可以通过移动到下一个或上一个手册页来在这个环中向前和向后移动。  有时重新格式化当前页面很有用，例如在更改了右边距（换行列）或某些其他格式参数后。
+
+Man 和 WoMan 格式化的缓冲区完全不相关，尽管一些操作它们的命令表面上是相同的（并且共享代码）。
+
+@table @kbd
+@item m
+@kindex m
+@findex man
+运行命令 @code{man} 获取 Un*x 手册页并将其放入缓冲区。  该命令是 man 包中的顶级命令。  它运行 Un*x 命令来在后台检索和清理手册页，并将结果放入 Man 模式（手册页浏览）缓冲区中。  如果该手册页已存在手册缓冲区，它将立即显示。  如果加载了 WoMan，则其工作原理完全相同，只是格式化时间显示在迷你缓冲区中。
+
+@item w
+@kindex w
+@findex woman
+运行命令 @code{woman} 就像使用扩展命令或菜单项一样。
+
+@item q
+@kindex q
+@findex Man-quit
+隐藏包含当前手册页 (@code{Man-quit}) 的缓冲区，即将其移动到缓冲区堆栈的底部。
+
+@item k
+@kindex k
+@findex Man-kill
+杀死包含当前手册页 (@code{Man-kill}) 的缓冲区，即完全删除它，以便只能通过再次格式化页面来检索它。
+
+@item M-p
+@kindex M-p
+@findex WoMan-previous-manpage
+找到之前的 WoMan 缓冲区 (@code{WoMan-previous-manpage})。
+
+@item M-n
+@kindex M-n
+@findex WoMan-next-manpage
+找到下一个 WoMan 缓冲区 (@code{WoMan-next-manpage})。
+
+@item R
+@kindex R
+@findex woman-reformat-last-file
+调用 WoMan 重新格式化由 WoMan (@code{woman-reformat-last-file}) 格式化的最后一个手册页，例如，在更改填充列之后。
+@end table
+
+
+@node Convenience
+@section 方便的按键绑定
+@cindex convenience key bindings
+@cindex key bindings, convenience
+
+@table @kbd
+@item -
+@kindex -
+@findex negative-argument
+为下一个命令开始一个负数字参数 (@code{negative-argument})。
+
+@item 0 .. 9
+@kindex 0 .. 9
+@findex digit-argument
+下一个命令的数字参数的一部分 (@code{digit-argument})。
+
+@item <
+@kindex <
+@itemx .
+@kindex .
+@findex beginning-of-buffer
+将点移动到缓冲区的开头；在之前的位置留下标记 (@code{beginning-of-buffer})。
+
+@item >
+@kindex >
+@findex end-of-buffer
+将点移动到缓冲区末尾；在之前的位置留下标记 (@code{end-of-buffer})。
+
+@item ?
+@kindex ?
+@findex describe-mode
+显示当前主要模式和次要模式的文档 (@code{describe-mode})。  首先是主要模式描述，然后是次要模式，每个模式都在单独的页面上。
+@end table
+
+
+@node Imenu
+@section 菜单支持；内容菜单
+@cindex imenu support
+@cindex contents menu
+
+WoMan 菜单提供了一个选项来为当前手册页创建内容菜单（使用 @code{imenu}）。  或者，如果您将选项 @code{woman-imenu} 自定义为 @code{t}，那么 WoMan 将为每个手册页自动执行此操作。  菜单标题由选项@code{woman-imenu-title}设置，默认为“CONTENTS”。  默认情况下，菜单显示手册部分和小节，但您可以通过自定义 @code{woman-imenu-generic-expression} 来更改此设置。
+
+WoMan 配置为不替换 imenu @file{*Completion*} 缓冲区中的空格。  有关 imenu 使用的更多文档（例如菜单排序），请参阅源文件 @file{imenu.el}，它随 GNU Emacs 一起分发。
+
+@c ===================================================================
+
+@node Customization
+@chapter 定制化
+@cindex customization
+
+所有 WoMan 用户选项都是可自定义的，建议仅通过标准 Emacs 自定义工具来更改它们。 WoMan 在父组 @code{Help} 下定义了一个名为 @code{WoMan} 的顶级自定义组。  它可以通过标准 Emacs 工具（例如，通过 @samp{Help->Customize} 子菜单）或通过 WoMan 主模式菜单访问。
+
+顶级 WoMan 组仅包含一些常规选项和三个子组。  这些钩子仅用于特殊目的，例如，需要执行代码，并且只能通过 @code{Customization} 或函数 @code{add-hook} 进行更改。  大多数定制应该可以通过现有的用户选项来实现。
+
+@vtable @code
+@item woman-show-log
+一个布尔值，默认为 @code{nil}。  如果非@code{nil}，则在适当的情况下显示@file{*WoMan-Log*}缓冲区，即是否有任何警告消息写入其中。  @xref{Log, , The *WoMan-Log* Buffer}。
+
+@item woman-pre-format-hook
+在格式化缓冲区之前立即运行挂钩。  例如，它可以用于面部定制。  然而@xref{Faces, , Faces}。
+
+@item woman-post-format-hook
+格式化缓冲区后立即运行的挂钩。  例如，它可以用于使用 @code{imenu} 安装动态菜单。 （但是，在这种情况下，最好使用内置的 WoMan @code{imenu} 支持。@xref{Imenu, , Imenu Support; Contents Menu}。）
+@end vtable
+
+@heading 定制子组
+
+@table @code
+@item WoMan Interface
+这些选项控制查找要浏览的适当文件的过程以及浏览界面的外观。
+
+@item WoMan Formatting
+这些选项控制 WoMan 用于格式化手册页的布局。
+
+@item WoMan Faces
+这些选项控制 WoMan 用于格式化手册页的显示面。
+@end table
+
+@menu
+* Interface Options::
+* Formatting Options::
+* Faces::
+* Special symbols::
+@end menu
+
+@node Interface Options
+@section 接口选项
+@cindex interface options
+
+这些选项控制查找要浏览的适当文件的过程以及浏览界面的外观。
+
+@vtable @code
+@item woman-man.conf-path
+表示要搜索的目录和/或要尝试 man 配置文件的文件的字符串列表。  默认为
+
+@lisp
+("/etc" "/usr/local/lib")
+@end lisp
+
+@noindent
+[分别适用于 GNU/Linux 和 Cygwin。] 目录上的尾随分隔符（@file{/} 对于 UNIX 等）@: 是可选的，如果指定目录，则匹配的文件名是第一个与正则表达式 @code{man.*\.conf} 匹配的文件名。  如果未设置环境变量 @code{MANPATH} 但找到配置文件，则会解析该文件（或同时）为 @code{woman-manpath} 提供默认值。
+
+@item woman-manpath
+代表 @emph{directory trees} 的字符串列表，用于搜索 Unix 手册文件。  每个元素应该是一个目录的名称，该目录包含 @file{man?} 形式的子目录，或更准确地说是由 @code{woman-manpath-man-regexp} 的值选择的子目录。非目录和不可读的文件将被忽略。  它还可以包含 conses，其中 car 表示映射到 cdr 中给出的目录树的 @code{PATH} 变量组件。
+
+@cindex @code{MANPATH}, environment variable
+如果未设置，则使用环境变量@code{MANPATH}。  如果没有找到这样的环境变量，则通过查阅 man 配置文件（如果找到）来确定默认列表。  默认情况下，预计为 @file{/etc/man.config} 或 @file{/usr/local/lib/man.conf}，由用户选项 @code{woman-man.conf-path} 控制。  @code{MANPATH} 的空子字符串表示默认列表。  否则，该变量的默认值为
+
+@lisp
+("/usr/man" "/usr/local/man")
+@end lisp
+
+首先评估任何环境变量（其名称必须具有 Unix 风格形式 @code{$NAME}，例如 @code{$HOME}、@code{$EMACSDATA}、@code{$EMACS_DIR}，无论平台如何），但每个元素必须评估为目录的 @emph{single} 名称。  后面的 @file{/} 会被忽略。  （还搜索@code{woman-path}中的特定目录。）
+
+在 Microsoft 平台上，我建议明确包含驱动器号，例如：
+
+@lisp
+("C:/Cygwin/usr/man" "C:/usr/man" "C:/usr/local/man")
+@end lisp
+
+@cindex directory separator character
+@cindex @code{MANPATH}, directory separator
+@code{MANPATH} 环境变量可以使用 DOS 分号分隔或 Unix 风格的冒号分隔语法（但不能混合）来设置。
+
+@item woman-manpath-man-regexp
+匹配 man 目录 @emph{under} 和 @code{woman-manpath} 目录的正则表达式。  它们通常具有 @file{man?} 形式的名称。  它的默认值是@code{"[Mm][Aa][Nn]"}，不区分大小写，主要是为了微软平台的利益。  其目的是避免诸如@file{cat?}、@file{.}、@file{..}等目录。
+
+@item woman-path
+代表 @emph{specific directories} 的字符串列表，用于搜索 Unix 手册文件。  例如
+
+@lisp
+("/emacs/etc")
+@end lisp
+
+除了 @code{woman-manpath} 中指定的目录树之外，还会搜索这些目录。  每个元素应该是一个目录字符串或@code{nil}，它代表路径扩展和缓存时的当前目录。  但是，每个目录字符串的最后一个组件（仅）被视为正则表达式（Emacs，而不是 shell），并且该字符串将扩展为匹配目录的列表。  非目录和不可读的文件将被忽略。  MS-DOS 上的默认值是
+
+@lisp
+("$DJDIR/info" "$DJDIR/man/cat[1-9onlp]")
+@end lisp
+
+@noindent
+在其他平台上是@code{nil}。
+
+首先评估任何环境变量（其名称必须具有 Unix 风格形式 @code{$NAME}，例如 @code{$HOME}、@code{$EMACSDATA}、@code{$EMACS_DIR}，无论平台如何），但每个元素必须评估为目录的 @emph{single} 名称（正则表达式，参见上文）。  例如
+
+@lisp
+("$EMACSDATA")
+@end lisp
+
+@noindent
+或同等地
+
+@lisp
+("$EMACS_DIR/etc")
+@end lisp
+
+@noindent
+尾随的 0⁣ 被丢弃。  （还会搜索@code{woman-manpath}中的目录树。）在 Microsoft 平台上，我建议显式包含驱动器号。
+
+@item woman-cache-level
+代表主题缓存级别的正整数：
+
+@enumerate
+@item
+仅缓存主题和目录列表（使用最少的内存，但不推荐）；
+@item
+还缓存每个主题的目录（速度更快，无需使用更多内存）；
+@item
+还缓存每个主题的实际文件名（最快，但使用两倍的内存）。
+@end enumerate
+
+当前默认值是 2，这是一个很好的通用折衷方案。  如果 @code{woman} 命令查找文件的速度很慢，请尝试 3，这对于大型远程安装的 man 目录可能特别有用。  使用前缀参数运行 @code{woman} 命令或删除缓存文件 @code{woman-cache-filename} 以使更改生效。  （值 < 1 的行为类似于 1；值 > 3 的行为类似于 3。）
+
+@item woman-cache-filename
+表示 WoMan 目录和主题缓存文件的完整路径名的字符串，或@code{nil}。  它用于保存和恢复 Emacs 会话之间的缓存。  这对于远程安装的手册页文件特别有用！  @code{nil} 的默认值会抑制此操作。  “标准”非@code{nil}文件名是@file{~/.wmncach.el}。  请记住，前缀参数会强制 @code{woman} 命令更新并重写缓存。
+
+@item woman-dired-keys
+要定义在当前文件上运行 WoMan 的 @code{dired} 模式键列表，例如 @code{("w" "W")} 或任何非 @code{nil} 原子，自动定义 @kbd{w} 和 @kbd{W}（如果它们未绑定），或 @code{nil} 不执行任何操作。  默认值为@code{t}。
+
+@item woman-imenu-generic-expression
+Imenu 对节和子节的支持：具有 @code{(MENU-TITLE REGEXP INDEX)} 形式元素的列表 — 请参阅 @code{imenu-generic-expression} 的文档。  默认值为
+
+@lisp
+((nil "\n\\([A-Z].*\\)" 1)  ; SECTION, but not TITLE
+ ("*Subsections*" "^   \\([A-Z].*\\)" 1))
+@end lisp
+
+@item woman-imenu
+一个布尔值，默认为 @code{nil}。  如果非@code{nil}，则WoMan 通过调用@code{imenu-add-to-menubar} 将内容菜单添加到菜单栏。
+
+@item woman-imenu-title
+表示 WoMan 将内容菜单添加到菜单栏时要使用的标题的字符串。  默认值为@code{"CONTENTS"}。
+
+@item woman-use-topic-at-point
+一个布尔值，默认为 @code{nil}。  如果非 @code{nil} 则 @code{woman} 命令使用该点处的单词作为主题，@emph{without interactive confirmation}（如果它作为主题存在）。
+
+@item woman-use-topic-at-point-default
+表示 @code{woman-use-topic-at-point} 默认值的布尔值。  默认值为@code{nil}。 [当加载 @code{woman} 时，变量 @code{woman-use-topic-at-point} 可能是 @code{let} 绑定的，在这种情况下，它的全局值不会被定义。  如果未绑定，函数 @code{woman-file-name} 将其设置为此值。]
+
+@item woman-uncompressed-file-regexp
+用于选择 man 源文件的正则匹配表达式（忽略任何压缩扩展名）。  默认值为 @code{"\\.\\([0-9lmnt]\\w*\\)"} [这意味着需要文件扩展名]。
+
+@emph{Do not change this unless you are sure you know what you are doing!}
+
+SysV 标准手册页使用两个字符后缀，这在 GNU 世界中变得越来越常见。  例如，@code{ncurses}包中的手册页包括@file{toe.1m}、@file{form.3x}等。
+
+@strong{Please note:} 将附加一个可选的压缩正则表达式，因此该正则表达式 @emph{must not} 以任何类型的字符串终止符结尾，例如 @code{$} 或 @code{\\'}。
+
+@item woman-file-compression-regexp
+正则匹配表达式，用于匹配压缩的 man 文件扩展名，解压缩器可用并由自动压缩模式处理。  它应该以 @code{\\.} 开头，以 @code{\\'} 结尾，@emph{must not} 是可选的。  默认值为 @code{"\\.\\(g?z\\|bz2\\|xz\\)\\'"}，与 @code{gzip}、@code{bzip2} 和 @code{xz} 压缩扩展匹配。
+
+@emph{Do not change this unless you are sure you know what you are doing!}
+
+[它应该与 @code{jka-compr-file-name-handler-entry} 的 @code{car} 兼容，但这过于复杂，包含不适当的扩展名 (@file{.tgz}) 并且默认情况下不加载！]
+
+@item woman-use-own-frame
+如果非@code{nil}，则使用专用框架来显示 WoMan 窗口。仅当 WoMan 在支持真实多帧的窗口系统（例如 X 或 Microsoft Windows）下运行时，这才有用，在这种情况下，默认值为非@code{nil}。
+@end vtable
+
+
+@node Formatting Options
+@section 格式选项
+@cindex formatting options
+
+这些选项控制 WoMan 用于格式化手册页的布局。
+
+@vtable @code
+@item woman-fill-column
+一个整数，指定格式化文本的右边距。  默认值为 65。
+
+@item woman-fill-frame
+一个布尔值。  如果非@code{nil}，则使用大部分帧宽度，覆盖@code{woman-fill-column}的值。  默认值为@code{nil}。
+
+@item woman-default-indent
+一个整数，指定 @code{-man} 宏的默认主要缩进。  默认值为 5。将此变量设置为 7 以模拟 GNU/Linux man 格式。
+
+@item woman-bold-headings
+一个布尔值。  如果非@code{nil}，则加粗章节和小节标题。  默认值为@code{t}。  [标题加粗是@emph{not}标准@code{man}行为。]
+
+@item woman-ignore
+一个布尔值。  如果非@code{nil}则忽略无法识别的请求等@:。  默认值为@code{t}。  这给出了标准的 @code{roff} 行为。如果 @code{nil} 那么它们将留在缓冲区中，这可能有助于调试。
+
+@item woman-preserve-ascii
+一个布尔值。  如果非 @code{nil} 则在 WoMan 缓冲区中保留 @acronym{ASCII} 字符。  否则，可能会保留非 @acronym{ASCII} 字符（显示为 @acronym{ASCII}），除非要将缓冲区保存到文件中，否则这是无关紧要的。  默认值为@code{nil}。
+
+@item woman-emulation
+WoMan 仿真，当前为 @code{nroff} 或 @code{troff}。  默认值为@code{nroff}。  @code{troff} 仿真是实验性的，很大程度上未经测试。
+@end vtable
+
+
+@node Faces
+@section 面孔
+@cindex faces
+
+这些选项控制 WoMan 用于格式化手册页的显示面。
+
+@vtable @code
+@item woman-fontify
+一个布尔值。  如果非@code{nil}，则 WoMan 假设面部支持可用。  如果显示器支持颜色或不同字体，则它默认为非 @code{nil} 值。
+
+@item woman-italic-face
+手册页中斜体字体的外观。  默认值：斜体、下划线、前景红色。  这太过分了！  @code{troff} 仅使用斜体； @code{nroff} 仅使用下划线。  您可能应该根据需要选择斜体或下划线，但不能同时选择两者，尽管斜体和下划线可以完美地配合使用！
+
+@item woman-bold-face
+手册页中的粗体字体。  默认值：粗体，前景蓝色。
+
+@item woman-unknown-face
+面向手册页中所有未知字体。  默认值：前景棕色。棕色是一个很好的折衷方案：它与默认值有区别，但不足以使字体错误看起来很糟糕。  （使用非标准字体的文件似乎表现得很糟糕或者以特殊的方式！）
+
+@item woman-addition-face
+面对由 WoMan 对手册页所做的所有添加。默认值：前景橙色。
+@end vtable
+
+
+@node Special symbols
+@section 特殊符号
+@cindex special symbols
+
+本节当前适用于 Microsoft Windows @emph{only}。
+
+WoMan 为特殊符号提供部分实验性支持，最初仅适用于 MS-Windows 和 MS-Windows 字体。  这包括主文本字体中的非@acronym{ASCII}字符以及使用单独的符号字体。  稍后，将添加对其他字体类型（例如 @code{bdf} 字体）和 X Window 系统的支持。  在 Emacs 20.7 中，当前支持部分适用于 Windows 9x，但可能不适用于任何其他平台。
+
+@vtable @code
+@item woman-use-extended-font
+一个布尔值。  如果非 @code{nil} 则 WoMan 可以使用默认字体中的非 @acronym{ASCII} 字符。  默认值为@code{t}。
+
+@item woman-use-symbol-font
+一个布尔值。  如果非@code{nil}则WoMan可以使用符号字体。默认是@code{nil}，主要是因为它可能会改变行距（至少在NTEmacs 20中）。
+
+@item woman-symbol-font
+描述用于特殊字符的符号字体的字符串。它应该与默认文本字体兼容且大小相同。在 MS-Windows 下，默认值为
+
+@lisp
+"-*-Symbol-normal-r-*-*-*-*-96-96-p-*-ms-symbol"
+@end lisp
+@end vtable
+
+
+@c ===================================================================
+
+@node Log
+@chapter *WoMan-Log* 缓冲区
+@cindex log buffer
+@cindex buffer, log
+
+这是以 Emacs 字节编译器为模型的。  它记录由 WoMan 格式化的所有文件以及所用的时间。  如果 WoMan 发现任何它无法处理的内容，则会向该缓冲区写入警告。  如果变量@code{woman-show-log}不是@code{nil}（默认情况下它是@code{nil}），那么WoMan会自动显示此缓冲区。  @xref{Interface Options, , Interface Options}。  许多 WoMan 警告可以完全忽略，因为它们报告了这样一个事实：WoMan 已忽略了 WoMan 忽略的请求是正确的。  在未来的某个版本中，这种偏执程度可能会降低，但前提是“WoMan”被认为更可靠。目前，所有警告都应以怀疑的态度对待。未解释的转义序列也会被记录（在某些情况下）。
+
+通过将变量 @code{woman-ignore} 重置为 @code{nil}（默认情况下为 @code{t}），未解释的 @code{roff} 请求可以选择性地保留在格式化缓冲区中，以准确指示它们发生的位置。 @xref{Interface Options, , Interface Options}。
+
+@c ===================================================================
+
+@node Technical
+@chapter 技术细节
+@cindex technical details
+@cindex horizontal spacing
+@cindex spacing, horizontal and vertical
+@cindex vertical spacing
+@cindex resolution
+
+@heading 水平和垂直间距和分辨率
+
+WoMan 目前假设水平方向每英寸 10 个字符，因此水平分辨率为 24 个基本单位，垂直方向每英寸 5 行，因此垂直分辨率为 48 个基本单位。 （@code{nroff} 使用每英寸 240。）
+
+@heading 垂直间距和空行
+
+格式化缓冲区中连续空行的数量应该是 0 或 1。空行应该留下一个空格，如 .sp 1。当前的策略是仅在文本输出之前立即输出垂直空格。
+
+@c ===================================================================
+
+@node Bugs
+@chapter 报告错误
+@cindex reporting bugs
+@cindex bugs, reporting
+
+如果 WoMan 完全失败，或者文件格式不正确（即，明显错误或与@code{man}显着不同）或不优雅，那么请
+
+@enumerate
+@item
+尝试来自 @uref{https://savannah.gnu.org/projects/emacs/} 上的 Emacs 存储库的最新版本 @file{woman.el}。  如果仍然失败，请
+
+@item
+使用@kbd{M-x report-emacs-bug}发送错误报告。请包含 @file{*WoMan-Log*} 缓冲区中与问题文件相关的条目以及问题的简要描述。  请指出您从何处获取 man 源文件，但除非要求发送，否则请勿发送。
+@end enumerate
+
+@c ===================================================================
+
+@node Acknowledgments
+@chapter 致谢
+@cindex acknowledgments
+
+对于希瑟、凯瑟琳和玛德琳，我生命中的女性（尽管她们可能永远不会使用它）！
+
+我还感谢以下人员提供的有用建议、错误报告、代码片段、普遍兴趣等：
+
+@quotation
+@c jari.aalto@@cs.tpu.fi
+贾里·阿尔托,
+@c dean@@dra.com
+迪恩·安德鲁斯，
+@c barranquero@@laley-actualidad.es
+胡安玛·巴兰克罗,
+@c kb@@cs.umb.edu
+卡尔·贝瑞,
+@c jchapman@@netcomuk.co.uk
+吉姆·查普曼，
+@c frederic.corne@@erli.fr
+弗雷德里克·科恩,
+@c craft@@alacritech.com
+彼得·克拉夫特,
+@c ccurley@@trib.com
+查尔斯·柯利,
+@c jdavidso@@teknowledge.com
+吉姆·戴维森，
+@c Kevin.DElia@@mci.com
+凯文·德埃利亚,
+@c jpff@@maths.bath.ac.uk
+约翰·菲奇,
+@c jwfrosch@@rish.b17c.ingr.com
+汉斯·弗罗施,
+@c ggp@@informix.com
+盖伊·加斯科因-皮格福德，
+@c gorkab@@sanchez.com
+布赖恩·戈尔卡,
+@c nhe@@lyngso-industri.dk
+尼古拉·亨里克森，
+@c the@@software-ag.de
+托马斯·赫钦罗德，
+@c ahinds@@thegrid.net
+亚历山大·海因兹,
+@c sth@@hacon.de
+斯特凡·霍恩伯格，
+@c tjump@@cais.com
+西奥多跳跃，
+@c paulk@@mathworks.com
+保罗·金努坎,
+@c jonas@@init.se
+乔纳斯·林德,
+@c andrewm@@optimation.co.nz
+安德鲁·麦克雷，
+@c howard@@silverstream.com
+霍华德·梅尔曼,
+@c dennis@@math.binghamton.edu
+丹尼斯·皮克斯顿,
+@c raman@@Adobe.com
+T.V.拉曼，
+@c bruce.ravel@@nist.gov
+布鲁斯·拉威尔,
+@c benny@@crocodial.de
+本杰明·里芬斯塔尔,
+@c kruland@@seistl.com
+凯文·鲁兰,
+@c tom@@platte.com
+汤姆·舒特,
+@c wxshi@@ma.neweb.ne.jp
+史伟学,
+@c fabio@@joplin.colorado.edu
+法比奥·索门齐,
+@c ks@@ic.uva.nl
+卡雷尔·施普伦格,
+@c szurgot@@itribe.net
+克里斯·苏格特,
+@c pat@@po.cwru.edu
+保罗·A·汤普森，
+@c arrigo@@maths.qmw.ac.uk
+阿里戈·特里乌尔齐,
+@c voelker@@cs.washington.edu
+杰夫·沃尔克,
+@c eliz@@is.elta.co.il
+伊莱·扎雷茨基
+@end quotation
+
+@c ===================================================================
+
+@comment END OF MANUAL TEXT
+@page
+
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Command Index
+@unnumbered 命令索引
+
+@printindex fn
+
+@node Variable Index
+@unnumbered 变量索引
+
+@printindex vr
+
+@c Without a page throw here, the page length seems to get reset to the
+@c depth of the index that fits on the page after the previous index.
+@c This must be a bug!
+
+@page
+
+@node Keystroke Index
+@unnumbered 击键索引
+
+@printindex ky
+
+@c Without a page throw here, the page length seems to get reset to the
+@c depth of the index that fits on the page after the previous index.
+@c This must be a bug!
+
+@page
+
+@node Concept Index
+@unnumbered 概念索引
+
+@printindex cp
+
+@bye

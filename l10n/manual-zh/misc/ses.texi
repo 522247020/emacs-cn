@@ -1,0 +1,1087 @@
+\输入 texinfo @c -*- 模式：texinfo；编码：utf-8； -*-
+@c %**start of header
+@setfilename ../../info/ses.info
+@settitle @acronym{SES}：简单的 Emacs 电子表格
+@documentlanguage en
+@include docstyle.texi
+@setchapternewpage off
+@syncodeindex fn cp
+@syncodeindex vr cp
+@syncodeindex ky cp
+@c %**end of header
+
+@copying
+该文件记录了@acronym{SES}：简单的 Emacs 电子表格。
+
+版权所有 @copyright{} 2002--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* @acronym{SES}: (ses).                    简单的 Emacs 电子表格。
+@end direntry
+
+@finalout
+
+@titlepage
+@title @acronym{SES}
+@subtitle 简单的 Emacs 电子表格
+@author Jonathan A. Yavner
+@author @email{jyavner@@member.fsf.org}
+
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@c ===================================================================
+
+@ifnottex
+@node Top
+@comment  node-name,  next,  previous,  up
+@top @acronym{SES}: Simple Emacs Spreadsheet
+
+@display
+@acronym{SES} is a major mode for GNU Emacs to edit spreadsheet files, which
+contain a rectangular grid of cells.  The cells' values are specified
+by formulas that can refer to the values of other cells.
+@end display
+@end ifnottex
+
+要报告错误，请使用@kbd{M-x report-emacs-bug}。
+
+@insertcopying
+
+@menu
+* Sales Pitch::                  为什么使用@acronym{SES}？
+* Quick Tutorial::               快速介绍
+* The Basics::                   基本电子表格命令
+* Advanced Features::            想了解更多吗？
+* For Gurus::                    想知道@emph{even more}吗？
+* Index::                        概念、功能和变量索引
+* Acknowledgments::              致谢
+* GNU Free Documentation License::  本文档的许可证。
+@end menu
+
+@c ===================================================================
+
+@node Sales Pitch
+@comment  node-name,  next,  previous,  up
+@chapter 推销宣传
+@cindex features
+
+@itemize @bullet
+@item 轻松创建和编辑简单的电子表格。
+@item 完全撤消/重做/自动保存。
+@item 对电子表格文件中的病毒免疫。
+@item 单元格公式是直接的 Emacs Lisp。
+@item 打印机功能用于控制细胞外观。
+@item 直观的击键命令：C-o = 插入行，M-o = 插入列等。
+@item 冗长的单元格值“溢出”到后面的空白单元格中。
+@item 标题行显示列字母。
+@item 编辑公式时完成-读取输入命名单元格的符号。
+@item 剪切、复制和粘贴可以传输公式和打印机功能。
+@item 导入和导出制表符分隔值或制表符分隔公式。
+@item 纯文本、易于破解的文件格式。
+@end itemize
+
+@c ===================================================================
+
+@node Quick Tutorial
+@chapter 快速教程
+@cindex introduction
+@cindex tutorial
+
+如果您想快速入门并认为您知道从简单的电子表格中可以得到什么，本章可能就是您所需要的。
+
+首先，访问文件扩展名为 @file{.ses} 的新文件。 Emacs 向您呈现一个包含单个单元格的空电子表格。
+
+首先插入标题：@kbd{"Income@key{RET}}。  双引号表示您正在编辑文本单元格，它不是单元格值的一部分，并且不需要右引号。
+
+要插入您的第一个收入值，您必须首先调整电子表格的大小。  按 @key{TAB} 添加新单元格并导航回该单元格。  输入一个数字，例如@samp{2.23}。  然后继续添加更多收入条目，例如：
+
+@example
+@group
+A
+ Income
+   2.23
+   0.02
+  15.76
+  -4.00
+@end group
+@end example
+
+要将这些值相加，请输入 Lisp 表达式：
+
+@example
+(+ A2 A3 A4 A5)
+@end example
+
+也许您想在单元格 @samp{A4} 的右侧添加一个单元格来解释为什么输入负数。  在该单元格中按 @kbd{TAB} 会添加一个全新的列 @samp{B}，您可以在其中添加这样的注释。
+
+默认情况下，该列相当窄，但按 @kbd{w} 可以根据需要调整其大小。  使其宽度为 20 个字符。  您现在可以为所有条目添加描述性图例，例如：
+
+@example
+@group
+A       B
+ Income
+   2.23       Consulting fee
+   0.02     Informed opinion
+  15.76       Lemonade stand
+     -4          Loan to Joe
+  14.01                Total
+@end group
+@end example
+
+默认情况下，单元格值打印输出是右对齐的，这就是@samp{B}列中的注释进行这种对齐的原因。  要更改此设置，您可以使用 @kbd{M-p ("%s")} 输入整列的打印机功能。  将 @code{"%s"} 包含在列表中告诉 @acronym{SES} 左对齐。  您可以使用 @kbd{p} 覆盖任何单个单元格中列的打印机功能。
+
+@c TODO : propagate extra explanation from the French version.
+
+如果乔偿还了贷款，您可以将该条目留空；例如，将光标定位在单元格 A5 中并按 @kbd{C-d}。  如果这样做，单元格 A6 中打印的总数将显示@samp{######}。这是因为空单元格中的值通常为 @code{nil}，而常规 @code{+} 运算符无法处理包含该值的范围。  您可以输入文字 @samp{0}，或使用 @kbd{C-k} 删除整行，而不是清空单元格。  另一种方法是使用特殊函数 @code{ses+} 代替常规的 @code{+}：
+
+@example
+(ses+ A2 A3 A4 A5)
+@end example
+
+为了使公式能够稳健地应对电子表格几何形状的变化，您可以使用 @code{ses-range} 宏通过端点引用一系列单元格，例如：
+
+@example
+(apply 'ses+ (ses-range A2 A5))
+@end example
+
+（@code{apply}是必要的，因为@code{ses-range}产生@emph{list}值。这允许更复杂的可能性。）
+
+或者，您可以使用 @code{ses-range} 的 @code{!} 修饰符从返回的列表中删除空白单元格，这样就可以使用 @code{+} 而不是 @code{ses+}：
+
+@lisp
+(apply '+ (ses-range A2 A5 !))
+@end lisp
+
+实际上，这两个选项并不完全相同，因为前者以相反的参数顺序求和，而后者以相同的顺序求和。  您还可以使用 @code{<} 修饰符反转 @code{ses-range} 返回的参数顺序。
+
+@c ===================================================================
+
+@node The Basics
+@comment  node-name,  next,  previous,  up
+@chapter 基础知识
+@cindex basic commands
+@findex ses-jump
+@findex ses-mark-row
+@findex ses-mark-column
+@findex ses-mark-whole-buffer
+@findex set-mark-command
+@findex keyboard-quit
+
+要创建新的电子表格，请访问名称以 @file{.ses} 结尾的不存在的文件。  例如，@kbd{C-x C-f test.ses @key{RET}}。
+
+
+@dfn{cell identifier} 是一个带有列字母和行号的符号。  单元格 B7 是第 7 行第 2 列。  对于非常宽的电子表格，有两个列字母：单元格 AB7 是第 7 行的第 28 列。  超宽电子表格获得 AAA1 等。您可以使用常规 Emacs 移动命令进行移动。
+
+@table @kbd
+@item j
+将点移动到由标识符 (@code{ses-jump}) 指定的单元格。  除非单元格是重命名的单元格，否则标识符不区分大小写。  对于 @math{R} 行和 @math{C} 列的电子表格，前缀参数 @math{n} 移动到坐标为 @math{(n\div R, n \% C)} 的单元格，@samp{A1} 的坐标为 @math{(0,0)}。  标识符或命令前缀参数的解释方式可以通过变量@code{ses-jump-cell-name-function}和@code{ses-jump-prefix-function}自定义。
+@end table
+
+点始终位于单元格的左边缘或空端线处。当标记处于非活动状态时，当前单元格带有下划线。  当标记处于活动状态时，范围是突出显示的单元格矩形（@acronym{SES} 始终使用瞬态标记模式）。  将鼠标从@samp{A1}拖动到@samp{A3}以创建范围@samp{A1-A2}。  许多 @acronym{SES} 命令仅适用于单个单元格，而不适用于范围。
+
+@table @kbd
+@item C-@key{SPC}
+@itemx C-@@
+在点 (@code{set-mark-command}) 处设置标记。
+
+@item C-g
+关闭标记 (@code{keyboard-quit})。
+
+@item M-h
+突出显示当前行 (@code{ses-mark-row})。
+
+@item S-M-h
+突出显示当前列 (@code{ses-mark-column})。
+
+@item C-x h
+突出显示所有单元格 (@code{mark-whole-buffer})。
+@end table
+
+@menu
+* Formulas::
+* Resizing::
+* Printer functions::
+* Clearing cells::
+* Copy/cut/paste::
+* Customizing @acronym{SES}::
+@end menu
+
+@node Formulas
+@section 单元格公式
+@cindex formulas
+@cindex formulas, entering
+@cindex values
+@cindex cell values
+@cindex editing cells
+@findex ses-read-cell
+@findex ses-read-symbol
+@findex ses-edit-cell
+@findex ses-recalculate-cell
+@findex ses-recalculate-all
+
+要将值插入单元格，只需键入数值表达式 @samp{"double-quoted text"} 或 Lisp 表达式即可。
+
+@table @kbd
+@item 0..9
+自动插入一个数字 (@code{ses-read-cell})。
+
+@item -
+自行插入负数 (@code{ses-read-cell})。
+
+@item .
+自插入一个十进制数 (@code{ses-read-cell})。
+
+@item "
+自插入字符串。  结尾的双引号已为您插入 (@code{ses-read-cell})。
+
+@item (
+自行插入表达式。  右括号已为您插入 (@code{ses-read-cell})。  要访问另一个单元格的值，只需在表达式中使用其标识符即可。  每当其他单元格发生更改时，该单元格的公式都会重新计算。  输入表达式时，您可以使用以下键：
+@table @kbd
+@item M-@key{TAB}
+完成符号名称，以及
+@item  C-h C-n
+列出帮助缓冲区中命名的单元格符号。
+@end table
+
+@item ' @r{(apostrophe)}
+输入一个符号 (@code{ses-read-symbol})。  @acronym{SES} 会记住已用作公式的所有符号，因此您可以仅键入符号的开头，然后使用 @kbd{@key{SPC}}、@kbd{@key{TAB}} 和 @kbd{?} 来完成它。
+@end table
+
+要输入其他内容（例如向量），请以数字开头，然后擦除该数字并输入您想要的任何内容。
+
+@table @kbd
+@item @key{RET}
+编辑当前单元格中的现有公式 (@code{ses-edit-cell})。
+
+@item C-c C-c
+强制重新计算当前单元格或范围 (@code{ses-recalculate-cell})。
+
+@item C-c C-l
+重新计算整个电子表格 (@code{ses-recalculate-all})。
+@end table
+
+@node Resizing
+@section 调整电子表格大小
+@cindex resizing spreadsheets
+@cindex dimensions
+@cindex row, adding or removing
+@cindex column, adding or removing
+@cindex adding rows or columns
+@cindex inserting rows or columns
+@cindex removing rows or columns
+@cindex deleting rows or columns
+@findex ses-insert-row
+@findex ses-insert-column
+@findex ses-delete-row
+@findex ses-delete-column
+@findex ses-set-column-width
+@findex ses-forward-or-insert
+@findex ses-append-row-jump-first-column
+
+
+基本命令：
+
+@table @kbd
+@item C-o
+(@code{ses-insert-row})
+
+@item M-o
+(@code{ses-insert-column})
+
+@item C-k
+(@code{ses-delete-row})
+
+@item M-k
+(@code{ses-delete-column})
+
+@item w
+(@code{ses-set-column-width})
+
+@item @key{TAB}
+将点移动到右下一个单元格，或者如果已经位于行上的最后一个单元格，则插入新列，或者如果位于行尾 (@code{ses-forward-or-insert})，则插入新行。
+
+@item C-j
+换行符插入当前行下方并移至 A 列 (@code{ses-append-row-jump-first-column})。
+@end table
+
+调整电子表格的大小（除非您只是更改列宽）会重新定位公式中的所有单元格引用，以便它们仍然引用相同的单元格。  如果公式提及 B1 并且您插入新的第一行，则该公式现在将提及 B2。
+
+如果删除公式引用的单元格，单元格符号将从公式中删除，因此删除第三列后@code{(+ A1 B1 C1)} 变为@code{(+ A1 B1)}。  如果这不是您想要的：
+
+@table @kbd
+@item C-_
+@itemx C-x u
+撤消之前的操作 (@code{(undo)})。
+@end table
+
+
+@node Printer functions
+@section 打印机功能
+@cindex printer functions
+@cindex cell formatting
+@cindex formatting cells
+
+打印机函数将二进制单元格值转换为 Emacs 将在屏幕上显示的打印形式。
+
+@menu
+* Various kinds of printer functions::
+* Configuring what printer function applies::
+* Standard printer functions::
+* Local printer functions::
+* Writing a lambda printer function::
+@end menu
+
+@node Various kinds of printer functions
+@subsection 各种打印机功能
+
+配置应用的打印机功能 (@pxref{Configuring what printer function applies}) 时，您可以将打印机功能输入为以下之一：
+
+@itemize
+@item
+格式字符串，例如 @samp{"$%.2f"}。  结果字符串在打印单元格内右对齐。  要左对齐，请使用括号：@samp{("$%.2f")}。
+@item
+打印机也可以是单参数函数，其结果是一个字符串（用于右对齐）或一个字符串的列表（用于左对齐）。  这样的函数可以依次配置为：
+@itemize
+@item
+一个 lambda 表达式，例如：
+
+@lisp
+(lambda (x)
+  (cond
+     ((null x) "")
+     ((numberp x) (format "%.2f" x))
+     (t (ses-center-span x ?# 'ses-prin1))))
+@end lisp
+
+在输入 lambda 时，您可以使用 @kbd{M-@key{TAB}} 来完成符号名称。
+@item
+代表标准打印机功能的符号 (@pxref{Standard printer functions})。
+@item
+该符号表示本地打印机功能 (@pxref{Local printer functions})。
+@end itemize
+
+
+@end itemize
+
+
+@node Configuring what printer function applies
+@subsection 配置适用的打印机功能
+
+每个单元都有一台打印机。  如果@code{nil}，则使用单元格列的列打印机。  如果这也是@code{nil}，则使用电子表格的默认打印机。
+
+@table @kbd
+@item p
+@findex ses-read-cell-printer
+输入当前单元格或范围的打印机 (@code{ses-read-cell-printer})。
+
+@item M-p
+@findex ses-read-column-printer
+输入当前列的打印机 (@code{ses-read-column-printer})。
+
+@item C-c C-p
+@findex ses-read-default-printer
+输入电子表格的默认打印机 (@code{ses-read-default-printer})。
+@end table
+
+@code{ses-read-@var{xxx}-printer} 允许在编辑期间执行以下命令：
+
+@table @kbd
+@item @key{arrow-up}
+@itemx @key{arrow-down}
+浏览历史记录： @code{ses-read-@var{xxx}-printer} 命令有自己的迷你缓冲区历史记录，其中预加载了此电子表格中使用的所有打印机集，以及标准打印机 (@pxref{Standard printer functions}) 和本地打印机 (@pxref{Local printer functions})。
+@item @key{TAB}
+完成本地打印机符号，以及
+@item C-h C-p
+在帮助缓冲区中列出本地打印机。
+@end table
+
+
+@node Standard printer functions
+@subsection 标准打印机功能
+
+
+除了@code{ses-prin1}之外，其他标准打印机仅适用于单元格，不适用于列或默认值，因为它们使用列打印机（如果@code{nil}则使用默认打印机）格式化值，然后对结果进行后处理，例如@:将其居中：
+
+@ftable @code
+@item ses-center
+只是居中。
+
+@item ses-center-span
+居中并溢出到后面的空白单元格。
+
+@item ses-dashfill
+使用破折号 (@samp{-}) 而不是空格居中。
+
+@item ses-dashfill-span
+以破折号和溢出居中。
+
+@item ses-tildefill-span
+使用波形符 (@samp{~}) 居中并溢出。
+
+@item ses-prin1
+这是后备打印机，在调用配置的打印机引发一些错误时使用。
+@end ftable
+
+@node Local printer functions
+@subsection 本地打印机功能
+
+@findex ses-define-local-printer
+您可以使用命令 @code{ses-define-local-printer} 定义纸张的本地打印机功能。  例如，定义打印机@samp{foo}到@code{"%.2f"}，然后使用符号@samp{foo}作为打印机功能。  然后，如果您在@samp{foo}上再次调用@code{ses-define-local-printer}将其重新定义为@code{"%.3f"}，则所有使用打印机@samp{foo}的单元格将相应地重新打印。
+
+有时，您希望每次打开工作表时自动定义或重新定义本地打印机。  例如，假设您要自动定义/重新定义本地打印机@code{euro}来显示数字（如欧元金额），也就是说数字@code{3.1}将显示为@code{3.10@dmn{}@euro{}}。  要在任何非只读 SES 缓冲区中执行此操作，您可以将如下代码添加到您的 @file{.emacs} 初始化文件中：
+
+@lisp
+(defun my-ses-mode-hook ()
+  (unless buffer-read-only
+    (ses-define-local-printer
+     'euro
+     (lambda (x)
+       (cond
+        ((null x) "")
+        ((numberp x) (format "%.2f€" x))
+        (t (ses-center-span x ?# 'ses-prin1)))))))
+(add-hook 'ses-mode-hook 'my-ses-mode-hook)
+@end lisp
+
+如果将命令 @code{ses-define-local-printer} 替换为函数 @code{ses-define-if-new-local-printer}
+@findex ses-define-if-new-local-printer
+仅当尚未定义具有相同名称的本地打印机时才会发生该定义。
+
+
+@node Writing a lambda printer function
+@subsection 编写 lambda 打印机函数
+
+您可以在以下两种情况下使用带有一个参数的 lambda 表达式编写打印机函数：
+
+@itemize
+@item
+当您配置应用于单元格或列的打印机功能时，或者
+@item
+当您使用命令@code{ses-define-local-printer}定义本地打印机功能时。
+@end itemize
+
+执行此操作时，请注意返回的值是字符串或包含字符串的列表，即使输入参数具有意外值也是如此。  这是一个例子：
+
+@example
+(lambda (val)
+   (cond
+      ((null val) "")
+      ((and (numberp val) (>= val 0)) (format "%.1f" val))
+      (t (ses-center-span val ?# 'ses-prin1))))
+@end example
+
+这个例子将：
+
+@itemize
+@item
+当单元格为空时（即@:当@code{val}为@code{nil}时），打印一个空字符串@code{""}
+@item
+当单元格值为非负数时，将值格式化为定点表示法，小数点后保留一位小数
+@item
+否则，通过将值打印为 s 表达式（使用 @code{ses-prin1}）来处理该值，将其居中并用 @code{#} 填充包围。
+@end itemize
+
+另一个需要采取的预防措施是避免由于打印机函数无限期地调用自身而导致堆栈溢出。  当您使用本地打印机作为列式打印机时，可能会发生此错误，并且此本地打印机隐式调用当前列式打印机，因此它会递归地调用自身。  想象一下，例如，您想要创建一些本地打印机@code{=fill}，它将单元格的内容居中并用等号@code{=}将其包围，并且您这样做（错误地）是这样的：
+
+@lisp
+;; ERRONEOUS CODE
+(lambda (x)
+  (cond
+   ((null x) "")
+   (t (ses-center x 0 ?=))))
+@end lisp
+
+因为 @code{=fill} 使用标准打印机 @code{ses-center} 而不显式传递任何打印机给它，所以 @code{ses-center} 将调用当前列打印机（如果有），否则调用电子表格默认打印机。  因此，使用@code{=fill}作为列打印机将导致该列中任何非空单元格上的堆栈溢出，因为@code{ses-center}将递归调用调用它的函数。  @acronym{SES} 不检查这一点；你只需要小心。  例如，像这样重写 @code{=fill}：
+
+@lisp
+(lambda (x)
+  (cond
+   ((null x) "")
+   ((stringp x) (ses-center x 0 ?= " %s "))
+   (t (ses-center-span x ?# 'ses-prin1))))
+@end lisp
+
+上面的代码被固定为 @code{ses-center} 和 @code{ses-center-span} 都使用显式的最后一个 @var{printer} 参数调用，分别为 @code{" %s "} 和 @code{'ses-prin1}。
+
+上面的代码仅将 @code{=} 填充应用于字符串；在填充 @code{=} 符号之前，它还在字符串的每一侧围绕一个空格。  因此，字符串 @samp{Foo} 将像 @samp{@w{=== Foo ===}} 一样显示在 11 个字符宽的列中。  通过使用 @code{#} 填充，任何既不是 @code{nil}（即 @: 空单元格）也不是字符串的值都会显示为错误。
+
+@node Clearing cells
+@section 清除细胞
+@cindex clearing commands
+@findex ses-clear-cell-backward
+@findex ses-clear-cell-forward
+
+这些命令将公式和打印机设置为@code{nil}：
+
+@table @kbd
+@item @key{DEL}
+向左移动并清除单元格 (@code{ses-clear-cell-backward})。
+
+@item C-d
+清除单元格并向右移动 (@code{ses-clear-cell-forward})。
+@end table
+
+
+@node Copy/cut/paste
+@section 复制、剪切和粘贴
+@cindex copy
+@cindex cut
+@cindex paste
+@findex kill-ring-save
+@findex mouse-set-region
+@findex mouse-set-secondary
+@findex ses-kill-override
+@findex yank
+@findex clipboard-yank
+@findex mouse-yank-at-click
+@findex mouse-yank-at-secondary
+@findex ses-yank-pop
+
+复制功能适用于单元格的矩形区域。  您可以将副本粘贴到非 @acronym{SES} 缓冲区中以导出打印文本。
+
+@table @kbd
+@item M-w
+@itemx [copy]
+@itemx [C-insert]
+将突出显示的单元格复制到终止环和主剪贴板 (@code{kill-ring-save})。
+
+@item [drag-mouse-1]
+标记一个区域并将其复制到杀伤环和主剪贴板 (@code{mouse-set-region})。
+
+@item [M-drag-mouse-1]
+标记一个区域并将其复制到杀死环和辅助剪贴板 (@code{mouse-set-secondary})。
+
+@item C-w
+@itemx [cut]
+@itemx [S-delete]
+剪切函数实际上并不删除行或列——它们先复制然后清除（@code{ses-kill-override}）。
+
+@item C-y
+@itemx [S-insert]
+从杀戮环粘贴（@code{yank}）。  根据插入文本的格式，粘贴函数的行为有所不同：
+@itemize @bullet
+@item
+当粘贴从 @acronym{SES} 缓冲区剪切或复制的单元格时，打印文本将被忽略，仅插入附加的公式和打印机；除非您使用@kbd{C-u}，否则公式中的单元格引用将被重新定位。
+@item
+粘贴的文本将覆盖左上角为当前单元格的单元格矩形。  如果矩形的一部分超出了电子表格的边缘，则必须确认电子表格大小的增加。
+@item
+非 0⁣ 文本通常作为当前单元格的替换公式插入。  如果公式是一个符号，它将被视为字符串，除非您使用 @kbd{C-u}。  具有语法错误的粘贴公式始终被视为字符串。
+@end itemize
+
+@item [paste]
+从主剪贴板或 Kill Ring 粘贴 (@code{clipboard-yank})。
+
+@item [mouse-2]
+设置点并从主剪贴板粘贴 (@code{mouse-yank-at-click})。
+
+@item [M-mouse-2]
+设置点并从辅助剪贴板粘贴 (@code{mouse-yank-secondary})。
+
+@item M-y
+粘贴后，您可以立即将文本替换为 Kill Ring (@code{ses-yank-pop}) 中的前一个元素。  与标准 Emacs yank-pop 不同，@acronym{SES} 版本使用 @code{undo} 删除旧的 yank。  这没有什么区别吗？
+@end table
+
+@node Customizing @acronym{SES}
+@section 定制@acronym{SES}
+@cindex customizing
+@vindex enable-local-eval
+
+默认情况下，新创建的电子表格有 1 行和 1 列。  列宽为 7，默认打印机为@samp{"%.7g"}。  其中每一个都可以定制。  在“ses”组中查找。
+
+输入单元格值后，通常会调用@code{forward-char}，它将点向右移动到下一个单元格@c TODO 传播额外的内容
+                                        @c explanation from the French
+                                        @c version.
+。  您可以自定义 @code{ses-after-entry-functions} 向左或向上或向下移动。  对于对角线移动，从列表中选择两个函数。
+
+@vindex ses-jump-cell-name-function
+@code{ses-jump-cell-name-function} 是一个可自定义变量，默认设置为 @code{upcase} 函数。  当您将单元格名称传递给 @command{ses-jump} 命令 (@kbd{j}) 时，会调用此函数，
+@c TODO : propagate extra explanation from the French version.
+它将输入的单元格名称更改为要跳转的位置。  默认设置 @code{upcase} 允许您以小写形式输入单元格名称。  @code{ses-jump-cell-name-function} 的另一个用途可能是某种国际化，将非拉丁字符转换为拉丁字符以命名单元格。  该函数可以以 cons 的形式返回单元格坐标，而不是单元格名称，例如 @code{(0 . 0)} 代表单元格 @code{A1}，@code{(1 . 0)} 代表单元格 @code{A2}，等等。
+
+@vindex ses-jump-prefix-function
+@code{ses-jump-prefix-function} 是一个可自定义变量，默认设置为 @code{ses-jump-prefix} 函数。  当您为 @command{ses-jump} 命令 (@kbd{j}) 提供前缀参数时，会调用此函数。  它返回与前缀参数相对应的单元格名称或单元格坐标。  单元格坐标采用 cons 的形式，例如 @code{(1 . 0)} 代表单元格 @code{A2}。  默认设置 @code{ses-jump-prefix} 将从左到右然后从上到下对单元格进行编号，因此假设 4x3 电子表格前缀参数 @samp{0} 跳转到单元格 @samp{A1}，前缀参数 @samp{2} 跳转到 @samp{C1}，前缀参数 @samp{3} 跳转到 @samp{A2}，依此类推。
+
+@vindex ses-mode-hook
+@code{ses-mode-hook} 是正常模式挂钩（在启动缓冲区的 @acronym{SES} 模式时执行的函数列表）。
+
+@vindex safe-functions
+变量 @code{safe-functions} 是可能不安全的函数列表，在分析公式和打印机时将其视为安全。 @xref{Virus protection}。  在定制 @code{safe-functions} 之前，请考虑一下您对提出此更改建议的人的信任程度。  值@code{t} 关闭所有防病毒保护。  函数值列表可能会启用“天哪”的电子表格，但它也会在您的防病毒装甲中创建活板门。  为了使病毒防护发挥作用，当出现病毒警告时，您必须始终按@kbd{n}，除非您了解有问题的代码试图执行的操作。  不要听那些叫你定制@code{enable-local-eval}的人——这个变量是给不系安全带的人的！
+
+
+@c ===================================================================
+
+@node Advanced Features
+@chapter 高级功能
+@cindex advanced features
+@findex ses-read-header-row
+
+
+@table @kbd
+@item C-c M-C-h
+(@code{ses-set-header-row}).
+@findex ses-set-header-row
+@kindex C-c M-C-h
+@acronym{SES} 窗口顶部的标题行通常显示每列的列字母。  您可以将其设置为显示某些行的副本，例如一行列标题，以便该行始终可见。  默认是将当前行设置为标题；使用 C-u 提示输入标题行。  将标题设置为第 0 行以再次显示列字母。
+@item [header-line mouse-3]
+弹出一个菜单，将当前行设置为标题，或恢复为列字母。
+@item M-x ses-rename-cell
+@findex ses-rename-cell
+将单元格从类似 A1 的标准名称重命名为可以作为有效局部变量名称的任何字符串（另请参见@ref{Nonrelocatable references}）。
+@item M-x ses-repair-cell-reference-all
+@findex ses-repair-cell-reference-all
+当您通过键入 @kbd{C-g} 中断单元格公式更新时，单元格引用链接可能会被破坏，这将在其依赖的任何其他单元格发生更改时危及自动单元格更新。  要修复该问题，请使用函数@code{ses-repair-cell-reference-all}
+@end table
+
+@menu
+* The print area::
+* Ranges in formulas::
+* Sorting by column::
+* Standard formula functions::
+* More on cell printing::
+* Import and export::
+* Virus protection::
+* Spreadsheets with details and summary::
+@end menu
+
+@node The print area
+@section 打印区域
+@cindex print area
+@findex widen
+@findex ses-renarrow-buffer
+@findex ses-reprint-all
+
+@acronym{SES} 文件由打印区和数据区组成。  通常缓冲区会缩小以仅显示打印区域。  除特殊的@acronym{SES}命令外，打印区域是只读的；它包含由打印机功能格式化的单元格值。  数据区记录公式和打印机功能等。
+
+@table @kbd
+@item C-x n w
+显示打印和数据区域 (@code{widen})。
+
+@item C-c C-n
+仅显示打印区域 (@code{ses-renarrow-buffer})。
+
+@item S-C-l
+@itemx M-C-l
+通过重新评估所有单元格的打印机功能来重新创建打印区域 (@code{ses-reprint-all})。
+@end table
+
+@node Ranges in formulas
+@section 公式中的范围
+@cindex ranges
+@findex ses-insert-range-click
+@findex ses-insert-range
+@findex ses-insert-ses-range-click
+@findex ses-insert-ses-range
+@vindex from
+@vindex to
+
+像这样的公式
+@lisp
+(+ A1 A2 A3)
+@end lisp
+是三个特定单元格的总和。  如果插入新的第二行，公式将变为
+@lisp
+(+ A1 A3 A4)
+@end lisp
+并且新行不包含在总和中。
+
+宏 @code{(ses-range @var{from} @var{to})} 计算出单元格矩形中的值列表。  如果你的公式是
+@lisp
+(apply '+ (ses-range A1 A3))
+@end lisp
+然后插入新的第二行，它变成
+@lisp
+(apply '+ (ses-range A1 A4))
+@end lisp
+新行包含在总和中。
+
+在迷你缓冲区中输入或编辑公式时，您可以在电子表格中选择一个范围（使用鼠标或键盘），然后将该范围的表示形式粘贴到公式中。  假设您选择@samp{A1-C1}：
+
+@table @kbd
+@item [S-mouse-3]
+插入 @samp{A1 B1 C1} (@code{ses-insert-range-click})
+
+@item C-c C-r
+键盘版本 (@code{ses-insert-range})。
+
+@item [C-S-mouse-3]
+插入 @samp{(ses-range A1 C1)} (@code{ses-insert-ses-range-click})。
+
+@item C-c C-s
+键盘版本 (@code{ses-insert-ses-range})。
+@end table
+
+如果删除某个范围的 @var{from} 或 @var{to} 单元格，则会使用最近的仍然存在的单元格。  如果删除整个范围，公式重定位器将从公式中删除 @samp{ses-range}。
+
+如果您在单列范围末尾插入新行，或在单行范围之外插入新列，则新单元格将包含在该范围中。  不包括在某个范围之前插入的新单元格。
+
+可以将标志添加到紧接着 @var{to} 单元格之后的 @code{ses-range}。
+@table @code
+@item !
+可以通过添加 @code{!} 标志来删除范围内的空单元格。  空单元格是其值为符号 @code{nil} 或 @code{*skip*} 之一的单元格。  例如，当单元格 @code{A2} 和 @code{A4} 为空时，@code{(ses-range A1 A4 !)} 将执行与 @code{(list A1 A3)} 相同的操作。
+@item _
+当标志 @code{_} 位于参数列表中的最后时，空单元格值将替换为标志 @code{_} 或 @code{0} 之后的参数。  例如，当单元格 @code{A2} 和 @code{A4} 为空时，@code{(ses-range A1 A4 _ "empty")} 将执行与 @code{(list A1 "empty" A3 "empty")} 相同的操作。  同样，@code{(ses-range A1 A4 _ )} 的作用与@code{(list A1 0 A3 0)} 相同。
+@item >v
+当顺序很重要时，通过从左上到右下按行读取单元格来列出单元格。  提供此标志只是为了完整性，因为它是默认的阅读顺序。
+@item <v
+通过从右上角到左下角逐行读取单元格来列出单元格。
+@item v>
+通过从左上到右下按列读取单元格来列出单元格。
+@item v<
+通过从右上到左下按列读取单元格来列出单元格。
+@item v
+@code{v>} 的简写。
+@item ^
+@code{^>} 的简写。
+@item >
+@code{>v} 的简写。
+@item <
+@code{>^} 的简写。
+@item *
+它不是列出单元格，而是创建一个计算向量或矩阵 (@pxref{Top,,,calc,GNU Emacs Calc Manual})。  如果范围仅包含一行或一列，则生成向量，否则生成矩阵。
+@item *2
+与@code{*} 相同，只是即使范围内只有一行或一列，也始终会生成矩阵。
+@item *1
+与@code{*}相同，只是即使范围内只有一行或一列，也始终会生成一个向量，也就是说相应的矩阵被展平。
+@end table
+
+@node Sorting by column
+@section 按列排序
+@cindex sorting
+@findex ses-sort-column
+@findex ses-sort-column-click
+
+@table @kbd
+@item C-c M-C-s
+使用其中一列 (@code{ses-sort-column}) 对范围的单元格进行排序。  行（如果范围不包括所有列，则为部分行）将重新排列，以便所选列按顺序排列。
+
+@item [header-line mouse-2]
+最简单的排序方法是在所选列的标题行 (@code{ses-sort-column-click}) 上单击鼠标 2。
+@end table
+
+排序比较使用 @code{string<}，它适用于右对齐数字和左对齐字符串。
+
+使用前缀 arg，排序按降序排列。
+
+通过重新定位公式，一次移动一行。  如果公式引用其行中的其他单元格，则此方法效果很好，但如果公式引用范围内的其他行或范围外的单元格，则效果不佳。
+
+
+@node Standard formula functions
+@section 标准公式函数
+@cindex standard formula functions
+@cindex *skip*
+@cindex *error*
+@findex ses-delete-blanks
+@findex ses-average
+@findex ses+
+
+通常您需要进行计算以排除空白单元格。  以下是一些可以从公式中调用的有用函数：
+
+@table @code
+@item (ses-delete-blanks &rest @var{args})
+返回一个列表，其中所有空白单元格（值为 @code{nil} 或 '*skip*）已被删除。  args 的顺序被恢复。  请注意 @code{ses-range} 有一个 @code{!} 修饰符可以删除空格，因此可以写：
+@lisp
+(ses-range A1 A5 !)
+@end lisp
+而不是
+@lisp
+(apply 'ses-delete-blanks (ses-range A1 A5 <))
+@end lisp
+
+@item (ses+ &rest @var{args})
+以相反顺序获取的非空白参数的总和。
+
+@item (ses-average @var{list})
+@var{list} 中非空白元素的平均值。  这里列表作为单个参数传递，因为您可能会将它与 @code{ses-range} 一起使用。
+@end table
+
+@node More on cell printing
+@section 有关细胞打印的更多信息
+@cindex cell printing, more
+@findex ses-truncate-cell
+@findex ses-recalculate-cell
+
+特殊单元格值：
+@itemize
+@item @code{nil} prints typically the same as "", but allows previous
+细胞溢出。
+@item '*skip* replaces @code{nil} when the previous cell actually does
+溢出;没有为它打印任何内容。
+@item '*error* indicates that the formula signaled an error instead of
+生成一个值：打印单元格中填充了井号 (#)。
+@end itemize
+
+@c TODO propagate extra explanation from the French version.
+
+如果打印机功能的结果对于单元格来说太宽并且后续单元格为@code{nil}，则结果将溢出到后续单元格中。  非常广泛的结果可能会溢出到多个单元格。  如果结果对于可用空间来说太宽（直到行尾或下一个非 1⁣ 单元格），如果单元格的值是字符串，则结果将被截断，否则将替换为散列标记。
+
+@acronym{SES} 可能会被包含换行符或制表符的打印机结果混淆，因此它们被替换为问号。
+
+@table @kbd
+@item t
+将单元格限制在其自己的列中 (@code{ses-truncate-cell})。  这允许您将点移动到右侧的单元格，否则该单元格将被溢出覆盖。  如果不更改右侧单元格，则下次重新打印时，受限单元格将再次溢出。
+
+@item c
+当应用于单个单元格时，此命令在回显区域中显示重新计算/重新打印期间发生的任何公式错误或打印机错误 (@code{ses-recalculate-cell})。  您可以使用它来撤消 @kbd{t} 的效果。
+@end table
+
+当打印机功能发出错误信号时，后备打印机
+@findex ses-prin1
+@code{ses-prin1} 被取代。  当您的打印机仅显示数字并且您使用字符串作为单元格值时，这非常有用。  请注意，标准默认打印机是 @samp{"%.7g"}，它仅包含数字，因此应用标准默认打印机且不为空且不包含数字的单元格将使用后备打印机 @code{ses-prin1}，例如包含字符串的单元格将执行此操作。  @kbd{c} 在此类单元格上将显示“格式说明符与参数类型不匹配”。
+
+
+@node Import and export
+@section 进出口
+@cindex import and export
+@cindex export, and import
+@findex ses-export-tsv
+@findex ses-export-tsf
+
+@table @kbd
+@item x t
+将一系列单元格导出为制表符分隔值 (@code{ses-export-tsv})。
+@item x T
+将一系列单元格导出为制表符分隔的公式 (@code{ses-export-tsf})。
+@end table
+
+导出的文本进入killring；您可以将其粘贴到另一个缓冲区中。  列由制表符分隔，行由换行符分隔。
+
+要导入文本，请在要粘贴的文本包含制表符和/或换行符的情况下使用任意复制命令。  导入的公式不会重新定位。
+
+@node Virus protection
+@section 病毒防护
+@cindex virus protection
+
+每当从文件中读取公式或打印机或将其粘贴到电子表格中时，它都会收到“需要安全检查”标记。  稍后，当第一次评估公式或打印机时，使用 @code{unsafep} 谓词检查安全性；如果发现“可能不安全”，则会显示有问题的配方或打印机，您必须按 @kbd{Y} 批准它或按 @kbd{N} 使用替代品。  替补总是发出错误信号。
+
+为了安全起见，您输入的公式或打印机会立即受到检查。  如果发现可能不安全并且您按 @kbd{N} 拒绝，操作将被取消，旧的配方或打印机将保留。
+
+除了病毒（尝试将自身复制到其他文件）之外，@code{unsafep} 还可以检测所有其他类型的特洛伊木马，例如删除文件、发送电子邮件、淹没网站、更改 Emacs 设置等的电子表格。
+
+一般来说，电子表格公式和打印机都是简单的东西，不需要进行任何花哨的计算，因此可以排除 Emacs Lisp 环境中所有潜在危险的部分，而不会限制您作为公式编写者的风格。  有关 Lisp 表单如何分类为安全或不安全的更多信息，请参阅 @file{unsafep.el} 中的文档。
+
+@node Spreadsheets with details and summary
+@section 包含详细信息和摘要的电子表格
+@cindex details and summary
+@cindex summary, and details
+
+电子表格的常见组织是具有一堆“详细”行，每个行可能描述一个事务，然后是一组“摘要”行，每个行显示详细信息某些子集的缩减数据。  @acronym{SES} 通过 @code{ses-select} 函数支持该组织。
+
+@table @code
+@item (ses-select @var{fromrange} @var{test} @var{torange})
+返回 @var{torange} 的子集。  对于 @var{fromrange} 中等于 @var{test} 的每个成员，@var{torange} 的相应成员都包含在结果中。
+@end table
+
+使用示例：
+@lisp
+(ses-average (ses-select (ses-range A1 A5) 'Smith (ses-range B1 B5)))
+@end lisp
+这将计算 @samp{A} 列值为符号 @samp{'Smith} 的行的 @samp{B} 列值的平均值。
+
+可以说，我们只能指定 @var{fromrange} 加 @var{to-row-offset} 和 @var{to-column-offset}。  明确声明 @var{torange} 是为了确保在任一范围内的任何单元格发生更改时都会重新计算公式。
+@c TODO reword this paragraph more clearly as in the French version
+
+
+Emacs 发行版中的文件@file{etc/ses-example.el} 是详细信息和摘要电子表格的示例。
+
+
+@c ===================================================================
+
+@node For Gurus
+@chapter 对于大师
+@cindex advanced features
+
+@menu
+* Deferred updates::
+* Nonrelocatable references::
+* The data area::
+* Buffer-local variables in spreadsheets::
+* Uses of advice-add in @acronym{SES}::
+@end menu
+
+@node Deferred updates
+@section 推迟更新
+@cindex deferred updates
+@cindex updates, deferred
+@vindex run-with-idle-timer
+
+为了通过避免冗余计算来节省时间，由于其他单元格的变化而需要重新计算的单元格被添加到集合中。  在命令结束时，集合中的每个单元格都会重新计算一次。这可能会创建一组需要重新计算的新单元格。  重复该过程，直到集合为空或检测到循环引用。  在极端情况下，特别是如果检测到循环单元格引用，您可能会看到“重新计算...（剩余@var{nnn}单元格）”形式的进度消息。  如果使用@kbd{C-g}中断计算，电子表格将处于不一致状态，因此请使用@kbd{C-_}或@kbd{C-c C-l}来修复它。
+
+为了通过避免冗余写入来节省更多时间，将发生更改的单元添加到集合中，而不是立即写入数据区域。  该组中的每个单元格在命令末尾写入一次。  如果您更改大量单元格，您可能会看到“正在写入...（剩余 0 个单元格）”形式的进度消息。这些延迟的单元格写入不能被 @kbd{C-g} 打断，因此您只需等待。
+
+当 Emacs 在命令结束后滚动缓冲区时，@acronym{SES} 使用 @code{run-with-idle-timer} 移动单元格下划线，并且在访问文件后缩小单元格并加下划线。  在访问和某些滚动命令后，这可能会出现短暂的故障。  您可以提前输入，而不必担心出现故障。
+
+
+@node Nonrelocatable references
+@section 不可重定位引用
+@cindex nonrelocatable references
+@cindex references, nonrelocatable
+
+@kbd{C-y} 重新定位粘贴公式中的所有单元格引用，而 @kbd{C-u C-y} 不重新定位任何单元格引用。  混合情况又如何呢？
+
+最好的方法是使用 @code{ses-rename-cell} 重命名您想要重新定位的单元格 @emph{not}。
+@findex ses-rename-cell
+没有类似 A1 名称样式的单元格不会在复制时重新定位。  使用此方法，相关单元格不会重新定位它们出现在的任何公式中。但是请注意，当公式包含某个范围 @code{(ses-range @var{cell1} @var{cell2})} 时，在拉出的公式中，每个范围边界 @var{cell1} 和 @var{cell2} 会独立地重新定位或不重新定位，具体取决于它们是类似 @samp{A1} 还是重命名。
+
+另一种方法是使用
+@lisp
+(symbol-value 'B3)
+@end lisp
+制作@dfn{absolute reference}。  公式重定位器会跳过带引号的内容，因此在粘贴或插入/删除行/列时不会重新定位。  然而，@samp{B3}不会被记录为该单元格的依赖项，因此当@samp{B3}更改时，该单元格不会自动更新，这就是为什么在大多数情况下使用@code{ses-rename-cell}是更好的选择。
+
+在计算单元格公式时，变量 @code{row} 和 @code{col} 会动态绑定。  您可以使用
+@lisp
+(ses-cell-value row 0)
+@end lisp
+获取当前行最左边列的值。  这种依赖关系也没有被记录。
+
+
+@node The data area
+@section 数据区
+@cindex data area
+@findex ses-reconstruct-all
+
+以换页符（其 ASCII 代码为八进制表示法的 014）开始，后面是每行的单元格定义宏集、本地打印机定义集、列宽、列打印机、默认打印机和标题行。  然后是全局参数（文件格式 ID、行数、列数、本地打印机数）和局部变量（指定缓冲区的 @acronym{SES} 模式等）。
+
+当加载@acronym{SES}文件时，首先加载全局参数，然后加载整个数据区，最后处理局部变量。
+
+您可以编辑数据区域，但不要插入或删除除局部变量部分之外的任何换行符，因为 @acronym{SES} 通过计算换行符来定位内容。  在行尾使用 @kbd{C-x C-e} 将您的编辑安装到电子表格数据结构中（这不会更新打印区域，例如使用 @kbd{C-c C-l} ）。
+
+数据区域被维护为电子表格数据结构的图像，从最初加载该区域时存储在缓冲区局部变量中。如果后续数据区搞乱了，你可以尝试从数据结构中重建数据区：
+
+@table @kbd
+@item C-c M-C-l
+(@code{ses-reconstruct-all}).
+@end table
+
+
+@node Buffer-local variables in spreadsheets
+@section 电子表格中的缓冲区局部变量
+@cindex buffer-local variables
+@cindex variables, buffer-local
+
+您可以将其他局部变量添加到数据区域底部的列表中，例如要在公式中引用的隐藏常量。
+
+您可以将变量 @code{ses--symbolic-formulas} 初始化为符号列表（作为括号内的字符串），以显示为 @kbd{'} 命令的补全。  使用此初始完成列表代替电子表格中实际的符号公式集。
+
+有关此示例，请参阅文件@file{etc/ses-example.ses}。
+
+如果（出于某种原因）您希望公式或打印机将数据保存到变量中，则必须将这些变量声明为缓冲区本地变量以避免病毒警告。
+
+您可以通过将函数设为伪局部变量 @code{eval} 的值来定义函数。  然后，这些函数可以在您的公式和打印机中使用，但通常每个@code{eval}都会在文件加载期间作为潜在病毒呈现给用户。  这可能会让人烦恼。
+
+您可以在 @file{.emacs} 文件中定义函数。  其他人仍然可以阅读您电子表格的打印区域，但他们将无法重新计算或重新打印任何取决于您的功能的内容。  为了避免病毒警告，公式中使用的每个函数都需要
+@lisp
+(put 'your-function-name 'safe-function t)
+@end lisp
+
+@node Uses of advice-add in @acronym{SES}
+@section 在 @acronym{SES} 中使用advice-add
+@findex advice-add
+@findex copy-region-as-kill
+@findex yank
+
+@table @code
+@item copy-region-as-kill
+从电子表格的打印区域复制时，将该区域视为矩形，并将每个单元格的公式和打印机附加为 @code{'ses} 属性。
+
+@item yank
+当拉入电子表格的打印区域时，首先尝试拉入单元格（如果拉入文本具有 @code{'ses} 属性），然后拉入制表符分隔的公式，然后（如果其他方法都失败）拉入当前单元格的单个公式。
+@end table
+
+@c ===================================================================
+@node Index
+@unnumbered 指数
+
+@printindex cp
+
+@c ===================================================================
+
+@node Acknowledgments
+@unnumbered 致谢
+
+编码方式：
+@quotation
+@c jyavner@@member.fsf.org
+乔纳森·亚夫纳，
+@c monnier@@gnu.org
+斯特凡·莫尼尔,
+@c shigeru.fukaya@@gmail.com
+深谷茂,
+@c vincent.belaiche@@sourceforge.net
+文森特·贝莱什
+@end quotation
+
+@noindent
+Texinfo 手册作者：
+@quotation
+@c jyavner@@member.fsf.org
+乔纳森·亚夫纳，
+@c brad@@chenla.org
+布拉德·柯林斯,
+@c vincent.belaiche@@sourceforge.net
+文森特·贝莱什
+@end quotation
+
+@noindent
+想法来自：
+@quotation
+@c christoph.conrad@@gmx.de
+克里斯托夫·康拉德,
+@c cyberbob@@redneck.gacracker.org
+网络鲍勃，
+@c syver-en@@online.no
+西弗·恩斯塔德,
+@c fischman@@zion.bpnetworks.com
+阿米·费什曼，
+@c Thomas.Gehrlein@@t-online.de
+托马斯·格尔莱因,
+@c c.f.a.johnson@@rogers.com
+克里斯·F·A·约翰逊，
+@c lyusong@@hotmail.com
+李玉松,
+@c juri@@jurta.org
+尤里·林科夫，
+@c maierh@@myself.com
+哈拉尔·迈尔,
+@c anash@@san.rr.com
+艾伦·纳什,
+@c pinard@@iro.umontreal.ca
+弗朗索瓦·皮纳尔,
+@c ppinto@@cs.cmu.edu
+佩德罗·平托,
+@c xsteve@@riic.at
+斯特凡·赖克尔,
+@c epameinondas@@gmx.de
+奥利弗·肖尔茨,
+@c rms@@gnu.org
+理查德·斯托曼，
+@c teirllm@@dms.auburn.edu
+吕克·泰尔林克,
+@c jotto@@pobox.com
+J·奥托·坦南特，
+@c jphil@@acs.pagesjaunes.fr
+让·菲利普·泰伯格，
+@c rrandresf@@hotmail.com
+安德烈斯·拉米雷斯
+@end quotation
+
+@c ===================================================================
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@bye

@@ -1,0 +1,3613 @@
+\输入texinfo
+@setfilename ../../info/ede.info
+@settitle Emacs开发环境
+@documentlanguage en
+@include docstyle.texi
+
+@copying
+该文件描述了 EDE（Emacs 开发环境）。
+
+版权所有 @copyright{} 1998--2001, 2004--2005, 2008--2026 自由软件基金会, Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* EDE: (ede).                    Emacs 开发环境。
+@end direntry
+
+@titlepage
+@center @titlefont{EDE (The Emacs Development Environment)}
+@sp 4
+@center by Eric Ludlam
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+@page
+
+@macro cedet{}
+@i{CEDET}
+@end macro
+
+@macro semantic{}
+@i{Semantic}
+@end macro
+
+@macro srecode{}
+@i{SRecode}
+@end macro
+
+@macro eieio{}
+@i{EIEIO}
+@end macro
+
+@macro ede{}
+@i{EDE}
+@end macro
+
+@macro cogre{}
+@i{COGRE}
+@end macro
+
+@macro speedbar{}
+@i{Speedbar}
+@end macro
+
+@contents
+
+@node Top
+@top EDE
+@comment  node-name,  next,  previous,  up
+
+@ede{} (Emacs Development Environment) is an Emacs extension that
+简化了 Emacs 中程序的构建和调试。  @ede{} 可以管理或创建您的 makefile 和其他构建环境职责，使您能够专注于编写代码而不是支持文件。  它的目的是让新程序员更容易学习和采用 GNU 的做事方式。
+
+与 Emacs 的内置“项目”支持 (@pxref{Projects,,, emacs, GNU Emacs Manual}) 相比，它提供了专注于文件导航和搜索的轻量级项目管理功能，@ede{} 提供了一种结构化方法来管理构建系统、配置文件和项目元数据。  虽然内置项目非常适合通用工作流程，但 @ede{} 对于使用 @samp{make}、@samp{automake} 或 @samp{autoconf} 等工具的项目或涉及管理多个目标、包含路径和构建配置的项目非常有用。
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* EDE Project Concepts::         @ede{} 项目概念
+* EDE Mode::                     打开 @ede{} 模式。
+* Quick Start::                  快速开始构建项目。
+* Creating a project::           创建一个项目。
+* Modifying your project::       添加和删​​除文件和目标。
+* Building and Debugging::       启动构建或调试会话。
+* Miscellaneous commands::       其他项目相关命令。
+* Extending EDE::                编程和扩展@ede{}。
+* GNU Free Documentation License::   本文档的许可证。
+@end menu
+
+@node EDE Project Concepts
+@chapter @ede{} 项目概念
+
+@ede{} is a generic interface for managing projects.  It specifies a
+一组菜单和键绑定，同时支持通过构建系统表达项目的多种方式。
+
+在后续章节中，我们将描述不同的项目类型 (@pxref{Creating a project})，以及构建和调试项目的命令 (@pxref{Building and Debugging})。
+
+在@ede{}中，项目层次结构与目录层次结构相匹配。  该项目的最顶层目录称为@dfn{project root}，其子目录为@dfn{subprojects}。
+
+每个项目可以包含多个@dfn{targets}。  在最简单的层面上，目标是项目内的命名文件集合。  目标可以指定两种不同类型的信息：
+
+@enumerate
+@item 
+要添加到分发中的文件集合（例如，您打算分发给其他人的 tarball）。
+
+@item 
+可以内置到其他东西（例如程序或编译的文档）中的文件集合。
+@end enumerate
+
+最后，@ede{}为其他工具提供了一种轻松学习文件关联的方法。  例如，程序可能需要将某种搜索限制为单个目标中的文件，或者发现文档或接口文件的位置。  @ede{} 可以提供此信息。
+
+@node EDE Mode
+@chapter @ede{}模式
+
+@ede{} is implemented as a minor mode, which augments other modes such
+如C模式和Texinfo模式。  您可以通过运行命令 @code{global-ede-mode} 为所有缓冲区启用@ede{}，或者将其放入初始化文件中：
+
+@example
+(global-ede-mode t)
+@end example
+
+激活 @ede{} 会将名为 @samp{Development} 的菜单添加到菜单栏。  此菜单提供了多个用于高级 @ede{} 命令的菜单项。  这些菜单项及其相应的键绑定与您实际处理的项目类型无关。
+
+@node Quick Start
+@chapter 快速入门
+
+启用 @ede{} 后，您就可以创建项目。  本章提供了一个示例 C++ 项目，它将创建用于编译的 Automake 文件。
+
+@section 第一步：创建根目录
+
+首先，让我们为我们的项目创建一个目录。  对于这个例子，我们将从 @file{/tmp} 中的内容开始。
+
+@example
+C-x C-f /tmp/myproject/README @key{RET}
+M-x make-directory @key{RET} @key{RET}
+@end example
+
+现在，在 README 文件中添加一些纯文本即可开始。
+
+现在，让我们创建项目：
+
+@example
+M-x ede-new @key{RET} Automake @key{RET} myproject @key{RET}
+@end example
+
+
+没有发生任何可见的事情，但是如果您使用 @code{dired} 查看目录，您应该看到以下内容：
+
+@example
+  /tmp/myproject:
+  total used in directory 32 available 166643476
+  drwxr-xr-x  2 zappo users  4096 2012-02-23 22:10 .
+  drwxrwxrwt 73 root  root  20480 2012-02-23 22:10 ..
+  -rw-r--r--  1 zappo users   195 2012-02-23 22:10 Project.ede
+  -rw-r--r--  1 zappo users    10 2012-02-23 22:09 README
+@end example
+
+@section 第2步：创建子目录和文件
+
+我们将制作一个更复杂的项目，因此使用 dired 使用 @kbd{+} 键创建更多目录，并输入新目录：
+
+@example
++ include @key{RET}
++ src @key{RET}
+@end example
+
+现在我将在本教程中进行捷径。  创建以下文件：
+
+@file{include/myproj.hh}
+@example
+/** myproj.hh ---
+ */
+
+#ifndef myproj_hh
+#define myproj_hh 1
+
+#define IMPORTANT_MACRO 1
+
+int my_lib_function();
+
+#endif // myproj_hh
+@end example
+
+
+@file{src/main.cpp}
+@example
+/** main.cpp ---
+ */
+
+#include <iostream>
+#include "myproj.hh"
+
+int main() @{
+
+@}
+
+#ifdef IMPORTANT_MACRO
+int my_fcn() @{
+
+@}
+#endif
+@end example
+
+@file{src/mylib.cpp}
+@example
+/** mylib.cpp ---
+ *
+ * Shared Library to build
+ */
+
+int my_lib_function() @{
+
+@}
+@end example
+
+@section 第 3 步：创建子项目
+
+@ede{} needs subdirectories to also have projects in them.  You can
+现在创建这些项目。
+
+将 @file{main.cpp} 作为当前缓冲区，输入：
+
+@example
+M-x ede-new @key{RET} Automake @key{RET} src @key{RET}
+@end example
+
+在 @file{myproj.hh} 作为当前缓冲区，输入：
+
+@example
+M-x ede-new @key{RET} Automake @key{RET} include @key{RET}
+@end example
+
+这些步骤实际上仅创建 Project.ede 文件，您将在其中开始添加目标。
+
+@section 第 4 步：创建目标
+
+为了构建程序，您的 @ede{} 项目中必须有目标。  您可以从缓冲区或 @code{dired} 目录缓冲区创建目标。
+
+注意：如果由于某种原因目录列表缓冲区或文件没有 @samp{Project} 菜单项，或者 @ede{} 键绑定不起作用，只需使用 @kbd{M-x revert-buffer @key{RET}} 强制刷新。  有时创建新项目无法正确重新启动缓冲区。
+
+让我们从头文件开始。  在@file{include/myproj.hh}中，您可以使用菜单，但我们现在将开始使用@ede{}命令前缀，即@kbd{C-c .}。
+
+@example
+C-c . t includes @key{RET} miscellaneous @key{RET} y
+@end example
+
+
+这将创建一个用于保存包含内容的杂项目标，然后将 myproj.hh 添加到该目标。  Automake（工具）有更好的方法来做到这一点，但对于这个项目来说，这已经足够了。
+
+接下来，使用 dired 访问 @file{src} 目录。  应该有一个 @samp{Project} 菜单。   您可以使用以下命令创建新目标
+
+@example
+. t myprogram @key{RET} program @key{RET}
+@end example
+
+请注意，@kbd{. t} 是用于创建目标的命令。  该命令也在菜单中。  这将创建一个用于构建程序的目标。  如果您愿意，请访问 @file{Project.ede} 查看迄今为止构建的结构。
+
+接下来，将光标放在 @file{main.cpp} 上，然后使用 @kbd{. a} 将该文件添加到目标中。
+
+@example
+. a myprogram @key{RET}
+@end example
+
+请注意，这些提示通常都有补全功能，因此您只需按 @kbd{TAB} 即可补全名称 @file{myprogram}。
+
+如果您有许多文件要添加到同一目标，您可以将它们全部标记在您的 Dired 缓冲区中，然后同时添加它们。
+
+接下来，将光标放在 @file{mylib.cpp} 上，对库执行相同的操作。
+
+@example
+. t mylib @key{RET} sharedobject @key{RET}
+. a mylib @key{RET}
+@end example
+
+@section 第五步：编译，失败
+
+接下来，我们将尝试编译该项目，但我们还没有完成，所以它不会立即工作。
+
+访问@file{/tmp/myproject/Project.ede}。  我们从这里开始是因为该目录中还没有任何程序文件。  现在我们可以使用编译命令：
+
+@example
+C-c . C
+@end example
+
+因为这是第一次，它会为您创建一堆 Automake 所需的文件。  然后它将使用 automake 构建它所需的支持基础设施。  如果您仅选择 @file{Makefile} 构建系统，则将跳过此步骤。
+
+Automake init 之后，它运行编译。  你会立即发现 main.cpp 中的错误 can't find @file{myproj.hh}。  我们需要去解决这个问题。
+
+@section 第 6 步：定制您的项目
+
+要修复失败的编译，我们需要将 @file{/tmp/myproject/include} 添加到包含路径。
+
+访问@file{main.cpp}。
+
+@example
+M-x customize-project @key{RET}
+@end example
+
+选择 @samp{[Settings]} 选项子组。  在@samp{Variable :}下单击@samp{[INS]}。  此时，您需要对 Automake 有一定的了解。  添加名为 @samp{CPPFLAGS} 的变量，并将值设置为 @samp{../include}。
+
+你应该看到这样的东西：
+
+@example
+Variables :
+[INS] [DEL] Cons-cell:
+            Name: AM_CPPFLAGS
+            Value: -I../include
+[INS]
+Variables to set in this Makefile.
+@end example
+
+单击@samp{[Apply]}。  请随意访问 @file{Project.ede} 看看它是如何更改配置文件的。
+
+使用@file{main.cpp}中的@kbd{C-c . C}再次编译整个项目。  现在应该可以编译了。
+
+@section 第7步：共享库依赖
+
+注意：以这种方式支持 Automake 的共享库很容易，但从 Makefile 类型的项目中执行此操作有点棘手。  如果您也在创建共享库，请坚持使用 Automake 项目。
+
+接下来，让我们添加 @file{main.cpp} 对我们共享库的依赖。  为此，请像这样更新 main：
+
+@example
+int main() @{
+
+  my_lib_function();
+
+@}
+@end example
+
+现在编译：
+
+@example
+C-c . c
+@end example
+
+其中小写的 @kbd{c} 仅编译该目标。  您应该看到一个错误。
+
+这次，我们需要添加 @file{main.cpp} 对共享库的依赖。  为此，我们需要自定义目标而不是项目。  这是因为诸如包含路径之类的变量是全局处理的，而目标的依赖关系是特定于目标的。
+
+@example
+M-x customize-target @key{RET}
+@end example
+
+在第一页上，您将看到 Ldlibs-local 部分。  首先单击 @samp{[INS]} 将 mylib 添加到其中，然后添加库。  它应该看起来像这样：
+
+@example
+Ldlibs-Local :
+[INS] [DEL] Local Library: libmylib.la
+[INS]
+Libraries that are part of this project. [Hide Rest]
+The full path to these libraries should be specified, such as:
+../lib/libMylib.la  or ../ar/myArchive.a
+@end example
+
+如果需要，您还将看到库相关标志和系统库的其他变量。  单击@samp{[Accept]}，然后从@file{main.cpp}开始，再次编译整个项目以强制编译所有依赖元素：
+
+@example
+C-c . C
+@end example
+
+@section 第 8 步：运行您的程序
+
+您可以直接从@ede{}运行您的程序。
+
+@example
+C-c . R @key{RET} @key{RET}
+@end example
+
+如果您的程序采用命令行参数，则可以在它提供要用于运行程序的命令行时输入它们。
+
+@node Creating a project
+@chapter 创建项目
+
+要创建新项目，请首先访问要包含在该项目中的文件。  如果您有目录层次结构，请首先访问最顶层目录中的文件。  在此缓冲区中，输入 @kbd{M-x ede-new}，或单击 @samp{Development} 菜单中的 @samp{Create Project} 项。
+
+@command{ede-new} 命令提示您要创建的项目类型。  每种项目类型都有其自身的优势或特定于语言的增强功能。  并非所有 @ede{} 支持的项目都允许创建新项目。  @code{emacs} 或 @code{linux} 等项目旨在仅识别现有项目。 @samp{Make} 和 @samp{Automake} 等项目类型支持使用 @command{ede-new} 创建新项目类型。
+
+@itemize
+@item 
+对于 @samp{Make} 项目类型，@ede{} 在每个项目目录中创建一个 @dfn{project file}，称为 @file{Project.ede}。  有关项目的信息存储在该文件中。  该项目自动生成一个@file{Makefile}。
+
+@item 
+对于 @samp{Automake} 项目类型，@ede{} 创建类似于 @samp{Make} 项目的 @file{Project.ede} 项目文件。与 @samp{Make} 项​​目不同，该项目会自动生成 @file{Makefile.am} 文件。  @ede{} 处理 Automake 引导例程，该例程导入并维护 @file{configure.am} 脚本和其他所需文件。
+@end itemize
+
+子项目仅仅是另一个项目的子目录中的项目。您可以使用 @command{ede-new} 命令（或 @samp{Create Project} 菜单项）创建子项目，同时访问项目根目录子目录中的缓冲区。  这个新项目会自动添加到父项目中，并且会在启动时自动加载
+@ede{} reads the parent project.
+
+当使用涉及 makefile 的项目命令时，@ede{} 使用最顶层项目的 makefile 作为构建的起始位置。  顶级项目如何在构建过程中处理子项目取决于该项目的类型。
+
+@node Modifying your project
+@chapter 修改您的项目
+
+在本章中，我们描述了操作项目的通用功能，包括其中的目标和文件。  描述特定项目类型的后续章节将提供有关这些功能的确切用途的更详细信息。
+
+@menu
+* Add/Remove target::
+* Add/Remove files::
+* Customize Features::
+* Project Local Variables::
+* EDE Project Features::
+@end menu
+
+@node Add/Remove target
+@section 添加/删除目标
+
+要创建新目标，请输入 @kbd{C-c . t} (@code{ede-new-target}) 或使用 @samp{Project Options} 子菜单中的 @samp{Add Target} 菜单项。  这会提示输入目标名称，并将当前缓冲区添加到该目标。
+
+@command{ede-new-target} 命令还会提示输入 @dfn{target type}。  每个目标类型都有自己的构建过程和它将接受的文件类。
+
+要从项目中删除目标，请键入 @kbd{M-x ede-delete-target}，或使用 @samp{Project Options} 子菜单中的 @samp{Remove Target} 菜单项。
+
+@node Add/Remove files
+@section 添加/删除文件
+
+要将当前文件添加到现有目标，请键入 @kbd{C-c . a} (@code{ede-add-file})，或使用 @samp{Target Options} 子菜单中的 @samp{Add File} 菜单项。
+
+您可以将一个文件添加到多个目标；这没关系。
+
+要从目标中删除当前文件，请键入 @kbd{C-c . d} (@code{ede-remove-file})，或使用 @samp{Target Options} 子菜单中的 @samp{Remove File} 菜单项。  如果该文件属于多个目标，则此命令会提示可以从中删除该文件的每个目标。
+
+在项目中工作时，如果您访问不属于现有目标的文件，@ede{} 会自动提示输入目标。  如果您不想将文件添加到任何目标，则可以选择@samp{none}。您可以使用变量 @command{ede-auto-add-method} 自定义此行为。
+
+@node Customize Features
+@section 定制功能
+
+项目及其目标是使用 @samp{EIEIO} 对象系统的对象。  @xref{Top,,,eieio,EIEIO manual}。  这些对象的数据字段包含与您的工作相关的重要信息。
+
+如果高级功能还不够，您可以随时通过运行命令 @command{customize-project} 或 @command{customize-target} 调整所有用户可自定义字段。  这会将当前项目或目标加载到自定义缓冲区中，您可以在其中调整各个插槽。  这对于复杂的项目通常是必要的。
+
+有些项目模式没有项目文件，而是直接读取Makefile或其他现有文件。  您可以通过键入 @kbd{C-c . e} (@code{ede-edit-file-target}) 来编辑文件，而不是直接编辑对象。  之后您应该“重新扫描”该项目 (@pxref{Miscellaneous commands})。
+
+@node Project Local Variables
+@section 项目局部变量
+
+EDE项目可以存储和管理项目局部变量。  变量存储在项目中，并在项目重新加载时恢复。
+
+未存储在磁盘上的项目稍后将不会恢复您的项目局部变量。
+
+您可以使用项目的@ref{Customize Features}来编辑项目局部变量。  它们位于“设置”组下，作为“项目局部变量”。
+
+您还可以使用 @kbd{M-x ede-set} 在迷你缓冲区中设置一个新的本地变量。
+
+在多级项目（例如 Automake 和 Make 生成项目）中，项目局部变量是从最顶层项目和本地目录的项目安装的。  这样，您就可以在整个项目中拥有一些变量，以及一些特定于子目录的变量。
+
+您可以使用项目局部变量来设置任何 Emacs 变量，以便属于不同项目的缓冲区可以具有不同的设置。
+
+注意：当您将项目局部变量与 @ref{ede-cpp-root} 一起使用时，格式为关联列表。  例如：
+
+@example
+(ede-cpp-root-project "SOMENAME"
+                       :file "/dir/to/some/file"
+                       :local-variables
+                       '((grep-command . "grep -nHi -e ")
+                         (compile-command . "make -f MyCustomMakefile all")))
+@end example
+
+@node EDE Project Features
+@section EDE项目特点
+
+本节详细介绍了 @ede{} @samp{Make} 样式项目的面向用户的功能。  @samp{Automake} 项目有类似的选项（但直接的 Automake 项目没有）。
+
+要修改此处提到的任何特定功能，您需要使用@command{customize-project}或@command{customize-target}自定义项目或目标。
+
+当您进行自定义时，您直接操作中的槽值
+@eieio{} objects.  @xref{Extending EDE}, if you are interested in
+额外的细节。
+
+@menu
+* Changing Compilers and Flags::
+* Configurations::
+@end menu
+
+@node Changing Compilers and Flags
+@subsection 更改编译器和标志
+
+构建东西的目标需要编译器。  要更改编译器，您需要自定义所需的目标。
+
+在 @samp{[Make]} 部分，您可以从列表中选择新的编译器或链接器。  如果您需要的链接器不可用，您将需要创建一个新链接器。  @xref{Compiler and Linker objects}。
+
+如果现有编译器或链接器很接近，但您需要修改一些标志集（例如添加包含路径），则您将需要添加配置变量。
+
+首先，您应该创建基本设置，并使用 @command{ede-proj-regenerate} 构建一个 makefile。  查看 @file{Makefile} 以查看插入了哪些命令。  一旦确定了需要修改的变量，就可以为其添加配置。 @xref{Configurations}。
+
+@node Configurations
+@subsection 配置
+
+配置指定构建项目的不同方式。  例如，您可以将项目配置为“调试”模式，或者“发布”模式。
+
+该项目和每个目标类型都有一个名为 @code{configuration-variables} 的槽。  要将新变量添加到配置中，请在自定义缓冲区中找到此插槽，然后插入新配置。  将其命名为“debug”或“release”，然后向其中插入一些名称/值对。
+
+您也可以拥有任意数量的有效配置。  要添加新配置，请自定义您的项目。  在 @samp{[Settings]} 块中进行“配置”。  此处添加新的命名配置。
+
+要在不同的活动配置之间切换，请修改“配置默认值”插槽。
+
+@node Building and Debugging
+@chapter 构建和调试
+
+@ede{} provides the following ``project-aware'' compilation and
+调试命令：
+
+@table @kbd
+@item C-c . c
+编译当前目标 (@code{ede-compile-target})。
+@item C-c . C
+编译整个项目 (@code{ede-compile-project})。
+@item c-c . D
+调试当前目标 (@code{ede-debug-target})。
+@item M-x ede-make-dist
+为您的项目构建一个分发文件。
+@end table
+
+这些命令也可以从 @samp{Development} 菜单获得。
+
+@node Miscellaneous commands
+@chapter 杂项命令
+
+如果您选择直接进入并编辑 @ede{} 项目文件——例如，使用 @kbd{C-c . e} (@pxref{Customize Features})——则必须“重新扫描”项目文件以更新内部数据结构。  要重新扫描当前项目，请输入 @kbd{C-c . g} (@code{ede-rescan-toplevel})。
+
+@ede{} can help you find files in your project, via the command
+@kbd{C-c . f}（@code{ede-find-file}）。  这会提示输入文件名；您无需指定目录。  然后 EDE 尝试访问项目中某处具有该名称的文件。
+
+@ede{} can use external tools to help with file finding.  To do this,
+自定义@code{ede-locate-setup-options}。
+
+@defvar ede-locate-setup-options
+@anchor{ede-locate-setup-options}
+默认情况下要尝试的定位对象列表。按优先顺序列出。  如果第一项无法在特定项目中使用，则尝试下一项。始终假设 @dfn{ede-locate-base} 位于列表末尾。
+@end defvar
+
+@ede{} also provides a project display mode for the speedbar
+(@pxref{Speedbar,,,emacs,GNU Emacs Manual})。  这允许您查看项目中的源文件结构：作为分层树，根据目标分组。
+
+要在此模式下激活速度栏，请输入 @kbd{C-c . s} (@code{ede-speedbar})。
+
+@menu
+* Make and Automake projects::   项目类型 @samp{ede-project}
+* Automake direct projects::     手写 automake 文件上的项目接口。
+* Simple projects::              项目 @ede{} 无法管理。
+@end menu
+
+@node Make and Automake projects
+@section Make 和 Automake 项目
+
+@samp{ede-project} 类型的项目会在每个项目目录中创建一个名为 @file{Project.ede} 的文件。  这用于跟踪您的配置信息。  如果您将此项目配置为@samp{Makefile}模式，则该项目将自动生成@file{Makefile}。  如果您将其配置为 @samp{Automake} 模式，则会创建 @file{Makefile.am} 文件。  automake 引导例程还将导入并维护一个configure.am 脚本以及Automake 所需的许多其他文件。
+
+@node Automake direct projects
+@section 汽车制造商直接项目
+
+直接读取@file{Makefile.am}的项目类型源自独立分发的原始@file{project-am.el}模式的来源。  这种模式最终变成了@ede{}。  @samp{project-am} 项目将读取现有的 automake 文件，但不会自动生成它们，也不会创建新的文件。  因此，它可用作浏览工具或管理文件列表的维护工具。
+
+@node Simple projects
+@section 简单的项目
+
+有很多简单的项目。  在这种情况下，一个简单的项目是一个检测或被引导识别属于某个项目的目录，但不提供典型项目的许多功能的项目。
+@ede{} project.  Having the project however allows tools such as
+@semantic{} to find sources and perform project level completions.
+
+
+@menu
+* ede-cpp-root::                 该项目标志着 C/C++ 代码项目的根。
+* ede-emacs::                    一个使用 Emacs 的项目。
+* ede-linux::                    一个使用 Linux 内核的项目。
+* ede-generic-project::          用于使用 EDE 包装构建系统的项目类型。
+* Custom Locate::                自定义如何在简单项目中查找文件
+@end menu
+
+@node ede-cpp-root
+@subsection ede-cpp-根
+
+@code{ede-cpp-root} 项目类型允许您在 @file{.emacs} 文件中创建没有保存文件的单个对象。  它允许@ede{}为@semantic{}包提供快速查找头文件的能力。
+
+@code{ede-cpp-root} 类了解有关 C++ 项目的一些信息，例如“include”目录的流行以及典型的文件布局内容。  如果这还不够，您可以子类化 @code{ede-cpp-root-project} 并在短短几行中添加您自己的调整。  有关示例，请参阅此文件的末尾。
+
+在最基本的情况下，将其添加到您的 @file{.emacs} 文件中，根据需要修改适当的位。
+
+@example
+(ede-cpp-root-project "SOMENAME" :file "/dir/to/some/file")
+@end example
+
+将 @var{SOMENAME} 替换为您想要的任何名称，并将文件名替换为项目根目录下的实际文件。  它可能是一个 Makefile、一个 README 文件。  任何。  没关系。  它只是一把挂起 @ede{} 其余部分的钥匙。
+
+创建此项目最可能的原因是加快搜索包含文件的速度，或者简化引导 @semantic{} 查找文件的能力，而无需太多用户交互。  与@semantic{}补全相结合，短包含路径是关键。  您可以覆盖默认包含路径和系统包含路径，如下所示：
+
+@example
+(ede-cpp-root-project "NAME" :file "FILENAME"
+    :include-path '( "/include" "../include" "/c/include" )
+    :system-include-path '( "/usr/include/c++/3.2.2/" )
+    :compile-command "make compile"
+    :spp-table '( ("MOOSE" . "")
+                  ("CONST" . "const") ) )
+@end example
+
+在这种情况下，将搜索包含路径列表中的每个项目。  如果目录以“/”开头，则扩展到项目根目录。  如果目录不以“/”开头，则扩展文件名时相对于当前缓冲区的默认目录。
+
+包含路径仅影响 C/C++ 头文件。  使用插槽 @code{:header-match-regexp} 进行更改。
+
+@code{:system-include-path} 允许您指定可以找到系统头文件的包含目录的绝对名称。这些将仅应用于此项目中的文件。
+
+使用 @code{:compile-command} 您可以提供一个在调用 @code{ede-compile-project} 时运行的命令。
+
+@code{:spp-table} 提供了项目特定的 #define 样式宏的列表，这些宏对于该项目是唯一的，在命令行上传递给编译器，或者位于特殊头文件中。有关如何格式化此条目的更多信息，请参阅@code{semantic-lex-c-preprocessor-symbol-map}。
+
+如果您的项目中只有一个文件，您可以将 @code{:spp-files} 设置为相对于项目根目录的文件名列表。  指定这一点就像在语义中设置变量@code{semantic-lex-c-preprocessor-symbol-file}。
+
+如果您想用自己的函数覆盖文件查找工具，您可以这样做：
+
+@example
+(ede-cpp-root-project "NAME" :file "FILENAME" :locate-fcn 'MYFCN)
+@end example
+
+其中@var{MYFCN}是函数的符号。  可以使用locate函数代替@code{ede-expand-filename}，这样您就可以快速自定义自定义目标以使用专门的本地例程而不是默认的@ede{}例程。  函数符号必须带有两个参数：
+
+@table @var
+@item NAME
+要查找的文件的名称。
+@item DIR
+此 cpp-root 项目的目录根。
+@end table
+
+当使用@code{ede-cpp-root}创建项目时，您可以通过@ref{Project Local Variables}获得额外的配置。  请注意，项目局部变量的格式是关联列表。您不能使用 @kbd{M-x ede-set} 并使项目局部变量在会话之间保持不变。
+
+如果 cpp-root 项目风格适合您，但您想要一个动态加载器，而不是在 @file{.emacs} 中硬编码路径名值，您也可以这样做，但您需要编写一些 lisp 代码。
+
+为此，您需要向 @code{ede-project-class-files} 列表添加一个条目，并提供两个函数来教导 @ede{} 如何加载项目模式
+
+它看起来像这样：
+
+@example
+(defun MY-FILE-FOR-DIR (&optional dir)
+  "Return a full file name to the project file stored in DIR."
+  <write your code here, or return nil>
+  )
+
+(defun MY-ROOT-FCN ()
+  "Return the root fcn for `default-directory'"
+  ;; You might be able to use 'ede-cpp-root-project-root'
+  ;; and not write this at all.
+  )
+
+(defun MY-LOAD (dir)
+  "Load a project of type `cpp-root' for the directory DIR.
+Return nil if there isn't one."
+  ;; Use your preferred construction method here.
+  (ede-cpp-root-project "NAME" :file (expand-file-name "FILE" dir)
+                               :locate-fcn 'MYFCN)
+  )
+
+(add-to-list 'ede-project-class-files
+             (ede-project-autoload "cpp-root"
+              :name "CPP ROOT"
+              :file 'ede-cpp-root
+              :proj-file 'MY-FILE-FOR-DIR
+              :proj-root 'MY-ROOT-FCN
+              :load-type 'MY-LOAD
+              :class-sym 'ede-cpp-root)
+             t)
+@end example
+
+此示例仅创建一个自动加载器，并不会创建新类型的项目。
+
+@xref{ede-cpp-root-project}，有关定义 @code{ede-cpp-root} 项目类型的类的详细信息。
+
+@node ede-emacs
+@subsection ede-emacs
+
+@code{ede-emacs} 项目自动识别 Emacs 源代码树，并为其启用 EDE 项目模式。
+
+它预先填充 C 预处理器符号映射以进行正确的解析，并具有优化的包含文件识别功能。
+
+@node ede-linux
+@subsection ede-linux
+
+@code{ede-linux} 项目将自动识别 Linux 内核源代码树，并为其启用 EDE 项目模式。
+
+它预先填充C预处理器符号映射以进行合理的解析，并具有优化的包含文件识别功能。
+
+通过变量@code{project-linux-build-directory-default}和@code{project-linux-architecture-default}，您可以分别设置构建目录及其架构。  默认情况下假设构建发生在源目录中并自动检测架构；如果自动检测失败，系统会询问您。
+
+@node ede-generic-project
+@subsection ede 通用项目
+
+@code{ede-generic-project} 是一个项目系统，可以轻松地将不同类型的构建系统包装为 EDE 项目。像@ref{ede-emacs}这样的项目需要编码技能才能创建。通用项目还需要编写 Emacs Lisp 代码，但要求很低。  然后，您可以使用 @command{customize-project} 配置该项目的构建命令、包含内容和其他选项。  配置保存在@file{EDEConfig.el}中。
+
+默认情况下禁用通用项目，因为它们有可能干扰其他项目。  要使用通用项目系统开始检测项目，您需要启用它。
+
+@deffn Command ede-enable-generic-projects
+启用通用项目加载器。
+
+这将为使用 @file{Makefile}、@file{SConstruct} 或 @file{CMakeLists} 检测到的项目启用通用加载程序。
+
+如果您创建自己的通用项目类型，则不需要使用此命令。
+@end deffn
+
+如果您想创建自己的通用项目加载器，则需要定义自己的项目和目标类，并创建自动加载器。 Makefile 的示例如下所示：
+
+@example
+;;; MAKEFILE
+
+(defclass ede-generic-makefile-project (ede-generic-project)
+  ((buildfile :initform "Makefile"))
+  "Generic Project for makefiles.")
+
+(cl-defmethod ede-generic-setup-configuration ((proj ede-generic-makefile-project) config)
+  "Set up a configuration for Make."
+  (oset config build-command "make -k")
+  (oset config debug-command "gdb "))
+
+(ede-generic-new-autoloader "generic-makefile" "Make"
+                            "Makefile" 'ede-generic-makefile-project)
+@end example
+
+此示例项目将检测其中包含文件 @file{Makefile} 的任何目录，将其视为属于此项目类型。项目的定制将使您能够使构建和调试命令更加精确。
+
+@node Custom Locate
+@subsection 自定义定位
+
+各种简单的项目样式都有一个主要缺点，即 EDE@. 并不完全了解项目中的文件。当使用 EDE API 尝试通过项目中的某个引用名称归档文件时，可能会失败。
+
+@ede{} can therefore use some external locate commands, such as the unix
+“locate”命令，或“GNU Global”。
+
+您要使用的工具（例如 @code{locate} 或 @code{global}）的配置需要在没有 @ede{} 帮助的情况下完成。  然而，一旦配置完成，@ede{}就可以使用它。
+
+要启用这些工具之一，请使用不同定位对象的名称设置变量 @code{ede-locate-setup-options}。  @ref{Miscellaneous commands}。
+
+在加载到 CEDET 或 EDE@. 之前，在 @file{.emacs} 中进行配置如果您想添加对 GNU Global 的支持，您的配置将如下所示：
+
+@example
+(setq ede-locate-setup-options '(ede-locate-global ede-locate-base))
+@end example
+
+这样，当需要完成搜索时，它将首先尝试使用 GLOBAL@. 如果全局对于该目录不可用，那么它将恢复到基本定位对象。  基础对象总是找不到文件。
+
+您可以添加自己的定位工具，但从 @code{ede-locate-base} 子类化。  子类还应该实现两个方法。  请参阅@file{ede-locate.el}中 GNU Global 的代码作为简单示例。
+
+@@TODO - 添加 ID Utils 和 CScope 示例
+
+有关 idutils 和 cscope 的更多信息请参见 CEDET 手册，它们各自有自己的部分。
+
+@node Extending EDE
+@chapter 扩展@ede{}
+
+本章适用于想要在@ede{}中编写新部分或修复错误的用户。  需要了解 Emacs Lisp 和一些 @eieio{}(CLOS)。
+
+@ede{} uses @eieio{}, the CLOS package for Emacs, to define two object
+超类，特别是 PROJECT 和 TARGET@. 中的所有命令
+@ede{} are usually meant to address the current project, or current
+目标。
+
+@ede{} 中的所有特定项目都派生@ede{} 超类的子类。  这样，项目作者就可以详细定制项目的保存方式、目标的编译方式等具体行为。  @ede{} 使用方法通过 API 与这些项目对象进行通信。  您在 @ede{} 模式下使用的命令是这些方法的高级功能包装器。  @xref{Top,,, eieio, EIEIO manual}，有关使用 @eieio{} 扩展类和编写方法的详细信息。
+
+如果您打算扩展@ede{}，则很可能在现有项目类型之一中需要新的目标类型。  本章的其余部分将讨论扩展 @code{ede-project} 类及其目标。有关向其中添加目标的基本详细信息，请参阅@file{project-am.el}。
+
+对于@code{ede-project}类型，核心目标类称为@code{ede-proj-target}。  继承它将为您提供启动所需的一切，包括将源代码添加到 makefile 中。  如果您还需要在 makefile 中添加其他规则，则需要从 @code{ede-proj-target-makefile} 继承。  您可能还想添加新字段来跟踪重要信息。
+
+如果您正在将当前不受支持的代码构建到程序或共享库中，则根本不可能需要新的目标。  相反，您需要创建一个新的编译器或链接器对象来编译所需类型的源代码。 @ref{Compiler and Linker objects}。
+
+一旦您的新类存在，您将需要填写一些基本方法。有关这些示例，请参阅 @file{ede-skel.el} 文件。  文件 @file{ede-proj-info.el} 和 @file{ede-proj-elisp.el} 是两个有趣的例子。
+
+@menu
+* Development Overview::
+* Detecting a Project::
+* User interface methods::       与键绑定相关的方法
+* Base project methods::         @ede{} 对象最基本的方法。
+* Sourcecode objects::           定义新的源代码类。
+* Compiler and Linker objects::   定义新的编译器和链接器。
+* Project::                      项目类别的详细信息。
+* Targets::                      目标类别的详细信息。
+* Sourcecode::                   源代码类的详细信息。
+* Compilers::                    编译器类的详细信息。
+@end menu
+
+@node Development Overview
+@section 发展概况
+
+@ede{} is made up of a series of classes implemented with @eieio{}.
+这些类定义了可用于创建不同类型的项目的接口。
+
+@ede{} defines two superclasses which are @code{ede-project} and
+@code{ede-target}。  @ede{} 中的所有命令通常旨在寻址当前项目或当前目标。
+
+@ede{} 中的所有特定项目都派生@ede{} 超类的子类。这样，项目作者就可以详细定制项目的保存方式、目标的编译方式等具体行为。  @ede{} 使用方法通过 API 与这些项目对象进行通信。  您在 @ede{} 模式下使用的命令是这些方法的高级功能包装器。
+
+一些示例项目类型是：
+
+@table @code
+@item project-am
+Automake 项目读取现有的 Automake 文件。
+@item ede-proj-project
+此项目类型将创建 @file{Makefiles} 或 @file{Makefile.am} 文件来编译您的项目。
+@item ede-linux
+该项目类型将检测 Linux 源代码树。
+@item ede-emacs
+该项目将检测 Emacs 源代码树。
+@end table
+
+还有其他几种项目类型。
+
+创建新项目类型时需要知道的第一个类是@code{ede-project-autoload}。  需要此类的新实例来定义 Emacs 如何将不同的文件/缓冲区与不同的项目类型相关联。  所有自动加载都保存在变量 @code{ede-project-class-files} 中。
+
+下一个最重要的类别是@code{ede-project}。  这是定义所有项目行为方式的基类。  项目的基本模式是每个目录有一个项目，最顶层的项目或目录将项目定义为一个整体。
+
+@code{ede-project} 的主要特征是名称和版本号等。  它还包含 @code{ede-target} 对象列表和子项目列表，或更多 @code{ede-project} 对象。
+
+新项目类型必须子类化 @code{ede-project} 才能添加特殊行为。  新项目类型还需要子类化 @code{ede-target} 以添加特殊行为。
+
+通过这种方式，公共 @ede{} 接口被设计为针对 @code{ede-project} 工作，从而针对所有子类工作。
+
+@code{ede-project}子类@code{ede-project-placeholder}。  这是 Emacs 运行之间需要缓存的最小必要项目。  这样，Emacs 就可以跟踪所有见过的项目，而无需将这些项目加载到内存中。
+
+这是使用 @cogre{} 创建的 @ede{} 系统的高级 UML 图。
+
+@example
++-----------------------+        +-----------------------+
+|                       |        |ede-project-placeholder|
+|ede-project-class-files|        +-----------------------+
+|                       |        +-----------------------+
++-----------------------+        +-----------------------+
+           /\                                ^
+           \/                               /_\
+            |                                |
+ +--------------------+                +-----------+         +----------+
+ |ede-project-autoload|                |ede-project|         |ede-target|
+ +--------------------+<>--------------+-----------+<>-------+----------+
+ +--------------------+                +-----------+         +----------+
+ +--------------------+                +-----------+         +----------+
+                                             ^
+                                            /_\
+                                             |
+                       +---------------------+-----------------+
+                       |                     |                 |
+                       |                     |                 |
+                       |                     |                 |
+              +----------------+   +-------------------+  +---------+
+              |ede-proj-project|   |project-am-makefile|  |ede-emacs|
+              +----------------+   +-------------------+  +---------+
+              +----------------+   +-------------------+  +---------+
+              +----------------+   +-------------------+  +---------+
+@end example
+
+
+@node Detecting a Project
+@section 检测项目
+
+项目检测通过存储在 @code{ede-project-class-files} 中的 @code{ede-project-autoload} 实例列表进行。  完整的项目检测方案的工作原理如下：
+
+@table @asis
+@item 步骤一：
+@code{find-file-hook} 在 BUFFER 上调用 @code{ede-turn-on-hook}。
+@item 步骤2：
+@code{ede-turn-on-hook} 开启 @code{ede-minor-mode}
+@item 步骤3：
+@code{ede-minor-mode} 查看 BUFFER 是否与任何打开的项目关联。  如果没有，则调用@code{ede-load-project-file}查找与当前BUFFER所在目录关联的项目。
+@item 第4步：
+@code{ede-minor-mode} 通过一系列变量将找到的项目与当前缓冲区关联起来，例如@code{ede-object}、@code{ede-object-project} 和@code{ede-object-root-project}。
+@end table
+
+一旦关联了缓冲区，@ede{}次要模式命令将在该缓冲区上运行。
+
+函数 @code{ede-load-project-file} 是检测项目的核心，它的工作原理是使用实用程序 @code{ede-directory-project-p} 循环 @code{ede-project-autoload} 中的所有已知项目自动加载类型。
+
+函数@code{ede-directory-project-p}将在每个@code{ede-project-autoload}上调用@code{ede-dir-to-projectfile}，直到其中一个返回true。  方法@code{ede-dir-to-projectfile}依次从自动加载中获取@code{:proj-file}槽。  如果它是一个字符串（即项目文件名），它会检查 BUFFER 目录中是否存在该字符串。  如果它是一个函数，那么它会调用该函数并期望它返回一个文件名或@code{nil}。  如果该文件存在，则假定该目录是项目的一部分，并且 @code{ede-directory-project-p} 返回匹配的 @code{ede-project-autoload} 实例。
+
+如果当前目录包含文件 @code{.ede-ignore}，则即使存在匹配模式，也会自动假定该目录不包含任何项目。  在可能包含许多其他子项目但仍具有某种 Makefile 的目录中使用此类文件。
+
+如果当前目录是一个项目，则@ede{}向上扫描，直到找到项目的顶部。  它通过调用 @code{ede-toplevel-project} 来实现这一点。  如果尚未发现这一点，则一次向上扫描一个目录，直到找到没有项目的目录。  最后找到的项目成为项目根。  如果找到的 @code{ede-project-autoload} 实例具有有效的 @code{proj-root} 槽值，则调用该函数，而不是手动扫描项目。  某些项目类型有一个用于确定项目根的快捷方式，因此这很方便。
+
+回到@code{ede-load-project-file}，现在有一个@code{ede-project-autoload}的实例。  它使用 @code{load-type} 槽来自动加载项目类型，并创建为项目根找到的项目类型的新实例。  该项目已添加到所有项目的全局列表中。  然后创建所有子项目并将其组装到项目数据结构中。
+
+
+@node User interface methods
+@section 用户界面方法
+
+这些方法是与用户命令相关的核心行为。如果您没有实现方法，则有一个合理的默认值可以满足您的需要。
+
+@table @code
+@item project-add-file
+将文件添加到您的项目中。  如果您想根据扩展名或其他详细信息将新源放入不同的字段，请覆盖此选项。
+@item project-remove-file
+项目添加文件的逆向。
+@item project-compile-target
+如果您想在用户“编译”此目标时执行一些特殊操作，请覆盖此选项。
+@item project-debug-target
+当用户想要调试您的目标时该怎么做。
+@item project-update-version
+轻松更新项目的版本号。
+@item project-edit-file-target
+编辑存储项目信息的文件。
+@item project-new-target
+在项目中创建新目标。
+@item project-delete-target
+从项目中删除目标。
+@item project-make-dist
+制作项目的分发版（tar 存档）。
+@item project-rescan
+重新扫描项目文件，更改现有对象中的数据。
+@end table
+
+@node Base project methods
+@section 基础项目方法
+
+这些方法对于从项目和目标类型查询基础信息非常重要：
+
+@table @code
+@item ede-name
+返回一个字符串，该字符串是该目标的名称。
+@item ede-target-name
+返回一个字符串，该字符串是 Make 系统使用的目标名称。
+@item ede-description
+项目或目标的简要描述。  当前由 @samp{ede-speedbar} 接口使用。
+@item ede-want-file-p
+如果目标接受给定文件，则返回非@code{nil}。通常没有必要覆盖它。  请参阅源代码部分。
+@item ede-buffer-mine
+如果缓冲区属于该目标，则返回非@code{nil}。  加载文件时在关联期间使用。  通常没有必要覆盖它，除非您保留辅助文件。
+@end table
+
+这些方法由语义包扩展使用。 @xref{Top,,, semantic, Semantic manual}。
+
+@table @code
+@item ede-buffer-header-file
+返回属于给定缓冲区的头文件。  原型在适当的时候放置在那里
+@item ede-buffer-documentation-files
+返回有关该文件的信息将存储在的文档文件。
+@item ede-documentation
+列出项目或目标负责的所有文档。
+@end table
+
+@node Sourcecode objects
+@section 源代码对象
+
+@ede{} projects track source file / target associates via source code
+对象。  其定义在@file{ede-source.el}中。  源代码对象包含知道如何将文件标识为该类的方法（即，C 文件以 @file{.c} 结尾）。  有些目标可以处理许多不同类型的源，这些源必须全部编译在一起。  例如，混合 C 和 C++ 程序将具有两种源代码类型的实例化。
+
+当目标需要知道是否接受源文件时，它会引用其源代码对象列表。  然后这些对象做出决定。
+
+源代码对象作为符号列表存储在目标对象中，其中符号的值是对象。  这使得项目保存文件机制能够工作。
+
+下面是 Emacs Lisp 源代码对象的实例化示例：
+
+@example
+(defvar ede-source-emacs
+  (ede-sourcecode "ede-emacs-source"
+                  :name "Emacs Lisp"
+                  :sourcepattern "\\.el$"
+                  :garbagepattern '("*.elc"))
+  "Emacs Lisp source code definition.")
+@end example
+
+如果您想回收现有源代码对象的部分内容，可以克隆原始源代码对象，然后调整不同的部分。例如：
+
+@example
+(defvar ede-source-emacs-autoload
+  (clone ede-source-emacs "ede-source-emacs-autoload"
+         :name "Emacs Lisp Autoload"
+         :sourcepattern "-loaddefs\\.el")
+  "Emacs Lisp autoload source code.")
+@end example
+
+在这种情况下，垃圾模式是相同的。
+
+@xref{Sourcecode}.
+
+@node Compiler and Linker objects
+@section 
+
+为了让目标创建@file{Makefile}，它必须知道如何将源编译到程序或所需的数据文件中，并可能将它们链接在一起。
+
+
+
+@ede{} will examine the actual source files in a target, cross reference
+
+
+除了在适当的时候为 @file{configure.ac} 创建 Automake 设置之外，编译器实例化还必须插入指定其计划使用的编译器的变量。
+
+
+
+
+
+
+
+@example
+(defvar ede-makeinfo-compiler
+  (ede-compiler
+   "ede-makeinfo-compiler"
+   :name "makeinfo"
+   :variables '(("MAKEINFO" . "makeinfo"))
+   :commands '("makeinfo -o $@ $<")
+   :autoconf '(("AC_CHECK_PROG" . "MAKEINFO, makeinfo"))
+   :sourcetype '(ede-makeinfo-source)
+   )
+  "Compile texinfo files into info files.")
+@end example
+
+@xref{Compilers}.
+
+
+
+The second important object is the linker class.  链接器与编译器类似，不同之处在于可能使用多个编译器来创建某些目标文件，并且仅使用一个链接器将这些对象链接在一起。
+
+
+
+@defindex pj
+@defindex tg
+@defindex sc
+@defindex cm
+
+@node Project
+@section 项目
+
+@menu
+* ede-project-placeholder::
+* ede-project::
+* ede-cpp-root-project::
+* ede-simple-project::
+* ede-simple-base-project::
+* ede-proj-project::
+* project-am-makefile::
+* ede-step-project::
+@end menu
+
+@node ede-project-placeholder
+@subsection ede-项目-占位符
+@pjindex ede-project-placeholder
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-project-placeholder
+@table @asis
+@item 孩子们：
+@xref{ede-project}.
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :name
+
+
+
+
+@item :version
+
+
+
+
+@item :directory
+类型：@code{string}
+
+该项目关联的目录。
+
+@item :file
+类型：@code{string}
+
+存储该项目的文件名。
+
+@end table
+
+@end table
+
+@subsubsection 专门方法
+
+@deffn Method ede--project-inode :AFTER proj
+获取项目@var{PROJ}所在目录的inode。
+@end deffn
+
+@deffn Method ede-project-root :AFTER this
+如果项目知道其根，请在此处返回它。允许一个项目对象换一棵树类型的系统。
+@end deffn
+
+@deffn Method ede-find-subproject-for-directory :AFTER proj dir
+查找 @var{PROJ} 对应于 @var{DIR} 的子项目。
+@end deffn
+
+@deffn Method ede-project-root-directory :AFTER this &optional file
+如果项目知道其根，请在此处返回它。允许一个项目对象换一棵树类型的系统。可选的@var{FILE}是要测试的文件。  它优先于项目的锚文件而被忽略。
+@end deffn
+
+@deffn Method ede-project-force-load :AFTER this
+确保占位符 @var{THIS} 替换为真实的内容。返回在其位置创建的新对象。
+@end deffn
+
+@deffn Method project-interactive-select-target :AFTER this prompt
+确保占位符 @var{THIS} 替换为真实的内容，然后通过。
+@end deffn
+
+@deffn Method project-add-file :AFTER this file
+确保占位符 @var{THIS} 替换为真实的内容，然后通过。
+@end deffn
+
+@node ede-project
+@subsection ede项目
+@pjindex ede-project
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-project-placeholder
+@xref{ede-project-placeholder}.
+@table @code
+@item ede-project
+@table @asis
+@item 孩子们：
+@xref{ede-cpp-root-project}, @w{ede-emacs-project,} @w{ede-linux-project,} @w{ede-maven-project,} @xref{ede-simple-project}, @xref{ede-simple-base-project}, @xref{ede-proj-project}, @xref{project-am-makefile}, @xref{ede-step-project}.
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :targets
+类型：@code{list}
+
+该项目中的顶级目标列表。
+
+@item :tool-cache
+类型：@code{list}
+
+该项目中的工具缓存配置列表。这允许任何工具创建、管理和保留项目特定的设置。
+
+@item :web-site-url
+类型： @code{string} @*
+
+该项目网站的 URL。这是要发送到网站以获取文档的 URL。
+
+@item :web-site-directory @*
+
+Emacs 可以在其中找到网页的目录。对于远程位置，请使用与 ange-ftp 兼容的路径。您还可以将 TRAMP 与 rcp 和 scp 一起使用。
+
+@item :web-site-file @*
+
+包含该项目网站的文件。该文件可以与槽@code{web-site-directory}相关。这可以是本地文件，使用 ange-ftp 或 TRAMP。
+
+@item :ftp-site
+类型： @code{string} @*
+
+可以在其中找到该项目的发行版的 FTP 站点。该 FTP 站点应采用 Emacs 形式，如 @code{ange-ftp} 所需，但也可以采用 TRAMP 与 scp 或 rcp 一起使用的形式。
+
+@item :ftp-upload-site
+类型： @code{string} @*
+
+用于上传新发行版的 FTP 站点。根据 @code{ange-ftp} 的需要，该 FTP 站点应采用 Emacs 形式。如果此插槽为@code{nil}，则使用@code{ftp-site} 代替。
+
+@item :configurations
+类型：@code{list} @* 默认值：@code{("debug" "release")}
+
+可用配置类型的列表。各个目标/项目类型可以在配置和目标特定元素（例如构建变量）之间形成关联。
+
+@item :configuration-default @*
+默认值：@code{"debug"}
+
+默认配置。
+
+@item :local-variables @*
+默认值：@code{nil}
+
+项目局部变量
+
+@end table
+
+@end table
+@subsubsection 专门方法
+
+@deffn Method ede-preprocessor-map :AFTER this
+获取项目 @var{THIS} 的预处理器图。
+@end deffn
+
+@deffn Method ede-subproject-relative-path :AFTER proj &optional parent-in
+获取 @var{PROJ} 相对于父项目的路径名。如果指定了 PARENT，则相对于 PARENT 项目。指定 PARENT 对于相对于根项目的子子项目很有用。
+@end deffn
+
+@deffn Method eieio-speedbar-description :AFTER obj
+提供 @var{OBJ} 的速度栏描述。
+@end deffn
+
+@deffn Method ede-map-any-target-p :AFTER this proc
+对于项目@var{THIS}，将@var{PROC}映射到所有目标，并返回（如果有非@code{nil}）。返回 @var{PROC} 返回的第一个非 @code{nil} 值。
+@end deffn
+
+@deffn Method ede-map-subprojects :AFTER this proc
+对于对象 @var{THIS}，在所有直接子项目上执行 @var{PROC}。此功能不适用于 @var{PROC} 子项目。另请参阅@dfn{ede-map-all-subprojects}。
+@end deffn
+
+@deffn Method ede-convert-path :AFTER this path
+以标准方式转换给定项目的路径。默认使其项目相对。参数 @var{THIS} 是将 @var{PATH} 转换为的项目。
+@end deffn
+
+@deffn Method ede-name :AFTER this
+返回 @var{THIS} 项目文件的短名称。通过提取最低目录名称来完成此操作。
+@end deffn
+
+@deffn Method ede-set-project-variables :AFTER project &optional buffer
+在@var{BUFFER}中设置@var{PROJECT}的局部变量。
+@end deffn
+
+@deffn Method eieio-speedbar-derive-line-path :AFTER obj &optional depth
+返回到@var{OBJ}的路径。可选的@var{DEPTH}是我们开始的深度。
+@end deffn
+
+@deffn Method ede-map-all-subprojects :AFTER this allproc
+对于对象 @var{THIS}，对 @var{THIS} 和所有子项目执行 PROC。此功能还将 PROC 应用于子子项目。另请参见@dfn{ede-map-subprojects}。
+@end deffn
+
+@deffn Method project-update-version :AFTER ot
+项目@var{OT}的@code{:version}已更新。处理保存或其他细节。
+@end deffn
+
+@deffn Method ede-buffer-header-file :AFTER this buffer
+返回@code{nil}，项目没有头文件。
+@end deffn
+
+@deffn Method ede-buffer-documentation-files :AFTER this buffer
+返回项目@var{THIS}中基于@var{BUFFER}的所有文档。
+@end deffn
+
+@deffn Method ede-map-targets :AFTER this proc
+对于对象@var{THIS}，对所有目标执行@var{PROC}。
+@end deffn
+
+@deffn Method ede-buffer-mine :AFTER this buffer
+如果对象@var{THIS}声明对@var{BUFFER}中的文件的所有权，则返回非@code{nil}。
+@end deffn
+
+@deffn Method ede-object-keybindings :BEFORE this
+从类 @code{ede-project} 的对象中检索槽 @code{keybindings}
+@end deffn
+
+@deffn Method ede-description :AFTER this
+返回适合 @var{THIS} 的迷你缓冲区的描述。
+@end deffn
+
+@deffn Method eieio-speedbar-object-children :AFTER this
+返回 @var{THIS} 的速度栏显示子项列表。
+@end deffn
+
+@deffn Method project-make-dist :AFTER this
+基于 @var{THIS} 项目构建项目的发行版。
+@end deffn
+
+@deffn Method ede-system-include-path :AFTER this
+获取项目@var{THIS}使用的系统包含路径。
+@end deffn
+
+@deffn Method project-new-target-custom :AFTER proj
+创建一个新目标。  由项目@var{PROJ}来获取名称。
+@end deffn
+
+@deffn Method ede-subproject-p :AFTER proj
+如果 @var{PROJ} 是子项目，则返回非 @code{nil}。
+@end deffn
+
+@deffn Method ede-expand-filename :AFTER this filename &optional force
+返回基于项目@var{THIS}的完全限定文件名。 @var{FILENAME} 应该只是出现在该项目控制的目录中的文件名。可选参数 @var{FORCE} 强制提供默认文件名，即使它不存在。
+@end deffn
+
+@deffn Method ede-menu-items-build :AFTER obj &optional current
+返回构建项目@var{OBJ}的菜单项列表。如果可选参数@var{CURRENT}非@code{nil}，则返回子菜单代码。
+@end deffn
+
+@deffn Method ede-update-version-in-source :AFTER this version
+更改源中版本字符串的出现次数。在项目@var{THIS}中，循环遍历所有目标，让它们有机会将其源设置为@var{VERSION}。
+@end deffn
+
+@deffn Method project-new-target :AFTER proj &rest args
+创建一个新目标。  由项目@var{PROJ}来获取名称。
+@end deffn
+
+@deffn Method project-compile-project :AFTER obj &optional command
+编译整个当前项目@var{OBJ}。参数@var{COMMAND}是编译时使用的命令。
+@end deffn
+
+@deffn Method eieio-speedbar-object-buttonname :AFTER object
+返回用作 @var{OBJECT} 的速度栏按钮的字符串。
+@end deffn
+
+@deffn Method ede-map-project-buffers :AFTER this proc
+对于@var{THIS}，在属于@var{THIS}的所有缓冲区上执行@var{PROC}。
+@end deffn
+
+@deffn Method ede-expand-filename-impl :AFTER this filename &optional force
+返回基于项目@var{THIS}的完全限定文件名。 @var{FILENAME} 应该只是出现在该项目控制的目录中的文件名。可选参数 @var{FORCE} 强制提供默认文件名，即使它不存在。
+@end deffn
+
+@deffn Method eieio-done-customizing :AFTER proj
+当用户完成自定义@var{PROJ} 时调用此函数。
+@end deffn
+
+@deffn Method ede-html-documentation :AFTER this
+返回项目@var{THIS}提供的 HTML 文件列表。
+@end deffn
+
+@deffn Method ede-documentation :AFTER this
+返回提供文档的文件列表。文档不适用于对象 @var{THIS}，而是由 @var{THIS} 为项目中的其他文件提供。
+@end deffn
+
+@deffn Method project-interactive-select-target :AFTER this prompt
+以交互方式查询项目@var{THIS}中存在的目标。参数 @var{PROMPT} 是向用户查询目标时使用的提示。
+@end deffn
+
+@deffn Method ede-target-in-project-p :AFTER proj target
+@var{PROJ} 是@var{TARGET} 的父级吗？如果 @var{TARGET} 属于子项目，则返回该项目文件。
+@end deffn
+
+@deffn Method ede-find-target :AFTER proj buffer
+获取@var{PROJ}中属于@var{BUFFER}或@code{nil}的目标。
+@end deffn
+
+@deffn Method ede-add-subproject :AFTER proj-a proj-b
+添加子项目@var{PROJ-B}到@var{PROJ-A}。
+@end deffn
+
+@deffn Method ede-commit-project :AFTER proj
+将对 @var{PROJ} 的任何更改提交到其文件中。
+@end deffn
+
+@deffn Method project-dist-files :AFTER this
+返回构成 @var{THIS} 项目发行版的文件列表。
+@end deffn
+
+@deffn Method ede-object-menu :BEFORE this
+从类 @code{ede-project} 的对象中检索槽 @code{menu}
+@end deffn
+
+@deffn Method ede-commit-local-variables :AFTER proj
+将更改提交到 @var{PROJ} 中的局部变量。
+@end deffn
+
+@node ede-cpp-root-project
+@subsection ede-cpp-根项目
+@pjindex ede-cpp-root-project
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-project-placeholder
+@xref{ede-project-placeholder}.
+@table @code
+@item ede-project
+@xref{ede-project}.
+@table @code
+@item ede-cpp-root-project
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+该类实现 @code{ede-cpp-root} 项目类型。 @xref{ede-cpp-root}，有关使用此项目类型的信息。
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :include-path
+类型：@code{list} @* 默认值：@code{("/include" "../include/")}
+
+默认的定位功能会扩展项目内的文件名。如果扩展了头文件（.h、.hh 等）@: 名称，并且 @code{:locate-fcn} 槽为 @code{nil}，则首先检查包含路径，而忽略其他目录。  对于非常大的项目，这种优化可以节省大量时间。
+
+路径中的目录名称可以相对于当前缓冲区的@code{default-directory}（不以/开头）。  相对于项目根目录的目录应以 / 开头，例如“/include”，表示目录 @code{include} 离开项目根目录。
+
+@item :system-include-path
+类型：@code{list} @* 默认值：@code{nil}
+
+系统包含该项目中文件的路径。在 ede-cpp-root-project 中初始化的 C 文件的语义系统包含路径设置为此值。  如果这是@code{nil}，则语义路径不会被修改。
+
+@item :spp-table
+类型：@code{list} @* 默认值：@code{nil}
+
+文件的 C 预处理器宏。解析文件时将使用预处理器符号。这些宏可能通过命令行编译器传入，或者是从头文件派生的关键符号。  通过此槽提供头文件宏值可以提高准确性和性能。使用 @code{:spp-files} 可以直接使用这些文件。
+
+@item :spp-files
+类型：@code{list} @* 默认值：@code{nil}
+
+带有文件预处理器宏的 C 头文件。解析此项目中的文件时将使用这些文件中出现的预处理器符号。有关其工作原理的更多信息，请参阅@code{semantic-lex-c-preprocessor-symbol-map}。
+
+@item :header-match-regexp
+类型：@code{string} @* 默认值：@code{"\\.\\(h\\(h\\|xx\\|pp\\|\\+\\+\\)?\\|H\\)$\\|\\<\\w+$"}
+
+正则表达式用于识别C/C++头文件。
+
+@item :locate-fcn
+类型：@code{(or null function)} @* 默认值：@code{nil}
+
+可以使用locate函数代替@dfn{ede-expand-filename}，这样您就可以快速自定义自定义目标以使用专门的本地例程而不是EDE例程。函数符号必须采用两个参数： NAME - 要查找的文件的名称。 DIR - 此 cpp-root 项目的目录根。
+
+它应该返回从 NAME@. 传入的完全限定文件名，如果该文件不存在，则应该返回 @code{nil}。
+
+@end table
+
+@end table
+@subsubsection 专门方法
+
+@deffn Method initialize-instance :AFTER this &rest fields
+确保 @code{:file} 完全展开。
+@end deffn
+
+@deffn Method ede-preprocessor-map :AFTER this
+获取项目 @var{this} 的预处理器图。
+@end deffn
+
+@deffn Method ede-cpp-root-header-file-p :AFTER proj name
+如果 @var{proj} 中的文件名 @var{name} 是标头，则非 @code{nil}。
+@end deffn
+
+@deffn Method ede-system-include-path :AFTER this
+获取项目@var{this}使用的系统包含路径。
+@end deffn
+
+@deffn Method ede-expand-filename-impl :AFTER proj name
+在此项目@var{proj}中，找到文件@var{name}。这知道有关源树的详细信息。
+@end deffn
+
+@node ede-simple-project
+@subsection ede-简单项目
+@pjindex ede-simple-project
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-project-placeholder
+@xref{ede-project-placeholder}.
+@table @code
+@item ede-project
+@xref{ede-project}.
+@table @code
+@item ede-simple-project
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@subsubsection 专门方法
+
+@deffn Method ede-commit-project :AFTER proj
+将对 @var{PROJ} 的任何更改提交到其文件中。
+@end deffn
+
+@node ede-simple-base-project
+@subsection ede-简单基础项目
+@pjindex ede-simple-base-project
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-project-placeholder
+@xref{ede-project-placeholder}.
+@table @code
+@item ede-project
+@xref{ede-project}.
+@table @code
+@item ede-simple-base-project
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+EDE Simple 项目基类。这个项目可以控制一棵子目录树。
+
+@table @asis
+@end table
+
+@node ede-proj-project
+@subsection ede-项目-项目
+@pjindex ede-proj-project
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-project-placeholder
+@xref{ede-project-placeholder}.
+@table @code
+@item ede-project
+@xref{ede-project}.
+@table @code
+@item ede-proj-project
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :makefile-type
+类型：@code{symbol} @* 默认值：@code{Makefile}
+
+要生成的 Makefile 的类型。可以是 @code{'Makefile}、“Makefile.in”或“Makefile.am”之一。如果该值不是 @code{'Makefile}，则它将覆盖目标中的 @code{:makefile} 槽。
+
+@item :variables
+类型：@code{list} @* 默认值：@code{nil}
+
+要在此 Makefile 中设置的变量。
+
+@item :configuration-variables
+类型：@code{list} @* 默认值：@code{("debug" (("DEBUG" . "1")))}
+
+在不同配置中使用的 Makefile 变量。当配置变为活动状态时，这些变量将在 makefile 中使用。
+
+@item :inference-rules @*
+默认值：@code{nil}
+
+添加到 makefile 的推理规则。
+
+@item :include-file @*
+默认值：@code{nil}
+
+要包含的其他文件。这些文件可以包含其他规则、变量和自定义。
+
+@item :automatic-dependencies
+类型：@code{boolean} @* 默认值：@code{t}
+
+非@code{nil} 在 Makefile 中实现自动依赖关系。
+
+@item :metasubproject
+类型：@code{boolean} @* 默认值：@code{nil}
+
+如果这是一个元子项目，则非@code{nil}。通常，子项目由父项目确定。  如果多个顶级项目被分组为一个不由 EDE 维护的大型项目，那么您需要将其设置为非@code{nil}。  唯一的效果是 @code{dist} 规则将避免生成 tar 文件。
+
+@end table
+
+@end table
+@subsubsection 专门方法
+
+@deffn Method ede-proj-makefile-create :AFTER this mfilename
+为 @var{THIS} 中的所有 Makefile 目标创建一个 Makefile。 @var{MFILENAME} 是要生成的 makefile。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-rules :AFTER this
+插入 @var{THIS} 目标所需的规则。
+@end deffn
+
+@deffn Method ede-proj-makefile-tags :AFTER this targets
+插入当前位置规则以制作递归TAGS 文件。参数 @var{THIS} 是要为其创建标签的项目。参数 @var{TARGETS} 是我们应该依赖 TAGS 的目标。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-variables :AFTER this
+插入目标@var{THIS}所需的变量。
+@end deffn
+
+@deffn Method project-make-dist :AFTER this
+基于 @var{THIS} 目标构建项目的发行版。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-dist-rules :AFTER this
+在 Makefile 中插入 @var{THIS} 的分布规则，例如 CLEAN 和 DIST。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-dist-dependencies :AFTER this
+插入 DIST 规则应依赖的任何符号。参数 @var{THIS} 是应该插入内容的项目。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-subproj-rules :AFTER this
+为项目 @var{THIS} 插入一条规则，该项目应该是子项目。
+@end deffn
+
+@deffn Method ede-proj-makefile-create-maybe :AFTER this mfilename
+如果需要，为 @var{THIS} 中的所有 Makefile 目标创建一个 Makefile。 @var{MFILENAME} 是要生成的 makefile。
+@end deffn
+
+@deffn Method ede-proj-configure-test-required-file :AFTER this file
+对于项目@var{THIS}，测试文件@var{FILE}是否存在，或创建它。
+@end deffn
+
+@deffn Method ede-proj-setup-buildenvironment :AFTER this &optional force
+设置项目@var{THIS}的构建环境。处理 Makefile 或 Makefile.am configure.ac 组合。可选参数@var{FORCE}将强制重新生成项目。
+@end deffn
+
+@deffn Method ede-proj-makefile-garbage-patterns :AFTER this
+将被视为垃圾的模式列表返回给@var{THIS}。这些可以通过 make clean 删除。
+@end deffn
+
+@deffn Method ede-proj-configure-synchronize :AFTER this
+将我们对项目@var{THIS}的了解同步到configure.ac中。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-variables-new :AFTER this
+插入目标@var{THIS}所需的变量。
+
+注意：尚未使用！  这是正在进行的 EDE SRecode 转换的一部分。
+@end deffn
+
+@deffn Method ede-proj-makefile-configuration-variables :AFTER this configuration
+从 @var{THIS} 返回配置变量列表。使用@var{CONFIGURATION}作为当前配置进行查询。
+@end deffn
+
+@deffn Method eieio-done-customizing :AFTER proj
+当用户完成自定义该对象时调用此方法。参数 @var{PROJ} 是要保存的项目。
+@end deffn
+
+@deffn Method ede-proj-configure-recreate :AFTER this
+删除项目@var{THIS}的配置脚本并重新开始。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-user-rules :AFTER this
+插入 @var{THIS} 目标所需的用户指定规则。这与 @dfn{ede-proj-makefile-insert-rules} 不同，因为该函数不会创建使用 automake 自动创建的构建规则。
+@end deffn
+
+@deffn Method ede-proj-dist-makefile :AFTER this
+返回其中包含 @var{THIS} 的 DIST 目标的 Makefile 的名称。
+@end deffn
+
+@deffn Method ede-proj-configure-file :AFTER this
+项目@var{THIS}使用的configure.ac脚本。
+@end deffn
+
+@deffn Method ede-commit-project :AFTER proj
+将对 @var{PROJ} 的任何更改提交到其文件中。
+@end deffn
+
+@deffn Method project-dist-files :AFTER this
+返回构成 @var{THIS} 项目发行版的文件列表。
+@end deffn
+
+@deffn Method ede-commit-local-variables :AFTER proj
+将更改提交到 @var{PROJ} 中的局部变量。
+@end deffn
+
+@node project-am-makefile
+@subsection 项目生成文件
+@pjindex project-am-makefile
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-project-placeholder
+@xref{ede-project-placeholder}.
+@table @code
+@item ede-project
+@xref{ede-project}.
+@table @code
+@item project-am-makefile
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@subsubsection 专门方法
+
+@deffn Method project-am-subtree :AFTER ampf subdir
+返回@var{SUBDIR}指定的@var{AMPF}中的子项目。
+@end deffn
+
+@deffn Method project-targets-for-file :AFTER proj
+返回项目@var{PROJ}的目标列表。
+@end deffn
+
+@deffn Method project-new-target :AFTER proj &optional name type
+创建一个名为@var{NAME}的新目标。参数 @var{TYPE} 是要插入的目标类型。  这是一个与 @code{project-am-type-alist} 或类型类符号中的内容匹配的字符串。尽管这是一种方法，但它取决于当前缓冲区，以便提供智能默认目标类型。
+@end deffn
+
+@node ede-step-project
+@subsection ede-step-项目
+@pjindex ede-step-project
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-project-placeholder
+@xref{ede-project-placeholder}.
+@table @code
+@item ede-project
+@xref{ede-project}.
+@table @code
+@item ede-step-project
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :init-variables
+类型：@code{list} @* 默认值：@code{nil}
+
+要在此 Makefile 中设置的变量，位于文件顶部。
+
+@item :additional-variables
+类型：@code{(or null list)} @* 默认值：@code{nil}
+
+该项目所需的任意变量。将此项留空是安全的。
+
+@item :additional-rules
+类型：@code{(or null list)} @* 默认值：@code{nil}
+
+实现此目标所需的任意规则和依赖关系。将此项留空是安全的。
+
+@item :installation-domain
+类型：@code{symbol} @* 默认值：@code{user}
+
+安装域规范。变量 GNUSTEP_INSTALLATION_DOMAIN 设置为该值。
+
+@item :preamble
+类型：@code{(or null list)} @* 默认值：@code{("GNUmakefile.preamble")}
+
+用于附加变量的辅助 makefile。包含在特定目标文件之前。
+
+@item :postamble
+类型：@code{(or null list)} @* 默认值：@code{("GNUmakefile.postamble")}
+
+用于附加规则的辅助 makefile。包含在特定目标文件之后。
+
+@item :metasubproject
+类型：@code{boolean} @* 默认值：@code{nil}
+
+如果这是一个元子项目，则非@code{nil}。通常，子项目由父项目确定。  如果多个顶级项目被分组为一个不由 EDE 维护的大型项目，那么您需要将其设置为非@code{nil}。  唯一的效果是 @code{dist} 规则将避免生成 tar 文件。
+
+@end table
+
+@end table
+@subsubsection 专门方法
+
+@deffn Method ede-proj-makefile-create :AFTER this mfilename
+为 @var{THIS} 中的所有 Makefile 目标创建一个 GNUmakefile。 @var{MFILENAME} 是要生成的 makefile。
+@end deffn
+
+@deffn Method project-make-dist :AFTER this
+基于 @var{THIS} 目标构建项目的发行版。
+@end deffn
+
+@deffn Method ede-proj-makefile-create-maybe :AFTER this mfilename
+如果需要，为 @var{THIS} 中的所有 Makefile 目标创建一个 Makefile。 @var{MFILENAME} 是要生成的 makefile。
+@end deffn
+
+@deffn Method ede-proj-setup-buildenvironment :AFTER this &optional force
+设置项目@var{THIS}的构建环境。处理 Makefile 或 Makefile.am configure.ac 组合。可选参数@var{FORCE}将强制重新生成项目。
+@end deffn
+
+@deffn Method eieio-done-customizing :AFTER proj
+当用户完成自定义该对象时调用此方法。参数 @var{PROJ} 是要保存的项目。
+@end deffn
+
+@deffn Method ede-proj-dist-makefile :AFTER this
+返回其中包含 @var{THIS} 的 DIST 目标的 Makefile 的名称。
+@end deffn
+
+@deffn Method ede-commit-project :AFTER proj
+将对 @var{PROJ} 的任何更改提交到其文件中。
+@end deffn
+
+@deffn Method project-dist-files :AFTER this
+返回构成 @var{THIS} 项目发行版的文件列表。
+@end deffn
+
+@deffn Method ede-commit-local-variables :AFTER proj
+将更改提交到 @var{PROJ} 中的局部变量。
+@end deffn
+
+@node Targets
+@section 目标
+
+@menu
+* ede-target::
+* ede-proj-target::
+* ede-proj-target-makefile::
+* semantic-ede-proj-target-grammar::
+* ede-proj-target-makefile-objectcode::
+* ede-proj-target-makefile-archive::
+* ede-proj-target-makefile-program::
+* ede-proj-target-makefile-shared-object::
+* ede-proj-target-elisp::
+* ede-proj-target-elisp-autoloads::
+* ede-proj-target-makefile-miscelaneous::
+* ede-proj-target-makefile-info::
+* ede-proj-target-scheme::
+* project-am-target::
+* project-am-objectcode::
+* project-am-program::
+* project-am-header-noinst::
+* project-am-header-inst::
+* project-am-lisp::
+* project-am-texinfo::
+* project-am-man::
+@end menu
+
+
+@node ede-target
+@subsection ede目标
+@tgindex ede-target
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@table @asis
+@item 孩子们：
+@w{ede-cpp-root-target,} @w{ede-emacs-target-c,} @w{ede-emacs-target-el,} @w{ede-emacs-target-misc,} @w{ede-linux-target-c,} @w{ede-linux-target-misc,} @w{ede-maven-target-java,} @w{ede-maven-target-c,} @w{ede-maven-target-misc,} @w{ede-simple-target,} @xref{ede-proj-target}, @xref{project-am-target}.
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :name
+类型：@code{string}
+
+该目标的名称。
+
+@item :path
+类型：@code{string}
+
+该目标的来源路径。相对于其所属项目的路径。
+
+@item :source
+类型：@code{list} @* 默认值：@code{nil}
+
+该目标中的源文件。
+
+@item :versionsource
+类型：@code{list} @* 默认值：@code{nil}
+
+其中包含版本字符串的源文件。每当主项目的 EDE 版本发生更改时，都会检查这些文件的版本字符串。  当找到字符串时，之前的版本将被更新。
+
+@end table
+
+@end table
+@subsubsection 专门方法
+
+@deffn Method ede-preprocessor-map :AFTER this
+获取项目 @var{THIS} 的预处理器图。
+@end deffn
+
+@deffn Method eieio-speedbar-description :AFTER obj
+提供 @var{OBJ} 的速度栏描述。
+@end deffn
+
+@deffn Method project-compile-target :AFTER obj &optional command
+编译当前目标@var{OBJ}。参数@var{COMMAND}是用于编译目标的命令。
+@end deffn
+
+@deffn Method project-debug-target :AFTER obj
+在调试器中运行当前项目目标@var{OBJ}。
+@end deffn
+
+@deffn Method ede-convert-path :AFTER this path
+以标准方式转换给定项目的路径。默认使其项目相对。参数 @var{THIS} 是将 @var{PATH} 转换为的项目。
+@end deffn
+
+@deffn Method ede-name :AFTER this
+返回 @var{THIS} 目标的名称。
+@end deffn
+
+@deffn Method ede-target-buffer-in-sourcelist :AFTER this buffer source
+如果对象 @var{THIS} 位于 @var{BUFFER} 到 @var{SOURCE} 列表中，则返回非 @code{nil}。处理复杂的路径问题。
+@end deffn
+
+@deffn Method eieio-speedbar-derive-line-path :AFTER obj &optional depth
+返回到@var{OBJ}的路径。可选的@var{DEPTH}是我们开始的深度。
+@end deffn
+
+@deffn Method ede-buffer-header-file :AFTER this buffer
+EDE@. 中没有默认头文件，请快速检查此缓冲区中是否有 Header 标记。
+@end deffn
+
+@deffn Method project-remove-file :AFTER ot fnnd
+从项目目标 @var{OT} 中删除当前缓冲区。参数@var{FNND}是一个参数。
+@end deffn
+
+@deffn Method ede-buffer-documentation-files :AFTER this buffer
+检查 @var{THIS} 的一些文档文件。还要快速检查一下此@var{BUFFER}中是否有文档标签。
+@end deffn
+
+@deffn Method ede-map-target-buffers :AFTER this proc
+对于@var{THIS}，在属于@var{THIS}的所有缓冲区上执行@var{PROC}。
+@end deffn
+
+@deffn Method eieio-speedbar-child-description :AFTER obj
+为 @var{OBJ} 的普通子级提供速度栏描述。普通子元素是不是 EIEIO 对象的子元素。
+@end deffn
+
+@deffn Method ede-object-keybindings :BEFORE this
+从类 @code{ede-target} 的对象中检索槽 @code{keybindings}
+@end deffn
+
+@deffn Method ede-description :AFTER this
+返回适合 @var{THIS} 的迷你缓冲区的描述。
+@end deffn
+
+@deffn Method eieio-speedbar-object-children :AFTER this
+返回 @var{THIS} 的速度栏显示子项列表。
+@end deffn
+
+@deffn Method ede-system-include-path :AFTER this
+获取项目@var{THIS}使用的系统包含路径。
+@end deffn
+
+@deffn Method ede-object-sourcecode :BEFORE this
+从类 @code{ede-target} 的对象中检索槽 @code{sourcetype}
+@end deffn
+
+@deffn Method ede-expand-filename :AFTER this filename &optional force
+根据目标@var{THIS}返回完全限定的文件名。 @var{FILENAME} 应该是出现在 @var{THIS} 工作的目录中的文件名。可选参数 @var{FORCE} 强制提供默认文件名，即使它不存在。
+@end deffn
+
+@deffn Method ede-menu-items-build :AFTER obj &optional current
+返回构建目标@var{OBJ}的菜单项列表。如果可选参数@var{CURRENT}非@code{nil}，则返回子菜单代码。
+@end deffn
+
+@deffn Method ede-want-file-p :AFTER this file
+如果@var{THIS}目标想要@var{FILE}，则返回非@code{nil}。
+@end deffn
+
+@deffn Method ede-update-version-in-source :AFTER this version
+在 @var{THIS} 的源代码中，将版本号更改为 @var{VERSION}。
+@end deffn
+
+@deffn Method project-delete-target :AFTER ot
+从其父项目中删除当前目标@var{OT}。
+@end deffn
+
+@deffn Method ede-target-sourcecode :AFTER this
+返回 @var{THIS} 允许的源代码对象。
+@end deffn
+
+@deffn Method eieio-speedbar-child-make-tag-lines :AFTER this depth
+为 @var{THIS} 的子级创建速度栏标记线。它的深度为@var{DEPTH}。
+@end deffn
+
+@deffn Method eieio-speedbar-object-buttonname :AFTER object
+返回用作 @var{OBJECT} 的速度栏按钮的字符串。
+@end deffn
+
+@deffn Method eieio-done-customizing :AFTER target
+当用户完成自定义@var{TARGET} 时调用此函数。
+@end deffn
+
+@deffn Method project-edit-file-target :AFTER ot
+编辑与此文件关联的目标@var{OT}。
+@end deffn
+
+@deffn Method ede-documentation :AFTER this
+返回提供文档的文件列表。文档不适用于对象 @var{THIS}，而是由 @var{THIS} 为项目中的其他文件提供。
+@end deffn
+
+@deffn Method ede-want-file-source-p :AFTER this file
+如果@var{THIS}目标想要@var{FILE}，则返回非@code{nil}。
+@end deffn
+
+@deffn Method ede-want-file-auxiliary-p :AFTER this file
+如果@var{THIS}目标想要@var{FILE}，则返回非@code{nil}。
+@end deffn
+
+@deffn Method project-add-file :AFTER ot file
+将当前缓冲区添加到项目目标@var{OT}中。参数 @var{FILE} 是要添加的文件。
+@end deffn
+
+@deffn Method ede-target-name :AFTER this
+返回 @var{THIS} 目标的名称，适用于 make 或 debug 风格的命令。
+@end deffn
+
+@deffn Method ede-object-menu :BEFORE this
+从类 @code{ede-target} 的对象中检索槽 @code{menu}
+@end deffn
+
+@node ede-proj-target
+@subsection ede-项目-目标
+@tgindex ede-proj-target
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item ede-proj-target
+@table @asis
+@item 孩子们：
+@xref{ede-proj-target-makefile}, @w{ede-proj-target-aux,} @xref{ede-proj-target-scheme}.
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :name
+类型：@code{string}
+
+该目标的名称。
+
+@item :path
+类型：@code{string}
+
+该目标的来源路径。相对于其所属项目的路径。
+
+@item :auxsource
+类型：@code{list} @* 默认值：@code{nil}
+
+该目标中包含辅助源文件。其中每一个都被认为相当于一个源文件，但它不是分布式的，并且每一个都应该有相应的规则来构建它。
+
+@item :compiler
+类型：@code{(or null symbol)} @* 默认值：@code{nil}
+
+用于编译该对象的编译器。这应该是一个符号，其中包含定义编译器的对象。这使得保存/恢复能够按名称进行，从而允许共享这些编译器资源及其全局定制。
+
+@item :linker
+类型：@code{(or null symbol)} @* 默认值：@code{nil}
+
+用于链接该对象的编译源的链接器。这应该是一个符号，其中包含定义链接器的对象。这使得保存/恢复能够按名称进行，从而允许共享这些链接器资源及其全局定制。
+
+@end table
+
+@end table
+@subsubsection 专门方法
+
+@deffn Method project-compile-target :AFTER obj &optional command
+编译当前目标@var{OBJ}。参数@var{COMMAND}是用于编译目标的命令。
+@end deffn
+
+@deffn Method project-debug-target :AFTER obj
+在调试器中运行当前项目目标@var{OBJ}。
+@end deffn
+
+@deffn Method ede-proj-configure-add-missing :AFTER this
+查询automake提供的@var{THIS}需要的文件是否丢失。结果 --add-missing 被传递给 automake。
+@end deffn
+
+@deffn Method ede-proj-flush-autoconf :AFTER this
+刷新配置文件（当前缓冲区）以容纳@var{THIS}。通过刷新，清除文件中可能存在的任何残留物。  对 @dfn{ede-proj-tweak-autoconf} 的后续调用可以恢复通过刷新删除的项目。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-rules :AFTER this
+插入 @var{THIS} 目标所需的规则。
+@end deffn
+
+@deffn Method project-remove-file :AFTER target file
+对于@var{TARGET}，删除@var{FILE}。 @var{FILE} 必须由@dfn{ede-convert-path} 按摩。
+@end deffn
+
+@deffn Method ede-proj-configure-create-missing :AFTER this
+通过创建来添加 @var{THIS} 缺少的文件。
+@end deffn
+
+@deffn Method ede-proj-makefile-sourcevar :AFTER this
+返回 @var{THIS} 源的变量名称。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-variables :AFTER this &optional moresource
+插入目标@var{THIS}所需的变量。可选参数@var{MORESOURCE}是要添加到sources变量的附加源列表。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-automake-post-variables :AFTER this
+在 Makefile.am 中的 SOURCES 之后插入目标 @var{THIS} 所需的变量。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-dist-dependencies :AFTER this
+插入 DIST 规则应依赖的任何符号。参数 @var{THIS} 是应该插入内容的目标。
+@end deffn
+
+@deffn Method ede-proj-linkers :AFTER obj
+@var{OBJ} 使用的链接器列表。如果 1⁣ 槽为空，则在第一个匹配发现的基础上为 @code{availablelinkers} 槽中的任何给定类型构造一个。否则，返回 @code{linker} 槽。将所有符号转换为要使用的对象。
+@end deffn
+
+@deffn Method ede-proj-makefile-garbage-patterns :AFTER this
+将被视为垃圾的模式列表返回给@var{THIS}。这些可以通过 make clean 删除。
+@end deffn
+
+@deffn Method ede-proj-tweak-autoconf :AFTER this
+调整配置文件（当前缓冲区）以适应@var{THIS}。
+@end deffn
+
+@deffn Method ede-proj-compilers :AFTER obj
+@var{OBJ} 使用的编译器列表。如果 1⁣ 槽为空，则在第一个匹配发现的基础上为 @code{availablecompilers} 槽中的任何给定类型构造一个。否则，返回 @code{compiler} 槽。将所有符号转换为要使用的对象。
+@end deffn
+
+@deffn Method project-delete-target :AFTER this
+从其父项目中删除当前目标@var{THIS}。
+@end deffn
+
+@deffn Method ede-proj-makefile-target-name :AFTER this
+返回 @var{THIS} 目标的主目标名称。
+@end deffn
+
+@deffn Method eieio-done-customizing :AFTER target
+当用户完成自定义该对象时调用此方法。参数@var{TARGET}是我们正在完成定制的项目。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-user-rules :AFTER this
+插入 @var{THIS} 目标所需的用户指定规则。
+@end deffn
+
+@deffn Method project-add-file :AFTER this file
+将当前缓冲区添加到目标@var{THIS}，表示为@var{FILE}。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-automake-pre-variables :AFTER this
+在 Makefile.am 中的 SOURCES 之前插入目标 @var{THIS} 所需的变量。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-dist-filepatterns :AFTER this
+插入 DIST 规则应依赖的任何符号。参数 @var{THIS} 是应该插入内容的目标。
+@end deffn
+
+@deffn Method ede-proj-makefile-dependency-files :AFTER this
+返回要转换为依赖项的源文件列表。参数@var{THIS}是从中获取源的目标。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-source-variables :AFTER this &optional moresource
+插入@var{THIS}所需的源变量。可选参数@var{MORESOURCE}是要添加到sources变量的附加源列表。
+@end deffn
+
+
+@node ede-proj-target-makefile
+@subsection ede-proj-目标-makefile
+@tgindex ede-proj-target-makefile
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item ede-proj-target
+@xref{ede-proj-target}.
+@table @code
+@item ede-proj-target-makefile
+@table @asis
+@item 孩子们：
+@xref{semantic-ede-proj-target-grammar}, @xref{ede-proj-target-makefile-objectcode}, @xref{ede-proj-target-elisp}, @xref{ede-proj-target-makefile-miscelaneous}, @xref{ede-proj-target-makefile-info}.
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :makefile
+类型：@code{string} @* 默认值：@code{"Makefile"}
+
+生成的 Makefile 的文件名。
+
+@item :partofall
+类型：@code{boolean} @* 默认值：@code{t}
+
+非@code{nil} 表示创建的规则是 all 目标的一部分。将其设置为 @code{nil} 创建构建此项目的规则，但不将其包含在 @code{all:} 规则中。
+
+@item :configuration-variables
+类型：@code{list} @* 默认值：@code{nil}
+
+附加 Makefile 变量以在不同配置中使用。当配置变为活动状态时，这些变量将在 makefile 中使用。目标变量总是被重命名，例如 foo_CFLAGS，然后包含到该变量通常出现的命令中。
+
+@item :rules
+类型：@code{list} @* 默认值：@code{nil}
+
+实现此目标所需的任意规则和依赖关系。将此项留空是安全的。
+
+@end table
+
+@end table
+@subsubsection 专门方法
+
+@deffn Method ede-proj-makefile-dependencies :AFTER this
+返回表示 @var{THIS} 依赖关系的字符串。一些编译器仅使用依赖项中的第一个元素，其他编译器有中间体（目标文件）列表，而其他编译器则不关心。这允许自定义这些元素的显示方式。
+@end deffn
+
+@deffn Method project-compile-target :AFTER obj &optional command
+编译当前目标程序@var{OBJ}。可选参数 @var{COMMAND} 是要使用的备用命令。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-rules :AFTER this
+插入 @var{THIS} 目标所需的规则。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-variables :AFTER this &optional moresource
+插入目标@var{THIS}所需的变量。可选参数@var{MORESOURCE}是要添加到sources变量的附加源列表。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-commands :AFTER this
+插入目标@var{THIS}所需的命令。对于目标，插入所选编译器所需的命令。
+@end deffn
+
+@deffn Method ede-proj-makefile-configuration-variables :AFTER this configuration
+从 @var{THIS} 返回配置变量列表。使用@var{CONFIGURATION}作为当前配置进行查询。
+@end deffn
+
+@node semantic-ede-proj-target-grammar
+@subsection 语义 ede-proj-目标语法
+@tgindex semantic-ede-proj-target-grammar
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item ede-proj-target
+@xref{ede-proj-target}.
+@table @code
+@item ede-proj-target-makefile
+@xref{ede-proj-target-makefile}.
+@table @code
+@item semantic-ede-proj-target-grammar
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@subsubsection 专门方法
+
+@deffn Method project-compile-target :AFTER obj
+将所有源代码编译为 Lisp 目标@var{OBJ}。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-rules :AFTER this
+插入 @var{THIS} 目标所需的规则。
+@end deffn
+
+@deffn Method ede-buffer-mine :AFTER this buffer
+如果对象@var{THIS}声明对@var{BUFFER}中的文件的所有权，则返回@code{t}。声明对所有 -by.el 和 -wy.el 文件的所有权。
+@end deffn
+
+@deffn Method ede-proj-makefile-sourcevar :AFTER this
+返回 @var{THIS} 源的变量名称。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-dist-dependencies :AFTER this
+插入 dist 依赖项或中间目标。这可以确保所有语法 Lisp 文件都是在 dist 运行之前创建的，因此它们始终是最新的。参数 @var{THIS} 是应该插入内容的目标。
+@end deffn
+
+
+@node ede-proj-target-makefile-objectcode
+@subsection ede-proj-目标-makefile-目标代码
+@tgindex ede-proj-target-makefile-objectcode
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item ede-proj-target
+@xref{ede-proj-target}.
+@table @code
+@item ede-proj-target-makefile
+@xref{ede-proj-target-makefile}.
+@table @code
+@item ede-proj-target-makefile-objectcode
+@table @asis
+@item 孩子们：
+@xref{ede-proj-target-makefile-archive}, @xref{ede-proj-target-makefile-program}.
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :configuration-variables
+类型：@code{list} @* 默认值：@code{("debug" ("CFLAGS" . "-g") ("LDFLAGS" . "-g"))}
+
+@xref{ede-proj-target-makefile}.
+@end table
+@end table
+@subsubsection 专门方法
+
+@deffn Method ede-buffer-header-file :AFTER this buffer
+没有默认的头文件。
+@end deffn
+
+@deffn Method ede-proj-makefile-sourcevar :AFTER this
+返回 @var{THIS} 源的变量名称。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-variables :AFTER this &optional moresource
+插入目标@var{THIS}所需的变量。未使用可选参数@var{MORESOURCE}。
+@end deffn
+
+@deffn Method ede-proj-makefile-dependency-files :AFTER this
+返回要转换为依赖项的源文件列表。参数@var{THIS}是从中获取源的目标。
+@end deffn
+
+
+@node ede-proj-target-makefile-archive
+@subsection ede-proj-目标-makefile-存档
+@tgindex ede-proj-target-makefile-archive
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item ede-proj-target
+@xref{ede-proj-target}.
+@table @code
+@item ede-proj-target-makefile
+@xref{ede-proj-target-makefile}.
+@table @code
+@item ede-proj-target-makefile-objectcode
+@xref{ede-proj-target-makefile-objectcode}.
+@table @code
+@item ede-proj-target-makefile-archive
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@subsubsection 专门方法
+
+@deffn Method ede-proj-makefile-insert-rules :AFTER this
+创建为 @var{THIS} 创建存档所需的 make 规则。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-source-variables :PRIMARY this
+插入目标@var{THIS}所需的 bin_PROGRAMS 变量。我们实际上并没有插入 SOURCE 详细信息，但这由 Makefile.am 生成器使用，因此使用它来添加这个重要的 bin 程序。
+@end deffn
+
+
+@node ede-proj-target-makefile-program
+@subsection ede-proj-目标-makefile-程序
+@tgindex ede-proj-target-makefile-program
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item ede-proj-target
+@xref{ede-proj-target}.
+@table @code
+@item ede-proj-target-makefile
+@xref{ede-proj-target-makefile}.
+@table @code
+@item ede-proj-target-makefile-objectcode
+@xref{ede-proj-target-makefile-objectcode}.
+@table @code
+@item ede-proj-target-makefile-program
+@table @asis
+@item 孩子们：
+@xref{ede-proj-target-makefile-shared-object}.
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :ldlibs
+类型：@code{list} @* 默认值：@code{nil}
+
+该程序所依赖的库，例如“m”或“Xt”。链接器标志“-l”会自动添加到前面。  请勿包含“lib”前缀或“.so”后缀。
+
+注意：目前仅用于 Automake 项目。
+
+@item :ldflags
+类型：@code{list} @* 默认值：@code{nil}
+
+链接此目标时要添加的其他标志。使用 ldlibs 添加附加库。  使用它来指定链接器的特定选项。
+
+注意：当前未使用。  这个错误需要修复。
+
+@end table
+
+@end table
+@subsubsection 专门方法
+
+@deffn Method project-debug-target :AFTER obj
+调试程序目标@var{OBJ}。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-rules :AFTER this
+插入 @var{THIS} 目标所需的规则。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-automake-post-variables :AFTER this
+插入目标@var{THIS}所需的 bin_PROGRAMS 变量。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-automake-pre-variables :AFTER this
+插入目标@var{THIS}所需的 bin_PROGRAMS 变量。
+@end deffn
+
+
+@node ede-proj-target-makefile-shared-object
+@subsection ede-proj-目标-makefile-共享对象
+@tgindex ede-proj-target-makefile-shared-object
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item ede-proj-target
+@xref{ede-proj-target}.
+@table @code
+@item ede-proj-target-makefile
+@xref{ede-proj-target-makefile}.
+@table @code
+@item ede-proj-target-makefile-objectcode
+@xref{ede-proj-target-makefile-objectcode}.
+@table @code
+@item ede-proj-target-makefile-program
+@xref{ede-proj-target-makefile-program}.
+@table @code
+@item ede-proj-target-makefile-shared-object
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@subsubsection 专门方法
+
+@deffn Method ede-proj-configure-add-missing :AFTER this
+查询automake提供的@var{THIS}需要的文件是否丢失。结果 --add-missing 被传递给 automake。
+@end deffn
+
+@deffn Method ede-proj-makefile-sourcevar :AFTER this
+返回 @var{THIS} 源的变量名称。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-automake-post-variables :AFTER this
+插入目标@var{THIS}所需的 bin_PROGRAMS 变量。我们需要重写具有 LDADD 元素的 -program 。
+@end deffn
+
+@deffn Method ede-proj-makefile-target-name :AFTER this
+返回 @var{THIS} 目标的主目标名称。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-automake-pre-variables :AFTER this
+插入目标@var{THIS}所需的 bin_PROGRAMS 变量。我们实际上并没有插入 SOURCE 详细信息，但这由 Makefile.am 生成器使用，因此使用它来添加这个重要的 bin 程序。
+@end deffn
+
+
+@node ede-proj-target-elisp
+@subsection ede-proj-目标-elisp
+@tgindex ede-proj-target-elisp
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item ede-proj-target
+@xref{ede-proj-target}.
+@table @code
+@item ede-proj-target-makefile
+@xref{ede-proj-target-makefile}.
+@table @code
+@item ede-proj-target-elisp
+@table @asis
+@item 孩子们：
+@xref{ede-proj-target-elisp-autoloads}.
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :aux-packages
+类型：@code{list} @* 默认值：@code{nil}
+
+需要额外的包。每个辅助工具只需要一个顶级包。找到这些包的位置，并将其添加到编译时加载路径中。
+
+@end table
+
+@end table
+@subsubsection 专门方法
+
+@deffn Method project-compile-target :AFTER obj
+将所有源代码编译为 Lisp 目标@var{OBJ}。奖励：返回一个缺点单元格：（已编译。更新）。
+@end deffn
+
+@deffn Method ede-proj-flush-autoconf :AFTER this
+刷新配置文件（当前缓冲区）以容纳@var{THIS}。
+@end deffn
+
+@deffn Method ede-buffer-mine :AFTER this buffer
+如果对象@var{THIS}声明对@var{BUFFER}中的文件的所有权，则返回@code{t}。声明对此目标中与 .el 文件匹配的所有 .elc 文件的所有权。
+@end deffn
+
+@deffn Method ede-proj-makefile-sourcevar :AFTER this
+返回 @var{THIS} 源的变量名称。
+@end deffn
+
+@deffn Method ede-proj-tweak-autoconf :AFTER this
+调整配置文件（当前缓冲区）以适应@var{THIS}。
+@end deffn
+
+@deffn Method ede-update-version-in-source :AFTER this version
+在 Lisp 文件中，将 @var{THIS} 的版本字符串更新为 @var{VERSION}。 Elisp 文件中有一些标准指定如何查找版本字符串，例如 2⁣ 变量或标准标头。
+@end deffn
+
+@node ede-proj-target-elisp-autoloads
+@subsection ede-proj-目标-elisp-自动加载
+@tgindex ede-proj-target-elisp-autoloads
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item ede-proj-target
+@xref{ede-proj-target}.
+@table @code
+@item ede-proj-target-makefile
+@xref{ede-proj-target-makefile}.
+@table @code
+@item ede-proj-target-elisp
+@xref{ede-proj-target-elisp}.
+@table @code
+@item ede-proj-target-elisp-autoloads
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :aux-packages
+类型：@code{list} @* 默认值：@code{("cedet-autogen")}
+
+@xref{ede-proj-target-elisp}.
+@item :autoload-file
+类型：@code{string} @* 默认值：@code{"loaddefs.el"}
+
+放置自动加载定义的文件。对于给定的包应该有一个加载定义文件。  加载定义是为已创建目标目录中存在的所有 Emacs Lisp 源创建的。
+
+@item :autoload-dirs
+类型：@code{list} @* 默认值：@code{nil}
+
+用于扫描自动加载定义的目录。如果@code{nil}默认为当前目录。
+
+@end table
+
+@end table
+@subsubsection 专门方法
+
+@deffn Method ede-proj-makefile-dependencies :AFTER this
+返回表示 @var{THIS} 依赖关系的字符串。始终为自动加载生成器返回空字符串。
+@end deffn
+
+@deffn Method project-compile-target :AFTER obj
+创建或更新自动加载目标。
+@end deffn
+
+@deffn Method ede-proj-flush-autoconf :AFTER this
+刷新配置文件（当前缓冲区）以容纳@var{THIS}。
+@end deffn
+
+@deffn Method ede-buffer-mine :AFTER this buffer
+如果对象@var{THIS}声明对@var{BUFFER}中的文件的所有权，则返回@code{t}。声明对此目标中与 .el 文件匹配的所有 .elc 文件的所有权。
+@end deffn
+
+@deffn Method ede-proj-makefile-sourcevar :AFTER this
+返回 @var{THIS} 源的变量名称。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-dist-dependencies :AFTER this
+插入 DIST 规则应依赖的任何符号。 Emacs Lisp 自动加载文件传送生成的 .el 文件。参数@var{THIS}是需要插入信息文件的目标。
+@end deffn
+
+@deffn Method ede-proj-tweak-autoconf :AFTER this
+调整配置文件（当前缓冲区）以适应@var{THIS}。
+@end deffn
+
+@deffn Method ede-update-version-in-source :AFTER this version
+在 Lisp 文件中，将 @var{THIS} 的版本字符串更新为 @var{VERSION}。 Elisp 文件中有一些标准指定如何查找版本字符串，例如 2⁣ 变量或标准标头。
+@end deffn
+
+@deffn Method ede-proj-compilers :AFTER obj
+@var{OBJ} 使用的编译器列表。如果@code{compiler}槽为空，则获取编译器列表中的car。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-dist-filepatterns :AFTER this
+插入 DIST 规则应分配的任何符号。 Emacs Lisp 自动加载文件传送生成的 .el 文件。参数@var{THIS}是需要插入信息文件的目标。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-source-variables :AFTER this &optional moresource
+插入@var{THIS}所需的源变量。可选参数@var{MORESOURCE}是要添加到sources变量的附加源列表。
+@end deffn
+
+
+@node ede-proj-target-makefile-miscelaneous
+@subsection ede-proj-目标-makefile-杂项
+@tgindex ede-proj-target-makefile-miscelaneous
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item ede-proj-target
+@xref{ede-proj-target}.
+@table @code
+@item ede-proj-target-makefile
+@xref{ede-proj-target-makefile}.
+@table @code
+@item ede-proj-target-makefile-miscelaneous
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :submakefile
+类型：@code{string} @* 默认值：@code{""}
+
+具有专门 makefile 的各种来源。子 makefile 用于构建此目标。
+
+@end table
+
+@end table
+@subsubsection 专门方法
+
+@deffn Method ede-proj-makefile-insert-rules :AFTER this
+创建为 @var{THIS} 创建存档所需的 make 规则。
+@end deffn
+
+@deffn Method ede-proj-makefile-sourcevar :AFTER this
+返回 @var{THIS} 源的变量名称。
+@end deffn
+
+@deffn Method ede-proj-makefile-dependency-files :AFTER this
+返回 @var{THIS} 目标所依赖的文件列表。
+@end deffn
+
+
+@node ede-proj-target-makefile-info
+@subsection ede-proj-目标-makefile-信息
+@tgindex ede-proj-target-makefile-info
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item ede-proj-target
+@xref{ede-proj-target}.
+@table @code
+@item ede-proj-target-makefile
+@xref{ede-proj-target-makefile}.
+@table @code
+@item ede-proj-target-makefile-info
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :mainmenu
+类型：@code{string} @* 默认值：@code{""}
+
+主菜单位于该文件中。所有其他来源应独立包括在内。
+
+@end table
+
+@end table
+@subsubsection 专门方法
+
+@deffn Method ede-proj-configure-add-missing :AFTER this
+查询automake提供的@var{THIS}需要的文件是否丢失。结果 --add-missing 被传递给 automake。
+@end deffn
+
+@deffn Method object-write :AFTER this
+在对 @var{THIS} 进行任何更改之前，请确保主菜单位于第一个。
+@end deffn
+
+@deffn Method ede-proj-makefile-sourcevar :AFTER this
+返回 @var{THIS} 源的变量名称。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-dist-dependencies :AFTER this
+插入 DIST 规则应依赖的任何符号。 Texinfo 文件想要插入生成的 @file{.info} 文件。参数@var{THIS}是需要插入信息文件的目标。
+@end deffn
+
+@deffn Method ede-proj-makefile-target-name :AFTER this
+返回 @var{THIS} 目标的主目标名称。
+@end deffn
+
+@deffn Method ede-documentation :AFTER this
+返回提供文档的文件列表。文档不适用于对象 @var{THIS}，而是由 @var{THIS} 为项目中的其他文件提供。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-dist-filepatterns :AFTER this
+插入 DIST 规则应依赖的任何符号。 Texinfo 文件想要插入生成的 @file{.info} 文件。参数@var{THIS}是需要插入信息文件的目标。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-source-variables :AFTER this &optional moresource
+插入 @var{THIS} 信息目标所需的源变量。可选参数@var{MORESOURCE}是要添加到sources变量的附加源列表。执行 Makefile 模式的常规操作，但在 Automake 模式下工作时将源代码拆分为两个变量。
+@end deffn
+
+@node ede-proj-target-scheme
+@subsection ede-proj-目标方案
+@tgindex ede-proj-target-scheme
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item ede-proj-target
+@xref{ede-proj-target}.
+@table @code
+@item ede-proj-target-scheme
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :interpreter
+类型：@code{string} @* 默认值：@code{"guile"}
+
+此代码的首选解释器。
+
+@end table
+
+@end table
+@subsubsection 专门方法
+
+@deffn Method ede-proj-tweak-autoconf :AFTER this
+调整配置文件（当前缓冲区）以适应@var{THIS}。
+@end deffn
+
+
+@node project-am-target
+@subsection 项目与目标
+@tgindex project-am-target
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item project-am-target
+@table @asis
+@item 孩子们：
+@xref{project-am-objectcode}, @w{project-am-header,} @xref{project-am-lisp}, @xref{project-am-texinfo}, @xref{project-am-man}.
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@subsubsection 专门方法
+
+@deffn Method project-compile-target-command :AFTER this
+编译给定目标时使用的默认目标。
+@end deffn
+
+@deffn Method project-make-dist :AFTER this
+在调试器中运行当前项目。
+@end deffn
+
+@deffn Method project-edit-file-target :AFTER obj
+编辑与此文件关联的目标。
+@end deffn
+
+@node project-am-objectcode
+@subsection 项目对象代码
+@tgindex project-am-objectcode
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item project-am-target
+@xref{project-am-target}.
+@table @code
+@item project-am-objectcode
+@table @asis
+@item 孩子们：
+@xref{project-am-program}, @w{project-am-lib.}
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@subsubsection 专门方法
+
+@deffn Method project-am-macro :AFTER this
+将此对象类型的默认宏返回到“编辑”。
+@end deffn
+
+@deffn Method project-debug-target :AFTER obj
+在调试器中运行当前项目目标。
+@end deffn
+
+@deffn Method project-compile-target-command :AFTER this
+编译目标代码目标时使用的默认目标。
+@end deffn
+
+@deffn Method ede-buffer-header-file :AFTER this buffer
+没有默认的头文件。
+@end deffn
+
+@node project-am-program
+@subsection 项目与计划
+@tgindex project-am-program
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item project-am-target
+@xref{project-am-target}.
+@table @code
+@item project-am-objectcode
+@xref{project-am-objectcode}.
+@table @code
+@item project-am-program
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :ldadd @*
+默认值：@code{nil}
+
+附加 LD 参数。
+@end table
+@end table
+
+@node project-am-header-noinst
+@subsection 项目-am-header-noinst
+@tgindex project-am-header-noinst
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item project-am-target
+@xref{project-am-target}.
+@table @code
+@item @w{project-am-header.}
+@table @code
+@item project-am-header-noinst
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@subsubsection 专门方法
+
+@deffn Method project-am-macro :AFTER this
+返回该对象的默认宏以“编辑”。
+@end deffn
+
+@node project-am-header-inst
+@subsection 项目-am-标题-inst
+@tgindex project-am-header-inst
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item project-am-target
+@xref{project-am-target}.
+@table @code
+@item @w{project-am-header.}
+@table @code
+@item project-am-header-inst
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@subsubsection 专门方法
+
+@deffn Method project-am-macro :AFTER this
+返回该对象的默认宏以“编辑”。
+@end deffn
+
+@node project-am-lisp
+@subsection 项目 am-lisp
+@tgindex project-am-lisp
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item project-am-target
+@xref{project-am-target}.
+@table @code
+@item project-am-lisp
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@subsubsection 专门方法
+
+@deffn Method project-am-macro :AFTER this
+返回该对象的默认宏以“编辑”。
+@end deffn
+
+@node project-am-texinfo
+@subsection texinfo 项目
+@tgindex project-am-texinfo
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item project-am-target
+@xref{project-am-target}.
+@table @code
+@item project-am-texinfo
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :include @*
+默认值：@code{nil}
+
+附加的 texinfo 包含在此。
+
+@end table
+@end table
+@subsubsection 专门方法
+
+@deffn Method project-am-macro :AFTER this
+将此对象类型的默认宏返回到“编辑”。
+@end deffn
+
+@deffn Method project-compile-target-command :AFTER this
+编译 texinfo 文件时使用的默认目标。
+@end deffn
+
+@deffn Method ede-documentation :AFTER this
+返回提供文档的文件列表。文档不适用于对象 @var{THIS}，而是由 @var{THIS} 为项目中的其他文件提供。
+@end deffn
+
+@node project-am-man
+@comment  node-name,  next,  previous,  up
+@subsection 曼曼计划
+@tgindex project-am-man
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-speedbar
+@table @code
+@item eieio-speedbar-directory-button
+@table @code
+@item ede-target
+@xref{ede-target}.
+@table @code
+@item project-am-target
+@xref{project-am-target}.
+@table @code
+@item project-am-man
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@subsubsection 专门方法
+
+@deffn Method project-am-macro :AFTER this
+将此对象类型的默认宏返回到“编辑”。
+@end deffn
+
+@node Sourcecode
+@section 源代码
+
+源代码类型是一个旨在将文件与目标相关联的对象。
+
+@menu
+* ede-sourcecode::
+@end menu
+
+
+@node ede-sourcecode
+@subsection ede源代码
+@scindex ede-sourcecode
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-instance-inheritor
+@table @code
+@item ede-sourcecode
+没有孩子
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :parent-instance
+类型：@code{eieio-instance-inheritor-child}
+
+该实例的父级。如果此类的槽是引用的且未绑定，则检查父槽的值。
+
+@item :name
+类型：@code{string}
+
+此类源代码的名称。例如“C”或“Emacs Lisp”
+
+@item :sourcepattern
+类型：@code{string} @* 默认值：@code{".*"}
+
+Emacs 正则表达式匹配此目标接受的源代码。
+
+@item :auxsourcepattern
+类型：@code{(or null string)} @* 默认值：@code{nil}
+
+Emacs 正则表达式匹配此目标接受的辅助源代码。辅助源是编译所需的源代码文件，它们本身不被编译。
+
+@item :enable-subdirectories
+类型：@code{boolean} @* 默认值：@code{nil}
+
+如果此源代码类型使用子目录，则非@code{nil}。  如果源代码总是位于创建它的目标附近，则应该是@code{nil}。  如果源代码可以或通常位于所属目标的子目录中，请将其设置为@code{t}。
+
+@item :garbagepattern
+类型：@code{list} @* 默认值：@code{nil}
+
+Shell 文件正则表达式匹配的文件被视为垃圾。这是执行 @code{clean} 类型指令时添加到 @code{rm} 命令的项目列表。
+
+@end table
+
+@end table
+@subsubsection 专门方法
+
+@deffn Method ede-want-any-files-p :AFTER this filenames
+如果@var{THIS}将接受@var{FILENAMES}中的任何文件，则返回非@code{nil}。
+@end deffn
+
+@deffn Method ede-want-any-source-files-p :AFTER this filenames
+如果@var{THIS}接受@var{FILENAMES}中的任何源文件，则返回非@code{nil}。
+@end deffn
+
+@deffn Method ede-want-any-auxiliary-files-p :AFTER this filenames
+如果@var{THIS}将接受@var{FILENAMES}中的任何辅助文件，则返回非@code{nil}。
+@end deffn
+
+@deffn Method ede-buffer-header-file :AFTER this filename
+返回 @var{THIS} 和 @var{FILENAME} 的头文件的文件名列表。用于猜测头文件，但使用 auxsource 正则表达式。
+@end deffn
+
+@deffn Method ede-want-file-p :AFTER this filename
+如果源代码定义@var{THIS}将采用@var{FILENAME}，则返回非@code{nil}。
+@end deffn
+
+@deffn Method ede-want-file-source-p :AFTER this filename
+如果@var{THIS}将@var{FILENAME}作为辅助，则返回非@code{nil}。
+@end deffn
+
+@deffn Method ede-want-file-auxiliary-p :AFTER this filename
+如果@var{THIS}将@var{FILENAME}作为辅助，则返回非@code{nil}。
+@end deffn
+
+@node Compilers
+@section 编译器
+
+编译器对象旨在将源代码与编译器相关联。  然后目标引用它可以使用的编译器。创建 makefile 时，该对象类型知道如何创建编译命令。
+
+@menu
+* ede-compilation-program::
+* ede-compiler::
+* ede-object-compiler::
+* ede-linker::
+@end menu
+
+
+@node ede-compilation-program
+@subsection ede编译程序
+@cmindex ede-compilation-program
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-instance-inheritor
+@table @code
+@item ede-compilation-program
+@table @asis
+@item 孩子们：
+@xref{ede-compiler}, @xref{ede-linker}.
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :parent-instance
+类型：@code{eieio-instance-inheritor-child}
+
+该实例的父级。如果此类的槽是引用的且未绑定，则检查父槽的值。
+
+@item :name
+类型：@code{string}
+
+该类型编译器的名称。
+
+@item :variables
+类型：@code{list}
+
+此编译器的 Makefile 中所需的变量。一个关联列表，其中每个元素是 (VARNAME . VALUE)，其中 VARNAME 是字符串，VALUE 是字符串或字符串列表。例如，GCC 将定义 CC=gcc，emacs 将定义 EMACS=emacs。
+
+@item :sourcetype
+类型：@code{list}
+
+@code{ede-sourcecode} @xref{ede-sourcecode} 的列表。此类将处理的对象。这用于将目标对象与它们可以使用的编译器和链接器进行匹配，以及该对象感兴趣的文件。
+
+@item :rules
+类型：@code{list} @* 默认值：@code{nil}
+
+该编译器运行所需的辅助规则。例如，yacc/lex 文件需要额外的链式规则或推论。
+
+@item :commands
+类型：@code{list}
+
+用于执行该编译器的命令。使用此编译器的对象会将这些命令放在其规则定义之后。
+
+@item :autoconf
+类型：@code{list} @* 默认值：@code{nil}
+
+如果使用这种类型的编译器，则调用 Autoconf 函数。当项目处于 Automake 模式时，这定义了要调用的 autoconf 函数来初始化 automake 以使用该编译器。例如，可能有多个 C 编译器，但它们可能都使用相同的 autoconf 形式。
+
+@item :objectextention
+类型：@code{string}
+
+一个字符串，用于目标文件的扩展名。例如，C 代码在 unix 上使用 .o，而 Emacs Lisp 使用 .elc。
+
+@end table
+
+@end table
+@subsubsection 专门方法
+
+@deffn Method ede-proj-flush-autoconf :AFTER this
+刷新配置文件（当前缓冲区）以容纳@var{THIS}。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-rules :AFTER this
+插入 @var{THIS} 编译器对象所需的规则。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-variables :AFTER this
+插入编译器所需的变量@var{THIS}。
+@end deffn
+
+@deffn Method ede-proj-makefile-insert-commands :AFTER this
+插入使用编译器@var{THIS}所需的命令。创建 makefile 规则的对象必须为它在插入规则后决定使用的编译器调用此方法。
+@end deffn
+
+@deffn Method ede-object-sourcecode :AFTER this
+从类 @code{ede-compilation-program} 的对象中检索槽 @code{sourcetype}
+@end deffn
+
+@deffn Method ede-proj-tweak-autoconf :AFTER this
+调整配置文件（当前缓冲区）以适应@var{THIS}。
+@end deffn
+
+
+@node ede-compiler
+@subsection ede编译器
+@cmindex ede-compiler
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-instance-inheritor
+@table @code
+@item ede-compilation-program
+@xref{ede-compilation-program}.
+@table @code
+@item ede-compiler
+@table @asis
+@item 孩子们：
+@xref{ede-object-compiler}, @w{semantic-ede-grammar-compiler-class.}
+@end table
+
+@end table
+
+@end table
+
+@end table
+@end table
+
+创建一个名为 NAME 且类类型为 ede-compiler 的新对象
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :parent-instance
+类型：@code{eieio-instance-inheritor-child}
+
+该实例的父级。如果此类的槽是引用的且未绑定，则检查父槽的值。
+
+@item :name
+类型：@code{string}
+
+该类型编译器的名称。
+
+@item :variables
+类型：@code{list}
+
+此编译器的 Makefile 中所需的变量。一个关联列表，其中每个元素是 (VARNAME . VALUE)，其中 VARNAME 是字符串，VALUE 是字符串或字符串列表。例如，GCC 将定义 CC=gcc，emacs 将定义 EMACS=emacs。
+
+@item :sourcetype
+类型：@code{list}
+
+@code{ede-sourcecode} @xref{ede-sourcecode} 的列表。此类将处理的对象。这用于将目标对象与它们可以使用的编译器和链接器进行匹配，以及该对象感兴趣的文件。
+
+@item :commands
+类型：@code{list}
+
+用于执行该编译器的命令。使用此编译器的对象会将这些命令放在其规则定义之后。
+
+@item :objectextention
+类型：@code{string}
+
+一个字符串，用于目标文件的扩展名。例如，C 代码在 unix 上使用 .o，而 Emacs Lisp 使用 .elc。
+
+@item :makedepends
+类型：@code{boolean} @* 默认值：@code{nil}
+
+如果该编译器可以生成依赖项，则为非@code{nil}。
+
+@item :uselinker
+类型：@code{boolean} @* 默认值：@code{nil}
+
+如果该编译器创建可以链接的代码，则为非@code{nil}。这要求包含目标还定义可以使用的可用链接器列表。
+
+@end table
+
+@end table
+@subsubsection 专门方法
+
+@deffn Method ede-proj-makefile-insert-object-variables :AFTER this targetname sourcefiles
+插入 OBJ 变量以指定要为 @var{THIS} 生成的目标代码。目标的名称是 @var{TARGETNAME} 作为字符串。  @var{SOURCEFILES} 是要对象化的文件列表。并非所有编译器都这样做。
+@end deffn
+
+@deffn Method ede-compiler-intermediate-objects-p :AFTER this
+如果@var{THIS}有中间目标文件，则返回非@code{nil}。如果此编译器创建可以链接在一起的代码，则编译器创建的目标文件被视为中间文件。
+@end deffn
+
+@deffn Method ede-compiler-intermediate-object-variable :AFTER this targetname
+返回基于 @var{THIS} 的字符串，表示 make 对象变量。 @var{TARGETNAME} 是这些对象所属的目标的名称。
+@end deffn
+
+
+@node ede-object-compiler
+@subsection ede 对象编译器
+@cmindex ede-object-compiler
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-instance-inheritor
+@table @code
+@item ede-compilation-program
+@xref{ede-compilation-program}.
+@table @code
+@item ede-compiler
+@xref{ede-compiler}.
+@table @code
+@item ede-object-compiler
+没有孩子
+@end table
+@end table
+@end table
+@end table
+@end table
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :uselinker
+类型：@code{boolean} @* 默认值：@code{t}
+
+@xref{ede-compiler}.
+@item :dependencyvar
+类型：@code{list}
+
+专用于依赖关系生成的变量。
+@end table
+@end table
+
+@subsubsection 专门方法
+
+@deffn Method ede-proj-makefile-insert-variables :AFTER this
+插入编译器所需的变量@var{THIS}。
+@end deffn
+
+@node ede-linker
+@subsection ede链接器
+@cmindex ede-linker
+
+@table @asis
+@item 继承树：
+@table @code
+@item eieio-instance-inheritor
+@table @code
+@item ede-compilation-program
+@xref{ede-compilation-program}.
+@table @code
+@item ede-linker
+没有孩子
+@end table
+
+@end table
+
+@end table
+@end table
+
+创建一个名为 NAME 且类类型为 ede-linker 的新对象
+
+@table @asis
+@item 插槽：
+
+@table @code
+@item :name
+类型：@code{string}
+
+该类型编译器的名称。
+
+@item :variables
+类型：@code{list}
+
+此编译器的 Makefile 中所需的变量。一个关联列表，其中每个元素是 (VARNAME . VALUE)，其中 VARNAME 是字符串，VALUE 是字符串或字符串列表。例如，GCC 将定义 CC=gcc，emacs 将定义 EMACS=emacs。
+
+@item :sourcetype
+类型：@code{list}
+
+@code{ede-sourcecode} @xref{ede-sourcecode} 的列表。此类将处理的对象。这用于将目标对象与它们可以使用的编译器和链接器进行匹配，以及该对象感兴趣的文件。
+
+@item :commands
+类型：@code{list}
+
+用于执行该编译器的命令。使用此编译器的对象会将这些命令放在其规则定义之后。
+
+@item :objectextention
+类型：@code{string}
+
+一个字符串，用于目标文件的扩展名。例如，C 代码在 unix 上使用 .o，而 Emacs Lisp 使用 .elc。
+
+@end table
+@end table
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@bye

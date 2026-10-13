@@ -1,0 +1,438 @@
+\输入 texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename ../../info/vtable.info
+@settitle 可变螺距表
+@documentlanguage en
+@include docstyle.texi
+@c Merge all indexes into a single Index node.
+@syncodeindex fn cp
+@syncodeindex vr cp
+@syncodeindex ky cp
+@c %**end of header
+
+@copying
+该文件记录了 GNU vtable.el 包。
+
+版权所有 @copyright{} 2022--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* vtable: (vtable).      可变螺距表。
+@end direntry
+
+@finalout
+
+@titlepage
+@title 可变螺距表
+@subtitle 数据的柱状显示。
+
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top vtable
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Introduction::         介绍和例子。
+* Concepts::             vtable 概念。
+* Making A Table::       主界面功能。
+* Commands::             vtable 命令。
+* Interface Functions::  接口功能。
+
+附录
+* GNU Free Documentation License::   本文档的许可证。
+
+指数
+* Index::
+@end menu
+
+@node Introduction
+@chapter 简介和教程
+
+在 Emacs 中显示表格数据的大多数模式都使用 @code{tabulated-list-mode}，但它有一些限制：它假设所显示的文本是等宽的，这使得在单个列表中混合字体和图像变得困难。  @dfn{vtable}（“可变音高表”）包解决了这个问题。
+
+@code{tabulated-list-mode} 是主要模式，并假设它控制整个缓冲区。  vtable 并不假设——您可以在其他数据中间有一个 vtable，或者在同一个缓冲区中有多个 vtable。
+
+这是可以创建的最简单的 vtable：
+
+@lisp
+(make-vtable
+ :objects '(("Foo" 1034)
+            ("Gazonk" 45)))
+@end lisp
+
+默认情况下，vtable 使用 @code{vtable} 面（继承自 @code{variable-pitch} 面），并将仅包含数字数据的列右对齐（并将其余列左对齐）。
+
+您通常想要命名这些列：
+
+@lisp
+(make-vtable
+ :columns '("Name" "ID")
+ :objects '(("Foo" 1034)
+            ("Gazonk" 45)))
+@end lisp
+
+单击列名称将根据每列中的数据（在本例中对应于列表中的元素）对表进行排序。
+
+默认情况下，数据按“原样”显示，即 @samp{(format "%s" ...)} 显示数据的方式，但您可以覆盖它。
+
+@lisp
+(make-vtable
+ :columns '("Name" "ID")
+ :objects '(("Foo" 1034)
+            ("Gazonk" 45))
+ :formatter (lambda (value column &rest _)
+              (if (= column 1)
+                  (file-size-human-readable value)
+                value)))
+@end lisp
+
+在这种情况下，@samp{1034}将显示为@samp{1k}——但仍会在@samp{45}之后排序，因为排序是对实际数据而不是显示的数据进行的。
+
+或者，您可以将格式化程序放在列定义中，而不是使用表的通用格式化程序：
+
+@lisp
+(make-vtable
+ :columns '("Name"
+            (:name "ID" :formatter file-size-human-readable))
+ :objects '(("Foo" 1034)
+            ("Gazonk" 45)))
+@end lisp
+
+数据不必是简单的列表——您可以向 vtable 提供任何类型的对象，但您还必须编写一个函数来返回每列的数据。  例如，这是 @kbd{M-x list-buffers} 的一个非常简单的版本：
+
+@lisp
+(make-vtable
+ :columns '("Name" "Size" "File")
+ :objects (buffer-list)
+ :actions '("k" kill-buffer
+            "RET" display-buffer)
+ :getter (lambda (object column vtable)
+           (pcase (vtable-column vtable column)
+             ("Name" (buffer-name object))
+             ("Size" (buffer-size object))
+             ("File" (or (buffer-file-name object) "")))))
+@end lisp
+
+在这种情况下，@var{objects}是缓冲区列表。  为了获取要显示的数据，vtable 调用 @dfn{getter} 函数，该函数会为每个对象的每一列调用，并且应该返回最终将显示的数据。
+
+另请注意 @dfn{actions}：这些是简单的命令，将通过点下的对象调用。  因此，在一行上点击@kbd{@key{RET}}将导致@code{display-buffer}被调用，并以缓冲区对象作为参数。  （您还可以提供要使用的键盘映射，但是您必须编写调用 @code{vtable-current-object} 的命令来获取该对象。）
+
+请注意，这些操作不是使用缓冲区中显示的数据来调用的，而是使用原始对象来调用的。
+
+最后，这是一个使用几乎所有功能的示例：
+
+@lisp
+(make-vtable
+ :columns `(( :name "Thumb" :width "500px"
+              :displayer
+              ,(lambda (value max-width table)
+                 (propertize "*" 'display
+                             (create-image value nil nil
+                                           :max-width max-width))))
+            (:name "Size" :width 10
+                   :formatter file-size-human-readable)
+            (:name "Time" :width 10 :primary ascend)
+            "Name")
+ :objects-function (lambda ()
+                     (directory-files "/tmp/" t "\\.jpg\\'"))
+ :actions '("RET" find-file)
+ :getter (lambda (object column table)
+           (pcase (vtable-column table column)
+             ("Name" (file-name-nondirectory object))
+             ("Thumb" object)
+             ("Size" (file-attribute-size (file-attributes object)))
+             ("Time" (format-time-string
+                      "%F" (file-attribute-modification-time
+                            (file-attributes object))))))
+ :separator-width 5
+ :keymap (define-keymap
+           "q" #'kill-buffer))
+@end lisp
+
+该 vtable 实现了一个简单的图像浏览器，可显示图像缩略图（根据列的宽度动态更改大小）、人类可读的文件大小、日期和文件名。  分隔符宽度为 5 个典型字符宽。  在一行上点击@kbd{@key{RET}}将在新窗口中打开图像，点击@kbd{q}将杀死缓冲区。
+
+@node Concepts
+@chapter 概念
+
+@cindex vtable
+vtable 列出了有关多个 @dfn{objects} 的数据。  每个对象可以是列表或向量，但也可以是其他任何对象。
+
+@cindex getter of a vtable
+要获取特定列的 @dfn{value}，请在该对象上调用 @dfn{getter} 函数。  如果没有定义 getter 函数，则默认尝试将对象索引为序列。  无论如何，我们最终都会得到一个用于排序的值。
+
+@cindex formatter of a vtable
+然后，该值通过 @dfn{formatter} 函数变为 @dfn{formatted}，该函数以 @dfn{value} 作为参数进行调用。  格式化程序通常使值对读者更友好。
+
+@cindex displayer of a vtable
+最后，格式化的值被传递给@dfn{displayer}函数，该函数负责将表格面放在格式化的值上，并确保它不比列宽宽。  显示器通常会截断太长的字符串并缩放图像大小。
+
+所有这三个转换（获取器、格式化器和显示函数）都可以在每列的基础上定义，也可以在每个表的基础上定义。  （每列转换优先于每表转换。）
+
+在表上定义的用户命令不适用于显示的数据。  相反，它们是以原始对象作为参数来调用的。
+
+@node Making A Table
+@chapter 制作一张桌子
+
+@findex make-vtable
+用于制作（以及可选地将表插入缓冲区）的接口函数是@code{make-vtable}。  它返回一个表对象。
+
+关键字参数说明如下。
+
+@code{make-vtable} 中有许多可能的回调接口函数，其中许多都采用 @var{object} 参数（来自 @code{:objects} 列表的对象）、列索引参数（从零开始的整数）和表参数（@code{make-vtable} 返回的对象）。
+
+@table @code
+@item :objects
+这是要显示的对象的列表。  它应该是一个字符串列表（然后将显示为单列表），或者是一个列表，其中每个元素都是包含字符串、数字和其他可以“简单”显示的对象的混合的序列。
+
+在后一种情况下，如果 @code{:columns} 是非 @code{nil} 并且序列中的元素比 @code{:columns} 中的元素多，则仅显示 @code{:columns} 第一个元素。
+
+如果@code{:objects}列表为空（并且没有定义@code{:objects-function}），则会创建一个空的vtable。  在这种情况下，必须提供 @code{:columns} 规格。
+
+@item :objects-function
+动态生成对象通常很方便（例如，自动进行恢复）。  在这种情况下，这应该是一个函数（将不带参数调用），并且应该返回一个作为 @code{:objects} 列表接受的值。
+
+@item :columns
+这是一个列表，其中每个元素可以是字符串（列名称）、关键字/值的 plist（用于创建 @code{vtable-column} 对象）或完整的 @code{vtable-column} 对象。  @code{vtable-column} 对象具有以下插槽：
+
+@table @code
+@item name
+列的名称。
+
+@item width
+列的宽度。  这可以是以下之一：
+
+@table @asis
+@item 一个数字@var{n}
+@itemx @samp{@var{n}ex} 形式的字符串
+表格表面 @var{n} @samp{x} 个字符的宽度。
+
+@item @samp{@var{n}px} 形式的字符串
+@var{n} 像素。
+
+@item @samp{@var{n}%} 形式的字符串
+窗口宽度的 @var{n} 百分比。
+@end table
+
+如果未提供 @code{width}，则根据列数据（在 @code{:objects} 列表中或通过 @code{:objects-function} 提供）计算宽度，或者，如果没有数据，则根据窗口宽度计算宽度。
+
+@item 最小宽度
+它使用与 @code{width} 相同的格式，但指定最小宽度（如果 @code{width} 小于此值，则覆盖 @code{width}。
+
+@item 最大宽度
+它使用与 @code{width} 相同的格式，但指定最大宽度（如果 @code{width} 大于此值，则覆盖 @code{width}。如果 @code{width} 以窗口宽度的百分比形式给出，并且您希望确保列不会变得无意义的大或难以阅读的窄，则 @code{min-width}/@code{max-width} 会很有用。
+
+@item 基本的
+这是否是主列——这将用于初始排序。  这应该是 @code{ascend} 或 @code{descend} 来表示表应该按什么顺序排序。
+
+@item 吸气剂
+如果存在，将调用此函数以返回列值。
+
+@defun column-getter object table
+它用两个参数调用：对象和表。
+@end defun
+
+@item 格式化程序
+如果存在，将调用此函数来格式化该值。
+
+@defun column-formatter value
+使用一个参数调用它：列值。
+@end defun
+
+@item 显示器
+如果存在，将调用此函数来准备要显示的格式化值。  此函数应返回应用了桌面的字符串，并将字符串的宽度限制为显示宽度。
+
+@defun column-displayer fvalue max-width table
+@var{fvalue} 是格式化值； @var{max-width} 是最大宽度（以像素为单位），@var{table} 是表格。
+@end defun
+
+@item 对齐
+应该是 @code{right} 或 @code{left}。  如果未指定，数值将刷新到右侧，所有其他值将刷新到左侧。
+@end table
+
+@item :吸气剂
+如果给定，这是一个应该返回要在表中使用的值的函数，并且将为表中的每个元素调用一次（除非被列 getter 函数覆盖）。
+
+@defun getter object index table
+对于简单对象（如序列），此函数通常仅返回与列索引（从零开始）对应的元素，但该函数可以执行它想要的任何计算。  如果根据列名而不是列索引编写函数更方便，则可以使用 @code{vtable-column} 函数从索引映射到名称。
+@end defun
+
+@item :格式化程序
+如果存在，这是一个应该格式化值的函数，并且将对表中的所有值调用它（除非被列格式化程序覆盖）。
+
+@defun formatter value index table
+该函数使用三个参数调用：值（由 getter 返回）；列索引和表。  它可以返回任何值。
+
+例如，这可用于以人类可读的形式格式化数字。
+@end defun
+
+@item ：显示器
+在显示元素之前，它被传递给显示函数（如果有）。
+
+@defun displayer fvalue index max-width table
+这是用四个参数调用的： 元素的格式化值（由格式化函数返回）；列索引；显示宽度（以像素为单位）；和桌子。
+
+此函数应返回一个应用了桌面并截断为显示宽度的字符串。
+
+这可用于（例如）更改表中显示的图像的大小。
+@end defun
+
+@item :使用标题行
+如果非 @code{nil} （这是默认值），则在标题行上显示列名称。  这是最常见的用例，但是如果缓冲区中的表之前有其他文本，或者同一缓冲区中有多个表，那么这应该是 @code{nil}。
+
+@item ：脸
+要使用的脸。  默认为@code{vtable}。  该面不会覆盖数据中的面，或者 getter 和 formatter 函数提供的面。
+
+@item :行颜色
+如果存在，这应该是用作行背景颜色的颜色名称列表。  如果此处的颜色少于行数，则行将重复。  这里最常见的用例是在行上具有交替的背景颜色，因此这通常是两种颜色的列表。  这也可以是要使用的面的列表。
+
+@item : 列颜色
+如果存在，这应该是用作列背景颜色的颜色名称列表。  如果此处的颜色少于列数，则颜色将重复。  这里最常见的用例是在列上具有交替的背景颜色，因此这通常是两种颜色的列表。  这也可以是要使用的面的列表。  如果 @code{:row-colors} 和 @code{:column-colors} 都存在，颜色将被“混合”以产生表中的最终颜色。
+
+@item ：行动
+它使用与 @code{define-keymap} 相同的语法，但不直接引用命令。  相反，每个键都绑定到一个命令，该命令选择当前对象，然后调用以其作为参数指定的函数。
+
+@item :键盘映射
+这是桌子上使用的键映射。  这里的命令像往常一样被调用，如果它们应该作用于当前行显示的对象，它们可以使用 @code{vtable-current-object} 函数 (@pxref{Interface Functions}) 来确定该对象是什么。
+
+@item :分隔符宽度
+列之间空白区域的宽度。  如果未指定，则默认为 1。
+
+@item :分隔线宽度
+@itemx : 分隔符
+您可以在列之间插入分隔线。  这可以通过使用 @code{:divider} 来指定，它应该是要在列之间显示的字符串，或者使用 @code{:divider-width} 来指定，它指定要用作分隔符的空间的宽度，以用于显示表格的面的字符为单位。  如果未指定，@code{:divider} 默认为 @code{nil}，但指定 @code{:divider-width} 可以有效地将分隔符设置为该宽度的空白字符串。
+
+@item ：排序方式
+这应该是一个元组列表，并指定表的排序方式。  每个元组应由一个整数（列索引）和 @code{ascend} 或 @code{descend} 组成。
+
+该表首先按此列表中的第一个元素排序，然后是下一个元素，直到到达末尾。
+
+@item ：省略
+显示的值会被缩短以适应列宽。  默认为 @code{t}，它使用函数 @code{truncate-string-ellipsis} 返回的文本显示省略号。  将其设置为字符串以使用您自己的省略号文本。  将其设置为 @code{nil} 以禁止省略号。
+
+@findex vtable-insert
+@item ：插入
+默认情况下，@code{make-vtable} 将在该点插入表格。  如果这是 @code{nil}，则不会插入任何内容，但会返回 vtable 对象，稍后可以使用 @code{vtable-insert} 函数插入它。
+@end table
+
+@code{make-table} 返回一个 @code{vtable} 对象。  您可以使用具有基于上述关键字的名称的访问器函数来访问该对象中的槽。  例如，要访问面部，请使用@code{vtable-face}。
+
+@node Commands
+@chapter 命令
+@cindex vtable commands
+
+当点放置在 vtable 上时，会绑定以下键：
+
+@table @kbd
+@findex vtable-sort-by-current-column
+@item S
+按当前列对表格进行排序 (@code{vtable-sort-by-current-column})。  请注意，该表是根据 getter 函数 (@pxref{Making A Table}) 返回的数据排序的，而不是根据它在缓冲区中的显示方式排序的。  仅包含数字数据的列按数字排序，其余列按字符串排序。
+
+@findex vtable-narrow-current-column
+@item @{
+使当前列变窄 (@code{vtable-narrow-current-column})。
+
+@findex vtable-widen-current-column
+@item @}
+使当前列更宽 (@code{vtable-widen-current-column})。
+
+@findex vtable-previous-column
+@item M-<left>
+移至上一列 (@code{vtable-previous-column})。
+
+@findex vtable-next-column
+@item M-<right>
+移至下一列 (@code{vtable-next-column})。
+
+@findex vtable-revert-command
+@item g
+重新生成表 (@code{vtable-revert-command})。  如果表具有可以获取新数据的@code{:objects-function}，则此命令最有意义。
+@end table
+
+@node Interface Functions
+@chapter 接口功能
+
+如果您需要编写基于 vtable 的模式，则必须以各种方式与表进行交互——例如，您需要编写更新对象然后显示结果的命令。  本章描述了此类交互的功能。
+
+@defun vtable-current-table
+该函数返回点下的表格。
+@end defun
+
+@defun vtable-current-object
+该函数返回当前行的对象。  （请注意，这是原始对象，而不是缓冲区中显示的字符。）
+@end defun
+
+@defun vtable-current-column
+该函数返回点下的列的列索引。
+@end defun
+
+@defun vtable-goto-table table
+将点移动到 @var{table} 的开头并返回位置。  如果在当前缓冲区中找不到@var{table}，则不移动点并返回@code{nil}。
+@end defun
+
+@defun vtable-goto-object object
+将点移动到当前表格中显示@var{object}的行的开头并返回位置。  如果找不到@var{object}，则不移动点并返回@code{nil}。
+@end defun
+
+@defun vtable-goto-column index
+将点移动到第 0 列的开头。  （第一列编号为零。）
+@end defun
+
+@defun vtable-beginning-of-table
+移至当前表的开头。
+@end defun
+
+@defun vtable-end-of-table
+移至当前表的末尾。
+@end defun
+
+@defun vtable-remove-object table object
+从 @var{table} 中删除 @var{object}。  这也会更新显示的表格。
+@end defun
+
+@defun vtable-insert-object table object &optional location before
+将@var{object}插入@var{table}。  @var{location} 应该是表中的一个对象，新对象插入到该对象之后，如果 @var{before} 为非 @code{nil}，则插入到该对象之前。  如果@var{location}是@code{nil}，则将@var{object}附加到@var{table}，或者如果@var{before}不是-@code{nil}则在前面。
+
+@var{location} 也可以是一个整数，即表中从零开始的索引。  在这种情况下，@var{object} 被插入到该索引处。  如果索引超出范围，如果索引太小，则将@var{object}添加到@var{table}的前面，如果索引太大，则将其附加到@var{table}。  在这种情况下，@var{before} 被忽略。
+
+如果 @var{table} 为空，则忽略 @var{location} 和 @var{before}。
+
+这也会更新显示的表格。
+@end defun
+
+@defun vtable-update-object table object &optional old-object
+更新@var{object}在@var{table}中的表示。  可选参数 @var{old-object}，如果非 @code{nil}，则表示用 @var{object} 替换 @var{old-object} 并重新显示表中的关联行。  在任何一种情况下，如果在表中未找到现有对象（与 @code{equal} 进行比较），则发出错误信号。
+
+这与调用 @code{vtable-remove-object} 然后调用 @code{vtable-insert-object} 具有相同的效果，但效率更高。
+
+请注意一个限制：如果表的缓冲区不在可见窗口中，或者如果其窗口自更新后宽度已更改，则无法更新表，并且会发出错误信号。
+@end defun
+
+@defun vtable-column table index
+返回 @var{table} 中第 @var{index} 列的列名称。
+@end defun
+
+@node GNU Free Documentation License
+@chapter GNU 自由文档许可证
+@include doclicense.texi
+
+@node Index
+@unnumbered 指数
+@printindex cp
+
+@bye

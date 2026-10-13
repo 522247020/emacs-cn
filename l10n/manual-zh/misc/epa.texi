@@ -1,0 +1,583 @@
+\输入 texinfo @c -*- 模式：texinfo -*-
+@c %**start of header
+@setfilename ../../info/epa.info
+@settitle EasyPG助手用户手册
+@documentlanguage en
+@include docstyle.texi
+@c %**end of header
+
+@set VERSION 1.0.0
+
+@copying
+该文件描述 EasyPG Assistant @value{VERSION}。
+
+版权所有 @copyright{} 2007--2026 自由软件基金会，Inc.
+
+@quotation
+根据 GNU 自由文档许可证 1.3 版或自由软件基金会发布的任何更高版本的条款，授予复制、分发和/或修改本文档的许可；没有不变的章节，封面文本是“GNU 手册”，封底文本如下 (a) 所示。  许可证的副本包含在标题为“GNU 自由文档许可证”的部分中。
+
+(a) FSF 的封底文字是：“您可以自由复制和修改本 GNU 手册。”
+@end quotation
+@end copying
+
+@dircategory Emacs misc features
+@direntry
+* EasyPG Assistant: (epa).       GNU Privacy Guard 的 Emacs 用户界面。
+@end direntry
+
+@titlepage
+@title EasyPG助手
+
+@author by Daiki Ueno
+@page
+
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@node Top
+@top EasyPG助手用户手册
+@cindex easypg assistant
+@cindex gnu privacy guard
+@cindex gnupg
+
+EasyPG Assistant 是 GNU Privacy Guard（GnuPG，@pxref{Top, , Top, gnupg, Using the GNU Privacy Guard}）的 Emacs 用户界面。
+
+EasyPG Assistant 是 EasyPG 软件包的一部分，EasyPG 是 Emacs 的一体化 GnuPG 界面。  EasyPG 还包含名为 EasyPG Library 的库接口。
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@c Unfortunately the node names of this manual are not very consistent
+@c w.r.t. their case.  However, case is significant in node names, so
+@c we probably better should not change these to not break any
+@c external references.  Things are more relaxed for structure titles,
+@c so we consistently updated them to title-case.
+
+@menu
+* Overview::
+* Quick start::
+* Commands::
+* GnuPG version compatibility::
+* GnuPG Pinentry::
+* Caching Passphrases::
+* Bug Reports::
+* GNU Free Documentation License::   本文档的许可证。
+* Concept Index::
+* Key Index::
+* Function Index::
+* Variable Index::
+@end menu
+
+@node Overview
+@chapter 概述
+@cindex features of easypg assistant
+
+EasyPG Assistant 是 @acronym{GnuPG, GNU Privacy Guard} 的 Emacs 前端应用程序，提供以下功能：
+
+@itemize @bullet
+@item 密钥管理。
+@item 对区域的加密操作。
+@item 对文件的加密操作。
+@item 迫切的整合。
+@item 邮件模式集成。
+@item *.gpg 文件的自动加密/解密。
+@end itemize
+
+@node Quick start
+@chapter 快速入门
+@cindex introduction to easypg assistant
+@cindex gnupg documentation
+@cindex documentation on gnupg
+@cindex configuration of gnupg
+@cindex introduction to gnupg
+
+您无需任何 Emacs 或 GnuPG 配置即可使用 EasyPG Assistant，例如使用对称加密自动加密和解密文件，请参阅@ref{Encrypting/decrypting gpg files}。然而，要使用 EasyPG Assistant 的全套功能，您至少应该有一些最低限度的 GnuPG 配置。
+
+John Michael Ashley 的 GNU 隐私手册（作为 @uref{https://gnupg.org/documentation/guides.html, the GnuPG user guides} 的一部分在线提供）提供了 GnuPG 使用和配置的介绍。  与此相反，GnuPG 手册 (@pxref{Top, , Top, gnupg, Using the GNU Privacy Guard}) 更像是一本参考手册。
+
+EasyPG Assistant 命令以 @samp{epa-} 为前缀。  例如，
+
+@itemize @bullet
+@item 要浏览您的密钥环，请输入 @kbd{M-x epa-list-keys}
+
+@item 要创建该区域的明文签名，请输入 @kbd{M-x epa-sign-region}
+
+@item 要加密文件，请输入 @kbd{M-x epa-encrypt-file}
+
+@item 要查询密钥服务器的密钥，请输入 @kbd{M-x epa-search-keys}
+@end itemize
+
+EasyPG Assistant 提供了多种加密功能，可以集成到其他 Emacs 功能中。  例如，@file{*.gpg}文件的自动加密/解密。
+
+@node Commands
+@chapter 命令
+
+本章介绍典型用例的各种命令。
+
+@menu
+* Key management::
+* Cryptographic operations on regions::
+* Cryptographic operations on files::
+* Dired integration::
+* Mail-mode integration::
+* Encrypting/decrypting gpg files::
+* Querying a key server::
+@end menu
+
+@node Key management
+@section 密钥管理
+@cindex key management
+
+@cindex key ring, browsing
+@cindex browse key ring
+使用 EasyPG Assistant 的第一步可能是浏览您的密钥环。  @kbd{M-x epa-list-keys} 对应于命令行中的@samp{gpg --list-keys}。
+
+@deffn Command epa-list-keys name mode
+显示公共密钥环中与 @var{name} 匹配的所有密钥。
+@end deffn
+
+@noindent
+输出如下所示。
+
+@example
+  u A5B6B2D4B15813FE Daiki Ueno <ueno@@unixuser.org>
+@end example
+
+@noindent
+最左边一列的字符表示密钥的信任级别。  如果是@samp{u}，则密钥被标记为最终可信。  第二列是密钥 ID，其余是用户 ID。
+
+您可以按 @key{TAB} 移动条目。  如果您键入 @key{RET} 或单击条目上的按钮 1，您将看到有关所选键的更多详细信息。
+
+@example
+ u Daiki Ueno <ueno@@unixuser.org>
+ u A5B6B2D4B15813FE 1024bits DSA
+        Created: 2001-10-09
+        Expires: 2007-09-04
+        Capabilities: sign certify
+        Fingerprint: 8003 7CD0 0F1A 9400 03CA  50AA A5B6 B2D4 B158 13FE
+ u 4447461B2A9BEA2D 2048bits ELGAMAL_E
+        Created: 2001-10-09
+        Expires: 2007-09-04
+        Capabilities: encrypt
+        Fingerprint: 9003 D76B 73B7 4A8A E588  10AF 4447 461B 2A9B EA2D
+@end example
+
+@cindex private key ring, browsing
+@noindent
+要浏览您的私钥环，请使用 @kbd{M-x epa-list-secret-keys}。
+
+@deffn Command epa-list-secret-keys name
+显示私钥环中与 @var{name} 匹配的所有密钥。
+@end deffn
+
+@noindent
+在@file{*Keys*}缓冲区中，有多个命令可用。  常见的用例是将一些密钥导出到文件中。  为此，请键入 @kbd{m} 选择按键，键入 @kbd{o}，然后提供文件名。
+
+以下是与密钥管理相关的其他命令。  其中一些将文件作为输入/输出，另一些则将当前区域作为输入/输出。
+
+@cindex insert keys
+@deffn Command epa-insert-keys keys
+在该点后插入选定的 @var{keys}。  它可以让您在插入之前选择键。  默认情况下，它将以 OpenPGP Armor 格式对密钥进行编码。
+@end deffn
+
+@cindex import keys
+@deffn Command epa-import-keys file
+将密钥从 @var{file} 导入到您的密钥环。
+@end deffn
+
+@deffn Command epa-import-keys-region start end
+将当前区域中 @var{start} 和 @var{end} 之间的密钥导入到您的密钥环中。
+@end deffn
+
+@deffn Command epa-import-armor-in-region start end
+在@var{start} 和 @var{end} 之间的当前区域中导入 OpenPGP Armor 格式的密钥。  与@code{epa-import-keys-region}的不同之处在于，@code{epa-import-armor-in-region}搜索该​​地区的盔甲并将@code{epa-import-keys-region}应用于每件盔甲。
+@end deffn
+
+@cindex delete keys
+@deffn Command epa-delete-keys allow-secret
+删除选定的键。  如果@var{allow-secret}非@code{nil}，它也会删除密钥。
+@end deffn
+
+@node Cryptographic operations on regions
+@section 区域上的加密操作
+@cindex cryptographic operations on regions
+@cindex region operations, cryptographic
+
+@cindex decrypt region
+@deffn Command epa-decrypt-region start end
+解密@var{start}和@var{end}之间的当前区域。  它用解密的文本替换该区域。
+@end deffn
+
+@deffn Command epa-decrypt-armor-in-region start end
+解密当前@var{start}和@var{end}之间区域的OpenPGP装甲。  与@code{epa-decrypt-region}的不同之处在于，@code{epa-decrypt-armor-in-region}搜索该​​地区的盔甲并将@code{epa-decrypt-region}应用于每件盔甲。  也就是说，该命令不会改变盔甲周围的原始文本。
+@end deffn
+
+@cindex verify region
+@deffn Command epa-verify-region start end
+验证 @var{start} 和 @var{end} 之间的当前区域。  它将验证结果发送到迷你缓冲区或弹出窗口。  它用签名文本替换该区域。
+@end deffn
+
+@deffn Command epa-verify-cleartext-in-region
+验证当前区域中 @var{start} 和 @var{end} 之间的 OpenPGP 明文块。  与@code{epa-verify-region}的区别在于@code{epa-verify-cleartext-in-region}搜索区域中的OpenPGP明文块并将@code{epa-verify-region}应用于每个块。  也就是说，此命令不会更改 OpenPGP 明文块周围的原始文本。
+@end deffn
+
+@cindex sign region
+@deffn Command epa-sign-region start end signers type
+对 @var{start} 和 @var{end} 之间的当前区域进行签名。  默认情况下，它会创建一个明文签名。  如果给出了前缀参数，它会让您选择签名密钥，然后选择签名类型。
+@end deffn
+
+@cindex encrypt region
+@deffn Command epa-encrypt-region start end recipients sign signers
+加密@var{start}和@var{end}之间的当前区域。  它可以让您选择收件人。  如果给出了前缀参数，它还会询问您是否在加密之前对文本进行签名，如果您回答“是”，它会让您选择签名密钥。
+@end deffn
+
+@defvar epa-keys-select-method
+该变量控制 @code{epa-select-keys} 中按键选择的方法。  默认值 @code{buffer} 会弹出一个特殊的缓冲区，您可以在其中选择键。  如果值为 @code{minibuffer}，@code{epa-select-keys} 将提示输入迷你缓冲区中的键，您应在其中键入以逗号分隔的键。
+@end defvar
+
+@node Cryptographic operations on files
+@section 文件的加密操作
+@cindex cryptographic operations on files
+@cindex file operations, cryptographic
+
+@cindex decrypt file
+@deffn Command epa-decrypt-file file &optional output
+解密@var{file}。  如果您没有指定用于解密文件的名称 @var{output}，此函数会提示输入要使用的值。
+@end deffn
+
+@cindex verify file
+@deffn Command epa-verify-file file
+验证@var{file}。
+@end deffn
+
+@cindex sign file
+@deffn Command epa-sign-file file signers type
+符号@var{file}。  如果给出了前缀参数，它会让您选择签名密钥，然后选择签名类型。
+@end deffn
+
+@cindex encrypt file
+@deffn Command epa-encrypt-file file recipients
+加密@var{file}。  它可以让您选择收件人。
+@end deffn
+
+@node Dired integration
+@section 定向集成
+@cindex dired integration
+@cindex directory operations
+@cindex multiple file operations
+
+EasyPG Assistant 扩展了 GNU Emacs 的 Dired 模式，允许用户轻松地对文件进行加密操作。  例如，
+
+@example
+M-x dired
+(mark some files)
+: e (or M-x epa-dired-do-encrypt)
+(select recipients by 'm' and click [OK])
+@end example
+
+@noindent
+分配了以下键。
+
+@table @kbd
+@item : d
+@kindex : d
+@findex epa-dired-do-decrypt
+解密标记的文件。
+
+@item : v
+@kindex : v
+@findex epa-dired-do-verify
+验证标记的文件。
+
+@item : s
+@kindex : s
+@findex epa-dired-do-sign
+签署标记的文件。
+
+@item : e
+@kindex : e
+@findex epa-dired-do-encrypt
+加密标记的文件。
+
+@end table
+
+@node Mail-mode integration
+@section 邮件模式集成
+@cindex mail-mode integration
+@cindex sending signed/encrypted mails
+
+EasyPG Assistant 提供了次要模式@code{epa-mail-mode} 来帮助用户编写内联 OpenPGP 消息。  内联 OpenPGP 是一种发送签名/加密电子邮件的传统方式，通过将原始 OpenPGP blob 嵌入邮件正文中，而不是使用现代 MIME 格式。
+
+注意：不建议内联 OpenPGP，您应该考虑使用 PGP/MIME@. 请参阅@uref{https://josefsson.org/inline-openpgp-considered-harmful.html, Inline OpenPGP in E-mail is bad@comma{} Mm'kay?}。
+
+@noindent
+启用 @code{epa-mail-mode} 后，将分配以下键。您可以通过@kbd{C-u 1 M-x epa-mail-mode}或通过自定义界面来完成。  尝试@kbd{M-x customize-variable epa-global-mail-mode}。
+
+@table @kbd
+@item C-c C-e C-d and C-c C-e d
+@kindex C-c C-e C-d
+@kindex C-c C-e d
+@findex epa-mail-decrypt
+解密当前缓冲区中的 OpenPGP 装甲。
+
+@item C-c C-e C-v and C-c C-e v
+@kindex C-c C-e C-v
+@kindex C-c C-e v
+@findex epa-mail-verify
+验证当前缓冲区中的 OpenPGP 明文签名消息。  如果验证由于某种原因失败，此命令会发出错误信号。
+
+@item C-c C-e C-s and C-c C-e s
+@kindex C-c C-e C-s
+@kindex C-c C-e s
+@findex epa-mail-sign
+使用默认密钥从当前缓冲区编写签名消息。  使用前缀参数，选择要交互使用的键。
+
+@item C-c C-e C-e and C-c C-e e
+@kindex C-c C-e C-e
+@kindex C-c C-e e
+@findex epa-mail-encrypt
+@vindex epa-mail-aliases
+从当前缓冲区编写加密消息。默认情况下，它尝试根据邮件标头的 @samp{to}、@samp{cc} 和 @samp{bcc} 字段构建收件人列表。  要将您的密钥包含在收件人列表中，请使用 @file{~/.gnupg/gpg.conf} 中的 @samp{encrypt-to} 选项。  此函数使用 @code{epa-mail-aliases} 列表转换收件人地址。  您还可以使用该选项忽略特定收件人以进行加密。
+
+使用前缀参数，要求您以交互方式选择收件人、是否签名以及使用哪个密钥签名。
+@end table
+
+@node Encrypting/decrypting gpg files
+@section 加密和解密 gpg 文件
+@cindex encrypting gpg files
+@cindex decrypting gpg files
+@cindex gpg files, encrypting and decrypting
+@cindex automatic file encryption and decryption
+
+默认情况下，每个名称以 @file{.gpg} 结尾的文件都将被视为加密的。  也就是说，当您打开这样的文件时，解密的文本而不是加密的文本将插入到缓冲区中。同样，当您将缓冲区保存到 @file{foo.gpg} 文件时，会写入加密数据。
+
+当您第一次将缓冲区保存到加密文件时，EasyPG Assistant 会向您显示缓冲区@file{*Keys*} 中的密钥列表，您可以在其中选择加密的收件人。  @xref{Key management}，用于该缓冲区格式的描述。  您可以通过自定义本节下面进一步描述的变量 @code{epa-file-encrypt-to} 和 @code{epa-file-select-keys} 来简化此收件人选择步骤。
+
+@cindex symmetric encryption, passphrase entry for
+如果您在此步骤中未选择任何收件人，EasyPG Assistant 将使用对称加密。  因此，您必须为每个缓冲区保存输入两次密码，并每隔一段时间为文件读取输入密码，因为 GnuPG 代理会缓存文件读取的密码至少一段时间，但不会为缓冲区保存缓存您的密码。  @xref{Caching Passphrases}，了解更多信息。
+
+@cindex public key encryption, passphrase entry for
+如果您创建了自己的密钥对@footnote{For encryption and decryption of files you do not intend to share, you do not have to use an email address as recipient during creation of the keypair.  You can also use some free-form string that gives information on the use of the keypair, like @code{backup} or @code{account database}.}，您可以选择它作为收件人，EasyPG Assistant 将为该文件使用公钥加密。  由于 GnuPG 使用您的公钥进行加密，因此它不会提示您输入缓冲区保存的密码，但它会时不时地提示您输入文件读取的密码，具体取决于 GnuPG 代理缓存配置。
+
+@cindex temporary files created by easypg assistant
+为了如上所述加密和解密文件，EasyPG Assistant 在某些情况下会使用包含其处理的文件的纯文本内容的中间临时文件。  EasyPG Assistant 在函数@code{temporary-file-directory} (@pxref{Unique File Names, , Generating Unique File Names, elisp, GNU Emacs Lisp Reference Manual}) 返回的目录下创建它们。  如果您想确保不留下任何纯文本痕迹，请至少对该目录使用加密的文件系统。
+
+加密文件的文件名模式可以通过@code{epa-file-name-regexp}控制。
+
+@defvar epa-file-name-regexp
+匹配被视为加密的文件名的正则表达式。
+@end defvar
+
+您可以使用 @kbd{M-x epa-file-disable} 禁用此行为，然后使用 @kbd{M-x epa-file-enable} 将其恢复。
+
+@deffn Command epa-file-disable
+禁用 *.gpg 文件的自动加密/解密。
+@end deffn
+
+@deffn Command epa-file-enable
+启用 *.gpg 文件的自动加密/解密。
+@end deffn
+
+@noindent
+默认情况下，@code{epa-file} 将尝试使用对称加密，也称为基于密码的加密。  如果您想使用公钥加密，请执行@kbd{M-x epa-file-select-keys}，这将弹出密钥选择对话框。
+
+@deffn Command epa-file-select-keys
+选择收件人密钥以使用公钥加密来加密当前访问的文件。
+@end deffn
+
+您还可以使用变量 @code{epa-file-select-keys} 更改默认行为。
+
+@defvar epa-file-select-keys
+控制是否弹出按键选择对话框。
+@end defvar
+
+@vindex epa-file-encrypt-to
+对于经常访问的文件，最好通过文件变量 (@pxref{File Variables, , Local Variables in Files, emacs, The Emacs Editor}) 告诉 Emacs 应使用哪种加密方法。  为此，请使用 @code{epa-file-encrypt-to} 局部变量。
+
+例如，如果您希望使用与电子邮件地址 @samp{ueno@@unixuser.org} 关联的公钥对 Elisp 文件进行加密，请将以下行添加到文件的开头。
+
+@cartouche
+@lisp
+;; -*- epa-file-encrypt-to: ("ueno@@unixuser.org") -*-
+@end lisp
+@end cartouche
+
+相反，如果您希望文件始终使用对称加密进行加密（无论 @code{epa-file-select-keys} 变量的值如何），请按如下方式更改该行。
+
+@cartouche
+@lisp
+;; -*- epa-file-encrypt-to: nil -*-
+@end lisp
+@end cartouche
+
+控制自动加密/解密行为的其他变量如下。
+
+@defvar epa-file-cache-passphrase-for-symmetric-encryption
+如果非@code{nil}，则缓存对称加密的密码。  默认值为@code{nil}。
+
+出于安全原因，该选项默认关闭，不建议使用。  相反，请考虑使用 GnuPG 代理，它在许多情况下可以完成相同的工作，并且以更安全的方式完成。 @xref{Caching Passphrases}，了解更多信息。
+@end defvar
+
+@defvar epa-file-inhibit-auto-save
+如果非@code{nil}，则在打开加密文件时禁用自动保存。默认值为@code{t}。
+@end defvar
+
+@node Querying a key server
+@section 查询密钥服务器
+@cindex query key server
+@cindex key server, querying
+
+@code{epa-search-keys} 命令可用于查询 @acronym{GPG} 密钥服务器。  然后，Emacs 将弹出一个列出匹配项的缓冲区，然后您可以获取（并添加）密钥到您的个人密钥环。
+
+在密钥搜索缓冲区中，您可以使用 @kbd{f} 命令标记要获取的密钥，然后使用 @kbd{x} 获取密钥（并将它们合并到密钥环中）。
+
+@code{epa-keyserver} 变量表示要查询哪个服务器。
+
+@node GnuPG version compatibility
+@chapter GnuPG 版本兼容性
+@cindex gnupg version compatibility
+@cindex version compatibility with gnupg
+@cindex compatibility with gnupg
+
+截至 2023 年 6 月，GnuPG 有三个活跃分支：2.4、2.2 和 1.4。  GnuPG 版本 2.4.1 及更高版本受到 @uref{https://dev.gnupg.org/T6481, GnuPG bug T6481} 的影响，几乎无法与 Emacs 一起使用。  至少对于 GnuPG 版本 2.4.1 有一个针对该错误的补丁，您的操作系统或发行版可能已经提供了该补丁。  GnuPG 1.4 被认为是旧版本。
+
+除此之外，上面提到的所有这些分支都应该可以与具有基本用例的 Emacs 完美配合。  然而，它们具有一些不兼容的特征，从 Emacs 中使用时可能会看到这些特征。
+
+@itemize
+@item
+GnuPG 2.1 使用的密钥存储格式与 1.4 不兼容。  这意味着，使用 GnuPG 2.1 创建的密钥在 1.4 中不可见。
+
+@item
+GnuPG 2.1 对用于与 @command{gpg-agent} 通信的 Unix 域套接字使用固定地址。  GnuPG 2.0 和 1.4 使用的 @code{GPG_AGENT_INFO} 环境变量将被忽略。这意味着，如果您的系统同时具有 GnuPG 2.1 和 1.4，则 GnuPG 1.4 中的 gpg 命令无法使用 2.1 提供的 @command{gpg-agent} （至少开箱即用）。
+
+@item
+GnuPG 2.1（2.1.5 或更高版本）具有将 Pinentry 密码提示定向到 Emacs 迷你缓冲区的机制。  @xref{GnuPG Pinentry}。
+@end itemize
+
+@node GnuPG Pinentry
+@chapter GnuPG Pinentry
+@cindex gnupg pinentry
+@cindex pinentry provided by gnupg
+
+GnuPG 套件的一个重要组件是 Pinentry，它允许安全输入 GnuPG 请求的密码。  GnuPG 提供各种不同的程序作为 Pinentry，从平淡的 TTY @command{pinentry-tty} 到用于各种桌面环境的精美图形对话框，如 @command{pinentry-gnome3}。  您的操作系统通常决定默认使用其中哪一个。
+
+请注意，具体 Pinentry 程序的选择仅决定 @emph{how} GnuPG 对密码的查询，而不决定@emph{how often}。对于后一个问题，请参阅@ref{Caching Passphrases}。
+
+@cindex pinentry, emacs as
+通过一些配置，Emacs 也可以扮演 Pinentry 的角色。 GnuPG 2.1.5 及更高版本中提供的最自然的选择是使用 Emacs 本身作为 Pinentry 来处理由 Emacs 触发的请求。例如，如果您使用自动解密打开一个名称以 @file{.gpg} 结尾的文件，您很可能还想在 Emacs 中输入该请求的密码。
+
+@cindex loopback pinentry
+这个所谓的 @dfn{loopback Pinentry} 还有一个额外的好处，即当您远程或从纯文本终端使用 Emacs 时它也可以工作。要启用它：
+
+@enumerate
+@item
+@vindex allow-loopback-pinentry
+确保为 @command{gpg-agent} 配置选项 @code{allow-loopback-pinentry}，这应该是默认值。  @xref{Agent Options, , Option Summary, gnupg, Using the GNU Privacy Guard}。
+
+@item
+@vindex epg-pinentry-mode
+在 Emacs 中将变量 @code{epg-pinentry-mode} 自定义为 @code{loopback}。
+@end enumerate
+
+请注意，环回 Pinentry 不适用于 @command{gpgsm}，因此 EasyPG 将忽略此设置。
+
+还有其他选项可以将 Emacs 用作 Pinentry，您可能会遇到名为 @command{pinentry-emacs} 或 @command{gpg-agent} 选项 @code{allow-emacs-pinentry} 的 Pinentry。  但是，这些被认为是不安全或半过时的，并且可能不受您的操作系统或发行版的支持。  例如，Debian GNU/Linux 仅支持上述环回 Pinentry。
+
+@ignore
+In case somebody requests these:
+
+Use Emacs for all GnuPG requests:
+
+Make @command{pinentry-emacs} the default Pinentry by means of your
+operating system.  Install package @file{pinentry.el} from GNU ELPA
+and execute @kbd{M-x pinentry-start} to start the Emacs Pinentry
+service.  @emph{All} GnuPG passphrase requests should then result in a
+minibuffer prompt in the running Emacs.  If Emacs or the Emacs
+Pinentry service are not running, passphrase requests fail.
+
+Use Emacs for all GnuPG requests with other Pinentry as fallback:
+
+Ensure the other Pinentry supports Emacs; @command{pinentry-curses}
+does, for example.  Configure @command{gpg-agent} option
+@code{allow-emacs-pinentry}.  Set environment variable
+@code{INSIDE_EMACS} for the calling process.  Install package
+@file{pinentry.el}.  Now if Emacs is running and @kbd{M-x
+pinentry-start} has been executed, all GnuPG passphrase requests
+should result in a minibuffer prompt in the running Emacs.  If Emacs
+or the Emacs Pinentry service are not running, GnuPG uses the other
+Pinentry instead.
+@end ignore
+
+@node Caching Passphrases
+@chapter 缓存密码
+@cindex caching passphrases
+@cindex entering passphrases
+@cindex passphrases, entering and caching
+
+如果您经常打开和关闭同一个文件，那么输入密码是一项麻烦的任务。  GnuPG 和 EasyPG Assistant 提供了在有限时间内记住您的密码的机制。  使用这些，您只需偶尔重新输入密码即可。  然而，配置有点令人困惑，因为它取决于您的 GnuPG 安装 (@pxref{GnuPG version compatibility})、加密方法（对称或公钥）以及您是否要使用 GnuPG 代理。  作为附加限制，GnuPG 2.0 及更高版本必须使用 GnuPG 代理。  这里有一些问题：
+
+@enumerate
+@item Do you use GnuPG version 2.0 or later instead of GnuPG version 1.4?
+@item Do you use symmetric encryption rather than public key encryption?
+@item Do you want to use GnuPG Agent?
+@end enumerate
+
+以下是根据您的答案进行的配置：
+
+@multitable {111} {222} {333} {configuration configuration configuration}
+@item @b{1} @tab @b{2} @tab @b{3} @tab Configuration
+@item Yes   @tab Yes   @tab Must  @tab Set up GnuPG Agent.
+@item Yes   @tab No    @tab Must  @tab Set up GnuPG Agent.
+@item No    @tab Yes   @tab Yes   @tab Set up elisp passphrase cache.
+@item No    @tab Yes   @tab No    @tab Set up elisp passphrase cache.
+@item No    @tab No    @tab Yes   @tab Set up GnuPG Agent.
+@item No    @tab No    @tab No    @tab You can't, without GnuPG Agent.
+@end multitable
+
+要设置 GnuPG Agent，请按照@ref{Invoking GPG-AGENT, , , gnupg, Using the GNU Privacy Guard}中的说明进行操作。
+
+要设置 elisp 密码缓存，请设置 @code{epa-file-cache-passphrase-for-symmetric-encryption}。 @xref{Encrypting/decrypting gpg files}。
+
+@node Bug Reports
+@chapter 错误报告
+@cindex bug reports
+@cindex reporting bugs
+
+Emacs 开发团队正在积极解决 EasyPG Assistant 的错误和问题。  也非常欢迎功能请求和建议。  使用@kbd{M-x report-emacs-bug}，参见@ref{Bugs, , Reporting Bugs, emacs, The Emacs Editor}。
+
+提交错误报告时，请尝试极其详细地描述重现问题所需的步骤。  还要尝试收集必要的信息来修复错误，例如：
+
+@itemize @bullet
+@item the GnuPG version.  Send the output of @samp{gpg --version}.
+@item the GnuPG configuration.  Send the contents of @file{~/.gnupg/gpg.conf}.
+@end itemize
+
+在报告错误之前，您应该在@file{~/.emacs}文件中设置@code{epg-debug}并重复错误。  然后，包含 @file{ *epg-debug*} 缓冲区的内容。  请注意，缓冲区名称的第一个字母是空格。
+
+@node GNU Free Documentation License
+@appendix GNU 自由文档许可证
+@include doclicense.texi
+
+@node Concept Index
+@unnumbered 概念索引
+@printindex cp
+
+@node Key Index
+@unnumbered 关键指标
+@printindex ky
+
+@node Function Index
+@unnumbered 功能索引
+@printindex fn
+
+@node Variable Index
+@unnumbered 变量索引
+@printindex vr
+
+@bye
+
+@c End:
