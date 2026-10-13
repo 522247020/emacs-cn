@@ -1,19 +1,17 @@
 #!/bin/sh
-# 从预编译产物安装中文版 Emacs（安装到 /opt/emacs-cn）。
+# 从预编译产物安装中文版 Emacs。
 #
 # 用法：
-#   sh install.sh [emacs-cn-linux-x86_64.tar.zst]
+#   sh install.sh [emacs-cn-*.tar.zst]
 #
 # 说明：
-#   * 产物把前缀 /opt/emacs-cn 编译进了 Emacs，必须解包到 /。
+#   * 产物把构建时的 PREFIX 编进了 Emacs（默认 /opt/emacs-cn，也可能是
+#     $HOME/.local/emacs-cn 等），必须解包到 /；本脚本会自动识别该前缀。
 #   * 需要 root（或 sudo），以及 zstd。
-#   * 新设备需与构建环境（Ubuntu 系）glibc/依赖库兼容；
-#     不兼容时建议在目标机上自行编译（见 README）。
+#   * 新设备需与构建环境 glibc/依赖库兼容；不兼容时请在目标机自行编译。
 set -eu
 
 TARBALL=${1:-emacs-cn-linux-x86_64.tar.zst}
-PREFIX=/opt/emacs-cn
-
 [ -f "$TARBALL" ] || { echo "错误：找不到 $TARBALL" >&2; exit 1; }
 
 SUDO=""
@@ -27,7 +25,15 @@ if ! command -v zstd >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "==> 解包到 / （安装到 $PREFIX）"
+# 从产物内容自动识别安装前缀
+PREFIX=$(tar --zstd -tf "$TARBALL" 2>/dev/null \
+          | sed -n -e 's#^\./\(.*\)/bin/emacs$#/\1#p' \
+                   -e 's#^\./\(.*\)/bin/emacs-[0-9].*$#/\1#p' \
+          | head -1)
+[ -n "$PREFIX" ] || PREFIX=/opt/emacs-cn
+echo "==> 检测到安装前缀: $PREFIX"
+
+echo "==> 解包到 /"
 $SUDO tar --zstd -xf "$TARBALL" -C /
 
 # ---------------------------------------------------------------- 依赖库
