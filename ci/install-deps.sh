@@ -14,6 +14,24 @@ SUDO=""
 
 if command -v pacman >/dev/null 2>&1; then
   echo "==> 检测到 Arch Linux，使用 pacman 安装依赖"
+
+  # 等待/处理 pacman 数据库锁（Omarchy 等可能有后台更新）
+  i=0
+  while [ -e /var/lib/pacman/db.lck ] && [ "$i" -lt 30 ]; do
+    echo "    pacman 数据库被锁，等待中... ($((i*2))s)"
+    sleep 2
+    i=$((i+1))
+  done
+  if [ -e /var/lib/pacman/db.lck ]; then
+    if pgrep -x pacman >/dev/null 2>&1; then
+      echo "错误：有 pacman 正在运行，请等它结束后重试。" >&2
+    else
+      echo "错误：存在残留锁 /var/lib/pacman/db.lck。" >&2
+      echo "      确认没有 pacman 在跑后执行：sudo rm -f /var/lib/pacman/db.lck" >&2
+    fi
+    exit 1
+  fi
+
   # 容器里 keyring 可能过期
   $SUDO pacman -Sy --noconfirm archlinux-keyring || true
   $SUDO pacman -Syu --needed --noconfirm \
