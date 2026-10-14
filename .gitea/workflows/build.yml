@@ -68,42 +68,49 @@ jobs:
           set -eu
           API="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
           AUTH="Authorization: token ${TOKEN}"
+          ASSET="emacs-cn-linux-x86_64.tar.zst"
 
           case "${GITHUB_REF:-}" in
-            refs/tags/*)
-              TAG="${GITHUB_REF_NAME}"
-              ;;
+            refs/tags/*) TAG="${GITHUB_REF_NAME}" ;;
             refs/heads/main)
-              if [ ! -f VERSION ]; then echo "缺少 VERSION 文件"; exit 1; fi
-              TAG="v$(cat VERSION)"
-              if curl -sf -H "$AUTH" "$API/tags/$TAG" >/dev/null 2>&1; then
-                echo "tag $TAG 已存在（如需发新版本，请修改 VERSION 后重推）"
-                exit 0
-              fi
-              echo "创建 tag: $TAG -> ${GITHUB_SHA}"
-              curl -sf -X POST "$API/tags" -H "$AUTH" -H "Content-Type: application/json" \
-                -d "{\"tag_name\":\"$TAG\",\"target\":\"${GITHUB_SHA}\"}"
-              ;;
-            *)
-              echo "非 main/tag，跳过发布"
-              exit 0
-              ;;
+              [ -f VERSION ] || { echo "缺少 VERSION 文件"; exit 1; }
+              TAG="v$(cat VERSION)" ;;
+            *) echo "非 main/tag，跳过发布"; exit 0 ;;
           esac
+          echo "== TAG=$TAG =="
 
-          echo "创建 Release: $TAG"
-          curl -sf -X POST "$API/releases" -H "$AUTH" -H "Content-Type: application/json" \
-            -d "{\"tag_name\":\"$TAG\",\"name\":\"$TAG\"}" > release.json || true
-          cat release.json || true
-          RID=$(curl -sf -H "$AUTH" "$API/releases/tags/$TAG" \
-                | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2 || true)
-          if [ -n "${RID:-}" ]; then
-            curl -sf -X POST "$API/releases/$RID/assets?name=emacs-cn-linux-x86_64.tar.zst" \
-              -H "$AUTH" -F "attachment=@emacs-cn-linux-x86_64.tar.zst"
-            echo "已上传附件到 Release $TAG"
-          else
-            echo "未能获取 Release id（可能权限不足）"
-            exit 1
-          fi
+          # 1) 创建 tag（已存在也继续）
+          printf '{"tag_name":"%s","target":"%s"}' "$TAG" "${GITHUB_SHA}" > /tmp/tag.json
+          code=$(curl -s -o /tmp/tag.out -w '%{http_code}' -X POST "$API/tags" \
+            -H "$AUTH" -H 'Content-Type: application/json' --data @/tmp/tag.json)
+          echo "tag HTTP $code"; cat /tmp/tag.out; echo
+
+          # 2) 创建 Release（已存在也继续）
+          printf '{"tag_name":"%s","name":"%s","target_commitish":"%s"}' \
+            "$TAG" "$TAG" "${GITHUB_SHA}" > /tmp/rel.json
+          code=$(curl -s -o /tmp/rel.out -w '%{http_code}' -X POST "$API/releases" \
+            -H "$AUTH" -H 'Content-Type: application/json' --data @/tmp/rel.json)
+          echo "release HTTP $code"; cat /tmp/rel.out; echo
+
+          # 3) 取 Release id
+          REL=$(curl -s -H "$AUTH" "$API/releases/tags/$TAG")
+          RID=$(printf '%s' "$REL" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2 || true)
+          [ -n "${RID:-}" ] || { echo "无法获取 Release id：$REL"; exit 1; }
+          echo "Release id=$RID"
+
+          # 4) 删除同名旧附件（幂等）
+          for aid in $(curl -s -H "$AUTH" "$API/releases/$RID/assets" \
+                       | grep -o '"id":[0-9]*' | cut -d: -f2); do
+            curl -s -X DELETE -H "$AUTH" "$API/releases/$RID/assets/$aid" >/dev/null || true
+          done
+
+          # 5) 上传附件
+          code=$(curl -s -o /tmp/asset.out -w '%{http_code}' -X POST \
+            "$API/releases/$RID/assets?name=$ASSET" \
+            -H "$AUTH" -F "attachment=@$ASSET")
+          echo "asset HTTP $code"; cat /tmp/asset.out; echo
+          [ "$code" = 201 ] || { echo "附件上传失败"; exit 1; }
+          echo "已发布 $TAG"
 
   # Arch 版本：在 archlinux 容器里构建，产出的二进制用 Arch 的
   # libxml2.so.16 等 soname，可直接在 Arch/Manjaro/Omarchy 上运行。
@@ -157,16 +164,29 @@ jobs:
           set -eu
           API="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
           AUTH="Authorization: token ${TOKEN}"
+          ASSET="emacs-cn-arch-x86_64.tar.zst"
           case "${GITHUB_REF:-}" in
             refs/tags/*) TAG="${GITHUB_REF_NAME}" ;;
             *)           TAG="v$(cat VERSION)" ;;
           esac
-          RID=$(curl -sf -H "$AUTH" "$API/releases/tags/$TAG" \
-                | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2 || true)
-          if [ -n "${RID:-}" ]; then
-            curl -sf -X POST "$API/releases/$RID/assets?name=emacs-cn-arch-x86_64.tar.zst" \
-              -H "$AUTH" -F "attachment=@emacs-cn-arch-x86_64.tar.zst"
+          REL=$(curl -s -H "$AUTH" "$API/releases/tags/$TAG")
+          RID=$(printf '%s' "$REL" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2 || true)
+          if [ -z "${RID:-}" ]; then
+            echo "未找到 Release $TAG（可能 Debian 构建尚未发布），跳过"
+            exit 0
+          fi
+          # 删除同名旧附件（幂等）
+          for aid in $(curl -s -H "$AUTH" "$API/releases/$RID/assets" \
+                       | grep -o '"id":[0-9]*' | cut -d: -f2); do
+            curl -s -X DELETE -H "$AUTH" "$API/releases/$RID/assets/$aid" >/dev/null || true
+          done
+          code=$(curl -s -o /tmp/asset2.out -w '%{http_code}' -X POST \
+            "$API/releases/$RID/assets?name=$ASSET" \
+            -H "$AUTH" -F "attachment=@$ASSET")
+          echo "asset HTTP $code"; cat /tmp/asset2.out; echo
+          if [ "$code" = 201 ]; then
             echo "已上传 Arch 产物到 Release $TAG"
           else
-            echo "未找到 Release $TAG（可能 Debian 构建尚未发布），跳过"
+            echo "附件上传失败"
+            exit 1
           fi
