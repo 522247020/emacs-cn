@@ -428,6 +428,22 @@ MANUAL = {
     'Clone Info buffer': '克隆 Info 缓冲区',
     'Index': '索引',
     'Menu': '菜单',
+
+    # 启动画面 / 杂项
+    'Open *scratch* buffer': '打开 *scratch* 缓冲区',
+    'New to Emacs?': '初次使用 Emacs？',
+    'New to Emacs?  Consider enabling ': '初次使用 Emacs？  考虑启用 ',
+    '  Consider enabling ': '  考虑启用 ',
+    'newcomer presets': '新手预设',
+    'Emacs tutorial': 'Emacs 教程',
+    'Emacs manual': 'Emacs 手册',
+    'Browse manuals': '浏览手册',
+    'Buy manuals': '购买手册',
+    'Activate menubar': '激活菜单栏',
+    'Visit New File': '访问新文件',
+    'Open Home Directory': '打开主目录',
+    'Customize Startup': '自定义启动',
+    'Open file': '打开文件',
 }
 
 
@@ -479,8 +495,9 @@ def main():
     if dropped:
         print('dropped', len(dropped), 'entries with stray %', file=sys.stderr)
 
-    # Drop entries whose translation is identical to the source.
-    items = sorted((k, post_fix(v)) for k, (v, kind) in data.items() if k != v)
+    # Drop Chinese-source entries (translation artefacts) and identity rows.
+    items = sorted((k, post_fix(v)) for k, (v, kind) in data.items()
+                   if k != v and not re.search(r'[\u4e00-\u9fff]', k))
 
     lines = []
     lines.append(';;; chinese-l10n-data.el --- Chinese translation data  -*- lexical-binding: t; coding: utf-8; -*-')

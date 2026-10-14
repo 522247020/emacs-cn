@@ -229,6 +229,15 @@ Function values (lambdas) are left untouched."
     (when (boundp sym)
       (set-default sym (chinese-l10n--translate-splash-list (symbol-value sym))))))
 
+(defun chinese-l10n--splash-insert-args (args)
+  "Translate the string arguments of `fancy-splash-insert'."
+  (mapcar (lambda (x) (if (stringp x) (chinese-l10n-translate x) x)) args))
+
+(defun chinese-l10n--setup-splash ()
+  (when (fboundp 'fancy-splash-insert)
+    (advice-add 'fancy-splash-insert :filter-args
+                #'chinese-l10n--splash-insert-args)))
+
 ;;; Widgets and buttons
 
 (defun chinese-l10n--translate-widget-args (args)
@@ -529,6 +538,7 @@ The result is either (menu-item LABEL ...) or (KEY menu-item LABEL ...)."
     (chinese-l10n--setup-prompts)
     (chinese-l10n--setup-widgets)
     (chinese-l10n--setup-easy-menu)
+    (chinese-l10n--setup-splash)
     (chinese-l10n--setup-completion)
     (chinese-l10n--setup-documentation)
     (chinese-l10n--translate-error-symbols)

@@ -195,7 +195,7 @@ def iter_lisp():
             if os.sep + '.git' in dp:
                 continue
             for f in fn:
-                if f.endswith('.el'):
+                if f.endswith('.el') and not f.startswith('chinese-l10n'):
                     yield os.path.join(dp, f)
 
 def iter_c():
@@ -262,6 +262,9 @@ def is_bad(s):
     if not s or s.strip() == '':
         return True
     if '\x00' in s:
+        return True
+    # 跳过已经含中文的串（无需翻译；也避免“中→中”链式词条）
+    if re.search(r'[\u4e00-\u9fff]', s):
         return True
     # Skip regexp-ish strings.
     if re.search(r"\\[()|_<>{}[\]'=]", s):

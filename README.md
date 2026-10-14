@@ -8,6 +8,28 @@ everything keeps working.
 
 > 中文说明见 [README.zh-CN.md](README.zh-CN.md)。
 
+## Screenshot
+
+Terminal capture (see `docs/screenshot-tty.txt`):
+
+```
+欢迎使用 GNU Emacs，它是 GNU/Linux 操作系统的一个组件。
+
+获取帮助	   C-h  （按住 CTRL 并按下 h）
+Emacs 手册	   C-h r	浏览手册	   C-h i
+Emacs 教程	   C-h t	撤销更改	   C-x u
+购买手册	   C-h RET	退出 Emacs	   C-x C-c
+激活菜单栏   M-`
+
+实用任务：
+访问新文件			打开主目录
+自定义启动		打开 *scratch* 缓冲区
+
+菜单栏：  帮助 文件 编辑 选项 缓冲区 工具
+
+回显消息：  缓冲区开头 / 已设置标记 / 正在保存文件x.el... / 退出
+```
+
 ## What is translated
 
 | Surface | Example |
@@ -125,5 +147,6 @@ sh ci/update-emacs.sh emacs-31   # fetch upstream, re-apply the localization
 
 ## Contributing
 
-Corrections to the translation are welcome: edit the relevant dictionary
-entry or `.texi` file, or improve `l10n/` and regenerate.
+Corrections to the translation are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md)
+and [docs/translation.md](docs/translation.md).  Version history is in
+[CHANGELOG.md](CHANGELOG.md).
