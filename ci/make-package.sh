@@ -13,7 +13,7 @@ set -eu
 
 STAGE=${1:?用法: make-package.sh <stage-dir> <prefix> <version> <out-dir>}
 PREFIX=${2:?}
-VERSION=${3:?}
+PKGVER=${3:?}
 OUTDIR=${4:?}
 
 [ -d "$STAGE" ] || { echo "错误：找不到暂存目录 $STAGE" >&2; exit 1; }
@@ -21,8 +21,9 @@ mkdir -p "$OUTDIR"
 REL=${PREFIX#/}          # /opt/emacs-cn -> opt/emacs-cn
 
 ID=""; ID_LIKE=""
+OS_RELEASE=${OS_RELEASE:-/etc/os-release}
 # shellcheck disable=SC1091
-[ -r /etc/os-release ] && . /etc/os-release 2>/dev/null || true
+[ -r "$OS_RELEASE" ] && . "$OS_RELEASE" 2>/dev/null || true
 # 可用 PKG_DISTRO 覆盖（测试用，如 PKG_DISTRO=debian）
 [ -n "${PKG_DISTRO:-}" ] && ID="$PKG_DISTRO"
 
@@ -42,7 +43,7 @@ make_deb() {
     echo "警告：未安装 dpkg-deb，跳过 .deb 生成"
     return 0
   fi
-  DEBVER=$(printf '%s' "$VERSION" | tr '-' '~')
+  DEBVER=$(printf '%s' "$PKGVER" | tr '-' '~')
   tmp=$(mktemp -d)
   mkdir -p "$tmp/DEBIAN"
   cp -a "$STAGE/." "$tmp/"
@@ -77,7 +78,7 @@ make_pacman() {
   {
     echo "pkgname = emacs-cn"
     echo "pkgbase = emacs-cn"
-    echo "pkgver = $VERSION"
+    echo "pkgver = $PKGVER"
     echo "pkgdesc = Chinese localized GNU Emacs"
     echo "url = https://www.gnu.org/software/emacs/"
     echo "builddate = $(date +%s)"
@@ -87,7 +88,7 @@ make_pacman() {
     echo "license = GPL-3.0-or-later"
     for p in $ARCH_DEPENDS; do echo "depend = $p"; done
   } > "$tmp/.PKGINFO"
-  out="$OUTDIR/emacs-cn-${VERSION}-x86_64.pkg.tar.zst"
+  out="$OUTDIR/emacs-cn-${PKGVER}-x86_64.pkg.tar.zst"
   ( cd "$tmp" && tar --zstd -cf "$out" .PKGINFO "$REL" )
   echo "已生成 $out"
   rm -rf "$tmp"
