@@ -26,10 +26,21 @@ All notable changes to the Chinese localization are documented here.
 - 翻译器 `l10n/texi-translate.py`：保留 Texinfo 标记，跳过 `@example`/`@macro`
   等块，节点名保持英文。
 
-### 工程
+## 31.1.50-cn3
+
+### 打包 / 平台
 
 - 产出**发行版原生包**：Debian/Ubuntu 的 `.deb`、Arch 的 pacman 包
-  （`ci/make-package.sh`），CI 与便携 `tar.zst` 一并上传到 Release。
+  （`ci/make-package.sh`），与便携 `tar.zst` 一并上传到 Release。
+- 支持 **arm64/aarch64**：产物按架构命名，GitHub Actions 用 ARM runner 构建。
+- 新增 **Wayland 原生版**（`--with-pgtk`，包名 `emacs-cn-wayland`，对应
+  Arch 的 `emacs-wayland`）；用 `TOOLKIT=pgtk` 切换，两变体互相冲突。
+- CI 覆盖 **x86_64 + arm64 × X11 + Wayland** 四种组合。
+
+## 31.1.50-cn2
+
+### 工程
+
 - 依赖安装脚本同时支持 **Arch** 与 **Debian/Ubuntu**（`ci/install-deps.sh`）。
 - 预编译产物按发行版区分：`emacs-cn-{arch,debian}-x86_64.tar.zst`
   （动态链接的 soname 差异，例如 Arch 的 `libxml2.so.16` 与 Ubuntu 的 `.so.2`）。

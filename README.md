@@ -59,32 +59,45 @@ keep working.
 
 ## Download and install
 
-The CI publishes, for each release, **native packages** and portable
-tarballs:
+The CI publishes, for each release, native packages and portable tarballs,
+for **x86_64 and arm64**, and for two graphics backends:
 
-| Artifact | Install on |
+* **X11** (default): `--with-x-toolkit=gtk3` — package name `emacs-cn`.
+* **Wayland (pgtk)**: `--with-pgtk` (pure GTK, native Wayland) — package name
+  `emacs-cn-wayland`, equivalent to Arch's `emacs-wayland`.
+
+| File pattern | Type |
 | --- | --- |
-| `emacs-cn_*_amd64.deb` | Debian / Ubuntu |
-| `emacs-cn-*-x86_64.pkg.tar.zst` | Arch / Manjaro / Omarchy |
-| `emacs-cn-{debian,arch}-x86_64.tar.zst` | portable tarball |
+| `emacs-cn_*_<arch>.deb` | Debian/Ubuntu, X11 |
+| `emacs-cn-wayland_*_<arch>.deb` | Debian/Ubuntu, Wayland |
+| `emacs-cn-*-<arch>.pkg.tar.zst` | Arch/Manjaro, X11 |
+| `emacs-cn-wayland-*-<arch>.pkg.tar.zst` | Arch/Manjaro, Wayland |
+| `emacs-cn-<distro>-<arch>[-pgtk].tar.zst` | portable tarball |
+
+`<arch>` is `amd64`/`arm64` for `.deb`, `x86_64`/`aarch64` for pacman and
+tarballs.
 
 ```sh
-# Debian / Ubuntu
+# Debian / Ubuntu (X11 / Wayland)
 sudo apt install ./emacs-cn_*_amd64.deb
+sudo apt install ./emacs-cn-wayland_*_arm64.deb
 
-# Arch / Manjaro / Omarchy
+# Arch / Manjaro / Omarchy (X11 / Wayland)
 sudo pacman -U emacs-cn-*-x86_64.pkg.tar.zst
+sudo pacman -U emacs-cn-wayland-*-x86_64.pkg.tar.zst
 
 # portable tarball (the prefix is compiled in, so extract to /)
-sudo tar --zstd -xf emacs-cn-<distro>-x86_64.tar.zst -C /
-# or, to also install missing runtime libs and a launcher:
-sh install.sh emacs-cn-<distro>-x86_64.tar.zst
+sudo tar --zstd -xf emacs-cn-<distro>-<arch>[-pgtk].tar.zst -C /
 
 emacs-cn -nw
 ```
 
-> Emacs is dynamically linked, so use the package built for your distro —
-> the `libxml2` soname differs (`.so.2` on Ubuntu, `.so.16` on newer Arch).
+> The X11 and Wayland variants both install to `/opt/emacs-cn` and declare a
+> conflict with each other — install only one.
+>
+> Emacs is dynamically linked, so use the package built for your distro and
+> CPU — the `libxml2` soname differs (`.so.2` on Ubuntu, `.so.16` on newer
+> Arch), and an `amd64` package cannot be installed on `arm64` at all.
 
 ## Build from source
 

@@ -16,15 +16,27 @@ PREFIX=${PREFIX:-/opt/emacs-cn}
 NATIVE=${NATIVE:-yes}
 JOBS=${JOBS:-$(nproc 2>/dev/null || echo 2)}
 
-# 按发行版自动命名产物（可用 OUT 覆盖）
+# 图形后端：x11（默认，GTK3/X11）或 pgtk（纯 GTK，原生 Wayland，即 emacs-wayland）
+TOOLKIT=${TOOLKIT:-x11}
+case "$TOOLKIT" in
+  pgtk|wayland)
+    TOOLKIT=pgtk; TOOLKIT_OPT=--with-pgtk; VARIANT=-pgtk
+    PKGNAME=${PKGNAME:-emacs-cn-wayland} ;;
+  *)
+    TOOLKIT=x11; TOOLKIT_OPT=--with-x-toolkit=gtk3; VARIANT=
+    PKGNAME=${PKGNAME:-emacs-cn} ;;
+esac
+
+# 按 发行版 + 架构 (+ 变体) 自动命名产物（可用 OUT 覆盖）
+ARCH=$(uname -m)   # x86_64 / aarch64
 if [ -z "${OUT:-}" ]; then
   ID=""; ID_LIKE=""
   # shellcheck disable=SC1091
   [ -r /etc/os-release ] && . /etc/os-release 2>/dev/null || true
   case "$ID $ID_LIKE" in
-    *arch*|*manjaro*|*omarchy*) OUT=emacs-cn-arch-x86_64.tar.zst ;;
-    *debian*|*ubuntu*|*mint*|*pop*) OUT=emacs-cn-debian-x86_64.tar.zst ;;
-    *) OUT=emacs-cn-linux-x86_64.tar.zst ;;
+    *arch*|*manjaro*|*omarchy*) OUT=emacs-cn-arch-$ARCH$VARIANT.tar.zst ;;
+    *debian*|*ubuntu*|*mint*|*pop*) OUT=emacs-cn-debian-$ARCH$VARIANT.tar.zst ;;
+    *) OUT=emacs-cn-linux-$ARCH$VARIANT.tar.zst ;;
   esac
 fi
 
@@ -48,12 +60,12 @@ echo "==> autogen"
 configure_with() {
   ./configure \
     --prefix="$PREFIX" \
-    --with-x-toolkit=gtk3 \
-    "$1" \
+    $TOOLKIT_OPT \
+    "$@" \
     --without-tree-sitter
 }
 
-echo "==> configure (prefix=$PREFIX, native=$NATIVE)"
+echo "==> configure (prefix=$PREFIX, native=$NATIVE, toolkit=$TOOLKIT)"
 if [ "$NATIVE_OPT" = --with-native-compilation ]; then
   # 尝试原生编译；libgccjit 不可用时自动回退
   if configure_with --with-native-compilation; then
@@ -86,4 +98,4 @@ ls -lh "$ROOT/$OUT"
 echo "==> 生成发行版原生包"
 PKGVER=$(cat "$ROOT/VERSION" 2>/dev/null | tr -d '\n' || true)
 [ -n "$PKGVER" ] || PKGVER=0
-sh "$ROOT/ci/make-package.sh" "$ROOT/stage" "$PREFIX" "$PKGVER" "$ROOT"
+sh "$ROOT/ci/make-package.sh" "$ROOT/stage" "$PREFIX" "$PKGVER" "$ROOT" "$PKGNAME"
