@@ -26,6 +26,14 @@ All notable changes to the Chinese localization are documented here.
 - 翻译器 `l10n/texi-translate.py`：保留 Texinfo 标记，跳过 `@example`/`@macro`
   等块，节点名保持英文。
 
+## 31.1.50-cn4
+
+### 打包 / 平台
+
+- GitHub 工作流新增 **Arch (pacman)** 构建（`build-arch`），使 GitHub 的
+  Release 同时提供 `.deb` 与 `.pkg.tar.zst`（此前 GitHub 只有 Debian 产物）。
+- GitHub 覆盖：Debian 的 amd64/arm64 × X11/Wayland，Arch 的 x86_64 × X11/Wayland。
+
 ## 31.1.50-cn3
 
 ### 打包 / 平台

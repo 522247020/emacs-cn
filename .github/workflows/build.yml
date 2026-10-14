@@ -13,20 +13,22 @@ permissions:
   contents: write
 
 jobs:
+  # ---- Debian / Ubuntu（amd64 + arm64）×（X11 + Wayland）----
+  #
+  #   x11  —— --with-x-toolkit=gtk3（默认）
+  #   pgtk —— --with-pgtk（纯 GTK，原生 Wayland，即 emacs-wayland）
+  #
+  # 说明：arm64 使用 GitHub 的 ARM 托管 runner（公开仓库可用）。
+  # 若你的账户不支持，删掉下面两行 runner 为 ubuntu-24.04-arm 的条目即可。
   build:
-    # x86_64 与 arm64 各构建两种图形后端：
-    #   x11  —— --with-x-toolkit=gtk3（默认）
-    #   pgtk —— --with-pgtk（纯 GTK，原生 Wayland，即 emacs-wayland）
-    # 说明：arm64 使用 GitHub 的 ARM 托管 runner（公开仓库可用）。
-    # 若你的账户不支持，删掉下面两行 runner 为 ubuntu-24.04-arm 的条目即可。
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { runner: ubuntu-latest,    toolkit: x11,  suffix: x86_64 }
-          - { runner: ubuntu-latest,    toolkit: pgtk, suffix: x86_64-wayland }
-          - { runner: ubuntu-24.04-arm, toolkit: x11,  suffix: arm64 }
-          - { runner: ubuntu-24.04-arm, toolkit: pgtk, suffix: arm64-wayland }
+          - { runner: ubuntu-latest,    toolkit: x11,  suffix: debian-x86_64 }
+          - { runner: ubuntu-latest,    toolkit: pgtk, suffix: debian-x86_64-wayland }
+          - { runner: ubuntu-24.04-arm, toolkit: x11,  suffix: debian-arm64 }
+          - { runner: ubuntu-24.04-arm, toolkit: pgtk, suffix: debian-arm64-wayland }
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 240
     steps:
@@ -56,10 +58,51 @@ jobs:
           compression-level: 0
           if-no-files-found: error
 
-  # 所有构建完成后，统一创建 Release 并附上全部产物。
+  # ---- Arch Linux（pacman 包，x86_64）×（X11 + Wayland）----
+  build-arch:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { toolkit: x11,  suffix: arch-x86_64 }
+          - { toolkit: pgtk, suffix: arch-x86_64-wayland }
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    timeout-minutes: 240
+    steps:
+      # 容器里装 git / node（actions/checkout、upload-artifact 需要 node）
+      - name: Install git and node
+        run: pacman -Sy --noconfirm git nodejs
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install build dependencies
+        run: sh ci/install-deps.sh
+
+      - name: Build and package
+        env:
+          PREFIX: /opt/emacs-cn
+          NATIVE: yes
+          TOOLKIT: ${{ matrix.toolkit }}
+        run: sh ci/build-emacs.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: emacs-cn-${{ matrix.suffix }}
+          path: |
+            emacs-cn-arch-*.tar.zst
+            emacs-cn*.pkg.tar.zst
+          compression-level: 0
+          if-no-files-found: error
+
+  # ---- 所有构建完成后，统一创建 Release 并附上全部产物 ----
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: build
+    needs: [build, build-arch]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
