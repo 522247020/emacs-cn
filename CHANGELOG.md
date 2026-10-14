@@ -28,6 +28,8 @@ All notable changes to the Chinese localization are documented here.
 
 ### 工程
 
+- 产出**发行版原生包**：Debian/Ubuntu 的 `.deb`、Arch 的 pacman 包
+  （`ci/make-package.sh`），CI 与便携 `tar.zst` 一并上传到 Release。
 - 依赖安装脚本同时支持 **Arch** 与 **Debian/Ubuntu**（`ci/install-deps.sh`）。
 - 预编译产物按发行版区分：`emacs-cn-{arch,debian}-x86_64.tar.zst`
   （动态链接的 soname 差异，例如 Arch 的 `libxml2.so.16` 与 Ubuntu 的 `.so.2`）。

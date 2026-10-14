@@ -106,12 +106,16 @@ jobs:
             curl -s -X DELETE -H "$AUTH" "$API/releases/$RID/assets/$aid" >/dev/null || true
           done
 
-          # 5) 上传附件
-          code=$(curl -s -o /tmp/asset.out -w '%{http_code}' -X POST \
-            "$API/releases/$RID/assets?name=$ASSET" \
-            -H "$AUTH" -F "attachment=@$ASSET")
-          echo "asset HTTP $code"; cat /tmp/asset.out; echo
-          [ "$code" = 201 ] || { echo "附件上传失败"; exit 1; }
+          # 5) 上传附件（tar.zst + 原生包）
+          for f in emacs-cn-*.tar.zst emacs-cn_*.deb emacs-cn-*.pkg.tar.zst; do
+            [ -f "$f" ] || continue
+            name=$(basename "$f")
+            code=$(curl -s -o /tmp/asset.out -w '%{http_code}' -X POST \
+              "$API/releases/$RID/assets?name=$name" \
+              -H "$AUTH" -F "attachment=@$f")
+            echo "$name HTTP $code"
+            [ "$code" = 201 ] || { echo "附件上传失败: $name"; cat /tmp/asset.out; exit 1; }
+          done
           echo "已发布 $TAG"
 
   # Arch 版本：在 archlinux 容器里构建，产出的二进制用 Arch 的
@@ -182,13 +186,14 @@ jobs:
                        | grep -o '"id":[0-9]*' | cut -d: -f2); do
             curl -s -X DELETE -H "$AUTH" "$API/releases/$RID/assets/$aid" >/dev/null || true
           done
-          code=$(curl -s -o /tmp/asset2.out -w '%{http_code}' -X POST \
-            "$API/releases/$RID/assets?name=$ASSET" \
-            -H "$AUTH" -F "attachment=@$ASSET")
-          echo "asset HTTP $code"; cat /tmp/asset2.out; echo
-          if [ "$code" = 201 ]; then
-            echo "已上传 Arch 产物到 Release $TAG"
-          else
-            echo "附件上传失败"
-            exit 1
-          fi
+          # 上传 tar.zst + pacman 包
+          for f in emacs-cn-arch-x86_64.tar.zst emacs-cn-*.pkg.tar.zst; do
+            [ -f "$f" ] || continue
+            name=$(basename "$f")
+            code=$(curl -s -o /tmp/asset2.out -w '%{http_code}' -X POST \
+              "$API/releases/$RID/assets?name=$name" \
+              -H "$AUTH" -F "attachment=@$f")
+            echo "$name HTTP $code"
+            [ "$code" = 201 ] || { echo "附件上传失败: $name"; cat /tmp/asset2.out; exit 1; }
+          done
+          echo "已上传 Arch 产物到 Release $TAG"

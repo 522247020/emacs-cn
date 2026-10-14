@@ -190,26 +190,36 @@ make install
 - **推送 `v*` 标签**：为该标签创建 Release 并附上产物。
 - **发布新版本**：修改 `VERSION`（如 `31.1.50-cn1` → `31.1.50-cn2`）后推送到 `main` 即可。
 
-使用产物（**按发行版选对应包**）：
+使用产物（**按发行版选对应包**，CI 会同时产出原生包与压缩包）：
 
-| 产物 | 适用 | 说明 |
+| 产物 | 适用 | 安装 |
 | --- | --- | --- |
-| `emacs-cn-linux-x86_64.tar.zst` | Debian / Ubuntu | 在 Ubuntu runner 上构建 |
-| `emacs-cn-arch-x86_64.tar.zst` | Arch / Manjaro / Omarchy | 在 archlinux 容器里构建 |
+| `emacs-cn_*_amd64.deb` | Debian / Ubuntu | `sudo apt install ./emacs-cn_*_amd64.deb` |
+| `emacs-cn-*-x86_64.pkg.tar.zst` | Arch / Manjaro / Omarchy | `sudo pacman -U emacs-cn-*-x86_64.pkg.tar.zst` |
+| `emacs-cn-{debian,arch}-x86_64.tar.zst` | 便携压缩包 | `sudo tar --zstd -xf ... -C /` |
 
 ```sh
-# 解包（需要写入 /opt）
+# Debian / Ubuntu
+sudo apt install ./emacs-cn_*_amd64.deb
+
+# Arch / Manjaro / Omarchy
+sudo pacman -U emacs-cn-*-x86_64.pkg.tar.zst
+
+# 便携压缩包（前缀编进了路径，需解到 /）
 sudo tar --zstd -xf emacs-cn-<distro>-x86_64.tar.zst -C /
-/opt/emacs-cn/bin/emacs -nw
+# 或用安装脚本（会补齐运行库、建 emacs-cn 命令与桌面项）
+sh install.sh emacs-cn-<distro>-x86_64.tar.zst
+
+emacs-cn -nw
 ```
 
 > **为什么必须分发行版**：Emacs 是动态链接的，依赖系统的 soname。
 > 例如 `libxml2`：Ubuntu 是 `libxml2.so.2`，而较新的 Arch 是
 > `libxml2.so.16`。用 Ubuntu 版在 Arch 上跑会报
 > `libxml2.so.2: cannot open shared object file`——装 `libxml2` 也没用。
-> 所以请用对应发行版的产物；不确定就**在目标机上自行编译**（见下）。
+> 所以请用对应发行版的包；不确定就**在目标机上自行编译**（见下）。
 >
-> 另：产物把安装前缀 `/opt/emacs-cn` 编进了路径，必须解到该位置。
+> 另：压缩包把安装前缀 `/opt/emacs-cn` 编进了路径，必须解到该位置。
 > 想换路径就改 `ci/build-emacs.sh` 的 `PREFIX` 后重新构建。
 
 ### 在目标机上自行编译（最稳）

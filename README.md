@@ -59,28 +59,32 @@ keep working.
 
 ## Download and install
 
-Prebuilt tarballs are produced by the CI (GitHub/Gitea Releases).  Pick the
-one matching your distribution — Emacs is dynamically linked, so the
-`libxml2`/glibc/soname must match:
+The CI publishes, for each release, **native packages** and portable
+tarballs:
 
-| Artifact | For |
+| Artifact | Install on |
 | --- | --- |
-| `emacs-cn-debian-x86_64.tar.zst` | Debian / Ubuntu |
-| `emacs-cn-arch-x86_64.tar.zst` | Arch / Manjaro / Omarchy |
+| `emacs-cn_*_amd64.deb` | Debian / Ubuntu |
+| `emacs-cn-*-x86_64.pkg.tar.zst` | Arch / Manjaro / Omarchy |
+| `emacs-cn-{debian,arch}-x86_64.tar.zst` | portable tarball |
 
 ```sh
-# extract (the install prefix is compiled in, so extract to /)
-sudo tar --zstd -xf emacs-cn-<distro>-x86_64.tar.zst -C /
+# Debian / Ubuntu
+sudo apt install ./emacs-cn_*_amd64.deb
 
-# or use the helper, which also installs missing runtime libs and a
-# launcher command
+# Arch / Manjaro / Omarchy
+sudo pacman -U emacs-cn-*-x86_64.pkg.tar.zst
+
+# portable tarball (the prefix is compiled in, so extract to /)
+sudo tar --zstd -xf emacs-cn-<distro>-x86_64.tar.zst -C /
+# or, to also install missing runtime libs and a launcher:
 sh install.sh emacs-cn-<distro>-x86_64.tar.zst
 
 emacs-cn -nw
 ```
 
-> The build prefix is fixed at build time (`/opt/emacs-cn` by default, or
-> `$HOME/.local/emacs-cn`).  `install.sh` auto-detects it from the tarball.
+> Emacs is dynamically linked, so use the package built for your distro —
+> the `libxml2` soname differs (`.so.2` on Ubuntu, `.so.16` on newer Arch).
 
 ## Build from source
 

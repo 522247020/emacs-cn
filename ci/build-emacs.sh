@@ -77,8 +77,13 @@ echo "==> make install DESTDIR=$ROOT/stage"
 rm -rf "$ROOT/stage"
 make install DESTDIR="$ROOT/stage"
 
-echo "==> 打包"
+echo "==> 打包 (tar.zst)"
 cd "$ROOT/stage"
 tar --zstd -cf "$ROOT/$OUT" .
 echo "==> 完成: $ROOT/$OUT"
 ls -lh "$ROOT/$OUT"
+
+echo "==> 生成发行版原生包"
+PKGVER=$(cat "$ROOT/VERSION" 2>/dev/null | tr -d '\n' || true)
+[ -n "$PKGVER" ] || PKGVER=0
+sh "$ROOT/ci/make-package.sh" "$ROOT/stage" "$PREFIX" "$PKGVER" "$ROOT"
