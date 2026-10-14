@@ -142,6 +142,53 @@ jobs:
           compression-level: 0
           if-no-files-found: error
 
+  # ---- 生成 apt 仓库并发布到 GitHub Pages ----------------
+  # 需要在仓库 Settings → Pages 里把 Source 设为 "GitHub Actions"。
+  apt:
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+    needs: [build, build-debian]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev apt-utils
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Build apt repository
+        env:
+          APT_GPG_KEY: ${{ secrets.APT_GPG_KEY }}
+        run: sh ci/make-apt-repo.sh dist public
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
+
   # ---- 所有构建完成后，统一创建 Release 并附上全部产物 ----
   release:
     if: startsWith(github.ref, 'refs/tags/')

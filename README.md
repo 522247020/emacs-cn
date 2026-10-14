@@ -107,6 +107,27 @@ emacs-cn -nw
 > built for your distribution and CPU (an `amd64` package cannot be installed
 > on `arm64`).
 
+### apt repository
+
+The CI also publishes an apt repository on GitHub Pages, so you can use
+`apt install` and receive updates:
+
+```sh
+# Debian / Raspberry Pi OS
+echo "deb [trusted=yes] https://522247020.github.io/emacs-cn/debian stable main" \
+  | sudo tee /etc/apt/sources.list.d/emacs-cn.list
+
+# Ubuntu: use .../emacs-cn/ubuntu instead (libraries differ)
+sudo apt update
+sudo apt install emacs-cn            # X11
+sudo apt install emacs-cn-wayland    # Wayland (pgtk)
+```
+
+Enable it once in **Settings → Pages → Source: GitHub Actions**.  On a
+**private** repository GitHub Pages needs a paid plan — in that case use the
+`.deb` from Releases or build locally.  Signing is supported by exporting the
+private key to the `APT_GPG_KEY` secret (otherwise `[trusted=yes]` is used).
+
 ## Build from source
 
 ```sh

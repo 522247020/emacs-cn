@@ -26,6 +26,14 @@ All notable changes to the Chinese localization are documented here.
 - 翻译器 `l10n/texi-translate.py`：保留 Texinfo 标记，跳过 `@example`/`@macro`
   等块，节点名保持英文。
 
+## 31.1.50-cn6
+
+### 打包 / 平台
+
+- 新增 **apt 仓库**（托管于 GitHub Pages）：Debian/Ubuntu 可直接
+  `apt install emacs-cn` / `emacs-cn-wayland` 并获得更新。生成脚本
+  `ci/make-apt-repo.sh`（多架构 Packages/Release，可选 GPG 签名）。
+
 ## 31.1.50-cn5
 
 ### 打包 / 平台
