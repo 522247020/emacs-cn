@@ -12,23 +12,23 @@ on:
 permissions:
   contents: write
 
+# 三种体系各自构建（.deb 的依赖与 SONAME 必须匹配目标发行版）：
+#   build        —— Ubuntu 原生 runner，产出 emacs-cn-ubuntu_*_*.deb
+#   build-debian —— Debian 容器，产出 emacs-cn-debian_*_*.deb（适配 Raspberry Pi OS）
+#   build-arch   —— Arch 容器，产出 .pkg.tar.zst
+# 每种又分 X11（默认）与 Wayland（--with-pgtk，包名 emacs-cn-wayland）。
+
 jobs:
-  # ---- Debian / Ubuntu（amd64 + arm64）×（X11 + Wayland）----
-  #
-  #   x11  —— --with-x-toolkit=gtk3（默认）
-  #   pgtk —— --with-pgtk（纯 GTK，原生 Wayland，即 emacs-wayland）
-  #
-  # 说明：arm64 使用 GitHub 的 ARM 托管 runner（公开仓库可用）。
-  # 若你的账户不支持，删掉下面两行 runner 为 ubuntu-24.04-arm 的条目即可。
+  # ---- Ubuntu（amd64 + arm64）----
   build:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { runner: ubuntu-latest,    toolkit: x11,  suffix: debian-x86_64 }
-          - { runner: ubuntu-latest,    toolkit: pgtk, suffix: debian-x86_64-wayland }
-          - { runner: ubuntu-24.04-arm, toolkit: x11,  suffix: debian-arm64 }
-          - { runner: ubuntu-24.04-arm, toolkit: pgtk, suffix: debian-arm64-wayland }
+          - { runner: ubuntu-latest,    toolkit: x11,  suffix: ubuntu-amd64 }
+          - { runner: ubuntu-latest,    toolkit: pgtk, suffix: ubuntu-amd64-wayland }
+          - { runner: ubuntu-24.04-arm, toolkit: x11,  suffix: ubuntu-arm64 }
+          - { runner: ubuntu-24.04-arm, toolkit: pgtk, suffix: ubuntu-arm64-wayland }
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 240
     steps:
@@ -52,13 +52,57 @@ jobs:
         with:
           name: emacs-cn-${{ matrix.suffix }}
           path: |
-            emacs-cn-*.tar.zst
-            emacs-cn*.deb
-            emacs-cn*.pkg.tar.zst
+            emacs-cn-ubuntu-*.tar.zst
+            emacs-cn*-ubuntu_*.deb
           compression-level: 0
           if-no-files-found: error
 
-  # ---- Arch Linux（pacman 包，x86_64）×（X11 + Wayland）----
+  # ---- Debian（amd64 + arm64）：供 Debian / Raspberry Pi OS 使用 ----
+  build-debian:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest,    toolkit: x11,  suffix: debian-amd64 }
+          - { runner: ubuntu-latest,    toolkit: pgtk, suffix: debian-amd64-wayland }
+          - { runner: ubuntu-24.04-arm, toolkit: x11,  suffix: debian-arm64 }
+          - { runner: ubuntu-24.04-arm, toolkit: pgtk, suffix: debian-arm64-wayland }
+    runs-on: ${{ matrix.runner }}
+    container: debian:trixie
+    timeout-minutes: 240
+    steps:
+      # 容器里先装 git / node（actions/checkout、upload-artifact 需要）
+      - name: Install git and node
+        run: |
+          apt-get update
+          apt-get install -y git nodejs ca-certificates
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install build dependencies
+        run: sh ci/install-deps.sh
+
+      - name: Build and package
+        env:
+          PREFIX: /opt/emacs-cn
+          NATIVE: yes
+          TOOLKIT: ${{ matrix.toolkit }}
+        run: sh ci/build-emacs.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: emacs-cn-${{ matrix.suffix }}
+          path: |
+            emacs-cn-debian-*.tar.zst
+            emacs-cn*-debian_*.deb
+          compression-level: 0
+          if-no-files-found: error
+
+  # ---- Arch Linux（pacman 包，x86_64）----
   build-arch:
     strategy:
       fail-fast: false
@@ -70,7 +114,6 @@ jobs:
     container: archlinux:latest
     timeout-minutes: 240
     steps:
-      # 容器里装 git / node（actions/checkout、upload-artifact 需要 node）
       - name: Install git and node
         run: pacman -Sy --noconfirm git nodejs
 
@@ -102,7 +145,7 @@ jobs:
   # ---- 所有构建完成后，统一创建 Release 并附上全部产物 ----
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [build, build-arch]
+    needs: [build, build-debian, build-arch]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts

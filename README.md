@@ -66,10 +66,17 @@ for **x86_64 and arm64**, and for two graphics backends:
 * **Wayland (pgtk)**: `--with-pgtk` (pure GTK, native Wayland) — package name
   `emacs-cn-wayland`, equivalent to Arch's `emacs-wayland`.
 
-| File pattern | Type |
+Because Emacs is dynamically linked, the `.deb` is built separately on
+**Debian** and **Ubuntu** (their library names *and SONAMEs* differ, e.g.
+Debian's `libjpeg62-turbo`/`libjpeg.so.62` vs Ubuntu's
+`libjpeg-turbo8`/`libjpeg.so.8`).
+
+| File pattern | For |
 | --- | --- |
-| `emacs-cn_*_<arch>.deb` | Debian/Ubuntu, X11 |
-| `emacs-cn-wayland_*_<arch>.deb` | Debian/Ubuntu, Wayland |
+| `emacs-cn-debian_*_<arch>.deb` | Debian, Raspberry Pi OS … (X11) |
+| `emacs-cn-wayland-debian_*_<arch>.deb` | Debian, Raspberry Pi OS … (Wayland) |
+| `emacs-cn-ubuntu_*_<arch>.deb` | Ubuntu (X11) |
+| `emacs-cn-wayland-ubuntu_*_<arch>.deb` | Ubuntu (Wayland) |
 | `emacs-cn-*-<arch>.pkg.tar.zst` | Arch/Manjaro, X11 |
 | `emacs-cn-wayland-*-<arch>.pkg.tar.zst` | Arch/Manjaro, Wayland |
 | `emacs-cn-<distro>-<arch>[-pgtk].tar.zst` | portable tarball |
@@ -78,13 +85,16 @@ for **x86_64 and arm64**, and for two graphics backends:
 tarballs.
 
 ```sh
-# Debian / Ubuntu (X11 / Wayland)
-sudo apt install ./emacs-cn_*_amd64.deb
-sudo apt install ./emacs-cn-wayland_*_arm64.deb
+# Debian / Raspberry Pi OS
+sudo apt install ./emacs-cn-debian_*_arm64.deb
+sudo apt install ./emacs-cn-wayland-debian_*_arm64.deb   # Wayland
 
-# Arch / Manjaro / Omarchy (X11 / Wayland)
+# Ubuntu
+sudo apt install ./emacs-cn-ubuntu_*_amd64.deb
+
+# Arch / Manjaro / Omarchy
 sudo pacman -U emacs-cn-*-x86_64.pkg.tar.zst
-sudo pacman -U emacs-cn-wayland-*-x86_64.pkg.tar.zst
+sudo pacman -U emacs-cn-wayland-*-x86_64.pkg.tar.zst      # Wayland
 
 # portable tarball (the prefix is compiled in, so extract to /)
 sudo tar --zstd -xf emacs-cn-<distro>-<arch>[-pgtk].tar.zst -C /
@@ -93,11 +103,9 @@ emacs-cn -nw
 ```
 
 > The X11 and Wayland variants both install to `/opt/emacs-cn` and declare a
-> conflict with each other — install only one.
->
-> Emacs is dynamically linked, so use the package built for your distro and
-> CPU — the `libxml2` soname differs (`.so.2` on Ubuntu, `.so.16` on newer
-> Arch), and an `amd64` package cannot be installed on `arm64` at all.
+> conflict with each other — install only one.  Likewise pick the `.deb`
+> built for your distribution and CPU (an `amd64` package cannot be installed
+> on `arm64`).
 
 ## Build from source
 

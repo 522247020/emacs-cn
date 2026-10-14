@@ -207,3 +207,104 @@ jobs:
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: sh ci/gitea-upload.sh emacs-cn-arch-*.tar.zst emacs-cn*.pkg.tar.zst
+
+  # Debian 原生 .deb（适配 Debian / Raspberry Pi OS）
+  build-debian:
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 240
+    container:
+      image: debian:trixie
+    steps:
+      - name: 准备 git
+        run: |
+          apt-get update
+          apt-get install -y git ca-certificates
+
+      - name: Checkout（git clone）
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          SCHEME=$(printf '%s' "$GITHUB_SERVER_URL" | sed -E 's#^(https?)://.*#\1#')
+          HOST=${GITHUB_SERVER_URL#*://}
+          git config --global --add safe.directory '*'
+          rm -rf repo
+          git clone --depth 1 \
+            "${SCHEME}://oauth2:${TOKEN}@${HOST}/${GITHUB_REPOSITORY}.git" repo
+          cd repo
+          if [ -n "${GITHUB_REF_NAME:-}" ] \
+             && git ls-remote --tags origin "refs/tags/${GITHUB_REF_NAME}" | grep -q .; then
+            git fetch --depth 1 origin "refs/tags/${GITHUB_REF_NAME}"
+            git checkout -q FETCH_HEAD
+          fi
+          git log --oneline -1
+
+      - name: 安装依赖（Debian）
+        working-directory: repo
+        run: sh ci/install-deps.sh
+
+      - name: 构建并打包（Debian）
+        working-directory: repo
+        env:
+          PREFIX: /opt/emacs-cn
+          NATIVE: yes
+        run: sh ci/build-emacs.sh
+
+      - name: 上传产物到 Release
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+        working-directory: repo
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: sh ci/gitea-upload.sh emacs-cn-debian-*.tar.zst emacs-cn*-debian_*.deb
+
+  # Debian + Wayland（pure-GTK/PGTK）
+  build-debian-wayland:
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 240
+    container:
+      image: debian:trixie
+    steps:
+      - name: 准备 git
+        run: |
+          apt-get update
+          apt-get install -y git ca-certificates
+
+      - name: Checkout（git clone）
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          SCHEME=$(printf '%s' "$GITHUB_SERVER_URL" | sed -E 's#^(https?)://.*#\1#')
+          HOST=${GITHUB_SERVER_URL#*://}
+          git config --global --add safe.directory '*'
+          rm -rf repo
+          git clone --depth 1 \
+            "${SCHEME}://oauth2:${TOKEN}@${HOST}/${GITHUB_REPOSITORY}.git" repo
+          cd repo
+          if [ -n "${GITHUB_REF_NAME:-}" ] \
+             && git ls-remote --tags origin "refs/tags/${GITHUB_REF_NAME}" | grep -q .; then
+            git fetch --depth 1 origin "refs/tags/${GITHUB_REF_NAME}"
+            git checkout -q FETCH_HEAD
+          fi
+          git log --oneline -1
+
+      - name: 安装依赖（Debian）
+        working-directory: repo
+        run: sh ci/install-deps.sh
+
+      - name: 构建并打包（Debian + Wayland）
+        working-directory: repo
+        env:
+          PREFIX: /opt/emacs-cn
+          NATIVE: yes
+          TOOLKIT: pgtk
+        run: sh ci/build-emacs.sh
+
+      - name: 上传产物到 Release
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+        working-directory: repo
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: sh ci/gitea-upload.sh emacs-cn-debian-*.tar.zst emacs-cn*-debian_*.deb

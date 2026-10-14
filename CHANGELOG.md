@@ -26,6 +26,18 @@ All notable changes to the Chinese localization are documented here.
 - 翻译器 `l10n/texi-translate.py`：保留 Texinfo 标记，跳过 `@example`/`@macro`
   等块，节点名保持英文。
 
+## 31.1.50-cn5
+
+### 打包 / 平台
+
+- **修复树莓派（Raspberry Pi OS）安装失败**：此前 `.deb` 在 Ubuntu 上构建，
+  依赖 `libjpeg-turbo8`（`libjpeg.so.8`），与 Debian 系的 `libjpeg62-turbo`
+  （`libjpeg.so.62`）SONAME 不兼容。现改为在 **Debian 容器**里构建
+  `emacs-cn-debian_*.deb`；Ubuntu 仍单独产出 `emacs-cn-ubuntu_*.deb`。
+- `.deb` 依赖改为用 `ldd` + `dpkg -S` 从实际二进制推导（在哪个发行版构建，
+  就得到该发行版的正确包名），并保留兼容 Debian/Ubuntu 的兜底列表。
+- `.deb` 文件名加入发行版标识；`libgccjit` 改为可选 `Recommends`。
+
 ## 31.1.50-cn4
 
 ### 打包 / 平台

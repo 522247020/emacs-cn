@@ -36,12 +36,25 @@ OS_RELEASE=${OS_RELEASE:-/etc/os-release}
 [ -r "$OS_RELEASE" ] && . "$OS_RELEASE" 2>/dev/null || true
 # 可用 PKG_DISTRO 覆盖（测试用，如 PKG_DISTRO=debian）
 [ -n "${PKG_DISTRO:-}" ] && ID="$PKG_DISTRO"
+# .deb 文件名里的发行版标识
+case "$ID $ID_LIKE" in
+  *arch*|*manjaro*|*omarchy*) DISTRO_TAG=arch ;;
+  *ubuntu*|*mint*|*pop*)      DISTRO_TAG=ubuntu ;;
+  *debian*)                   DISTRO_TAG=debian ;;
+  *)                          DISTRO_TAG=$ID ;;
+esac
 
-DEB_DEPENDS="libc6, libgtk-3-0, libgnutls30, libxml2, libjansson4, \
-libharfbuzz0b, libncursesw6, zlib1g, libjpeg-turbo8, libpng16-16, libgif7, \
-libtiff6, librsvg2-2, libxpm4, libotf1, libm17n-0, libsystemd0, libdbus-1-3, \
-libsqlite3-0, libffi8, libnettle8, libp11-kit0, libidn2-0, libunistring5, \
-libacl1, libselinux1, libgpm2, libgccjit0"
+# 兜底依赖（当无法用 ldd 推导时使用）。用 "A | B" 兼容 Debian/Ubuntu
+# 的包名差异：Debian 是 libjpeg62-turbo，Ubuntu 是 libjpeg-turbo8，等等。
+# libgccjit 是运行时 dlopen 的（原生编译用），列为可选 Recommends。
+DEB_DEPENDS="libc6, libgtk-3-0, libgnutls30 | libgnutls30t64, libxml2, \
+libjansson4, libharfbuzz0b, libncursesw6, zlib1g, \
+libjpeg62-turbo | libjpeg-turbo8, libpng16-16, libgif7 | libgif4, \
+libtiff6 | libtiff5, librsvg2-2, libxpm4, libotf1, libm17n-0, libsystemd0, \
+libdbus-1-3, libsqlite3-0, libffi8 | libffi7, libnettle8 | libnettle7, \
+libp11-kit0, libidn2-0, libunistring5 | libunistring2, libacl1, libselinux1, \
+libgpm2"
+DEB_RECOMMENDS="libgccjit0"
 
 ARCH_DEPENDS="gtk3 gnutls libxml2 jansson harfbuzz ncurses zlib libjpeg-turbo \
 libpng giflib libtiff librsvg libxpm libotf m17n-lib systemd-libs dbus sqlite \
@@ -52,6 +65,27 @@ if [ "$PKGNAME" = emacs-cn ]; then
 else
   PKGDESC="Chinese localized GNU Emacs, pure-GTK/Wayland build (Wayland 中文版)"
 fi
+
+# 用 ldd + dpkg -S 从实际二进制推导运行时依赖：在哪个发行版构建，
+# 就得到该发行版的正确包名（Debian 上得到 libjpeg62-turbo 而非 libjpeg-turbo8）。
+gen_deb_depends() {
+  main=""
+  for f in "$STAGE/$REL/bin/emacs" "$STAGE/$REL/bin"/emacs-*; do
+    if [ -f "$f" ] && head -c 4 "$f" 2>/dev/null | grep -q ELF; then
+      main="$f"; break
+    fi
+  done
+  if [ -n "$main" ] && command -v ldd >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
+    deps=""
+    for lib in $(ldd "$main" 2>/dev/null | sed -n 's/.*=> \/\([^ ]*\).*/\/\1/p'); do
+      p=$(dpkg -S "$lib" 2>/dev/null | head -1 | cut -d: -f1)
+      [ -n "$p" ] && deps="$deps $p"
+    done
+    deps=$(printf '%s\n' $deps | sort -u | paste -sd, -)
+    if [ -n "$deps" ]; then printf '%s' "$deps"; return 0; fi
+  fi
+  printf '%s' "$DEB_DEPENDS"
+}
 
 make_deb() {
   echo "==> 生成 .deb"
@@ -72,14 +106,15 @@ make_deb() {
     echo "Architecture: $DEBARCH"
     echo "Maintainer: emacs-cn <emacs-cn@localhost>"
     echo "Installed-Size: $isize"
-    echo "Depends: $(echo "$DEB_DEPENDS" | tr -d '\\\n')"
+    echo "Depends: $(gen_deb_depends | tr -d '\\\n' | sed 's/ *$//')"
+    echo "Recommends: $DEB_RECOMMENDS"
     [ "$PKGNAME" = emacs-cn ] || { echo "Conflicts: emacs-cn"; echo "Provides: emacs-cn"; }
     echo "Description: $PKGDESC"
     echo " A Chinese-localized build of GNU Emacs.  The user interface, docstrings"
     echo " and manuals are translated into Simplified Chinese; command names and key"
     echo " sequences are kept unchanged."
   } > "$tmp/DEBIAN/control"
-  out="$OUTDIR/${PKGNAME}_${DEBVER}_${DEBARCH}.deb"
+  out="$OUTDIR/${PKGNAME}-${DISTRO_TAG}_${DEBVER}_${DEBARCH}.deb"
   dpkg-deb --build --root-owner-group "$tmp" "$out" >/dev/null 2>&1 \
     || dpkg-deb -b "$tmp" "$out" >/dev/null
   echo "已生成 $out"
