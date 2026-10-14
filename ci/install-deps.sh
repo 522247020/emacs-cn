@@ -75,14 +75,24 @@ elif command -v apt-get >/dev/null 2>&1; then
   $SUDO apt-get install -y --no-install-recommends software-properties-common >/dev/null 2>&1 || true
   $SUDO add-apt-repository -y universe >/dev/null 2>&1 || true
 
-  $SUDO apt-get install -y --no-install-recommends \
-    build-essential git autoconf automake texinfo pkg-config zstd curl ca-certificates \
-    libgnutls28-dev libxml2-dev libjansson-dev libgmp-dev \
-    libgtk-3-dev libharfbuzz-dev libncurses-dev zlib1g-dev \
-    libjpeg-dev libpng-dev libgif-dev libtiff-dev librsvg2-dev libxpm-dev \
-    libotf-dev libm17n-dev libsystemd-dev libdbus-1-dev libsqlite3-dev \
-    libffi-dev libnettle-dev libp11-kit-dev libidn2-dev libunistring-dev \
-    libacl1-dev libselinux1-dev libgpm-dev
+  # 运行时/开发包（不存在的会被自动过滤，如 libnettle-dev 实为 nettle-dev）
+  DEB_PKGS="build-essential git autoconf automake texinfo pkg-config zstd curl ca-certificates
+    libgnutls28-dev libxml2-dev libjansson-dev libgmp-dev
+    libgtk-3-dev libharfbuzz-dev libncurses-dev zlib1g-dev
+    libjpeg-dev libpng-dev libgif-dev libtiff-dev librsvg2-dev libxpm-dev
+    libotf-dev libm17n-dev libsystemd-dev libdbus-1-dev libsqlite3-dev
+    libffi-dev nettle-dev libp11-kit-dev libidn2-dev libunistring-dev
+    libacl1-dev libselinux1-dev libgpm-dev"
+  pkgs=""
+  for p in $DEB_PKGS; do
+    if apt-cache show "$p" >/dev/null 2>&1; then
+      pkgs="$pkgs $p"
+    else
+      echo "    跳过仓库中不存在的包：$p"
+    fi
+  done
+  # shellcheck disable=SC2086
+  $SUDO apt-get install -y --no-install-recommends $pkgs
 
   # libgccjit 版本随发行版而异，逐个尝试（仅 -dev 包才有 -lgccjit）
   installed=no
