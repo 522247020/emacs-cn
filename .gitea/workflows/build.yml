@@ -68,7 +68,9 @@ jobs:
           set -eu
           API="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
           AUTH="Authorization: token ${TOKEN}"
-          ASSET="emacs-cn-linux-x86_64.tar.zst"
+          ASSET=$(ls emacs-cn-*.tar.zst 2>/dev/null | head -1)
+          [ -n "$ASSET" ] || { echo "找不到构建产物 emacs-cn-*.tar.zst"; ls -la; exit 1; }
+          echo "产物: $ASSET"
 
           case "${GITHUB_REF:-}" in
             refs/tags/*) TAG="${GITHUB_REF_NAME}" ;;
